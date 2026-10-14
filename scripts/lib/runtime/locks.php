@@ -12,6 +12,9 @@
 if (!defined('PMSS_UPDATE_LOCK_FDS_ENV')) {
     define('PMSS_UPDATE_LOCK_FDS_ENV', 'PMSS_UPDATE_LOCK_FDS');
 }
+if (!defined('PMSS_CRON_LOCK_BUSY_EXIT')) {
+    define('PMSS_CRON_LOCK_BUSY_EXIT', 75);
+}
 
 function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)
 {

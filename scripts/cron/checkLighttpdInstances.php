@@ -13,8 +13,12 @@ require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
 require_once __DIR__.'/../lib/runtime.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
 
-$pmssCheckLighttpdLock = pmssCronLockAcquire('checkLighttpdInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
 $argUserRaw = trim((string) ($argv[1] ?? ''));
+$onBusy = $argUserRaw === '' ? 'pmssCronLockSkipLog' : static function (string $message): int {
+    pmssCronLockSkipLog($message);
+    return PMSS_CRON_LOCK_BUSY_EXIT;
+};
+$pmssCheckLighttpdLock = pmssCronLockAcquire('checkLighttpdInstances', $onBusy, 'pmssUserWatchdogLockAcquire');
 if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
 }

@@ -186,8 +186,9 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
             pmssEnsureLingerAndDocker($userTrim);
 
             foreach ($postChecks as $label => $helperPath) {
-                $rc = runUserStep($userTrim, $label, pmssBuildCommand($helperPath, [$userTrim]));
-                if ($rc !== 0) {
+                $skipExitCodes = $label === 'Checking lighttpd instance' ? [PMSS_CRON_LOCK_BUSY_EXIT] : [];
+                $rc = runUserStep($userTrim, $label, pmssBuildCommand($helperPath, [$userTrim]), $skipExitCodes);
+                if ($rc !== 0 && !in_array($rc, $skipExitCodes, true)) {
                     pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', $label, $rc));
                 }
             }

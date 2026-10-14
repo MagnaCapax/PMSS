@@ -5,6 +5,28 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class CronInlineCharacterizationTest extends TestCase
 {
+    public function testLighttpdBusyLockDistinguishesAccountCheckFromMinuteRun(): void
+    {
+        $lockDir = $this->pmssMakeTempDir('pmss-lighttpd-busy-lock-', 0700);
+        $lock = fopen($lockDir.'/pmss-checkLighttpdInstances.lock', 'c');
+        $this->assertTrue(is_resource($lock));
+        $this->assertTrue(flock($lock, LOCK_EX | LOCK_NB));
+        try {
+            foreach ([['account', 75], [null, 0]] as [$user, $expectedRc]) {
+                $result = $this->pmssRunRepoPhpScriptCommand(
+                    'scripts/cron/checkLighttpdInstances.php',
+                    $user === null ? [] : [$user],
+                    ['PMSS_RUNTIME_LOCK_DIR' => $lockDir]
+                );
+                $this->assertSame($expectedRc, $result['rc'], $result['output']);
+                $this->assertSame(1, substr_count($result['output'], 'checkLighttpdInstances already running; skipping'));
+            }
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
     public function testWebPublicCertFailureMarkerUsesSharedWriter(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/webPublicCertsProcess.php', [
@@ -48,7 +70,7 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkLighttpdInstances.php', [
             "require_once __DIR__.'/../lib/runtime.php';",
-            "pmssCronLockAcquire('checkLighttpdInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire')",
+            "pmssCronLockAcquire('checkLighttpdInstances', \$onBusy, 'pmssUserWatchdogLockAcquire')",
             "require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';",
             "pmssUserLighttpdEnabled(\$thisUser)",
             "pmssLighttpdWatchdogDeleteErrorPage(\$thisUser, \$watchdogWebRoot)",
@@ -73,7 +95,7 @@ class CronInlineCharacterizationTest extends TestCase
             "'lighttpd start requested'",
         ]);
         $this->assertOrderedStrings([
-            "pmssCronLockAcquire('checkLighttpdInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire')",
+            "pmssCronLockAcquire('checkLighttpdInstances', \$onBusy, 'pmssUserWatchdogLockAcquire')",
             "pmssUserWatchdogServiceSpec('lighttpd'",
         ], $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php'), 'lighttpd shared lock-fd close contract: ');
     }

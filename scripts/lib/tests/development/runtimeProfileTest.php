@@ -16,6 +16,34 @@ require_once dirname(__DIR__, 2).'/update/runtime/profile.php';
 
 class RuntimeProfileTest extends TestCase
 {
+    public function testDeclaredBusyExitRecordsSkipWithoutFailureWarning(): void
+    {
+        $logDir = $this->pmssMakeTempDir('pmss-step-skip-log-');
+        $profilePath = $this->pmssMakeTempPath('pmss-step-skip-profile-', '.json');
+        $code = 'require '.var_export($this->pmssRepoPath('scripts/lib/update/runtime/commands.php'), true).'; '
+            .'$GLOBALS["PMSS_PROFILE"] = []; '
+            .'runUserStep("account", "Checking lighttpd instance", "exit 75", [75]); '
+            .'runStep("ordinary failure", "exit 75"); '
+            .'runStep("ordinary success", "exit 0"); '
+            .'pmssProfileSummary(); '
+            .'echo "PROFILE=".json_encode($GLOBALS["PMSS_PROFILE"])."\n";';
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code),
+            ['PMSS_LOG_DIR' => $logDir, 'PMSS_PROFILE_OUTPUT' => $profilePath, 'PMSS_DRY_RUN' => '0']
+        );
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertSame(1, substr_count($result['output'], 'Command failed (rc=75)'));
+        $this->assertStringContainsString('Step status summary: 1 OK, 1 ERR, 1 SKIP', $result['output']);
+        $profile = json_decode((string) file_get_contents($profilePath), true);
+        $statuses = array_column($profile, 'status');
+        sort($statuses);
+        $this->assertSame(['ERR', 'OK', 'SKIP'], $statuses);
+        $skipped = array_values(array_filter($profile, static function (array $entry): bool {
+            return $entry['status'] === 'SKIP';
+        }));
+        $this->assertSame(75, $skipped[0]['rc']);
+    }
+
     private function resetState(): void
     {
         $GLOBALS['PMSS_TEST_LOGS'] = [];

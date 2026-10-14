@@ -10,7 +10,7 @@
  */
 
 if (!function_exists('runUserStep')) {
-    function runUserStep(string $user, string $description, string $command): int
+    function runUserStep(string $user, string $description, string $command, array $skipExitCodes = []): int
     {
         $mode = (string) ($GLOBALS['PMSS_TEST_RUNUSERSTEP_MODE'] ?? 'noop');
         if ($mode === 'profile') {

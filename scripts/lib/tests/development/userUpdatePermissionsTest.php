@@ -182,7 +182,7 @@ if ($kind === 'link' || $kind === 'dangling') {
     symlink($home.'/target', $path);
 }
 $GLOBALS['PMSS_STEPS'] = [];
-function runUserStep(string $user, string $description, string $command): int
+function runUserStep(string $user, string $description, string $command, array $skipExitCodes = []): int
 {
     $GLOBALS['PMSS_STEPS'][] = ['description' => $description, 'command' => $command];
     return __STEP_RC__;

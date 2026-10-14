@@ -100,6 +100,14 @@ script's idempotency and updating the existing flock-asserting tests) is tracked
 - `scripts/lib/runtime/locks.php` (`pmssLockFileAcquire`), `scripts/cron/trafficLog.php` (the model idiom)
 - Prior cron-guard precedents: commits Refs #456 (updateQuotas), #756 (checkRootlessDocker)
 
+## Amendment 2026-10-14: lighttpd account post-check status
+
+The no-argument lighttpd cron invocation retains its busy-lock exit 0 and skip line.
+The updater's single-account invocation returns 75 on the same busy lock so its
+opt-in step policy records `SKIP`, not a successful check. Both modes keep one
+shared lock; no wait or second account lock is introduced. Other cron jobs and
+ordinary command failures keep their existing exit and logging behavior.
+
 ## Amendment 2026-09-24: lock location
 
 Runtime locks resolve through `pmssRuntimeLockPath()` / `pmssRuntimeLockDir()` to the

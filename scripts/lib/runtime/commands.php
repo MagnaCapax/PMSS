@@ -30,7 +30,7 @@ function pmssCommandCapture(string $cmd, int $timeoutSec = 0, bool $loginShell =
     return ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr']];
 }
 
-function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null, bool $inheritTty = false): int
+function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null, bool $inheritTty = false, array $skipExitCodes = []): int
 {
     $log = $logger ?? 'logMessage';
     // Malformed commands must neither launch a truncated prefix nor enter command logs.
@@ -95,7 +95,7 @@ function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null
             fwrite(STDERR, $msg.PHP_EOL);
             echo $msg.PHP_EOL;
             $log($msg);
-        } else {
+        } elseif (!in_array($exitCode, $skipExitCodes, true)) {
             $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd.$excerpt);
         }
     }

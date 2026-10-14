@@ -193,19 +193,20 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     symlink checks. Valid ports, leading zeroes, whitespace, and bounds retain
     their existing behavior.
 
-- runCommand(string $cmd, bool $verbose=false, ?callable $logger=null, bool $inheritTty=false): int
+- runCommand(string $cmd, bool $verbose=false, ?callable $logger=null, bool $inheritTty=false, array $skipExitCodes=[]): int
   - Spawns `/bin/bash -lc <cmd>` via `proc_open`, streams stdout/stderr, returns rc.
   - Exposes `$GLOBALS['PMSS_LAST_COMMAND_OUTPUT']` with `stdout`/`stderr`.
   - Timeout: defaults to 1200s; apt/dpkg commands are floored to 1200s. `PMSS_COMMAND_TIMEOUT` overrides but cannot reduce apt/dpkg below 1200s.
   - Timeout termination: sends SIGTERM first, then SIGKILL after a 5s grace period when the child lingers. Timeout fires append structured `timeout_fired` JSONL to `PMSS_TIMEOUT_FIRE_LOG` or `/var/log/pmss-timeout-fires.jsonl`.
   - When `$inheritTty=true` and stdin/stdout/stderr are TTYs, inherits the terminal for interactive prompts; output capture is disabled (`stdout`/`stderr` set to empty strings).
-  - On non-zero rc, logs warning with 300-char stderr excerpt.
+  - On non-zero rc, logs warning with 300-char stderr excerpt unless the caller declared that exact rc in `$skipExitCodes`. Timeout warnings remain visible.
 
-- runStep(string $description, string $command): int
+- runStep(string $description, string $command, array $skipExitCodes=[]): int
   - Honors `PMSS_DRY_RUN=1` (rc=0, status=SKIP); logs `[OK|ERR|SKIP <secs> rc=<n>] ...`.
   - Records profile entry with duration, rc, and 300-char stdout/stderr excerpts.
+  - A declared skip rc records `SKIP` and returns the raw rc; undeclared non-zero codes still record `ERR`.
 
-- runUserStep(string $user, string $description, string $command): int
+- runUserStep(string $user, string $description, string $command, array $skipExitCodes=[]): int
   - Same as `runStep` but prefixes description with `[user:<name>]`.
 
 - aptCmd(string $args): string
@@ -816,7 +817,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Directory preparation seeds `.lighttpd/custom` at `0640` and reapplies that mode to existing regular files without rewriting their contents or modification time; symlinks and non-file targets remain rejected.
 
 - scripts/cron/checkLighttpdInstances.php [<user>]
-  - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy. A non-blocking runtime lock makes overlapping invocations skip cleanly. The 502 page file helpers reject invalid account names before writing or treating a missing file as a completed deletion.
+  - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy. A non-blocking runtime lock makes overlapping invocations print the existing skip line. A busy single-account invocation exits 75; the no-argument cron invocation still exits 0. The updater records the single-account result as `SKIP` and continues marking the account refreshed. The 502 page file helpers reject invalid account names before writing or treating a missing file as a completed deletion.
   - Socket failure markers: validates both the runtime directory and marker path before recording or clearing consecutive failures. Symlinks and non-regular markers remain untouched; an unsafe path or incomplete counter write retains the existing `wait` action with count zero and cannot authorize a socket-failure restart.
   - Socket health: An `ECONNREFUSED` result for a configured `php.socket-N` path is treated as stale-index drift when strict `ss -xln` parsing finds at least the configured number of live listeners under the same account's `.lighttpd` directory. Missing, malformed, or incomplete listener evidence retains the consecutive-failure restart gate.
   - Restart verification: after issuing a restart, retries the bounded `ss -xln` listener-coverage read through the shared command runner. Missing listeners emit `restart_attempted_still_down`; a failed probe emits `restart_attempted_unverified`. Both outcomes are log-only and never trigger another restart.

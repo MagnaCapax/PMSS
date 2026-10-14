@@ -273,7 +273,7 @@ require $repoRoot.'/scripts/lib/update.php';
 
 $GLOBALS['PMSS_USER_STEP_CALLS'] = [];
 $GLOBALS['PMSS_LINGER_USERS'] = [];
-function runUserStep(string $user, string $description, string $command): int
+function runUserStep(string $user, string $description, string $command, array $skipExitCodes = []): int
 {
     $GLOBALS['PMSS_USER_STEP_CALLS'][] = [
         'user' => $user,
