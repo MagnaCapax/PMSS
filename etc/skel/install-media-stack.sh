@@ -1268,7 +1268,10 @@ SONARR_DL_BASE="https://services.sonarr.tv/v1/download"
 SONARR_MAJOR="${OVR_SONARR_VERSION:-4}"
 RADARR_UPDATE_BASE="https://radarr.servarr.com/v1/update"
 PROWLARR_UPDATE_BASE="https://prowlarr.servarr.com/v1/update"
-# Cloudplow: pinned to last known-good commit (project unmaintained since 2023)
+# Cloudplow: pinned to the commit before upstream 2026-06-11. That change runs rclone's
+# remote control with --rc-no-auth when Plex support is on, which on a shared server
+# would let other accounts reach an unauthenticated rclone control port. Do not bump
+# this pin without keeping rclone rc authentication.
 CLOUDPLOW_COMMIT="4a4e9cf7579ce4ba91761c12ad1bc88ae2707f8c"
 DOTNET_ROOT_PATH="$HOME/.bin/dotnet"
 JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
