@@ -41,7 +41,8 @@ function pmssUserRootlessDockerStoreExists(string $dataRoot): bool
         }
         if (is_dir($path)) {
             $contents = pmssDirectoryEntriesRead($path);
-            if (is_array($contents) && $contents !== []) {
+            // An unreadable store cannot be treated as empty for driver changes.
+            if ($contents === false || $contents !== []) {
                 return true;
             }
         }

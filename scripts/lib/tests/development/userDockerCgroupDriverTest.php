@@ -189,6 +189,28 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->assertTrue(\pmssUserRootlessDockerStoreExists($store));
     }
 
+    public function testFailedStoreScanPreservesExistingStoragePolicy(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-scan-failure-');
+        $store = $home.'/store';
+        mkdir($store.'/containerd', 0755, true);
+
+        // Inject a scan failure without relying on runner permissions.
+        $script = <<<'PHP'
+namespace RootlessDockerStoreScanFixture;
+function pmssDirectoryEntriesRead(string $path) {
+    if ($path === getenv('PMSS_TEST_DOCKER_STORE').'/containerd') return false;
+    return \pmssDirectoryEntriesRead($path);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerStoreScanFixture');
+        $script .= <<<'PHP'
+echo json_encode(['exists' => pmssUserRootlessDockerStoreExists(getenv('PMSS_TEST_DOCKER_STORE'))]);
+PHP;
+        $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_DOCKER_STORE' => $store]);
+        $this->assertTrue($result['exists']);
+    }
+
     public function testConfiguredDataRootOutsideHomeIsNotScanned(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
