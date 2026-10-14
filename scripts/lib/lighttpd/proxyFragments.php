@@ -189,9 +189,11 @@ function pmssLighttpdProxyPortEnsure(string $user, string $proxyName, string $pr
         $proxyPort = pmssPortManagerAssignServicePort($user, $proxyName);
     } else {
         $portDir = dirname($proxyPortFile);
-        $proxyPort = (!pmssPathTargetIsSafe($portDir, true) || !is_dir($portDir) || is_link($portDir))
-            ? null
-            : pmssPortManagerSelectAvailablePort(pmssPortManagerUsedPorts($portDir, $portDir.'/.pmss-no-legacy'));
+        $proxyPort = null;
+        if (pmssPathTargetIsSafe($portDir, true) && is_dir($portDir) && !is_link($portDir)) {
+            $used = pmssPortManagerUsedPorts($portDir, $portDir.'/.pmss-no-legacy', $scanComplete);
+            if ($scanComplete) $proxyPort = pmssPortManagerSelectAvailablePort($used);
+        }
     }
     if ($proxyPort === null || !pmssNetworkPortFileWrite($proxyPortFile, $proxyPort, 1024, 65500, 0640)) {
         return 0;

@@ -84,15 +84,23 @@ function pmssPortManagerReservationRootIsSafe(string $root): bool
 }
 
 /** @return array<int, bool> */
-function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports'): array
+function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports', ?bool &$scanComplete = null): array
 {
+    $scanComplete = true;
     $portsBase = rtrim($portsBase, '/');
     if (!pmssPortManagerReservationRootIsSafe($portsBase)) {
+        // An absent legacy namespace is normal; an existing unsafe one is not.
+        $scanComplete = !pmssPathExistsOrLink($portsBase);
         return [];
     }
 
     $used = array();
-    foreach ((glob($portsBase.'/*/*') ?: array()) as $path) {
+    $paths = @glob($portsBase.'/*/*');
+    if ($paths === false || !pmssPortManagerReservationRootIsSafe($portsBase)) {
+        $scanComplete = false;
+        return [];
+    }
+    foreach ($paths as $path) {
         $port = pmssNetworkPortParseDigits(basename($path));
         if ($port !== null) {
             $used[$port] = true;
@@ -106,15 +114,22 @@ function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports
  *
  * @return array<int, bool>
  */
-function pmssPortManagerUsedPorts(string $portDir, string $legacyPortsBase = '/var/lib/pmss/ports'): array
+function pmssPortManagerUsedPorts(string $portDir, string $legacyPortsBase = '/var/lib/pmss/ports', ?bool &$scanComplete = null): array
 {
-    $used = pmssPortManagerLegacyUsedPorts($legacyPortsBase);
+    $used = pmssPortManagerLegacyUsedPorts($legacyPortsBase, $legacyComplete);
+    $scanComplete = $legacyComplete;
     $portDir = rtrim($portDir, '/');
     if (!pmssPortManagerReservationRootIsSafe($portDir)) {
+        $scanComplete = false;
         return $used;
     }
 
-    foreach ((glob($portDir.'/*') ?: array()) as $path) {
+    $paths = @glob($portDir.'/*');
+    if ($paths === false || !pmssPortManagerReservationRootIsSafe($portDir)) {
+        $scanComplete = false;
+        return $used;
+    }
+    foreach ($paths as $path) {
         $assignedPort = pmssPortManagerReadAssignedPort($path);
         if ($assignedPort !== null) {
             $used[$assignedPort] = true;

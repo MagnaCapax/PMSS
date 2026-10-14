@@ -82,7 +82,8 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
         }
 
         $legacyDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_LEGACY_DIR', pmssPortManagerDefaultPath('legacy-rtorrent-ports', '/var/lib/pmss/ports')), '/');
-        $used = pmssPortManagerUsedPorts($context['dir'], $legacyDir);
+        $used = pmssPortManagerUsedPorts($context['dir'], $legacyDir, $scanComplete);
+        if (!$scanComplete) { $status = 'reservation_scan_failed'; return null; }
         $port = ($preferredPort !== null
             && pmssNetworkPortInRange($preferredPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)
             && !isset($used[$preferredPort])

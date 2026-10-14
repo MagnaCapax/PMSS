@@ -111,6 +111,41 @@ PHP;
         $this->assertFalse(isset($used[0]));
     }
 
+    public function testAssignmentStopsWhenExistingLegacyNamespaceIsUnsafe(): void
+    {
+        [$portDir, $legacyDir] = $this->trackPortNamespace();
+        $link = $legacyDir.'/linked';
+        symlink($legacyDir, $link);
+        $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_LEGACY_DIR' => $link]);
+
+        $status = '';
+        $this->assertSame(null, \pmssPortManagerAssignServicePort('alice', 'rclone', 25000, $status));
+        $this->assertSame('reservation_scan_failed', $status);
+        $this->assertFalse(file_exists($portDir.'/rclone-alice'));
+    }
+
+    public function testFailedReservationGlobIsDistinguishedFromEmptyNamespace(): void
+    {
+        $managed = $this->makePortDir();
+        $legacy = $this->makePortDir();
+        $script = 'namespace PortManagerScanFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/portManager.php'), true).';';
+        $script .= <<<'PHP'
+function glob($pattern) {
+    return strpos($pattern, getenv('PMSS_TEST_SCAN_FAIL_ROOT').'/') === 0 ? false : \glob($pattern);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/portManager/state.php', 'PortManagerScanFixture');
+        $script .= '$complete = null; $used = pmssPortManagerUsedPorts('.var_export($managed, true).', '.var_export($legacy, true).', $complete);';
+        $script .= 'echo json_encode(["complete" => $complete, "used" => $used]);';
+
+        foreach ([$managed, $legacy] as $failRoot) {
+            $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_SCAN_FAIL_ROOT' => $failRoot]);
+            $this->assertSame(['complete' => false, 'used' => []], $result);
+        }
+        $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_SCAN_FAIL_ROOT' => 'none']);
+        $this->assertSame(['complete' => true, 'used' => []], $result);
+    }
+
     public function testAssignServicePortAdoptsAvailablePreferredPort(): void
     {
         [$portDir] = $this->trackPortNamespace();
