@@ -94,8 +94,9 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
         foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
             $value = $caller($socketPath, $method, [], 2);
             // A malformed RPC value must not turn into a successful zero reading.
-            if (!is_numeric($value) || !is_finite((float) $value) || (float) $value < 0.0) return $stats;
-            $stats[$key] = (float) $value;
+            $number = pmssFiniteNonNegativeFloat($value);
+            if ($number === null) return $stats;
+            $stats[$key] = $number;
         }
         $stats['ok'] = true;
         $stats['ratio'] = ($stats['download_total'] > 0.0) ? ($stats['upload_total'] / $stats['download_total']) : null;

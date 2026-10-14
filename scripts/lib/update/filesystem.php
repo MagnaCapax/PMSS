@@ -89,9 +89,7 @@ function pmssFilesystemStatLineParse(string $line): ?array
 function pmssFilesystemBytesPerInode(array $stats): ?float
 {
     foreach (['block_size', 'blocks', 'inodes'] as $key) {
-        if (!isset($stats[$key]) || !is_numeric($stats[$key])
-            || !is_finite((float) $stats[$key]) || (float) $stats[$key] <= 0.0
-        ) {
+        if (($value = pmssFiniteNonNegativeFloat($stats[$key] ?? null)) === null || $value <= 0.0) {
             return null;
         }
     }

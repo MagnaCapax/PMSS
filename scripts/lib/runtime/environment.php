@@ -14,6 +14,14 @@ function pmssCommandBinaryNameIsSafe(string $binary): bool { return preg_match('
 function pmssCommandPathCandidateIsSafe(string $path): bool { return strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false; }
 function pmssBlockDeviceNameIsDataDevice(string $device): bool { return preg_match(PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN, $device) === 1; }
 
+/** Accept finite, non-negative numeric scalars from telemetry and policy data. */
+function pmssFiniteNonNegativeFloat($value): ?float
+{
+    if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) return null;
+    $number = (float) $value;
+    return is_finite($number) && $number >= 0 ? $number : null;
+}
+
 function pmssCommandPath(string $binary): string
 {
     // trim() removes edge NULs; reject them before they can name another binary.

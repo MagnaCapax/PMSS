@@ -19,10 +19,7 @@ function pmssSystemStatsHostPressureMetricParse($value, string $suffix = ''): ?f
         if (strlen($value) <= strlen($suffix) || substr($value, -strlen($suffix)) !== $suffix) return null;
         $value = substr($value, 0, -strlen($suffix));
     }
-    if (!is_numeric($value)) return null;
-
-    $number = (float) $value;
-    return is_finite($number) && $number >= 0 ? $number : null;
+    return pmssFiniteNonNegativeFloat($value);
 }
 
 /** Build the narrow metric payload exposed to customer-side PHP. */

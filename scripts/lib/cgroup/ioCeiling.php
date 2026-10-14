@@ -6,20 +6,15 @@
  * @author PMSS Team
  */
 
+require_once dirname(__DIR__).'/runtime.php';
+
 const PMSS_IO_CEILING_DIMENSIONS = [
     'read_iops' => 'iopsRead', 'write_iops' => 'iopsWrite',
     'read_mbs' => 'throughputRead', 'write_mbs' => 'throughputWrite',
 ];
 
 /** Accept only finite, non-negative numeric scalars from I/O samples and policy. */
-function pmssCgroupNonNegativeFiniteNumber($value): ?float
-{
-    if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) {
-        return null;
-    }
-    $number = (float) $value;
-    return is_finite($number) && $number >= 0 ? $number : null;
-}
+function pmssCgroupNonNegativeFiniteNumber($value): ?float { return pmssFiniteNonNegativeFloat($value); }
 
 /** Validate tracker settings before allocating or publishing any estimates. */
 function pmssIoCeilingSettings(array $policy): ?array
