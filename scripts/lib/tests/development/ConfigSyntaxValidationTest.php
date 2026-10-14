@@ -211,6 +211,20 @@ NGINX;
         $this->assertOutputOmitsSyntaxErrors($outputStr, $syntaxErrors, 'lighttpd');
     }
 
+    /** Preserve both per-user logs while moving their writes off the event loop. */
+    public function testLighttpdLogsUseAccountPipes(): void
+    {
+        $config = $this->renderLighttpdTemplate();
+        $this->assertTrue(strpos($config, '"mod_accesslog"') !== false, 'Access logging must stay enabled');
+        foreach (['server.errorlog' => 'error.log', 'accesslog.filename' => 'access.log'] as $key => $file) {
+            $expected = '"|exec /bin/cat >> /home/testuser/.lighttpd/'.$file.'"';
+            $this->assertTrue(
+                (bool) preg_match('/^'.preg_quote($key, '/').'\\s*=\\s*'.preg_quote($expected, '/').'$/m', $config),
+                $key.' must append through the per-user piped logger'
+            );
+        }
+    }
+
     /**
      * TEST: Lighttpd template has balanced parentheses.
      *

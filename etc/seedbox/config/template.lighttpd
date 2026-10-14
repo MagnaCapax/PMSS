@@ -25,8 +25,9 @@ server.modules              = (
 server.port = ##serverPort
 server.document-root       = "/home/##username/www/public/"
 server.upload-dirs = ( "/home/##username/.lighttpd/upload" )
-server.errorlog            = "/home/##username/.lighttpd/error.log"
-accesslog.filename         = "/home/##username/.lighttpd/access.log"
+# GH #909: pipe log writes so /home journal stalls do not block the event loop.
+server.errorlog            = "|exec /bin/cat >> /home/##username/.lighttpd/error.log"
+accesslog.filename         = "|exec /bin/cat >> /home/##username/.lighttpd/access.log"
 server.pid-file            = "/home/##username/.lighttpd/lighttpd.pid"
 # Serve customer-tree error files instead of raw lighttpd errors.
 server.errorfile-prefix    = "/home/##username/www/error-"

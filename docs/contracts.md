@@ -463,6 +463,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha='', ?string &$reason=null): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context or null with an optional reject-reason slug.
 - pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user (including php.ini `error_log` through the account file writer, preserving unrelated directives and comments; an existing root-owned regular entry retains its managed-writer fallback), reserve/adopt native media-stack ports through the shared port manager, refresh the PMSS-managed qBittorrent safety defaults and Deluge fleet safety limits, create `.tmp` and `.irssi` (config copied from skel as the account), and `www/recycle` with perms/ownership. Does not repair previously flattened php.ini files.
+
 - pmssReadTorrentThrottle(string $username): ?int → reads a bounded, singly linked regular entry and accepts only a non-negative decimal within the PHP integer range; production also requires the opened entry to have the managed owner and an expected group.
 - pmssIntegerSettingFileRead(string $path, callable $parser, int $default=0): int → reads a bounded, singly linked regular entry before passing its text to the setting parser; missing or invalid entries use the caller's default.
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; force-refreshes legacy `~/www/index.php` copies missing the PHP 8.2 `frameData` initialization; deletes `~/www/phpXplorer`.
@@ -805,7 +806,8 @@ failed replacement leaves the previous config intact and skips the restart.
 Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/configureLighttpd.php [<user>]
-  - Behavior: Renders per-user lighttpd vhost/fastcgi config from templates. With a username, targets only that user; otherwise (no args) refreshes all.
+- Behavior: Renders per-user lighttpd vhost/fastcgi config from templates. With a username, targets only that user; otherwise (no args) refreshes all.
+  - Logging: the managed template pipes access and daemon errors to their existing files in `~/.lighttpd/`. The logger appends as the account, so both files remain quota-bound and the hourly access-log trimmer remains active.
   - 503 pages: rendered lighttpd configs use the customer-tree `~/www/error-503.html` static page so app proxies that are enabled but still starting return a styled retry page instead of lighttpd's raw default.
   - PMSS-managed proxy fragments: always refreshes the qBittorrent and rclone proxies; when `/home/<user>/.invidiousPort` contains a valid port, also publishes `/public-<user>/invidious/` and `/user-<user>/apps/invidious/` through the user's lighttpd.
   - Proxy-fragment collision handling: when another readable `custom.d/*.conf` fragment defines the same URL conditional, the PMSS-owned fragment yields and is removed if already present; unsafe or unreadable sibling fragments block managed replacement without modifying either side.
