@@ -63,15 +63,30 @@ function pmssCgroupPolicyMajorMinorIsValid(string $majorMinor): bool { return pr
 function pmssCgroupPolicyMountBfqActive(string $mountPath = '/home', ?string $source = null, string $sysBlock = '/sys/block'): ?bool
 {
     $device = basename(trim($source ?? pmssCgroupPolicyMountSourceResolve($mountPath)));
-    if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1 || !is_dir($sysBlock.'/'.$device)) return null;
+    if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1) return null;
 
-    $slaves = @glob($sysBlock.'/'.$device.'/slaves/*');
-    // Unknown membership cannot be classified from the parent scheduler.
-    if ($slaves === false) return null;
-    $targets = $slaves !== [] ? array_map('basename', $slaves) : [$device];
-
+    $pending = [[$device, 0]];
     $complete = true;
-    foreach ($targets as $target) {
+    while ($pending !== []) {
+        list($target, $depth) = array_pop($pending);
+        if ($depth > 8) { $complete = false; continue; }
+
+        // Partitions live beneath their parent disk, not directly in /sys/block.
+        if (!is_dir($sysBlock.'/'.$target)) {
+            $partitions = @glob($sysBlock.'/*/'.$target.'/partition');
+            if ($partitions === false || count($partitions) !== 1) { $complete = false; continue; }
+            $parent = basename(dirname(dirname($partitions[0])));
+            $pending[] = [$parent, $depth + 1];
+            continue;
+        }
+
+        $slaves = @glob($sysBlock.'/'.$target.'/slaves/*');
+        if ($slaves === false) { $complete = false; continue; }
+        if ($slaves !== []) {
+            foreach ($slaves as $slave) $pending[] = [basename($slave), $depth + 1];
+            continue;
+        }
+
         $schedFile = $sysBlock.'/'.$target.'/queue/scheduler';
         if (!is_readable($schedFile)) {
             $complete = false;

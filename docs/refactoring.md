@@ -54,6 +54,9 @@ classifies a leaf device normally.
 The BFQ probe also returns unknown when any backing member's scheduler is
 missing or cannot be read and no other member proves BFQ active. A partial
 read cannot prove that BFQ is inactive across the backing topology.
+The BFQ probe follows stacked devices to leaf schedulers with a bounded walk,
+and resolves partition members through their parent disks. Unreadable or
+overdeep topology remains unknown rather than reporting BFQ inactive.
 
 Nginx's fallback self-signed certificate command accepts only a valid host name
 and quotes the complete OpenSSL subject as one shell argument. Valid host names

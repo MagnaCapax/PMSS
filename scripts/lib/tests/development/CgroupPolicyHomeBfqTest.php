@@ -15,7 +15,7 @@ require_once dirname(__DIR__, 2).'/cgroup/policy.php';
 class CgroupPolicyHomeBfqTest extends TestCase
 {
     /** Build a fake /sys/block tree: [device => scheduler-or-null], plus optional slaves. */
-    private function fakeSysBlock(array $devices, array $slaves = []): string
+    private function fakeSysBlock(array $devices, array $slaves = [], array $partitions = []): string
     {
         $root = $this->pmssMakeTempDir('pmss-home-bfq-', 0700);
         foreach ($devices as $device => $scheduler) {
@@ -28,6 +28,12 @@ class CgroupPolicyHomeBfqTest extends TestCase
             @mkdir($root.'/'.$device.'/slaves', 0700, true);
             foreach ($members as $member) {
                 @mkdir($root.'/'.$device.'/slaves/'.$member, 0700, true);
+            }
+        }
+        foreach ($partitions as $disk => $members) {
+            foreach ($members as $member) {
+                @mkdir($root.'/'.$disk.'/'.$member, 0700, true);
+                file_put_contents($root.'/'.$disk.'/'.$member.'/partition', "1\n");
             }
         }
         return $root;
@@ -95,6 +101,55 @@ class CgroupPolicyHomeBfqTest extends TestCase
             pmssCgroupPolicyMountBfqActive('/home', '/dev/md1', $root),
             'md members without BFQ must read as inactive'
         );
+    }
+
+    /** Both md layers have no elevator; only physical leaves decide. */
+    public function testNestedMdChecksLeafSchedulers(): void
+    {
+        $root = $this->fakeSysBlock([
+            'md0' => 'none', 'md1' => 'none', 'md2' => 'none',
+            'sda' => 'mq-deadline [bfq] none', 'sdb' => 'mq-deadline [bfq] none',
+        ], ['md0' => ['md1', 'md2'], 'md1' => ['sda'], 'md2' => ['sdb']]);
+
+        $this->assertTrue(pmssCgroupPolicyMountBfqActive('/home', '/dev/md0', $root));
+    }
+
+    public function testMdPartitionMembersResolveToParentDisks(): void
+    {
+        $root = $this->fakeSysBlock([
+            'md1' => 'none', 'sda' => 'mq-deadline [bfq] none',
+        ], ['md1' => ['sda1']], ['sda' => ['sda1']]);
+
+        $this->assertTrue(pmssCgroupPolicyMountBfqActive('/home', '/dev/md1', $root));
+        $this->assertTrue(pmssCgroupPolicyMountBfqActive('/home', '/dev/sda1', $root));
+    }
+
+    public function testNestedMdWithoutBfqLeavesIsInactive(): void
+    {
+        $root = $this->fakeSysBlock([
+            'md0' => 'none', 'md1' => 'none', 'sda' => '[none] mq-deadline bfq',
+        ], ['md0' => ['md1'], 'md1' => ['sda1']], ['sda' => ['sda1']]);
+
+        $this->assertFalse(pmssCgroupPolicyMountBfqActive('/home', '/dev/md0', $root));
+    }
+
+    public function testSharedLeafWithoutBfqRemainsInactive(): void
+    {
+        $root = $this->fakeSysBlock([
+            'md0' => 'none', 'md1' => 'none', 'md2' => 'none',
+            'sda' => '[none] mq-deadline bfq',
+        ], ['md0' => ['md1', 'md2'], 'md1' => ['sda'], 'md2' => ['sda']]);
+
+        $this->assertFalse(pmssCgroupPolicyMountBfqActive('/home', '/dev/md0', $root));
+    }
+
+    public function testCyclicTopologyIsUnknownAfterDepthBound(): void
+    {
+        $root = $this->fakeSysBlock(['md0' => 'none', 'md1' => 'none'], [
+            'md0' => ['md1'], 'md1' => ['md0'],
+        ]);
+
+        $this->assertSame(null, pmssCgroupPolicyMountBfqActive('/home', '/dev/md0', $root));
     }
 
     /**
