@@ -129,6 +129,22 @@ class CgroupPolicyHomeBfqTest extends TestCase
         );
     }
 
+    public function testFailedSlaveScanIsUndeterminableEvenWithParentBfq(): void
+    {
+        $root = $this->fakeSysBlock(['vda' => 'mq-deadline [bfq] none']);
+        $script = <<<'PHP'
+namespace CgroupPolicySlaveScanFixture;
+function glob($pattern) { return false; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/policy.php', 'CgroupPolicySlaveScanFixture');
+        $script .= <<<'PHP'
+echo json_encode(['active' => pmssCgroupPolicyMountBfqActive('/home', '/dev/vda', getenv('PMSS_TEST_BFQ_SYS_BLOCK'))]);
+PHP;
+        $this->assertSame(['active' => null], $this->pmssRunInlinePhpJson($script, [
+            'PMSS_TEST_BFQ_SYS_BLOCK' => $root,
+        ]));
+    }
+
     /** Path-shaped junk in the mount source must never escape /sys/block. */
     public function testMaliciousMountSourceIsRejected(): void
     {

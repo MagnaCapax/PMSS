@@ -65,7 +65,9 @@ function pmssCgroupPolicyMountBfqActive(string $mountPath = '/home', ?string $so
     $device = basename(trim($source ?? pmssCgroupPolicyMountSourceResolve($mountPath)));
     if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1 || !is_dir($sysBlock.'/'.$device)) return null;
 
-    $slaves  = glob($sysBlock.'/'.$device.'/slaves/*') ?: [];
+    $slaves = @glob($sysBlock.'/'.$device.'/slaves/*');
+    // Unknown membership cannot be classified from the parent scheduler.
+    if ($slaves === false) return null;
     $targets = $slaves !== [] ? array_map('basename', $slaves) : [$device];
 
     $readable = false;

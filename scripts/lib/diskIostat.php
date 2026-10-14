@@ -142,7 +142,9 @@ function pmssDiskIostatHomeDevices(array $sampled, string $sysClassBlock = '/sys
         $seen[$device] = true;
         $path = $root.'/'.$device;
         if (!is_dir($path)) return false;
-        $slaves = glob($path.'/slaves/*') ?: [];
+        $slaves = @glob($path.'/slaves/*');
+        // A failed scan cannot prove this is a leaf disk.
+        if ($slaves === false) return false;
         if ($slaves) {
             foreach ($slaves as $slave) {
                 if (!$walk(basename($slave), $depth + 1)) return false;

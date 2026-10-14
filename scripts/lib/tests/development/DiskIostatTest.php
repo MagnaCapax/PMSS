@@ -152,6 +152,27 @@ PHP;
         $this->assertSame(null, $this->homeDevices(['vda'], '', $class, $root.'/dev'));
     }
 
+    public function testFailedSlaveScanDoesNotSelectParentAsHomeLeaf(): void
+    {
+        list($root, $class) = $this->homeTree(['md0' => []]);
+        $script = <<<'PHP'
+namespace DiskIostatSlaveScanFixture;
+function glob($pattern) { return false; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatSlaveScanFixture');
+        $script .= <<<'PHP'
+[$class, $source, $devRoot] = json_decode(getenv('PMSS_TEST_IOSTAT_TOPOLOGY'), true);
+$runner = static function () use ($source): string { return $source; };
+echo json_encode([
+    pmssDiskIostatHomeDevices(['md0'], $class, $runner, $devRoot),
+    pmssDiskIostatSampleDevices(['md0', 'sda'], $class, $runner, $devRoot),
+]);
+PHP;
+        $this->assertSame([null, ['md0', 'sda']], $this->pmssRunInlinePhpJson($script, [
+            'PMSS_TEST_IOSTAT_TOPOLOGY' => json_encode([$class, $root.'/dev/md0', $root.'/dev']),
+        ]));
+    }
+
     public function testDiscoverDevicesMatchesSharedDataDeviceFilter(): void
     {
         $sysBlock = $this->pmssMakeTempDir('pmss-sys-block-');
