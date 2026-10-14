@@ -182,11 +182,37 @@ function pmssMediaStackPanelPidRead(string $home): int
 }
 
 /**
- * Check whether a stored launcher pid still exists.
+ * Accept only the panel-launched installer, not another process reusing its pid.
  */
-function pmssMediaStackPanelPidRunning(int $pid): bool
+function pmssMediaStackPanelPidRunning(string $home, int $pid): bool
 {
-    return $pid > 1 && ((function_exists('posix_kill') && @posix_kill($pid, 0)) || is_dir('/proc/'.$pid));
+    if ($pid <= 1) {
+        return false;
+    }
+
+    $proc = '/proc/'.$pid;
+    clearstatcache(true, $proc);
+    $owner = @fileowner($proc);
+    $selfOwner = @fileowner('/proc/self');
+    if ($owner === false || $owner !== $selfOwner) {
+        return false;
+    }
+
+    // A newly forked launcher can publish its pid before nohup execs Bash.
+    $expected = "/bin/bash\0".pmssCustomerHomePath($home, 'install-media-stack.sh')."\0";
+    for ($attempt = 0; $attempt < 10; $attempt++) {
+        $command = @file_get_contents($proc.'/cmdline', false, null, 0, 4096);
+        if ($command === $expected) {
+            return true;
+        }
+        if ($command === false) {
+            return false;
+        }
+        if ($attempt < 9) {
+            usleep(10000);
+        }
+    }
+    return false;
 }
 
 /**
@@ -597,7 +623,7 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
     $installed = $installedApps !== array()
         || is_file(pmssCustomerHomePath($home, '.config/jellyfin/config/network.xml'));
     $pid = pmssMediaStackPanelPidRead($home);
-    $running = pmssMediaStackPanelPidRunning($pid);
+    $running = pmssMediaStackPanelPidRunning($home, $pid);
     $logTail = pmssMediaStackPanelLogTailRead($home);
     $gate = pmssMediaStackPanelStartGateRead($home);
     $urls = ($installed || $logTail !== '') ? pmssMediaStackPanelUrlsRead($home, $username, $hostname) : array();

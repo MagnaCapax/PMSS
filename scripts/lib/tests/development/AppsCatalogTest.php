@@ -234,23 +234,32 @@ class AppsCatalogTest extends TestCase
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
             $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
-            $this->pmssWriteFile($home.'/.install-media-stack-web.pid', (string) getmypid());
-            $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
-            $media = substr($html, strpos($html, 'id="pmss-media-apps"'));
-            $media = substr($media, 0, strpos($media, '<div class="group">Torrent clients</div>'));
-            $this->assertStringContainsString('data-installing="1"', $media);
-            $this->assertSame(1, substr_count($media, 'class="row"'));
-            $this->assertStringContainsString('Installing the media stack…', $media);
-            $this->assertStringContainsString('Media stack install is running.', $media);
-            $this->assertStringNotContainsString('data-app=', $media);
-            $this->assertStringNotContainsString('data-action=', $media);
-            $this->assertStringNotContainsString('id="pmss-start-all"', $media);
-            $json = $render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'];
-            $status = json_decode($json, true);
-            $this->assertTrue($status['poll']);
-            $this->assertStringContainsString('Installing the media stack…', $status['mediaHtml']);
-            $this->assertFalse(isset($status['rows']['jellyfin']));
-            $this->assertStringContainsString('payload.poll ? 5000 : 10000', $html);
+            $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 10\n:\n");
+            \pmssFrontendShellExec(\pmssMediaStackPanelStartCommandBuild($home, 'renderuser'));
+            $pid = \pmssMediaStackPanelPidRead($home);
+            $this->assertTrue(\pmssMediaStackPanelPidRunning($home, $pid));
+            try {
+                $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
+                $media = substr($html, strpos($html, 'id="pmss-media-apps"'));
+                $media = substr($media, 0, strpos($media, '<div class="group">Torrent clients</div>'));
+                $this->assertStringContainsString('data-installing="1"', $media);
+                $this->assertSame(1, substr_count($media, 'class="row"'));
+                $this->assertStringContainsString('Installing the media stack…', $media);
+                $this->assertStringContainsString('Media stack install is running.', $media);
+                $this->assertStringNotContainsString('data-app=', $media);
+                $this->assertStringNotContainsString('data-action=', $media);
+                $this->assertStringNotContainsString('id="pmss-start-all"', $media);
+                $json = $render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'];
+                $status = json_decode($json, true);
+                $this->assertTrue($status['poll']);
+                $this->assertStringContainsString('Installing the media stack…', $status['mediaHtml']);
+                $this->assertFalse(isset($status['rows']['jellyfin']));
+                $this->assertStringContainsString('payload.poll ? 5000 : 10000', $html);
+            } finally {
+                if ($pid > 1 && function_exists('posix_kill')) {
+                    @posix_kill($pid, SIGTERM);
+                }
+            }
         });
     }
 

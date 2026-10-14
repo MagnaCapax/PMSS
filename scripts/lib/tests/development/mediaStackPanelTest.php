@@ -326,11 +326,31 @@ class MediaStackPanelTest extends TestCase
         $this->assertStringContainsString('Radarr: failed repeatedly (3 consecutive failed checks).', implode(' ', $status['details']));
     }
 
-    public function testStatusShowsRunningWhenPidExists(): void
+    public function testStatusIgnoresUnrelatedLivePid(): void
     {
         $status = $this->mediaStatusFixture('pmss-media-running-', '.install-media-stack-web.pid', (string) getmypid());
 
-        $this->pmssAssertArraySubsetSame(['state' => 'running', 'poll' => true], $status);
+        $this->pmssAssertArraySubsetSame(['state' => 'ready', 'poll' => false], $status);
+    }
+
+    public function testPidRequiresExactInstallerIdentity(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-pid-');
+        $this->assertFalse(\pmssMediaStackPanelPidRunning($home, 0));
+        $this->assertFalse(\pmssMediaStackPanelPidRunning($home, 1));
+        $this->assertFalse(\pmssMediaStackPanelPidRunning($home, getmypid()));
+
+        $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 5\n:\n");
+        $command = 'nohup /bin/bash '.escapeshellarg($home.'/install-media-stack.sh').' --extra >/dev/null 2>&1 </dev/null & echo $!';
+        $pid = (int) shell_exec($command);
+        try {
+            $this->assertTrue($pid > 1);
+            $this->assertFalse(\pmssMediaStackPanelPidRunning($home, $pid));
+        } finally {
+            if ($pid > 1 && function_exists('posix_kill')) {
+                @posix_kill($pid, SIGTERM);
+            }
+        }
     }
 
     public function testStatusShowsFailedLogWhenPreviousRunStopped(): void
@@ -365,7 +385,7 @@ class MediaStackPanelTest extends TestCase
     public function testStartCommandDetachesInstallerFromFrontendPipe(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-detach-');
-        $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 5\n");
+        $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 5\n:\n");
 
         $start = microtime(true);
         \pmssFrontendShellExec(\pmssMediaStackPanelStartCommandBuild($home, 'alice'));
@@ -373,7 +393,8 @@ class MediaStackPanelTest extends TestCase
 
         $this->assertTrue($elapsed < 2, 'Frontend command waited for the background installer: '.$elapsed.'s');
         $pid = \pmssMediaStackPanelPidRead($home);
-        $this->assertTrue(\pmssMediaStackPanelPidRunning($pid), 'PID file must identify a live installer process.');
+        $this->assertTrue(\pmssMediaStackPanelPidRunning($home, $pid), 'PID file must identify a live installer process.');
+        $this->assertFalse(\pmssMediaStackPanelPidRunning($home.'/other', $pid), 'Another installer path must not match.');
     }
 
     public function testRecoveryCommandUsesFixedInstallerMode(): void
