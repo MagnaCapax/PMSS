@@ -2,6 +2,11 @@
 /** Append exactly one safe JSON audit record for a restart invocation. */
 function pmssRestartUserLogWrite(array $record, string $path = '/var/log/pmss/restartUser.log'): bool
 {
+    // Reject malformed input before creating the log directory or target file.
+    if ($path === '' || strpos($path, "\0") !== false) return false;
+    $json = json_encode($record, JSON_UNESCAPED_SLASHES);
+    if (!is_string($json)) return false;
+
     $dir = dirname($path);
     if (is_link($dir) || (!is_dir($dir) && !@mkdir($dir, 0755, true))
         || is_link($path) || (file_exists($path) && !is_file($path))) return false;
@@ -23,8 +28,7 @@ function pmssRestartUserLogWrite(array $record, string $path = '/var/log/pmss/re
         if (!is_array($opened) || !is_array($linked) || ($linked['mode'] & 0170000) !== 0100000
             || $opened['ino'] !== $linked['ino'] || $opened['dev'] !== $linked['dev']) return false;
         if ($created && (!@chmod($path, 0640) || !@chgrp($path, 'adm'))) return false;
-        $json = json_encode($record, JSON_UNESCAPED_SLASHES);
-        return is_string($json) && flock($handle, LOCK_EX)
+        return flock($handle, LOCK_EX)
             && fwrite($handle, $json."\n") === strlen($json) + 1 && fflush($handle);
     } finally {
         fclose($handle);

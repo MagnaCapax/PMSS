@@ -28,6 +28,10 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+The account restart audit writer rejects empty or NUL-containing paths and
+records that cannot be encoded as JSON before creating a directory or opening
+the log. Valid records retain their existing JSON Lines bytes and append result.
+
 The file-backed storage benchmark reserves its random output name with exclusive
 creation before preallocation or fio runs. A name collision fails without
 touching the existing entry. Normal and shutdown cleanup compare device and

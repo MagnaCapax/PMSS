@@ -173,4 +173,15 @@ SH
         $this->assertSame($record, json_decode(trim((string) file_get_contents($path)), true));
         $this->assertSame(1, count(file($path)));
     }
+
+    public function testAuditLogRejectsMalformedInputBeforeCreatingFiles(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-restart-log-');
+        $path = $dir.'/nested/restartUser.log';
+        $this->assertFalse(\pmssRestartUserLogWrite(['invalid' => "\xB1"], $path));
+        $this->assertFalse(is_dir($dir.'/nested'));
+        $this->assertFalse(\pmssRestartUserLogWrite(['outcome' => 'test'], $path."\0suffix"));
+        $this->assertFalse(is_dir($dir.'/nested'));
+        $this->assertFalse(\pmssRestartUserLogWrite(['outcome' => 'test'], ''));
+    }
 }
