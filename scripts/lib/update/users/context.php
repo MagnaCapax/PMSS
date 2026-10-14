@@ -14,6 +14,12 @@ function pmssUserContextIdentity(array $ctx): array
     return [(string) ($ctx['user'] ?? ''), rtrim((string) ($ctx['home'] ?? ''), '/')];
 }
 
+/** Keep both context gates on the same downstream payload shape. */
+function pmssUserContextCreate(string $user, string $home, string $rutorrentIndexSha): array
+{
+    return ['user' => $user, 'home' => $home, 'user_esc' => escapeshellarg($user), 'rutorrent_index_sha' => $rutorrentIndexSha];
+}
+
 /**
  * Build the shared per-user context array used by update-step2 user helpers.
  *
@@ -50,12 +56,7 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = '', ?str
 
     // rutorrent_index_sha tracks the current skeleton ruTorrent index.html
     // hash so callers can detect when per-user instances are out of date.
-    return [
-        'user'               => $user,
-        'home'               => $home,
-        'user_esc'           => escapeshellarg($user),
-        'rutorrent_index_sha'=> $rutorrentIndexSha,
-    ];
+    return pmssUserContextCreate($user, $home, $rutorrentIndexSha);
 }
 
 /**
@@ -92,10 +93,5 @@ function pmssBuildUserWebRootContext(string $user, string $rutorrentIndexSha = '
         return null;
     }
 
-    return [
-        'user'                => $user,
-        'home'                => $home,
-        'user_esc'            => escapeshellarg($user),
-        'rutorrent_index_sha' => $rutorrentIndexSha,
-    ];
+    return pmssUserContextCreate($user, $home, $rutorrentIndexSha);
 }
