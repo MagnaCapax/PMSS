@@ -117,6 +117,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `scripts/util/lighttpdSymlinkRepair.php USERNAME` is an explicit root-only
+  recovery command for `.lighttpd/upload`, `access.log`, and `error.log` links.
+  It requires an account-owned real home and a successful, non-exhausted live
+  quota probe before changing links. Repairs run as the account and never touch
+  link targets. A failed repair stops before service startup; a successful run
+  calls `startLighttpd`. `PMSS_DRY_RUN=1` reports the link names without changes.
+
 - `killProcess()` rejects NUL bytes in the original process name before trimming,
   so malformed names cannot select a process for `pkill -x`. Ordinary surrounding
   whitespace still normalizes to the same exact binary name.
