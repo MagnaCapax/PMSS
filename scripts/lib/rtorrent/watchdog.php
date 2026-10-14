@@ -86,7 +86,7 @@ function pmssCheckRtorrentApplyThrottle(string $user, string $socketPath, bool $
     if ($throttle === null) return;
 
     $throttleValue = $throttle > 0 ? $throttle : 0;
-    if (rtorrentScgiCall($socketPath, 'throttle.global_up.max_rate.set', [$throttleValue], 5) === false) {
+    if (rtorrentScgiCall($socketPath, 'throttle.global_up.max_rate.set_kb', ['', $throttleValue], 5) === false) {
         pmssCheckRtorrentLogBoth($user, 'failed to apply upload throttle', $debug);
         return;
     }

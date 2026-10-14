@@ -55,11 +55,21 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertTrue(isset($result['config']));
 
         // Freeze the public render result instead of repeating its sizing formula.
-        $expected = "min=24\nmax=128\nusg=168\nus=28\nthrottle.global_up.max_rate.set = 1234\n"
+        $expected = "min=24\nmax=128\nusg=168\nus=28\nthrottle.global_up.max_rate.set_kb = 1234\n"
             ."scgi=5000\npex=auto\ndhtmode=yes\nmem=750M\n";
 
         $this->assertEquals($expected, (string) $result['configFile']);
         $this->assertEquals($input, $result['config']);
+
+        foreach ([0, null] as $throttle) {
+            $withoutCap = $input;
+            if ($throttle === null) {
+                unset($withoutCap['uploadThrottle']);
+            } else {
+                $withoutCap['uploadThrottle'] = $throttle;
+            }
+            $this->assertSame(str_replace('throttle.global_up.max_rate.set_kb = 1234', '', $expected), $cfg->createConfig($withoutCap)['configFile']);
+        }
 
         $defaults = new \rtorrentConfig(['custom' => true], "min=##minimumPeers\nmax=##maximumPeers\nus=##uploadSlots\nusg=##uploadSlotsGlobal\n");
         $defaultResult = $defaults->createConfig($input);

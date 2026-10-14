@@ -54,11 +54,16 @@ class RtorrentScgiTest extends TestCase
         $this->assertStringContainsAllStrings(['<?xml version="1.0"', '<methodCall>', '<methodName>system.api_version</methodName>', '</methodCall>'], $xml);
     }
 
-    public function testXmlrpcIntCallFormattingProducesValidXml(): void
+    public function testXmlrpcThrottleCallFormatsEmptyTargetBeforeKibValue(): void
     {
-        $xml = rtorrentScgiFormatXmlrpcParamsCall('throttle.global_up.max_rate.set', [42]);
+        $xml = rtorrentScgiFormatXmlrpcParamsCall('throttle.global_up.max_rate.set_kb', ['', 42]);
 
-        $this->assertStringContainsAllStrings(['<methodName>throttle.global_up.max_rate.set</methodName>', '<int>42</int>', '<params>'], $xml);
+        $this->assertSame(
+            '<?xml version="1.0" encoding="UTF-8"?><methodCall><methodName>throttle.global_up.max_rate.set_kb</methodName><params>'
+            .'<param><value><string></string></value></param><param><value><int>42</int></value></param>'
+            .'</params></methodCall>',
+            $xml
+        );
     }
 
     public function testXmlrpcParamsCallFormatsStringAndListValues(): void

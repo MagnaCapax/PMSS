@@ -115,7 +115,7 @@ class checkRtorrentContractTest extends TestCase
                         '$throttle = pmssReadTorrentThrottle($user);',
                         'if ($throttle === null) return;',
                         '$throttleValue = $throttle > 0 ? $throttle : 0;',
-                        "rtorrentScgiCall(\$socketPath, 'throttle.global_up.max_rate.set', [\$throttleValue], 5)",
+                        "rtorrentScgiCall(\$socketPath, 'throttle.global_up.max_rate.set_kb', ['', \$throttleValue], 5)",
                     ],
                     'missingPrefix' => 'checkRtorrent throttle guard missing: ',
                 ]],

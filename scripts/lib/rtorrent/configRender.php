@@ -15,7 +15,7 @@ function pmssRtorrentConfigRender(string $template, array $config, array $resour
     $uploadThrottleLine = '';
     if (is_numeric($config['uploadThrottle'] ?? null)) {
         $uploadThrottle = (int) $config['uploadThrottle'];
-        $uploadThrottleLine = $uploadThrottle > 0 ? 'throttle.global_up.max_rate.set = '.$uploadThrottle : '';
+        $uploadThrottleLine = $uploadThrottle > 0 ? 'throttle.global_up.max_rate.set_kb = '.$uploadThrottle : '';
     }
 
     // Global slots must precede their shared token prefix in the replacement pass.
