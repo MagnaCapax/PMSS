@@ -14,7 +14,7 @@ function pmssUserTransferScratchPaths(string $scratchRoot): array
     $scratchRoot = rtrim($scratchRoot, '/');
     return [
         'expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh',
-        'identityProbe' => $scratchRoot.'/identity-probe.sh',
+        'identityProbe' => $scratchRoot.'/identity-probe.sh', 'namespaceProbe' => $scratchRoot.'/namespace-probe.sh',
         'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh',
         'remoteSizeScript' => $scratchRoot.'/remote-size.sh', 'qbittorrentProbeScript' => $scratchRoot.'/qbittorrent-categories.sh',
         'dockerQuiesceScript' => $scratchRoot.'/docker-quiesce.sh', 'dockerIds' => $scratchRoot.'/docker-ids',
@@ -58,9 +58,11 @@ function pmssUserTransferBuildRsyncCommand(
         $arguments[] = escapeshellarg($prefix.$source);
     }
 
-    $rsync = 'rsync -aHAX --numeric-ids --stats --usermap='
-        .escapeshellarg($cfg['receiver']['sourceUid'].':0').' --groupmap='
-        .escapeshellarg($cfg['receiver']['sourceGid'].':0')
+    $namespace = !empty($cfg['namespaceRsync']);
+    $rsync = 'rsync -aHAX --numeric-ids --stats'
+        .($namespace ? ' --rsync-path='.escapeshellarg('unshare --map-auto --map-root-user rsync')
+            : ' --usermap='.escapeshellarg($cfg['receiver']['sourceUid'].':0')
+                .' --groupmap='.escapeshellarg($cfg['receiver']['sourceGid'].':0'))
         .' --filter='.escapeshellarg('-x user.rsync.*').' --filter='.escapeshellarg('-x! user.*')
         .($options === '' ? '' : ' '.$options).' -e '
         .escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
@@ -94,6 +96,14 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
 function pmssUserTransferBuildAuthProbe(array $cfg): string
 {
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, '/bin/true')."\n";
+}
+
+/** Probe the source as the authenticated account, with no account-controlled SSH config. */
+function pmssUserTransferBuildNamespaceProbe(array $cfg): string
+{
+    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand(
+        $cfg, 'unshare --map-auto --map-root-user true'
+    )." >/dev/null 2>&1\n";
 }
 
 /** Capture the same bounded container set that is stopped on the source. */

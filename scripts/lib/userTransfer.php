@@ -29,6 +29,7 @@ function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array
         'expect' => pmssUserTransferBuildExpectWrapper()."\n",
         'authProbe' => pmssUserTransferBuildAuthProbe($cfg),
         'identityProbe' => pmssUserTransferBuildIdentityProbe($cfg),
+        'namespaceProbe' => pmssUserTransferBuildNamespaceProbe($cfg),
         'mainScript' => pmssUserTransferBuildRsyncMain($cfg),
         'finalScript' => pmssUserTransferBuildRsyncFinal($cfg),
         'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg),
@@ -111,8 +112,20 @@ function pmssUserTransferMain(array $argv): int
             }
             $source = pmssUserTransferParseIdentity((string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
             $cfg['receiver'] = pmssUserTransferReceiverConfig($cfg['localUser'], $home, $source);
+            pmssUserTransferWriteFile($scratchPaths['namespaceProbe'], pmssUserTransferBuildNamespaceProbe($cfg), 0700);
+            $localProbe = pmssBuildCommand('env', [
+                '-u', 'PMSS_USER_TRANSFER_PASSWORD', 'setpriv', '--reuid='.$cfg['receiver']['uid'],
+                '--regid='.$cfg['receiver']['gid'], '--clear-groups',
+                'unshare', '--map-auto', '--map-root-user', 'true',
+            ]);
+            $localRc = runStep('Probing target account user namespace', $localProbe);
+            $remoteRc = runStep('Probing source account user namespace', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['namespaceProbe']]));
+            $cfg['namespaceRsync'] = $localRc === 0 && $remoteRc === 0;
+            if (!$cfg['namespaceRsync']) {
+                logMessage('[INFO] Transfer rsync user namespace unavailable; using the existing receiver mapping');
+            }
             foreach (pmssUserTransferScratchPayloads($cfg, $scratchPaths) as $key => $contents) {
-                if ($key !== 'expect' && $key !== 'authProbe' && $key !== 'identityProbe') {
+                if ($key !== 'expect' && $key !== 'authProbe' && $key !== 'identityProbe' && $key !== 'namespaceProbe') {
                     pmssUserTransferWriteFile($scratchPaths[$key], $contents, 0700);
                 }
             }

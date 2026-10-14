@@ -117,8 +117,12 @@ function pmssUserTransferBuildReceiver(array $cfg, string $rsync): string
         .'[ "$(id -u)" = 0 ] || exit 1; exec '.$rsync;
     // Expect keeps the password in the root parent; the account-owned child
     // must never inherit it through /proc/<pid>/environ.
-    $launch = 'env -u PMSS_USER_TRANSFER_PASSWORD setpriv --reuid='.$receiver['uid'].' --regid='.$receiver['gid'].' --clear-groups '
-        .'unshare -U bash -c '.escapeshellarg($inner).' &' . "\n"
+    $accountLaunch = 'env -u PMSS_USER_TRANSFER_PASSWORD setpriv --reuid='.$receiver['uid'].' --regid='.$receiver['gid'].' --clear-groups ';
+    if (!empty($cfg['namespaceRsync'])) {
+        // The account's first sub-ID blocks become namespace IDs 1..N on both hosts.
+        $launch = 'exec '.$accountLaunch.'unshare --map-auto --map-root-user '.$rsync."\n";
+    } else {
+        $launch = $accountLaunch.'unshare -U bash -c '.escapeshellarg($inner).' &' . "\n"
         .'child=$!' . "\n"
         ."trap 'kill \"\$child\" 2>/dev/null || true' EXIT\n"
         .'for i in {1..500}; do' . "\n"
@@ -131,6 +135,7 @@ function pmssUserTransferBuildReceiver(array $cfg, string $rsync): string
         .'printf %s deny > "/proc/$child/setgroups"' . "\n"
         .'/usr/bin/printf %s '.escapeshellarg($receiver['gidMap']).' > "/proc/$child/gid_map"' . "\n"
         .'wait "$child"' . "\n";
+    }
 
     // Mounts are private before any remount. A bind of this home remains writable
     // while every other writable mount is made read-only inside the child view.
