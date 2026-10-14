@@ -399,6 +399,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     retain service identity, while client ID returns after fleet backfill.
   - Main rsync excludes server-specific torrent client configs such as
     `~/.config/qBittorrent/qBittorrent.conf`.
+  - Final rsync copies session data but excludes the source host's
+    `session/rtorrent.lock`; the target keeps its own runtime lock.
   - Post-transfer qBittorrent category preservation reads only category-bearing
     source metadata into the private scratch directory, prefers a non-empty
     source `categories.json`, and falls back to legacy `Session\Categories` from

@@ -142,6 +142,15 @@ class UserTransferTest extends TestCase
         }
     }
 
+    public function testFinalPassExcludesSourceRtorrentLock(): void
+    {
+        foreach ([false, true] as $namespaceRsync) {
+            $script = \pmssUserTransferBuildRsyncFinal($this->baseConfig(['namespaceRsync' => $namespaceRsync]));
+            $this->assertStringContainsString('/session/rtorrent.lock', $script);
+            $this->assertStringContainsString(':/home/deefbox/./session', $script);
+        }
+    }
+
     public function testCrossUsernamePayloadOwnershipCheckUsesTargetIds(): void
     {
         $command = \pmssUserTransferBuildPayloadOwnershipCheckCommand('/home/newuser/data', 1201, 1202);

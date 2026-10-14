@@ -90,7 +90,7 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
     return pmssUserTransferBuildRsyncCommand($cfg, [
         $remoteHome.'/./session', $remoteHome.'/./www/rutorrent/share', $remoteHome.'/./.lighttpd/custom',
         $remoteHome.'/./.lighttpd/custom.d', $remoteHome.'/./.local', $remoteHome.'/./www/public',
-    ], ['/.billingId', '/.billingServiceId', '/.billingClientId'], ['-R']);
+    ], ['/session/rtorrent.lock', '/.billingId', '/.billingServiceId', '/.billingClientId'], ['-R']);
 }
 
 function pmssUserTransferBuildAuthProbe(array $cfg): string
