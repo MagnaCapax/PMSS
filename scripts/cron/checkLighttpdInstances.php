@@ -14,10 +14,10 @@ require_once __DIR__.'/../lib/runtime.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
 
 $argUserRaw = trim((string) ($argv[1] ?? ''));
-$onBusy = $argUserRaw === '' ? 'pmssCronLockSkipLog' : static function (string $message): int {
+$onBusy = $argUserRaw !== '' ? static function (string $message): int {
     pmssCronLockSkipLog($message);
     return PMSS_CRON_LOCK_BUSY_EXIT;
-};
+} : 'pmssCronLockSkipLog';
 $pmssCheckLighttpdLock = pmssCronLockAcquire('checkLighttpdInstances', $onBusy, 'pmssUserWatchdogLockAcquire');
 if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
