@@ -91,31 +91,22 @@ apt install i965-va-driver
 
 ### Render Group Membership
 
-Users must be in the `render` group to access `/dev/dri/renderD128`:
+On PMSS hosts with an Intel iGPU, PMSS opens Intel render nodes to all local
+accounts through a managed udev rule ([ADR 0096](adr/0096-intel-igpu-hardware-transcoding-firmware-and-render-node-access.md)).
+No render-group change or support request is needed. Check the device and VAAPI:
 
 ```bash
-# Check current groups
-groups
-
-# Check if render group exists
-getent group render
-
-# Add user to render group (requires root)
-usermod -aG render <username>
-
-# User must log out and back in for group change to take effect
-```
-
-To verify access:
-```bash
-# Should succeed if in render group
 ls -la /dev/dri/renderD128
-
-# Test with vainfo
 vainfo
 ```
 
-If you get permission errors, the user is not in the render group.
+If `vainfo` or FFmpeg VAAPI fails, check for firmware load errors or a wedged GPU:
+
+```bash
+dmesg | grep -i -E 'guc|wedged'
+```
+
+Firmware installed during an update loads at the next boot.
 
 ### Environment Variables
 

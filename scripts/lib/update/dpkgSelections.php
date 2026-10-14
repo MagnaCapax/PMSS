@@ -85,14 +85,30 @@ function pmssDpkgSelectionsDrop(array &$result, string $bucket, string $package)
     $result['warnings'] = true; $result[$bucket][] = $package;
 }
 
+/** Detect an Intel display controller from read-only PCI sysfs metadata. */
+function pmssHostHasIntelDisplayPciDevice(string $devicesPath = '/sys/bus/pci/devices'): bool
+{
+    foreach (@glob(rtrim($devicesPath, '/').'/*/class') ?: [] as $classPath) {
+        $class = @file_get_contents($classPath);
+        $vendor = @file_get_contents(dirname($classPath).'/vendor');
+        if (is_string($class) && is_string($vendor)
+            && strpos(strtolower(trim($class)), '0x03') === 0
+            && strtolower(trim($vendor)) === '0x8086') {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * @param array<int,string> $lines
- * @return array{sanitised:array<int,string>,warnings:bool,short_form_seen:bool,dropped_unavailable:array<int,string>,dropped_obsolete:array<int,string>,dropped_kernel:array<int,string>,started_at:float}
+ * @return array{sanitised:array<int,string>,warnings:bool,short_form_seen:bool,dropped_unavailable:array<int,string>,dropped_obsolete:array<int,string>,dropped_kernel:array<int,string>,dropped_hardware:array<int,string>,started_at:float}
  */
-function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable $packageAvailable = null): array
+function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable $packageAvailable = null, ?callable $intelDisplayPresent = null): array
 {
     $packageAvailable = $packageAvailable ?: 'pmssPackageAvailable';
-    $result = ['sanitised' => [], 'warnings' => false, 'short_form_seen' => false, 'dropped_unavailable' => [], 'dropped_obsolete' => [], 'dropped_kernel' => [], 'started_at' => microtime(true)];
+    $intelDisplayPresent = $intelDisplayPresent ?: 'pmssHostHasIntelDisplayPciDevice';
+    $result = ['sanitised' => [], 'warnings' => false, 'short_form_seen' => false, 'dropped_unavailable' => [], 'dropped_obsolete' => [], 'dropped_kernel' => [], 'dropped_hardware' => [], 'started_at' => microtime(true)];
     foreach ($lines as $idx => $line) {
         $trimmed = trim((string) $line);
         if ($trimmed === '') continue;
@@ -117,6 +133,10 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
             $result['warnings'] = true;
             continue;
         }
+        if ($lower === 'firmware-misc-nonfree' && strtolower($state) === 'install' && !$intelDisplayPresent()) {
+            pmssDpkgSelectionsDrop($result, 'dropped_hardware', $package);
+            continue;
+        }
         if (strtolower($state) === 'install' && !$packageAvailable($package)) {
             $result['warnings'] = true;
             strtolower($package) !== 'cgroup-bin' && $result['dropped_unavailable'][] = $package;
@@ -134,7 +154,7 @@ function pmssDpkgSelectionsLogSummary(array $result): void
         $sample = array_slice($result['dropped_unavailable'], 0, 10);
         pmssLogStatus('SKIP', sprintf('Baseline: dropped %d unavailable packages (first %d: %s)', count($result['dropped_unavailable']), count($sample), implode(', ', $sample)), 0, microtime(true) - (float) ($result['started_at'] ?? microtime(true)));
     }
-    foreach (['dropped_kernel' => 'Baseline: dropped %d versioned kernel packages', 'dropped_obsolete' => 'Baseline: dropped %d obsolete entries (legacy names)'] as $bucket => $message) {
+    foreach (['dropped_kernel' => 'Baseline: dropped %d versioned kernel packages', 'dropped_obsolete' => 'Baseline: dropped %d obsolete entries (legacy names)', 'dropped_hardware' => 'Baseline: dropped %d packages without required hardware'] as $bucket => $message) {
         !empty($result[$bucket]) && pmssLogStatus('SKIP', sprintf($message, count($result[$bucket])), 0, 0.0);
     }
     !empty($result['short_form_seen']) && pmssLogStatus('INFO', 'Baseline: detected short-form dpkg selection entries; treating as \"install\" state', 0, 0.0);
