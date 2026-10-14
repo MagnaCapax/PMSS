@@ -106,6 +106,12 @@ function pmssUserTransferBuildNamespaceProbe(array $cfg): string
     )." >/dev/null 2>&1\n";
 }
 
+/** Both account-owned namespace probes must succeed before changing rsync's ID space. */
+function pmssUserTransferNamespaceRsyncAvailable(int $localRc, int $remoteRc): bool
+{
+    return $localRc === 0 && $remoteRc === 0;
+}
+
 /** Capture the same bounded container set that is stopped on the source. */
 function pmssUserTransferBuildDockerQuiesce(array $cfg, string $localIdsPath): string
 {

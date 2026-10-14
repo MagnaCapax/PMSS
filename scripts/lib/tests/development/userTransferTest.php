@@ -404,6 +404,45 @@ SNAP;
         $this->assertStringContainsAllStrings(['rsync -aHAX --numeric-ids', 'www', 'session', 'unshare -U', 'wait "$child"'], $script);
     }
 
+    public function testNamespaceRsyncKeepsPassOptionsAndUsesContainerRelativeIds(): void
+    {
+        $cfg = $this->baseConfig(['namespaceRsync' => true]);
+        $main = \pmssUserTransferBuildRsyncMain($cfg);
+        $final = \pmssUserTransferBuildRsyncFinal($cfg);
+        foreach ([$main, $final] as $script) {
+            $this->assertStringContainsAllStrings([
+                'rsync -aHAX --numeric-ids --stats',
+                '--rsync-path=',
+                'env -u PMSS_USER_TRANSFER_PASSWORD setpriv --reuid=1200 --regid=1200 --clear-groups',
+                'unshare --map-auto --map-root-user rsync',
+                '--filter=', '/.billingId', '/.billingServiceId', '/.billingClientId',
+                'mount --make-rprivate /',
+            ], $script);
+            $this->assertStringNotContainsString('--usermap=', $script);
+            $this->assertStringNotContainsString('--groupmap=', $script);
+            $this->assertStringNotContainsString('unshare -U bash', $script);
+        }
+        $this->assertStringContainsAllStrings(['.config/qBittorrent/qBittorrent.conf', '.resourceData', '*.pmss-tmp-*', ':/home/deefbox/'], $main);
+        $this->assertStringContainsAllStrings(["'-R'", ':/home/deefbox/./session', ':/home/deefbox/./www/public'], $final);
+    }
+
+    public function testNamespaceProbeFailureKeepsExistingRsyncMapping(): void
+    {
+        $probe = \pmssUserTransferBuildNamespaceProbe($this->baseConfig());
+        $this->assertStringContainsAllStrings([
+            'ssh -F /dev/null', "-l 'deefbox'", "'example.com'",
+            "'unshare --map-auto --map-root-user true'", '>/dev/null 2>&1',
+        ], $probe);
+        foreach ([[1, 0], [0, 1], [127, 0], [0, 255], [1, 1]] as [$localRc, $remoteRc]) {
+            $this->assertFalse(\pmssUserTransferNamespaceRsyncAvailable($localRc, $remoteRc));
+            $cfg = $this->baseConfig(['namespaceRsync' => \pmssUserTransferNamespaceRsyncAvailable($localRc, $remoteRc)]);
+            $script = \pmssUserTransferBuildRsyncFinal($cfg);
+            $this->assertStringContainsAllStrings(['--numeric-ids', '--usermap=', '--groupmap=', 'unshare -U bash', 'wait "$child"', "'-R'"], $script);
+            $this->assertStringNotContainsString('--rsync-path=', $script);
+        }
+        $this->assertTrue(\pmssUserTransferNamespaceRsyncAvailable(0, 0));
+    }
+
     public function testSourceIdentityAndSubordinateMapsRejectUnsafeInputs(): void
     {
         $frame = static function (string $body): string {

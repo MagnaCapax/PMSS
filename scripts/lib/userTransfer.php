@@ -120,7 +120,7 @@ function pmssUserTransferMain(array $argv): int
             ]);
             $localRc = runStep('Probing target account user namespace', $localProbe);
             $remoteRc = runStep('Probing source account user namespace', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['namespaceProbe']]));
-            $cfg['namespaceRsync'] = $localRc === 0 && $remoteRc === 0;
+            $cfg['namespaceRsync'] = pmssUserTransferNamespaceRsyncAvailable($localRc, $remoteRc);
             if (!$cfg['namespaceRsync']) {
                 logMessage('[INFO] Transfer rsync user namespace unavailable; using the existing receiver mapping');
             }
