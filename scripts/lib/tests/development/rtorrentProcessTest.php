@@ -142,6 +142,16 @@ class RtorrentProcessTest extends TestCase
         }
     }
 
+    public function testFailureCountStateCapsRepresentableCounter(): void
+    {
+        $stateFile = $this->tempDir.'/max-failure.count';
+        file_put_contents($stateFile, (string) PHP_INT_MAX);
+
+        $this->assertSame(['action' => 'stale', 'count' => PHP_INT_MAX],
+            rtorrentProcessCheckFailureCountState($stateFile, 4));
+        $this->assertSame((string) PHP_INT_MAX, file_get_contents($stateFile));
+    }
+
     public function testStateFilePathSafetyAcceptsNormalTempFile(): void
     {
         $this->assertTrue(rtorrentProcessStateFilePathIsSafe($this->tempDir.'/state.ts'));
@@ -178,9 +188,29 @@ class RtorrentProcessTest extends TestCase
 
         $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
 
-        $this->assertEquals('record', $result['action']);
-        $this->assertEquals(1, $result['count']);
+        $this->assertSame(['action' => 'wait', 'count' => 0], $result);
         $this->assertTrue(is_dir($stateFile), 'Directory target should remain untouched');
+    }
+
+    public function testFailureCountStateRequiresCompleteWrite(): void
+    {
+        $script = <<<'PHP'
+namespace WatchdogCountWriteFixture;
+function pmssFileWriteComplete($path, $data, $flags = 0) {
+    $GLOBALS['writes'][] = [$data, $flags];
+    return false;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/watchdogState.php', 'WatchdogCountWriteFixture');
+        $script .= <<<'PHP'
+$GLOBALS['writes'] = [];
+$result = rtorrentProcessCheckFailureCountState(getenv('PMSS_TEST_STATE_FILE'), 1);
+echo json_encode([$result, $GLOBALS['writes']]);
+PHP;
+        $stateFile = $this->tempDir.'/failed-write.count';
+        $this->assertSame([['action' => 'wait', 'count' => 0], [['1', LOCK_EX]]],
+            $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_STATE_FILE' => $stateFile]));
+        $this->assertFalse(file_exists($stateFile));
     }
 
     public function testClearStaleStateRefusesSymlinkLeaf(): void

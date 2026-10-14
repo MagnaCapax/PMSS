@@ -99,7 +99,7 @@ function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'):
         return null;
     }
     $value = (float) $matches[1];
-    return is_finite($value) ? $value : null;
+    return is_finite($value) && $value <= 100.0 ? $value : null;
 }
 
 /**
@@ -116,10 +116,11 @@ function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'):
 function pmssDiskIostatReadIopingHomeMs(): ?float
 {
     $raw = pmssSystemStatsIopingMs('/home');           // e.g. "0.2ms" or "na"
-    if (!is_string($raw) || !preg_match('/^([0-9.]+)ms$/', $raw, $matches)) {
+    if (!is_string($raw) || !preg_match('/\A([0-9]+(?:\.[0-9]+)?)ms\z/', $raw, $matches)) {
         return null;
     }
-    return (float) $matches[1];
+    $value = (float) $matches[1];
+    return is_finite($value) ? $value : null;
 }
 
 /** Resolve only sampled leaf disks behind /home; unknown topology stays unknown. */

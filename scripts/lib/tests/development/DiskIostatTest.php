@@ -13,12 +13,31 @@ class DiskIostatTest extends TestCase
             file_put_contents($path, "some avg300=99.00\nfull avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
             $this->assertSame($expected, \pmssDiskIostatReadPsiFullAvg300($path));
         }
-        foreach (['...', '1..2', '.5', '12bad', ''] as $raw) {
+        foreach (['...', '1..2', '.5', '12bad', '', '100.01', '101'] as $raw) {
             file_put_contents($path, "full avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
             $this->assertSame(null, \pmssDiskIostatReadPsiFullAvg300($path));
         }
         file_put_contents($path, 'full avg300='.str_repeat('9', 400)." total=123\n");
         $this->assertSame(null, \pmssDiskIostatReadPsiFullAvg300($path));
+    }
+
+    public function testIopingHomeRejectsMalformedAndNonFiniteLatency(): void
+    {
+        $script = <<<'PHP'
+namespace DiskIostatIopingFixture;
+function pmssSystemStatsIopingMs($path) { return $GLOBALS['latency']; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatIopingFixture');
+        $script .= <<<'PHP'
+$GLOBALS['latency'] = getenv('PMSS_TEST_IOPING_LATENCY');
+echo json_encode(['value' => pmssDiskIostatReadIopingHomeMs()]);
+PHP;
+        foreach (['0ms' => 0.0, '0.2ms' => 0.2, '12.34ms' => 12.34] as $raw => $expected) {
+            $this->assertSame(['value' => $expected], $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IOPING_LATENCY' => $raw]));
+        }
+        foreach (['na', '1..2ms', '.5ms', '12badms', "1ms\n", '1ms extra', str_repeat('9', 400).'ms'] as $raw) {
+            $this->assertSame(['value' => null], $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IOPING_LATENCY' => $raw]));
+        }
     }
 
     /** Build a fake class/block tree with kernel-style partition links. */

@@ -61,11 +61,15 @@ function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): ar
 function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureThreshold): array
 {
     if (!rtorrentProcessStateFilePathIsSafe($stateFile)) {
-        return ['action' => 'record', 'count' => 1];
+        return ['action' => 'wait', 'count' => 0];
     }
 
-    $count = max(0, pmssReadRegularFileInt($stateFile)) + 1;
-    rtorrentProcessWriteStateFile($stateFile, (string) $count);
+    // An unreadable or unwritable counter cannot prove consecutive failures.
+    $previousCount = max(0, pmssReadRegularFileInt($stateFile));
+    $count = $previousCount === PHP_INT_MAX ? PHP_INT_MAX : $previousCount + 1;
+    if (!rtorrentProcessWriteStateFile($stateFile, (string) $count)) {
+        return ['action' => 'wait', 'count' => 0];
+    }
 
     return [
         'action' => $count >= max(1, $failureThreshold) ? 'stale' : ($count === 1 ? 'record' : 'wait'),
