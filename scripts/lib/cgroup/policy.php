@@ -70,15 +70,23 @@ function pmssCgroupPolicyMountBfqActive(string $mountPath = '/home', ?string $so
     if ($slaves === false) return null;
     $targets = $slaves !== [] ? array_map('basename', $slaves) : [$device];
 
-    $readable = false;
+    $complete = true;
     foreach ($targets as $target) {
         $schedFile = $sysBlock.'/'.$target.'/queue/scheduler';
-        if (!is_readable($schedFile)) continue;
-        $readable = true;
-        if (preg_match('/\[bfq\]/', (string) @file_get_contents($schedFile)) === 1) return true;
+        if (!is_readable($schedFile)) {
+            $complete = false;
+            continue;
+        }
+        $scheduler = @file_get_contents($schedFile);
+        if ($scheduler === false) {
+            $complete = false;
+            continue;
+        }
+        if (preg_match('/\[bfq\]/', $scheduler) === 1) return true;
     }
 
-    return $readable ? false : null;
+    // A failed member read cannot prove the whole backing topology lacks BFQ.
+    return $complete ? false : null;
 }
 
 /** Resolve a block device's kernel major:minor token from /sys/block. */

@@ -145,6 +145,39 @@ PHP;
         ]));
     }
 
+    public function testMissingMemberSchedulerKeepsInactiveResultUndeterminable(): void
+    {
+        $root = $this->fakeSysBlock([
+            'md1' => 'none',
+            'sda' => '[none] mq-deadline bfq',
+            'sdb' => null,
+        ], ['md1' => ['sda', 'sdb']]);
+
+        $this->assertSame(null, pmssCgroupPolicyMountBfqActive('/home', '/dev/md1', $root));
+    }
+
+    public function testFailedSchedulerReadKeepsInactiveResultUndeterminable(): void
+    {
+        $root = $this->fakeSysBlock([
+            'md1' => 'none',
+            'sda' => '[none] mq-deadline bfq',
+            'sdb' => '[none] mq-deadline bfq',
+        ], ['md1' => ['sda', 'sdb']]);
+        $script = <<<'PHP'
+namespace CgroupPolicySchedulerReadFixture;
+function file_get_contents($path) {
+    return strpos($path, '/sdb/') !== false ? false : \file_get_contents($path);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/policy.php', 'CgroupPolicySchedulerReadFixture');
+        $script .= <<<'PHP'
+echo json_encode(['active' => pmssCgroupPolicyMountBfqActive('/home', '/dev/md1', getenv('PMSS_TEST_BFQ_SYS_BLOCK'))]);
+PHP;
+        $this->assertSame(['active' => null], $this->pmssRunInlinePhpJson($script, [
+            'PMSS_TEST_BFQ_SYS_BLOCK' => $root,
+        ]));
+    }
+
     /** Path-shaped junk in the mount source must never escape /sys/block. */
     public function testMaliciousMountSourceIsRejected(): void
     {

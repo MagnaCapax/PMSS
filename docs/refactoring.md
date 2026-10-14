@@ -47,6 +47,9 @@ The `/home` disk topology readers distinguish an empty slave list from a failed
 slave scan. On scan failure, iostat retains its discovered-device fallback and
 the BFQ probe returns its existing unknown result; a successful empty scan still
 classifies a leaf device normally.
+The BFQ probe also returns unknown when any backing member's scheduler is
+missing or cannot be read and no other member proves BFQ active. A partial
+read cannot prove that BFQ is inactive across the backing topology.
 
 Nginx's fallback self-signed certificate command accepts only a valid host name
 and quotes the complete OpenSSL subject as one shell argument. Valid host names
