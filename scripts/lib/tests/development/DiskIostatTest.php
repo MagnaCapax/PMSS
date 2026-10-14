@@ -30,7 +30,7 @@ PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatIopingFixture');
         $script .= <<<'PHP'
 $GLOBALS['latency'] = getenv('PMSS_TEST_IOPING_LATENCY');
-echo json_encode(['value' => pmssDiskIostatReadIopingHomeMs()]);
+echo json_encode(['value' => pmssDiskIostatReadIopingHomeMs()], JSON_PRESERVE_ZERO_FRACTION);
 PHP;
         foreach (['0ms' => 0.0, '0.2ms' => 0.2, '12.34ms' => 12.34] as $raw => $expected) {
             $this->assertSame(['value' => $expected], $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IOPING_LATENCY' => $raw]));
