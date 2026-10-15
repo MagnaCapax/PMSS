@@ -13,9 +13,6 @@ const PMSS_IO_CEILING_DIMENSIONS = [
     'read_mbs' => 'throughputRead', 'write_mbs' => 'throughputWrite',
 ];
 
-/** Accept only finite, non-negative numeric scalars from I/O samples and policy. */
-function pmssCgroupNonNegativeFiniteNumber($value): ?float { return pmssFiniteNonNegativeFloat($value); }
-
 /** Validate tracker settings before allocating or publishing any estimates. */
 function pmssIoCeilingSettings(array $policy): ?array
 {
@@ -49,7 +46,7 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
         }
         $values = [];
         foreach (PMSS_IO_CEILING_DIMENSIONS as $dimension => $field) {
-            $value = pmssCgroupNonNegativeFiniteNumber($sample[$field] ?? null);
+            $value = pmssFiniteNonNegativeFloat($sample[$field] ?? null);
             if ($value === null) {
                 continue 2;
             }

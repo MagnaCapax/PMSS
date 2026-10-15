@@ -585,6 +585,7 @@ iptables helpers:
 
 ## Resource Statistics
 
+- Passive I/O ceiling samples, persisted ceiling reads, and derived read-IOPS oversell settings use the shared finite, non-negative numeric parser.
 - `pmssResourceLogManagedUserUids()` revalidates list output before UID lookup
   and omits nonpositive resolver results. `pmssResourceLogLookupManagedUid()`
   accepts only representable, positive decimal output from its `id -u` fallback.

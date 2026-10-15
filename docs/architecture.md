@@ -67,6 +67,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/trackerCleaner.php** – Cron-facing facade for the tracker cleaner. The `trackerCleaner/` modules own selection policy, logs, guarded backups, and the bounded run separately (ADR 0076).
 - **scripts/lib/portManager.php** – Stable service-port and CLI facade. `portManager/state.php` owns assignment files and shared reservation reads; `portManager/selection.php` owns bind checks and allocation. Legacy rTorrent markers remain part of the used-port set. Allocation stops if either reservation namespace cannot be scanned completely; an absent legacy namespace remains valid.
 - **scripts/lib/blockDeviceLeaves.php** – One bounded sysfs topology walk supplies backing leaf disks to BFQ policy and `/home` iostat selection. Callers retain their own response to incomplete topology.
+- **scripts/lib/cgroup/readIopsPolicy.php** – Derived read-IOPS policy loads the runtime value helpers directly; passive ceiling computation remains in `cgroup/ioCeiling.php`.
 - **scripts/lib/nginxConfig/** – Generates the public user subdomain route and reconciles obsolete private hash routes. The template catalog contains only active and suspended public variants.
 - **scripts/lib/resources/log.php** – Resource-log entrypoint. `resources/counters.php` owns cgroup reads shared with performance telemetry; `resources/counterState.php` owns locked delta persistence shared with traffic ingress (ADR 0078).
 

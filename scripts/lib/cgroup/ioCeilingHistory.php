@@ -106,5 +106,5 @@ function pmssIoCeilingPublishedReadIops(string $statePath = PMSS_IO_CEILING_STAT
         return null;
     }
 
-    return pmssCgroupNonNegativeFiniteNumber($state['published']['read_iops'] ?? null);
+    return pmssFiniteNonNegativeFloat($state['published']['read_iops'] ?? null);
 }

@@ -9,7 +9,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/ioCeiling.php';
+require_once __DIR__.'/../runtime.php';
 
 /** Return a positive integer setting or null without coercing invalid policy. */
 function pmssCgroupPolicyPositiveIntSetting($value): ?int
@@ -154,7 +154,7 @@ function pmssCgroupPolicyDerivedReadIopsCap(
     }
 
     $share = pmssCgroupPolicyUserIoWeight($source, $policy) / $weightSum;
-    $oversell = pmssCgroupNonNegativeFiniteNumber($policy['cgroup']['assignMax']['iops'] ?? null);
+    $oversell = pmssFiniteNonNegativeFloat($policy['cgroup']['assignMax']['iops'] ?? null);
     $candidate = (int) floor(max(0.0, $hostMaxReadIops) * ($oversell !== null && $oversell > 0 ? $oversell : 2.0) * $share);
     return pmssCgroupPolicyReadIopsClamp($candidate, $floor, $tierCeiling);
 }
