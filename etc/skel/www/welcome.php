@@ -682,10 +682,10 @@ function pmssWelcomeTrafficDisclosureHtmlBuild($trafficPercent, $trafficBandwidt
         $cooldown = pmssWelcomeTrafficCooldownTextBuild($throttleFileMtime);
         $lines[] = '<b>Throttle cooldown active</b> - current ceiling is '.$capText.'; '.$cooldown;
     } elseif ((float) $trafficPercent >= 70.0) {
-        $lines[] = '<b>Approaching monthly traffic cap</b> - review the graduated throttling policy before crossing the cap.';
+        $lines[] = '<b>Approaching monthly traffic cap</b> - review the traffic throttle policy before crossing the cap.';
     }
 
-    $lines[] = 'Policy: <a href="https://wiki.pulsedmedia.com/index.php/Bandwidth#Graduated_throttling" target="_blank">Graduated throttling</a>.';
+    $lines[] = 'Policy: <a href="https://wiki.pulsedmedia.com/wiki/Pulsed_Media_Traffic_Limits#How_the_throttle_works" target="_blank">How the throttle works</a>.';
     $class = $isReduced ? 'pmss-traffic-disclosure pmss-traffic-disclosure-active' : 'pmss-traffic-disclosure';
 
     return '<div class="'.$class.'">'.implode('<br />', $lines).'</div>';

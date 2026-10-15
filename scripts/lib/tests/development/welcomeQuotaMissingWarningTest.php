@@ -275,7 +275,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     {
         $this->assertWelcomeUsageScriptContains(
             'ob_start(); trafficCreateSection(array("raw" => array("month" => 716800)), 1000); echo ob_get_clean();',
-            ['Usage: <b>70.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Bandwidth#Graduated_throttling']
+            ['Usage: <b>70.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Pulsed_Media_Traffic_Limits#How_the_throttle_works']
         );
     }
 
