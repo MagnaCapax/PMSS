@@ -75,3 +75,14 @@ Firmware activates only at the next boot.
   historical i915 local privilege escalation via a buffer-bounds flaw.
 - [NVD CVE-2010-2962](https://nvd.nist.gov/vuln/detail/CVE-2010-2962):
   historical i915 GEM ioctl local privilege escalation.
+
+## Amendment 2026-10-15: render-group membership
+
+The operator decided that every PMSS account on an Intel iGPU host also belongs
+to `render`. Jellyfin and Plex guides and container images check this membership,
+and it preserves access if render-node mode changes later. This supersedes the
+earlier rejection of group membership; it does not change the Intel-only 0666
+udev rule. That rule still covers processes started before a supplementary-group
+change, including running tmux, systemd-user, and rootless Docker sessions,
+until they restart. Membership grants no access beyond what the 0666 rule
+already permits. Hosts without Intel display hardware are unaffected.

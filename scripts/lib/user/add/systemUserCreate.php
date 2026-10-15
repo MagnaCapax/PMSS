@@ -8,6 +8,7 @@
 
 require_once dirname(__DIR__, 2).'/userLifecycle.php';
 require_once dirname(__DIR__).'/directories.php';
+require_once dirname(__DIR__, 2).'/update/systemPrep/renderNodeAccess.php';
 
 /**
  * Create the underlying Unix account and validate that `/home/<user>` is sane.
@@ -29,6 +30,7 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
     if (function_exists('pmssAddUserFailureRollbackMarkSystemUserCreated')) {
         pmssAddUserFailureRollbackMarkSystemUserCreated();
     }
+    pmssEnsureIntelRenderGroupMember($user['name'], 'logProvisionMessage');
 
     $pwEntry = pmssUserAccountLookup($user['name']);
     if (!is_dir($homePath)) {

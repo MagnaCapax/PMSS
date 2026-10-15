@@ -93,7 +93,10 @@ apt install i965-va-driver
 
 On PMSS hosts with an Intel iGPU, PMSS opens Intel render nodes to all local
 accounts through a managed udev rule ([ADR 0096](adr/0096-intel-igpu-hardware-transcoding-firmware-and-render-node-access.md)).
-No render-group change or support request is needed. Check the device and VAAPI:
+PMSS also adds every account to the `render` group automatically; no support
+request is needed. A session started before the account was added must restart
+(log out and back in, and restart tmux or Docker) before `groups` shows the new
+membership. Check the device and VAAPI:
 
 ```bash
 ls -la /dev/dri/renderD128
@@ -367,12 +370,10 @@ Compare CPU usage with and without hardware transcoding:
 Failed to open VAAPI device: Permission denied
 ```
 
-**Solution**: Add user to render group:
-```bash
-# As root
-usermod -aG render <username>
-# User must log out and back in
-```
+**Solution**: On Intel iGPU hosts, PMSS adds accounts to `render` automatically
+and opens the render node through its udev rule. Check that the host update has
+run and restart sessions started before the group change. On other GPU hosts,
+ask the administrator to check that GPU's device permissions.
 
 #### No VAAPI Support / Driver Not Found
 

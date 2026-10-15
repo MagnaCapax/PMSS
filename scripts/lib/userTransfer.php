@@ -19,6 +19,7 @@
  **/
 
 require_once __DIR__.'/userLifecycle.php';
+require_once __DIR__.'/update/systemPrep/renderNodeAccess.php';
 pmssRequireRelativeFiles(__DIR__, ['update/runtime/commands.php', 'userTransfer/cliParse.php', 'userTransfer/postSetup.php', 'userTransfer/transferRuntime.php']);
 
 /** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
@@ -83,6 +84,9 @@ function pmssUserTransferMain(array $argv): int
             logMessage('[SKIP] Dry run complete');
             return 0;
         }
+
+        // Transfers require an existing local account; converge its GPU group now.
+        pmssEnsureIntelRenderGroupMember($cfg['localUser'], 'logMessage');
 
         $password = pmssUserTransferResolvePassword();
         putenv('PMSS_USER_TRANSFER_PASSWORD='.$password);
