@@ -308,6 +308,25 @@ PHP;
         }
     }
 
+    public function testWriteSnapshotFilesRejectsRedirectedTargetsBeforePublishing(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-iostat-redirect-');
+        $victim = $this->pmssWriteFile($root.'/victim', 'keep');
+        $paths = [$root.'/iostat', $root.'/history', $root.'/raw'];
+        $redirect = $root.'/redirect';
+        $this->assertTrue(symlink($root, $redirect));
+        foreach ([0, 1, 2] as $index) {
+            foreach ([$root.'/linked-'.$index, $redirect.'/victim'] as $unsafe) {
+                if (strpos($unsafe, '/linked-') !== false) $this->assertTrue(symlink($victim, $unsafe));
+                $targets = $paths;
+                $targets[$index] = $unsafe;
+                $this->assertFalse(\pmssDiskIostatWriteSnapshotFiles($targets[0], ['time' => 1], 'raw', $targets[1], $targets[2]));
+                $this->assertSame('keep', file_get_contents($victim));
+                foreach ($paths as $path) $this->assertFalse(file_exists($path));
+            }
+        }
+    }
+
     public function testWriteSnapshotFilesRejectsShortWritesAtEachOutput(): void
     {
         $script = <<<'PHP'

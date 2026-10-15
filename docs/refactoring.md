@@ -51,6 +51,11 @@ applied, even if the directory exists. Existing successful calls retain their
 directory and mode; callers can use their current failure path instead of
 writing into a directory with unintended permissions.
 
+Disk iostat snapshot publication validates all three output paths before the
+first write. Symlinked targets or ancestors and missing parent directories use
+the existing invalid-path failure result; ordinary snapshot and history bytes
+remain unchanged.
+
 The `/home` disk topology readers distinguish an empty slave list from a failed
 slave scan. On scan failure, iostat retains its discovered-device fallback and
 the BFQ probe returns its existing unknown result; a successful empty scan still
