@@ -22,7 +22,10 @@ class AppsCatalogTest extends TestCase
 
     public function testGuivRequiresStayInsideDeliveredSet(): void
     {
-        $guiv = array('welcome', 'stats', 'scriptsInc', 'userMediaStackPanel', 'qbittorrent',
+        $guiv = array('welcome', 'stats', 'scriptsInc', 'scriptsIncFormat', 'scriptsIncFiles',
+            'scriptsIncFrontend', 'scriptsIncBonus', 'scriptsIncCgroup', 'scriptsIncBackup',
+            'scriptsIncRestoreTar', 'scriptsIncRestore', 'scriptsIncAppProcess', 'scriptsIncAppsHtml',
+            'scriptsIncAppsStatus', 'scriptsIncActionJs', 'userMediaStackPanel', 'qbittorrent',
             'deluge', 'rclone', 'rtorrentRestart', 'lighttpdRestart');
         foreach ($guiv as $name) {
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
@@ -38,7 +41,7 @@ class AppsCatalogTest extends TestCase
                     continue;
                 }
                 $this->assertTrue(strpos($expression, '$path') !== false &&
-                    ($name === 'scriptsInc' && strpos($source, 'is_file($path)') !== false
+                    (in_array($name, array('scriptsInc', 'scriptsIncFiles'), true) && strpos($source, 'is_file($path)') !== false
                         || $name === 'welcome' && strpos($source, "file_exists(\$path = '/etc/seedbox/config/network')") !== false),
                     $name.' has an unguarded dynamic include: '.$expression);
             }

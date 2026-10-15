@@ -1,0 +1,122 @@
+<?php
+/** AppsStatus helpers. Loaded by scriptsInc.php; never require a part directly. */
+
+if (!function_exists('pmssCustomerAppsTmuxSessionsParse')) {
+/** Accept only a single pane launched from the installer's app directory. */
+function pmssCustomerAppsTmuxSessionsParse(string $output): array
+{
+    $paths = array('cloudplow' => array('/.bin/cloudplow', 'cloudplow.py'));
+    foreach (pmssMediaStackPanelAppDefinitionsRead() as $app => $definition) {
+        $files = $definition['markers']['file'] ?? $definition['secureMarkers']['file'];
+        $paths[$app] = array('/'.dirname($files[0]), basename($files[0]));
+    }
+    $sessions = array();
+    $counts = array();
+    foreach (explode("\n", trim($output)) as $line) {
+        $parts = explode('|', $line, 2);
+        if (count($parts) !== 2 || !isset($paths[$parts[0]])) continue;
+        $name = $parts[0];
+        $counts[$name] = ($counts[$name] ?? 0) + 1;
+        if (strpos($parts[1], $paths[$name][0]) !== false
+            && strpos($parts[1], $paths[$name][1]) !== false) $sessions[$name] = true;
+    }
+    foreach ($counts as $name => $count) if ($count !== 1) unset($sessions[$name]);
+    return $sessions;
+}
+}
+
+if (!function_exists('pmssCustomerAppsTmuxSessionsRead')) {
+/** One tmux query covers every media app without trusting a session name alone. */
+function pmssCustomerAppsTmuxSessionsRead(): array
+{
+    $output = pmssFrontendShellExec("tmux list-panes -a -F '#{session_name}|#{pane_start_command}' 2>/dev/null");
+    return function_exists('pmssMediaStackPanelAppDefinitionsRead')
+        ? pmssCustomerAppsTmuxSessionsParse((string) $output) : array();
+}
+}
+
+if (!function_exists('pmssCustomerAppsStatusRead')) {
+/** Use current markers and processes, never a potentially stale watchdog snapshot. */
+function pmssCustomerAppsStatusRead(string $home, string $username, string $hostname): array
+{
+    $panel = function_exists('pmssMediaStackPanelStatusRead')
+        ? pmssMediaStackPanelStatusRead($home, $username, $hostname) : array();
+    $installed = function_exists('pmssMediaStackPanelExpectedAppIdsRead')
+        ? pmssMediaStackPanelExpectedAppIdsRead($home) : array();
+    if (function_exists('pmssMediaStackPanelAppDefinitionsRead')
+        && is_file(pmssCustomerHomePath($home, '.bin/cloudplow/cloudplow/cloudplow.py'))) $installed['cloudplow'] = true;
+    $sessions = $installed === array() ? array() : pmssCustomerAppsTmuxSessionsRead();
+    $apps = array();
+    foreach (pmssCustomerAppsMediaIdsRead() as $id) {
+        if (!isset($installed[$id])) continue;
+        $marker = pmssCustomerHomePath($home, '.'.$id.'Disable');
+        $security = $panel['security'][$id] ?? array();
+        $apps[$id] = array(
+            'kind' => 'media',
+            'state' => is_file($marker) ? 'off' : (isset($sessions[$id]) ? 'running' : 'not-running'),
+            'url' => (string) ($security['url'] ?? ''),
+            'security' => (string) ($security['status'] ?? 'Unavailable'),
+            'protected' => !empty($security['protected']),
+            'exposed' => $security !== array() && empty($security['protected']),
+            'canSecure' => !empty($security['canSecure']),
+        );
+    }
+    $rtorrentOff = is_file(pmssCustomerHomePath($home, '.rtorrentDisable'));
+    $apps['rtorrent'] = array('kind' => 'rtorrent', 'state' => $rtorrentOff ? 'off'
+        : (pmssCustomerNativePidsRead(array('/usr/bin/rtorrent', '/usr/local/bin/rtorrent')) !== array() ? 'running' : 'not-running'), 'url' => 'rutorrent/');
+    foreach (pmssCustomerManagedAppDefinitions() as $name => $definition) {
+        if (!pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
+        $enabled = is_file(pmssCustomerHomePath($home, basename($definition['enable'])));
+        $apps[$name] = array('kind' => 'managed', 'state' => !$enabled ? 'off'
+            : (pmssCustomerNativePidsRead($definition['binaries']) !== array() ? 'running' : 'not-running'),
+            'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : 'rclone/'),
+            'endpoint' => $definition['endpoint']);
+    }
+    // This page is served by the account's lighttpd, so a successful request proves it is running.
+    $apps['lighttpd'] = array('kind' => 'web', 'state' => 'running');
+    return array('apps' => $apps, 'installed' => $installed !== array(),
+        'canStart' => !empty($panel['canStart']) && is_file(__DIR__.'/mediaStack.php'),
+        'canRestart' => !empty($panel['canRestart']) && is_file(__DIR__.'/mediaStack.php'),
+        'poll' => !empty($panel['poll']), 'message' => (string) ($panel['message'] ?? ''),
+        'mediaAppControl' => is_file(__DIR__.'/appsRuntime.php'));
+}
+}
+
+if (!function_exists('pmssCustomerAppsStatusJsonEmit')) {
+/** Send one read-only status shape from either customer page. */
+function pmssCustomerAppsStatusJsonEmit(): void
+{
+    pmssWelcomeRequireLocalHelper('userMediaStackPanel.php');
+    $home = dirname(__DIR__);
+    $hostname = function_exists('gethostname') ? (string) gethostname() : '';
+    $status = pmssCustomerAppsStatusRead($home, basename(rtrim($home, '/')),
+        $hostname !== '' ? $hostname : (string) php_uname('n'));
+    $rows = array();
+    foreach ($status['apps'] as $id => $app) {
+        if ($status['poll'] && $app['kind'] === 'media') continue;
+        $rows[$id] = pmssCustomerAppRowHtmlBuild($id, $app, $status['mediaAppControl']);
+    }
+    $status['rows'] = $rows;
+    $status['mediaHtml'] = pmssCustomerAppsMediaRowsBuild($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($status);
+}
+}
+
+if (!function_exists('pmssCustomerAppsLogJsonEmit')) {
+/** Serve bounded media logs through either page when the newer runtime is installed. */
+function pmssCustomerAppsLogJsonEmit(): void
+{
+    pmssWelcomeRequireLocalHelper('appsRuntime.php');
+    $app = is_string($_GET['log'] ?? null) ? $_GET['log'] : '';
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    if (!function_exists('pmssAppsLogTailRead') || !in_array($app, pmssCustomerAppsMediaIdsRead(), true)) {
+        http_response_code(400);
+        echo '{}';
+        return;
+    }
+    echo json_encode(array('app' => $app, 'html' => pmssAppsLogTailRead(dirname(__DIR__), $app)));
+}
+}
