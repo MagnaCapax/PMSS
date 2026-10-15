@@ -64,20 +64,6 @@ function pmssUserRefreshMarkDone(string $user, string $signature, ?callable $wri
     }
 }
 
-function pmssUserMaintenanceRecordProfile(string $user, string $status, int $rc, float $duration, string $stderrExcerpt = ''): void
-{
-    pmssRecordProfile([
-        'description'    => 'updateUser '.$user,
-        'command'        => '',
-        'status'         => $status,
-        'rc'             => $rc,
-        'duration'       => round($duration, 4),
-        'dry_run'        => false,
-        'stdout_excerpt' => '',
-        'stderr_excerpt' => $stderrExcerpt,
-    ]);
-}
-
 function pmssUserMaintenanceLegacyCpuQuotaNeedsFix(string $sliceDir): bool
 {
     foreach (is_dir($sliceDir) ? (glob($sliceDir.'/*.conf') ?: []) : [] as $file) {
@@ -195,7 +181,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
 
             $userDuration = microtime(true) - $userStart;
             pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
-            pmssUserMaintenanceRecordProfile($userTrim, 'OK', 0, $userDuration);
+            pmssCommandProfileRecord('updateUser '.$userTrim, '', 'OK', 0, $userDuration, false);
             pmssUserRefreshMarkDone($userTrim, $refreshSignature);
             $processedUsers++;
         } catch (\Throwable $throwable) {
@@ -206,7 +192,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
 
             logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: %s", $userTrim, $reason));
             pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
-            pmssUserMaintenanceRecordProfile($userTrim, 'ERR', 1, $userDuration, substr(preg_replace('/\s+/', ' ', $reason), 0, 300));
+            pmssCommandProfileRecord('updateUser '.$userTrim, '', 'ERR', 1, $userDuration, false, '', substr(preg_replace('/\s+/', ' ', $reason), 0, 300));
         }
     }
 

@@ -362,9 +362,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 'required' => [
                     'Synchronizing per-user htpasswd',
                     'Checking lighttpd instance',
-                    "'description'    => 'updateUser '.\$user",
-                    "'stdout_excerpt' => ''",
-                    "'stderr_excerpt' => \$stderrExcerpt",
+                    "pmssCommandProfileRecord('updateUser '.\$userTrim, '', 'OK', 0, \$userDuration, false);",
+                    "pmssCommandProfileRecord('updateUser '.\$userTrim, '', 'ERR', 1, \$userDuration, false, '',",
                     'Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)',
                     "'users/docker.php'",
                     "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';",
