@@ -13,6 +13,19 @@ final class TerminateUserContractTest extends TestCase
         $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)']]);
     }
 
+    public function testTerminateUserReleasesEveryToggleAppPortAndCrashState(): void
+    {
+        // Every port service the toggle-app watchdog reserves must be released on termination.
+        $source = $this->pmssReadRepoFile('scripts/lib/user/toggleApp.php');
+        preg_match_all("/pmssPortManagerAssignServicePort\\(\\\$user, '([a-z-]+)'\\)/", $source, $named);
+        $services = array_merge(array('slskd', 'copyparty'), $named[1]);
+        $this->assertTrue(in_array('slskd-peer', $services, true));
+        foreach (array_unique($services) as $service) {
+            $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', "release '.escapeshellarg(\$username).' {$service}'");
+        }
+        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', '/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json');
+    }
+
     public function testTerminateUserInvokesSystemdRevertOnSlice(): void
     {
         $this->pmssAssertRepoFileContainsString(

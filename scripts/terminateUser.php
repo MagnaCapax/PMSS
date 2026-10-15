@@ -194,8 +194,15 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('release_media_autobrr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-autobrr'),
     array('release_media_jellyfin_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-jellyfin'),
     array('release_media_openclaw_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-openclaw'),
+    array('release_slskd_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' slskd'),
+    array('release_slskd_peer_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' slskd-peer'),
+    array('release_copyparty_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' copyparty'),
 ), $dryRun);
 pmssTerminateUserUnlinkPath($username, 'remove_nginx_user_file', "/etc/nginx/users/{$username}", $dryRun);
+// Toggle-app crash history lives outside the home; a later account with the same name must not inherit it.
+foreach (array('slskd', 'copyparty') as $toggleApp) {
+    pmssTerminateUserUnlinkPath($username, 'remove_toggle_app_state', "/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json", $dryRun);
+}
 
 // Home and the recreate backup are purged the same way; immutable flags are
 // cleared by verified inode on the residue only.
