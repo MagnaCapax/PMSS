@@ -1040,7 +1040,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Whole-Account Service Restart – `etc/skel/www/scriptsInc.php`
 
-- Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone frontends, stopped media-stack tmux apps, and Lighttpd.
+- Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone/slskd/Copyparty frontends, stopped media-stack tmux apps, and Lighttpd.
 - Requests run sequentially as the authenticated customer; qBittorrent retains its account-password synchronization challenge, media-stack recovery retains its same-origin AJAX POST gate, and failures do not prevent later services from receiving their request.
 - The Lighttpd request is sent last so its graceful restart cannot interrupt earlier panel requests. Media-stack recovery uses the existing `--start-stopped` path and preserves live tmux sessions.
 
@@ -1053,6 +1053,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - The web install launcher closes its standard streams before returning the POST response; its PID file records the installer process used by status polling.
 - All state-changing customer endpoints require POST with `X-Requested-With: XMLHttpRequest`. A GET action returns HTTP 405. qBittorrent retains the HTTP 428 password-sync challenge.
 - Media app stop writes `~/.<app>Disable`; start removes it; restart preserves it. The observe-only watchdog publishes `off` with zero failures for marked apps, and bulk recovery skips them. Native frontend stops signal only account-owned processes in the panel's mount namespace whose executable resolves to the app's native binary allowlist; Deluge's Python entry points also require an exact interpreter and script match.
+- slskd and Copyparty start only after account-UID PHP writes a mode-0600 config and separate random service login, followed by a secured marker. Their port-manager-assigned listeners bind to loopback and retain `/user-<name>/<app>/` through the lighttpd proxy. Root stores crash counts outside home: five consecutive starts missing at the next watchdog run yield `gave up`; restart clears that gate. The Apps row reads owner-only login and account-written `running`, `stopped`, `not secured`, or `gave up` state.
 
 ---
 

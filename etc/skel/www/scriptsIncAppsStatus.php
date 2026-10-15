@@ -69,8 +69,19 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
         $enabled = is_file(pmssCustomerHomePath($home, basename($definition['enable'])));
         $apps[$name] = array('kind' => 'managed', 'state' => !$enabled ? 'off'
             : (pmssCustomerNativePidsRead($definition['binaries']) !== array() ? 'running' : 'not-running'),
-            'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : 'rclone/'),
+            'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : ($name === 'rclone' ? 'rclone/' : $name.'/')),
             'endpoint' => $definition['endpoint']);
+        if ($name === 'slskd' || $name === 'copyparty') {
+            $base = pmssCustomerHomePath($home, '.pmss/apps/'.$name);
+            $state = @file_get_contents($base.'.state');
+            if ($enabled) $apps[$name]['state'] = !is_file($base.'.secured') ? 'not secured'
+                : ($apps[$name]['state'] === 'running' ? 'running' : (trim((string) $state) === 'gave up' ? 'gave up' : 'stopped'));
+            $login = $base.'.login';
+            if (is_file($login) && !is_link($login) && (@fileperms($login) & 0777) === 0600
+                && function_exists('posix_geteuid') && @fileowner($login) === posix_geteuid()) {
+                $apps[$name]['login'] = trim((string) @file_get_contents($login));
+            }
+        }
     }
     // This page is served by the account's lighttpd, so a successful request proves it is running.
     $apps['lighttpd'] = array('kind' => 'web', 'state' => 'running');

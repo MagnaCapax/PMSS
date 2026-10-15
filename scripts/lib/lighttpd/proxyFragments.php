@@ -67,6 +67,14 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             ],
         ],
         'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
+        'slskd' => ["# PMSS-managed: slskd reverse proxy.\n\n", [
+            ['redirect', '/user-'.$user.'/slskd', '/user-'.$user.'/slskd/'],
+            ['^/user-'.$user.'/slskd/', [], false, true],
+        ]],
+        'copyparty' => ["# PMSS-managed: Copyparty reverse proxy.\n\n", [
+            ['redirect', '/user-'.$user.'/copyparty', '/user-'.$user.'/copyparty/'],
+            ['^/user-'.$user.'/copyparty/', [], false, true],
+        ]],
         'qbittorrent' => [
             "# PMSS-managed: qBittorrent reverse proxy.\n\n",
             [

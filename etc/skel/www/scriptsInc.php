@@ -1120,6 +1120,8 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
    'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php', 'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')),
    'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')),
    'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php',      'binaries' => array('/usr/bin/rclone')),
+   'slskd'       => array('enable' => '../.slskdEnable',       'endpoint' => 'slskd.php',       'binaries' => array('/opt/slskd/slskd')),
+   'copyparty'   => array('enable' => '../.copypartyEnable',   'endpoint' => 'copyparty.php',   'binaries' => array('/usr/local/bin/copyparty-sfx.py')),
   ); }
 }
 
@@ -1271,8 +1273,19 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
         $enabled = is_file(pmssCustomerHomePath($home, basename($definition['enable'])));
         $apps[$name] = array('kind' => 'managed', 'state' => !$enabled ? 'off'
             : (pmssCustomerNativePidsRead($definition['binaries']) !== array() ? 'running' : 'not-running'),
-            'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : 'rclone/'),
+            'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : ($name === 'rclone' ? 'rclone/' : $name.'/')),
             'endpoint' => $definition['endpoint']);
+        if ($name === 'slskd' || $name === 'copyparty') {
+            $base = pmssCustomerHomePath($home, '.pmss/apps/'.$name);
+            $state = @file_get_contents($base.'.state');
+            if ($enabled) $apps[$name]['state'] = !is_file($base.'.secured') ? 'not secured'
+                : ($apps[$name]['state'] === 'running' ? 'running' : (trim((string) $state) === 'gave up' ? 'gave up' : 'stopped'));
+            $login = $base.'.login';
+            if (is_file($login) && !is_link($login) && (@fileperms($login) & 0777) === 0600
+                && function_exists('posix_geteuid') && @fileowner($login) === posix_geteuid()) {
+                $apps[$name]['login'] = trim((string) @file_get_contents($login));
+            }
+        }
     }
     // This page is served by the account's lighttpd, so a successful request proves it is running.
     $apps['lighttpd'] = array('kind' => 'web', 'state' => 'running');
@@ -1291,7 +1304,8 @@ function pmssCustomerAppsDescriptionsRead(): array
         'Prowlarr' => 'Manages indexers for Sonarr and Radarr', 'SABnzbd' => 'Usenet downloader',
         'Autobrr' => 'Grabs releases from IRC announces', 'Cloudplow' => 'Moves finished files to cloud storage',
         'rTorrent + ruTorrent' => 'Your main torrent client', 'qBittorrent' => 'Second torrent client',
-        'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage');
+        'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage',
+        'slskd' => 'Soulseek client', 'Copyparty' => 'Private file sharing');
 }
 
 /** The installed rows use one shared responsive markup shape. */
@@ -1314,16 +1328,19 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
         'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr',
         'cloudplow' => 'Cloudplow', 'rtorrent' => 'rTorrent + ruTorrent',
         'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone',
+        'slskd' => 'slskd', 'copyparty' => 'Copyparty',
         'lighttpd' => 'Web server');
     $name = $names[$id] ?? $id;
     $description = pmssCustomerAppsDescriptionsRead()[$name] ?? ($id === 'lighttpd' ? 'Your account web server' : '');
     $state = $app['state'];
     $label = $state === 'off' ? ($app['kind'] === 'managed' ? 'Off' : 'Stopped by you')
-        : ($state === 'not-running' ? 'Not running' : ($state === 'running' ? 'Running' : 'Status unavailable'));
+        : ($state === 'not-running' ? 'Not running' : ($state === 'running' ? 'Running'
+            : ($state === 'not secured' ? 'Not secured' : ($state === 'gave up' ? 'Gave up' : ($state === 'stopped' ? 'Stopped' : 'Status unavailable')))));
     $pillClass = $state === 'running' ? 'p-run' : ($state === 'off' ? 'p-off' : 'p-stop');
     $html = pmssCustomerAppRowStart($name, $description, $id)
         .'<span class="pill '.$pillClass.'">'.pmssCustomerHtmlAttr($label).'</span>';
     if (!empty($app['exposed'])) $html .= '<span class="pill p-warn">No login set</span>';
+    if (!empty($app['login'])) $html .= '<span class="desc">Login: <code>'.pmssCustomerHtmlAttr($app['login']).'</code></span>';
     $html .= '<div class="acts">';
     if (($state === 'running' || $app['kind'] === 'media') && !empty($app['url'])) {
         $html .= '<a class="b b-pri" href="'.pmssCustomerHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open</a>';
@@ -1340,6 +1357,7 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
     } elseif ($app['kind'] === 'managed') {
         if ($state === 'running') $html .= pmssCustomerAppButton('Restart', 'restart').pmssCustomerAppButton('Turn off', 'disable');
         elseif ($state === 'off') $html .= pmssCustomerAppButton('Turn on', 'start', 'b-pri');
+        elseif ($state === 'gave up') $html .= pmssCustomerAppButton('Restart', 'restart', 'b-pri').pmssCustomerAppButton('Turn off', 'disable');
         else $html .= pmssCustomerAppButton('Start', 'start', 'b-pri').pmssCustomerAppButton('Turn off', 'disable');
     } else {
         $html .= pmssCustomerAppButton('Restart', 'restart', 'b-pri');
@@ -1728,18 +1746,18 @@ function pmssAppsWait(id, desired, deadline) {
     }, 2000);
 }
 function pmssAppsAct(button, id, action) {
-    var row = $(button).closest('.row'), kind = id === 'rtorrent' ? 'rtorrent' : (id === 'lighttpd' ? 'web' : (id === 'qBittorrent' || id === 'Deluge' || id === 'rclone' ? 'managed' : 'media'));
+    var row = $(button).closest('.row'), kind = id === 'rtorrent' ? 'rtorrent' : (id === 'lighttpd' ? 'web' : (id === 'qBittorrent' || id === 'Deluge' || id === 'rclone' || id === 'slskd' || id === 'copyparty' ? 'managed' : 'media'));
     if (action === 'log') { $.getJSON(pmssAppsStatusUrl().replace('status=1', 'log=' + encodeURIComponent(id)), function(payload) { row.find('.row-log').html(payload.html || 'No log available.').prop('hidden', false); }); return; }
     if (id === 'rtorrent' && action === 'stop' && !window.confirm('Stop rTorrent? All your torrents stop seeding until you start it again.')) return;
     if (action === 'secure') { if (!window.confirm('Secure this app with its default login?')) return; pmssMediaStackSecureApp(button, id); return; }
-    var endpoint = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : (kind === 'web' ? 'lighttpdRestart.php?action=confirm-restart' : (id === 'qBittorrent' ? 'qbittorrent.php' : id === 'Deluge' ? 'deluge.php' : 'rclone.php') + '?action=' + action));
+    var endpoint = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : (kind === 'web' ? 'lighttpdRestart.php?action=confirm-restart' : (id === 'qBittorrent' ? 'qbittorrent.php' : id === 'Deluge' ? 'deluge.php' : id === 'slskd' ? 'slskd.php' : id === 'copyparty' ? 'copyparty.php' : 'rclone.php') + '?action=' + action));
     var desired = action === 'stop' || action === 'disable' ? 'off' : 'running';
     pmssAppsBusy[id] = true;
     row.find('.row-error').text(''); row.find('.row-progress').text(action === 'stop' || action === 'disable' ? 'Stopping…' : 'Starting…');
     row.find('button').prop('disabled', true);
     pmssActionRequest({url:endpoint, data:kind === 'media' ? {app:id} : null, passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''}).done(function() {
         if (kind === 'web') { pmssAppsBusy[id] = false; row.find('.row-progress').text('Restart requested.'); row.find('button').prop('disabled', false); return; }
-        pmssAppsWait(id, desired, Date.now() + 60000);
+        pmssAppsWait(id, desired, Date.now() + ((id === 'slskd' || id === 'copyparty') ? 120000 : 60000));
     }).fail(function(xhr, cancelled) {
         pmssAppsBusy[id] = false; row.find('.row-progress').text(''); row.find('button').prop('disabled', false);
         if (!cancelled) row.find('.row-error').text((xhr.responseJSON && xhr.responseJSON.message) || 'Action failed. Please try again.');
@@ -1754,7 +1772,7 @@ function pmssAppsRestartAll(button) {
     $.getJSON(pmssAppsStatusUrl(), function(status) {
         var actions = [], failures = 0, apps = status.apps || {};
         if (apps.rtorrent && apps.rtorrent.state !== 'off') actions.push({url:'rtorrentRestart.php?action=restart'});
-        $.each({qBittorrent:'qbittorrent.php', Deluge:'deluge.php', rclone:'rclone.php'}, function(id, endpoint) {
+        $.each({qBittorrent:'qbittorrent.php', Deluge:'deluge.php', rclone:'rclone.php', slskd:'slskd.php', copyparty:'copyparty.php'}, function(id, endpoint) {
             if (apps[id] && apps[id].state !== 'off') actions.push({url:endpoint + '?action=restart', passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''});
         });
         if (status.installed && status.canRestart && $('#pmss-start-all').length) actions.push({url:'mediaStack.php?action=start-stopped'});

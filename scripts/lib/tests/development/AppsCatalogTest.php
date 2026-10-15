@@ -26,7 +26,7 @@ class AppsCatalogTest extends TestCase
             'scriptsIncFrontend', 'scriptsIncBonus', 'scriptsIncCgroup', 'scriptsIncBackup',
             'scriptsIncRestoreTar', 'scriptsIncRestore', 'scriptsIncAppProcess', 'scriptsIncAppsHtml',
             'scriptsIncAppsStatus', 'scriptsIncActionJs', 'userMediaStackPanel', 'qbittorrent',
-            'deluge', 'rclone', 'rtorrentRestart', 'lighttpdRestart');
+            'deluge', 'rclone', 'slskd', 'copyparty', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
         foreach ($guiv as $name) {
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
             $tokens = token_get_all($source);
@@ -438,7 +438,7 @@ class AppsCatalogTest extends TestCase
     public function testEveryStateEndpointRejectsGetAndAcceptsAjaxPostGate(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home): void {
-            foreach (array('qbittorrent.php', 'deluge.php', 'rclone.php', 'rtorrentRestart.php',
+            foreach (array('qbittorrent.php', 'deluge.php', 'rclone.php', 'slskd.php', 'copyparty.php', 'rtorrentRestart.php',
                 'lighttpdRestart.php', 'mediaStack.php') as $endpoint) {
                 $action = $endpoint === 'mediaStack.php' ? 'app-stop' : 'unknown';
                 $get = $this->pmssAppsEndpointProbe($home, $endpoint, $action, 'GET', true);

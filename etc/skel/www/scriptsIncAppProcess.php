@@ -7,6 +7,8 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
    'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php', 'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')),
    'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')),
    'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php',      'binaries' => array('/usr/bin/rclone')),
+   'slskd'       => array('enable' => '../.slskdEnable',       'endpoint' => 'slskd.php',       'binaries' => array('/opt/slskd/slskd')),
+   'copyparty'   => array('enable' => '../.copypartyEnable',   'endpoint' => 'copyparty.php',   'binaries' => array('/usr/local/bin/copyparty-sfx.py')),
   ); }
 }
 

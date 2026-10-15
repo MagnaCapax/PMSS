@@ -234,6 +234,11 @@ function pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?ca
     foreach ($processNeedles as $name => $needle) {
         $apps[$name] = $psOutput === null ? 'error' : (stripos($psOutput, $needle) !== false ? 'active' : 'stopped');
     }
+    foreach (array('slskd', 'copyparty') as $name) {
+        $definitions = function_exists('pmssCustomerManagedAppDefinitions') ? pmssCustomerManagedAppDefinitions() : array();
+        $apps[$name] = function_exists('pmssCustomerNativePidsRead') && isset($definitions[$name])
+            && pmssCustomerNativePidsRead($definitions[$name]['binaries']) !== array() ? 'active' : 'stopped';
+    }
 
     $dockerStatus = 'error';
     if ($uid !== null && file_exists('/run/user/'.$uid.'/docker.sock')) {

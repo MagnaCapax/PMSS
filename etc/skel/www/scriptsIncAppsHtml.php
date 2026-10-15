@@ -10,7 +10,8 @@ function pmssCustomerAppsDescriptionsRead(): array
         'Prowlarr' => 'Manages indexers for Sonarr and Radarr', 'SABnzbd' => 'Usenet downloader',
         'Autobrr' => 'Grabs releases from IRC announces', 'Cloudplow' => 'Moves finished files to cloud storage',
         'rTorrent + ruTorrent' => 'Your main torrent client', 'qBittorrent' => 'Second torrent client',
-        'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage');
+        'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage',
+        'slskd' => 'Soulseek client', 'Copyparty' => 'Private file sharing');
 }
 }
 
@@ -39,16 +40,19 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
         'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr',
         'cloudplow' => 'Cloudplow', 'rtorrent' => 'rTorrent + ruTorrent',
         'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone',
+        'slskd' => 'slskd', 'copyparty' => 'Copyparty',
         'lighttpd' => 'Web server');
     $name = $names[$id] ?? $id;
     $description = pmssCustomerAppsDescriptionsRead()[$name] ?? ($id === 'lighttpd' ? 'Your account web server' : '');
     $state = $app['state'];
     $label = $state === 'off' ? ($app['kind'] === 'managed' ? 'Off' : 'Stopped by you')
-        : ($state === 'not-running' ? 'Not running' : ($state === 'running' ? 'Running' : 'Status unavailable'));
+        : ($state === 'not-running' ? 'Not running' : ($state === 'running' ? 'Running'
+            : ($state === 'not secured' ? 'Not secured' : ($state === 'gave up' ? 'Gave up' : ($state === 'stopped' ? 'Stopped' : 'Status unavailable')))));
     $pillClass = $state === 'running' ? 'p-run' : ($state === 'off' ? 'p-off' : 'p-stop');
     $html = pmssCustomerAppRowStart($name, $description, $id)
         .'<span class="pill '.$pillClass.'">'.pmssCustomerHtmlAttr($label).'</span>';
     if (!empty($app['exposed'])) $html .= '<span class="pill p-warn">No login set</span>';
+    if (!empty($app['login'])) $html .= '<span class="desc">Login: <code>'.pmssCustomerHtmlAttr($app['login']).'</code></span>';
     $html .= '<div class="acts">';
     if (($state === 'running' || $app['kind'] === 'media') && !empty($app['url'])) {
         $html .= '<a class="b b-pri" href="'.pmssCustomerHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open</a>';
@@ -65,6 +69,7 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
     } elseif ($app['kind'] === 'managed') {
         if ($state === 'running') $html .= pmssCustomerAppButton('Restart', 'restart').pmssCustomerAppButton('Turn off', 'disable');
         elseif ($state === 'off') $html .= pmssCustomerAppButton('Turn on', 'start', 'b-pri');
+        elseif ($state === 'gave up') $html .= pmssCustomerAppButton('Restart', 'restart', 'b-pri').pmssCustomerAppButton('Turn off', 'disable');
         else $html .= pmssCustomerAppButton('Start', 'start', 'b-pri').pmssCustomerAppButton('Turn off', 'disable');
     } else {
         $html .= pmssCustomerAppButton('Restart', 'restart', 'b-pri');

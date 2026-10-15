@@ -291,18 +291,18 @@ function pmssAppsWait(id, desired, deadline) {
     }, 2000);
 }
 function pmssAppsAct(button, id, action) {
-    var row = $(button).closest('.row'), kind = id === 'rtorrent' ? 'rtorrent' : (id === 'lighttpd' ? 'web' : (id === 'qBittorrent' || id === 'Deluge' || id === 'rclone' ? 'managed' : 'media'));
+    var row = $(button).closest('.row'), kind = id === 'rtorrent' ? 'rtorrent' : (id === 'lighttpd' ? 'web' : (id === 'qBittorrent' || id === 'Deluge' || id === 'rclone' || id === 'slskd' || id === 'copyparty' ? 'managed' : 'media'));
     if (action === 'log') { $.getJSON(pmssAppsStatusUrl().replace('status=1', 'log=' + encodeURIComponent(id)), function(payload) { row.find('.row-log').html(payload.html || 'No log available.').prop('hidden', false); }); return; }
     if (id === 'rtorrent' && action === 'stop' && !window.confirm('Stop rTorrent? All your torrents stop seeding until you start it again.')) return;
     if (action === 'secure') { if (!window.confirm('Secure this app with its default login?')) return; pmssMediaStackSecureApp(button, id); return; }
-    var endpoint = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : (kind === 'web' ? 'lighttpdRestart.php?action=confirm-restart' : (id === 'qBittorrent' ? 'qbittorrent.php' : id === 'Deluge' ? 'deluge.php' : 'rclone.php') + '?action=' + action));
+    var endpoint = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : (kind === 'web' ? 'lighttpdRestart.php?action=confirm-restart' : (id === 'qBittorrent' ? 'qbittorrent.php' : id === 'Deluge' ? 'deluge.php' : id === 'slskd' ? 'slskd.php' : id === 'copyparty' ? 'copyparty.php' : 'rclone.php') + '?action=' + action));
     var desired = action === 'stop' || action === 'disable' ? 'off' : 'running';
     pmssAppsBusy[id] = true;
     row.find('.row-error').text(''); row.find('.row-progress').text(action === 'stop' || action === 'disable' ? 'Stopping…' : 'Starting…');
     row.find('button').prop('disabled', true);
     pmssActionRequest({url:endpoint, data:kind === 'media' ? {app:id} : null, passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''}).done(function() {
         if (kind === 'web') { pmssAppsBusy[id] = false; row.find('.row-progress').text('Restart requested.'); row.find('button').prop('disabled', false); return; }
-        pmssAppsWait(id, desired, Date.now() + 60000);
+        pmssAppsWait(id, desired, Date.now() + ((id === 'slskd' || id === 'copyparty') ? 120000 : 60000));
     }).fail(function(xhr, cancelled) {
         pmssAppsBusy[id] = false; row.find('.row-progress').text(''); row.find('button').prop('disabled', false);
         if (!cancelled) row.find('.row-error').text((xhr.responseJSON && xhr.responseJSON.message) || 'Action failed. Please try again.');
@@ -317,7 +317,7 @@ function pmssAppsRestartAll(button) {
     $.getJSON(pmssAppsStatusUrl(), function(status) {
         var actions = [], failures = 0, apps = status.apps || {};
         if (apps.rtorrent && apps.rtorrent.state !== 'off') actions.push({url:'rtorrentRestart.php?action=restart'});
-        $.each({qBittorrent:'qbittorrent.php', Deluge:'deluge.php', rclone:'rclone.php'}, function(id, endpoint) {
+        $.each({qBittorrent:'qbittorrent.php', Deluge:'deluge.php', rclone:'rclone.php', slskd:'slskd.php', copyparty:'copyparty.php'}, function(id, endpoint) {
             if (apps[id] && apps[id].state !== 'off') actions.push({url:endpoint + '?action=restart', passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''});
         });
         if (status.installed && status.canRestart && $('#pmss-start-all').length) actions.push({url:'mediaStack.php?action=start-stopped'});
