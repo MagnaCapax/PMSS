@@ -2,13 +2,13 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/user/dockerInstallLsio.php';
+require_once dirname(__DIR__, 4).'/etc/skel/bin/dockerInstallLsio.php';
 
 class LinuxserverInstallPlanSnapshotTest extends TestCase
 {
     public function testLsioAppInstallPlansKeepCommandAndDirectoryShape(): void
     {
-        $home = '/home/example';
+        $home = '/srv/pmss-test-home';
         $snapshot = array();
         foreach (array_keys(\pmssDockerInstallLsioAppCatalog()) as $app) {
             $spec = \pmssDockerInstallLsioAppSpec($app, $home, true);
@@ -23,73 +23,91 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
 
         $this->assertSame(array(
             'jellyfin' => array(
-                'mkdirPaths' => array('/home/example/docker/jellyfin/config', '/home/example/media'),
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/jellyfin/config', '/srv/pmss-test-home/media'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'jellyfin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8096:8096', '-v', '/home/example/docker/jellyfin/config:/config', '-v', '/home/example/media:/data', '--restart', 'unless-stopped', 'lscr.io/linuxserver/jellyfin:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'jellyfin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8096:8096', '-v', '/srv/pmss-test-home/docker/jellyfin/config:/config', '-v', '/srv/pmss-test-home/media:/data', '--restart', 'unless-stopped', 'lscr.io/linuxserver/jellyfin:latest'),
             ),
             'qbittorrent' => array(
-                'mkdirPaths' => array('/home/example/docker/qbittorrent/config', '/home/example/downloads'),
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/qbittorrent/config', '/srv/pmss-test-home/downloads'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'qbittorrent', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '8080:8080', '-e', 'WEBUI_PORT=8080', '-v', '/home/example/docker/qbittorrent/config:/config', '-v', '/home/example/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/qbittorrent:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'qbittorrent', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8080:8080', '-e', 'WEBUI_PORT=8080', '-v', '/srv/pmss-test-home/docker/qbittorrent/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/qbittorrent:latest'),
             ),
             'radarr' => array(
-                'mkdirPaths' => array('/home/example/docker/radarr/config', '/home/example/movies', '/home/example/downloads'),
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/radarr/config', '/srv/pmss-test-home/movies', '/srv/pmss-test-home/downloads'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'radarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '7878:7878', '-v', '/home/example/docker/radarr/config:/config', '-v', '/home/example/movies:/movies', '-v', '/home/example/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/radarr:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'radarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:7878:7878', '-v', '/srv/pmss-test-home/docker/radarr/config:/config', '-v', '/srv/pmss-test-home/movies:/movies', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/radarr:latest'),
             ),
             'sonarr' => array(
-                'mkdirPaths' => array('/home/example/docker/sonarr/config', '/home/example/tv', '/home/example/downloads'),
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/sonarr/config', '/srv/pmss-test-home/tv', '/srv/pmss-test-home/downloads'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'sonarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '8989:8989', '-v', '/home/example/docker/sonarr/config:/config', '-v', '/home/example/tv:/tv', '-v', '/home/example/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/sonarr:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'sonarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8989:8989', '-v', '/srv/pmss-test-home/docker/sonarr/config:/config', '-v', '/srv/pmss-test-home/tv:/tv', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/sonarr:latest'),
             ),
             'prowlarr' => array(
-                'mkdirPaths' => array('/home/example/docker/prowlarr/config'),
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/prowlarr/config'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'prowlarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '9696:9696', '-v', '/home/example/docker/prowlarr/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/prowlarr:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'prowlarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:9696:9696', '-v', '/srv/pmss-test-home/docker/prowlarr/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/prowlarr:latest'),
             ),
             'mariadb' => array(
-                'mkdirPaths' => array('/home/example/docker/mariadb/config'),
-                'credentialFile' => '/home/example/docker/mariadb/pmss-credentials.env',
-                'dbName' => 'db_example_app',
-                'dbUser' => 'db_example',
-                'command' => array('docker', 'run', '-d', '--name', 'mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE=db_example_app', '-e', 'MYSQL_USER=db_example', '-e', 'MYSQL_PASSWORD=<generated-at-install>', '-v', '/home/example/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/mariadb/config'),
+                'credentialFile' => '/srv/pmss-test-home/docker/mariadb/pmss-credentials.env',
+                'dbName' => 'db_pmss_test_home_app',
+                'dbUser' => 'db_pmss_test_home',
+                'command' => array('docker', 'run', '-d', '--name', 'mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE=db_pmss_test_home_app', '-e', 'MYSQL_USER=db_pmss_test_home', '-e', 'MYSQL_PASSWORD=<generated-at-install>', '-v', '/srv/pmss-test-home/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
             ),
             'phpmyadmin' => array(
-                'mkdirPaths' => array('/home/example/docker/phpmyadmin/config'),
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/phpmyadmin/config'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'phpmyadmin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8082:80', '-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306', '-v', '/home/example/docker/phpmyadmin/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/phpmyadmin:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'phpmyadmin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8082:80', '-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306', '-v', '/srv/pmss-test-home/docker/phpmyadmin/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/phpmyadmin:latest'),
             ),
         ), $snapshot);
     }
 
     public function testJellyfinCustomPortAlsoPublishesOnlyOnLoopback(): void
     {
-        $spec = \pmssDockerInstallLsioAppSpec('jellyfin', '/home/example', true);
+        $spec = \pmssDockerInstallLsioAppSpec('jellyfin', '/srv/pmss-test-home', true);
         $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '18096', 'UTC', $spec);
 
         $this->assertSame('127.0.0.1:18096:8096', $command[array_search('-p', $command, true) + 1]);
     }
 
+    public function testEveryCatalogAppPublishesOnLoopbackByDefault(): void
+    {
+        foreach (array_keys(\pmssDockerInstallLsioAppCatalog()) as $app) {
+            $spec = \pmssDockerInstallLsioAppSpec($app, '/srv/pmss-test-home', true);
+            $command = \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec);
+            $publish = $command[array_search('-p', $command, true) + 1];
+            $this->assertSame('127.0.0.1:'.$spec['defaultPort'].':'.$spec['containerPort'], $publish);
+        }
+    }
+
+    public function testExplicitCatalogBindHostIsPreserved(): void
+    {
+        $spec = \pmssDockerInstallLsioAppSpec('radarr', '/srv/pmss-test-home', true);
+        $spec['bindHost'] = '192.0.2.1';
+        $command = \pmssDockerInstallLsioDockerRunCommand('radarr', '17878', 'UTC', $spec);
+        $this->assertSame('192.0.2.1:17878:7878', $command[array_search('-p', $command, true) + 1]);
+    }
+
     public function testLsioMariadbInstallPlanUsesEnvFileOutsideDryRun(): void
     {
-        $spec = \pmssDockerInstallLsioAppSpec('mariadb', '/home/example', false);
+        $spec = \pmssDockerInstallLsioAppSpec('mariadb', '/srv/pmss-test-home', false);
 
-        $this->assertSame('/home/example/docker/mariadb/pmss-credentials.env', $spec['credentialFile']);
-        $this->assertSame(array('--env-file', '/home/example/docker/mariadb/pmss-credentials.env'), $spec['extraArgs']);
+        $this->assertSame('/srv/pmss-test-home/docker/mariadb/pmss-credentials.env', $spec['credentialFile']);
+        $this->assertSame(array('--env-file', '/srv/pmss-test-home/docker/mariadb/pmss-credentials.env'), $spec['extraArgs']);
         $this->assertSame(
-            array('docker', 'run', '-d', '--name', 'mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '--env-file', '/home/example/docker/mariadb/pmss-credentials.env', '-v', '/home/example/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
+            array('docker', 'run', '-d', '--name', 'mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '--env-file', '/srv/pmss-test-home/docker/mariadb/pmss-credentials.env', '-v', '/srv/pmss-test-home/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
             \pmssDockerInstallLsioDockerRunCommand('mariadb', (string) $spec['defaultPort'], 'UTC', $spec)
         );
     }

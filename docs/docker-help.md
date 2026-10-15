@@ -35,9 +35,10 @@ in `~/bin`. It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`,
 `prowlarr`, `mariadb`, and `phpmyadmin`, keeps their mounts under `~/`, joins
 them to a shared `pmss-media` network, and starts them with
 `--restart unless-stopped` so the existing rootless Docker watchdog can bring
-them back with the daemon. MariaDB and phpMyAdmin bind to `127.0.0.1` by
-default, and the MariaDB helper writes separate service credentials to
-`~/docker/mariadb/pmss-credentials.env` on first install:
+them back with the daemon. Every preset binds to `127.0.0.1` by default;
+other accounts on the same host may still reach that loopback address, so
+configure application authentication as well. The MariaDB helper writes separate
+service credentials to `~/docker/mariadb/pmss-credentials.env` on first install:
 
 ```
 docker-install-lsio qbittorrent

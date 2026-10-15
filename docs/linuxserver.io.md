@@ -175,9 +175,10 @@ If you want the most common PMSS-ready presets without retyping the full
 It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, `prowlarr`,
 `mariadb`, and `phpmyadmin`, creates the expected home-directory mounts,
 attaches the containers to a shared `pmss-media` Docker network, and keeps
-`--restart unless-stopped` enabled. Jellyfin and the database presets bind to
-`127.0.0.1` by default. Use the SSH tunnel above for the Jellyfin wizard and
-later browser access. The legacy
+`--restart unless-stopped` enabled. Every preset binds to
+`127.0.0.1` by default. Loopback is shared by accounts on the same host, so
+configure application authentication as well. Use the SSH tunnel above for
+the Jellyfin wizard and later browser access. The legacy
 `~/bin/linuxserverInstall.sh` wrapper remains available for compatibility.
 
 ## 4. Common seedbox recipes

@@ -215,6 +215,7 @@ PHP;
         'install-media-stack.sh',
         'install-ai-tools.sh',
         'bin/docker-install-lsio',
+        'bin/dockerInstallLsio.php',
         'bin/docker-install-wireguard.sh',
         'bin/install-openclaw',
         'bin/linuxserverInstall.sh',

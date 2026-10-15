@@ -1,11 +1,11 @@
 #!/usr/bin/env php
 <?php
 /**
- * Stable tenant wrapper for the shared LSIO installer entrypoint.
+ * Stable tenant wrapper for the customer-delivered LSIO installer.
  */
 
 $target = getenv('PMSS_DOCKER_INSTALL_LSIO_SCRIPT');
-$target = is_string($target) && $target !== '' ? $target : '/scripts/util/dockerInstallLsio.php';
+$target = is_string($target) && $target !== '' ? $target : __DIR__.'/dockerInstallLsio.php';
 
 if (!is_file($target)) {
     fwrite(STDERR, "docker-install-lsio requires {$target}\n");

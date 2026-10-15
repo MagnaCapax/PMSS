@@ -1,16 +1,37 @@
 <?php
 /**
- * LinuxServer.io container installer helpers for tenant-facing wrappers.
+ * LinuxServer.io container installer shared by tenant and operator entrypoints.
  *
- * Keeps the user-home command surface small while centralizing the actual
- * Docker command construction and dry-run safety checks in first-party PHP.
+ * Delivered into each account's bin directory; no operator-tree dependencies.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
+/** Quote a command without passing account-controlled arguments to the shell. */
+function pmssDockerInstallLsioShellCommand(array $command): string
+{
+    return implode(' ', array_map('escapeshellarg', $command));
+}
+
+/** Return the exit status of a quiet Docker preflight. */
+function pmssDockerInstallLsioCheck(array $command): int
+{
+    $status = 1;
+    exec(pmssDockerInstallLsioShellCommand($command).' >/dev/null 2>&1', $unused, $status);
+    return $status;
+}
+
+/** Find Docker on the customer's PATH without loading the operator runtime. */
+function pmssDockerInstallLsioDockerAvailable(): bool
+{
+    foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $directory) {
+        if ($directory !== '' && is_executable($directory.'/docker') && is_file($directory.'/docker')) {
+            return true;
+        }
+    }
+    return false;
+}
 
 /**
  * Build the command usage text for the current entrypoint name.
@@ -52,7 +73,9 @@ function pmssDockerInstallLsioRandomSecret(): string
  */
 function pmssDockerInstallLsioTimezone(): string
 {
-    $timezone = pmssReadRegularFileTrimmed('/etc/timezone');
+    $timezone = is_file('/etc/timezone') && !is_link('/etc/timezone')
+        ? @file_get_contents('/etc/timezone') : false;
+    $timezone = is_string($timezone) ? trim($timezone) : null;
     return $timezone !== null && $timezone !== '' ? $timezone : 'UTC';
 }
 
@@ -76,7 +99,7 @@ function pmssDockerInstallLsioDisplayCommand(array $command): string
 function pmssDockerInstallLsioPassthru(array $command): int
 {
     $rc = 0;
-    passthru(pmssCommandArgvShellQuote($command), $rc);
+    passthru(pmssDockerInstallLsioShellCommand($command), $rc);
     return (int) $rc;
 }
 
@@ -98,7 +121,7 @@ function pmssDockerInstallLsioEnsureDirectories(array $paths): bool
             fwrite(STDERR, "Path already exists and is not a directory: {$path}\n");
             return false;
         }
-        if (!pmssDirEnsureExists($path, 0755)) {
+        if (!@mkdir($path, 0755, true) && !is_dir($path)) {
             fwrite(STDERR, "Failed to create directory: {$path}\n");
             return false;
         }
@@ -120,11 +143,24 @@ function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string
         '',
     ]);
 
-    $account = function_exists('posix_getpwuid') && function_exists('posix_geteuid')
-        ? @posix_getpwuid(posix_geteuid()) : false;
-    $home = dirname(dirname(dirname($credentialFile)));
-    if (!is_array($account) || !isset($account['name'])
-        || !pmssReplaceAccountFile($account['name'], $home, $credentialFile, $payload, 0600)) {
+    // A private same-directory temporary file keeps credentials out of command lines.
+    // Refuse links and other non-regular existing targets before replacement.
+    $existing = @lstat($credentialFile);
+    if ($existing !== false && ((($existing['mode'] ?? 0) & 0170000) !== 0100000
+        || ($existing['nlink'] ?? 0) !== 1
+        || (function_exists('posix_geteuid') && ($existing['uid'] ?? -1) !== posix_geteuid()))) {
+        fwrite(STDERR, "Failed to write credential file: {$credentialFile}\n");
+        return false;
+    }
+    $temporary = @tempnam(dirname($credentialFile), '.pmss-lsio-');
+    $written = is_string($temporary) && dirname($temporary) === dirname($credentialFile)
+        && @chmod($temporary, 0600)
+        && @file_put_contents($temporary, $payload) === strlen($payload)
+        && @rename($temporary, $credentialFile);
+    if (is_string($temporary) && is_file($temporary)) {
+        @unlink($temporary);
+    }
+    if (!$written) {
         fwrite(STDERR, "Failed to write credential file: {$credentialFile}\n");
         return false;
     }
@@ -140,7 +176,9 @@ function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?st
         return $defaultPort;
     }
 
-    $port = pmssNetworkPortParseDigits($value);
+    $raw = trim($value);
+    $port = ctype_digit($raw) && strlen(ltrim($raw, '0')) <= 5 ? (int) $raw : 0;
+    $port = $port >= 1 && $port <= 65535 ? $port : null;
     return $port === null ? null : (string) $port;
 }
 
@@ -186,7 +224,7 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
     $spec = [
         'image' => 'lscr.io/linuxserver/'.$app.':latest',
         'mkdirPaths' => [],
-        'bindHost' => (string) ($appSpec['bindHost'] ?? ''),
+        'bindHost' => (string) ($appSpec['bindHost'] ?? '127.0.0.1'),
         'containerPort' => (string) ($appSpec['containerPort'] ?? $appSpec['port']),
         'defaultPort' => (string) $appSpec['port'],
         'extraArgs' => $appSpec['extraArgs'] ?? [],
@@ -265,23 +303,27 @@ function pmssDockerInstallLsioMain(array $argv): int
     }
 
     if (count($positionals) < 1 || count($positionals) > 2) {
-        return pmssCliReturnWithStderr(pmssDockerInstallLsioUsage($scriptName), 1);
+        fwrite(STDERR, pmssDockerInstallLsioUsage($scriptName));
+        return 1;
     }
 
     $app = (string) $positionals[0];
     $homeDir = (string) getenv('HOME');
     if ($homeDir === '') {
-        return pmssCliReturnWithStderr("HOME is not set.\n", 1);
+        fwrite(STDERR, "HOME is not set.\n");
+        return 1;
     }
 
     $spec = pmssDockerInstallLsioAppSpec($app, $homeDir, $dryRun);
     if ($spec === null) {
-        return pmssCliReturnWithStderr(pmssDockerInstallLsioUsage($scriptName), 1);
+        fwrite(STDERR, pmssDockerInstallLsioUsage($scriptName));
+        return 1;
     }
 
     $hostPort = pmssDockerInstallLsioHostPort(isset($positionals[1]) ? (string) $positionals[1] : null, (string) $spec['defaultPort']);
     if ($hostPort === null) {
-        return pmssCliReturnWithStderr("Invalid host port; expected an integer between 1 and 65535.\n", 1);
+        fwrite(STDERR, "Invalid host port; expected an integer between 1 and 65535.\n");
+        return 1;
     }
 
     $dockerRun = pmssDockerInstallLsioDockerRunCommand($app, $hostPort, pmssDockerInstallLsioTimezone(), $spec);
@@ -292,19 +334,22 @@ function pmssDockerInstallLsioMain(array $argv): int
         return 0;
     }
 
-    if (pmssCommandPath('docker') === '') {
-        return pmssCliReturnWithStderr("docker command not found in PATH\n", 1);
+    if (!pmssDockerInstallLsioDockerAvailable()) {
+        fwrite(STDERR, "docker command not found in PATH\n");
+        return 1;
     }
 
-    if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'info']))['rc'] !== 0) {
-        return pmssCliReturnWithStderr("Docker daemon unavailable; wait for the PMSS rootless Docker watchdog and retry.\n", 1);
+    if (pmssDockerInstallLsioCheck(['docker', 'info']) !== 0) {
+        fwrite(STDERR, "Docker daemon unavailable; wait for the PMSS rootless Docker watchdog and retry.\n");
+        return 1;
     }
 
-    if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'container', 'inspect', $app]))['rc'] === 0) {
-        return pmssCliReturnWithStderr("Container {$app} already exists; remove it manually if you want to recreate it.\n", 1);
+    if (pmssDockerInstallLsioCheck(['docker', 'container', 'inspect', $app]) === 0) {
+        fwrite(STDERR, "Container {$app} already exists; remove it manually if you want to recreate it.\n");
+        return 1;
     }
 
-    if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'network', 'inspect', 'pmss-media']))['rc'] !== 0) {
+    if (pmssDockerInstallLsioCheck(['docker', 'network', 'inspect', 'pmss-media']) !== 0) {
         if (pmssDockerInstallLsioPassthru(['docker', 'network', 'create', 'pmss-media']) !== 0) {
             return 1;
         }

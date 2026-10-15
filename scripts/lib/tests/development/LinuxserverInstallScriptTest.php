@@ -6,7 +6,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/user/dockerInstallLsio.php';
+require_once dirname(__DIR__, 4).'/etc/skel/bin/dockerInstallLsio.php';
 
 class LinuxserverInstallScriptTest extends TestCase
 {
@@ -17,7 +17,7 @@ class LinuxserverInstallScriptTest extends TestCase
     private $bashBin;
     private $installerPath;
     private $legacyInstallerPath;
-    private $utilPath;
+    private $helperPath;
 
     protected function setUp(): void
     {
@@ -29,7 +29,7 @@ class LinuxserverInstallScriptTest extends TestCase
         $this->bashBin = trim((string) shell_exec('command -v bash 2>/dev/null'));
         $this->installerPath = __DIR__.'/../../../../etc/skel/bin/docker-install-lsio';
         $this->legacyInstallerPath = __DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh';
-        $this->utilPath = __DIR__.'/../../../../scripts/util/dockerInstallLsio.php';
+        $this->helperPath = __DIR__.'/../../../../etc/skel/bin/dockerInstallLsio.php';
 
         @mkdir($this->homeDir, 0700, true);
         @mkdir($this->fakeBinDir, 0700, true);
@@ -72,7 +72,8 @@ BASH;
             'HOME='.$this->homeDir,
             'PATH='.$pathValue,
             'PMSS_TEST_DOCKER_LOG='.$this->dockerLog,
-            'PMSS_DOCKER_INSTALL_LSIO_SCRIPT='.$this->utilPath,
+            'PMSS_DOCKER_INSTALL_LSIO_SCRIPT='.$this->helperPath,
+            'PMSS_DOCKER_INSTALL_LSIO_WRAPPER='.$this->installerPath,
         ];
         foreach ($env as $key => $value) {
             $envPairs[] = $key.'='.$value;
@@ -138,7 +139,7 @@ BASH;
         $result = $this->runHelper(['sonarr', '18989', '--dry-run']);
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertStringContainsString('-p 18989:8989', $result['output']);
+        $this->assertStringContainsString('-p 127.0.0.1:18989:8989', $result['output']);
     }
 
     public function testDryRunMariadbUsesLocalOnlyBindAndGeneratedCredentials(): void
@@ -248,6 +249,27 @@ BASH;
         $this->assertStringContainsString('--network pmss-media', $result['output']);
     }
 
+    public function testCustomerTreeDryRunNeedsNoOperatorScripts(): void
+    {
+        $customerBin = $this->homeDir.'/bin';
+        $this->pmssEnsureDir($customerBin);
+        copy($this->installerPath, $customerBin.'/docker-install-lsio');
+        copy($this->helperPath, $customerBin.'/dockerInstallLsio.php');
+        $this->installerPath = $customerBin.'/docker-install-lsio';
+        $this->legacyInstallerPath = $customerBin.'/linuxserverInstall.sh';
+        copy(__DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh', $this->legacyInstallerPath);
+
+        foreach (['current', 'legacy'] as $entry) {
+            $result = $this->runHelper(['radarr', '--dry-run'], [
+                'PMSS_DOCKER_INSTALL_LSIO_SCRIPT' => $customerBin.'/dockerInstallLsio.php',
+                'PMSS_DOCKER_INSTALL_LSIO_WRAPPER' => $customerBin.'/docker-install-lsio',
+            ], $entry);
+            $this->assertSame(0, $result['rc']);
+            $this->assertStringContainsString('-p 127.0.0.1:7878:7878', $result['output']);
+        }
+        $this->assertTrue(strpos(file_get_contents($customerBin.'/dockerInstallLsio.php'), '/scripts/') === false);
+    }
+
     public function testUnknownAppShowsUsage(): void
     {
         $result = $this->runHelper(['bazarr', '--dry-run']);
@@ -261,6 +283,7 @@ BASH;
         $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
 
         $this->assertStringContainsString("'bin/docker-install-lsio'", $source);
+        $this->assertStringContainsString("'bin/dockerInstallLsio.php'", $source);
         $this->assertStringContainsString("'bin/linuxserverInstall.sh'", $source);
     }
 }

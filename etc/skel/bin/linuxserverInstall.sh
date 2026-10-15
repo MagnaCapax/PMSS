@@ -10,7 +10,7 @@ if ! command -v php >/dev/null 2>&1; then
 fi
 
 wrapper_path="${PMSS_DOCKER_INSTALL_LSIO_WRAPPER:-$HOME/bin/docker-install-lsio}"
-script_path="${PMSS_DOCKER_INSTALL_LSIO_SCRIPT:-/scripts/util/dockerInstallLsio.php}"
+script_path="${PMSS_DOCKER_INSTALL_LSIO_SCRIPT:-$HOME/bin/docker-install-lsio}"
 
 if [[ -f "$wrapper_path" ]]; then
 	exec php "$wrapper_path" "$@"
