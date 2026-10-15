@@ -947,6 +947,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Assignment and release recheck the reservation path after acquiring the lock; a concurrent change is handled using the current assignment state.
 
 - etc/skel/install-media-stack.sh
+  - File-count quota preflight uses the account's soft file limit and reserves about 20,000 free files before downloading; unavailable or unlimited quota data does not block installation. A later command failure reports quota exhaustion when the account has reached that limit, and the panel shows the specific failure from the install log.
   - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.
   - App control: `--start-app=APP` launches only one installed, absent tmux session; `--stop-app=APP` kills only a one-pane session whose launch command contains the installer's app directory. A same-named customer session is left untouched. The closed app list includes Jellyfin, Sonarr, Radarr, Prowlarr, SABnzbd, Autobrr, and Cloudplow. `--start-stopped` skips `~/.<app>Disable` markers.
 

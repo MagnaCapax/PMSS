@@ -77,7 +77,7 @@ if [[ $PMSS_MEDIA_STACK_SELF_UPDATE -eq 1 ]]; then
 	fi
 fi
 
-set -euo pipefail # Exit on error, undefined vars, pipe failures
+set -Eeuo pipefail # Exit on error, undefined vars, pipe failures
 
 # ----------------------------------------------------------------------------
 # CLI args, logging and helpers
@@ -94,6 +94,7 @@ STOP_APP=""
 APP_ACTION_REQUESTED=0
 SECURE_APP=""
 MEDIA_STACK_MIN_MEMORY_MIB=1024
+MEDIA_STACK_REQUIRED_FILES=20000
 MEDIA_STACK_MIN_MEMORY_BYTES=$((MEDIA_STACK_MIN_MEMORY_MIB * 1024 * 1024))
 MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))
 # First starts on busy disks can take minutes; session-aware waits stop when the app exits.
@@ -252,6 +253,48 @@ log_info() { echo -e "${C_INFO}[INFO]${C_RESET} $*" >&2; }
 log_ok() { echo -e "${C_OK}[ OK ]${C_RESET} $*" >&2; }
 log_warn() { echo -e "${C_WARN}[WARN]${C_RESET} $*" >&2; }
 log_err() { echo -e "${C_ERR}[ERR ]${C_RESET} $*" >&2; }
+
+# Plain quota output has optional block and file grace columns. Ignore
+# unavailable or unlimited quota data rather than guessing an account limit.
+media_stack_quota_files() {
+	command -v quota >/dev/null 2>&1 || return 0
+	quota -w -p -u 2>/dev/null | awk '
+		$1 ~ /^\// && NF >= 7 {
+			i = NF
+			if ($i !~ /^[0-9]+$/) i--
+			used = $(i-2); soft = $(i-1); hard = $i
+			sub(/\*$/, "", used)
+			if (used ~ /^[0-9]+$/ && soft ~ /^[0-9]+$/ && hard ~ /^[0-9]+$/ &&
+				length(used) <= 15 && length(soft) <= 15 && soft + 0 > 0) {
+				print used, soft
+				exit
+			}
+		}' || true
+}
+
+media_stack_inode_preflight_guard() {
+	local used soft
+	read -r used soft < <(media_stack_quota_files) || true
+	[[ -n "${soft:-}" ]] || return 0
+	if ((used > soft - MEDIA_STACK_REQUIRED_FILES)); then
+		log_err "File-count quota is too small: media stack needs about ${MEDIA_STACK_REQUIRED_FILES} free files; ${used} are used and this account allows ${soft}."
+		exit 1
+	fi
+}
+
+# ERR also reaches functions; diagnose quota failures that happen after preflight.
+media_stack_install_error() {
+	local rc="$1" used soft
+	trap - ERR
+	read -r used soft < <(media_stack_quota_files) || true
+	if [[ -n "${soft:-}" ]] && ((used >= soft)); then
+		log_err "File quota reached during media stack install; free account files and retry."
+	else
+		log_err "Media stack install stopped after a command failed (exit ${rc}); see the log above."
+	fi
+	exit "$rc"
+}
+trap 'media_stack_install_error "$?"' ERR
 
 # Relaunch only absent sessions through the installer-managed aliases. This
 # gives the panel one explicit recovery action without creating a restart loop.
@@ -588,7 +631,7 @@ extract_tgz() {
 		return
 	fi
 	[[ -n "$s" ]] && tar_args+=(--strip-components="$s")
-	tar "${tar_args[@]}" >/dev/null 2>&1
+	tar "${tar_args[@]}" >/dev/null
 	rm -f "$a" >/dev/null 2>&1
 	echo "Installation files downloaded and extracted"
 }
@@ -1311,6 +1354,7 @@ if [[ -z "$SECURE_APP" ]]; then
 
 	log_ok "All required dependencies found"
 	media_stack_memory_preflight_guard
+	media_stack_inode_preflight_guard
 
 	# Fetch latest checksums for download verification
 	[[ $DRY_RUN -eq 0 ]] && fetch_checksums_file
@@ -2346,7 +2390,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 	managed_install_path_reset "$installdir"
 	python3 -m venv "$installdir"
 	cd "$installdir"
-	git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
+	git clone https://github.com/l3uddz/cloudplow.git >/dev/null
 	cd "${installdir}/cloudplow" && git checkout "$CLOUDPLOW_COMMIT" >/dev/null 2>&1
 	cd "$installdir"
 	python_venv_install_requirements "$installdir" "${installdir}/cloudplow/requirements.txt"

@@ -625,6 +625,9 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
     $pid = pmssMediaStackPanelPidRead($home);
     $running = pmssMediaStackPanelPidRunning($home, $pid);
     $logTail = pmssMediaStackPanelLogTailRead($home);
+    $quotaPreflightFailure = strpos($logTail, 'File-count quota is too small:') !== false;
+    $quotaFailure = $quotaPreflightFailure
+        || strpos($logTail, 'File quota reached during media stack install;') !== false;
     $gate = pmssMediaStackPanelStartGateRead($home);
     $urls = ($installed || $logTail !== '') ? pmssMediaStackPanelUrlsRead($home, $username, $hostname) : array();
     $security = ($installed || $logTail !== '') ? pmssMediaStackPanelSecurityStatusesRead($home, $username, $hostname) : array();
@@ -636,6 +639,17 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
             'message' => 'Media stack install is running. This can take several minutes.',
             'details' => array('The page refreshes status automatically while the installer runs.'),
             'poll' => true,
+        ));
+    }
+
+    if ($quotaFailure) {
+        return array_merge($status, array(
+            'state' => 'failed',
+            'message' => $quotaPreflightFailure
+                ? 'Media stack needs about 20,000 free files; this account has insufficient file quota.'
+                : 'File quota reached during media stack installation.',
+            'details' => array('Free account files and retry the installer. Use SSH to repair a partial install.'),
+            'canStart' => !$installed && $gate['ok'],
         ));
     }
 

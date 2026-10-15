@@ -361,6 +361,31 @@ class MediaStackPanelTest extends TestCase
         $this->assertStringContainsString('Download failed', $status['tail']);
     }
 
+    public function testStatusShowsFileQuotaFailure(): void
+    {
+        foreach (array(
+            array('[ERR ] File-count quota is too small: media stack needs about 20000 free files;', 'insufficient file quota'),
+            array('[ERR ] File quota reached during media stack install; free account files and retry.', 'File quota reached'),
+        ) as $case) {
+            list($line, $message) = $case;
+            $status = $this->mediaStatusFixture('pmss-media-quota-', '.install-media-stack.log', $line."\n");
+            $this->assertSame('failed', $status['state']);
+            $this->assertStringContainsString($message, $status['message']);
+        }
+    }
+
+    public function testStatusShowsFileQuotaFailureAfterPartialInstall(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-quota-partial-');
+        @mkdir($home.'/.bin/Sonarr', 0755, true);
+        @file_put_contents($home.'/.bin/Sonarr/Sonarr.dll', 'partial');
+        @file_put_contents($home.'/.install-media-stack.log', "[ERR ] File quota reached during media stack install; free account files and retry.\n");
+
+        $status = $this->mediaStatusRead($home);
+        $this->assertSame('failed', $status['state']);
+        $this->assertFalse($status['canStart']);
+    }
+
     public function testHtmlIncludesMediaStackCredentialsNotice(): void
     {
         $html = \pmssMediaStackPanelHtmlBuild(array(
