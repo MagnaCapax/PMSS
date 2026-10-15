@@ -117,7 +117,7 @@ if ($nodeBinary !== '') {
 
             // Versioned npm tools must converge after upstream publishes a bad latest.
             $packageJsonPath = $prefixDir.'/lib/node_modules/'.$toolSpec[1].'/package.json';
-            $packageJson = @json_decode((string) @file_get_contents($packageJsonPath), true);
+            $packageJson = pmssJsonDecodeAssoc((string) @file_get_contents($packageJsonPath));
             if (is_array($packageJson) && (string) ($packageJson['version'] ?? '') === $toolSpec[2]) {
                 continue;
             }

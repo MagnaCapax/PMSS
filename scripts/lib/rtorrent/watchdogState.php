@@ -105,7 +105,7 @@ function rtorrentProcessEscalationRetryState(string $stateFile, int $retryInterv
     // Accept the current JSON marker and the legacy scalar timestamp format.
     $payload = is_file($stateFile) ? @file_get_contents($stateFile) : false;
     $trimmed = is_string($payload) ? trim($payload) : '';
-    $decoded = $trimmed !== '' ? json_decode($payload, true) : null;
+    $decoded = $trimmed !== '' ? pmssJsonDecodeAssoc($payload) : null;
     if (is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)) {
         $timestamp = max(0, (int) $decoded['timestamp']);
     } else {

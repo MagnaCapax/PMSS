@@ -80,10 +80,8 @@ function pmssUserTransferQbittorrentCategoriesJsonRead(string $path): ?array
     if ($raw === '') {
         return [];
     }
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return null;
-    }
+    $decoded = pmssJsonDecodeAssoc($raw);
+    if ($decoded === null) return null;
 
     $categories = [];
     foreach ($decoded as $name => $options) {
@@ -115,8 +113,8 @@ function pmssUserTransferQbittorrentCategoriesMerge(string $targetPath, array $e
         logMessage('[WARN] Failed to create qBittorrent config directory for category preservation');
         return 0;
     }
-    $json = json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    if (!is_string($json) || !pmssAtomicWriteFile($targetPath, $json."\n", 0600)) {
+    $json = pmssJsonEncodePrettyLine($existing);
+    if ($json === null || !pmssAtomicWriteFile($targetPath, $json, 0600)) {
         logMessage('[WARN] Failed to write qBittorrent categories.json');
         return 0;
     }
