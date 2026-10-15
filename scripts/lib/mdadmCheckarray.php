@@ -123,13 +123,7 @@ function pmssMdadmCheckarrayRunCommand(string $binary, array $arrays): int
 function pmssMdadmCheckarrayReadInteger(string $path): ?int
 {
     $value = @file_get_contents($path);
-    if (!is_string($value) || !ctype_digit(trim($value))) {
-        return null;
-    }
-
-    $digits = ltrim(trim($value), '0');
-    $parsed = filter_var($digits === '' ? '0' : $digits, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-    return $parsed === false ? null : $parsed;
+    return is_string($value) ? pmssUnsignedDecimalIntParse(trim($value)) : null;
 }
 
 /** The host minimum applies only when both the setting and last start are valid. */

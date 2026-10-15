@@ -69,19 +69,18 @@ function pmssFilesystemStatLineParse(string $line): ?array
         return null;
     }
 
-    foreach ([$parts[0], $parts[1], $parts[2]] as $value) {
-        // Integer casts saturate on overflow; preserve leading-zero support.
-        if (!ctype_digit((string) $value) || (int) $value <= 0
-            || (string) (int) $value !== ltrim($value, '0')
-        ) {
-            return null;
-        }
+    $values = [];
+    foreach (array_slice($parts, 0, 3) as $value) {
+        // The shared parser rejects overflow while retaining leading zeroes.
+        $parsed = pmssUnsignedDecimalIntParse($value);
+        if ($parsed === null || $parsed <= 0) return null;
+        $values[] = $parsed;
     }
 
     return [
-        'block_size' => (int) $parts[0],
-        'blocks'     => (int) $parts[1],
-        'inodes'     => (int) $parts[2],
+        'block_size' => $values[0],
+        'blocks'     => $values[1],
+        'inodes'     => $values[2],
     ];
 }
 

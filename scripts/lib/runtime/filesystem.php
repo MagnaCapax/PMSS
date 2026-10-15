@@ -197,9 +197,8 @@ function pmssNetworkPortParseDigits($value, int $min = 1, int $max = 65535): ?in
     // Reject NUL before trim() can turn malformed port data into valid digits.
     if ((!is_int($value) && !is_string($value)) || (is_string($value) && strpos($value, "\0") !== false)) return null;
     $raw = trim((string) $value);
-    if (!ctype_digit($raw)) return null;
-    $port = (int) $raw;
-    return pmssNetworkPortInRange($port, $min, $max) ? $port : null;
+    $port = pmssUnsignedDecimalIntParse($raw);
+    return $port !== null && pmssNetworkPortInRange($port, $min, $max) ? $port : null;
 }
 
 function pmssReadRegularFileNetworkPort(string $path, int $min = 1, int $max = 65535): ?int

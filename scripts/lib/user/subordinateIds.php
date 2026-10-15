@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../runtime.php';
+
 /** @return array<int, array{0:int, 1:int}> */
 function pmssSubordinateIdRanges(string $user, int $primaryId, string $kind): array
 {
@@ -27,17 +29,15 @@ function pmssSubordinateIdRanges(string $user, int $primaryId, string $kind): ar
     $ranges = [];
     foreach ($lines as $line) {
         $parts = explode(':', $line);
-        if (count($parts) !== 3 || ($parts[0] !== $user && $parts[0] !== (string) $primaryId)
-            || !ctype_digit($parts[1]) || !ctype_digit($parts[2])) {
+        if (count($parts) !== 3 || ($parts[0] !== $user && $parts[0] !== (string) $primaryId)) {
             continue;
         }
 
         // Keep find's exclusive upper bound representable as a PHP integer.
-        $start = (int) $parts[1];
-        $count = (int) $parts[2];
-        if ($start < 100000 || $count <= 0 || $start > PHP_INT_MAX - $count
-            || (string) $start !== ltrim($parts[1], '0')
-            || (string) $count !== ltrim($parts[2], '0')) {
+        $start = pmssUnsignedDecimalIntParse($parts[1]);
+        $count = pmssUnsignedDecimalIntParse($parts[2]);
+        if ($start === null || $count === null || $start < 100000 || $count <= 0
+            || $start > PHP_INT_MAX - $count) {
             continue;
         }
         $ranges[] = [$start, $count];
