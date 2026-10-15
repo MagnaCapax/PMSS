@@ -2,8 +2,10 @@
 /** Build the delivered, documentation-only LinuxServer.io app catalog. */
 const PMSS_LSIO_SOURCE = 'https://api.linuxserver.io/api/v1/images?include_config=false';
 const PMSS_LSIO_EXCLUDED = array(
-    // PMSS already provides these applications.
-    'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'qbittorrent', 'deluge', 'lidarr', 'bazarr', 'mariadb', 'phpmyadmin', 'resilio-sync', 'wireguard',
+    // PMSS already provides these applications: media stack (jellyfin, sonarr, radarr, prowlarr, sabnzbd),
+    // native clients (qbittorrent, deluge), /opt builds (lidarr), docker-install-lsio (mariadb, phpmyadmin),
+    // native installers (resilio-sync, wireguard). Add a name here only with the PMSS path that provides it.
+    'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'qbittorrent', 'deluge', 'lidarr', 'mariadb', 'phpmyadmin', 'resilio-sync', 'wireguard',
     // Circumvention-specific application.
     'oscam',
     // Shared-host abuse risk: long-running CPU donation, and payload delivery built to deceive downloaders.

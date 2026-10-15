@@ -157,6 +157,8 @@ class AppsCatalogTest extends TestCase
         foreach (array('boinc', 'foldingathome', 'pwndrop') as $excluded) $this->assertFalse(in_array($excluded, $names, true), $excluded);
         foreach (\PMSS_LSIO_EXCLUDED as $excluded) $this->assertFalse(in_array($excluded, $names, true), $excluded);
         $this->assertTrue(in_array('thelounge', $names, true));
+        // PMSS does not provide Bazarr, so the catalog must list it.
+        $this->assertTrue(in_array('bazarr', $names, true));
         foreach ($catalog as $app) {
             $this->assertTrue(strpos($app['guide'], 'https://docs.linuxserver.io/images/docker-') === 0);
             $this->assertTrue(preg_match_all('/./us', $app['description']) <= 120);
