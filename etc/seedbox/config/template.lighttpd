@@ -42,6 +42,10 @@ index-file.names           = ( "index.php", "index.html",
 
 
 url.access-deny            = ( "~", ".inc" )
+# Jellyfin lets local callers restart it without authentication; every request through this proxy is local.
+$HTTP["url"] =~ "(?i)^/jellyfin/System/Restart" {
+    url.access-deny = ( "" )
+}
 static-file.exclude-extensions = ( ".php", ".pl", ".fcgi" )
 
 

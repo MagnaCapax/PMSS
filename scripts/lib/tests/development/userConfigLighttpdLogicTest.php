@@ -291,6 +291,12 @@ LIGHTTPD;
             '"bin-path"              => "/usr/bin/php-cgi -c /home/alice/.lighttpd/php.ini",',
             $rendered
         );
+        $this->assertStringContainsString(
+            '$HTTP["url"] =~ "(?i)^/jellyfin/System/Restart" {' . "\n" .
+            '    url.access-deny = ( "" )' . "\n" .
+            '}',
+            $rendered
+        );
         $this->pmssAssertStringNotContainsString('"bin-args"', $rendered);
     }
 
