@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../blockDeviceLeaves.php';
 
 /** Return a positive integer setting or null without coercing invalid policy. */
 function pmssCgroupPolicyPositiveIntSetting($value): ?int
@@ -163,11 +164,7 @@ function pmssCgroupPolicyDerivedReadIopsCap(
 function pmssCgroupPolicyBlockDeviceName(string $devicePath): ?string
 {
     $device = basename(trim($devicePath));
-    if (preg_match('/^[A-Za-z0-9._!+-]+\z/', $device) !== 1) {
-        return null;
-    }
-
-    return $device;
+    return preg_match('/^[A-Za-z0-9._!+-]+\z/', $device) === 1 ? $device : null;
 }
 
 /** Return true when the /home source is an md device; derived caps wait for #623. */
@@ -178,54 +175,29 @@ function pmssCgroupPolicyHomeDeviceIsMdBacked(string $devicePath, string $sysCla
         || is_dir(rtrim($sysClassBlock, '/').'/'.$device.'/md'));
 }
 
-/** Resolve one block device's storage class from sysfs rotational/NVMe primitives. */
-function pmssCgroupPolicyBlockStorageClassResolve(string $deviceName, string $sysClassBlock, array &$seen): ?string
-{
-    $device = pmssCgroupPolicyBlockDeviceName($deviceName);
-    if ($device === null || isset($seen[$device])) {
-        return null;
-    }
-    $seen[$device] = true;
-
-    if (preg_match('/^nvme\d+n\d+(?:p\d+)?\z/', $device) === 1) {
-        return 'nvme';
-    }
-
-    $root = rtrim($sysClassBlock, '/');
-    $class = null;
-    $rotational = @file_get_contents($root.'/'.$device.'/queue/rotational');
-    if (is_string($rotational)) {
-        $trimmed = trim($rotational);
-        if ($trimmed === '1') {
-            return 'hdd';
-        }
-        if ($trimmed === '0') {
-            $class = 'ssd';
-        }
-    }
-
-    $slaveClasses = [];
-    foreach (glob($root.'/'.$device.'/slaves/*') ?: [] as $slavePath) {
-        $slaveClass = pmssCgroupPolicyBlockStorageClassResolve((string) basename($slavePath), $sysClassBlock, $seen);
-        if ($slaveClass !== null) {
-            $slaveClasses[] = $slaveClass;
-        }
-    }
-    foreach (['hdd', 'nvme', 'ssd'] as $priority) {
-        if (in_array($priority, $slaveClasses, true)) return $priority;
-    }
-
-    return $class;
-}
-
 /** Detect the class of the single-device /home backing block device. */
 function pmssCgroupPolicyHomeStorageClassResolve(string $devicePath, string $sysClassBlock = '/sys/class/block'): ?string
 {
     $device = pmssCgroupPolicyBlockDeviceName($devicePath);
-    if ($device === null) {
-        return null;
-    }
+    if ($device === null) return null;
+    if (preg_match('/^nvme\d+n\d+(?:p\d+)?\z/', $device) === 1) return 'nvme';
 
-    $seen = [];
-    return pmssCgroupPolicyBlockStorageClassResolve($device, $sysClassBlock, $seen);
+    $root = rtrim($sysClassBlock, '/');
+    $rotational = @file_get_contents($root.'/'.$device.'/queue/rotational');
+    if (is_string($rotational) && trim($rotational) === '1') return 'hdd';
+    $class = is_string($rotational) && trim($rotational) === '0' ? 'ssd' : null;
+    // Visit every backing node so an intermediate queue retains its legacy
+    // classification; the shared walk owns cycles, partitions, and leaf scans.
+    pmssBlockDeviceLeaves($device, $root, static function (string $pattern) { return @glob($pattern); },
+        static function (string $name) use ($root, &$class): void {
+            if (preg_match('/^nvme\d+n\d+(?:p\d+)?\z/', $name) === 1) {
+                if ($class !== 'hdd') $class = 'nvme';
+                return;
+            }
+            $rotational = @file_get_contents($root.'/'.$name.'/queue/rotational');
+            if (!is_string($rotational)) return;
+            if (trim($rotational) === '1') $class = 'hdd';
+            elseif (trim($rotational) === '0' && $class === null) $class = 'ssd';
+        });
+    return $class;
 }

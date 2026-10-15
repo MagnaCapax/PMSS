@@ -7,13 +7,14 @@
  */
 
 /** @return array{leaves:array<int, string>,complete:bool} */
-function pmssBlockDeviceLeaves(string $device, string $root, ?callable $globber = null): array
+function pmssBlockDeviceLeaves(string $device, string $root, ?callable $globber = null, ?callable $visit = null): array
 {
     $leaves = []; $complete = true;
     $globber = $globber ?: 'glob';
-    $walk = static function (string $name, int $depth) use (&$walk, &$leaves, &$complete, $root, $globber): void {
+    $walk = static function (string $name, int $depth) use (&$walk, &$leaves, &$complete, $root, $globber, $visit): void {
         // Bound cycles and reject names before constructing a sysfs path.
         if ($depth > 8 || preg_match('/\A[A-Za-z0-9._+-]+\z/', $name) !== 1) { $complete = false; return; }
+        if ($visit !== null) $visit($name);
         $path = $root.'/'.$name;
         if (!is_dir($path)) {
             $partitions = $globber($root.'/*/'.$name.'/partition');

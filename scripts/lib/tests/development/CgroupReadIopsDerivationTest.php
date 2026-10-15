@@ -120,6 +120,30 @@ class CgroupReadIopsDerivationTest extends TestCase
         $this->assertSame('hdd', \pmssCgroupPolicyHomeStorageClassResolve('/dev/sda', $root));
     }
 
+    /** Lock storage-class precedence across direct disks and stacked devices. */
+    public function testHomeStorageClassPreservesDirectAndStackedPrecedence(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-read-iops-topology-', 0700);
+        foreach (['md0', 'md1', 'sda', 'sdb', 'nvme0n1', 'dm0'] as $device) {
+            @mkdir($root.'/'.$device.'/queue', 0700, true);
+            @mkdir($root.'/'.$device.'/slaves', 0700, true);
+        }
+        file_put_contents($root.'/sda/queue/rotational', "1\n");
+        file_put_contents($root.'/sdb/queue/rotational', "0\n");
+        file_put_contents($root.'/dm0/queue/rotational', "0\n");
+        file_put_contents($root.'/md1/queue/rotational', "1\n");
+        symlink($root.'/sdb', $root.'/md0/slaves/sdb');
+        symlink($root.'/sda', $root.'/md0/slaves/sda');
+        symlink($root.'/nvme0n1', $root.'/dm0/slaves/nvme0n1');
+        symlink($root.'/sdb', $root.'/md1/slaves/sdb');
+
+        foreach (['sda' => 'hdd', 'sdb' => 'ssd', 'nvme0n1' => 'nvme',
+            'md0' => 'hdd', 'md1' => 'hdd', 'dm0' => 'nvme', 'missing' => null] as $device => $class) {
+            $this->assertSame($class, \pmssCgroupPolicyHomeStorageClassResolve('/dev/'.$device, $root), $device);
+        }
+        $this->assertSame(null, \pmssCgroupPolicyHomeStorageClassResolve('/dev/bad name', $root));
+    }
+
     public function testUnknownClassUsesProfileDefaultFloor(): void
     {
         $this->assertSame(200, \pmssCgroupPolicyDerivedReadIopsCap(
