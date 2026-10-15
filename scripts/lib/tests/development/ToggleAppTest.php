@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/watchdog.php';
+require_once dirname(__DIR__, 2).'/user/toggleApp.php';
 require_once dirname(__DIR__, 2).'/lighttpd/proxyFragments.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/toggleAppRuntime.php';
 
@@ -147,6 +148,22 @@ class ToggleAppTest extends TestCase
         } finally {
             $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
         }
+    }
+
+    public function testDetachedLaunchReturnsWhileTheAppKeepsRunning(): void
+    {
+        // The watchdog passthru()s the start command and waits for EOF on its stdout pipe.
+        $marker = $this->pmssMakeTempDir('toggle-detach-').'/alive';
+        $command = \pmssToggleAppDetachedGroup('true', 'sleep 3; touch '.escapeshellarg($marker));
+        $started = microtime(true);
+        $proc = proc_open('bash -c '.escapeshellarg($command), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        fclose($pipes[0]);
+        stream_get_contents($pipes[1]);
+        stream_get_contents($pipes[2]);
+        proc_close($proc);
+        $this->assertTrue(microtime(true) - $started < 2.0);
+        $this->assertFalse(is_file($marker));
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/toggleApp.php', 'pmssToggleAppDetachedGroup($conditions, $launch)');
     }
 
     public function testProxyRetainsPrefixAndSkeletonShipsEndpoints(): void

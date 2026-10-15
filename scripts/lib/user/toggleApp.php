@@ -57,7 +57,17 @@ function pmssToggleAppStartCommand(string $user, string $app): string
     $launch = $app === 'slskd'
         ? 'cd /opt/slskd && nohup '.escapeshellarg($binary).' --config '.escapeshellarg($config)
         : 'nohup python3 '.escapeshellarg($binary).' -c '.escapeshellarg($config);
-    $inner = 'test -s '.escapeshellarg($config).' && test -f '.escapeshellarg($secured)
-        .' && test -f '.escapeshellarg($enabled).' && '.$launch.' >/dev/null 2>&1 &';
-    return pmssBuildUserServiceShellCommand($user, $inner);
+    $conditions = 'test -s '.escapeshellarg($config).' && test -f '.escapeshellarg($secured)
+        .' && test -f '.escapeshellarg($enabled);
+    return pmssBuildUserServiceShellCommand($user, pmssToggleAppDetachedGroup($conditions, $launch));
+}
+
+/**
+ * Run the checks and the launch as one backgrounded group with all streams detached.
+ * A bare `a && b && cmd >/dev/null &` backgrounds a subshell that keeps the caller's
+ * stdout open while cmd runs, so the watchdog's passthru never returns and the cron lock is held.
+ */
+function pmssToggleAppDetachedGroup(string $conditions, string $launch): string
+{
+    return '( '.$conditions.' && '.$launch.' ) </dev/null >/dev/null 2>&1 &';
 }
