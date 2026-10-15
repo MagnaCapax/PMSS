@@ -81,7 +81,7 @@ final class UserShowLimitsTest extends TestCase
         $this->assertSame(25.0, $this->metric($data, 'memory', 'memory pressure')['value']);
         $this->assertSame(null, $this->metric($data, 'processes', 'processes')['limit']);
         $this->assertSame(null, $this->metric($data, 'cpu', 'CPU quota enforced')['value']);
-        $this->assertSame(21474836480.0, $this->metric($data, 'traffic', 'upload this month')['limit']);
+        $this->assertSame(21474836480.0, $this->metric($data, 'traffic', 'upload past 30 days')['limit']);
         $this->assertSame(20971520.0, $this->metric($data, 'disk I/O', 'IOReadBW configured')['value']);
         $this->assertSame('bytes_per_second', $this->metric($data, 'disk I/O', 'IOReadBW configured')['unit']);
         $this->assertSame('bytes_per_second', $this->metric($data, 'disk I/O', 'read bps enforced')['unit']);
@@ -90,7 +90,7 @@ final class UserShowLimitsTest extends TestCase
         file_put_contents($o['cgroups']['memory'].'/memory.limit_in_bytes', "9223372036854771712\n");
         $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'memory', 'memory')['limit']);
         file_put_contents($o['home'].'/.trafficLimit', "0\n");
-        $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'traffic', 'upload this month')['limit']);
+        $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'traffic', 'upload past 30 days')['limit']);
     }
 
     public function testMissingConfigAndHelperStayLocal(): void

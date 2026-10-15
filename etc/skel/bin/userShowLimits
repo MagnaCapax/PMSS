@@ -161,7 +161,7 @@ function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
             pmssUserShowLimitsMetric($m, 'memory pressure', $state['pressure_usage_percent'] ?? null, 100, 'percent', 'cgroup');
             pmssUserShowLimitsMetric($m, 'memory status', $state['status'] ?? null, null, '', 'cgroup');
             pmssUserShowLimitsMetric($m, 'OOM kills', $state['oom_kill_events'] ?? null, null, 'count', 'cgroup');
-            pmssUserShowLimitsMetric($m, 'RAM GB-hours this month', pmssUserShowLimitsMonth($home, '.resourceData', 'ram_hours'), null, 'gib-hours', 'resource-data');
+            pmssUserShowLimitsMetric($m, 'RAM GB-hours past 30 days', pmssUserShowLimitsMonth($home, '.resourceData', 'ram_hours'), null, 'gib-hours', 'resource-data');
         },
         'processes' => function (&$m) use ($uid, $cgroups, $overrides) {
             pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerCgroupCounterPaths', 'pmssCustomerCgroupCounterRead', 'pmssCustomerUnsignedIntegerFileRead', 'pmssCustomerTrimmedFileRead'), $overrides);
@@ -199,7 +199,7 @@ function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
             }
             $percent = is_numeric($quota) && (float) $quota >= 0 && is_numeric($period) && (float) $period > 0 ? (float) $quota * 100 / (float) $period : null;
             pmssUserShowLimitsMetric($m, 'CPU quota enforced', $percent, null, 'percent', 'cgroup');
-            pmssUserShowLimitsMetric($m, 'CPU hours this month', ($nano = pmssUserShowLimitsMonth($home, '.resourceData', 'cpu')) === null ? null : $nano / 3600000000000, null, 'hours', 'resource-data');
+            pmssUserShowLimitsMetric($m, 'CPU hours past 30 days', ($nano = pmssUserShowLimitsMonth($home, '.resourceData', 'cpu')) === null ? null : $nano / 3600000000000, null, 'hours', 'resource-data');
         },
         'disk I/O' => function (&$m) use ($home, $uid, $cgroups, $overrides) {
             pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerTrimmedFileRead', 'pmssCustomerSerializedArrayFileRead'), $overrides);
@@ -218,7 +218,7 @@ function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
                 if (is_string($raw) && preg_match('/(?:^|\s)(?:'.preg_quote($key, '/').'\s*=|[0-9]+:[0-9]+\s+)([0-9]+)/', $raw, $match)) $value = $match[1];
                 pmssUserShowLimitsMetric($m, $name.' enforced', $value, null, strpos($key, 'bps') !== false ? 'bytes_per_second' : 'iops', 'cgroup');
             }
-            foreach (array('io_read' => 'I/O read bytes this month', 'io_write' => 'I/O write bytes this month', 'io_read_ops' => 'I/O read ops this month', 'io_write_ops' => 'I/O write ops this month') as $key => $name) {
+            foreach (array('io_read' => 'I/O read bytes past 30 days', 'io_write' => 'I/O write bytes past 30 days', 'io_read_ops' => 'I/O read ops past 30 days', 'io_write_ops' => 'I/O write ops past 30 days') as $key => $name) {
                 pmssUserShowLimitsMetric($m, $name, pmssUserShowLimitsMonth($home, '.resourceData', $key), null, strpos($key, 'ops') !== false ? 'count' : 'bytes', 'resource-data');
             }
         },
@@ -228,8 +228,8 @@ function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
             $config = pmssUserShowLimitsConfig($home, $overrides);
             $state = pmssTrafficLimitStateRead($home.'/.trafficLimit', $home.'/.bonusTraffic');
             $limit = ($state['effectiveLimitGiB'] ?? 0) > 0 ? $state['effectiveLimitGiB'] * 1073741824 : null;
-            pmssUserShowLimitsMetric($m, 'upload this month', pmssUserShowLimitsMonth($home, '.trafficData', '', 1048576), $limit, 'bytes', 'traffic-data');
-            pmssUserShowLimitsMetric($m, 'inbound this month', pmssUserShowLimitsMonth($home, '.trafficDataIngress', '', 1048576), null, 'bytes', 'traffic-data');
+            pmssUserShowLimitsMetric($m, 'upload past 30 days', pmssUserShowLimitsMonth($home, '.trafficData', '', 1048576), $limit, 'bytes', 'traffic-data');
+            pmssUserShowLimitsMetric($m, 'inbound past 30 days', pmssUserShowLimitsMonth($home, '.trafficDataIngress', '', 1048576), null, 'bytes', 'traffic-data');
             pmssUserShowLimitsMetric($m, 'bonus traffic', isset($state['bonusGiB']) ? $state['bonusGiB'] * 1073741824 : null, null, 'bytes', 'traffic-data');
             pmssUserShowLimitsConfigured($m, $config, 'trafficCapMbit', 'mbit');
         },
@@ -298,7 +298,7 @@ function pmssUserShowLimitsHuman(array $data)
             if ($metric['metric'] === 'memory pressure') $suffix = '%';
             if ($value !== null) $shown .= $suffix;
             if ($metric['limit'] !== null && $metric['metric'] !== 'memory pressure') $shown .= ' / '.($unit === 'bytes' ? $format($metric['limit']) : pmssUserShowLimitsHumanNumber($metric['limit']).$suffix).' enforced';
-            elseif ($value !== null && in_array($metric['metric'], array('memory', 'processes', 'upload this month'), true)) $shown .= ' / unlimited';
+            elseif ($value !== null && in_array($metric['metric'], array('memory', 'processes', 'upload past 30 days'), true)) $shown .= ' / unlimited';
             elseif ($metric['source'] === 'cgroup' && $value !== null && strpos($metric['metric'], 'enforced') !== false) $shown .= ' enforced';
             $pair = array('memory' => 'ramMiB configured', 'blocks used' => 'quota configured', 'CPU weight enforced' => 'CPUWeight configured', 'CPU shares enforced' => 'CPUWeight configured', 'CPU quota enforced' => 'cpuQuotaPercent configured', 'I/O weight enforced' => 'IOWeight configured');
             $configMetric = $configured[$pair[$metric['metric']] ?? ''] ?? null;
