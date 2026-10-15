@@ -38,3 +38,9 @@ Account commands share the panel's interpretation of limits and memory
 pressure. A partial panel update remains visible as an unavailable section;
 the next PMSS update restores the helper. The command needs no root service,
 network call, or extra published account data.
+
+The operator-tree `scripts/pmss-stats.php` command and its text renderer are
+retired. It sat behind the `/scripts` permission boundary and had no account
+selector, so it could only report on the user running it. `userShowLimits`
+covers its purpose. The stats collector it used stays, because usage alerts
+call it.
