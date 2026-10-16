@@ -103,6 +103,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   storage-pressure notices.
 - `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`). Failed `repquota` on a mount declared with journaled quotas emits `###PMSS_QUOTA_ALERT` and exits non-zero; cron captures the alert in `/var/log/pmss/quotaSnapshot.log`.
 - `resourceLog.php` – Capture per-user CPU, memory, and I/O samples every five minutes into the resource metering pipeline.
+- `liveStatsLog.php` – One minute after the five-minute collectors, append node totals and each user's latest sample to the 24 h live-stats rings (`/var/lib/pmss/public/node-live.json`, `/var/lib/pmss/live/<user>.json`); see ADR 0114.
   The shared cgroup-v1 blkio reader rejects a Read or Write total that reaches
   the existing counter sentinel (`PHP_INT_MAX`) before addition can overflow.
   That file follows the existing unavailable-counter fallback and sample guards.
