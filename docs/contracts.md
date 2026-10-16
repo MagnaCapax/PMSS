@@ -823,6 +823,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/configureLighttpd.php [<user>]
 - Behavior: Renders per-user lighttpd vhost/fastcgi config from templates. With a username, targets only that user; otherwise (no args) refreshes all.
   - Logging: the managed template pipes access and daemon errors to their existing files in `~/.lighttpd/`. The logger appends as the account, so both files remain quota-bound and the hourly access-log trimmer remains active.
+  - Process tracking: the managed config writes no PID file in the quota-bound home; the starter and watchdog detect account processes directly.
   - 503 pages: rendered lighttpd configs use the customer-tree `~/www/error-503.html` static page so app proxies that are enabled but still starting return a styled retry page instead of lighttpd's raw default.
   - PMSS-managed proxy fragments: always refreshes the qBittorrent and rclone proxies; when `/home/<user>/.invidiousPort` contains a valid port, also publishes `/public-<user>/invidious/` and `/user-<user>/apps/invidious/` through the user's lighttpd.
   - Proxy-fragment collision handling: when another readable `custom.d/*.conf` fragment defines the same URL conditional, the PMSS-owned fragment yields and is removed if already present; unsafe or unreadable sibling fragments block managed replacement without modifying either side.

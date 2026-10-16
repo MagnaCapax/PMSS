@@ -1,7 +1,7 @@
-# ADR 0101: Reconcile running qBittorrent WebUI settings
+# ADR 0102: Reconcile running qBittorrent WebUI settings
 
 Date: 2026-10-16
-Category: operations
+Category: security
 
 ## Status
 

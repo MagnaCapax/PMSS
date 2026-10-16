@@ -225,6 +225,14 @@ NGINX;
         }
     }
 
+    public function testLighttpdTemplateDoesNotWritePidFile(): void
+    {
+        $this->assertTrue(
+            strpos($this->renderLighttpdTemplate(), 'server.pid-file') === false,
+            'Per-user lighttpd must start when the account cannot create a PID file'
+        );
+    }
+
     /**
      * TEST: Lighttpd template has balanced parentheses.
      *
