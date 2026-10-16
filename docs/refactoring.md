@@ -43,6 +43,9 @@ creation before preallocation or fio runs. A name collision fails without
 touching the existing entry. Normal and shutdown cleanup compare device and
 inode before unlinking, so a replaced path is left alone. Successful benchmark
 jobs and their report format remain unchanged.
+The read-only home-device probe parses md degraded counts as representable
+unsigned integers. Malformed or overflowed sysfs values retain its existing
+preflight failure result; valid counts keep the same report shape.
 
 Boot-default convergence logs nonzero `/proc` remount and `update-grub` results
 through the caller logger after managed configuration is persisted. Both steps

@@ -62,6 +62,29 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $this->assertSame('unable to read md array status', $raid10['error']);
     }
 
+    public function testMdDegradedCounterRejectsMalformedAndOverflowedValues(): void
+    {
+        $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
+        mkdir($sysfs.'/md0/md', 0755, true);
+        file_put_contents($sysfs.'/md0/md/array_state', "clean\n");
+        file_put_contents($sysfs.'/md0/md/level', "raid10\n");
+        $check = static function (): bool { return true; };
+        $canonical = static function (string $path): string { return $path; };
+        $size = static function (): int { return 1024 * 1024; };
+
+        foreach (['', '-1', '1.0', '1x', (string) PHP_INT_MAX.'0'] as $counter) {
+            file_put_contents($sysfs.'/md0/md/degraded', $counter."\n");
+            $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+            $this->assertSame(false, $result['ok']);
+            $this->assertSame('unable to read md array status', $result['error']);
+        }
+
+        file_put_contents($sysfs.'/md0/md/degraded', "0001\n");
+        $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+        $this->assertSame(true, $result['ok']);
+        $this->assertSame(1, $result['md']['degraded']);
+    }
+
     public function testUnsafeAndNonBlockMountsAreRejected(): void
     {
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');

@@ -44,10 +44,12 @@ function storageBenchmarkHomeDeviceResolve(
             && in_array(trim($level), ['raid0', 'linear'], true)) {
             $degraded = '0';
         }
-        if ($state === false || $level === false || $degraded === false || !ctype_digit(trim($degraded))) {
+        // An overflowed sysfs counter cannot be reported as a reliable md status.
+        $degradedCount = $degraded === false ? null : pmssUnsignedDecimalIntParse(trim($degraded));
+        if ($state === false || $level === false || $degradedCount === null) {
             return $entry + ['ok' => false, 'error' => 'unable to read md array status'];
         }
-        $entry['md'] = ['array_state' => trim($state), 'degraded' => (int) trim($degraded), 'level' => trim($level)];
+        $entry['md'] = ['array_state' => trim($state), 'degraded' => $degradedCount, 'level' => trim($level)];
     }
     return $entry + ['ok' => true];
 }
