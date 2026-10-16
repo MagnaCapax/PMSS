@@ -320,9 +320,9 @@ DELETION BLOCKED when ANY of these are true:
 - Docblock mentions install.sh, cron, CLI, or external invocation
 - File is under scripts/util/ (often called from shell scripts)
 - File handles: quotas, permissions, certificates, network config, apt/dpkg
-- Uncertain about external callers — ask operator
+- Uncertain about external callers — leave it in place and pick another target
 
-When in doubt: DO NOT DELETE. Mark as potential dead code in your summary and let operator decide.
+When in doubt: DO NOT DELETE. Mark it as potential dead code in your summary and move on.
 
 Parallel Runs (ABSURDLY SIMPLE)
 

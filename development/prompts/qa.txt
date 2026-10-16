@@ -225,7 +225,7 @@ STOP CONDITIONS
 - All complete-verify issues processed → STOP (success)
 - Two consecutive unexpected failures → STOP (something systemic)
 - Context feels exhausted → STOP (commit progress, exit)
-- Test suite itself is broken → STOP (report to operator)
+- Test suite itself is broken → STOP and record it in the QA report
 
 ----------------------------------------------------------------------
 WORKFLOW (DO THIS NOW)

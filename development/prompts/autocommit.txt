@@ -118,7 +118,7 @@ STOP CONDITIONS (any of these halts before commit):
   - Cumulative LOC delta > 0 AND PREFIX is not refactor(safety)
   - Two consecutive verification failures
   - Context genuinely exhausted (>80 files read or working memory unable to track diff state)
-  - Architectural issue found requiring operator decision
+  - Architectural issue found (describe it in the run summary)
   - Per-mode per-commit scope reached (drop additional targets from this commit; do NOT split)
   - You are unsure about the safety of any target inside the arc
 
