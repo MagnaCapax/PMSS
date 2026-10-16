@@ -19,15 +19,15 @@ class ToggleAppTest extends TestCase
         }
         $this->assertFalse((bool) preg_match('/\bfn\s*\(/', $source));
         $catalog = require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php');
-        $this->assertSame(array('slskd', 'copyparty'), array_keys($catalog));
+        $this->assertSame(array('slskd', 'copyparty', 'qui', 'scryer'), array_keys($catalog));
         $this->assertSame(array('.slskdEnable', '.config/slskd/slskd.yml', array('slskd-peer')),
             array($catalog['slskd']['enable'], $catalog['slskd']['config'], $catalog['slskd']['extraPortServices']));
         $this->assertSame(array('.copypartyEnable', '.config/copyparty/copyparty.conf', array()),
             array($catalog['copyparty']['enable'], $catalog['copyparty']['config'], $catalog['copyparty']['extraPortServices']));
         $this->assertSame("cd '/opt/slskd' && nohup '/opt/slskd/slskd' '--config' '/home/bo/.config/slskd/slskd.yml'",
-            \pmssToggleAppLaunchCommand($catalog['slskd'], '/home/bo/'.$catalog['slskd']['config']));
+            \pmssToggleAppLaunchCommand($catalog['slskd'], '/home/bo/'.$catalog['slskd']['config'], '/home/bo'));
         $this->assertSame("nohup 'python3' '/usr/local/bin/copyparty-sfx.py' '-c' '/home/bo/.config/copyparty/copyparty.conf'",
-            \pmssToggleAppLaunchCommand($catalog['copyparty'], '/home/bo/'.$catalog['copyparty']['config']));
+            \pmssToggleAppLaunchCommand($catalog['copyparty'], '/home/bo/'.$catalog['copyparty']['config'], '/home/bo'));
         $this->assertSame(array('.config/slskd/slskd.yml' => "web:\n  port: 23001\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-bo/slskd\n  authentication:\n    disabled: false\n    username: bo\n    password: secret\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: 23002\n"),
             \pmssToggleAppConfigs('slskd', 'bo', '/home/bo', 23001, 'secret', 23002));
         $this->assertSame(array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: 23001\n  rp-loc: /user-bo/copyparty\n  xff-hdr: X-Forwarded-For\n  rproxy: -1\n\n[accounts]\n  bo: secret\n\n[/]\n  /home/bo/data\n  accs:\n    A: bo\n"),
@@ -74,7 +74,7 @@ PROXY;
         putenv('PMSS_TEST_MODE=1');
         try {
             putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$path);
-            $this->assertSame(array('slskd', 'copyparty'), array_keys(\pmssToggleAppCatalogRead()));
+            $this->assertSame(array('slskd', 'copyparty', 'qui', 'scryer'), array_keys(\pmssToggleAppCatalogRead()));
             chmod($path, 0660);
             $this->assertThrowsRuntime(static function (): void { \pmssToggleAppCatalogRead(); });
             chmod($path, 0600);
@@ -252,6 +252,81 @@ PROXY;
             $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy));
             $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy, 23001));
             $this->assertFalse(is_file($home.'/.pmss/apps/slskd.secured'));
+        } finally {
+            $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
+        }
+    }
+
+    public function testQuiCliSecuresOnlyAfterAccountExists(): void
+    {
+        $home = $this->pmssMakeTempDir('toggle-qui-');
+        $fixture = $home.'/qui-fixture';
+        $this->pmssWriteFile($fixture, <<<'PHP'
+#!/usr/bin/env php
+<?php
+$config = $argv[3] ?? '';
+file_put_contents(getenv('PMSS_TEST_QUI_LOG'), json_encode($argv)."\n", FILE_APPEND);
+file_put_contents(getenv('PMSS_TEST_QUI_STDIN'), stream_get_contents(STDIN));
+if (getenv('PMSS_TEST_QUI_MODE') === 'fail') exit(2);
+if (getenv('PMSS_TEST_QUI_MODE') === 'exists' && $argv[1] === 'create-user') {
+    fwrite(STDERR, 'User account already exists. Only one user account is allowed.');
+    exit(1);
+}
+file_put_contents($config.'/qui.db', 'account');
+PHP
+        );
+        chmod($fixture, 0700);
+        $oldMode = getenv('PMSS_TEST_MODE');
+        putenv('PMSS_TEST_MODE=1');
+        putenv('PMSS_TEST_QUI_BINARY='.$fixture);
+        putenv('PMSS_TEST_QUI_LOG='.$home.'/argv.log');
+        putenv('PMSS_TEST_QUI_STDIN='.$home.'/stdin');
+        $proxy = \pmssLighttpdManagedProxyFragment('qui', 'bo', 23001);
+        try {
+            $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $config = $home.'/.config/qui/config.toml';
+            $this->assertSame("host = \"127.0.0.1\"\nport = 23001\nbaseUrl = \"/user-bo/qui/\"\ncheckForUpdates = false\ndisableSelfUpdate = true\n", file_get_contents($config));
+            $this->assertSame(0600, fileperms($config) & 0777);
+            $login = $home.'/.pmss/apps/qui.login';
+            $this->assertSame(0600, fileperms($login) & 0777);
+            $this->assertSame(explode("\n", trim(file_get_contents($login)))[1]."\n", file_get_contents($home.'/stdin'));
+            unlink($home.'/.config/qui/qui.db');
+            putenv('PMSS_TEST_QUI_MODE=exists');
+            $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $argv = file($home.'/argv.log', FILE_IGNORE_NEW_LINES);
+            $this->assertSame(3, count($argv));
+            $this->assertStringContainsString('change-password', $argv[2]);
+            foreach ($argv as $line) $this->assertStringNotContainsString(explode("\n", trim(file_get_contents($login)))[1], $line);
+            unlink($login);
+            putenv('PMSS_TEST_QUI_MODE=fail');
+            $this->assertFalse(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $this->assertFalse(is_file($home.'/.pmss/apps/qui.secured'));
+        } finally {
+            $oldMode === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$oldMode);
+            foreach (array('PMSS_TEST_QUI_BINARY', 'PMSS_TEST_QUI_LOG', 'PMSS_TEST_QUI_STDIN', 'PMSS_TEST_QUI_MODE') as $key) putenv($key);
+        }
+    }
+
+    public function testScryerWritesPrivateBootstrapFilesAndQuotedLaunch(): void
+    {
+        $home = $this->pmssMakeTempDir('toggle-scryer-');
+        $old = getenv('PMSS_TEST_MODE');
+        putenv('PMSS_TEST_MODE=1');
+        try {
+            $proxy = \pmssLighttpdManagedProxyFragment('scryer', 'bo', 23001);
+            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'bo', $home, 23001, $proxy));
+            $env = $home.'/.config/scryer/scryer.env';
+            $password = $home.'/.pmss/apps/scryer.pw';
+            $this->assertSame("SCRYER_BIND=127.0.0.1:23001\nSCRYER_BASE_PATH=/user-bo/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME=bo\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\n", file_get_contents($env));
+            $this->assertSame(0600, fileperms($env) & 0777);
+            $this->assertSame(0600, fileperms($password) & 0777);
+            $this->assertSame(explode("\n", trim(file_get_contents($home.'/.pmss/apps/scryer.login')))[1]."\n", file_get_contents($password));
+            $row = (require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php'))['scryer'];
+            $launch = \pmssToggleAppLaunchCommand($row, "/home/bo/a'b/.config/scryer/scryer.env", "/home/bo/a'b");
+            $shell = 'set -a; . '.escapeshellarg("/home/bo/a'b/.config/scryer/scryer.env")
+                .'; set +a; exec '.escapeshellarg('/opt/scryer/scryer').' '.escapeshellarg('--data-dir')
+                .' '.escapeshellarg("/home/bo/a'b/.local/share/scryer");
+            $this->assertSame('nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell), $launch);
         } finally {
             $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
         }

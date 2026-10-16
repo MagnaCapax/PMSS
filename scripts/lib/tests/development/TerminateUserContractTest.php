@@ -19,7 +19,7 @@ final class TerminateUserContractTest extends TestCase
         $catalog = require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php');
         $services = array();
         foreach ($catalog as $app => $row) $services = array_merge($services, array($app), $row['extraPortServices']);
-        $this->assertSame(array('slskd', 'slskd-peer', 'copyparty'), $services);
+        $this->assertSame(array('slskd', 'slskd-peer', 'copyparty', 'qui', 'scryer'), $services);
         $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', 'array_merge(array($toggleApp), $row[\'extraPortServices\'])');
         $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', "escapeshellarg(\$service)");
         $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', '/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json');

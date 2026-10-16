@@ -33,3 +33,7 @@ The attack surface is unchanged. Copyparty has published browser-session and fil
 ## Consequences
 
 An additional secured app needs one catalog row, one customer config renderer, and one pinned installer. The root catalog guard fails closed: an unsafe or missing catalog stops the toggle-app cron before any app starts. Existing slskd and Copyparty markers, config bytes, ports, proxy paths, credentials, state files, and URL paths retain their behavior. Rollback can restore the prior cron and endpoints while preserving account-owned data.
+
+## Added catalog apps (2026-10-16)
+
+qui uses credential mode `qui`: its account CLI receives a random service password on stdin before the secured marker is written. A missing `qui.db` forces account setup again. Scryer uses `config`: the account writes a private environment file and separate password file before the secured marker, with authentication enabled at every launch. Its displayed password is an initial password that the user replaces at first login. Both use loopback binds and preserve their URL prefixes. A leaked service password can access the app's data and actions under that account, but is separate from the PMSS account credential. qui's published CORS advisory CVE-2026-30924 affects versions before 1.15.0; the pinned release is 1.32.0. No matching Scryer advisory was found during this addition; its unauthenticated default remains the principal exposure risk.

@@ -43,6 +43,46 @@ function pmssToggleAppCopypartyConfig(string $user, string $home, int $port, str
     return array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: {$port}\n  rp-loc: /user-{$user}/copyparty\n  xff-hdr: X-Forwarded-For\n  rproxy: -1\n\n[accounts]\n  {$user}: {$password}\n\n[/]\n  {$home}/data\n  accs:\n    A: {$user}\n");
 }
 
+/** qui serves its own URL prefix and stores its account database beside this file. */
+function pmssToggleAppQuiConfig(string $user, string $home, int $port, string $password, int $peerPort): array
+{
+    return array('.config/qui/config.toml' => "host = \"127.0.0.1\"\nport = {$port}\nbaseUrl = \"/user-{$user}/qui/\"\ncheckForUpdates = false\ndisableSelfUpdate = true\n");
+}
+
+/** Scryer reads its temporary admin password from a private file on every start. */
+function pmssToggleAppScryerConfig(string $user, string $home, int $port, string $password, int $peerPort): array
+{
+    return array(
+        '.config/scryer/scryer.env' => "SCRYER_BIND=127.0.0.1:{$port}\nSCRYER_BASE_PATH=/user-{$user}/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME={$user}\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\n",
+        '.pmss/apps/scryer.pw' => $password."\n",
+    );
+}
+
+/** Feed qui's account CLI through stdin so the secret never appears in argv. */
+function pmssToggleAppQuiAccountCommand(string $binary, string $configDir, string $user, string $password, string $action): array
+{
+    $command = escapeshellarg($binary).' '.escapeshellarg($action).' --config-dir '.escapeshellarg($configDir)
+        .' --username '.escapeshellarg($user);
+    $process = @proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes);
+    if (!is_resource($process)) return array(false, '');
+    fwrite($pipes[0], $password."\n");
+    fclose($pipes[0]);
+    $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    return array(proc_close($process) === 0, $output);
+}
+
+/** An existing database may already contain qui's single account; rotate it then. */
+function pmssToggleAppQuiAccountSet(string $binary, string $configDir, string $user, string $password): bool
+{
+    list($created, $output) = pmssToggleAppQuiAccountCommand($binary, $configDir, $user, $password, 'create-user');
+    if ($created) return true;
+    if (strpos($output, 'User account already exists. Only one user account is allowed.') === false) return false;
+    list($changed) = pmssToggleAppQuiAccountCommand($binary, $configDir, $user, $password, 'change-password');
+    return $changed;
+}
+
 /** Each renderer owns only its upstream format; the catalog chooses the renderer. */
 function pmssToggleAppConfigs(string $app, string $user, string $home, int $port, string $password, int $peerPort): array
 {
@@ -71,15 +111,26 @@ function pmssToggleAppBootstrap(string $app, string $user, string $home, int $po
     $configs = pmssToggleAppConfigs($app, $user, $home, $port, $password, $peerPort);
     if (!isset($configs[$row['config']])) return false;
     $configValid = $password !== '' && (@fileperms($login) & 0777) === 0600;
+    // qui keeps its single account in qui.db; without it the app would start with an empty user table.
+    $quiDb = $home.'/'.dirname($row['config']).'/qui.db';
+    if ($row['credentialMode'] === 'qui') $configValid = $configValid && is_file($quiDb) && !is_link($quiDb);
     foreach ($configs as $relative => $contents) {
         $path = $home.'/'.$relative;
         $configValid = $configValid && !is_link($path) && is_file($path)
             && (@fileperms($path) & 0777) === 0600 && @file_get_contents($path) === $contents;
     }
     if (!is_file($secured) || !$configValid) {
+        // A previous marker must not authorize a start after a failed repair.
+        if (is_file($secured) || is_link($secured)) @unlink($secured);
         $password = bin2hex(random_bytes(24));
         foreach (pmssToggleAppConfigs($app, $user, $home, $port, $password, $peerPort) as $relative => $contents) {
             if (!pmssToggleAppPrivateWrite($home.'/'.$relative, $contents)) return false;
+        }
+        if ($row['credentialMode'] === 'qui') {
+            $binary = $row['exe'];
+            if (getenv('PMSS_TEST_MODE') === '1' && getenv('PMSS_TEST_QUI_BINARY')) $binary = getenv('PMSS_TEST_QUI_BINARY');
+            if (!pmssToggleAppQuiAccountSet($binary, dirname($quiDb), $user, $password)) return false;
+            if (!is_file($quiDb) || is_link($quiDb)) return false;
         }
         if (!pmssToggleAppPrivateWrite($login, $user."\n".$password."\n")) return false;
     }

@@ -81,6 +81,7 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
             if (is_file($login) && !is_link($login) && (@fileperms($login) & 0777) === 0600
                 && function_exists('posix_geteuid') && @fileowner($login) === posix_geteuid()) {
                 $apps[$name]['login'] = trim((string) @file_get_contents($login));
+                if (isset($row['loginLabel'])) $apps[$name]['loginLabel'] = $row['loginLabel'];
             }
         }
     }

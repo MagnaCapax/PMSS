@@ -54,7 +54,7 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
     $html = pmssCustomerAppRowStart($name, $description, $id)
         .'<span class="pill '.$pillClass.'">'.pmssCustomerHtmlAttr($label).'</span>';
     if (!empty($app['exposed'])) $html .= '<span class="pill p-warn">No login set</span>';
-    if (!empty($app['login'])) $html .= '<span class="desc">Login: <code>'.pmssCustomerHtmlAttr($app['login']).'</code></span>';
+    if (!empty($app['login'])) $html .= '<span class="desc">'.pmssCustomerHtmlAttr($app['loginLabel'] ?? 'Login').': <code>'.pmssCustomerHtmlAttr($app['login']).'</code></span>';
     $html .= '<div class="acts">';
     if (($state === 'running' || $app['kind'] === 'media') && !empty($app['url'])) {
         $html .= '<a class="b b-pri" href="'.pmssCustomerHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open</a>';
@@ -111,6 +111,10 @@ function pmssCustomerAppsSectionHtmlBuild(array $status, string $statusUrl = 'ap
     foreach (array('rtorrent', 'qBittorrent', 'Deluge', 'rclone', 'lighttpd') as $id) {
         if (isset($status['apps'][$id])) $rows[$id] = pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id], !empty($status['mediaAppControl']));
     }
+    $toggleRows = '';
+    foreach (require __DIR__.'/toggleAppCatalog.php' as $id => $row) {
+        if (isset($status['apps'][$id])) $toggleRows .= pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id]);
+    }
     $startAll = !empty($status['installed']) && empty($status['poll']) && !empty($status['canRestart'])
         && is_file(__DIR__.'/mediaStack.php')
         ? '<button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button>' : '';
@@ -118,11 +122,12 @@ function pmssCustomerAppsSectionHtmlBuild(array $status, string $statusUrl = 'ap
 <div class="group">Media Stack</div><div class="section-actions">START_ALL</div><div class="list" id="pmss-media-apps" data-installing="INSTALLING">MEDIA_ROWS</div>
 <div class="group">Torrent clients</div><div class="list" id="pmss-torrent-apps">TORRENT_ROWS</div>
 <div class="group">Transfers</div><div class="list" id="pmss-transfer-apps">TRANSFER_ROWS</div>
+<div class="group">Optional apps</div><div class="list" id="pmss-toggle-apps">TOGGLE_ROWS</div>
 <div class="group">Web server</div><div class="list">WEB_ROW</div></section>', array('STATUS_URL' => pmssCustomerHtmlAttr($statusUrl),
         'START_ALL' => $startAll, 'INSTALLING' => !empty($status['poll']) ? '1' : '0',
         'MEDIA_ROWS' => pmssCustomerAppsMediaRowsBuild($status),
         'TORRENT_ROWS' => ($rows['rtorrent'] ?? '').($rows['qBittorrent'] ?? '').($rows['Deluge'] ?? ''),
-        'TRANSFER_ROWS' => $rows['rclone'] ?? '', 'WEB_ROW' => $rows['lighttpd'] ?? ''));
+        'TRANSFER_ROWS' => $rows['rclone'] ?? '', 'TOGGLE_ROWS' => $toggleRows, 'WEB_ROW' => $rows['lighttpd'] ?? ''));
 }
 }
 

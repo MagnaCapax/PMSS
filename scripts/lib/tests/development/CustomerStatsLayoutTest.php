@@ -267,7 +267,8 @@ final class CustomerStatsLayoutTest extends TestCase
                 'ovpnStatus' => 'inactive',
                 'apps' => array(
                     'rTorrent' => 'active', 'qBittorrent' => 'stopped', 'Deluge' => 'active', 'rclone' => 'active',
-                    'slskd' => 'stopped', 'copyparty' => 'stopped', 'Docker' => 'active',
+                    'slskd' => 'stopped', 'copyparty' => 'stopped', 'qui' => 'stopped',
+                    'scryer' => 'stopped', 'Docker' => 'active',
                 ),
                 'dockerInactiveNote' => '',
             ),

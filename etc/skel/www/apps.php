@@ -36,14 +36,12 @@ function pmssAppsCatalogRead(): array
             array('Storyteller', false, 'Lines up an audiobook with its ebook text', '8 GB RAM'),
         ),
         'Downloads and requests' => array(
-            array('qui', true, 'One web interface for several qBittorrent instances', ''),
             array('JDownloader 2', true, 'Download manager for direct links and file hosts', ''),
             array('Seerr', true, 'Media requests for Jellyfin, Plex and Emby', ''),
             array('DroppedNeedle', false, 'Music requests that drive your own slskd or SABnzbd', ''),
             array('ReadMeABook', false, 'Audiobook requests: search, download, merge, import', ''),
         ),
         'Library automation' => array(
-            array('Scryer', true, 'Movie, TV and anime automation in one program', ''),
             array('Medusa', true, 'TV library manager in the Sick-Beard family', ''),
             array('SickGear', true, 'TV and anime library manager', ''),
             array('Headphones', true, 'Music library downloader, predecessor of Lidarr', ''),

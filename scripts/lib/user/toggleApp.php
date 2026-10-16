@@ -51,13 +51,19 @@ function pmssToggleAppPrepare(string $user, string $app): bool
 }
 
 /** The shell receives only paths and fixed flags, never the generated password. */
-function pmssToggleAppLaunchCommand(array $row, string $config): string
+function pmssToggleAppLaunchCommand(array $row, string $config, string $home): string
 {
-    $tokens = array_map(static function (string $token) use ($config): string {
-        return escapeshellarg($token === '{config}' ? $config : $token);
+    $tokens = array_map(static function (string $token) use ($config, $home): string {
+        $token = str_replace(array('{config}', '{configDir}', '{home}'), array($config, dirname($config), $home), $token);
+        return escapeshellarg($token);
     }, $row['launch']);
-    return ($row['workingDirectory'] !== '' ? 'cd '.escapeshellarg($row['workingDirectory']).' && ' : '')
+    $command = ($row['workingDirectory'] !== '' ? 'cd '.escapeshellarg($row['workingDirectory']).' && ' : '')
         .'nohup '.implode(' ', $tokens);
+    if (!empty($row['sourceEnv'])) {
+        $shell = 'set -a; . '.escapeshellarg($config).'; set +a; exec '.implode(' ', $tokens);
+        return 'nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell);
+    }
+    return $command;
 }
 
 /** Start only after the account-owned config and secured marker exist. */
@@ -69,7 +75,7 @@ function pmssToggleAppStartCommand(string $user, string $app): string
     $config = '/home/'.$user.'/'.$row['config'];
     $secured = '/home/'.$user.'/'.$row['securedMarker'];
     $enabled = '/home/'.$user.'/'.$row['enable'];
-    $launch = pmssToggleAppLaunchCommand($row, $config);
+    $launch = pmssToggleAppLaunchCommand($row, $config, '/home/'.$user);
     $conditions = 'test -s '.escapeshellarg($config).' && test -f '.escapeshellarg($secured)
         .' && test -f '.escapeshellarg($enabled);
     return pmssBuildUserServiceShellCommand($user, pmssToggleAppDetachedGroup($conditions, $launch));
