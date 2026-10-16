@@ -147,6 +147,9 @@ as probe failures. A failed probe before signaling skips the kill; a failed
 probe after a signal stops escalation instead of claiming the process exited.
 Normal no-match, graceful-stop, and SIGKILL paths retain their prior behavior.
 `UpdateRuntimeProcessesTest` covers both probe failures with stub commands.
+The per-user watchdog PID reader also rejects zero and integer-overflow lines
+from `pgrep` before returning process targets. Raw probe output remains available
+to callers for diagnostics.
 
 Monthly IOPS enforcement uses the managed-user scan result, returning a nonzero
 cron status when the scan fails or emits diagnostics. A successful empty scan

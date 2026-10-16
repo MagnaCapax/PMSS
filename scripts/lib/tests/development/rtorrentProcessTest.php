@@ -256,6 +256,20 @@ PHP;
         $this->assertTrue(is_array($output), 'Expected raw output reference array');
     }
 
+    public function testWatchdogPidsRejectZeroAndOverflowWithoutChangingProbeOutput(): void
+    {
+        $lines = ['0', '000', '0017', '17', (string) PHP_INT_MAX, (string) PHP_INT_MAX.'0', 'invalid', '-1', ' 9 '];
+        $binDir = $this->pmssMakeLineOutputStub('pgrep', $lines, 'watchdog-pids-');
+
+        $this->pmssWithPathPrefix($binDir, function () use ($lines): void {
+            $rc = null;
+            $output = null;
+            $this->assertSame([17, PHP_INT_MAX, 9], pmssUserWatchdogProcessPids('alice', '^rtorrent', [], $rc, $output));
+            $this->assertSame(0, $rc);
+            $this->assertSame(array_map('rtrim', $lines), $output);
+        });
+    }
+
     public function testKillPidsIgnoresEmptyAndInvalidInputs(): void
     {
         foreach ([[], [0, -1, -999]] as $pids) {

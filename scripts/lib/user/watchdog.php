@@ -57,7 +57,11 @@ function pmssUserWatchdogProcessPids(string $username, string $processPattern, a
     foreach ($matches as $rawPid) {
         $pid = trim((string) $rawPid);
         if ($pid !== '' && ctype_digit($pid)) {
-            $pids[(int) $pid] = (int) $pid;
+            $value = (int) $pid;
+            // Reject zero and integer overflow before a caller uses this as a process target.
+            if ($value > 0 && (string) $value === ltrim($pid, '0')) {
+                $pids[$value] = $value;
+            }
         }
     }
     return array_values($pids);
