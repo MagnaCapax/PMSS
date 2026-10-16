@@ -48,10 +48,12 @@ function pmssUserConfigureHttp(array $ctx): void
 
     $irssiDir = "{$home}/.irssi";
     if (!is_dir($irssiDir)) {
-        pmssEnsureUserHomeDir($user, $home, '.irssi', 0755, $userLog);
-        $skelConfigPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.irssi/config';
-        $copyCommand = sprintf('cp %s %s/', $skelConfigPath === '/etc/skel/.irssi/config' ? $skelConfigPath : escapeshellarg($skelConfigPath), escapeshellarg($irssiDir));
-        runUserStep($user, 'Copying irssi skeleton config', pmssBuildUserShellCommand($user, $copyCommand));
+        // A conflicting or uncreatable path must not become a copy destination.
+        if (pmssEnsureUserHomeDir($user, $home, '.irssi', 0755, $userLog)) {
+            $skelConfigPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.irssi/config';
+            $copyCommand = sprintf('cp %s %s/', $skelConfigPath === '/etc/skel/.irssi/config' ? $skelConfigPath : escapeshellarg($skelConfigPath), escapeshellarg($irssiDir));
+            runUserStep($user, 'Copying irssi skeleton config', pmssBuildUserShellCommand($user, $copyCommand));
+        }
     }
 
     if (!is_dir("{$home}/www/recycle")) {

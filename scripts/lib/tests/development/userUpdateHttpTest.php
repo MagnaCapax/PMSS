@@ -143,6 +143,27 @@ JSON
         $this->assertEquals(\pmssBuildUserShellCommand('dummy', $expected), $cmd ?? '');
     }
 
+    public function testConfigureHttpSkipsIrssiCopyWhenDirectoryCannotBeCreated(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-http-irssi-conflict-');
+        file_put_contents($home.'/.irssi', 'customer content');
+        $jsonLog = $this->pmssMakeTempFile('pmss-json-');
+        file_put_contents($jsonLog, '');
+
+        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG']);
+        putenv('PMSS_DRY_RUN=1');
+        putenv('PMSS_JSON_LOG='.$jsonLog);
+        $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
+        try {
+            \pmssUserConfigureHttp($this->pmssUserUpdateContext($home));
+            $this->assertSame(null, $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config'));
+            $this->assertSame('customer content', file_get_contents($home.'/.irssi'));
+        } finally {
+            $this->pmssRestoreEnvMap($previous);
+            $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
+        }
+    }
+
     public function testConfigureHttpUsesSkelOverrideForIrssiCopy(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-skel-override-home-');
