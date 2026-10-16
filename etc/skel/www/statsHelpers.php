@@ -234,7 +234,7 @@ function pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?ca
     foreach ($processNeedles as $name => $needle) {
         $apps[$name] = $psOutput === null ? 'error' : (stripos($psOutput, $needle) !== false ? 'active' : 'stopped');
     }
-    foreach (array('slskd', 'copyparty') as $name) {
+    foreach (array_keys(require __DIR__.'/toggleAppCatalog.php') as $name) {
         $definitions = function_exists('pmssCustomerManagedAppDefinitions') ? pmssCustomerManagedAppDefinitions() : array();
         $apps[$name] = function_exists('pmssCustomerNativePidsRead') && isset($definitions[$name])
             && pmssCustomerNativePidsRead($definitions[$name]['binaries']) !== array() ? 'active' : 'stopped';
@@ -553,7 +553,7 @@ function pmssStatsAppToggleButtonHtmlBuild(string $appName, array $definitions):
     $definition = $definitions[$appName];
     $endpoint = (string) ($definition['endpoint'] ?? '');
     $enableFile = (string) ($definition['enable'] ?? '');
-    $endpointPath = __DIR__.'/'.$endpoint;
+    $endpointPath = __DIR__.'/'.explode('?', $endpoint, 2)[0];
     if ($endpoint === '' || $enableFile === '' || !is_file($endpointPath) || is_link($endpointPath)) {
         return '';
     }

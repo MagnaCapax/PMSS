@@ -10,6 +10,138 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/toggleAppRuntime.php';
 /** Security contracts for the two opt-in toggle apps. */
 class ToggleAppTest extends TestCase
 {
+    public function testCatalogIsPureDataAndKeepsLegacyValues(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/toggleAppCatalog.php');
+        foreach (token_get_all($source) as $token) {
+            if (is_array($token)) $this->assertFalse(in_array($token[0], array(T_FUNCTION, T_VARIABLE), true));
+            else $this->assertFalse($token === '`');
+        }
+        $this->assertFalse((bool) preg_match('/\bfn\s*\(/', $source));
+        $catalog = require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php');
+        $this->assertSame(array('slskd', 'copyparty'), array_keys($catalog));
+        $this->assertSame(array('.slskdEnable', '.config/slskd/slskd.yml', array('slskd-peer')),
+            array($catalog['slskd']['enable'], $catalog['slskd']['config'], $catalog['slskd']['extraPortServices']));
+        $this->assertSame(array('.copypartyEnable', '.config/copyparty/copyparty.conf', array()),
+            array($catalog['copyparty']['enable'], $catalog['copyparty']['config'], $catalog['copyparty']['extraPortServices']));
+        $this->assertSame("cd '/opt/slskd' && nohup '/opt/slskd/slskd' '--config' '/home/bo/.config/slskd/slskd.yml'",
+            \pmssToggleAppLaunchCommand($catalog['slskd'], '/home/bo/'.$catalog['slskd']['config']));
+        $this->assertSame("nohup 'python3' '/usr/local/bin/copyparty-sfx.py' '-c' '/home/bo/.config/copyparty/copyparty.conf'",
+            \pmssToggleAppLaunchCommand($catalog['copyparty'], '/home/bo/'.$catalog['copyparty']['config']));
+        $this->assertSame(array('.config/slskd/slskd.yml' => "web:\n  port: 23001\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-bo/slskd\n  authentication:\n    disabled: false\n    username: bo\n    password: secret\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: 23002\n"),
+            \pmssToggleAppConfigs('slskd', 'bo', '/home/bo', 23001, 'secret', 23002));
+        $this->assertSame(array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: 23001\n  rp-loc: /user-bo/copyparty\n  xff-hdr: X-Forwarded-For\n  rproxy: -1\n\n[accounts]\n  bo: secret\n\n[/]\n  /home/bo/data\n  accs:\n    A: bo\n"),
+            \pmssToggleAppConfigs('copyparty', 'bo', '/home/bo', 23001, 'secret', 0));
+        $expectedProxy = <<<'PROXY'
+# PMSS-managed: {LABEL} reverse proxy.
+
+$HTTP["url"] == "/user-bo/{ID}" {
+  url.redirect = ( "" => "/user-bo/{ID}/" )
+}
+
+$HTTP["url"] =~ "^/user-bo/{ID}/" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => 23001
+  ) ) ),
+  proxy.forwarded = ( "for" => 1,
+                      "host" => 1,
+                      "by" => 1
+  ),
+  proxy.header = (
+      "upgrade" => "enable"
+  )
+}
+
+PROXY;
+        foreach ($catalog as $app => $row) {
+            $this->assertSame(array('.pmss/apps/'.$app.'.secured', '.pmss/apps/'.$app.'.state',
+                '.pmss/apps/'.$app.'.restart', '.pmss/apps/'.$app.'.login'),
+                array($row['securedMarker'], $row['stateFile'], $row['restartFile'], $row['loginFile']));
+            $this->assertSame(str_replace(array('{LABEL}', '{ID}'), array($row['label'], $app), $expectedProxy)."\n",
+                \pmssLighttpdManagedProxyFragment($app, 'bo', 23001));
+        }
+    }
+
+    public function testRootCatalogGuardRefusesUnsafeFilesAndDirectories(): void
+    {
+        $dir = $this->pmssMakeTempDir('toggle-catalog-', 0700);
+        $path = $dir.'/catalog.php';
+        copy($this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php'), $path);
+        chmod($path, 0600);
+        $oldMode = getenv('PMSS_TEST_MODE');
+        $oldPath = getenv('PMSS_TOGGLE_APP_CATALOG_PATH');
+        putenv('PMSS_TEST_MODE=1');
+        try {
+            putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$path);
+            $this->assertSame(array('slskd', 'copyparty'), array_keys(\pmssToggleAppCatalogRead()));
+            chmod($path, 0660);
+            $this->assertThrowsRuntime(static function (): void { \pmssToggleAppCatalogRead(); });
+            chmod($path, 0600);
+            chmod($dir, 0770);
+            $this->assertThrowsRuntime(static function (): void { \pmssToggleAppCatalogRead(); });
+            chmod($dir, 0700);
+            $link = $dir.'/link.php';
+            symlink($path, $link);
+            putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$link);
+            $this->assertThrowsRuntime(static function (): void { \pmssToggleAppCatalogRead(); });
+            $cron = $this->pmssRunRepoPhpScriptCommand('scripts/cron/checkToggleApps.php', array(),
+                array('PMSS_TEST_MODE' => '1', 'PMSS_TOGGLE_APP_CATALOG_PATH' => $link));
+            $this->assertSame(1, $cron['rc']);
+            $this->assertStringContainsString('Unsafe toggle-app catalog', $cron['output']);
+            $directoryLink = $dir.'-link';
+            symlink($dir, $directoryLink);
+            putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$directoryLink.'/catalog.php');
+            $this->assertThrowsRuntime(static function (): void { \pmssToggleAppCatalogRead(); });
+        } finally {
+            $oldMode === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$oldMode);
+            $oldPath === false ? putenv('PMSS_TOGGLE_APP_CATALOG_PATH') : putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$oldPath);
+        }
+    }
+
+    public function testSingleCronAndCatalogOnlyWiring(): void
+    {
+        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
+        $this->assertSame(1, substr_count($cron, 'checkToggleApps.php'));
+        $this->assertFalse((bool) preg_match('/check(?:Slskd|Copyparty)Instances/', $cron));
+        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', '/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json');
+        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', "escapeshellarg(\$service)");
+    }
+
+    public function testAppIdsStayInCatalogRenderersAndCompatibilityShims(): void
+    {
+        $paths = array_merge(glob($this->pmssRepoPath('etc/skel/www/*.php')) ?: array(),
+            glob($this->pmssRepoPath('scripts/cron/*.php')) ?: array(),
+            array($this->pmssRepoPath('scripts/lib/user/toggleApp.php'),
+                $this->pmssRepoPath('scripts/lib/lighttpd/proxyFragments.php'),
+                $this->pmssRepoPath('scripts/terminateUser.php')));
+        foreach ($paths as $path) {
+            if (in_array(basename($path), array('toggleAppCatalog.php', 'toggleAppRuntime.php', 'slskd.php', 'copyparty.php'), true)) continue;
+            // DroppedNeedle's description names slskd as the client it drives; that is display copy, not wiring.
+            $source = str_replace('drive your own slskd or SABnzbd', '', (string) file_get_contents($path));
+            $this->assertFalse((bool) preg_match('/slskd|copyparty/i', $source), $path);
+        }
+    }
+
+    public function testEndpointRejectsUnknownIdsBeforeWritingAndStartsKnownId(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home): void {
+            foreach (array('unknown', '../x', 'slskd') as $app) {
+                $php = '$_SERVER["REQUEST_METHOD"]="POST";'
+                    .'$_SERVER["HTTP_X_REQUESTED_WITH"]="XMLHttpRequest";'
+                    .'$_GET["app"]='.var_export($app, true).';$_GET["action"]="start";'
+                    .'register_shutdown_function(function(){echo "HTTP=".(http_response_code() ?: 200);});'
+                    .'require '.var_export($home.'/www/toggleApp.php', true).';';
+                $result = $this->pmssExecShellCommand('cd '.escapeshellarg($home.'/www').' && '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($php));
+                $this->assertSame(0, $result['rc'], $result['output']);
+                $this->assertStringContainsString($app === 'slskd' ? 'HTTP=200' : 'HTTP=404', $result['output']);
+                if ($app !== 'slskd') $this->assertFalse(is_file($home.'/.slskdEnable'));
+            }
+            $this->assertTrue(is_file($home.'/.slskdEnable'));
+            $this->assertSame("not secured\n", file_get_contents($home.'/.pmss/apps/slskd.state'));
+        });
+    }
+
     public function testLegacySpecHasNoNewFields(): void
     {
         $this->assertSame(['processName' => 'demo', 'command' => 'true', 'userLogMessage' => 'start'],
@@ -164,6 +296,12 @@ class ToggleAppTest extends TestCase
         $this->assertTrue(microtime(true) - $started < 2.0);
         $this->assertFalse(is_file($marker));
         $this->pmssAssertRepoFileContainsString('scripts/lib/user/toggleApp.php', 'pmssToggleAppDetachedGroup($conditions, $launch)');
+        // Files the app creates stay private even under a loose caller umask.
+        $created = dirname($marker).'/created';
+        exec('umask 022; bash -c '.escapeshellarg(\pmssToggleAppDetachedGroup('true', 'touch '.escapeshellarg($created))));
+        for ($i = 0; $i < 50 && !is_file($created); $i++) usleep(100000);
+        clearstatcache();
+        $this->assertSame(0600, fileperms($created) & 0777);
     }
 
     public function testProxyRetainsPrefixAndSkeletonShipsEndpoints(): void
@@ -173,10 +311,10 @@ class ToggleAppTest extends TestCase
             $this->assertStringContainsString('^/user-alice/'.$app.'/', $proxy);
             $this->assertStringNotContainsString('map-urlpath', $proxy);
             $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/{$app}.php'");
-            $this->pmssAssertRepoFileContainsString('etc/skel/www/scriptsIncAppProcess.php', "'endpoint' => '{$app}.php'");
-            $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', 'check'.ucfirst($app).'Instances.php');
+            $this->pmssAssertRepoFileContainsString('etc/skel/www/scriptsIncAppProcess.php', "'endpoint' => 'toggleApp.php?app='");
         }
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/toggleAppRuntime.php'");
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', 'checkToggleApps.php');
     }
 
     public function testSiblingProxyConflictPreventsSecuredMarker(): void

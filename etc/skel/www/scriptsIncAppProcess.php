@@ -3,18 +3,20 @@
 
 if (!function_exists('pmssCustomerManagedAppDefinitions')) {
 /** Return metadata for customer-managed app frontends copied into www/. */
- function pmssCustomerManagedAppDefinitions() { return array(
+ function pmssCustomerManagedAppDefinitions() { $definitions = array(
    'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php', 'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')),
    'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')),
    'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php',      'binaries' => array('/usr/bin/rclone')),
-   'slskd'       => array('enable' => '../.slskdEnable',       'endpoint' => 'slskd.php',       'binaries' => array('/opt/slskd/slskd')),
-   'copyparty'   => array('enable' => '../.copypartyEnable',   'endpoint' => 'copyparty.php',   'binaries' => array('/usr/local/bin/copyparty-sfx.py')),
-  ); }
+  );
+  foreach (require __DIR__.'/toggleAppCatalog.php' as $id => $row) {
+   $definitions[$id] = array('enable' => '../'.$row['enable'], 'endpoint' => 'toggleApp.php?app='.$id, 'binaries' => $row['binaries']);
+  }
+  return $definitions; }
 }
 
 if (!function_exists('pmssWelcomeServiceAvailable')) {
 function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) {
-  if (!file_exists($scriptPath)) return false;
+  if (!file_exists(explode('?', (string) $scriptPath, 2)[0])) return false;
   foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true;
   return false;
  }

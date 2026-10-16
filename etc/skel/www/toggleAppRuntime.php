@@ -1,5 +1,9 @@
 <?php
 /** User-UID configuration and display state for secured toggle apps. */
+function pmssToggleAppCustomerCatalog(): array
+{
+    return require __DIR__.'/toggleAppCatalog.php';
+}
 
 /** Keep credentials and configs private even when the caller has a loose umask. */
 function pmssToggleAppPrivateWrite(string $path, string $contents): bool
@@ -24,41 +28,60 @@ function pmssToggleAppPrivateWriteIfChanged(string $path, string $contents): boo
 }
 
 /**
- * Build the two upstream config formats from port-manager assignments. slskd's Soulseek
+ * Build upstream config formats from port-manager assignments. slskd's Soulseek
  * listener takes its own port on every address: peers must reach it, and the upstream
  * default port would collide between accounts on one host.
  */
-function pmssToggleAppConfig(string $app, string $user, string $home, int $port, string $password, int $peerPort = 0): string
+function pmssToggleAppSlskdConfig(string $user, string $home, int $port, string $password, int $peerPort): array
 {
-    if ($app === 'slskd') {
-        return "web:\n  port: {$port}\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-{$user}/slskd\n  authentication:\n    disabled: false\n    username: {$user}\n    password: {$password}\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: {$peerPort}\n";
-    }
+    return array('.config/slskd/slskd.yml' => "web:\n  port: {$port}\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-{$user}/slskd\n  authentication:\n    disabled: false\n    username: {$user}\n    password: {$password}\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: {$peerPort}\n");
+}
+
+function pmssToggleAppCopypartyConfig(string $user, string $home, int $port, string $password, int $peerPort): array
+{
     // Use the rightmost forwarded IP, away from client-prepended spoofed values.
-    return "[global]\n  i: 127.0.0.1\n  p: {$port}\n  rp-loc: /user-{$user}/copyparty\n  xff-hdr: X-Forwarded-For\n  rproxy: -1\n\n[accounts]\n  {$user}: {$password}\n\n[/]\n  {$home}/data\n  accs:\n    A: {$user}\n";
+    return array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: {$port}\n  rp-loc: /user-{$user}/copyparty\n  xff-hdr: X-Forwarded-For\n  rproxy: -1\n\n[accounts]\n  {$user}: {$password}\n\n[/]\n  {$home}/data\n  accs:\n    A: {$user}\n");
+}
+
+/** Each renderer owns only its upstream format; the catalog chooses the renderer. */
+function pmssToggleAppConfigs(string $app, string $user, string $home, int $port, string $password, int $peerPort): array
+{
+    $catalog = pmssToggleAppCustomerCatalog();
+    if (!isset($catalog[$app])) return array();
+    $renderer = $catalog[$app]['configRenderer'];
+    return function_exists($renderer) ? $renderer($user, $home, $port, $password, $peerPort) : array();
 }
 
 /** Bootstrap runs as the account; the secured marker is the final write. */
 function pmssToggleAppBootstrap(string $app, string $user, string $home, int $port, string $proxy, int $peerPort = 0): bool
 {
-    if (!in_array($app, ['slskd', 'copyparty'], true) || preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1
+    $catalog = pmssToggleAppCustomerCatalog();
+    if (!isset($catalog[$app]) || preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1
         || $port < 2000 || $port > 38000 || ($home !== '/home/'.$user && getenv('PMSS_TEST_MODE') !== '1')) return false;
-    if ($app === 'slskd' && ($peerPort < 2000 || $peerPort > 38000 || $peerPort === $port)) return false;
-    $base = $home.'/.pmss/apps';
-    $config = $app === 'slskd' ? $home.'/.config/slskd/slskd.yml' : $home.'/.config/copyparty/copyparty.conf';
-    $login = $base.'/'.$app.'.login';
-    $secured = $base.'/'.$app.'.secured';
+    $row = $catalog[$app];
+    if ($row['extraPortServices'] !== array() && ($peerPort < 2000 || $peerPort > 38000 || $peerPort === $port)) return false;
+    $login = $home.'/'.$row['loginFile'];
+    $secured = $home.'/'.$row['securedMarker'];
     $proxyPath = $home.'/.lighttpd/custom.d/pmss-'.$app.'.conf';
-    if ($app === 'copyparty' && !is_dir($home.'/data') && !@mkdir($home.'/data', 0700, true)) return false;
+    if (isset($row['dataDirectory']) && !is_dir($home.'/'.$row['dataDirectory'])
+        && !@mkdir($home.'/'.$row['dataDirectory'], 0700, true)) return false;
     $saved = !is_link($login) && is_file($login) ? @file_get_contents($login) : false;
     $lines = is_string($saved) ? explode("\n", trim($saved)) : [];
     $password = count($lines) === 2 && $lines[0] === $user && preg_match('/^[a-f0-9]{48}$/D', $lines[1]) === 1 ? $lines[1] : '';
-    $configValid = $password !== '' && !is_link($config) && is_file($config)
-        && (@fileperms($config) & 0777) === 0600 && (@fileperms($login) & 0777) === 0600
-        && @file_get_contents($config) === pmssToggleAppConfig($app, $user, $home, $port, $password, $peerPort);
+    $configs = pmssToggleAppConfigs($app, $user, $home, $port, $password, $peerPort);
+    if (!isset($configs[$row['config']])) return false;
+    $configValid = $password !== '' && (@fileperms($login) & 0777) === 0600;
+    foreach ($configs as $relative => $contents) {
+        $path = $home.'/'.$relative;
+        $configValid = $configValid && !is_link($path) && is_file($path)
+            && (@fileperms($path) & 0777) === 0600 && @file_get_contents($path) === $contents;
+    }
     if (!is_file($secured) || !$configValid) {
         $password = bin2hex(random_bytes(24));
-        if (!pmssToggleAppPrivateWrite($config, pmssToggleAppConfig($app, $user, $home, $port, $password, $peerPort))
-            || !pmssToggleAppPrivateWrite($login, $user."\n".$password."\n")) return false;
+        foreach (pmssToggleAppConfigs($app, $user, $home, $port, $password, $peerPort) as $relative => $contents) {
+            if (!pmssToggleAppPrivateWrite($home.'/'.$relative, $contents)) return false;
+        }
+        if (!pmssToggleAppPrivateWrite($login, $user."\n".$password."\n")) return false;
     }
     // Yield to a pre-existing matching URL conditional instead of shadowing it.
     $directory = dirname($proxyPath);
@@ -83,16 +106,18 @@ function pmssToggleAppBootstrap(string $app, string $user, string $home, int $po
 /** Publish only the fixed four-state vocabulary for the owner-facing panel. */
 function pmssToggleAppStateWrite(string $app, string $state, string $home): bool
 {
-    if (!in_array($app, ['slskd', 'copyparty'], true)
+    $catalog = pmssToggleAppCustomerCatalog();
+    if (!isset($catalog[$app])
         || !in_array($state, ['running', 'stopped', 'not secured', 'gave up'], true)) return false;
-    return pmssToggleAppPrivateWrite($home.'/.pmss/apps/'.$app.'.state', $state."\n");
+    return pmssToggleAppPrivateWrite($home.'/'.$catalog[$app]['stateFile'], $state."\n");
 }
 
 /** Atomic replacement changes the marker inode without root reading a home file. */
 function pmssToggleAppRestartSignal(string $app, string $home): bool
 {
-    if (!in_array($app, ['slskd', 'copyparty'], true)) return false;
-    return pmssToggleAppPrivateWrite($home.'/.pmss/apps/'.$app.'.restart', "restart\n");
+    $catalog = pmssToggleAppCustomerCatalog();
+    if (!isset($catalog[$app])) return false;
+    return pmssToggleAppPrivateWrite($home.'/'.$catalog[$app]['restartFile'], "restart\n");
 }
 
 if (PHP_SAPI === 'cli' && realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) {

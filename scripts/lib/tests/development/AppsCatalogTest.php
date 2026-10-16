@@ -26,7 +26,7 @@ class AppsCatalogTest extends TestCase
             'scriptsIncFrontend', 'scriptsIncBonus', 'scriptsIncCgroup', 'scriptsIncBackup',
             'scriptsIncRestoreTar', 'scriptsIncRestore', 'scriptsIncAppProcess', 'scriptsIncAppsHtml',
             'scriptsIncAppsStatus', 'scriptsIncActionJs', 'userMediaStackPanel', 'qbittorrent',
-            'deluge', 'rclone', 'slskd', 'copyparty', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
+            'deluge', 'rclone', 'slskd', 'copyparty', 'toggleApp', 'toggleAppCatalog', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
         foreach ($guiv as $name) {
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
             $tokens = token_get_all($source);

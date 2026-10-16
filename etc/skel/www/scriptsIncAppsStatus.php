@@ -64,6 +64,7 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
     $rtorrentOff = is_file(pmssCustomerHomePath($home, '.rtorrentDisable'));
     $apps['rtorrent'] = array('kind' => 'rtorrent', 'state' => $rtorrentOff ? 'off'
         : (pmssCustomerNativePidsRead(array('/usr/bin/rtorrent', '/usr/local/bin/rtorrent')) !== array() ? 'running' : 'not-running'), 'url' => 'rutorrent/');
+    $toggleCatalog = require __DIR__.'/toggleAppCatalog.php';
     foreach (pmssCustomerManagedAppDefinitions() as $name => $definition) {
         if (!pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
         $enabled = is_file(pmssCustomerHomePath($home, basename($definition['enable'])));
@@ -71,12 +72,12 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
             : (pmssCustomerNativePidsRead($definition['binaries']) !== array() ? 'running' : 'not-running'),
             'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : ($name === 'rclone' ? 'rclone/' : $name.'/')),
             'endpoint' => $definition['endpoint']);
-        if ($name === 'slskd' || $name === 'copyparty') {
-            $base = pmssCustomerHomePath($home, '.pmss/apps/'.$name);
-            $state = @file_get_contents($base.'.state');
-            if ($enabled) $apps[$name]['state'] = !is_file($base.'.secured') ? 'not secured'
+        if (isset($toggleCatalog[$name])) {
+            $row = $toggleCatalog[$name];
+            $state = @file_get_contents(pmssCustomerHomePath($home, $row['stateFile']));
+            if ($enabled) $apps[$name]['state'] = !is_file(pmssCustomerHomePath($home, $row['securedMarker'])) ? 'not secured'
                 : ($apps[$name]['state'] === 'running' ? 'running' : (trim((string) $state) === 'gave up' ? 'gave up' : 'stopped'));
-            $login = $base.'.login';
+            $login = pmssCustomerHomePath($home, $row['loginFile']);
             if (is_file($login) && !is_link($login) && (@fileperms($login) & 0777) === 0600
                 && function_exists('posix_geteuid') && @fileowner($login) === posix_geteuid()) {
                 $apps[$name]['login'] = trim((string) @file_get_contents($login));

@@ -5,13 +5,15 @@ if (!function_exists('pmssCustomerAppsDescriptionsRead')) {
 /** Descriptions are display copy; app identity and URL come from existing readers. */
 function pmssCustomerAppsDescriptionsRead(): array
 {
-    return array('Jellyfin' => 'Stream your library to TV, phone and browser',
+    $descriptions = array('Jellyfin' => 'Stream your library to TV, phone and browser',
         'Sonarr' => 'Finds and downloads TV episodes', 'Radarr' => 'Finds and downloads movies',
         'Prowlarr' => 'Manages indexers for Sonarr and Radarr', 'SABnzbd' => 'Usenet downloader',
         'Autobrr' => 'Grabs releases from IRC announces', 'Cloudplow' => 'Moves finished files to cloud storage',
         'rTorrent + ruTorrent' => 'Your main torrent client', 'qBittorrent' => 'Second torrent client',
         'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage',
-        'slskd' => 'Soulseek client', 'Copyparty' => 'Private file sharing');
+        );
+    foreach (require __DIR__.'/toggleAppCatalog.php' as $row) $descriptions[$row['label']] = $row['description'];
+    return $descriptions;
 }
 }
 
@@ -40,8 +42,8 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
         'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr',
         'cloudplow' => 'Cloudplow', 'rtorrent' => 'rTorrent + ruTorrent',
         'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone',
-        'slskd' => 'slskd', 'copyparty' => 'Copyparty',
         'lighttpd' => 'Web server');
+    foreach (require __DIR__.'/toggleAppCatalog.php' as $appId => $row) $names[$appId] = $row['label'];
     $name = $names[$id] ?? $id;
     $description = pmssCustomerAppsDescriptionsRead()[$name] ?? ($id === 'lighttpd' ? 'Your account web server' : '');
     $state = $app['state'];

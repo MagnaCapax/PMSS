@@ -291,7 +291,7 @@ function pmssStatsToggleApp(button) {
         button.disabled = false;
         button.removeAttribute('aria-busy');
     };
-    request.open('POST', endpoint + '?action=' + encodeURIComponent(action), true);
+    request.open('POST', endpoint + (endpoint.indexOf('?') === -1 ? '?action=' : '&action=') + encodeURIComponent(action), true);
     request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     request.send('');
     return false;

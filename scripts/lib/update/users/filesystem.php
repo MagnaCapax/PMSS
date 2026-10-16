@@ -260,6 +260,8 @@ PHP;
         'www/qbittorrent.php',
         'www/slskd.php',
         'www/copyparty.php',
+        'www/toggleAppCatalog.php',
+        'www/toggleApp.php',
         'www/toggleAppRuntime.php',
         'www/rclone.php',
         'www/rutorrent/js/content.js',

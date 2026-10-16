@@ -7,6 +7,7 @@
 
 require_once __DIR__.'/userFileWrite.php';
 require_once __DIR__.'/../portManager.php';
+require_once __DIR__.'/../toggleAppCatalog.php';
 
 function pmssLighttpdProxyRuleFragment(
     string $pattern,
@@ -67,14 +68,6 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             ],
         ],
         'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
-        'slskd' => ["# PMSS-managed: slskd reverse proxy.\n\n", [
-            ['redirect', '/user-'.$user.'/slskd', '/user-'.$user.'/slskd/'],
-            ['^/user-'.$user.'/slskd/', [], false, true],
-        ]],
-        'copyparty' => ["# PMSS-managed: Copyparty reverse proxy.\n\n", [
-            ['redirect', '/user-'.$user.'/copyparty', '/user-'.$user.'/copyparty/'],
-            ['^/user-'.$user.'/copyparty/', [], false, true],
-        ]],
         'qbittorrent' => [
             "# PMSS-managed: qBittorrent reverse proxy.\n\n",
             [
@@ -91,7 +84,13 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
         ],
     ];
     if (!isset($definitions[$proxyName])) {
-        return '';
+        $catalog = pmssToggleAppCatalogRead();
+        if (!isset($catalog[$proxyName])) return '';
+        $base = '/user-'.$user.'/'.$proxyName;
+        $definitions[$proxyName] = ["# PMSS-managed: {$catalog[$proxyName]['label']} reverse proxy.\n\n", [
+            ['redirect', $base, $base.'/'],
+            ['^'.$base.'/', [], false, true],
+        ]];
     }
 
     $fragment = $definitions[$proxyName][0];

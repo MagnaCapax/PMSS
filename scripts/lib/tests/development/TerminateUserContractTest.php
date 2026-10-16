@@ -16,13 +16,12 @@ final class TerminateUserContractTest extends TestCase
     public function testTerminateUserReleasesEveryToggleAppPortAndCrashState(): void
     {
         // Every port service the toggle-app watchdog reserves must be released on termination.
-        $source = $this->pmssReadRepoFile('scripts/lib/user/toggleApp.php');
-        preg_match_all("/pmssPortManagerAssignServicePort\\(\\\$user, '([a-z-]+)'\\)/", $source, $named);
-        $services = array_merge(array('slskd', 'copyparty'), $named[1]);
-        $this->assertTrue(in_array('slskd-peer', $services, true));
-        foreach (array_unique($services) as $service) {
-            $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', "release '.escapeshellarg(\$username).' {$service}'");
-        }
+        $catalog = require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php');
+        $services = array();
+        foreach ($catalog as $app => $row) $services = array_merge($services, array($app), $row['extraPortServices']);
+        $this->assertSame(array('slskd', 'slskd-peer', 'copyparty'), $services);
+        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', 'array_merge(array($toggleApp), $row[\'extraPortServices\'])');
+        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', "escapeshellarg(\$service)");
         $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', '/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json');
     }
 

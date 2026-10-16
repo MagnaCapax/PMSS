@@ -18,7 +18,7 @@ require_once __DIR__.'/userMediaStackPanel.php';
 /** The wiki catalog keeps the existing category and native-install metadata. */
 function pmssAppsCatalogRead(): array
 {
-    return array(
+    $categories = array(
         'Media servers and live TV' => array(
             array('Tunarr', true, 'Builds live-TV channels from a Jellyfin, Plex or Emby library', 'no login'),
             array('Channels DVR', true, 'Records live TV from tuners or IPTV for the Channels apps', ''),
@@ -38,7 +38,6 @@ function pmssAppsCatalogRead(): array
         'Downloads and requests' => array(
             array('qui', true, 'One web interface for several qBittorrent instances', ''),
             array('JDownloader 2', true, 'Download manager for direct links and file hosts', ''),
-            array('slskd', true, 'Web client for the Soulseek network', ''),
             array('Seerr', true, 'Media requests for Jellyfin, Plex and Emby', ''),
             array('DroppedNeedle', false, 'Music requests that drive your own slskd or SABnzbd', ''),
             array('ReadMeABook', false, 'Audiobook requests: search, download, merge, import', ''),
@@ -63,7 +62,6 @@ function pmssAppsCatalogRead(): array
         'Photos, files and passwords' => array(
             array('Immich', false, 'Photo and video library with phone backup', '6 GB+ RAM'),
             array('PhotoPrism', true, 'Indexes, tags and searches photos and videos', '3 GB+ RAM'),
-            array('Copyparty', true, 'File server with resumable uploads and share links', ''),
             array('Vaultwarden', false, 'Password server for the Bitwarden apps', ''),
         ),
         'Dashboards, chat and desktop' => array(
@@ -73,6 +71,11 @@ function pmssAppsCatalogRead(): array
             array('Webtop', false, 'A full Linux desktop in a browser tab', ''),
         ),
     );
+    foreach (require __DIR__.'/toggleAppCatalog.php' as $row) {
+        array_splice($categories[$row['listingCategory']], $row['listingIndex'], 0,
+            array(array($row['label'], $row['listingAvailable'], $row['listingDescription'], '')));
+    }
+    return $categories;
 }
 
 /** Build closed wiki and managed-client destinations. */
