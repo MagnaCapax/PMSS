@@ -53,17 +53,19 @@ function pmssToggleAppPrepare(string $user, string $app): bool
 /** The shell receives only paths and fixed flags, never the generated password. */
 function pmssToggleAppLaunchCommand(array $row, string $config, string $home): string
 {
-    $tokens = array_map(static function (string $token) use ($config, $home): string {
-        $token = str_replace(array('{config}', '{configDir}', '{home}'), array($config, dirname($config), $home), $token);
-        return escapeshellarg($token);
+    $expand = static function (string $token) use ($config, $home): string {
+        return str_replace(array('{config}', '{configDir}', '{home}'), array($config, dirname($config), $home), $token);
+    };
+    $tokens = array_map(static function (string $token) use ($expand): string {
+        return escapeshellarg($expand($token));
     }, $row['launch']);
-    $command = ($row['workingDirectory'] !== '' ? 'cd '.escapeshellarg($row['workingDirectory']).' && ' : '')
-        .'nohup '.implode(' ', $tokens);
+    // The launch otherwise inherits root's working directory, which the account cannot read.
+    $cd = $row['workingDirectory'] !== '' ? 'cd '.escapeshellarg($expand($row['workingDirectory'])).' && ' : '';
     if (!empty($row['sourceEnv'])) {
         $shell = 'set -a; . '.escapeshellarg($config).'; set +a; exec '.implode(' ', $tokens);
-        return 'nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell);
+        return $cd.'nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell);
     }
-    return $command;
+    return $cd.'nohup '.implode(' ', $tokens);
 }
 
 /** Start only after the account-owned config and secured marker exist. */

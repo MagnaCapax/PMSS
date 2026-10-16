@@ -326,7 +326,8 @@ PHP
             $shell = 'set -a; . '.escapeshellarg("/home/bo/a'b/.config/scryer/scryer.env")
                 .'; set +a; exec '.escapeshellarg('/opt/scryer/scryer').' '.escapeshellarg('--data-dir')
                 .' '.escapeshellarg("/home/bo/a'b/.local/share/scryer");
-            $this->assertSame('nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell), $launch);
+            // Scryer reads a relative dotenv path, so it must start in the account home, not root's cwd.
+            $this->assertSame('cd '.escapeshellarg("/home/bo/a'b").' && nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell), $launch);
         } finally {
             $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
         }

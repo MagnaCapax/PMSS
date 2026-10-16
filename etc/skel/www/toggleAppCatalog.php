@@ -45,7 +45,7 @@ return array(
         'securedMarker' => '.pmss/apps/scryer.secured', 'stateFile' => '.pmss/apps/scryer.state',
         'restartFile' => '.pmss/apps/scryer.restart', 'loginFile' => '.pmss/apps/scryer.login',
         'binaries' => array('/opt/scryer/scryer'), 'processNeedle' => '/opt/scryer/scryer', 'processFull' => true,
-        'launch' => array('/opt/scryer/scryer', '--data-dir', '{home}/.local/share/scryer'), 'workingDirectory' => '',
+        'launch' => array('/opt/scryer/scryer', '--data-dir', '{home}/.local/share/scryer'), 'workingDirectory' => '{home}',
         'config' => '.config/scryer/scryer.env', 'configRenderer' => 'pmssToggleAppScryerConfig',
         'extraPortServices' => array(), 'credentialMode' => 'config', 'sourceEnv' => true,
         'loginLabel' => 'Login (initial password)', 'watchdogLabel' => 'Scryer', 'watchdogProcess' => 'scryer',
