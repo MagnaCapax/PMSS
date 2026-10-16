@@ -16,7 +16,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Monolithic but structured: single file with small helpers for clarity and reuse.
 - Idempotent: re‑runs converge to the same state; dry‑run exists for verification.
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
-- Memory pre-flight: accounts below 1024 MiB are warned and must use `--force` from SSH.
+- Memory pre-flight: accounts below 1000 MiB are warned and must use `--force` from SSH.
 - Uninstall path: `--uninstall` stops verified media-stack sessions, removes PMSS-managed app/config and runtime-status paths, and backs up/strips managed shell aliases.
 - Servarr update policy: Radarr, Sonarr, and Prowlarr select `Script` updates without supplying an update script and disable automatic updates. Manual updates report an undefined-script error before launching the built-in updater; rerun this installer to update safely.
 - App-level authentication: the installer generates per-app passwords, configures auth before the public proxy is restarted, and writes credentials to `~/.media-stack-credentials.txt` with mode `600`.
@@ -86,7 +86,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
   - `--skip-update`        No‑op kept for compatibility (self‑update is already off by default)
   - `--dry-run`            Verify URLs and show actions; do not change the system
   - `--verify-only`        Only verify URLs (alias to `--dry-run`) and exit early
-  - `--force`              Continue below the 1024 MiB account-memory guard
+  - `--force`              Continue below the 1000 MiB account-memory guard
   - `--start-stopped`      Start installed apps whose tmux sessions are absent, then exit
   - `--secure-app=APP`     Apply PMSS default auth to one installed app, then exit
   - `--uninstall`          Remove the PMSS-managed media stack from this account
@@ -195,7 +195,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 ## Operations & Safety
 - The script preserves unrelated `~/.bin` contents on reruns and refreshes only PMSS-managed media-stack paths in place.
-- The full stack is not suitable for very small shared-hosting memory budgets. If the detected account cgroup limit is below 1024 MiB, the installer warns and aborts unless run interactively with confirmation or explicitly with `--force`. The welcome-page wrapper surfaces the same warning and does not force installs from the browser.
+- The full stack is not suitable for very small shared-hosting memory budgets. If the detected account cgroup limit is below 1000 MiB, the installer warns and aborts unless run interactively with confirmation or explicitly with `--force`. The welcome-page wrapper surfaces the same warning and does not force installs from the browser.
 - The script prompts before removing existing Jellyfin state because stale config can hang reruns and the deletion is destructive. It keeps that state until the Jellyfin replacement has downloaded and extracted, then resets the config immediately before rebuilding it.
 - The welcome panel exposes the same one-shot `--start-stopped` recovery. It never enables automatic crash-loop restarts; review the app log before retrying a repeatedly failing app.
 - Media-stack ports are still chosen locally from `10000-65000`; they are not yet registered with `scripts/util/portManager.php`.

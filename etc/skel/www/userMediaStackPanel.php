@@ -12,7 +12,8 @@ if (function_exists('pmssWelcomeRequireLocalHelper')) {
     pmssWelcomeRequireLocalHelper('mediaStackRecoveryCommand.php');
 }
 
-const PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES = 1024 * 1024 * 1024;
+// A 1000 MiB plan ran the full stack idle at about 570 MiB anonymous memory with no limit hits (2026-10-16).
+const PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES = 1000 * 1024 * 1024;
 const PMSS_MEDIA_STACK_MEMORY_UNLIMITED_BYTES = 1024 * 1024 * 1024 * 1024 * 1024;
 
 /**

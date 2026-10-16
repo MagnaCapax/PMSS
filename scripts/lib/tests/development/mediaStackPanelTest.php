@@ -76,6 +76,8 @@ class MediaStackPanelTest extends TestCase
     {
         foreach ([
             [512 * 1024 * 1024, 'blocked', false, 'install-media-stack.sh --force'],
+            [999 * 1024 * 1024, 'blocked', false, 'install-media-stack.sh --force'],
+            [1000 * 1024 * 1024, 'ready', true, ''],
             [2 * 1024 * 1024 * 1024, 'ready', true, ''],
         ] as [$limitBytes, $expectedState, $expectedCanStart, $messageNeedle]) {
             $home = $this->mediaHomeCreate('pmss-media-memory-');
