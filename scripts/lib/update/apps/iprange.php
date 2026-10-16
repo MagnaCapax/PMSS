@@ -12,7 +12,7 @@ require_once __DIR__.'/remoteBinary.php';
 $iprangeVersion = '1.0.4';
 $iprangeArchive = 'iprange-'.$iprangeVersion.'.tar.xz';
 $iprangeUrl = 'https://github.com/firehol/iprange/releases/download/v'.$iprangeVersion.'/'.$iprangeArchive;
-$iprangeSha256 = 'f21aed906da1bd8e4586f981421f79c406a7c8c2efbcf15f268f7d9176148be6';
+$iprangeSha256 = 'e138d18974fb65674e5ea53da1ffbdde19704208e5114cc6b32d01db3ce1d567';
 
 if (empty($GLOBALS['PMSS_PACKAGES_READY'])) {
     logmsg('[WARN] Skipping iprange build: package phase not complete');
