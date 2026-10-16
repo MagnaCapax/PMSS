@@ -1320,6 +1320,7 @@ DOTNET_ROOT_PATH="$HOME/.bin/dotnet"
 JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
+JELLYFIN_CONFIG_RESET=0
 JELLYFIN_MIN_FFMPEG_VERSION="4.4"
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
@@ -1395,10 +1396,10 @@ if [[ -z "$SECURE_APP" ]]; then
 			printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
 			read -r confirm
 			[[ $confirm == [yY] ]] || exit 1
-			jellyfin_config_dir_reset
+			JELLYFIN_CONFIG_RESET=1
 		fi
 	elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ]; then
-		[[ $DRY_RUN -eq 1 ]] || jellyfin_config_dir_reset
+		[[ $DRY_RUN -eq 1 ]] || JELLYFIN_CONFIG_RESET=1
 	elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ]; then
 		log_warn "Leaving existing Jellyfin config untouched because this run will skip Jellyfin."
 	fi
@@ -2556,13 +2557,18 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	datadir="$JELLYFIN_DATA_DIR"
 	configdir="$JELLYFIN_CONFIG_DIR"
 	logdir="$JELLYFIN_LOG_DIR"
-	mkdir -p "$datadir" "$logdir" "$configdir"
 	managed_install_path_reset "$installdir/${app}"
 	cd "$installdir"
 	echo "Downloading...${app^^}"
 	fetch_verified_archive "$JELLYFIN_URL" "${app}.tar.gz" "Jellyfin" "${JF_FILENAME:-override}"
 	mkdir -p "${app}"
 	extract_tgz "${app}.tar.gz" "${app}" 1
+	# Preserve the working config until the new build is ready to configure.
+	if [[ "$JELLYFIN_CONFIG_RESET" -eq 1 ]]; then
+		jellyfin_config_dir_reset
+	fi
+	mkdir -p "$datadir" "$logdir" "$configdir"
+	[[ $DRY_RUN -eq 1 ]] || chmod 700 "$HOME/.config/jellyfin"
 	[[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
 
 	# Configure Jellyfin BEFORE first start (security: prevents 0.0.0.0 binding)

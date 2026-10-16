@@ -196,7 +196,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 ## Operations & Safety
 - The script preserves unrelated `~/.bin` contents on reruns and refreshes only PMSS-managed media-stack paths in place.
 - The full stack is not suitable for very small shared-hosting memory budgets. If the detected account cgroup limit is below 1024 MiB, the installer warns and aborts unless run interactively with confirmation or explicitly with `--force`. The welcome-page wrapper surfaces the same warning and does not force installs from the browser.
-- The script still prompts before removing existing Jellyfin state because stale config can hang reruns and the deletion is destructive.
+- The script prompts before removing existing Jellyfin state because stale config can hang reruns and the deletion is destructive. It keeps that state until the Jellyfin replacement has downloaded and extracted, then resets the config immediately before rebuilding it.
 - The welcome panel exposes the same one-shot `--start-stopped` recovery. It never enables automatic crash-loop restarts; review the app log before retrying a repeatedly failing app.
 - Media-stack ports are still chosen locally from `10000-65000`; they are not yet registered with `scripts/util/portManager.php`.
 - All app binds are `127.0.0.1`. Exposure to the Internet is not supported without proper SSL/reverse proxy hardening.

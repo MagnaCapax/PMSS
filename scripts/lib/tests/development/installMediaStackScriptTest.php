@@ -637,6 +637,27 @@ BASH
         $this->assertStringContainsString('Leaving existing Jellyfin config untouched because this run will skip Jellyfin.', $this->script);
     }
 
+    public function testJellyfinConfigResetWaitsForDownloadedBuild(): void
+    {
+        $preflight = strpos($this->script, '# Safety check for existing Jellyfin config/data');
+        $portPick = strpos($this->script, 'JELLYFIN_PORT="$(pick_existing_or_reserved_port');
+        $servarrSeed = strpos($this->script, 'log_step "Configuring Servarr authentication..."');
+        $download = strpos($this->script, 'fetch_verified_archive "$JELLYFIN_URL"');
+        $extract = strpos($this->script, 'extract_tgz "${app}.tar.gz" "${app}" 1', $download);
+        $reset = strpos($this->script, "\n\t\tjellyfin_config_dir_reset\n", $extract);
+        $mkdir = strpos($this->script, 'mkdir -p "$datadir" "$logdir" "$configdir"', $reset);
+        $chmod = strpos($this->script, 'chmod 700 "$HOME/.config/jellyfin"', $mkdir);
+        $network = strpos($this->script, 'if [ ! -f "$configdir/network.xml" ]; then', $chmod);
+
+        $this->assertStringContainsString('JELLYFIN_CONFIG_RESET=0', $this->script);
+        $this->assertStringContainsString('JELLYFIN_CONFIG_RESET=1', $this->script);
+        $this->assertTrue($preflight !== false && $portPick !== false && $servarrSeed !== false && $download !== false);
+        $this->assertTrue($extract !== false && $reset !== false && $mkdir !== false && $chmod !== false && $network !== false);
+        $this->assertTrue($preflight < $portPick && $portPick < $servarrSeed && $servarrSeed < $download);
+        $this->assertTrue($download < $extract && $extract < $reset && $reset < $mkdir && $mkdir < $chmod && $chmod < $network);
+        $this->assertStringNotContainsString('jellyfin_config_dir_reset', substr($this->script, $preflight, $portPick - $preflight));
+    }
+
     public function testLighttpdMediaStackMigrationMarkersPresent(): void
     {
         $this->assertStringContainsAllStrings([
