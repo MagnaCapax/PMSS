@@ -146,3 +146,25 @@ function pmssTrafficLimitThrottleOrphanReconcile(
     pmssTrafficLimitLog($user, 'orphaned traffic throttle file removed after runtime marker loss');
     return pmssTrafficLimitThrottleApply($user, $trafficCapMbit, false, $homeRoot);
 }
+
+/**
+ * Clear any throttle state left over once an account no longer has a monthly limit.
+ *
+ * Covers both "no limit" shapes the enforcement cron skips before its removal branch:
+ * the runtime limit file deleted outright (operator --unset removes it via the
+ * integer-setting persist helper) and a residual zero/absent effective limit. When the
+ * enforcement marker is still present it is removed and the throttle lifted; otherwise the
+ * orphan reconcile drops any stale throttle file. Without this an account throttled from a
+ * previous overage would stay throttled forever after its limit is cleared.
+ */
+function pmssTrafficLimitThrottleClearWhenUnlimited(string $user, string $enabledMarkerPath, string $homeRoot = '/home'): void
+{
+    if (pmssPathExistsOrLink($enabledMarkerPath)) {
+        if (pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {
+            pmssTrafficLimitLog($user, 'traffic throttle removed after limit cleared');
+            pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
+        }
+        return;
+    }
+    pmssTrafficLimitThrottleOrphanReconcile($user, 0, $enabledMarkerPath, $homeRoot);
+}
