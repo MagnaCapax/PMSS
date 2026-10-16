@@ -98,7 +98,7 @@ function pmssRemovePrivateTempDir(string $path, string $prefix, string $descript
 // runtime boundary and keep callers on the existing fail-soft path.
 function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }
 /** A write succeeds only when every payload byte reaches the file. */
-function pmssFileWriteComplete(string $path, string $content, int $flags = 0, ?callable $writer = null): bool { return ($writer ? $writer($path, $content) : @file_put_contents($path, $content, $flags)) === strlen($content); }
+function pmssFileWriteComplete(string $path, string $content, int $flags = 0, ?callable $writer = null): bool { return !pmssFilesystemPathHasNulByte($path) && ($writer ? $writer($path, $content) : @file_put_contents($path, $content, $flags)) === strlen($content); }
 /** Reject closed streams and other resource types before stream operations. */
 function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && get_resource_type($handle) === 'stream'; }
 /** Treat a dangling symlink as an occupied path, unlike file_exists(). */
@@ -109,7 +109,8 @@ function pmssRegularFilePathIsReadable(string $path): bool { return $path !== ''
 function pmssReadRegularFileContentsVerified(string $path, ?int $requiredUid = null, int $maxBytes = 4096, ?array &$metadata = null): ?string
 {
     $metadata = null;
-    if ($path === '' || $path[0] !== '/' || pmssFilesystemPathHasNulByte($path) || $maxBytes < 1) return null;
+    // The one-byte overread must remain representable as a stream length.
+    if ($path === '' || $path[0] !== '/' || pmssFilesystemPathHasNulByte($path) || $maxBytes < 1 || $maxBytes === PHP_INT_MAX) return null;
     clearstatcache(true, $path);
     $entry = @lstat($path);
     if (!is_array($entry) || (($entry['mode'] ?? 0) & 0170000) !== 0100000 || ($entry['nlink'] ?? 0) !== 1) return null;

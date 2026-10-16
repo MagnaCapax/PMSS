@@ -117,6 +117,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssFileWriteComplete()` returns `false` for NUL-containing paths before invoking a writer; valid paths retain complete-byte write semantics.
+- `pmssReadRegularFileContentsVerified()` returns `null` for a `PHP_INT_MAX` byte limit, whose one-byte overread would overflow the stream length; valid bounded reads retain their content and metadata contract.
+
 - `scripts/util/lighttpdSymlinkRepair.php USERNAME` is an explicit root-only
   recovery command for `.lighttpd/upload`, `access.log`, and `error.log` links.
   It requires an account-owned real home and a successful, non-exhausted live

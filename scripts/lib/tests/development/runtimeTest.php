@@ -8,6 +8,30 @@ require_once dirname(__DIR__, 2).'/log.php';
 
 class RuntimeTest extends TestCase
 {
+    public function testCompleteWriteRejectsNulPathBeforeWriter(): void
+    {
+        $calls = 0;
+        $writer = static function (string $path, string $content) use (&$calls): int {
+            $calls++;
+            return strlen($content);
+        };
+        $this->assertFalse(\pmssFileWriteComplete("bad\0path", 'payload', 0, $writer));
+        $this->assertFalse(\pmssFileWriteComplete("bad\0path", 'payload'));
+        $this->assertSame(0, $calls);
+        $this->assertTrue(\pmssFileWriteComplete('/unused-valid-path', 'payload', 0, $writer));
+        $this->assertSame(1, $calls);
+    }
+
+    public function testVerifiedReadRejectsOverflowingLimit(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-read-limit-');
+        $this->assertSame(1, file_put_contents($path, 'x'));
+        $metadata = ['stale' => true];
+        $this->assertSame(null, \pmssReadRegularFileContentsVerified($path, null, PHP_INT_MAX, $metadata));
+        $this->assertSame(null, $metadata);
+        $this->assertSame('x', \pmssReadRegularFileContentsVerified($path, null, 1));
+    }
+
     public function testCliDiagnosticReturnPreservesBytesAndContinues(): void
     {
         foreach (['', "failure\n", "  failure  ", "first\nsecond\n", "binary\0payload"] as $message) {
