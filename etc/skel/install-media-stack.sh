@@ -284,6 +284,9 @@ media_stack_inode_preflight_guard() {
 media_stack_install_error() {
 	local rc="$1" used soft
 	trap - ERR
+	# errtrace runs this trap inside command substitutions too; a failed $(...) there
+	# (e.g. pgrep finding nothing) is not an install failure. The parent reports real ones.
+	if ((BASH_SUBSHELL > 0)); then exit "$rc"; fi
 	read -r used soft < <(media_stack_quota_files) || true
 	if [[ -n "${soft:-}" ]] && ((used >= soft)); then
 		log_err "File quota reached during media stack install; free account files and retry."
@@ -2758,7 +2761,7 @@ echo ""
 echo "=== IMPORTANT WARNINGS ==="
 echo "This script installs EXTRA FEATURES AS-IS. NO GUARANTEES OR SUPPORT FROM PULSED MEDIA."
 echo "You MUST configure apps (e.g., add media libraries, indexers) and maintain updates."
-echo "All services bind to localhost—safe in shared env, but verify no leaks with 'netstat -tlnp'."
+echo "All services bind to localhost. Other accounts on this server can reach localhost too, so keep every app's own login enabled."
 echo "For security: Use VPN/HTTPS only; do not forward ports publicly. Monitor for conflicts with /opt installs."
 echo "Report issues to support, but expect no hand-holding—DIY maintenance required."
 echo "Enjoy responsibly!"

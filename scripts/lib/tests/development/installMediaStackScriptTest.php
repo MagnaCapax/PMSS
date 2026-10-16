@@ -32,6 +32,25 @@ class installMediaStackScriptTest extends TestCase
         }
     }
 
+    public function testErrTrapIgnoresFailedCommandSubstitutionButReportsRealFailures(): void
+    {
+        $handler = $this->pmssExtractShellFunctions($this->script, array('media_stack_install_error'));
+        $prelude = "set -Eeuo pipefail\nlog_err() { printf 'ERR %s\\n' \"\$*\" >&2; }\nmedia_stack_quota_files() { :; }\n"
+            .$handler."\ntrap 'media_stack_install_error \"\$?\"' ERR\n";
+        $output = $this->pmssRunShellHarness("#!/usr/bin/env bash\n"
+            ."cat > \"\$(dirname \"\$0\")/sub.sh\" <<'SUB'\n".$prelude
+            ."echo \"\$(false)\" >/dev/null\necho continued\nSUB\n"
+            ."cat > \"\$(dirname \"\$0\")/real.sh\" <<'REAL'\n".$prelude
+            ."false\necho unreachable\nREAL\n"
+            ."bash \"\$(dirname \"\$0\")/sub.sh\"; echo \"sub_rc=\$?\"\n"
+            ."bash \"\$(dirname \"\$0\")/real.sh\" || echo \"real_rc=\$?\"\n");
+        // A failed $(...) that fires the inherited ERR trap in its subshell must not claim the install stopped.
+        $this->assertStringContainsString("continued\nsub_rc=0", $output);
+        $this->assertSame(1, substr_count($output, 'install stopped after a command failed'));
+        $this->assertStringContainsString('real_rc=1', $output);
+        $this->assertStringNotContainsString('unreachable', $output);
+    }
+
     public function testServarrBranchDefaultsAndOverridesPresent(): void
     {
         foreach (array(
