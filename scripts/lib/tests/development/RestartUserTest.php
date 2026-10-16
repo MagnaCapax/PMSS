@@ -164,6 +164,21 @@ SH
         $this->assertSame('unchanged', file_get_contents($target));
     }
 
+    public function testAuditLogRefusesUnsafeAncestorsAndSegments(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-restart-log-');
+        $target = $this->pmssEnsureDir($dir.'/target');
+        $this->pmssCreateSymlinkOrSkip($target, $dir.'/alias');
+        $this->assertFalse(\pmssRestartUserLogWrite(['outcome' => 'test'], $dir.'/alias/restartUser.log'));
+        $this->assertFalse(file_exists($target.'/restartUser.log'));
+        $this->assertFalse(\pmssRestartUserLogWrite(['outcome' => 'test'], $dir.'/new/../restartUser.log'));
+        $this->assertFalse(is_dir($dir.'/new'));
+        foreach (["\n", "\r"] as $control) {
+            $this->assertFalse(\pmssRestartUserLogWrite(['outcome' => 'test'], $dir.'/new'.$control.'/restartUser.log'));
+        }
+        $this->assertFalse(is_dir($dir.'/new'));
+    }
+
     public function testAuditLogAppendsOneJsonLineToExistingRegularFile(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-restart-log-');

@@ -35,6 +35,8 @@ successfully without the old installer reference, retains cleanup behavior.
 The account restart audit writer rejects empty or NUL-containing paths and
 records that cannot be encoded as JSON before creating a directory or opening
 the log. Valid records retain their existing JSON Lines bytes and append result.
+It also rejects CR/LF bytes, dot segments, and symlinked ancestors before
+directory creation, and rechecks the path after a new parent is created.
 
 The file-backed storage benchmark reserves its random output name with exclusive
 creation before preallocation or fio runs. A name collision fails without

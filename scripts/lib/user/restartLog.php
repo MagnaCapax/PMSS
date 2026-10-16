@@ -1,14 +1,17 @@
 <?php
+require_once dirname(__DIR__).'/pathSafety.php';
+
 /** Append exactly one safe JSON audit record for a restart invocation. */
 function pmssRestartUserLogWrite(array $record, string $path = '/var/log/pmss/restartUser.log'): bool
 {
     // Reject malformed input before creating the log directory or target file.
-    if ($path === '' || strpos($path, "\0") !== false) return false;
+    if (preg_match('/[\r\n\0]/', $path) === 1 || !pmssPathSegmentsAreSafe($path, true)) return false;
     $json = json_encode($record, JSON_UNESCAPED_SLASHES);
     if (!is_string($json)) return false;
 
     $dir = dirname($path);
     if (is_link($dir) || (!is_dir($dir) && !@mkdir($dir, 0755, true))
+        || !pmssPathSegmentsAreSafe($path, true)
         || is_link($path) || (file_exists($path) && !is_file($path))) return false;
     if ($path === '/var/log/pmss/restartUser.log'
         && (fileowner($dir) !== 0 || (fileperms($dir) & 0022) !== 0)) return false;
