@@ -97,6 +97,10 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'Installing youtube-dl for FlexGet',
                     '/usr/local/bin/flexget',
                 ],
+                'forbidden' => [
+                    'certifi==' => 'FlexGet venv must not pin certifi (2017 pin downgraded the CA bundle every update)',
+                    'chardet==' => 'FlexGet venv must not pin chardet (py2-era pin)',
+                ],
             ],
             'iprange.php' => [
                 'required' => [
