@@ -64,7 +64,29 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   it exceeds 100 MiB so long-lived reverse-proxied web UIs do not silently
   consume user quota. The root cron template runs it hourly and logs trims to
   `/var/log/pmss/lighttpdAccessLogTrim.log`.
-- `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
+- `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit. When
+  `/etc/seedbox/config/qbittorrentWebuiEnforce.enabled` exists, reconcile WebUI
+  settings before the stopped-config and restart steps. A changed file causes
+  one bounded native-daemon stop; the existing watchdog then follows its normal
+  start path. Remove the marker to turn off this reconciliation. Write failures
+  leave the daemon running.
+
+  Before enabling a host, count configs lacking `WebUI\Password_PBKDF2` without
+  printing account names or contents:
+
+  ```sh
+  php -r 'require "/scripts/lib/user/qbittorrent.php"; $total=0; $missing=0; $unreadable=0; $skippedUnsafe=0; foreach (glob("/home/*/.config/qBittorrent/qBittorrent.conf") ?: [] as $path) { if (!pmssUserFilePathIsSafe($path)) { $skippedUnsafe++; continue; } if (!is_file($path)) continue; $total++; $contents=@file_get_contents($path); if (!is_string($contents)) { $unreadable++; continue; } if (preg_match("/^WebUI\\\\Password_PBKDF2=/m", $contents) !== 1) $missing++; } printf("configs=%d password_missing=%d unreadable=%d skipped_unsafe=%d\n", $total, $missing, $unreadable, $skippedUnsafe);'
+  ```
+
+  Support response for an account prompted on its next panel start or restart:
+  “Open the qBittorrent control in your panel, choose Start or Restart, and
+  enter a separate WebUI password. The panel applies it and starts
+  qBittorrent. If the prompt or start fails, contact support.”
+
+  Enable on no more than 2.5% of hosts per batch. Before expanding, confirm
+  that a prompted account recovers through one panel visit, the WebUI accepts
+  the new password, and the cron log shows no repeated stops. Record the
+  count-only census and support response before the first host is enabled.
 - `checkRcloneInstances.php` – Maintain rclone mount processes.
 - `cpuStat.php` – Periodically record CPU usage statistics.
 - `diskIostat.php` – Collect disk I/O metrics for later analysis. The live

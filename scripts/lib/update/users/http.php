@@ -27,6 +27,7 @@ function pmssUserConfigureHttp(array $ctx): void
     // Refresh the PMSS-managed qBittorrent safety defaults on every pass.
     // This includes reverse-proxy compatibility keys such as HostHeaderValidation.
     $qbittorrentConfig = "{$home}/.config/qBittorrent/qBittorrent.conf";
+    pmssQbittorrentWebUiAuthEnsure($user, $home);
     if (pmssQbittorrentApplyManagedConfig($user, $qbittorrentConfig)) {
         $userLog('Refreshed PMSS-managed qBittorrent settings');
     }

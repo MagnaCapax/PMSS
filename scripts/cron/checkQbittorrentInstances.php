@@ -8,6 +8,7 @@
  */
 require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/user/torrentPort.php';
+require_once __DIR__.'/../lib/user/qbittorrentWebUiAuth.php';
 
 $pmssCheckQbittorrentLock = pmssCronLockAcquire('checkQbittorrentInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
 
@@ -20,6 +21,9 @@ pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox
     $home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$thisUser;
     if (pmssQbittorrentPortEnsure($thisUser, $home)) {
         $running = pmssUserWatchdogProcessRunning($thisUser, 'qbittorrent-nox');
+    }
+    if (pmssQbittorrentWebUiAuthEnsure($thisUser, $home)) {
+        $running = false;
     }
     pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $running, 'pmssQbittorrentApplyManagedConfig');
     $qbittorrentRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['qbittorrent-nox'], static function () use ($thisUser): bool { return function_exists('pmssQbittorrentApplyUploadThrottle') && pmssQbittorrentApplyUploadThrottle($thisUser); }, 'qbittorrent-nox restarted to apply upload throttle', 15, static function () use ($thisUser): void { pmssUserWatchdogTerminateProcesses($thisUser, ['qbittorrent-nox'], 15); });

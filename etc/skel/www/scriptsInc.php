@@ -1532,7 +1532,7 @@ function pmssActionRequest(action, passwordValue) {
         },
         error: function(xhr) {
             if (xhr.status === 428 && action.passwordField) {
-                var password = window.prompt('Enter your account password to sync qBittorrent WebUI login.');
+                var password = window.prompt('Set a separate qBittorrent WebUI password and keep it for future logins.');
                 if (password !== null) {
                     pmssActionRequest(action, password).done(function(payload) {
                         deferred.resolve(payload);

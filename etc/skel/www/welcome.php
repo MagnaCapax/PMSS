@@ -333,7 +333,7 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
                         <?php if ($delugePasswordCanRotate): ?><form method="post" action=""><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form><?php else: ?><p><b>Deluge password rotation is unavailable on this host.</b></p><?php endif; ?>
                         <?php if ($delugePasswordNotice !== ''): ?><p><b><?php echo pmssCustomerHtmlAttr($delugePasswordNotice); ?></b></p><?php endif; ?>
                         <p>rclone password is the same as your web access password.</p>
-                        <p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password.</p>
+                        <p>qBittorrent username is your own username. Existing setups may use your account password; if the panel prompts you, set a separate WebUI password and use it for future logins.</p>
 
 <?php
 if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {

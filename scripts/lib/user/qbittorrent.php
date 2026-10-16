@@ -27,7 +27,7 @@ function pmssQbittorrentConfigPath(string $username): string
  */
 function pmssQbittorrentManagedConfigEntries(): array
 {
-    return [
+    $entries = [
         ['section' => 'BitTorrent', 'key' => 'Session\\AsyncIOThreadsCount', 'value' => '4'],
         ['section' => 'BitTorrent', 'key' => 'Session\\DiskCacheSize', 'value' => '128'],
         ['section' => 'BitTorrent', 'key' => 'Session\\DiskCacheTTL', 'value' => '120'],
@@ -45,6 +45,23 @@ function pmssQbittorrentManagedConfigEntries(): array
         // Keep off until per-user WebUI\ServerDomains contains customer WebUI hostnames and a live test host verifies WebUI load; blind enabling risks fleet-wide 403s.
         ['section' => 'Preferences', 'key' => 'WebUI\\HostHeaderValidation', 'value' => 'false'],
     ];
+    // Reconcile these with the running daemon only on hosts opted into the rollout.
+    if (is_file('/etc/seedbox/config/qbittorrentWebuiEnforce.enabled')) {
+        $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\LocalHostAuth', 'value' => 'true'];
+        $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\AuthSubnetWhitelistEnabled', 'value' => 'false'];
+    }
+    return $entries;
+}
+
+/** Split config lines while retaining their original newline convention. */
+function pmssQbittorrentConfigSplitLines(string $config): array
+{
+    $lineEnding = strpos($config, "\r\n") !== false ? "\r\n" : "\n";
+    $normalized = str_replace(["\r\n", "\r"], "\n", $config);
+    $lines = $normalized === '' ? [] : explode("\n", $normalized);
+    $trailing = substr($normalized, -1) === "\n";
+    if ($trailing) array_pop($lines);
+    return [$lines, $trailing, $lineEnding];
 }
 
 /** Render normalized qBittorrent config lines with the original newline style. */
@@ -63,17 +80,7 @@ function pmssQbittorrentConfigJoinLines(array $lines, bool $hadTrailingNewline, 
  */
 function pmssQbittorrentConfigUpsert(string $config, string $section, string $key, string $value): ?string
 {
-    $lineEnding = strpos($config, "\r\n") !== false ? "\r\n" : "\n";
-    $normalized = str_replace(["\r\n", "\r"], "\n", $config);
-    $lines = preg_split("/\n/", $normalized);
-    if (!is_array($lines)) {
-        return null;
-    }
-
-    $hadTrailingNewline = substr($normalized, -1) === "\n";
-    if ($hadTrailingNewline && end($lines) === '') {
-        array_pop($lines);
-    }
+    list($lines, $hadTrailingNewline, $lineEnding) = pmssQbittorrentConfigSplitLines($config);
 
     $sectionHeader = '['.$section.']';
     $managedLine = $key.'='.$value;

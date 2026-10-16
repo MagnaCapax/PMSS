@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/scriptsInc.php';
+require_once __DIR__.'/qbittorrentPasswordRequired.php';
 // Port enforcement is operator-side work; this customer endpoint only toggles daemons.
 /** Lightweight frontend toggle for qBittorrent. */
 
@@ -22,11 +23,6 @@ function pmssQbittorrentFrontendPasswordSync($action) {
         http_response_code(400);
         die('qBittorrent WebUI password sync failed');
     }
-}
-function pmssQbittorrentFrontendPasswordRequired($configPath) {
-    if (!pmssCustomerPathIsSafe($configPath) || !is_file($configPath) || is_link($configPath)) return false;
-    $config = @file_get_contents($configPath);
-    return is_string($config) && preg_match('/^WebUI\\\\Password_PBKDF2=/m', $config) !== 1;
 }
 function pmssQbittorrentFrontendPasswordApply($configPath, $password) {
     if ($password === '' || strpos($password, "\0") !== false || !pmssCustomerPathIsSafe($configPath) || !is_file($configPath) || is_link($configPath)) return false;

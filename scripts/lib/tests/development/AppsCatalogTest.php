@@ -25,7 +25,7 @@ class AppsCatalogTest extends TestCase
         $guiv = array('welcome', 'stats', 'scriptsInc', 'scriptsIncFormat', 'scriptsIncFiles',
             'scriptsIncFrontend', 'scriptsIncBonus', 'scriptsIncCgroup', 'scriptsIncBackup',
             'scriptsIncRestoreTar', 'scriptsIncRestore', 'scriptsIncAppProcess', 'scriptsIncAppsHtml',
-            'scriptsIncAppsStatus', 'scriptsIncActionJs', 'userMediaStackPanel', 'qbittorrent',
+            'scriptsIncAppsStatus', 'scriptsIncActionJs', 'userMediaStackPanel', 'qbittorrent', 'qbittorrentPasswordRequired',
             'deluge', 'rclone', 'slskd', 'copyparty', 'toggleApp', 'toggleAppCatalog', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
         foreach ($guiv as $name) {
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');

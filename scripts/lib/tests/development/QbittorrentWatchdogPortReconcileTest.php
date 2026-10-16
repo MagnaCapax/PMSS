@@ -13,12 +13,13 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
             "\$running = pmssUserWatchdogProcessRunning(\$thisUser, 'qbittorrent-nox');",
             "\$home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.\$thisUser;",
             "if (pmssQbittorrentPortEnsure(\$thisUser, \$home)) {",
+            "if (pmssQbittorrentWebUiAuthEnsure(\$thisUser, \$home)) {",
             'pmssUserWatchdogApplyManagedConfigWhenStopped(',
             'pmssUserWatchdogRestartProcessesIf(',
         ]);
         $this->pmssAssertRepoFileMatches(
             'scripts/cron/checkQbittorrentInstances.php',
-            '/pmssQbittorrentPortEnsure\(\$thisUser, \$home\)\) \{\s+\$running = pmssUserWatchdogProcessRunning\(\$thisUser, \'qbittorrent-nox\'\);\s+\}\s+pmssUserWatchdogApplyManagedConfigWhenStopped\(/'
+            '/pmssQbittorrentPortEnsure\(\$thisUser, \$home\)\) \{\s+\$running = pmssUserWatchdogProcessRunning\(\$thisUser, \'qbittorrent-nox\'\);\s+\}\s+if \(pmssQbittorrentWebUiAuthEnsure\(\$thisUser, \$home\)\) \{\s+\$running = false;\s+\}\s+pmssUserWatchdogApplyManagedConfigWhenStopped\(/'
         );
 
         $this->pmssAssertRepoFileContainsString(

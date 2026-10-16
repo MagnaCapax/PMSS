@@ -44,7 +44,7 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
         $legacyPassword = 'admin'.'admin';
 
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/welcome.php', $legacyPassword, 'welcome page must not advertise the legacy qBittorrent password');
-        $this->pmssAssertRepoFileContainsString('etc/skel/www/welcome.php', 'password matches your account password');
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/welcome.php', 'set a separate WebUI password');
     }
 
     public function testQbittorrentFrontendRequestsPasswordOnlyWhenHashIsMissing(): void
@@ -70,7 +70,7 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/scriptsInc.php', [
             'function pmssActionRequest(action, passwordValue)',
             'if (xhr.status === 428 && action.passwordField)',
-            "window.prompt('Enter your account password to sync qBittorrent WebUI login.')",
+            "window.prompt('Set a separate qBittorrent WebUI password and keep it for future logins.')",
             'pmssActionRequest(action, password).done',
             'if (action.passwordField && passwordValue !== undefined)',
             "request.type = 'POST';",

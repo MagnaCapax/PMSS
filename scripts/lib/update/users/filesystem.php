@@ -258,6 +258,7 @@ PHP;
         'www/panelSessionLogout.php',
         'www/pmssTabs.js',
         'www/qbittorrent.php',
+        'www/qbittorrentPasswordRequired.php',
         'www/slskd.php',
         'www/copyparty.php',
         'www/toggleAppCatalog.php',
