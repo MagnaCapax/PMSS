@@ -53,7 +53,7 @@ function pmssToggleAppQuiConfig(string $user, string $home, int $port, string $p
 function pmssToggleAppScryerConfig(string $user, string $home, int $port, string $password, int $peerPort): array
 {
     return array(
-        '.config/scryer/scryer.env' => "SCRYER_BIND=127.0.0.1:{$port}\nSCRYER_BASE_PATH=/user-{$user}/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME={$user}\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\n",
+        '.config/scryer/scryer.env' => "SCRYER_BIND=127.0.0.1:{$port}\nSCRYER_BASE_PATH=/user-{$user}/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME={$user}\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\nSCRYER_DISABLE_DEFAULT_ADMIN=true\n",
         '.pmss/apps/scryer.pw' => $password."\n",
     );
 }

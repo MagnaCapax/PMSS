@@ -317,7 +317,7 @@ PHP
             $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'bo', $home, 23001, $proxy));
             $env = $home.'/.config/scryer/scryer.env';
             $password = $home.'/.pmss/apps/scryer.pw';
-            $this->assertSame("SCRYER_BIND=127.0.0.1:23001\nSCRYER_BASE_PATH=/user-bo/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME=bo\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\n", file_get_contents($env));
+            $this->assertSame("SCRYER_BIND=127.0.0.1:23001\nSCRYER_BASE_PATH=/user-bo/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME=bo\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\nSCRYER_DISABLE_DEFAULT_ADMIN=true\n", file_get_contents($env));
             $this->assertSame(0600, fileperms($env) & 0777);
             $this->assertSame(0600, fileperms($password) & 0777);
             $this->assertSame(explode("\n", trim(file_get_contents($home.'/.pmss/apps/scryer.login')))[1]."\n", file_get_contents($password));
