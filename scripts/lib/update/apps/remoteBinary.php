@@ -23,6 +23,9 @@ function pmssPinnedRemoteAmd64OrSkip(string $label, string $action = 'bootstrap'
 /** Read a pinned install marker only for a regular binary and a non-symlink marker. */
 function pmssPinnedRemoteVersionMatches(string $binary, string $marker, string $version): bool { return is_file($binary) && !is_link($marker) && trim((string) @file_get_contents($marker)) === $version; }
 
+/** Publish a version only through a safe regular marker path after installation. */
+function pmssPinnedRemoteVersionMarkerWrite(string $marker, string $version): bool { return pmssPathTargetIsSafe($marker, false, true) && @file_put_contents($marker, $version."\n") === strlen($version) + 1; }
+
 /** Install a portable tar binary and write its marker only after a successful install. */
 function pmssPinnedRemotePortableTarInstall(string $label, string $url, string $sha256, string $root, string $binary, string $version): void
 {
@@ -36,8 +39,7 @@ function pmssPinnedRemotePortableTarInstall(string $label, string $url, string $
             .' && install -o root -g root -m 0755 '.escapeshellarg($root.'/'.$binary.'.tmp').' '.escapeshellarg($root.'/'.$binary)
             .' && rm -f '.escapeshellarg($root.'/'.$binary.'.tmp');
         if (runStep('Installing '.$label.' '.$version, $command) !== 0) return false;
-        return pmssPathTargetIsSafe($marker, false, true)
-            && @file_put_contents($marker, $version."\n") === strlen($version) + 1;
+        return pmssPinnedRemoteVersionMarkerWrite($marker, $version);
     });
 }
 

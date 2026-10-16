@@ -17,6 +17,5 @@ pmssPinnedRemoteArtifactTempFileUse('slskd '.$slskdVersion, $slskdUrl, $slskdSha
         .' && unzip -oq '.escapeshellarg($archivePath).' -d '.escapeshellarg($slskdRoot)
         .' && chmod 0755 '.escapeshellarg($slskdRoot.'/slskd');
     if (runStep('Installing slskd '.$slskdVersion, $command) !== 0) return false;
-    return pmssPathTargetIsSafe($slskdMarker, false, true)
-        && @file_put_contents($slskdMarker, $slskdVersion."\n") === strlen($slskdVersion) + 1;
+    return pmssPinnedRemoteVersionMarkerWrite($slskdMarker, $slskdVersion);
 });

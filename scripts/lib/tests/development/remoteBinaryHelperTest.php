@@ -15,7 +15,7 @@ class RemoteBinaryHelperTest extends TestCase
         $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
         file_put_contents($binary, 'binary');
         $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
-        file_put_contents($marker, "1.2.3\n");
+        $this->assertTrue(\pmssPinnedRemoteVersionMarkerWrite($marker, '1.2.3'));
         $this->assertTrue(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
         $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.4'));
         symlink($marker, $link);

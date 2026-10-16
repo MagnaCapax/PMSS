@@ -12,8 +12,7 @@ if (pmssPinnedRemoteChecksum($copypartyBinary) !== $copypartySha256) {
     pmssInstallPinnedRemoteBinary('Copyparty '.$copypartyVersion, $copypartyUrl, $copypartySha256, $copypartyBinary, true);
 }
 if (pmssPinnedRemoteChecksum($copypartyBinary) === $copypartySha256) {
-    if (runStep('Preparing Copyparty version marker directory', 'mkdir -p '.escapeshellarg(dirname($copypartyMarker))) === 0
-        && pmssPathTargetIsSafe($copypartyMarker, false, true)) {
-        @file_put_contents($copypartyMarker, $copypartyVersion."\n");
+    if (runStep('Preparing Copyparty version marker directory', 'mkdir -p '.escapeshellarg(dirname($copypartyMarker))) === 0) {
+        pmssPinnedRemoteVersionMarkerWrite($copypartyMarker, $copypartyVersion);
     }
 }
