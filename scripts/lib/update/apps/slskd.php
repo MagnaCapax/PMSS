@@ -8,8 +8,7 @@ $slskdSha256 = '26c862173c593142db3fcfcd78f0784cfc29987de40a5bd9c2e662ed3b84cce6
 $slskdRoot = '/opt/slskd';
 $slskdMarker = $slskdRoot.'/pmss-version';
 if (!pmssPinnedRemoteAmd64OrSkip('slskd')) return;
-if (is_file($slskdRoot.'/slskd') && !is_link($slskdMarker)
-    && trim((string) @file_get_contents($slskdMarker)) === $slskdVersion) return;
+if (pmssPinnedRemoteVersionMatches($slskdRoot.'/slskd', $slskdMarker, $slskdVersion)) return;
 
 $slskdUrl = 'https://github.com/slskd/slskd/releases/download/'.$slskdVersion.'/'.$slskdArchive;
 pmssPinnedRemoteArtifactTempFileUse('slskd '.$slskdVersion, $slskdUrl, $slskdSha256, static function (string $archivePath) use ($slskdRoot, $slskdMarker, $slskdVersion): bool {

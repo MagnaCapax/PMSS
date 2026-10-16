@@ -6,6 +6,24 @@ require_once dirname(__DIR__, 2).'/update/apps/remoteBinary.php';
 
 class RemoteBinaryHelperTest extends TestCase
 {
+    public function testPinnedVersionMatchRequiresBinaryAndUnlinkedMatchingMarker(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-pinned-version-');
+        $binary = $root.'/app';
+        $marker = $root.'/pmss-version';
+        $link = $root.'/linked-marker';
+        $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
+        file_put_contents($binary, 'binary');
+        $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
+        file_put_contents($marker, "1.2.3\n");
+        $this->assertTrue(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
+        $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.4'));
+        symlink($marker, $link);
+        $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $link, '1.2.3'));
+        unlink($binary);
+        $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
+    }
+
     public function testStaleBinaryRemovalGuardsUnsafeAndFailedTargets(): void
     {
         $root = $this->pmssMakeTempDir('pmss-stale-binary-');

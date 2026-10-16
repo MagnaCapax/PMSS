@@ -20,6 +20,9 @@ function pmssPinnedRemoteAmd64OrSkip(string $label, string $action = 'bootstrap'
     return false;
 }
 
+/** Read a pinned install marker only for a regular binary and a non-symlink marker. */
+function pmssPinnedRemoteVersionMatches(string $binary, string $marker, string $version): bool { return is_file($binary) && !is_link($marker) && trim((string) @file_get_contents($marker)) === $version; }
+
 /** Install a portable tar binary and write its marker only after a successful install. */
 function pmssPinnedRemotePortableTarInstall(string $label, string $url, string $sha256, string $root, string $binary, string $version): void
 {
