@@ -50,6 +50,8 @@ PHP;
                 'pmssCheckGuiWebRootReconcileIfSentinelMissing',
                 'pmssUserReconcileWebRoot',
                 "'scriptsInc.php'",
+                "'scriptsIncFormat.php'",
+                "'scriptsIncActionJs.php'",
                 'pmssCheckGuiManagedUserNameNormalize($thisUser)',
             ],
             'checkGui should keep core userspace repair wiring: '
@@ -364,6 +366,23 @@ PHP;
             $homeDir
         ));
         $this->assertEquals($sourceContent, file_get_contents($targetFile));
+    }
+
+    public function testRestoreUserFileRepairsDamagedPart(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $sourceFile = $this->tempDir.'/skel/scriptsIncFormat.php';
+        $targetFile = $homeDir.'/www/scriptsIncFormat.php';
+        $sourceContent = $this->pmssReadRepoFile('etc/skel/www/scriptsIncFormat.php');
+        $this->pmssWriteFile($sourceFile, $sourceContent);
+        $this->pmssWriteFile($targetFile, substr($sourceContent, 0, 50));
+        $messages = array();
+
+        $this->assertTrue(\pmssCheckGuiRestoreUserFile(
+            $targetFile, $sourceFile, $this->pmssCurrentOwner(), 'scriptsIncFormat.php',
+            $this->pmssMakeArrayLogger($messages), $homeDir
+        ));
+        $this->assertSame($sourceContent, file_get_contents($targetFile));
     }
 
     public function testRestoreUserFileKeepsLargerExistingPanelFile(): void

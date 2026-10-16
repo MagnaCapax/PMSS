@@ -17,6 +17,11 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $www = $dir.'/www';
         $this->pmssEnsureDir($www);
         $this->pmssWriteFile($www.'/scriptsInc.php', $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
+        foreach (array('Format', 'Files', 'Frontend', 'Bonus', 'Cgroup', 'Backup',
+            'RestoreTar', 'Restore', 'AppProcess', 'AppsHtml', 'AppsStatus', 'ActionJs') as $part) {
+            $name = 'scriptsInc'.$part.'.php';
+            $this->pmssWriteFile($www.'/'.$name, $this->pmssReadRepoFile('etc/skel/www/'.$name));
+        }
         $fixture = $www.'/welcomeSafety.php';
         return $this->pmssWriteFile($fixture, "<?php\nrequire_once __DIR__.'/scriptsInc.php';\n".substr($source, $start, $end - $start));
     }

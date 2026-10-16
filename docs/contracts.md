@@ -593,7 +593,8 @@ iptables helpers:
   writing and returns `false` on a failed or short write. Successful snapshot
   and history bytes retain their existing order and format.
 - Customer cgroup readers share ordered counter paths, unsigned/limit parsing,
-  and memory fields in `etc/skel/www/scriptsInc.php` (ADR 0059). Page-specific
+  and memory fields in `etc/skel/www/scriptsIncCgroup.php`, loaded by
+  `scriptsInc.php` (ADRs 0059 and 0099). Page-specific
   directory precedence and missing-data behavior stay unchanged; live pressure
   thresholds remain separate from the OOM recency signal.
 - The five-minute metrics collector projects the maximum parent/child cgroup-v1
@@ -978,7 +979,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Step classes: post-package orchestration can be classified as `must_succeed`, `soft_fail`, or `skip_if_missing`; `must_succeed` failures after package phase completion emit `step_failed` (`severity=error`) and abort phase 2. Unknown class strings fail closed as error-severity failures instead of silently downgrading policy.
   - Logrotate convergence: calls `pmssLogrotatePoliciesInstall()` to install and verify PMSS-managed policies for `/etc/logrotate.d/pmss-update` and `/etc/logrotate.d/rsyslog`; the rsyslog policy keeps OS logs daily with `maxsize 500M`.
 
-## Customer Bonus Display – `etc/skel/www/scriptsInc.php`
+## Customer Bonus Display – `etc/skel/www/scriptsIncBonus.php`
 
 - `pmssCustomerBonusDisplayStateRead(string $userBonusPath='../.userBonus', string $bonusQuotaPath='../.bonusQuota'): array`
   - Output: `['unit'=>'percent|gib', 'value'=>int]` for the customer-facing additional-resource banner.
@@ -1026,7 +1027,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   15 minutes, future-dated, malformed, oversized, or symlinked are ignored;
   customer PHP never loads operator `/scripts`.
 
-## Customer Torrent-State Backup – `etc/skel/www/scriptsInc.php` and `welcome.php`
+## Customer Torrent-State Backup – `etc/skel/www/scriptsIncBackup.php` and `welcome.php`
 
 - `welcome.php?backup=download`
   - Streams a gzip-compressed tar archive directly to the authenticated customer without retaining a server-side copy.
@@ -1038,17 +1039,17 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Archives are written as `~/.pmss-backups/config-YYYYMMDD-HHMMSS.tar.gz` with a private `0700` directory and `0600` files.
   - Retention keeps the newest 7 scheduled archives and prunes older files only after a newly written archive is verified as an existing non-empty file inside the same home.
 
-## Customer Whole-Account Service Restart – `etc/skel/www/scriptsInc.php`
+## Customer Whole-Account Service Restart – `etc/skel/www/scriptsIncAppsHtml.php` and `scriptsIncActionJs.php`
 
 - Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone/slskd/Copyparty frontends, stopped media-stack tmux apps, and Lighttpd.
 - Requests run sequentially as the authenticated customer; qBittorrent retains its account-password synchronization challenge, media-stack recovery retains its same-origin AJAX POST gate, and failures do not prevent later services from receiving their request.
 - The Lighttpd request is sent last so its graceful restart cannot interrupt earlier panel requests. Media-stack recovery uses the existing `--start-stopped` path and preserves live tmux sessions.
 
-## Customer Apps Controls – `etc/skel/www/scriptsInc.php`
+## Customer Apps Controls – `etc/skel/www/scriptsIncAppsStatus.php` and related parts
 
 - Both `welcome.php?status=1` and `apps.php?status=1` emit the same live tmux, native-process, marker, and media-stack auth state; both are read-only. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
 - A media app's tmux state is running only when its sole pane was launched from that app's installer directory. The root watchdog uses the same check; a same-named shell session is not an app.
-- If an older guiv-delivered `scriptsInc.php` lacks the Apps status or log emitter, that Apps feed returns HTTP 503 JSON with `updating: true` and a reload message. The shared status poll shows the message in app rows and stops retrying; other transient failures still retry.
+- If the guiv-delivered Apps status part is absent, that Apps feed returns HTTP 503 JSON with `updating: true` and a reload message. The shared status poll shows the message in app rows and stops retrying; other transient failures still retry.
 - While the stored media-stack launcher pid belongs to this account and its command line exactly matches the panel-launched installer, its `poll` status takes precedence over partial install markers: the Media Stack group shows one progress row and no app controls. A stale pid reused by another process does not keep the panel in Installing state. The shared status poll runs every five seconds until the installer exits, then renders app rows or the existing failure message and Install action. Media per-app controls require `appsRuntime.php` in the customer tree.
 - The web install launcher closes its standard streams before returning the POST response; its PID file records the installer process used by status polling.
 - All state-changing customer endpoints require POST with `X-Requested-With: XMLHttpRequest`. A GET action returns HTTP 405. qBittorrent retains the HTTP 428 password-sync challenge.

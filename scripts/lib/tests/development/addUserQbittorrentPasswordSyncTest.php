@@ -67,7 +67,7 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
 
     public function testWelcomeRetriesQbittorrentStartWithPasswordPost(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/scriptsInc.php', [
+        $this->assertOrderedStrings([
             'function pmssActionRequest(action, passwordValue)',
             'if (xhr.status === 428 && action.passwordField)',
             "window.prompt('Set a separate qBittorrent WebUI password and keep it for future logins.')",
@@ -78,7 +78,7 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
             'function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, passwordFieldName, passwordValue)',
             "url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : ''",
             'pmssActionRequest(action, passwordValue).done',
-        ]);
+        ], $this->pmssReadScriptsIncSources());
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', ['pmssActionScriptJs()', 'pmssCustomerAppsSectionHtmlBuild($appsStatus']);
     }
 }

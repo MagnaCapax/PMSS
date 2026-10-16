@@ -74,7 +74,7 @@ final class CustomerStatsLayoutTest extends TestCase
                     '<h6>Process count</h6>',
                 ),
             ),
-            'etc/skel/www/scriptsInc.php' => array('required' => array(
+            'etc/skel/www/scriptsIncBonus.php' => array('required' => array(
                 'function pmssCustomerBonusDisplayStateRead(',
                 'function pmssCustomerBonusDisplayTextBuild(',
                 'function pmssCustomerBonusDisplayNoteBuild(',

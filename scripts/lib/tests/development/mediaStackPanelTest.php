@@ -45,11 +45,11 @@ class MediaStackPanelTest extends TestCase
             "pmssCustomerAppsSectionHtmlBuild(\$appsStatus, 'welcome.php?status=1')",
             'pmssActionScriptJs()',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/scriptsInc.php', [
+        $this->assertStringContainsAllStrings([
             'pmssMediaStackSecureApp',
             "data: {action: 'confirm-secure-' + app}",
             "headers: {'X-Requested-With': 'XMLHttpRequest'}",
-        ]);
+        ], $this->pmssReadScriptsIncSources());
     }
 
     public function testStatusIsReadyForFreshHome(): void

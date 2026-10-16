@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Phase 1 keeps guiv-delivered parts inert and byte-matched to scriptsInc.php. */
+/** Keep guiv-delivered parts guarded and complete after the loader switch. */
 class ScriptsIncSplitTest extends TestCase
 {
     private const PARTS = array('Format', 'Files', 'Frontend', 'Bonus', 'Cgroup',
@@ -114,52 +114,58 @@ class ScriptsIncSplitTest extends TestCase
         }
     }
 
-    public function testFunctionSetAndBodiesMatchMonolith(): void
+    public function testFunctionSetMatchesHistoricalMonolithWithoutDuplicates(): void
     {
-        $monolithPath = getenv('PMSS_SCRIPTSINC_TEST_SOURCE') ?: $this->pmssRepoPath('etc/skel/www/scriptsInc.php');
-        $monolith = $this->namedFunctions((string) file_get_contents($monolithPath));
-        unset($monolith['writeLog']);
-        $parts = array();
+        // Function inventory from scriptsInc.php at 59fc75bd; keep independent of git at test time.
+        $expected = array(
+            'writeLog', 'pmssFrontendActionRequest', 'pmssFrontendPostActionRequired', 'pmssFrontendFunctionAvailable', 'pmssFrontendShellExecAvailable',
+            'pmssFrontendShellExec', 'pmssFormatBytes', 'pmssWelcomeSerializedArrayHasObject', 'pmssWelcomeSerializedArrayDecode', 'pmssCustomerSerializedArrayFileRead',
+            'pmssJsonDecodeAssoc', 'pmssJsonEncodePretty', 'pmssCustomerFileRead', 'pmssCustomerTrimmedFileRead', 'pmssCustomerUnsignedIntegerValue',
+            'pmssCustomerNonnegativeFloat', 'pmssCustomerUnsignedIntegerFileRead', 'pmssCustomerPositiveIntegerFileRead', 'pmssCustomerBonusDisplayStateRead', 'pmssCustomerBonusDisplayTextBuild',
+            'pmssCustomerBonusDisplayNoteBuild', 'pmssCustomerKeyValueFileRead', 'pmssCustomerCgroupSelfEntries', 'pmssCustomerCgroupDirOwnsMemoryController', 'pmssCustomerCgroupCounterPaths',
+            'pmssCustomerCgroupCounterRead', 'pmssCustomerCgroupMemoryRead', 'pmssCustomerHtmlAttr', 'pmssCustomerContextualHelpLinkBuild', 'pmssJsonFileReadAssoc',
+            'pmssCustomerHomeRoot', 'pmssCustomerHomePath', 'pmssCustomerPathIsSafe', 'pmssCustomerBackupRelativePaths', 'pmssCustomerBackupEntriesRead',
+            'pmssCustomerBackupTarCommandBuild', 'pmssCustomerBackupDownload', 'pmssCustomerBackupFileResult', 'pmssCustomerBackupFileDirectoryEnsure', 'pmssCustomerBackupFilePathBuild',
+            'pmssCustomerBackupFileCreate', 'pmssCustomerBackupArchivesRead', 'pmssCustomerBackupRetentionPrune', 'pmssCustomerPathIsInsideHome', 'pmssCustomerBackupRestoreResult',
+            'pmssCustomerBackupRestoreTargetPathIsSafe', 'pmssCustomerBackupRestoreLog', 'pmssCustomerBackupRestoreFinish', 'pmssCustomerBackupRestoreArchiveResolve', 'pmssCustomerBackupRestoreDiskPrecheck',
+            'pmssCustomerBackupRestoreTarSize', 'pmssCustomerBackupRestoreTarSkipPayload', 'pmssCustomerBackupRestoreTarPayloadRead', 'pmssCustomerBackupRestorePaxPayloadParse', 'pmssCustomerBackupRestoreMemberNormalize',
+            'pmssCustomerBackupRestoreTarMemberTypesRead', 'pmssCustomerBackupRestoreMemberAllowed', 'pmssCustomerBackupRestoreMemberTypeAllowed', 'pmssCustomerBackupRestoreMemberNameFromPhar', 'pmssCustomerBackupRestoreEntriesSelect',
+            'pmssCustomerBackupRestoreTouchesRtorrentLiveState', 'pmssCustomerBackupRestoreRtorrentProcRunning', 'pmssCustomerBackupRestoreRtorrentRunning', 'pmssCustomerBackupRestoreSnapshotPathBuild', 'pmssCustomerBackupRestoreSnapshotCreate',
+            'pmssCustomerBackupRestore', 'pmssWelcomeMessageCustomerPathIsSafe', 'pmssWelcomeRequireLocalHelper', 'pmssCustomerManagedAppDefinitions', 'pmssWelcomeServiceAvailable',
+            'pmssCustomerNativePidsRead', 'pmssCustomerNativeSignal', 'pmssCustomerNativeStop', 'pmssWelcomeHttpContextCreate', 'pmssCustomerAppsMediaIdsRead',
+            'pmssCustomerAppsTmuxSessionsParse', 'pmssCustomerAppsTmuxSessionsRead', 'pmssCustomerAppsStatusRead', 'pmssCustomerAppsDescriptionsRead', 'pmssCustomerAppRowStart',
+            'pmssCustomerAppButton', 'pmssCustomerAppRowHtmlBuild', 'pmssCustomerAppsMediaRowsBuild', 'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsCss',
+            'pmssCustomerAppsStatusJsonEmit', 'pmssCustomerAppsLogJsonEmit', 'pmssActionScriptJs', 'pmssFrontendToggleAction',
+        );
+        $loader = $this->namedFunctions($this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
+        $this->assertSame(array('writeLog'), array_keys($loader), 'The loader must retain only writeLog.');
+        $functions = $loader;
         foreach (self::PARTS as $part) {
             $source = $this->pmssReadRepoFile('etc/skel/www/scriptsInc'.$part.'.php');
             foreach ($this->partFunctions($source, $part) as $name => $body) {
-                $this->assertTrue(!isset($parts[$name]), 'Function appears in two parts: '.$name);
-                $parts[$name] = $body;
+                $this->assertTrue(!isset($functions[$name]), 'Function appears in two files: '.$name);
+                $functions[$name] = $body;
             }
         }
-        $this->assertSame(88, count($parts));
-        $this->assertSame(88, count($monolith));
-        $partNames = array_keys($parts);
-        $monolithNames = array_keys($monolith);
-        sort($partNames);
-        sort($monolithNames);
-        $this->assertSame($monolithNames, $partNames, 'Function names differ from scriptsInc.php.');
-        foreach ($monolith as $name => $body) {
-            $this->assertSame($body, $parts[$name], 'Copied source drifted for '.$name);
-        }
+        $this->assertSame(89, count($functions));
+        $actual = array_keys($functions);
+        sort($actual);
+        sort($expected);
+        $this->assertSame($expected, $actual, 'Function inventory changed from 59fc75bd.');
     }
 
-    public function testNoPartIsIncludedDuringPhaseOne(): void
+    public function testLoaderGuardsPartsInManifestOrder(): void
     {
-        foreach (array('etc/skel', 'scripts') as $directory) {
-            $paths = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(
-                $this->pmssRepoPath($directory), \FilesystemIterator::SKIP_DOTS));
-            foreach ($paths as $path) {
-                if (!$path->isFile() || $path->isLink() || substr($path->getFilename(), -4) !== '.php'
-                    || $path->getPathname() === __FILE__) continue;
-                $source = (string) file_get_contents($path->getPathname());
-                if (preg_match('/scriptsInc[A-Z][A-Za-z]*\.php/', $source) !== 1) continue;
-                $tokens = token_get_all($source);
-                foreach ($tokens as $index => $token) {
-                    if (!is_array($token) || !in_array($token[0], array(T_REQUIRE, T_REQUIRE_ONCE, T_INCLUDE, T_INCLUDE_ONCE), true)) continue;
-                    $expression = '';
-                    for ($next = $index + 1; isset($tokens[$next]) && $tokens[$next] !== ';'; $next++) {
-                        $expression .= is_array($tokens[$next]) ? $tokens[$next][1] : $tokens[$next];
-                    }
-                    $this->assertTrue(preg_match('/scriptsInc[A-Z][A-Za-z]*\.php/', $expression) !== 1,
-                        $path->getPathname().' includes a Phase 1 part.');
-                }
-            }
+        $loader = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        $this->assertStringContainsString('is_file($p) && !is_link($p)', $loader);
+        $this->assertStringContainsString('require_once $p', $loader);
+        $this->assertOrderedStrings(array_map(static function ($part): string {
+            return "'".$part."'";
+        }, self::PARTS), $loader);
+        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        foreach (self::PARTS as $part) {
+            $this->assertStringContainsString("'".$part."'", $loader);
+            $this->assertStringContainsString("'www/scriptsInc".$part.".php'", $manifest);
         }
     }
 

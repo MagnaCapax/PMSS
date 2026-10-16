@@ -1497,6 +1497,17 @@ PHP
         return $contents;
     }
 
+    /** Read the loader and its delivered parts for source-text contract checks. */
+    protected function pmssReadScriptsIncSources(): string
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        foreach (array('Format', 'Files', 'Frontend', 'Bonus', 'Cgroup', 'Backup',
+            'RestoreTar', 'Restore', 'AppProcess', 'AppsHtml', 'AppsStatus', 'ActionJs') as $part) {
+            $source .= "\n".$this->pmssReadRepoFile('etc/skel/www/scriptsInc'.$part.'.php');
+        }
+        return $source;
+    }
+
     /** Read a repository file and assert that it contains a substring. */
     protected function pmssAssertRepoFileContainsString(string $relativePath, string $needle, string $message = ''): void
     {

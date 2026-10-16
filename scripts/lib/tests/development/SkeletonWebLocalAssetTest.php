@@ -212,7 +212,7 @@ class SkeletonWebLocalAssetTest extends TestCase
     public function testWelcomeStartupCallsStayInsideWelcomeAndScriptsInc(): void
     {
         $welcome = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $scriptsInc = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        $scriptsInc = $this->pmssReadScriptsIncSources();
 
         $startup = $this->welcomeStartupPhpBlock($welcome);
         preg_match_all('/\b(pmss[A-Za-z0-9_]*)\s*\(/', $startup, $callMatches);

@@ -40,6 +40,14 @@ class AppsCatalogTest extends TestCase
                     $this->assertTrue(in_array(substr($match[1], 0, -4), $guiv, true), $name.' requires update-only '.$match[1]);
                     continue;
                 }
+                if ($name === 'scriptsInc' && trim($expression) === '$p') {
+                    $this->assertStringContainsString("\$p = __DIR__.'/scriptsInc'.\$part.'.php'", $source);
+                    $this->assertStringContainsString('is_file($p) && !is_link($p)', $source);
+                    foreach (array_slice($guiv, 3, 12) as $part) {
+                        $this->assertStringContainsString("'".substr($part, strlen('scriptsInc'))."'", $source);
+                    }
+                    continue;
+                }
                 $this->assertTrue(strpos($expression, '$path') !== false &&
                     (in_array($name, array('scriptsInc', 'scriptsIncFiles'), true) && strpos($source, 'is_file($path)') !== false
                         || $name === 'welcome' && strpos($source, "file_exists(\$path = '/etc/seedbox/config/network')") !== false),
@@ -94,7 +102,7 @@ class AppsCatalogTest extends TestCase
 
     public function testMovedOperationsExistOnlyInSharedHelper(): void
     {
-        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        $shared = $this->pmssReadScriptsIncSources();
         foreach (array('pmssCustomerAppsStatusRead', 'pmssCustomerAppRowHtmlBuild',
             'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsStatusJsonEmit', 'pmssAppsRestartAll') as $name) {
             $this->assertStringContainsString('function '.$name.'(', $shared);
@@ -322,7 +330,7 @@ class AppsCatalogTest extends TestCase
                 if ($installed) $this->assertStringContainsString('id="pmss-start-all" data-bulk-action="start-stopped"', $html);
             }
         });
-        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        $shared = $this->pmssReadScriptsIncSources();
         $this->assertStringContainsString('data-bulk-action="start-stopped"', $shared);
         $this->assertStringContainsString("$(document).on('click', '#pmss-start-all[data-bulk-action]'", $shared);
     }
@@ -354,7 +362,7 @@ class AppsCatalogTest extends TestCase
     public function testActionsUseExistingCustomerEndpointsOnly(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/apps.php');
-        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        $shared = $this->pmssReadScriptsIncSources();
         $this->assertStringContainsString("require_once __DIR__.'/scriptsInc.php'", $source);
         $this->assertStringContainsString("require_once __DIR__.'/userMediaStackPanel.php'", $source);
         $this->assertStringNotContainsString('/scripts/', $source);
@@ -367,7 +375,7 @@ class AppsCatalogTest extends TestCase
         foreach (array('mediaStack.php?action=status', 'mediaStack.php?action=', 'mediaStack.php') as $route) {
             $this->assertStringContainsString($route, $shared);
         }
-        $this->assertStringContainsString("'endpoint' => 'qbittorrent.php'", $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
+        $this->assertStringContainsString("'endpoint' => 'qbittorrent.php'", $this->pmssReadScriptsIncSources());
         $this->assertStringContainsString('pmssActionScriptJs()', $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
         $this->assertStringContainsString("'www/appsRuntime.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
         $this->assertStringContainsString("'www/appsLsioCatalog.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
@@ -469,7 +477,7 @@ class AppsCatalogTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('welcome.php', array(), array('minBytes' => 10000));
         $this->assertStringContainsString('rtorrentRestart.php', $html);
         $this->assertStringContainsString('lighttpdRestart.php?action=confirm-restart', $html);
-        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        $shared = $this->pmssReadScriptsIncSources();
         $this->assertStringContainsString("type: action.type || 'POST'", $shared);
         $this->assertStringContainsString("headers: {'X-Requested-With': 'XMLHttpRequest'}", $shared);
     }

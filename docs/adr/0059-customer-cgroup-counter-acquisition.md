@@ -14,7 +14,8 @@ counter variables into separate classification and output arrays.
 ## Options Considered
 - Keep page-specific readers: retains parallel implementations of the same rules.
 - Add a customer library: requires a new guiv delivery dependency (ADR 0022).
-- Reuse `scriptsInc.php`: shares acquisition within the existing delivery set.
+- Reuse the `scriptsInc.php` customer helper (now loaded from
+  `scriptsIncCgroup.php` under ADR 0099): shares acquisition within the delivery set.
 
 ## Decision
 Use the existing customer helper for one ordered counter-path builder, one

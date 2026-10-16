@@ -242,9 +242,12 @@ function pmssCheckGuiMain(array $argv): int
         }
         pmssCheckGuiEnsureUserDirectory($dataDir, $thisUser, 'data', $log, $homeDir);
 
-        // Keep the panel entrypoint and its load-bearing include recoverable
-        // outside the panel request path after a partial filesystem write.
-        foreach (['index.php', 'scriptsInc.php'] as $guiFile) {
+        // Restore the loader and each delivered part after partial filesystem writes.
+        foreach (['index.php', 'scriptsInc.php', 'scriptsIncFormat.php', 'scriptsIncFiles.php',
+            'scriptsIncFrontend.php', 'scriptsIncBonus.php', 'scriptsIncCgroup.php',
+            'scriptsIncBackup.php', 'scriptsIncRestoreTar.php', 'scriptsIncRestore.php',
+            'scriptsIncAppProcess.php', 'scriptsIncAppsHtml.php', 'scriptsIncAppsStatus.php',
+            'scriptsIncActionJs.php'] as $guiFile) {
             pmssCheckGuiRestoreUserFile(
                 $wwwDir.'/'.$guiFile,
                 $skeletonWwwDir.'/'.$guiFile,

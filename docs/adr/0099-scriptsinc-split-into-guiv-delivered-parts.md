@@ -35,19 +35,21 @@ allowlist and sync list already carry these exact names. Phase 1 adds them to
 the per-user manifest as inert, guarded copies. `scriptsInc.php` and its
 callers remain unchanged.
 
-After delivery is verified, Phase 2 will turn `scriptsInc.php` into the sole
-loader while retaining `writeLog`. It will require each part in the order above
-only when `is_file($path) && !is_link($path)`. Callers will continue requiring
-only `scriptsInc.php`. Phase 2 will add the parts to `checkGui.php`'s restore
-list and re-point source-text tests to the loader and parts without weakening
-their assertions.
+After delivery was verified on sampled hosts (every account had all twelve
+parts), Phase 2 turned `scriptsInc.php` into the sole ordered loader. It keeps
+`writeLog` in the loader so the home-level rTorrent scripts can log even when
+every part is absent. Each part is required from `__DIR__` only when
+`is_file($path) && !is_link($path)`; a missing part leaves only its functions
+unavailable. Callers continue requiring only `scriptsInc.php`. `checkGui.php`
+restores damaged parts along with the loader, and source-text tests inspect
+the loader and parts together.
 
 ## Consequences
 
 - Existing homes keep running the monolith during Phase 1, regardless of the
   order in which the heal delivers the new files.
-- The token-based split test catches drift between the monolith and its copies
-  until Phase 2 removes the duplicated definitions.
+- The token-based split test checks that the loader and parts define the same
+  89 functions as `scriptsInc.php` at 59fc75bd, with no duplicates.
 - Every future part name must enter the billing-side allowlist and sync list
   before a loader may depend on it. This decision amends ADR 0022.
 
