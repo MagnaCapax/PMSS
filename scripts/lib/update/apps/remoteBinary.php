@@ -12,6 +12,32 @@ function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): 
     return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
 }
 
+/** Keep the pinned amd64 installer skip message consistent across apps. */
+function pmssPinnedRemoteAmd64OrSkip(string $label, string $action = 'bootstrap'): bool
+{
+    if (pmssPinnedRemoteAmd64ArtifactsSupported()) return true;
+    logmsg('[SKIP] '.$label.' '.$action.' skipped on unsupported architecture: '.php_uname('m'));
+    return false;
+}
+
+/** Install a portable tar binary and write its marker only after a successful install. */
+function pmssPinnedRemotePortableTarInstall(string $label, string $url, string $sha256, string $root, string $binary, string $version): void
+{
+    $marker = $root.'/pmss-version';
+    pmssPinnedRemoteArtifactTempFileUse($label.' '.$version, $url, $sha256, static function (string $archivePath) use ($label, $root, $binary, $marker, $version): bool {
+        if (!pmssPathTargetIsSafe($root, true) || !pmssPathTargetIsSafe($root.'/'.$binary, false)
+            || !pmssPathTargetIsSafe($root.'/'.$binary.'.tmp', false)
+            || !pmssPathTargetIsSafe($marker, false)) return false;
+        $command = 'mkdir -p '.escapeshellarg($root)
+            .' && tar -xzOf '.escapeshellarg($archivePath).' '.escapeshellarg($binary).' > '.escapeshellarg($root.'/'.$binary.'.tmp')
+            .' && install -o root -g root -m 0755 '.escapeshellarg($root.'/'.$binary.'.tmp').' '.escapeshellarg($root.'/'.$binary)
+            .' && rm -f '.escapeshellarg($root.'/'.$binary.'.tmp');
+        if (runStep('Installing '.$label.' '.$version, $command) !== 0) return false;
+        return pmssPathTargetIsSafe($marker, false, true)
+            && @file_put_contents($marker, $version."\n") === strlen($version) + 1;
+    });
+}
+
 /** Remove a stale managed binary only when its path is safe and removal succeeds. */
 function pmssPinnedRemoteStaleBinaryRemove(string $path, string $label): bool
 {

@@ -21,10 +21,7 @@ $ttydSha256  = '8a217c968aba172e0dbf3f34447218dc015bc4d5e59bf51db2f2cd12b7be4f55
 $ttydUrl     = 'https://github.com/tsl0922/ttyd/releases/download/'.$ttydVersion.'/ttyd.x86_64';
 
 // Static amd64 artifact only; skip cleanly elsewhere.
-if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
-    logmsg('[SKIP] ttyd install skipped on unsupported architecture: '.php_uname('m'));
-    return;
-}
+if (!pmssPinnedRemoteAmd64OrSkip('ttyd', 'install')) return;
 
 // Keep the matching version; guard removal before replacing a stale copy.
 if (!pmssPinnedRemoteBinaryPrepareInstall('/usr/bin/ttyd', ['/usr/bin/ttyd --version 2>/dev/null'], '/'.preg_quote($ttydVersion, '/').'/', 'ttyd')) {

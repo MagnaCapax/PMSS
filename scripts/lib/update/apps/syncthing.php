@@ -11,10 +11,7 @@ $syncthingVersion = 'v2.0.13';
 $syncthingArchive = 'syncthing-linux-amd64-'.$syncthingVersion.'.tar.gz';
 $syncthingUrl = 'https://github.com/syncthing/syncthing/releases/download/'.$syncthingVersion.'/'.$syncthingArchive;
 $syncthingSha256 = '55ffe8a5deefc373c95a760ab71c3cbe77da493bb9bf426525d33c2fe22ead88';
-if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
-    logmsg('[SKIP] Syncthing bootstrap skipped on unsupported architecture: '.php_uname('m'));
-    return;
-}
+if (!pmssPinnedRemoteAmd64OrSkip('Syncthing')) return;
 
 if (!pmssPinnedRemoteBinaryPrepareInstall('/usr/bin/syncthing', ['/usr/bin/syncthing version 2>/dev/null'], '/'.preg_quote($syncthingVersion, '/').'/', 'Syncthing')) {
     return;

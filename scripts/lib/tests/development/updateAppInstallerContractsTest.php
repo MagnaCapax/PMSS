@@ -171,7 +171,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 'required' => [
                     "require_once __DIR__.'/remoteBinary.php';",
                     'syncthing version 2>/dev/null',
-                    'pmssPinnedRemoteAmd64ArtifactsSupported()',
+                    "pmssPinnedRemoteAmd64OrSkip('Syncthing')",
                     "pmssPinnedRemoteBinaryPrepareInstall('/usr/bin/syncthing',",
                     'https://github.com/syncthing/syncthing/releases/download/',
                     'syncthing-linux-amd64-',

@@ -7,10 +7,7 @@ $copypartySha256 = '8f9a0def8a9c15252a06395781ec083372043b60caa80fb33c3d6dafa7f1
 $copypartyBinary = '/usr/local/bin/copyparty-sfx.py';
 $copypartyMarker = '/usr/local/share/pmss/copyparty-version';
 $copypartyUrl = 'https://github.com/9001/copyparty/releases/download/v'.$copypartyVersion.'/copyparty-sfx.py';
-if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
-    logmsg('[SKIP] Copyparty bootstrap skipped on unsupported architecture: '.php_uname('m'));
-    return;
-}
+if (!pmssPinnedRemoteAmd64OrSkip('Copyparty')) return;
 if (pmssPinnedRemoteChecksum($copypartyBinary) !== $copypartySha256) {
     pmssInstallPinnedRemoteBinary('Copyparty '.$copypartyVersion, $copypartyUrl, $copypartySha256, $copypartyBinary, true);
 }

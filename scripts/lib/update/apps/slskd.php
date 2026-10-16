@@ -7,10 +7,7 @@ $slskdArchive = 'slskd-'.$slskdVersion.'-linux-x64.zip';
 $slskdSha256 = '26c862173c593142db3fcfcd78f0784cfc29987de40a5bd9c2e662ed3b84cce6';
 $slskdRoot = '/opt/slskd';
 $slskdMarker = $slskdRoot.'/pmss-version';
-if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
-    logmsg('[SKIP] slskd bootstrap skipped on unsupported architecture: '.php_uname('m'));
-    return;
-}
+if (!pmssPinnedRemoteAmd64OrSkip('slskd')) return;
 if (is_file($slskdRoot.'/slskd') && !is_link($slskdMarker)
     && trim((string) @file_get_contents($slskdMarker)) === $slskdVersion) return;
 
