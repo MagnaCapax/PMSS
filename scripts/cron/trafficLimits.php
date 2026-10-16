@@ -45,8 +45,15 @@ $userConfigStore = new UserConfigStore();
 foreach($users AS $thisUser) {
     $userTrafficLimitFile = "/etc/seedbox/runtime/trafficLimits/{$thisUser}";
     $trafficDataFile = "/home/{$thisUser}/.trafficData";
-    if (!file_exists($trafficDataFile) or
-        !file_exists($userTrafficLimitFile) ) continue;
+    $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
+    // No configured limit (operator --unset deletes the runtime file) means "no cap".
+    // Lift any throttle left from a previous overage before skipping, otherwise the account
+    // stays throttled forever because the removal branch below is never reached.
+    if (!file_exists($userTrafficLimitFile)) {
+        pmssTrafficLimitThrottleClearWhenUnlimited($thisUser, $userTrafficLimitEnabledFile);
+        continue;
+    }
+    if (!file_exists($trafficDataFile)) continue;
 
     $data = pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser);
     if ($data === null) {
@@ -55,6 +62,8 @@ foreach($users AS $thisUser) {
     }
     $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, "/home/{$thisUser}/.bonusTraffic");
     if ($trafficLimitState['effectiveLimitGiB'] <= 0) {
+        // A residual zero/absent effective limit is also "no cap"; lift leftover throttle.
+        pmssTrafficLimitThrottleClearWhenUnlimited($thisUser, $userTrafficLimitEnabledFile);
         continue;
     }
     $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
@@ -70,7 +79,6 @@ foreach($users AS $thisUser) {
     // Once usage drops below the threshold for the configured cooldown window,
     // remove the marker and lift the rate limit. The double disable call guards
     // against occasional router desyncs.
-    $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
     $overLimit = ($trafficUsageGiB > $trafficLimit);
 
     // Needs to stay within the limit for X period of time, hence we can always touch & update the limit file
