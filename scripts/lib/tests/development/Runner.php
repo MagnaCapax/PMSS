@@ -45,6 +45,13 @@ function pmssTestCleanupNewTempArtifacts(array $before): void
     }
 }
 
+// Serialize suites before taking the temp snapshot: another suite's live root
+// would otherwise look like a new artifact and be removed at shutdown.
+$runnerLock = @fopen(sys_get_temp_dir().'/.pmss-development-runner.lock', 'c');
+if ($runnerLock === false || !@flock($runnerLock, LOCK_EX)) {
+    throw new \RuntimeException('Cannot lock the development test runner');
+}
+
 $tempArtifactsBefore = pmssTestListTempArtifacts();
 $suiteRoot = sys_get_temp_dir().'/pmss-tests-'.bin2hex(random_bytes(6));
 $versionDir = $suiteRoot.'/version';
