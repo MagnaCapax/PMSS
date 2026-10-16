@@ -256,13 +256,29 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
     return $spec;
 }
 
+/** Return whether the host exposes a DRI render character device. */
+function pmssDockerInstallLsioHasRenderNode(string $driPath = '/dev/dri'): bool
+{
+    if (!is_dir($driPath)) {
+        return false;
+    }
+
+    foreach (glob($driPath.'/renderD*') ?: [] as $path) {
+        if (@filetype($path) === 'char') {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * Build the final docker run command for the selected app.
  *
  * @param array<string,mixed> $spec
+ * @param callable|null $hasRenderNode Injectable host probe for tests.
  * @return array<int,string>
  */
-function pmssDockerInstallLsioDockerRunCommand(string $app, string $hostPort, string $timezone, array $spec): array
+function pmssDockerInstallLsioDockerRunCommand(string $app, string $hostPort, string $timezone, array $spec, ?callable $hasRenderNode = null): array
 {
     $command = ['docker', 'run', '-d', '--name', $app, '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ='.$timezone, '--network', 'pmss-media'];
 
@@ -270,6 +286,11 @@ function pmssDockerInstallLsioDockerRunCommand(string $app, string $hostPort, st
     $command[] = (string) $spec['bindHost'] !== ''
         ? $spec['bindHost'].':'.$hostPort.':'.$spec['containerPort']
         : $hostPort.':'.$spec['containerPort'];
+
+    if ($app === 'jellyfin' && ($hasRenderNode ?? 'pmssDockerInstallLsioHasRenderNode')()) {
+        $command[] = '--device';
+        $command[] = '/dev/dri:/dev/dri';
+    }
 
     foreach (['extraArgs', 'volumeArgs'] as $key) {
         foreach ($spec[$key] as $argument) {

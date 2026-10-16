@@ -178,8 +178,10 @@ attaches the containers to a shared `pmss-media` Docker network, and keeps
 `--restart unless-stopped` enabled. Every preset binds to
 `127.0.0.1` by default. Loopback is shared by accounts on the same host, so
 configure application authentication as well. Use the SSH tunnel above for
-the Jellyfin wizard and later browser access. The legacy
-`~/bin/linuxserverInstall.sh` wrapper remains available for compatibility.
+the Jellyfin wizard and later browser access. On Intel iGPU hosts with a DRI
+render node, the Jellyfin preset passes `/dev/dri` into the container
+automatically. The legacy `~/bin/linuxserverInstall.sh` wrapper remains
+available for compatibility.
 
 ## 4. Common seedbox recipes
 

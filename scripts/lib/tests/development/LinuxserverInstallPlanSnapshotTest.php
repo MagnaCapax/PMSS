@@ -17,7 +17,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
                 'credentialFile' => $spec['credentialFile'],
                 'dbName' => $spec['dbName'] ?? '',
                 'dbUser' => $spec['dbUser'] ?? '',
-                'command' => \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec),
+                'command' => \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec, static function (): bool { return false; }),
             );
         }
 
@@ -80,6 +80,35 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
         $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '18096', 'UTC', $spec);
 
         $this->assertSame('127.0.0.1:18096:8096', $command[array_search('-p', $command, true) + 1]);
+    }
+
+    public function testJellyfinGetsRenderDeviceWhenProbeFindsOne(): void
+    {
+        $spec = \pmssDockerInstallLsioAppSpec('jellyfin', '/srv/pmss-test-home', true);
+        $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '8096', 'UTC', $spec, static function (): bool { return true; });
+
+        $this->assertSame('/dev/dri:/dev/dri', $command[array_search('--device', $command, true) + 1]);
+        $this->assertStringContainsString('--device /dev/dri:/dev/dri', \pmssDockerInstallLsioDisplayCommand($command));
+    }
+
+    public function testJellyfinOmitsRenderDeviceWhenProbeFindsNone(): void
+    {
+        $spec = \pmssDockerInstallLsioAppSpec('jellyfin', '/srv/pmss-test-home', true);
+        $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '8096', 'UTC', $spec, static function (): bool { return false; });
+
+        $this->assertSame(false, in_array('--device', $command, true));
+    }
+
+    public function testOtherAppsNeverProbeOrReceiveRenderDevice(): void
+    {
+        foreach (array_keys(\pmssDockerInstallLsioAppCatalog()) as $app) {
+            if ($app === 'jellyfin') {
+                continue;
+            }
+            $spec = \pmssDockerInstallLsioAppSpec($app, '/srv/pmss-test-home', true);
+            $command = \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec, static function (): bool { return true; });
+            $this->assertSame(false, in_array('--device', $command, true));
+        }
     }
 
     public function testEveryCatalogAppPublishesOnLoopbackByDefault(): void

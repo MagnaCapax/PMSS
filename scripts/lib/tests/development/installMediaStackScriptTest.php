@@ -17,6 +17,21 @@ class installMediaStackScriptTest extends TestCase
         $this->script = $this->pmssReadRepoFile('etc/skel/install-media-stack.sh');
     }
 
+    public function testQuotaFilesReadsUsageAndSkipsUnlimitedQuotas(): void
+    {
+        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_quota_files');
+        foreach (array(
+            '/dev/md2 18192 62914560 78643200 0 2807 30000 37500 0' => '2807 30000',
+            '/dev/md2 18192 62914560 78643200 0 30001* 30000 37500 0' => '30001 30000',
+            '/dev/md2 18192 62914560 78643200 0 2807 0 37500 0' => '',
+        ) as $quotaLine => $expected) {
+            $harness = "#!/usr/bin/env bash\nset -euo pipefail\n"
+                .'quota() { printf "%s\\n" '.escapeshellarg($quotaLine)."; }\n"
+                .$function."\nmedia_stack_quota_files\n";
+            $this->assertSame($expected, trim($this->pmssRunShellHarness($harness)));
+        }
+    }
+
     public function testServarrBranchDefaultsAndOverridesPresent(): void
     {
         foreach (array(

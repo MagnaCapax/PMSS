@@ -254,15 +254,13 @@ log_ok() { echo -e "${C_OK}[ OK ]${C_RESET} $*" >&2; }
 log_warn() { echo -e "${C_WARN}[WARN]${C_RESET} $*" >&2; }
 log_err() { echo -e "${C_ERR}[ERR ]${C_RESET} $*" >&2; }
 
-# Plain quota output has optional block and file grace columns. Ignore
-# unavailable or unlimited quota data rather than guessing an account limit.
+# quota -w -p always prints both grace columns, giving nine filesystem fields.
+# Ignore unavailable or unlimited quota data rather than guessing an account limit.
 media_stack_quota_files() {
 	command -v quota >/dev/null 2>&1 || return 0
 	quota -w -p -u 2>/dev/null | awk '
-		$1 ~ /^\// && NF >= 7 {
-			i = NF
-			if ($i !~ /^[0-9]+$/) i--
-			used = $(i-2); soft = $(i-1); hard = $i
+		$1 ~ /^\// && NF == 9 {
+			used = $6; soft = $7; hard = $8
 			sub(/\*$/, "", used)
 			if (used ~ /^[0-9]+$/ && soft ~ /^[0-9]+$/ && hard ~ /^[0-9]+$/ &&
 				length(used) <= 15 && length(soft) <= 15 && soft + 0 > 0) {
