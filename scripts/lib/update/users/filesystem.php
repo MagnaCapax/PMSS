@@ -274,6 +274,7 @@ PHP;
         'www/screen.css',
         'www/stats.php',
         'www/statsHelpers.php',
+        'www/statsLive.php',
         'www/rutorrent/php/settings.php',
         'www/rutorrent/plugins/theme/conf.php',
         'www/welcome.php',

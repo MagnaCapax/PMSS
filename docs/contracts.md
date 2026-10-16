@@ -1032,6 +1032,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - Traffic Info uses the same over-cap result for its warning and disclosure. An over-cap account without an active throttle marker reports the cap as policy, not current speed; an active marker reports its effective Mbps value. Approaching and over-cap states link to the service's traffic upgrade, or KB article 36 when the billing service ID is unavailable. Unlimited plans retain their separate path.
 - When the update-only `statsHelpers.php` has not arrived, `stats.php` returns
   HTTP 200 with a short reload notice instead of failing during the guiv heal.
+- `statsLive.php` (loaded by `stats.php` through `pmssWelcomeRequireLocalHelper()`; the block is simply absent when the helper has not arrived) prints
+  the "Node load vs. your share" block from two root-written artifacts: `/var/lib/pmss/public/node-live.json` (node sums) and
+  `/var/lib/pmss/live/<own user>.json` (own samples, `root:<user> 0640`). Customers never receive another account's samples (ADR 0111).
 - `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks and gives legends explicit point markers, width, and spacing (Refs #878).
 - The Storage I/O text block emits explicit newlines between read, write, and
   operations values; PHP template close tags otherwise consume source newlines (Refs #879).
