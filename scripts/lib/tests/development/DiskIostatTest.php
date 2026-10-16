@@ -80,6 +80,21 @@ PHP;
         $this->assertSame(['leaves' => [], 'complete' => false], \pmssBlockDeviceLeaves('missing', $class));
     }
 
+    /** Dot components must never turn a device lookup into a parent-directory walk. */
+    public function testSharedTopologyWalkRejectsDotAndMalformedDeviceNames(): void
+    {
+        list($root, $class) = $this->homeTree(['disk.name' => []]);
+        $visited = [];
+        foreach (['', '.', '..', 'disk/name', "disk\nname"] as $name) {
+            $result = \pmssBlockDeviceLeaves($name, $class, null,
+                static function (string $device) use (&$visited): void { $visited[] = $device; });
+            $this->assertSame(['leaves' => [], 'complete' => false], $result);
+        }
+        $this->assertSame([], $visited);
+        $this->assertSame(['leaves' => ['disk.name'], 'complete' => true],
+            \pmssBlockDeviceLeaves('disk.name', $class));
+    }
+
     public function testGuestSamplesOnlyHomeDiskAndKeepsLegacySnapshotKeys(): void
     {
         list($root, $class) = $this->homeTree(['vda' => [], 'vdb' => []]);

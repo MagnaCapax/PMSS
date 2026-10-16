@@ -71,6 +71,9 @@ read cannot prove that BFQ is inactive across the backing topology.
 The BFQ probe follows stacked devices to leaf schedulers with a bounded walk,
 and resolves partition members through their parent disks. Unreadable or
 overdeep topology remains unknown rather than reporting BFQ inactive.
+The shared block-device walk rejects `.` and `..` as device names before
+building sysfs paths. Other valid dotted names retain their leaf result;
+invalid names retain the incomplete-topology result without visiting nodes.
 
 Nginx's fallback self-signed certificate command accepts only a valid host name
 and quotes the complete OpenSSL subject as one shell argument. Valid host names

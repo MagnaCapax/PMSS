@@ -13,7 +13,8 @@ function pmssBlockDeviceLeaves(string $device, string $root, ?callable $globber 
     $globber = $globber ?: 'glob';
     $walk = static function (string $name, int $depth) use (&$walk, &$leaves, &$complete, $root, $globber, $visit): void {
         // Bound cycles and reject names before constructing a sysfs path.
-        if ($depth > 8 || preg_match('/\A[A-Za-z0-9._+-]+\z/', $name) !== 1) { $complete = false; return; }
+        if ($depth > 8 || $name === '.' || $name === '..'
+            || preg_match('/\A[A-Za-z0-9._+-]+\z/', $name) !== 1) { $complete = false; return; }
         if ($visit !== null) $visit($name);
         $path = $root.'/'.$name;
         if (!is_dir($path)) {
@@ -33,7 +34,8 @@ function pmssBlockDeviceLeaves(string $device, string $root, ?callable $globber 
             $real = realpath($path);
             if ($real === false) { $complete = false; return; }
             $name = basename(dirname($real));
-            if (preg_match('/\A[A-Za-z0-9._+-]+\z/', $name) !== 1 || !is_dir($root.'/'.$name)) { $complete = false; return; }
+            if ($name === '.' || $name === '..' || preg_match('/\A[A-Za-z0-9._+-]+\z/', $name) !== 1
+                || !is_dir($root.'/'.$name)) { $complete = false; return; }
         }
         $leaves[$name] = true;
     };
