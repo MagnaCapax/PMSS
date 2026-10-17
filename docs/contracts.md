@@ -1022,6 +1022,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Server Status – `etc/skel/www/welcome.php` and `stats.php`
 
+- Traffic Info uses the same over-cap result for its warning and disclosure. An over-cap account without an active throttle marker reports the cap as policy, not current speed; an active marker reports its effective Mbps value. Approaching and over-cap states link to the service's traffic upgrade, or KB article 36 when the billing service ID is unavailable. Unlimited plans retain their separate path.
 - When the update-only `statsHelpers.php` has not arrived, `stats.php` returns
   HTTP 200 with a short reload notice instead of failing during the guiv heal.
 - `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks and gives legends explicit point markers, width, and spacing (Refs #878).

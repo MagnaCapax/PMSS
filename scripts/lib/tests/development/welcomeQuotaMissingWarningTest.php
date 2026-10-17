@@ -56,7 +56,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     private function makeWelcomeUsageFixture(): string
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $start = strpos($source, 'function pmssWelcomeTrafficEffectiveHtmlBuild');
+        $start = strpos($source, 'function pmssWelcomeTrafficUpgradeUrlBuild');
         $this->assertTrue($start !== false, 'welcome.php usage helpers should remain present');
 
         $tail = substr($source, $start);
@@ -279,9 +279,23 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomeTrafficSectionShowsApproachDisclosure(): void
     {
         $this->assertWelcomeUsageScriptContains(
-            'ob_start(); trafficCreateSection(array("raw" => array("month" => 716800)), 1000); echo ob_get_clean();',
-            ['Usage: <b>70.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Pulsed_Media_Traffic_Limits#How_the_throttle_works']
+            'ob_start(); trafficCreateSection(array("raw" => array("month" => 819200)), 1000, null, 0, array(), 42); echo ob_get_clean();',
+            ['Usage: <b>80.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42']
         );
+    }
+
+    public function testWelcomeTrafficSectionShowsOverCapWithoutThrottle(): void
+    {
+        foreach (array(120 => 1228800, 248 => 2539520) as $percent => $month) {
+            $output = $this->assertWelcomeUsageScriptContains(
+                'ob_start(); trafficCreateSection(array("raw" => array("month" => '.$month.')), 1000, null, 0, array("effectiveCapMbit" => 25, "isReduced" => false), 42); echo ob_get_clean();',
+                ['Over monthly traffic cap', number_format($percent - 100, 1).'% over cap',
+                    'can be limited to 25 Mbps', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42']
+            );
+            $this->pmssAssertStringNotContainsString('Approaching monthly traffic cap', $output);
+            $this->pmssAssertStringNotContainsString('Current effective: full plan port speed', $output);
+            $this->pmssAssertStringNotContainsString('REDUCED BANDWIDTH', $output);
+        }
     }
 
     public function testWelcomeTrafficSectionShowsActiveThrottleDisclosure(): void
@@ -289,8 +303,18 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $state = array('defaultCapMbit' => 100, 'effectiveCapMbit' => 25, 'isReduced' => true);
         $this->assertWelcomeUsageScriptContains(
             'ob_start(); trafficCreateSection(array("raw" => array("month" => 1536000)), 1000, null, 0, '.var_export($state, true).'); echo ob_get_clean();',
-            ['Throttled to 25 Mbps', '50.0% over cap', 'Throttle lift requires 3 consecutive days under cap.']
+            ['Throttled to 25 Mbps', '50.0% over cap', 'bandwidth is limited to 25 Mbps',
+                'Throttle lift requires 3 consecutive days under cap.', 'Add extra traffic to your plan', 'id=36']
         );
+    }
+
+    public function testWelcomeTrafficSectionLeavesUnlimitedPlanWithoutOverCapWarning(): void
+    {
+        $output = $this->assertWelcomeUsageScriptContains(
+            'ob_start(); trafficCreateSection(array("raw" => array("month" => 2539520)), 0); echo ob_get_clean();',
+            ['Traffic limit: Unlimited', 'Current effective: full plan port speed']
+        );
+        $this->pmssAssertStringNotContainsString('OVER TRAFFIC LIMIT WARNING', $output);
     }
 
     public function testWelcomeTrafficSectionShowsCooldownDisclosure(): void

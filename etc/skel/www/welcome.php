@@ -641,6 +641,24 @@ function pmssWelcomeTrafficDefaultCapMbitRead() {
 }
 
 /**
+ * Link traffic upgrades to the service when billing identifies it.
+ */
+function pmssWelcomeTrafficUpgradeUrlBuild($billingServiceId) {
+    if ((int) $billingServiceId <= 0) {
+        return 'https://pulsedmedia.com/clients/knowledgebase.php?action=displayarticle&id=36';
+    }
+
+    return 'https://pulsedmedia.com/clients/upgrade.php?type=configoptions&id='.(int) $billingServiceId;
+}
+
+/**
+ * Keep the traffic add-on destination consistent across status messages.
+ */
+function pmssWelcomeTrafficUpgradeLinkHtmlBuild($billingServiceId) {
+    return '<a href="'.pmssCustomerHtmlAttr(pmssWelcomeTrafficUpgradeUrlBuild($billingServiceId)).'" target="_blank">Add extra traffic to your plan</a>';
+}
+
+/**
  * Build tiny traffic-cap disclosure text shown near usage gauge.
  */
 function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId) {
@@ -652,28 +670,25 @@ function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingSe
         return '<span style="font-size: 0.82em; color: #666;">Current effective: full plan port speed</span>';
     }
 
-    $upgradeUrl = 'https://pulsedmedia.com/clients/upgrade.php?type=configoptions';
-    if ((int) $billingServiceId > 0) {
-        $upgradeUrl .= '&id='.(int) $billingServiceId;
-    }
-
     $effectiveText = number_format(max(0, $effectiveCapMbit));
 
     return '<span style="font-size: 0.82em; color: #7a1a1a;">Current effective: '.$effectiveText.' Mbps (reduced)</span>'
-        . '<br /><span style="font-size: 0.82em;"><a href="'.pmssCustomerHtmlAttr($upgradeUrl).'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
+        . '<br /><span style="font-size: 0.82em;"><a href="'.pmssCustomerHtmlAttr(pmssWelcomeTrafficUpgradeUrlBuild($billingServiceId)).'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
 }
 
 /**
  * Build customer-visible traffic throttle status for capped accounts.
  */
-function pmssWelcomeTrafficDisclosureHtmlBuild($trafficPercent, $trafficBandwidthState, $billingServiceId) {
+function pmssWelcomeTrafficDisclosureHtmlBuild($trafficPercent, $trafficBandwidthState, $billingServiceId, $overCap) {
     $usageText = number_format((float) $trafficPercent, 1);
-    $lines = array(
-        pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId),
-        'Usage: <b>'.$usageText.'%</b> of monthly traffic cap.',
-    );
-
     $isReduced = !empty($trafficBandwidthState['isReduced']);
+    // An absent throttle marker does not make over-cap usage a full-speed promise.
+    $lines = array();
+    if (!$overCap || $isReduced) {
+        $lines[] = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
+    }
+    $lines[] = 'Usage: <b>'.$usageText.'%</b> of monthly traffic cap.';
+
     $effectiveCapMbit = is_numeric($trafficBandwidthState['effectiveCapMbit'] ?? null)
         ? max(0, (int) $trafficBandwidthState['effectiveCapMbit'])
         : 0;
@@ -682,16 +697,22 @@ function pmssWelcomeTrafficDisclosureHtmlBuild($trafficPercent, $trafficBandwidt
         : null;
     $capText = number_format($effectiveCapMbit).' Mbps';
 
-    if ($isReduced && (float) $trafficPercent > 100.0) {
+    if ($isReduced && $overCap) {
         $overagePercent = max(0.0, (float) $trafficPercent - 100.0);
         $lines[] = '<b>Throttled to '.$capText.'</b> - usage is '.number_format($overagePercent, 1).'% over cap. Throttle lift requires 3 consecutive days under cap.';
     } elseif ($isReduced) {
         $cooldown = pmssWelcomeTrafficCooldownTextBuild($throttleFileMtime);
         $lines[] = '<b>Throttle cooldown active</b> - current ceiling is '.$capText.'; '.$cooldown;
+    } elseif ($overCap) {
+        $overagePercent = max(0.0, (float) $trafficPercent - 100.0);
+        $lines[] = '<b>Over monthly traffic cap</b> - usage is '.number_format($overagePercent, 1).'% over cap.';
     } elseif ((float) $trafficPercent >= 70.0) {
         $lines[] = '<b>Approaching monthly traffic cap</b> - review the traffic throttle policy before crossing the cap.';
     }
 
+    if (!$overCap && ($isReduced || (float) $trafficPercent >= 70.0)) {
+        $lines[] = pmssWelcomeTrafficUpgradeLinkHtmlBuild($billingServiceId).'.';
+    }
     $lines[] = 'Policy: <a href="https://wiki.pulsedmedia.com/wiki/Pulsed_Media_Traffic_Limits#How_the_throttle_works" target="_blank">How the throttle works</a>.';
     $class = $isReduced ? 'pmss-traffic-disclosure pmss-traffic-disclosure-active' : 'pmss-traffic-disclosure';
 
@@ -1018,11 +1039,22 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
     $limitTotal = $trafficLimit + $bonusTraffic;
     $trafficUsedGiB = $trafficUsedRaw / 1024;
     $percent = pmssWelcomePercent($trafficUsedGiB, $limitTotal, 0);
-    $trafficDisclosure = pmssWelcomeTrafficDisclosureHtmlBuild(pmssWelcomePercent($trafficUsedGiB, $limitTotal, 1), $trafficBandwidthState, $billingServiceId);
+    $overCap = $trafficUsedGiB > $limitTotal;
+    $isReduced = !empty($trafficBandwidthState['isReduced']);
+    $trafficDisclosure = pmssWelcomeTrafficDisclosureHtmlBuild(pmssWelcomePercent($trafficUsedGiB, $limitTotal, 1), $trafficBandwidthState, $billingServiceId, $overCap);
 
-    $warning = $percent > 100
-        ? '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.'
-        : '';
+    $warning = '';
+    if ($overCap) {
+        $capMbit = is_numeric($trafficBandwidthState['effectiveCapMbit'] ?? null)
+            ? max(0, (int) $trafficBandwidthState['effectiveCapMbit']) : 0;
+        $speedText = $isReduced
+            ? 'Datacenter external outbound (TO internet) bandwidth is limited to '.number_format($capMbit).' Mbps.'
+            : 'While over the cap, datacenter external outbound (TO internet) bandwidth can be limited to '.number_format($capMbit).' Mbps.';
+        $warningTitle = 'OVER TRAFFIC LIMIT WARNING'.($isReduced ? ' - REDUCED BANDWIDTH' : '');
+        $warning = '<br /><b style="color: red;">'.$warningTitle.'</b><br />You are beyond your traffic limit. '
+            .pmssWelcomeTrafficUpgradeLinkHtmlBuild($billingServiceId).'.<br />'.$speedText
+            .' Datacenter internal and inbound bandwidth is unrestricted.';
+    }
     $titleText = "{$trafficUsed} / {$limitTotal} GiB";
     $bonusLine = ($bonusTraffic > 0) ? 'Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
     $usageLine = 'Used: '.$trafficUsed.' / Limit: '.number_format($limitTotal).' GiB (30-day window)';
