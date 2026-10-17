@@ -1,7 +1,8 @@
 <?php
-/** Account-side Codex launcher; deliberately independent of /scripts. */
+/** Account-side AI launcher; deliberately independent of /scripts. */
 
 const PMSS_AI_CODEX_BINARY = '/opt/pmss/ai-tools/codex/codex-rust-v0.93.0';
+const PMSS_AI_CLAUDE_BINARY = '/opt/pmss/ai-tools/npm/claude/bin/claude';
 
 /** PHP 7.0 cannot enumerate getenv(); Linux exposes this process's environment. */
 function pmssAiCodexEnvironment(): array
@@ -135,8 +136,116 @@ function pmssAiCodexState(array $env): array
     return $state;
 }
 
+/** A personal Claude option, or unreadable state, takes precedence. */
+function pmssAiClaudeFileChoice(string $path, string $kind): bool
+{
+    if (!file_exists($path) && !is_link($path)) {
+        return false;
+    }
+    if ($kind === 'credentials') {
+        return true;
+    }
+    $contents = @file_get_contents($path);
+    if (!is_string($contents)) {
+        return true;
+    }
+    $data = json_decode($contents, true);
+    if (!is_array($data) || json_last_error() !== JSON_ERROR_NONE) {
+        return true;
+    }
+    if ($kind === 'state') {
+        return array_key_exists('oauthAccount', $data) || array_key_exists('primaryApiKey', $data);
+    }
+    if (array_key_exists('apiKeyHelper', $data)) {
+        return true;
+    }
+    if (isset($data['env']) && is_array($data['env'])) {
+        foreach ($data['env'] as $name => $value) {
+            if (strpos((string) $name, 'ANTHROPIC_') === 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/** Read the account key and Claude's own settings without changing either. */
+function pmssAiClaudeState(array $env): array
+{
+    $uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+    $home = $env['HOME'] ?? '';
+    $state = ['uid' => $uid, 'keyFileValid' => false, 'configChoice' => false];
+    if ($uid === 0 || $home === '') {
+        return $state;
+    }
+    $file = rtrim($home, '/').'/.virsilipasKey';
+    if (is_link($file) || !is_file($file) || @fileowner($file) !== $uid) {
+        return $state;
+    }
+    $contents = @file_get_contents($file);
+    $settings = is_string($contents) ? @parse_ini_string($contents, false, INI_SCANNER_RAW) : false;
+    if (!is_array($settings)) {
+        return $state;
+    }
+    $state['keyFileValid'] = true;
+    $state['key'] = $settings['key'] ?? '';
+    $state['endpoint'] = $settings['endpoint'] ?? '';
+    $custom = array_key_exists('CLAUDE_CONFIG_DIR', $env);
+    $configDir = $custom ? $env['CLAUDE_CONFIG_DIR'] : rtrim($home, '/').'/.claude';
+    $statePath = $custom ? rtrim($configDir, '/').'/.claude.json' : rtrim($home, '/').'/.claude.json';
+    $state['configChoice'] = pmssAiClaudeFileChoice(rtrim($configDir, '/').'/.credentials.json', 'credentials')
+        || pmssAiClaudeFileChoice($statePath, 'state')
+        || pmssAiClaudeFileChoice(rtrim($configDir, '/').'/settings.json', 'settings');
+    return $state;
+}
+
+/** Explicit command options are left for Claude Code to interpret. */
+function pmssAiClaudeHasCommandChoice(array $args): bool
+{
+    foreach ($args as $arg) {
+        if (in_array($arg, ['--model', '--fallback-model', '--settings', 'setup-token'], true)
+            || preg_match('/^--(?:model|fallback-model|settings)=/', $arg)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Pure precedence decision; credentials enter only the child environment. */
+function pmssAiClaudeDecision(array $args, array $env, array $state): array
+{
+    $pass = ['argv' => array_merge([PMSS_AI_CLAUDE_BINARY], $args), 'env' => $env, 'notice' => false];
+    foreach (['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL',
+        'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_OAUTH_TOKEN'] as $name) {
+        if (isset($env[$name]) && $env[$name] !== '') {
+            return $pass;
+        }
+    }
+    if (in_array(strtolower((string) ($env['PMSS_VIRSILIPAS'] ?? '')), ['off', '0', 'no'], true)
+        || ($state['uid'] ?? 0) === 0
+        || !isset($env['HOME']) || $env['HOME'] === ''
+        || empty($state['keyFileValid']) || !isset($state['key'], $state['endpoint'])
+        || !is_string($state['key']) || $state['key'] === ''
+        || preg_match('/[\s\p{Z}\p{C}]/u', $state['key']) !== 0
+        || !is_string($state['endpoint'])
+        || !preg_match('#^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$#D', $state['endpoint'])
+        || !empty($state['configChoice']) || pmssAiClaudeHasCommandChoice($args)) {
+        return $pass;
+    }
+    $endpoint = rtrim($state['endpoint'], '/');
+    $env['ANTHROPIC_BASE_URL'] = preg_replace('#/v1$#', '', $endpoint);
+    $env['ANTHROPIC_AUTH_TOKEN'] = $state['key'];
+    foreach (['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL',
+        'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL'] as $name) {
+        if (!array_key_exists($name, $env)) {
+            $env[$name] = 'default';
+        }
+    }
+    return ['argv' => $pass['argv'], 'env' => $env, 'notice' => true];
+}
+
 /** Replace this process when possible; otherwise preserve all three streams. */
-function pmssAiCodexExec(array $decision): void
+function pmssAiCodexExec(array $decision)
 {
     $argv = $decision['argv'];
     $path = array_shift($argv);
@@ -157,14 +266,23 @@ function pmssAiCodexExec(array $decision): void
 if (isset($_SERVER['SCRIPT_FILENAME']) && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
     $args = array_slice($argv, 2);
     $env = pmssAiCodexEnvironment();
-    $pass = ['argv' => array_merge([PMSS_AI_CODEX_BINARY], $args), 'env' => $env, 'notice' => false];
+    $tool = $argv[1] ?? '';
+    if (!in_array($tool, ['codex', 'claude'], true)) {
+        exit(127);
+    }
+    $binary = $tool === 'codex' ? PMSS_AI_CODEX_BINARY : PMSS_AI_CLAUDE_BINARY;
+    $pass = ['argv' => array_merge([$binary], $args), 'env' => $env, 'notice' => false];
     try {
-        $decision = ($argv[1] ?? '') === 'codex' ? pmssAiCodexDecision($args, $env, pmssAiCodexState($env)) : $pass;
+        $decision = $tool === 'codex' ? pmssAiCodexDecision($args, $env, pmssAiCodexState($env))
+            : pmssAiClaudeDecision($args, $env, pmssAiClaudeState($env));
     } catch (Throwable $e) {
         $decision = $pass;
     }
     if ($decision['notice'] && function_exists('posix_isatty') && posix_isatty(STDERR)) {
-        fwrite(STDERR, "Codex is using your Pulsed Media AI credits (~/.virsilipasKey). To change: PMSS_VIRSILIPAS=off codex, or codex login.\n");
+        $notice = $tool === 'codex'
+            ? "Codex is using your Pulsed Media AI credits (~/.virsilipasKey). To change: PMSS_VIRSILIPAS=off codex, or codex login.\n"
+            : "Claude Code is using your Pulsed Media AI credits (~/.virsilipasKey). To change: PMSS_VIRSILIPAS=off claude, or log in to your own account (PMSS_VIRSILIPAS=off claude, then /login).\n";
+        fwrite(STDERR, $notice);
     }
     try {
         pmssAiCodexExec($decision);

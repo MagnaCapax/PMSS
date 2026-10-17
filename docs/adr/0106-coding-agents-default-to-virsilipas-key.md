@@ -60,6 +60,7 @@ the pinned binary without injected settings. Account settings remain intact.
 The per-user OpenClaw installer follows the same default on a fresh install:
 it uses a runtime environment reference to the account's `~/.virsilipasKey`
 and preserves an existing OpenClaw provider choice.
+The system Claude Code follows the same account-key default, preserving personal choices.
 
 The published CLI advisory GHSA-w5fx-fh39-j5rw describes a sandbox path
 bypass in releases through 0.38.0; the current pin is

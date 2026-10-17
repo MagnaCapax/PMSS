@@ -354,7 +354,8 @@ AI CLI Tools
 ============
 
 Three AI coding assistants are installed in your home directory.
-Each requires YOUR OWN API key or account — nothing is shared.
+System codex and claude use your account's Virsilipas key by default.
+Personal copies require your own API key or account.
 
 TOOLS:
 
@@ -369,6 +370,8 @@ TOOLS:
             Docs: https://github.com/openai/codex
 
   claude    Anthropic Claude Code
+            The system claude uses ~/.virsilipasKey when it holds a key.
+            To use your own login: PMSS_VIRSILIPAS=off claude, then /login
             Set: export ANTHROPIC_API_KEY="your-key"
             Docs: https://github.com/anthropics/claude-code
 

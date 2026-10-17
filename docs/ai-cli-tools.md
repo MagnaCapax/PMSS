@@ -1,10 +1,14 @@
 # AI CLI Tools
 
 PMSS now installs system-wide AI CLI binaries during updates via
-`scripts/lib/update/apps/aiToolsInstall.php`. The commands are linked into
+`scripts/lib/update/apps/aiToolsInstall.php`. The commands are published in
 `/usr/local/bin` so users can run `gemini`, `codex`, and `claude` immediately.
+The system `codex` and `claude` commands use the account's Virsilipas key by
+default when no personal provider choice is present.
 
-This script installs three AI coding assistants in your home directory. Each tool requires your own API key or account to use. No credentials are pre-installed or shared between users.
+The optional script installs three AI coding assistants in your home directory.
+System Codex and Claude Code can use your account's Virsilipas key; personal
+copies need their own provider setup. No credentials are shared between users.
 
 Installed tools:
 - **Gemini CLI** (Google) - Requires a Gemini API key or organisation access through Google Cloud / Code Assist Standard or Enterprise
@@ -111,7 +115,14 @@ codex "prompt"     # One-shot query
 
 ### Claude Code (Anthropic)
 
-Claude Code requires an Anthropic API key or subscription.
+The system `claude` command uses `~/.virsilipasKey` for Pulsed Media AI credits
+when you have not configured your own Claude login, settings, environment
+credential, or model choice. It reads the key for each run and does not change
+files in your home directory. Run `PMSS_VIRSILIPAS=off claude` to opt out; from
+there, use `/login` for your own account. A personal `~/bin/claude` copy bypasses
+the system launcher when called by its full path.
+
+You can also use your own Anthropic API key or subscription.
 
 **Setup:**
 1. Get an API key from https://console.anthropic.com
@@ -135,7 +146,7 @@ claude "prompt"     # One-shot query
 ## Privacy and Security
 
 - **Private credentials:** All API keys and settings are stored in your home directory with mode 700 (owner-only access).
-- **No shared keys:** Each user must provide their own API keys. Nothing is pre-configured or shared between accounts.
+- **No shared keys:** Each account's Virsilipas key is private to that account. Users may configure their own provider credentials.
 - **User-local installation:** Tools install to `~/bin` and `~/.local`, not system-wide. Other users cannot access your installation.
 - **Checksum verification:** Downloads are verified against known checksums when available.
 
