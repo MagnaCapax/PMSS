@@ -708,6 +708,11 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ## rTorrent Configuration – `scripts/lib/rtorrentConfig.php`
 
+- `scripts/util/rtorrentThrottleGet.php USERNAME` reads the live global upload
+  and download limits from the account's rTorrent SCGI socket. It prints two
+  `*_bytes_per_second` lines (zero means unlimited). Invalid usernames fail
+  with usage on stderr; missing sockets and invalid SCGI responses print `n/a`
+  on stderr and exit non-zero without partial stdout.
 - The per-user `.rtorrentExecute.php` supervisor launches the PMSS-built
   `/usr/local/bin/rtorrent` directly, regardless of its inherited `PATH`.
 - `etc/skel/.rtorrentThrottleInit.php`
