@@ -8,6 +8,7 @@
 require_once __DIR__.'/../user/identity.php';
 require_once __DIR__.'/panelSessionLogin.php';
 require_once __DIR__.'/userFileWrite.php';
+require_once __DIR__.'/transmissionProxy.php';
 
 function pmssClampLighttpdBandwidthLimits(string $config): string
 {
@@ -61,11 +62,17 @@ function pmssLighttpdRenderUserConfig(
     int $rclonePort,
     int $qbittorrentPort,
     array $resources,
-    array $panelSessionLogin = []
+    array $panelSessionLogin = [],
+    ?bool $transmissionSelected = null
 ): string {
+    if ($transmissionSelected === null) {
+        $transmissionSelected = !(defined('PMSS_TEST_MODE') && PMSS_TEST_MODE)
+            && pmssLighttpdTransmissionSelected($user, '/home/'.$user);
+    }
     $config = str_replace(
-        ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##"],
-        [$user, $serverPort, $rclonePort, $qbittorrentPort, pmssWebdavWwwPolicyBlock($user)],
+        ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##"],
+        [$user, $serverPort, $rclonePort, $qbittorrentPort, pmssWebdavWwwPolicyBlock($user),
+            $transmissionSelected ? pmssLighttpdTransmissionProxyBlock($user) : ''],
         (string) $template
     );
     $config = preg_replace(

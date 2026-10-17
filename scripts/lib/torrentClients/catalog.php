@@ -20,6 +20,9 @@ function pmssTorrentClientsCatalogLoad(string $path): array
         if (!is_string($client) || !in_array($client, ['qbittorrent', 'rtorrent', 'deluge', 'transmission'], true)
             || !is_string($version) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
             || !in_array($kind, ['system', 'static', 'venv'], true)) return [];
+        // Transmission entries describe only builds with the managed socket RPC mode.
+        if ($client === 'transmission' && ($kind !== 'static' || ($entry['rpcUnixSocket'] ?? null) !== true)) return [];
+        if ($client !== 'transmission' && array_key_exists('rpcUnixSocket', $entry)) return [];
         $id = $client.'|'.$version;
         if (isset($seen[$id])) return [];
         $seen[$id] = true;

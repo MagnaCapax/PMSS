@@ -1,6 +1,5 @@
 [
   {"client":"qbittorrent","version":"system","url":[],"sha256":"","kind":"system","compatFamily":"qbittorrent","cve":[],"disabled":false,"isDefault":true,"binary":"/usr/bin/qbittorrent-nox"},
   {"client":"rtorrent","version":"system","url":[],"sha256":"","kind":"system","compatFamily":"rtorrent","cve":[],"disabled":false,"isDefault":true,"binary":"/usr/local/bin/rtorrent"},
-  {"client":"deluge","version":"system","url":[],"sha256":"","kind":"system","compatFamily":"deluge","cve":[],"disabled":false,"isDefault":true,"binary":"/usr/bin/deluged"},
-  {"client":"transmission","version":"system","url":[],"sha256":"","kind":"system","compatFamily":"transmission","cve":[],"disabled":false,"isDefault":true,"binary":"/usr/bin/transmission-daemon"}
+  {"client":"deluge","version":"system","url":[],"sha256":"","kind":"system","compatFamily":"deluge","cve":[],"disabled":false,"isDefault":true,"binary":"/usr/bin/deluged"}
 ]

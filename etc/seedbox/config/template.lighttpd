@@ -37,17 +37,12 @@ server.stream-response-body = 2
 server.stream-request-body = 2
 index-file.names           = ( "index.php", "index.html",
                                "index.lighttpd.html" )
-
-
-
 url.access-deny            = ( "~", ".inc" )
 # Jellyfin lets local callers restart it without authentication; every request through this proxy is local.
 $HTTP["url"] =~ "(?i)^/jellyfin/System/Restart" {
     url.access-deny = ( "" )
 }
 static-file.exclude-extensions = ( ".php", ".pl", ".fcgi" )
-
-
 dir-listing.encoding        = "utf-8"
 dir-listing.activate        = "enable"
 
@@ -56,17 +51,14 @@ server.username            = "##username"
 
 ## change uid to <uid> (default: don't care)
 server.groupname           = "##username"
-
 #### compress module
 # deflate disabled: marginal value for per-user vhosts; keep commented until post-2028 refactor removes module/package entirely.
 #deflate.mimetypes          = ("text/html", "text/css", "application/javascript")
-
-
-
 #### external configuration files
 ## mimetype mapping
 include_shell "/usr/share/lighttpd/create-mime*pl"
 
+##PMSS_TRANSMISSION_PROXY##
 include "/home/##username/.lighttpd/custom"
 include "/home/##username/.lighttpd/custom.d/*.conf"
 
@@ -87,8 +79,6 @@ auth.require = (
         "require" => "user=##username"
     )
 )
-
-
 alias.url += (
  "/user-##username/" => "/home/##username/www/",
  "/webdav-##username/" => "/home/##username/",
@@ -141,8 +131,6 @@ $HTTP["url"] =~ "^/owncloud($|/)" {
 }
 
 fastcgi.debug = 0
-
-
 fastcgi.server += ( ".php" =>
         ((
                 "bin-path"              => "/usr/bin/php-cgi -c /home/##username/.lighttpd/php.ini",

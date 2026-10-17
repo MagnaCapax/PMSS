@@ -2,7 +2,12 @@
 /** Customer-side resolver; it has no dependency on operator-only /scripts. */
 
 /** Return a canonical executable only for a direct, allowed directory target. */
-function pmssTorrentClientResolve(string $home, string $client): ?string
+function pmssTorrentClientResolve(
+    string $home,
+    string $client,
+    string $projectionPath = '/var/lib/pmss/public/torrentClients.json',
+    string $storeRoot = '/home/.pmss/clients'
+): ?string
 {
     $names = [
         'qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent',
@@ -13,7 +18,7 @@ function pmssTorrentClientResolve(string $home, string $client): ?string
     $base = rtrim($home, '/').'/bin/'.$client;
     $target = @readlink($base.'/default');
     if (!is_string($target) || $target === '') return null;
-    $storePrefix = '/home/.pmss/clients/'.$client.'/';
+    $storePrefix = rtrim($storeRoot, '/').'/'.$client.'/';
     $ownPrefix = $base.'/';
     if ($target[0] !== '/') $target = $ownPrefix.$target;
     if (strpos($target, $storePrefix) === 0) {
@@ -25,16 +30,18 @@ function pmssTorrentClientResolve(string $home, string $client): ?string
     } else return null;
     if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
         || $version === 'default' || !is_dir($target) || is_link($target)) return null;
+    if ($client === 'transmission' && !$store) return null;
     if ($store) {
-        $projection = '/var/lib/pmss/public/torrentClients.json';
-        $stat = @lstat($projection);
+        $stat = @lstat($projectionPath);
         if (!is_array($stat) || ($stat['mode'] & 0170000) !== 0100000) return null;
-        $raw = @file_get_contents($projection);
+        $raw = @file_get_contents($projectionPath);
         $data = is_string($raw) ? json_decode($raw, true) : null;
         $listed = false;
         foreach ((array) ($data['versions'] ?? []) as $entry) {
             if (($entry['client'] ?? null) === $client && ($entry['version'] ?? null) === $version
-                && ($entry['kind'] ?? null) !== 'system') { $listed = true; break; }
+                && ($entry['kind'] ?? null) !== 'system'
+                && ($client !== 'transmission' || (($entry['kind'] ?? null) === 'static'
+                    && ($entry['rpcUnixSocket'] ?? null) === true))) { $listed = true; break; }
         }
         if (!$listed) return null;
     }
@@ -65,6 +72,10 @@ function pmssTorrentClientResolverLaunch(string $home, string $client, bool $loc
 if (PHP_SAPI === 'cli' && isset($_SERVER['SCRIPT_FILENAME'])
     && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
     $home = getenv('HOME');
+    if (is_string($home) && ($argv[1] ?? '') === 'transmission' && ($argv[2] ?? '') === '--launch') {
+        require_once __DIR__.'/transmissionLaunch.php';
+        exit(pmssTransmissionLaunch($home) ? 0 : 1);
+    }
     exit(is_string($home) && ($argv[1] ?? '') === 'qbittorrent' && ($argv[2] ?? '') === '--launch'
         && pmssTorrentClientResolverLaunch($home, 'qbittorrent', ($argv[3] ?? '') === '--held') ? 0 : 1);
 }

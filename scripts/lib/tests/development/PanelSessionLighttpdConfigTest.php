@@ -13,8 +13,8 @@ class PanelSessionLighttpdConfigTest extends TestCase
     private function legacyRender(string $template, string $user = 'alice'): string
     {
         $config = str_replace(
-            ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##"],
-            [$user, 31234, 32345, 33456, \pmssWebdavWwwPolicyBlock($user)],
+            ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##"],
+            [$user, 31234, 32345, 33456, \pmssWebdavWwwPolicyBlock($user), ''],
             $template
         );
         $config = preg_replace(
@@ -23,20 +23,13 @@ class PanelSessionLighttpdConfigTest extends TestCase
             $config,
             1
         );
-
         return \pmssClampLighttpdBandwidthLimits(is_string($config) ? $config : $template);
     }
 
     private function render(string $template, array $panelSessionLogin = []): string
     {
         return \pmssLighttpdRenderUserConfig(
-            $template,
-            'alice',
-            31234,
-            32345,
-            33456,
-            $this->resources(),
-            $panelSessionLogin
+            $template, 'alice', 31234, 32345, 33456, $this->resources(), $panelSessionLogin
         );
     }
 
@@ -44,7 +37,6 @@ class PanelSessionLighttpdConfigTest extends TestCase
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
         $expected = $this->legacyRender($template);
-
         foreach ([[], ['enabled' => false, 'moduleLoadable' => true, 'gatePath' => '/tmp/unused.lua', 'gateExists' => true]] as $options) {
             $rendered = $this->render($template, $options);
             $this->assertSame($expected, $rendered, 'panelSessionLogin off must not change generated lighttpd config');
@@ -66,7 +58,6 @@ class PanelSessionLighttpdConfigTest extends TestCase
             'gatePath' => $gate,
             'gateExists' => true,
         ]);
-
         $this->assertStringContainsAndOmitsStrings(
             ['"/user-alice/"', '"/webdav-alice/"', '"method" => "basic"'],
             ['mod_magnet', 'magnet.attract-raw-url-to', 'auth.extern-authn'],
@@ -83,7 +74,6 @@ class PanelSessionLighttpdConfigTest extends TestCase
             'moduleLoadable' => true,
             'gatePath' => $missingGate,
         ]);
-
         $this->assertStringContainsAndOmitsStrings(
             ['"/user-alice/"', '"/webdav-alice/"', '"method" => "basic"'],
             ['mod_magnet', 'magnet.attract-raw-url-to', 'auth.extern-authn'],
@@ -101,7 +91,6 @@ class PanelSessionLighttpdConfigTest extends TestCase
             'gatePath' => $gate,
             'gateExists' => true,
         ]);
-
         $this->assertOrderedStrings(['"mod_magnet",', '"mod_auth",'], $rendered);
         $this->assertStringContainsAllStrings([
             '$HTTP["url"] =~ "^/user-alice($|/)"',
@@ -122,7 +111,6 @@ class PanelSessionLighttpdConfigTest extends TestCase
         $home = $this->pmssEnsureDir($root.'/alice');
         $this->pmssEnsureDir($home.'/.lighttpd');
         $module = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-panel-module-').'/mod_magnet.so', 'module');
-
         $this->assertTrue(\pmssLighttpdPanelSessionGateDeploy('alice', $home));
         $gatePath = $home.'/.lighttpd/panelSessionGate.lua';
         $this->assertSame($this->pmssReadRepoFile('scripts/lib/lighttpd/panelSessionGate.lua'), (string) file_get_contents($gatePath));
@@ -139,7 +127,6 @@ class PanelSessionLighttpdConfigTest extends TestCase
             $this->resources(),
             $options
         );
-
         $this->assertStringContainsString('magnet.attract-raw-url-to = ( "'.$gatePath.'" )', $rendered);
     }
 

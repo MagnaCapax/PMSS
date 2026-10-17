@@ -61,6 +61,6 @@ final class TorrentClientsCatalogTest extends TestCase
     public function testShippedSystemManifestLoads(): void
     {
         $path = dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json';
-        $this->assertSame(4, count(\pmssTorrentClientsCatalogLoad($path)));
+        $this->assertSame(3, count(\pmssTorrentClientsCatalogLoad($path)));
     }
 }

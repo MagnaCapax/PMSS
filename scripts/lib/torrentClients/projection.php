@@ -23,7 +23,7 @@ function pmssTorrentClientsProjectionWrite(
         $binary = $entry['kind'] === 'system' ? ($entry['binary'] ?? '')
             : $root.'/'.$client.'/'.$version.'/'.$binaryNames[$client];
         if (!is_string($binary) || !is_file($binary) || is_link($binary)) continue;
-        $versions[] = [
+        $published = [
             'client' => $client,
             'version' => $version,
             'kind' => $entry['kind'],
@@ -31,6 +31,11 @@ function pmssTorrentClientsProjectionWrite(
             'compatFamily' => $entry['compatFamily'] ?? '',
             'badges' => $entry['cve'] ?? [],
         ];
+        if ($client === 'transmission') {
+            if (($entry['rpcUnixSocket'] ?? null) !== true || $entry['kind'] !== 'static') continue;
+            $published['rpcUnixSocket'] = true;
+        }
+        $versions[] = $published;
     }
     if (!pmssPathSegmentsAreSafe($publicPath, false, true, true, false)) return false;
     $ownerUid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_geteuid() : 0;
