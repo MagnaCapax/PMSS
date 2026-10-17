@@ -85,6 +85,53 @@ final class OpenClawInstallerTest extends TestCase
         $this->assertSame('openclaw', end($args));
     }
 
+    public function testVirsilipasDecisionRequiresPrivateKeyHttpsAndFreshState(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-openclaw-key-');
+        $file = $home.'/.virsilipasKey';
+        $this->assertSame(null, \ocVirsilipasCredentials($home));
+        file_put_contents($file, "endpoint=https://virsilipas.mcx.fi/v1\nkey=\n");
+        chmod($file, 0600);
+        $this->assertSame(null, \ocVirsilipasCredentials($home));
+        file_put_contents($file, "endpoint=http://virsilipas.mcx.fi/v1\nkey=test-private-key\n");
+        $this->assertSame(null, \ocVirsilipasCredentials($home));
+        file_put_contents($file, "endpoint=https://virsilipas.mcx.fi/v1?x=1\nkey=test-private-key\n");
+        $this->assertSame(null, \ocVirsilipasCredentials($home));
+        file_put_contents($file, "endpoint=https://virsilipas.mcx.fi/v1\nkey=test-private-key\n");
+        $credentials = \ocVirsilipasCredentials($home);
+        $this->assertSame('test-private-key', $credentials['key']);
+        $state = $home.'/.openclaw';
+        $this->assertTrue(\ocUseVirsilipas($state, $credentials));
+        $this->assertFalse(\ocUseVirsilipas($state, null));
+        mkdir($state, 0700);
+        file_put_contents($state.'/openclaw.json', '{"models":{"providers":{"own":{"baseUrl":"https://own.example/v1"}}}}');
+        $this->assertFalse(\ocUseVirsilipas($state, $credentials));
+        chmod($file, 0644);
+        $this->assertSame(null, \ocVirsilipasCredentials($home));
+        unlink($file);
+        $outside = $this->pmssMakeTempFile('pmss-openclaw-key-outside-');
+        $this->pmssCreateSymlinkOrSkip($outside, $file);
+        $this->assertSame(null, \ocVirsilipasCredentials($home));
+    }
+
+    public function testVirsilipasOnboardingAndWrapperKeepKeyOutOfArgumentsAndFiles(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-openclaw-args-');
+        $credentials = array('endpoint' => 'https://virsilipas.mcx.fi/v1', 'key' => 'test-private-key');
+        $default = \ocOnboardArgs(23000, null);
+        $this->assertSame('skip', $default[array_search('--auth-choice', $default, true) + 1]);
+        $args = \ocOnboardArgs(23000, $credentials);
+        $this->assertSame('custom-api-key', $args[array_search('--auth-choice', $args, true) + 1]);
+        $this->assertSame('ref', $args[array_search('--secret-input-mode', $args, true) + 1]);
+        $this->assertSame('default', $args[array_search('--custom-model-id', $args, true) + 1]);
+        $this->assertSame('openai', $args[array_search('--custom-compatibility', $args, true) + 1]);
+        $this->assertFalse(in_array('--custom-api-key', $args, true));
+        $this->assertSame(false, strpos(implode(' ', $args), $credentials['key']));
+        $wrapper = \ocCliWrapper(array('node' => $home.'/node/bin/node', 'entry' => $home.'/openclaw.mjs'));
+        $this->assertSame(false, strpos($wrapper, $credentials['key']));
+        $this->assertTrue(strpos($wrapper, 'ocVirsilipasCredentials') !== false);
+    }
+
     public function testCronMergeMigratesLegacyMarkedLine(): void
     {
         $legacy = "@reboot php \$HOME/install-openclaw.php check # pmss-openclaw\n";
@@ -129,7 +176,7 @@ final class OpenClawInstallerTest extends TestCase
     public function testGatewayTokenIsPrivateAndReused(): void
     {
         $root = $this->pmssMakeTempDir('pmss-openclaw-token-');
-        $paths = array('env' => $root.'/gateway.env', 'node' => $root.'/node');
+        $paths = array('home' => $root, 'state' => $root, 'env' => $root.'/gateway.env', 'node' => $root.'/node');
         \ocEnsureToken($paths);
         $first = file_get_contents($paths['env']);
         $this->assertSame(0600, fileperms($paths['env']) & 0777);
@@ -146,6 +193,35 @@ final class OpenClawInstallerTest extends TestCase
         $env = \ocGatewayEnv($paths);
         $this->assertSame($root.'/npm-cache', $env['npm_config_cache']);
         $this->assertSame($root.'/node/bin', explode(':', $env['PATH'])[0]);
+    }
+
+    public function testGatewayReadsRotatedVirsilipasKeyWithoutWritingItToTokenFile(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-openclaw-rotation-');
+        mkdir($home.'/.openclaw', 0700);
+        $paths = array('home' => $home, 'env' => $home.'/.openclaw/gateway.env',
+            'node' => $home.'/node/bin/node', 'state' => $home.'/.openclaw');
+        \ocEnsureToken($paths);
+        file_put_contents($paths['state'].'/pmss-virsilipas', "virsilipas\n");
+        $keyFile = $home.'/.virsilipasKey';
+        file_put_contents($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=first-private-key\n");
+        chmod($keyFile, 0600);
+        $prior = getenv('CUSTOM_API_KEY');
+        putenv('CUSTOM_API_KEY');
+        try {
+            $this->assertSame('first-private-key', \ocGatewayEnv($paths)['CUSTOM_API_KEY']);
+            file_put_contents($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=second-private-key\n");
+            $this->assertSame('second-private-key', \ocGatewayEnv($paths)['CUSTOM_API_KEY']);
+            $this->assertSame(false, strpos(file_get_contents($paths['env']), 'private-key'));
+            unlink($paths['state'].'/pmss-virsilipas');
+            $this->assertFalse(isset(\ocGatewayEnv($paths)['CUSTOM_API_KEY']));
+        } finally {
+            if ($prior === false) {
+                putenv('CUSTOM_API_KEY');
+            } else {
+                putenv('CUSTOM_API_KEY='.$prior);
+            }
+        }
     }
 
     public function testPortCatalogAdoptsGatewayPortAndRejectsInvalidContent(): void

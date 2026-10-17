@@ -20,11 +20,14 @@ install-openclaw status
 The installer asks for confirmation (`--yes` skips the prompt). It installs
 Node v24.21.0 and OpenClaw in your home, verifies the Node archive against
 the pinned SHA256, configures a token-authenticated loopback gateway, and
-adds two marked jobs to your own crontab. It skips channel and model-provider
-setup. Configure your provider credentials with `~/bin/openclaw configure`
-and add a channel only after restricting the bot to your own account. No
-provider key is supplied by PMSS. Never paste a key into a shell command
-that will be saved in shell history.
+adds two marked jobs to your own crontab. It skips channel setup. On a fresh
+install, a nonempty key in your account-owned, mode-0600 `~/.virsilipasKey`
+with an HTTPS `endpoint=` selects Pulsed Media AI credits and model `default`.
+The key is read from that file when the gateway or CLI starts; it is not copied
+into OpenClaw configuration. An existing OpenClaw configuration is preserved.
+Without a valid key, configure a provider with `~/bin/openclaw configure`.
+Add a channel only after restricting the bot to your own account. Never paste
+a key into a shell command that will be saved in shell history.
 
 To reach the gateway from your computer, read the port in
 `~/.openclaw/gateway.port` and open an SSH tunnel:
@@ -48,6 +51,9 @@ install scripts outside the allowlist, so the installer permits the required
 OpenClaw onboarding uses non-interactive local mode, skips the daemon and
 channels, binds loopback, and stores a reference to
 `OPENCLAW_GATEWAY_TOKEN` in the private gateway environment file.
+The fresh Virsilipas setup uses a reference to `CUSTOM_API_KEY`; the installer
+reads the current value from `~/.virsilipasKey` into the process environment
+at startup.
 
 Useful commands:
 

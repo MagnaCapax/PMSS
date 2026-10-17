@@ -57,6 +57,9 @@ launcher adds no listener, port, web endpoint, or broader file permissions.
 Its binary and launcher are root-owned, with 0755 and 0644 modes respectively;
 the stub is root-owned 0755. On an unexpected read or parse failure, it runs
 the pinned binary without injected settings. Account settings remain intact.
+The per-user OpenClaw installer follows the same default on a fresh install:
+it uses a runtime environment reference to the account's `~/.virsilipasKey`
+and preserves an existing OpenClaw provider choice.
 
 The published CLI advisory GHSA-w5fx-fh39-j5rw describes a sandbox path
 bypass in releases through 0.38.0; the current pin is

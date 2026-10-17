@@ -971,6 +971,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Startup: install and manual start wait up to 120 seconds for the loopback listener; the cron check waits up to 5 seconds. A live process at the deadline is reported as still starting, and status shows listener state.
   - Lifecycle: install or successful manual start writes two marked jobs using `$HOME/bin/install-openclaw` in the account's own crontab; check stops retrying after five consecutive failed starts until manual start.
   - Authentication: a private gateway environment file supplies a token, and the gateway binds loopback only.
+  - Model default: only a fresh install with a private, account-owned `~/.virsilipasKey` and a nonempty key plus HTTPS endpoint onboards the `virsilipas/default` OpenAI-compatible provider. OpenClaw stores an environment secret reference, and the gateway reads the current key from that file at startup; an existing account configuration or missing/invalid key keeps skipped provider onboarding.
 
 - etc/skel/bin/install-pikkumies.sh
   - Scope: command run by the account owner, or queued by `addUser.php` as the new user (in the user's slice, with `PIKKUMIES_SKIP_HERMES=1`) when the account has at least 1000 MiB RAM (ADR 0090); no root, port, service, or PMSS-managed cron.

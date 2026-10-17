@@ -40,6 +40,57 @@ function ocNpmInstallArgs(array $paths): array
     );
 }
 
+/** Read only an account-owned, private service key and the Codex-approved HTTPS endpoint. */
+function ocVirsilipasCredentials(string $home): ?array
+{
+    $file = $home.'/.virsilipasKey';
+    if (!is_file($file) || is_link($file) || fileowner($file) !== posix_geteuid()
+        || (fileperms($file) & 0077) !== 0) {
+        return null;
+    }
+    $size = @filesize($file);
+    if (!is_int($size) || $size > 4096) {
+        return null;
+    }
+    $contents = @file_get_contents($file);
+    $settings = is_string($contents) ? @parse_ini_string($contents, false, INI_SCANNER_RAW) : false;
+    $key = is_array($settings) ? ($settings['key'] ?? '') : '';
+    $endpoint = is_array($settings) ? ($settings['endpoint'] ?? '') : '';
+    if (!is_string($key) || $key === '' || preg_match('/[\s\p{Z}\p{C}]/u', $key) !== 0
+        || !is_string($endpoint)
+        || !preg_match('#^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$#D', $endpoint)) {
+        return null;
+    }
+    return array('key' => $key, 'endpoint' => $endpoint);
+}
+
+/** A prior OpenClaw state directory is an account choice, even if its config is incomplete. */
+function ocUseVirsilipas(string $state, ?array $credentials): bool
+{
+    return !file_exists($state) && !is_link($state) && $credentials !== null;
+}
+
+/** Build non-interactive onboarding without putting either secret in argv. */
+function ocOnboardArgs(int $port, ?array $credentials): array
+{
+    $flags = array('onboard', '--non-interactive', '--accept-risk', '--mode', 'local', '--auth-choice', $credentials === null ? 'skip' : 'custom-api-key', '--gateway-auth', 'token', '--gateway-token-ref-env', 'OPENCLAW_GATEWAY_TOKEN', '--gateway-bind', 'loopback', '--gateway-port', (string) $port, '--skip-daemon', '--skip-channels', '--skip-skills', '--skip-health', '--skip-ui', '--suppress-gateway-token-output');
+    if ($credentials !== null) {
+        array_push($flags, '--custom-base-url', $credentials['endpoint'], '--custom-model-id', 'default', '--custom-provider-id', 'virsilipas', '--custom-compatibility', 'openai', '--secret-input-mode', 'ref');
+    }
+    return $flags;
+}
+
+/** The interactive CLI obtains the current key only when the PMSS provider was installed. */
+function ocCliWrapper(array $paths): string
+{
+    return "#!/bin/sh\nPATH=".escapeshellarg(dirname($paths['node'])).":\$PATH\nexport PATH\n"
+        ."if [ -z \"\${CUSTOM_API_KEY+x}\" ] && [ -f \"\$HOME/.openclaw/pmss-virsilipas\" ]; then\n"
+        ."  # The PHP expression is intentionally single-quoted for the shell.\n  # shellcheck disable=SC2016\n"
+        ."  CUSTOM_API_KEY=\$(php -r 'ob_start(); require getenv(\"HOME\").\"/bin/install-openclaw\"; ob_end_clean(); \$c=ocVirsilipasCredentials(getenv(\"HOME\")); if (\$c !== null) echo \$c[\"key\"];')\n"
+        ."  [ -z \"\$CUSTOM_API_KEY\" ] || export CUSTOM_API_KEY\nfi\nexec "
+        .escapeshellarg($paths['node']).' '.escapeshellarg($paths['entry'])." \"\$@\"\n";
+}
+
 /** Return the first-line PMSS port only if it has the media-stack marker shape. */
 function ocReservedPort(string $path): ?int
 {
@@ -166,6 +217,14 @@ function ocGatewayEnv(array $paths): array
     }
     $env = getenv();
     $env['OPENCLAW_GATEWAY_TOKEN'] = $match[1];
+    $marker = isset($paths['state']) ? $paths['state'].'/pmss-virsilipas' : null;
+    if ($marker !== null && isset($paths['home']) && is_file($marker) && !is_link($marker)
+        && !isset($env['CUSTOM_API_KEY'])) {
+        $credentials = ocVirsilipasCredentials($paths['home']);
+        if ($credentials !== null) {
+            $env['CUSTOM_API_KEY'] = $credentials['key'];
+        }
+    }
     $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
     // The gateway runs npm itself (global root/prefix lookups, plugins); keep that under ~/.openclaw so --purge removes it.
     $env['npm_config_cache'] = $paths['state'].'/npm-cache';
@@ -424,6 +483,8 @@ function ocMain(array $args): int
         if ($files !== null && $files['used'] > $files['soft'] - OC_REQUIRED_FILES) {
             throw new RuntimeException('OpenClaw needs '.OC_REQUIRED_FILES.' files; '.$files['used'].' files are currently used and the account file limit is '.$files['soft'].'. Installing would exceed the account file-count quota.');
         }
+        $credentials = ocVirsilipasCredentials($paths['home']);
+        $useVirsilipas = ocUseVirsilipas($paths['state'], $credentials);
         ocInstallNode($paths);
         $env = getenv();
         $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
@@ -449,13 +510,29 @@ function ocMain(array $args): int
                 throw new RuntimeException('Installed OpenClaw onboarding lacks '.$flag);
             }
         }
-        $flags = array('onboard', '--non-interactive', '--accept-risk', '--mode', 'local', '--auth-choice', 'skip', '--gateway-auth', 'token', '--gateway-token-ref-env', 'OPENCLAW_GATEWAY_TOKEN', '--gateway-bind', 'loopback', '--gateway-port', (string) $port, '--skip-daemon', '--skip-channels', '--skip-skills', '--skip-health', '--skip-ui', '--suppress-gateway-token-output');
+        if ($useVirsilipas) {
+            // A release without the custom-provider flags keeps the skipped-provider install.
+            foreach (array('--custom-base-url', '--custom-model-id', '--custom-provider-id', '--custom-compatibility', '--secret-input-mode') as $flag) {
+                if (strpos($help, $flag) === false) {
+                    $useVirsilipas = false;
+                }
+            }
+        }
+        if ($useVirsilipas) {
+            $env['CUSTOM_API_KEY'] = $credentials['key'];
+        }
+        $flags = ocOnboardArgs($port, $useVirsilipas ? $credentials : null);
         list($rc, $output) = ocCli($paths, $flags, $env);
         if ($rc !== 0) {
             throw new RuntimeException('Onboarding failed; see OpenClaw diagnostics.');
         }
-        $wrapper = "#!/bin/sh\nPATH=".escapeshellarg(dirname($paths['node'])).":\$PATH\nexport PATH\nexec "
-            .escapeshellarg($paths['node']).' '.escapeshellarg($paths['entry'])." \"\$@\"\n";
+        if ($useVirsilipas) {
+            $marker = $paths['state'].'/pmss-virsilipas';
+            if (file_put_contents($marker, "virsilipas\n") !== strlen("virsilipas\n") || !chmod($marker, 0600)) {
+                throw new RuntimeException('Could not mark the Virsilipas runtime configuration');
+            }
+        }
+        $wrapper = ocCliWrapper($paths);
         if (!is_dir($paths['home'].'/bin')) {
             mkdir($paths['home'].'/bin', 0750);
         }
@@ -466,7 +543,11 @@ function ocMain(array $args): int
         if (!ocStart($paths, true, 120)) {
             throw new RuntimeException('Gateway did not stay running; inspect ~/.openclaw/logs/gateway.log');
         }
-        echo "Installed on loopback port {$port}. Configure your model provider with: ~/bin/openclaw configure\n";
+        if ($useVirsilipas) {
+            echo "Installed on loopback port {$port}. OpenClaw is set to use your Pulsed Media AI credits; change it with: ~/bin/openclaw configure\n";
+        } else {
+            echo "Installed on loopback port {$port}. Configure your model provider with: ~/bin/openclaw configure\n";
+        }
         return 0;
     }
     if ($command === 'uninstall') {
