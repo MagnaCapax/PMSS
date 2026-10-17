@@ -63,7 +63,7 @@ function pmssLighttpdDelugeWebPortFromConfig(string $user, string $path): ?int
     if ($needsWrite) {
         pmssDelugeNormalizeEmptySessionsObject($parsed['config']);
         if (pmssDelugeWriteWebConf($path, $parsed['meta'], $parsed['config'], $user)) {
-            passthru('killall -u '.escapeshellarg($user).' -TERM deluge-web 2>/dev/null || true');
+            pmssTorrentClientNativeStop($user, 'deluge', 15, ['processName' => 'deluge-web']);
         }
     }
 

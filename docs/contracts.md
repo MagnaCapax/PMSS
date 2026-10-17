@@ -1075,6 +1075,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - The web install launcher closes its standard streams before returning the POST response; its PID file records the installer process used by status polling.
 - All state-changing customer endpoints require POST with `X-Requested-With: XMLHttpRequest`. A GET action returns HTTP 405. qBittorrent retains the HTTP 428 password-sync challenge.
 - Media app stop writes `~/.<app>Disable`; start removes it; restart preserves it. The observe-only watchdog publishes `off` with zero failures for marked apps, and bulk recovery skips them. Native frontend stops signal only account-owned processes in the panel's mount namespace whose executable resolves to the app's native binary allowlist; Deluge's Python entry points also require an exact interpreter and script match.
+- Root-side Deluge Web configuration and port changes use the shared native stop predicate for system and account-selected entry points. A Deluge Web process outside those install paths is left running.
 - slskd and Copyparty start only after account-UID PHP writes a mode-0600 config and separate random service login, followed by a secured marker. Their port-manager-assigned listeners bind to loopback and retain `/user-<name>/<app>/` through the lighttpd proxy. Root stores crash counts outside home: five consecutive starts missing at the next watchdog run yield `gave up`; restart clears that gate. The Apps row reads owner-only login and account-written `running`, `stopped`, `not secured`, or `gave up` state.
 
 ---

@@ -85,7 +85,7 @@ function pmssDelugePortEnsure(string $user, string $home): bool
         return true;
     }
 
-    @shell_exec(sprintf('killall -u %s -9 %s 2>/dev/null', escapeshellarg($user), escapeshellarg('deluge-web')));
+    pmssTorrentClientNativeStop($user, 'deluge', 9, ['processName' => 'deluge-web']);
     $parsed['config']['port'] = $expectedPort;
     pmssDelugeNormalizeEmptySessionsObject($parsed['config']);
     return pmssDelugeWriteWebConf($home.'/.config/deluge/web.conf', $parsed['meta'], $parsed['config'], $user);

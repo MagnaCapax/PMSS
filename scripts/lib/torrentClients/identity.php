@@ -93,7 +93,8 @@ function pmssTorrentClientNativeStopPids(string $user, string $client, array $op
         if ($client === 'deluge' && preg_match('/\Apython(?:3(?:\.[0-9]+)?)?\z/', basename($exe)) === 1) {
             $script = pmssTorrentClientDelugeScriptPath($pid, $processName, $read);
             if ($script === '' || (isset($ops['scriptPath']) && $script !== $ops['scriptPath'])) continue;
-            foreach ($accountRoots as $root) {
+            // The same roots admit system scripts; storeOnly retains store roots only.
+            foreach ($roots as $root) {
                 if (pmssRootGuardPathMatchesRoot($script, $root)) { $native[] = $pid; break; }
             }
             continue;

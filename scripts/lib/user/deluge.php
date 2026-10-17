@@ -202,10 +202,7 @@ function userConfigureDeluge(array $user, array $configuration): void
     // If the web config changed, restart deluge-web so base/port changes take effect.
     // Cron (checkDelugeInstances.php) will start it again when Deluge is enabled.
     if ($webConfChanged && file_exists("$home/.delugeEnable")) {
-        runStep('Restarting Deluge Web UI (config changed)', sprintf(
-            'killall -u %s -TERM deluge-web 2>/dev/null || true',
-            escapeshellarg($username)
-        ));
+        pmssTorrentClientNativeStop($username, 'deluge', 15, ['processName' => 'deluge-web']);
     }
 }
 

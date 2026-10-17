@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/integerSetting.php';
+require_once __DIR__.'/../torrentClients/identity.php';
 
 /**
  * Resolve the canonical Deluge core.conf path for a user.
@@ -245,10 +246,7 @@ function pmssDelugeRestartWebIfEnabled(string $username): void
         return;
     }
 
-    runStep('Restarting Deluge Web UI (hostlist auth changed)', sprintf(
-        'killall -u %s -TERM deluge-web 2>/dev/null || true',
-        escapeshellarg($username)
-    ));
+    pmssTorrentClientNativeStop($username, 'deluge', 15, ['processName' => 'deluge-web']);
 }
 
 /**
