@@ -20,7 +20,7 @@ if (!function_exists('pmssFormatBytes')) {
   }
 
   $formatted = number_format($bytes, (int) $precision, '.', '');
-  if ($trimTrailingZeros) {
+  if ($trimTrailingZeros && strpos($formatted, '.') !== false) {
    $formatted = rtrim(rtrim($formatted, '0'), '.');
   }
 

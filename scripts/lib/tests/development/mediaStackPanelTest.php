@@ -23,6 +23,22 @@ class MediaStackPanelTest extends TestCase
         return \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
     }
 
+    public function testFormatBytesPreservesWholeNumbersAndTrimsFractions(): void
+    {
+        $cases = [
+            [1000 * 1024 * 1024, 0, '1000 MiB'],
+            [250 * 1024 * 1024, 0, '250 MiB'],
+            [100 * 1024 * 1024, 0, '100 MiB'],
+            [0, 0, '0 MiB'],
+            [12.5 * 1024 * 1024, 2, '12.5 MiB'],
+            [12 * 1024 * 1024, 2, '12 MiB'],
+        ];
+        $script = '$output = array(); foreach ('.var_export($cases, true).' as $case) {'
+            .' $output[] = pmssFormatBytes($case[0], $case[1], 2, true); } echo json_encode($output);';
+        $actual = $this->pmssRunRepoInlinePhpRequireJson('etc/skel/www/scriptsIncFormat.php', $script);
+        $this->assertSame(array_column($cases, 2), $actual);
+    }
+
     public function testEndpointRequiresCustomerTreeHelper(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/mediaStack.php', [
