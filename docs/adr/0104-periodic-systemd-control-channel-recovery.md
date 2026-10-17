@@ -1,7 +1,7 @@
 # ADR 0104: Periodic systemd control-channel recovery
 
 Date: 2026-10-17
-Category: reliability
+Category: architecture
 
 ## Status
 Accepted
