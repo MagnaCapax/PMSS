@@ -11,7 +11,7 @@ function pmssTorrentClientsDelugeVenvCompatible(array $entry): bool
     if (($entry['compatWindow'] ?? '') !== 'bullseye-cp37-310') return true;
     if ((pmssDetectDistro()['version'] ?? 0) !== 11) return false;
     $python = pmssCommandPath('python3');
-    $version = $python === '' ? '' : (string) @shell_exec(escapeshellarg($python).' --version 2>&1');
+    $version = $python === '' ? '' : pmssCommandCapture(escapeshellarg($python).' --version 2>&1', 10)['stdout'];
     return preg_match('/\APython 3\.(?:7|8|9|10)(?:\.|\s|\z)/', $version) === 1;
 }
 
