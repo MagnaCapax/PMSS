@@ -893,7 +893,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Runs outside the panel request path and checks non-empty
     `www/index.php` and `www/rutorrent/index.html` sentinels. When either
     sentinel fails, it invokes the shared per-user web-root reconciler before
-    retaining the existing core-file and directory repairs.
+    retaining the existing core-file and directory repairs. Managed panel
+    files with content differing from the skeleton are restored, even when
+    the existing copy is larger; a missing skeleton leaves a non-empty copy intact.
   - Safety: Revalidates user paths and skeleton sources, and replaces repaired
     files atomically so a failed write does not truncate the prior copy; the
     shared reconciler keeps its per-user lock and symlink/path-safety guards.

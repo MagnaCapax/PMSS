@@ -385,13 +385,13 @@ PHP;
         $this->assertSame($sourceContent, file_get_contents($targetFile));
     }
 
-    public function testRestoreUserFileKeepsLargerExistingPanelFile(): void
+    public function testRestoreUserFileReplacesLargerDivergentPanelFile(): void
     {
         $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
         $sourceFile = $this->tempDir.'/skel/scriptsInc.php';
         $targetFile = $homeDir.'/www/scriptsInc.php';
         $sourceContent = "<?php echo 'source';\n";
-        $targetContent = $sourceContent."// local trailing content\n";
+        $targetContent = "<?php function oldPanelHelper() { echo 'incomplete";
         $this->pmssWriteFile($sourceFile, $sourceContent);
         $this->pmssWriteFile($targetFile, $targetContent);
         $messages = [];
@@ -404,8 +404,57 @@ PHP;
             $this->pmssMakeArrayLogger($messages),
             $homeDir
         ));
-        $this->assertEquals($targetContent, file_get_contents($targetFile));
+        $this->assertSame($sourceContent, file_get_contents($targetFile));
+        $this->pmssAssertMessagesContain($messages, 'Restoring scriptsInc.php');
+    }
+
+    public function testRestoreUserFileReplacesSameSizeCorruption(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $sourceFile = $this->tempDir.'/skel/scriptsInc.php';
+        $targetFile = $homeDir.'/www/scriptsInc.php';
+        $sourceContent = "<?php echo 'source';\n";
+        $this->pmssWriteFile($sourceFile, $sourceContent);
+        $this->pmssWriteFile($targetFile, str_replace('source', 'broken', $sourceContent));
+        $messages = [];
+
+        $this->assertTrue(\pmssCheckGuiRestoreUserFile(
+            $targetFile, $sourceFile, $this->pmssCurrentOwner(), 'scriptsInc.php',
+            $this->pmssMakeArrayLogger($messages), $homeDir
+        ));
+        $this->assertSame($sourceContent, file_get_contents($targetFile));
+    }
+
+    public function testRestoreUserFileKeepsMatchingPanelFile(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $sourceFile = $this->tempDir.'/skel/scriptsInc.php';
+        $targetFile = $homeDir.'/www/scriptsInc.php';
+        $sourceContent = "<?php echo 'source';\n";
+        $this->pmssWriteFile($sourceFile, $sourceContent);
+        $this->pmssWriteFile($targetFile, $sourceContent);
+        $messages = [];
+
+        $this->assertTrue(\pmssCheckGuiRestoreUserFile(
+            $targetFile, $sourceFile, $this->pmssCurrentOwner(), 'scriptsInc.php',
+            $this->pmssMakeArrayLogger($messages), $homeDir
+        ));
         $this->assertFalse($this->pmssMessagesContain($messages, 'Restoring scriptsInc.php'));
+    }
+
+    public function testRestoreUserFileKeepsExistingFileWithoutSkeleton(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $targetFile = $homeDir.'/www/scriptsInc.php';
+        $content = "<?php echo 'existing';\n";
+        $this->pmssWriteFile($targetFile, $content);
+        $messages = [];
+
+        $this->assertTrue(\pmssCheckGuiRestoreUserFile(
+            $targetFile, $this->tempDir.'/skel/missing.php', $this->pmssCurrentOwner(),
+            'scriptsInc.php', $this->pmssMakeArrayLogger($messages), $homeDir
+        ));
+        $this->assertSame($content, file_get_contents($targetFile));
     }
 
     public function testRestoreUserIndexRejectsSymlinkTarget(): void

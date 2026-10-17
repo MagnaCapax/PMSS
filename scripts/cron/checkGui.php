@@ -5,8 +5,8 @@
  *
  * Preconditions:
  *   - User homes live under `/home/<user>` with `www/` mirroring the skeleton.
- *   - Healthy managed panel files are present and at least as large as their
- *     skeleton sources; missing, empty, or undersized files are restored.
+ *   - Healthy managed panel files match their skeleton sources; missing or
+ *     divergent files are restored.
  *
  * Future enhancements may add HTTP responsiveness probes; keep the watchdog
  * lightweight and idempotent so it can run every few minutes without churn.
@@ -150,7 +150,7 @@ function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string
 }
 
 /**
- * Restore a managed user panel file when it is missing, empty, or undersized.
+ * Restore a managed user panel file when it is missing or differs from the skeleton.
  */
 function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, string $user, string $label, callable $log, string $homeDir = ''): bool
 {
@@ -162,9 +162,17 @@ function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, str
 
     $targetSize = @filesize($targetFile);
     $sourceSize = @filesize($sourceFile);
-    if (is_file($targetFile) && is_int($targetSize) && $targetSize > 0
-        && (!is_int($sourceSize) || $targetSize >= $sourceSize)) {
-        return true;
+    if (is_file($targetFile) && is_int($targetSize) && $targetSize > 0) {
+        // Preserve an existing panel file when the skeleton is temporarily unavailable.
+        if (!is_int($sourceSize) || $sourceSize <= 0) {
+            return true;
+        }
+        if (pmssPathTargetIsSafe($sourceFile, false, true) && pmssRegularFilePathIsReadable($sourceFile)) {
+            $targetHash = @sha1_file($targetFile);
+            if ($targetHash !== false && $targetHash === @sha1_file($sourceFile)) {
+                return true;
+            }
+        }
     }
 
     if (file_exists($targetFile) && !is_file($targetFile)) {
