@@ -5,7 +5,7 @@ Category: architecture
 
 ## Status
 
-Accepted, on hold (2026-10-08): not shipped to accounts until the LLM proxy per-user keys and accounting are ready. The installer from 88edd1a7 was taken out of `etc/skel` and the update file list; restoring it is a revert of the hold commit.
+Accepted
 
 ## Context
 
@@ -32,12 +32,13 @@ adds no root service, port, or cron logic. Pikkumies manages one daily
 `pikkumies update` line tagged `# pikkumies-update` in the account's crontab
 and preserves other entries.
 
-The wrapper creates `~/.pikkumiesKey` only when absent, with Pulsed Media's
-endpoint in `endpoint=` and an empty `key=`. The endpoint answers only with a
-per-user key; this file is the channel a platform later uses to provide one.
+The wrapper creates `~/.virsilipasKey` only when absent (and not a link), with
+Pulsed Media's endpoint in `endpoint=` and an empty `key=`. The endpoint answers
+only with a per-user key; the account owner pastes the key shown in the client
+area, or the platform's key distribution fills the same file. Pikkumies reads
+`~/.pikkumiesKey` first (a provider of the user's own), then `~/.virsilipasKey`.
 Pikkumies owns the `~/pikkumies` symlink. PMSS does not edit tracked files in
-`~/.mcxPikkumies`; local settings belong in `~/.pikkumiesKey` or
-`~/pikkumies/local/`.
+`~/.mcxPikkumies`; local settings belong in `~/pikkumies/local/`.
 
 ## Security review
 
@@ -55,3 +56,17 @@ checksum-verified standalone Python into the account on x86_64, about 75 MB
 download and 257 MB on disk in the user's own quota (Pikkumies ADR-0014).
 Updates come daily from the MagnaCapax GitHub
 organisation, the same trust `update.php` already places in it.
+
+## Amendment 2026-10-17: launched, key file ~/.virsilipasKey
+
+The hold of 2026-10-08 is lifted: the LLM proxy's per-user keys and accounting
+are live (keys for every active client, opening and per-invoice grants), and the
+operator directed distribution on 2026-10-17 ("just start it and distribute the
+installation"). The operator also named the key file the same day: "virsilipas
+key should be naturally named as virsilipas or virsilipasKEy not pikkumiesKey",
+so the wrapper now creates `~/.virsilipasKey` instead of `~/.pikkumiesKey`.
+Pikkumies (from mcxPikkumies 11a6234) reads it after `~/.pikkumiesKey`, takes
+endpoint and key from the same file, ignores a key file that is a link, and
+refuses to build its agent runtime when the account's file quota cannot hold it
+(about 65,000 files and 2.5 GiB; measured 60,572 files and 2.0 GB on a PMSS
+account), so a small account gets a clear message instead of a half-built tree.
