@@ -40,13 +40,41 @@ function pmssTorrentClientResolve(
         foreach ((array) ($data['versions'] ?? []) as $entry) {
             if (($entry['client'] ?? null) === $client && ($entry['version'] ?? null) === $version
                 && ($entry['kind'] ?? null) !== 'system'
+                && ($client !== 'deluge' || ($entry['kind'] ?? null) === 'venv')
                 && ($client !== 'transmission' || (($entry['kind'] ?? null) === 'static'
                     && ($entry['rpcUnixSocket'] ?? null) === true))) { $listed = true; break; }
         }
         if (!$listed) return null;
     }
-    $binary = $target.'/'.$names[$client];
+    $binary = $target.($client === 'deluge' && $store ? '/bin/' : '/').$names[$client];
     return is_file($binary) && !is_link($binary) ? $binary : null;
+}
+
+/** Run both selected Deluge entrypoints from the same published venv. */
+function pmssTorrentClientDelugeLaunch(
+    string $home,
+    string $projectionPath = '/var/lib/pmss/public/torrentClients.json',
+    string $storeRoot = '/home/.pmss/clients',
+    ?callable $run = null,
+    string $component = 'both'
+): bool
+{
+    if (!in_array($component, ['both', 'deluged', 'deluge-web'], true)) return false;
+    if (!is_link($home.'/bin/deluge/default')) return false;
+    $daemon = pmssTorrentClientResolve($home, 'deluge', $projectionPath, $storeRoot);
+    if ($daemon === null || strpos($daemon, '/bin/deluged') !== strlen($daemon) - strlen('/bin/deluged')) return false;
+    $web = dirname($daemon).'/deluge-web';
+    if (!is_file($web) || is_link($web)) return false;
+    $run = $run ?? static function (string $command): int {
+        $rc = 1;
+        @exec($command.' >/dev/null 2>&1', $unused, $rc);
+        return $rc;
+    };
+    $rcDaemon = $component === 'deluge-web' ? 0
+        : $run(escapeshellarg($daemon).' -l '.escapeshellarg($home.'/.delugeLog').' -L info');
+    $rcWeb = $component === 'deluged' ? 0
+        : $run(escapeshellarg($web).' -l '.escapeshellarg($home.'/.delugeWebLog').' -L info');
+    return $rcDaemon === 0 && $rcWeb === 0;
 }
 
 /** Preserve the system rTorrent command unless a published store build is selected. */
@@ -88,6 +116,10 @@ if (PHP_SAPI === 'cli' && isset($_SERVER['SCRIPT_FILENAME'])
     if (is_string($home) && ($argv[1] ?? '') === 'transmission' && ($argv[2] ?? '') === '--launch') {
         require_once __DIR__.'/transmissionLaunch.php';
         exit(pmssTransmissionLaunch($home) ? 0 : 1);
+    }
+    if (is_string($home) && ($argv[1] ?? '') === 'deluge' && ($argv[2] ?? '') === '--launch') {
+        exit(pmssTorrentClientDelugeLaunch($home, '/var/lib/pmss/public/torrentClients.json',
+            '/home/.pmss/clients', null, $argv[3] ?? 'both') ? 0 : 1);
     }
     exit(is_string($home) && ($argv[1] ?? '') === 'qbittorrent' && ($argv[2] ?? '') === '--launch'
         && pmssTorrentClientResolverLaunch($home, 'qbittorrent', ($argv[3] ?? '') === '--held') ? 0 : 1);

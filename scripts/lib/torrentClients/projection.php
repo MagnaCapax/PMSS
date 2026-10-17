@@ -21,8 +21,11 @@ function pmssTorrentClientsProjectionWrite(
         $client = $entry['client'];
         $version = $entry['version'];
         $binary = $entry['kind'] === 'system' ? ($entry['binary'] ?? '')
-            : $root.'/'.$client.'/'.$version.'/'.$binaryNames[$client];
+            : $root.'/'.$client.'/'.$version
+                .($client === 'deluge' && $entry['kind'] === 'venv' ? '/bin/' : '/').$binaryNames[$client];
         if (!is_string($binary) || !is_file($binary) || is_link($binary)) continue;
+        if ($client === 'deluge' && $entry['kind'] === 'venv'
+            && (!is_file(dirname($binary).'/deluge-web') || is_link(dirname($binary).'/deluge-web'))) continue;
         $published = [
             'client' => $client,
             'version' => $version,

@@ -47,6 +47,23 @@ function pmssTorrentClientsCatalogLoad(string $path): array
                 || ($entry['url'] ?? null) !== [] || ($entry['sha256'] ?? null) !== '') return [];
             continue;
         }
+        // A Deluge store version is assembled only from locally mirrored, pinned wheels.
+        if ($client === 'deluge') {
+            if ($kind !== 'venv' || ($entry['url'] ?? null) !== [] || ($entry['sha256'] ?? null) !== ''
+                || !is_array($entry['wheels'] ?? null) || $entry['wheels'] === []
+                || array_values($entry['wheels']) !== $entry['wheels']
+                || !in_array($entry['compatWindow'] ?? '', ['', 'bullseye-cp37-310'], true)) return [];
+            $wheelNames = [];
+            foreach ($entry['wheels'] as $wheel) {
+                if (!is_array($wheel) || !is_string($wheel['file'] ?? null)
+                    || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\.whl\z/', $wheel['file']) !== 1
+                    || !is_string($wheel['sha256'] ?? null)
+                    || preg_match('/\A[a-fA-F0-9]{64}\z/', $wheel['sha256']) !== 1
+                    || isset($wheelNames[$wheel['file']])) return [];
+                $wheelNames[$wheel['file']] = true;
+            }
+            continue;
+        }
         if (!is_array($entry['url'] ?? null) || $entry['url'] === []
             || array_values($entry['url']) !== $entry['url']
             || !is_string($entry['sha256'] ?? null)

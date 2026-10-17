@@ -244,6 +244,10 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    loads no store code and changes no downloads, links, or public projection.
    With the marker, account version links and the public projection are prepared;
    a customer default link is created only by the Configure switch (ADR 0106).
+   Deluge catalog venv rows, when later supplied, use pinned wheels from the
+   root-owned store mirror and publish both daemon scripts (ADR 0110). The
+   shipped catalog has no Deluge store version, so its existing launch path
+   remains active.
 8. Configure the web stack, regenerate per-user nginx configs from staged
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).

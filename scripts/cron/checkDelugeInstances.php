@@ -12,19 +12,26 @@
  */
 require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/user/delugeManagedConfig.php';
+require_once __DIR__.'/../lib/torrentClients/identity.php';
 
 $pmssCheckDelugeLock = pmssCronLockAcquire('checkDelugeInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
 
 pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 'deluge stopped due to suspension', [
     pmssUserWatchdogServiceSpec('deluged', static function (string $thisUser): string {
-        return pmssBuildUserServiceShellCommand($thisUser, "cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info");
+        return pmssBuildUserServiceShellCommand($thisUser, "[ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluged >/dev/null 2>&1) || (cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info)");
     }, 'deluged start requested'),
     pmssUserWatchdogServiceSpec('deluge-web', static function (string $thisUser): string {
-        return pmssBuildUserServiceShellCommand($thisUser, "cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info");
+        return pmssBuildUserServiceShellCommand($thisUser, "[ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluge-web >/dev/null 2>&1) || (cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info)");
     }, 'deluge-web start requested'),
 ], function (string $thisUser): array {
     $running = pmssUserWatchdogProcessRunning($thisUser, 'deluged');
     pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $running, 'pmssDelugeApplyManagedConfig');
-    $delugedRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['deluged', 'deluge-web'], static function () use ($thisUser): bool { return function_exists('pmssDelugeApplyUploadThrottle') && pmssDelugeApplyUploadThrottle($thisUser); }, 'deluge restarted to apply upload throttle');
+    $delugedRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['deluged', 'deluge-web'], static function () use ($thisUser): bool { return function_exists('pmssDelugeApplyUploadThrottle') && pmssDelugeApplyUploadThrottle($thisUser); }, 'deluge restarted to apply upload throttle', 9, static function () use ($thisUser): void {
+        $daemon = pmssTorrentClientNativeStopPids($thisUser, 'deluge', ['storeOnly' => true]);
+        $web = pmssTorrentClientNativeStopPids($thisUser, 'deluge', ['storeOnly' => true, 'processName' => 'deluge-web']);
+        if ($daemon === [] && $web === []) { pmssUserWatchdogTerminateProcesses($thisUser, ['deluged', 'deluge-web'], 9); return; }
+        pmssTorrentClientNativeStop($thisUser, 'deluge', 15, ['storeOnly' => true]);
+        pmssTorrentClientNativeStop($thisUser, 'deluge', 15, ['storeOnly' => true, 'processName' => 'deluge-web']);
+    });
     return ['deluged' => $delugedRunning];
 }, __DIR__.'/../lib/user/deluge.php');

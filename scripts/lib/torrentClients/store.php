@@ -4,6 +4,7 @@
 require_once dirname(__DIR__).'/update/apps/remoteBinary.php';
 require_once __DIR__.'/storeArchive.php';
 require_once __DIR__.'/storePaths.php';
+require_once __DIR__.'/delugeVenv.php';
 
 /** Measure the existing root-owned set before reserving headroom for a new copy. */
 function pmssTorrentClientsStoreSetSize(string $root): ?int
@@ -40,6 +41,9 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
     $size = $ops['size'] ?? 'pmssTorrentClientsStoreSetSize';
     $log = $ops['log'] ?? 'logmsg';
     $install = $ops['install'] ?? static function (array $entry, string $binary): bool {
+        if ($entry['client'] === 'deluge' && $entry['kind'] === 'venv') {
+            return pmssTorrentClientsDelugeVenvInstall($entry, dirname(dirname($binary)));
+        }
         if ($entry['kind'] === 'venv') return pmssTorrentClientsStoreVenvInstall($entry, $binary);
         foreach ($entry['url'] as $url) {
             pmssInstallPinnedRemoteBinary(
@@ -66,13 +70,15 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
             'qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent',
             'deluge' => 'deluged', 'transmission' => 'transmission-daemon',
         ][$client];
-        $binary = $root.'/'.$id.'/'.$binaryName;
+        $binary = $root.'/'.$id.($client === 'deluge' && $entry['kind'] === 'venv' ? '/bin/' : '/').$binaryName;
         if (!pmssTorrentClientsStorePathChainSafe($root, $client, $version)) {
             $log('[WARN] torrent client '.$id.' unsafe store directory');
             $results[$id] = 'failed';
             continue;
         }
         if (is_file($binary) && !is_link($binary)
+            && ($client !== 'deluge' || $entry['kind'] !== 'venv'
+                || (is_file(dirname($binary).'/deluge-web') && !is_link(dirname($binary).'/deluge-web')))
             && ($entry['kind'] !== 'static'
                 || hash_file('sha256', $binary) === strtolower($entry['sha256'] ?? ''))) {
             $results[$id] = 'installed';
