@@ -49,6 +49,19 @@ function pmssTorrentClientResolve(
     return is_file($binary) && !is_link($binary) ? $binary : null;
 }
 
+/** Preserve the system rTorrent command unless a published store build is selected. */
+function pmssRtorrentExecutorCommand(
+    string $home,
+    string $projectionPath = '/var/lib/pmss/public/torrentClients.json',
+    string $storeRoot = '/home/.pmss/clients'
+): string
+{
+    $binary = pmssTorrentClientResolve($home, 'rtorrent', $projectionPath, $storeRoot);
+    $storePrefix = rtrim($storeRoot, '/').'/rtorrent/';
+    return $binary !== null && strpos($binary, $storePrefix) === 0
+        ? escapeshellarg($binary) : '/usr/local/bin/rtorrent';
+}
+
 /** Start a selected client as the account while excluding a concurrent switch. */
 function pmssTorrentClientResolverLaunch(string $home, string $client, bool $lockHeld = false): bool
 {
