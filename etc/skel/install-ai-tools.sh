@@ -354,12 +354,14 @@ AI CLI Tools
 ============
 
 Three AI coding assistants are installed in your home directory.
-System codex and claude use your account's Virsilipas key by default.
+System gemini, codex, and claude use your account's Virsilipas key by default.
 Personal copies require your own API key or account.
 
 TOOLS:
 
   gemini    Google Gemini CLI
+            The system gemini uses ~/.virsilipasKey when no personal choice is set.
+            To opt out: PMSS_VIRSILIPAS=off gemini
             Set: export GEMINI_API_KEY="your-key-from-aistudio.google.com"
             Docs:   https://github.com/google-gemini/gemini-cli
 

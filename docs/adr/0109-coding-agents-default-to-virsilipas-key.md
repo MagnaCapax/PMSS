@@ -61,6 +61,17 @@ The per-user OpenClaw installer follows the same default on a fresh install:
 it uses a runtime environment reference to the account's `~/.virsilipasKey`
 and preserves an existing OpenClaw provider choice.
 The system Claude Code follows the same account-key default, preserving personal choices.
+The system Gemini CLI also follows this default through a root-owned stub and
+lowest-precedence root-owned system defaults file. It preserves personal
+credentials, settings, environment values, `.env` values, and CLI model choices;
+its unpinned npm version remains unchanged. The defaults file selects API-key
+authentication and the provider's `default` model without creating user settings.
+Gemini CLI advisory [GHSA-wpqr-6v78-jr5g](https://github.com/advisories/GHSA-wpqr-6v78-jr5g) concerns workspace trust and tool
+allowlisting before 0.39.1; the fleet's observed 0.43.0 is later. The wrapper
+adds no shell privilege or network listener. Exposure of the service key could
+spend that account's credits, so it stays in the child environment, never argv
+or logs; the primary account password remains separate. The installed stub,
+launcher, and defaults are root-owned, and no user settings are written.
 
 The published CLI advisory GHSA-w5fx-fh39-j5rw describes a sandbox path
 bypass in releases through 0.38.0; the current pin is

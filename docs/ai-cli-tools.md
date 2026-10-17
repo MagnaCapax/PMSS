@@ -3,15 +3,15 @@
 PMSS now installs system-wide AI CLI binaries during updates via
 `scripts/lib/update/apps/aiToolsInstall.php`. The commands are published in
 `/usr/local/bin` so users can run `gemini`, `codex`, and `claude` immediately.
-The system `codex` and `claude` commands use the account's Virsilipas key by
+The system `gemini`, `codex`, and `claude` commands use the account's Virsilipas key by
 default when no personal provider choice is present.
 
 The optional script installs three AI coding assistants in your home directory.
-System Codex and Claude Code can use your account's Virsilipas key; personal
+System Gemini CLI, Codex, and Claude Code can use your account's Virsilipas key; personal
 copies need their own provider setup. No credentials are shared between users.
 
 Installed tools:
-- **Gemini CLI** (Google) - Requires a Gemini API key or organisation access through Google Cloud / Code Assist Standard or Enterprise
+- **Gemini CLI** (Google) - Uses account credits by default; personal API keys and settings take precedence
 - **Codex CLI** (OpenAI) - Requires API key or subscription
 - **Claude Code** (Anthropic) - Requires API key or subscription
 
@@ -51,6 +51,14 @@ After installation, run `ai-help` for a summary of all tools and their configura
 ## Tool Guides
 
 ### Gemini CLI (Google)
+
+The system `gemini` command uses `~/.virsilipasKey` for Pulsed Media AI credits
+when you have no personal Gemini credentials, authentication settings, provider
+environment variables, provider `.env` values, or explicit `-m`/`--model`
+choice. It reads the key for each run without changing files in your home.
+Run `PMSS_VIRSILIPAS=off gemini` to opt out, or set your own `GEMINI_API_KEY`.
+A personal `~/bin/gemini` copy bypasses the system launcher when called by its
+full path. Your `~/.gemini/settings.json` takes precedence over system defaults.
 
 Google stopped serving Gemini CLI requests from personal Google-account sign-in (AI Pro/Ultra and free Code Assist for individuals) on 2026-06-18, moving those users to Antigravity CLI, which this script does not install. See [Google's announcement](https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/).
 

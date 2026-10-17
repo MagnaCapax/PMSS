@@ -13,6 +13,7 @@
 require_once __DIR__.'/remoteBinary.php';
 require_once __DIR__.'/aiToolsCodex.php';
 require_once __DIR__.'/aiToolsClaude.php';
+require_once __DIR__.'/aiToolsGemini.php';
 
 /** Write the Codex fallback config only when the target is a regular file path. */
 function pmssAiToolsCodexFallbackConfigEnsure(bool $dryRun, ?callable $logger = null): void
@@ -109,14 +110,12 @@ if ($nodeBinary !== '') {
         $binaryPath = $prefixDir.'/bin/'.$toolSpec[3];
         $installNeeded = !is_file($binaryPath) || $force;
         if (!$installNeeded) {
-            if ($toolSpec[2] === '') {
-                continue;
+            if ($toolSpec[2] !== '') {
+                // Versioned npm tools must converge after upstream publishes a bad latest.
+                $packageJsonPath = $prefixDir.'/lib/node_modules/'.$toolSpec[1].'/package.json';
+                $packageJson = pmssJsonDecodeAssoc((string) @file_get_contents($packageJsonPath));
+                $installNeeded = !is_array($packageJson) || (string) ($packageJson['version'] ?? '') !== $toolSpec[2];
             }
-
-            // Versioned npm tools must converge after upstream publishes a bad latest.
-            $packageJsonPath = $prefixDir.'/lib/node_modules/'.$toolSpec[1].'/package.json';
-            $packageJson = pmssJsonDecodeAssoc((string) @file_get_contents($packageJsonPath));
-            $installNeeded = !is_array($packageJson) || (string) ($packageJson['version'] ?? '') !== $toolSpec[2];
         }
 
         if ($installNeeded) {
@@ -129,22 +128,30 @@ if ($nodeBinary !== '') {
                 continue;
             }
         }
-        if ($toolSpec[3] !== 'claude') {
-            runStep('Linking '.$toolSpec[0].' command', pmssBuildCommand('ln', ['-sf', $binaryPath, '/usr/local/bin/'.$toolSpec[3]]));
-            continue;
-        }
         if ($dryRun || !is_file($binaryPath) || !is_executable($binaryPath)) {
             continue;
         }
         $launcherSource = __DIR__.'/templates/pmss-ai-launch.php';
         $launcher = '/opt/pmss/ai-tools/pmss-ai-launch.php';
-        $stub = '/usr/local/bin/claude';
-        if (pmssAiToolsClaudeInstallNeeded($launcher, $stub, $launcherSource)) {
+        $gemini = $toolSpec[3] === 'gemini';
+        $stub = '/usr/local/bin/'.$toolSpec[3];
+        $defaults = '/opt/pmss/ai-tools/gemini-virsilipas-defaults.json';
+        $needed = $gemini
+            ? pmssAiToolsGeminiInstallNeeded($launcher, $stub, $launcherSource, $defaults)
+            : pmssAiToolsClaudeInstallNeeded($launcher, $stub, $launcherSource);
+        if ($needed) {
+            if ($gemini && runStep('Ensuring Gemini defaults directory is root-owned',
+                pmssBuildCommand('install', ['-d', '-o', 'root', '-g', 'root', '-m', '0755', '/opt/pmss/ai-tools'])) !== 0) {
+                $logger('[WARN] Unable to prepare Gemini defaults directory; keeping existing command');
+                continue;
+            }
             $content = @file_get_contents($launcherSource);
             if (!is_string($content) || !pmssAiToolsCodexAtomicWrite($launcher, $content, 0644)) {
-                $logger('[WARN] Unable to install Claude launcher; keeping existing command');
-            } elseif (!pmssAiToolsCodexAtomicWrite($stub, pmssAiToolsClaudeStub(), 0755)) {
-                $logger('[WARN] Unable to install Claude command stub; keeping existing command');
+                $logger('[WARN] Unable to install '.$toolSpec[0].' launcher; keeping existing command');
+            } elseif ($gemini && !pmssAiToolsCodexAtomicWrite($defaults, pmssAiToolsGeminiDefaults(), 0644)) {
+                $logger('[WARN] Unable to install Gemini defaults; keeping existing command');
+            } elseif (!pmssAiToolsCodexAtomicWrite($stub, $gemini ? pmssAiToolsGeminiStub() : pmssAiToolsClaudeStub(), 0755)) {
+                $logger('[WARN] Unable to install '.$toolSpec[0].' command stub; keeping existing command');
             }
         }
     }

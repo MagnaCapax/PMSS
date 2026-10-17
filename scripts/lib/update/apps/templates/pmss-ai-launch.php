@@ -3,6 +3,8 @@
 
 const PMSS_AI_CODEX_BINARY = '/opt/pmss/ai-tools/codex/codex-rust-v0.93.0';
 const PMSS_AI_CLAUDE_BINARY = '/opt/pmss/ai-tools/npm/claude/bin/claude';
+const PMSS_AI_GEMINI_BINARY = '/opt/pmss/ai-tools/npm/gemini/bin/gemini';
+const PMSS_AI_GEMINI_DEFAULTS = '/opt/pmss/ai-tools/gemini-virsilipas-defaults.json';
 
 /** PHP 7.0 cannot enumerate getenv(); Linux exposes this process's environment. */
 function pmssAiCodexEnvironment(): array
@@ -244,6 +246,135 @@ function pmssAiClaudeDecision(array $args, array $env, array $state): array
     return ['argv' => $pass['argv'], 'env' => $env, 'notice' => true];
 }
 
+/** An existing user auth selection, or unreadable settings, wins. */
+function pmssAiGeminiSettingsChoice(string $path): bool
+{
+    if (!file_exists($path) && !is_link($path)) {
+        return false;
+    }
+    $contents = @file_get_contents($path);
+    if (!is_string($contents)) {
+        return true;
+    }
+    $settings = json_decode($contents, true);
+    if (!is_array($settings) || json_last_error() !== JSON_ERROR_NONE) {
+        return true;
+    }
+    return isset($settings['security']['auth']) && is_array($settings['security']['auth'])
+        && array_key_exists('selectedType', $settings['security']['auth']);
+}
+
+/** Gemini loads the nearest .env, preferring a trusted directory's .gemini file. */
+function pmssAiGeminiEnvFile(string $cwd, string $home, bool $trusted, bool $ignoreLocal): string
+{
+    $dir = realpath($cwd);
+    if (!is_string($dir)) {
+        return '';
+    }
+    while (true) {
+        if ($trusted && file_exists($dir.'/.gemini/.env')) {
+            return $dir.'/.gemini/.env';
+        }
+        if (file_exists($dir.'/.env') && (!$ignoreLocal || $dir === $home)) {
+            return $dir.'/.env';
+        }
+        $parent = dirname($dir);
+        if ($parent === $dir) {
+            break;
+        }
+        $dir = $parent;
+    }
+    if ($trusted && file_exists($home.'/.gemini/.env')) {
+        return $home.'/.gemini/.env';
+    }
+    return file_exists($home.'/.env') ? $home.'/.env' : '';
+}
+
+/** Defer if any .env the CLI could select defines provider inputs. */
+function pmssAiGeminiEnvChoice(string $cwd, string $home): bool
+{
+    foreach ([true, false] as $trusted) {
+        foreach ([true, false] as $ignoreLocal) {
+            $path = pmssAiGeminiEnvFile($cwd, $home, $trusted, $ignoreLocal);
+            if ($path === '') {
+                continue;
+            }
+            $contents = @file_get_contents($path);
+            if (!is_string($contents)) {
+                return true;
+            }
+            if (preg_match('/^\s*(?:export\s+)?(?:GEMINI_API_KEY|GOOGLE_API_KEY|GOOGLE_GEMINI_BASE_URL|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_CLOUD_PROJECT)\s*=/m', $contents)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/** Read account state; no settings or credentials are written to the home. */
+function pmssAiGeminiState(array $env): array
+{
+    $uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+    $home = $env['HOME'] ?? '';
+    $state = ['uid' => $uid, 'keyFileValid' => false, 'configChoice' => false];
+    if ($uid === 0 || $home === '') {
+        return $state;
+    }
+    $file = rtrim($home, '/').'/.virsilipasKey';
+    clearstatcache(true, $file);
+    if (is_link($file) || !is_file($file) || @fileowner($file) !== $uid) {
+        return $state;
+    }
+    $contents = @file_get_contents($file);
+    $settings = is_string($contents) ? @parse_ini_string($contents, false, INI_SCANNER_RAW) : false;
+    if (!is_array($settings)) {
+        return $state;
+    }
+    $state['keyFileValid'] = true;
+    $state['key'] = $settings['key'] ?? '';
+    $state['endpoint'] = $settings['endpoint'] ?? '';
+    $base = !empty($env['GEMINI_CLI_HOME']) ? $env['GEMINI_CLI_HOME'] : $home;
+    $config = rtrim($base, '/').'/.gemini';
+    $state['configChoice'] = file_exists($config.'/oauth_creds.json') || is_link($config.'/oauth_creds.json')
+        || file_exists($config.'/google_accounts.json') || is_link($config.'/google_accounts.json')
+        || pmssAiGeminiSettingsChoice($config.'/settings.json')
+        || pmssAiGeminiEnvChoice((string) getcwd(), $base);
+    return $state;
+}
+
+/** Pure precedence decision: pass credentials only through the child environment. */
+function pmssAiGeminiDecision(array $args, array $env, array $state): array
+{
+    $pass = ['argv' => array_merge([PMSS_AI_GEMINI_BINARY], $args), 'env' => $env, 'notice' => false];
+    foreach (['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GEMINI_BASE_URL',
+        'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_GENAI_USE_GCA', 'GOOGLE_CLOUD_PROJECT',
+        'GEMINI_CLI_AUTH_OVERRIDE', 'GEMINI_DEFAULT_AUTH_TYPE',
+        'GEMINI_CLI_SYSTEM_DEFAULTS_PATH', 'GEMINI_CLI_SYSTEM_SETTINGS_PATH'] as $name) {
+        if (isset($env[$name]) && $env[$name] !== '') {
+            return $pass;
+        }
+    }
+    foreach ($args as $arg) {
+        if ($arg === '-m' || $arg === '--model' || strpos($arg, '--model=') === 0) {
+            return $pass;
+        }
+    }
+    if (in_array(strtolower((string) ($env['PMSS_VIRSILIPAS'] ?? '')), ['off', '0', 'no'], true)
+        || ($state['uid'] ?? 0) === 0 || !isset($env['HOME']) || $env['HOME'] === ''
+        || empty($state['keyFileValid']) || !isset($state['key'], $state['endpoint'])
+        || !is_string($state['key']) || $state['key'] === ''
+        || preg_match('/[\s\p{Z}\p{C}]/u', $state['key']) !== 0
+        || !is_string($state['endpoint'])
+        || !preg_match('#^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$#D', $state['endpoint'])
+        || !empty($state['configChoice'])) {
+        return $pass;
+    }
+    $env['GOOGLE_GEMINI_BASE_URL'] = preg_replace('#/v1$#', '', rtrim($state['endpoint'], '/'));
+    $env['GEMINI_API_KEY'] = $state['key'];
+    $env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH'] = PMSS_AI_GEMINI_DEFAULTS;
+    return ['argv' => $pass['argv'], 'env' => $env, 'notice' => true];
+}
+
 /** Replace this process when possible; otherwise preserve all three streams. */
 function pmssAiCodexExec(array $decision)
 {
@@ -267,21 +398,24 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath($_SERVER['SCRIPT_FILENAME']) 
     $args = array_slice($argv, 2);
     $env = pmssAiCodexEnvironment();
     $tool = $argv[1] ?? '';
-    if (!in_array($tool, ['codex', 'claude'], true)) {
+    if (!in_array($tool, ['codex', 'claude', 'gemini'], true)) {
         exit(127);
     }
-    $binary = $tool === 'codex' ? PMSS_AI_CODEX_BINARY : PMSS_AI_CLAUDE_BINARY;
+    $binary = $tool === 'codex' ? PMSS_AI_CODEX_BINARY : ($tool === 'claude' ? PMSS_AI_CLAUDE_BINARY : PMSS_AI_GEMINI_BINARY);
     $pass = ['argv' => array_merge([$binary], $args), 'env' => $env, 'notice' => false];
     try {
         $decision = $tool === 'codex' ? pmssAiCodexDecision($args, $env, pmssAiCodexState($env))
-            : pmssAiClaudeDecision($args, $env, pmssAiClaudeState($env));
+            : ($tool === 'claude' ? pmssAiClaudeDecision($args, $env, pmssAiClaudeState($env))
+                : pmssAiGeminiDecision($args, $env, pmssAiGeminiState($env)));
     } catch (Throwable $e) {
         $decision = $pass;
     }
     if ($decision['notice'] && function_exists('posix_isatty') && posix_isatty(STDERR)) {
         $notice = $tool === 'codex'
             ? "Codex is using your Pulsed Media AI credits (~/.virsilipasKey). To change: PMSS_VIRSILIPAS=off codex, or codex login.\n"
-            : "Claude Code is using your Pulsed Media AI credits (~/.virsilipasKey). To change: PMSS_VIRSILIPAS=off claude, or log in to your own account (PMSS_VIRSILIPAS=off claude, then /login).\n";
+            : ($tool === 'claude'
+                ? "Claude Code is using your Pulsed Media AI credits (~/.virsilipasKey). To change: PMSS_VIRSILIPAS=off claude, or log in to your own account (PMSS_VIRSILIPAS=off claude, then /login).\n"
+                : "Gemini CLI is using your Pulsed Media AI credits (~/.virsilipasKey). To change: PMSS_VIRSILIPAS=off gemini, or set your own GEMINI_API_KEY.\n");
         fwrite(STDERR, $notice);
     }
     try {
