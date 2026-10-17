@@ -968,9 +968,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Authentication: a private gateway environment file supplies a token, and the gateway binds loopback only.
 
 - etc/skel/bin/install-pikkumies.sh
-  - Scope: opt-in command run by the account owner; no root, port, service, or PMSS-managed cron.
+  - Scope: command run by the account owner, or queued by `addUser.php` as the new user (in the user's slice, with `PIKKUMIES_SKIP_HERMES=1`) when the account has at least 1000 MiB RAM (ADR 0090); no root, port, service, or PMSS-managed cron.
   - Self-update: first fetches its newest copy from PMSS main into a temporary file and runs it with `--skip-update` when line 1 is the bash shebang and line 2 is `# PMSS: Pikkumies Installer`; otherwise the local copy runs. The fetched copy deletes its temporary file. `--no-self-update` keeps the local copy (ADR 0090).
-  - Lifecycle: writes only `~/.mcxPikkumies` (git checkout with fast-forward updates), `~/pikkumies` (symlink), and `~/.virsilipasKey` when absent and not a link (Pulsed Media endpoint in `endpoint=`, empty `key=`). Through `pikkumies install`, it adds one daily `pikkumies update` crontab line tagged `# pikkumies-update` and preserves every other line, and puts `pikkumies` on `PATH`: a symlink in `~/.local/bin` or `~/bin` when either is on `PATH`, otherwise one marked block in `~/.bashrc` and `~/.profile`.
+  - Lifecycle: writes only `~/.mcxPikkumies` (git checkout with fast-forward updates), `~/pikkumies` (symlink), and `~/.virsilipasKey` when absent and not a link (Pulsed Media endpoint in `endpoint=`, empty `key=`). Through `pikkumies install`, it adds one daily `pikkumies update` crontab line tagged `# pikkumies-update` and one per-minute line tagged `# pikkumies-cron-tick` (PHP only unless a scheduled job is due) and preserves every other line, and puts `pikkumies` on `PATH`: a symlink in `~/.local/bin` or `~/bin` when either is on `PATH`, otherwise one marked block in `~/.bashrc` and `~/.profile`.
   - Local settings: PMSS does not edit files inside `~/.mcxPikkumies` because the Pikkumies updater stops on edited tracked files; use `~/.virsilipasKey` (platform key), `~/.pikkumiesKey` (a provider of the user's own, read first) or `~/pikkumies/local/`.
 
 - scripts/util/systemTest.php

@@ -12,6 +12,9 @@
 /** Minimum RAM required for rootless Docker. */
 function pmssUserDockerMinRamMiB(): int { return 245; }
 
+/** Minimum RAM for preinstalling Pikkumies on a new account: the floor the media stack measured (ADR 0090). */
+function pmssUserPikkumiesPreinstallMinRamMiB(): int { return 1000; }
+
 /** Convert stored feature-toggle values to a stable boolean. */
 function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $default = true): bool
 {

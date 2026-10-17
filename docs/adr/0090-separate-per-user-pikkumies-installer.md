@@ -88,3 +88,34 @@ no other PMSS file, and it already fetches Pikkumies from GitHub on every run,
 so the self-update adds no new source. The wrapper comment now says it changes
 shell files only when neither `~/bin` nor `~/.local/bin` is on PATH, which is
 what the Pikkumies installer does.
+
+## Amendment 2026-10-17: preinstalled on new accounts with enough RAM
+
+The operator, 2026-10-17: "infact pikkumies should be preinstalled ..... in
+most cases that is, if enough ram." `addUser.php` now queues the wrapper as the
+new user, inside the user's slice (`pmssBuildUserServiceShellCommand`), when
+the account has at least 1000 MiB RAM and `~/bin/install-pikkumies.sh` exists
+(`pmssAddUserPikkumiesPreinstallCommand`, `pmssUserPikkumiesPreinstallMinRamMiB`).
+1000 MiB is the floor the media stack measured (a 1000 MiB plan ran the full
+stack idle at about 570 MiB). A Hermes process measured 67 to 91 MB (Pikkumies
+ADR-0024). Plans below 1000 MiB keep the opt-in command. A count on four
+servers on 2026-10-17 found 100 of 118 accounts at or above the floor.
+
+The preinstall sets `PIKKUMIES_SKIP_HERMES=1`, so account creation only clones
+Pikkumies, writes its config and crontab lines, and puts it on PATH. The agent
+runtime (about 60,000 files and 2 GB in the account's quota) builds later: at
+the account's daily `pikkumies update` time, which Pikkumies spreads by uid, or
+when the user first runs `pikkumies`. Accounts created together, as when a
+server's users move to a new one, therefore never build at the same time. The
+wrapper passes no `--accept-terms`: the first interactive session shows the
+terms and starts only once the person accepts them.
+
+For new accounts with enough RAM the command is no longer opt-in. PMSS still
+adds no service, port or cron logic of its own. Pikkumies adds two tagged lines to
+the account's crontab, preserving every other line: the daily update and a
+per-minute tick that starts PHP only, and starts the runtime only when a
+scheduled job is due. Existing accounts are not changed by this amendment.
+
+The "75 MB download and 257 MB on disk" in Consequences was the standalone
+Python of Pikkumies ADR-0014, which ADR-0033 superseded; the runtime now takes
+about 2 GB, as measured above.

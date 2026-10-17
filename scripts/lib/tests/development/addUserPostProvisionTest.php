@@ -53,4 +53,35 @@ final class AddUserPostProvisionTest extends TestCase
         $this->assertFalse(\pmssAddUserBonusQuotaPersist(['name' => 'alice', 'bonusQuotaGiB' => 50], $home));
         $this->assertSame('unchanged', file_get_contents($outside));
     }
+
+    public function testPikkumiesPreinstallNeedsTheRamFloorAndTheSkeletonInstaller(): void
+    {
+        // The slice launcher resolves the uid with `id -u`; a stub keeps the test independent of the host's users.
+        $name = 'alice';
+        $this->pmssEnsureDir($this->tempDir.'/stub');
+        file_put_contents($this->tempDir.'/stub/id', "#!/bin/sh\necho 4321\n");
+        chmod($this->tempDir.'/stub/id', 0755);
+        $path = (string) getenv('PATH');
+        $home = $this->tempDir.'/home';
+        $this->pmssEnsureDir($home.'/bin');
+        $floor = \pmssUserPikkumiesPreinstallMinRamMiB();
+        $this->assertSame(1000, $floor);
+        putenv('PATH='.$this->tempDir.'/stub:'.$path);
+        try {
+            $noInstaller = \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) $floor], $home);
+            file_put_contents($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
+            $belowFloor = \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) ($floor - 1)], $home);
+            $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) $floor], $home);
+        } finally {
+            putenv('PATH='.$path);
+        }
+
+        $this->assertTrue($noInstaller === null, 'no installer in ~/bin');
+        $this->assertTrue($belowFloor === null, 'below the RAM floor');
+        foreach (['nohup sh -c ', 'systemd-run', '--slice=user-', 'PIKKUMIES_SKIP_HERMES=1', 'install-pikkumies.sh', "' >/dev/null 2>&1 &"] as $part) {
+            $this->assertTrue(strpos($command, $part) !== false, "preinstall command lacks $part: $command");
+        }
+        $this->assertTrue(strpos($command, '--slice=user-4321.slice') !== false, 'not the new user\'s slice: '.$command);
+        $this->assertTrue(strpos($command, '--accept-terms') === false, 'the terms are the person\'s to accept at the first session');
+    }
 }
