@@ -105,6 +105,28 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
         continue;
     }
 
+    // HTTP-01 must reach the current per-user vhost, including a permalink
+    // added since its last generation. Activate it before contacting the CA.
+    if (!is_file('/scripts/util/createNginxConfig.php')) {
+        logLine('user='.$user.' result=failed reason=nginx-generator-missing');
+        $failed++;
+        continue;
+    }
+    $configOut = [];
+    exec('/scripts/util/createNginxConfig.php --user '.escapeshellarg($user).' 2>&1', $configOut, $configRc);
+    if ($configRc !== 0) {
+        logLine('user='.$user.' result=failed reason=nginx-config rc='.$configRc);
+        $failed++;
+        continue;
+    }
+    $reloadOut = [];
+    exec('systemctl reload nginx 2>&1 || /etc/init.d/nginx reload 2>&1', $reloadOut, $reloadRc);
+    if ($reloadRc !== 0) {
+        logLine('user='.$user.' result=failed reason=nginx-reload rc='.$reloadRc);
+        $failed++;
+        continue;
+    }
+
     // This local lineage label is never a certificate name. Keeping it lets
     // certbot replace the same lineage's -d names without changing nginx lookup.
     $certName = $user.'.'.$serverFqdn;

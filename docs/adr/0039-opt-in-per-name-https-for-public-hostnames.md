@@ -130,3 +130,12 @@ References for this amendment: `scripts/lib/nginxUserHosts.php`
 `pmssWebPublicCertNames`, `scripts/cron/webPublicCertsProcess.php`,
 `etc/skel/bin/createWebPublicCerts`, and
 `scripts/lib/update/users/filesystem.php`.
+
+## Amendment 2026-10-17: converge the vhost before issuance
+
+The billing-service-id marker can change after the last per-user nginx config
+generation. Before contacting the CA, the issuance job regenerates the
+requesting user's vhost, checks its config through the generator, and gracefully
+reloads nginx so HTTP-01 reaches the current permalink route. If generation or
+reload fails, it skips certbot for that request. The existing post-issuance
+generation and batch reload still activate the new certificate.

@@ -37,6 +37,19 @@ class CronInlineCharacterizationTest extends TestCase
         ], ['@file_put_contents($failedMarker' => 'failure marker must use the shared writer']);
     }
 
+    public function testWebPublicCertActivatesCurrentVhostBeforeCertbot(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/webPublicCertsProcess.php');
+        $this->assertOrderedStrings([
+            '$names = pmssWebPublicCertNames(',
+            "exec('/scripts/util/createNginxConfig.php --user '.escapeshellarg(\$user).' 2>&1', \$configOut, \$configRc);",
+            "exec('systemctl reload nginx 2>&1 || /etc/init.d/nginx reload 2>&1', \$reloadOut, \$reloadRc);",
+            "\$cmd = 'certbot '.implode(",
+        ], $source, 'ACME must use the activated current vhost: ');
+        $this->assertStringContainsString('if ($configRc !== 0)', $source);
+        $this->assertStringContainsString('if ($reloadRc !== 0)', $source);
+    }
+
     public function testBootTuningUsesSharedManagedPathWrites(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep.php', [
