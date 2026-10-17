@@ -135,6 +135,53 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertSame('25', trim((string) file_get_contents($home.'/.throttle')));
     }
 
+    public function testClearedLimitRemovesMarkerAndThrottleInEveryPersistedState(): void
+    {
+        foreach (['both', 'marker', 'throttle', 'neither'] as $state) {
+            $homeRoot = $this->tempDir.'/'.$state.'/home';
+            $home = $this->pmssEnsureDir($homeRoot.'/alice');
+            $enabledMarker = $this->tempDir.'/'.$state.'/runtime/alice.enabled';
+            $this->pmssEnsureDir(dirname($enabledMarker), 0700);
+            if ($state === 'both' || $state === 'marker') {
+                file_put_contents($enabledMarker, '');
+            }
+            if ($state === 'both' || $state === 'throttle') {
+                file_put_contents($home.'/.throttle', '25');
+            }
+
+            list($result, $output) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
+                return \pmssTrafficLimitThrottleClearUnlimited('alice', $enabledMarker, $homeRoot);
+            });
+            $this->assertTrue($result, $state);
+            $this->assertFalse(file_exists($enabledMarker), $state);
+            $this->assertFalse(file_exists($home.'/.throttle'), $state);
+            if ($state === 'neither') {
+                $this->assertSame('', $output, 'no state needs no log');
+            } elseif ($state === 'throttle') {
+                $this->assertTrue(strpos($output, 'orphaned traffic throttle file removed') !== false, $state);
+            } else {
+                $this->assertTrue(strpos($output, 'traffic throttle removed') !== false, $state);
+            }
+        }
+    }
+
+    public function testClearedLimitRefusesSymlinkMarker(): void
+    {
+        $homeRoot = $this->tempDir.'/home';
+        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        file_put_contents($home.'/.throttle', '25');
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip(
+            $this->tempDir.'/real-marker', $this->tempDir.'/runtime/alice.enabled', 'old', 0700
+        );
+
+        list($result) = $this->pmssCaptureStdout(function () use ($linkPath, $homeRoot): bool {
+            return \pmssTrafficLimitThrottleClearUnlimited('alice', $linkPath, $homeRoot);
+        });
+        $this->assertFalse($result);
+        $this->assertSame('old', file_get_contents($realPath));
+        $this->assertSame('25', file_get_contents($home.'/.throttle'));
+    }
+
     public function testThrottleFileOperationsRejectSymlinkTargets(): void
     {
         foreach ([

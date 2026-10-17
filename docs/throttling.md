@@ -90,6 +90,8 @@ If no tier matches AND `progressiveThrottleEnabled` is true, `pmssTrafficLimitCo
 
 `.enabled` marker is required to be older than `trafficLimitPeriod` (3 days) of under-limit usage before throttle is removed. `trafficLimits.php` `unlink`s the marker and calls `setRateLimit(user, defaultCap, false)` twice (intentional double-disable to handle router desync).
 
+Clearing the traffic limit removes the marker and stored throttle cap on the next cron run, without waiting for the cooldown. This changes persisted state; the kernel traffic policy updates when network setup next applies FireQOS.
+
 ## Rendered fireqos.conf Shape
 
 Per-user class in the rendered config:

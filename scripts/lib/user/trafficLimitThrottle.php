@@ -146,3 +146,16 @@ function pmssTrafficLimitThrottleOrphanReconcile(
     pmssTrafficLimitLog($user, 'orphaned traffic throttle file removed after runtime marker loss');
     return pmssTrafficLimitThrottleApply($user, $trafficCapMbit, false, $homeRoot);
 }
+
+/** Lift persisted throttle state when the root-owned traffic limit is cleared. */
+function pmssTrafficLimitThrottleClearUnlimited(string $user, string $enabledMarkerPath, string $homeRoot = '/home'): bool
+{
+    if (!pmssPathExistsOrLink($enabledMarkerPath)) {
+        return pmssTrafficLimitThrottleOrphanReconcile($user, 0, $enabledMarkerPath, $homeRoot);
+    }
+    if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {
+        return false;
+    }
+    pmssTrafficLimitLog($user, 'traffic throttle removed: traffic limit cleared');
+    return pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
+}

@@ -45,16 +45,17 @@ $userConfigStore = new UserConfigStore();
 foreach($users AS $thisUser) {
     $userTrafficLimitFile = "/etc/seedbox/runtime/trafficLimits/{$thisUser}";
     $trafficDataFile = "/home/{$thisUser}/.trafficData";
-    if (!file_exists($trafficDataFile) or
-        !file_exists($userTrafficLimitFile) ) continue;
+    $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
+    $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, "/home/{$thisUser}/.bonusTraffic");
+    if ($trafficLimitState['effectiveLimitGiB'] <= 0) {
+        pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile);
+        continue;
+    }
+    if (!file_exists($trafficDataFile)) continue;
 
     $data = pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser);
     if ($data === null) {
         echo date('Y-m-d H:i:s') . ": Skipping {$thisUser}, invalid traffic data file\n";
-        continue;
-    }
-    $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, "/home/{$thisUser}/.bonusTraffic");
-    if ($trafficLimitState['effectiveLimitGiB'] <= 0) {
         continue;
     }
     $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
@@ -70,7 +71,6 @@ foreach($users AS $thisUser) {
     // Once usage drops below the threshold for the configured cooldown window,
     // remove the marker and lift the rate limit. The double disable call guards
     // against occasional router desyncs.
-    $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
     $overLimit = ($trafficUsageGiB > $trafficLimit);
 
     // Needs to stay within the limit for X period of time, hence we can always touch & update the limit file

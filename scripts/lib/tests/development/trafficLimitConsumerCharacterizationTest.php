@@ -50,6 +50,17 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         ]);
     }
 
+    public function testTrafficLimitCronClearsUnlimitedBeforeReadingUsage(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 4).'/scripts/cron/trafficLimits.php');
+        $clear = strpos($source, 'pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile)');
+        $usage = strpos($source, 'if (!file_exists($trafficDataFile)) continue;');
+
+        $this->assertTrue($clear !== false);
+        $this->assertTrue($usage !== false);
+        $this->assertTrue($clear < $usage);
+    }
+
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void
     {
         $slidingKey = 'sliding'.'ThrottleStart';
