@@ -131,7 +131,7 @@ SH;
             [
                 '$qbittorrentUpdated = pmssUpdateQbittorrentPasswordAsUser($username, $password);',
                 'if ($qbittorrentUpdated) {',
-                'killall -u %s -KILL %s 2>/dev/null',
+                'pmssTorrentClientNativeStop($username, \'qbittorrent\', 9);',
             ],
             'changePw qBittorrent restart guard missing substring: ',
             'changePw qBittorrent restart order changed near: '

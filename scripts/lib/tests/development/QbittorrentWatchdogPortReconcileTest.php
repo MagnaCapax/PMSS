@@ -10,7 +10,7 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkQbittorrentInstances.php', [
             "require_once __DIR__.'/../lib/user/watchdog.php';",
             "require_once __DIR__.'/../lib/user/torrentPort.php';",
-            "\$running = pmssUserWatchdogProcessRunning(\$thisUser, 'qbittorrent-nox');",
+            "\$running = pmssTorrentClientLauncherLivenessPids(\$thisUser, 'qbittorrent') !== [];",
             "\$home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.\$thisUser;",
             "if (pmssQbittorrentPortEnsure(\$thisUser, \$home)) {",
             "if (pmssQbittorrentWebUiAuthEnsure(\$thisUser, \$home)) {",
@@ -19,7 +19,7 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
         ]);
         $this->pmssAssertRepoFileMatches(
             'scripts/cron/checkQbittorrentInstances.php',
-            '/pmssQbittorrentPortEnsure\(\$thisUser, \$home\)\) \{\s+\$running = pmssUserWatchdogProcessRunning\(\$thisUser, \'qbittorrent-nox\'\);\s+\}\s+if \(pmssQbittorrentWebUiAuthEnsure\(\$thisUser, \$home\)\) \{\s+\$running = false;\s+\}\s+pmssUserWatchdogApplyManagedConfigWhenStopped\(/'
+            '/pmssQbittorrentPortEnsure\(\$thisUser, \$home\)\) \{\s+\$running = pmssTorrentClientLauncherLivenessPids\(\$thisUser, \'qbittorrent\'\) !== \[\];\s+\}\s+if \(pmssQbittorrentWebUiAuthEnsure\(\$thisUser, \$home\)\) \{\s+\$running = false;\s+\}\s+pmssUserWatchdogApplyManagedConfigWhenStopped\(/'
         );
 
         $this->pmssAssertRepoFileContainsString(

@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/qbittorrentVersion.php';
 
 /**
  * Resolve the canonical qBittorrent config path for a user.
@@ -25,13 +26,12 @@ function pmssQbittorrentConfigPath(string $username): string
  *
  * @return array<int, array{section:string,key:string,value:string}>
  */
-function pmssQbittorrentManagedConfigEntries(): array
+function pmssQbittorrentManagedConfigEntries(string $compatFamily = ''): array
 {
     $entries = [
         ['section' => 'BitTorrent', 'key' => 'Session\\AsyncIOThreadsCount', 'value' => '4'],
         ['section' => 'BitTorrent', 'key' => 'Session\\DiskCacheSize', 'value' => '128'],
         ['section' => 'BitTorrent', 'key' => 'Session\\DiskCacheTTL', 'value' => '120'],
-        ['section' => 'BitTorrent', 'key' => 'Session\\DiskIOType', 'value' => 'Posix'],
         ['section' => 'BitTorrent', 'key' => 'Session\\MaxConnections', 'value' => '300'],
         ['section' => 'BitTorrent', 'key' => 'Session\\MaxConnectionsPerTorrent', 'value' => '75'],
         ['section' => 'BitTorrent', 'key' => 'Session\\Preallocation', 'value' => 'true'],
@@ -45,6 +45,10 @@ function pmssQbittorrentManagedConfigEntries(): array
         // Keep off until per-user WebUI\ServerDomains contains customer WebUI hostnames and a live test host verifies WebUI load; blind enabling risks fleet-wide 403s.
         ['section' => 'Preferences', 'key' => 'WebUI\\HostHeaderValidation', 'value' => 'false'],
     ];
+    $diskIoType = pmssQbittorrentDiskIoType($compatFamily);
+    if ($diskIoType !== null) {
+        $entries[] = ['section' => 'BitTorrent', 'key' => 'Session\\DiskIOType', 'value' => $diskIoType];
+    }
     // Reconcile these with the running daemon only on hosts opted into the rollout.
     if (is_file('/etc/seedbox/config/qbittorrentWebuiEnforce.enabled')) {
         $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\LocalHostAuth', 'value' => 'true'];
@@ -186,9 +190,14 @@ function pmssQbittorrentApplyManagedConfig(string $username, ?string $configFile
 {
     return pmssQbittorrentConfigMutate(
         $username,
-        static function (string $config): ?string {
+        static function (string $config) use ($username): ?string {
             $updatedConfig = $config;
-            foreach (pmssQbittorrentManagedConfigEntries() as $entry) {
+            $family = pmssQbittorrentCompatFamily($username);
+            if ($family === 'lt1.2') {
+                $updatedConfig = pmssQbittorrentDiskIoTypeRemove($updatedConfig);
+                if (!is_string($updatedConfig)) return null;
+            }
+            foreach (pmssQbittorrentManagedConfigEntries($family) as $entry) {
                 $updatedConfig = pmssQbittorrentConfigUpsert($updatedConfig, $entry['section'], $entry['key'], $entry['value']);
                 if (!is_string($updatedConfig)) {
                     return null;

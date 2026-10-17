@@ -41,3 +41,30 @@ function pmssTorrentClientResolve(string $home, string $client): ?string
     $binary = $target.'/'.$names[$client];
     return is_file($binary) && !is_link($binary) ? $binary : null;
 }
+
+/** Start a selected client as the account while excluding a concurrent switch. */
+function pmssTorrentClientResolverLaunch(string $home, string $client, bool $lockHeld = false): bool
+{
+    if ($client !== 'qbittorrent' || !is_link($home.'/bin/'.$client.'/default')) return false;
+    $lock = null;
+    if (!$lockHeld) {
+        $dir = $home.'/.config/pmss/torrentClients';
+        if (!is_dir($dir) && !@mkdir($dir, 0700, true)) return false;
+        if (is_link($dir)) return false;
+        $lock = @fopen($dir.'/'.$client.'.lock', 'c');
+        if (!is_resource($lock)) return false;
+        if (!@flock($lock, LOCK_EX | LOCK_NB)) { fclose($lock); return true; }
+    }
+    $binary = pmssTorrentClientResolve($home, $client);
+    $rc = 1;
+    if ($binary !== null) @exec(escapeshellarg($binary).' -d >/dev/null 2>&1', $unused, $rc);
+    if (is_resource($lock)) { flock($lock, LOCK_UN); fclose($lock); }
+    return $rc === 0;
+}
+
+if (PHP_SAPI === 'cli' && isset($_SERVER['SCRIPT_FILENAME'])
+    && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
+    $home = getenv('HOME');
+    exit(is_string($home) && ($argv[1] ?? '') === 'qbittorrent' && ($argv[2] ?? '') === '--launch'
+        && pmssTorrentClientResolverLaunch($home, 'qbittorrent', ($argv[3] ?? '') === '--held') ? 0 : 1);
+}

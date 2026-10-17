@@ -84,16 +84,16 @@ function pmssConfigureSettingsStateRead($home)
 }
 
 /** Dispatch one settings change; callers enforce the POST/XHR transport guard. */
-function pmssConfigureActionApply($home, $action, $request)
+function pmssConfigureActionApply($home, $action, $request, $ops = array())
 {
     $paths = pmssPanelSessionPaths($home);
     // These actions can run account commands or publish the username, so they need the account password.
-    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername'), true);
+    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch'), true);
     if ($highImpact && (!isset($request['password']) || !is_string($request['password'])
         || !pmssPanelSessionPasswordValid($paths, pmssPanelSessionUsername($home), $request['password']))) {
         $result = array('ok' => false, 'status' => 403, 'message' => 'The password you entered was not accepted. Nothing was changed.');
     } else {
-        $result = pmssConfigureActionRun($home, $action, $request);
+        $result = pmssConfigureActionRun($home, $action, $request, $ops);
     }
     pmssPanelSessionLog($paths, 'configure action='.preg_replace('/[^a-zA-Z]/', '', (string) $action)
         .' status='.($result['ok'] ? 'ok' : 'fail'));
@@ -101,11 +101,16 @@ function pmssConfigureActionApply($home, $action, $request)
 }
 
 /** Keep each action bounded to its own account files and existing helpers. */
-function pmssConfigureActionRun($home, $action, $request)
+function pmssConfigureActionRun($home, $action, $request, $ops = array())
 {
     $ok = false;
     $message = 'The setting could not be saved.';
-    if ($action === 'customFrames') {
+    if ($action === 'torrentClientSwitch') {
+        if (!is_file(__DIR__.'/configureTorrentClients.php') || !is_file(__DIR__.'/torrentClientsResolve.php'))
+            return array('ok' => false, 'status' => 503, 'message' => 'Version switching is unavailable on this host.');
+        require_once __DIR__.'/configureTorrentClients.php';
+        return pmssConfigureTorrentClientSwitch($home, $request, $ops);
+    } elseif ($action === 'customFrames') {
         $path = $home.'/.customFrames';
         // Refuse oversized existing files rather than silently dropping rows.
         $value = is_file($path) && @filesize($path) > 4096 ? null

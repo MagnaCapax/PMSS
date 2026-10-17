@@ -1,6 +1,7 @@
 <?php
 /** Bounded, root-owned stop state for qBittorrent WebUI reconciliation. */
 
+require_once __DIR__.'/../torrentClients/identity.php';
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../runtime/filesystem.php';
 
@@ -114,7 +115,8 @@ function pmssQbittorrentWebUiAuthStop(string $user, array $pids, bool $changed, 
         $eligible = 0;
         foreach ($pids as $pid) {
             // Recheck after the config write; a numeric process id may be reused.
-            if (!pmssQbittorrentWebUiAuthPidIsNative((int) $pid, $ops)) continue;
+            if ($ops === [] ? !in_array((int) $pid, pmssTorrentClientNativeStopPids($user, 'qbittorrent'), true)
+                : !pmssQbittorrentWebUiAuthPidIsNative((int) $pid, $ops)) continue;
             $eligible++;
             $sent = $signal($pid) && $sent;
         }

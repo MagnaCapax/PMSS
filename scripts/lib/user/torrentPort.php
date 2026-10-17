@@ -7,7 +7,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userConfigApply.php', 'qbittorrent.php', 'identity.php']);
+pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userConfigApply.php', '../torrentClients/identity.php', 'qbittorrent.php', 'identity.php']);
 
 /**
  * Validate the user/home pair before crossing process or filesystem boundaries.
@@ -123,7 +123,7 @@ function pmssQbittorrentPortEnsure(string $user, string $home): bool
         return true;
     }
 
-    @shell_exec(sprintf('killall -u %s -9 %s 2>/dev/null', escapeshellarg($user), escapeshellarg('qbittorrent-nox')));
+    pmssTorrentClientNativeStop($user, 'qbittorrent', 9);
 
     return pmssQbittorrentConfigMutate(
         $user,

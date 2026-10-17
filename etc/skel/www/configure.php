@@ -137,6 +137,15 @@ if (is_file(__DIR__.'/mediaStack.php') && function_exists('pmssMediaStackPanelHt
 $urls = pmssAppsAllowedUrlsRead();
 $lsioCatalog = is_file(__DIR__.'/appsLsioCatalog.php') ? require __DIR__.'/appsLsioCatalog.php' : array();
 if (!is_array($lsioCatalog)) $lsioCatalog = array();
+$torrentVersions = array();
+$torrentRunning = '';
+$torrentNotice = '';
+if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrentClientsResolve.php')) {
+    require_once __DIR__.'/configureTorrentClients.php';
+    $torrentVersions = pmssConfigureTorrentClientVersionsRead();
+    $torrentRunning = pmssConfigureTorrentClientRunningVersion($home);
+    $torrentNotice = trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/qbittorrent.notice', 256));
+}
 ?>
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Configure</title>
@@ -157,7 +166,10 @@ if (!is_array($lsioCatalog)) $lsioCatalog = array();
 <div id="wrap"><div id="full_page"><div class="full_top_nohd"></div><div class="full_body"><div class="apps">
 <h1>Configure</h1><p class="note">Apps and settings for your account.</p>
 <div class="configure-layout"><nav class="configure-index" aria-label="Configure sections"><?php foreach ($sections as $id => $label): ?><a href="#<?= pmssCustomerHtmlAttr($id) ?>"><?= pmssCustomerHtmlAttr($label) ?></a><?php endforeach; ?></nav><main>
-<section class="configure-card" id="apps"><h2>Apps</h2><?= pmssCustomerAppsSectionHtmlBuild($status, 'configure.php?status=1') ?></section>
+<section class="configure-card" id="apps"><h2>Apps</h2><?= pmssCustomerAppsSectionHtmlBuild($status, 'configure.php?status=1') ?>
+<?php if ($torrentVersions): ?><h3>qBittorrent version</h3><p>Running: <?= pmssCustomerHtmlAttr($torrentRunning) ?></p><?php if ($torrentNotice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($torrentNotice) ?></p><?php endif; ?>
+<div class="configure-actions"><select id="configure-qbittorrent-version" aria-label="qBittorrent version"><?php foreach ($torrentVersions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"><?= pmssCustomerHtmlAttr($version) ?></option><?php endforeach; ?></select>
+<input type="password" id="configure-qbittorrent-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'qbittorrent',version:document.getElementById('configure-qbittorrent-version').value,password:document.getElementById('configure-qbittorrent-password').value},'Back up the current configuration and restart qBittorrent with this version?')">Switch version</button></div><?php endif; ?></section>
 <?php if (isset($sections['media'])): ?><section class="configure-card" id="media"><h2>Media Stack</h2><div id="pmss-media-stack-status"><?= pmssMediaStackPanelHtmlBuild($mediaStackStatus) ?></div><details><summary>Advanced (SSH)</summary><p>Reruns and uninstall are done over SSH so you can review existing data first.</p><code>bash ~/install-media-stack.sh</code><code>bash ~/install-media-stack.sh --self-update</code><code>bash ~/install-media-stack.sh --uninstall</code><code>bash ~/install-media-stack.sh --force</code><p>Run <code style="display:inline">bash ~/install-media-stack.sh --help</code> for every option.</p></details></section><?php endif; ?>
 <section class="configure-card" id="alerts"><h2>Usage alert email</h2><p>Opt in to email when traffic reaches 80% of the monthly allowance, disk usage reaches 90% of quota, or a monitored media-stack service is reported down. Alerts reset after the condition clears.</p><button type="button" onclick="pmssConfigurePreference(this,'usageAlertsMode','<?= $usageAlertsEnabled ? 'disabled' : 'enabled' ?>')"><?= $usageAlertsEnabled ? 'Disable usage alert email' : 'Enable usage alert email' ?></button></section>
 <section class="configure-card" id="logins"><h2>Passwords and logins</h2><p>Deluge Web UI password: <b><?php if (is_file(__DIR__.'/userPasswords.php')) { require_once __DIR__.'/userPasswords.php'; echo pmssCustomerHtmlAttr(pmssDelugeAuthReadLocalclientPassword($home.'/.config/deluge/auth')); } else { echo 'Unavailable'; } ?></b> (also used for the daemon connection; separate from your account password)</p><?php if (function_exists('pmssDelugeServicePasswordRotate')): ?><button type="button" onclick="pmssConfigureSend('delugeRotate',{},'Deluge clients using the old password will need the new one. Rotate it?')">Rotate Deluge password</button><?php endif; ?><p>rclone password is the same as your web access password.</p><p>qBittorrent username is your own username. Existing setups may use your account password; if the panel prompts you, set a separate WebUI password and use it for future logins.</p></section>
@@ -182,7 +194,7 @@ function pmssConfigureSend(action, fields, consequence) {
     fields.action = action;
     pmssConfigureNotice('Saving...', false);
     $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},data:fields,
-        success:function(result){pmssConfigureNotice(result.message || 'Saved.', false); if (action === 'delugeRotate') setTimeout(function(){location.reload(true);}, 1500);},
+        success:function(result){pmssConfigureNotice(result.message || 'Saved.', false); if (action === 'delugeRotate' || action === 'torrentClientSwitch') setTimeout(function(){location.reload(true);}, 1500);},
         error:function(xhr){pmssConfigureNotice((xhr.responseJSON && xhr.responseJSON.message) || 'The setting could not be saved.', true);}});
 }
 function pmssConfigurePreference(button, key, mode) {

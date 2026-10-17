@@ -51,8 +51,16 @@ function pmssTorrentClientNativeStopPids(string $user, string $client, array $op
     ];
     $known = pmssRootGuardInstallPrefixes();
     if (!isset($guardNames[$client], $known[$guardNames[$client]])) return [];
-    // Lexical account prefix: root must not realpath or stat tenant-owned bin.
-    $roots = ['/home/.pmss/clients/'.$client.'/', '/home/'.$user.'/bin/'.$client.'/'];
+    $installRoots = $ops['installRoots'] ?? $known[$guardNames[$client]];
+    // Lexical account prefixes: root must not realpath or stat tenant-owned bin.
+    $accountRoots = $ops['accountRoots'] ??
+        ['/home/.pmss/clients/'.$client.'/', '/home/'.$user.'/bin/'.$client.'/'];
+    $nativeInstallRoots = $installRoots;
+    foreach ($installRoots as $root) {
+        $resolved = @realpath($root);
+        if ($resolved !== false) $nativeInstallRoots[] = $resolved;
+    }
+    $roots = array_merge($nativeInstallRoots, $accountRoots);
     $exeRead = $ops['exe'] ?? static function (int $pid) { return @readlink('/proc/'.$pid.'/exe'); };
     $native = [];
     foreach (pmssTorrentClientIdentityCandidates($user, $client, $ops) as $pid) {
@@ -67,4 +75,20 @@ function pmssTorrentClientNativeStopPids(string $user, string $client, array $op
         }
     }
     return $native;
+}
+
+/** Recheck the whole identity immediately before signalling a specific PID. */
+function pmssTorrentClientNativeStop(string $user, string $client, int $signal = 15, array $ops = []): int
+{
+    $signal = $signal === 9 ? 9 : 15;
+    $signalPid = $ops['signal'] ?? static function (int $pid, int $value): bool {
+        return @posix_kill($pid, $value);
+    };
+    $stopped = 0;
+    foreach (pmssTorrentClientNativeStopPids($user, $client, $ops) as $pid) {
+        // Enumeration results are hints: a reused PID must pass the fresh predicate.
+        if (!in_array($pid, pmssTorrentClientNativeStopPids($user, $client, $ops), true)) continue;
+        if ($signalPid($pid, $signal)) $stopped++;
+    }
+    return $stopped;
 }

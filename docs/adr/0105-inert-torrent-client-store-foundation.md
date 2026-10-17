@@ -29,8 +29,9 @@ while `torrentClients.enabled` exists. The app include catches all throwables.
 The store requires more than 3 GiB plus its measured existing set size free on
 `/home`; a shortfall skips installation without pruning prior versions.
 
-Account links are created only through `pmssAccountPathRun()` and do not replace
-an existing account default. The customer resolver lives in `etc/skel/www/`
+Account version links are created only through `pmssAccountPathRun()`; P1 stopped
+automatic default-link creation so selection requires a customer switch (ADR 0106).
+The customer resolver lives in `etc/skel/www/`
 and reads only the public host projection. Process identity uses UID, process
 name, and mount namespace; the later native-stop path also checks the kernel
 executable path against the store and that account's bin prefix. No launcher,
@@ -38,9 +39,8 @@ panel, or credential flow uses these helpers in this phase.
 
 ## Security and consequences
 
-[CVE-2023-30801](https://nvd.nist.gov/vuln/detail/CVE-2023-30801)
-shows that a torrent client's exposed WebUI can be a command-execution path.
-This phase does not open ports, change WebUI authentication, or store passwords.
+This phase adds no torrent-client WebUI listener, changes no WebUI
+authentication, and stores no passwords.
 Root-owned store files are 0755; the host-only projection is 0644 beneath the
 root-owned public directory. Logs contain client/version status, no account
 credentials. A compromised tenant may alter only its own links and cannot

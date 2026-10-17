@@ -12,7 +12,7 @@ function pmssTorrentClientsUserLinksRun(string $user, string $home, array $paths
     return pmssAccountPathRun($user, $home, $paths, $command);
 }
 
-/** Publish available store versions and create a default only when absent. */
+/** Publish available store versions; only an explicit switch selects a default. */
 function pmssTorrentClientsUserLinksConverge(string $user, string $home, array $ops = []): bool
 {
     if (!pmssTorrentClientsMarkerEnabled()) return true;
@@ -45,15 +45,6 @@ function pmssTorrentClientsUserLinksConverge(string $user, string $home, array $
             // Check the real parent; an existing link is an expected no-op on rerun.
             $ok = pmssTorrentClientsUserLinksRun($user, $home, [$clientBin], $command, $ops) && $ok;
         }
-        $default = @readlink($storeClient.'/default');
-        if (!is_string($default) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $default) !== 1
-            || !pmssTorrentClientsStorePathChainSafe($root, $client, $default)
-            || !is_dir($storeClient.'/'.$default)) continue;
-        $link = $home.'/bin/'.$client.'/default';
-        $command = 'mkdir -p '.escapeshellarg(dirname($link))
-            .' && if [ ! -e '.escapeshellarg($link).' ] && [ ! -L '.escapeshellarg($link).' ]; then '
-            .'ln -s '.escapeshellarg($storeClient.'/'.$default).' '.escapeshellarg($link).'; fi';
-        $ok = pmssTorrentClientsUserLinksRun($user, $home, [$clientBin], $command, $ops) && $ok;
     }
     return $ok;
 }

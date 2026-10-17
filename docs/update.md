@@ -242,6 +242,8 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    The torrent-client store hook is dormant until
    `/etc/seedbox/config/torrentClients.enabled` exists. Without that marker it
    loads no store code and changes no downloads, links, or public projection.
+   With the marker, account version links and the public projection are prepared;
+   a customer default link is created only by the Configure switch (ADR 0106).
 8. Configure the web stack, regenerate per-user nginx configs from staged
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).

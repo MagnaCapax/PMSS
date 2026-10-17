@@ -91,6 +91,7 @@ function pmssQbittorrentWebUiAuthPidIsNative(int $pid, array $ops = []): bool
 /** Match only the account's known native binary locations. */
 function pmssQbittorrentWebUiAuthNativePids(string $user, array $ops = []): array
 {
+    if ($ops === []) return pmssTorrentClientNativeStopPids($user, 'qbittorrent');
     $pids = isset($ops['pids']) ? $ops['pids']($user) : pmssUserWatchdogProcessPids($user, 'qbittorrent-nox', ['exact' => true]);
     $native = [];
     foreach ($pids as $pid) if (pmssQbittorrentWebUiAuthPidIsNative((int) $pid, $ops)) $native[] = (int) $pid;

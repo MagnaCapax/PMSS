@@ -42,6 +42,7 @@ if ($username === '') {
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/user/qbittorrent.php';
+require_once __DIR__.'/lib/torrentClients/identity.php';
 require_once __DIR__.'/lib/user/passwordFile.php';
 require_once __DIR__.'/lib/user/userFilesystem.php';
 
@@ -115,7 +116,7 @@ $qbittorrentUpdated = pmssUpdateQbittorrentPasswordAsUser($username, $password);
 // after the hash write so stale settings cannot restore the previous password;
 // watchdog cron will restart it.
 if ($qbittorrentUpdated) {
-    shell_exec(sprintf('killall -u %s -KILL %s 2>/dev/null', escapeshellarg($username), 'qbittorrent-nox'));
+    pmssTorrentClientNativeStop($username, 'qbittorrent', 9);
 }
 
 if ($qbittorrentUpdated && !$jsonlOutput) {

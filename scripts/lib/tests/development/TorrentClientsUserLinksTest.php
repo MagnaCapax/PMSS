@@ -27,8 +27,7 @@ final class TorrentClientsUserLinksTest extends TestCase
         $versionLink = $home.'/bin/qbittorrent/5.1.0';
         $defaultLink = $home.'/bin/qbittorrent/default';
         $this->assertSame($store.'/5.1.0', readlink($versionLink));
-        $this->assertSame($store.'/5.1.0', readlink($defaultLink));
-        unlink($defaultLink);
+        $this->assertFalse(is_link($defaultLink));
         mkdir($home.'/bin/qbittorrent/custom');
         file_put_contents($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'custom');
         symlink('custom', $defaultLink);

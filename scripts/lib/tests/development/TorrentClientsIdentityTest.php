@@ -31,7 +31,38 @@ final class TorrentClientsIdentityTest extends TestCase
             'exe' => static function (int $pid) use ($exe): string { return $exe[$pid]; },
         ];
         $this->assertSame([101, 102, 104], \pmssTorrentClientLauncherLivenessPids('t', 'qbittorrent', $ops));
-        $this->assertSame([101, 102], \pmssTorrentClientNativeStopPids('t', 'qbittorrent', $ops));
+        $this->assertSame([101, 102, 104], \pmssTorrentClientNativeStopPids('t', 'qbittorrent', $ops));
+    }
+
+    /** Resolve system install links while leaving an account-owned bin link lexical. */
+    public function testNativeStopResolvesOnlyInstallPrefixSymlink(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-clients-links-');
+        $installBin = $this->pmssEnsureDir($root.'/usr/local/bin');
+        $versioned = $this->pmssWriteFile($installBin.'/qbittorrent-nox-4.6.7', 'binary');
+        $this->pmssCreateSymlinkOrSkip('qbittorrent-nox-4.6.7', $installBin.'/qbittorrent-nox');
+        $tenantTarget = $this->pmssEnsureDir($root.'/tenant-target');
+        $this->pmssEnsureDir($root.'/home/t/bin');
+        $this->pmssCreateSymlinkOrSkip($tenantTarget, $root.'/home/t/bin/qbittorrent');
+        $tenantExe = $this->pmssWriteFile($tenantTarget.'/qbittorrent-nox', 'binary');
+        foreach ([201, 202] as $pid) {
+            $this->pmssEnsureDir($root.'/proc/'.$pid);
+            $this->pmssWriteFile($root.'/proc/'.$pid.'/comm', "qbittorrent-nox\n");
+            $this->pmssWriteFile($root.'/proc/'.$pid.'/status', "Uid:\t1000 1000 1000 1000\n");
+        }
+        $exe = [201 => $versioned, 202 => $tenantExe];
+        $ops = [
+            'account' => static function (): array { return ['uid' => 1000]; },
+            'pids' => static function (): array { return [201, 202]; },
+            'read' => static function (string $path) use ($root) {
+                return @file_get_contents(str_replace('/proc/', $root.'/proc/', $path));
+            },
+            'namespace' => static function (): string { return 'mnt:[1]'; },
+            'exe' => static function (int $pid) use ($exe): string { return $exe[$pid]; },
+            'installRoots' => [$installBin.'/qbittorrent-nox'],
+            'accountRoots' => [$root.'/home/t/bin/qbittorrent/'],
+        ];
+        $this->assertSame([201], \pmssTorrentClientNativeStopPids('t', 'qbittorrent', $ops));
     }
 
     public function testUidAndNameMismatchAreExcluded(): void
