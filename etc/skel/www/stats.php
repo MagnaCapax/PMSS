@@ -368,6 +368,8 @@ echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
 
 </div>
 
+<?php if (pmssWelcomeRequireLocalHelper('statsLive.php')) pmssStatsLiveRender(); ?>
+
 <?php pmssStatsRenderResourceBlocks($resourceState); ?>
 
 <div class="stats-block">
