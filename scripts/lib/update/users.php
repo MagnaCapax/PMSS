@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../user/log.php';
+require_once __DIR__.'/../torrentClients/postSetup.php';
 pmssRequireRelativeFiles(__DIR__, [
     'users/filesystem.php', 'users/webRoot.php', 'users/webRootReconcile.php',
     'users/rutorrent.php', 'users/context.php', 'users/http.php', 'users/permissions.php',
@@ -49,6 +50,9 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '',
     foreach (pmssUserEnvironmentHandlers() as $handler) {
         $handler($ctx);
     }
+
+    // Recreate already calls this pass after home handback (ADR 0089).
+    pmssTorrentClientsPostSetupConverge($user, '/home/'.$user);
 
     return true;
 }
