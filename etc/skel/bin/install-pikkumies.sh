@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 # PMSS: Pikkumies Installer
 # Installs or updates Pikkumies, the helper agent (https://github.com/MagnaCapax/mcxPikkumies),
-# in your own account: ~/.mcxPikkumies and ~/pikkumies. No root, no changes to your shell files.
+# in your own account: ~/.mcxPikkumies and ~/pikkumies. No root. It changes your shell files only when
+# neither ~/bin nor ~/.local/bin is on your PATH (one marked block in ~/.bashrc and ~/.profile).
 # Re-run to update; Pikkumies also updates itself daily from your crontab (the line tagged # pikkumies-update).
+# This installer first fetches its own newest copy from PMSS and runs that; --no-self-update keeps this copy.
 # Remove: rm -rf ~/.mcxPikkumies ~/pikkumies, then delete that crontab line; ~/.virsilipasKey holds your AI key (ADR 0090).
+[ -n "${PIKKUMIES_SELF_TMP:-}" ] && [ "$PIKKUMIES_SELF_TMP" = "$0" ] && rm -f "$0"
+if [[ " $* " != *" --no-self-update "* && " $* " != *" --skip-update "* ]] && tmp=$(mktemp 2>/dev/null); then
+    url="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/bin/install-pikkumies.sh"
+    curl -fsSL "$url" -o "$tmp" 2>/dev/null || wget -q "$url" -O "$tmp" 2>/dev/null || true
+    if head -1 "$tmp" | grep -qx '#!/usr/bin/env bash' && sed -n 2p "$tmp" | grep -qx '# PMSS: Pikkumies Installer'; then
+        chmod 700 "$tmp" && PIKKUMIES_SELF_TMP="$tmp" exec "$tmp" --skip-update "$@"
+    fi
+    rm -f "$tmp"
+fi
 set -euo pipefail
 dir="$HOME/.mcxPikkumies"
 if [ -d "$dir/.git" ]; then

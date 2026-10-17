@@ -70,3 +70,21 @@ endpoint and key from the same file, ignores a key file that is a link, and
 refuses to build its agent runtime when the account's file quota cannot hold it
 (about 65,000 files and 2.5 GiB; measured 60,572 files and 2.0 GB on a PMSS
 account), so a small account gets a clear message instead of a half-built tree.
+
+## Amendment 2026-10-17: the installer updates itself by default
+
+The operator, 2026-10-17: "also it neesd to be the auto updating type like
+install media stack one has" and "self update default enabled, --arg should be
+disable". The wrapper now fetches its own newest copy from PMSS main
+(`etc/skel/bin/install-pikkumies.sh`) and runs it with `--skip-update`, so the
+fetched copy never fetches again. It does so only when line 1 is the bash
+shebang and line 2 is `# PMSS: Pikkumies Installer`, the same check the media
+stack and AI tools installers use; anything else (no curl or wget, a network
+error, an HTML error page) leaves the local copy running. `--no-self-update`
+keeps the local copy. The default differs from those two installers (opt-in
+since GH #800, so the web panel and SSH behave the same and SSH does not run
+ahead of the installed platform): this wrapper has no web panel caller and uses
+no other PMSS file, and it already fetches Pikkumies from GitHub on every run,
+so the self-update adds no new source. The wrapper comment now says it changes
+shell files only when neither `~/bin` nor `~/.local/bin` is on PATH, which is
+what the Pikkumies installer does.
