@@ -156,3 +156,9 @@ During staggered guiv delivery, `apps.php?status=1` and `?log=APP` return HTTP
 emitters. The shared status poll displays that message in app rows and stops
 retrying until the page is reloaded. Ordinary transient poll failures retain
 their retry behavior.
+
+## Amendment 2026-10-17
+
+ADR 0103 supersedes the Apps-tab navigation decision. Configure consolidates
+app controls and account settings after both new customer files are delivered;
+the Apps page remains available for older accounts during migration.

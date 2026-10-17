@@ -239,6 +239,8 @@ PHP;
         'radarr-sonarr.txt',
         'www/console.php',
         'www/apps.php',
+        'www/configure.php',
+        'www/configureSettings.php',
         'www/appsLsioCatalog.php',
         'www/appsRuntime.php',
         'www/deluge.php',

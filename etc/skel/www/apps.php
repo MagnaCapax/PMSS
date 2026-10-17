@@ -89,6 +89,11 @@ function pmssAppsAllowedUrlsRead(): array
 }
 
 require_once __DIR__.'/appsRuntime.php';
+if (is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php')) {
+    header('Location: configure.php', true, 302);
+    return;
+}
+
 if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()) {
     http_response_code(200);
     header('Content-Type: text/html; charset=utf-8');

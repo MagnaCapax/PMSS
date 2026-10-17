@@ -17,6 +17,37 @@ namespace PMSS\Tests;
  */
 class UserPanelTopFrameContractTest extends TestCase
 {
+    public function testConfigureIsLastAndAppsFallsBackBeforeDelivery(): void
+    {
+        $html = $this->pmssRenderCopiedUserPanelIndex(array(), array(),
+            array('apps.php', 'configure.php', 'configureSettings.php'), array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $this->assertStringContainsString('href="#pmssconfigure"', $html);
+        $this->assertStringNotContainsString('href="#apps"', $html);
+        $this->assertTrue(strrpos($html, 'href="#pmssconfigure"') > strrpos($html, 'href="#wiki"'));
+        $this->assertStringContainsString('aria-label="Configure"', $html);
+        $legacy = $this->pmssRenderCopiedUserPanelIndex(array(), array(), array('apps.php'),
+            array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $this->assertStringContainsString('href="#apps"', $legacy);
+        $this->assertStringNotContainsString('href="#pmssconfigure"', $legacy);
+        $partial = $this->pmssRenderCopiedUserPanelIndex(array(), array(), array('apps.php', 'configure.php'),
+            array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $this->assertStringContainsString('href="#apps"', $partial);
+        $this->assertStringNotContainsString('href="#pmssconfigure"', $partial);
+    }
+
+    public function testConfigureStaysLastAfterCustomerFrames(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-configure-tabs-');
+        foreach (array('apps.php', 'configure.php', 'configureSettings.php') as $name) {
+            $this->assertTrue(copy($this->pmssRepoPath('etc/skel/www/'.$name), $home.'/www/'.$name));
+        }
+        $this->pmssWriteFile($home.'/.customFrames', "custom0|Guide|Guide|https://example.com\ncustom1|Duplicate|Duplicate|configure.php\n");
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $this->assertSame(1, substr_count($html, 'href="#pmssconfigure"'));
+        $this->assertTrue(strrpos($html, 'href="#pmssconfigure"') > strrpos($html, 'href="#custom0"'));
+        $this->assertStringNotContainsString('href="#custom1"', $html);
+    }
+
     /** Return the id of the first in-page tab anchor (the default tab), or '' if none. */
     private function firstTabId(string $html): string
     {

@@ -294,8 +294,16 @@ function pmssLocalFrameConsoleFrameRead($launcherPath = 'console.php')
  */
 function pmssLocalFrameAppsFrameRead($path = 'apps.php')
 {
-    return is_file($path)
+    return pmssLocalFrameConfigureFrameRead() === array() && is_file($path)
         ? array('apps' => pmssLocalFrameDefinition('apps.php', 'Apps', 'Applications you can run'))
+        : array();
+}
+
+/** Show Configure only after both update-delivered customer files arrive. */
+function pmssLocalFrameConfigureFrameRead($path = 'configure.php', $helper = 'configureSettings.php')
+{
+    return is_file($path) && is_file($helper)
+        ? array('pmssconfigure' => pmssLocalFrameDefinition('configure.php', '⚙ Configure', 'Apps and settings for your account'))
         : array();
 }
 
@@ -593,7 +601,7 @@ $frameData = pmssLocalFrameCustomFramesRead();
 // TWICE. Dedup case-insensitively so a tab the master already provides is never re-added.
 $pmssFramesKeysLower = array();
 foreach (array_keys($frames) as $pmssFrameKey) { $pmssFramesKeysLower[strtolower($pmssFrameKey)] = true; }
-foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead(), pmssLocalFrameAppsFrameRead()) as $pmssCandidateFrames) {
+foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead(), pmssLocalFrameAppsFrameRead(), pmssLocalFrameConfigureFrameRead()) as $pmssCandidateFrames) {
     foreach ($pmssCandidateFrames as $app => $frame) {
         if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
             $frameData[$app] = $frame;
@@ -604,6 +612,15 @@ if (file_exists('../.delugeEnable') && file_exists('deluge.php') && !isset($pmss
     $frameData['deluge'] = pmssLocalFrameDefinition('deluge/', 'Deluge', 'Deluge - Torrent web UI');
 }
 $frames = array_merge($frames, $frameData);
+// Remote and customer frame definitions cannot move or duplicate Configure.
+$pmssConfigureFrame = pmssLocalFrameConfigureFrameRead();
+foreach ($frames as $pmssFrameKey => $pmssFrame) {
+    if ($pmssFrameKey === 'pmssconfigure' || (isset($pmssFrame['url']) && $pmssFrame['url'] === 'configure.php')
+        || ($pmssConfigureFrame !== array() && ($pmssFrameKey === 'apps' || (isset($pmssFrame['url']) && $pmssFrame['url'] === 'apps.php')))) unset($frames[$pmssFrameKey]);
+}
+if ($pmssConfigureFrame !== array()) {
+    $frames = array_merge($frames, $pmssConfigureFrame);
+}
 
 $styleList = array('iframe');
 foreach($frames AS $thisId => $thisFrame) {
@@ -643,7 +660,7 @@ foreach($frames AS $thisId => $thisFrame) {
         continue;
     }
 
-    echo "\t\t" . '<li><a href="#' . $frameIdHtml . '" title="' . $frameTitleHtml . '" onClick="loadFrame(\'' . $frameIdJs . '\', \'' . $frameUrlJs . '\'); setTimeout(\'setHeights();\', 500); "><span>' .
+    echo "\t\t" . '<li><a href="#' . $frameIdHtml . '" title="' . $frameTitleHtml . '"' . ($thisId === 'pmssconfigure' ? ' aria-label="Configure"' : '') . ' onClick="loadFrame(\'' . $frameIdJs . '\', \'' . $frameUrlJs . '\'); setTimeout(\'setHeights();\', 500); "><span>' .
         $frameTextHtml . '</span></a></li>' . "\n";
 }
 ?>

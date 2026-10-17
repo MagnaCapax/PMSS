@@ -10,6 +10,24 @@ ob_end_clean();
 /** Customer Apps tab contract: live controls and a closed wiki catalog. */
 class AppsCatalogTest extends TestCase
 {
+    /** Exercise the retained Apps contract on an account awaiting Configure delivery. */
+    private function pmssWithLegacyAppsRender(callable $callback)
+    {
+        return $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot) use ($callback) {
+            @unlink($home.'/www/configure.php');
+            @unlink($home.'/www/configureSettings.php');
+            return $callback($home, $render, $runRoot);
+        });
+    }
+
+    private function pmssRenderLegacyAppsPage(string $page, array $homeFlags, array $expectation): string
+    {
+        return $this->pmssWithLegacyAppsRender(function (string $home, callable $render) use ($page, $homeFlags, $expectation): string {
+            foreach ($homeFlags as $flag) @touch($home.'/'.ltrim((string) $flag, '/'));
+            return $render($page, array_merge(array('minBytes' => 5000, 'query' => ''), $expectation))['stdout'];
+        });
+    }
+
     public function testMediaSessionStatusRequiresAnInstallerPane(): void
     {
         $parse = '\\pmssCustomerAppsTmuxSessionsParse';
@@ -60,7 +78,7 @@ class AppsCatalogTest extends TestCase
 
     public function testWelcomeAndAppsShareRowsAndReadOnlyStatus(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
             $this->pmssWriteFile($home.'/.jellyfinDisable', '');
             $apps = $render('apps.php', ['minBytes' => 4000])['stdout'];
@@ -82,7 +100,7 @@ class AppsCatalogTest extends TestCase
 
     public function testHealedWelcomeWorksBeforeUpdateOnlyAppsFilesArrive(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
             $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/sh\nexit 0\n");
             $this->pmssWriteFile($home.'/.bashrc.custom', "# media aliases\n");
@@ -141,7 +159,7 @@ class AppsCatalogTest extends TestCase
 
     public function testFreshHomeHasInstallBannerAndOnlyAllowedWikiLinks(): void
     {
-        $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);
+        $html = $this->pmssRenderLegacyAppsPage('apps.php', [], ['minBytes' => 4000]);
         $this->assertStringContainsString('Media Stack is not installed', $html);
         $this->assertStringContainsString('Install Media Stack', $html);
         $this->assertStringContainsString('function pmssActionRequest(action, passwordValue)', $html);
@@ -202,7 +220,7 @@ class AppsCatalogTest extends TestCase
 
     public function testMoreAppsRendersOpenWithLsioRowsAndOneSearch(): void
     {
-        $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);
+        $html = $this->pmssRenderLegacyAppsPage('apps.php', [], ['minBytes' => 4000]);
         $this->assertStringContainsString('<h2>Find more apps</h2>', $html);
         $this->assertStringNotContainsString('<details>', $html);
         $this->assertStringContainsString('Guides on the Pulsed Media wiki', $html);
@@ -224,7 +242,7 @@ class AppsCatalogTest extends TestCase
 
     public function testMissingLsioCatalogLeavesWikiGuidesAvailable(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             @unlink($home.'/www/appsLsioCatalog.php');
             $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
             $this->assertStringContainsString('Guides on the Pulsed Media wiki', $html);
@@ -235,7 +253,7 @@ class AppsCatalogTest extends TestCase
 
     public function testRestartAllIsInResponsivePageHeader(): void
     {
-        $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);
+        $html = $this->pmssRenderLegacyAppsPage('apps.php', [], ['minBytes' => 4000]);
         $this->assertSame(1, substr_count($html, '>Restart all my services</button>'));
         $header = substr($html, strpos($html, '<div class="apps-header">'), 220);
         $this->assertStringContainsString('<h2>Your apps</h2><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button>', $header);
@@ -245,7 +263,7 @@ class AppsCatalogTest extends TestCase
 
     public function testRunningInstallerHidesPartialMediaAppControls(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
             $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 10\n:\n");
             \pmssFrontendShellExec(\pmssMediaStackPanelStartCommandBuild($home, 'renderuser'));
@@ -306,7 +324,7 @@ class AppsCatalogTest extends TestCase
 
     public function testFailedInstallRestoresMessageAndInstallButton(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssWriteFile($home.'/.install-media-stack.log', "[ERR ] Download failed\n");
             $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
             $this->assertStringContainsString('A previous web install stopped before completion.', $html);
@@ -317,7 +335,7 @@ class AppsCatalogTest extends TestCase
 
     public function testRenderedHandlersHaveNoEscapedQuotesAndWebServerIsRunning(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             foreach (array(false, true) as $installed) {
                 if ($installed) $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
                 $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
@@ -337,7 +355,7 @@ class AppsCatalogTest extends TestCase
 
     public function testInstalledStackRendersRuntimeRowsAndSecurityState(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
             $this->pmssEnsureDir($home.'/.config/radarr', 0700);
             $this->pmssWriteFile($home.'/.radarrDisable', '');
@@ -383,7 +401,7 @@ class AppsCatalogTest extends TestCase
 
     public function testLiveStatusJsonAndBoundedEscapedLog(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
             $this->pmssWriteFile($home.'/.jellyfinDisable', '');
             $json = $render('apps.php', array('query' => 'status=1', 'minBytes' => 100))['stdout'];
@@ -445,7 +463,7 @@ class AppsCatalogTest extends TestCase
 
     public function testEveryStateEndpointRejectsGetAndAcceptsAjaxPostGate(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home): void {
+        $this->pmssWithLegacyAppsRender(function (string $home): void {
             foreach (array('qbittorrent.php', 'deluge.php', 'rclone.php', 'slskd.php', 'copyparty.php', 'rtorrentRestart.php',
                 'lighttpdRestart.php', 'mediaStack.php') as $endpoint) {
                 $action = $endpoint === 'mediaStack.php' ? 'app-stop' : 'unknown';
@@ -462,7 +480,7 @@ class AppsCatalogTest extends TestCase
 
     public function testRtorrentRestartRejectsMissingAndEmptyActions(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home): void {
+        $this->pmssWithLegacyAppsRender(function (string $home): void {
             $marker = $home.'/www/.rtorrentRestart';
             foreach (array(null, '', 'unknown') as $action) {
                 $post = $this->pmssAppsEndpointProbe($home, 'rtorrentRestart.php', $action, 'POST', true);
@@ -474,7 +492,7 @@ class AppsCatalogTest extends TestCase
 
     public function testWelcomeStillRendersControlsUsingPostRequests(): void
     {
-        $html = $this->pmssRenderCustomerPanelPage('welcome.php', array(), array('minBytes' => 10000));
+        $html = $this->pmssRenderLegacyAppsPage('welcome.php', array(), array('minBytes' => 10000));
         $this->assertStringContainsString('rtorrentRestart.php', $html);
         $this->assertStringContainsString('lighttpdRestart.php?action=confirm-restart', $html);
         $shared = $this->pmssReadScriptsIncSources();
@@ -484,7 +502,7 @@ class AppsCatalogTest extends TestCase
 
     public function testAppsShowsUpdatingNoticeWhenGuivHelperIsOld(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render, string $runRoot): void {
             // A healed, older scriptsInc.php may lack helpers used by a newer apps.php.
             $this->pmssWriteFile($home.'/www/scriptsInc.php', "<?php\n");
             $bootstrap = $runRoot.'/php-cli-bootstrap.php';
@@ -498,7 +516,7 @@ class AppsCatalogTest extends TestCase
 
     public function testStatsShowsUpdatingNoticeBeforeUpdateOnlyHelperArrives(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render, string $runRoot): void {
             $this->assertTrue(unlink($home.'/www/statsHelpers.php'));
             file_put_contents($runRoot.'/php-cli-bootstrap.php',
                 "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);
@@ -512,7 +530,7 @@ class AppsCatalogTest extends TestCase
 
     public function testAppsFeedsAnswerUpdatingWhenGuivHelperIsOld(): void
     {
-        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render, string $runRoot): void {
             $this->pmssWriteFile($home.'/www/scriptsInc.php', "<?php\n");
             file_put_contents($runRoot.'/php-cli-bootstrap.php',
                 "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);

@@ -5,13 +5,35 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class CustomerPanelRenderHarnessTest extends TestCase
 {
-    public function testAppsPageRendersWithoutPhpErrors(): void
+    public function testWelcomeMovesControlsOnlyAfterConfigureDelivery(): void
     {
-        $html = $this->pmssRenderCustomerPanelPage('apps.php', [], [
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $new = $render('welcome.php', array('minBytes' => 10000))['stdout'];
+            $this->assertStringContainsString('<h6>Apps and settings</h6>', $new);
+            $this->assertStringNotContainsString('<h6>Usage alert email</h6>', $new);
+            $this->assertTrue(unlink($home.'/www/configureSettings.php'));
+            $old = $render('welcome.php', array('minBytes' => 10000))['stdout'];
+            $this->assertStringContainsString('<h6>Usage alert email</h6>', $old);
+            $this->assertStringContainsString('<h6>App passwords</h6>', $old);
+        });
+    }
+
+    public function testConfigurePageRendersWithoutPhpErrors(): void
+    {
+        $html = $this->pmssRenderCustomerPanelPage('configure.php', [], [
             'minBytes' => 4000,
         ]);
         $this->assertStringContainsString('Find more apps', $html);
         $this->assertStringContainsString('Media Stack is not installed', $html);
+    }
+
+    public function testAppsStatusEndpointSurvivesConfigureDelivery(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $status = $render('apps.php', array('query' => 'status=1', 'minBytes' => 100))['stdout'];
+            $this->assertTrue(is_array(json_decode($status, true)));
+            $this->assertStringContainsString('"apps"', $status);
+        });
     }
 
     public function testRendersCurrentCustomerPanelWithoutPhpErrors(): void
@@ -22,7 +44,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
         $this->assertStringContainsString('[customer-panel-render-harness] OK', $run['stderr']);
         $payload = $this->pmssDecodeJsonArray($run['result']['output']);
         $this->assertSame(true, $payload['ok']);
-        $this->assertSame(3, count($payload['pages']));
+        $this->assertSame(4, count($payload['pages']));
         $this->assertFalse(is_dir($payload['environmentRoot']), 'Harness must clean its synthetic customer home');
     }
 

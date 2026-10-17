@@ -14,6 +14,7 @@
  * @version 1.0
  */
 require_once __DIR__.'/scriptsInc.php';
+$pmssConfigureAvailable = is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php');
 if (isset($_GET['status'])) { pmssCustomerAppsStatusJsonEmit(); exit; }
 if (isset($_GET['log'])) { pmssCustomerAppsLogJsonEmit(); exit; }
 
@@ -323,6 +324,11 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
                             <li><a href="https://filezilla-project.org/download.php?platform=win64" target="_blank">FileZilla - Popular opensource client</a></li>
                         </ul>
 
+<?php if ($pmssConfigureAvailable): ?>
+                        <h6>Apps and settings</h6>
+                        <p>Start, stop and restart your apps, and change account settings, in the ⚙ Configure tab.</p>
+                        <p><a href="configure.php" style="display:inline-block;padding:8px 14px;background:#3a3f4b;color:#fff;text-decoration:none;border-radius:4px" onclick="try { var a = window.parent.document.querySelector('a[href=&quot;#pmssconfigure&quot;]'); if (a) { a.click(); return false; } } catch (e) {}">Open Configure</a></p>
+<?php else: ?>
                         <h6>Usage alert email</h6>
                         <p>Opt in to email when traffic reaches 80% of the monthly allowance, disk usage reaches 90% of quota, or a monitored media-stack service is reported down. Alerts reset after the condition clears.</p>
                         <input type="button" name="usageAlertsMode" value="<?php echo $usageAlertsEnabled ? 'Disable usage alert email' : 'Enable usage alert email'; ?>" onClick="pmssUsageAlertsModeApply(this, '<?php echo $usageAlertsEnabled ? 'disabled' : 'enabled'; ?>');" />
@@ -380,6 +386,7 @@ if (file_exists('openvpn-config.tgz')) {
                         <h6>Panel frame source<?php echo pmssCustomerContextualHelpLinkBuild('panelFrameSource'); ?></h6>
                         <p>Remote-updated frame definitions are the default. Local definitions avoid that frame-definition request, but receive navigation changes only with server PMSS updates. Other panel content may still use remote resources.</p>
                         <input type="button" name="guiFramesMode" value="<?php echo $guiFramesLocalOnly ? 'Use remote-updated frames' : 'Use local frame definitions'; ?>" onClick="pmssGuiFramesModeApply(this, '<?php echo $guiFramesLocalOnly ? 'remote' : 'local'; ?>');" />
+<?php endif; ?>
 
                     </div>
 

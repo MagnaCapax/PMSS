@@ -22,6 +22,7 @@ function pmssCustomerPanelRenderExpectations(): array
         'welcome.php' => ['minBytes' => $minBytes ?? 10000, 'query' => 'quota='.$quota],
         'info.php' => ['minBytes' => $minBytes ?? 5000, 'query' => ''],
         'stats.php' => ['minBytes' => $minBytes ?? 5000, 'query' => ''],
+        'configure.php' => ['minBytes' => $minBytes ?? 4000, 'query' => ''],
     ];
 }
 

@@ -558,6 +558,10 @@ function pmssStatsAppToggleButtonHtmlBuild(string $appName, array $definitions):
         return '';
     }
 
+    if (is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php')) {
+        return '<a href="configure.php#apps">Manage in Configure</a>';
+    }
+
     $enabled = is_file($enableFile);
     $action = $enabled ? 'disable' : 'start';
     $label = $enabled ? 'Disable' : 'Enable';
