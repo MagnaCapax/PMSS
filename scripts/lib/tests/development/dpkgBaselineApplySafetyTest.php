@@ -9,6 +9,30 @@ require_once dirname(__DIR__, 2).'/update/environment.php';
  */
 class DpkgBaselineApplySafetyTest extends TestCase
 {
+    public function testLegacyMediaAreaDpkgPresenceStates(): void
+    {
+        foreach ([
+            '' => false,
+            '   ' => false,
+            'unknown ok not-installed' => false,
+            'deinstall ok config-files' => true,
+            'install ok half-installed' => true,
+            'install ok installed' => true,
+        ] as $status => $expected) {
+            $this->assertSame($expected, \pmssDpkgStatusIndicatesPresent($status), $status);
+        }
+    }
+
+    public function testLegacyMediaAreaPurgeAndHoldStayInsidePresenceGuard(): void
+    {
+        $this->pmssAssertRepoFileMatches(
+            'scripts/lib/update/environment.php',
+            '~if \(pmssDpkgStatusIndicatesPresent\(pmssRepoMediaareaDpkgStatus\(\)\)\) \{\s*'
+            .'runStep\(\'Purging legacy MediaArea package\'.*?;\s*'
+            .'runStep\(\'Holding legacy MediaArea package to block reinstalls\'.*?;\s*\}~s'
+        );
+    }
+
     public function testDpkgSelectionSanitizerKeepsBaselinePolicySnapshot(): void
     {
         $available = static function (string $package): bool { return in_array($package, ['alpha', 'held'], true); };

@@ -345,8 +345,7 @@ pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'start'])
 
 pmssRunProfiledCallable('Preparing noninteractive apt defaults', 'pmssConfigureAptNonInteractive', ['logmsg']);
 pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static function (): void {
-    $status = trim((string) @shell_exec(pmssLockChildClosePrefix().'dpkg-query -W -f=${Status} repo-mediaarea 2>/dev/null'));
-    if ($status === '' || stripos($status, 'not-installed') !== false) {
+    if (!pmssDpkgStatusIndicatesPresent(pmssRepoMediaareaDpkgStatus())) {
         return;
     }
 

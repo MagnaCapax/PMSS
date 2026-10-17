@@ -16,6 +16,19 @@ require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/dpkgSelections.php';
 require_once __DIR__.'/managedPath.php';
 
+/** Treat any known dpkg state except not-installed as legacy package presence. */
+function pmssDpkgStatusIndicatesPresent(string $status): bool
+{
+    $status = trim($status);
+    return $status !== '' && stripos($status, 'not-installed') === false;
+}
+
+/** Read the legacy MediaArea package state without emitting missing-package errors. */
+function pmssRepoMediaareaDpkgStatus(): string
+{
+    return (string) @shell_exec(pmssLockChildClosePrefix().'dpkg-query -W -f=${Status} repo-mediaarea 2>/dev/null');
+}
+
 /**
      * Remove lingering MediaArea apt sources and cached bootstrap packages.
      *
@@ -47,8 +60,10 @@ require_once __DIR__.'/managedPath.php';
             }
         }
 
-        runStep('Purging legacy MediaArea package', aptCmd('purge -y repo-mediaarea || true'));
-        runStep('Holding legacy MediaArea package to block reinstalls', pmssAptDpkgEnvPrefix().' apt-mark hold repo-mediaarea || true');
+        if (pmssDpkgStatusIndicatesPresent(pmssRepoMediaareaDpkgStatus())) {
+            runStep('Purging legacy MediaArea package', aptCmd('purge -y repo-mediaarea || true'));
+            runStep('Holding legacy MediaArea package to block reinstalls', pmssAptDpkgEnvPrefix().' apt-mark hold repo-mediaarea || true');
+        }
         runStep(
             'Removing cached MediaArea packages',
             'rm -f /var/cache/apt/archives/repo-mediaarea_*.deb '

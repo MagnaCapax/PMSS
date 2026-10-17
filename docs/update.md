@@ -135,6 +135,10 @@ run. The sequence is:
 4. `pmssApplyDpkgSelections()` – apply the codename-specific baseline snapshot.
 5. `pmssApplyDpkgSelections()` recovery + post-phase fix-broken/autoremove checks.
 
+Legacy MediaArea cleanup queries dpkg once per cleanup pass. Package removal,
+purge, and hold run only when dpkg reports a state other than `not-installed`;
+repository and cache cleanup still run when the package is absent.
+
 After the package phase, update-step2 compares the installed versions of
 `containerd.io`, `docker-ce`, and `docker-ce-rootless-extras` with a snapshot
 taken before package recovery. When any of those daemon packages changed, it

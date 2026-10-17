@@ -23,7 +23,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
                     "runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');",
                     "logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');",
                     "pmssRunProfiledStep('Cleaning mediaarea bootstrap package state'",
-                    "dpkg-query -W -f=\${Status} repo-mediaarea 2>/dev/null",
+                    'pmssDpkgStatusIndicatesPresent(pmssRepoMediaareaDpkgStatus())',
                     "runStep('Marking repo-mediaarea for deinstallation', \$setSelection);",
                 ],
                 'forbidden' => [
