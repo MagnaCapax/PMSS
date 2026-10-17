@@ -363,6 +363,7 @@ TOOLS:
             Docs:   https://github.com/google-gemini/gemini-cli
 
   codex     OpenAI Codex CLI
+            The system codex uses ~/.virsilipasKey when it holds a key.
             Set: export OPENAI_API_KEY="your-key"
             Then: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
             Docs: https://github.com/openai/codex

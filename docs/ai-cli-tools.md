@@ -71,9 +71,23 @@ gemini "prompt"     # One-shot query
 
 ### Codex CLI (OpenAI)
 
-Codex CLI requires an OpenAI API key or subscription.
+#### Pulsed Media AI credits by default
 
-**Setup:**
+The system `codex` command uses your Pulsed Media AI credits when
+`~/.virsilipasKey` contains a key. It reads the key for that run without
+changing files in your home directory. Your existing login, model choice, or
+explicit command options take precedence.
+
+To opt out, run `PMSS_VIRSILIPAS=off codex`, use `codex login`, or set your own
+`model_provider` in `~/.codex/config.toml`. The system paths come first on your
+PATH, so typing `codex` runs the system launcher; call `~/bin/codex` by its path
+to run a personal copy and bypass the launcher. A personal copy installed by
+`install-ai-tools.sh` is the Codex release that was latest on install day; current
+releases reject `wire_api = "chat"`, so that copy cannot use the Virsilipas provider.
+
+You can also configure Codex with your own API key or subscription.
+
+**Personal setup:**
 1. Get an API key from https://platform.openai.com/api-keys
 2. Log in with your API key:
 ```bash

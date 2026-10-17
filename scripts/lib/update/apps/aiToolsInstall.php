@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/remoteBinary.php';
+require_once __DIR__.'/aiToolsCodex.php';
 
 /** Write the Codex fallback config only when the target is a regular file path. */
 function pmssAiToolsCodexFallbackConfigEnsure(bool $dryRun, ?callable $logger = null): void
@@ -129,34 +130,74 @@ if ($nodeBinary !== '') {
     }
 }
 
-$destination = '/usr/local/bin/codex';
-if (!is_file($destination) || $force) {
+$codexRoot = '/opt/pmss/ai-tools/codex';
+$destination = $codexRoot.'/codex-'.PMSS_AI_CODEX_TAG;
+$launcherSource = __DIR__.'/templates/pmss-ai-launch.php';
+$launcher = '/opt/pmss/ai-tools/pmss-ai-launch.php';
+$stub = '/usr/local/bin/codex';
+if (pmssAiToolsCodexInstallNeeded($destination, $launcher, $stub, $launcherSource, $force)) {
     if (!$supportsPinnedArtifacts) {
         $logger('[WARN] Skipping Codex install: no pinned binary for this CPU architecture');
+    } elseif (!in_array(PMSS_AI_CODEX_TAG, PMSS_AI_CODEX_CHAT_TAGS, true)) {
+        $logger('[WARN] Skipping Codex install: pinned tag lacks a live Virsilipas chat check');
     } else {
-        $tag         = 'rust-v0.93.0';
+        $tag         = PMSS_AI_CODEX_TAG;
         $archive     = 'codex-x86_64-unknown-linux-musl.tar.gz';
         $sha256      = '3574eef71b062c17904b0761c397a97709ef28e99c616e2d1db261b2ea293d07';
         $url         = 'https://github.com/openai/codex/releases/download/'.$tag.'/'.$archive;
-        $downloadDir = sys_get_temp_dir().'/pmss-ai-tools-codex';
-
-        runStep('Preparing Codex download directory', pmssBuildCommand('mkdir', ['-p', $downloadDir]));
-        pmssPinnedRemoteTempFileUse(
-            'Codex CLI archive',
-            $url,
-            $sha256,
-            'pmss-ai-codex-',
-            'Downloading pinned Codex CLI archive',
-            static function (string $archivePath) use ($downloadDir, $destination, $dryRun): void {
-                runStep('Extracting Codex CLI archive', pmssBuildCommand('tar', ['-xzf', $archivePath, '-C', $downloadDir]));
-                runStep('Installing Codex CLI binary', pmssBuildCommand('install', ['-m', '0755', $downloadDir.'/codex-x86_64-unknown-linux-musl', $destination]));
-
-                // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
-                if (preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {
-                    runStep('Ensuring /etc/codex exists', pmssBuildCommand('mkdir', ['-p', '/etc/codex']));
-                    pmssAiToolsCodexFallbackConfigEnsure($dryRun);
+        $binaryReady = is_file($destination) && is_executable($destination) && !is_link($destination) && !$force;
+        if (!$binaryReady) {
+            runStep('Ensuring Codex binary directory exists', pmssBuildCommand('install', ['-d', '-o', 'root', '-g', 'root', '-m', '0755', $codexRoot]));
+            $downloadDir = $dryRun ? '' : pmssCreatePrivateTempDir('pmss-ai-codex-');
+            if ($dryRun || $downloadDir !== null) {
+                try {
+                    $binaryReady = pmssPinnedRemoteTempFileUse(
+                        'Codex CLI archive', $url, $sha256, 'pmss-ai-codex-',
+                        'Downloading pinned Codex CLI archive',
+                        static function (string $archivePath) use ($downloadDir, $destination, $codexRoot, $dryRun): bool {
+                            if (runStep('Extracting Codex CLI archive', pmssBuildCommand('tar', ['-xzf', $archivePath, '-C', $downloadDir ?: '/tmp'])) !== 0) {
+                                return false;
+                            }
+                            if ($dryRun) {
+                                return true;
+                            }
+                            $temporary = @tempnam($codexRoot, '.pmss-codex-');
+                            if (!is_string($temporary)) {
+                                return false;
+                            }
+                            try {
+                                if (dirname($temporary) !== $codexRoot
+                                    || runStep('Installing Codex CLI binary', pmssBuildCommand('install', ['-o', 'root', '-g', 'root', '-m', '0755', $downloadDir.'/codex-x86_64-unknown-linux-musl', $temporary])) !== 0) {
+                                    return false;
+                                }
+                                return @rename($temporary, $destination);
+                            } finally {
+                                if (is_file($temporary)) {
+                                    @unlink($temporary);
+                                }
+                            }
+                        }
+                    ) === true;
+                } finally {
+                    if ($downloadDir !== '') {
+                        @unlink($downloadDir.'/codex-x86_64-unknown-linux-musl');
+                        @rmdir($downloadDir);
+                    }
                 }
             }
-        );
+        }
+        if ($binaryReady && !$dryRun) {
+            $content = @file_get_contents($launcherSource);
+            if (!is_string($content) || !pmssAiToolsCodexAtomicWrite($launcher, $content, 0644)) {
+                $logger('[WARN] Unable to install Codex launcher; keeping existing command');
+            } elseif (!pmssAiToolsCodexAtomicWrite($stub, pmssAiToolsCodexStub(), 0755)) {
+                $logger('[WARN] Unable to install Codex command stub; keeping existing command');
+            }
+        }
+        // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
+        if ($binaryReady && preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {
+            runStep('Ensuring /etc/codex exists', pmssBuildCommand('mkdir', ['-p', '/etc/codex']));
+            pmssAiToolsCodexFallbackConfigEnsure($dryRun);
+        }
     }
 }
