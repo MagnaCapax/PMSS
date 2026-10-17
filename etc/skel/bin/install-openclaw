@@ -44,6 +44,8 @@ function ocNpmInstallArgs(array $paths): array
 function ocVirsilipasCredentials(string $home): ?array
 {
     $file = $home.'/.virsilipasKey';
+    // Judge the file as it is now: older PHP keeps a cached stat after chmod().
+    clearstatcache(true, $file);
     if (!is_file($file) || is_link($file) || fileowner($file) !== posix_geteuid()
         || (fileperms($file) & 0077) !== 0) {
         return null;

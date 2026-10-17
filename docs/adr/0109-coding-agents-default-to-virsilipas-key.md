@@ -1,4 +1,4 @@
-# ADR 0106: Coding agents default to the user's Virsilipas key
+# ADR 0109: Coding agents default to the user's Virsilipas key
 
 Date: 2026-10-17
 Category: architecture
