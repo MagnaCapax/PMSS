@@ -877,6 +877,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Installs/updates root cron entries from `/etc/seedbox/config/root.cron`.
   - Behavior: Maintains the PMSS-owned `cron.service` drop-in with `Restart=always` and an aggregate `TasksMax=8192` cap so cron-spawned user jobs cannot consume host-wide pid capacity.
 
+- scripts/cron/systemdControlChannelCheck.php
+  - Behavior: Every 15 minutes, root cron probes the manager Version property and logind session listing with 15-second deadlines. On failure it reexecutes systemd, restarts D-Bus then logind, and probes again.
+  - Safety: Each recovery command has a 45-second deadline; recovery stops on command failure. Overlapping runs skip under a cron lock, and every recovery attempt is logged.
+
 - scripts/util/ftpConfig.php
   - Behavior: Installs a PMSS-owned `proftpd.service` restart-only drop-in when the ProFTPD configuration directory exists and systemd is available. A changed drop-in triggers a systemd reload before the existing configuration test and service restart (ADR 0093).
 
