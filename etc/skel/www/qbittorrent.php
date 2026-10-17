@@ -16,10 +16,12 @@ function pmssQbittorrentFrontendPasswordSync($action) {
     $configPath = __DIR__.'/../.config/qBittorrent/qBittorrent.conf';
     if (!pmssQbittorrentFrontendPasswordRequired($configPath)) return;
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !isset($_POST['qbittorrentPassword'])) {
+        error_log('PMSS qBittorrent toggle: WebUI password required before '.$action);
         http_response_code(428);
         die('qBittorrent WebUI password sync required');
     }
     if (!pmssQbittorrentFrontendPasswordApply($configPath, (string) $_POST['qbittorrentPassword'])) {
+        error_log('PMSS qBittorrent toggle: WebUI password sync failed before '.$action);
         http_response_code(400);
         die('qBittorrent WebUI password sync failed');
     }

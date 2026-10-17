@@ -55,7 +55,11 @@ function pmssFrontendToggleAction($enableFile, callable $startHandler, $disableC
  pmssFrontendPostActionRequired();
  switch (pmssFrontendActionRequest()) {
   case 'start':
-    touch($enableFile);
+    if (!@touch($enableFile) || !is_file($enableFile)) {
+      error_log('PMSS frontend toggle: enable marker write failed: '.basename($enableFile));
+      http_response_code(500);
+      return;
+    }
     $startHandler();
     break;
 

@@ -29,4 +29,4 @@ pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox
     pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $running, 'pmssQbittorrentApplyManagedConfig');
     $qbittorrentRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['qbittorrent-nox'], static function () use ($thisUser): bool { return function_exists('pmssQbittorrentApplyUploadThrottle') && pmssQbittorrentApplyUploadThrottle($thisUser); }, 'qbittorrent-nox restarted to apply upload throttle', 15, static function () use ($thisUser): void { pmssTorrentClientNativeStop($thisUser, 'qbittorrent', 15); });
     return ['qbittorrent-nox' => $qbittorrentRunning];
-}, __DIR__.'/../lib/user/qbittorrent.php');
+}, __DIR__.'/../lib/user/qbittorrent.php', '/home', '/scripts/listUsers.php', true);

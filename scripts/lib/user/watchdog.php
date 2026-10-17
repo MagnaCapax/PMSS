@@ -270,7 +270,7 @@ function pmssUserWatchdogHandleSuspended(string $username, array $processNames, 
 }
 
 /** @param array<int,string> $processNames @param array<int,array<string,mixed>> $serviceSpecs */
-function pmssUserWatchdogRunService(string $heading, string $enableMarker, array $processNames, string $userLogMessage, array $serviceSpecs, ?callable $runningStateBuilder = null, ?string $optionalRequirePath = null, string $homeRoot = '/home', string $command = '/scripts/listUsers.php'): void
+function pmssUserWatchdogRunService(string $heading, string $enableMarker, array $processNames, string $userLogMessage, array $serviceSpecs, ?callable $runningStateBuilder = null, ?string $optionalRequirePath = null, string $homeRoot = '/home', string $command = '/scripts/listUsers.php', bool $reportMissingMarker = false): void
 {
     $heading !== '' && print date('Y-m-d H:i:s') . ': Checking '.$heading." instances\n";
     $optionalRequirePath !== null && is_file($optionalRequirePath) && require_once $optionalRequirePath;
@@ -281,10 +281,18 @@ function pmssUserWatchdogRunService(string $heading, string $enableMarker, array
         return;
     }
 
+    $missingMarkerCount = 0;
     foreach ($users as $username) {
-        if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot) || !is_file($homeRoot.'/'.$username.'/.'.$enableMarker)) {
+        if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot)) {
+            continue;
+        }
+        if (!is_file($homeRoot.'/'.$username.'/.'.$enableMarker)) {
+            $missingMarkerCount++;
             continue;
         }
         pmssUserWatchdogEnsureServices($username, $serviceSpecs, $runningStateBuilder !== null ? (array) $runningStateBuilder($username) : array());
+    }
+    if ($reportMissingMarker && $missingMarkerCount > 0) {
+        echo $heading.': missing enable markers: '.$missingMarkerCount."\n";
     }
 }

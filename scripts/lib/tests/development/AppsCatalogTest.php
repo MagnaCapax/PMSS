@@ -569,6 +569,22 @@ class AppsCatalogTest extends TestCase
         $this->assertSame('yes', file_get_contents($started));
     }
 
+    public function testToggleStartRejectsUnwritableMarker(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-toggle-marker-');
+        $source = '<?php require '.var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).';'
+            .'$_SERVER["REQUEST_METHOD"]="POST"; $_SERVER["HTTP_X_REQUESTED_WITH"]="XMLHttpRequest";'
+            .'$_POST["action"]="start";'
+            .'pmssFrontendToggleAction('.var_export($root, true).', static function () { echo "started"; }, "true");'
+            .'echo "HTTP=".http_response_code();';
+        $script = $this->pmssWriteFile($root.'/toggle.php', $source);
+        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' 2>&1');
+
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertStringContainsString('HTTP=500', $result['output']);
+        $this->assertStringNotContainsString('started', $result['output']);
+    }
+
     private function pmssAppsEndpointProbe(string $home, string $endpoint, ?string $action, string $method, bool $ajax): string
     {
         $php = '$_SERVER["REQUEST_METHOD"]='.var_export($method, true).';'

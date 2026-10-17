@@ -332,6 +332,24 @@ class UserLifecycleWatchdogTest extends TestCase
         $this->assertEquals('', $output);
     }
 
+    public function testRunServiceReportsMissingMarkersOnlyWhenRequested(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('watchdog-missing-marker-');
+        $this->pmssEnsureUserWebHome($homeRoot, 'alice');
+        $listUsers = $this->pmssMakeTempDir('watchdog-missing-list-').'/listUsers.php';
+        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"alice\\n\";");
+
+        list(, $quiet) = $this->pmssCaptureStdout(function () use ($homeRoot, $listUsers): void {
+            pmssUserWatchdogRunService('', 'demoEnable', [], '', [], null, null, $homeRoot, $listUsers);
+        });
+        list(, $reported) = $this->pmssCaptureStdout(function () use ($homeRoot, $listUsers): void {
+            pmssUserWatchdogRunService('Demo', 'demoEnable', [], '', [], null, null, $homeRoot, $listUsers, true);
+        });
+
+        $this->assertSame('', $quiet);
+        $this->assertStringContainsString("Demo: missing enable markers: 1\n", $reported);
+    }
+
     public function testLocalPortReadAcceptsTrimmedNumericPort(): void
     {
         $path = $this->pmssMakeTempFile('watchdog-port-');

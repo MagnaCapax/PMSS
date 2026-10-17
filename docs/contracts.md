@@ -445,6 +445,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, array $runningStates=[]): array
   - Starts missing service specs after applying the exported lock-fd close prefix;
     the watchdog parent retains its lock while long-lived daemons cannot inherit it.
+- qBittorrent toggle and watchdog diagnostics
+  - A failed enable-marker write returns HTTP 500 before attempting a start.
+    Password-sync prerequisite and failure branches write reason-only PHP error-log entries.
+  - The qBittorrent watchdog reports a count of accounts skipped for a missing
+    enable marker on each run; other service watchdogs retain their prior output.
 - pmssUserSystemdWatchdogRunUser(string $username, string $homeRoot='/home', string $lingerRoot='/var/lib/systemd/linger', ?callable $probe=null, ?callable $accountLookup=null): ?array
   - Runs from the existing two-minute all-users cron and observes only accounts with
     linger, an account-authored `~/.config/systemd/user/*.service`, and cgroup v1.
