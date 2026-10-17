@@ -47,12 +47,19 @@ function pmssAddUserBonusQuotaPersist(array $user, string $homePath): bool
  */
 function pmssAddUserPikkumiesPreinstallCommand(array $user, string $homePath): ?string
 {
+    $launch = pmssPikkumiesPreinstallLaunch($user, $homePath);
+
+    return $launch === null ? null : 'nohup sh -c '.escapeshellarg($launch).' >/dev/null 2>&1 &';
+}
+
+/** The foreground install as the user, in the user's slice, or null below the RAM floor or without the skeleton installer. */
+function pmssPikkumiesPreinstallLaunch(array $user, string $homePath): ?string
+{
     if ((int) ($user['memory'] ?? 0) < pmssUserPikkumiesPreinstallMinRamMiB() || !is_file(rtrim($homePath, '/').'/bin/install-pikkumies.sh')) {
         return null;
     }
-    $launch = pmssBuildUserServiceShellCommand((string) $user['name'], 'PIKKUMIES_SKIP_HERMES=1 bash "$HOME/bin/install-pikkumies.sh"', true);
 
-    return 'nohup sh -c '.escapeshellarg($launch).' >/dev/null 2>&1 &';
+    return pmssBuildUserServiceShellCommand((string) $user['name'], 'PIKKUMIES_SKIP_HERMES=1 bash "$HOME/bin/install-pikkumies.sh"', true);
 }
 
 /**

@@ -119,3 +119,31 @@ scheduled job is due. Existing accounts are not changed by this amendment.
 The "75 MB download and 257 MB on disk" in Consequences was the standalone
 Python of Pikkumies ADR-0014, which ADR-0033 superseded; the runtime now takes
 about 2 GB, as measured above.
+
+## Amendment 2026-10-17: existing accounts, host by host
+
+The operator's "infact pikkumies should be preinstalled ..... in most cases
+that is, if enough ram" answered a report that said installing on every
+account had not been asked for, so it covers accounts that already exist, not
+only new ones. `scripts/lib/update/apps/pikkumiesPreinstall.php` runs in
+update-step2 and does nothing unless `/etc/seedbox/config/pikkumiesPreinstall.enabled`
+exists on the host. Updates reach every server on the same night, while a
+change of this size goes out a few servers at a time with a check in between,
+so the marker is how the rollout is staged: it is placed on a batch of hosts,
+the result is checked, then the next batch.
+
+On a host with the marker, each managed account gets the same command as a new
+account (`pmssPikkumiesPreinstallLaunch`: RAM floor, skeleton installer
+present, as the user in the user's slice, `PIKKUMIES_SKIP_HERMES=1`), unless it
+already has `~/.mcxPikkumies`. The installs run one after another in a single
+background chain, so a host's accounts do not clone at the same moment. An
+account gets a root-owned state file in `/var/lib/pmss/pikkumies-preinstall/`
+when it already has Pikkumies or when its install exits 0, so it is not tried
+again and a user who removed Pikkumies does not get it back. An account below
+the floor, without the installer, or whose install failed (a download error,
+say) gets no state file and is tried again at a later update.
+
+These homes hold their owners' data, so the runtime build that follows at the
+daily update time leaves 10% of the disk and file quota free, or skips
+(Pikkumies `HermesInstall::UNATTENDED_RESERVE`, its ADR-0033 addendum of the
+same date).
