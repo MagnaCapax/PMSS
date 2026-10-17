@@ -217,6 +217,7 @@ PHP;
         'bin/docker-install-lsio',
         'bin/dockerInstallLsio.php',
         'bin/docker-install-wireguard.sh',
+        'bin/docker-reclaim-ownership',
         'bin/install-openclaw',
         'bin/install-pikkumies.sh',
         'bin/linuxserverInstall.sh',

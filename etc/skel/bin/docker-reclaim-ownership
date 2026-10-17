@@ -1,0 +1,42 @@
+#!/bin/bash
+# Reclaim ownership of a path from a container that chowned it to a different
+# (namespace-remapped) UID/GID -- e.g. a linuxserver.io image run without
+# PUID=0/PGID=0 (see docs/linuxserver.io.md, section 2.1). Rootless Docker
+# always maps container UID/GID 0 back to your own account on the host, so
+# running a disposable container as UID 0 against the affected path hands it
+# back to you, no matter what UID it is currently stuck at -- even one you no
+# longer have any access to (not even to list the directory).
+set -euo pipefail
+
+usage() {
+	echo "Usage: docker-reclaim-ownership PATH" >&2
+	echo "Reclaims PATH (and everything under it) back to your own ownership," >&2
+	echo "undoing a container's chown to a different internal UID/GID." >&2
+}
+
+target=${1:-}
+if [ -z "$target" ] || [ "$target" = "--help" ] || [ "$target" = "-h" ]; then
+	usage
+	exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+	echo "docker command not found in PATH" >&2
+	exit 1
+fi
+
+resolved=$(realpath -e -- "$target" 2>/dev/null) || {
+	echo "Path not found: $target" >&2
+	exit 1
+}
+case "$resolved" in
+"$HOME" | "$HOME"/*) ;;
+*)
+	echo "Refusing: $resolved is outside your home directory ($HOME)" >&2
+	exit 1
+	;;
+esac
+
+echo "Reclaiming ownership of $resolved ..."
+docker run --rm -v "$resolved":/reclaim busybox chown -R 0:0 /reclaim
+echo "Done. $resolved (and everything under it) is owned by you again."

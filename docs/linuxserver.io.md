@@ -66,7 +66,10 @@ on the host. For LinuxServer.io images on PMSS:
 - **Always set** `PUID=0` and `PGID=0`.
 - This ensures files created by the container stay owned by you on the host.
 - Without these variables, some images may use a non-root internal user, which
-  can lead to confusing ownership/permission behaviour in rootless setups.
+  can lead to confusing ownership/permission behaviour in rootless setups --
+  up to and including losing access to the bind-mounted directory itself. If
+  that already happened, `docker-reclaim-ownership PATH` (in `~/bin`) hands it
+  back to you; see [`docs/docker-help.md`](./docker-help.md#locked-out-of-your-own-directory-after-running-a-container).
 
 ### 2.2 Volumes (where your data lives)
 
