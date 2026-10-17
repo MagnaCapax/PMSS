@@ -12,8 +12,8 @@ docker run -d \
 	--name wireguard \
 	--cap-add NET_ADMIN \
 	--cap-add SYS_MODULE \
-	-e PUID="$(id -u)" \
-	-e PGID="$(id -g)" \
+	-e PUID=0 \
+	-e PGID=0 \
 	-e TZ="$(cat /etc/timezone 2>/dev/null || echo 'UTC')" \
 	-e SERVERURL="$(hostname)" \
 	-e SERVERPORT="$PORT" \
