@@ -7,7 +7,7 @@
  * @author PMSS Team
  */
 
-foreach (['../lib/update.php', '../lib/update/runtime/commands.php', '../lib/update/services/systemd.php', '../lib/update/distro.php', '../lib/configBackups.php'] as $relativePath) {
+foreach (['../lib/update.php', '../lib/update/runtime/commands.php', '../lib/update/services/systemd.php', '../lib/update/distro.php', '../lib/update/managedPath.php', '../lib/configBackups.php', '../lib/proftpdModules.php'] as $relativePath) {
     require_once __DIR__.'/'.$relativePath;
 }
 
@@ -78,6 +78,26 @@ $rendered = str_replace(
 );
 
 if ($tlsBlock === '') { $rendered = preg_replace('#\n?<IfModule mod_tls\\.c>.*?</IfModule>#s', '', $rendered); }
+
+// Debian may ship mod_tls installed but commented out; repair only that module.
+$modulesPath = '/etc/proftpd/modules.conf';
+if ($tlsBlock !== '' && is_file('/usr/lib/proftpd/mod_tls.so') && is_file($modulesPath) && !is_link($modulesPath)) {
+    $modules = @file_get_contents($modulesPath);
+    if ($modules === false) {
+        logMessage('[WARN] Unable to read ProFTPD modules.conf');
+    } else {
+        $updatedModules = pmssProftpdTlsModuleContent($modules);
+        if ($updatedModules !== $modules) {
+            $mode = fileperms($modulesPath);
+            if ($mode === false || pmssBackupCriticalConfig('proftpd', $modulesPath) === null
+                || !pmssWriteManagedPathFile($modulesPath, $updatedModules, 'ProFTPD modules', 'logMessage', null, null, $mode & 07777)) {
+                logMessage('[WARN] Unable to activate ProFTPD mod_tls; leaving module configuration unchanged');
+            } else {
+                logMessage('Activated ProFTPD mod_tls in modules.conf');
+            }
+        }
+    }
+}
 
 foreach (['/var/log/proftpd', '/var/run/proftpd'] as $path) {
     if (!pmssDirEnsureExists($path, 0750)) {

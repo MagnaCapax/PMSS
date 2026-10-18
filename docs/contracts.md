@@ -913,6 +913,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/ftpConfig.php
   - Behavior: Applies FTP server configuration from templates and restarts service.
+  - TLS module: with a certificate and installed mod_tls, backs up Debian's modules.conf and activates only a missing mod_tls load line. An already-active line is unchanged; failed reads, backups, or writes leave the module file untouched. The existing config test still gates restart.
 
 - scripts/util/userPermissions.php <user>
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
