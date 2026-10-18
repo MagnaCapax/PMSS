@@ -10,6 +10,12 @@ function pmssTorrentClientsBinaryNames(): array
     ];
 }
 
+/** Root owns the store outside the development fixture tree. */
+function pmssTorrentClientsStoreOwnerIds(): array { return defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? [posix_geteuid(), posix_getegid()] : [0, 0]; }
+
+/** Resolve the same versioned daemon path for installation and publication. */
+function pmssTorrentClientsStoreBinaryPath(string $root, string $client, $version, $kind): string { return $root.'/'.$client.'/'.$version.($client === 'deluge' && $kind === 'venv' ? '/bin/' : '/').pmssTorrentClientsBinaryNames()[$client]; }
+
 /** One path-component rule for catalog, store, and account-link versions. */
 function pmssTorrentClientsVersionValid($version): bool
 {
@@ -32,8 +38,7 @@ function pmssTorrentClientsStorePathChainSafe(string $root, string $client = '',
     $paths = [dirname($root), $root];
     if ($client !== '') $paths[] = $root.'/'.$client;
     if ($version !== '') $paths[] = $root.'/'.$client.'/'.$version;
-    $uid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_geteuid() : 0;
-    $gid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_getegid() : 0;
+    [$uid, $gid] = pmssTorrentClientsStoreOwnerIds();
     foreach ($paths as $path) {
         clearstatcache(true, $path);
         if (($stat = @lstat($path)) === false) continue;

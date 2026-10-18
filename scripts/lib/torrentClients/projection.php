@@ -18,14 +18,12 @@ function pmssTorrentClientsProjectionWrite(
     if (!pmssTorrentClientsMarkerEnabled()) return false;
     $root = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT') ?: '/home/.pmss/clients';
     $versions = [];
-    $binaryNames = pmssTorrentClientsBinaryNames();
     foreach ($catalog as $entry) {
-        if (!is_array($entry) || !isset($binaryNames[$entry['client'] ?? ''], $entry['version'], $entry['kind'])) continue;
+        if (!is_array($entry) || !isset(pmssTorrentClientsBinaryNames()[$entry['client'] ?? ''], $entry['version'], $entry['kind'])) continue;
         $client = $entry['client'];
         $version = $entry['version'];
         $binary = $entry['kind'] === 'system' ? ($entry['binary'] ?? '')
-            : $root.'/'.$client.'/'.$version
-                .($client === 'deluge' && $entry['kind'] === 'venv' ? '/bin/' : '/').$binaryNames[$client];
+            : pmssTorrentClientsStoreBinaryPath($root, $client, $version, $entry['kind']);
         if (!is_string($binary) || !is_file($binary) || is_link($binary)) continue;
         if ($client === 'deluge' && $entry['kind'] === 'venv'
             && (!is_file(dirname($binary).'/deluge-web') || is_link(dirname($binary).'/deluge-web'))) continue;
@@ -44,8 +42,7 @@ function pmssTorrentClientsProjectionWrite(
         $versions[] = $published;
     }
     if (!pmssPathSegmentsAreSafe($publicPath, false, true, true, false)) return false;
-    $ownerUid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_geteuid() : 0;
-    $ownerGid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_getegid() : 0;
+    [$ownerUid, $ownerGid] = pmssTorrentClientsStoreOwnerIds();
     if (!pmssCheckDirectoriesEnsurePublicDirectory(dirname($publicPath), static function (string $message): void {
         fwrite(STDERR, $message.PHP_EOL);
     }, $ownerUid, $ownerGid)) return false;

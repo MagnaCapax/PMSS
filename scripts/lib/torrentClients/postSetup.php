@@ -23,7 +23,7 @@ function pmssTorrentClientsPostSetupAvailable(string $path): array
 function pmssTorrentClientsPostSetupHasStoreLink(string $user, string $home, array $ops): bool
 {
     $root = rtrim($ops['root'] ?? '/home/.pmss/clients', '/');
-    $command = 'for client in qbittorrent rtorrent deluge transmission; do '
+    $command = 'for client in '.implode(' ', array_keys(pmssTorrentClientsBinaryNames())).'; do '
         .'target=$(readlink '.escapeshellarg($home).'/bin/$client/default 2>/dev/null) || continue; '
         .'case "$target" in '.escapeshellarg($root.'/').'*) exit 0;; esac; done; exit 1';
     return pmssTorrentClientsUserLinksRun($user, $home, [$home.'/bin'], $command, $ops);

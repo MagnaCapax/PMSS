@@ -38,8 +38,7 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
             || preg_match('/\A[a-fA-F0-9]{64}\z/', $wheel['sha256']) !== 1) return false;
         $path = $wheelDir.'/'.$wheel['file'];
         $stat = @lstat($path);
-        $uid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_geteuid() : 0;
-        if (isset($seen[$path]) || !is_array($stat) || $stat['uid'] !== $uid
+        if (isset($seen[$path]) || !is_array($stat) || $stat['uid'] !== pmssTorrentClientsStoreOwnerIds()[0]
             || !is_file($path) || is_link($path)
             || hash_file('sha256', $path) !== strtolower($wheel['sha256'])) return false;
         $seen[$path] = true;

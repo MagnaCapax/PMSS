@@ -23,8 +23,7 @@ function pmssTorrentClientsStoreDirectory(string $path): bool
 {
     if (is_link($path) || (!is_dir($path) && !@mkdir($path, 0755))) return false;
     $stat = @lstat($path);
-    $uid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_geteuid() : 0;
-    $gid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_getegid() : 0;
+    [$uid, $gid] = pmssTorrentClientsStoreOwnerIds();
     return is_array($stat) && ($stat['mode'] & 0170000) === 0040000
         && $stat['uid'] === $uid && $stat['gid'] === $gid && @chmod($path, 0755);
 }
@@ -54,7 +53,6 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
         return false;
     };
     $results = [];
-    $binaryNames = pmssTorrentClientsBinaryNames();
     foreach ($catalog as $entry) {
         if (!is_array($entry) || !isset($entry['client'], $entry['version'], $entry['kind'])) continue;
         if (!empty($entry['disabled']) || $entry['kind'] === 'system') continue;
@@ -62,12 +60,12 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
         $version = $entry['version'];
         $id = $client.'/'.$version;
         // Even direct callers must not turn unchecked catalog values into paths.
-        if (!is_string($client) || !isset($binaryNames[$client])
+        if (!is_string($client) || !isset(pmssTorrentClientsBinaryNames()[$client])
             || !pmssTorrentClientsVersionValid($version)) {
             $results[$id] = 'invalid';
             continue;
         }
-        $binary = $root.'/'.$id.($client === 'deluge' && $entry['kind'] === 'venv' ? '/bin/' : '/').$binaryNames[$client];
+        $binary = pmssTorrentClientsStoreBinaryPath($root, $client, $version, $entry['kind']);
         if (!pmssTorrentClientsStorePathChainSafe($root, $client, $version)) {
             $log('[WARN] torrent client '.$id.' unsafe store directory');
             $results[$id] = 'failed';
