@@ -64,42 +64,40 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
     $pathMap = static function (string $basePath): array {
         return [$basePath.'/' => '/', $basePath => ''];
     };
-    $definitions = [
-        'deluge' => [
-            "# PMSS-managed: Deluge reverse proxy.\n# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n",
-            [
-                ['^/user-'.$user.'/deluge($|/)', $pathMap('/user-'.$user.'/deluge'), true, false],
-                ['^/deluge-'.$user.'($|/)', $pathMap('/deluge-'.$user), true, false],
-            ],
-        ],
-        'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
-        'qbittorrent' => [
-            "# PMSS-managed: qBittorrent reverse proxy.\n\n",
-            [
-                ['redirect', '/user-'.$user.'/qbittorrent', '/user-'.$user.'/qbittorrent/'],
-                ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true, false, true, true],
-            ],
-        ],
-        'invidious' => [
-            "# PMSS-managed: Invidious reverse proxy.\n\n",
-            [
-                ['^/public-'.$user.'/invidious($|/)', $pathMap('/public-'.$user.'/invidious'), false, true],
-                ['^/user-'.$user.'/apps/invidious($|/)', $pathMap('/user-'.$user.'/apps/invidious'), false, true],
-            ],
-        ],
-    ];
-    if (!isset($definitions[$proxyName])) {
+    // Select only the requested route; each rule keeps its existing render flags.
+    if ($proxyName === 'deluge') {
+        $fragment = "# PMSS-managed: Deluge reverse proxy.\n# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n";
+        $rules = [
+            ['^/user-'.$user.'/deluge($|/)', $pathMap('/user-'.$user.'/deluge'), true, false],
+            ['^/deluge-'.$user.'($|/)', $pathMap('/deluge-'.$user), true, false],
+        ];
+    } elseif ($proxyName === 'rclone') {
+        $fragment = "# PMSS-managed: rclone reverse proxy.\n\n";
+        $rules = [['^/user-'.$user.'/rclone/', [], true, false, true]];
+    } elseif ($proxyName === 'qbittorrent') {
+        $fragment = "# PMSS-managed: qBittorrent reverse proxy.\n\n";
+        $rules = [
+            ['redirect', '/user-'.$user.'/qbittorrent', '/user-'.$user.'/qbittorrent/'],
+            ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true, false, true, true],
+        ];
+    } elseif ($proxyName === 'invidious') {
+        $fragment = "# PMSS-managed: Invidious reverse proxy.\n\n";
+        $rules = [
+            ['^/public-'.$user.'/invidious($|/)', $pathMap('/public-'.$user.'/invidious'), false, true],
+            ['^/user-'.$user.'/apps/invidious($|/)', $pathMap('/user-'.$user.'/apps/invidious'), false, true],
+        ];
+    } else {
         $catalog = pmssToggleAppCatalogRead();
         if (!isset($catalog[$proxyName])) return '';
         $base = '/user-'.$user.'/'.$proxyName;
-        $definitions[$proxyName] = ["# PMSS-managed: {$catalog[$proxyName]['label']} reverse proxy.\n\n", [
+        $fragment = "# PMSS-managed: {$catalog[$proxyName]['label']} reverse proxy.\n\n";
+        $rules = [
             ['redirect', $base, $base.'/'],
             ['^'.$base.'/', [], false, true],
-        ]];
+        ];
     }
 
-    $fragment = $definitions[$proxyName][0];
-    foreach ($definitions[$proxyName][1] as $rule) {
+    foreach ($rules as $rule) {
         if ($rule[0] === 'redirect') {
             $fragment .= '$HTTP["url"] == "'.$rule[1]."\" {\n"
                 .'  url.redirect = ( "" => "'.$rule[2]."\" )\n}\n\n";
