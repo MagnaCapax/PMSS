@@ -49,6 +49,18 @@ function pmssWriteManagedPathFile(
     return false;
 }
 
+/** Record the staged version only after phase 2 reaches its completion point. */
+function pmssWriteCompletedVersionMarker(string $versionPath, string $completedPath, callable $logger): bool
+{
+    $version = trim((string) @file_get_contents($versionPath));
+    if ($version === '') {
+        $logger('[WARN] Cannot write completed version marker: version file missing or empty at '.$versionPath);
+        return false;
+    }
+
+    return pmssWriteManagedPathFile($completedPath, $version."\n", 'completed version marker', $logger, null, null, 0644);
+}
+
 /**
  * Refresh managed file content only when it changed.
  *

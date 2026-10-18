@@ -19,6 +19,8 @@ Responsibilities:
   not survive.
 - Record the selected version under `/etc/seedbox/config/version` and
   `version.meta`.
+  `version` means the snapshot was staged; `version.completed` equal to it means
+  update-step2 finished for that snapshot.
 - Re-run itself once if the fetched snapshot updated `update.php`.
 - Invoke phase 2 unless explicitly skipped.
 - Keep `/etc/cron.d/pmss` active through phase-1 staging; disable it only for

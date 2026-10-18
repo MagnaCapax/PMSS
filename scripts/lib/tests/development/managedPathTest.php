@@ -52,6 +52,51 @@ class ManagedPathTest extends TestCase
         $this->assertEquals([], $messages);
     }
 
+    public function testCompletedVersionMarkerUsesTrimmedVersion(): void
+    {
+        [$root] = $this->managedPathFixture('pmss-completed-version-');
+        $versionPath = $root.'/version';
+        $completedPath = $root.'/version.completed';
+        file_put_contents($versionPath, "  git/main@2026-10-18  \n");
+        $messages = [];
+
+        $this->assertTrue(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $this->pmssMakeArrayLogger($messages)));
+        $this->assertSame("git/main@2026-10-18\n", file_get_contents($completedPath));
+        $this->assertSame(0644, fileperms($completedPath) & 0777);
+        $this->assertSame([], $messages);
+    }
+
+    public function testCompletedVersionMarkerSkipsMissingAndEmptyVersion(): void
+    {
+        [$root] = $this->managedPathFixture('pmss-completed-empty-');
+        $versionPath = $root.'/version';
+        $completedPath = $root.'/version.completed';
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $this->assertFalse(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $logger));
+        $this->assertFalse(file_exists($completedPath));
+        file_put_contents($versionPath, " \n\t");
+        $this->assertFalse(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $logger));
+        $this->assertFalse(file_exists($completedPath));
+        $this->assertSame(2, count($messages));
+        $this->assertTrue($this->pmssMessagesContain($messages, '[WARN] Cannot write completed version marker'));
+    }
+
+    public function testCompletedVersionMarkerMatchesPhase2DryRunWrite(): void
+    {
+        [$root] = $this->managedPathFixture('pmss-completed-dry-run-');
+        $versionPath = $root.'/version';
+        $completedPath = $root.'/version.completed';
+        file_put_contents($versionPath, "git/main\n");
+        $messages = [];
+
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($versionPath, $completedPath, &$messages): void {
+            $this->assertTrue(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $this->pmssMakeArrayLogger($messages)));
+        });
+        $this->assertSame("git/main\n", file_get_contents($completedPath));
+    }
+
     public function testManagedWriteAppliesRequestedModeWhenMetadataProvided(): void
     {
         [, $path] = $this->managedPathFixture('pmss-env-write-meta-');

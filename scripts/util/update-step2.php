@@ -646,6 +646,8 @@ $pmssRootCronRestored = true;
 
 // Record successful completion for MOTD/monitoring.
 pmssWriteManagedPathFile('/var/run/pmss/updated', date('Y-m-d H:i:s'), 'update completion marker', 'logmsg');
+// #1017: Persist the staged version that reached phase-2 completion.
+pmssWriteCompletedVersionMarker('/etc/seedbox/config/version', '/etc/seedbox/config/version.completed', 'logmsg');
 
 // Surface log locations for operators to review after updates.
 try {

@@ -211,6 +211,7 @@ function pmssAgentDiagnosticsCollect(string $user = ''): array
         'timestamp' => date('c'),
         'hostname' => gethostname() ?: '',
         'version' => trim((string) @file_get_contents(pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_VERSION_PATH', '/etc/seedbox/config/version'))),
+        'version_completed' => trim((string) @file_get_contents(pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_VERSION_COMPLETED_PATH', '/etc/seedbox/config/version.completed'))),
         'user' => $user !== '' ? $user : null,
         'sections' => pmssAgentDiagnosticsSpecCollect(pmssAgentDiagnosticsSectionSpecs($user)),
     ];
@@ -220,7 +221,7 @@ function pmssAgentDiagnosticsCollect(string $user = ''): array
 function pmssAgentDiagnosticsRenderText(array $payload): string
 {
     $output = "PMSS Agent Diagnostics\n";
-    foreach (['timestamp', 'hostname', 'version'] as $field) {
+    foreach (['timestamp', 'hostname', 'version', 'version_completed'] as $field) {
         $output .= $field.': '.($payload[$field] ?? '')."\n";
     }
     $output .= 'user: '.(($payload['user'] ?? null) === null ? '-' : $payload['user'])."\n";

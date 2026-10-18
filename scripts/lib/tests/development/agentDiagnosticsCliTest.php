@@ -34,10 +34,12 @@ final class agentDiagnosticsCliTest extends TestCase
         $mdstatPath = $this->pmssMakeTempFile('pmss-agent-mdstat-');
         $fstabPath = $this->pmssMakeTempFile('pmss-agent-fstab-');
         $versionPath = $this->pmssMakeTempFile('pmss-agent-version-');
+        $completedPath = $this->pmssMakeTempFile('pmss-agent-completed-');
         file_put_contents($motdPath, "hello host\n");
         file_put_contents($mdstatPath, "md0 : active raid1\n");
         file_put_contents($fstabPath, "/dev/md0 /home ext4 defaults 0 0\n");
         file_put_contents($versionPath, "git/main@2026-03-28\n");
+        file_put_contents($completedPath, "git/main@2026-03-28\n");
 
         $binDir = $this->makeCommandStubs();
         $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json', '--pretty', '--user=alice'], $this->pmssPathPrefixedEnvironment($binDir, $this->pmssTestModeEnv([
@@ -46,6 +48,7 @@ final class agentDiagnosticsCliTest extends TestCase
             'PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH' => $mdstatPath,
             'PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH' => $fstabPath,
             'PMSS_AGENT_DIAGNOSTICS_VERSION_PATH' => $versionPath,
+            'PMSS_AGENT_DIAGNOSTICS_VERSION_COMPLETED_PATH' => $completedPath,
         ])));
         $payload = $this->pmssDecodeJsonArray($output);
 
@@ -62,6 +65,7 @@ final class agentDiagnosticsCliTest extends TestCase
             array_keys($payload['sections']['services'])
         );
         $this->assertSame('git/main@2026-03-28', $payload['version']);
+        $this->assertSame('git/main@2026-03-28', $payload['version_completed']);
         $this->assertSame('alice', $payload['user']);
         $this->assertSame("hello host\n", $payload['sections']['motd']['raw']);
         $this->assertSame(['alice', 'bob'], $payload['sections']['users']['list']);
@@ -134,9 +138,17 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $scriptRoot = $this->makeScriptRoot();
         $binDir = $this->makeCommandStubs();
-        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/agentDiagnostics.php', [], ['PMSS Agent Diagnostics', 'user: -', '== services =='], $this->pmssPathPrefixedEnvironment($binDir, $this->pmssTestModeEnv([
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/agentDiagnostics.php', [], ['PMSS Agent Diagnostics', 'version_completed:', 'user: -', '== services =='], $this->pmssPathPrefixedEnvironment($binDir, $this->pmssTestModeEnv([
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
         ])));
+    }
+
+    public function testCompletedVersionIsEmptyWhenFileIsAbsent(): void
+    {
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-completed-missing-');
+        $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_VERSION_COMPLETED_PATH' => $root.'/missing'], function (): void {
+            $this->assertSame('', \pmssAgentDiagnosticsCollect()['version_completed']);
+        });
     }
 
     public function testJsonSectionReportsScriptFailure(): void
