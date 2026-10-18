@@ -15,6 +15,7 @@ class NetworkFireqosTest extends TestCase
         }
         if ($throttle !== null) {
             @file_put_contents($homeDir.'/root/.throttle', $throttle);
+            @chmod($homeDir.'/root/.throttle', 0644);
         }
         return [$stateDir, $homeDir];
     }
@@ -246,5 +247,34 @@ class NetworkFireqosTest extends TestCase
             $this->assertStringContainsString('class root ceil 100Mbit', $config);
             $this->assertStringNotContainsString('99999Mbit', $config);
         });
+    }
+
+    public function testOversizedUidOutputDoesNotCreateAUserClass(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub('id', "#!/bin/sh\nprintf '%s\\n' '999999999999999999999999999999'\n", 'pmss-fireqos-id-');
+        $this->pmssWithPathPrefixedEnv($binDir, [], function (): void {
+            $this->assertEquals([], \networkFireqosUserCaps([], ['root']));
+            $this->assertStringNotContainsString('class root', \networkBuildFireqosConfig([], ['root'], []));
+        });
+    }
+
+    public function testOversizedThrottleFileFallsBackToDefaultCap(): void
+    {
+        $config = $this->buildFireqosConfigWithThrottleFixture(
+            true,
+            '999999999999999999999999999999',
+            ['throttle' => ['max' => 90]]
+        );
+        $this->assertStringContainsString('class root ceil 90Mbit', $config);
+    }
+
+    public function testRenderedCapsRejectOverflowButKeepRepresentableValues(): void
+    {
+        $this->assertEquals(['root' => 25, 'daemon' => null], \networkFireqosRenderedUserCaps(
+            "class group users\n    class root ceil 25Mbit\n    class daemon\nclass group end\n"
+        ));
+        $this->assertEquals(null, \networkFireqosRenderedUserCaps(
+            "class group users\n    class root ceil 999999999999999999999999999999Mbit\nclass group end\n"
+        ));
     }
 }

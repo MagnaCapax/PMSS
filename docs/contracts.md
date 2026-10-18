@@ -575,6 +575,7 @@ Bootstrap helpers from install-time env (Phase 2):
 FireQOS helpers:
 - networkLoadConfig()/networkLoadLocalnets(): array → load active net config and localnets, with defaults and env overrides (`PMSS_NETWORK_CONFIG`, `PMSS_LOCALNET_FILE`).
 - networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string → render FireQOS template with per-user classes and localnets matches; optional per-user cap via `/var/run/pmss/trafficLimits/<user>.enabled`.
+- FireQOS UID output and root-owned `.throttle` values must fit a PHP integer before rendering. Invalid UIDs are skipped; invalid throttle values retain the configured fallback cap. An unrepresentable cap in the installed config returns an unknown rendered state so the existing convergence check can retry.
 - networkApplyFireqos(string $config): void → writes `/etc/seedbox/config/fireqos.conf` and starts FireQOS; logs to `/var/log/pmss/fireqos.log`.
 
 iptables helpers:

@@ -24,7 +24,8 @@ function networkFireqosUserCaps(array $networkConfig, array $users, ?callable $f
             continue;
         }
         $uid = trim((string) @shell_exec('id -u '.escapeshellarg($username).' 2>/dev/null'));
-        if (!ctype_digit($uid)) {
+        $uid = pmssUnsignedDecimalIntParse($uid);
+        if ($uid === null) {
             continue;
         }
 
@@ -44,13 +45,14 @@ function networkFireqosUserCaps(array $networkConfig, array $users, ?callable $f
             if (is_array($stats) && isset($stats['mode'], $stats['uid']) && ($stats['mode'] & 0170000) === 0100000
                 && (int) $stats['uid'] === 0 && (($stats['mode'] & 0777) & 0022) === 0) {
                 $raw = is_string($raw) ? trim($raw) : '';
-                $stored = ctype_digit($raw) ? (int) $raw : 0;
-                if ($stored > 0) {
+                // Oversized file contents must not become a saturated cap.
+                $stored = pmssUnsignedDecimalIntParse($raw);
+                if ($stored !== null && $stored > 0) {
                     $capMbit = $stored;
                 }
             }
         }
-        $caps[$username] = ['uid' => (int) $uid, 'cap' => $capMbit];
+        $caps[$username] = ['uid' => $uid, 'cap' => $capMbit];
     }
     return $caps;
 }
@@ -110,7 +112,10 @@ function networkFireqosRenderedUserCaps(string $config): ?array
             return $caps;
         }
         if (preg_match('/^class ([a-zA-Z0-9_-]+)(?: ceil ([0-9]+)Mbit)?$/', $line, $match)) {
-            $caps[$match[1]] = isset($match[2]) ? (int) $match[2] : null;
+            $cap = isset($match[2]) ? pmssUnsignedDecimalIntParse($match[2]) : null;
+            // An unrepresentable rendered cap is not evidence of convergence.
+            if (isset($match[2]) && $cap === null) return null;
+            $caps[$match[1]] = $cap;
         }
     }
     return null;
