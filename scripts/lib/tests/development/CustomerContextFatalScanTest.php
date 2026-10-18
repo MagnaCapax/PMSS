@@ -114,6 +114,21 @@ PHP
         $this->assertSame("[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 3 unresolved customer PHP function call(s):\n  etc/skel/www/alpha.php:2 - pmssAlphaOperator() (operator tree definition: scripts/lib/alpha.php)\n  etc/skel/www/alpha.php:3 - pmssUnknownOperator()\n  etc/skel/www/omega.php:2 - pmssOmegaOperator() (operator tree definition: scripts/lib/nested/omega.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.", $result['output']);
     }
 
+    public function testReportsOperatorCallsToUndefinedFunctions(): void
+    {
+        $root = $this->pmssCustomerContextFixtureRoot([
+            'scripts/lib/lighttpd/proxy.php' => "<?php\nif (!is_socket('/run/x.sock')) return;\npmssKnownHelper();\n",
+            'scripts/lib/helper.php' => "<?php\nfunction pmssKnownHelper(): void { pmssSkelHelper(); }\n",
+            'scripts/startDaemon' => "#!/usr/bin/env php\n<?php\npmssMissingStarter();\nif (function_exists('pmssOptionalStarter')) {\n    pmssOptionalStarter();\n}\n",
+            'etc/skel/www/skelHelper.php' => "<?php\nfunction pmssSkelHelper(): void {}\n",
+        ]);
+
+        $result = $this->pmssCustomerContextRunScan($root);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertSame("[customer-context-fatal-scan] FAIL - UNDEFINED_FUNCTION_CALL: 2 operator PHP call(s) to undefined functions:\n  scripts/lib/lighttpd/proxy.php:2 - is_socket()\n  scripts/startDaemon:3 - pmssMissingStarter()", $result['output']);
+    }
+
     private function pmssCustomerContextFixtureRoot(array $files): string
     {
         $root = $this->pmssMakeTempDir('pmss-customer-context-scan-', 0700);

@@ -39,7 +39,7 @@ function pmssLighttpdDockerClientPort(string $user, string $app, ?callable $insp
         $account = function_exists('posix_getpwnam') ? posix_getpwnam($user) : false;
         if (!is_array($account) || !isset($account['uid'])) return null;
         $socket = '/run/user/'.(int) $account['uid'].'/docker.sock';
-        if (!is_socket($socket)) return null;
+        if (@filetype($socket) !== 'socket') return null;
         // Select only identity and published-port fields; inspect must not expose env secrets.
         $format = '{"Name":{{json .Name}},"State":{"Running":{{json .State.Running}}},'
             .'"Config":{"Labels":{{json .Config.Labels}}},'

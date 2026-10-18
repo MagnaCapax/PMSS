@@ -1,14 +1,17 @@
 <?php
 /**
- * Token-aware customer PHP fatal-call scanner.
+ * Token-aware PHP fatal-call scanner.
  *
  * Customer-facing PHP cannot load operator-only helpers from `/scripts`, so
  * unresolved bare function calls are treated as ADR 0016/0017 regressions.
+ * Operator PHP under `/scripts` is checked too: a call to a function that is
+ * neither built in nor defined anywhere in the repo fatals at runtime.
  *
  * @license GPL-3.0-only
  */
 
 const PMSS_CUSTOMER_CONTEXT_ANTIPATTERN = 'OPERATOR_TREE_FUNCTION_LEAK';
+const PMSS_OPERATOR_UNDEFINED_FUNCTION = 'UNDEFINED_FUNCTION_CALL';
 
 /** Execute the customer context fatal scanner CLI. */
 function pmssCustomerContextFatalScanMain(array $argv): int
@@ -16,9 +19,16 @@ function pmssCustomerContextFatalScanMain(array $argv): int
     $override = getenv('PMSS_CUSTOMER_CONTEXT_SCAN_ROOT');
     $root = is_string($override) && trim($override) !== '' ? rtrim($override, '/') : dirname(__DIR__, 2);
     $violations = pmssCustomerContextFatalScan($root);
-    if ($violations === []) {
-        fwrite(STDERR, "[customer-context-fatal-scan] OK - customer-side bare function calls resolve safely\n");
+    $undefined = (new PmssCustomerContextFatalScanner($root))->scanOperatorTree();
+    if ($violations === [] && $undefined === []) {
+        fwrite(STDERR, "[customer-context-fatal-scan] OK - customer-side and operator-side bare function calls resolve safely\n");
         return 0;
+    }
+    if ($undefined !== []) {
+        fwrite(STDERR, '[customer-context-fatal-scan] FAIL - '.PMSS_OPERATOR_UNDEFINED_FUNCTION.': '.count($undefined)." operator PHP call(s) to undefined functions:\n");
+        foreach ($undefined as $v) fwrite(STDERR, '  '.$v['file'].':'.$v['line'].' - '.$v['function']."()\n");
+        if ($violations === []) return 1;
+        fwrite(STDERR, "\n");
     }
 
     fwrite(STDERR, '[customer-context-fatal-scan] FAIL - '.PMSS_CUSTOMER_CONTEXT_ANTIPATTERN.': '.count($violations)." unresolved customer PHP function call(s):\n");
@@ -76,6 +86,26 @@ final class PmssCustomerContextFatalScanner
         return $violations;
     }
 
+    /** @return array<int,array{file:string,line:int,function:string}> */
+    public function scanOperatorTree(): array
+    {
+        $scripts = $this->root.'/scripts';
+        if (!is_dir($scripts)) return [];
+
+        $files = array_merge($this->files($scripts, true), $this->shebangPhpFiles($scripts));
+        $defs = $this->definitions(array_merge($files, $this->files($this->root.'/etc', true)));
+        $undefined = [];
+        foreach ($files as $file) {
+            $tokens = $this->tokens($file);
+            foreach ($this->calls($tokens) as $call) {
+                $key = strtolower($call['function']);
+                if (isset($this->builtins[$key]) || isset($defs[$key]) || $this->guarded($tokens, $call['index'], $key)) continue;
+                $undefined[] = ['file' => $this->relative($file), 'line' => $call['line'], 'function' => $call['function']];
+            }
+        }
+        return $undefined;
+    }
+
     private function files(string $dir, bool $recursive): array
     {
         if (!is_dir($dir)) return [];
@@ -97,8 +127,13 @@ final class PmssCustomerContextFatalScanner
     /** Discover extensionless PHP commands by their interpreter line. */
     private function binPhpFiles(): array
     {
+        return $this->shebangPhpFiles($this->skel.'/bin');
+    }
+
+    /** List extensionless PHP commands directly inside one directory. */
+    private function shebangPhpFiles(string $dir): array
+    {
         $files = [];
-        $dir = $this->skel.'/bin';
         if (!is_dir($dir)) return $files;
         foreach (new DirectoryIterator($dir) as $file) {
             if (!$file->isFile()) continue;
