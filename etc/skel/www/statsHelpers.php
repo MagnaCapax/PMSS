@@ -558,6 +558,7 @@ function pmssStatsAppToggleButtonHtmlBuild(string $appName, array $definitions):
         return '';
     }
 
+    // #TODO(2026-11-01): Remove the pre-Configure fallback (ADR 0103 removal plan).
     if (is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php')) {
         return '<a href="configure.php#apps">Manage in Configure</a>';
     }

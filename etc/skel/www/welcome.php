@@ -14,6 +14,7 @@
  * @version 1.0
  */
 require_once __DIR__.'/scriptsInc.php';
+// #TODO(2026-11-01): Remove the pre-Configure fallback (ADR 0103 removal plan).
 $pmssConfigureAvailable = is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php');
 if (isset($_GET['status'])) { pmssCustomerAppsStatusJsonEmit(); exit; }
 if (isset($_GET['log'])) { pmssCustomerAppsLogJsonEmit(); exit; }

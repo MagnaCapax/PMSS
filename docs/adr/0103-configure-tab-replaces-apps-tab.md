@@ -66,6 +66,33 @@ execution, reinforcing the existing separation of account and service secrets.
   remain available on hosts awaiting delivery; its content should be kept in
   sync until fleet convergence.
 
+## Removal plan (added 2026-10-18)
+
+The file-presence check is a transition path, not a permanent second flow
+("One Flow, No Special Cases": an exception needs a removal plan). Remove it
+on or after **2026-11-01**, and only once every host runs PMSS at or after
+b1784bc5, so that every account has received `configure.php` and
+`configureSettings.php` from its per-user update.
+
+That host condition is the safety gate, not the date. `index.php`,
+`info.php` and `welcome.php` are in the guiv heal set, so a copy with the
+fallback removed reaches every healing account within a day of the daily
+heal-master sync. On a host still waiting for the release, such an account
+would get a Configure link with no Configure page behind it.
+
+Each fallback site carries `#TODO(2026-11-01)`; list them with
+`rg -n '#TODO\(2026-11-01\)' etc/skel/www`. Remove:
+
+- `index.php` `pmssLocalFrameConfigureFrameRead()`: always return the
+  Configure frame.
+- `welcome.php` `$pmssConfigureAvailable` and the legacy controls behind it.
+- `info.php`: the legacy shell console block; keep the Configure pointer.
+- `apps.php`: redirect page visits unconditionally and drop the legacy page.
+  The JSON status and log endpoints stay (see Decision).
+- `statsHelpers.php`: the legacy app-control link branch.
+- The transitional app-catalog copy noted under Consequences.
+- Tests covering the fallback branches move to the single path.
+
 ## References
 
 - ADR 0016 and 0017: customer-tree isolation and review.

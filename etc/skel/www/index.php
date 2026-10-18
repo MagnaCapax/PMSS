@@ -299,7 +299,10 @@ function pmssLocalFrameAppsFrameRead($path = 'apps.php')
         : array();
 }
 
-/** Show Configure only after both update-delivered customer files arrive. */
+/**
+ * Show Configure only after both update-delivered customer files arrive.
+ * #TODO(2026-11-01): Remove this transition check (ADR 0103 removal plan).
+ */
 function pmssLocalFrameConfigureFrameRead($path = 'configure.php', $helper = 'configureSettings.php')
 {
     return is_file($path) && is_file($helper)

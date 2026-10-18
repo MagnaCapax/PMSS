@@ -16,6 +16,7 @@ if (isset($_GET['status']) || isset($_GET['log'])) {
 require_once __DIR__.'/userMediaStackPanel.php';
 
 require_once __DIR__.'/appsRuntime.php';
+// #TODO(2026-11-01): Redirect unconditionally; drop the legacy Apps page (ADR 0103 removal plan).
 if (is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php')) {
     header('Location: configure.php', true, 302);
     return;

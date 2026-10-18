@@ -106,6 +106,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
  ?>
 </div>
 
+<?php /* #TODO(2026-11-01): Remove the pre-Configure fallback (ADR 0103 removal plan). */ ?>
 <?php if (is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php')): ?>
     <p>Shell console options are in ⚙ Configure.</p>
 <?php elseif (is_file(__DIR__ . '/console.php') && is_file('/usr/bin/ttyd')): ?>
