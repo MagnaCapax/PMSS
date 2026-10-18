@@ -45,7 +45,7 @@ function pmssLighttpdDockerClientPort(string $user, string $app, ?callable $insp
             .'"Config":{"Labels":{{json .Config.Labels}}},'
             .'"NetworkSettings":{"Ports":{{json .NetworkSettings.Ports}}}}';
         $command = 'DOCKER_HOST='.escapeshellarg('unix://'.$socket)
-            .' timeout 5s docker container inspect --format '.escapeshellarg($format).' '.escapeshellarg($app);
+            .' timeout --kill-after=1s 5s docker container inspect --format '.escapeshellarg($format).' '.escapeshellarg($app);
         $inspect = static function () use ($user, $command): ?string {
             $output = [];
             $rc = 1;
