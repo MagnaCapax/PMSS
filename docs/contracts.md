@@ -841,6 +841,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - PMSS-managed proxy fragments: always refreshes the qBittorrent and rclone proxies; when `/home/<user>/.invidiousPort` contains a valid port, also publishes `/public-<user>/invidious/` and `/user-<user>/apps/invidious/` through the user's lighttpd.
   - Proxy-fragment collision handling: when another readable `custom.d/*.conf` fragment defines the same URL conditional, the PMSS-owned fragment yields and is removed if already present; unsafe or unreadable sibling fragments block managed replacement without modifying either side.
   - PMSS-managed lighttpd proxy fragments enable `proxy.header` upgrade forwarding so WebSocket-capable apps can complete HTTP upgrade handshakes through the per-user proxy.
+  - The qBittorrent fragment retains the panel Basic-Auth gate but removes its `Authorization` request header before proxying. qBittorrent then uses its own WebUI login and session cookie; an existing native install may prompt once for that login instead of signing in through forwarded panel credentials (ADR 0111).
   - Side-effects: Writes files under `/home/<user>/.lighttpd/` and lighttpd config directories.
   - Directory preparation seeds `.lighttpd/custom` at `0640` and reapplies that mode to existing regular files without rewriting their contents or modification time; symlinks and non-file targets remain rejected.
 

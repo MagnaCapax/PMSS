@@ -46,7 +46,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     {
         $expectedHashes = [
             'rclone' => '6d265ad8b338c69f39057129c0cd1a9a7bca09b3270ccea555168ceca96104de',
-            'qbittorrent' => '3e100e73153d063640ebb7c142e3b4a4d996a8f153245c2907f78bc4b1b9c05b',
+            'qbittorrent' => 'f6d681882eed629e49ea8f704793b4ae59eaab61373cb103b38dc7052fe43234',
             'invidious' => '168bb1b5e71c3ea4af59cf176a2181b00f425485dd504cb3ca088a8c73a178b4',
             'deluge' => '485c54359bd2220fe74b10ff06e371d4e5aea69b53130eab71d845cb8968c822',
         ];
@@ -104,6 +104,19 @@ class LighttpdProxyFragmentsTest extends TestCase
         ], $fragment);
         $this->assertStringNotContainsString('setenv.set-request-header = ( "Origin"', $fragment);
         $this->assertStringNotContainsString('setenv.set-request-header = ( "Referer"', $fragment);
+    }
+
+    public function testOnlyQbittorrentFragmentStripsPanelAuthorization(): void
+    {
+        $fragments = $this->managedProxyFragments();
+        $this->assertStringContainsString(
+            'setenv.set-request-header = ( "Authorization" => "" )',
+            $fragments['qbittorrent']
+        );
+        $this->assertStringNotContainsString('auth.require = ()', $fragments['qbittorrent']);
+        foreach (['rclone', 'invidious', 'deluge'] as $proxyName) {
+            $this->assertStringNotContainsString('"Authorization"', $fragments[$proxyName]);
+        }
     }
 
     public function testRcloneFragmentAddsZeroContentLengthOnlyForBodylessPosts(): void

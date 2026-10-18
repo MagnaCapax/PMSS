@@ -16,12 +16,17 @@ function pmssLighttpdProxyRuleFragment(
     bool $disableAuth = false,
     bool $forwardForwardedHeaders = false,
     bool $injectZeroContentLengthOnEmptyPost = false,
-    bool $preserveRequestHostHeader = false
+    bool $preserveRequestHostHeader = false,
+    bool $stripAuthorization = false
 ): string {
     $hasPathMap = count($pathMap) > 0;
     $fragment = '$HTTP["url"] =~ "'.$pattern."\" {\n";
     if ($disableAuth) {
         $fragment .= "  auth.require = ()\n";
+    }
+    if ($stripAuthorization) {
+        // Keep panel Basic credentials out of the app's independent login.
+        $fragment .= '  setenv.set-request-header = ( "Authorization" => "" )'."\n";
     }
     if ($injectZeroContentLengthOnEmptyPost) {
         $fragment .= '  $HTTP["request-method"] == "POST" {'."\n"
@@ -72,7 +77,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             "# PMSS-managed: qBittorrent reverse proxy.\n\n",
             [
                 ['redirect', '/user-'.$user.'/qbittorrent', '/user-'.$user.'/qbittorrent/'],
-                ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true, false, true],
+                ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true, false, true, true],
             ],
         ],
         'invidious' => [
@@ -100,7 +105,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
                 .'  url.redirect = ( "" => "'.$rule[2]."\" )\n}\n\n";
             continue;
         }
-        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false, $rule[5] ?? false)."\n\n";
+        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false, $rule[5] ?? false, $rule[6] ?? false)."\n\n";
     }
 
     return $fragment;
