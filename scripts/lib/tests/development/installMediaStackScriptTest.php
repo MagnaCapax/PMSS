@@ -370,6 +370,23 @@ class installMediaStackScriptTest extends TestCase
         ), $seed);
     }
 
+    public function testAuthSeedCleanupStopsProcessBeforeRemovingSecrets(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-media-auth-cleanup-');
+        $first = $this->pmssWriteFile($dir.'/request.json', 'secret');
+        $second = $this->pmssWriteFile($dir.'/headers.conf', 'secret');
+        $functions = $this->pmssExtractShellFunctions($this->script, ['media_stack_auth_seed_cleanup']);
+        $script = implode("\n", [
+            '#!/usr/bin/env bash', 'set -euo pipefail',
+            'FIRST='.escapeshellarg($first), 'SECOND='.escapeshellarg($second),
+            'media_stack_session_kill_owned() { [[ -f "$FIRST" && -f "$SECOND" ]] && printf "stopped:%s\n" "$1"; }',
+            $functions,
+            'media_stack_auth_seed_cleanup auth-seed "$FIRST" "$SECOND"',
+            '[[ ! -e "$FIRST" && ! -e "$SECOND" ]] && echo removed',
+        ]);
+        $this->assertSame("stopped:auth-seed\nremoved", $this->pmssRunShellHarness($script));
+    }
+
     public function testServarrSeedWaitsIgnoreOldFatalLogAndStopOnNewFatalLog(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-fatal-seed-');
@@ -533,6 +550,8 @@ BASH
             'servarr_api_key_curl_config_wait',
             'servarr_auth_payload_write',
             'servarr_host_config_url',
+            'media_stack_auth_seed_cleanup',
+            'servarr_auth_seed_cleanup',
             'servarr_auth_seed',
         ));
         $script = implode("\n", array(

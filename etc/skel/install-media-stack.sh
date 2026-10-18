@@ -1750,6 +1750,21 @@ servarr_host_config_url() {
 	printf 'http://127.0.0.1:%s%s/api/%s/config/host' "$seed_port" "${url_base%/}" "$api_version"
 }
 
+# Stop a seed process before removing the owner-only request files it used.
+media_stack_auth_seed_cleanup() {
+	local session="$1"
+	shift
+	media_stack_session_kill_owned "$session"
+	rm -f "$@"
+}
+
+# Servarr also restores the configured port after its seed process stops.
+servarr_auth_seed_cleanup() {
+	local session="$1" response_json="$2" payload_json="$3" curl_config="$4" config_file="$5" desired_port="$6"
+	media_stack_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config"
+	servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+}
+
 servarr_auth_seed() {
 	local app="$1" install_name="$2" dll="$3" desired_port="$4" api_version="$5" password="$6" extra_args="${7:-}"
 	local datadir="$HOME/.config/${app}"
@@ -1800,9 +1815,7 @@ servarr_auth_seed() {
 		else
 			log_err "${install_name} did not write a valid local API key within ~${MEDIA_STACK_APP_START_WAIT}s; see $datadir/${app}-auth-seed.log"
 		fi
-		media_stack_session_kill_owned "$session"
-		rm -f "$response_json" "$payload_json" "$curl_config"
-		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 		return 1
 	fi
 
@@ -1816,33 +1829,25 @@ servarr_auth_seed() {
 		else
 			log_err "${install_name} did not expose its local auth configuration API within ~${MEDIA_STACK_APP_START_WAIT}s; see $datadir/${app}-auth-seed.log"
 		fi
-		media_stack_session_kill_owned "$session"
-		rm -f "$response_json" "$payload_json" "$curl_config"
-		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 		return 1
 	fi
 
 	if ! curl -fsS --max-time 90 --config "$curl_config" "$base_url" -o "$response_json"; then
 		log_err "Failed to read ${install_name} local auth configuration"
-		media_stack_session_kill_owned "$session"
-		rm -f "$response_json" "$payload_json" "$curl_config"
-		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 		return 1
 	fi
 	if ! servarr_auth_payload_write "$response_json" "$payload_json" "$password"; then
 		log_err "Failed to build ${install_name} auth payload"
-		media_stack_session_kill_owned "$session"
-		rm -f "$response_json" "$payload_json" "$curl_config"
-		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 		return 1
 	fi
 
 	put_code=$(media_stack_http_code "${base_url}/1" --config "$curl_config" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}" --max-time 90)
 	if [[ "$put_code" != "200" && "$put_code" != "202" ]]; then
 		log_err "${install_name} rejected local auth configuration (HTTP ${put_code})"
-		media_stack_session_kill_owned "$session"
-		rm -f "$response_json" "$payload_json" "$curl_config"
-		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 		return 1
 	fi
 
@@ -1850,15 +1855,11 @@ servarr_auth_seed() {
 	unauth_code=$(media_stack_http_code "$base_url")
 	if [[ "$unauth_code" != "401" && "$unauth_code" != "403" ]]; then
 		log_err "${install_name} auth verification failed; unauthenticated API returned HTTP ${unauth_code}"
-		media_stack_session_kill_owned "$session"
-		rm -f "$response_json" "$payload_json" "$curl_config"
-		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 		return 1
 	fi
 
-	media_stack_session_kill_owned "$session"
-	rm -f "$response_json" "$payload_json" "$curl_config"
-	servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+	servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 	servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
 	servarr_config_xml_tag_converge "$config_file" UpdateMechanism Script
@@ -1957,36 +1958,31 @@ jellyfin_auth_seed() {
 		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "illegal instruction\|SIGILL\|signal 4"; then
 			log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
 		fi
-		media_stack_session_kill_owned "$session"
-		rm -f "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
 		return 1
 	fi
 	if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" "$MEDIA_STACK_APP_START_WAIT"); then
 		log_err "Jellyfin startup API never answered HTTP 200, with or without BaseUrl (see $JELLYFIN_LOG_DIR/jellyfin-auth-seed.log)"
-		media_stack_session_kill_owned "$session"
-		rm -f "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
 		return 1
 	fi
 
 	if ! curl -fsS --max-time 10 "${base_url}/Startup/User" >/dev/null; then
 		log_err "Jellyfin startup user initialization failed"
-		media_stack_session_kill_owned "$session"
-		rm -f "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
 		return 1
 	fi
 	jellyfin_auth_payload_write "$payload_json" "$password"
 	code=$(media_stack_http_code "${base_url}/Startup/User" -X POST -H 'Content-Type: application/json' --data-binary "@${payload_json}")
 	if [[ "$code" != "204" ]]; then
 		log_err "Jellyfin rejected startup admin creation (HTTP ${code})"
-		media_stack_session_kill_owned "$session"
-		rm -f "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
 		return 1
 	fi
 	code=$(media_stack_http_code "${base_url}/Startup/Complete" -X POST)
 	if [[ "$code" != "204" ]]; then
 		log_err "Jellyfin rejected startup completion (HTTP ${code})"
-		media_stack_session_kill_owned "$session"
-		rm -f "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
 		return 1
 	fi
 
@@ -2000,8 +1996,7 @@ jellyfin_auth_seed() {
 	code=$(media_stack_http_code "${base_url}/Users/AuthenticateByName" -X POST -H 'Content-Type: application/json' -H 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1"' --data-binary "@${auth_json}")
 	if [[ "$code" != "200" ]]; then
 		log_err "Jellyfin admin login verification failed (HTTP ${code})"
-		media_stack_session_kill_owned "$session"
-		rm -f "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
 		return 1
 	fi
 
