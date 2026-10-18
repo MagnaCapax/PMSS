@@ -45,7 +45,7 @@ function pmssUserTransferCreateRestartMarker(string $marker, string $localUser):
 /**
  * Execute the marker-driven restart immediately so migration is not cron-latent.
  */
-function pmssUserTransferRunRtorrentRestart(string $home, string $localUser): void
+function pmssUserTransferRunRtorrentRestart(string $home, string $localUser, ?callable $runner = null): void
 {
     $restartScript = $home.'/.rtorrentRestart.php';
     if (!pmssRegularFilePathIsReadable($restartScript) || !pmssUserTransferIsPathWithinHome($restartScript, $home)) {
@@ -54,10 +54,15 @@ function pmssUserTransferRunRtorrentRestart(string $home, string $localUser): vo
     }
 
     $requestedAt = time();
-    runStep(
+    $runner = $runner ?? 'runStep';
+    if ($runner(
         'Running rTorrent restart request',
         pmssBuildUserShellCommand($localUser, 'cd '.escapeshellarg($home).' && php ./.rtorrentRestart.php')
-    );
+    ) !== 0) {
+        // A failed command cannot establish a reload, even if the socket looks live.
+        logMessage('[WARN] rTorrent restart command failed; skipping reload verification');
+        return;
+    }
     pmssUserTransferVerifyRtorrentRestart($home, $localUser, $requestedAt);
 }
 
