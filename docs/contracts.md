@@ -1137,6 +1137,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/terminateUser.php [--dry-run] [--confirm] USERNAME
   - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, then synchronously purges `/home/<user>`, `/home/backup-<user>`, and `/home/backup-<user>.superseded`. It never sweeps `backup-*` prefixes.
+  - Output: With non-TTY stdout, emits empty heartbeat lines during silent steps, including preflight and synchronous purge. The existing completion line remains the last non-empty line. TTY output is unchanged.
   - Removal: Removes ordinary contents first, clears immutable attributes only from the remaining residue, and retries removal — so the recursive attribute walk never traverses a full account.
   - Completion: After the final cleanup, exit 0 and print `## Done. User termination verified.` only when all purge steps succeeded, the passwd entry is absent, and all three paths are absent. Otherwise exit 1 and print `## Incomplete: <first failed check or step label>`. The lifecycle end event records `OK` or `INCOMPLETE`.
   - Dry-run: Logs planned removal work without deleting those paths; its final line is `## Done. User termination flow completed (dry run).` and does not claim verification.
