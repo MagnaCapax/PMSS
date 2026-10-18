@@ -7,6 +7,9 @@ function pmssStdoutHeartbeatShouldStart(bool $stdoutIsTty): bool
     return !$stdoutIsTty;
 }
 
+/** Apply the shared CLI stdout policy before a blocking lifecycle command. */
+function pmssStdoutHeartbeatStartForStdout(): void { if (pmssStdoutHeartbeatShouldStart(pmssStreamIsTty(STDOUT))) pmssStdoutHeartbeatStart(); }
+
 /** Start a child that shares stdout and checks its parent's life each interval. */
 function pmssStdoutHeartbeatStart(int $intervalSeconds = 5): ?int
 {

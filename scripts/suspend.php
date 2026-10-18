@@ -17,9 +17,7 @@ require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
 
-if (pmssStdoutHeartbeatShouldStart(pmssStreamIsTty(STDOUT))) {
-    pmssStdoutHeartbeatStart();
-}
+pmssStdoutHeartbeatStartForStdout();
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Suspending
 // a user when /home is unavailable would fail or act on stale paths.

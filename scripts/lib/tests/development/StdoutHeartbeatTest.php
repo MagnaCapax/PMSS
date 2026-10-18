@@ -18,8 +18,7 @@ final class StdoutHeartbeatTest extends TestCase
         foreach (['terminateUser.php', 'suspend.php', 'unsuspend.php'] as $script) {
             $this->pmssAssertRepoFileContract('scripts/'.$script, ['ordered' => [[
                 "require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';",
-                'if (pmssStdoutHeartbeatShouldStart(pmssStreamIsTty(STDOUT))) {',
-                'pmssStdoutHeartbeatStart();',
+                'pmssStdoutHeartbeatStartForStdout();',
                 "pmssRequireHomeMounted('".$script."')",
             ]]]);
         }

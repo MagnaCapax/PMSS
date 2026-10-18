@@ -22,9 +22,7 @@ require_once __DIR__.'/lib/toggleAppCatalog.php';
 pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/user/terminationCleanup.php']);
 require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
 
-if (pmssStdoutHeartbeatShouldStart(pmssStreamIsTty(STDOUT))) {
-    pmssStdoutHeartbeatStart();
-}
+pmssStdoutHeartbeatStartForStdout();
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Terminating
 // a user when /home is unavailable could lead to incomplete cleanup or acting on
