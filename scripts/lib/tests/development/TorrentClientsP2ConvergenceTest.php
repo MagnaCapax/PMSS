@@ -39,6 +39,24 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         return [$root, $home, $ops, $events];
     }
 
+    public function testProjectionReaderRejectsUnsafeAndMalformedFiles(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-projection-reader-');
+        $path = $root.'/projection.json';
+        $entry = ['client' => 'qbittorrent', 'version' => '5.1.0'];
+        $this->pmssWriteFile($path, json_encode(['versions' => [$entry]]));
+        $this->assertSame([$entry], \pmssTorrentClientsProjectionVersionsRead($path));
+        symlink($path, $root.'/linked.json');
+        $this->assertSame([], \pmssTorrentClientsProjectionVersionsRead($root.'/linked.json'));
+        link($path, $root.'/hardlinked.json');
+        $this->assertSame([], \pmssTorrentClientsProjectionVersionsRead($path));
+        unlink($root.'/hardlinked.json');
+        $this->pmssWriteFile($path, str_repeat(' ', 65537));
+        $this->assertSame([], \pmssTorrentClientsProjectionVersionsRead($path));
+        $this->pmssWriteFile($path, '{"versions":false}');
+        $this->assertSame([], \pmssTorrentClientsProjectionVersionsRead($path));
+    }
+
     public function testTargetFlagConvergesLinksAndPreservesSelection(): void
     {
         [$root, $home, $ops, $events] = $this->fixture('enabled');

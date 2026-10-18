@@ -2,20 +2,17 @@
 /** Reconcile migrated selections after the account home is usable. */
 
 require_once __DIR__.'/catalog.php';
+require_once __DIR__.'/projection.php';
 require_once __DIR__.'/userLinks.php';
 require_once dirname(__DIR__).'/user/log.php';
 
 /** Read the host-published view, never a selection supplied by the tenant. */
 function pmssTorrentClientsPostSetupAvailable(string $path): array
 {
-    if (!is_file($path) || is_link($path) || @filesize($path) > 65536) return [];
-    $data = json_decode((string) @file_get_contents($path), true);
-    if (!is_array($data) || !is_array($data['versions'] ?? null)) return [];
     $available = [];
-    foreach ($data['versions'] as $entry) {
-        if (!is_array($entry) || !is_string($entry['client'] ?? null)
-            || !is_string($entry['version'] ?? null) || !in_array($entry['client'],
-                ['qbittorrent', 'rtorrent', 'deluge', 'transmission'], true)
+    foreach (pmssTorrentClientsProjectionVersionsRead($path) as $entry) {
+        if (!is_array($entry) || !is_string($entry['version'] ?? null)
+            || !in_array($entry['client'] ?? null, ['qbittorrent', 'rtorrent', 'deluge', 'transmission'], true)
             || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $entry['version']) !== 1) continue;
         $available[$entry['client']][$entry['version']] = true;
     }

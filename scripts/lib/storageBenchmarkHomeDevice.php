@@ -69,19 +69,17 @@ function storageBenchmarkHomeDeviceRunTests(
     unset($row['ok']);
     $path = $device['device'];
     if ($fioPresent) {
-        $runFio = $fioRunner ?: 'fioRun';
         foreach ([
             ['name' => 'home-device-randread-4k', 'rw' => 'randread', 'bs' => '4k', 'iodepth' => 64],
             ['name' => 'home-device-seqread-1M', 'rw' => 'read', 'bs' => '1M', 'iodepth' => 32],
         ] as $job) {
             $job += ['numjobs' => 1, 'direct' => 1, 'readonly' => true];
-            $result = $runFio($path, $device['size'], $runtime, $job);
-            $entry = storageBenchmarkApplyRunResult($row + [
+            $entry = $row + [
                 'test' => $job['name'], 'params' => ['rw' => $job['rw'], 'bs' => $job['bs'],
                     'iodepth' => $job['iodepth'], 'numjobs' => 1, 'direct' => 1,
-                    'readonly' => true, 'runtime' => $runtime], 'ok' => $result['ok'],
-            ], $result, 'fio failed');
-            storageBenchmarkAppendJsonLine($jsonLog, $entry);
+                    'readonly' => true, 'runtime' => $runtime],
+            ];
+            $result = storageBenchmarkFioJobRun($jsonLog, $path, $device['size'], $runtime, $job, $entry, 'fio failed', $fioRunner);
             printf("%s\t%s\tread_MB/s=%s\tread_IOPS=%s\n", $path, $job['name'],
                 $result['ok'] ? number_format($result['result']['read_bw_MBps'], 2) : 'n/a',
                 $result['ok'] ? number_format($result['result']['read_iops'], 1) : 'n/a');
