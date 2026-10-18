@@ -23,6 +23,37 @@ function pmssAiCodexEnvironment(): array
     return array_merge($env, $_ENV);
 }
 
+/** Keep key ownership, parsing, and precedence identical across the three CLIs. */
+function pmssAiAccountKeyState(array $env, bool $refresh = false): array
+{
+    $uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+    $home = $env['HOME'] ?? '';
+    $state = ['uid' => $uid, 'keyFileValid' => false];
+    if ($uid === 0 || $home === '') return $state;
+    $file = rtrim($home, '/').'/.virsilipasKey';
+    if ($refresh) clearstatcache(true, $file);
+    if (is_link($file) || !is_file($file) || @fileowner($file) !== $uid) return $state;
+    $contents = @file_get_contents($file);
+    $settings = is_string($contents) ? @parse_ini_string($contents, false, INI_SCANNER_RAW) : false;
+    if (!is_array($settings)) return $state;
+    $state['keyFileValid'] = true;
+    $state['key'] = $settings['key'] ?? '';
+    $state['endpoint'] = $settings['endpoint'] ?? '';
+    return $state;
+}
+
+/** Shared key gate; each CLI retains its own explicit-choice checks. */
+function pmssAiAccountKeyUsable(array $env, array $state): bool
+{
+    return !in_array(strtolower((string) ($env['PMSS_VIRSILIPAS'] ?? '')), ['off', '0', 'no'], true)
+        && ($state['uid'] ?? 0) !== 0 && isset($env['HOME']) && $env['HOME'] !== ''
+        && !empty($state['keyFileValid']) && isset($state['key'], $state['endpoint'])
+        && is_string($state['key']) && $state['key'] !== ''
+        && preg_match('/[\s\p{Z}\p{C}]/u', $state['key']) === 0
+        && is_string($state['endpoint'])
+        && preg_match('#^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$#D', $state['endpoint']) === 1;
+}
+
 /** Read only assignments before the first TOML table. */
 function pmssAiCodexHasTopLevelChoice(string $config): bool
 {
@@ -74,18 +105,7 @@ function pmssAiCodexHasCommandChoice(array $args): bool
 function pmssAiCodexDecision(array $args, array $env, array $state): array
 {
     $pass = ['argv' => array_merge([PMSS_AI_CODEX_BINARY], $args), 'env' => $env, 'notice' => false];
-    if (in_array(strtolower((string) ($env['PMSS_VIRSILIPAS'] ?? '')), ['off', '0', 'no'], true)
-        || ($state['uid'] ?? 0) === 0
-        || !isset($env['HOME'])
-        || $env['HOME'] === ''
-        || empty($state['keyFileValid'])
-        || !isset($state['key'], $state['endpoint'])
-        || !is_string($state['key'])
-        || $state['key'] === ''
-        || preg_match('/[\s\p{Z}\p{C}]/u', $state['key']) !== 0
-        || !is_string($state['endpoint'])
-        || !preg_match('#^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$#D', $state['endpoint'])
-        || !empty($state['authExists'])
+    if (!pmssAiAccountKeyUsable($env, $state) || !empty($state['authExists'])
         || (isset($env['OPENAI_API_KEY']) && $env['OPENAI_API_KEY'] !== '')
         || (isset($env['OPENAI_BASE_URL']) && $env['OPENAI_BASE_URL'] !== '')
         || !empty($state['configChoice'])
@@ -106,27 +126,9 @@ function pmssAiCodexDecision(array $args, array $env, array $state): array
 /** Collect account-owned inputs without writing into the account. */
 function pmssAiCodexState(array $env): array
 {
-    $uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+    $state = pmssAiAccountKeyState($env);
     $home = $env['HOME'] ?? '';
-    $state = ['uid' => $uid, 'keyFileValid' => false];
-    if ($uid === 0 || $home === '') {
-        return $state;
-    }
-    $file = rtrim($home, '/').'/.virsilipasKey';
-    if (is_link($file) || !is_file($file) || @fileowner($file) !== $uid) {
-        return $state;
-    }
-    $contents = @file_get_contents($file);
-    if (!is_string($contents)) {
-        return $state;
-    }
-    $settings = @parse_ini_string($contents, false, INI_SCANNER_RAW);
-    if (!is_array($settings)) {
-        return $state;
-    }
-    $state['keyFileValid'] = true;
-    $state['key'] = $settings['key'] ?? '';
-    $state['endpoint'] = $settings['endpoint'] ?? '';
+    if (!$state['keyFileValid']) return $state;
     $codexHome = isset($env['CODEX_HOME']) && $env['CODEX_HOME'] !== '' ? $env['CODEX_HOME'] : rtrim($home, '/').'/.codex';
     $state['authExists'] = file_exists($codexHome.'/auth.json') || is_link($codexHome.'/auth.json');
     $config = @file_get_contents($codexHome.'/config.toml');
@@ -174,24 +176,10 @@ function pmssAiClaudeFileChoice(string $path, string $kind): bool
 /** Read the account key and Claude's own settings without changing either. */
 function pmssAiClaudeState(array $env): array
 {
-    $uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+    $state = pmssAiAccountKeyState($env);
     $home = $env['HOME'] ?? '';
-    $state = ['uid' => $uid, 'keyFileValid' => false, 'configChoice' => false];
-    if ($uid === 0 || $home === '') {
-        return $state;
-    }
-    $file = rtrim($home, '/').'/.virsilipasKey';
-    if (is_link($file) || !is_file($file) || @fileowner($file) !== $uid) {
-        return $state;
-    }
-    $contents = @file_get_contents($file);
-    $settings = is_string($contents) ? @parse_ini_string($contents, false, INI_SCANNER_RAW) : false;
-    if (!is_array($settings)) {
-        return $state;
-    }
-    $state['keyFileValid'] = true;
-    $state['key'] = $settings['key'] ?? '';
-    $state['endpoint'] = $settings['endpoint'] ?? '';
+    $state['configChoice'] = false;
+    if (!$state['keyFileValid']) return $state;
     $custom = array_key_exists('CLAUDE_CONFIG_DIR', $env);
     $configDir = $custom ? $env['CLAUDE_CONFIG_DIR'] : rtrim($home, '/').'/.claude';
     $statePath = $custom ? rtrim($configDir, '/').'/.claude.json' : rtrim($home, '/').'/.claude.json';
@@ -223,14 +211,7 @@ function pmssAiClaudeDecision(array $args, array $env, array $state): array
             return $pass;
         }
     }
-    if (in_array(strtolower((string) ($env['PMSS_VIRSILIPAS'] ?? '')), ['off', '0', 'no'], true)
-        || ($state['uid'] ?? 0) === 0
-        || !isset($env['HOME']) || $env['HOME'] === ''
-        || empty($state['keyFileValid']) || !isset($state['key'], $state['endpoint'])
-        || !is_string($state['key']) || $state['key'] === ''
-        || preg_match('/[\s\p{Z}\p{C}]/u', $state['key']) !== 0
-        || !is_string($state['endpoint'])
-        || !preg_match('#^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$#D', $state['endpoint'])
+    if (!pmssAiAccountKeyUsable($env, $state)
         || !empty($state['configChoice']) || pmssAiClaudeHasCommandChoice($args)) {
         return $pass;
     }
@@ -314,25 +295,10 @@ function pmssAiGeminiEnvChoice(string $cwd, string $home): bool
 /** Read account state; no settings or credentials are written to the home. */
 function pmssAiGeminiState(array $env): array
 {
-    $uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+    $state = pmssAiAccountKeyState($env, true);
     $home = $env['HOME'] ?? '';
-    $state = ['uid' => $uid, 'keyFileValid' => false, 'configChoice' => false];
-    if ($uid === 0 || $home === '') {
-        return $state;
-    }
-    $file = rtrim($home, '/').'/.virsilipasKey';
-    clearstatcache(true, $file);
-    if (is_link($file) || !is_file($file) || @fileowner($file) !== $uid) {
-        return $state;
-    }
-    $contents = @file_get_contents($file);
-    $settings = is_string($contents) ? @parse_ini_string($contents, false, INI_SCANNER_RAW) : false;
-    if (!is_array($settings)) {
-        return $state;
-    }
-    $state['keyFileValid'] = true;
-    $state['key'] = $settings['key'] ?? '';
-    $state['endpoint'] = $settings['endpoint'] ?? '';
+    $state['configChoice'] = false;
+    if (!$state['keyFileValid']) return $state;
     $base = !empty($env['GEMINI_CLI_HOME']) ? $env['GEMINI_CLI_HOME'] : $home;
     $config = rtrim($base, '/').'/.gemini';
     $state['configChoice'] = file_exists($config.'/oauth_creds.json') || is_link($config.'/oauth_creds.json')
@@ -359,14 +325,7 @@ function pmssAiGeminiDecision(array $args, array $env, array $state): array
             return $pass;
         }
     }
-    if (in_array(strtolower((string) ($env['PMSS_VIRSILIPAS'] ?? '')), ['off', '0', 'no'], true)
-        || ($state['uid'] ?? 0) === 0 || !isset($env['HOME']) || $env['HOME'] === ''
-        || empty($state['keyFileValid']) || !isset($state['key'], $state['endpoint'])
-        || !is_string($state['key']) || $state['key'] === ''
-        || preg_match('/[\s\p{Z}\p{C}]/u', $state['key']) !== 0
-        || !is_string($state['endpoint'])
-        || !preg_match('#^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$#D', $state['endpoint'])
-        || !empty($state['configChoice'])) {
+    if (!pmssAiAccountKeyUsable($env, $state) || !empty($state['configChoice'])) {
         return $pass;
     }
     $env['GOOGLE_GEMINI_BASE_URL'] = preg_replace('#/v1$#', '', rtrim($state['endpoint'], '/'));

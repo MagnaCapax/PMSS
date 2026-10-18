@@ -1,12 +1,11 @@
 <?php
 /** System Gemini CLI stub, defaults, and content convergence. */
+require_once __DIR__.'/aiToolsCodex.php';
 
 /** Keep the npm command usable when PHP or its launcher is unavailable. */
 function pmssAiToolsGeminiStub(): string
 {
-    return "#!/bin/sh\nif [ -x /usr/bin/php ] && [ -r /opt/pmss/ai-tools/pmss-ai-launch.php ]; then\n"
-        ."    exec /usr/bin/php /opt/pmss/ai-tools/pmss-ai-launch.php gemini \"\$@\"\n"
-        ."fi\nexec /opt/pmss/ai-tools/npm/gemini/bin/gemini \"\$@\"\n";
+    return pmssAiToolsStub('gemini', '/opt/pmss/ai-tools/npm/gemini/bin/gemini');
 }
 
 /** The CLI accepts this root-owned file as its lowest-precedence settings. */
@@ -35,9 +34,7 @@ function pmssAiToolsGeminiInstallNeeded(string $launcher, string $stub, string $
         $stub => [pmssAiToolsGeminiStub(), 0755],
         $defaults => [pmssAiToolsGeminiDefaults(), 0644]] as $path => $spec) {
         clearstatcache(true, $path);
-        if ($spec[0] === null || is_link($path) || @file_get_contents($path) !== $spec[0]
-            || @fileowner($path) !== $owner || @filegroup($path) !== $group
-            || (@fileperms($path) & 0777) !== $spec[1]) {
+        if (pmssAiToolsFileDiffers($path, $spec[0], $spec[1], $owner, $group)) {
             return true;
         }
     }
