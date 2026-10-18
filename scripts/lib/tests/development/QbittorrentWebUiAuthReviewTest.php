@@ -123,7 +123,8 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $events = [];
         $ops = $this->fixture($events);
         $this->pmssEnsureDir($ops['stateDir']);
-        $this->pmssWriteFile($ops['stateDir'].'/qbittorrentWebui-alice.state', "0\n0\n");
+        $stateFile = $this->pmssWriteFile($ops['stateDir'].'/qbittorrentWebui-alice.state', "0\n0\n");
+        $this->assertTrue(chmod($stateFile, 0600));
         $this->assertTrue(\pmssQbittorrentWebUiAuthStateShouldLog('alice', 'state-failed', $ops));
         $this->assertFalse(\pmssQbittorrentWebUiAuthStateShouldLog('alice', 'state-failed', $ops));
         $this->assertTrue(\pmssQbittorrentWebUiAuthStateShouldLog('alice', 'deferred', $ops));
