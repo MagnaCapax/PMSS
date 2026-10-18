@@ -308,7 +308,8 @@ The session and network binary hardening step removes other-read from existing
 legacy wtmp, utmp, lastlog, and faillog files and the netstat, who, and w
 binaries. It also covers Debian 13's `wtmp.db`, rotated `wtmp_*.db`, and
 `lastlog2.db`. Missing paths are skipped; permission failures are logged as a
-soft-failed update step.
+soft-failed update step. Symlinks and non-file targets are rejected before
+chmod, so a redirected path cannot change another file's permissions.
 
 ## Usage Examples
 

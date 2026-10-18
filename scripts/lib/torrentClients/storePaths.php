@@ -10,6 +10,12 @@ function pmssTorrentClientsBinaryNames(): array
     ];
 }
 
+/** One path-component rule for catalog, store, and account-link versions. */
+function pmssTorrentClientsVersionValid($version): bool
+{
+    return is_string($version) && preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) === 1;
+}
+
 /** The development suite exercises writers only inside its temporary tree. */
 function pmssTorrentClientsMarkerEnabled(): bool
 {

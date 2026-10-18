@@ -11,9 +11,9 @@ function pmssTorrentClientsPostSetupAvailable(string $path): array
 {
     $available = [];
     foreach (pmssTorrentClientsProjectionVersionsRead($path) as $entry) {
-        if (!is_array($entry) || !is_string($entry['version'] ?? null)
+        if (!is_array($entry)
             || !in_array($entry['client'] ?? null, ['qbittorrent', 'rtorrent', 'deluge', 'transmission'], true)
-            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $entry['version']) !== 1) continue;
+            || !pmssTorrentClientsVersionValid($entry['version'] ?? null)) continue;
         $available[$entry['client']][$entry['version']] = true;
     }
     return $available;
@@ -90,9 +90,8 @@ function pmssTorrentClientsPostSetupConverge(string $user, string $home, array $
     foreach ($catalog as $entry) {
         if (!$entry['isDefault']) continue;
         $client = $entry['client'];
-        $default = $entry['version'];
-        if ($default !== 'system' && !isset($available[$client][$default])) continue;
-        if (pmssTorrentClientsPostSetupFallback($user, $home, $client, $available, $default, $ops)) {
+        if ($entry['version'] !== 'system' && !isset($available[$client][$entry['version']])) continue;
+        if (pmssTorrentClientsPostSetupFallback($user, $home, $client, $available, $entry['version'], $ops)) {
             $log($user, '[WARN] '.$client.' selection unavailable on this host; using the host default.');
         }
     }

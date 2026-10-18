@@ -27,21 +27,20 @@ function pmssTorrentClientsUserLinksConverge(string $user, string $home, array $
         if (!is_array($versions)) continue;
         $bin = $home.'/bin';
         $clientBin = $bin.'/'.$client;
-        $command = 'mkdir -p '.escapeshellarg($bin);
-        $ok = pmssTorrentClientsUserLinksRun($user, $home, [$bin], $command, $ops) && $ok;
-        if (!$ok) continue;
-        $command = 'mkdir -p '.escapeshellarg($clientBin);
-        $ok = pmssTorrentClientsUserLinksRun($user, $home, [$clientBin], $command, $ops) && $ok;
+        foreach ([$bin, $clientBin] as $directory) {
+            $command = 'mkdir -p '.escapeshellarg($directory);
+            $ok = pmssTorrentClientsUserLinksRun($user, $home, [$directory], $command, $ops) && $ok;
+            if (!$ok) break;
+        }
         if (!$ok) continue;
         foreach ($versions as $version) {
-            if ($version === 'default' || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
+            if ($version === 'default' || !pmssTorrentClientsVersionValid($version)
                 || !pmssTorrentClientsStorePathChainSafe($root, $client, $version)
                 || !is_dir($storeClient.'/'.$version)) continue;
-            $target = $storeClient.'/'.$version;
             $link = $home.'/bin/'.$client.'/'.$version;
             $command = 'mkdir -p '.escapeshellarg(dirname($link))
                 .' && if [ ! -e '.escapeshellarg($link).' ] && [ ! -L '.escapeshellarg($link).' ]; then '
-                .'ln -s '.escapeshellarg($target).' '.escapeshellarg($link).'; fi';
+                .'ln -s '.escapeshellarg($storeClient.'/'.$version).' '.escapeshellarg($link).'; fi';
             // Check the real parent; an existing link is an expected no-op on rerun.
             $ok = pmssTorrentClientsUserLinksRun($user, $home, [$clientBin], $command, $ops) && $ok;
         }

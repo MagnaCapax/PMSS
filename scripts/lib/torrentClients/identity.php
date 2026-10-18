@@ -3,14 +3,12 @@
 
 require_once dirname(__DIR__).'/user/watchdog.php';
 require_once dirname(__DIR__).'/arrRootGuard.php';
+require_once __DIR__.'/storePaths.php';
 
 /** Share the name, UID and mount context gate across both decisions. */
 function pmssTorrentClientIdentityCandidates(string $user, string $client, array $ops): array
 {
-    $names = [
-        'qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent',
-        'deluge' => 'deluged', 'transmission' => 'transmission-daemon',
-    ];
+    $names = pmssTorrentClientsBinaryNames();
     if (!isset($names[$client]) || !pmssValidateUsername($user)) return [];
     $processName = $client === 'deluge' && ($ops['processName'] ?? '') === 'deluge-web'
         ? 'deluge-web' : $names[$client];

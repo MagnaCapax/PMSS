@@ -20,7 +20,7 @@ function pmssTorrentClientsCatalogLoad(string $path): array
         $version = $entry['version'] ?? null;
         $kind = $entry['kind'] ?? null;
         if (!is_string($client) || !isset($binaryNames[$client])
-            || !is_string($version) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
+            || !pmssTorrentClientsVersionValid($version)
             || !in_array($kind, ['system', 'static', 'venv'], true)) return [];
         // Transmission entries describe only builds with the managed socket RPC mode.
         if ($client === 'transmission' && ($kind !== 'static' || ($entry['rpcUnixSocket'] ?? null) !== true)) return [];

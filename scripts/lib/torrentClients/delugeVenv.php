@@ -23,7 +23,7 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
         || !is_array($entry['wheels'] ?? null) || $entry['wheels'] === []) return false;
     $version = $entry['version'] ?? null;
     $storeRoot = dirname(dirname($versionDir));
-    if (!is_string($version) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
+    if (!pmssTorrentClientsVersionValid($version)
         || $versionDir !== $storeRoot.'/deluge/'.$version
         || !pmssTorrentClientsStorePathChainSafe($storeRoot, 'deluge', $version)
         || !pmssTorrentClientsStorePathChainSafe($storeRoot, 'wheels')) return false;

@@ -63,7 +63,7 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
         $id = $client.'/'.$version;
         // Even direct callers must not turn unchecked catalog values into paths.
         if (!is_string($client) || !isset($binaryNames[$client])
-            || !is_string($version) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1) {
+            || !pmssTorrentClientsVersionValid($version)) {
             $results[$id] = 'invalid';
             continue;
         }

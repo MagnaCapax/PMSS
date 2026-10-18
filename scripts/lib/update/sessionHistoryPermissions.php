@@ -23,12 +23,14 @@ function pmssSessionHistoryPermissionsHarden(string $root = ''): bool
 
     foreach ($paths as $path) {
         $target = $root.$path;
-        if (!file_exists($target)) {
+        clearstatcache(true, $target);
+        $stats = @lstat($target);
+        if ($stats === false) {
             continue;
         }
-        clearstatcache(true, $target);
-        $mode = @fileperms($target);
-        if ($mode === false || (($mode & 0004) !== 0 && !@chmod($target, ($mode & 07777) & ~0004))) {
+        // Only harden the named record or binary, never a redirected target or directory.
+        $mode = $stats['mode'];
+        if (($mode & 0170000) !== 0100000 || (($mode & 0004) !== 0 && !@chmod($target, ($mode & 07777) & ~0004))) {
             throw new RuntimeException('Cannot harden permissions: '.$path);
         }
     }

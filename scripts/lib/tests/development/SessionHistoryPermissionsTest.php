@@ -80,4 +80,38 @@ class SessionHistoryPermissionsTest extends TestCase
         clearstatcache(true, $target);
         $this->assertSame(0640, fileperms($target) & 07777);
     }
+
+    public function testSymlinkDoesNotChangeItsTarget(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-session-link-');
+        $outside = $this->makeTarget($root, '/outside', 0644);
+        $link = $root.'/var/log/wtmp';
+        mkdir(dirname($link), 0755, true);
+        $this->pmssCreateSymlinkOrSkip($outside, $link);
+
+        try {
+            \pmssSessionHistoryPermissionsHarden($root);
+            $this->assertTrue(false, 'expected symlink rejection');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Cannot harden permissions: /var/log/wtmp', $exception->getMessage());
+        }
+        clearstatcache(true, $outside);
+        $this->assertSame(0644, fileperms($outside) & 07777);
+    }
+
+    public function testDirectoryTargetIsRejectedWithoutChangingMode(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-session-directory-');
+        $target = $root.'/var/log/wtmp';
+        mkdir($target, 0755, true);
+
+        try {
+            \pmssSessionHistoryPermissionsHarden($root);
+            $this->assertTrue(false, 'expected directory rejection');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Cannot harden permissions: /var/log/wtmp', $exception->getMessage());
+        }
+        clearstatcache(true, $target);
+        $this->assertSame(0755, fileperms($target) & 07777);
+    }
 }
