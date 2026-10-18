@@ -17,6 +17,29 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->assertSame([], glob($root.'/*'));
     }
 
+    public function testLinkedStateDirectoryAndMarkerAreNotWritten(): void
+    {
+        require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-links-');
+        file_put_contents($root.'/marker', '');
+        $this->pmssEnsureDir($root.'/target');
+        symlink($root.'/target', $root.'/state-link');
+        $calls = [];
+        $ops = [
+            'users' => static function () use (&$calls): array { $calls[] = 'users'; return ['alice']; },
+            'run' => static function () use (&$calls): void { $calls[] = 'run'; },
+        ];
+        \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state-link', $ops);
+        $this->assertSame([], $calls);
+        $this->assertSame([], glob($root.'/target/*'));
+
+        $this->pmssEnsureDir($root.'/state');
+        symlink($root.'/absent', $root.'/state/alice');
+        \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
+        $this->assertSame(['users'], $calls);
+        $this->assertFalse(file_exists($root.'/absent'));
+    }
+
     public function testStartsOnlyEligibleAccountsOnceInOneBackgroundChain(): void
     {
         require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';

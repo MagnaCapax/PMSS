@@ -24,7 +24,7 @@ function pmssPikkumiesPreinstallExistingRun(
         };
         $run = $ops['run'] ?? static function (string $command): void { exec($command); };
         $homeBase = $ops['homeBase'] ?? '/home';
-        if (!is_dir($stateDir) && !mkdir($stateDir, 0700, true) && !is_dir($stateDir)) {
+        if (is_link($stateDir) || (!is_dir($stateDir) && !mkdir($stateDir, 0700, true) && !is_dir($stateDir))) {
             error_log('[WARN] pikkumies preinstall: cannot create '.$stateDir);
             return;
         }
@@ -32,7 +32,8 @@ function pmssPikkumiesPreinstallExistingRun(
         foreach ($users() as $user) {
             $user = (string) $user;
             $home = $homeBase.'/'.$user;
-            if (!pmssValidateUsername($user) || file_exists($stateDir.'/'.$user)) continue;
+            // A dangling link must not become the target of the later root-owned touch.
+            if (!pmssValidateUsername($user) || is_link($stateDir.'/'.$user) || file_exists($stateDir.'/'.$user)) continue;
             if (is_dir($home.'/.mcxPikkumies')) {
                 touch($stateDir.'/'.$user);
                 continue;
