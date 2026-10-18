@@ -197,6 +197,12 @@ The candidate must also acquire mode 0600 before validation. A failed mode
 change removes the candidate and skips replacement, while the successful path
 keeps the same bytes and backup behavior.
 
+Managed-path backups validate the source before opening it and confirm the open
+handle still names that regular file before creating a copy. A backup is usable
+only after a complete copy, close, and mode application. The user slice drop-in
+repair leaves its original file in place when backup creation fails; valid
+repairs keep their content and backup format.
+
 Snapshot log writers ignore invalid, closed, and non-stream handles without
 consuming unrelated resources. Task cleanup tolerates a callback closing its
 stream, so its return value or original exception survives and the prior umask

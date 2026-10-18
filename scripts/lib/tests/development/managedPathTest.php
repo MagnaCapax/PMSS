@@ -179,6 +179,28 @@ class ManagedPathTest extends TestCase
         $this->assertEquals([], $messages);
     }
 
+    public function testManagedBackupRejectsSymlinkSource(): void
+    {
+        [$root, $path] = $this->managedPathFixture('pmss-env-backup-source-link-');
+        [$target, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/outside.conf', $path, "outside\n");
+        $messages = [];
+
+        $this->assertSame('', \pmssCreateManagedPathBackup($link, 'test target', $this->pmssMakeArrayLogger($messages), '20260102030408'));
+        $this->assertSame("outside\n", file_get_contents($target));
+        $this->assertSame([], glob($link.'.pmss-backup-*') ?: []);
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
+    }
+
+    public function testManagedBackupRejectsMissingSource(): void
+    {
+        [, $path] = $this->managedPathFixture('pmss-env-backup-source-missing-');
+        $messages = [];
+
+        $this->assertSame('', \pmssCreateManagedPathBackup($path, 'test target', $this->pmssMakeArrayLogger($messages), '20260102030409'));
+        $this->assertSame([], glob($path.'.pmss-backup-*') ?: []);
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to open test target for backup'));
+    }
+
     public function testManagedBackupLogsWhenAllTimestampCandidatesExist(): void
     {
         [, $path] = $this->managedPathFixture('pmss-env-backup-full-');

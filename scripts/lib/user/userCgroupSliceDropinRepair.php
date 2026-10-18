@@ -82,6 +82,10 @@ function pmssUserCgroupSliceDropinFileRepairBareMemoryMax(string $file, callable
     }
 
     $backup = pmssCreateManagedPathBackup($file, 'user slice drop-in', $logger, date('YmdHis'));
+    // Never replace the live drop-in without a usable recovery copy.
+    if ($backup === '') {
+        return false;
+    }
     if (!pmssWriteManagedPathFile(
         $file,
         $plan['content'],
@@ -98,7 +102,7 @@ function pmssUserCgroupSliceDropinFileRepairBareMemoryMax(string $file, callable
     $logger(sprintf(
         '[WARN] Repaired bare MemoryMax in %s%s (values: %s)',
         $file,
-        $backup === '' ? '' : ' (backup '.$backup.')',
+        ' (backup '.$backup.')',
         implode(', ', array_unique($plan['values']))
     ));
     return true;

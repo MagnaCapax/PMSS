@@ -125,6 +125,14 @@ function pmssManagedPathBackupCandidate(string $path, string $timestamp, int $at
  */
 function pmssCreateManagedPathBackup(string $path, string $label, callable $logger, string $timestamp): string
 {
+    // Direct callers must validate the source before opening or copying it.
+    if (!pmssManagedPathIsSafe($path, $label, $logger)) {
+        return '';
+    }
+    if (!pmssRegularFilePathIsReadable($path)) {
+        $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
+        return '';
+    }
     for ($attempt = 0; $attempt < 10; $attempt++) {
         $backup = pmssManagedPathBackupCandidate($path, $timestamp, $attempt);
         if (pmssPathExistsOrLink($backup)) {
@@ -136,6 +144,11 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
 
         $source = @fopen($path, 'rb');
         if (!is_resource($source)) {
+            $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
+            return '';
+        }
+        if (!pmssLockFileHandleMatchesPath($source, $path)) {
+            @fclose($source);
             $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
             return '';
         }
@@ -155,11 +168,8 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
         $targetClosed = @fclose($target);
         @fclose($source);
         // A short copy must not be published as a usable backup.
-        if (is_array($sourceStat) && isset($sourceStat['size']) && $copied === $sourceStat['size'] && $targetClosed) {
-            $sourceMode = @fileperms($path);
-            if (is_int($sourceMode)) {
-                @chmod($backup, $sourceMode & 0777);
-            }
+        if (is_array($sourceStat) && isset($sourceStat['size'], $sourceStat['mode']) && $copied === $sourceStat['size'] && $targetClosed
+            && @chmod($backup, $sourceStat['mode'] & 0777)) {
             return $backup;
         }
 

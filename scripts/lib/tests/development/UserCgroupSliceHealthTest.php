@@ -114,4 +114,20 @@ class UserCgroupSliceHealthTest extends TestCase
         $this->assertFalse(\pmssUserCgroupSliceDropinFileRepairBareMemoryMax($link, $logger));
         $this->assertStringContainsString('Skipping unsafe user slice drop-in target', implode("\n", $messages));
     }
+
+    public function testDropinFileRepairPreservesFileWhenBackupNamesAreOccupied(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-user-slice-backup-full-');
+        $original = "[Slice]\nMemoryMax=512\nMemoryLimit=512M\n";
+        $file = $this->pmssWriteFile($dir.'/90-pmss-user.conf', $original);
+        $timestamp = date('YmdHis');
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            file_put_contents(\pmssManagedPathBackupCandidate($file, $timestamp, $attempt), 'occupied');
+        }
+        $messages = [];
+
+        $this->assertFalse(\pmssUserCgroupSliceDropinFileRepairBareMemoryMax($file, $this->pmssMakeArrayLogger($messages)));
+        $this->assertSame($original, file_get_contents($file));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'timestamped backup paths already exist'));
+    }
 }
