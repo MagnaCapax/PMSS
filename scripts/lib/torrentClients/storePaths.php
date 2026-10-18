@@ -20,8 +20,8 @@ function pmssTorrentClientsStorePathChainSafe(string $root, string $client = '',
     $uid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_geteuid() : 0;
     $gid = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE ? posix_getegid() : 0;
     foreach ($paths as $path) {
-        $stat = @lstat($path);
-        if ($stat === false) continue;
+        clearstatcache(true, $path);
+        if (($stat = @lstat($path)) === false) continue;
         // Ownership alone does not prevent a tenant from replacing store entries.
         if (($stat['mode'] & 0170000) !== 0040000 || $stat['uid'] !== $uid || $stat['gid'] !== $gid
             || ($stat['mode'] & 0022) !== 0) return false;
