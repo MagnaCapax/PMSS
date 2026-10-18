@@ -43,7 +43,7 @@ pmssRequireRelativeFiles(__DIR__.'/../lib', [
     'update/arrRootExecutionBlock.php', 'update/repositories.php', 'update/storageBenchmark.php',
     'update/systemPrep.php', 'update/services/systemd.php', 'update/services/logging.php',
     'update/services/logrotate.php', 'update/services/mountHardening.php', 'update/userMaintenance.php',
-    'update/networking.php', 'update/services/bootstrap.php', 'motd/Generator.php', 'certbotSetup.php',
+    'update/networking.php', 'update/sessionHistoryPermissions.php', 'update/services/bootstrap.php', 'motd/Generator.php', 'certbotSetup.php',
 ]);
 
 requireRoot();
@@ -599,7 +599,7 @@ pmssRunProfiledCallable('Installing logrotate policies', 'pmssLogrotatePoliciesI
 
 pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetworkTemplate', ['logmsg']);
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
-runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /var/log/lastlog /var/log/faillog /usr/bin/netstat /usr/bin/who /usr/bin/w');
+pmssRunProfiledCallable('Hardening access to session and network binaries', 'pmssSessionHistoryPermissionsHarden', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 // Opt-in only (marker /etc/seedbox/config/socket-table-privacy.enabled). With no marker this
 // restores stock /proc/net modes and is a no-op — inert until the operator enables it per host.
 pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);

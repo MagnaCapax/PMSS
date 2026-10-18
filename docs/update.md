@@ -304,6 +304,12 @@ strict handling is required) so profile JSON captures each orchestration
 step with stable labels. `PMSS_DRY_RUN=1` still logs planned work while command
 execution is skipped.
 
+The session and network binary hardening step removes other-read from existing
+legacy wtmp, utmp, lastlog, and faillog files and the netstat, who, and w
+binaries. It also covers Debian 13's `wtmp.db`, rotated `wtmp_*.db`, and
+`lastlog2.db`. Missing paths are skipped; permission failures are logged as a
+soft-failed update step.
+
 ## Usage Examples
 
 Upgrade to the latest release:

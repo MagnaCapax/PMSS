@@ -59,7 +59,7 @@ class UpdateStep2FinalPermissionsTest extends TestCase
             ],
             'ordered' => [[
                 'needles' => [
-                    "runStep('Hardening access to session and network binaries'",
+                    "pmssRunProfiledCallable('Hardening access to session and network binaries'",
                     "\$topLevelOwnershipOk = pmssRunProfiledCallable('Checking top-level root ownership invariant'",
                     "'top_level_ownership_invariant'",
                     "pmssRunProfiledCallable('Running post-install storage benchmark'",
