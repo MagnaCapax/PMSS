@@ -98,6 +98,50 @@ class UpdateServicesRuntimeTest extends TestCase
         ], $commands);
     }
 
+    public function testResetInheritedOomImmunitySelectsUserProcessesAndSelf(): void
+    {
+        $proc = $this->pmssMakeTempDir('pmss-oom-proc-');
+        $fixtures = [
+            '101' => ['-1000', '0::/user.slice/user-1000.slice/session-1.scope', "Uid:\t0\t0\t0\t0\n", '0'],
+            '102' => ['-1000', '0::/system.slice/example.service', "Uid:\t1000\t0\t0\t0\n", '0'],
+            '103' => ['-1000', '0::/system.slice/example.service', "Uid:\t0\t1000\t1000\t1000\n", '-1000'],
+            '104' => ['-1000', '0::/system.slice/example.service', "Uid:\t0\t0\t0\t0\n", '-1000'],
+            '105' => ['0', '0::/user.slice/user-1000.slice/session-1.scope', "Uid:\t1000\n", '0'],
+            '106' => ['-500', '0::/user.slice/user-1000.slice/session-1.scope', "Uid:\t1000\n", '-500'],
+        ];
+        $this->pmssWriteFile($proc.'/self/oom_score_adj', '-1000');
+        foreach ($fixtures as $pid => list($score, $cgroup, $status)) {
+            $this->pmssWriteFile($proc.'/'.$pid.'/oom_score_adj', $score);
+            $this->pmssWriteFile($proc.'/'.$pid.'/cgroup', $cgroup);
+            $this->pmssWriteFile($proc.'/'.$pid.'/status', $status);
+        }
+        $this->pmssWriteFile($proc.'/107/status', "Uid:\t1000\n");
+        $this->pmssWriteFile($proc.'/not-a-pid/oom_score_adj', '-1000');
+        $this->pmssWriteFile($proc.'/not-a-pid/cgroup', '0::/user.slice/user-1000.slice');
+
+        $this->assertSame(3, \pmssResetInheritedOomImmunity($proc));
+        $this->assertSame('0', $this->pmssReadFileOrEmpty($proc.'/self/oom_score_adj'));
+        foreach ($fixtures as $pid => $fixture) {
+            $this->assertSame($fixture[3], $this->pmssReadFileOrEmpty($proc.'/'.$pid.'/oom_score_adj'));
+        }
+        $this->assertSame('-1000', $this->pmssReadFileOrEmpty($proc.'/not-a-pid/oom_score_adj'));
+        $this->assertSame(0, \pmssResetInheritedOomImmunity($proc));
+    }
+
+    public function testResetInheritedOomImmunityDryRunLeavesProcFixtureUntouched(): void
+    {
+        $proc = $this->pmssMakeTempDir('pmss-oom-dry-proc-');
+        $this->pmssWriteFile($proc.'/self/oom_score_adj', '-1000');
+        $this->pmssWriteFile($proc.'/101/oom_score_adj', '-1000');
+        $this->pmssWriteFile($proc.'/101/cgroup', '0::/user.slice/user-1000.slice/session-1.scope');
+
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($proc): void {
+            $this->assertSame(0, \pmssResetInheritedOomImmunity($proc));
+        });
+        $this->assertSame('-1000', $this->pmssReadFileOrEmpty($proc.'/self/oom_score_adj'));
+        $this->assertSame('-1000', $this->pmssReadFileOrEmpty($proc.'/101/oom_score_adj'));
+    }
+
     public function testCronRestartDropinCreatesDirectoryAndFileSafely(): void
     {
         list($root, $dropinDir, $dropinFile) = $this->pmssCronDropinFixture('pmss-cron-dropin-');

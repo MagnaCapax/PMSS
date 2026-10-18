@@ -224,6 +224,55 @@ function pmssEnsureSshdStarvationDropin(
     return true;
 }
 
+/** Reset inherited SSH OOM immunity on the updater and tenant processes (#901). */
+function pmssResetInheritedOomImmunity(string $procRoot = '/proc'): int
+{
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        logMessage('[SKIP] Reset inherited OOM immunity (dry run)');
+        return 0;
+    }
+
+    $reset = 0;
+    $failed = 0;
+    $selfScore = $procRoot.'/self/oom_score_adj';
+    if (trim((string) @file_get_contents($selfScore)) === '-1000') {
+        if (@file_put_contents($selfScore, '0') !== false && trim((string) @file_get_contents($selfScore)) === '0') {
+            ++$reset;
+        } else {
+            ++$failed;
+        }
+    }
+
+    // The updater must lose inherited immunity before it launches tenant services.
+    foreach (@scandir($procRoot) ?: [] as $pid) {
+        if (!ctype_digit($pid) || !is_dir($procRoot.'/'.$pid)) {
+            continue;
+        }
+        $path = $procRoot.'/'.$pid;
+        $score = $path.'/oom_score_adj';
+        if (trim((string) @file_get_contents($score)) !== '-1000') {
+            continue;
+        }
+        $cgroup = @file_get_contents($path.'/cgroup');
+        $inUserSlice = is_string($cgroup) && strpos($cgroup, '/user.slice/') !== false;
+        $status = $inUserSlice ? '' : @file_get_contents($path.'/status');
+        $hasUserUid = is_string($status) && preg_match('/^Uid:\s*(\d+)(?:\s|$)/m', $status, $uid) === 1
+            && (int) $uid[1] >= 1000;
+        if (!$inUserSlice && !$hasUserUid) {
+            continue;
+        }
+        if (@file_put_contents($score, '0') !== false && trim((string) @file_get_contents($score)) === '0') {
+            ++$reset;
+        } else {
+            ++$failed;
+        }
+    }
+
+    logMessage(($failed ? '[WARN]' : '[INFO]').' Reset inherited OOM immunity: '.$reset.' process(es) -1000 -> 0'.
+        ($failed ? ' ('.$failed.' failed)' : ''));
+    return $reset;
+}
+
 /**
  * Validate sshd_config, applying the legacy-parser fallback only on parser errors.
  */
@@ -274,6 +323,7 @@ function pmssApplyRuntimeTemplates(): void
     ] as $action) { runStep(...$action); }
 
     pmssEnsureSshdStarvationDropin();
+    pmssResetInheritedOomImmunity();
 
     pmssBackupCriticalConfig('sshd', '/etc/ssh/sshd_config');
     foreach ([

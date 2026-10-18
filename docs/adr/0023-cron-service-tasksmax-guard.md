@@ -62,6 +62,12 @@ PMSS also installs an `ssh.service` drop-in with high CPU/IO weights and
 drop-in omits it. This is defense-in-depth for CPU/IO/OOM pressure only; the
 pid-exhaustion fix is the per-user slice containment above.
 
+Removing `OOMScoreAdjust=-1000` does not lower scores already inherited by
+running processes. After applying the SSH drop-in, the runtime-template step
+resets inherited `-1000` on its own process and on user-slice or non-system-UID
+processes every update, so existing tenant trees and later update children no
+longer carry SSH listener immunity (#901).
+
 ## Consequences
 - Positive: Runaway cron jobs can hit a bounded service-level task cap instead
   of host-wide pid capacity.
