@@ -209,7 +209,7 @@ foreach ($toggleApps as $toggleApp => $row) {
     pmssTerminateUserUnlinkPath($username, 'remove_toggle_app_state', "/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json", $dryRun);
 }
 
-// Home and the recreate backup are purged the same way; immutable flags are
+// Home and both recreate backups are purged the same way; immutable flags are
 // cleared by verified inode on the residue only.
 //
 // The purge runs LAST because it is the only unbounded step here. Every step above is
@@ -229,8 +229,17 @@ foreach ($toggleApps as $toggleApp => $row) {
 // Route-retire -> nginx reload -> port release must also stay in that order: portManager
 // shuffles the free list, so releasing a port before its route is gone lets a new account
 // draw a port a stale route still proxies to.
-pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserPurgeDirectorySteps('home', "/home/{$username}"), $dryRun);
-pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserPurgeDirectorySteps('user_backup', "/home/backup-{$username}"), $dryRun);
+$purgePaths = array(
+    'home' => "/home/{$username}",
+    'user_backup' => "/home/backup-{$username}",
+    'user_backup_superseded' => "/home/backup-{$username}.superseded",
+);
+$purgeResults = array();
+foreach ($purgePaths as $label => $path) {
+    $purgeResults = array_merge($purgeResults, pmssUserLifecycleRunSteps(
+        'terminate', $username, pmssTerminateUserPurgeDirectorySteps($label, $path), $dryRun
+    ));
+}
 
 $db = new users();
 if (pmssUserAccountLookup($username) !== null) {
@@ -261,10 +270,12 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 
 $overallDuration = microtime(true) - $overallStart;
+$completion = pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun);
 pmssUserLifecycleContextLog('terminate', 'end', $username, array(
-    'status'           => 'OK',
+    'status'           => $completion['status'],
     'dry_run'          => $dryRun,
     'overall_duration' => round($overallDuration, 4),
 ));
 
-echo "\n## Done. User termination flow completed.\n";
+echo "\n".$completion['line']."\n";
+exit($completion['rc']);

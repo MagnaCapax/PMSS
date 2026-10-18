@@ -23,7 +23,7 @@ are frequently used during day-to-day operations:
   resolved again before counting and must still be inside the user's home.
 - `scripts/addUser.php` - provision a new user account (creates services/config).
 - `scripts/suspend.php` / `scripts/unsuspend.php` - toggle user suspension state.
-- `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); the home and any matching `backup-<user>` recreate backup are removed synchronously.
+- `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); the home, matching `backup-<user>` recreate backup, and its `.superseded` archive are purged synchronously. Exit 0 with `## Done. User termination verified.` means the account and all three paths are gone; exit 1 with `## Incomplete: ...` identifies the first failed check or purge step.
 
 Storage benchmark `fioRun()` releases its private JSON output file in `finally`,
 including when command construction, execution, or output reading throws. The

@@ -1136,9 +1136,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
     the web-stack launch or process verification fails.
 
 - scripts/terminateUser.php [--dry-run] [--confirm] USERNAME
-  - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, then removes `/home/<user>` and any `/home/backup-<user>` left by `recreateUser.php`. It never sweeps `backup-*` prefixes.
+  - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, then synchronously purges `/home/<user>`, `/home/backup-<user>`, and `/home/backup-<user>.superseded`. It never sweeps `backup-*` prefixes.
   - Removal: Removes ordinary contents first, clears immutable attributes only from the remaining residue, and retries removal — so the recursive attribute walk never traverses a full account.
-  - Dry-run: Logs planned removal work without deleting those paths.
+  - Completion: After the final cleanup, exit 0 and print `## Done. User termination verified.` only when all purge steps succeeded, the passwd entry is absent, and all three paths are absent. Otherwise exit 1 and print `## Incomplete: <first failed check or step label>`. The lifecycle end event records `OK` or `INCOMPLETE`.
+  - Dry-run: Logs planned removal work without deleting those paths; its final line is `## Done. User termination flow completed (dry run).` and does not claim verification.
   - Safety: Direct cleanup helpers reject NUL-containing paths and skip malformed/out-of-range rTorrent port values before unlinking reservation files. The recursive purge step builder accepts only exact managed home or recreate-backup paths for valid usernames; invalid paths throw before a shell step is built.
 
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB

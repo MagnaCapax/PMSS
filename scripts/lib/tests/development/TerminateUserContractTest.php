@@ -43,7 +43,7 @@ final class TerminateUserContractTest extends TestCase
     }
 
     /**
-     * Home and the recreate backup are purged synchronously through one shared helper,
+     * Home and both recreate backups are purged synchronously through one shared helper,
      * after the account is removed and after every bounded cleanup step has run.
      * Refs #729 (revert of the async rename-aside reclaim), #908 (purge ordering).
      *
@@ -58,7 +58,7 @@ final class TerminateUserContractTest extends TestCase
      * bounded work first means a timeout costs only the resumable purge. Running it later
      * in the same blocking run reintroduces none of #729 -- nothing is queued or renamed.
      */
-    public function testTerminateUserPurgesHomeAndBackupSynchronously(): void
+    public function testTerminateUserPurgesHomeAndBackupsSynchronously(): void
     {
         $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
             'forbidden' => [
@@ -73,8 +73,13 @@ final class TerminateUserContractTest extends TestCase
                 'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
                 "'release_lighttpd_port'",
                 "'remove_nginx_user_file'",
-                "pmssTerminateUserPurgeDirectorySteps('home', \"/home/{\$username}\")",
-                "pmssTerminateUserPurgeDirectorySteps('user_backup', \"/home/backup-{\$username}\")",
+                "'home' => \"/home/{\$username}\"",
+                "'user_backup' => \"/home/backup-{\$username}\"",
+                "'user_backup_superseded' => \"/home/backup-{\$username}.superseded\"",
+                'pmssTerminateUserPurgeDirectorySteps($label, $path)',
+                'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
+                "echo \"\\n\".\$completion['line'].\"\\n\";",
+                "exit(\$completion['rc']);",
             ]],
         ]);
     }
@@ -147,6 +152,9 @@ final class TerminateUserContractTest extends TestCase
     {
         $backup = \pmssTerminateUserPurgeDirectorySteps('user_backup', '/home/backup-user1234');
         $this->assertSame('remove_user_backup_initial', $backup[0][0]);
+        $superseded = \pmssTerminateUserPurgeDirectorySteps('user_backup_superseded', '/home/backup-user1234.superseded');
+        $this->assertSame('remove_user_backup_superseded_initial', $superseded[0][0]);
+        $this->assertStringContainsString("'/home/backup-user1234.superseded'", $superseded[0][1]);
 
         foreach ([
             ['home', ''],
@@ -157,6 +165,9 @@ final class TerminateUserContractTest extends TestCase
             ['home', "/home/user1234\0other"],
             ['home', '/home/backup-user1234'],
             ['user_backup', '/home/user1234'],
+            ['user_backup_superseded', '/home/backup-user1234'],
+            ['user_backup_superseded', '/home/backup-user1234.superseded/other'],
+            ['user_backup_superseded', '/home/backup-user1234.superseded-extra'],
             ['unexpected', '/home/user1234'],
         ] as $case) {
             try {
@@ -166,6 +177,56 @@ final class TerminateUserContractTest extends TestCase
                 $this->assertSame('Refusing unsafe user purge path', $e->getMessage());
             }
         }
+    }
+
+    public function testTerminationCompletionRequiresSuccessfulPurgesAndAbsentHomes(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-termination-result-');
+        $paths = array(
+            'home' => $root.'/user',
+            'user_backup' => $root.'/backup-user',
+            'user_backup_superseded' => $root.'/backup-user.superseded',
+        );
+        $results = array();
+        foreach (array_keys($paths) as $label) {
+            foreach (array('initial', 'leftovers') as $phase) $results['remove_'.$label.'_'.$phase] = 0;
+            $results['clear_immutable_'.$label] = 0;
+        }
+        $username = 'pmssmissing12345';
+
+        $complete = \pmssTerminateUserCompletion($username, $paths, $results, false);
+        $this->assertSame(array('line' => '## Done. User termination verified.', 'rc' => 0, 'status' => 'OK'), $complete);
+
+        $failed = $results;
+        $failed['remove_user_backup_initial'] = 1;
+        $this->assertSame('## Incomplete: remove_user_backup_initial', \pmssTerminateUserCompletion($username, $paths, $failed, false)['line']);
+        $this->assertSame(1, \pmssTerminateUserCompletion($username, $paths, $failed, false)['rc']);
+        unset($failed['remove_user_backup_initial']);
+        $this->assertSame(1, \pmssTerminateUserCompletion($username, $paths, $failed, false)['rc'], 'a missing purge step is incomplete');
+
+        $this->pmssEnsureDir($paths['home']);
+        $this->assertSame('## Incomplete: home_still_present', \pmssTerminateUserCompletion($username, $paths, $results, false)['line']);
+        $this->assertSame(1, \pmssTerminateUserCompletion($username, $paths, $results, false)['rc']);
+        rmdir($paths['home']);
+        $this->pmssEnsureDir($paths['user_backup_superseded']);
+        $this->assertSame('## Incomplete: user_backup_superseded_still_present', \pmssTerminateUserCompletion($username, $paths, $results, false)['line']);
+        rmdir($paths['user_backup_superseded']);
+        $this->assertSame('## Incomplete: account_still_present', \pmssTerminateUserCompletion('root', $paths, $results, false)['line']);
+        $dryRun = \pmssTerminateUserCompletion($username, $paths, $results, true);
+        $this->assertSame('## Done. User termination flow completed (dry run).', $dryRun['line']);
+        $this->assertSame(0, $dryRun['rc']);
+    }
+
+    public function testSupersededBackupIsRemovedByPinnedPurge(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-termination-superseded-');
+        $archive = $root.'/backup-user.superseded';
+        $this->pmssWriteFile($archive.'/customer-data', 'fixture');
+        foreach (array(false, true, false) as $clear) {
+            exec(\pmssPinnedTreePurgeCommand($archive, $clear), $output, $rc);
+            $this->assertSame(0, $rc);
+        }
+        $this->assertFalse(file_exists($archive));
     }
 
     public function testTerminateUserHomeInvariantIsExact(): void

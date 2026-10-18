@@ -79,9 +79,18 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
  */
 function pmssTerminateUserPurgeDirectorySteps(string $label, string $path): array
 {
-    // Keep recursive deletion limited to the two account paths this helper owns.
-    $prefix = $label === 'home' ? '/home/' : ($label === 'user_backup' ? '/home/backup-' : '');
-    if ($prefix === '' || strpos($path, $prefix) !== 0 || !pmssUsernameIsValid(substr($path, strlen($prefix)))) {
+    // Accept only the exact account paths, including recreate's fixed archive suffix.
+    $prefix = $label === 'home' ? '/home/' : '/home/backup-';
+    $suffix = $label === 'user_backup_superseded' ? '.superseded' : '';
+    $validLabel = in_array($label, array('home', 'user_backup', 'user_backup_superseded'), true);
+    $username = substr($path, strlen($prefix));
+    if ($suffix !== '' && substr($username, -strlen($suffix)) === $suffix) {
+        $username = substr($username, 0, -strlen($suffix));
+    } elseif ($suffix !== '') {
+        $username = '';
+    }
+    if (!$validLabel || strpos($path, $prefix) !== 0 || !pmssUsernameIsValid($username)
+        || $path !== $prefix.$username.$suffix) {
         throw new InvalidArgumentException('Refusing unsafe user purge path');
     }
 
@@ -92,6 +101,33 @@ function pmssTerminateUserPurgeDirectorySteps(string $label, string $path): arra
         array('clear_immutable_'.$label, pmssPinnedTreePurgeCommand($path, true)),
         array('remove_'.$label.'_leftovers', $remove),
     );
+}
+
+/** Return the final line, exit code, and audit status after every purge has run. */
+function pmssTerminateUserCompletion(string $username, array $paths, array $purgeResults, bool $dryRun): array
+{
+    if ($dryRun) {
+        return array('line' => '## Done. User termination flow completed (dry run).', 'rc' => 0, 'status' => 'OK');
+    }
+
+    // A later successful retry does not erase an earlier failed purge step.
+    foreach (array('home', 'user_backup', 'user_backup_superseded') as $label) {
+        foreach (array('remove_'.$label.'_initial', 'clear_immutable_'.$label, 'remove_'.$label.'_leftovers') as $step) {
+            if (!isset($purgeResults[$step]) || $purgeResults[$step] !== 0) {
+                return array('line' => '## Incomplete: '.$step, 'rc' => 1, 'status' => 'INCOMPLETE');
+            }
+        }
+    }
+    if (pmssUserAccountLookup($username) !== null) {
+        return array('line' => '## Incomplete: account_still_present', 'rc' => 1, 'status' => 'INCOMPLETE');
+    }
+    foreach ($paths as $label => $path) {
+        clearstatcache(true, $path);
+        if (pmssPathExistsOrLink($path)) {
+            return array('line' => '## Incomplete: '.$label.'_still_present', 'rc' => 1, 'status' => 'INCOMPLETE');
+        }
+    }
+    return array('line' => '## Done. User termination verified.', 'rc' => 0, 'status' => 'OK');
 }
 
 function pmssTerminateUserNginxRouteFileSpecs(string $username): array
