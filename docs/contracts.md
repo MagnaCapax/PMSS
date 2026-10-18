@@ -1126,6 +1126,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/changePw.php [--jsonl] USERNAME [PASSWORD]
   - Behavior: Sets the Unix password (generated if omitted), writes the per-user htpasswd and any existing qBittorrent config with the account's privileges, and prints the password.
+    On Debian 11 and newer, shadow and htpasswd receive the same `$2y$` bcrypt hash. Debian 10 and unreadable or nonnumeric Debian versions retain the `passwd` and `htpasswd -B` path. Both shadow paths feed credentials through stdin.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
 
 - scripts/unsuspend.php USERNAME

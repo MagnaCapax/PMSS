@@ -3,6 +3,8 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../user/passwordFile.php';
+require_once __DIR__.'/../../user/changePwCredential.php';
+require_once __DIR__.'/../../lighttpd/htpasswd.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/panelSessionAuth.php';
 
 class changePwPasswdFailureGuardTest extends TestCase
@@ -11,12 +13,11 @@ class changePwPasswdFailureGuardTest extends TestCase
 
     public function testChangePwCredentialSyncSourceContracts(): void
     {
-        $legacyPattern = "'printf ".'%s | passwd %s'."'";
         $this->pmssAssertRepoFileContractCases([
             'scripts/changePw.php' => [
                 'required' => [
-                    'exec($cmd.\' 2>&1\', $passwdOutput, $passwdReturnCode);',
-                    "printf '%%s' %s | passwd %s",
+                    'pmssChangePwShadowUpdate($username, $password, $useBcrypt, $passwdOutput);',
+                    'pmssUserHtpasswdHashWrite($htpasswdFile, $username, $passwordHash, $username)',
                     '$alphabet = \'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_\';',
                     '$jsonlOutput = false;',
                     '$parseOptions = true;',
@@ -26,12 +27,12 @@ class changePwPasswdFailureGuardTest extends TestCase
                     '?bool $qbittorrentUpdated',
                     "'qbittorrent_updated' => \$qbittorrentUpdated,",
                     '$htpasswdOutput = [];',
-                    '$htpasswdReturnCode = pmssUserHtpasswdPasswordUpdate($username, $password, $htpasswdFile, $htpasswdOutput);',
+                    'pmssUserHtpasswdPasswordUpdate($username, $password, $htpasswdFile, $htpasswdOutput);',
                     'if ($htpasswdReturnCode !== 0) {',
                 ],
                 'forbidden' => [
                     'shell_exec($cmd);' => 'changePw must not ignore passwd exit codes',
-                    $legacyPattern,
+                    "printf '%%s' %s | passwd %s" => 'password must not be placed in the command line',
                     '!@#$%',
                     '$qbittorrent'.'ReturnCode = 0;',
                     "'qbittorrent".'_rc'."' =>",
@@ -45,10 +46,10 @@ class changePwPasswdFailureGuardTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/changePw.php',
             [
-                'exec($cmd.\' 2>&1\', $passwdOutput, $passwdReturnCode);',
+                'pmssChangePwShadowUpdate($username, $password, $useBcrypt, $passwdOutput);',
                 'if ($passwdReturnCode !== 0) {',
                 'exit(1);',
-                'pmssUserHtpasswdPasswordUpdate($username, $password, $htpasswdFile, $htpasswdOutput);',
+                'pmssUserHtpasswdHashWrite($htpasswdFile, $username, $passwordHash, $username)',
             ],
             'changePw missing guard substring: ',
             'changePw guard order changed near: '
@@ -61,7 +62,7 @@ class changePwPasswdFailureGuardTest extends TestCase
             'scripts/changePw.php',
             [
                 '$htpasswdOutput = [];',
-                '$htpasswdReturnCode = pmssUserHtpasswdPasswordUpdate($username, $password, $htpasswdFile, $htpasswdOutput);',
+                '$htpasswdReturnCode = $useBcrypt',
                 'if ($htpasswdReturnCode !== 0) {',
                 'htpasswd update failed for {$username}; aborting credential sync',
                 '$qbittorrentUpdated = pmssUpdateQbittorrentPasswordAsUser($username, $password);',
@@ -69,6 +70,87 @@ class changePwPasswdFailureGuardTest extends TestCase
             'changePw htpasswd guard missing substring: ',
             'changePw htpasswd guard order changed near: '
         );
+    }
+
+    public function testBcryptShadowAndHtpasswdUseOneHashAcrossUnsuspendSync(): void
+    {
+        $versionPath = $this->tempDir.'/debian_version';
+        file_put_contents($versionPath, "12.15\n");
+        $this->assertTrue(\pmssChangePwBcryptSupported($versionPath));
+        file_put_contents($versionPath, "11.11\n");
+        $this->assertTrue(\pmssChangePwBcryptSupported($versionPath));
+
+        $username = $this->pmssCurrentOwner();
+        $password = 'test-secret-with-special-$-chars';
+        $inputPath = $this->tempDir.'/chpasswd-input';
+        $argsPath = $this->tempDir.'/chpasswd-args';
+        $binDir = $this->tempDir.'/bin';
+        mkdir($binDir, 0700);
+        file_put_contents($binDir.'/chpasswd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n");
+        chmod($binDir.'/chpasswd', 0700);
+        $originalPath = getenv('PATH');
+        putenv('PATH='.$binDir.':'.$originalPath);
+        putenv('PMSS_TEST_INPUT='.$inputPath);
+        putenv('PMSS_TEST_ARGS='.$argsPath);
+        $output = [];
+        try {
+            [$status, $hash] = \pmssChangePwShadowUpdate($username, $password, true, $output);
+        } finally {
+            putenv('PATH='.$originalPath);
+            putenv('PMSS_TEST_INPUT');
+            putenv('PMSS_TEST_ARGS');
+        }
+        $this->assertEquals(0, $status);
+        $this->assertTrue(strpos($hash, '$2y$') === 0);
+        $this->assertTrue(password_verify($password, $hash));
+        $this->assertSame('-e', (string) file_get_contents($argsPath));
+        $this->assertFalse(strpos((string) file_get_contents($argsPath), $password) !== false);
+        $this->assertFalse(strpos((string) file_get_contents($argsPath), $hash) !== false);
+        $this->assertSame($username.':'.$hash."\n", (string) file_get_contents($inputPath));
+
+        $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
+        $htpasswdPath = $homeRoot.'/'.$username.'/.lighttpd/.htpasswd';
+        mkdir(dirname($htpasswdPath), 0755, true);
+        $this->assertTrue(\pmssUserHtpasswdHashWrite($htpasswdPath, $username, $hash, $username));
+        $beforeSync = (string) file_get_contents($htpasswdPath);
+        $this->assertSame($username.':'.$hash."\n", $beforeSync);
+        $shadowPath = $this->tempDir.'/shadow';
+        file_put_contents($shadowPath, $username.':'.$hash.':20000:0:99999:7:::'."\n");
+        $this->assertTrue(\pmssUserHtpasswdSyncFromShadow($username, $shadowPath));
+        $this->assertSame($beforeSync, (string) file_get_contents($htpasswdPath));
+    }
+
+    public function testDebianTenAndUnknownVersionsKeepPasswdPath(): void
+    {
+        $versionPath = $this->tempDir.'/debian_version';
+        foreach (["10.13\n", "bookworm/sid\n", "", "12.invalid\n"] as $version) {
+            file_put_contents($versionPath, $version);
+            $this->assertFalse(\pmssChangePwBcryptSupported($versionPath));
+        }
+        $this->assertFalse(\pmssChangePwBcryptSupported($this->tempDir.'/missing-version'));
+
+        $inputPath = $this->tempDir.'/passwd-input';
+        $argsPath = $this->tempDir.'/passwd-args';
+        $binDir = $this->tempDir.'/bin';
+        mkdir($binDir, 0700);
+        file_put_contents($binDir.'/passwd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n");
+        chmod($binDir.'/passwd', 0700);
+        $originalPath = getenv('PATH');
+        putenv('PATH='.$binDir.':'.$originalPath);
+        putenv('PMSS_TEST_INPUT='.$inputPath);
+        putenv('PMSS_TEST_ARGS='.$argsPath);
+        $output = [];
+        try {
+            [$status, $hash] = \pmssChangePwShadowUpdate('alice', 'legacy-secret', false, $output);
+        } finally {
+            putenv('PATH='.$originalPath);
+            putenv('PMSS_TEST_INPUT');
+            putenv('PMSS_TEST_ARGS');
+        }
+        $this->assertSame(0, $status);
+        $this->assertSame('', $hash);
+        $this->assertSame('alice', (string) file_get_contents($argsPath));
+        $this->assertSame("legacy-secret\nlegacy-secret\n", (string) file_get_contents($inputPath));
     }
 
     public function testHtpasswdUpdateRunsAsAccountAndProducesValidLine(): void
