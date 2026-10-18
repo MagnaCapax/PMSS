@@ -11,10 +11,18 @@ final class StdoutHeartbeatTest extends TestCase
         $this->assertFalse(\pmssStdoutHeartbeatShouldStart(true));
         $this->assertTrue(\pmssStdoutHeartbeatShouldStart(false));
         $this->assertSame(null, \pmssStdoutHeartbeatStart(0));
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
-            'pmssStdoutHeartbeatShouldStart(pmssStreamIsTty(STDOUT))',
-            "pmssRequireHomeMounted('terminateUser.php')",
-        ]]]);
+    }
+
+    public function testLifecycleScriptsStartHeartbeatBeforeHomeGuard(): void
+    {
+        foreach (['terminateUser.php', 'suspend.php', 'unsuspend.php'] as $script) {
+            $this->pmssAssertRepoFileContract('scripts/'.$script, ['ordered' => [[
+                "require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';",
+                'if (pmssStdoutHeartbeatShouldStart(pmssStreamIsTty(STDOUT))) {',
+                'pmssStdoutHeartbeatStart();',
+                "pmssRequireHomeMounted('".$script."')",
+            ]]]);
+        }
     }
 
     /** A shell child must keep writing while PHP is blocked in passthru(). */

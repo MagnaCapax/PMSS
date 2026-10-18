@@ -1129,12 +1129,16 @@ Automation often invokes these utilities; below are expected inputs and effects.
     On Debian 11 and newer, shadow and htpasswd receive the same `$2y$` bcrypt hash. Debian 10 and unreadable or nonnumeric Debian versions retain the `passwd` and `htpasswd -B` path. Both shadow paths feed credentials through stdin.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
 
+- scripts/suspend.php USERNAME
+  - Output: With non-TTY stdout, emits empty heartbeat lines during silent steps. TTY output is unchanged.
+
 - scripts/unsuspend.php USERNAME
   - Behavior: Unlocks the account, restores and validates the active web root,
     refreshes nginx, starts lighttpd directly, and verifies that both the
     user-owned `lighttpd` and `php-cgi` processes remain running.
   - Failure: Still attempts the existing rTorrent start, then exits non-zero when
     the web-stack launch or process verification fails.
+  - Output: With non-TTY stdout, emits empty heartbeat lines during silent steps. TTY output is unchanged.
 
 - scripts/terminateUser.php [--dry-run] [--confirm] USERNAME
   - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, then synchronously purges `/home/<user>`, `/home/backup-<user>`, and `/home/backup-<user>.superseded`. It never sweeps `backup-*` prefixes.
