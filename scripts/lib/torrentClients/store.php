@@ -54,6 +54,7 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
         return false;
     };
     $results = [];
+    $binaryNames = pmssTorrentClientsBinaryNames();
     foreach ($catalog as $entry) {
         if (!is_array($entry) || !isset($entry['client'], $entry['version'], $entry['kind'])) continue;
         if (!empty($entry['disabled']) || $entry['kind'] === 'system') continue;
@@ -61,16 +62,12 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
         $version = $entry['version'];
         $id = $client.'/'.$version;
         // Even direct callers must not turn unchecked catalog values into paths.
-        if (!in_array($client, ['qbittorrent', 'rtorrent', 'deluge', 'transmission'], true)
+        if (!is_string($client) || !isset($binaryNames[$client])
             || !is_string($version) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1) {
             $results[$id] = 'invalid';
             continue;
         }
-        $binaryName = [
-            'qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent',
-            'deluge' => 'deluged', 'transmission' => 'transmission-daemon',
-        ][$client];
-        $binary = $root.'/'.$id.($client === 'deluge' && $entry['kind'] === 'venv' ? '/bin/' : '/').$binaryName;
+        $binary = $root.'/'.$id.($client === 'deluge' && $entry['kind'] === 'venv' ? '/bin/' : '/').$binaryNames[$client];
         if (!pmssTorrentClientsStorePathChainSafe($root, $client, $version)) {
             $log('[WARN] torrent client '.$id.' unsafe store directory');
             $results[$id] = 'failed';

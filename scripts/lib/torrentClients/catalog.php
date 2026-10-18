@@ -2,6 +2,7 @@
 /** Pure validation of the operator-owned torrent client catalog. */
 
 require_once dirname(__DIR__).'/runtime/filesystem.php';
+require_once __DIR__.'/storePaths.php';
 
 /** Reject the entire document if any entry is malformed or ambiguous. */
 function pmssTorrentClientsCatalogLoad(string $path): array
@@ -12,12 +13,13 @@ function pmssTorrentClientsCatalogLoad(string $path): array
     if (!is_array($entries) || $entries === []) return [];
     $seen = [];
     $defaults = [];
+    $binaryNames = pmssTorrentClientsBinaryNames();
     foreach ($entries as $index => $entry) {
         if (!is_int($index) || $index < 0 || !is_array($entry)) return [];
         $client = $entry['client'] ?? null;
         $version = $entry['version'] ?? null;
         $kind = $entry['kind'] ?? null;
-        if (!is_string($client) || !in_array($client, ['qbittorrent', 'rtorrent', 'deluge', 'transmission'], true)
+        if (!is_string($client) || !isset($binaryNames[$client])
             || !is_string($version) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
             || !in_array($kind, ['system', 'static', 'venv'], true)) return [];
         // Transmission entries describe only builds with the managed socket RPC mode.
@@ -38,12 +40,10 @@ function pmssTorrentClientsCatalogLoad(string $path): array
             $defaults[$client] = true;
         }
         if ($kind === 'system') {
-            $systemBinaries = [
-                'qbittorrent' => '/usr/bin/qbittorrent-nox', 'rtorrent' => '/usr/local/bin/rtorrent',
-                'deluge' => '/usr/bin/deluged', 'transmission' => '/usr/bin/transmission-daemon',
-            ];
+            $systemBinary = ($client === 'rtorrent' ? '/usr/local/bin/' : '/usr/bin/')
+                .$binaryNames[$client];
             if (!isset($entry['binary']) || !is_string($entry['binary'])
-                || $entry['binary'] !== $systemBinaries[$client]
+                || $entry['binary'] !== $systemBinary
                 || ($entry['url'] ?? null) !== [] || ($entry['sha256'] ?? null) !== '') return [];
             continue;
         }

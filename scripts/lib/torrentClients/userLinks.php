@@ -20,7 +20,7 @@ function pmssTorrentClientsUserLinksConverge(string $user, string $home, array $
     if (!pmssValidateUsername($user) || $home !== rtrim($homeRoot, '/').'/'.$user) return false;
     $root = $ops['root'] ?? '/home/.pmss/clients';
     $ok = true;
-    foreach (['qbittorrent', 'rtorrent', 'deluge', 'transmission'] as $client) {
+    foreach (array_keys(pmssTorrentClientsBinaryNames()) as $client) {
         $storeClient = $root.'/'.$client;
         if (!pmssTorrentClientsStorePathChainSafe($root, $client) || !is_dir($storeClient)) continue;
         $versions = @scandir($storeClient);

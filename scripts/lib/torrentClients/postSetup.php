@@ -37,10 +37,7 @@ function pmssTorrentClientsPostSetupFallback(string $user, string $home, string 
     $prefix = $root.'/'.$client.'/';
     $noticeDir = $home.'/.config/pmss/torrentClients';
     $notice = $noticeDir.'/'.$client.'.notice';
-    $binaries = [
-        'qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent',
-        'deluge' => 'deluged', 'transmission' => 'transmission-daemon',
-    ];
+    $binaries = pmssTorrentClientsBinaryNames();
     if (!isset($binaries[$client])) return false;
     $command = 'selected=$(readlink '.escapeshellarg($link).' 2>/dev/null) || exit 1; '
         .'case "$selected" in '.escapeshellarg($prefix).'*) ;; *) exit 1;; esac; ';

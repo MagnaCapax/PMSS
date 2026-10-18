@@ -1,6 +1,15 @@
 <?php
 /** Keep root scans inside real, operator-owned store directories. */
 
+/** Canonical daemon binary names for catalog, store, and account links. */
+function pmssTorrentClientsBinaryNames(): array
+{
+    return [
+        'qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent',
+        'deluge' => 'deluged', 'transmission' => 'transmission-daemon',
+    ];
+}
+
 /** The development suite exercises writers only inside its temporary tree. */
 function pmssTorrentClientsMarkerEnabled(): bool
 {

@@ -18,10 +18,7 @@ function pmssTorrentClientsProjectionWrite(
     if (!pmssTorrentClientsMarkerEnabled()) return false;
     $root = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT') ?: '/home/.pmss/clients';
     $versions = [];
-    $binaryNames = [
-        'qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent',
-        'deluge' => 'deluged', 'transmission' => 'transmission-daemon',
-    ];
+    $binaryNames = pmssTorrentClientsBinaryNames();
     foreach ($catalog as $entry) {
         if (!is_array($entry) || !isset($binaryNames[$entry['client'] ?? ''], $entry['version'], $entry['kind'])) continue;
         $client = $entry['client'];
