@@ -100,10 +100,8 @@ if (!function_exists('pmssCustomerAppsStatusJsonEmit')) {
 function pmssCustomerAppsStatusJsonEmit(): void
 {
     pmssWelcomeRequireLocalHelper('userMediaStackPanel.php');
-    $home = dirname(__DIR__);
-    $hostname = function_exists('gethostname') ? (string) gethostname() : '';
-    $status = pmssCustomerAppsStatusRead($home, basename(rtrim($home, '/')),
-        $hostname !== '' ? $hostname : (string) php_uname('n'));
+    list($home, $username, $hostname) = pmssCustomerAccountContext();
+    $status = pmssCustomerAppsStatusRead($home, $username, $hostname);
     $rows = array();
     foreach ($status['apps'] as $id => $app) {
         if ($status['poll'] && $app['kind'] === 'media') continue;

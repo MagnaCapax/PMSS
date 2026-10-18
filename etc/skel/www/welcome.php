@@ -59,10 +59,8 @@ $delugePasswordCanRotate = $pageState['delugePasswordCanRotate'];
 $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $mediaStackStatus = $pageState['mediaStackStatus'];
-$home = dirname(__DIR__);
-$hostname = function_exists('gethostname') ? (string) gethostname() : '';
-$appsStatus = pmssCustomerAppsStatusRead($home, basename(rtrim($home, '/')),
-    $hostname !== '' ? $hostname : (string) php_uname('n'));
+list($home, $username, $hostname) = pmssCustomerAccountContext();
+$appsStatus = pmssCustomerAppsStatusRead($home, $username, $hostname);
 $billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);

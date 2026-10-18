@@ -43,8 +43,13 @@ class MediaStackPanelTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/mediaStack.php', [
             "require_once __DIR__.'/userMediaStackPanel.php';",
-            '$username = basename(rtrim($home, \'/\'));',
+            'list($home, $username, $hostname) = pmssCustomerAccountContext();',
         ], ['/scripts/lib/user/mediaStackPanel.php']);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/scriptsIncFormat.php', [
+            'function pmssCustomerAccountContext()',
+            "basename(rtrim(\$home, '/'))",
+            "php_uname('n')",
+        ]);
         $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/userMediaStackPanel.php', [
             'function pmssMediaStackPanelCurrent'.'UserRead',
             'function pmssMediaStackPanelCurrent'.'HostnameRead',

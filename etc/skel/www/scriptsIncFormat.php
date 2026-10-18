@@ -68,6 +68,15 @@ if (!function_exists('pmssCustomerHtmlAttr')) {
 /** Escape customer GUI text and attributes with the shared PMSS flags. */ function pmssCustomerHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
 }
 
+if (!function_exists('pmssCustomerAccountContext')) {
+/** Return the current customer home, account name, and host label. */
+ function pmssCustomerAccountContext() {
+  $home = dirname(__DIR__);
+  $hostname = function_exists('gethostname') ? (string) gethostname() : '';
+  return array($home, basename(rtrim($home, '/')), $hostname !== '' ? $hostname : (string) php_uname('n'));
+ }
+}
+
 if (!function_exists('pmssCustomerContextualHelpLinkBuild')) {
 /** Render help only for panel items with a known published wiki page. */
  function pmssCustomerContextualHelpLinkBuild($item) {

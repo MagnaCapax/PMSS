@@ -116,14 +116,14 @@ class ScriptsIncSplitTest extends TestCase
 
     public function testFunctionSetMatchesHistoricalMonolithWithoutDuplicates(): void
     {
-        // Function inventory from scriptsInc.php at 59fc75bd; keep independent of git at test time.
+        // Historical inventory from 59fc75bd plus the shared account context helper.
         $expected = array(
             'writeLog', 'pmssFrontendActionRequest', 'pmssFrontendPostActionRequired', 'pmssFrontendFunctionAvailable', 'pmssFrontendShellExecAvailable',
             'pmssFrontendShellExec', 'pmssFormatBytes', 'pmssWelcomeSerializedArrayHasObject', 'pmssWelcomeSerializedArrayDecode', 'pmssCustomerSerializedArrayFileRead',
             'pmssJsonDecodeAssoc', 'pmssJsonEncodePretty', 'pmssCustomerFileRead', 'pmssCustomerTrimmedFileRead', 'pmssCustomerUnsignedIntegerValue',
             'pmssCustomerNonnegativeFloat', 'pmssCustomerUnsignedIntegerFileRead', 'pmssCustomerPositiveIntegerFileRead', 'pmssCustomerBonusDisplayStateRead', 'pmssCustomerBonusDisplayTextBuild',
             'pmssCustomerBonusDisplayNoteBuild', 'pmssCustomerKeyValueFileRead', 'pmssCustomerCgroupSelfEntries', 'pmssCustomerCgroupDirOwnsMemoryController', 'pmssCustomerCgroupCounterPaths',
-            'pmssCustomerCgroupCounterRead', 'pmssCustomerCgroupMemoryRead', 'pmssCustomerHtmlAttr', 'pmssCustomerContextualHelpLinkBuild', 'pmssJsonFileReadAssoc',
+            'pmssCustomerCgroupCounterRead', 'pmssCustomerCgroupMemoryRead', 'pmssCustomerHtmlAttr', 'pmssCustomerAccountContext', 'pmssCustomerContextualHelpLinkBuild', 'pmssJsonFileReadAssoc',
             'pmssCustomerHomeRoot', 'pmssCustomerHomePath', 'pmssCustomerPathIsSafe', 'pmssCustomerBackupRelativePaths', 'pmssCustomerBackupEntriesRead',
             'pmssCustomerBackupTarCommandBuild', 'pmssCustomerBackupDownload', 'pmssCustomerBackupFileResult', 'pmssCustomerBackupFileDirectoryEnsure', 'pmssCustomerBackupFilePathBuild',
             'pmssCustomerBackupFileCreate', 'pmssCustomerBackupArchivesRead', 'pmssCustomerBackupRetentionPrune', 'pmssCustomerPathIsInsideHome', 'pmssCustomerBackupRestoreResult',
@@ -147,11 +147,11 @@ class ScriptsIncSplitTest extends TestCase
                 $functions[$name] = $body;
             }
         }
-        $this->assertSame(89, count($functions));
+        $this->assertSame(90, count($functions));
         $actual = array_keys($functions);
         sort($actual);
         sort($expected);
-        $this->assertSame($expected, $actual, 'Function inventory changed from 59fc75bd.');
+        $this->assertSame($expected, $actual, 'Customer helper inventory changed unexpectedly.');
     }
 
     public function testLoaderGuardsPartsInManifestOrder(): void

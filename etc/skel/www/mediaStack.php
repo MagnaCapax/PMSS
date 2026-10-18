@@ -13,10 +13,7 @@
 // from customer PHP.
 require_once __DIR__.'/userMediaStackPanel.php';
 
-$home = dirname(__DIR__);
-$username = basename(rtrim($home, '/'));
-$hostname = function_exists('gethostname') ? (string) gethostname() : '';
-$hostname = $hostname !== '' ? $hostname : (string) php_uname('n');
+list($home, $username, $hostname) = pmssCustomerAccountContext();
 $action = $_GET['action'] ?? 'status';
 $action = is_string($action) ? $action : 'status';
 
