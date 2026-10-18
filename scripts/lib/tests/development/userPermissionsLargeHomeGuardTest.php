@@ -27,6 +27,7 @@ PHP;
             'required' => [
                 '["/home/{$thisUser}/data", 0750],',
                 '"/home/{$thisUser}/.resourceData",',
+                '"/home/{$thisUser}/.throttle",',
                 '["/home/{$thisUser}/.notifyEmail", 0640],',
                 '["/home/{$thisUser}/.notifyEmail", "root:{$thisUser}"],',
                 $dataPrune,

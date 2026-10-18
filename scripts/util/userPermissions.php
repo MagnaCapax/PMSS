@@ -243,6 +243,9 @@ foreach ($chmodItems as $item) {
 $excludes = [
     "/home/{$thisUser}/.quota",
     "/home/{$thisUser}/.resourceData",
+    // trafficLimits writes it as root and the FireQOS renderer trusts only a root-owned copy;
+    // never chown it to the account, and never adopt a tenant-written one (#1056).
+    "/home/{$thisUser}/.throttle",
     "/home/{$thisUser}/.billingServiceId",
     "/home/{$thisUser}/.billingId",
     "/home/{$thisUser}/.billingClientId",
