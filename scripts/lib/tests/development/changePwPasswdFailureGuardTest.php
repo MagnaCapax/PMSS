@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../user/passwordFile.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/panelSessionAuth.php';
 
 class changePwPasswdFailureGuardTest extends TestCase
 {
@@ -80,9 +81,9 @@ class changePwPasswdFailureGuardTest extends TestCase
         $stub = <<<'SH'
 #!/bin/sh
 if [ "$1" = -c ]; then shift; fi
-if [ "$1" = -b ]; then shift; fi
-if [ "$1" = -m ]; then shift; fi
-php -r '$hash = password_hash($argv[3], PASSWORD_BCRYPT); file_put_contents($argv[1], $argv[2].":".$hash."\n");' "$@"
+if [ "$1" = -b ]; then shift; else exit 2; fi
+if [ "$1" = -B ]; then shift; else exit 2; fi
+php -r '$hash = password_hash($argv[3], PASSWORD_BCRYPT); $rows = is_file($argv[1]) ? file($argv[1]) : []; $rows = array_filter($rows, function ($row) use ($argv) { return strpos($row, $argv[2].":") !== 0; }); $rows[] = $argv[2].":".$hash."\n"; file_put_contents($argv[1], implode("", $rows));' "$@"
 SH;
         file_put_contents($binDir.'/htpasswd', $stub."\n");
         chmod($binDir.'/htpasswd', 0700);
@@ -94,12 +95,20 @@ SH;
             $this->assertEquals(0600, fileperms($path) & 0777);
             $line = trim((string) file_get_contents($path));
             $this->assertTrue(strpos($line, $username.':') === 0);
-            $this->assertTrue(password_verify('test-pass-1', substr($line, strlen($username) + 1)));
+            $hash = substr($line, strlen($username) + 1);
+            $this->assertTrue(strpos($hash, '$2y$') === 0);
+            $this->assertTrue(\pmssPanelSessionPasswordMatchesHash('test-pass-1', $hash));
+            $this->assertFalse(\pmssPanelSessionPasswordMatchesHash('wrong', $hash));
+            $legacyEntry = 'legacy:$apr1$old$unchanged';
+            file_put_contents($path, $line."\n".$legacyEntry."\n");
             $this->assertEquals(0, \pmssUserHtpasswdPasswordUpdate($username, 'test-pass-2', $path, $output));
         } finally {
             putenv('PATH='.$originalPath);
         }
-        $this->assertEquals(1, count(file($path)));
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $this->assertEquals(2, count($lines));
+        $this->assertSame($legacyEntry, $lines[0]);
+        $this->assertTrue(strpos($lines[1], $username.':$2y$') === 0);
     }
 
     public function testHtpasswdUpdateRejectsLinkedFile(): void

@@ -45,6 +45,13 @@ session file under `~/.lighttpd/` with mode `0600`, regenerates the session id o
 successful login, requires a CSRF token for POST, and emits a host-scoped cookie
 with `Secure`, `HttpOnly`, and `SameSite=Lax`.
 
+Password changes write bcrypt (`$2y$`) to the per-user htpasswd file so
+lighttpd, the PHP panel verifier, and rclone can all use the new entry. Existing
+`$apr1$` entries are not rewritten by an update: they remain usable by lighttpd
+and rclone but cannot pass the PHP session or Configure password check until a
+password change writes a bcrypt entry. Unsuspend continues to copy the shadow
+hash verbatim; its compatibility with every reader requires separate validation.
+
 ## Invariants
 - **Off by default is byte-identical:** absent/false `panelSessionLogin` must
   render the same per-user lighttpd config bytes as before this ADR.

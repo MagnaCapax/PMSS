@@ -16,7 +16,7 @@ function pmssUserHtpasswdPasswordUpdate(string $username, string $password, stri
         return 1;
     }
 
-    $htpasswdCommand = is_file($path) ? 'htpasswd -b -m' : 'htpasswd -c -b -m';
+    $htpasswdCommand = is_file($path) ? 'htpasswd -b -B' : 'htpasswd -c -b -B';
     $command = sprintf(
         'umask 0077; %s %s %s %s',
         $htpasswdCommand,
