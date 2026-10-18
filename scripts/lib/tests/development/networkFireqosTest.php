@@ -40,7 +40,11 @@ class NetworkFireqosTest extends TestCase
 
         $config = '';
         $this->pmssWithEnv($env, function () use (&$config, $networkConfig, $users, $localnets): void {
-            $config = \networkBuildFireqosConfig($networkConfig, $users, $localnets);
+            $config = \networkBuildFireqosConfig($networkConfig, $users, $localnets, static function (string $path): array {
+                $stats = lstat($path);
+                $stats['uid'] = 0;
+                return $stats;
+            });
         });
         return $config;
     }
@@ -58,7 +62,7 @@ class NetworkFireqosTest extends TestCase
             'PMSS_FIREQOS_CONFIG_PATH' => $configPath,
             'PMSS_FIREQOS_LOG_PATH' => $logPath,
         ], function () use ($configPath, $logPath, $markerPath): void {
-            \networkApplyFireqos("interface eth0\nrate 1000\n");
+            $this->assertTrue(\networkApplyFireqos("interface eth0\nrate 1000\n"));
 
             $this->assertEquals("interface eth0\nrate 1000\n", (string) @file_get_contents($configPath));
             $this->assertEquals('start '.$configPath, trim((string) @file_get_contents($markerPath)));
@@ -77,10 +81,24 @@ class NetworkFireqosTest extends TestCase
             'PMSS_FIREQOS_CONFIG_PATH' => $blockedParent.'/fireqos.conf',
             'PMSS_FIREQOS_LOG_PATH' => $logDir.'/fireqos.log',
         ], function () use ($blockedParent, $markerPath): void {
-            \networkApplyFireqos("interface eth0\nrate 1000\n");
+            $this->assertFalse(\networkApplyFireqos("interface eth0\nrate 1000\n"));
 
             $this->assertFalse(file_exists($blockedParent.'/fireqos.conf'));
             $this->assertFalse(file_exists($markerPath));
+        });
+    }
+
+    public function testApplyFireqosReportsStartExitCode(): void
+    {
+        $configDir = $this->pmssMakeTempDir('pmss-fireqos-config-', 0700);
+        $logDir = $this->pmssMakeTempDir('pmss-fireqos-log-', 0700);
+        $binDir = $this->pmssMakeExecutableStub('fireqos', "#!/bin/sh\nexit 7\n", 'pmss-fireqos-bin-');
+        $this->pmssWithPathPrefixedEnv($binDir, [
+            'PMSS_FIREQOS_CONFIG_PATH' => $configDir.'/fireqos.conf',
+            'PMSS_FIREQOS_LOG_PATH' => $logDir.'/fireqos.log',
+        ], function () use ($logDir): void {
+            $this->assertFalse(\networkApplyFireqos("interface eth0\n"));
+            $this->assertStringContainsString('rc=7', (string) file_get_contents($logDir.'/fireqos.log'));
         });
     }
 
@@ -177,7 +195,56 @@ class NetworkFireqosTest extends TestCase
         }
 
         $this->assertTrue($created === false);
-        $this->assertStringContainsString('class root ', $config);
+        $this->assertStringContainsString('class root', $config);
         $this->assertStringNotContainsString($username, $config);
+    }
+
+    public function testRepositoryTemplateRoutesEveryUidIntoGroupBeforeLeaves(): void
+    {
+        $users = ['root', 'daemon', 'nobody'];
+        $config = $this->buildFireqosConfigWithThrottleFixture(false, null, ['interface' => 'eth0', 'speed' => 1000], $users,
+            [], $this->pmssReadRepoFile('etc/seedbox/config/template.fireqos'));
+        $lines = explode("\n", $config);
+        $group = array_search('class group users commit 50% ceil 95% balanced', $lines, true);
+        $firstClass = array_search('    class root', $lines, true);
+        $this->assertTrue($group !== false && $firstClass !== false);
+        foreach (['root' => 0, 'daemon' => 1, 'nobody' => 65534] as $name => $uid) {
+            $match = '      match rawmark '.$uid;
+            $class = array_search('    class '.$name, $lines, true);
+            $this->assertTrue($class !== false && $lines[$class + 1] === $match);
+            $this->assertTrue(in_array($match, array_slice($lines, $group + 1, $firstClass - $group - 1), true));
+        }
+        $this->assertStringContainsString('interface $DEVICE outbound output rate $INTERFACE_SPEED minrate 1Mbit', $config);
+    }
+
+    public function testRenderedCapsRoundTripAndApplyDecision(): void
+    {
+        $config = $this->buildFireqosConfigWithThrottleFixture(true, '25', ['throttle' => ['max' => 100]],
+            ['root', 'daemon'], [], $this->pmssReadRepoFile('etc/seedbox/config/template.fireqos'));
+        $this->assertEquals(['root' => 25, 'daemon' => null], \networkFireqosRenderedUserCaps($config));
+        $desired = ['root' => 25, 'daemon' => null];
+        $this->assertFalse(\networkFireqosNeedsApply($desired, ['daemon' => null, 'root' => 25]));
+        $this->assertTrue(\networkFireqosNeedsApply($desired, ['root' => 50, 'daemon' => null]));
+        $this->assertTrue(\networkFireqosNeedsApply($desired, ['root' => 25]));
+        $this->assertTrue(\networkFireqosNeedsApply($desired, ['root' => 25, 'daemon' => null, 'nobody' => null]));
+        $this->assertTrue(\networkFireqosNeedsApply($desired, null));
+        $this->assertEquals(null, \networkFireqosRenderedUserCaps('interface eth0'));
+    }
+
+    public function testTenantOwnedThrottleFallsBackToDefaultCap(): void
+    {
+        [$stateDir, $homeDir] = $this->fireqosThrottleFixture(true, '99999');
+        $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir, 'PMSS_HOME_DIR' => $homeDir], function () use ($homeDir): void {
+            $tenantStats = static function (string $path): array {
+                $stats = lstat($path);
+                $stats['uid'] = 1001;
+                return $stats;
+            };
+            $caps = \networkFireqosUserCaps(['throttle' => ['max' => 100]], ['root'], $tenantStats);
+            $config = \networkBuildFireqosConfig(['throttle' => ['max' => 100]], ['root'], [], $tenantStats);
+            $this->assertEquals(100, $caps['root']['cap']);
+            $this->assertStringContainsString('class root ceil 100Mbit', $config);
+            $this->assertStringNotContainsString('99999Mbit', $config);
+        });
     }
 }

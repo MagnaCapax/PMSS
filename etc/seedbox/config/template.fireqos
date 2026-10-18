@@ -5,15 +5,15 @@ INTERFACE_SPEED=##SPEEDMbit
 #Uncomment following if you have issues matching users
 #FIREQOS_CONNMARK_RESTORE="act_connmark"
 
-interface $DEVICE outbound output rate $INTERFACE_SPEED
+interface $DEVICE outbound output rate $INTERFACE_SPEED minrate 1Mbit
 
 ##LOCALNETWORK
 # ^ setupNetwork.php injects `match src <cidr>` lines here so LAN ranges bypass shaping.
 
 #Users grouped into single group below. commit means minimum rate
 class group users commit 50% ceil 95% balanced
-  ##USERMATCHES
-  # ^ Generated `match mark` statements per user by setupNetwork.php.
+##USERMATCHES
+  # ^ UID rawmark routes into the group precede each user's matching leaf class.
 class group end
 
 class interactive   commit 5%

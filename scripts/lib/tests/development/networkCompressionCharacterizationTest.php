@@ -26,14 +26,14 @@ class NetworkCompressionCharacterizationTest extends TestCase
         ]);
     }
 
-    public function testFireqosKeepsUidLookupInsideRenderer(): void
+    public function testFireqosKeepsUidLookupInsideCapsResolver(): void
     {
         $symbol = 'networkFireqos'.'LookupUid';
 
         $this->pmssAssertRepoFileNotContainsFunction(
             'scripts/lib/network/fireqos.php',
             $symbol,
-            'network/fireqos.php should keep username validation and uid probing local to networkBuildFireqosConfig()'
+            'network/fireqos.php should keep username validation and uid probing local to networkFireqosUserCaps()'
         );
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/network/fireqos.php', [
             "pmssResolvePathFromEnv('PMSS_FIREQOS_TEMPLATE', '/etc/seedbox/config/template.fireqos')",

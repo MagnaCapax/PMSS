@@ -23,7 +23,7 @@ How PMSS limits per-user network egress when a customer exceeds their monthly tr
 │ fireqos.php::networkBuildFireqosConfig                                                 │
 │   per user: read .enabled + .throttle (hard) > defaultCap                              │
 │   render: class <user> ceil <N>Mbit                                                    │
-│             match rawmark <fireqosMark>                                                │
+│   group match rawmark <uid>; leaf class <user> with match rawmark <uid>                │
 │   write to /etc/seedbox/config/fireqos.conf                                            │
 └────────────────────────────┬───────────────────────────────────────────────────────────┘
                              │
@@ -31,7 +31,7 @@ How PMSS limits per-user network egress when a customer exceeds their monthly tr
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ networkApplyFireqos: shell `fireqos start /etc/seedbox/config/fireqos.conf`            │
 │   parses DSL, programs kernel:                                                         │
-│     - iptables mangle OUTPUT: MARK packets per UID with fireqosMark                    │
+│     - iptables filter OUTPUT: MARK packets with their account UID                      │
 │     - tc qdisc add eth0 root htb                                                       │
 │     - tc class add eth0 parent N: classid X:Y htb rate ... ceil <N>Mbit                │
 │     - tc filter on rawmark to direct packets to per-user class                         │
@@ -53,7 +53,7 @@ The persisted `raw.month` total and `daily` chart series use the same rolling
 | `/etc/seedbox/runtime/trafficLimits/<user>` | root | plain int | `userTrafficLimit.php` | Monthly traffic cap in **GiB** (0 = unlimited) |
 | `/home/<user>/.bonusTraffic` | root | plain int | `userBonusTraffic.php` | Extra GiB granted on top of base limit |
 | `/var/run/pmss/trafficLimits/<user>.enabled` | root | empty marker | `trafficLimits.php` | Hard-cap state active; mtime drives cooldown |
-| `/home/<user>/.throttle` | user | plain int | `setRateLimit()` | Hard-cap ceiling in **Mbit/s** when limit is enforced |
+| `/home/<user>/.throttle` | root | plain int | `setRateLimit()` | Hard-cap ceiling in **Mbit/s** when limit is enforced; untrusted ownership falls back to the configured default |
 
 ### System (per host)
 
@@ -90,27 +90,31 @@ If no tier matches AND `progressiveThrottleEnabled` is true, `pmssTrafficLimitCo
 
 `.enabled` marker is required to be older than `trafficLimitPeriod` (3 days) of under-limit usage before throttle is removed. `trafficLimits.php` `unlink`s the marker and calls `setRateLimit(user, defaultCap, false)` twice (intentional double-disable to handle router desync).
 
-Clearing the traffic limit removes the marker and stored throttle cap on the next cron run, without waiting for the cooldown. This changes persisted state; the kernel traffic policy updates when network setup next applies FireQOS.
+Clearing the traffic limit removes the marker and stored throttle cap on the next cron run, without waiting for the cooldown. The hourly traffic limits cron compares desired and rendered caps and runs the full `setupNetwork.php` when they differ, updating iptables marks and FireQOS together. Missing rendered config or users group also triggers convergence. A reboot loses the tmpfs marker, so an account inside the cooldown can be released early.
 
 ## Rendered fireqos.conf Shape
 
-Per-user class in the rendered config:
+The interface uses `minrate 1Mbit`, so FireQOS does not raise low caps to one hundredth of a fast uplink. The users group receives one parent-level route per UID before its first child class:
 
 ```
-class <username> ceil <N>Mbit
-    match rawmark <fireqosMark>
+class group users commit 50% ceil 95% balanced
+      match rawmark <uid>
+    class <username> ceil <N>Mbit
+      match rawmark <uid>
+class group end
 ```
 
-`fireqosMark` is sequential (1, 2, 3, ...) per the order users are walked. iptables mangle OUTPUT chain marks packets to each user's UID with the corresponding `fireqosMark`. The `match rawmark` line in fireqos directs marked packets into the per-user HTB class.
+iptables OUTPUT (filter table, via makeMonitoringRules.php) marks packets with the account UID. The parent match routes them into the users group; the leaf match selects the per-user class. Thus group fairness and its 95% ceiling apply to all managed users.
 
 When `.enabled` is not present, the user's class is rendered without a `ceil` clause — they get the parent class's full bandwidth allocation.
 
 ## Verification Commands
 
 ```bash
-# 1. Has fireqos installed any HTB classes?
-tc class show dev eth0
-# Expect: HTB classes per user when throttle is active.
+# 1. Is the users-group filter installed, and do leaf classes carry bytes?
+tc filter show dev eth0 parent 1:
+tc -s class show dev eth0
+# Expect: a filter flowid for the users group and nonzero per-user leaf bytes during egress.
 # If only `mq` qdiscs visible: fireqos failed; check /var/log/pmss/fireqos.log.
 
 # 2. fireqos parser status — most recent run
@@ -127,8 +131,8 @@ cat /etc/seedbox/runtime/trafficLimits/<user>      # GiB monthly cap
 cat /home/<user>/.throttle                          # Mbit hard cap (when over)
 ls -la /var/run/pmss/trafficLimits/<user>.enabled   # presence + mtime = throttled state + cooldown
 
-# 5. Iptables MARK plumbing (mangle table OUTPUT chain)
-iptables -t mangle -L OUTPUT -n -v | grep -E 'UID match' | head -10
+# 5. Iptables MARK plumbing (filter table OUTPUT chain)
+iptables -L OUTPUT -n -v | grep -E "owner UID match.*MARK set" | head -10
 # Expect: MARK rules for every UID with a managed user.
 
 # 6. Per-user usage data (egress bytes)
@@ -167,7 +171,7 @@ Fix: verify trafficStats cron in root.cron; check trafficStats.log for errors.
 
 Symptom: HTB classes installed but no traffic flows into them.
 
-Cause: `setupNetwork.php` not run since user added; mangle OUTPUT chain doesn't have UID match for the user.
+Cause: `setupNetwork.php` not run since user added; the OUTPUT chain doesn't have UID match for the user.
 
 Fix: re-run `/scripts/util/setupNetwork.php` to regenerate iptables rules.
 

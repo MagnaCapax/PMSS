@@ -99,6 +99,26 @@ function networkParseMonitoringCommands(string $raw): array
     return $commands;
 }
 
+/** Render per-UID egress accounting commands for the monitoring chain. */
+function networkMonitoringRulesRender(array $userUids, array $localnets): string
+{
+    $lastLocalNet = $localnets ? end($localnets) : '';
+    $rules = "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";
+    foreach ($userUids as $thisUid) {
+        foreach ($localnets as $thisLocalNet) {
+            $rules .= "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";
+        }
+        if ($lastLocalNet !== '') {
+            $rules .= "/sbin/iptables -A OUTPUT ! -d {$lastLocalNet} -m owner --uid-owner {$thisUid} -j MARK --set-mark {$thisUid}\n";
+        }
+        $rules .= "/sbin/iptables -A OUTPUT -m owner --uid-owner {$thisUid} -j ACCEPT\n";
+    }
+    foreach ($localnets as $thisLocalNet) {
+        $rules .= "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -j ACCEPT\n";
+    }
+    return $rules;
+}
+
 /**
  * Run the monitoring-rule helper and reject output from failed executions.
  */

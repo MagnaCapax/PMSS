@@ -13,6 +13,7 @@
  * @license GPL-3.0-only
  */
 require_once '/scripts/lib/network/config.php';
+require_once '/scripts/lib/network/fireqos.php';
 require_once '/scripts/lib/traffic/storage.php';
 require_once '/scripts/lib/user/selection.php';
 require_once '/scripts/lib/user/log.php';
@@ -106,5 +107,39 @@ foreach($users AS $thisUser) {
 
     } else {
         pmssTrafficLimitThrottleOrphanReconcile($thisUser, $trafficCapMbit, $userTrafficLimitEnabledFile);
+    }
+}
+
+// Rebuild both UID marks and FireQOS classes when the hourly desired caps drift.
+if (pmssCommandPath('fireqos') !== '') {
+    $desired = array_map(static function (array $user): ?int { return $user['cap']; }, networkFireqosUserCaps($networkConfig, $users));
+    $fireqosPath = pmssResolvePathFromEnv('PMSS_FIREQOS_CONFIG_PATH', '/etc/seedbox/config/fireqos.conf');
+    $contents = @file_get_contents($fireqosPath);
+    $rendered = $contents === false ? null : networkFireqosRenderedUserCaps($contents);
+    if (networkFireqosNeedsApply($desired, $rendered)) {
+        $changes = [];
+        foreach ($desired as $user => $cap) {
+            if ($rendered === null || !array_key_exists($user, $rendered)) {
+                $changes[] = $user.': added';
+            } elseif ($rendered[$user] !== $cap) {
+                $changes[] = $user.': '.($rendered[$user] ?? 'none').'->'.($cap ?? 'none');
+            }
+        }
+        foreach ($rendered ?? [] as $user => $cap) {
+            if (!array_key_exists($user, $desired)) {
+                $changes[] = $user.': removed';
+            }
+        }
+        if ($rendered === null) {
+            $changes[] = 'users group missing or unreadable';
+        }
+        echo date('Y-m-d H:i:s').': FireQOS drift: '.implode(', ', $changes)."\n";
+        $output = [];
+        $rc = 1;
+        exec('timeout 300 /scripts/util/setupNetwork.php >> /var/log/pmss/setupNetwork.log 2>&1', $output, $rc);
+        echo date('Y-m-d H:i:s').": setupNetwork exit {$rc}\n";
+        $contents = @file_get_contents($fireqosPath);
+        $verified = $contents === false ? null : networkFireqosRenderedUserCaps($contents);
+        echo date('Y-m-d H:i:s').': '.(networkFireqosNeedsApply($desired, $verified) ? 'verify mismatch' : 'verify ok')."\n";
     }
 }

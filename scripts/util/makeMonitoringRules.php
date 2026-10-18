@@ -15,27 +15,9 @@ require_once '/scripts/lib/resources/log.php';
 $userUids = pmssResourceLogManagedUserUids();
 if (!$userUids) exit(0);
 
-$mark = 1;
-
 // Owner match is required for per-user accounting; skip if unavailable.
 if (!networkIptablesOwnerMatchAvailable()) exit(0);
 
 // Multiple networks may be defined, one per line, to mark "local" traffic.
 $localnets = networkLoadLocalnets();
-$lastLocalNet = $localnets ? end($localnets) : '';
-
-// Loopback never leaves the host, so exclude it from egress accounting.
-echo "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";
-
-foreach ($userUids as $thisUid) {
-    foreach ($localnets as $thisLocalNet) {
-        echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";
-    }
-    if ($lastLocalNet !== '') echo "/sbin/iptables -A OUTPUT ! -d {$lastLocalNet} -m owner --uid-owner {$thisUid} -j MARK --set-mark {$mark}\n";
-    echo "/sbin/iptables -A OUTPUT -m owner --uid-owner {$thisUid} -j ACCEPT\n";
-    ++$mark;
-}
-
-foreach ($localnets as $thisLocalNet) {
-    echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -j ACCEPT\n";
-}
+echo networkMonitoringRulesRender($userUids, $localnets);
