@@ -147,3 +147,21 @@ These homes hold their owners' data, so the runtime build that follows at the
 daily update time leaves 10% of the disk and file quota free, or skips
 (Pikkumies `HermesInstall::UNATTENDED_RESERVE`, its ADR-0033 addendum of the
 same date).
+
+## Amendment 2026-10-18: the key distribution's writer
+
+The platform's key distribution reaches a node the same way a panel password
+change does: billing asks the provisioning backend, which queues one command
+for the account's server. That command is `scripts/util/setVirsilipasKey.php
+--jsonl --create|--update-only <user> <key>`. Root only checks the arguments,
+the account and its home, then switches to the account user before it reads or
+writes anything in the home: `~/.virsilipasKey` is ADR-0046 Customer-editable,
+so root never touches that path.
+
+The writer keeps the customer's changes. A file whose `endpoint=` is not Pulsed
+Media's is the customer's own provider and is left alone, as are a link or a
+non-regular file at the path. `--create` is used only for an account that never
+had a key; `--update-only` (a new key after "Get a new key") replaces an
+existing file of ours and never creates one, so a customer who deleted the file
+keeps it deleted. The file the wrapper above creates (our endpoint, empty
+`key=`) counts as ours and is filled. The output line never contains the key.
