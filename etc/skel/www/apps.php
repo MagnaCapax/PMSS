@@ -39,12 +39,7 @@ if (!is_array($lsioCatalog)) $lsioCatalog = array();
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script><?= pmssActionScriptJs() ?></script>
 <?= pmssCustomerAppsCss() ?>
 <style>
-.apps{font-size:14px;line-height:1.45;max-width:980px;margin:0 auto}.apps h1{font-size:1.5rem;margin:4px 0 14px}.apps>h2{font-size:1.05rem;color:#fff;margin:24px 0 8px}
-.apps>.list,.lsio-group .list{border:1px solid #2e3b4f;border-radius:8px;overflow:hidden}
-.lsio-group .group{color:#9fb0c3;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}
-.search{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3b4f;background:#0b1220;color:#e6edf3;font-size:14px;margin:4px 0 10px}.note{color:#9fb0c3;font-size:13px;margin:0 0 8px}
-.mrow{display:flex;gap:12px;align-items:baseline;padding:7px 14px;border-top:1px solid #223042;background:#0f1b2b}.mrow:first-child{border-top:0}.mrow .name{font-weight:bold;color:#fff;min-width:170px}.mrow .desc{flex:1;color:#9fb0c3;font-size:13px}.mrow .tag{font-size:11px;color:#f0b429;margin-left:6px}.mrow a{white-space:nowrap;font-size:13px}
-@media(max-width:640px){.mrow{flex-wrap:wrap}.mrow .name{min-width:0}}
+<?= pmssAppsCatalogCss() ?>
 </style></head><body><div id="pmss-action-notice" role="status" aria-live="polite"></div>
 <div id="wrap"><div id="full_page"><div class="full_top_nohd"></div><div class="full_body"><div class="apps">
 <h1>Apps</h1>
@@ -59,12 +54,5 @@ if (!is_array($lsioCatalog)) $lsioCatalog = array();
 <?php endforeach; ?></div></div></div><?php endif; ?>
 </div></div><div class="full_bottom"></div></div></div>
 <script>
-$('#pmss-apps-search').on('input', function() {
-    var query = this.value.toLowerCase().trim(), compactQuery = query.replace(/[\s-]/g, '');
-    $('#pmss-more-apps .mrow, #pmss-lsio-apps .mrow').each(function() {
-        var row = $(this), search = (row.find('.name, .desc').text() + ' ' + row.attr('data-category') + ' ' + (row.attr('data-search') || '')).toLowerCase();
-        row.toggle(search.indexOf(query) !== -1 || search.replace(/[\s-]/g, '').indexOf(compactQuery) !== -1);
-    });
-    $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow:visible').length > 0); });
-});
+<?= pmssAppsCatalogSearchJs() ?>
 </script></body></html>

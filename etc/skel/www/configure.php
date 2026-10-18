@@ -77,12 +77,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script><?= pmssActionScriptJs() ?></script>
 <?= pmssCustomerAppsCss() ?>
 <style>
-.apps{font-size:14px;line-height:1.45;max-width:980px;margin:0 auto}.apps h1{font-size:1.5rem;margin:4px 0 14px}.apps>h2{font-size:1.05rem;color:#fff;margin:24px 0 8px}
-.apps>.list,.lsio-group .list{border:1px solid #2e3b4f;border-radius:8px;overflow:hidden}
-.lsio-group .group{color:#9fb0c3;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}
-.search{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3b4f;background:#0b1220;color:#e6edf3;font-size:14px;margin:4px 0 10px}.note{color:#9fb0c3;font-size:13px;margin:0 0 8px}
-.mrow{display:flex;gap:12px;align-items:baseline;padding:7px 14px;border-top:1px solid #223042;background:#0f1b2b}.mrow:first-child{border-top:0}.mrow .name{font-weight:bold;color:#fff;min-width:170px}.mrow .desc{flex:1;color:#9fb0c3;font-size:13px}.mrow .tag{font-size:11px;color:#f0b429;margin-left:6px}.mrow a{white-space:nowrap;font-size:13px}
-@media(max-width:640px){.mrow{flex-wrap:wrap}.mrow .name{min-width:0}}
+<?= pmssAppsCatalogCss() ?>
 .configure-layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px}.configure-index{position:sticky;top:12px;align-self:start;display:flex;flex-direction:column;gap:5px}.configure-index a{padding:5px 9px;white-space:nowrap}.configure-card{background:#0f1b2b;border:1px solid #2e3b4f;border-radius:8px;padding:16px;margin-bottom:16px}.configure-card h2{color:#fff;margin-top:0}.configure-card p,.configure-card summary{color:#9fb0c3}.configure-card input,.configure-card textarea{max-width:100%;box-sizing:border-box}.configure-card code{display:block;overflow:auto;margin:5px 0}.configure-row{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}.configure-row input{min-width:0}.configure-row .url{flex:1 1 230px}
 @media(max-width:760px){.configure-layout{display:block}.configure-index{position:sticky;top:0;z-index:2;flex-direction:row;overflow-x:auto;background:#0f1b2b;padding:7px 0;margin-bottom:12px}}
 .configure-index a{padding:6px 10px;border-radius:6px;color:#cfe3f5;text-decoration:none;white-space:nowrap}.configure-index a:hover,.configure-index a:focus{background:#1b2c42;color:#fff}.configure-card button,.configure-card input[type=button],.configure-card input[type=submit]{background:#13708a;color:#fff;border:1px solid #1b8aa8;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;margin:2px 4px 2px 0}.configure-card button:hover{background:#178aa9}.configure-card input[type=text],.configure-card input:not([type]),.configure-card input[type=password],.configure-card textarea{background:#0b1220;color:#e6edf3;border:1px solid #2e3b4f;border-radius:6px;padding:7px 10px;font-size:13px}.configure-card textarea{font-family:monospace;width:100%}.configure-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 0}.configure-actions input[type=password]{flex:0 1 240px}.configure-card h3{color:#e6edf3;font-size:1rem;margin:18px 0 6px}details.catalog{margin:10px 0}details.catalog>summary{cursor:pointer;color:#fff;font-weight:bold;font-size:1.05rem;padding:6px 0}
@@ -138,13 +133,5 @@ function pmssConfigureFramesSave() {
     var rows = []; $('#configure-rows .configure-row').each(function(){rows.push({label:$(this).find('.label').val(),tooltip:$(this).find('.tooltip').val(),url:$(this).find('.url').val()});});
     pmssConfigureSend('customFrames',{rows:rows,password:document.getElementById('configure-tabs-password').value},'Save custom tabs? Their URLs will open from your panel.');
 }
-$('#pmss-apps-search').on('input', function() {
-    var query = this.value.toLowerCase().trim(), compactQuery = query.replace(/[\s-]/g, '');
-    $('#pmss-more-apps .mrow, #pmss-lsio-apps .mrow').each(function() {
-        var row = $(this), search = (row.find('.name, .desc').text() + ' ' + row.attr('data-category') + ' ' + (row.attr('data-search') || '')).toLowerCase();
-        row.toggle(search.indexOf(query) !== -1 || search.replace(/[\s-]/g, '').indexOf(compactQuery) !== -1);
-    });
-    $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow:visible').length > 0); });
-    $('details.catalog').prop('open', query !== '');
-});
+<?= pmssAppsCatalogSearchJs(true) ?>
 </script></body></html>

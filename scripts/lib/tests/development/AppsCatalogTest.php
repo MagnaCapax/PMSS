@@ -238,6 +238,7 @@ class AppsCatalogTest extends TestCase
         $this->assertStringContainsString("query.replace(/[\\s-]/g, '')", $html);
         $this->assertStringContainsString("search.indexOf(query) !== -1 || search.replace(/[\\s-]/g, '').indexOf(compactQuery) !== -1", $html);
         $this->assertStringContainsString("row.attr('data-search')", $html);
+        $this->assertStringNotContainsString("$('details.catalog').prop('open'", $html);
     }
 
     public function testMissingLsioCatalogLeavesWikiGuidesAvailable(): void

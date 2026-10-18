@@ -25,6 +25,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
         ]);
         $this->assertStringContainsString('Find more apps', $html);
         $this->assertStringContainsString('Media Stack is not installed', $html);
+        $this->assertStringContainsString("$('details.catalog').prop('open', query !== '')", $html);
     }
 
     public function testAppsStatusEndpointSurvivesConfigureDelivery(): void
