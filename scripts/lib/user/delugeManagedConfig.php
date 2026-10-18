@@ -257,11 +257,7 @@ function pmssDelugeApplyManagedConfig(string $username, ?string $configFile = nu
     $coreChanged = pmssDelugeConfigMutate(
         $username,
         static function (array $config): array {
-            foreach (pmssDelugeManagedConfigEntries() as $key => $value) {
-                $config[$key] = $value;
-            }
-
-            return $config;
+            return array_replace($config, pmssDelugeManagedConfigEntries());
         },
         $configFile
     );

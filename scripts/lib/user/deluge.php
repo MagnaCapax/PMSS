@@ -19,11 +19,9 @@ pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFile
  */
 function pmssDelugeCoreTemplatePath(?array $distro = null): string
 {
-    $configDir = pmssResolvePathFromEnv('PMSS_SEEDBOX_CONFIG_DIR', '/etc/seedbox/config');
-
     return (int) (($distro['version'] ?? 0)) >= 12
-        ? $configDir.'/template.deluge.core.nocache.conf'
-        : $configDir.'/template.deluge.core.conf';
+        ? pmssDelugeTemplatePath('template.deluge.core.nocache.conf')
+        : pmssDelugeTemplatePath('template.deluge.core.conf');
 }
 
 /**
@@ -140,10 +138,8 @@ function userConfigureDeluge(array $user, array $configuration): void
         }
     }
 
-    if (!file_exists($configDir)) {
-        runStep('Creating Deluge config dir', pmssBuildUserShellCommand($username, 'mkdir -p -- '.escapeshellarg($configDir)));
-    }
     $ownedDirs = [
+        'Deluge config'     => $configDir,
         'Deluge unfinished' => $unfinishedDir,
         'Deluge session'    => $sessionDir,
     ];
@@ -217,9 +213,7 @@ function pmssDelugeApplyUploadThrottle(string $username, ?int $throttle = null):
         return false;
     }
 
-    if ($throttle === null) {
-        $throttle = pmssReadTorrentThrottle($username);
-    }
+    $throttle = $throttle ?? pmssReadTorrentThrottle($username);
     $value = ($throttle !== null && $throttle > 0) ? (string) $throttle : '-1.0';
     $updated = preg_replace('/"max_upload_speed"\\s*:\\s*-?[0-9.]+/', '"max_upload_speed": '.$value, $config, 1, $count);
 

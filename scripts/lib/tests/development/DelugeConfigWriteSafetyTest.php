@@ -9,7 +9,7 @@ final class DelugeConfigWriteSafetyTest extends TestCase
     public function testMissingDirectoriesAreCreatedAsAccountUser(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/deluge.php');
-        $this->assertStringContainsString("pmssBuildUserShellCommand(\$username, 'mkdir -p -- '.escapeshellarg(\$configDir))", $source);
+        $this->assertStringContainsString("'Deluge config'     => \$configDir", $source);
         $this->assertStringContainsString("pmssBuildUserShellCommand(\$username, 'mkdir -p -- '.escapeshellarg(\$dir))", $source);
         $this->assertFalse(strpos($source, "sprintf('chown %1\$s -R %2\$s', escapeshellarg(\$username.':'.\$username), escapeshellarg(\$dir))") !== false);
     }
