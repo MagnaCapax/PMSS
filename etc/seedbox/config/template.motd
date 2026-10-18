@@ -31,6 +31,13 @@ LinuxServer.io containers: https://github.com/MagnaCapax/PMSS/blob/main/docs/lin
 List containers: `docker ps`
 For usage tips run `docker-help`.
 
+Handy commands:
+  pikkumies        AI assistant for your box   (install: install-pikkumies.sh)
+  userShowLimits   Show your CPU / RAM / disk quota
+  support          Contact Pulsed Media support
+  docker ps        List your containers
+  docker-help      Docker usage tips
+
 Documentation:
 Wiki: https://wiki.pulsedmedia.com/index.php/Main_Page
 Knowledgebase: https://pulsedmedia.com/clients/index.php/knowledgebase
