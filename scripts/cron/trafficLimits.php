@@ -136,7 +136,7 @@ if (pmssCommandPath('fireqos') !== '') {
         echo date('Y-m-d H:i:s').': FireQOS drift: '.implode(', ', $changes)."\n";
         $output = [];
         $rc = 1;
-        exec('timeout 300 /scripts/util/setupNetwork.php >> /var/log/pmss/setupNetwork.log 2>&1', $output, $rc);
+        exec('timeout --kill-after=30 300 /scripts/util/setupNetwork.php >> /var/log/pmss/setupNetwork.log 2>&1', $output, $rc);
         echo date('Y-m-d H:i:s').": setupNetwork exit {$rc}\n";
         $contents = @file_get_contents($fireqosPath);
         $verified = $contents === false ? null : networkFireqosRenderedUserCaps($contents);
