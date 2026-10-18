@@ -91,6 +91,31 @@ final class TorrentClientsStoreTest extends TestCase
         $this->assertSame(0, $calls);
     }
 
+    public function testWritableStoreDirectoryIsRejectedBeforeInstall(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-clients-writable-');
+        $store = $root.'/store';
+        mkdir($store.'/rtorrent/0.9.9', 0755, true);
+        $calls = 0;
+        foreach ([
+            [$root, 0775], [$store, 0777],
+            [$store.'/rtorrent', 0775], [$store.'/rtorrent/0.9.9', 0777],
+        ] as [$path, $mode]) {
+            chmod($path, $mode);
+            $results = \pmssTorrentClientsStoreConverge([$this->entry()], [
+                'root' => $store,
+                'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
+                'size' => static function (): int { return 0; },
+                'install' => static function () use (&$calls): bool { $calls++; return true; },
+                'log' => static function (): void {},
+            ]);
+            $this->assertSame(['rtorrent/0.9.9' => 'failed'], $results);
+            chmod($path, 0755);
+        }
+        $this->assertSame(0, $calls);
+        $this->assertTrue(\pmssTorrentClientsStorePathChainSafe($store, 'rtorrent', '0.9.9'));
+    }
+
     public function testSuccessfulInstallKeepsOlderVersionAndSetsDefault(): void
     {
         $root = $this->pmssMakeTempDir('pmss-clients-install-');

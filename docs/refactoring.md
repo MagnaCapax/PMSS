@@ -244,6 +244,11 @@ directory names, and workspace paths before downloading or constructing the
 destructive cleanup command. Valid names keep the existing extraction flow;
 `RemoteBinaryHelperTest` covers rejected inputs without network access.
 
+Torrent-client store scans reject group- or world-writable existing directories
+in the managed path chain, even when ownership is correct. Ordinary private and
+read-only directories retain their previous result; `TorrentClientsStoreTest`
+covers rejection before installation.
+
 The lighttpd watchdog's incremental nginx reader closes its log stream in
 `finally`, including when metadata checks, state loading, seeking, or parsing
 throws. Exceptions continue to propagate without publishing a new cursor.

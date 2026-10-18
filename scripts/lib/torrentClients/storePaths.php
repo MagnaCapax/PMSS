@@ -22,7 +22,9 @@ function pmssTorrentClientsStorePathChainSafe(string $root, string $client = '',
     foreach ($paths as $path) {
         $stat = @lstat($path);
         if ($stat === false) continue;
-        if (($stat['mode'] & 0170000) !== 0040000 || $stat['uid'] !== $uid || $stat['gid'] !== $gid) return false;
+        // Ownership alone does not prevent a tenant from replacing store entries.
+        if (($stat['mode'] & 0170000) !== 0040000 || $stat['uid'] !== $uid || $stat['gid'] !== $gid
+            || ($stat['mode'] & 0022) !== 0) return false;
     }
     return true;
 }
