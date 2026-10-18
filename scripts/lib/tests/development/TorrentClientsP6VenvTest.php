@@ -69,4 +69,25 @@ final class TorrentClientsP6VenvTest extends TestCase
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', ['install' => $install]));
         $this->assertSame(0, $calls);
     }
+
+    public function testFailedTemporaryLinkCleanupPreventsPublication(): void
+    {
+        [$root, $entry] = $this->fixture();
+        $versionDir = $root.'/deluge/2.1.1';
+        $install = static function ($dir, $label, $steps, $cli, $link): void {
+            mkdir($dir.'/bin', 0755, true);
+            file_put_contents($cli, 'fixture');
+            file_put_contents($dir.'/bin/deluge-web', 'fixture');
+            symlink($cli, $link);
+        };
+        $cleanupCalls = 0;
+        $unlink = static function (string $path) use (&$cleanupCalls): bool {
+            $cleanupCalls++;
+            return false;
+        };
+        $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $versionDir,
+            ['install' => $install, 'unlink' => $unlink]));
+        $this->assertSame(1, $cleanupCalls);
+        $this->assertTrue(is_link($versionDir.'/.deluge-cli'));
+    }
 }

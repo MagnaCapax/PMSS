@@ -54,7 +54,9 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
         $versionDir.'/bin/deluged', $link,
         '[WARN] Skipping Deluge venv: python3 missing', '[WARN] Deluge venv missing deluged', $log);
     $linked = is_link($link) && readlink($link) === $versionDir.'/bin/deluged';
-    if (is_link($link)) @unlink($link);
+    $unlink = $ops['unlink'] ?? static function (string $path): bool { return @unlink($path); };
+    // Do not publish a version with the installer's temporary CLI link left behind.
+    if (is_link($link) && !$unlink($link)) return false;
     // InstallCli calls pmssPythonVenvEnsure; both daemon scripts must exist.
     return $linked && is_file($versionDir.'/bin/deluged') && !is_link($versionDir.'/bin/deluged')
         && is_file($versionDir.'/bin/deluge-web') && !is_link($versionDir.'/bin/deluge-web');
