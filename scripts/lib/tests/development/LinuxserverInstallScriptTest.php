@@ -107,11 +107,11 @@ BASH;
     public function testSupportedAppCatalogFeedsUsageText(): void
     {
         $this->assertSame(
-            ['jellyfin', 'qbittorrent', 'radarr', 'sonarr', 'prowlarr', 'mariadb', 'phpmyadmin'],
+            ['jellyfin', 'qbittorrent', 'transmission', 'radarr', 'sonarr', 'prowlarr', 'mariadb', 'phpmyadmin'],
             array_keys(\pmssDockerInstallLsioAppCatalog())
         );
         $this->assertStringContainsString(
-            'Supported apps: jellyfin qbittorrent radarr sonarr prowlarr mariadb phpmyadmin',
+            'Supported apps: jellyfin qbittorrent transmission radarr sonarr prowlarr mariadb phpmyadmin',
             \pmssDockerInstallLsioUsage('docker-install-lsio')
         );
     }
@@ -123,6 +123,54 @@ BASH;
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(!is_dir($this->homeDir.'/downloads'), 'dry-run must not create downloads dir');
         $this->assertStringContainsAllStrings(['WEBUI_PORT=8080', $this->homeDir.'/downloads:/downloads'], $result['output']);
+    }
+
+    public function testTorrentClientDryRunsUseLoopbackAndSharedDownloads(): void
+    {
+        $result = $this->runHelper(['transmission', '--dry-run']);
+        $this->assertSame(0, $result['rc']);
+        $this->assertStringContainsAllStrings([
+            '--label pmss.client=transmission',
+            '-p 127.0.0.1:9091:9091',
+            $this->homeDir.'/downloads:/downloads',
+            'USER=<generated-at-install>',
+            'PASS=<generated-at-install>',
+        ], $result['output']);
+        $this->assertStringNotContainsString('WHITELIST=', $result['output']);
+        $this->assertTrue(!is_dir($this->homeDir.'/docker/transmission/config'));
+    }
+
+    public function testDelugeDefaultPasswordPresetIsUnavailable(): void
+    {
+        $result = $this->runHelper(['deluge', '--dry-run']);
+        $this->assertTrue($result['rc'] !== 0);
+        $this->assertTrue(!is_dir($this->homeDir.'/docker/deluge/config'));
+    }
+
+    public function testTorrentClientRunRequestsManagedProxyRefresh(): void
+    {
+        $this->pmssEnsureDir($this->homeDir.'/.lighttpd');
+        $result = $this->runHelper(['transmission']);
+
+        $this->assertSame(0, $result['rc']);
+        $this->assertTrue(is_file($this->homeDir.'/.lighttpd/.dockerClientProxyRefresh'));
+        $this->assertStringContainsAllStrings([
+            '--label pmss.client=transmission',
+            '-p 127.0.0.1:9091:9091',
+            $this->homeDir.'/watch:/watch',
+            '--env-file '.$this->homeDir.'/docker/transmission/pmss-credentials.env',
+        ], $result['dockerLog']);
+        $this->assertStringNotContainsString('PASS=', $result['dockerLog']);
+        $this->assertStringNotContainsString('USER=', $result['dockerLog']);
+        $this->assertStringNotContainsString('WHITELIST=', $result['dockerLog']);
+        $credentialFile = $this->homeDir.'/docker/transmission/pmss-credentials.env';
+        $this->assertTrue(is_file($credentialFile));
+        $this->assertSame(0600, fileperms($credentialFile) & 0777);
+        $this->assertSame(posix_geteuid(), fileowner($credentialFile));
+        $contents = (string) file_get_contents($credentialFile);
+        $this->assertTrue((bool) preg_match('/\AUSER=[a-f0-9]{36}\nPASS=[a-f0-9]{36}\n\z/', $contents));
+        $this->assertStringNotContainsString($contents, $result['dockerLog']);
+        $this->assertStringContainsString($credentialFile, $result['output']);
     }
 
     public function testDryRunRadarrUsesMoviesAndSharedDownloads(): void
@@ -275,7 +323,7 @@ BASH;
         $result = $this->runHelper(['bazarr', '--dry-run']);
 
         $this->assertTrue($result['rc'] !== 0, 'unknown app should fail');
-        $this->assertStringContainsString('Supported apps: jellyfin qbittorrent radarr sonarr prowlarr mariadb phpmyadmin', $result['output']);
+        $this->assertStringContainsString('Supported apps: jellyfin qbittorrent transmission radarr sonarr prowlarr mariadb phpmyadmin', $result['output']);
     }
 
     public function testSkeletonCopiesInstallerScript(): void

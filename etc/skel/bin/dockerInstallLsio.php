@@ -131,17 +131,20 @@ function pmssDockerInstallLsioEnsureDirectories(array $paths): bool
 }
 
 /**
- * Persist generated MariaDB credentials with restrictive permissions.
+ * Persist generated service credentials with restrictive permissions.
  */
-function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string $dbName, string $dbUser): bool
+function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string $dbName, string $dbUser, string $app = 'mariadb'): bool
 {
-    $payload = implode("\n", [
+    $lines = $app === 'transmission' ? [
+        'USER='.pmssDockerInstallLsioRandomSecret(),
+        'PASS='.pmssDockerInstallLsioRandomSecret(),
+    ] : [
         'MYSQL_ROOT_PASSWORD='.pmssDockerInstallLsioRandomSecret(),
         'MYSQL_DATABASE='.$dbName,
         'MYSQL_USER='.$dbUser,
         'MYSQL_PASSWORD='.pmssDockerInstallLsioRandomSecret(),
-        '',
-    ]);
+    ];
+    $payload = implode("\n", $lines)."\n";
 
     // A private same-directory temporary file keeps credentials out of command lines.
     // Refuse links and other non-regular existing targets before replacement.
@@ -192,6 +195,7 @@ function pmssDockerInstallLsioAppCatalog(): array
     return [
         'jellyfin' => ['port' => '8096', 'bindHost' => '127.0.0.1', 'volumes' => ['config' => '/config', 'media' => '/data']],
         'qbittorrent' => ['port' => '8080', 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config' => '/config', 'downloads' => '/downloads']],
+        'transmission' => ['port' => '9091', 'credentials' => true, 'volumes' => ['config' => '/config', 'downloads' => '/downloads', 'watch' => '/watch']],
         'radarr' => ['port' => '7878', 'volumes' => ['config' => '/config', 'movies' => '/movies', 'downloads' => '/downloads']],
         'sonarr' => ['port' => '8989', 'volumes' => ['config' => '/config', 'tv' => '/tv', 'downloads' => '/downloads']],
         'prowlarr' => ['port' => '9696', 'volumes' => ['config' => '/config']],
@@ -219,6 +223,7 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
         'movies' => $homeDir.'/movies',
         'tv' => $homeDir.'/tv',
         'media' => $homeDir.'/media',
+        'watch' => $homeDir.'/watch',
     ];
 
     $spec = [
@@ -243,14 +248,20 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
 
     if (!empty($appSpec['credentials'])) {
         $credentialFile = $homeDir.'/docker/'.$app.'/pmss-credentials.env';
-        $dbUser = pmssDockerInstallLsioDatabaseIdentifier(basename(rtrim($homeDir, '/')), 'db_');
-        $dbName = pmssDockerInstallLsioDatabaseIdentifier($dbUser.'_app', '');
         $spec['credentialFile'] = $credentialFile;
-        $spec['dbName'] = $dbName;
-        $spec['dbUser'] = $dbUser;
-        $spec['extraArgs'] = $dryRun
-            ? ['-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE='.$dbName, '-e', 'MYSQL_USER='.$dbUser, '-e', 'MYSQL_PASSWORD=<generated-at-install>']
-            : ['--env-file', $credentialFile];
+        if ($app === 'mariadb') {
+            $dbUser = pmssDockerInstallLsioDatabaseIdentifier(basename(rtrim($homeDir, '/')), 'db_');
+            $dbName = pmssDockerInstallLsioDatabaseIdentifier($dbUser.'_app', '');
+            $spec['dbName'] = $dbName;
+            $spec['dbUser'] = $dbUser;
+            $spec['extraArgs'] = $dryRun
+                ? ['-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE='.$dbName, '-e', 'MYSQL_USER='.$dbUser, '-e', 'MYSQL_PASSWORD=<generated-at-install>']
+                : ['--env-file', $credentialFile];
+        } else {
+            $spec['extraArgs'] = $dryRun
+                ? ['-e', 'USER=<generated-at-install>', '-e', 'PASS=<generated-at-install>']
+                : ['--env-file', $credentialFile];
+        }
     }
 
     return $spec;
@@ -280,7 +291,7 @@ function pmssDockerInstallLsioHasRenderNode(string $driPath = '/dev/dri'): bool
  */
 function pmssDockerInstallLsioDockerRunCommand(string $app, string $hostPort, string $timezone, array $spec, ?callable $hasRenderNode = null): array
 {
-    $command = ['docker', 'run', '-d', '--name', $app, '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ='.$timezone, '--network', 'pmss-media'];
+    $command = ['docker', 'run', '-d', '--name', $app, '--label', 'pmss.client='.$app, '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ='.$timezone, '--network', 'pmss-media'];
 
     $command[] = '-p';
     $command[] = (string) $spec['bindHost'] !== ''
@@ -381,10 +392,22 @@ function pmssDockerInstallLsioMain(array $argv): int
     }
 
     if ((string) $spec['credentialFile'] !== ''
-        && !is_file((string) $spec['credentialFile'])
-        && !pmssDockerInstallLsioWriteCredentialFile((string) $spec['credentialFile'], (string) $spec['dbName'], (string) $spec['dbUser'])) {
+        && ($app === 'transmission' || !is_file((string) $spec['credentialFile']))
+        && !pmssDockerInstallLsioWriteCredentialFile((string) $spec['credentialFile'], (string) ($spec['dbName'] ?? ''), (string) ($spec['dbUser'] ?? ''), $app)) {
         return 1;
     }
 
-    return pmssDockerInstallLsioPassthru($dockerRun);
+    $rc = pmssDockerInstallLsioPassthru($dockerRun);
+    if ($rc === 0 && (string) $spec['credentialFile'] !== '') {
+        echo 'Service credentials: '.$spec['credentialFile'].PHP_EOL;
+    }
+    if ($rc === 0 && $app === 'transmission') {
+        // The root-owned lighttpd config is refreshed by its existing watchdog.
+        $marker = $homeDir.'/.lighttpd/.dockerClientProxyRefresh';
+        if (!is_dir(dirname($marker)) || is_link($marker) || (!is_file($marker) && @file_put_contents($marker, '') === false)) {
+            fwrite(STDERR, "Container installed; panel proxy refresh marker could not be written.\n");
+            return 1;
+        }
+    }
+    return $rc;
 }

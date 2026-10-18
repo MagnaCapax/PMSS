@@ -67,6 +67,18 @@ foreach($users AS $thisUser) {
         pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
     }
 
+    // A successful customer Docker install requests one managed proxy rebuild.
+    $dockerProxyRefresh = $homeDir.'/.lighttpd/.dockerClientProxyRefresh';
+    if (is_file($dockerProxyRefresh) && !is_link($dockerProxyRefresh)) {
+        $refreshRc = runStep(
+            "Refreshing Docker client proxy for {$thisUser}",
+            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$thisUser])
+        );
+        if ($refreshRc === 0) {
+            @unlink($dockerProxyRefresh);
+        }
+    }
+
     $nginxRecoveryAction = (string) ($nginxRecoveryActions[$thisUser] ?? '');
     if ($nginxRecoveryAction === 'reconfigure') {
         echo "Persistent nginx upstream 502s remain for user: {$thisUser}; regenerating lighttpd config before restart.\n";

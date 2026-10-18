@@ -80,6 +80,13 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             ['redirect', '/user-'.$user.'/qbittorrent', '/user-'.$user.'/qbittorrent/'],
             ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true, false, true, true],
         ];
+    } elseif ($proxyName === 'transmission') {
+        $fragment = "# PMSS-managed: Transmission Docker reverse proxy.\n\n";
+        $base = '/user-'.$user.'/transmission';
+        $rules = [
+            ['redirect', $base, $base.'/web/'],
+            ['^'.$base.'/', [$base.'/' => '/transmission/'], false, false, false, false, true],
+        ];
     } elseif ($proxyName === 'invidious') {
         $fragment = "# PMSS-managed: Invidious reverse proxy.\n\n";
         $rules = [

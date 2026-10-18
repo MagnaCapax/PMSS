@@ -27,49 +27,56 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'jellyfin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8096:8096', '-v', '/srv/pmss-test-home/docker/jellyfin/config:/config', '-v', '/srv/pmss-test-home/media:/data', '--restart', 'unless-stopped', 'lscr.io/linuxserver/jellyfin:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'jellyfin', '--label', 'pmss.client=jellyfin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8096:8096', '-v', '/srv/pmss-test-home/docker/jellyfin/config:/config', '-v', '/srv/pmss-test-home/media:/data', '--restart', 'unless-stopped', 'lscr.io/linuxserver/jellyfin:latest'),
             ),
             'qbittorrent' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/qbittorrent/config', '/srv/pmss-test-home/downloads'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'qbittorrent', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8080:8080', '-e', 'WEBUI_PORT=8080', '-v', '/srv/pmss-test-home/docker/qbittorrent/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/qbittorrent:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'qbittorrent', '--label', 'pmss.client=qbittorrent', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8080:8080', '-e', 'WEBUI_PORT=8080', '-v', '/srv/pmss-test-home/docker/qbittorrent/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/qbittorrent:latest'),
+            ),
+            'transmission' => array(
+                'mkdirPaths' => array('/srv/pmss-test-home/docker/transmission/config', '/srv/pmss-test-home/downloads', '/srv/pmss-test-home/watch'),
+                'credentialFile' => '/srv/pmss-test-home/docker/transmission/pmss-credentials.env',
+                'dbName' => '',
+                'dbUser' => '',
+                'command' => array('docker', 'run', '-d', '--name', 'transmission', '--label', 'pmss.client=transmission', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:9091:9091', '-e', 'USER=<generated-at-install>', '-e', 'PASS=<generated-at-install>', '-v', '/srv/pmss-test-home/docker/transmission/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '-v', '/srv/pmss-test-home/watch:/watch', '--restart', 'unless-stopped', 'lscr.io/linuxserver/transmission:latest'),
             ),
             'radarr' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/radarr/config', '/srv/pmss-test-home/movies', '/srv/pmss-test-home/downloads'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'radarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:7878:7878', '-v', '/srv/pmss-test-home/docker/radarr/config:/config', '-v', '/srv/pmss-test-home/movies:/movies', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/radarr:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'radarr', '--label', 'pmss.client=radarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:7878:7878', '-v', '/srv/pmss-test-home/docker/radarr/config:/config', '-v', '/srv/pmss-test-home/movies:/movies', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/radarr:latest'),
             ),
             'sonarr' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/sonarr/config', '/srv/pmss-test-home/tv', '/srv/pmss-test-home/downloads'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'sonarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8989:8989', '-v', '/srv/pmss-test-home/docker/sonarr/config:/config', '-v', '/srv/pmss-test-home/tv:/tv', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/sonarr:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'sonarr', '--label', 'pmss.client=sonarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8989:8989', '-v', '/srv/pmss-test-home/docker/sonarr/config:/config', '-v', '/srv/pmss-test-home/tv:/tv', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/sonarr:latest'),
             ),
             'prowlarr' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/prowlarr/config'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'prowlarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:9696:9696', '-v', '/srv/pmss-test-home/docker/prowlarr/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/prowlarr:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'prowlarr', '--label', 'pmss.client=prowlarr', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:9696:9696', '-v', '/srv/pmss-test-home/docker/prowlarr/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/prowlarr:latest'),
             ),
             'mariadb' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/mariadb/config'),
                 'credentialFile' => '/srv/pmss-test-home/docker/mariadb/pmss-credentials.env',
                 'dbName' => 'db_pmss_test_home_app',
                 'dbUser' => 'db_pmss_test_home',
-                'command' => array('docker', 'run', '-d', '--name', 'mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE=db_pmss_test_home_app', '-e', 'MYSQL_USER=db_pmss_test_home', '-e', 'MYSQL_PASSWORD=<generated-at-install>', '-v', '/srv/pmss-test-home/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'mariadb', '--label', 'pmss.client=mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE=db_pmss_test_home_app', '-e', 'MYSQL_USER=db_pmss_test_home', '-e', 'MYSQL_PASSWORD=<generated-at-install>', '-v', '/srv/pmss-test-home/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
             ),
             'phpmyadmin' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/phpmyadmin/config'),
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'phpmyadmin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8082:80', '-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306', '-v', '/srv/pmss-test-home/docker/phpmyadmin/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/phpmyadmin:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'phpmyadmin', '--label', 'pmss.client=phpmyadmin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8082:80', '-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306', '-v', '/srv/pmss-test-home/docker/phpmyadmin/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/phpmyadmin:latest'),
             ),
         ), $snapshot);
     }
@@ -136,8 +143,18 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
         $this->assertSame('/srv/pmss-test-home/docker/mariadb/pmss-credentials.env', $spec['credentialFile']);
         $this->assertSame(array('--env-file', '/srv/pmss-test-home/docker/mariadb/pmss-credentials.env'), $spec['extraArgs']);
         $this->assertSame(
-            array('docker', 'run', '-d', '--name', 'mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '--env-file', '/srv/pmss-test-home/docker/mariadb/pmss-credentials.env', '-v', '/srv/pmss-test-home/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
+            array('docker', 'run', '-d', '--name', 'mariadb', '--label', 'pmss.client=mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '--env-file', '/srv/pmss-test-home/docker/mariadb/pmss-credentials.env', '-v', '/srv/pmss-test-home/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
             \pmssDockerInstallLsioDockerRunCommand('mariadb', (string) $spec['defaultPort'], 'UTC', $spec)
         );
+    }
+
+    public function testTransmissionInstallPlanUsesEnvFileOutsideDryRun(): void
+    {
+        $spec = \pmssDockerInstallLsioAppSpec('transmission', '/srv/pmss-test-home', false);
+        $command = \pmssDockerInstallLsioDockerRunCommand('transmission', '9091', 'UTC', $spec);
+
+        $this->assertSame(['--env-file', '/srv/pmss-test-home/docker/transmission/pmss-credentials.env'], $spec['extraArgs']);
+        $this->assertStringNotContainsString('PASS=', implode(' ', $command));
+        $this->assertStringNotContainsString('USER=', implode(' ', $command));
     }
 }

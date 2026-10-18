@@ -12,6 +12,7 @@ require_once __DIR__.'/../systemdSliceProperties.php';
 require_once __DIR__.'/userFileWrite.php';
 require_once __DIR__.'/configRender.php';
 require_once __DIR__.'/delugeWebConf.php';
+require_once __DIR__.'/dockerClientProxy.php';
 require_once __DIR__.'/panelSessionLogin.php';
 require_once __DIR__.'/proxyFragments.php';
 require_once __DIR__.'/resourcePlan.php';
@@ -110,6 +111,14 @@ function pmssUserConfigLighttpdConfigureUser(
         pmssLighttpdWriteManagedProxyFragment('deluge', $thisUser, $delugeWebPort, $customDir.'/pmss-deluge.conf');
     }
 
+    $dockerTransmissionPort = pmssLighttpdDockerClientPort($thisUser, 'transmission');
+    $transmissionConfPath = $customDir.'/pmss-transmission.conf';
+    if ($dockerTransmissionPort !== null) {
+        pmssLighttpdWriteManagedProxyFragment('transmission', $thisUser, $dockerTransmissionPort, $transmissionConfPath);
+    } elseif (is_file($transmissionConfPath) || is_link($transmissionConfPath)) {
+        exec(pmssBuildUserShellCommand($thisUser, 'rm -f -- '.escapeshellarg($transmissionConfPath)));
+    }
+
     $props = pmssReadUserSlicePropertiesByUsername(
         $thisUser,
         ['MemoryHigh', 'MemoryMax', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota']
@@ -132,7 +141,8 @@ function pmssUserConfigLighttpdConfigureUser(
         $rclonePort,
         $qbittorrentPort,
         $resources,
-        $panelSessionLogin
+        $panelSessionLogin,
+        $dockerTransmissionPort !== null ? false : null
     );
     // Managed authoritative config (ADR-0032): root-owned + world-readable (0644) so the
     // per-user lighttpd can read it but the user cannot edit it (edits belong in

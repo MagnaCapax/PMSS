@@ -342,12 +342,17 @@ PMSS. Treat them as **starting points**, not copy‑paste gospel:
 - Always cross‑check the official docs at https://docs.linuxserver.io/images/
   for the current list of environment variables and ports.
 
-PMSS-tested recipes are the Jellyfin walkthrough above and the apps supported by
-`docker-install-lsio`: `jellyfin`, `qbittorrent`, `radarr`, `sonarr`,
-`prowlarr`, `mariadb`, and `phpmyadmin`. Other catalog examples in this section
+PMSS installer-backed recipes are the Jellyfin walkthrough above and the apps supported by
+`docker-install-lsio`: `jellyfin`, `qbittorrent`, `transmission`,
+`radarr`, `sonarr`, `prowlarr`, `mariadb`, and `phpmyadmin`. Other catalog examples in this section
 are generic upstream LinuxServer.io recipes, not PMSS installer-backed or
 PMSS-tested deployments. PMSS installs and supports Jellyfin as its media
 server; Plex is included here only as an upstream-deferred catalog example.
+The Deluge installer preset is withheld because the LSIO image starts with a
+known WebUI password and offers no supported first-install password setting.
+Transmission writes its generated WebUI username and password to
+`~/docker/transmission/pmss-credentials.env` (mode 0600); the installer prints
+this path after installation.
 
 All examples follow the same baseline:
 
@@ -407,22 +412,10 @@ DLNA and discovery; review the linuxserver.io Plex docs when using it heavily.
 
 **Deluge** – Alternative torrent client:
 
-```bash
-mkdir -p ~/docker/deluge/config ~/downloads
-
-docker run -d \
-  --name deluge \
-  -e PUID=0 -e PGID=0 \
-  -e TZ=Etc/UTC \
-  -p 8112:8112 \
-  -v ~/docker/deluge/config:/config \
-  -v ~/downloads:/downloads \
-  --restart unless-stopped \
-  lscr.io/linuxserver/deluge:latest
-```
-
-This maps only the WebUI port (8112). For optimal torrent performance, add the
-listen ports recommended in the official Deluge container docs.
+The example is withheld on shared PMSS hosts until its WebUI password can be
+seeded before the listener starts. See the
+[LSIO Deluge documentation](https://docs.linuxserver.io/images/docker-deluge/)
+for upstream configuration details.
 
 **SABnzbd** – Usenet downloader with WebUI:
 
