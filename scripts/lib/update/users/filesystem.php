@@ -246,6 +246,7 @@ PHP;
         'www/configureTorrentClients.php',
         'www/configureTorrentClientsOther.php',
         'www/configureTorrentClientsSwitch.php',
+        'www/configureTorrentClientsVersion.php',
         'www/appsLsioCatalog.php',
         'www/appsRuntime.php',
         'www/deluge.php',

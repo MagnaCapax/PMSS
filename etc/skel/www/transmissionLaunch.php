@@ -31,6 +31,21 @@ function pmssTransmissionNativePids(string $binary, string $procRoot = '/proc'):
     return $pids;
 }
 
+/** One customer-side contract for both preparing and checking socket settings. */
+function pmssTransmissionManagedSettings(string $home): array
+{
+    return array(
+        'rpc-enabled' => true,
+        'rpc-bind-address' => 'unix:'.$home.'/.lighttpd/transmission.sock',
+        'rpc-socket-mode' => '0700',
+        'rpc-authentication-required' => false,
+        'rpc-whitelist-enabled' => true,
+        'rpc-whitelist' => '',
+        'rpc-host-whitelist-enabled' => false,
+        'rpc-url' => '/user-'.basename($home).'/transmission/',
+    );
+}
+
 /** Require the stopped-daemon settings before a selected build may start. */
 function pmssTransmissionSettingsReady(string $home): bool
 {
@@ -40,17 +55,7 @@ function pmssTransmissionSettingsReady(string $home): bool
     $raw = @file_get_contents($path);
     $settings = is_string($raw) ? json_decode($raw, true) : null;
     if (!is_array($settings)) return false;
-    $managed = [
-        'rpc-enabled' => true,
-        'rpc-bind-address' => 'unix:'.$home.'/.lighttpd/transmission.sock',
-        'rpc-socket-mode' => '0700',
-        'rpc-authentication-required' => false,
-        'rpc-whitelist-enabled' => true,
-        'rpc-whitelist' => '',
-        'rpc-host-whitelist-enabled' => false,
-        'rpc-url' => '/user-'.basename($home).'/transmission/',
-    ];
-    foreach ($managed as $kebab => $value) {
+    foreach (pmssTransmissionManagedSettings($home) as $kebab => $value) {
         $snake = str_replace('-', '_', $kebab);
         if (array_key_exists($kebab, $settings) === array_key_exists($snake, $settings)) return false;
         if (($settings[array_key_exists($snake, $settings) ? $snake : $kebab] ?? null) !== $value) return false;
@@ -74,17 +79,7 @@ function pmssTransmissionSettingsPrepare(string $home): bool
     $settings = is_string($raw) ? json_decode($raw, true) : null;
     if (!is_array($settings) || ($settings !== array() && array_values($settings) === $settings)) return false;
     $snakeCase = array_key_exists('rpc_bind_address', $settings);
-    $managed = array(
-        'rpc-enabled' => true,
-        'rpc-bind-address' => 'unix:'.$socketDir.'/transmission.sock',
-        'rpc-socket-mode' => '0700',
-        'rpc-authentication-required' => false,
-        'rpc-whitelist-enabled' => true,
-        'rpc-whitelist' => '',
-        'rpc-host-whitelist-enabled' => false,
-        'rpc-url' => '/user-'.basename($home).'/transmission/',
-    );
-    foreach ($managed as $key => $value) {
+    foreach (pmssTransmissionManagedSettings($home) as $key => $value) {
         $snake = str_replace('-', '_', $key);
         unset($settings[$key], $settings[$snake]);
         $settings[$snakeCase ? $snake : $key] = $value;

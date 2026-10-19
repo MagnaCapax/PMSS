@@ -45,6 +45,15 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     }
     $oldVersion = is_string($old) && strpos($old, '/home/.pmss/clients/'.$client.'/') === 0
         ? basename($old) : (is_string($old) ? 'custom' : 'system');
+    $lastRun = trim(pmssConfigureFileRead($dir.'/'.$client.'.lastRun', 64));
+    if (pmssConfigureTorrentClientMajorDowngrade($lastRun, $version)) {
+        $message = 'Downgrading '.ucfirst($client).' from '.$lastRun.' to '.$version
+            .' can corrupt existing data; switch refused — open a ticket for a data-preserving rollback.';
+        pmssConfigureFileWrite($dir.'/'.$client.'.notice', $message."\n");
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'status' => 409, 'message' => $message);
+    }
     $backup = $ops['backup'] ?? 'pmssCustomerBackupFileCreate';
     $stop = $ops['stop'] ?? 'pmssConfigureTorrentClientOtherStop';
     $start = $ops['start'] ?? 'pmssConfigureTorrentClientOtherStart';
