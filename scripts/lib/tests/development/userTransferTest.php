@@ -809,7 +809,8 @@ SNAP;
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentRestart.php', [
             'function pmssRtorrentRestartPidIsRtorrent(int $pid, int $uid): bool',
             'ps -p \' . (int) $pid . \' -o euid=,comm=',
-            'pgrep -u \' . (int) $uid . \' -x rtorrent',
+            'pgrep -u \' . (int) $uid . " -x \'rtorrent( main)?\'"',
+            "preg_match('/^rtorrent( main)?$/', \$m[2]) === 1",
             'rtorrent lock pid is stale or not rtorrent',
             'pmssRtorrentRestartSignalPids($rtorrentPids, 15)',
         ], 'Missing robust rTorrent restart fragment: ');
