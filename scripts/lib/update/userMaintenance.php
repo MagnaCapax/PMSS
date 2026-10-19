@@ -101,6 +101,10 @@ function pmssUserMaintenanceRepairLegacyCpuQuota(string $user): void
  */
 function pmssUpdateAllUsers(string $rutorrentIndexSha): array
 {
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
+        $staleLingerCount = pmssUserMaintenancePruneStaleLinger();
+        logMessage(sprintf('Removed %d stale systemd linger flag(s)', $staleLingerCount));
+    }
     $users = users::listHomeUsers();
     sort($users, SORT_NATURAL | SORT_FLAG_CASE);
     $totalUsers = count($users);

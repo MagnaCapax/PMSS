@@ -269,7 +269,8 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    test, starting nginx if it is stopped; an explicit `--restart` remains
    available for callers that need a full restart. The certificate setup step
    also reloads nginx after rebuilding and validating its configuration.
-9. Update every user environment via `pmssUpdateAllUsers()`, which also owns
+9. Update every user environment via `pmssUpdateAllUsers()`, which first removes
+   root-owned linger flags for valid names absent from passwd, then owns
    linger/rootless-Docker wiring and the optional post-refresh checks
    (user crontabs are user-owned and not rewritten).
    A failed `userPermissions.php` repair reports the failed-command count and

@@ -14,6 +14,43 @@ require_once dirname(__DIR__, 2).'/user/log.php';
 require_once dirname(__DIR__, 2).'/user/rootlessDockerConfig.php';
 require_once dirname(__DIR__, 2).'/user/userConfigStore.php';
 
+/** Remove root-owned linger flags for names absent from passwd before enabling linger. */
+function pmssUserMaintenancePruneStaleLinger(string $directory = '/var/lib/systemd/linger', ?callable $lookup = null, bool $dryRun = false, int $expectedOwner = 0): int
+{
+    if ($dryRun || pmssEnvFlagEnabled('PMSS_TEST_MODE') || pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        return 0;
+    }
+    $lookup = $lookup ?? 'posix_getpwnam';
+    $directoryStat = @lstat($directory);
+    if ($directoryStat === false || ($directoryStat['mode'] & 0170000) !== 0040000 || $directoryStat['uid'] !== $expectedOwner) {
+        return 0;
+    }
+    $names = @scandir($directory);
+    if ($names === false) {
+        logMessage('[WARN] Unable to scan systemd linger directory');
+        return 0;
+    }
+
+    // This root-owned systemd directory is outside account control (ADR 0121).
+    $removed = 0;
+    foreach ($names as $name) {
+        if (!pmssValidateUsername($name)) {
+            continue;
+        }
+        $path = $directory.'/'.$name;
+        $stat = @lstat($path);
+        if ($stat === false || $stat['uid'] !== $expectedOwner || !in_array($stat['mode'] & 0170000, [0100000, 0120000], true) || $lookup($name) !== false) {
+            continue;
+        }
+        if (@unlink($path)) {
+            $removed++;
+        } else {
+            logMessage('[WARN] Unable to remove stale systemd linger flag for '.pmssLogSafeLabel($name));
+        }
+    }
+    return $removed;
+}
+
 /** Keep shell-facing user maintenance helpers behind the username policy. */
 function pmssUserMaintenanceUsernameAllowed(string $user, string $context): bool
 {

@@ -42,16 +42,31 @@ final class TerminateUserContractTest extends TestCase
             ]]]);
     }
 
-    public function testTerminateUserDisablesLingerAndResetsManagerBeforeUserdel(): void
+    public function testTerminateUserSystemdAndTmuxCleanupOrder(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
-            "pmssUserAccountLookup(\$username)) !== null) {",
+        // Strip comments so a disabled step cannot satisfy this source contract.
+        $source = '';
+        foreach (token_get_all($this->pmssReadRepoFile('scripts/terminateUser.php')) as $token) {
+            if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) continue;
+            $source .= is_array($token) ? $token[1] : $token;
+        }
+        $this->assertFalse((bool) preg_match('/if\s*\(\s*false\s*\)/', $source), 'cleanup steps must be reachable');
+        $this->assertOrderedStrings([
             "'disable_linger'",
-            "'loginctl disable-linger '.escapeshellarg(\$username).' || true'",
-            "'reset_failed_user_manager'",
-            "'systemctl reset-failed '.escapeshellarg('user@'.\$uid.'.service').' || true'",
+            "'remove_tmux_socket'",
             "'userdel_initial'",
-        ]]]);
+            "'kill_processes_final'",
+            "'reset_failed_user_manager'",
+            "'userdel_groupdel_final'",
+        ], $source);
+        $lingerStep = substr($source, strpos($source, "'disable_linger'"), 260);
+        $resetStep = substr($source, strpos($source, "'reset_failed_user_manager'"), 380);
+        $this->assertStringContainsString("'if [ -e '.escapeshellarg('/var/lib/systemd/linger/'.\$username)", $lingerStep);
+        $this->assertStringContainsString('then timeout --kill-after=5s 45s loginctl disable-linger', $lingerStep);
+        $this->assertStringContainsString('if timeout --kill-after=5s 45s systemctl is-failed --quiet', $resetStep);
+        $this->assertStringContainsString('then timeout --kill-after=5s 45s systemctl reset-failed', $resetStep);
+        $this->assertStringContainsString("pmssBuildUserShellCommand(\$username, 'rm -rf -- /tmp/tmux-\$(id -u)')", $source);
+        $this->assertStringNotContainsString("'loginctl disable-linger '.escapeshellarg(\$username).' || true'", $source);
     }
 
     /**

@@ -103,6 +103,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
             array(
                 'Kill lingering user processes',
                 'Release lighttpd port',
+                'Disable systemd linger',
                 'Delete user account and home',
                 'Delete user group',
                 'Cleanup addUser lock files',
@@ -110,6 +111,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
             $source
         );
         $this->assertStringContainsAllStrings(['/scripts/util/portManager.php release', 'userdel -r', "'/etc/seedbox/runtime/trafficLimits/'.\$userName", 'pmssAddUserCleanupFailedProvisionTargetValid($userName, $homePath)', "'pmssPathTargetIsSafe'"], $source);
+        $this->assertStringContainsString('timeout --kill-after=5s 45s loginctl disable-linger', $source);
     }
 
     public function testCleanupStepFailureRunsRemainingStepsAndFailsClosed(): void

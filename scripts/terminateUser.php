@@ -78,7 +78,8 @@ if (!is_dir("/home/{$username}")) {
 
 // Ensure a passwd entry exists before continuing so we do not silently act on
 // stray directories or stale state.
-if (pmssUserAccountLookup($username) === null) {
+$accountInfo = pmssUserAccountLookup($username);
+if ($accountInfo === null) {
     pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in /etc/passwd');
     die("Refusing to terminate {$username}: no passwd entry found\n");
 }
@@ -145,23 +146,18 @@ pmssUserLifecycleStep('terminate', $username, 'kill_processes_retry', $killUserC
 pmssTerminateUserReleaseRtorrentPortReservations($username, "/home/{$username}/.rtorrent.rc", $dryRun);
 
 // Reset per-user slice properties so no stale limits linger (safe if slice missing)
-if (($info = pmssUserAccountLookup($username)) !== null) {
-    $uid = (int)$info['uid'];
+$uid = (int) $accountInfo['uid'];
+if (pmssUserAccountLookup($username) !== null) {
     // Use systemd revert to drop any drop-ins for user slice if present
     pmssUserLifecycleStep('terminate', $username,
         'revert_slice',
         'systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true',
         $dryRun
     );
-    // Disable linger while the account still resolves; clear its stopped manager's failed state.
+    // Disable linger while the account still resolves.
     pmssUserLifecycleStep('terminate', $username,
         'disable_linger',
-        'loginctl disable-linger '.escapeshellarg($username).' || true',
-        $dryRun
-    );
-    pmssUserLifecycleStep('terminate', $username,
-        'reset_failed_user_manager',
-        'systemctl reset-failed '.escapeshellarg('user@'.$uid.'.service').' || true',
+        'if [ -e '.escapeshellarg('/var/lib/systemd/linger/'.$username).' ]; then timeout --kill-after=5s 45s loginctl disable-linger '.escapeshellarg($username).'; fi',
         $dryRun
     );
 }
@@ -179,6 +175,8 @@ $groupdelCommand = 'groupdel '.escapeshellarg($username);
 pmssUserLifecycleRunSteps('terminate', $username, array(
     array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
     array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
+    // tmux sockets are account-controlled; remove them as the account (ADR 0121).
+    array('remove_tmux_socket', 'timeout --kill-after=5s 45s '.pmssBuildUserShellCommand($username, 'rm -rf -- /tmp/tmux-$(id -u)').' || true'),
     array('userdel_initial', $userdelCommand),
 ), $dryRun);
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
@@ -276,6 +274,7 @@ if (pmssUserAccountLookup($username) !== null) {
 // If attempts 1 and 2 failed, keep the final cleanup order explicit.
 pmssUserLifecycleRunSteps('terminate', $username, array(
     array('kill_processes_final', $killUserCommand),
+    array('reset_failed_user_manager', 'if timeout --kill-after=5s 45s systemctl is-failed --quiet '.escapeshellarg('user@'.$uid.'.service').'; then timeout --kill-after=5s 45s systemctl reset-failed '.escapeshellarg('user@'.$uid.'.service').'; else rc=$?; if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then exit "$rc"; fi; fi'),
     array('userdel_groupdel_final', $userdelCommand),
     array('groupdel_final', $groupdelCommand),
     array('cleanup_lock_files', 'rm -f -- '.pmssRuntimeLockDir().'/pmss-*-'.$username.'.lock /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
