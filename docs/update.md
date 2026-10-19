@@ -31,6 +31,16 @@ Responsibilities:
   `setupPermissions.php` pass before surfacing the failure so
   `/etc/seedbox` remains traversable.
 
+Immediately before phase-2 handoff, the bootstrap requires 3 GiB free on `/`
+and `/home`. It always checks `/` using space available to ordinary users.
+When running as root, it also reads `/home` free blocks including the filesystem
+reserve, which root can use for maintenance; a failed read falls back to the
+ordinary-user measurement. The preflight logs both measurements and warns when
+only the root reserve lets `/home` pass.
+Phase 2 repeats the same 3 GiB preflight before package work, using the same
+root-usable `/home` decision and conservative fallback. Its disk readings and
+reserve warning are logged independently after handoff.
+
 Common flags:
 
 ```

@@ -157,4 +157,56 @@ class HomeInodeDensityTest extends TestCase
         $this->assertTrue($result, 'Warning-only preflight failures should not abort update-step2');
         $this->assertStringContainsAllStrings(['Unable to open dpkg lock file', 'APT cache path missing or not writable'], implode("\n", $messages));
     }
+
+    /** Inject both disk readings so the phase-2 cases never probe host disks. */
+    private function runDiskPreflight(array $paths, int $uid, float $userAvailable, ?float $rootUsable): array
+    {
+        $readings = [];
+        $measure = static function (string $path, string $kind) use ($userAvailable, $rootUsable, &$readings) {
+            $readings[] = $path.':'.$kind;
+            return $kind === 'root' ? $rootUsable : $userAvailable;
+        };
+        [$result, $messages] = $this->pmssArrayLoggerCapture(static function (callable $logger) use ($paths, $measure, $uid): bool {
+            return \pmssUpdateStep2PreflightChecks($logger, $paths, [], [], '', 3.0 * 1073741824, $measure, $uid);
+        });
+        return [$result, $messages, $readings];
+    }
+
+    public function testRootHomePassesOnReservedBlocks(): void
+    {
+        [$result, $messages, $readings] = $this->runDiskPreflight(['/home'], 0, 0.0, 22.0 * 1073741824);
+        $this->assertTrue($result);
+        $this->assertSame(['/home:user', '/home:root'], $readings);
+        $this->pmssAssertMessagesContain($messages, 'user-available 0.00 GiB, root-usable 22.00 GiB');
+        $this->pmssAssertMessagesContain($messages, '[WARN] /home user-available space is below 3 GiB; update is using root-reserved blocks');
+    }
+
+    public function testRootHomeFailsWhenRootUsableSpaceIsLow(): void
+    {
+        [$result, $messages] = $this->runDiskPreflight(['/home'], 0, 0.0, 2.0 * 1073741824);
+        $this->assertFalse($result);
+        $this->pmssAssertMessagesContain($messages, '2 GiB available, 3 GiB required');
+    }
+
+    public function testMalformedRootReadFallsBackToUserAllowance(): void
+    {
+        [$result, $messages] = $this->runDiskPreflight(['/home'], 0, 0.0, \pmssRootUsableDiskBytes('bad'));
+        $this->assertFalse($result);
+        $this->pmssAssertMessagesContain($messages, '[WARN] Unable to determine root-usable free space for /home');
+        $this->pmssAssertMessagesContain($messages, '0 GiB available, 3 GiB required');
+    }
+
+    public function testNonRootHomeUsesUserAllowance(): void
+    {
+        [$result, , $readings] = $this->runDiskPreflight(['/home'], 1000, 0.0, 22.0 * 1073741824);
+        $this->assertFalse($result);
+        $this->assertSame(['/home:user'], $readings);
+    }
+
+    public function testRootFilesystemUsesUserAllowance(): void
+    {
+        [$result, , $readings] = $this->runDiskPreflight(['/'], 0, 0.0, 22.0 * 1073741824);
+        $this->assertFalse($result);
+        $this->assertSame(['/:user'], $readings);
+    }
 }

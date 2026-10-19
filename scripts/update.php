@@ -1973,20 +1973,56 @@ function runUpdateStep2(bool $dryRun): void
     }
 }
 
+/** Parse statvfs free blocks and fragment size; reject malformed or unusable output. */
+function pmssRootUsableDiskBytes(?string $statOutput): ?float
+{
+    if ($statOutput === null || !preg_match('/^([0-9]+)\s+([0-9]+)$/D', trim($statOutput), $matches)) {
+        return null;
+    }
+    $blocks = (float) $matches[1];
+    $fragmentSize = (float) $matches[2];
+    $bytes = $blocks * $fragmentSize;
+    return $fragmentSize > 0 && is_finite($bytes) ? $bytes : null;
+}
+
+/** Root may use the ext4 reserve on /home; every other check uses the user allowance. */
+function pmssDiskPreflightAvailableBytes(string $path, int $effectiveUid, float $userAvailable, ?float $rootUsable): float
+{
+    return $path === '/home' && $effectiveUid === 0 && $rootUsable !== null ? $rootUsable : $userAvailable;
+}
+
 function checkDiskSpace(): void
 {
     // 3 GiB in bytes
     $required = 3.0 * 1024 * 1024 * 1024;
     $paths = ['/', '/home'];
 
+    $effectiveUid = function_exists('posix_geteuid') ? posix_geteuid() : -1;
     foreach ($paths as $path) {
         if (!is_dir($path)) {
             continue;
         }
-        $free = @disk_free_space($path);
-        if ($free === false) {
+        $userAvailable = @disk_free_space($path);
+        if ($userAvailable === false) {
             logmsg("[WARN] Unable to determine free space for {$path}");
             continue;
+        }
+        $rootUsable = null;
+        if ($path === '/home' && $effectiveUid === 0) {
+            $output = [];
+            $rc = 1;
+            @exec(pmssShellCommandWithoutInheritedUpdateLock("stat -f -c '%f %S' -- '/home' 2>/dev/null"), $output, $rc);
+            $rootUsable = $rc === 0 ? pmssRootUsableDiskBytes(implode("\n", $output)) : null;
+            if ($rootUsable === null) {
+                logmsg('[WARN] Unable to determine root-usable free space for /home; using user-available space');
+            }
+        }
+        $free = pmssDiskPreflightAvailableBytes($path, $effectiveUid, (float) $userAvailable, $rootUsable);
+        $rootUsableDisplay = $rootUsable === null ? 'n/a' : sprintf('%.2f GiB', $rootUsable / 1073741824);
+        logmsg(sprintf('[INFO] Preflight disk space %s: user-available %.2f GiB, root-usable %s (required 3 GiB)',
+            $path, $userAvailable / 1073741824, $rootUsableDisplay));
+        if ($path === '/home' && $effectiveUid === 0 && $userAvailable < $required && $rootUsable !== null && $free >= $required) {
+            logmsg('[WARN] /home user-available space is below 3 GiB; update is using root-reserved blocks');
         }
         if ($free < $required) {
             $availableGb = round($free / 1073741824, 2);
