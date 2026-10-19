@@ -87,6 +87,11 @@ helpers from `scripts/lib/update/…`. The orchestrator is intentionally thin an
 mostly wires together specialised modules, while keeping a few one-caller steps
 inline:
 
+The per-session account view is default off. On Debian 12 or later with a
+separate `/home` mount, set `/etc/seedbox/config/account-view.enabled` and run
+phase 2 to install it. Check the updater log for the rendered PAM status. To
+roll back, remove the marker, rerun phase 2, and reboot (ADR 0119).
+
 ```
 scripts/lib/update/distro.php          # OS detection and legacy self-heal
 scripts/lib/update/environment.php     # dpkg/apt environment guards
