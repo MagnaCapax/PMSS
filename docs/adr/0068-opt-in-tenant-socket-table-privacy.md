@@ -5,7 +5,7 @@ Category: security
 
 ## Status
 
-Accepted (stage 1 + stage 2 implemented, default-OFF; not yet enabled on any host)
+Accepted (stage 1 + stage 2 implemented, default-OFF; enabled per host by marker; pilot-verified on Debian 12 / kernel 6.1)
 
 ## Context
 
