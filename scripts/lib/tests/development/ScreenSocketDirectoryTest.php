@@ -32,4 +32,18 @@ class ScreenSocketDirectoryTest extends TestCase
         $actual = (string) shell_exec('env HOME='.escapeshellarg($home).' /bin/sh -c '.escapeshellarg($script));
         $this->assertSame($home.'/.screen', $actual);
     }
+
+    public function testExistingDirectoryModeIsReconciled(): void
+    {
+        if (!function_exists('posix_getuid') || posix_getuid() < 1000) return;
+        $home = $this->pmssMakeTempDir('pmss-screen-mode-', 0700);
+        mkdir($home.'/.screen', 0755);
+        chmod($home.'/.screen', 0755);
+        $bashrc = dirname(__DIR__, 4).'/etc/skel/.bashrc';
+        $actual = (string) shell_exec('env HOME='.escapeshellarg($home).' BASH_ENV='.escapeshellarg($bashrc)
+            .' /bin/bash -c '.escapeshellarg('printf "%s" "$SCREENDIR"'));
+        clearstatcache();
+        $this->assertSame($home.'/.screen', $actual);
+        $this->assertSame(0700, fileperms($home.'/.screen') & 0777);
+    }
 }

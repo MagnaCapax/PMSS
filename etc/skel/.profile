@@ -19,7 +19,7 @@ if [ -z "${BASH_VERSION:-}" ]; then
     _pmss_screen_uid=$(/usr/bin/id -u 2>/dev/null || echo 0)
     if [ "$_pmss_screen_uid" -ge 1000 ] 2>/dev/null && [ -n "${HOME:-}" ]; then
         [ -e "$HOME/.screen" ] || /bin/mkdir -m 0700 -- "$HOME/.screen" 2>/dev/null || true
-        if [ -d "$HOME/.screen" ] && [ ! -L "$HOME/.screen" ]; then
+        if [ -d "$HOME/.screen" ] && [ ! -L "$HOME/.screen" ] && /bin/chmod 0700 -- "$HOME/.screen" 2>/dev/null; then
             export SCREENDIR="$HOME/.screen"
         fi
     fi
