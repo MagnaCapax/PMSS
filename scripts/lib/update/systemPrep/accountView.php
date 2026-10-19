@@ -145,6 +145,13 @@ function pmssAccountViewApply(?callable $logger = null, string $root = '', ?bool
         clearstatcache(true, $path);
         if ((fileperms($path) & 0777) !== $spec[1] && !@chmod($path, $spec[1])) return false;
     }
+    if (!$test) {
+        if (runStep('Reloading systemd for account view', 'systemctl daemon-reload') !== 0 ||
+            runStep('Enabling PMSS mount propagation unit', 'systemctl enable --now pmss-mount-propagation.service') !== 0) {
+            $log('[WARN] Per-session account view not enabled by this run: mount propagation unit unavailable');
+            return false;
+        }
+    }
     $ok = false;
     pmssRefreshManagedPathFile($profile, $profileSpec[0], 'account view PAM profile', $log,
         pmssManagedPathInstallOptions($profile, 'account view PAM profile', ['mode' => $profileSpec[1]]), $ok);
@@ -152,8 +159,6 @@ function pmssAccountViewApply(?callable $logger = null, string $root = '', ?bool
     clearstatcache(true, $profile);
     if ((fileperms($profile) & 0777) !== $profileSpec[1] && !@chmod($profile, $profileSpec[1])) return false;
     if (!$test) {
-        runStep('Reloading systemd for account view', 'systemctl daemon-reload');
-        runStep('Enabling PMSS mount propagation unit', 'systemctl enable --now pmss-mount-propagation.service');
         runStep('Installing per-session account view PAM profile', 'pam-auth-update --package --enable pmss-account-view');
         if (!pmssAccountViewPamRendered()) {
             $log('[WARN] Per-session account view not active: PAM session rules were not rendered');
