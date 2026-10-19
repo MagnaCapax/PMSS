@@ -149,7 +149,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
             'pmssLockHandleExportChildCloseFds($fh);',
             'putenv(PMSS_UPDATE_LOCK_FDS_ENV);',
             "passthru(pmssLockChildClosePrefix().'systemctl start nginx",
-            "passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart'",
+            "passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --reload'",
         ]);
     }
 

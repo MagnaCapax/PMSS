@@ -39,11 +39,12 @@ function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
 function pmssCreateNginxConfigMain(array $argv): int
 {
     $usage = pmssCliHelpUsageOptions([
-        '/scripts/util/createNginxConfig.php [--user USERNAME] [--restart]',
-        '/scripts/util/createNginxConfig.php USERNAME [--restart]',
+        '/scripts/util/createNginxConfig.php [--user USERNAME] [--restart|--reload]',
+        '/scripts/util/createNginxConfig.php USERNAME [--restart|--reload]',
     ], [
         ['--user, -u USERNAME', 'Only regenerate nginx config for USERNAME (keeps other user configs intact)'],
         ['--restart, -r', 'Restart nginx after writing configs (only if config test passes)'],
+        ['--reload', 'Reload nginx after writing configs, or start it if stopped (only if config test passes)'],
     ], 21, [], true, ['--help, -h', 'Show this help']);
 
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
@@ -57,13 +58,15 @@ function pmssCreateNginxConfigMain(array $argv): int
     }
 
     $restartNginx = pmssCliOptionPresent($parsed, 'restart', 'r');
+    $reloadNginx = pmssCliOptionPresent($parsed, 'reload');
+    if ($restartNginx && $reloadNginx) return pmssCliReturnWithStderr($usage);
 
     $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $requestedUser, array('emitEmptyMessage' => true, 'invalidMessage' => "Invalid username: %s\n", 'notFoundMessage' => "Username not found: %s\n"));
     if ($selection['exitCode'] !== 0 || ($requestedUser !== '' && $selection['users'] === array())) return $selection['exitCode'];
     if ($selection['users'] === array()) {
         // A successful empty listing still needs the global default site refreshed.
         pmssCreateNginxConfigSetup();
-        return pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
+        return pmssCreateNginxConfigTestAndMaybeRestart($restartNginx, $reloadNginx);
     }
 
     $requestedUser = $selection['username'];
@@ -109,7 +112,7 @@ function pmssCreateNginxConfigMain(array $argv): int
         pmssCreateNginxConfigChmodGlob(0640, $pattern);
     }
 
-    $configTestRc = pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
+    $configTestRc = pmssCreateNginxConfigTestAndMaybeRestart($restartNginx, $reloadNginx);
     if ($configTestRc !== 0) {
         return $configTestRc;
     }

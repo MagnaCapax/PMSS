@@ -25,8 +25,8 @@ function pmssCreateNginxConfigSetup(): array {
     \file_put_contents($GLOBALS['target'], \file_get_contents($GLOBALS['template']));
     return [];
 }
-function pmssCreateNginxConfigTestAndMaybeRestart(bool $restart): int {
-    $GLOBALS['configTestCalls'][] = $restart;
+function pmssCreateNginxConfigTestAndMaybeRestart(bool $restart, bool $reload = false): int {
+    $GLOBALS['configTestCalls'][] = [$restart, $reload];
     return 0;
 }
 PHP;
@@ -46,7 +46,7 @@ PHP;
         $result = $this->runSelection(['exitCode' => 0, 'username' => '', 'users' => []]);
         $this->assertSame(0, $result['rc']);
         $this->assertSame(1, $result['setupCalls']);
-        $this->assertSame([false], $result['configTestCalls']);
+        $this->assertSame([[false, false]], $result['configTestCalls']);
         $this->assertMatches('/location \/\s*\{/', $result['site']);
         $this->assertTrue(strpos($result['site'], 'try_files $uri $uri/ =404;') !== false);
     }
@@ -56,7 +56,14 @@ PHP;
         $result = $this->runSelection(['exitCode' => 0, 'username' => '', 'users' => []], ['--restart']);
         $this->assertSame(0, $result['rc']);
         $this->assertSame(1, $result['setupCalls']);
-        $this->assertSame([true], $result['configTestCalls']);
+        $this->assertSame([[true, false]], $result['configTestCalls']);
+    }
+
+    public function testEmptyListingWithReloadActivatesConfig(): void
+    {
+        $result = $this->runSelection(['exitCode' => 0, 'username' => '', 'users' => []], ['--reload']);
+        $this->assertSame(0, $result['rc']);
+        $this->assertSame([[false, true]], $result['configTestCalls']);
     }
 
     public function testMissingRequestedUserSkipsSetup(): void

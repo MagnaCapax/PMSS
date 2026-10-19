@@ -28,7 +28,7 @@ class SetupLetsEncryptTest extends TestCase
         return array_replace([
             'cronPath' => $this->pmssMakeTempDir('pmss-certbot-cron-').'/certbot',
             'createNginxConfigCommand' => 'create-nginx',
-            'nginxRestartCommand' => 'restart-nginx',
+            'nginxReloadCommand' => 'reload-nginx',
             'fileExists' => static function (string $path): bool {
                 return false;
             },
@@ -131,7 +131,7 @@ class SetupLetsEncryptTest extends TestCase
         $this->assertStringContainsString('Install certbot packages', $stdout);
         $this->assertStringNotContainsString('Request Let\'s Encrypt certificate', $stdout);
         $this->assertEquals(
-            ['Install certbot packages', 'Rebuild nginx configuration', 'Restart nginx'],
+            ['Install certbot packages', 'Rebuild nginx configuration', 'Reload nginx'],
             array_column($commands, 'description')
         );
     }
@@ -151,7 +151,7 @@ class SetupLetsEncryptTest extends TestCase
         $this->assertEquals('644', substr(sprintf('%o', fileperms($cronPath)), -3));
     }
 
-    public function testSharedSetupFailsLoudlyWhenNginxRestartFails(): void
+    public function testSharedSetupFailsLoudlyWhenNginxReloadFails(): void
     {
         $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-fail-').'/certbot';
 
@@ -162,13 +162,13 @@ class SetupLetsEncryptTest extends TestCase
                     return $path === '/etc/letsencrypt/live/example.com';
                 },
                 'commandRunner' => static function (string $command, string $description): array {
-                    if ($description === 'Restart nginx') {
-                        return ['rc' => 1, 'stdout' => '', 'stderr' => 'restart failed'];
+                    if ($description === 'Reload nginx') {
+                        return ['rc' => 1, 'stdout' => '', 'stderr' => 'reload failed'];
                     }
                     return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
                 },
             ]));
-        }, 'Restart nginx failed (rc=1): restart failed');
+        }, 'Reload nginx failed (rc=1): reload failed');
     }
 
     public function testSharedSetupRejectsInvalidCommandRunnerPayload(): void
@@ -201,7 +201,7 @@ class SetupLetsEncryptTest extends TestCase
                 'Link certbot binary',
                 'Request Let\'s Encrypt certificate',
                 'Rebuild nginx configuration',
-                'Restart nginx',
+                'Reload nginx',
             ],
             array_column($commands, 'description')
         );
@@ -245,7 +245,7 @@ class SetupLetsEncryptTest extends TestCase
                 'Install certbot virtualenv packages',
                 'Request Let\'s Encrypt certificate',
                 'Rebuild nginx configuration',
-                'Restart nginx',
+                'Reload nginx',
             ],
             $commands
         );
@@ -273,7 +273,7 @@ class SetupLetsEncryptTest extends TestCase
             [
                 'Verify certbot virtualenv functional',
                 'Rebuild nginx configuration',
-                'Restart nginx',
+                'Reload nginx',
             ],
             $commands
         );

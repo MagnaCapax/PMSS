@@ -93,6 +93,43 @@ class NginxConfigTestTest extends TestCase
         $this->assertStringContainsString('CRITICAL: nginx restart failed (rc=4)', $this->pmssReadFileOrEmpty($this->tempDir.'/logs/update.log'));
     }
 
+    public function testReloadSuccessReturnsOk(): void
+    {
+        $this->pmssWriteExecutableFile($this->tempDir.'/nginx-test-success.sh', "#!/bin/sh\nexit 0\n");
+        $reloadLog = $this->tempDir.'/reload.log';
+        $this->pmssWriteExecutableFile($this->tempDir.'/reload.sh', "#!/bin/sh\nprintf 'reload nginx\\n' >>".escapeshellarg($reloadLog)."\nexit 0\n");
+
+        list($rc, $out) = $this->runConfigTestWithCommands($this->tempDir.'/nginx-test-success.sh', null, false, $this->tempDir.'/reload.sh', true);
+
+        $this->assertEquals(0, $rc);
+        $this->assertStringContainsString('nginx reloaded or started', $out);
+        $this->assertStringContainsString('reload nginx', $this->pmssReadFileOrEmpty($reloadLog));
+    }
+
+    public function testBrokenConfigBlocksReload(): void
+    {
+        $this->pmssWriteExecutableFile($this->tempDir.'/nginx-test-fail.sh', "#!/bin/sh\nexit 1\n");
+        $reloadLog = $this->tempDir.'/reload.log';
+        $this->pmssWriteExecutableFile($this->tempDir.'/reload.sh', "#!/bin/sh\nprintf 'called\\n' >>".escapeshellarg($reloadLog)."\n");
+
+        list($rc, $out) = $this->runConfigTestWithCommands($this->tempDir.'/nginx-test-fail.sh', null, false, $this->tempDir.'/reload.sh', true);
+
+        $this->assertEquals(1, $rc);
+        $this->assertStringContainsString('Reload aborted', $out);
+        $this->assertTrue(!file_exists($reloadLog));
+    }
+
+    public function testReloadFailureReturnsError(): void
+    {
+        $this->pmssWriteExecutableFile($this->tempDir.'/nginx-test-success.sh', "#!/bin/sh\nexit 0\n");
+        $this->pmssWriteExecutableFile($this->tempDir.'/reload-fail.sh', "#!/bin/sh\nexit 4\n");
+
+        list($rc, $out) = $this->runConfigTestWithCommands($this->tempDir.'/nginx-test-success.sh', null, false, $this->tempDir.'/reload-fail.sh', true);
+
+        $this->assertEquals(1, $rc);
+        $this->assertStringContainsString('nginx reload/start FAILED', $out);
+    }
+
     public function testWhitespaceOnlyConfigTestCommandFallsBackToDefault(): void
     {
         $this->assertCommandEnvFallsBack('PMSS_NGINX_CONFIG_TEST_COMMAND', " \t ", 'nginx -t 2>&1');
@@ -114,14 +151,15 @@ class NginxConfigTestTest extends TestCase
     }
 
     /** @return array{0:int,1:string} */
-    private function runConfigTestWithCommands(string $testCommand, ?string $restartCommand, bool $restart): array
+    private function runConfigTestWithCommands(string $testCommand, ?string $restartCommand, bool $restart, ?string $reloadCommand = null, bool $reload = false): array
     {
-        return $this->pmssCaptureStdout(function () use ($restart): int {
-            return \pmssCreateNginxConfigTestAndMaybeRestart($restart);
+        return $this->pmssCaptureStdout(function () use ($restart, $reload): int {
+            return \pmssCreateNginxConfigTestAndMaybeRestart($restart, $reload);
         }, [
             'PMSS_LOG_DIR' => $this->tempDir.'/logs',
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => $testCommand,
             'PMSS_NGINX_RESTART_COMMAND' => $restartCommand,
+            'PMSS_NGINX_RELOAD_COMMAND' => $reloadCommand,
         ]);
     }
 

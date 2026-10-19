@@ -120,8 +120,6 @@ function pmssConfigureWebStack(): void
 {
     $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = true;
 
-    // Stop nginx first so package upgrades and template refreshes never race against an active daemon.
-    runStep('Stopping nginx prior to configuration refresh', 'systemctl stop nginx || /etc/init.d/nginx stop || true');
     runStep('Stopping lighttpd (systemd)', '/etc/init.d/lighttpd stop');
     pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');
     killProcess('lighttpd', 'Terminating lingering lighttpd processes');
@@ -129,8 +127,7 @@ function pmssConfigureWebStack(): void
     pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');
 
     // Regenerate all per-user nginx configs from the freshly staged template
-    // before the longer app/user phases. The final refresh later in this script
-    // still restarts nginx after app installers finish.
+    // before the longer app/user phases. The final refresh activates them.
     $nginxConfigRc = runStep('Regenerating nginx configs from staged templates', '/scripts/util/createNginxConfig.php');
     if ($nginxConfigRc !== 0) {
         throw new RuntimeException('nginx_config_regeneration_failed');
@@ -138,7 +135,6 @@ function pmssConfigureWebStack(): void
 
     // Per-user lighttpd configuration, htpasswd sync, and instance checks
     // are handled inside the consolidated per-user maintenance loop.
-    // nginx stays stopped until the final post-update refresh.
     runStep('Setting /home directory permissions', 'chmod 751 /home');
     // Quota state files reject chmod; prune them so the find commands stay noise-free.
     $prune = '\( -name "aquota.*" -o -name "lost+found" \)';
@@ -221,7 +217,7 @@ function pmssUpdateStep2RegisterShutdownGuard(): void
                 logmsg('[WARN] update-step2 exited before final nginx refresh; attempting rescue run (reason: '.$reason.')');
                 $rc = pmssUpdateStep2RunRescueAction('post_update_web_refresh_rescue', ['reason' => $reason], static function (): int {
                     $rc = 0;
-                    passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart', $rc);
+                    passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --reload', $rc);
                     return $rc;
                 });
                 logmsg(sprintf('[WARN] Rescue nginx refresh completed with rc=%d', $rc));
@@ -569,7 +565,7 @@ if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
 runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
 pmssRunProfiledStep('Running post-update web refresh', static function (): void {
-    $refreshRc = runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
+    $refreshRc = runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --reload');
     if ($refreshRc === 0) {
         $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = false;
     }

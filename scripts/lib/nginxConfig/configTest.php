@@ -29,7 +29,7 @@ function pmssCreateNginxConfigAppendLog(string $message): void
     pmssLogAppendTimestampedLine($logFile, $message, '[Y-m-d H:i:s] ', '[createNginxConfig] ');
 }
 
-function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
+function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx, bool $reloadNginx = false): int
 {
     $configTestOutput = [];
     exec(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1'), $configTestOutput, $configTestRc);
@@ -52,6 +52,9 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
         if ($restartNginx) {
             echo "{$cRed}## Restart aborted: refusing to restart nginx with broken configuration{$cReset}\n## Fix the errors above, then manually restart:\n   systemctl restart nginx\n";
             pmssCreateNginxConfigAppendLog('restart aborted due to config test failure');
+        } elseif ($reloadNginx) {
+            echo "{$cRed}## Reload aborted: refusing to reload nginx with broken configuration{$cReset}\n";
+            pmssCreateNginxConfigAppendLog('reload aborted due to config test failure');
         } else {
             echo "{$cYellow}## Fix the configuration errors above before restarting nginx{$cReset}\n";
         }
@@ -59,8 +62,22 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
         return 1;
     }
 
-    if (!$restartNginx) {
+    if (!$restartNginx && !$reloadNginx) {
         echo "## Done! You should restart nginx:\n   systemctl restart nginx\n";
+        return 0;
+    }
+
+    if ($reloadNginx) {
+        // A fresh install may have no running master yet; reload then start it.
+        $reloadRc = 0;
+        passthru(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RELOAD_COMMAND', 'systemctl reload nginx || /etc/init.d/nginx reload || systemctl start nginx || /etc/init.d/nginx start'), $reloadRc);
+        if ($reloadRc !== 0) {
+            echo "{$cRed}[CRITICAL]{$cReset} nginx reload/start {$cRed}FAILED{$cReset} (rc={$reloadRc})\n";
+            pmssCreateNginxConfigAppendLog("CRITICAL: nginx reload/start failed (rc={$reloadRc})");
+            return 1;
+        }
+        echo "## Done! nginx reloaded or started\n";
+        pmssCreateNginxConfigAppendLog('nginx reloaded or started');
         return 0;
     }
 

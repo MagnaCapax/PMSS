@@ -162,7 +162,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/update/webStack.php')), 'Expected one-call update/webStack.php helper file to be removed');
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
             'function pmssConfigureWebStack(): void',
-            "runStep('Stopping nginx prior to configuration refresh'",
+            "runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --reload')",
             "pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');",
             "if (\$reportedVersion > 0 && \$reportedVersion < 10)",
         ], [

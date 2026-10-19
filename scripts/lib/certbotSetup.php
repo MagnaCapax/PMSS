@@ -122,9 +122,9 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
     $createNginxConfigCommand = isset($options['createNginxConfigCommand'])
         ? (string) $options['createNginxConfigCommand']
         : pmssBuildCommand('/scripts/util/createNginxConfig.php');
-    $nginxRestartCommand = isset($options['nginxRestartCommand'])
-        ? (string) $options['nginxRestartCommand']
-        : pmssBuildCommand('/etc/init.d/nginx', array('restart'));
+    $nginxReloadCommand = isset($options['nginxReloadCommand'])
+        ? (string) $options['nginxReloadCommand']
+        : 'systemctl reload nginx || /etc/init.d/nginx reload || systemctl start nginx || /etc/init.d/nginx start';
     $certbotBinary = '/usr/bin/certbot';
     $certbotVirtualenvBinary = '/opt/certbot/bin/certbot';
     $liveCertPath = $liveDir.'/'.$domain;
@@ -197,5 +197,5 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
 
     pmssSetupLetsEncryptEnsureRenewalCron($cronPath, $fileExists);
     pmssSetupLetsEncryptRunCommand($createNginxConfigCommand, 'Rebuild nginx configuration', $commandRunner);
-    pmssSetupLetsEncryptRunCommand($nginxRestartCommand, 'Restart nginx', $commandRunner);
+    pmssSetupLetsEncryptRunCommand($nginxReloadCommand, 'Reload nginx', $commandRunner);
 }

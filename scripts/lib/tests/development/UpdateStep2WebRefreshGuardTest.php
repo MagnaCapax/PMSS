@@ -15,7 +15,7 @@ class UpdateStep2WebRefreshGuardTest extends TestCase
             'pmssUpdateStep2RegisterShutdownGuard();',
             "\$GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = true;",
             "\$GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = false;",
-            "/scripts/util/createNginxConfig.php --restart",
+            "/scripts/util/createNginxConfig.php --reload",
             "'PMSS_UPDATE_STEP2_COMPLETED'",
         ]);
         $this->pmssAssertRepoFileSubstringCountAtLeast(
