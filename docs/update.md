@@ -203,6 +203,7 @@ table only tracks external/non-Debian sources.
 | --- | --- | --- |
 | `aiToolsInstall.php` | Installs system-wide Gemini CLI, Claude Code, and pinned Codex CLI for all users. | Downloads pinned Node.js/Codex artifacts over HTTPS and installs npm packages into `/opt/pmss/ai-tools`. |
 | `btsync.php` | Maintains BTSync 1.4/2.2 binaries and Resilio `rslsync` under `/usr/bin`. | Downloads binaries from `http://pulsedmedia.com/remote/pkg/`; needs write access to `/usr/bin`. |
+| `chromium.php` | Installs Debian's `chromium` browser runtime for account-level agents on Debian 12/13 (plus `slirp4netns` on 13), never `chromium-sandbox`; skips with one log line below 3 GiB free on `/`, `/usr` or `/var`, or when an administrator removed or held a package (ADR 0123). | Uses Debian APT with recommends off; not part of the dpkg selection baselines. |
 | `deluge.php` | Installs or upgrades Deluge; Debian 10 path builds from source, newer releases lean on apt packages. | Debian 10 run pulls PyPI wheels and `https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz`; requires `pip`. |
 | `docker.php` | Sets up rootless Docker (docker-ce, buildx, compose) and enables user namespaces. | Adds Docker APT repo (`https://download.docker.com/linux/debian`), fetches Docker GPG key, and downloads `slirp4netns` from GitHub for Debian 10/11. |
 | `filebot.php` | Ensures FileBot 4.9.4 is installed via dpkg. | Fetches `FileBot_4.9.4_amd64.deb` from `http://pulsedmedia.com/remote/pkg/`. |
