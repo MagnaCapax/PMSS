@@ -7,6 +7,8 @@ Category: domain
 
 Accepted
 
+Account-name visibility in this ADR is superseded in part by ADR 0118.
+
 ## Context
 
 PMSS gives every seedbox and storage-box customer a per-user web-hosting capability, served by a per-user lighttpd instance:

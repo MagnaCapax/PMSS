@@ -7,6 +7,8 @@ Category: security
 
 Accepted (stage 1 + stage 2 implemented, default-OFF; enabled per host by marker; pilot-verified on Debian 12 / kernel 6.1)
 
+Account-name visibility in this ADR is superseded in part by ADR 0118.
+
 ## Context
 
 On a shared host every account shares one network namespace. The kernel's
