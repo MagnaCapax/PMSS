@@ -41,7 +41,7 @@ class DbusPolicyHardeningTest extends TestCase
         $snapshots = [
             '10-pmss-systemd1-restrict.conf' => [2215, '33127e72e838b6de039066dab788216a5d7792111043bea8f046a5f023eea6ab'],
             '10-pmss-login1-restrict.conf' => [1102, 'bcda38506feaf4553b1afe7bdc7a65fa070f8bc376f8524284af07f7649adc4d'],
-            'pmss-run-systemd-users.conf' => [216, '45dd3b70e3f8393a0f45c1e90dcd28e9efcbd1f53f4584595a35ab61524d5a3d'],
+            'pmss-run-systemd-users.conf' => [221, '52b7da9f6773e1e74735ce9925fd192edeff7c10a0cf151f86476686670617c4'],
             'pmss-run-systemd-sessions.conf' => [238, 'b672da9aafb26c4391db5e57d63f4b6038a22c00817f5cb5374173d8c5c74e30'],
         ];
 
@@ -110,10 +110,12 @@ class DbusPolicyHardeningTest extends TestCase
         $bodies = $this->installDisclosureArtifacts($messages);
         foreach (['users', 'sessions'] as $leaf) {
             $body = $bodies['pmss-run-systemd-'.$leaf.'.conf'];
-            $this->assertStringContainsString('d /run/systemd/'.$leaf.' 0750 root root', $body);
+            $type = $leaf === 'users' ? 'z' : 'd';
+            $this->assertStringContainsString($type.' /run/systemd/'.$leaf.' 0750 root root', $body);
             $this->assertStringNotContainsString('0644', $body);
             $this->assertStringNotContainsString('0755', $body);
         }
+        $this->assertStringNotContainsString('d /run/systemd/users ', $bodies['pmss-run-systemd-users.conf']);
     }
 
     public function testCompletePolicyInstallIsIdempotent(): void

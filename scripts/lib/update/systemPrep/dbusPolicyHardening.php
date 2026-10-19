@@ -92,9 +92,9 @@ function pmssSystemdDbusDisclosureArtifacts(): array
             'label' => '/run/systemd/users tmpfiles policy',
             'runtime_path' => '/run/systemd/users',
             'description' => 'Restricting /run/systemd/users directory mode',
-            'content' => "# PMSS-managed: restrict the /run/systemd/users directory (UID->username map) to root.\n"
+            'content' => "# PMSS-managed: adjust the /run/systemd/users directory mode after the stock creation rule.\n"
                 ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
-                ."d /run/systemd/users 0750 root root -\n",
+                ."z /run/systemd/users 0750 root root -\n",
         ],
         [
             'kind' => 'tmpfiles',
