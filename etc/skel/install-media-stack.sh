@@ -1664,10 +1664,12 @@ media_stack_wait_http_ok() {
 	return 1
 }
 
+# curl -w already prints 000 when no response arrives; a fallback after || would print a second one.
 media_stack_http_code() {
-	local url="$1"
+	local url="$1" code=""
 	shift
-	curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$@" "$url" 2>/dev/null || printf '000'
+	code=$(curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$@" "$url" 2>/dev/null) || true
+	printf '%s' "${code:-000}"
 }
 
 media_stack_json_escape() {
@@ -1881,7 +1883,21 @@ servarr_auth_seed() {
 		return 1
 	fi
 
+	# Record the password before the PUT. A PUT that times out here can still be applied by the
+	# app, and the next run then finds the app protected and skips the seed; an entry written only
+	# after success would leave that login unknown. If the PUT is never applied, the next run
+	# reads this entry and applies the same password.
+	if ! media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$password"; then
+		log_err "Failed to record ${install_name} credentials; not changing its login"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
+		return 1
+	fi
 	put_code=$(media_stack_http_code "${base_url}/1" --config "$curl_config" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}" --max-time 90)
+	if [[ "$put_code" == "000" ]]; then
+		log_err "${install_name} did not answer the local auth change in time; its login is saved in $MEDIA_STACK_CREDENTIALS_FILE, run the installer again to finish"
+		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
+		return 1
+	fi
 	if [[ "$put_code" != "200" && "$put_code" != "202" ]]; then
 		log_err "${install_name} rejected local auth configuration (HTTP ${put_code})"
 		servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
@@ -1901,7 +1917,6 @@ servarr_auth_seed() {
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
 	servarr_config_xml_tag_converge "$config_file" UpdateMechanism Script
 	log_ok "${install_name} app-level auth configured"
-	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$password"
 }
 
 autobrr_auth_seed() {

@@ -363,11 +363,32 @@ class installMediaStackScriptTest extends TestCase
             'Sonarr auth seeding failed; not starting media stack',
         ], $this->script);
 
+        // The login is recorded before the PUT: a PUT that times out can still be applied by the app (#858).
         $seed = $this->pmssExtractShellFunction($this->script, 'servarr_auth_seed');
         $this->assertOrderedStrings(array(
-            'log_ok "${install_name} app-level auth configured"',
             'media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$password"',
+            'put_code=$(media_stack_http_code "${base_url}/1"',
+            'if [[ "$put_code" == "000" ]]; then',
+            'log_ok "${install_name} app-level auth configured"',
         ), $seed);
+        $this->assertSame(1, substr_count($seed, 'media_stack_credentials_app_write'));
+    }
+
+    public function testMediaStackHttpCodePrintsOneCodeWhenNoResponseArrives(): void
+    {
+        // curl -w prints 000 itself when nothing answers; the old `|| printf '000'` then printed 000000 (#858).
+        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_http_code');
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail',
+            $function,
+            'curl() { printf 000; return 28; }',
+            'echo "timeout=$(media_stack_http_code http://x)"',
+            'curl() { return 7; }',
+            'echo "silent=$(media_stack_http_code http://x)"',
+            'curl() { printf 202; }',
+            'echo "ok=$(media_stack_http_code http://x)"',
+        ));
+        $this->assertSame("timeout=000\nsilent=000\nok=202", $this->pmssRunShellHarness($script));
     }
 
     public function testAuthSeedCleanupStopsProcessBeforeRemovingSecrets(): void
