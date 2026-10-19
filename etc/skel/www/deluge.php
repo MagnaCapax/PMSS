@@ -6,7 +6,9 @@ require_once __DIR__.'/scriptsInc.php';
 pmssFrontendToggleAction(
     '../.delugeEnable',
     static function () {
-        pmssFrontendShellExec(pmssCustomerDelugeSystemCommand());
+        pmssCustomerTorrentClientToggleStart('deluge', static function () {
+            pmssFrontendShellExec(pmssCustomerDelugeSystemCommand());
+        });
     },
     static function () { pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['Deluge']['binaries']); }
 );

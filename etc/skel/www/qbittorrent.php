@@ -8,7 +8,9 @@ $action = pmssFrontendActionRequest();
 pmssFrontendPostActionRequired();
 pmssQbittorrentFrontendPasswordSync($action);
 
-pmssFrontendToggleAction('../.qbittorrentEnable', static function () { passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &'); }, static function () {
+pmssFrontendToggleAction('../.qbittorrentEnable', static function () {
+    pmssCustomerTorrentClientToggleStart('qbittorrent', static function () { passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &'); });
+}, static function () {
     pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['qBittorrent']['binaries']);
 });
 function pmssQbittorrentFrontendPasswordSync($action) {
