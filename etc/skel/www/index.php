@@ -524,6 +524,7 @@ $panelTitle = trim($panelHostname.' '.$panelVendorName.' Dashboard');
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
+<script>var u = new URL(location.href); if (u.username || u.password) { u.username = ''; u.password = ''; location.replace(u.href); }</script>
 <title><?=htmlspecialchars($panelTitle, ENT_QUOTES, 'UTF-8');?></title>
 <?=preg_replace('/<title\b[^>]*>.*?<\/title\s*>/is', '', $htmlHead);?>
 <style>

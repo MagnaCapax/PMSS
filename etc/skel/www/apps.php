@@ -25,7 +25,7 @@ if (is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php
 if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()) {
     http_response_code(200);
     header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Apps</title></head><body><p>The Apps page is being updated on this server. Reload it in a few minutes.</p></body></html>';
+    echo '<!doctype html><html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8"><title>Apps</title></head><body><p>The Apps page is being updated on this server. Reload it in a few minutes.</p></body></html>';
     return;
 }
 list($home, $username, $hostname) = pmssCustomerAccountContext();
@@ -35,7 +35,7 @@ $lsioCatalog = is_file(__DIR__.'/appsLsioCatalog.php') ? require __DIR__.'/appsL
 if (!is_array($lsioCatalog)) $lsioCatalog = array();
 ?>
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Apps</title>
+<html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = ''; u.password = ''; location.replace(u.href); }</script><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Apps</title>
 <link href="screen.css" rel="stylesheet" media="screen">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script><?= pmssActionScriptJs() ?></script>
 <?= pmssCustomerAppsCss() ?>

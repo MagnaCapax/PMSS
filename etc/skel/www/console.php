@@ -125,7 +125,7 @@ if (!$running) {
 
         http_response_code(503);
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!doctype html><meta charset="utf-8"><title>Console unavailable</title>'
+        echo '<!doctype html><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8"><title>Console unavailable</title></head>'
             .'<body style="font-family:sans-serif;padding:2em;max-width:40em">'
             .'<h2>Console temporarily unavailable</h2>'
             .'<p>The browser shell could not be started. Please try again.</p>'
@@ -138,7 +138,7 @@ if (!$running) {
 $label = $persist ? 'persistent tmux session (reattaches on reconnect)'
                    : 'ephemeral session (ends when you close this tab)';
 header('Content-Type: text/html; charset=utf-8');
-echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+echo '<!doctype html><html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8">'
     .'<meta name="viewport" content="width=device-width, initial-scale=1">'
     .'<title>Shell console</title>'
     .'<style>html,body{margin:0;height:100%;background:#101216}'

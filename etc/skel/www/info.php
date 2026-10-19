@@ -35,6 +35,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
 <!doctype html>
 <html lang="en">
   <head>
+    <script>var u = new URL(location.href); if (u.username || u.password) { u.username = ''; u.password = ''; location.replace(u.href); }</script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Seedbox info</title>

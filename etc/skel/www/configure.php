@@ -79,7 +79,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 }
 ?>
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Configure</title>
+<html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = ''; u.password = ''; location.replace(u.href); }</script><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Configure</title>
 <link href="screen.css" rel="stylesheet" media="screen">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script><?= pmssActionScriptJs() ?></script>
 <?= pmssCustomerAppsCss() ?>

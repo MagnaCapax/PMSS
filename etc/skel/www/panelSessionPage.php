@@ -17,7 +17,7 @@ function pmssPanelSessionRenderLoginForm(string $username, string $csrf, string 
     $action = '/user-'.$username.'/panelSessionLogin.php';
     $messageHtml = $message === '' ? '' : '<p class="error">'.pmssPanelSessionHtml($message).'</p>';
 
-    return '<!doctype html><html><head><meta charset="utf-8"><title>Panel login</title>'
+    return '<!doctype html><html><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8"><title>Panel login</title>'
         .'<meta name="viewport" content="width=device-width,initial-scale=1">'
         .'<style>body{font:16px/1.4 system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;background:#f6f7f8;color:#111827}'
         .'form{width:min(24rem,calc(100vw - 2rem));background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:1.25rem}'
