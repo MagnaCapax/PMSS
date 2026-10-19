@@ -600,6 +600,28 @@ BASH
         $this->assertStringContainsString('leftovers=0', $output, 'seed must remove temporary files containing credentials');
     }
 
+    /** --secure-app and the auth seed treat an app as protected only when the panel would: a login method AND AuthenticationRequired=Enabled. */
+    public function testServarrAuthConfiguredMatchesPanelProtectedCheck(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-media-auth-configured-');
+        $functions = $this->pmssExtractShellFunctions($this->script, array('servarr_config_auth_configured'));
+        $cases = array(
+            'forms-enabled' => array('<AuthenticationMethod>Forms</AuthenticationMethod><AuthenticationRequired>Enabled</AuthenticationRequired>', 0),
+            'basic-enabled' => array('<AuthenticationMethod>Basic</AuthenticationMethod><AuthenticationRequired>Enabled</AuthenticationRequired>', 0),
+            'external-enabled' => array('<AuthenticationMethod>External</AuthenticationMethod><AuthenticationRequired>Enabled</AuthenticationRequired>', 0),
+            'forms-local-exempt' => array('<AuthenticationMethod>Forms</AuthenticationMethod><AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>', 1),
+            'forms-no-required-tag' => array('<AuthenticationMethod>Forms</AuthenticationMethod>', 1),
+            'none-enabled' => array('<AuthenticationMethod>None</AuthenticationMethod><AuthenticationRequired>Enabled</AuthenticationRequired>', 1),
+        );
+        foreach ($cases as $name => $case) {
+            $config = $dir.'/'.$name.'.xml';
+            $this->pmssWriteFile($config, "<Config>\n  ".$case[0]."\n</Config>\n");
+            $script = "set -u\n".$functions."\nservarr_config_auth_configured ".escapeshellarg($config)."\n";
+            exec('bash -c '.escapeshellarg($script), $output, $rc);
+            $this->assertSame($case[1], $rc, $name);
+        }
+    }
+
     public function testAutobrrAuthSeedingUsesCliAndPreservesExistingUsers(): void
     {
         $this->assertStringContainsAllStrings([

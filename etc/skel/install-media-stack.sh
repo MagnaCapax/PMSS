@@ -1713,10 +1713,14 @@ media_stack_credentials_summary_print() {
 	grep -v '^#' "$MEDIA_STACK_CREDENTIALS_FILE"
 }
 
+# Protected means what the panel shows as Protected (userMediaStackPanel.php): a login method AND
+# AuthenticationRequired=Enabled. DisabledForLocalAddresses lets every account on the host in over
+# loopback, so it is not protected and --secure-app must secure it.
 servarr_config_auth_configured() {
-	local config_file="$1" method
+	local config_file="$1" method required
 	method=$(sed -n -E 's|.*<AuthenticationMethod>([^<]*)</AuthenticationMethod>.*|\1|p' "$config_file" | head -n 1 | tr '[:upper:]' '[:lower:]')
-	if [[ "$method" == "forms" || "$method" == "basic" || "$method" == "external" ]]; then
+	required=$(sed -n -E 's|.*<AuthenticationRequired>([^<]*)</AuthenticationRequired>.*|\1|p' "$config_file" | head -n 1 | tr '[:upper:]' '[:lower:]')
+	if [[ "$method" == "forms" || "$method" == "basic" || "$method" == "external" ]] && [[ "$required" == "enabled" ]]; then
 		return 0
 	fi
 	return 1
