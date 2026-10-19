@@ -86,6 +86,13 @@ function pmssCustomerNativeStop(array $binaries): void {
 }
 }
 
+if (!function_exists('pmssCustomerDelugeSystemCommand')) {
+/** Keep the legacy Deluge start command shared by the toggle and Configure. */
+function pmssCustomerDelugeSystemCommand(): string {
+ return 'nohup deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &';
+}
+}
+
 if (!function_exists('pmssCustomerAppsMediaIdsRead')) {
 /** Return the seven installer-managed IDs, including the local Cloudplow install. */
 function pmssCustomerAppsMediaIdsRead(): array

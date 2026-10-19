@@ -1,0 +1,76 @@
+<?php
+/** Password-guarded Configure switch for the two additional native clients. */
+require_once __DIR__.'/configureTorrentClients.php';
+require_once __DIR__.'/configureTorrentClientsOther.php';
+
+/** Snapshot, stop, select and start with the same account-owned state contract. */
+function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
+{
+    $client = $request['client'] ?? null;
+    if (!in_array($client, array('deluge', 'transmission'), true))
+        return array('ok' => false, 'status' => 400, 'message' => 'That torrent client is unavailable.');
+    $versions = isset($ops['versions']) ? $ops['versions']
+        : pmssConfigureTorrentClientVersionsRead('/var/lib/pmss/public/torrentClients.json', $client);
+    $version = $request['version'] ?? null;
+    if (!is_array($versions) || !is_string($version)
+        || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
+        || !isset($versions[$version]) || !is_array($versions[$version])
+        || !in_array($versions[$version]['kind'] ?? null,
+            $client === 'deluge' ? array('system', 'venv') : array('static'), true)
+        || (($version === 'system') !== (($versions[$version]['kind'] ?? null) === 'system'))
+        || ($client === 'transmission' && ($versions[$version]['rpcUnixSocket'] ?? null) !== true))
+        return array('ok' => false, 'status' => 400, 'message' => 'That '.$client.' version is unavailable.');
+    if (!is_dir($home.'/bin/'.$client) || is_link($home.'/bin/'.$client))
+        return array('ok' => false, 'status' => 503, 'message' => 'The client link directory is unavailable.');
+    $dir = $home.'/.config/pmss/torrentClients';
+    if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
+        return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
+    $lock = @fopen($dir.'/'.$client.'.lock', 'c');
+    if (!is_resource($lock) || !@flock($lock, LOCK_EX | LOCK_NB)) {
+        if (is_resource($lock)) fclose($lock);
+        return array('ok' => false, 'status' => 409, 'message' => 'A '.$client.' switch is already running.');
+    }
+    $link = $home.'/bin/'.$client.'/default';
+    if (file_exists($link) && !is_link($link)) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'status' => 409, 'message' => 'The current selection is invalid.');
+    }
+    $old = @readlink($link);
+    $resolve = $ops['resolve'] ?? 'pmssTorrentClientResolve';
+    if (is_string($old) && $resolve($home, $client) === null) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'status' => 409, 'message' => 'The current selection is invalid.');
+    }
+    $oldVersion = is_string($old) && strpos($old, '/home/.pmss/clients/'.$client.'/') === 0
+        ? basename($old) : (is_string($old) ? 'custom' : 'system');
+    $backup = $ops['backup'] ?? 'pmssCustomerBackupFileCreate';
+    $stop = $ops['stop'] ?? 'pmssConfigureTorrentClientOtherStop';
+    $start = $ops['start'] ?? 'pmssConfigureTorrentClientOtherStart';
+    $repoint = $ops['repoint'] ?? 'pmssConfigureTorrentClientOtherRepoint';
+    $snapshot = $backup($home);
+    $stopped = is_array($snapshot) && !empty($snapshot['ok']) && $stop($home, $client);
+    $repointed = $stopped && $repoint($home, $client, $version);
+    $ok = $repointed && pmssConfigureFileWrite($dir.'/'.$client.'.lastRun', $version."\n")
+        && $start($home, $client, $version)
+        && pmssConfigureFileWrite($dir.'/'.$client.'.lastgood', $version."\n");
+    $restored = true;
+    if (!$ok && $stopped) {
+        $lastgood = trim(pmssConfigureFileRead($dir.'/'.$client.'.lastgood', 64));
+        $restore = $lastgood === $oldVersion ? $lastgood : $oldVersion;
+        $restored = $repointed ? ($stop($home, $client) && $repoint($home, $client, $restore, $old)
+            && ($restore === 'system' && $client === 'transmission' || $start($home, $client, $restore)))
+            : ($oldVersion === 'system' && $client === 'transmission' || $start($home, $client, $restore));
+        if ($restored) pmssConfigureFileWrite($dir.'/'.$client.'.lastRun', $restore."\n");
+    }
+    pmssConfigureFileWrite($dir.'/'.$client.'.notice', $ok
+        ? ucfirst($client).' selected: '.$version."\n" : ($restored
+            ? ucfirst($client).' switch failed; previous version restored.'
+            : ucfirst($client).' switch failed; manual recovery is needed.')."\n");
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    return array('ok' => $ok, 'status' => $ok ? 200 : 503,
+        'message' => $ok ? ucfirst($client).' switched to '.$version.'.' : ($restored
+            ? 'The switch failed; the previous version was restored.' : 'The switch failed; manual recovery is needed.'));
+}

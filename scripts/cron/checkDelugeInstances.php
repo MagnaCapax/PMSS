@@ -18,10 +18,10 @@ $pmssCheckDelugeLock = pmssCronLockAcquire('checkDelugeInstances', 'pmssCronLock
 
 pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 'deluge stopped due to suspension', [
     pmssUserWatchdogServiceSpec('deluged', static function (string $thisUser): string {
-        return pmssBuildUserServiceShellCommand($thisUser, "[ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluged >/dev/null 2>&1) || (cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info)");
+        return pmssBuildUserServiceShellCommand($thisUser, "[ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/deluge.lock; flock -n 9 || exit 0; }; [ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluged >/dev/null 2>&1) || (cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info)");
     }, 'deluged start requested'),
     pmssUserWatchdogServiceSpec('deluge-web', static function (string $thisUser): string {
-        return pmssBuildUserServiceShellCommand($thisUser, "[ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluge-web >/dev/null 2>&1) || (cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info)");
+        return pmssBuildUserServiceShellCommand($thisUser, "[ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/deluge.lock; flock -n 9 || exit 0; }; [ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluge-web >/dev/null 2>&1) || (cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info)");
     }, 'deluge-web start requested'),
 ], function (string $thisUser): array {
     $running = pmssUserWatchdogProcessRunning($thisUser, 'deluged');

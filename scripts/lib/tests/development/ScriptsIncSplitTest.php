@@ -116,7 +116,7 @@ class ScriptsIncSplitTest extends TestCase
 
     public function testFunctionSetMatchesHistoricalMonolithWithoutDuplicates(): void
     {
-        // Historical inventory from 59fc75bd plus the shared account context helper.
+        // Historical inventory from 59fc75bd plus later shared customer helpers.
         $expected = array(
             'writeLog', 'pmssFrontendActionRequest', 'pmssFrontendPostActionRequired', 'pmssFrontendFunctionAvailable', 'pmssFrontendShellExecAvailable',
             'pmssFrontendShellExec', 'pmssFormatBytes', 'pmssWelcomeSerializedArrayHasObject', 'pmssWelcomeSerializedArrayDecode', 'pmssCustomerSerializedArrayFileRead',
@@ -132,7 +132,7 @@ class ScriptsIncSplitTest extends TestCase
             'pmssCustomerBackupRestoreTarMemberTypesRead', 'pmssCustomerBackupRestoreMemberAllowed', 'pmssCustomerBackupRestoreMemberTypeAllowed', 'pmssCustomerBackupRestoreMemberNameFromPhar', 'pmssCustomerBackupRestoreEntriesSelect',
             'pmssCustomerBackupRestoreTouchesRtorrentLiveState', 'pmssCustomerBackupRestoreRtorrentProcRunning', 'pmssCustomerBackupRestoreRtorrentRunning', 'pmssCustomerBackupRestoreSnapshotPathBuild', 'pmssCustomerBackupRestoreSnapshotCreate',
             'pmssCustomerBackupRestore', 'pmssWelcomeMessageCustomerPathIsSafe', 'pmssWelcomeRequireLocalHelper', 'pmssCustomerManagedAppDefinitions', 'pmssWelcomeServiceAvailable',
-            'pmssCustomerNativePidsRead', 'pmssCustomerNativeSignal', 'pmssCustomerNativeStop', 'pmssWelcomeHttpContextCreate', 'pmssCustomerAppsMediaIdsRead',
+            'pmssCustomerNativePidsRead', 'pmssCustomerNativeSignal', 'pmssCustomerNativeStop', 'pmssCustomerDelugeSystemCommand', 'pmssWelcomeHttpContextCreate', 'pmssCustomerAppsMediaIdsRead',
             'pmssCustomerAppsTmuxSessionsParse', 'pmssCustomerAppsTmuxSessionsRead', 'pmssCustomerAppsStatusRead', 'pmssCustomerAppsDescriptionsRead', 'pmssCustomerAppRowStart',
             'pmssCustomerAppButton', 'pmssCustomerAppRowHtmlBuild', 'pmssCustomerAppsMediaRowsBuild', 'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsCss',
             'pmssCustomerAppsStatusJsonEmit', 'pmssCustomerAppsLogJsonEmit', 'pmssActionScriptJs', 'pmssFrontendToggleAction',
@@ -147,7 +147,7 @@ class ScriptsIncSplitTest extends TestCase
                 $functions[$name] = $body;
             }
         }
-        $this->assertSame(90, count($functions));
+        $this->assertSame(91, count($functions));
         $actual = array_keys($functions);
         sort($actual);
         sort($expected);

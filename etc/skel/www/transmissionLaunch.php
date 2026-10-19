@@ -58,6 +58,46 @@ function pmssTransmissionSettingsReady(string $home): bool
     return true;
 }
 
+/** Prepare the same socket-only settings on the first account-side selection. */
+function pmssTransmissionSettingsPrepare(string $home): bool
+{
+    $parent = $home.'/.config';
+    $dir = $parent.'/transmission-daemon';
+    $socketDir = $home.'/.lighttpd';
+    if (!is_dir($parent) || is_link($parent) || !is_dir($socketDir) || is_link($socketDir)
+        || is_link($socketDir.'/transmission.sock')
+        || ((!is_dir($dir) && !@mkdir($dir, 0700)) || is_link($dir))) return false;
+    $path = $dir.'/settings.json';
+    $size = is_file($path) ? @filesize($path) : 0;
+    if (is_link($path) || (file_exists($path) && (!is_file($path) || !is_int($size) || $size > 65536))) return false;
+    $raw = is_file($path) ? @file_get_contents($path) : '{}';
+    $settings = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($settings) || ($settings !== array() && array_values($settings) === $settings)) return false;
+    $snakeCase = array_key_exists('rpc_bind_address', $settings);
+    $managed = array(
+        'rpc-enabled' => true,
+        'rpc-bind-address' => 'unix:'.$socketDir.'/transmission.sock',
+        'rpc-socket-mode' => '0700',
+        'rpc-authentication-required' => false,
+        'rpc-whitelist-enabled' => true,
+        'rpc-whitelist' => '',
+        'rpc-host-whitelist-enabled' => false,
+        'rpc-url' => '/user-'.basename($home).'/transmission/',
+    );
+    foreach ($managed as $key => $value) {
+        $snake = str_replace('-', '_', $key);
+        unset($settings[$key], $settings[$snake]);
+        $settings[$snakeCase ? $snake : $key] = $value;
+    }
+    foreach (array('rpc-username', 'rpc-password') as $key) {
+        unset($settings[$key], $settings[str_replace('-', '_', $key)]);
+    }
+    $content = json_encode((object) $settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    return is_string($content) && (is_string($raw) && $content."\n" === $raw
+        && (@fileperms($path) & 0777) === 0600
+        || pmssConfigureFileWrite($path, $content."\n")) && pmssTransmissionSettingsReady($home);
+}
+
 /** Keep flock as the foreground daemon's parent for its whole lifetime. */
 function pmssTransmissionLaunch(string $home, array $ops = []): bool
 {

@@ -109,7 +109,17 @@ function pmssConfigureActionRun($home, $action, $request, $ops = array())
         if (!is_file(__DIR__.'/configureTorrentClients.php') || !is_file(__DIR__.'/torrentClientsResolve.php'))
             return array('ok' => false, 'status' => 503, 'message' => 'Version switching is unavailable on this host.');
         require_once __DIR__.'/configureTorrentClients.php';
-        return pmssConfigureTorrentClientSwitch($home, $request, $ops);
+        if (($request['client'] ?? null) === 'qbittorrent')
+            return pmssConfigureTorrentClientSwitch($home, $request, $ops);
+        if (in_array($request['client'] ?? null, array('deluge', 'transmission'), true)) {
+            if (!is_file(__DIR__.'/configureTorrentClientsSwitch.php')
+                || !is_file(__DIR__.'/configureTorrentClientsOther.php')
+                || !is_file(__DIR__.'/transmissionLaunch.php'))
+                return array('ok' => false, 'status' => 503, 'message' => 'Version switching is unavailable on this host.');
+            require_once __DIR__.'/configureTorrentClientsSwitch.php';
+            return pmssConfigureTorrentClientOtherSwitch($home, $request, $ops);
+        }
+        return array('ok' => false, 'status' => 400, 'message' => 'That torrent client is unavailable.');
     } elseif ($action === 'customFrames') {
         $path = $home.'/.customFrames';
         // Refuse oversized existing files rather than silently dropping rows.

@@ -1,14 +1,14 @@
 <?php
-/** Customer-owned qBittorrent switch mechanics for Configure. */
+/** Customer-owned qBittorrent switch mechanics and shared version reader. */
 require_once __DIR__.'/torrentClientsResolve.php';
 /** Read only installed versions from the root-published projection. */
-function pmssConfigureTorrentClientVersionsRead($path = '/var/lib/pmss/public/torrentClients.json')
+function pmssConfigureTorrentClientVersionsRead($path = '/var/lib/pmss/public/torrentClients.json', $client = 'qbittorrent')
 {
     if (!is_file($path) || is_link($path) || @filesize($path) > 65536) return array();
     $data = json_decode((string) @file_get_contents($path), true);
     $versions = array();
     foreach ((array) ($data['versions'] ?? array()) as $entry) {
-        if (!is_array($entry) || ($entry['client'] ?? '') !== 'qbittorrent'
+        if (!is_array($entry) || ($entry['client'] ?? '') !== $client
             || !is_string($entry['version'] ?? null)
             || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $entry['version']) !== 1
             || !in_array($entry['kind'] ?? '', array('system', 'static', 'venv'), true)) continue;

@@ -21,8 +21,10 @@ foreach ($users as $user) {
     $socket = @stream_socket_client('unix://'.$socketPath, $errno, $error, 0.05);
     if (is_resource($socket)) { fclose($socket); continue; }
     if (!pmssTransmissionSettingsApply($user, $home)) continue;
-    $command = 'cd '.escapeshellarg($home).' && php '.escapeshellarg($home.'/www/torrentClientsResolve.php')
-        .' transmission --launch >/dev/null 2>&1';
+    $command = 'cd '.escapeshellarg($home)
+        .' && { [ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/transmission.lock; flock -n 9 || exit 0; }; php '
+        .escapeshellarg($home.'/www/torrentClientsResolve.php')
+        .' transmission --launch >/dev/null 2>&1; }';
     $output = [];
     $rc = 1;
     @exec(pmssBuildUserServiceShellCommand($user, $command), $output, $rc);
