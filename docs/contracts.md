@@ -1045,6 +1045,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks and gives legends explicit point markers, width, and spacing (Refs #878).
 - The Storage I/O text block emits explicit newlines between read, write, and
   operations values; PHP template close tags otherwise consume source newlines (Refs #879).
+- The Storage I/O text uses saved display values when present and formats raw
+  read/write bytes for month, week, day, and hour when display values are absent.
 - `pmssWelcomeServerInfoHtmlBuild()` renders host uptime plus the 1/5/15-minute load averages after the per-account RAM section.
 - Load is explicitly labeled as shared-server data rather than a per-account metric.
 - `/proc/uptime` and `/proc/loadavg` are read directly from the customer tree without shelling; each unavailable or malformed metric fails soft to `unavailable` without hiding the other metric.

@@ -210,6 +210,23 @@ final class CustomerStatsLayoutTest extends TestCase
         $this->assertStringNotContainsString('Average: n/a', $output);
     }
 
+    public function testStorageIoRendersRawOnlyWindowsAndPreservesDisplay(): void
+    {
+        $resourceData = array(
+            'io_read' => array('display' => array('month' => 'saved read'), 'raw' => array('month' => 1048576, 'week' => 2097152, 'day' => 0, 'hour' => 1024)),
+            'io_write' => array('raw' => array('month' => 3145728, 'week' => 4194304, 'day' => 5242880, 'hour' => 6144)),
+        );
+        $snapshot = \pmssStatsResourceSnapshotBuild($resourceData);
+        $this->assertSame(array('month' => 'saved read', 'week' => '2MiB', 'day' => '0KiB', 'hour' => '1KiB'), $snapshot['ioReadDisplay']);
+        $this->assertSame(array('month' => '3MiB', 'week' => '4MiB', 'day' => '5MiB', 'hour' => '6KiB'), $snapshot['ioWriteDisplay']);
+
+        [, $output] = $this->pmssCaptureStdout(function () use ($resourceData): void {
+            \pmssStatsRenderResourceBlocks(array('data' => $resourceData, 'time' => 0, 'error' => null));
+        });
+        $this->assertStringContainsString('I/O Read (month/week/day/hour): saved read / 2MiB / 0KiB / 1KiB', $output);
+        $this->assertStringContainsString('I/O Write (month/week/day/hour): 3MiB / 4MiB / 5MiB / 6KiB', $output);
+    }
+
     public function testStorageIoRenderKeepsSeparatePreformattedLines(): void
     {
         [, $output] = $this->pmssCaptureStdout(function (): void {

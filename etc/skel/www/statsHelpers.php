@@ -379,9 +379,17 @@ function pmssStatsResourceSnapshotBuild(?array $resourceData): array
     foreach (array('io_read' => 'ioReadDisplay', 'io_write' => 'ioWriteDisplay', 'cpu' => 'cpuDisplay', 'memory' => 'memoryDisplay', 'ram_hours' => 'ramHoursDisplay') as $section => $target) {
         $snapshot[$target] = pmssStatsNestedArrayRead($resourceData, $section, 'display');
     }
+    $ioReadRaw = pmssStatsNestedArrayRead($resourceData, 'io_read', 'raw');
+    $ioWriteRaw = pmssStatsNestedArrayRead($resourceData, 'io_write', 'raw');
     $memoryRaw = pmssStatsNestedArrayRead($resourceData, 'memory', 'raw');
     $ramHoursRaw = pmssStatsNestedArrayRead($resourceData, 'ram_hours', 'raw');
     foreach (array('month', 'week', 'day', 'hour') as $period) {
+        if (!isset($snapshot['ioReadDisplay'][$period]) && is_numeric($ioReadRaw[$period] ?? null)) {
+            $snapshot['ioReadDisplay'][$period] = pmssFormatBytesShort($ioReadRaw[$period]);
+        }
+        if (!isset($snapshot['ioWriteDisplay'][$period]) && is_numeric($ioWriteRaw[$period] ?? null)) {
+            $snapshot['ioWriteDisplay'][$period] = pmssFormatBytesShort($ioWriteRaw[$period]);
+        }
         if (!isset($snapshot['memoryDisplay'][$period]) && is_numeric($memoryRaw[$period] ?? null)) {
             $snapshot['memoryDisplay'][$period] = pmssFormatBytesShort($memoryRaw[$period]);
         }
