@@ -86,13 +86,17 @@ This section is intended to be copy-pasteable for end users.
    On the seedbox (SSH session, as your user):
 
    ```bash
-   echo "$(cat public.key)" >> ~/.wireguard-public-key
+   echo 'PASTE_YOUR_PUBLIC_KEY_HERE' >> ~/.wireguard-public-key
    ```
+
+   Replace the placeholder with the single line from `public.key` (it ends in `=`).
 
    - One key per line; you can add multiple lines for multiple devices.
    - Invalid lines are ignored by the server and do not affect other peers.
    - Within a few minutes the server will detect the new key and refresh its
      WireGuard configuration.
+   - The assigned `10.90.90.X/32` address for an extra key is not shown to you;
+     ask support for it before configuring that device.
 
 7. **Keep the generated profile as your first-device baseline**
 
