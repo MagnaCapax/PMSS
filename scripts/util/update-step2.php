@@ -606,6 +606,7 @@ pmssRunProfiledCallable('Hardening access to session and network binaries', 'pms
 // Opt-in only (marker /etc/seedbox/config/socket-table-privacy.enabled). With no marker this
 // restores stock /proc/net modes and is a no-op — inert until the operator enables it per host.
 pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+pmssRunProfiledCallable('Applying user.slice directory mode', 'pmssCgroupDirectoryModeApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 // Stage 2: the sock_diag BPF-LSM filter. First ensure an autoattach-capable bpftool when the
 // feature is enabled (Debian 12 main ships 7.1.0 which cannot attach LSM programs — install 7.5
 // from bookworm-backports); then run the loader. The loader self-gates on the same marker and

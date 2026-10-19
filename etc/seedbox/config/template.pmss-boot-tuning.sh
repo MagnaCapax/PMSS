@@ -184,6 +184,19 @@ for disk in /sys/block/bcache*; do
 	write_sys "$disk/queue/read_ahead_kb" 4096
 done
 
+# Keep each controller's user.slice parent traversable by known account paths.
+if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+	if [ ! -L /sys/fs/cgroup/user.slice ] && [ -d /sys/fs/cgroup/user.slice ]; then
+		chmod 0711 /sys/fs/cgroup/user.slice 2>/dev/null || true
+	fi
+else
+	for slice in /sys/fs/cgroup/*/user.slice; do
+		if [ ! -L "$slice" ] && [ -d "$slice" ]; then
+			chmod 0711 "$slice" 2>/dev/null || true
+		fi
+	done
+fi
+
 # Opt-in socket-table privacy (managed by scripts/lib/update/systemPrep/socketTablePrivacy.php).
 # The /proc/net table modes are per-network-namespace kernel state that resets on reboot, so
 # reapply the root-only mode here when the operator marker is present. No marker = untouched.
