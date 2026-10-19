@@ -109,6 +109,24 @@ function pmssUserShowLimitsSlice($uid, $controller)
     return is_dir('/sys/fs/cgroup'.$slice) ? '/sys/fs/cgroup'.$slice : '/sys/fs/cgroup/'.$controller.$slice;
 }
 
+/** Bytes on disk in files the account owns that were deleted while a process still holds them open. Quota keeps counting them until the process closes them or restarts. */
+function pmssUserShowLimitsDeletedHeld($proc, $uid)
+{
+    $seen = array();
+    $total = 0;
+    foreach (glob($proc.'/[0-9]*/fd/*', GLOB_NOSORT) ?: array() as $fd) {
+        $target = @readlink($fd);
+        if ($target === false || substr($target, -10) !== ' (deleted)') continue;
+        $st = @stat($fd);
+        if ($st === false || ($st['mode'] & 0170000) !== 0100000 || $st['uid'] !== $uid || $st['nlink'] > 0) continue;
+        $key = $st['dev'].':'.$st['ino'];
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+        $total += $st['blocks'] * 512;
+    }
+    return $total;
+}
+
 /** Collect account and server sections, isolating failures by section. */
 function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
 {
@@ -135,7 +153,7 @@ function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
             pmssUserShowLimitsMetric($m, 'bonus', $bonus['value'] ?? null, null, ($bonus['unit'] ?? '') === 'gib' ? 'gib' : 'percent', 'account-config');
             pmssUserShowLimitsMetric($m, 'Docker enabled', isset($config['dockerEnabled']) ? (bool) $config['dockerEnabled'] : null, null, 'bool', 'account-config');
         },
-        'disk' => function (&$m) use ($home, $overrides, $now) {
+        'disk' => function (&$m) use ($home, $overrides, $now, $proc, $uid) {
             $config = pmssUserShowLimitsConfig($home, $overrides);
             foreach (array('quota', 'quotaBurst') as $key) pmssUserShowLimitsConfigured($m, $config, $key, 'bytes', 1073741824);
             $quota = pmssUserShowLimitsQuota($home.'/.quota');
@@ -149,6 +167,7 @@ function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
             pmssUserShowLimitsMetric($m, 'files against hard', $quota[3] ?? null, $quota[5] ?? null, 'count', 'quota-snapshot');
             $age = is_file($home.'/.quota') ? @filemtime($home.'/.quota') : false;
             pmssUserShowLimitsMetric($m, 'snapshot age', $age === false ? null : max(0, $now - $age), null, 'seconds', 'quota-snapshot');
+            pmssUserShowLimitsMetric($m, 'held by deleted files', pmssUserShowLimitsDeletedHeld($proc, $uid), null, 'bytes', 'proc');
         },
         'memory' => function (&$m) use ($home, $uid, $cgroups, $overrides, $now) {
             pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerCgroupMemoryRead', 'pmssCustomerSerializedArrayFileRead', 'pmssFormatBytes'), $overrides);

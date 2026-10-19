@@ -168,6 +168,24 @@ final class UserShowLimitsTest extends TestCase
         $this->assertTrue((bool) preg_match('/CPU quota enforced\s+n\/a \[cgroup\]/', $human));
     }
 
+    public function testDeletedButOpenFilesAreCounted(): void
+    {
+        $o = $this->fixture();
+        $this->assertSame(0.0, $this->metric(\pmssUserShowLimitsCollect($o), 'disk', 'held by deleted files')['value']);
+        $o['proc'] = '/proc';
+        $o['uid'] = posix_geteuid();
+        $before = $this->metric(\pmssUserShowLimitsCollect($o), 'disk', 'held by deleted files')['value'];
+        $path = $o['home'].'/held.bin';
+        $handle = fopen($path, 'w+');
+        fwrite($handle, str_repeat('x', 1048576));
+        fflush($handle);
+        unlink($path);
+        $held = $this->metric(\pmssUserShowLimitsCollect($o), 'disk', 'held by deleted files')['value'];
+        fclose($handle);
+        $this->assertTrue($held - $before >= 1048576, 'held grew by '.($held - $before));
+        $this->assertSame($before, $this->metric(\pmssUserShowLimitsCollect($o), 'disk', 'held by deleted files')['value']);
+    }
+
     public function testRootRefusal(): void
     {
         $this->assertSame(false, \pmssUserShowLimitsRootCheck(0));
