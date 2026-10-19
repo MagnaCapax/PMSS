@@ -73,7 +73,8 @@ class AccountViewTest extends TestCase
     {
         $artifacts = pmssAccountViewArtifacts();
         $profile = $artifacts['/usr/share/pam-configs/pmss-account-view'][0];
-        foreach (pmssAccountViewSessionRules() as $rule) $this->assertStringContainsString($rule, $profile);
+        foreach (pmssAccountViewSessionRules() as $rule) $this->assertStringContainsString(substr($rule, 8), $profile);
+        $this->assertStringNotContainsString('session session', $profile);
         $dropin = $artifacts['/etc/systemd/system/user@.service.d/31-pmss-account-view.conf'][0];
         $this->assertStringContainsString('BindReadOnlyPaths=-/var/lib/pmss/account-view/%i/passwd:/etc/passwd', $dropin);
         $this->assertStringContainsString('ExecStartPre=-+', $dropin);

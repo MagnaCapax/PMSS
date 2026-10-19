@@ -16,8 +16,9 @@ function pmssAccountViewSessionRules(): array
 function pmssAccountViewArtifacts(string $root = ''): array
 {
     $generator = (string) @file_get_contents(__DIR__.'/accountViewGenerator.php');
-    $profile = "Name: PMSS per-session account view\nDefault: yes\nSession-Type: Additional\nSession:\n\t"
-        .implode("\n\t", pmssAccountViewSessionRules())."\n";
+    $profileRules = array_map(static function (string $rule): string { return substr($rule, strlen('session ')); }, pmssAccountViewSessionRules());
+    $profile = "Name: PMSS per-session account view\nDefault: yes\nPriority: 0\nSession-Type: Additional\nSession:\n\t"
+        .implode("\n\t", $profileRules)."\n";
     $init = <<<'SH'
 #!/bin/sh
 uid=$(/usr/bin/id -u -- "$4") || /bin/kill -KILL $$
