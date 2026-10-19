@@ -4,7 +4,7 @@
  *
  * Averages for 15 min / 1 h / 24 h plus a 24 h trend as inline SVG (no JavaScript,
  * no polling). Reads only the files written by root cron (liveStatsLog.php);
- * customers see the node total and their own numbers, never other accounts. ADR 0114.
+ * customers see the node total and their own numbers, never other accounts. ADR 0122.
  *
  * @license GPL-3.0-only
  * @author  PMSS Team

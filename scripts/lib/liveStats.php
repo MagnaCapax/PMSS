@@ -4,7 +4,7 @@
  *
  * Per-user values come from the newest line of logs PMSS already writes
  * (resourceLog, trafficLog, trafficIngressLog), so no counter is read twice.
- * Only the node totals (/proc) are new. ADR 0114.
+ * Only the node totals (/proc) are new. ADR 0122.
  *
  * @license GPL-3.0-only
  * @author  PMSS Team

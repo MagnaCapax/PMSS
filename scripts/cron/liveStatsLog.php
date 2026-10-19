@@ -7,7 +7,7 @@
  * trafficIngressLog) and only reads what they already wrote, plus three /proc
  * files for the node totals. Privacy: the node file holds sums only; each user
  * file is root-owned, group-readable by that user alone. Customers never see
- * other users' samples. Design record: docs/adr/0114-live-stats-node-vs-own-share.md
+ * other users' samples. Design record: docs/adr/0122-live-stats-node-vs-own-share.md
  *
  * @license GPL-3.0-only
  * @author  PMSS Team
