@@ -1,4 +1,4 @@
-# ADR 0119: Opt-in per-session account view
+# ADR 0121: Opt-in per-session account view
 
 Date: 2026-10-19
 Category: domain
