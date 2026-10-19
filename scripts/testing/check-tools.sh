@@ -28,7 +28,7 @@ fi
 # Required BY THE SUITE rather than by this script: without these the hermetic
 # development tests fail for reasons that have nothing to do with the code under
 # test, which reads as a broken checkout to a new contributor.
-if have curl; then echo "  ✓ curl"; else echo "  ✗ curl (required by the filemanager remote-URL tests)"; fi
+if php -r 'exit(function_exists("curl_init") ? 0 : 1);' 2>/dev/null; then echo "  ✓ php-curl"; else echo "  ✗ php-curl (install php-curl; required by the filemanager remote-URL tests)"; fi
 if php -r 'exit(class_exists("DOMDocument") ? 0 : 1);' 2>/dev/null; then
 	echo "  ✓ php DOMDocument"
 else

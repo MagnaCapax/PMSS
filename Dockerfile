@@ -13,15 +13,16 @@ RUN apt-get update \
         git \
         lua5.4 \
         php-cli \
+        php-curl \
         php-xml \
         ripgrep \
         shellcheck \
         shfmt \
     && rm -rf /var/lib/apt/lists/*
 
-# php-xml and curl are not optional extras: the hermetic development suite needs
+# php-xml, php-curl, and curl are not optional extras: the development suite needs
 # DOMDocument (welcome announcements, managed D-Bus policy renders) and the
-# filemanager remote-URL contract test reaches its guard only when curl exists.
+# filemanager remote-URL contract test reaches its guard only when PHP curl exists.
 # Without them the documented `scripts/testing/test-all.sh` cannot pass in the
 # documented container.
 
