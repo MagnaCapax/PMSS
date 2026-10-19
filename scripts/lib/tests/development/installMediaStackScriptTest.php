@@ -668,15 +668,33 @@ BASH
         ], $this->script);
     }
 
-    public function testJellyfinSystemXmlTagSetterLocksSnapshot(): void
+    public function testJellyfinXmlTagSetterEscapesValues(): void
     {
         $script = implode("\n", array(
             '#!/usr/bin/env bash', 'set -euo pipefail', 'file=$(mktemp)',
-            $this->pmssExtractShellFunctions($this->script, array('xml_escape', 'sed_replacement_escape', 'jellyfin_system_xml_tag_set')),
+            $this->pmssExtractShellFunctions($this->script, array('xml_escape', 'sed_replacement_escape', 'jellyfin_xml_tag_set')),
             'printf "%s\n" "<ServerConfiguration>" "  <BaseUrl>old</BaseUrl>" "</ServerConfiguration>" > "$file"',
-            'jellyfin_system_xml_tag_set "$file" BaseUrl /public-alice/jellyfin; jellyfin_system_xml_tag_set "$file" FFmpegPath "/opt/a&b/ffmpeg"; cat "$file"', '',
+            'jellyfin_xml_tag_set "$file" ServerConfiguration BaseUrl "/public-a&b/jellyfin"; cat "$file"', '',
         ));
-        $this->assertSame("<ServerConfiguration>\n  <BaseUrl>/public-alice/jellyfin</BaseUrl>\n  <FFmpegPath>/opt/a&amp;b/ffmpeg</FFmpegPath>\n</ServerConfiguration>", $this->pmssRunShellHarness($script));
+        $this->assertSame("<ServerConfiguration>\n  <BaseUrl>/public-a&amp;b/jellyfin</BaseUrl>\n</ServerConfiguration>", $this->pmssRunShellHarness($script));
+    }
+
+    public function testJellyfinEncoderPathIsSetBeforeFirstStartAndOnSecureRetry(): void
+    {
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail', 'JELLYFIN_CONFIG_DIR=$(mktemp -d)',
+            $this->pmssExtractShellFunctions($this->script, array('xml_escape', 'sed_replacement_escape', 'jellyfin_xml_tag_set', 'jellyfin_encoding_ffmpeg_set')),
+            'OVR_JELLYFIN_FFMPEG="/opt/a&b/ffmpeg"; jellyfin_encoding_ffmpeg_set; cat "$JELLYFIN_CONFIG_DIR/encoding.xml"',
+            'printf "%s\n%s\n%s\n" "<EncodingOptions>" "  <EncoderAppPath />" "</EncodingOptions>" > "$JELLYFIN_CONFIG_DIR/encoding.xml"',
+            'OVR_JELLYFIN_FFMPEG="/opt/updated/ffmpeg"; jellyfin_encoding_ffmpeg_set; cat "$JELLYFIN_CONFIG_DIR/encoding.xml"',
+            'OVR_JELLYFIN_FFMPEG=""; jellyfin_encoding_ffmpeg_set; cat "$JELLYFIN_CONFIG_DIR/encoding.xml"', '',
+        ));
+        $first = "<EncodingOptions>\n  <EncoderAppPath>/opt/a&amp;b/ffmpeg</EncoderAppPath>\n</EncodingOptions>";
+        $updated = "<EncodingOptions>\n  <EncoderAppPath>/opt/updated/ffmpeg</EncoderAppPath>\n</EncodingOptions>";
+        $this->assertSame($first."\n".$updated."\n".$updated, $this->pmssRunShellHarness($script));
+        $this->assertSame(3, substr_count($this->script, 'jellyfin_encoding_ffmpeg_set'));
+        $this->assertTrue(strpos($this->script, 'jellyfin_encoding_ffmpeg_set', strpos($this->script, 'media_stack_secure_jellyfin()')) < strpos($this->script, 'jellyfin_auth_seed "$JELLYFIN_PASSWORD"', strpos($this->script, 'media_stack_secure_jellyfin()')));
+        $this->assertStringNotContainsString('"FFmpegPath"', $this->script);
     }
 
     public function testJellyfinFfmpegPreflightRunsBeforeDataLossPrompt(): void

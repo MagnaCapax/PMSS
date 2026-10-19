@@ -111,7 +111,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 - Jellyfin
   - `--jellyfin-url=URL`   Use exact URL for server tarball
-  - `--jellyfin-ffmpeg=PATH` Write FFmpegPath to Jellyfin system.xml (e.g., `/home/<user>/.bin/ffmpeg`) and skip automatic fallback selection
+  - `--jellyfin-ffmpeg=PATH` Write EncoderAppPath to Jellyfin encoding.xml (e.g., `/home/<user>/.bin/ffmpeg`) and skip automatic fallback selection
 
 - SABnzbd
   - `--sab-url=URL`        Use exact URL of the `-src` archive
@@ -216,7 +216,7 @@ The uninstall mode stops the media-stack `tmux` sessions, removes only the PMSS-
 - If the installer reports a low memory limit, use a larger plan for the full stack. `--force` is available for deliberate SSH-only installs, but throttling can make rtorrent and the panel unresponsive on small accounts.
 - Use `--uninstall` to remove a user-local media stack that was installed on an unsuitable account.
 - If Servarr apps fail to start on Debian 11 due to sqlite/GLIBC errors, confirm Radarr pinning occurred or pass `--radarr-version=v5.10.4.9218`.
-- If Jellyfin is skipped or exits immediately with an FFmpeg validation error, verify `~/.config/jellyfin/config/system.xml` points to a usable FFmpeg 4.4+ binary. On Debian 11, install a user-local static build under `~/.bin/ffmpeg` and rerun with `--jellyfin-ffmpeg=$HOME/.bin/ffmpeg`. Follow `docs/hardware-transcoding.md` for driver and acceleration troubleshooting.
+- If Jellyfin is skipped or exits immediately with an FFmpeg validation error, verify `~/.config/jellyfin/config/encoding.xml` has an `EncoderAppPath` pointing to a usable FFmpeg 4.4+ binary. On Debian 11, install a user-local static build under `~/.bin/ffmpeg` and rerun with `--jellyfin-ffmpeg=$HOME/.bin/ffmpeg`. Follow `docs/hardware-transcoding.md` for driver and acceleration troubleshooting.
 
 ## FFmpeg Options (Userland)
 
@@ -230,7 +230,7 @@ Jellyfin depends on ffmpeg for startup and transcoding. On older distros, the pa
 Steps (example with BtbN):
 1) Ensure your user bin exists: `mkdir -p ~/.bin`
 2) Download and extract a static ffmpeg build to `~/.bin/ffmpeg` and `chmod +x ~/.bin/ffmpeg`.
-3) The installer appends `~/.bin` to your PATH in `~/.bashrc.custom` after system paths and writes Jellyfin's `FFmpegPath` when it receives an explicit user-local ffmpeg path. You can also set it in Jellyfin (Dashboard -> Playback) to `/home/<user>/.bin/ffmpeg`.
+3) The installer appends `~/.bin` to your PATH in `~/.bashrc.custom` after system paths and writes Jellyfin's `EncoderAppPath` in `encoding.xml` when it receives an explicit user-local ffmpeg path. You can also set it in Jellyfin (Dashboard -> Playback) to `/home/<user>/.bin/ffmpeg`.
 
 Hardware acceleration:
 - VAAPI/NVENC need matching user-accessible driver libraries. If you place libs under `~/.local/lib` or `~/.bin/lib`, export `LD_LIBRARY_PATH=$HOME/.local/lib:$HOME/.bin/lib:$LD_LIBRARY_PATH` before launching Jellyfin (the installer already sets DOTNET env; you can extend it in `~/.bashrc.custom`).
@@ -244,7 +244,7 @@ Compiling from source (advanced):
 Notes:
 - *ARR apps don’t require ffmpeg; only Jellyfin uses it.
 - The installer does not manage ffmpeg binaries. Codec selection, GPU libraries, hardware acceleration, and static-binary updates remain explicit user choices.
-- You can pass `--jellyfin-ffmpeg=/home/<user>/.bin/ffmpeg` to stamp Jellyfin's FFmpeg path automatically in your user config and bypass fallback selection.
+- You can pass `--jellyfin-ffmpeg=/home/<user>/.bin/ffmpeg` to set Jellyfin's encoder path automatically in your user config and bypass fallback selection.
 
 ## Alternative: Docker Rootless (Not Recommended for Shared Hosting)
 

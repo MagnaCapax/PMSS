@@ -143,7 +143,7 @@ Overrides:
   --sab-version=TAG           Override SABnzbd tag (advisory)
 
   --jellyfin-url=URL          Use exact URL for Jellyfin server tar.gz
-  --jellyfin-ffmpeg=PATH      Set Jellyfin FFmpegPath in system.xml to PATH
+  --jellyfin-ffmpeg=PATH      Set Jellyfin EncoderAppPath in encoding.xml to PATH
 
 Modes:
   --dry-run                   Verify endpoints and show actions; do not modify system
@@ -2005,12 +2005,26 @@ jellyfin_auth_seed() {
 	log_ok "Jellyfin admin account configured"
 }
 
-jellyfin_system_xml_tag_set() {
-	local file="$1" tag="$2" value=""
-	value=$(sed_replacement_escape "$(xml_escape "$3")")
+jellyfin_xml_tag_set() {
+	local file="$1" root="$2" tag="$3" value=""
+	value=$(sed_replacement_escape "$(xml_escape "$4")")
+	if grep -qE "<${tag}[[:space:]]*/>" "$file"; then
+		sed -i -E "s|<${tag}[[:space:]]*/>|<${tag}>${value}</${tag}>|g" "$file"
+		return
+	fi
 	grep -q "<${tag}>" "$file" &&
 		sed -i -E "s|<${tag}>[^<]*</${tag}>|<${tag}>${value}</${tag}>|g" "$file" && return
-	sed -i -E "s|</ServerConfiguration>|  <${tag}>${value}</${tag}>\n</ServerConfiguration>|" "$file"
+	sed -i -E "s|</${root}>|  <${tag}>${value}</${tag}>\n</${root}>|" "$file"
+}
+
+jellyfin_encoding_ffmpeg_set() {
+	[[ -n "$OVR_JELLYFIN_FFMPEG" ]] || return 0
+	local file="$JELLYFIN_CONFIG_DIR/encoding.xml"
+	if [[ ! -f "$file" ]]; then
+		printf '%s\n%s\n' '<EncodingOptions>' '</EncodingOptions>' >"$file"
+	fi
+	# Jellyfin reads the encoder path from encoding.xml during its first start.
+	jellyfin_xml_tag_set "$file" EncodingOptions EncoderAppPath "$OVR_JELLYFIN_FFMPEG"
 }
 
 media_stack_sessions() {
@@ -2281,10 +2295,8 @@ media_stack_secure_jellyfin() {
 	if [[ ! -f "$syscfg" ]]; then
 		printf '%s\n%s\n' '<ServerConfiguration>' '</ServerConfiguration>' >"$syscfg"
 	fi
-	jellyfin_system_xml_tag_set "$syscfg" "BaseUrl" "/public-${USERNAME}/${app}"
-	if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-		jellyfin_system_xml_tag_set "$syscfg" "FFmpegPath" "$OVR_JELLYFIN_FFMPEG"
-	fi
+	jellyfin_xml_tag_set "$syscfg" ServerConfiguration BaseUrl "/public-${USERNAME}/${app}"
+	jellyfin_encoding_ffmpeg_set
 
 	media_stack_stop_app_for_auth "$app" "jellyfin.dll"
 	if ! jellyfin_auth_seed "$JELLYFIN_PASSWORD" "$jellyfin_port"; then
@@ -2624,14 +2636,12 @@ EOF
 SYSXML
 			echo "</ServerConfiguration>" >>"$syscfg"
 		fi
-		jellyfin_system_xml_tag_set "$syscfg" "BaseUrl" "/public-${USERNAME}/${app}"
-		if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-			jellyfin_system_xml_tag_set "$syscfg" "FFmpegPath" "$OVR_JELLYFIN_FFMPEG"
-		fi
+		jellyfin_xml_tag_set "$syscfg" ServerConfiguration BaseUrl "/public-${USERNAME}/${app}"
+		jellyfin_encoding_ffmpeg_set
 	else
 		log_info "[dry-run] would configure ${app^^} (port=${JELLYFIN_PORT}, url_base=/public-${USERNAME}/${app})"
 		if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-			log_info "[dry-run] would set Jellyfin FFmpegPath to '$OVR_JELLYFIN_FFMPEG' in $configdir/system.xml"
+			log_info "[dry-run] would set Jellyfin EncoderAppPath to '$OVR_JELLYFIN_FFMPEG' in $configdir/encoding.xml"
 		fi
 	fi
 	echo "${app^^} configured"
