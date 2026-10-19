@@ -87,4 +87,34 @@ class TrafficLimitTieredCapCharacterizationTest extends TestCase
             $this->assertEquals($case[2], $result['logMessage']);
         }
     }
+
+    public function testPlanCapOutranksDefaultStagesAndProgressive(): void
+    {
+        $stages = \pmssTrafficLimitDefaultOverageStages();
+
+        // A plan sold as 1 Gbps after the quota keeps 1000 Mbit, under stages and under progressive mode.
+        $staged = \pmssTrafficLimitThrottlePlan(100.0, 400.0, 1000, $stages, false, 2.5, 0.0, true);
+        $this->assertEquals(1000, $staged['effectiveCapMbit']);
+        $this->assertEquals('traffic throttle enabled (limit=100.00 GiB usage=400.00 GiB plan cap=1000 Mbit)', $staged['logMessage']);
+        $progressive = \pmssTrafficLimitThrottlePlan(100.0, 400.0, 1000, [], true, 2.5, 0.0, true);
+        $this->assertEquals(1000, $progressive['effectiveCapMbit']);
+
+        // A plan figure below the stage cap is kept as well.
+        $this->assertEquals(50, \pmssTrafficLimitThrottlePlan(100.0, 400.0, 50, $stages, false, 2.5, 0.0, true)['effectiveCapMbit']);
+
+        // Without a plan cap the default stage still applies to the default cap.
+        $default = \pmssTrafficLimitThrottlePlan(100.0, 400.0, 1000, $stages, false, 2.5, 0.0);
+        $this->assertEquals(100, $default['effectiveCapMbit']);
+    }
+
+    public function testPlanCapReadsOnlyAPositiveConfiguredValue(): void
+    {
+        $this->assertEquals(1000, \pmssTrafficLimitPlanCapMbit(['trafficCapMbit' => '1000']));
+        $this->assertEquals(100, \pmssTrafficLimitPlanCapMbit(['trafficCapMbit' => 100]));
+        $this->assertEquals(0, \pmssTrafficLimitPlanCapMbit(['trafficCapMbit' => 0]));
+        $this->assertEquals(0, \pmssTrafficLimitPlanCapMbit(['trafficCapMbit' => -5]));
+        $this->assertEquals(0, \pmssTrafficLimitPlanCapMbit(['trafficCapMbit' => 'fast']));
+        $this->assertEquals(0, \pmssTrafficLimitPlanCapMbit(['ramMiB' => 1024]));
+        $this->assertEquals(0, \pmssTrafficLimitPlanCapMbit(null));
+    }
 }

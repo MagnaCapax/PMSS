@@ -145,15 +145,36 @@ function pmssTrafficLimitOverageStagesMatchLegacyDefault(array $rawStages): bool
 }
 
 /**
+ * Return the post-quota cap the account's plan sets, or 0 when it sets none.
+ *
+ * @param mixed $userConfig
+ */
+function pmssTrafficLimitPlanCapMbit($userConfig): int
+{
+    if (!is_array($userConfig) || !isset($userConfig['trafficCapMbit']) || !is_numeric($userConfig['trafficCapMbit'])) return 0;
+    return max(0, (int) $userConfig['trafficCapMbit']);
+}
+
+/**
  * Resolve the effective throttle cap and stable user log message.
+ *
+ * A cap the account's plan sets (`$planCapSet`) outranks the default overage
+ * stages and progressive throttle: a plan sold as 1 Gbps after the quota keeps
+ * 1000 Mbit (#1056).
  *
  * @param array<int, array<string, float|int|string|bool|array|object>> $overageThrottleStages
  * @return array{effectiveCapMbit:int,logMessage:string}
  */
-function pmssTrafficLimitThrottlePlan(float $trafficLimitGiB, float $trafficUsageGiB, int $trafficCapMbit, array $overageThrottleStages, bool $progressiveThrottleEnabled, float $progressiveThrottleFloorPercent, float $progressiveThrottleGracePercent): array
+function pmssTrafficLimitThrottlePlan(float $trafficLimitGiB, float $trafficUsageGiB, int $trafficCapMbit, array $overageThrottleStages, bool $progressiveThrottleEnabled, float $progressiveThrottleFloorPercent, float $progressiveThrottleGracePercent, bool $planCapSet = false): array
 {
     $overageGiB = $trafficUsageGiB - $trafficLimitGiB;
     $overagePercent = ($trafficLimitGiB > 0) ? ($overageGiB / $trafficLimitGiB) * 100 : 0.0;
+    if ($planCapSet) {
+        return [
+            'effectiveCapMbit' => $trafficCapMbit,
+            'logMessage' => sprintf('traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB plan cap=%d Mbit)', $trafficLimitGiB, $trafficUsageGiB, $trafficCapMbit),
+        ];
+    }
     $tiered = !empty($overageThrottleStages)
         ? pmssTrafficLimitSelectTieredCapMbit($overagePercent, $overageGiB, $trafficCapMbit, $overageThrottleStages)
         : ['effective' => (int) $trafficCapMbit, 'matched' => null];

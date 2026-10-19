@@ -62,10 +62,10 @@ foreach($users AS $thisUser) {
     $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
     $trafficUsageGiB = (pmssTrafficRawMonthMiB($data) / 1024);   // Set to GiB
     $userConfig = $userConfigStore->get($thisUser);
-    $trafficCapMbit = (is_array($userConfig) && isset($userConfig['trafficCapMbit']) && is_numeric($userConfig['trafficCapMbit']))
-        ? (int) $userConfig['trafficCapMbit']
-        : $defaultTrafficCapMbit;
-    $trafficCapMbit = ($trafficCapMbit > 0) ? $trafficCapMbit : $defaultTrafficCapMbit;
+    // A cap the plan sets outranks the default overage stages (#1056).
+    $planCapMbit = pmssTrafficLimitPlanCapMbit($userConfig);
+    $planCapSet = ($planCapMbit > 0);
+    $trafficCapMbit = $planCapSet ? $planCapMbit : $defaultTrafficCapMbit;
 
     // Enforce traffic throttling: when usage exceeds the configured limit touch the
     // `.enabled` marker (keeping it fresh so sustained overages remain throttled).
@@ -83,7 +83,8 @@ foreach($users AS $thisUser) {
             $throttlePolicy['overageThrottleStages'],
             $throttlePolicy['progressiveThrottleEnabled'],
             $throttlePolicy['progressiveThrottleFloorPercent'],
-            $throttlePolicy['progressiveThrottleGracePercent']
+            $throttlePolicy['progressiveThrottleGracePercent'],
+            $planCapSet
         );
 
         if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {

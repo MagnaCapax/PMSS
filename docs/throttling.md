@@ -76,7 +76,7 @@ When `usage > limit`:
 
 ### Post-cap default profile
 
-Defined in `pmssTrafficLimitDefaultOverageStages()` (file: `scripts/lib/user/trafficLimit.php`). The default profile holds post-cap users at 100 Mbit/s for any overage and never raises a lower per-user `trafficCapMbit` override.
+Defined in `pmssTrafficLimitDefaultOverageStages()` (file: `scripts/lib/user/trafficLimit.php`). The default profile holds post-cap users at 100 Mbit/s for any overage. Stages and progressive throttle apply only to accounts whose plan sets no `trafficCapMbit`. A plan-set cap is the post-quota cap as is, higher or lower than the stage cap, so a plan sold as 1 Gbps after the quota keeps 1000 Mbit/s.
 
 | Overage % over limit | Min absolute overage | Cap (Mbit) |
 |---|---|---|

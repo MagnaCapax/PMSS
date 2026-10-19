@@ -28,6 +28,10 @@ Mark each managed user's OUTPUT packets with the account UID. Render a bare matc
 - After reboot, an account inside the three-day cooldown can be released early because its marker was on tmpfs.
 - Forwarded per-user VPN traffic remains unmarked; that path is unchanged and out of scope.
 
+## Amendment 2026-10-19: a plan's own cap outranks the default stages
+
+Once enforcement works, the default overage stage (100 Mbit at any overage) would lower an account whose plan sets a higher post-quota cap. Some plans are sold as 1 Gbps after the quota. The hourly limits cron therefore uses an account's own `trafficCapMbit` as its post-quota cap whenever the plan sets one, and applies the overage stages and progressive throttle only to accounts without a plan cap. This matches the post-quota speed the customer panel already shows.
+
 ## References
 
 - Refs #1056
