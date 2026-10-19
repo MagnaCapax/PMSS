@@ -362,6 +362,28 @@ media_stack_session_kill_owned() {
 	tmux kill-session -t "=$1" 2>/dev/null || true
 }
 
+# Cloudplow writes its default config and exits on the first run. Prepare it
+# before either the installer or recovery path creates a lasting session.
+media_stack_cloudplow_config_ensure() {
+	local config_dir="$HOME/.config/cloudplow" config_file="$HOME/.config/cloudplow/config.json"
+	[[ -f "$config_file" ]] && return 0
+	if [[ ! -f "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" ]]; then
+		log_warn "Cloudplow config is missing and Cloudplow is not installed"
+		return 1
+	fi
+	mkdir -p "$config_dir" || {
+		log_warn "Could not create Cloudplow config directory: $config_dir"
+		return 1
+	}
+	timeout 30 "$HOME/.bin/cloudplow/bin/python3" "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" run \
+		--config="$config_file" --loglevel=DEBUG --cachefile="$config_dir/cache.db" \
+		--logfile="$config_dir/cloudplow.log" >/dev/null 2>&1 || true
+	if [[ ! -f "$config_file" ]]; then
+		log_warn "Cloudplow did not create $config_file; skipping its session"
+		return 1
+	fi
+}
+
 media_stack_start_stopped() {
 	local alias_file="$HOME/.bashrc.custom"
 	local app app_rc failed=0
@@ -391,6 +413,10 @@ media_stack_start_stopped() {
 		fi
 		if tmux has-session -t "=$app" 2>/dev/null; then
 			log_warn "Session $app is not a PMSS app; leaving it untouched"
+			failed=1
+			continue
+		fi
+		if [[ "$app" == "cloudplow" ]] && grep -q '^alias cloudplow=' "$alias_file" && ! media_stack_cloudplow_config_ensure; then
 			failed=1
 			continue
 		fi
@@ -2095,9 +2121,11 @@ media_stack_start_apps() {
 	media_stack_start_tmux_app "sabnzbd" "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" \
 		"source $HOME/.bin/sabnzbd/bin/activate && cd \"$HOME/.bin/sabnzbd/sabnzbd\" && nice -n 19 python3 SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini 2>&1 | tee -a \"$HOME/.config/sabnzbd/sabnzbd.log\"" \
 		"SABnzbd not found at $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py"
-	media_stack_start_tmux_app "cloudplow" "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" \
-		"source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" \
-		"Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
+	if media_stack_cloudplow_config_ensure; then
+		media_stack_start_tmux_app "cloudplow" "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" \
+			"source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" \
+			"Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
+	fi
 	media_stack_start_tmux_app "autobrr" "$HOME/.bin/autobrr/autobrr" \
 		"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$AUTOBRR_PORT\" AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL AUTOBRR__BASE_URL_MODE_LEGACY=false \"$HOME/.bin/autobrr/autobrr\" --config=\"$HOME/.config/autobrr\" 2>&1 | tee -a \"$HOME/.config/autobrr/autobrr.log\"" \
 		"Autobrr not found at $HOME/.bin/autobrr/autobrr"

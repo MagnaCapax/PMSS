@@ -1057,6 +1057,75 @@ BASHRC
         $this->assertStringNotContainsString('new-session -d -s radarr true', $output);
     }
 
+    public function testCloudplowConfigIsCreatedBeforeFirstSession(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-cloudplow-first-start-');
+        $this->pmssWriteRelativeFile($home, '.bin/dotnet/dotnet', 'binary');
+        $this->pmssWriteRelativeFile($home, '.bin/cloudplow/cloudplow/cloudplow.py', 'binary');
+        $this->pmssWriteExecutableFile($home.'/.bin/cloudplow/bin/python3', <<<'BASH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+    case "$arg" in --config=*) config=${arg#*=} ;; esac
+done
+printf '{}\n' > "$config"
+printf 'config\n' >> "$HOME/actions"
+BASH
+        );
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'media_stack_cloudplow_config_ensure', 'media_stack_start_apps',
+        ));
+        $harness = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail',
+            'HOME='.escapeshellarg($home),
+            'DOTNET_ROOT_PATH="$HOME/.bin/dotnet" JELLYFIN_INSTALL_ENABLED=0 JELLYFIN_MIN_FFMPEG_VERSION=5 AUTOBRR_PORT=12345 AUTOBRR_BASE_URL=/autobrr/',
+            'log_warn() { :; }',
+            'media_stack_start_servarr_app() { :; }',
+            'media_stack_start_tmux_app() { [[ "$1" != cloudplow ]] || printf "session:%s\n" "$1" >> "$HOME/actions"; }',
+            $functions, 'media_stack_start_apps', 'cat "$HOME/actions"', '',
+        ));
+        $output = $this->pmssRunShellHarness($harness);
+        $this->assertSame("config\nsession:cloudplow", $output);
+        $this->assertSame("{}\n", file_get_contents($home.'/.config/cloudplow/config.json'));
+        $this->assertStringContainsString('media_stack_cloudplow_config_ensure',
+            $this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped'));
+        $this->assertStringContainsString('sleep 3',
+            $this->pmssExtractShellFunction($this->script, 'media_stack_verify_sessions'));
+    }
+
+    public function testStartStoppedCreatesMissingCloudplowConfig(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-cloudplow-recovery-');
+        $bin = $this->pmssMakeTempDir('pmss-cloudplow-recovery-bin-');
+        $this->pmssWriteRelativeFile($home, '.bin/cloudplow/cloudplow/cloudplow.py', 'binary');
+        $this->pmssWriteFile($home.'/.bashrc.custom', "alias cloudplow='tmux new-session -d -s cloudplow true'\n");
+        $this->pmssWriteExecutableFile($home.'/.bin/cloudplow/bin/python3', <<<'BASH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+    case "$arg" in --config=*) printf '{}\n' > "${arg#*=}" ;; esac
+done
+BASH
+        );
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+if [[ "$1" == list-panes || "$1" == has-session ]]; then exit 1; fi
+[[ -f "$HOME/.config/cloudplow/config.json" ]] || exit 2
+printf 'started\n' >> "$HOME/actions"
+BASH
+        );
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'media_stack_app_installed', 'media_stack_session_owned',
+            'media_stack_cloudplow_config_ensure', 'media_stack_start_stopped',
+        ));
+        $harness = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail',
+            'HOME='.escapeshellarg($home), 'PATH='.escapeshellarg($bin).':$PATH',
+            'MEDIA_STACK_BASE_SESSIONS=(cloudplow) START_APP=cloudplow',
+            'log_ok() { :; }', 'log_warn() { :; }', 'log_err() { :; }',
+            $functions, 'media_stack_start_stopped', 'cat "$HOME/actions"', '',
+        ));
+        $this->assertSame('started', $this->pmssRunShellHarness($harness));
+    }
+
     public function testStoppedMarkerSkipsBulkButExplicitStartTargetsOneApp(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-marker-');
