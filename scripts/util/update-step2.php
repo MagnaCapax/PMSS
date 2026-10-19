@@ -36,6 +36,8 @@ $GLOBALS['PMSS_LOGMSG_DEFAULTS'] = array_replace([
 // and document its failure behaviour so future maintainers know whether errors
 // should halt the run or log-and-continue.
 require_once __DIR__.'/../lib/update.php';
+require_once __DIR__.'/../lib/user/restartSpace.php';
+require_once __DIR__.'/../lib/user/watchdog.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', [
     'update/runtime/profile.php', 'update/runtime/commands.php', 'update/runtime/stepPolicy.php',
     'update/runtime/processes.php', 'update/environment.php', 'update/filesystem.php',
@@ -120,10 +122,22 @@ function pmssConfigureWebStack(): void
 {
     $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = true;
 
-    runStep('Stopping lighttpd (systemd)', '/etc/init.d/lighttpd stop');
+    // The legacy global kill also targets healthy per-account daemons; defer it
+    // when any running account cannot create files needed by a fresh start.
+    $lowSpaceUsers = [];
+    foreach (users::listHomeUsers() as $user) {
+        $home = '/home/'.$user;
+        if ((pmssUserWatchdogProcessRunning($user, 'lighttpd') || pmssUserWatchdogProcessRunning($user, 'php-cgi'))
+            && !pmssAccountRestartSpaceAllows($user, $home, 'update web-stack stop', 'logmsg')) {
+            $lowSpaceUsers[] = $user;
+        }
+    }
+    if ($lowSpaceUsers === []) {
+        runStep('Stopping lighttpd (systemd)', '/etc/init.d/lighttpd stop');
+        killProcess('lighttpd', 'Terminating lingering lighttpd processes');
+        killProcess('php-cgi', 'Terminating lingering php-cgi processes');
+    }
     pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');
-    killProcess('lighttpd', 'Terminating lingering lighttpd processes');
-    killProcess('php-cgi', 'Terminating lingering php-cgi processes');
     pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');
 
     // Regenerate all per-user nginx configs from the freshly staged template

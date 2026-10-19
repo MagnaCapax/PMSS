@@ -40,6 +40,12 @@ only the root reserve lets `/home` pass.
 Phase 2 repeats the same 3 GiB preflight before package work, using the same
 root-usable `/home` decision and conservative fallback. Its disk readings and
 reserve warning are logged independently after handoff.
+When an account home has under 64 MiB available to its user, phase 2 leaves
+running lighttpd/php-cgi instances in place instead of performing the global
+web-stack stop. The lighttpd watchdog likewise defers an automatic restart of a
+running instance and logs a per-account warning. Disabled and suspended account
+stops still run. Normal-space restart behavior is unchanged; a stopped service
+may still receive a start attempt.
 
 Common flags:
 

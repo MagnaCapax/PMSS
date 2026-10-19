@@ -160,6 +160,16 @@ foreach($users AS $thisUser) {
     }
 
     $restartRequired = $socketError || $configChangedAfterStart || $nginxRecoveryRequired;
+    // Keep a live daemon when its replacement cannot start on the home mount.
+    if ($restartRequired && $lighttpdRunningBeforeRestart && !pmssAccountRestartSpaceAllows(
+        $thisUser,
+        $homeDir,
+        'automatic lighttpd/php-cgi restart',
+        static function (string $message): void { echo $message."\n"; }
+    )) {
+        $restartRequired = false;
+        $socketError = false;
+    }
     $lighttpdRunning = pmssUserWatchdogRestartProcessesIf(
         $thisUser,
         $socketError || $lighttpdRunningBeforeRestart,
