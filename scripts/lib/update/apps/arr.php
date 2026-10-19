@@ -186,7 +186,7 @@ function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl,
     $archivePath = $workDir.'/'.$assetName; $extractPath = $workDir.'/'.$config['extract_dir']; $installPath = $config['install_path'];
     $steps = [
         ['Download failed; keeping existing installation', sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl)), $archivePath, 'is_file'],
-        ['Extraction failed; keeping existing installation', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir)), $extractPath, 'is_dir'],
+        ['Extraction failed; keeping existing installation', sprintf('umask 022 && tar --no-same-owner --no-same-permissions -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir)), $extractPath, 'is_dir'],
         ['Install parent directory missing; refusing to replace application', '', dirname($installPath), 'is_dir'],
     ];
 

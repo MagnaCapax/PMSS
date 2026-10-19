@@ -3,6 +3,12 @@
 PMSS now installs system-wide AI CLI binaries during updates via
 `scripts/lib/update/apps/aiToolsInstall.php`. The commands are published in
 `/usr/local/bin` so users can run `gemini`, `codex`, and `claude` immediately.
+The bundled Node.js runtime is extracted as root-owned. When the bundled runtime
+is selected during an update, a tree with another owner is removed and downloaded
+again. Unused older Node.js runtimes under `/opt/pmss/ai-tools` are also removed.
+Removal moves each runtime into a private directory beside it, then clears that
+directory with `rm`. A later non-dry-run update also clears matching private
+staging directories left by an interrupted removal.
 The system `gemini`, `codex`, and `claude` commands use the account's Virsilipas key by
 default when no personal provider choice is present.
 

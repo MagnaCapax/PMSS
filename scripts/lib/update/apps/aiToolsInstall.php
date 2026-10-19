@@ -14,6 +14,7 @@ require_once __DIR__.'/remoteBinary.php';
 require_once __DIR__.'/aiToolsCodex.php';
 require_once __DIR__.'/aiToolsClaude.php';
 require_once __DIR__.'/aiToolsGemini.php';
+require_once __DIR__.'/aiToolsNodeRuntime.php';
 
 /** Write the Codex fallback config only when the target is a regular file path. */
 function pmssAiToolsCodexFallbackConfigEnsure(bool $dryRun, ?callable $logger = null): void
@@ -44,6 +45,31 @@ $force = pmssEnvFlagEnabled('PMSS_FORCE_AI_TOOLS_REFRESH');
 $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $architecture = php_uname('m');
 $supportsPinnedArtifacts = pmssPinnedRemoteAmd64ArtifactsSupported($architecture);
+$installRoot = '/opt/pmss/ai-tools';
+$nodeDir = $installRoot.'/node-v22.22.1-linux-x64';
+
+if (!$dryRun && is_dir($installRoot)) {
+    foreach (@scandir($installRoot) ?: [] as $entry) {
+        if (preg_match('/\A\.pmss-remove-[0-9a-f]{16}\z/', $entry) === 1) {
+            $staleDir = $installRoot.'/'.$entry;
+            $logger('[INFO] Removing staged AI tools Node.js runtime: '.$staleDir);
+            if (!pmssAiToolsNodeTreeRemove($staleDir)) {
+                $logger('[WARN] Unable to remove staged AI tools Node.js runtime: '.$staleDir);
+            }
+            continue;
+        }
+        if (preg_match('/\Anode-v[0-9]+(?:\.[0-9]+)*-linux-x64\z/', $entry) !== 1) {
+            continue;
+        }
+        $oldDir = $installRoot.'/'.$entry;
+        if ($oldDir !== $nodeDir) {
+            $logger('[INFO] Removing unused AI tools Node.js runtime: '.$oldDir);
+            if (!pmssAiToolsNodeTreeRemove($oldDir)) {
+                $logger('[WARN] Unable to remove unused AI tools Node.js runtime: '.$oldDir);
+            }
+        }
+    }
+}
 
 $nodeBinary = '';
 $systemNode = pmssCommandPath('node');
@@ -60,12 +86,20 @@ if ($nodeBinary === '') {
         $nodeVersion  = '22.22.1';
         $nodeArchive  = 'node-v22.22.1-linux-x64.tar.xz';
         $nodeSha256   = '9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa';
-        $installRoot  = '/opt/pmss/ai-tools';
-        $nodeDir      = $installRoot.'/node-v22.22.1-linux-x64';
         $nodeBinary   = $nodeDir.'/bin/node';
         $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
 
-        if (!is_executable($nodeBinary)) {
+        $nodeTreeReady = true;
+        if (!$dryRun && pmssAiToolsNodeTreeNeedsRefresh($nodeDir)) {
+            $logger('[INFO] Refreshing AI tools Node.js runtime with non-root-owned entries: '.$nodeDir);
+            $nodeTreeReady = pmssAiToolsNodeTreeRemove($nodeDir);
+            if (!$nodeTreeReady) {
+                $logger('[WARN] Unable to remove AI tools Node.js runtime; skipping its installation');
+            }
+        }
+        if (!$nodeTreeReady) {
+            $nodeBinary = '';
+        } elseif (!is_executable($nodeBinary)) {
             runStep('Ensuring AI tools install root exists', pmssBuildCommand('mkdir', ['-p', $installRoot]));
             $resolvedNodeBinary = pmssPinnedRemoteTempFileUse(
                 'Node.js runtime for AI CLI tools',
@@ -80,7 +114,8 @@ if ($nodeBinary === '') {
                         return $nodeBinary;
                     }
 
-                    runStep('Extracting pinned Node.js runtime for AI CLI tools', pmssBuildCommand('tar', ['-xJf', $downloadPath, '-C', $installRoot]));
+                    // Keep shared binaries readable under a restrictive updater umask.
+                    runStep('Extracting pinned Node.js runtime for AI CLI tools', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions', '-xJf', $downloadPath, '-C', $installRoot]));
                     return is_executable($nodeBinary) ? $nodeBinary : '';
                 }
             );
@@ -182,7 +217,7 @@ if (pmssAiToolsCodexInstallNeeded($destination, $launcher, $stub, $launcherSourc
                         'Codex CLI archive', $url, $sha256, 'pmss-ai-codex-',
                         'Downloading pinned Codex CLI archive',
                         static function (string $archivePath) use ($downloadDir, $destination, $codexRoot, $dryRun): bool {
-                            if (runStep('Extracting Codex CLI archive', pmssBuildCommand('tar', ['-xzf', $archivePath, '-C', $downloadDir ?: '/tmp'])) !== 0) {
+                            if (runStep('Extracting Codex CLI archive', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions', '-xzf', $archivePath, '-C', $downloadDir ?: '/tmp'])) !== 0) {
                                 return false;
                             }
                             if ($dryRun) {

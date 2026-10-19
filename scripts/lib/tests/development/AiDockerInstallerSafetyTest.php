@@ -2,9 +2,63 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../update/apps/aiToolsNodeRuntime.php';
 
 class AiDockerInstallerSafetyTest extends TestCase
 {
+    public function testAiToolsArchiveExtractionAndNodeRefreshOrder(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/aiToolsInstall.php', [
+            "require_once __DIR__.'/aiToolsNodeRuntime.php';",
+            'if (!$dryRun && is_dir($installRoot))',
+            "preg_match('/\\A\\.pmss-remove-[0-9a-f]{16}\\z/', \$entry)",
+            'pmssAiToolsNodeTreeRemove($staleDir)',
+            "preg_match('/\\Anode-v[0-9]+(?:\\.[0-9]+)*-linux-x64\\z/', \$entry)",
+            'pmssAiToolsNodeTreeRemove($oldDir)',
+            'pmssAiToolsNodeTreeNeedsRefresh($nodeDir)',
+            'pmssAiToolsNodeTreeRemove($nodeDir)',
+            '!is_executable($nodeBinary)',
+            "runStep('Extracting pinned Node.js runtime for AI CLI tools', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions'",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/aiToolsInstall.php', [
+            "runStep('Extracting Codex CLI archive', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions'",
+            "preg_match('/\\Anode-v[0-9]+(?:\\.[0-9]+)*-linux-x64\\z/', \$entry)",
+            'pmssAiToolsNodeTreeRemove($oldDir)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/arr.php', [
+            'umask 022 && tar --no-same-owner --no-same-permissions -xzf %s -C %s',
+        ]);
+    }
+
+    public function testAiToolsNodeTreeOwnershipAndLinkSafeRemoval(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-ai-node-');
+        $tree = $root.'/node-v22.22.1-linux-x64';
+        $outside = $root.'/outside';
+        $this->assertTrue(@mkdir($tree.'/bin', 0700, true));
+        $this->assertTrue(@mkdir($outside));
+        $this->assertSame(1, @file_put_contents($tree.'/bin/node', 'n'));
+        $this->assertSame(1, @file_put_contents($outside.'/keep', 'x'));
+        $this->assertTrue(@symlink($outside, $tree.'/bin/outside-link'));
+
+        $uid = @fileowner($tree);
+        $this->assertTrue(is_int($uid));
+        $this->assertFalse(\pmssAiToolsNodeTreeNeedsRefresh($tree, $uid));
+        $this->assertTrue(\pmssAiToolsNodeTreeNeedsRefresh($tree, $uid + 1));
+        $this->assertTrue(\pmssAiToolsNodeTreeNeedsRefresh($tree.'/bin/outside-link', $uid));
+        $this->assertTrue(\pmssAiToolsNodeTreeRemove($tree));
+        $this->assertFalse(file_exists($tree));
+        $this->assertSame([], glob($root.'/.pmss-remove-*'));
+        $this->assertTrue(is_file($outside.'/keep'));
+        $this->assertTrue(\pmssAiToolsNodeTreeRemove($tree));
+
+        $stale = $root.'/.pmss-remove-0123456789abcdef';
+        $this->assertTrue(@mkdir($stale.'/tree/bin', 0700, true));
+        $this->assertSame(1, @file_put_contents($stale.'/tree/bin/node', 'n'));
+        $this->assertTrue(\pmssAiToolsNodeTreeRemove($stale));
+        $this->assertSame([], glob($root.'/.pmss-remove-*'));
+    }
+
     public function testCodexFallbackConfigWriteIsChecked(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/aiToolsInstall.php', [
