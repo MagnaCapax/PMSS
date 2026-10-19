@@ -147,10 +147,6 @@ function pmssEnsureSystemdDbusDisclosureHardening(?callable $logger = null): voi
             continue;
         }
 
-        // The tmpfiles rule persists the directory mode; chmod applies it immediately.
-        runStep(
-            $artifact['description'],
-            'systemd-tmpfiles --create '.escapeshellarg($target).' 2>/dev/null; [ -d '.$artifact['runtime_path'].' ] && chmod 0750 '.$artifact['runtime_path'].' 2>/dev/null || true'
-        );
+        // The tmpfiles file is installed only; it is not applied to the live directory here.
     }
 }
