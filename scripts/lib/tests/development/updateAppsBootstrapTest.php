@@ -20,6 +20,8 @@ class UpdateAppsBootstrapTest extends TestCase
                 $this->assertTrue(@copy($sourcePath, $sandboxDir.'/'.$file), 'Unable to copy '.$file.' into sandbox');
             }
         }
+        $helperPath = $sourceDir.'/../rootOwnedTree.php';
+        $this->assertTrue(@copy($helperPath, $this->tempDir.'/rootOwnedTree.php'), 'Unable to copy shared tree helper');
 
         $output = $this->pmssRunInlinePhp('include '.var_export($sandboxDir.'/'.$installerFile, true).';', [], '2>&1');
         $this->assertTrue(is_string($output), 'Unable to execute sandboxed installer');

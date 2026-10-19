@@ -14,7 +14,7 @@ require_once __DIR__.'/remoteBinary.php';
 require_once __DIR__.'/aiToolsCodex.php';
 require_once __DIR__.'/aiToolsClaude.php';
 require_once __DIR__.'/aiToolsGemini.php';
-require_once __DIR__.'/aiToolsNodeRuntime.php';
+require_once __DIR__.'/../rootOwnedTree.php';
 
 /** Write the Codex fallback config only when the target is a regular file path. */
 function pmssAiToolsCodexFallbackConfigEnsure(bool $dryRun, ?callable $logger = null): void
@@ -53,7 +53,7 @@ if (!$dryRun && is_dir($installRoot)) {
         if (preg_match('/\A\.pmss-remove-[0-9a-f]{16}\z/', $entry) === 1) {
             $staleDir = $installRoot.'/'.$entry;
             $logger('[INFO] Removing staged AI tools Node.js runtime: '.$staleDir);
-            if (!pmssAiToolsNodeTreeRemove($staleDir)) {
+            if (!pmssRootOwnedTreeRemove($staleDir)) {
                 $logger('[WARN] Unable to remove staged AI tools Node.js runtime: '.$staleDir);
             }
             continue;
@@ -64,7 +64,7 @@ if (!$dryRun && is_dir($installRoot)) {
         $oldDir = $installRoot.'/'.$entry;
         if ($oldDir !== $nodeDir) {
             $logger('[INFO] Removing unused AI tools Node.js runtime: '.$oldDir);
-            if (!pmssAiToolsNodeTreeRemove($oldDir)) {
+            if (!pmssRootOwnedTreeRemove($oldDir)) {
                 $logger('[WARN] Unable to remove unused AI tools Node.js runtime: '.$oldDir);
             }
         }
@@ -90,9 +90,9 @@ if ($nodeBinary === '') {
         $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
 
         $nodeTreeReady = true;
-        if (!$dryRun && pmssAiToolsNodeTreeNeedsRefresh($nodeDir)) {
+        if (!$dryRun && pmssRootOwnedTreeNeedsRefresh($nodeDir)) {
             $logger('[INFO] Refreshing AI tools Node.js runtime with non-root-owned entries: '.$nodeDir);
-            $nodeTreeReady = pmssAiToolsNodeTreeRemove($nodeDir);
+            $nodeTreeReady = pmssRootOwnedTreeRemove($nodeDir);
             if (!$nodeTreeReady) {
                 $logger('[WARN] Unable to remove AI tools Node.js runtime; skipping its installation');
             }

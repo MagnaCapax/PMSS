@@ -499,6 +499,9 @@ foreach ($apps as $app) {
     });
 }
 
+require_once __DIR__.'/../lib/update/apps/arr.php';
+pmssRunProfiledCallable('Converging shared ARR install ownership', 'pmssArrConvergeSharedInstallOwnership', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+
 // Reapply system service disablement after app installers in case any package
 // postinst scripts (re)started daemons mid-update.
 pmssRunProfiledCallable('Applying system service disable/mask policy (post-app)', 'pmssStopDisableMaskSeedboxSystemServices');

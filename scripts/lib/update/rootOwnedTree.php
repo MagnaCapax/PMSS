@@ -1,8 +1,8 @@
 <?php
-/** Ownership and cleanup helpers for the bundled AI tools Node.js runtime. */
+/** Ownership and cleanup helpers for shared root-owned install trees. */
 
 /** Check each directory entry itself; symlink targets are never inspected. */
-function pmssAiToolsNodeTreeNeedsRefresh(string $dir, int $expectedUid = 0): bool
+function pmssRootOwnedTreeNeedsRefresh(string $dir, int $expectedUid = 0): bool
 {
     $root = @lstat($dir);
     if ($root === false) {
@@ -29,8 +29,8 @@ function pmssAiToolsNodeTreeNeedsRefresh(string $dir, int $expectedUid = 0): boo
     return false;
 }
 
-/** Move a managed runtime tree aside, then remove it with rm. */
-function pmssAiToolsNodeTreeRemove(string $path): bool
+/** Move a managed install tree aside, then remove it with rm. */
+function pmssRootOwnedTreeRemove(string $path): bool
 {
     $root = @lstat($path);
     if ($root === false) {

@@ -54,6 +54,9 @@ is needed for every root step that encounters such objects.
 - Account-owned work uses the account identity; system-wide installed trees
   retain root ownership on refresh.
 
+Shared `/opt/<App>` ARR installs are also covered. Updates check existing
+trees, replace those with non-root-owned entries, and leave other trees alone.
+
 ## Related ADRs
 
 - ADR 0005: validation at trust boundaries for internal tool output.

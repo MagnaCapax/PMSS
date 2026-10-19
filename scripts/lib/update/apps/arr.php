@@ -15,6 +15,7 @@
 // the parent's wait, not the child; that "fix" (GH #527) converted a visible update hang
 // into a silent root daemon and produced the 2026-07-03 root compromise of a fleet host.
 const PMSS_ARR_APP_BRANCHES = ['Lidarr' => 'develop|master', 'Prowlarr' => 'develop|master', 'Radarr' => 'develop|master', 'Readarr' => 'develop|master', 'Sonarr' => 'main|develop'];
+require_once __DIR__.'/../rootOwnedTree.php';
 
 /**
  * Reject config values that could break shell/file boundaries.
@@ -30,7 +31,7 @@ function pmssArrIsSafeConfigValue(string $value): bool
 function pmssArrInstallPathIsSafe(string $path): bool
 {
     require_once dirname(__DIR__, 2).'/pathSafety.php';
-    // The updater replaces this directory with rm+mv; never allow top-level
+    // The updater replaces this directory; never allow top-level
     // targets such as /opt, /home, or /tmp to pass config validation.
     if (!pmssPathAbsoluteStringIsSafe($path)
         || count(explode('/', trim($path, '/'))) < 2) {
@@ -196,10 +197,14 @@ function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl,
         $message = 'Unsafe activation paths; keeping existing installation';
         $ok = false;
     }
-    foreach ($ok ? [
-        ['Failed to remove existing installation; keeping existing installation', 'rm -rf '.escapeshellarg($installPath), '', ''],
-        ['Failed to activate extracted release', sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)), $installPath, 'is_dir'],
-    ] : [] as $step) { if ($step[1] !== '' && runCommand($step[1]) !== 0) { $message = $step[0]; $ok = false; break; } if ($step[2] !== '' && !$step[3]($step[2])) { $message = $step[0]; $ok = false; break; } }
+    if ($ok && is_dir($installPath) && !pmssRootOwnedTreeRemove($installPath)) {
+        $message = 'Failed to remove existing installation; keeping existing installation';
+        $ok = false;
+    }
+    if ($ok && (runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath))) !== 0 || !is_dir($installPath))) {
+        $message = 'Failed to activate extracted release';
+        $ok = false;
+    }
     if ($message !== '') { $log($message); }
     pmssRemovePrivateTempDir($workDir, $workPrefix, 'Cleaning '.$app.' updater workspace', $log, static function (string $description, string $command): int { return runCommand($command); }); return $ok;
 }
@@ -247,15 +252,19 @@ function pmssArrUpdate(array $config): void
 
     $installPath = $config['install_path'];
 
-    $currentVersion = pmssArrInstalledVersionRead($installPath);
-    if ($currentVersion === $latestVersion && is_dir($installPath)) {
+    $needsRefresh = is_dir($installPath) && pmssRootOwnedTreeNeedsRefresh($installPath);
+    $currentVersion = $needsRefresh ? null : pmssArrInstalledVersionRead($installPath);
+    if ($needsRefresh) {
+        $log('install has non-root-owned entries; reinstalling');
+    }
+    if (!$needsRefresh && $currentVersion === $latestVersion && is_dir($installPath)) {
         $log("Already at {$latestVersion}, skipping update");
         return;
     }
     if ($currentVersion !== null && $currentVersion !== $latestVersion) {
         $log("Updating from {$currentVersion} to {$latestVersion}");
     }
-    if ($currentVersion === null && is_dir($installPath)) {
+    if (!$needsRefresh && $currentVersion === null && is_dir($installPath)) {
         $log('Unknown installed version; reinstalling to avoid stale binaries');
     }
 
@@ -267,19 +276,41 @@ function pmssArrUpdate(array $config): void
     }
 }
 
+/** Build the existing release config for one shared ARR app. */
+function pmssArrAppConfig(string $app, string $branchPattern): array
+{
+    return [
+        'app' => $app,
+        'install_path' => '/opt/'.$app,
+        'releases_url' => 'https://api.github.com/repos/'.$app.'/'.$app.'/releases',
+        'asset_pattern' => sprintf('/%s\\.(?:%s)\\.([0-9.]+).*linux.*tar\\.gz/i', preg_quote($app, '/'), $branchPattern),
+        'extract_dir' => $app,
+        'user_agent' => 'PMSS-'.$app,
+    ];
+}
+
+/** Refresh only existing shared ARR trees with entries owned by another UID. */
+function pmssArrConvergeSharedInstallOwnership(): void
+{
+    foreach (PMSS_ARR_APP_BRANCHES as $app => $branchPattern) {
+        $installPath = '/opt/'.$app;
+        if (!is_dir($installPath) || !pmssRootOwnedTreeNeedsRefresh($installPath)) {
+            continue;
+        }
+        try {
+            pmssArrUpdate(pmssArrAppConfig($app, $branchPattern));
+        } catch (Throwable $exception) {
+            logmsg($app.': shared install refresh failed: '.$exception->getMessage());
+        }
+    }
+}
+
 /** Run every supported Servarr updater from the single app entrypoint. */
 function pmssArrUpdateSupportedApps(): void
 {
     foreach (PMSS_ARR_APP_BRANCHES as $app => $branchPattern) {
         if ($app === 'Sonarr') { @unlink('/etc/apt/sources.list.d/sonarr.list'); @passthru('apt-key del 0xA236C58F409091A18ACA53CBEBFF6B99D9B78493 2>/dev/null'); }
 
-        pmssArrUpdate([
-            'app' => $app,
-            'install_path' => '/opt/'.$app,
-            'releases_url' => 'https://api.github.com/repos/'.$app.'/'.$app.'/releases',
-            'asset_pattern' => sprintf('/%s\\.(?:%s)\\.([0-9.]+).*linux.*tar\\.gz/i', preg_quote($app, '/'), $branchPattern),
-            'extract_dir' => $app,
-            'user_agent' => 'PMSS-'.$app,
-        ]);
+        pmssArrUpdate(pmssArrAppConfig($app, $branchPattern));
     }
 }

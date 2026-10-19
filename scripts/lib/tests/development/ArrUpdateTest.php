@@ -244,8 +244,38 @@ class ArrUpdateTest extends TestCase
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
-            $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
+            $expectedMarker = @fileowner($installPath) === 0 ? 'existing' : 'replacement';
+            $this->assertEquals($expectedMarker, (string) @file_get_contents($installPath.'/marker.txt'));
             $this->assertTrue(!is_file($probeLog), 'the installed binary must never be executed to determine its version');
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
+    public function testUpdateReinstallsMatchingVersionWhenInstallIsNotRootOwned(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-owner-refresh-');
+        $app = 'PmssArrOwner'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/install';
+        $archivePath = $this->createArchive($baseDir, 'PackageDir', ['marker.txt' => 'replacement']);
+        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $shimDir = $this->writeCurlShim($baseDir);
+        $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
+        $this->pmssWriteFile($installPath.'/version.txt', "1.2.3\n");
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            $this->assertTrue(@chown($installPath.'/marker.txt', 1001));
+            clearstatcache(true, $installPath.'/marker.txt');
+        }
+        $this->assertTrue(\pmssRootOwnedTreeNeedsRefresh($installPath));
+
+        try {
+            list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath): void {
+                $this->runArrUpdate($app, $installPath, $metadataPath, 'PackageDir');
+            }, $this->pmssPathPrefixedEnvironment($shimDir));
+
+            $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
+            $this->assertStringContainsString('install has non-root-owned entries; reinstalling', $output);
+            $this->assertStringNotContainsString('Already at 1.2.3', $output);
         } finally {
             $this->cleanup($baseDir);
         }
