@@ -838,6 +838,20 @@ LIGHTTPD;
     }
 
     /**
+     * Every account's panel and WebDAV share one origin, so each auth realm names the account
+     * (ADR-0122): a browser keeps each account's Basic credentials apart.
+     */
+    public function testLighttpdAuthRealmNamesTheAccount(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
+        $realms = preg_match_all('/"realm"\s*=>\s*"([^"]*)"/', $template, $matches);
+        $this->assertSame(2, $realms, 'expected the panel and WebDAV realms');
+        foreach ($matches[1] as $realm) {
+            $this->assertStringContainsString('##username', $realm, 'realm must name the account: ' . $realm);
+        }
+    }
+
+    /**
      * TEST 44: Lighttpd template produces valid syntax when rendered
      *
      * HARDENS: Rendered config must not have obvious syntax errors.
