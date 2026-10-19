@@ -142,11 +142,15 @@ function pmssAccountViewApply(?callable $logger = null, string $root = '', ?bool
         pmssRefreshManagedPathFile($path, $spec[0], 'account view artifact', $log,
             pmssManagedPathInstallOptions($path, 'account view artifact', ['mode' => $spec[1]]), $ok);
         if (!$ok) return false;
+        clearstatcache(true, $path);
+        if ((fileperms($path) & 0777) !== $spec[1] && !@chmod($path, $spec[1])) return false;
     }
     $ok = false;
     pmssRefreshManagedPathFile($profile, $profileSpec[0], 'account view PAM profile', $log,
         pmssManagedPathInstallOptions($profile, 'account view PAM profile', ['mode' => $profileSpec[1]]), $ok);
     if (!$ok) return false;
+    clearstatcache(true, $profile);
+    if ((fileperms($profile) & 0777) !== $profileSpec[1] && !@chmod($profile, $profileSpec[1])) return false;
     if (!$test) {
         runStep('Reloading systemd for account view', 'systemctl daemon-reload');
         runStep('Enabling PMSS mount propagation unit', 'systemctl enable --now pmss-mount-propagation.service');

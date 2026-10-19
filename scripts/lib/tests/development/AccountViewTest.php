@@ -93,7 +93,9 @@ class AccountViewTest extends TestCase
         mkdir($root.'/etc/seedbox/config', 0755, true);
         file_put_contents($root.'/etc/seedbox/config/account-view.enabled', '');
         $this->assertTrue(pmssAccountViewApply($log, $root, true));
+        chmod($root.'/etc/security/namespace.d/pmss-account-view.init', 0644);
         $this->assertTrue(pmssAccountViewApply($log, $root, true));
+        $this->assertSame(0755, fileperms($root.'/etc/security/namespace.d/pmss-account-view.init') & 0777);
         $this->assertTrue(is_file($root.'/usr/share/pam-configs/pmss-account-view'));
         mkdir($root.'/var/lib/pmss/account-view/1000', 0700, true);
         file_put_contents($root.'/var/lib/pmss/account-view/1000/passwd', 'sample');
