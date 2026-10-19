@@ -164,6 +164,7 @@ function pmssAccountViewApply(?callable $logger = null, string $root = '', ?bool
             $log('[WARN] Per-session account view not active: PAM session rules were not rendered');
             return false;
         }
+        $log('Per-session account view active: PAM session rules rendered in both stacks');
     }
     return true;
 }
