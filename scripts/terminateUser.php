@@ -153,6 +153,17 @@ if (($info = pmssUserAccountLookup($username)) !== null) {
         'systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true',
         $dryRun
     );
+    // Disable linger while the account still resolves; clear its stopped manager's failed state.
+    pmssUserLifecycleStep('terminate', $username,
+        'disable_linger',
+        'loginctl disable-linger '.escapeshellarg($username).' || true',
+        $dryRun
+    );
+    pmssUserLifecycleStep('terminate', $username,
+        'reset_failed_user_manager',
+        'systemctl reset-failed '.escapeshellarg('user@'.$uid.'.service').' || true',
+        $dryRun
+    );
 }
 
 echo "\nDeleting user, user data and HTTP password:\n";

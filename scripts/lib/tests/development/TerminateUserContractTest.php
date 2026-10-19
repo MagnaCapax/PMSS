@@ -42,6 +42,18 @@ final class TerminateUserContractTest extends TestCase
             ]]]);
     }
 
+    public function testTerminateUserDisablesLingerAndResetsManagerBeforeUserdel(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
+            "pmssUserAccountLookup(\$username)) !== null) {",
+            "'disable_linger'",
+            "'loginctl disable-linger '.escapeshellarg(\$username).' || true'",
+            "'reset_failed_user_manager'",
+            "'systemctl reset-failed '.escapeshellarg('user@'.\$uid.'.service').' || true'",
+            "'userdel_initial'",
+        ]]]);
+    }
+
     /**
      * Home and both recreate backups are purged synchronously through one shared helper,
      * after the account is removed and after every bounded cleanup step has run.
