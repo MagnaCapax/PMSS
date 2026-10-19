@@ -22,6 +22,7 @@ final class ManagedFileWriteSafetyTest extends TestCase
     {
         $setup = (string) file_get_contents(dirname(__DIR__, 2).'/nginxConfig/setup.php');
         $this->assertTrue(strpos($setup, "pmssEnsureSafeDir('/etc/nginx/users', 0751)") !== false, 'nginx users directory mode must be applied on existing hosts too');
+        $this->assertTrue(strpos($setup, 'pmssEnsureSafeDir($subdomainConfigDir, 0711)') !== false, 'nginx config directory mode must be applied on existing hosts too');
     }
 
     public function testEnsureSafeDirReportsModeFailure(): void

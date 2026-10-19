@@ -179,6 +179,9 @@ if (pmssPermissionTargetDirectoryExists($configDir)) {
         }
 
         if ($node->isDir()) {
+            if ($path === $configDir.'/users') {
+                continue;
+            }
             @chmod($path, 0775);
             continue;
         }
@@ -203,6 +206,7 @@ if (pmssPermissionTargetDirectoryExists($configDir)) {
     // are legitimately world-read by the per-user panel and must stay 0664.
     $usersDir = $configDir.'/users';
     if (is_dir($usersDir) && !is_link($usersDir)) {
+        @chmod($usersDir, 0711);
         foreach (glob($usersDir.'/*.json') ?: [] as $userRecord) {
             if (is_file($userRecord) && !is_link($userRecord)) {
                 @chmod($userRecord, 0640);

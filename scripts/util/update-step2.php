@@ -469,8 +469,11 @@ pmssRunProfiledCallable('Ensuring Intel render-group membership', 'pmssEnsureInt
 // Directories get traversal; files are only ever tightened here, never widened. A blanket
 // file chmod 0755 made root-only files (per-user records, private keys) world-readable
 // until setupPermissions re-restricted them later in this same pass.
-runStep('Resetting /etc/seedbox directory permissions', 'find /etc/seedbox -type d -not -perm 0755 -exec chmod 0755 {} +');
+runStep('Resetting /etc/seedbox directory permissions', 'find /etc/seedbox -path /etc/seedbox/config/users -prune -o -type d -not -perm 0755 -exec chmod 0755 {} +');
 runStep('Removing group/world write under /etc/seedbox', 'find /etc/seedbox -type f -perm /022 -exec chmod go-w {} +');
+foreach (['/etc/seedbox/config/users', '/var/lib/systemd/linger'] as $directory) {
+    if (!pmssEnsureSafeDir($directory, 0711)) logmsg('[WARN] Could not apply mode 0711 to '.$directory);
+}
 runStep('Resetting /scripts permissions', 'find /scripts -not -type l -not -perm 0750 -exec chmod 0750 {} +');
 pmssRunProfiledCallable('Ensuring locale baseline', 'pmssEnsureLocaleBaseline');
 

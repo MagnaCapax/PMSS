@@ -43,6 +43,7 @@ class DbusPolicyHardeningTest extends TestCase
             '10-pmss-login1-restrict.conf' => [1102, 'bcda38506feaf4553b1afe7bdc7a65fa070f8bc376f8524284af07f7649adc4d'],
             'pmss-run-systemd-users.conf' => [221, '52b7da9f6773e1e74735ce9925fd192edeff7c10a0cf151f86476686670617c4'],
             'pmss-run-systemd-sessions.conf' => [238, 'b672da9aafb26c4391db5e57d63f4b6038a22c00817f5cb5374173d8c5c74e30'],
+            'pmss-run-user.conf' => [96, '3885020206112cf94210b583ad4b0b154031eb9692e5235030a8196ba4f78949'],
         ];
 
         $expectedNames = array_keys($snapshots);
@@ -118,6 +119,13 @@ class DbusPolicyHardeningTest extends TestCase
         $this->assertStringNotContainsString('d /run/systemd/users ', $bodies['pmss-run-systemd-users.conf']);
     }
 
+    public function testRuntimeParentModeUsesAdjustment(): void
+    {
+        $messages = [];
+        $bodies = $this->installDisclosureArtifacts($messages);
+        $this->assertStringContainsString('z /run/user 0711 - - -', $bodies['pmss-run-user.conf']);
+    }
+
     public function testCompletePolicyInstallIsIdempotent(): void
     {
         $messages = [];
@@ -125,7 +133,7 @@ class DbusPolicyHardeningTest extends TestCase
 
         $secondRun = [];
         \pmssEnsureSystemdDbusDisclosureHardening($this->pmssMakeArrayLogger($secondRun));
-        foreach (['systemd1 D-Bus enumeration policy', 'logind D-Bus enumeration policy', '/run/systemd/users tmpfiles policy', '/run/systemd/sessions tmpfiles policy'] as $label) {
+        foreach (['systemd1 D-Bus enumeration policy', 'logind D-Bus enumeration policy', '/run/systemd/users tmpfiles policy', '/run/systemd/sessions tmpfiles policy', '/run/user tmpfiles policy'] as $label) {
             $this->assertTrue($this->pmssMessagesContain($secondRun, $label.' already present and up to date'), 'idempotent skip: '.$label);
         }
     }

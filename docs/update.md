@@ -238,6 +238,10 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    hardware-aware late-order sysctl tuning, Debian 13+
    `/tmp` disk-backed baseline, root shell config, `/home`
    permissions, hostname/quota overrides exported by `install.sh`).
+   Runtime parent modes use managed tmpfiles adjustments at boot and are also
+   applied during updates. The updater reapplies the nginx config and systemd
+   linger directory modes, while the final permission pass preserves the
+   account config directory mode.
 6. Apply repository templates, refresh apt indexes, migrate legacy files.
 7. Run system-level application installers under `scripts/lib/update/apps/*.php`,
    excluding helper modules and account-scoped media-stack maintenance.
