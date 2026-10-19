@@ -5,7 +5,7 @@
  * systemd exposes several cross-user disclosure channels on shared hosts:
  * systemd1 unit/process enumeration, login1 session enumeration, and the
  * world-readable runtime metadata below /run/systemd/{users,sessions}.
- * The artifact registry below keeps the policies and directory modes in one model
+ * The artifact registry below keeps the four protections in one ordered model
  * so rendering, installation, and orchestration cannot drift independently.
  *
  * Root remains unaffected by the D-Bus rules: vendor user="root" policies are
@@ -21,7 +21,7 @@ require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../runtime/processes.php';
 
 /**
- * Return the complete ordered set of managed policy and mode artifacts.
+ * Return the complete ordered set of disclosure-hardening artifacts.
  *
  * Artifact content is generated solely from this registry. Keeping filenames,
  * labels, policy members, and tmpfiles paths together eliminates the former
@@ -91,38 +91,26 @@ function pmssSystemdDbusDisclosureArtifacts(): array
             'basename' => 'pmss-run-systemd-users.conf',
             'label' => '/run/systemd/users tmpfiles policy',
             'runtime_path' => '/run/systemd/users',
-            'mode' => '0750',
             'description' => 'Restricting /run/systemd/users directory mode',
-            'content' => "# PMSS-managed: adjust the /run/systemd/users directory mode after the stock creation rule.\n"
+            'content' => "# PMSS-managed: restrict the /run/systemd/users directory (UID->username map) to root.\n"
                 ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
-                ."z /run/systemd/users 0750 root root -\n",
+                ."d /run/systemd/users 0750 root root -\n",
         ],
         [
             'kind' => 'tmpfiles',
             'basename' => 'pmss-run-systemd-sessions.conf',
             'label' => '/run/systemd/sessions tmpfiles policy',
             'runtime_path' => '/run/systemd/sessions',
-            'mode' => '0750',
             'description' => 'Restricting /run/systemd/sessions directory mode',
             'content' => "# PMSS-managed: restrict the /run/systemd/sessions directory (per-session REMOTE_HOST/client IP) to root.\n"
                 ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
                 ."d /run/systemd/sessions 0750 root root -\n",
         ],
-        [
-            'kind' => 'tmpfiles',
-            'basename' => 'pmss-run-user.conf',
-            'label' => '/run/user tmpfiles policy',
-            'runtime_path' => '/run/user',
-            'mode' => '0711',
-            'description' => 'Adjusting /run/user directory mode',
-            'content' => "# PMSS-managed: adjust the runtime parent after the stock creation rule.\n"
-                ."z /run/user 0711 - - -\n",
-        ],
     ];
 }
 
 /**
- * Ensure the managed systemd policies and runtime directory modes are installed.
+ * Ensure all four systemd cross-user disclosure channels are hardened.
  *
  * Each artifact converges independently and degrades to a warning or skip, so
  * one unavailable policy location does not prevent the remaining protections.
@@ -159,10 +147,10 @@ function pmssEnsureSystemdDbusDisclosureHardening(?callable $logger = null): voi
             continue;
         }
 
-        // The tmpfiles rule applies at boot; chmod converges an existing directory now.
+        // The tmpfiles rule persists the directory mode; chmod applies it immediately.
         runStep(
             $artifact['description'],
-            'systemd-tmpfiles --create '.escapeshellarg($target).' 2>/dev/null; [ -d '.$artifact['runtime_path'].' ] && [ ! -L '.$artifact['runtime_path'].' ] && chmod '.$artifact['mode'].' '.$artifact['runtime_path'].' 2>/dev/null || true'
+            'systemd-tmpfiles --create '.escapeshellarg($target).' 2>/dev/null; [ -d '.$artifact['runtime_path'].' ] && chmod 0750 '.$artifact['runtime_path'].' 2>/dev/null || true'
         );
     }
 }

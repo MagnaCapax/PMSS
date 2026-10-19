@@ -469,11 +469,8 @@ pmssRunProfiledCallable('Ensuring Intel render-group membership', 'pmssEnsureInt
 // Directories get traversal; files are only ever tightened here, never widened. A blanket
 // file chmod 0755 made root-only files (per-user records, private keys) world-readable
 // until setupPermissions re-restricted them later in this same pass.
-runStep('Resetting /etc/seedbox directory permissions', 'find /etc/seedbox -path /etc/seedbox/config/users -prune -o -type d -not -perm 0755 -exec chmod 0755 {} +');
+runStep('Resetting /etc/seedbox directory permissions', 'find /etc/seedbox -type d -not -perm 0755 -exec chmod 0755 {} +');
 runStep('Removing group/world write under /etc/seedbox', 'find /etc/seedbox -type f -perm /022 -exec chmod go-w {} +');
-foreach (['/etc/seedbox/config/users', '/var/lib/systemd/linger'] as $directory) {
-    if (!pmssEnsureSafeDir($directory, 0711)) logmsg('[WARN] Could not apply mode 0711 to '.$directory);
-}
 runStep('Resetting /scripts permissions', 'find /scripts -not -type l -not -perm 0750 -exec chmod 0750 {} +');
 pmssRunProfiledCallable('Ensuring locale baseline', 'pmssEnsureLocaleBaseline');
 
@@ -606,8 +603,6 @@ pmssRunProfiledCallable('Hardening access to session and network binaries', 'pms
 // Opt-in only (marker /etc/seedbox/config/socket-table-privacy.enabled). With no marker this
 // restores stock /proc/net modes and is a no-op — inert until the operator enables it per host.
 pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
-pmssRunProfiledCallable('Applying user.slice directory mode', 'pmssCgroupDirectoryModeApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
-pmssRunProfiledCallable('Applying per-session account view (opt-in)', 'pmssAccountViewApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 // Stage 2: the sock_diag BPF-LSM filter. First ensure an autoattach-capable bpftool when the
 // feature is enabled (Debian 12 main ships 7.1.0 which cannot attach LSM programs — install 7.5
 // from bookworm-backports); then run the loader. The loader self-gates on the same marker and

@@ -9,16 +9,6 @@
 # Keep newly-created files private before any early shell return.
 umask 077
 
-# Put new screen sockets under this account's home for all bash sessions.
-_pmss_screen_uid=$(/usr/bin/id -u 2>/dev/null || echo 0)
-if [ "$_pmss_screen_uid" -ge 1000 ] 2>/dev/null && [ -n "${HOME:-}" ]; then
-    [ -e "$HOME/.screen" ] || /bin/mkdir -m 0700 -- "$HOME/.screen" 2>/dev/null || true
-    if [ -d "$HOME/.screen" ] && [ ! -L "$HOME/.screen" ] && /bin/chmod 0700 -- "$HOME/.screen" 2>/dev/null; then
-        export SCREENDIR="$HOME/.screen"
-    fi
-fi
-unset _pmss_screen_uid
-
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples

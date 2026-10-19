@@ -171,10 +171,9 @@ function pmssCreateNginxConfigSetup(): array
         fwrite(STDERR, "Could not apply mode 0751 to /etc/nginx/users\n");
     }
 
-    if (!pmssEnsureSafeDir($subdomainConfigDir, 0711)) {
-        fwrite(STDERR, "Could not apply mode 0711 to {$subdomainConfigDir}\n");
-    }
-    if (!$subdomainEnabled && $subdomainBase !== '') {
+    if ($subdomainEnabled) {
+        pmssDirEnsureExists($subdomainConfigDir, 0755);
+    } elseif ($subdomainBase !== '') {
         fwrite(STDERR, "Skipping nginx subdomain vhosts (invalid hostname: {$subdomainBase})\n");
     }
 

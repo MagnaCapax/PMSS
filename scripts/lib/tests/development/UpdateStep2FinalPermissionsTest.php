@@ -36,9 +36,7 @@ class UpdateStep2FinalPermissionsTest extends TestCase
         $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
             'required' => [
                 'find /home -mindepth 1 -maxdepth 1 %s -prune -o -type %s -not -perm %s -exec chmod %s {} +',
-                "runStep('Resetting /etc/seedbox directory permissions', 'find /etc/seedbox -path /etc/seedbox/config/users -prune -o -type d -not -perm 0755 -exec chmod 0755 {} +');",
-                "['/etc/seedbox/config/users', '/var/lib/systemd/linger']",
-                'pmssEnsureSafeDir($directory, 0711)',
+                "runStep('Resetting /etc/seedbox directory permissions', 'find /etc/seedbox -type d -not -perm 0755 -exec chmod 0755 {} +');",
                 "runStep('Removing group/world write under /etc/seedbox', 'find /etc/seedbox -type f -perm /022 -exec chmod go-w {} +');",
                 "runStep('Resetting /scripts permissions', 'find /scripts -not -type l -not -perm 0750 -exec chmod 0750 {} +');",
             ],
@@ -48,16 +46,6 @@ class UpdateStep2FinalPermissionsTest extends TestCase
                 "runStep('Resetting /etc/seedbox permissions', 'find /etc/seedbox -not -type l -not -perm 0755 -exec chmod 0755 {} +');",
                 "runStep('Resetting /etc/seedbox permissions', 'chmod -R 755 /etc/seedbox');",
                 "runStep('Resetting /scripts permissions', 'chmod -R 750 /scripts');",
-            ],
-        ]);
-    }
-
-    public function testUserConfigDirectoryKeepsItsModeInFinalPermissionPass(): void
-    {
-        $this->pmssAssertRepoFileContract('scripts/util/setupPermissions.php', [
-            'required' => [
-                "if (\$path === \$configDir.'/users')",
-                '@chmod($usersDir, 0711)',
             ],
         ]);
     }

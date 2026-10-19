@@ -1908,8 +1908,6 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                 if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
                     $owner = posix_getpwuid(fileowner($path . '/' . $f));
                     $group = posix_getgrgid(filegroup($path . '/' . $f));
-                    if ($owner === false) $owner = array('name' => (string) fileowner($path . '/' . $f));
-                    if ($group === false) $group = array('name' => (string) filegroup($path . '/' . $f));
                 } else {
                     $owner = array('name' => '?');
                     $group = array('name' => '?');
@@ -1962,8 +1960,6 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                 if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
                     $owner = posix_getpwuid(fileowner($path . '/' . $f));
                     $group = posix_getgrgid(filegroup($path . '/' . $f));
-                    if ($owner === false) $owner = array('name' => (string) fileowner($path . '/' . $f));
-                    if ($group === false) $group = array('name' => (string) filegroup($path . '/' . $f));
                 } else {
                     $owner = array('name' => '?');
                     $group = array('name' => '?');

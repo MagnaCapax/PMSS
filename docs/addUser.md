@@ -51,7 +51,6 @@ Usage
 - If `RAM_MiB` is below `245`, PMSS persists `dockerEnabled=false` for safety.
 - Invalid CLI input exits non-zero. `--bonus-quota-gib` accepts only a non-negative integer and writes only positive values. Username validation failures also emit an `ERROR:` line and `###ADDUSER_JSON` with `success=false` for automation.
 - Before initial credential sync, provisioning converges the required `~/.lighttpd/` directory and retains the existing rollback path if safe directory creation fails.
-- Managed shell startup files set `SCREENDIR` to `~/.screen` for accounts with UID 1000 or higher and create that directory with mode 0700. New screen sessions use the per-account directory.
 
 ## Examples
 
