@@ -14,6 +14,18 @@
 # Keep newly-created files private even if parent permissions drift.
 umask 077
 
+# Login shells other than bash use the same per-account screen directory.
+if [ -z "${BASH_VERSION:-}" ]; then
+    _pmss_screen_uid=$(/usr/bin/id -u 2>/dev/null || echo 0)
+    if [ "$_pmss_screen_uid" -ge 1000 ] 2>/dev/null && [ -n "${HOME:-}" ]; then
+        [ -e "$HOME/.screen" ] || /bin/mkdir -m 0700 -- "$HOME/.screen" 2>/dev/null || true
+        if [ -d "$HOME/.screen" ] && [ ! -L "$HOME/.screen" ]; then
+            export SCREENDIR="$HOME/.screen"
+        fi
+    fi
+    unset _pmss_screen_uid
+fi
+
 # if running bash
 if [ -n "$BASH_VERSION" ]; then
     # include .bashrc if it exists

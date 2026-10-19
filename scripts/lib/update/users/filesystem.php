@@ -212,6 +212,7 @@ PHP;
         '.rtorrentRestart.php',
         '.rtorrentThrottleInit.php',
         '.bashrc',
+        '.profile',
         'install-media-stack.sh',
         'install-ai-tools.sh',
         'bin/docker-install-lsio',
