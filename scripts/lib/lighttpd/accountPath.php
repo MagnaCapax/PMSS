@@ -7,13 +7,17 @@
 
 require_once __DIR__.'/../pathSafety.php';
 
-/** Root launches account work without PAM, an inherited TTY, or inherited env. */
+/**
+ * Root launches account work without inherited env or a controlling TTY. Standard input stays the caller's
+ * pipe because pmssAccountPathRun streams file content over it, so neither </dev/null nor --pty is used;
+ * setsid leaves the account process without a controlling terminal.
+ */
 function pmssAccountPathShellCommand(int $effectiveUid, int $accountUid, string $username, string $command): string
 {
-    if (!function_exists('pmssBuildUserShellNoPamCommand')) require_once __DIR__.'/../runtime/environment.php';
     return $effectiveUid === $accountUid
         ? 'sh -c '.escapeshellarg($command)
-        : pmssBuildUserShellNoPamCommand($username, $command);
+        : 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin setsid runuser -u '.escapeshellarg($username)
+            .' -- sh -c '.escapeshellarg($command);
 }
 
 /**

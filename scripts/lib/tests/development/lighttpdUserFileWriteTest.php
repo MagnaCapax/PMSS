@@ -11,9 +11,30 @@ class LighttpdUserFileWriteTest extends TestCase
     public function testRootAccountCommandUsesNoPamIsolatedRunner(): void
     {
         $command = \pmssAccountPathShellCommand(0, 1001, 'alice', 'touch /tmp/example');
-        $this->assertStringContainsAllStrings(['env -i', 'runuser', '-u', "'alice'", '</dev/null'], $command);
+        $this->assertStringContainsAllStrings(['env -i', 'setsid runuser', '-u', "'alice'"], $command);
         $this->assertFalse(strpos($command, 'su -s') !== false);
+        $this->assertFalse(strpos($command, '</dev/null') !== false);
+        $this->assertFalse(strpos($command, '--pty') !== false);
         $this->assertSame("sh -c 'true'", \pmssAccountPathShellCommand(1001, 1001, 'alice', 'true'));
+    }
+
+    public function testRootAccountCommandDeliversStandardInputToTheAccountCommand(): void
+    {
+        $stub = $this->tempDir.'/stub';
+        $this->assertTrue(@mkdir($stub, 0700));
+        // Stand-in for runuser: drop "-u USER --" and run the rest as this user.
+        file_put_contents($stub.'/runuser', "#!/bin/sh\nshift 3\nexec \"\$@\"\n");
+        chmod($stub.'/runuser', 0700);
+        $received = $this->tempDir.'/received';
+        $command = \pmssAccountPathShellCommand(0, 1001, 'alice', 'cat > '.escapeshellarg($received));
+        $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin',
+            'PATH='.escapeshellarg($stub.':/usr/sbin:/usr/bin:/sbin:/bin'), $command);
+        $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        $this->assertTrue(is_resource($process));
+        fwrite($pipes[0], "user:hash\n");
+        fclose($pipes[0]);
+        $this->assertSame(0, proc_close($process));
+        $this->assertSame("user:hash\n", (string) @file_get_contents($received));
     }
 
     public function testAccountFileReplacementKeepsContentAndMode(): void
