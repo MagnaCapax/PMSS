@@ -208,8 +208,9 @@ final class TerminateUserContractTest extends TestCase
         $failed['remove_user_backup_initial'] = 1;
         $failed['clear_immutable_home'] = 1;
         $this->assertSame('## Incomplete: clear_immutable_home', \pmssTerminateUserCompletion($username, $paths, $failed, false)['line']);
-        unset($failed['remove_user_backup_initial']);
-        $this->assertSame(1, \pmssTerminateUserCompletion($username, $paths, $failed, false)['rc'], 'a missing purge step is incomplete');
+        $missing = $results;
+        unset($missing['remove_user_backup_initial']);
+        $this->assertSame('## Incomplete: remove_user_backup_initial', \pmssTerminateUserCompletion($username, $paths, $missing, false)['line'], 'a missing purge step is incomplete');
 
         $this->pmssEnsureDir($paths['home']);
         $this->assertSame('## Incomplete: home_still_present', \pmssTerminateUserCompletion($username, $paths, $results, false)['line']);
