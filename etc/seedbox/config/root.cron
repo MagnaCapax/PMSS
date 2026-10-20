@@ -22,7 +22,10 @@ MAILTO=""
 * * * * *   root ps -o pid= -C rtorrent|xargs -I'{1}' ionice -c2 -n3 -p{1}
 * * * * *   root ps -o pid= -C deluged|xargs -I'{1}' ionice -c2 -n3 -p{1}
 * * * * *   root ps -o pid= -C qbittorrent-nox|xargs -I'{1}' ionice -c2 -n3 -p{1}
-* * * * *   root ps -o pid= -C bash|xargs -I'{1}' ionice -c1 -n2 -p{1}
+# Only root-owned shells get the realtime I/O class; `ps` ORs selection flags, so
+# filter the uid column rather than combining -C with -U (GH#1100: matching by
+# process name alone let any account reach ionice class 1 with a look-alike binary).
+* * * * *   root ps -o pid=,uid= -C bash | awk '$2==0{print $1}' |xargs -I'{1}' ionice -c1 -n2 -p{1}
 * * * * *   root ps -o pid= -C php|xargs -I'{1}' ionice -c2 -n6 -p{1}
 * * * * *   root ps -o pid= -C rar|xargs -I'{1}' ionice -c3 -p{1}
 * * * * *   root ps -o pid= -C unrar|xargs -I'{1}' ionice -c3 -p{1}
