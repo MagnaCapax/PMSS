@@ -249,13 +249,28 @@ function pmssHermesAgentboardStop($home)
         && strpos($cmd, '/opt/pikkumies-agentboard/agentboard') !== false) @posix_kill((int) $pid, SIGTERM);
 }
 
+/** Older browsers may omit Fetch Site; require the panel's exact Referer origin. */
+function pmssPikkumiesOpenSameOriginReferer($referer, $scheme, $authority)
+{
+    if (!is_string($referer) || !is_string($authority) || $referer === '' || $authority === '') return false;
+    $source = parse_url($referer);
+    $panel = parse_url($scheme.'://'.$authority);
+    return is_array($source) && is_array($panel) && !isset($source['user']) && !isset($source['pass'])
+        && strtolower($source['scheme'] ?? '') === strtolower($panel['scheme'] ?? '')
+        && strtolower($source['host'] ?? '') === strtolower($panel['host'] ?? '')
+        && ($source['port'] ?? ($scheme === 'https' ? 443 : 80)) === ($panel['port'] ?? ($scheme === 'https' ? 443 : 80));
+}
+
 // Derive identity from the PHP process, never from a request parameter.
 $uid = function_exists('posix_geteuid') ? posix_geteuid() : -1;
 $account = $uid >= 0 && function_exists('posix_getpwuid') ? posix_getpwuid($uid) : false;
 $home = is_array($account) ? (string) ($account['dir'] ?? '') : '';
 $name = is_array($account) ? (string) ($account['name'] ?? '') : '';
+$panelScheme = ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'http' ? 'http' : 'https';
 $sameOrigin = ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'same-origin'
-    || ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'none';
+    || ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'none'
+    || (!isset($_SERVER['HTTP_SEC_FETCH_SITE']) && pmssPikkumiesOpenSameOriginReferer(
+        $_SERVER['HTTP_REFERER'] ?? '', $panelScheme, $_SERVER['HTTP_HOST'] ?? ''));
 $statusView = ($_GET['view'] ?? '') === 'status';
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET' || !$sameOrigin) {
     pmssPikkumiesOpenPage(!isset($_SERVER['HTTP_SEC_FETCH_SITE'])

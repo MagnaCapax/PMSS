@@ -15,6 +15,10 @@ location /user-##username/ {
         error_page 502 /error-502-##username.html;
 }
 
+# Internal account UI mounts must not be reachable on the shared panel origin.
+location ^~ /public-##username/__pmss-ui- { return 404; }
+location ^~ /~##username/__pmss-ui- { return 404; }
+
 location /public-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/;
         # lighttpd map-urlpath restores Location headers, but it does not

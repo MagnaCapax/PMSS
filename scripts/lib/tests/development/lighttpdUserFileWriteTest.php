@@ -8,6 +8,14 @@ class LighttpdUserFileWriteTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-lighttpd-user-write-']; }
 
+    public function testRootAccountCommandUsesNoPamIsolatedRunner(): void
+    {
+        $command = \pmssAccountPathShellCommand(0, 1001, 'alice', 'touch /tmp/example');
+        $this->assertStringContainsAllStrings(['env -i', 'runuser', '-u', "'alice'", '</dev/null'], $command);
+        $this->assertFalse(strpos($command, 'su -s') !== false);
+        $this->assertSame("sh -c 'true'", \pmssAccountPathShellCommand(1001, 1001, 'alice', 'true'));
+    }
+
     public function testAccountFileReplacementKeepsContentAndMode(): void
     {
         $home = $this->tempDir.'/account';

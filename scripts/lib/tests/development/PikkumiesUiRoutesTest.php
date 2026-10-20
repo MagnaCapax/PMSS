@@ -8,6 +8,48 @@ require_once dirname(__DIR__, 2).'/lighttpd/pikkumiesUi.php';
 
 final class PikkumiesUiRoutesTest extends TestCase
 {
+    /** Evaluate the rendered nginx map's ordered regex rows. */
+    private function mapResult(string $map, string $input): int
+    {
+        preg_match('/default ([01]);/', $map, $default);
+        $value = (int) ($default[1] ?? -1);
+        preg_match_all('/^\s*~([^\s]+) ([01]);$/m', $map, $rows, PREG_SET_ORDER);
+        foreach ($rows as $row) {
+            if (preg_match('#'.str_replace('#', '\\#', $row[1]).'#', $input) === 1) return (int) $row[2];
+        }
+        return $value;
+    }
+
+    public function testRenderedAliasPrefixesDenyEveryInternalUiMount(): void
+    {
+        $template = str_replace(['##username', '##serverPort'], ['uitester', '12345'],
+            $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user'));
+        preg_match_all('/location (\^~ )?(\/[^ ]+) \{([^}]*)\}/s', $template, $matches, PREG_SET_ORDER);
+        foreach (['/public-uitester/', '/~uitester/'] as $prefix) {
+            foreach (['a/', 'b/', 'c/', 'c-agentboard/'] as $ui) {
+                $request = $prefix.'__pmss-ui-'.$ui;
+                $chosen = null;
+                foreach ($matches as $location) {
+                    if (strpos($request, $location[2]) !== 0) continue;
+                    if ($chosen === null || strlen($location[2]) > strlen($chosen[2])) $chosen = $location;
+                }
+                $this->assertTrue($chosen !== null, $request);
+                $this->assertStringContainsString('return 404;', $chosen[3]);
+                $this->assertFalse(strpos($chosen[3], 'proxy_pass') !== false);
+            }
+        }
+    }
+
+    public function testPortAMapsRejectForeignUpgradeAndCrossSiteApi(): void
+    {
+        $block = \pmssPikkumiesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
+        preg_match_all('/map "[^"]+" \$[^\s]+ \{(.*?)\n\}/s', $block, $maps);
+        $this->assertSame(2, count($maps[1]));
+        $this->assertSame(0, $this->mapResult($maps[1][0], 'GET:websocket:https://evil.example'));
+        $this->assertSame(1, $this->mapResult($maps[1][0], 'GET:websocket:https://0123456789abcdef.mcx.fi:844'));
+        $this->assertSame(0, $this->mapResult($maps[1][1], 'GET:/api/sessions:cross-site'));
+        $this->assertSame(1, $this->mapResult($maps[1][1], 'GET:/api/sessions:same-origin'));
+    }
     public function testPortCollisionRefusesForeignListener(): void
     {
         $foreign = 'LISTEN 0 128 0.0.0.0:844 0.0.0.0:* users:(("other",pid=7,fd=3))';
@@ -16,6 +58,19 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertTrue(\pmssPikkumiesUiPortAvailable(844, $nginx));
         $this->assertTrue(\pmssPikkumiesUiPortAvailable(844, str_replace(':844', ':845', $foreign)));
         $this->assertTrue(\pmssPikkumiesUiPortAvailable(844, ''));
+    }
+
+    public function testBillingPublicationUsesPrivateAccountReadAndMarkerGate(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-ui-billing-');
+        $directory = $root.'/billing';
+        $marker = $root.'/enabled';
+        $this->assertSame(['root', 'uitester', 0640], \pmssPikkumiesUiIdentityMetadata('uitester'));
+        $this->assertTrue(\pmssPikkumiesUiIdentityPublish('uitester', '123', $directory, $marker));
+        $this->assertFalse(is_dir($directory));
+        file_put_contents($marker, '');
+        $this->assertFalse(\pmssPikkumiesUiIdentityPublish('uitester', '123', $directory, $marker));
+        $this->assertTrue(is_dir($directory));
     }
 
     public function testPortABlockUsesOnlyServiceHostAndPrivateInternalMount(): void

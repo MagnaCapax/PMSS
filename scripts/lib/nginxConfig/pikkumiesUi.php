@@ -17,22 +17,29 @@ function pmssPikkumiesUiPagesInstall(): bool
 }
 
 /** Publish only root-provisioned identity for account-side launchers. */
-function pmssPikkumiesUiIdentityPublish(string $user, ?string $serviceId, string $directory = '/var/lib/pmss/public/billing'): bool
+function pmssPikkumiesUiIdentityMetadata(string $user): array
 {
+    return ['root', $user, 0640];
+}
+
+function pmssPikkumiesUiIdentityPublish(string $user, ?string $serviceId, string $directory = '/var/lib/pmss/public/billing',
+    string $marker = '/etc/seedbox/config/pikkumiesEternals.enabled'): bool
+{
+    $enabled = is_file($marker) && !is_link($marker);
     if (!pmssValidateUsername($user) || !pmssPathTargetIsSafe($directory, true, false, false)
         || is_link($directory)) return false;
-    if (!is_dir($directory) && !@mkdir($directory, 0711, true)) return false;
+    if (!is_dir($directory) && (!$enabled || !@mkdir($directory, 0711, true))) return !$enabled;
     if (!is_dir($directory) || is_link($directory) || @fileowner($directory) !== 0) return false;
     @chmod($directory, 0711);
     $path = $directory.'/'.$user;
-    if ($serviceId === null) {
+    if (!$enabled || $serviceId === null) {
         if (!file_exists($path) && !is_link($path)) return true;
         $entry = @lstat($path);
         return is_array($entry) && ($entry['mode'] & 0170000) === 0100000
             && $entry['uid'] === 0 && $entry['nlink'] === 1 && @unlink($path);
     }
     if (pmssUnsignedDecimalIntParse($serviceId) === null || (int) $serviceId < 1) return false;
-    return pmssWriteManagedFile($path, $serviceId."\n", 'root', 'root', 0644);
+    return pmssWriteManagedFile($path, $serviceId."\n", ...pmssPikkumiesUiIdentityMetadata($user));
 }
 
 /** Refuse a port owned by a service other than nginx. */
