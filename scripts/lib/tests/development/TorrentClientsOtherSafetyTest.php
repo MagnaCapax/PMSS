@@ -29,11 +29,12 @@ final class TorrentClientsOtherSafetyTest extends TestCase
 
     public function testRepointRequiresRealDirectoryAndClientBinaries(): void
     {
-        foreach (array('deluge', 'transmission') as $client) {
+        foreach (array('deluge', 'transmission', 'rtorrent') as $client) {
             $home = $this->pmssMakeTempDir('pmss-other-repoint-');
             $this->pmssEnsureDir($home.'/bin/'.$client);
             $target = $this->pmssEnsureDir($home.'/build');
-            $binary = $client === 'deluge' ? '/bin/deluged' : '/transmission-daemon';
+            $binary = $client === 'deluge' ? '/bin/deluged'
+                : ($client === 'rtorrent' ? '/rtorrent' : '/transmission-daemon');
             if ($client === 'deluge') $this->pmssEnsureDir($target.'/bin');
             $this->assertFalse(\pmssConfigureTorrentClientOtherRepoint($home, $client, 'v1', $target));
             $this->pmssWriteFile($target.$binary, 'fixture');

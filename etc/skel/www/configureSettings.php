@@ -185,7 +185,7 @@ function pmssConfigureActionRun($home, $action, $request, $ops = array())
         require_once __DIR__.'/configureTorrentClients.php';
         if (($request['client'] ?? null) === 'qbittorrent')
             return pmssConfigureTorrentClientSwitch($home, $request, $ops);
-        if (in_array($request['client'] ?? null, array('deluge', 'transmission'), true)) {
+        if (in_array($request['client'] ?? null, array('deluge', 'transmission', 'rtorrent'), true)) {
             if (!is_file(__DIR__.'/configureTorrentClientsSwitch.php')
                 || !is_file(__DIR__.'/configureTorrentClientsOther.php')
                 || !is_file(__DIR__.'/transmissionLaunch.php'))

@@ -14,8 +14,8 @@ final class TorrentClientsP4R0Test extends TestCase
         $store = $root.'/store';
         $projection = $root.'/torrentClients.json';
         mkdir($home.'/bin/rtorrent', 0755, true);
-        mkdir($store.'/rtorrent/0.16.0', 0755, true);
-        file_put_contents($store.'/rtorrent/0.16.0/rtorrent', 'fixture');
+        mkdir($store.'/rtorrent/0.9.8-r16', 0755, true);
+        file_put_contents($store.'/rtorrent/0.9.8-r16/rtorrent', 'fixture');
         return [$home, $store, $projection];
     }
 
@@ -32,10 +32,10 @@ final class TorrentClientsP4R0Test extends TestCase
     public function testPublishedStoreSelectionResolvesBinary(): void
     {
         [$home, $store, $projection] = $this->fixture();
-        $binary = $store.'/rtorrent/0.16.0/rtorrent';
-        symlink($store.'/rtorrent/0.16.0', $home.'/bin/rtorrent/default');
+        $binary = $store.'/rtorrent/0.9.8-r16/rtorrent';
+        symlink($store.'/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
         file_put_contents($projection, json_encode(['versions' => [
-            ['client' => 'rtorrent', 'version' => '0.16.0', 'kind' => 'static'],
+            ['client' => 'rtorrent', 'version' => '0.9.8-r16', 'kind' => 'static'],
         ]]));
         $this->assertSame($binary, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
         $this->assertSame(escapeshellarg($binary),
@@ -48,7 +48,7 @@ final class TorrentClientsP4R0Test extends TestCase
     public function testResolverFailureFallsBackAndExecutorKeepsLooping(): void
     {
         [$home, $store, $projection] = $this->fixture();
-        symlink($store.'/rtorrent/0.16.0', $home.'/bin/rtorrent/default');
+        symlink($store.'/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
         // An absent projection makes the P0 resolver reject the store selection.
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
         $this->assertSame('/usr/local/bin/rtorrent',

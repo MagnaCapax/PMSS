@@ -5,7 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/configureSettings.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsSwitch.php';
 
-/** Keep both new actions inside the existing password and rollback contract. */
+/** Keep client actions inside the existing password and rollback contract. */
 final class TorrentClientsOtherSwitchTest extends TestCase
 {
     private function home(string $client): string
@@ -20,6 +20,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
 
     private function version(string $client): array
     {
+        if ($client === 'rtorrent') return array('0.9.8-r16', array('kind' => 'static'));
         return $client === 'deluge'
             ? array('2.1.1', array('kind' => 'venv'))
             : array('4.1.3', array('kind' => 'static', 'rpcUnixSocket' => true));
@@ -27,7 +28,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
 
     public function testSuccessfulSwitchOrdersOperationsAndWritesPrivateState(): void
     {
-        foreach (array('deluge', 'transmission') as $client) {
+        foreach (array('deluge', 'transmission', 'rtorrent') as $client) {
             $home = $this->home($client);
             list($version, $entry) = $this->version($client);
             $events = array();
@@ -59,7 +60,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
 
     public function testFailedStartRestoresPreviousSelection(): void
     {
-        foreach (array('deluge', 'transmission') as $client) {
+        foreach (array('deluge', 'transmission', 'rtorrent') as $client) {
             $home = $this->home($client);
             list($version, $entry) = $this->version($client);
             $old = '/home/.pmss/clients/'.$client.'/old';
@@ -88,7 +89,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
 
     public function testUnavailableVersionsAndPasswordsDoNoWork(): void
     {
-        foreach (array('deluge', 'transmission') as $client) {
+        foreach (array('deluge', 'transmission', 'rtorrent') as $client) {
             $home = $this->home($client);
             list($version, $entry) = $this->version($client);
             $events = array();
@@ -112,7 +113,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
 
     public function testRegularDefaultPathIsRefusedBeforeBackupOrStop(): void
     {
-        foreach (array('deluge', 'transmission') as $client) {
+        foreach (array('deluge', 'transmission', 'rtorrent') as $client) {
             $home = $this->home($client);
             list($version, $entry) = $this->version($client);
             $this->pmssWriteFile($home.'/bin/'.$client.'/default', 'keep');

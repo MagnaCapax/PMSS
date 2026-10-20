@@ -1,11 +1,17 @@
 <?php
-/** Customer-side Deluge and Transmission switch operations. */
+/** Customer-side native torrent-client switch operations. */
 require_once __DIR__.'/torrentClientsResolve.php';
 require_once __DIR__.'/transmissionLaunch.php';
 
 /** Use the existing customer native identity readers for the current selection. */
 function pmssConfigureTorrentClientOtherPids($home, $client, $component = 'both')
 {
+    if ($client === 'rtorrent') {
+        $binaries = array('/usr/bin/rtorrent', '/usr/local/bin/rtorrent');
+        $binary = pmssTorrentClientResolve($home, $client);
+        if ($binary !== null) $binaries[] = $binary;
+        return pmssCustomerNativePidsRead($binaries);
+    }
     if ($client === 'transmission') {
         $binary = pmssTorrentClientResolve($home, $client);
         return $binary === null ? array() : pmssTransmissionNativePids($binary);
@@ -32,6 +38,8 @@ function pmssConfigureTorrentClientOtherRunningVersion($home, $client)
 /** Recheck native identity before TERM and wait for both Deluge components. */
 function pmssConfigureTorrentClientOtherStop($home, $client)
 {
+    // The rTorrent executor respawns children: restart it only after repointing.
+    if ($client === 'rtorrent') return true;
     foreach (pmssConfigureTorrentClientOtherPids($home, $client) as $pid) {
         if (!in_array($pid, pmssConfigureTorrentClientOtherPids($home, $client), true)
             || !@posix_kill($pid, 15)) return false;
@@ -48,11 +56,13 @@ function pmssConfigureTorrentClientOtherRepoint($home, $client, $version, $resto
 {
     $path = $home.'/bin/'.$client.'/default';
     if (file_exists($path) && !is_link($path)) return false;
-    if ($version === 'system') return $client === 'deluge' && (!is_link($path) || @unlink($path));
+    if ($version === 'system') return in_array($client, array('deluge', 'rtorrent'), true)
+        && (!is_link($path) || @unlink($path));
     $target = $restoreTarget === null ? '/home/.pmss/clients/'.$client.'/'.$version : $restoreTarget;
     if (!is_string($target) || $target === '') return false;
     $check = $target[0] === '/' ? $target : dirname($path).'/'.$target;
-    $binary = $client === 'deluge' ? '/bin/deluged' : '/transmission-daemon';
+    $binary = $client === 'deluge' ? '/bin/deluged'
+        : ($client === 'rtorrent' ? '/rtorrent' : '/transmission-daemon');
     if (!is_dir($check) || is_link($check) || !is_file($check.$binary)
         || is_link($check.$binary)) return false;
     if ($client === 'deluge' && (!is_file($check.'/bin/deluge-web')
@@ -67,6 +77,23 @@ function pmssConfigureTorrentClientOtherRepoint($home, $client, $version, $resto
 /** Call the established launchers while the account switch lock is held. */
 function pmssConfigureTorrentClientOtherStart($home, $client, $version)
 {
+    if ($client === 'rtorrent') {
+        $binary = $version === 'system' ? '/usr/local/bin/rtorrent' : pmssTorrentClientResolve($home, $client);
+        // Account-local selections still use the executor's legacy system fallback.
+        if ($binary !== null && pmssRtorrentExecutorCommand($home) === '/usr/local/bin/rtorrent')
+            $binary = '/usr/local/bin/rtorrent';
+        if ($binary === null || !is_file($home.'/.rtorrentRestart.php')
+            || is_file($home.'/.rtorrentDisable') || !@touch($home.'/www/.rtorrentRestart')) return false;
+        // Reuse Apps' restart consumer; it preserves the supervising executor.
+        $rc = 1;
+        @exec('cd '.escapeshellarg($home).' && php ./.rtorrentRestart.php >/dev/null 2>&1', $unused, $rc);
+        if ($rc !== 0) return false;
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            if (pmssCustomerNativePidsRead(array($binary)) !== array()) return true;
+            usleep(100000);
+        }
+        return false;
+    }
     if ($client === 'transmission') {
         return pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home);
     }

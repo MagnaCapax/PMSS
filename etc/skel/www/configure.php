@@ -91,7 +91,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
     if (is_file(__DIR__.'/configureTorrentClientsOther.php') && is_file(__DIR__.'/configureTorrentClientsSwitch.php')
         && is_file(__DIR__.'/transmissionLaunch.php')) {
         require_once __DIR__.'/configureTorrentClientsOther.php';
-        foreach (array('deluge', 'transmission') as $client)
+        foreach (array('deluge', 'transmission', 'rtorrent') as $client)
             $otherTorrentVersions[$client] = pmssConfigureTorrentClientVersionsRead('/var/lib/pmss/public/torrentClients.json', $client);
     }
 }
@@ -151,7 +151,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <?php endif; ?></div>
 </section>
 <?php endif; ?>
-<?php foreach (array('deluge' => 'Deluge', 'transmission' => 'Transmission') as $client => $label): $versions = $otherTorrentVersions[$client] ?? array(); if ($versions): ?>
+<?php foreach (array('deluge' => 'Deluge', 'transmission' => 'Transmission', 'rtorrent' => 'rTorrent') as $client => $label): $versions = $otherTorrentVersions[$client] ?? array(); if ($versions): ?>
 <section class="configure-card" id="<?= $client ?>-version"><h2><?= $label ?> version</h2><p>Running: <?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientOtherRunningVersion($home, $client)) ?></p><?php $notice = trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/'.$client.'.notice', 256)); if ($notice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($notice) ?></p><?php endif; ?>
 <div class="configure-actions"><select id="configure-<?= $client ?>-version" aria-label="<?= $label ?> version"><?php foreach ($versions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"><?= pmssCustomerHtmlAttr($version) ?></option><?php endforeach; ?></select>
 <input type="password" id="configure-<?= $client ?>-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'<?= $client ?>',version:document.getElementById('configure-<?= $client ?>-version').value,password:document.getElementById('configure-<?= $client ?>-password').value},'Back up the current configuration and restart <?= $label ?> with this version?')">Switch version</button></div></section><?php endif; endforeach; ?>

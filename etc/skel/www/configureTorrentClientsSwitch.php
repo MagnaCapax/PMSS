@@ -1,5 +1,5 @@
 <?php
-/** Password-guarded Configure switch for the two additional native clients. */
+/** Password-guarded Configure switch for the additional native clients. */
 require_once __DIR__.'/configureTorrentClients.php';
 require_once __DIR__.'/configureTorrentClientsOther.php';
 
@@ -7,7 +7,7 @@ require_once __DIR__.'/configureTorrentClientsOther.php';
 function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
 {
     $client = $request['client'] ?? null;
-    if (!in_array($client, array('deluge', 'transmission'), true))
+    if (!in_array($client, array('deluge', 'transmission', 'rtorrent'), true))
         return array('ok' => false, 'status' => 400, 'message' => 'That torrent client is unavailable.');
     $versions = isset($ops['versions']) ? $ops['versions']
         : pmssConfigureTorrentClientVersionsRead('/var/lib/pmss/public/torrentClients.json', $client);
@@ -16,12 +16,15 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
         || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1
         || !isset($versions[$version]) || !is_array($versions[$version])
         || !in_array($versions[$version]['kind'] ?? null,
-            $client === 'deluge' ? array('system', 'venv') : array('static'), true)
+            $client === 'deluge' ? array('system', 'venv')
+                : ($client === 'rtorrent' ? array('system', 'static') : array('static')), true)
         || (($version === 'system') !== (($versions[$version]['kind'] ?? null) === 'system'))
         || ($client === 'transmission' && ($versions[$version]['rpcUnixSocket'] ?? null) !== true))
         return array('ok' => false, 'status' => 400, 'message' => 'That '.$client.' version is unavailable.');
     if (!is_dir($home.'/bin/'.$client) || is_link($home.'/bin/'.$client))
         return array('ok' => false, 'status' => 503, 'message' => 'The client link directory is unavailable.');
+    if ($client === 'rtorrent' && is_file($home.'/.rtorrentDisable'))
+        return array('ok' => false, 'status' => 409, 'message' => 'Start rTorrent in Apps before switching versions.');
     $dir = $home.'/.config/pmss/torrentClients';
     if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
         return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
