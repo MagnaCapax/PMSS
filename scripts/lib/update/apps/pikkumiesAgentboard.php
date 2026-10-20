@@ -32,16 +32,31 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
         // Only the expected member is extracted; no archive owner or permissions survive.
         $command = 'tar -xzf '.escapeshellarg($archive)
             .' --no-same-owner --no-same-permissions -C '.escapeshellarg($stage).' -- agentboard';
-        if (runStep('Extracting Pikkumies Agentboard', $command) !== 0) return false;
+        $oldUmask = umask(0022);
+        try {
+            $extractRc = runStep('Extracting Pikkumies Agentboard', $command);
+        } finally {
+            umask($oldUmask);
+        }
+        if ($extractRc !== 0) return false;
         $entry = @lstat($stage.'/agentboard');
         if (!is_array($entry) || ($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1) return false;
         if (!@chmod($stage.'/agentboard', 0755) || !@chmod($stage, 0755)) return false;
         if (file_exists($versionDir)) {
-            $installed = @lstat($versionDir.'/agentboard');
-            if (!is_dir($versionDir) || @fileowner($versionDir) !== $ownerUid || !is_array($installed)
-                || ($installed['mode'] & 0170000) !== 0100000 || $installed['uid'] !== $ownerUid
-                || $installed['nlink'] !== 1
-                || @hash_file('sha256', $versionDir.'/agentboard') !== @hash_file('sha256', $stage.'/agentboard')) return false;
+            $ownedDir = is_dir($versionDir) && @fileowner($versionDir) === $ownerUid;
+            $installed = $ownedDir ? @lstat($versionDir.'/agentboard') : false;
+            $valid = $ownedDir && is_array($installed)
+                && ($installed['mode'] & 0170000) === 0100000 && $installed['uid'] === $ownerUid
+                && $installed['nlink'] === 1
+                && @hash_file('sha256', $versionDir.'/agentboard') === @hash_file('sha256', $stage.'/agentboard');
+            if (!$valid) {
+                $quarantine = $root.'/.quarantine';
+                if ((!is_dir($quarantine) && !@mkdir($quarantine, 0700))
+                    || is_link($quarantine) || @fileowner($quarantine) !== $ownerUid
+                    || !@chmod($quarantine, 0700)) return false;
+                $retired = $quarantine.'/'.$version.'-'.bin2hex(random_bytes(8));
+                if (!@rename($versionDir, $retired) || !@rename($stage, $versionDir)) return false;
+            }
         } elseif (!@rename($stage, $versionDir)) return false;
 
         $link = $root.'/agentboard';
@@ -59,8 +74,17 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
 }
 
 /** Keep the update hook a logged no-op until the release has immutable pins. */
+function pmssPikkumiesAgentboardHostEnabled(string $marker = '/etc/seedbox/config/pikkumiesEternals.enabled'): bool
+{
+    return is_file($marker) && !is_link($marker);
+}
+
 function pmssPikkumiesAgentboardInstall(): void
 {
+    if (!pmssPikkumiesAgentboardHostEnabled()) {
+        logmsg('[SKIP] Pikkumies Agentboard host marker is absent');
+        return;
+    }
     $version = PMSS_PIKKUMIES_AGENTBOARD_VERSION;
     $sha256 = PMSS_PIKKUMIES_AGENTBOARD_SHA256;
     if ($version === '' || $sha256 === '') {

@@ -40,4 +40,43 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
             $this->assertTrue(preg_match('/^[a-f0-9]{64}$/iD', \PMSS_PIKKUMIES_AGENTBOARD_SHA256) === 1);
         }
     }
+
+    public function testHostMarkerGateRejectsAbsentAndLinkedFiles(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-agentboard-gate-');
+        $marker = $root.'/enabled';
+        $this->assertFalse(\pmssPikkumiesAgentboardHostEnabled($marker));
+        file_put_contents($marker, '');
+        $this->assertTrue(\pmssPikkumiesAgentboardHostEnabled($marker));
+        unlink($marker);
+        symlink($root.'/missing', $marker);
+        $this->assertFalse(\pmssPikkumiesAgentboardHostEnabled($marker));
+    }
+
+    public function testInvalidExistingVersionIsQuarantinedAndReplaced(): void
+    {
+        $temp = $this->pmssMakeTempDir('pmss-agentboard-refresh-');
+        $source = $temp.'/source';
+        $root = $temp.'/installed';
+        mkdir($source);
+        mkdir($root);
+        mkdir($root.'/v2');
+        file_put_contents($source.'/agentboard', "#!/bin/sh\nexit 0\n");
+        file_put_contents($root.'/v2/agentboard', 'stale');
+        $archive = $temp.'/agentboard.tar.gz';
+        exec('tar -czf '.escapeshellarg($archive).' -C '.escapeshellarg($source).' agentboard', $output, $rc);
+        $this->assertSame(0, $rc);
+        $before = umask(0077);
+        try {
+            $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v2', hash_file('sha256', $archive), $root, posix_geteuid()));
+            $this->assertSame(0077, umask());
+        } finally {
+            umask($before);
+        }
+        $this->assertSame(file_get_contents($source.'/agentboard'), file_get_contents($root.'/v2/agentboard'));
+        $this->assertSame(0700, fileperms($root.'/.quarantine') & 0777);
+        $retired = glob($root.'/.quarantine/v2-*');
+        $this->assertSame(1, count($retired));
+        $this->assertSame('stale', file_get_contents($retired[0].'/agentboard'));
+    }
 }
