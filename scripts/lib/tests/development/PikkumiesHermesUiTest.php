@@ -209,7 +209,10 @@ final class PikkumiesHermesUiTest extends TestCase
             '0123456789abcdef.mcx.fi', 12345, $root);
         $block = preg_replace('/^    (?:include|ssl_dhparam) \/etc\/letsencrypt\/[^;]+;\n/m', '', $block);
         $block = str_replace('/var/log/nginx/access.log', $root.'/access.log', $block);
-        $config = "pid {$root}/nginx.pid; events {} http { log_format pmss_ui_b_noargs '\$uri';\n"
+        // Every path nginx -t opens stays under $root, so the check also runs as an unprivileged user.
+        $config = "pid {$root}/nginx.pid; error_log {$root}/error.log; events {} http { access_log {$root}/access.log;\n"
+            ."client_body_temp_path {$root}/tmp_body; proxy_temp_path {$root}/tmp_proxy; fastcgi_temp_path {$root}/tmp_fcgi;\n"
+            ."uwsgi_temp_path {$root}/tmp_uwsgi; scgi_temp_path {$root}/tmp_scgi; log_format pmss_ui_b_noargs '\$uri';\n"
             ."log_format pmss_ui_noargs '\$uri'; limit_conn_zone \$binary_remote_addr zone=addr:10m;\n"
             .\pmssPikkumiesHermesDefaultNginxBlock('    ssl_certificate '.escapeshellarg($cert).";\n"
                 .'    ssl_certificate_key '.escapeshellarg($key).";\n")
