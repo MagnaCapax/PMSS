@@ -1,4 +1,4 @@
-# ADR 0125: Curated Deluge virtualenv entries
+# ADR 0129: Curated Deluge virtualenv entries
 
 Date: 2026-10-20
 Category: architecture

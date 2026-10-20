@@ -1,4 +1,4 @@
-# ADR 0127: Curated static rTorrent entry
+# ADR 0130: Curated static rTorrent entry
 
 Date: 2026-10-20
 Category: architecture
