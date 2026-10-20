@@ -66,6 +66,14 @@ and Hermes state; the archived home retains their previous data.
 
 ## Consequences and limits
 
+- The upstream Hermes advisory list showed no published advisory on
+  2026-10-20. That does not close the source-level loopback risk: an
+  unauthenticated dashboard can expose the account's agent commands and
+  secrets to another tenant. A uses a 256-bit bearer kept in a mode-0600
+  account file and carried in the URL fragment, which is not sent in HTTP
+  requests or access logs. Primary account credentials are not stored by
+  this feature. B and C remain closed until their separate service credentials,
+  session secrets, listener ownership checks and login gates are installed.
 - UI authentication remains the access boundary: A has single-use bearer
   tokens, while B and C require Hermes' own login before their routes can open.
   Origin and routing checks provide additional protection.
@@ -96,4 +104,5 @@ and Hermes state; the archived home retains their previous data.
 ## References
 
 ADRs 0021, 0023, 0031, 0039, 0090, 0101, 0118, 0121 and 0122;
-`docs/contracts.md`, `docs/portManager.md`.
+`docs/contracts.md`, `docs/portManager.md`,
+[Hermes security advisories](https://github.com/NousResearch/hermes-agent/security/advisories).
