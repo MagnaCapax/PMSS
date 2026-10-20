@@ -69,6 +69,7 @@ function pmssHermesProviderKeyRefresh(array $paths): void
     $credentials = pmssAgentVirsilipasCredentials($paths['home']);
     $file = $paths['base'].'/.env';
     $receipt = $paths['base'].'/pmss-provider-endpoint';
+    clearstatcache(true, $file);
     if ($credentials === null || !is_file($receipt) || is_link($receipt)
         || trim((string) @file_get_contents($receipt)) !== $credentials['endpoint']
         || !is_file($file) || is_link($file)
@@ -206,6 +207,7 @@ function pmssHermesInstall(array $paths, string $origin): void
         $keyEnv = pmssHermesCustomKeyEnv($provider['endpoint']);
         pmssHermesConfigSet($paths, 'model.api_key', '${'.$keyEnv.'}');
         $envPath = $paths['base'].'/.env';
+        clearstatcache(true, $envPath);
         if (is_link($envPath) || (file_exists($envPath) && (!is_file($envPath)
             || (fileperms($envPath) & 0077) !== 0))) throw new RuntimeException('Hermes provider env is unsafe');
         if (!is_file($envPath)) pmssHermesPrivateWrite($envPath, '');

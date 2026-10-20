@@ -1,6 +1,10 @@
 <?php
 /** Shared account-only primitives for agent installers; never load operator /scripts. */
 
+// Signal numbers without the pcntl extension (absent from php-cgi/fpm and some CLI builds).
+if (!defined('SIGTERM')) define('SIGTERM', 15);
+if (!defined('SIGKILL')) define('SIGKILL', 9);
+
 /** The account CLI carries its own command lookup across the /scripts boundary. */
 function pmssAgentCommandPath(string $binary): string
 {

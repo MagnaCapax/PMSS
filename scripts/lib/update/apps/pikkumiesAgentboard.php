@@ -46,6 +46,7 @@ function pmssPikkumiesAgentboardArchiveMembersSafe(string $archive): bool
 /** Return a sorted content manifest after checking every entry without following links. */
 function pmssPikkumiesAgentboardTreeManifest(string $dir, int $ownerUid, bool $normalize = false)
 {
+    clearstatcache(true, $dir);
     if (!pmssPikkumiesAgentboardVersionOwned($dir, $ownerUid)) return false;
     if (!$normalize && (fileperms($dir) & 0777) !== 0755) return false;
     $manifest = [];

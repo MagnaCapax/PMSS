@@ -61,6 +61,7 @@ function pmssHermesPanelAction($home, $action, $request, $ops = array()): array
         return array('ok' => false, 'status' => 400, 'message' => 'Unknown Hermes action.');
     if ($action === 'show-login') {
         $file = $home.'/.hermes/pmss-dashboard.env';
+        clearstatcache(true, $file);
         if (!is_file($file) || is_link($file) || (fileperms($file) & 0077) !== 0 || filesize($file) > 2048)
             return array('ok' => false, 'status' => 409, 'message' => 'Hermes login is unavailable.');
         $raw = file_get_contents($file);

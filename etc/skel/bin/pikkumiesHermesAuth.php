@@ -17,6 +17,7 @@ function pmssPikkumiesHermesPaths(string $home): array
 function pmssPikkumiesHermesCredentials(array $paths): ?array
 {
     $file = $paths['credentials'];
+    clearstatcache(true, $file); // chmod() does not clear PHP's stat cache before 8.3
     if (!is_file($file) || is_link($file) || fileowner($file) !== posix_geteuid()
         || (fileperms($file) & 0077) !== 0 || filesize($file) > 256) return null;
     $raw = (string) @file_get_contents($file);
@@ -97,6 +98,7 @@ function pmssPikkumiesHermesReady(array $paths): bool
 function pmssPikkumiesHermesStop(array $paths): void
 {
     pmssHermesRelayStop($paths['relayPid'], $paths['socket']);
+    clearstatcache(true, $paths['pid']);
     $raw = is_file($paths['pid']) && !is_link($paths['pid']) ? trim((string) @file_get_contents($paths['pid'])) : '';
     if (preg_match('/^[1-9][0-9]*$/D', $raw)) {
         $proc = '/proc/'.$raw;

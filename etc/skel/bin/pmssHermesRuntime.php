@@ -17,6 +17,7 @@ function pmssHermesPaths(string $home): array
 function pmssHermesEnv(array $paths, string $publicUrl): array
 {
     $file = $paths['env'];
+    clearstatcache(true, $file);
     if (!is_file($file) || is_link($file) || fileowner($file) !== posix_geteuid()
         || (fileperms($file) & 0077) !== 0 || filesize($file) > 2048) throw new RuntimeException('Dashboard credential file is absent or insecure');
     $raw = (string) file_get_contents($file);
@@ -32,6 +33,7 @@ function pmssHermesEnv(array $paths, string $publicUrl): array
 /** A PID only belongs to this installer if UID and command line match its tree. */
 function pmssHermesRunningPid(array $paths): ?int
 {
+    clearstatcache(true, $paths['pid']);
     $raw = is_file($paths['pid']) && !is_link($paths['pid']) ? trim((string) file_get_contents($paths['pid'])) : '';
     if (!preg_match('/^[1-9][0-9]*$/D', $raw)) return null;
     $proc = '/proc/'.$raw;

@@ -41,6 +41,7 @@ function pmssHermesRelayReady(string $socket): bool
 /** Forward both directions; bytes a non-blocking write could not take wait in that stream's queue. */
 function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null): int
 {
+    clearstatcache(true, dirname($socket));
     if ($port < 1024 || $port > 65535 || is_link(dirname($socket))
         || !is_dir(dirname($socket)) || (fileperms(dirname($socket)) & 0077) !== 0) return 1;
     if (file_exists($socket) || is_link($socket)) {
@@ -106,6 +107,7 @@ function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null
 /** A PID is actionable only when it still names this account's relay script. */
 function pmssHermesRelayStop(string $pidFile, string $socket): void
 {
+    clearstatcache(true, $pidFile);
     $raw = is_file($pidFile) && !is_link($pidFile) ? trim((string) @file_get_contents($pidFile)) : '';
     if (preg_match('/^[1-9][0-9]*$/D', $raw)) {
         $proc = '/proc/'.$raw;

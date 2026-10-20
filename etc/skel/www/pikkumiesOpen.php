@@ -253,6 +253,7 @@ function pmssHermesAgentboardStart($home, $origin, $panelOrigin, $launcherUrl)
 function pmssHermesAgentboardStop($home)
 {
     $pidFile = $home.'/.config/pmss/ui/agentboard.pid';
+    clearstatcache(true, $pidFile);
     $pid = is_file($pidFile) && !is_link($pidFile) ? trim((string) @file_get_contents($pidFile)) : '';
     if (!preg_match('/^[1-9][0-9]*$/D', $pid)) return;
     $proc = '/proc/'.$pid;
@@ -262,7 +263,7 @@ function pmssHermesAgentboardStop($home)
         if (@fileowner($proc) === posix_geteuid()
             && ($argument === '/opt/pikkumies-agentboard/agentboard'
                 || preg_match('~\A/opt/pikkumies-agentboard/[A-Za-z0-9._-]+/agentboard\z~D', $argument) === 1)) {
-            @posix_kill((int) $pid, SIGTERM);
+            @posix_kill((int) $pid, defined('SIGTERM') ? SIGTERM : 15);
             return;
         }
     }

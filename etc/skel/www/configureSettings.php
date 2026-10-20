@@ -45,6 +45,7 @@ function pmssConfigureFileRead($path, $limit)
 function pmssPikkumiesHermesLoginRead($home)
 {
     $path = $home.'/.mcxPikkumies/pikkumies/local/ui/hermes/credentials';
+    clearstatcache(true, $path); // chmod() does not clear PHP's stat cache before 8.3
     if (!is_file($path) || is_link($path) || @fileowner($path) !== posix_geteuid()
         || (@fileperms($path) & 0077) !== 0 || @filesize($path) > 256) return '';
     $raw = @file_get_contents($path);
