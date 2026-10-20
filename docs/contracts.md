@@ -1182,6 +1182,81 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ---
 
+## Pikkumies Eternals and web UIs (contract v1)
+
+This is the shared contract for PMSS, mcxPikkumies, and
+mcxPikkumiesAgentboard. ADR 0124 records Eternals and account web UIs;
+ADR 0125 covers vanilla Hermes. Paths beginning with `~` are relative
+to the account home. `L` means `Config::localDir()`.
+
+- Install root: `~/.mcxPikkumies/pikkumies`; `L = Config::localDir()` is
+  `<root>/local`. There is no `~/.pikkumies` state root.
+- Eternal records: `L/eternals/<id>` where `id` matches `^pm[1-9]$`.
+  The locks are `L/eternals.lock` and `L/eternals/<id>.run`; the Off marker is
+  `L/eternals.off`. The source hold is `L/eternals.hold` with JSON
+  `{"until": <ts>}`;
+  `hold --until <ts>` applies on both source and target during transfer.
+- Host marker: `/etc/seedbox/config/pikkumiesEternals.enabled` is root-owned
+  and staged on hosts. No `etc/seedbox/config/*.enabled` file is shipped.
+- Lifecycle: Pikkumies' own per-minute user cron tick keeps the Eternals running
+  and resumes them after reboot unless the user quit them. The tmux session is
+  `pikkumies`; its windows are `pm1` through `pm9`, named by `id`, with `pm1`
+  as Primary. The pinned invocation argv is `pikkumies run --eternal <id>`;
+  fleet monitoring matches this argv.
+- `pikkumies eternal list --json` returns
+  `[{"id":"pm1","state":"running|starting|waiting-for-setup|not-ready|quit"}]`.
+  The only states are `running`, `starting`, `waiting-for-setup`, `not-ready`,
+  and `quit`; there is no `failing` state. The reported capability flag is
+  `eternal`: an existing `pikkumies eternal list --json` means capable.
+- `pikkumies ask` reads text on stdin, limited to 4000 chars. Exit codes:
+  `0` = sent; `1` = error; `2` = setup not finished; `3` = approval prompt open;
+  `4` = rate-capped; `5` = Primary starting; `6` = Primary busy.
+  The UI retries exits 5 and 6 every 5 s. `ask` pastes only when Primary is idle.
+  Terms pending is NOT an exit-75 refusal: Primary starts and shows the terms prompt.
+  Do not emit the string
+  `Primary not running`; show state via the list, badges, and launcher pages.
+- Simplified UI (port A): only `pikkumies ui start` starts the process. PMSS
+  installs the root-owned binary `/opt/pikkumies-agentboard/agentboard`.
+  It uses the Unix socket `L/ui/ui.sock` in `L/ui/` (0700), single-use tokens
+  in `L/ui/tokens/` (0700, files 0600, lifetime 60 s), and TMPDIR
+  `L/tmp/` (0700). The `pikkumies` tmux server, Eternals, `ask`, `ui start`,
+  and UI processes use `TMUX_TMPDIR=L/tmux` (0700) and `TMPDIR=L/tmp`
+  (0700), never `/tmp/tmux-<uid>`. Each UI process keeps its own data dir,
+  log file, and tmux pid file under `L/ui/<ui>/`. Environment names are
+  `AGENTBOARD_MODE=pikkumies`,
+  `AGENTBOARD_SOCKET`, `AGENTBOARD_TOKEN_DIR`, `AGENTBOARD_LAUNCHER_URL`,
+  `AGENTBOARD_ALLOWED_ORIGIN`, `AGENTBOARD_FRAME_ANCESTORS`,
+  `TMUX_SESSION=pikkumies`, and `TERMINAL_MODE=pty`.
+- Welcome-page prompt bar: hands a question to Primary. Pending-ask JSON in
+  the port-A origin's localStorage is a queue of up to 5
+  `{"text": string <= 4000 chars, "nonce": string, "ts": unix seconds}` items,
+  delivered in order. Its TTL is 60 minutes. The UI frames and panel use
+  `pikkumies:switch`, `pikkumies:ready`, `pikkumies:reconnect`,
+  `pikkumies:rows:1`, `pikkumies:rows:2`, `pikkumies:rows:3`,
+  `pikkumies:rows:4`, `pikkumies:rows:5`, and `pikkumies:rows:6`
+  postMessage names, always with
+  an exact target origin. UI pages accept no inbound postMessage.
+- `?session=` accepts only `^pm[1-9]$`. Per-UI `ui=` selector values are
+  `simplified` (port A, agentboard fork in pikkumies mode), `hermes` (port B,
+  Pikkumies' Hermes dashboard, "Power user"), `vanilla-hermes-web`, and
+  `vanilla-agentboard` (port C, one at a time).
+- Ports A, B, and C are respectively 844, 845, and 846. ADR 0124 records
+  their account UI routing. Each port serves its UI at `/` on the service
+  permalink. A also serves `/bar` from a root-owned host path outside `/home`.
+  The host marker gates A and B; C does not depend on it.
+- Port C tokens live in `~/.config/pmss/ui/tokens/` (0700, files 0600,
+  single-use, 60 s). The launcher accepts `?view=status` for a same-origin
+  GET that reads state and may place a guarded certificate request; it does
+  not start a UI or mint a token. An absent `Sec-Fetch-Site` is denied.
+- Account UI preferences live in `~/.config/pmss/ui/`; absent means Simplified
+  for Pikkumies and Hermes web UI for vanilla Hermes.
+- The Agentboard binary is `/opt/pikkumies-agentboard/<version>/agentboard`,
+  reached through `/opt/pikkumies-agentboard/agentboard`. It uses the
+  `bun-linux-x64-baseline` target. The installer is inactive with an empty
+  version or sha256 pin.
+
+---
+
 ## Notes for Agentic Coding
 - Prefer high-level helpers (`runStep`, `pmssRefreshRepositories`, `pmssApplyDpkgSelections`, `pmssUpdateUserEnvironment`) to keep logs/profile consistent.
 - Honor environment overrides in tests (`PMSS_*` flags) to avoid mutating the real system.

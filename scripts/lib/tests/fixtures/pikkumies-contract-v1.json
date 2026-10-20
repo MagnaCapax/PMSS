@@ -1,0 +1,78 @@
+{
+  "installRoot": "~/.mcxPikkumies/pikkumies",
+  "localDir": ["L = Config::localDir()", "<root>/local"],
+  "excludedStateRoot": "~/.pikkumies",
+  "paths": {
+    "record": "L/eternals/<id>",
+    "lock": "L/eternals.lock",
+    "runLock": "L/eternals/<id>.run",
+    "offMarker": "L/eternals.off",
+    "sourceHold": "L/eternals.hold",
+    "hostMarker": "/etc/seedbox/config/pikkumiesEternals.enabled",
+    "binary": "/opt/pikkumies-agentboard/agentboard",
+    "socket": "L/ui/ui.sock",
+    "socketDir": "L/ui/",
+    "tokenDir": "L/ui/tokens/",
+    "tmpDir": "L/tmp/",
+    "tmuxDir": "L/tmux",
+    "uiProcessDir": "L/ui/<ui>/",
+    "vanillaTokenDir": "~/.config/pmss/ui/tokens/"
+  },
+  "eternals": {
+    "idRegex": "^pm[1-9]$",
+    "session": "pikkumies",
+    "primary": "pm1",
+    "lastWindow": "pm9",
+    "argv": ["pikkumies", "run", "--eternal", "<id>"],
+    "listCommand": "pikkumies eternal list --json",
+    "listExample": "[{\"id\":\"pm1\",\"state\":\"running|starting|waiting-for-setup|not-ready|quit\"}]",
+    "states": ["running", "starting", "waiting-for-setup", "not-ready", "quit"],
+    "capability": "eternal",
+    "holdArgument": "hold --until <ts>",
+    "sourceHoldJson": "{\"until\": <ts>}"
+  },
+  "ask": {
+    "command": "pikkumies ask",
+    "input": "stdin",
+    "maxChars": 4000,
+    "exitCodes": {
+      "0": "sent",
+      "1": "error",
+      "2": "setup not finished",
+      "3": "approval prompt open",
+      "4": "rate-capped",
+      "5": "Primary starting",
+      "6": "Primary busy"
+    },
+    "termsBehavior": "Terms pending is NOT an exit-75 refusal",
+    "forbiddenStatusText": "Primary not running"
+  },
+  "simplifiedUi": {
+    "startCommand": "pikkumies ui start",
+    "directoryMode": "0700",
+    "tokenFileMode": "0600",
+    "tokenUses": "single-use",
+    "tokenLifetime": "60 s",
+    "env": [
+      "AGENTBOARD_MODE=pikkumies",
+      "AGENTBOARD_SOCKET",
+      "AGENTBOARD_TOKEN_DIR",
+      "AGENTBOARD_LAUNCHER_URL",
+      "AGENTBOARD_ALLOWED_ORIGIN",
+      "AGENTBOARD_FRAME_ANCESTORS",
+      "TMUX_SESSION=pikkumies",
+      "TERMINAL_MODE=pty"
+    ]
+  },
+  "panel": {
+    "pendingAskJson": "{\"text\": string <= 4000 chars, \"nonce\": string, \"ts\": unix seconds}",
+    "pendingAskTtl": "60 minutes",
+    "pendingAskLimit": "up to 5",
+    "messages": ["pikkumies:switch", "pikkumies:ready", "pikkumies:reconnect", "pikkumies:rows:1", "pikkumies:rows:2", "pikkumies:rows:3", "pikkumies:rows:4", "pikkumies:rows:5", "pikkumies:rows:6"],
+    "sessionRegex": "^pm[1-9]$",
+    "selectors": ["simplified", "hermes", "vanilla-hermes-web", "vanilla-agentboard"]
+  },
+  "ports": ["844", "845", "846"],
+  "adrs": ["ADR 0124", "ADR 0125"],
+  "binaryTarget": "bun-linux-x64-baseline"
+}
