@@ -219,6 +219,10 @@ final class PikkumiesHermesUiTest extends TestCase
             .\pmssHermesUiDefaultNginxBlock('    ssl_certificate '.escapeshellarg($cert).";\n"
                 .'    ssl_certificate_key '.escapeshellarg($key).";\n")
             .$block."\n}";
+        // nginx -t binds every listen port; an unprivileged user cannot bind 844-846, so test them 20000 higher.
+        $config = preg_replace_callback('/\blisten (84[4-6])\b/', static function (array $m): string {
+            return 'listen '.((int) $m[1] + 20000);
+        }, $config);
         file_put_contents($root.'/nginx.conf', $config);
         exec(escapeshellarg($nginx).' -t -p '.escapeshellarg($root.'/').' -c '.escapeshellarg($root.'/nginx.conf').' 2>&1', $rows, $rc);
         $this->assertSame(0, $rc, implode("\n", $rows));
