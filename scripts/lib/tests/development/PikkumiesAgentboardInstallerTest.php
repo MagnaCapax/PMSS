@@ -74,6 +74,22 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         $this->assertSame('v1/agentboard', readlink($root.'/agentboard'));
     }
 
+    /** Link entries are refused before an extraction directory is made. */
+    public function testLinkEntriesAreRefusedBeforeExtraction(): void
+    {
+        $temp = $this->pmssMakeTempDir('pmss-agentboard-links-');
+        $root = $temp.'/installed';
+        foreach (['symlink', 'hardlink'] as $case) {
+            $archive = $this->archive($temp, $case, true, $case);
+            $this->assertFalse(\pmssPikkumiesAgentboardArchiveMembersSafe($archive), $case);
+            $this->assertFalse(\pmssPikkumiesAgentboardArchiveInstall(
+                $archive, 'v1', hash_file('sha256', $archive), $root, posix_geteuid()
+            ), $case);
+            $this->assertSame([], glob($root.'/.stage-*'));
+            $this->assertFalse(file_exists($root.'/v1'));
+        }
+    }
+
     /** A release cannot activate with a version and no verified checksum. */
     public function testReleasePinsAreCompleteTogether(): void
     {

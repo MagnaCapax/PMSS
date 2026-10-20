@@ -25,9 +25,14 @@ function pmssPikkumiesAgentboardVersionOwned(string $versionDir, int $ownerUid):
 function pmssPikkumiesAgentboardArchiveMembersSafe(string $archive): bool
 {
     $rows = [];
+    $listing = [];
     exec('tar -tzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null', $rows, $rc);
     if ($rc !== 0 || $rows === []) return false;
-    foreach ($rows as $path) {
+    exec('tar -tvzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null', $listing, $rc);
+    if ($rc !== 0 || count($listing) !== count($rows)) return false;
+    foreach ($rows as $index => $path) {
+        // Match the listing row to its name and accept only files or directories.
+        if (!in_array($listing[$index][0] ?? '', ['-', 'd'], true)) return false;
         $path = rtrim($path, '/');
         if ($path !== 'agentboard' && $path !== 'dist' && $path !== 'dist/client'
             && strpos($path, 'dist/client/') !== 0) return false;
@@ -85,11 +90,12 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
 
     $versionDir = $root.'/'.$version;
     if (is_link($versionDir)) return false;
+    // Inspect the archive before making an extraction directory.
+    if (!pmssPikkumiesAgentboardArchiveMembersSafe($archive)) return false;
     $stage = $root.'/.stage-'.bin2hex(random_bytes(8));
     if (!@mkdir($stage, 0700)) return false;
     try {
-        // Reject unexpected paths before tar writes, then inspect every extracted entry.
-        if (!pmssPikkumiesAgentboardArchiveMembersSafe($archive)) return false;
+        // Inspect every extracted entry before publishing the version.
         $command = 'tar -xzf '.escapeshellarg($archive)
             .' --no-same-owner --no-same-permissions -C '.escapeshellarg($stage).' -- agentboard dist/client';
         $oldUmask = umask(0022);
