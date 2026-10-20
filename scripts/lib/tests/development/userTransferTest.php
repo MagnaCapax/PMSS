@@ -396,9 +396,30 @@ SNAP;
         $this->assertStringContainsAllStrings(['--numeric-ids', '--usermap=', '--groupmap=', 'unshare -U', 'env -u PMSS_USER_TRANSFER_PASSWORD', '/.billingId'], \pmssUserTransferBuildRsyncMain($cfg));
         $this->assertStringContainsAllStrings(['--numeric-ids', '-R', 'unshare -U', '/.billingClientId'], \pmssUserTransferBuildRsyncFinal($cfg));
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
-        $this->assertSame($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
+        $expectedScratchPaths['sourceHoldScript'] = '/root/pmss-userTransfer-<generated>/eternal-hold.sh';
+        $expectedScratchPaths['sourceReleaseScript'] = '/root/pmss-userTransfer-<generated>/eternal-release.sh';
+        $this->assertEquals($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
         $this->assertSame($expectedPayloadKeys, array_keys(\pmssUserTransferScratchPayloads($cfg)));
         $this->assertStringContainsString('/etc/sub$kind', \pmssUserTransferScratchPayloads($cfg)['identityProbe']);
+    }
+
+    public function testEternalHoldKeepsStateColdDuringFinalPass(): void
+    {
+        $cfg = $this->baseConfig();
+        $main = \pmssUserTransferBuildRsyncMain($cfg);
+        $final = \pmssUserTransferBuildRsyncFinal($cfg);
+        $sourceHold = \pmssUserTransferBuildEternalSourceCommand($cfg, 1800000000);
+        $sourceRelease = \pmssUserTransferBuildEternalSourceCommand($cfg, null);
+        $targetHold = \pmssUserTransferTargetEternalCommand('deefbox', 1800000000);
+
+        $this->assertStringContainsString('/.mcxPikkumies/pikkumies/local', $main);
+        $this->assertStringContainsString('/./.mcxPikkumies/pikkumies/local', $final);
+        $this->assertStringContainsString('--ignore-missing-args', $final);
+        $this->assertStringContainsString('/.mcxPikkumies/pikkumies/local/eternals.hold', $final);
+        $this->assertStringContainsString('eternal hold --until 1800000000', $sourceHold);
+        $this->assertStringContainsString('eternal hold --until 1800000000', $targetHold);
+        $this->assertStringContainsString('rm -f --', $sourceRelease);
+        $this->assertStringNotContainsString('transfer-hold', $targetHold);
     }
 
     public function testDockerQuiesceProbeBoundsAndStopsSourceSet(): void

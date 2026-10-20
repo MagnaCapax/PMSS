@@ -20,7 +20,7 @@
 
 require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/systemPrep/renderNodeAccess.php';
-pmssRequireRelativeFiles(__DIR__, ['update/runtime/commands.php', 'userTransfer/cliParse.php', 'userTransfer/postSetup.php', 'userTransfer/transferRuntime.php']);
+pmssRequireRelativeFiles(__DIR__, ['update/runtime/commands.php', 'userTransfer/cliParse.php', 'userTransfer/postSetup.php', 'userTransfer/transferRuntime.php', 'userTransfer/eternalHold.php']);
 
 /** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
 function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array
@@ -93,6 +93,8 @@ function pmssUserTransferMain(array $argv): int
 
         $scratch = pmssUserTransferCreateScratchRoot();
         $scratchPaths = pmssUserTransferScratchPaths($scratch);
+        $sourceHeld = false;
+        $targetHeld = false;
         $cleanup = static function () use ($scratchPaths, $scratch): void {
             pmssUserTransferScratchCleanup($scratch, $scratchPaths);
         };
@@ -135,6 +137,16 @@ function pmssUserTransferMain(array $argv): int
             }
 
             $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
+            $holdUntil = time() + 21600;
+            pmssUserTransferWriteFile($scratchPaths['sourceHoldScript'], pmssUserTransferBuildEternalSourceCommand($cfg, $holdUntil), 0700);
+            $sourceHeld = true;
+            if (runStep('Holding source Eternals', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceHoldScript']])) !== 0) {
+                throw new RuntimeException('Could not hold source Eternals before final transfer', 1);
+            }
+            $targetHeld = true;
+            if (runStep('Holding target Eternals', pmssUserTransferTargetEternalCommand($cfg['localUser'], $holdUntil)) !== 0) {
+                throw new RuntimeException('Could not hold target Eternals before final transfer', 1);
+            }
             $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
 
             $dockerQuiesceRc = runStep('Quiescing source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerQuiesceScript']]));
@@ -182,6 +194,16 @@ function pmssUserTransferMain(array $argv): int
             logMessage('[OK] User transfer complete');
             return 0;
         } finally {
+            if ($sourceHeld) {
+                pmssUserTransferWriteFile($scratchPaths['sourceReleaseScript'], pmssUserTransferBuildEternalSourceCommand($cfg, null), 0700);
+                runStep('Releasing source Eternals', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceReleaseScript']]));
+            }
+            if ($targetHeld) {
+                runStep('Releasing target Eternals', pmssUserTransferTargetEternalCommand($cfg['localUser'], null));
+                $binary = '/home/'.$cfg['localUser'].'/.mcxPikkumies/pikkumies/bin/pikkumies';
+                runStep('Resuming target Eternals', pmssBuildUserShellNoPamCommand($cfg['localUser'],
+                    'if [ -x '.escapeshellarg($binary).' ]; then '.escapeshellarg($binary).' eternal ensure; fi'));
+            }
             pmssUserTransferScratchCleanup($scratch, $scratchPaths);
             putenv('PMSS_USER_TRANSFER_PASSWORD');
         }

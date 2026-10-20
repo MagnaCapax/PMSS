@@ -19,6 +19,7 @@ function pmssUserTransferScratchPaths(string $scratchRoot): array
         'remoteSizeScript' => $scratchRoot.'/remote-size.sh', 'qbittorrentProbeScript' => $scratchRoot.'/qbittorrent-categories.sh',
         'dockerQuiesceScript' => $scratchRoot.'/docker-quiesce.sh', 'dockerIds' => $scratchRoot.'/docker-ids',
         'dockerStartScript' => $scratchRoot.'/docker-start.sh',
+        'sourceHoldScript' => $scratchRoot.'/eternal-hold.sh', 'sourceReleaseScript' => $scratchRoot.'/eternal-release.sh',
         'qbittorrentConfig' => $scratchRoot.'/qBittorrent.conf',
         'qbittorrentCategories' => $scratchRoot.'/categories.json',
     ];
@@ -80,6 +81,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.trafficDataLocal', '.trafficDataIngress', '.trafficDataIngressLocal', 'rTorrentLog', '.bonusQuota',
         '.bonusTraffic', '.trafficLimit', '.resourceData', '*.pmss-tmp-*',
         '/.billingId', '/.billingServiceId', '/.billingClientId',
+        '/.mcxPikkumies/pikkumies/local',
     ];
 
     return pmssUserTransferBuildRsyncCommand($cfg, ['/home/'.$cfg['remoteUser'].'/'], $excludes);
@@ -91,7 +93,20 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
     return pmssUserTransferBuildRsyncCommand($cfg, [
         $remoteHome.'/./session', $remoteHome.'/./www/rutorrent/share', $remoteHome.'/./.lighttpd/custom',
         $remoteHome.'/./.lighttpd/custom.d', $remoteHome.'/./.local', $remoteHome.'/./www/public',
-    ], ['/session/rtorrent.lock', '/.billingId', '/.billingServiceId', '/.billingClientId'], ['-R']);
+        $remoteHome.'/./.mcxPikkumies/pikkumies/local',
+    ], ['/session/rtorrent.lock', '/.billingId', '/.billingServiceId', '/.billingClientId', '/.mcxPikkumies/pikkumies/local/eternals.hold'], ['-R', '--ignore-missing-args']);
+}
+
+/** Source commands run under the authenticated account, never through remote root. */
+function pmssUserTransferBuildEternalSourceCommand(array $cfg, ?int $until): string
+{
+    $binary = '"$HOME/.mcxPikkumies/pikkumies/bin/pikkumies"';
+    $marker = '"$HOME/.mcxPikkumies/pikkumies/local/eternals.hold"';
+    $remote = $until === null
+        ? 'rm -f -- '.$marker
+        : 'if [ -x '.$binary.' ] && [ -f /etc/seedbox/config/pikkumiesEternals.enabled ]; then '
+            .$binary.' eternal hold --until '.(string) $until.'; fi';
+    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
 }
 
 function pmssUserTransferBuildAuthProbe(array $cfg): string
