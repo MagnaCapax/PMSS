@@ -1,12 +1,12 @@
 # ADR 0127: Pikkumies Eternals and account web UIs
 
 Date: 2026-10-20
-Category: architecture, security
+Category: architecture
 
 ## Status
 
-Accepted. Port A is implemented behind the host marker and a pinned binary;
-the authenticated backends for ports B and C remain closed in this revision.
+Accepted. Ports A and B are gated by the host marker. Port C has a separate
+account install gate.
 
 ## Context
 
@@ -44,8 +44,7 @@ The marker is staged host by host. No enabled marker is shipped in the overlay.
 The launcher is account-side PHP with no includes. It derives identity from
 its effective UID, accepts only same-origin or `none` Fetch Site requests,
 and keeps A tokens in `L/ui/tokens/` with a 60-second lifetime and an eight
-token cap. It leaves B and C closed until their authenticated backend gates
-are installed. `?view=status` does not start a UI or mint a token. The launcher
+token cap. `?view=status` does not start a UI or mint a token. The launcher
 requests a certificate only when DNS points to the current host and the
 permalink fails TLS verification. Certificate flag changes run as the account.
 The certificate job reads billing IDs from root-owned provisioning state.
@@ -56,9 +55,28 @@ On state all exist. The bar stays disabled until the read-only status view
 reports the UI ready; its root-owned page then stores a bounded pending-ask
 queue on port A's origin and signals the panel with exact-origin messages.
 Configure presents a two-choice interface control. Power user retains the
-same simplified tab and adds a new-tab launcher action for port B. Port B's
-launcher remains closed by the existing gate because its authenticated
-backend is absent. The panel never embeds B.
+same simplified tab and adds a new-tab launcher action for port B. The panel
+never embeds B. Port B uses a separate account-owned Hermes process on its own
+reserved loopback port. Its private credential file holds a random service
+password and session secret, both separate from the account password. The
+launcher reads the file only as the account, starts through `env -i` with an
+exact public URL, and verifies both listener UID and HTTP login response before
+redirecting. nginx permits only the Hermes login assets before an auth request,
+rejects `/api/cron/fire`, checks GET API Fetch Site and exact write Origin, and
+logs no query arguments. Port C uses the same clean-environment launch rule.
+Configure reveals B's separate login password only after an account-password
+challenge; its response is not cached or logged.
+The account installs one tagged per-minute cron check when B first opens. The
+check does not start a backend; it stops an owned listener that loses its login
+gate. The launcher repeats the same check on each open.
+Logout and password change stop the simplified UI as the account and rotate
+the B and C session secrets. The account-side stop helper handles installed
+Pikkumies versions whose `ui stop` command is absent.
+
+The launcher displays the account memory floor when a v1 cgroup memory limit
+is below 1000 MiB. An absent Hermes runtime gets a setup page; its button runs
+Pikkumies' account-owned `post-update` setup under a lock. The setup action
+does not run on a transfer hold or below the memory floor.
 
 The Agentboard binary lives under a versioned root-owned `/opt` directory and
 an atomically switched stable symlink. A version and SHA-256 pin are required
@@ -82,8 +100,10 @@ and Hermes state; the archived home retains their previous data.
   secrets to another tenant. A uses a 256-bit bearer kept in a mode-0600
   account file and carried in the URL fragment, which is not sent in HTTP
   requests or access logs. Primary account credentials are not stored by
-  this feature. B and C remain closed until their separate service credentials,
-  session secrets, listener ownership checks and login gates are installed.
+  this feature. B and C use separate service credentials, session secrets,
+  listener ownership checks and login gates. Exposure of a B or C service
+  credential permits access to that account's agent UI, so its file is 0600,
+  its value stays out of argv and logs, and the loopback listener is gated.
 - UI authentication remains the access boundary: A has single-use bearer
   tokens, while B and C require Hermes' own login before their routes can open.
   Origin and routing checks provide additional protection.
@@ -108,8 +128,8 @@ and Hermes state; the archived home retains their previous data.
   panel response path also has no confirmed strip for an account-supplied
   `Service-Worker-Allowed` header. Neither existing surface is widened by A.
 - Hermes loopback TCP listeners need an authenticated gate because other
-  accounts can reach loopback. B and C remain closed here. Their sessions may
-  share a browser cookie jar when enabled.
+  accounts can reach loopback. B and C enforce the gate before launch and on
+  each launcher access. Their sessions may share a browser cookie jar.
 - The service permalink zone is not on the Public Suffix List, so cookie
   isolation between names is weaker than separate registrable domains.
   Certificate Transparency exposes issued permalink names.

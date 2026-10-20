@@ -1263,6 +1263,13 @@ to the account home. `L` means `Config::localDir()`.
   their account UI routing. Each port serves its UI at `/` on the service
   permalink. A also serves `/bar` from a root-owned host path outside `/home`.
   The host marker gates A and B; C does not depend on it.
+- Port B runs `pikkumies run dashboard` as the account on a reserved loopback
+  listener. Its private 0600 credentials hold an independent login password
+  and session secret. B and C start with `env -i`, a pinned public URL, and no
+  secret on argv. Logout and account password changes rotate both dashboard
+  session secrets and stop A as the account. B's account cron checks its login
+  gate each minute and stops an ungated listener. The launcher offers a locked
+  account-side setup action and shows the 1000 MiB memory floor.
 - Port C tokens live in `~/.config/pmss/ui/tokens/` (0700, files 0600,
   single-use, 60 s, at most eight live tokens). The launcher accepts `?view=status` for a same-origin
   GET that reads state and may place a guarded certificate request; it does

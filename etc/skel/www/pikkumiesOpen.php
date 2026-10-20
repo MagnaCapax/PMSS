@@ -8,6 +8,8 @@ function pmssPikkumiesOpenPage($state, $started)
     $pages = [
         'ready' => ['Getting Pikkumies ready.', 'The first time can take several minutes. This page updates by itself.'],
         'setup' => ['Pikkumies needs a one-time setup.', 'It takes a few minutes and happens once.'],
+        'setting-up' => ['Setting up Pikkumies.', 'This happens once. You can leave this page.'],
+        'memory' => ['Not enough memory for Pikkumies.', 'Your account has less memory than the about 1 GB it needs.'],
         'moving' => ['Your account is being moved to a new server.', 'Pikkumies returns when the move finishes.'],
         'error' => ['Pikkumies cannot open for this account yet.', 'Please contact support.'],
         'cross-site' => ['Open Pikkumies from your control panel.', ''],
@@ -17,7 +19,9 @@ function pmssPikkumiesOpenPage($state, $started)
     $copy = $pages[$state] ?? $pages['error'];
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    if ($state === 'ready') header('Refresh: 5; url=pikkumiesOpen.php?session=pm1&started='.(int) $started);
+    $ui = ($_GET['ui'] ?? '') === 'hermes' ? 'hermes' : 'simplified';
+    $retry = 'pikkumiesOpen.php?ui='.$ui.'&started='.(int) $started;
+    if ($state === 'ready' || $state === 'setting-up') header('Refresh: 5; url='.$retry);
     if ($state === 'cross-site' || $state === 'old-browser') http_response_code(403);
     $slow = $started > 0 && time() - $started > ($state === 'ready' ? 900 : 180)
         ? ' Taking longer than usual. Contact support.' : '';
@@ -27,9 +31,34 @@ function pmssPikkumiesOpenPage($state, $started)
         .'h1{font-size:18px}a{color:#93c5fd}</style><main><h1>'.htmlspecialchars($copy[0], ENT_QUOTES, 'UTF-8').'</h1>';
     if ($copy[1] !== '' || $slow !== '') echo '<p>'.htmlspecialchars($copy[1].$slow, ENT_QUOTES, 'UTF-8').'</p>';
     if ($state === 'cross-site') echo '<p><a href="index.php">Open your control panel</a></p>';
+    if ($state === 'setup') echo '<p><a href="pikkumiesOpen.php?ui='.$ui.'&amp;view=setup">Set up now</a></p>';
+    if ($state === 'memory') echo '<p><a href="mailto:support@pulsedmedia.com">Contact support</a></p>';
     if ($state === 'not-running') echo '<p><button onclick="location.href=\'pikkumiesOpen.php?session=pm1\'">Reconnect</button></p>';
     if ($state === 'error') echo '<p><a href="mailto:support@pulsedmedia.com">Contact support</a></p>';
     echo '</main></html>';
+}
+
+/** Read the production v1 memory ceiling, including parent slice limits. */
+function pmssPikkumiesOpenMemoryLow($cgroupFile = '/proc/self/cgroup', $root = '/sys/fs/cgroup/memory')
+{
+    $rows = @file($cgroupFile, FILE_IGNORE_NEW_LINES);
+    if (!is_array($rows)) return false;
+    foreach ($rows as $row) {
+        $parts = explode(':', $row, 3);
+        if (count($parts) !== 3 || !in_array('memory', explode(',', $parts[1]), true)) continue;
+        $relative = '/'.ltrim($parts[2], '/');
+        do {
+            foreach (['memory.limit_in_bytes', 'memory.soft_limit_in_bytes'] as $file) {
+                $path = rtrim($root, '/').$relative.'/'.$file;
+                $raw = @file_get_contents($path, false, null, 0, 32);
+                if (is_string($raw) && preg_match('/^[1-9][0-9]*\s*$/D', $raw)
+                    && (int) $raw < 1000 * 1048576) return true;
+            }
+            if ($relative === '/') break;
+            $relative = dirname($relative);
+        } while ($relative !== '.');
+    }
+    return false;
 }
 
 /** Status never starts the UI or mints a bearer token. */
@@ -90,7 +119,7 @@ function pmssPikkumiesOpenTokenMint($directory)
 /** Verify the published name against this host's TLS listener. */
 function pmssPikkumiesOpenTlsValid($name, $port = 844)
 {
-    if (!in_array($port, [443, 844, 846], true)) return false;
+    if (!in_array($port, [443, 844, 845, 846], true)) return false;
     $context = stream_context_create(['ssl' => [
         'verify_peer' => true, 'verify_peer_name' => true, 'peer_name' => $name,
         'SNI_enabled' => true, 'SNI_server_name' => $name,
@@ -301,8 +330,7 @@ if ($ui === 'vanilla-hermes-web' || $ui === 'vanilla-agentboard') {
     header('Location: '.$origin.'/__pmss-select-agentboard#t='.$token, true, 302);
     return;
 }
-// B/C remain closed until their separate authenticated backends are provisioned.
-if ($ui !== 'simplified' || $home === '' || $name === ''
+if (($ui !== 'simplified' && $ui !== 'hermes') || $home === '' || $name === ''
     || !is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
     if ($statusView) { pmssPikkumiesOpenStatusEmit(false, false); return; }
     pmssPikkumiesOpenPage('error', 0);
@@ -327,9 +355,10 @@ if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/D', $host) !== 1) {
     return;
 }
 $permalink = substr(hash('sha256', 'mcx.fi:service:'.ltrim($billingId, '0')), 0, 16).'.mcx.fi';
-$origin = 'https://'.$permalink.':844';
+$port = $ui === 'hermes' ? 845 : 844;
+$origin = 'https://'.$permalink.':'.$port;
 $panelOrigin = 'https://'.$host;
-$launcherUrl = $panelOrigin.'/user-'.$name.'/pikkumiesOpen.php';
+$launcherUrl = $panelOrigin.'/user-'.$name.'/pikkumiesOpen.php'.($ui === 'hermes' ? '?ui=hermes' : '');
 $socket = $local.'/ui/ui.sock';
 $started = isset($_GET['started']) && ctype_digit((string) $_GET['started']) ? (int) $_GET['started'] : time();
 if (pmssPikkumiesOpenMoving($local)) {
@@ -337,13 +366,43 @@ if (pmssPikkumiesOpenMoving($local)) {
     pmssPikkumiesOpenPage('moving', $started);
     return;
 }
-$certificateState = pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permalink);
+if (pmssPikkumiesOpenMemoryLow()) {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin, true); return; }
+    pmssPikkumiesOpenPage('memory', $started);
+    return;
+}
+$runtimeReady = is_file($home.'/.mcxPikkumies/pikkumies/include/.hermes-ready');
+if (($_GET['view'] ?? '') === 'setup' && !$runtimeReady) {
+    $lock = $local.'/ui/setup.lock';
+    if (!is_dir(dirname($lock))) @mkdir(dirname($lock), 0700, true);
+    $command = 'umask 077 && flock -n -o '.escapeshellarg($lock).' nohup '
+        .escapeshellarg($binary).' post-update </dev/null >>'.escapeshellarg($local.'/install.log').' 2>&1 &';
+    exec($command);
+    pmssPikkumiesOpenPage('setting-up', $started);
+    return;
+}
+if (!$runtimeReady) {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin, true); return; }
+    pmssPikkumiesOpenPage('setup', $started);
+    return;
+}
+$certificateState = pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permalink, $port);
 if ($certificateState === 'error') {
     if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin); return; }
     pmssPikkumiesOpenPage('error', $started);
     return;
 }
 if ($statusView) {
+    if ($ui === 'hermes') {
+        $runner = $home.'/bin/pikkumiesHermesUi.php';
+        $ready = false;
+        if ($certificateState === 'valid' && is_file($runner) && !is_link($runner)) {
+            exec('HOME='.escapeshellarg($home).' /usr/bin/php '.escapeshellarg($runner).' ready >/dev/null 2>&1', $unused, $readyRc);
+            $ready = $readyRc === 0;
+        }
+        pmssPikkumiesOpenStatusEmit(true, $ready, $origin);
+        return;
+    }
     $rows = [];
     exec('/usr/bin/timeout -k 1s 2s '.escapeshellarg($binary).' eternal list --json 2>/dev/null', $rows, $rowsRc);
     $eternals = $rowsRc === 0 ? json_decode(implode("\n", $rows), true) : null;
@@ -357,6 +416,15 @@ if ($statusView) {
 }
 if ($certificateState !== 'valid') {
     pmssPikkumiesOpenPage('ready', $started);
+    return;
+}
+if ($ui === 'hermes') {
+    $runner = $home.'/bin/pikkumiesHermesUi.php';
+    if (!is_file($runner) || is_link($runner)) { pmssPikkumiesOpenPage('error', $started); return; }
+    exec('HOME='.escapeshellarg($home).' /usr/bin/php '.escapeshellarg($runner).' start '.escapeshellarg($origin).' >/dev/null 2>&1', $unused, $backendRc);
+    if ($backendRc !== 0) { pmssPikkumiesOpenPage('error', $started); return; }
+    header('Cache-Control: no-store');
+    header('Location: '.$origin.'/', true, 302);
     return;
 }
 $list = [];

@@ -41,6 +41,17 @@ function pmssConfigureFileRead($path, $limit)
     return is_string($value) && strlen($value) <= $limit ? $value : '';
 }
 
+/** Reveal only the account-owned B login password after the panel password gate. */
+function pmssPikkumiesHermesLoginRead($home)
+{
+    $path = $home.'/.mcxPikkumies/pikkumies/local/ui/hermes/credentials';
+    if (!is_file($path) || is_link($path) || @fileowner($path) !== posix_geteuid()
+        || (@fileperms($path) & 0077) !== 0 || @filesize($path) > 256) return '';
+    $raw = @file_get_contents($path);
+    return is_string($raw) && preg_match('/^HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=([a-f0-9]{64})\nHERMES_DASHBOARD_BASIC_AUTH_SECRET=[a-f0-9]{64}\n$/D', $raw, $match)
+        ? $match[1] : '';
+}
+
 /** Replace one account file atomically, with private permissions. */
 function pmssConfigureFileWrite($path, $value)
 {
@@ -118,7 +129,7 @@ function pmssConfigureActionApply($home, $action, $request, $ops = array())
 {
     $paths = pmssPanelSessionPaths($home);
     // These actions can run account commands or publish the username, so they need the account password.
-    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch', 'hermesShowLogin'), true);
+    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch', 'hermesShowLogin', 'pikkumiesHermesShowLogin'), true);
     if ($highImpact && (!isset($request['password']) || !is_string($request['password'])
         || !pmssPanelSessionPasswordValid($paths, pmssPanelSessionUsername($home), $request['password']))) {
         $result = array('ok' => false, 'status' => 403, 'message' => 'The password you entered was not accepted. Nothing was changed.');
@@ -135,7 +146,14 @@ function pmssConfigureActionRun($home, $action, $request, $ops = array())
 {
     $ok = false;
     $message = 'The setting could not be saved.';
-    if ($action === 'hermesInstall' || $action === 'hermesShowLogin') {
+    if ($action === 'pikkumiesHermesShowLogin') {
+        $name = pmssPanelSessionUsername($home);
+        $state = function_exists('pmssPikkumiesPanelStateRead')
+            ? pmssPikkumiesPanelStateRead($home, $name) : array('origin' => '');
+        $password = $state['origin'] !== '' ? pmssPikkumiesHermesLoginRead($home) : '';
+        return array('ok' => $password !== '', 'status' => $password !== '' ? 200 : 409,
+            'message' => $password !== '' ? $password : 'Pikkumies Hermes login is unavailable.');
+    } elseif ($action === 'hermesInstall' || $action === 'hermesShowLogin') {
         if (!function_exists('pmssHermesPanelAction'))
             return array('ok' => false, 'status' => 503, 'message' => 'Hermes is unavailable on this host.');
         return pmssHermesPanelAction($home, $action === 'hermesInstall' ? 'install' : 'show-login', $request, $ops);

@@ -55,6 +55,28 @@ class ConfigureSettingsTest extends TestCase
         $this->assertSame("old\n", file_get_contents($path));
         $this->assertSame("new\n", file_get_contents($path.'.prev'));
         $this->assertStringNotContainsString('secret', file_get_contents($home.'/.lighttpd/error.log'));
+        $this->assertSame(403, \pmssConfigureActionApply($home, 'pikkumiesHermesShowLogin', array('password' => 'wrong'))['status']);
+    }
+
+    public function testPikkumiesHermesPasswordReaderRejectsLooseOrMalformedFiles(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-pikkumies-login-', 0700);
+        $path = $home.'/.mcxPikkumies/pikkumies/local/ui/hermes/credentials';
+        $this->pmssEnsureDir(dirname($path));
+        $this->assertSame('', \pmssPikkumiesHermesLoginRead($home));
+        $content = 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD='.str_repeat('a', 64)."\n"
+            .'HERMES_DASHBOARD_BASIC_AUTH_SECRET='.str_repeat('b', 64)."\n";
+        file_put_contents($path, $content);
+        chmod($path, 0600);
+        $this->assertSame(str_repeat('a', 64), \pmssPikkumiesHermesLoginRead($home));
+        chmod($path, 0644);
+        $this->assertSame('', \pmssPikkumiesHermesLoginRead($home));
+        chmod($path, 0600);
+        file_put_contents($path, $content.'EXTRA=1' . "\n");
+        $this->assertSame('', \pmssPikkumiesHermesLoginRead($home));
+        unlink($path);
+        symlink($home.'/missing', $path);
+        $this->assertSame('', \pmssPikkumiesHermesLoginRead($home));
     }
 
     public function testCustomFramesRejectUnsafeInputAndKeepComments(): void

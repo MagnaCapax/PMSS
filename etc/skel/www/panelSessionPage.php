@@ -80,9 +80,17 @@ function pmssPanelSessionLogoutMain(): int
     }
 
     pmssPanelSessionDelete($paths);
+    $pikkumies = $paths['home'].'/.mcxPikkumies/pikkumies/bin/pikkumies';
+    if (is_file($pikkumies) && !is_link($pikkumies) && is_executable($pikkumies))
+        exec(escapeshellarg($pikkumies).' ui stop >/dev/null 2>&1');
     $hermes = $paths['home'].'/bin/install-hermes';
     if (is_file($hermes) && !is_link($hermes) && is_executable($hermes))
         exec(escapeshellarg($hermes).' rotate-session >/dev/null 2>&1');
+    $pikkumiesHermes = $paths['home'].'/bin/pikkumiesHermesUi.php';
+    if (is_file($pikkumiesHermes) && !is_link($pikkumiesHermes)) {
+        exec('HOME='.escapeshellarg($paths['home']).' /usr/bin/php '.escapeshellarg($pikkumiesHermes).' stop-simplified >/dev/null 2>&1');
+        exec('HOME='.escapeshellarg($paths['home']).' /usr/bin/php '.escapeshellarg($pikkumiesHermes).' rotate-session >/dev/null 2>&1');
+    }
     pmssPanelSessionLog($paths, 'logout status=ok');
     pmssPanelSessionEmitHeaders([
         'Set-Cookie' => pmssPanelSessionCookieDeleteHeader($username),

@@ -123,7 +123,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <div class="configure-actions"><button type="button" onclick="pmssPikkumiesToggle('<?= $pmssPikkumiesState['off'] ? 'on' : 'off' ?>')"><?= $pmssPikkumiesState['off'] ? 'Turn on Pikkumies' : 'Turn off Pikkumies' ?></button>
 <?php if ($pmssPikkumiesState['visible']): ?>
 <button type="button" onclick="pmssPikkumiesTabOpen()">Open Pikkumies</button>
-<?php if ($pmssPikkumiesState['mode'] === 'power-user'): ?><a href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a><?php endif; ?>
+<?php if ($pmssPikkumiesState['mode'] === 'power-user'): ?><a href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a><button type="button" onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button><input type="password" id="pmss-pikkumies-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><output id="pmss-pikkumies-hermes-password" hidden></output><?php endif; ?>
 <?php endif; ?></div>
 <p>Pikkumies windows, called Eternals, keep running and pick up their conversation after a restart, until you close them.</p>
 <p>Interface</p><div class="pmss-pikkumies-segments" role="group" aria-label="Interface">
@@ -219,6 +219,13 @@ function pmssHermesShowLogin() {
     $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},
         data:{action:'hermesShowLogin',password:field.value},
         success:function(result){var output=document.getElementById('pmss-hermes-password'); output.textContent=result.message; output.hidden=false; document.getElementById('pmss-hermes-copy').hidden=false; field.value='';},
+        error:function(){pmssConfigureNotice('The password you entered was not accepted.', true); field.value='';}});
+}
+function pmssPikkumiesHermesShowLogin() {
+    var field = document.getElementById('pmss-pikkumies-hermes-account-password');
+    $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},
+        data:{action:'pikkumiesHermesShowLogin',password:field.value},
+        success:function(result){var output=document.getElementById('pmss-pikkumies-hermes-password'); output.textContent=result.message; output.hidden=false; field.value='';},
         error:function(){pmssConfigureNotice('The password you entered was not accepted.', true); field.value='';}});
 }
 function pmssHermesStatusPoll() {

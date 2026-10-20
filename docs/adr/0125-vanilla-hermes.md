@@ -1,7 +1,7 @@
 # ADR 0125: Account-owned vanilla Hermes on port C
 
 Date: 2026-10-20
-Category: architecture, security
+Category: architecture
 
 ## Status
 
