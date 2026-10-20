@@ -137,4 +137,44 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->assertSame(1, substr_count($runs[0], 'install-pikkumies.sh'), 'only one account is eligible: '.$runs[0]);
         $this->assertTrue(strpos($runs[0], ") && touch -- '\\''".$root."/state/big'\\''") !== false, 'the state file must follow a successful install only: '.$runs[0]);
     }
+public function testMarkerPathIsMadeInARootOnlyDirectoryAndRefusesLinksAndRepeats(): void
+    {
+        require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-path-');
+        $state = $root.'/state';
+        $this->assertSame($state.'/alice', \pmssPikkumiesPreinstallStateMarkerPath('alice', $state));
+        $this->assertSame(0700, fileperms($state) & 0777, 'the state directory is created root-only');
+        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('../etc', $state));
+        touch($state.'/alice');
+        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('alice', $state), 'already marked');
+        symlink($root.'/absent', $state.'/bob');
+        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('bob', $state), 'a link is never a marker target');
+        $this->pmssEnsureDir($root.'/target');
+        symlink($root.'/target', $root.'/state-link');
+        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('carol', $root.'/state-link'));
+        $this->assertSame([], glob($root.'/target/*'));
+    }
+
+    public function testNewAccountIsMarkedOnlyAfterItsInstallSucceeds(): void
+    {
+        // A new account's preinstall writes the same marker as the update hook, after a successful install only, so a
+        // later removal is respected and a failed download is tried again (ADR 0090 amendment 2026-10-20).
+        require_once dirname(__DIR__, 2).'/user/add/postProvision.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-new-');
+        $home = $root.'/account';
+        $this->pmssEnsureDir($home.'/bin');
+        file_put_contents($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
+        $this->pmssEnsureDir($root.'/stub');
+        file_put_contents($root.'/stub/id', "#!/bin/sh\necho 4321\n");
+        chmod($root.'/stub/id', 0755);
+        $path = (string) getenv('PATH');
+        putenv('PATH='.$root.'/stub:'.$path);
+        try {
+            $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => 'alice', 'memory' => '2000'], $home, $root.'/state');
+        } finally {
+            putenv('PATH='.$path);
+        }
+        $this->assertTrue(strpos($command, ") && touch -- '\\''".$root."/state/alice'\\''") !== false, 'the marker must follow a successful install: '.$command);
+        $this->assertFalse(file_exists($root.'/state/alice'), 'nothing is marked before the install has run');
+    }
 }

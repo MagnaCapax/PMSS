@@ -46,11 +46,19 @@ function pmssAddUserBonusQuotaPersist(array $user, string $homePath): bool
  * are made here; the agent runtime builds later at the account's own daily update time or on first use,
  * so accounts created together never build together (ADR 0090). The terms are asked at the first session.
  */
-function pmssAddUserPikkumiesPreinstallCommand(array $user, string $homePath): ?string
+function pmssAddUserPikkumiesPreinstallCommand(array $user, string $homePath, string $stateDir = '/var/lib/pmss/pikkumies-preinstall'): ?string
 {
     $launch = pmssPikkumiesPreinstallLaunch($user, $homePath);
+    if ($launch === null) {
+        return null;
+    }
+    // Marked like the update hook marks existing accounts: only when the install exits 0, so a removal by the user is
+    // respected later and a failed download is tried again at a later update.
+    require_once dirname(__DIR__).'/pikkumiesPreinstallState.php';
+    $marker = pmssPikkumiesPreinstallStateMarkerPath((string) ($user['name'] ?? ''), $stateDir);
+    $chain = $marker === null ? $launch : '( '.$launch.' ) && touch -- '.escapeshellarg($marker);
 
-    return $launch === null ? null : 'nohup sh -c '.escapeshellarg($launch).' >/dev/null 2>&1 &';
+    return 'nohup sh -c '.escapeshellarg($chain).' >/dev/null 2>&1 &';
 }
 
 /** The foreground install as the user, in the user's slice, or null below the RAM floor or without the skeleton installer. */

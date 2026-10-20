@@ -17,6 +17,7 @@ function pmssPikkumiesPreinstallExistingRun(
     try {
         require_once dirname(__DIR__, 2).'/user/selection.php';
         require_once dirname(__DIR__, 2).'/user/add/postProvision.php';
+        require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
         $users = $ops['users'] ?? static function (): array { return pmssListManagedUsers('/scripts/listUsers.php'); };
         $ramMiB = $ops['ramMiB'] ?? static function (string $user): int {
             $payload = pmssUserConfigResolvePayload($user);
@@ -32,17 +33,19 @@ function pmssPikkumiesPreinstallExistingRun(
         foreach ($users() as $user) {
             $user = (string) $user;
             $home = $homeBase.'/'.$user;
-            // A dangling link must not become the target of the later root-owned touch.
-            if (!pmssValidateUsername($user) || is_link($stateDir.'/'.$user) || file_exists($stateDir.'/'.$user)) continue;
+            // Null for an invalid name, an existing marker or a link (a dangling link must not become the target of
+            // the later root-owned touch).
+            $marker = pmssPikkumiesPreinstallStateMarkerPath($user, $stateDir);
+            if ($marker === null) continue;
             if (is_dir($home.'/.mcxPikkumies')) {
-                touch($stateDir.'/'.$user);
+                touch($marker);
                 continue;
             }
             // Below the RAM floor or no installer yet: not marked, so a later update can try again.
             $launch = pmssPikkumiesPreinstallLaunch(['name' => $user, 'memory' => $ramMiB($user)], $home);
             if ($launch === null) continue;
             // Marked only when the install exits 0, so a failed download is tried again at a later update.
-            $launches[] = '( '.$launch.' ) && touch -- '.escapeshellarg($stateDir.'/'.$user);
+            $launches[] = '( '.$launch.' ) && touch -- '.escapeshellarg($marker);
         }
         if ($launches === []) return;
         $run('nohup sh -c '.escapeshellarg(implode('; ', $launches)).' >/dev/null 2>&1 &');

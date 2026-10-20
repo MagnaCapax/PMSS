@@ -171,3 +171,24 @@ had a key; `--update-only` (a new key after "Get a new key") replaces an
 existing file of ours and never creates one, so a customer who deleted the file
 keeps it deleted. The file the wrapper above creates (our endpoint, empty
 `key=`) counts as ours and is filled. The output line never contains the key.
+
+## Amendment 2026-10-20: new accounts get the same state file
+
+A new account's preinstall (`pmssAddUserPikkumiesPreinstallCommand`) wrote no
+state file, so the rule above ("a user who removed Pikkumies does not get it
+back") did not cover accounts created with Pikkumies preinstalled: on a host
+outside the rollout batches, or before the next update marked them, a removed
+Pikkumies looked like an account that never had it. The new-account command now
+ends with the same chain as the update hook, `( install ) && touch -- <state
+file>`, so the state file is written only when the install exits 0 and a failed
+download is still tried again. Both writers get the path from one helper,
+`pmssPikkumiesPreinstallStateMarkerPath()` in
+`scripts/lib/user/pikkumiesPreinstallState.php`: it validates the name, creates
+the root-only (0700) state directory when missing, refuses a linked directory,
+and returns no path for an existing state file or a link, so a dangling link is
+never the target of the root-owned touch.
+
+Accounts created between the new-account preinstall (2026-10-17) and this
+change, which have since removed `~/.mcxPikkumies`, cannot be told apart from
+accounts that never had it; they stay unmarked. An account that still has
+`~/.mcxPikkumies` is marked by the update hook on a rollout host, as before.
