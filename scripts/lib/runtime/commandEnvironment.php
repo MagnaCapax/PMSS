@@ -77,7 +77,9 @@ function pmssCommandBashInvocation(string $cmd): string
     if ($isAptDpkg) {
         $cmdForShell = pmssAptDpkgEnvExportPrefix($pathShouldApply ? $pathOverride : null).$cmdForShell;
     } elseif ($pathShouldApply) {
-        $cmdForShell = 'PATH='.escapeshellarg($pathOverride).' '.$cmdForShell;
+        // A statement, not an assignment prefix: "PATH=x if ...; then" is a syntax error, and a prefix
+        // reaches only the first command of a list or pipeline.
+        $cmdForShell = 'export PATH='.escapeshellarg($pathOverride).'; '.$cmdForShell;
     }
 
     $cmdForShell = pmssLockChildClosePrefix().$cmdForShell;

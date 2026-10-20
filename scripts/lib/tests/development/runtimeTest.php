@@ -336,6 +336,17 @@ class RuntimeTest extends TestCase
         $this->assertTrue(strpos($out, 'HELLO_RUNTIME') !== false);
     }
 
+    public function testRunCommandRunsCompoundCommandsWithPathSet(): void
+    {
+        $this->assertTrue(getenv('PATH') !== false && getenv('PATH') !== '');
+        $rc = \runCommand('if [ -n "x" ]; then printf COMPOUND_OK; fi', false, function (string $m): void {});
+        $this->assertEquals(0, $rc);
+        $this->assertSame('COMPOUND_OK', trim($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
+        $rc = \runCommand('for word in A B; do printf "$word"; done | tr -d "\n"', false, function (string $m): void {});
+        $this->assertEquals(0, $rc);
+        $this->assertSame('AB', trim($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
+    }
+
     public function testRunCommandFailureCapturesStderrAndNonZero(): void
     {
         $rc = \runCommand('ls /definitely-not-a-real-path-xyz 2>/dev/null; exit 2', false, function (string $m): void {});
