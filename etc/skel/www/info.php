@@ -51,8 +51,13 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
         margin-left: 0;
         margin-right: 0;
       }
+      /* Every box in the info flex row except #stats spans the full row (#713, #748, #1115). */
+      .portfoliobox > :not(#stats) {
+        flex: 0 0 100%;
+      }
       .pmss-raid-notice {
         flex: 0 0 100%;
+        box-sizing: border-box;
         margin: 14px 0 18px;
         padding: 12px 14px;
         border: 1px solid #d8a55a;

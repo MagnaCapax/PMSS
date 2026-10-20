@@ -25,6 +25,20 @@ final class CustomerStatsLayoutTest extends TestCase
         );
     }
 
+    public function testInfoFlexRowChildrenOtherThanStatsSpanFullRow(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'etc/skel/www/info.php',
+            ".portfoliobox > :not(#stats) {\n        flex: 0 0 100%;",
+            'Every info-page flex child except #stats must span the full row (#1115).'
+        );
+        $this->pmssAssertRepoFileContainsString(
+            'etc/skel/www/info.php',
+            "flex: 0 0 100%;\n        box-sizing: border-box;",
+            'The full-width RAID notice must include its padding and border in the 100% width.'
+        );
+    }
+
     public function testResourceBasicsRenderAsCompactTopSnapshot(): void
     {
         $welcome = $this->pmssRenderCustomerPanelPage('welcome.php');
