@@ -81,35 +81,30 @@ class AiDockerInstallerSafetyTest extends TestCase
             "substr(\$arch, 0, 1) === '-'",
             'unsafe uname architecture output; falling back to x86_64.',
             '$arch = pmssDockerSlirpArchitectureFromOutput($archOutput);',
-            "slirp4netns-'.\$arch",
+            '$slirpSha256 = PMSS_DOCKER_SLIRP_SHA256[$arch] ?? \'\';',
         ]);
     }
 
-    public function testDockerSlirpTemporaryFileCleanupIsObservable(): void
+    public function testDockerSlirpInstallIsPinnedUnderItsOwnName(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/docker.php', [
-            "function pmssDockerSlirpTemporaryPath(bool \$dryRun = false, ?callable \$logger = null): string",
-            "return sys_get_temp_dir().'/pmss-slirp4netns-dry-run';",
-            "@tempnam(sys_get_temp_dir(), 'pmss-slirp4netns-')",
-            'unable to allocate temporary slirp4netns download path.',
-            "\$dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');",
-            '$downloadPath = pmssDockerSlirpTemporaryPath($dryRun);',
-            "\$downloadPath !== ''",
-            "runStep('[docker] Docker: downloading slirp4netns helper",
-            '$downloadRc === 0 && ($dryRun || is_file($downloadPath))',
-            "runStep('[docker] Docker: installing slirp4netns helper'",
-            "!\$dryRun && file_exists(\$downloadPath) && !@unlink(\$downloadPath)",
-            'unable to remove temporary slirp4netns helper from download directory.',
-        ]);
-    }
-
-    public function testDockerSlirpInstallIsSkippedAfterFailedDownload(): void
-    {
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/docker.php', [
-            '$downloadRc = runStep',
-            '$downloadRc === 0 && ($dryRun || is_file($downloadPath))',
-            'slirp4netns download failed; skipping helper install.',
+            "require_once __DIR__.'/remoteBinary.php';",
+            'const PMSS_DOCKER_SLIRP_SHA256 = [',
+            '$slirpSha256 = PMSS_DOCKER_SLIRP_SHA256[$arch] ?? \'\';',
+            'no pinned slirp4netns build for',
+            "'https://github.com/rootless-containers/slirp4netns/releases/download/v1.3.6/slirp4netns-'.\$arch",
+            "pmssInstallPinnedRemoteBinary('slirp4netns v1.3.6', \$slirpUrl, \$slirpSha256, '/usr/local/bin/slirp4netns', true);",
             "runStep('[docker] Docker: creating iptables symlink'",
+            "pmssEnvFlagEnabled('PMSS_DRY_RUN') ? [] : (glob('/usr/local/bin/pmss-slirp4netns-??????') ?: [])",
+            'is_file($straySlirp) && !is_link($straySlirp)',
+            "pmssPinnedRemoteStaleBinaryRemove(\$straySlirp, 'stray slirp4netns');",
         ]);
+        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/docker.php');
+        foreach (["'/usr/local/bin/']", '@tempnam(', 'download/v1.3.2/', '--version'] as $forbidden) {
+            $this->assertTrue(strpos($source, $forbidden) === false, 'docker.php must not contain '.$forbidden);
+        }
+        foreach (['x86_64', 'aarch64', 'armv7l', 'ppc64le', 'riscv64', 's390x'] as $arch) {
+            $this->assertSame(1, preg_match("/'".$arch."' => '[a-f0-9]{64}',/", $source), $arch);
+        }
     }
 }

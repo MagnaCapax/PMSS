@@ -832,7 +832,7 @@ These scripts are primarily imperative; treat them as idempotent installers guar
   - Newer: `apt-get install -y deluged deluge-web`, disables service.
 
 - docker.php
-  - Installs rootless Docker prerequisites; adds Docker APT repo/key; installs Docker packages and disables the system service/socket; enables unprivileged user namespace; fetches newer `slirp4netns` on Debian < 12.
+  - Installs rootless Docker prerequisites; adds Docker APT repo/key; installs Docker packages and disables the system service/socket; enables unprivileged user namespace; installs the pinned, SHA-256-verified `slirp4netns` as `/usr/local/bin/slirp4netns` on Debian < 12 (an existing helper stays when download or verification fails).
 
 - filebot.php
   - Ensures `/usr/bin/filebot` at pinned version; downloads and installs deb when missing.
