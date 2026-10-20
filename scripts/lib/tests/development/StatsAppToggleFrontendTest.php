@@ -17,9 +17,12 @@ class StatsAppToggleFrontendTest extends TestCase
         $html = $this->pmssRenderLegacyStats();
         require_once $this->pmssRepoPath('etc/skel/www/scriptsInc.php');
         foreach (pmssCustomerManagedAppDefinitions() as $app => $definition) {
+            // Legacy Stats offers installed binaries; installable rows live in Configure.
+            if (!empty($definition['installable'])) continue;
             $this->assertStringContainsString('data-app="'.$app.'"', $html);
             $this->assertStringContainsString('data-endpoint="'.$definition['endpoint'].'"', $html);
         }
+        $this->assertStringNotContainsString('data-app="openclaw"', $html);
 
         $this->assertStringContainsAndOmitsStrings(['class="status-actions"', 'data-action="start"'], ['data-endpoint="rtorrent', 'data-endpoint="docker'], $html);
     }

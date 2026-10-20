@@ -7,6 +7,159 @@ require_once dirname(__DIR__, 2).'/mediaStackPorts.php';
 
 final class OpenClawInstallerTest extends TestCase
 {
+    public function testRepeatInstallOnlyReconcilesBrowserWithoutOnboardingOrDownloading(): void
+    {
+        if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');
+        $root = $this->pmssMakeTempDir('pmss-oc-repeat-');
+        $home = $root.'/alice';
+        mkdir($home.'/stubs', 0700, true);
+        $paths = \ocPaths($home);
+        mkdir(dirname($paths['node']), 0700, true);
+        symlink(PHP_BINARY, $paths['node']);
+        mkdir(dirname($paths['entry']), 0700, true);
+        file_put_contents($paths['entry'], '<?php file_put_contents(getenv("HOME")."/calls", json_encode(array_slice($argv,1))."\\n", FILE_APPEND); if (($argv[1] ?? "") === "config" && ($argv[2] ?? "") === "get") echo "token";');
+        mkdir($paths['state'], 0700);
+        \ocEnsureToken($paths);
+        $token = file_get_contents($paths['env']);
+        file_put_contents($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":{"primary":"own/model"}}}}');
+        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        file_put_contents($home.'/.lighttpd.conf', "server.port = 24000\n");
+        foreach (array('quota' => 'exit 0', 'pkill' => 'exit 0', 'lighttpd' => 'exit 0', 'curl' => 'echo 401',
+            'crontab' => 'if [ "$1" = "-l" ]; then echo "no crontab for alice"; exit 1; fi') as $name => $body) {
+            file_put_contents($home.'/stubs/'.$name, "#!/bin/sh\n".$body."\n");
+            chmod($home.'/stubs/'.$name, 0700);
+        }
+        $env = getenv();
+        $env['HOME'] = $home;
+        $env['PATH'] = $home.'/stubs:'.$env['PATH'];
+        list($rc, $output) = \ocRun(array(PHP_BINARY, dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw', 'install', '--yes'), $env);
+        // The fake gateway exits immediately; all browser reconciliation before it must succeed.
+        $this->assertSame(1, $rc);
+        $this->assertStringContainsString('Gateway did not stay running', $output);
+        $calls = file_get_contents($home.'/calls');
+        foreach (array('gateway.controlUi.basePath', 'gateway.publicOrigin', 'gateway.trustedProxies') as $key) {
+            $this->assertStringContainsString($key, $calls);
+        }
+        $this->assertStringNotContainsString('onboard', $calls);
+        $this->assertSame($token, file_get_contents($paths['env']));
+        $this->assertStringContainsString('own/model', file_get_contents($paths['state'].'/openclaw.json'));
+        $this->assertSame(0600, fileperms($paths['state'].'/pmss-provider-pending') & 0777);
+        $this->assertSame(\ocProxyFragment('/user-alice/openclaw', 23000), file_get_contents($home.'/.lighttpd/custom.d/openclaw.conf'));
+    }
+
+    public function testBrowserFragmentMatchesSharedKeepPrefixRenderer(): void
+    {
+        require_once dirname(__DIR__, 2).'/lighttpd/proxyFragments.php';
+        foreach (array('alice' => 12345, 'bob' => 65500, 'abc123' => 20000) as $user => $port) {
+            $base = '/user-'.$user.'/openclaw';
+            $this->assertSame(\pmssLighttpdProxyRuleFragment('^'.$base.'($|/)', $port), \ocProxyFragment($base, $port));
+        }
+    }
+
+    public function testDashboardRewritePreservesBootstrapAndUsesCanonicalWebsocket(): void
+    {
+        $base = '/user-alice/openclaw';
+        $fields = array('bootstrapToken' => 'single+use/secret=', 'bootstrapProfile' => 'owner',
+            'gatewayUrl' => 'ws://127.0.0.1:23000'.$base, 'extra' => 'kept');
+        $json = json_encode(array('browserUrl' => 'http://127.0.0.1:23000'.$base.'/#'.http_build_query($fields)));
+        $url = \ocDashboardUrlRewrite($json, 'https://server.example', $base, 23000);
+        $this->assertStringContainsString('https://server.example'.$base.'/#', $url);
+        parse_str(parse_url($url, PHP_URL_FRAGMENT), $actual);
+        $fields['gatewayUrl'] = 'wss://server.example'.$base;
+        $this->assertSame($fields, $actual);
+        foreach (array('', '/', $base, $base.'/') as $gatewayPath) {
+            $local = $fields;
+            $local['gatewayUrl'] = 'ws://127.0.0.1:23000'.$gatewayPath;
+            $handoff = json_encode(array('browserUrl' => 'http://127.0.0.1:23000'.$base.'/#'.http_build_query($local)));
+            $this->assertSame($url, \ocDashboardUrlRewrite($handoff, 'https://server.example', $base, 23000));
+        }
+        foreach (array('{}', 'null', 'bad json', json_encode(array('browserUrl' => array())),
+            str_replace('127.0.0.1', 'evil.example', $json), str_replace('23000', '23001', $json),
+            json_encode(array('browserUrl' => 'http://127.0.0.1:23000'.$base.'/#token=long-lived')),
+            json_encode(array('browserUrl' => 'http://127.0.0.1:23000'.$base.'/#bootstrapToken[]=x'))) as $invalid) {
+            $threw = false;
+            try { \ocDashboardUrlRewrite($invalid, 'https://server.example', $base, 23000); }
+            catch (\RuntimeException $e) { $threw = true; }
+            $this->assertTrue($threw, 'Malformed handoff accepted');
+        }
+    }
+
+    public function testProxyFailureRemovesFragmentAndRestartsPanelAgain(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-oc-proxy-');
+        mkdir($root.'/alice');
+        $paths = array('home' => $root.'/alice');
+        $calls = 0;
+        try {
+            \ocProxyApply($paths, 23000, static function () use (&$calls): bool { return ++$calls > 1; });
+            $this->assertTrue(false, 'Expected rollback error');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('panel recovered', $e->getMessage());
+        }
+        $this->assertSame(2, $calls);
+        $file = $paths['home'].'/.lighttpd/custom.d/openclaw.conf';
+        $this->assertFalse(file_exists($file));
+        \ocProxyApply($paths, 23000, static function (): bool { return true; });
+        $this->assertSame(\ocProxyFragment('/user-alice/openclaw', 23000), file_get_contents($file));
+        \ocProxyApply($paths, null, static function (): bool { return true; });
+        $this->assertFalse(file_exists($file));
+        symlink($root.'/outside', $file);
+        $threw = false;
+        try { \ocProxyApply($paths, 23000, static function (): bool { return true; }); }
+        catch (\RuntimeException $e) { $threw = true; }
+        $this->assertTrue($threw);
+        $this->assertFalse(file_exists($root.'/outside'));
+    }
+
+    public function testLateProviderDecisionTableProtectsUserChoice(): void
+    {
+        $key = array('key' => 'private', 'endpoint' => 'https://ai.example/v1');
+        foreach (array(
+            array(false, null, null, 'none'), array(false, $key, null, 'none'),
+            array(true, null, null, 'wait'), array(true, null, '', 'wait'),
+            array(true, $key, 'own/model', 'remove'), array(true, null, 'own/model', 'remove'),
+            array(true, $key, null, 'apply'), array(true, $key, '', 'apply'),
+        ) as $row) $this->assertSame($row[3], \ocPendingProviderDecision($row[0], $row[1], $row[2]));
+    }
+
+    public function testLateProviderAppliesOnceWithSecretReferenceAndPrivateMarkers(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-oc-late-');
+        mkdir($home.'/.openclaw', 0700);
+        $paths = \ocPaths($home);
+        $paths['node'] = PHP_BINARY;
+        $paths['entry'] = $home.'/cli.php';
+        file_put_contents($paths['entry'], '<?php file_put_contents(getenv("HOME")."/calls", json_encode(array_slice($argv,1))."\\n", FILE_APPEND);');
+        file_put_contents($paths['state'].'/openclaw.json', '{}');
+        \ocEnsureToken($paths);
+        \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
+        $this->assertFalse(\ocPendingProviderApply($paths));
+        file_put_contents($home.'/.virsilipasKey', "endpoint=https://ai.example/v1\nkey=private-test-service-key\n");
+        chmod($home.'/.virsilipasKey', 0600);
+        $prior = getenv('HOME');
+        putenv('HOME='.$home);
+        try {
+            $this->assertTrue(\ocPendingProviderApply($paths));
+            $this->assertFalse(\ocPendingProviderApply($paths));
+        } finally { $prior === false ? putenv('HOME') : putenv('HOME='.$prior); }
+        $calls = file_get_contents($home.'/calls');
+        $this->assertSame(2, substr_count($calls, "\n"));
+        $this->assertStringContainsString('CUSTOM_API_KEY', $calls);
+        $this->assertStringNotContainsString('private-test-service-key', $calls);
+        $this->assertSame(0600, fileperms($paths['state'].'/pmss-virsilipas') & 0777);
+        $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
+        \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
+        file_put_contents($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":{"primary":"own/model"}}}}');
+        $this->assertFalse(\ocPendingProviderApply($paths));
+        $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
+        $this->assertSame($calls, file_get_contents($home.'/calls'));
+        \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
+        file_put_contents($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":"own/shorthand"}}}');
+        $this->assertFalse(\ocPendingProviderApply($paths));
+        $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
+        $this->assertSame($calls, file_get_contents($home.'/calls'));
+    }
+
     public function testCmdlineAcceptsEntryAndExactRewrittenTitles(): void
     {
         $entry = '/tmp/oc-entry/openclaw.mjs';

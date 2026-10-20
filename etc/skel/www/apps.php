@@ -1,6 +1,16 @@
 <?php
 /** Customer app controls and the closed, documentation-only Docker catalog. */
 require_once __DIR__.'/scriptsInc.php';
+if (isset($_GET['managed'])) {
+    if ($_GET['managed'] !== 'openclaw' || !is_file(__DIR__.'/userOpenClaw.php')) {
+        http_response_code(503);
+        echo 'OpenClaw controls are unavailable during this update.';
+        return;
+    }
+    require_once __DIR__.'/userOpenClaw.php';
+    pmssOpenClawActionHandle();
+    return;
+}
 if (isset($_GET['status']) || isset($_GET['log'])) {
     $helper = isset($_GET['status']) ? 'pmssCustomerAppsStatusJsonEmit' : 'pmssCustomerAppsLogJsonEmit';
     if (!function_exists($helper)) {

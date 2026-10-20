@@ -8,9 +8,9 @@ const OC_CRON_TAG = '# pmss-openclaw';
 const OC_REQUIRED_FILES = 60000;
 
 /** Keep all process paths under the caller's own home. */
-function ocPaths(): array
+function ocPaths(?string $home = null): array
 {
-    $home = getenv('HOME');
+    $home = $home ?? getenv('HOME');
     if (!is_string($home) || $home === '' || !is_dir($home) || is_link($home)) {
         throw new RuntimeException('HOME must be an existing directory');
     }
@@ -435,11 +435,19 @@ function ocStart(array $paths, bool $reset, int $waitSeconds): bool
 /** One cron check at a time; five consecutive failures require manual start. */
 function ocCheck(array $paths): void
 {
-    $lock = fopen($paths['state'].'/check.lock', 'c');
+    if (is_file($paths['state'].'/pmss-stopped')) {
+        return;
+    }
+    $lock = fopen($paths['home'].'/.openclaw-action.lock', 'c');
     if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
         return;
     }
+    $adopted = ocPendingProviderApply($paths);
+    if ($adopted) {
+        ocStop($paths);
+    }
     $prior = is_file($paths['check']) ? (string) file_get_contents($paths['check']) : '';
+    if ($adopted) $prior = '';
     if (strpos($prior, 'gave_up ') === 0) {
         return;
     }
@@ -456,18 +464,276 @@ function ocCheck(array $paths): void
     fclose($lock);
 }
 
+/** Use the panel's hostname source, never an untrusted request Host header. */
+function ocPublicOrigin(): string
+{
+    $host = function_exists('gethostname') ? (string) gethostname() : '';
+    $host = $host !== '' ? $host : (string) php_uname('n');
+    if (!preg_match('/^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/D', $host)) {
+        throw new RuntimeException('Canonical panel hostname is invalid');
+    }
+    return 'https://'.$host;
+}
+
+/** The full account prefix is also the gateway's asset and websocket prefix. */
+function ocBasePath(array $paths): string
+{
+    $user = basename($paths['home']);
+    if (!preg_match('/^[a-z][a-z0-9]{2,7}$/D', $user)) {
+        throw new RuntimeException('Invalid account name');
+    }
+    return '/user-'.$user.'/openclaw';
+}
+
+/** Embed the shared keep-prefix rule: the customer cannot include /scripts. */
+function ocProxyFragment(string $base, int $port): string
+{
+    return '$HTTP["url"] =~ "^'.$base.'($|/)" {'."\n"
+        ."  proxy.server = ( \"\" => ( (\n    \"host\" => \"127.0.0.1\",\n    \"port\" => {$port}\n  ) ) ),\n"
+        ."  proxy.header = (\n      \"upgrade\" => \"enable\"\n  )\n}";
+}
+
+/** Restart exactly the account's web processes, as the media-stack installer does. */
+function ocPanelRestart(array $paths): bool
+{
+    list($rc) = ocRun(array('lighttpd', '-tt', '-f', $paths['home'].'/.lighttpd.conf'));
+    if ($rc !== 0) return false;
+    foreach (array('lighttpd', 'php-cgi') as $name) {
+        ocRun(array('pkill', '-9', '-u', (string) posix_geteuid(), $name));
+    }
+    list($rc) = ocRun(array('lighttpd', '-f', $paths['home'].'/.lighttpd.conf'));
+    if ($rc !== 0) {
+        return false;
+    }
+    $config = @file_get_contents($paths['home'].'/.lighttpd.conf');
+    if (!is_string($config) || !preg_match('/^\s*server\.port\s*=\s*([0-9]+)\s*$/m', $config, $match)) {
+        return false;
+    }
+    for ($attempt = 0; $attempt < 10; ++$attempt) {
+        // A 401 is the expected proof that the account's Basic realm is alive.
+        list($rc, $code) = ocRun(array('curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '2',
+            'http://127.0.0.1:'.$match[1].'/user-'.basename($paths['home']).'/'));
+        if ($rc === 0 && in_array(trim($code), array('200', '301', '302', '401'), true)) {
+            return true;
+        }
+        usleep(200000);
+    }
+    return false;
+}
+
+/** Publish only the opted-in fragment; failed restarts remove it and restore the panel. */
+function ocProxyApply(array $paths, ?int $port, ?callable $restart = null): void
+{
+    $dir = $paths['home'].'/.lighttpd/custom.d';
+    foreach (array(dirname($dir), $dir, $dir.'/openclaw.conf') as $path) {
+        if (is_link($path) || (file_exists($path) && !is_dir($path) && $path !== $dir.'/openclaw.conf')) {
+            throw new RuntimeException('Unsafe OpenClaw proxy path');
+        }
+    }
+    $file = $dir.'/openclaw.conf';
+    if ($port !== null) {
+        if (!is_dir($dir) && !mkdir($dir, 0700, true)) {
+            throw new RuntimeException('Could not create proxy directory');
+        }
+        $fragment = ocProxyFragment(ocBasePath($paths), $port);
+        if (file_put_contents($file, $fragment) !== strlen($fragment)) {
+            @unlink($file);
+            throw new RuntimeException('Could not write OpenClaw proxy');
+        }
+    } elseif (file_exists($file) && !unlink($file)) {
+        throw new RuntimeException('Could not remove OpenClaw proxy');
+    }
+    $restart = $restart ?? 'ocPanelRestart';
+    if (!$restart($paths)) {
+        @unlink($file);
+        $recovered = $restart($paths);
+        throw new RuntimeException('OpenClaw proxy failed; fragment removed. '.($recovered ? 'Account panel recovered.' : 'Account panel restart still failed; contact support.'));
+    }
+}
+
+/** Set browser configuration without changing the gateway's token authentication. */
+function ocBrowserConfigure(array $paths, int $port): void
+{
+    $env = ocGatewayEnv($paths);
+    list($rc, $auth) = ocCli($paths, array('config', 'get', 'gateway.auth.mode'), $env);
+    if ($rc !== 0 || trim($auth, " \t\r\n\"") !== 'token') {
+        throw new RuntimeException('Gateway token authentication is not configured');
+    }
+    foreach (array('gateway.controlUi.basePath' => ocBasePath($paths),
+        'gateway.publicOrigin' => ocPublicOrigin(), 'gateway.trustedProxies' => '["127.0.0.1"]') as $key => $value) {
+        list($rc) = ocCli($paths, array('config', 'set', $key, $value), $env);
+        if ($rc !== 0) {
+            throw new RuntimeException('Could not configure OpenClaw browser access: '.$key);
+        }
+    }
+    ocProxyApply($paths, $port);
+}
+
+/** Validate the loopback handoff, retaining bootstrap fields and replacing only origins. */
+function ocDashboardUrlRewrite(string $json, string $origin, string $base, ?int $port): string
+{
+    $data = json_decode($json, true);
+    $url = is_array($data) ? ($data['browserUrl'] ?? null) : null;
+    $parts = is_string($url) && !preg_match('/[\x00-\x20\x7f]/', $url) ? parse_url($url) : false;
+    if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'http' || ($parts['host'] ?? '') !== '127.0.0.1'
+        || ($parts['port'] ?? null) !== $port || ($parts['path'] ?? '') !== $base.'/'
+        || isset($parts['user']) || isset($parts['pass']) || isset($parts['query'])
+        || !preg_match('#^https://[A-Za-z0-9.-]+$#D', $origin)) {
+        throw new RuntimeException('Unexpected OpenClaw dashboard JSON shape');
+    }
+    parse_str($parts['fragment'] ?? '', $fragment);
+    foreach (array('bootstrapToken', 'bootstrapProfile', 'gatewayUrl') as $key) {
+        if (!isset($fragment[$key]) || !is_string($fragment[$key]) || $fragment[$key] === ''
+            || preg_match('/[\x00-\x1f\x7f]/', $fragment[$key])) {
+            throw new RuntimeException('Unexpected OpenClaw dashboard JSON fields');
+        }
+    }
+    $gateway = parse_url($fragment['gatewayUrl']);
+    if (isset($fragment['token']) || !is_array($gateway) || ($gateway['scheme'] ?? '') !== 'ws'
+        || ($gateway['host'] ?? '') !== '127.0.0.1' || ($gateway['port'] ?? null) !== $port
+        || isset($gateway['user']) || isset($gateway['pass']) || isset($gateway['query']) || isset($gateway['fragment'])
+        || !in_array($gateway['path'] ?? '', array('', '/', $base, $base.'/'), true)) {
+        throw new RuntimeException('Unexpected OpenClaw dashboard gateway URL');
+    }
+    $fragment['gatewayUrl'] = 'wss://'.substr($origin, 8).$base;
+    return $origin.$base.'/#'.http_build_query($fragment, '', '&', PHP_QUERY_RFC3986);
+}
+
+/** Private marker creation never inherits a permissive account umask. */
+function ocPrivateMarkerWrite(string $path, string $contents): void
+{
+    $old = umask(0077);
+    try {
+        if (is_link($path) || file_put_contents($path, $contents) !== strlen($contents) || !chmod($path, 0600)) {
+            throw new RuntimeException('Could not write OpenClaw state marker');
+        }
+    } finally {
+        umask($old);
+    }
+}
+
+/** The user's primary model always wins over delayed platform credentials. */
+function ocPendingProviderDecision(bool $pending, ?array $credentials, $primary): string
+{
+    if (!$pending) return 'none';
+    if ($primary !== null && $primary !== '') return 'remove';
+    return $credentials === null ? 'wait' : 'apply';
+}
+
+/** Adopt a late key once; the cron caller owns the single restart. */
+function ocPendingProviderApply(array $paths): bool
+{
+    $marker = $paths['state'].'/pmss-provider-pending';
+    if (!is_file($marker)) return false;
+    $raw = @file_get_contents($paths['state'].'/openclaw.json');
+    $config = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($config)) return false;
+    $credentials = ocVirsilipasCredentials($paths['home']);
+    $model = $config['agents']['defaults']['model'] ?? null;
+    // Preserve a user's scalar model shorthand as well as the explicit primary field.
+    $primary = is_array($model) ? ($model['primary'] ?? null) : $model;
+    $decision = ocPendingProviderDecision(true, $credentials, $primary);
+    if ($decision === 'remove') { unlink($marker); return false; }
+    if ($decision !== 'apply') return false;
+    $provider = array('baseUrl' => $credentials['endpoint'],
+        'apiKey' => array('source' => 'env', 'provider' => 'default', 'id' => 'CUSTOM_API_KEY'),
+        'api' => 'openai-completions', 'models' => array(array('id' => 'default', 'name' => 'default (Custom Provider)')));
+    $env = ocGatewayEnv($paths);
+    $env['CUSTOM_API_KEY'] = $credentials['key'];
+    foreach (array('models.providers.virsilipas' => json_encode($provider), 'agents.defaults.model.primary' => 'virsilipas/default') as $key => $value) {
+        list($rc) = ocCli($paths, array('config', 'set', $key, $value), $env);
+        if ($rc !== 0) throw new RuntimeException('Could not apply pending OpenClaw provider');
+        // Publish the runtime key reader before making this provider the active model.
+        if ($key === 'models.providers.virsilipas') ocPrivateMarkerWrite($paths['state'].'/pmss-virsilipas', "virsilipas\n");
+    }
+    unlink($marker);
+    return true;
+}
+
+/** Bootstrap missing program files without repeating onboarding on existing installs. */
+function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, int $port): bool
+{
+    ocInstallNode($paths);
+    $env = getenv();
+    $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
+    list($rc, $output) = ocRun(ocNpmInstallArgs($paths), $env);
+    ocRemoveTree($paths['npmCache']);
+    if ($rc !== 0) {
+        if (strpos($output, '-122') !== false || strpos($output, 'EDQUOT') !== false) {
+            throw new RuntimeException('npm install failed: the account file-count quota was reached.');
+        }
+        throw new RuntimeException('npm install failed: '.$output);
+    }
+    if (!is_file($paths['entry'])) {
+        throw new RuntimeException('npm did not install the OpenClaw entry point');
+    }
+    if (!is_dir($paths['state'])) {
+        mkdir($paths['state'], 0700);
+    }
+    ocEnsureToken($paths);
+    $env = ocGatewayEnv($paths);
+    list($rc, $help) = ocCli($paths, array('onboard', '--help'), $env);
+    foreach (array('--non-interactive', '--accept-risk', '--skip-daemon', '--skip-channels', '--gateway-token-ref-env') as $flag) {
+        if ($rc !== 0 || strpos($help, $flag) === false) {
+            throw new RuntimeException('Installed OpenClaw onboarding lacks '.$flag);
+        }
+    }
+    if ($useVirsilipas) {
+        // A release without the custom-provider flags keeps the skipped-provider install.
+        foreach (array('--custom-base-url', '--custom-model-id', '--custom-provider-id', '--custom-compatibility', '--secret-input-mode') as $flag) {
+            if (strpos($help, $flag) === false) {
+                $useVirsilipas = false;
+            }
+        }
+    }
+    if ($useVirsilipas) {
+        $env['CUSTOM_API_KEY'] = $credentials['key'];
+    }
+    $flags = ocOnboardArgs($port, $useVirsilipas ? $credentials : null);
+    list($rc, $output) = ocCli($paths, $flags, $env);
+    if ($rc !== 0) {
+        throw new RuntimeException('Onboarding failed; see OpenClaw diagnostics.');
+    }
+    if ($useVirsilipas) {
+        $marker = $paths['state'].'/pmss-virsilipas';
+        if (file_put_contents($marker, "virsilipas\n") !== strlen("virsilipas\n") || !chmod($marker, 0600)) {
+            throw new RuntimeException('Could not mark the Virsilipas runtime configuration');
+        }
+    }
+    return $useVirsilipas;
+}
+
 /** One entry point keeps include-only test calls hermetic. */
 function ocMain(array $args): int
 {
     $command = $args[1] ?? '';
-    if (!in_array($command, array('install', 'start', 'stop', 'status', 'check', 'uninstall'), true)) {
-        echo "Usage: install-openclaw install [--yes] | start | stop | status [--show-token] | check | uninstall [--purge]\n";
+    if (!in_array($command, array('install', 'start', 'stop', 'status', 'check', 'uninstall', 'open-url'), true)) {
+        echo "Usage: install-openclaw install [--yes] | start | stop | status [--show-token] | check | open-url | uninstall [--purge]\n";
         return $command === '' ? 0 : 1;
     }
     if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
         throw new RuntimeException('Run as your own account, not root');
     }
     $paths = ocPaths();
+    // Share the cron lock so start/stop/install cannot race a watchdog restart.
+    $actionLock = null;
+    if ($command !== 'check' && $command !== 'status' && $command !== 'open-url') {
+        $actionLock = fopen($paths['home'].'/.openclaw-action.lock', 'c');
+        if (!$actionLock || !flock($actionLock, LOCK_EX | LOCK_NB)) {
+            throw new RuntimeException('Another OpenClaw action is running');
+        }
+    }
+    if ($command === 'open-url') {
+        if (ocRunningPid($paths) === null || !ocPortListening(ocReservedPort($paths['port']))) {
+            throw new RuntimeException('Gateway is stopped; start OpenClaw first.');
+        }
+        list($rc, $json) = ocCli($paths, array('dashboard', '--json', '--no-open'), ocGatewayEnv($paths));
+        if ($rc !== 0) {
+            throw new RuntimeException('Could not create an OpenClaw dashboard handoff.');
+        }
+        echo ocDashboardUrlRewrite($json, ocPublicOrigin(), ocBasePath($paths), ocReservedPort($paths['port']))."\n";
+        return 0;
+    }
     if ($command === 'install') {
         echo "OpenClaw is a chat-driven agent with shell access to this account. Its gateway or bot token equals shell access.\n";
         if (!in_array('--yes', $args, true)) {
@@ -482,57 +748,18 @@ function ocMain(array $args): int
         }
         list($quotaRc, $quotaOutput) = ocRun(array('quota', '-w', '-p', '-u'));
         $files = $quotaRc === 0 ? ocQuotaFileHeadroom($quotaOutput) : null;
-        if ($files !== null && $files['used'] > $files['soft'] - OC_REQUIRED_FILES) {
+        if (!is_file($paths['entry']) && $files !== null && $files['used'] > $files['soft'] - OC_REQUIRED_FILES) {
             throw new RuntimeException('OpenClaw needs '.OC_REQUIRED_FILES.' files; '.$files['used'].' files are currently used and the account file limit is '.$files['soft'].'. Installing would exceed the account file-count quota.');
         }
         $credentials = ocVirsilipasCredentials($paths['home']);
         $useVirsilipas = ocUseVirsilipas($paths['state'], $credentials);
-        ocInstallNode($paths);
-        $env = getenv();
-        $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
-        list($rc, $output) = ocRun(ocNpmInstallArgs($paths), $env);
-        ocRemoveTree($paths['npmCache']);
-        if ($rc !== 0) {
-            if (strpos($output, '-122') !== false || strpos($output, 'EDQUOT') !== false) {
-                throw new RuntimeException('npm install failed: the account file-count quota was reached.');
-            }
-            throw new RuntimeException('npm install failed: '.$output);
-        }
+        // Existing installations only need browser reconciliation, never another onboarding.
         if (!is_file($paths['entry'])) {
-            throw new RuntimeException('npm did not install the OpenClaw entry point');
-        }
-        if (!is_dir($paths['state'])) {
-            mkdir($paths['state'], 0700);
+            $useVirsilipas = ocInstallFresh($paths, $credentials, $useVirsilipas, $port);
         }
         ocEnsureToken($paths);
-        $env = ocGatewayEnv($paths);
-        list($rc, $help) = ocCli($paths, array('onboard', '--help'), $env);
-        foreach (array('--non-interactive', '--accept-risk', '--skip-daemon', '--skip-channels', '--gateway-token-ref-env') as $flag) {
-            if ($rc !== 0 || strpos($help, $flag) === false) {
-                throw new RuntimeException('Installed OpenClaw onboarding lacks '.$flag);
-            }
-        }
-        if ($useVirsilipas) {
-            // A release without the custom-provider flags keeps the skipped-provider install.
-            foreach (array('--custom-base-url', '--custom-model-id', '--custom-provider-id', '--custom-compatibility', '--secret-input-mode') as $flag) {
-                if (strpos($help, $flag) === false) {
-                    $useVirsilipas = false;
-                }
-            }
-        }
-        if ($useVirsilipas) {
-            $env['CUSTOM_API_KEY'] = $credentials['key'];
-        }
-        $flags = ocOnboardArgs($port, $useVirsilipas ? $credentials : null);
-        list($rc, $output) = ocCli($paths, $flags, $env);
-        if ($rc !== 0) {
-            throw new RuntimeException('Onboarding failed; see OpenClaw diagnostics.');
-        }
-        if ($useVirsilipas) {
-            $marker = $paths['state'].'/pmss-virsilipas';
-            if (file_put_contents($marker, "virsilipas\n") !== strlen("virsilipas\n") || !chmod($marker, 0600)) {
-                throw new RuntimeException('Could not mark the Virsilipas runtime configuration');
-            }
+        if ($credentials === null) {
+            ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
         }
         $wrapper = ocCliWrapper($paths);
         if (!is_dir($paths['home'].'/bin')) {
@@ -541,6 +768,9 @@ function ocMain(array $args): int
         file_put_contents($paths['home'].'/bin/openclaw', $wrapper);
         chmod($paths['home'].'/bin/openclaw', 0750);
         file_put_contents($paths['port'], $port."\n");
+        ocBrowserConfigure($paths, $port);
+        ocStop($paths);
+        @unlink($paths['state'].'/pmss-stopped');
         ocCronApply($paths, true);
         if (!ocStart($paths, true, 120)) {
             throw new RuntimeException('Gateway did not stay running; inspect ~/.openclaw/logs/gateway.log');
@@ -555,6 +785,7 @@ function ocMain(array $args): int
     if ($command === 'uninstall') {
         ocStop($paths);
         ocCronApply($paths, false);
+        ocProxyApply($paths, null);
         foreach (array($paths['home'].'/bin/openclaw', $paths['pid']) as $file) {
             if (is_file($file) || is_link($file)) {
                 unlink($file);
@@ -584,11 +815,19 @@ function ocMain(array $args): int
         return 0;
     }
     if ($command === 'stop') {
+        if (is_dir($paths['state'])) ocPrivateMarkerWrite($paths['state'].'/pmss-stopped', "stopped\n");
         ocStop($paths);
         echo "Gateway stopped.\n";
         return 0;
     }
     if ($command === 'start') {
+        if (!is_file($paths['home'].'/.lighttpd/custom.d/openclaw.conf')) {
+            $port = ocReservedPort($paths['home'].'/.media-stack-port-openclaw');
+            if ($port === null) throw new RuntimeException('No PMSS-reserved port yet');
+            ocBrowserConfigure($paths, $port);
+            ocStop($paths);
+        }
+        @unlink($paths['state'].'/pmss-stopped');
         if (!ocStart($paths, true, 120)) {
             throw new RuntimeException('Gateway did not stay running');
         }

@@ -13,6 +13,7 @@ require_once __DIR__.'/../../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../../userLifecycle.php';
 require_once __DIR__.'/../serviceLaunch.php';
 require_once __DIR__.'/../userConfigStore.php';
+require_once __DIR__.'/appProfile.php';
 
 /** Persist creation-time additional quota for immediate panel visibility. */
 function pmssAddUserBonusQuotaPersist(array $user, string $homePath): bool
@@ -109,6 +110,10 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
         logProvisionMessage('Bonus quota recorded: '.$user['bonusQuotaGiB'].' GiB');
     }
 
+    if (($user['appProfile'] ?? '') === 'openclaw') {
+        pmssAddUserOpenClawPreinstall($user, $homePath);
+        return;
+    }
     $pikkumies = pmssAddUserPikkumiesPreinstallCommand($user, $homePath);
     if ($pikkumies === null) {
         logProvisionMessage(sprintf('Pikkumies not preinstalled: %s MiB RAM (floor %d) or no ~/bin/install-pikkumies.sh', (string) ($user['memory'] ?? '?'), pmssUserPikkumiesPreinstallMinRamMiB()));

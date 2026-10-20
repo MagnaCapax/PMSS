@@ -6,6 +6,33 @@ require_once dirname(__DIR__, 2).'/user/add/postProvision.php';
 
 final class AddUserPostProvisionTest extends TestCase
 {
+    public function testOpenClawProfileRequiresRamQuotaHeadroomAndAbsentState(): void
+    {
+        $home = $this->tempDir.'/alice';
+        mkdir($home.'/bin', 0700, true);
+        file_put_contents($home.'/bin/install-openclaw', '<?php');
+        $user = array('name' => 'alice', 'memory' => 2048, 'appProfile' => 'openclaw');
+        $files = array('used' => 100, 'soft' => 60100, 'hard' => 75125);
+        $this->assertSame(null, \pmssAddUserOpenClawGate($user, $home, $files));
+        $small = $user;
+        $small['memory'] = 2047;
+        $this->assertStringContainsString('RAM', \pmssAddUserOpenClawGate($small, $home, $files));
+        $this->assertStringContainsString('quota', \pmssAddUserOpenClawGate($user, $home, null));
+        $files['used']++;
+        $this->assertStringContainsString('quota', \pmssAddUserOpenClawGate($user, $home, $files));
+        $files['used']--;
+        mkdir($home.'/.openclaw');
+        $this->assertStringContainsString('existing', \pmssAddUserOpenClawGate($user, $home, $files));
+        rmdir($home.'/.openclaw');
+        symlink($home.'/absent', $home.'/.openclaw');
+        $this->assertStringContainsString('existing', \pmssAddUserOpenClawGate($user, $home, $files));
+        unlink($home.'/.openclaw');
+        unlink($home.'/bin/install-openclaw');
+        $this->assertStringContainsString('installer', \pmssAddUserOpenClawGate($user, $home, $files));
+        unset($user['appProfile']);
+        $this->assertSame('profile not selected', \pmssAddUserOpenClawGate($user, $home, $files));
+    }
+
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-add-user-bonus-']; }
 
     public function testTrafficSeedingDelegatesToSharedStorageHelper(): void
@@ -68,6 +95,9 @@ final class AddUserPostProvisionTest extends TestCase
         $this->assertSame(1000, $floor);
         putenv('PATH='.$this->tempDir.'/stub:'.$path);
         try {
+            $openclaw = \pmssAddUserOpenClawPreinstallCommand($name);
+            $this->assertStringContainsAllStrings(array('systemd-run', '--slice=user-4321.slice', 'su', 'alice',
+                'php "$HOME/bin/install-openclaw" install --yes', 'umask 077', '.install-openclaw.log'), $openclaw);
             $noInstaller = \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) $floor], $home);
             file_put_contents($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
             $belowFloor = \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) ($floor - 1)], $home);

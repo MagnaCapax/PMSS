@@ -118,6 +118,13 @@ function pmssAppsLiveStatusRead(string $home, string $username, string $hostname
 /** Read only a fixed app log, cap work to 16 KiB and output to twenty short lines. */
 function pmssAppsLogTailRead(string $home, string $app): string
 {
+    if ($app === 'openclaw') {
+        $logs = array();
+        foreach (array('.install-openclaw.log', '.openclaw/logs/gateway.log') as $path) {
+            $logs[] = pmssCustomerHtmlAttr(pmssMediaStackPanelLogTailRead($home, 6000, $path));
+        }
+        return implode("\n", $logs);
+    }
     if (!in_array($app, pmssCustomerAppsMediaIdsRead(), true)) return '';
     $relative = $app === 'jellyfin' ? '.config/jellyfin/log/jellyfin.log'
         : '.config/'.$app.'/'.$app.'.log';

@@ -177,15 +177,15 @@ function pmssMediaStackPanelRecoveryRequestAllowed(array $server): bool
 /**
  * Read the launcher pid file when present.
  */
-function pmssMediaStackPanelPidRead(string $home): int
+function pmssMediaStackPanelPidRead(string $home, string $pidFile = '.install-media-stack-web.pid'): int
 {
-    return (int) (pmssCustomerTrimmedFileRead(pmssCustomerHomePath($home, '.install-media-stack-web.pid'), true) ?? '');
+    return (int) (pmssCustomerTrimmedFileRead(pmssCustomerHomePath($home, $pidFile), true) ?? '');
 }
 
 /**
  * Accept only the panel-launched installer, not another process reusing its pid.
  */
-function pmssMediaStackPanelPidRunning(string $home, int $pid): bool
+function pmssMediaStackPanelPidRunning(string $home, int $pid, ?array $commandArgs = null): bool
 {
     if ($pid <= 1) {
         return false;
@@ -200,7 +200,7 @@ function pmssMediaStackPanelPidRunning(string $home, int $pid): bool
     }
 
     // A newly forked launcher can publish its pid before nohup execs Bash.
-    $expected = "/bin/bash\0".pmssCustomerHomePath($home, 'install-media-stack.sh')."\0";
+    $expected = implode("\0", $commandArgs ?? array('/bin/bash', pmssCustomerHomePath($home, 'install-media-stack.sh')))."\0";
     for ($attempt = 0; $attempt < 10; $attempt++) {
         $command = @file_get_contents($proc.'/cmdline', false, null, 0, 4096);
         if ($command === $expected) {
@@ -219,9 +219,9 @@ function pmssMediaStackPanelPidRunning(string $home, int $pid): bool
 /**
  * Read a bounded tail from the installer log for status rendering.
  */
-function pmssMediaStackPanelLogTailRead(string $home, int $maxBytes = 6000): string
+function pmssMediaStackPanelLogTailRead(string $home, int $maxBytes = 6000, string $logFile = '.install-media-stack.log'): string
 {
-    $path = pmssCustomerHomePath($home, '.install-media-stack.log');
+    $path = pmssCustomerHomePath($home, $logFile);
     if (!is_file($path) || ($size = @filesize($path)) === false) {
         return '';
     }
@@ -598,14 +598,18 @@ function pmssMediaStackPanelSecurityStatusesRead(string $home, string $username,
 /**
  * Build the shell command that launches the installer in the background.
  */
-function pmssMediaStackPanelStartCommandBuild(string $home, string $username): string
+function pmssMediaStackPanelStartCommandBuild(string $home, string $username, array $launcher = array()): string
 {
-    $scriptPath = pmssCustomerHomePath($home, 'install-media-stack.sh');
-    $pidPath = pmssCustomerHomePath($home, '.install-media-stack-web.pid');
+    $scriptPath = pmssCustomerHomePath($home, $launcher['script'] ?? 'install-media-stack.sh');
+    $pidPath = pmssCustomerHomePath($home, $launcher['pid'] ?? '.install-media-stack-web.pid');
+    $command = (isset($launcher['interpreter']) ? escapeshellarg($launcher['interpreter']) : '/bin/bash').' '.escapeshellarg($scriptPath);
+    foreach ($launcher['args'] ?? array() as $arg) $command .= ' '.escapeshellarg($arg);
+    $log = isset($launcher['log']) ? escapeshellarg(pmssCustomerHomePath($home, $launcher['log'])) : '/dev/null';
 
     $innerCommand = 'cd '.escapeshellarg($home)
+        .(isset($launcher['log']) ? ' && umask 077' : '')
         .' && rm -f -- '.escapeshellarg($pidPath)
-        .' && { nohup /bin/bash '.escapeshellarg($scriptPath).' >/dev/null 2>&1 </dev/null & echo $! > '.escapeshellarg($pidPath).'; }';
+        .' && { nohup '.$command.' >'.$log.' 2>&1 </dev/null & echo $! > '.escapeshellarg($pidPath).'; }';
 
     return 'HOME='.escapeshellarg($home)
         .' USER='.escapeshellarg($username)

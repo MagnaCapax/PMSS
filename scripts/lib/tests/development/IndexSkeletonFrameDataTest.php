@@ -6,6 +6,20 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/scriptsInc.php';
 
 class IndexSkeletonFrameDataTest extends TestCase
 {
+    public function testOpenClawTabRequiresProxyAndStaysInsidePanel(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $home = $this->pmssMakeTempDir('pmss-oc-tab-').'/alice';
+        mkdir($home.'/.lighttpd/custom.d', 0700, true);
+        $dir = $home.'/.lighttpd/custom.d';
+        $this->assertFalse(isset(\pmssLocalFrameProxyAppFramesRead($dir, $home)['openclaw']));
+        file_put_contents($dir.'/openclaw.conf', '$HTTP["url"] =~ "^/user-alice/openclaw($|/)" { }');
+        $frames = \pmssLocalFrameProxyAppFramesRead($dir, $home);
+        $this->assertTrue(isset($frames['openclaw']));
+        $this->assertSame('configure.php#apps', $frames['openclaw']['url']);
+        $this->assertFalse(\pmssFrameOpensInNewWindow($frames['openclaw']));
+    }
+
     public function testCustomFrameReaderRunsBeforeLocalFrameMerge(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(

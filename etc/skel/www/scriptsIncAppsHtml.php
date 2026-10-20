@@ -11,6 +11,7 @@ function pmssCustomerAppsDescriptionsRead(): array
         'Autobrr' => 'Grabs releases from IRC announces', 'Cloudplow' => 'Moves finished files to cloud storage',
         'rTorrent + ruTorrent' => 'Your main torrent client', 'qBittorrent' => 'Second torrent client',
         'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage',
+        'OpenClaw' => 'AI agent with shell access; uses your Pulsed Media AI credits by default',
         );
     foreach (require __DIR__.'/toggleAppCatalog.php' as $row) $descriptions[$row['label']] = $row['description'];
     return $descriptions;
@@ -42,7 +43,7 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
         'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr',
         'cloudplow' => 'Cloudplow', 'rtorrent' => 'rTorrent + ruTorrent',
         'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone',
-        'lighttpd' => 'Web server');
+        'lighttpd' => 'Web server', 'openclaw' => 'OpenClaw');
     foreach (require __DIR__.'/toggleAppCatalog.php' as $appId => $row) $names[$appId] = $row['label'];
     $name = $names[$id] ?? $id;
     $description = pmssCustomerAppsDescriptionsRead()[$name] ?? ($id === 'lighttpd' ? 'Your account web server' : '');
@@ -50,6 +51,8 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
     $label = $state === 'off' ? ($app['kind'] === 'managed' ? 'Off' : 'Stopped by you')
         : ($state === 'not-running' ? 'Not running' : ($state === 'running' ? 'Running'
             : ($state === 'not secured' ? 'Not secured' : ($state === 'gave up' ? 'Gave up' : ($state === 'stopped' ? 'Stopped' : 'Status unavailable')))));
+    if ($state === 'installing') $label = 'Starting';
+    if ($state === 'failed') $label = 'Failed';
     $pillClass = $state === 'running' ? 'p-run' : ($state === 'off' ? 'p-off' : 'p-stop');
     $html = pmssCustomerAppRowStart($name, $description, $id)
         .'<span class="pill '.$pillClass.'">'.pmssCustomerHtmlAttr($label).'</span>';
@@ -73,6 +76,7 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
         elseif ($state === 'off') $html .= pmssCustomerAppButton('Turn on', 'start', 'b-pri');
         elseif ($state === 'gave up') $html .= pmssCustomerAppButton('Restart', 'restart', 'b-pri').pmssCustomerAppButton('Turn off', 'disable');
         else $html .= pmssCustomerAppButton('Start', 'start', 'b-pri').pmssCustomerAppButton('Turn off', 'disable');
+        if (!empty($app['log'])) $html .= pmssCustomerAppButton('Show log', 'log');
     } else {
         $html .= pmssCustomerAppButton('Restart', 'restart', 'b-pri');
     }
@@ -112,7 +116,8 @@ function pmssCustomerAppsSectionHtmlBuild(array $status, string $statusUrl = 'ap
         if (isset($status['apps'][$id])) $rows[$id] = pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id], !empty($status['mediaAppControl']));
     }
     $toggleRows = '';
-    foreach (require __DIR__.'/toggleAppCatalog.php' as $id => $row) {
+    foreach (pmssCustomerManagedAppDefinitions() as $id => $row) {
+        if (in_array($id, array('qBittorrent', 'Deluge', 'rclone'), true)) continue;
         if (isset($status['apps'][$id])) $toggleRows .= pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id]);
     }
     $startAll = !empty($status['installed']) && empty($status['poll']) && !empty($status['canRestart'])

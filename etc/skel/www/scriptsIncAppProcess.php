@@ -7,6 +7,12 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
    'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php', 'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')),
    'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')),
    'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php',      'binaries' => array('/usr/bin/rclone')),
+   'openclaw' => array('enable' => '../.openclaw/gateway.env', 'disable' => '.openclaw/pmss-stopped',
+       'endpoint' => 'apps.php?managed=openclaw', 'binaries' => array(dirname(__DIR__).'/.local/share/openclaw/lib/node_modules/openclaw/openclaw.mjs'),
+       'installable' => true, 'portMarker' => '.media-stack-port-openclaw', 'stateFile' => '.openclaw/check.state',
+       'waitSeconds' => 180, 'url' => 'apps.php?managed=openclaw&action=open', 'log' => true,
+       'statusHelperFile' => 'userOpenClaw.php', 'statusHelper' => 'pmssOpenClawStatusRead',
+       'consent' => 'OpenClaw is an AI agent that can run commands as your account. It uses your Pulsed Media AI credits by default. Continue?'),
   );
   foreach (require __DIR__.'/toggleAppCatalog.php' as $id => $row) {
    $definitions[$id] = array('enable' => '../'.$row['enable'], 'endpoint' => 'toggleApp.php?app='.$id, 'binaries' => $row['binaries']);

@@ -7,6 +7,20 @@ require_once dirname(__DIR__, 2).'/user/add/userConfigApply.php';
 
 class addUserCliTest extends TestCase
 {
+    public function testOpenClawProfileIsExplicitAndRejectsOtherValues(): void
+    {
+        $args = array('alice', 'rand', '2048', '200');
+        $this->assertFalse(isset($this->parseAddUserCli($args)['user']['appProfile']));
+        $this->assertSame('openclaw', $this->parseAddUserCli(array_merge($args, array('--app-profile=openclaw')))['user']['appProfile']);
+        foreach (array('', 'OpenClaw', 'other', 'openclaw;id', '../openclaw') as $profile) {
+            $threw = false;
+            try { $this->parseAddUserCli(array_merge($args, array('--app-profile='.$profile))); }
+            catch (\InvalidArgumentException $e) { $threw = true; }
+            $this->assertTrue($threw, 'Invalid app profile accepted');
+        }
+        $this->assertStringContainsString('--app-profile=openclaw', \pmssAddUserCliUsage());
+    }
+
     public function testUsageDocumentsHelpAndResourceFlags(): void
     {
         $usage = \pmssAddUserCliUsage();

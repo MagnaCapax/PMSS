@@ -288,6 +288,7 @@ PHP;
         'www/storageHealthNotice.php',
         'www/welcomeMessage.php',
         'www/userMediaStackPanel.php',
+        'www/userOpenClaw.php',
         'www/userPasswords.php',
     ];
     foreach ($files as $file) {

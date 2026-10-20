@@ -44,6 +44,7 @@ function pmssAddUserCliUsage(): string
             pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         ], pmssUserConfigCliResourceHelpLines('addUserAdvancedOptions', 'usage', ['CPUWeight' => $derivedDefault, 'IOWeight' => $derivedDefault]), [
             pmssCliHelpLine('--docker-enabled=true|false', 'Persist the initial rootless Docker policy.'),
+            pmssCliHelpLine('--app-profile=openclaw', 'Disable rTorrent, skip Pikkumies, and queue account-owned OpenClaw (2048 MiB RAM and 60000 free files required).'),
             pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
         ]),
         'Examples' => [
@@ -83,7 +84,7 @@ function pmssAddUserBonusQuotaGiBParse($raw): ?int
  */
 function pmssAddUserParseCli(array $argv): array
 {
-    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'bonus-quota-gib', 'upload-throttle-kib', 'docker-enabled'], pmssUserConfigCliResourceOptionNames());
+    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'bonus-quota-gib', 'upload-throttle-kib', 'docker-enabled', 'app-profile'], pmssUserConfigCliResourceOptionNames());
     $parsed = pmssParseCliTokens($argv, $longOptions);
     if (pmssCliHelpRequested($parsed)) return ['help' => true, 'usage' => pmssAddUserCliUsage()];
 
@@ -100,6 +101,11 @@ function pmssAddUserParseCli(array $argv): array
     }
 
     $bonusQuotaGiB = pmssAddUserBonusQuotaGiBParse(pmssCliOption($parsed, 'bonus-quota-gib', null, null));
+    $profile = pmssCliOption($parsed, 'app-profile', null, null);
+    if ($profile !== null) {
+        if ($profile !== 'openclaw') throw new InvalidArgumentException('Invalid --app-profile; expected openclaw');
+        $user['appProfile'] = $profile;
+    }
     if ($bonusQuotaGiB !== null) {
         $user['bonusQuotaGiB'] = $bonusQuotaGiB;
     }

@@ -66,12 +66,26 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
         : (pmssCustomerNativePidsRead(array('/usr/bin/rtorrent', '/usr/local/bin/rtorrent')) !== array() ? 'running' : 'not-running'), 'url' => 'rutorrent/');
     $toggleCatalog = require __DIR__.'/toggleAppCatalog.php';
     foreach (pmssCustomerManagedAppDefinitions() as $name => $definition) {
-        if (!pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
-        $enabled = is_file(pmssCustomerHomePath($home, basename($definition['enable'])));
+        if (isset($definition['portMarker']) && !is_file(pmssCustomerHomePath($home, $definition['portMarker']))) continue;
+        if (empty($definition['installable']) && !pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
+        $enabled = is_file(pmssCustomerHomePath($home, preg_replace('#^\.\./#', '', $definition['enable'])));
+        if (isset($definition['disable']) && is_file(pmssCustomerHomePath($home, $definition['disable']))) $enabled = false;
         $apps[$name] = array('kind' => 'managed', 'state' => !$enabled ? 'off'
             : (pmssCustomerNativePidsRead($definition['binaries']) !== array() ? 'running' : 'not-running'),
             'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : ($name === 'rclone' ? 'rclone/' : $name.'/')),
             'endpoint' => $definition['endpoint']);
+        if (isset($definition['stateFile'])) {
+            $state = trim((string) @file_get_contents(pmssCustomerHomePath($home, $definition['stateFile'])));
+            if ($enabled) $apps[$name]['state'] = strpos($state, 'gave_up ') === 0 ? 'gave up'
+                : (strpos($state, 'failed ') === 0 ? 'failed' : 'not-running');
+        }
+        foreach (array('url', 'log', 'consent', 'waitSeconds') as $field) {
+            if (isset($definition[$field])) $apps[$name][$field] = $definition[$field];
+        }
+        if (isset($definition['statusHelperFile'], $definition['statusHelper'])) {
+            pmssWelcomeRequireLocalHelper($definition['statusHelperFile']);
+            if (function_exists($definition['statusHelper'])) $apps[$name]['state'] = $definition['statusHelper']($home, $apps[$name]['state']);
+        }
         if (isset($toggleCatalog[$name])) {
             $row = $toggleCatalog[$name];
             $state = @file_get_contents(pmssCustomerHomePath($home, $row['stateFile']));
@@ -123,7 +137,7 @@ function pmssCustomerAppsLogJsonEmit(): void
     $app = is_string($_GET['log'] ?? null) ? $_GET['log'] : '';
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
-    if (!function_exists('pmssAppsLogTailRead') || !in_array($app, pmssCustomerAppsMediaIdsRead(), true)) {
+    if (!function_exists('pmssAppsLogTailRead') || (!in_array($app, pmssCustomerAppsMediaIdsRead(), true) && empty(pmssCustomerManagedAppDefinitions()[$app]['log']))) {
         http_response_code(400);
         echo '{}';
         return;

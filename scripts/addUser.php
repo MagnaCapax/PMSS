@@ -104,6 +104,10 @@ pmssAddUserFailureRollbackInit($userDb, $user['name'], $homePath);
 
 pmssAddUserSystemUserCreate($user, $homePath);
 pmssAddUserUserConfigApply($userDb, $user, $homePath);
+if (($user['appProfile'] ?? '') === 'openclaw'
+    && !pmssReplaceAccountFile($user['name'], $homePath, $homePath.'/.rtorrentDisable', "disabled\n", 0600)) {
+    pmssAddUserFatalExit('FAIL', 'Could not disable rTorrent for OpenClaw profile', 'app_profile_failed');
+}
 if (!pmssUpdateUserEnvironment($user['name'])) {
     pmssAddUserFatalExit(
         'FAIL',
@@ -121,11 +125,11 @@ if (file_exists('/etc/seedbox/modules/basic/addUser.php')) {
 
 // Finally start per-user services, refresh shared network state, and persist the optional traffic cap.
 foreach ([
-    ['Start rTorrent', sprintf('/scripts/startRtorrent %s', escapeshellarg($user['name']))],
+    ['Start rTorrent', ($user['appProfile'] ?? '') === 'openclaw' ? null : sprintf('/scripts/startRtorrent %s', escapeshellarg($user['name']))],
     ['Start lighttpd', sprintf('/scripts/startLighttpd %s', escapeshellarg($user['name']))],
     ['Restart nginx', 'systemctl restart nginx || /etc/init.d/nginx restart || true'],
     ['Refresh network rules', '/scripts/util/setupNetwork.php'],
-] as $step) runProvisionStep($step[0], $step[1]);
+] as $step) if ($step[1] !== null) runProvisionStep($step[0], $step[1]);
 if (!empty($user['trafficLimit']) && $user['trafficLimit'] > 0) {
     $targetModes = pmssTrafficLimitCliTargetModes($user['name'], $homePath);
     $persistError = null;

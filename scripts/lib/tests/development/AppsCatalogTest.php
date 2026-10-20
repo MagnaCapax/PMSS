@@ -10,6 +10,60 @@ ob_end_clean();
 /** Customer Apps tab contract: live controls and a closed wiki catalog. */
 class AppsCatalogTest extends TestCase
 {
+    public function testOpenClawManagedDefinitionPreservesExistingRowsAndBuildsJavascriptMap(): void
+    {
+        $definitions = \pmssCustomerManagedAppDefinitions();
+        $this->assertSame(array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php',
+            'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')), $definitions['qBittorrent']);
+        $this->assertSame(array('enable' => '../.rcloneEnable', 'endpoint' => 'rclone.php',
+            'binaries' => array('/usr/bin/rclone')), $definitions['rclone']);
+        $this->assertSame(array('enable' => '../.delugeEnable', 'endpoint' => 'deluge.php',
+            'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')), $definitions['Deluge']);
+        $row = $definitions['openclaw'];
+        $this->assertTrue($row['installable']);
+        $this->assertSame(180, $row['waitSeconds']);
+        $this->assertSame('.openclaw/check.state', $row['stateFile']);
+        $js = \pmssActionScriptJs();
+        $this->assertStringContainsAllStrings(array('var pmssManagedAppEndpoints = ', '"openclaw":"apps.php?managed=openclaw"',
+            '"openclaw":180', 'pmssManagedAppConsent[id]', 'pmssManagedAppEndpoints[id]'), $js);
+        $this->assertStringNotContainsString("id === 'qBittorrent' || id === 'Deluge'", $js);
+    }
+
+    public function testOpenClawInstallableRowNeedsReservedPortAndOffersSharedControls(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-oc-row-');
+        $read = static function () use ($home): array { return \pmssCustomerAppsStatusRead($home, 'alice', 'server.example'); };
+        $this->assertFalse(isset($read()['apps']['openclaw']));
+        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $app = $read()['apps']['openclaw'];
+        $this->assertSame('off', $app['state']);
+        $html = \pmssCustomerAppRowHtmlBuild('openclaw', $app);
+        $this->assertStringContainsAllStrings(array('Turn on', 'Show log', 'OpenClaw'), $html);
+        mkdir($home.'/.openclaw');
+        touch($home.'/.openclaw/gateway.env');
+        foreach (array('healthy 0 1' => 'not-running', 'failed 1 1' => 'failed', 'gave_up 1' => 'gave up') as $state => $expected) {
+            file_put_contents($home.'/.openclaw/check.state', $state);
+            $this->assertSame($expected, $read()['apps']['openclaw']['state']);
+        }
+        touch($home.'/.openclaw/pmss-stopped');
+        $this->assertSame('off', $read()['apps']['openclaw']['state']);
+        $app['state'] = 'running';
+        $html = \pmssCustomerAppRowHtmlBuild('openclaw', $app);
+        $this->assertStringContainsAllStrings(array('Restart', 'Turn off', 'Show log', 'action=open', 'target="_blank"'), $html);
+    }
+
+    public function testOpenClawLauncherUsesSharedPrivateBackgroundCommand(): void
+    {
+        $home = '/tmp/pmss-alice home';
+        $command = \pmssMediaStackPanelStartCommandBuild($home, 'alice', array('script' => 'bin/install-openclaw',
+            'interpreter' => '/usr/bin/php', 'args' => array('install', '--yes'),
+            'pid' => '.install-openclaw-web.pid', 'log' => '.install-openclaw.log'));
+        $this->assertStringContainsAllStrings(array("HOME='".$home."'", "USER='alice'", 'umask 077',
+            'install-openclaw', '--yes', '.install-openclaw-web.pid', '.install-openclaw.log', 'nohup '), $command);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/userOpenClaw.php', array(
+            "if (\$action !== 'open') pmssFrontendPostActionRequired();", "header('Cache-Control: no-store');", "header('Location: '.\$url, true, 302);"));
+    }
+
     /** Exercise the retained Apps contract on an account awaiting Configure delivery. */
     private function pmssWithLegacyAppsRender(callable $callback)
     {
