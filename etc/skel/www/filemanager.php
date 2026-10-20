@@ -2677,6 +2677,25 @@ function fm_get_filesize($size)
 }
 
 /**
+ * Recurse a tree while skipping (not fataling on) unreadable directories (GH#1026).
+ * An unreadable *starting* directory returns an empty iterator: RecursiveDirectoryIterator's
+ * constructor throws UnexpectedValueException, which CATCH_GET_CHILD does not cover (it only
+ * catches getChildren() during the walk), so a size walk started on an unreadable child folder
+ * — e.g. a rootless-Docker subuid-owned overlay dir listed in the parent — would still fatal.
+ * CATCH_GET_CHILD then skips any unreadable subdirectory met deeper in the walk.
+ */
+function fm_safe_recursive_iterator($dir) {
+    if (!is_readable($dir)) {
+        return new EmptyIterator();
+    }
+    return new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::LEAVES_ONLY,
+        RecursiveIteratorIterator::CATCH_GET_CHILD
+    );
+}
+
+/**
  * Get director total size
  * @param string $directory
  * @return int
@@ -2685,7 +2704,7 @@ function fm_get_directorysize($directory) {
     global $calc_folder;
     if ($calc_folder==true) { //  Slower output
       $size = 0;  $count= 0;  $dirCount= 0;
-    foreach(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)) as $file)
+    foreach(fm_safe_recursive_iterator($directory) as $file)
     if ($file->isFile())
         {   $size+=$file->getSize();
             $count++;
@@ -3119,7 +3138,7 @@ function fm_get_file_mimes($extension)
  function scan($dir, $filter = '') {
     $path = FM_ROOT_PATH.'/'.$dir;
      if($dir) {
-         $ite = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path));
+         $ite = fm_safe_recursive_iterator($path);
          $rii = new RegexIterator($ite, "/(" . $filter . ")/i");
 
          $files = array();
