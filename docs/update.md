@@ -257,6 +257,12 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    loads no store code and changes no downloads, links, or public projection.
    With the marker, account version links and the public projection are prepared;
    a customer default link is created only by the Configure switch (ADR 0106).
+   The catalog curates fourteen SHA-256-pinned userdocs x86_64 qBittorrent
+   static builds, covering 4.3.9 through 5.2.4 with both libtorrent families
+   (ADR 0124). Installed builds appear in the Configure picker through the
+   public projection; absent binaries are omitted. The marker remains an
+   operator-controlled staged rollout, with more than 3 GiB plus the existing
+   store size required free on `/home` before each new installation.
    Deluge catalog venv rows, when later supplied, use pinned wheels from the
    root-owned store mirror and publish both daemon scripts (ADR 0110). The
    shipped catalog has no Deluge store version, so its existing launch path

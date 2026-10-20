@@ -17,12 +17,12 @@ function pmssConfigureTorrentClientVersionsRead($path = '/var/lib/pmss/public/to
     return $versions;
 }
 
-/** Only two comparable numeric release strings can prove a major downgrade. */
+/** Numeric releases, including curated libtorrent suffixes, prove major downgrades. */
 function pmssConfigureTorrentClientMajorDowngrade($previous, $requested): bool
 {
     if (!is_string($previous) || !is_string($requested)
-        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?\z/', $previous, $old) !== 1
-        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?\z/', $requested, $new) !== 1) return false;
+        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.0))?\z/', $previous, $old) !== 1
+        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.0))?\z/', $requested, $new) !== 1) return false;
     // Compare decimal strings without integer overflow from long catalog values.
     $oldMajor = ltrim($old[1], '0');
     $newMajor = ltrim($new[1], '0');

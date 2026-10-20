@@ -58,9 +58,13 @@ final class TorrentClientsCatalogTest extends TestCase
         $this->assertSame([], $this->load([$entry]));
     }
 
-    public function testShippedSystemManifestLoads(): void
+    public function testShippedManifestKeepsSystemDefaults(): void
     {
         $path = dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json';
-        $this->assertSame(3, count(\pmssTorrentClientsCatalogLoad($path)));
+        $defaults = array_values(array_filter(\pmssTorrentClientsCatalogLoad($path), static function ($entry) {
+            return $entry['isDefault'];
+        }));
+        $this->assertSame(['qbittorrent', 'rtorrent', 'deluge'], array_column($defaults, 'client'));
+        $this->assertSame(['system', 'system', 'system'], array_column($defaults, 'kind'));
     }
 }

@@ -33,6 +33,17 @@ final class TorrentClientsDowngradeTest extends TestCase
         $this->assertRefusedWithoutCommands('qbittorrent', '5.1.0', '4.9.9');
     }
 
+    public function testCuratedQbittorrentLabelsKeepMajorDowngradeProtection(): void
+    {
+        foreach (array(array('5.2.4-lt2.0', '4.6.7-lt2.0'),
+            array('5.1.4-lt1.2', '4.3.9-lt1.2'), array('5.0.5', '4.4.5-lt2.0'),
+            array('5.2.4-lt1.2', '4.5.5'), array('5.2.4-lt2.0', '4.6.7-lt1.2')) as $pair) {
+            $this->assertRefusedWithoutCommands('qbittorrent', $pair[0], $pair[1]);
+        }
+        $this->assertFalse(\pmssConfigureTorrentClientMajorDowngrade('4.6.7-lt2.0', '5.2.4-lt1.2'));
+        $this->assertFalse(\pmssConfigureTorrentClientMajorDowngrade('5.2.4-lt2.0', '5.1.4-lt1.2'));
+    }
+
     public function testQbittorrentUpgradeKeepsExistingSwitchSequence(): void
     {
         $home = $this->home('qbittorrent');
