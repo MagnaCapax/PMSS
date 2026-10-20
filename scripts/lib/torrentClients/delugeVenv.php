@@ -5,14 +5,19 @@ require_once dirname(__DIR__).'/update/apps/pythonVenv.php';
 require_once dirname(__DIR__).'/update/distro.php';
 require_once __DIR__.'/storePaths.php';
 
-/** Keep the older wheel compatibility window explicit and host-specific. */
+/** Check the reviewed wheel set's distro, architecture and Python window before pip. */
 function pmssTorrentClientsDelugeVenvCompatible(array $entry): bool
 {
-    if (($entry['compatWindow'] ?? '') !== 'bullseye-cp37-310') return true;
-    if ((pmssDetectDistro()['version'] ?? 0) !== 11) return false;
+    $window = $entry['compatWindow'] ?? '';
+    if ($window === '') return true;
+    if (!in_array($window, ['bullseye-cp37-310', 'bookworm-cp311'], true)) return false;
+    $bookworm = $window === 'bookworm-cp311';
+    if ((pmssDetectDistro()['version'] ?? 0) !== ($bookworm ? 12 : 11)
+        || ($bookworm && php_uname('m') !== 'x86_64')) return false;
     $python = pmssCommandPath('python3');
     $version = $python === '' ? '' : pmssCommandCapture(escapeshellarg($python).' --version 2>&1', 10)['stdout'];
-    return preg_match('/\APython 3\.(?:7|8|9|10)(?:\.|\s|\z)/', $version) === 1;
+    return preg_match($bookworm ? '/\APython 3\.11(?:\.|\s|\z)/'
+        : '/\APython 3\.(?:7|8|9|10)(?:\.|\s|\z)/', $version) === 1;
 }
 
 /** Return false before invoking pip if the marker, manifest, or mirror is incomplete. */

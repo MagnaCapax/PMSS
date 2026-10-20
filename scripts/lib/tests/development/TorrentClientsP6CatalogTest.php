@@ -66,11 +66,14 @@ final class TorrentClientsP6CatalogTest extends TestCase
         }
     }
 
-    public function testShippedCatalogHasNoDelugeStoreVersion(): void
+    public function testShippedCatalogKeepsDelugeSystemDefault(): void
     {
         $entries = \pmssTorrentClientsCatalogLoad(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json');
         foreach ($entries as $entry) {
-            $this->assertFalse($entry['client'] === 'deluge' && $entry['kind'] !== 'system');
+            if ($entry['client'] === 'deluge' && $entry['isDefault']) {
+                $this->assertSame('system', $entry['kind']);
+                $this->assertSame('/usr/bin/deluged', $entry['binary']);
+            }
         }
     }
 }

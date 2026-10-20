@@ -52,7 +52,7 @@ function pmssTorrentClientsCatalogLoad(string $path): array
             if ($kind !== 'venv' || ($entry['url'] ?? null) !== [] || ($entry['sha256'] ?? null) !== ''
                 || !is_array($entry['wheels'] ?? null) || $entry['wheels'] === []
                 || array_values($entry['wheels']) !== $entry['wheels']
-                || !in_array($entry['compatWindow'] ?? '', ['', 'bullseye-cp37-310'], true)) return [];
+                || !in_array($entry['compatWindow'] ?? '', ['', 'bullseye-cp37-310', 'bookworm-cp311'], true)) return [];
             $wheelNames = [];
             foreach ($entry['wheels'] as $wheel) {
                 if (!is_array($wheel) || !is_string($wheel['file'] ?? null)

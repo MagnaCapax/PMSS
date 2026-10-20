@@ -16,5 +16,327 @@
   {"client":"qbittorrent","version":"5.1.4-lt1.2","url":["https://github.com/userdocs/qbittorrent-nox-static/releases/download/release-5.1.4_v1.2.20/x86_64-qbittorrent-nox"],"sha256":"0778ef4219a5865268b3333a852b15769246c97024b03c63eda6b0429e4dae28","kind":"static","compatFamily":"lt1.2","cve":[],"disabled":false,"isDefault":false},
   {"client":"qbittorrent","version":"5.1.4-lt2.0","url":["https://github.com/userdocs/qbittorrent-nox-static/releases/download/release-5.1.4_v2.0.12/x86_64-qbittorrent-nox"],"sha256":"e42bd8f84350adfdd690757ec650ec79b58e4806ec65438cdf9b92a2f61886ca","kind":"static","compatFamily":"5.1.4","cve":[],"disabled":false,"isDefault":false},
   {"client":"qbittorrent","version":"5.2.4-lt1.2","url":["https://github.com/userdocs/qbittorrent-nox-static/releases/download/release-5.2.4_v1.2.20/x86_64-qbittorrent-nox"],"sha256":"8b50214bbde610cce3f4e8fde55343997d97b19c4228dba3107d5ec2e75449ea","kind":"static","compatFamily":"lt1.2","cve":[],"disabled":false,"isDefault":false},
-  {"client":"qbittorrent","version":"5.2.4-lt2.0","url":["https://github.com/userdocs/qbittorrent-nox-static/releases/download/release-5.2.4_v2.0.15/x86_64-qbittorrent-nox"],"sha256":"14d29323f1c12c1e8892ac69496f8b51ddebb74b4b590fc13e343aa213fecaf4","kind":"static","compatFamily":"5.2.4","cve":[],"disabled":false,"isDefault":false}
+  {"client":"qbittorrent","version":"5.2.4-lt2.0","url":["https://github.com/userdocs/qbittorrent-nox-static/releases/download/release-5.2.4_v2.0.15/x86_64-qbittorrent-nox"],"sha256":"14d29323f1c12c1e8892ac69496f8b51ddebb74b4b590fc13e343aa213fecaf4","kind":"static","compatFamily":"5.2.4","cve":[],"disabled":false,"isDefault":false},
+  {
+      "client": "deluge",
+      "version": "2.0.5",
+      "url": [],
+      "sha256": "",
+      "kind": "venv",
+      "compatFamily": "2",
+      "cve": [],
+      "disabled": false,
+      "isDefault": false,
+      "compatWindow": "bookworm-cp311",
+      "wheels": [
+          {
+              "file": "attrs-26.1.0-py3-none-any.whl",
+              "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"
+          },
+          {
+              "file": "automat-25.4.16-py3-none-any.whl",
+              "sha256": "04e9bce696a8d5671ee698005af6e5a9fa15354140a87f4870744604dcdd3ba1"
+          },
+          {
+              "file": "cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+              "sha256": "34e261f78cb6ceaaa36f42f2613f4380d94d9c759a9c73c769ee6e0247364632"
+          },
+          {
+              "file": "constantly-23.10.4-py3-none-any.whl",
+              "sha256": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9"
+          },
+          {
+              "file": "cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+              "sha256": "630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2"
+          },
+          {
+              "file": "deluge-2.0.5-py3-none-any.whl",
+              "sha256": "c067990549c0373330b258bab850f8283fe389d032666f47f262ef15025ab2a6"
+          },
+          {
+              "file": "hyperlink-21.0.0-py2.py3-none-any.whl",
+              "sha256": "e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4"
+          },
+          {
+              "file": "idna-3.20-py3-none-any.whl",
+              "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+          },
+          {
+              "file": "incremental-24.11.0-py3-none-any.whl",
+              "sha256": "a34450716b1c4341fe6676a0598e88a39e04189f4dce5dc96f656e040baa10b3"
+          },
+          {
+              "file": "libtorrent-2.1.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+              "sha256": "36c823ddd89283cd37f03a8cc0dae17f096ba45247e029713ee0f8f00b8ecf08"
+          },
+          {
+              "file": "mako-1.4.3-py3-none-any.whl",
+              "sha256": "723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f"
+          },
+          {
+              "file": "markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+              "sha256": "6da83a088f8ef93b2d483a8232a4dbf4d69d3d8496b568a03c56becac43e1808"
+          },
+          {
+              "file": "packaging-26.3-py3-none-any.whl",
+              "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+          },
+          {
+              "file": "pyasn1-0.6.4-py3-none-any.whl",
+              "sha256": "deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"
+          },
+          {
+              "file": "pycparser-3.11-py3-none-any.whl",
+              "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
+          },
+          {
+              "file": "pyopenssl-26.4.0-py3-none-any.whl",
+              "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c"
+          },
+          {
+              "file": "pyxdg-0.28-py2.py3-none-any.whl",
+              "sha256": "bdaf595999a0178ecea4052b7f4195569c1ff4d344567bccdc12dfdf02d545ab"
+          },
+          {
+              "file": "rencode-1.0.9-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+              "sha256": "005f676ae9ea8bb19f81a7216d97e03f3906498259ac951170e66895ab4d6277"
+          },
+          {
+              "file": "service_identity-26.1.0-py3-none-any.whl",
+              "sha256": "68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118"
+          },
+          {
+              "file": "setuptools-80.9.0-py3-none-any.whl",
+              "sha256": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
+          },
+          {
+              "file": "six-1.17.0-py2.py3-none-any.whl",
+              "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+          },
+          {
+              "file": "twisted-26.4.0-py3-none-any.whl",
+              "sha256": "dc25ea0ebf6511c24f03232ee9f4afa54b291c5d897990e3a39cc4d14a1ef4c0"
+          },
+          {
+              "file": "typing_extensions-4.16.0-py3-none-any.whl",
+              "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+          },
+          {
+              "file": "zope_interface-8.7-cp311-cp311-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl",
+              "sha256": "1613beb1fb1b4f457818c5443e985142ec9e71af391bfb26e583e0353f206792"
+          }
+      ]
+  },
+  {
+      "client": "deluge",
+      "version": "2.1.1",
+      "url": [],
+      "sha256": "",
+      "kind": "venv",
+      "compatFamily": "2",
+      "cve": [],
+      "disabled": false,
+      "isDefault": false,
+      "compatWindow": "bookworm-cp311",
+      "wheels": [
+          {
+              "file": "attrs-26.1.0-py3-none-any.whl",
+              "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"
+          },
+          {
+              "file": "automat-25.4.16-py3-none-any.whl",
+              "sha256": "04e9bce696a8d5671ee698005af6e5a9fa15354140a87f4870744604dcdd3ba1"
+          },
+          {
+              "file": "cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+              "sha256": "34e261f78cb6ceaaa36f42f2613f4380d94d9c759a9c73c769ee6e0247364632"
+          },
+          {
+              "file": "constantly-23.10.4-py3-none-any.whl",
+              "sha256": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9"
+          },
+          {
+              "file": "cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+              "sha256": "630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2"
+          },
+          {
+              "file": "deluge-2.1.1-py3-none-any.whl",
+              "sha256": "bb36980283bf4830be4ed0739bccb8fd614f517838e3bfa7df3f4cb1dd1f81ca"
+          },
+          {
+              "file": "hyperlink-21.0.0-py2.py3-none-any.whl",
+              "sha256": "e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4"
+          },
+          {
+              "file": "idna-3.20-py3-none-any.whl",
+              "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+          },
+          {
+              "file": "incremental-24.11.0-py3-none-any.whl",
+              "sha256": "a34450716b1c4341fe6676a0598e88a39e04189f4dce5dc96f656e040baa10b3"
+          },
+          {
+              "file": "libtorrent-2.1.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+              "sha256": "36c823ddd89283cd37f03a8cc0dae17f096ba45247e029713ee0f8f00b8ecf08"
+          },
+          {
+              "file": "mako-1.4.3-py3-none-any.whl",
+              "sha256": "723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f"
+          },
+          {
+              "file": "markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+              "sha256": "6da83a088f8ef93b2d483a8232a4dbf4d69d3d8496b568a03c56becac43e1808"
+          },
+          {
+              "file": "packaging-26.3-py3-none-any.whl",
+              "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+          },
+          {
+              "file": "pyasn1-0.6.4-py3-none-any.whl",
+              "sha256": "deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"
+          },
+          {
+              "file": "pycparser-3.11-py3-none-any.whl",
+              "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
+          },
+          {
+              "file": "pyopenssl-26.4.0-py3-none-any.whl",
+              "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c"
+          },
+          {
+              "file": "pyxdg-0.28-py2.py3-none-any.whl",
+              "sha256": "bdaf595999a0178ecea4052b7f4195569c1ff4d344567bccdc12dfdf02d545ab"
+          },
+          {
+              "file": "rencode-1.0.9-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+              "sha256": "005f676ae9ea8bb19f81a7216d97e03f3906498259ac951170e66895ab4d6277"
+          },
+          {
+              "file": "service_identity-26.1.0-py3-none-any.whl",
+              "sha256": "68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118"
+          },
+          {
+              "file": "setuptools-80.9.0-py3-none-any.whl",
+              "sha256": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
+          },
+          {
+              "file": "twisted-26.4.0-py3-none-any.whl",
+              "sha256": "dc25ea0ebf6511c24f03232ee9f4afa54b291c5d897990e3a39cc4d14a1ef4c0"
+          },
+          {
+              "file": "typing_extensions-4.16.0-py3-none-any.whl",
+              "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+          },
+          {
+              "file": "zope_interface-8.7-cp311-cp311-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl",
+              "sha256": "1613beb1fb1b4f457818c5443e985142ec9e71af391bfb26e583e0353f206792"
+          }
+      ]
+  },
+  {
+      "client": "deluge",
+      "version": "2.2.0",
+      "url": [],
+      "sha256": "",
+      "kind": "venv",
+      "compatFamily": "2",
+      "cve": [],
+      "disabled": false,
+      "isDefault": false,
+      "compatWindow": "bookworm-cp311",
+      "wheels": [
+          {
+              "file": "attrs-26.1.0-py3-none-any.whl",
+              "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"
+          },
+          {
+              "file": "automat-25.4.16-py3-none-any.whl",
+              "sha256": "04e9bce696a8d5671ee698005af6e5a9fa15354140a87f4870744604dcdd3ba1"
+          },
+          {
+              "file": "cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+              "sha256": "34e261f78cb6ceaaa36f42f2613f4380d94d9c759a9c73c769ee6e0247364632"
+          },
+          {
+              "file": "constantly-23.10.4-py3-none-any.whl",
+              "sha256": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9"
+          },
+          {
+              "file": "cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+              "sha256": "630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2"
+          },
+          {
+              "file": "deluge-2.2.0-py3-none-any.whl",
+              "sha256": "5ac4ce734d92a1a0c36a3b89db447967175a986c06e84ec9cc61ca73e88bf0b5"
+          },
+          {
+              "file": "hyperlink-21.0.0-py2.py3-none-any.whl",
+              "sha256": "e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4"
+          },
+          {
+              "file": "idna-3.20-py3-none-any.whl",
+              "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+          },
+          {
+              "file": "incremental-24.11.0-py3-none-any.whl",
+              "sha256": "a34450716b1c4341fe6676a0598e88a39e04189f4dce5dc96f656e040baa10b3"
+          },
+          {
+              "file": "libtorrent-2.1.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+              "sha256": "36c823ddd89283cd37f03a8cc0dae17f096ba45247e029713ee0f8f00b8ecf08"
+          },
+          {
+              "file": "mako-1.4.3-py3-none-any.whl",
+              "sha256": "723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f"
+          },
+          {
+              "file": "markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+              "sha256": "6da83a088f8ef93b2d483a8232a4dbf4d69d3d8496b568a03c56becac43e1808"
+          },
+          {
+              "file": "packaging-26.3-py3-none-any.whl",
+              "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+          },
+          {
+              "file": "pyasn1-0.6.4-py3-none-any.whl",
+              "sha256": "deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"
+          },
+          {
+              "file": "pycparser-3.11-py3-none-any.whl",
+              "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
+          },
+          {
+              "file": "pyopenssl-26.4.0-py3-none-any.whl",
+              "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c"
+          },
+          {
+              "file": "pyxdg-0.28-py2.py3-none-any.whl",
+              "sha256": "bdaf595999a0178ecea4052b7f4195569c1ff4d344567bccdc12dfdf02d545ab"
+          },
+          {
+              "file": "rencode-1.0.9-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+              "sha256": "005f676ae9ea8bb19f81a7216d97e03f3906498259ac951170e66895ab4d6277"
+          },
+          {
+              "file": "service_identity-26.1.0-py3-none-any.whl",
+              "sha256": "68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118"
+          },
+          {
+              "file": "setuptools-84.2.0-py3-none-any.whl",
+              "sha256": "8cc107ac7a403105dc8d6477664171f36135fab26adf8b5e0edaebc313f39b21"
+          },
+          {
+              "file": "twisted-26.4.0-py3-none-any.whl",
+              "sha256": "dc25ea0ebf6511c24f03232ee9f4afa54b291c5d897990e3a39cc4d14a1ef4c0"
+          },
+          {
+              "file": "typing_extensions-4.16.0-py3-none-any.whl",
+              "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+          },
+          {
+              "file": "zope_interface-8.7-cp311-cp311-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl",
+              "sha256": "1613beb1fb1b4f457818c5443e985142ec9e71af391bfb26e583e0353f206792"
+          }
+      ]
+  }
 ]
