@@ -1153,6 +1153,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Safety: Direct cleanup helpers reject NUL-containing paths and skip malformed/out-of-range rTorrent port values before unlinking reservation files. The recursive purge step builder accepts only exact managed home or recreate-backup paths for valid usernames; invalid paths throw before a shell step is built.
 
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB
+  - Pikkumies: Clears the root-owned preinstall marker only after the skeleton rebuild succeeds; the next staged update can reinstall it.
   - Pre-flight: Before backup handling or process termination, exclusive private write probes must succeed in `/home`, the port runtime directory (or its parent before creation), and `/etc`; failure names the path and leaves the account untouched.
   - Behavior: Acquires a per-account runtime lock, then kills user processes;
     if `/home/<user>` exists, makes it private to root

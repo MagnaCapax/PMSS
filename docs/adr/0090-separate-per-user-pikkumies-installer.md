@@ -143,6 +143,12 @@ again and a user who removed Pikkumies does not get it back. An account below
 the floor, without the installer, or whose install failed (a download error,
 say) gets no state file and is tried again at a later update.
 
+Recreating an account clears its root-owned preinstall marker after the new
+skeleton is in place, allowing the next staged update to install Pikkumies in
+the rebuilt home. Termination clears the marker after account removal so a
+later account with the same name starts without inherited preinstall state.
+Both paths leave the marker alone on a failed rebuild or dry-run termination.
+
 These homes hold their owners' data, so the runtime build that follows at the
 daily update time leaves 10% of the disk and file quota free, or skips
 (Pikkumies `HermesInstall::UNATTENDED_RESERVE`, its ADR-0033 addendum of the

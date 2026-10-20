@@ -37,6 +37,7 @@ if (substr(__FILE__, 0, 3) === "\xEF\xBB\xBF") {
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/shell.php';
 require_once __DIR__.'/lib/user/recreateRestore.php';
+require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
 require_once __DIR__.'/lib/portManager.php';
 require_once __DIR__.'/lib/update.php';
 require_once __DIR__.'/lib/update/users.php';
@@ -170,6 +171,10 @@ pmssRequireSafeRecreateUserPath($homeDir, 'home');
 if (!is_dir($homeDir)) {
     fwrite(STDERR, "Validation failed: homeDir missing after skeleton copy\n");
     exit(1);
+}
+// The rebuilt home no longer has Pikkumies; let the next staged update retry it.
+if (!pmssPikkumiesPreinstallStateClear($userName)) {
+    fwrite(STDERR, "[!] Non-fatal: could not clear Pikkumies preinstall state for {$userName}\n");
 }
 // The home stays private to root until all account state has been restored.
 pmssRunOrExit('chown root:root ' . escapeshellarg($homeDir));

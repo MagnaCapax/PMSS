@@ -21,6 +21,7 @@ require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/toggleAppCatalog.php';
 pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/user/terminationCleanup.php']);
 require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
+require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
 
 pmssStdoutHeartbeatStartForStdout();
 
@@ -279,6 +280,15 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('groupdel_final', $groupdelCommand),
     array('cleanup_lock_files', 'rm -f -- '.pmssRuntimeLockDir().'/pmss-*-'.$username.'.lock /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
 ), $dryRun);
+
+// This root-owned marker must not be inherited by a later account with the same name.
+if ($dryRun) {
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'clear_pikkumies_preinstall_state', $username, 'SKIP', 'Dry run; marker not removed');
+} elseif (pmssUserAccountLookup($username) === null) {
+    $cleared = pmssPikkumiesPreinstallStateClear($username);
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'clear_pikkumies_preinstall_state', $username,
+        $cleared ? 'OK' : 'ERR', $cleared ? 'Marker cleared or absent' : 'Failed to clear marker');
+}
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 

@@ -6,6 +6,52 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Existing-home Pikkumies preinstall (ADR 0090): host marker gate, RAM floor, installer present, once per account. */
 final class PikkumiesPreinstallHookTest extends TestCase
 {
+    public function testLifecycleMarkerClearAcceptsOnlyFilesAndLinks(): void
+    {
+        require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-clear-');
+        $state = $root.'/state';
+        $this->pmssEnsureDir($state);
+
+        file_put_contents($state.'/alice', 'done');
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
+        $this->assertFalse(file_exists($state.'/alice'));
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
+
+        file_put_contents($root.'/target', 'keep');
+        symlink($root.'/target', $state.'/alice');
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
+        $this->assertFalse(is_link($state.'/alice'));
+        $this->assertSame('keep', file_get_contents($root.'/target'));
+
+        $this->pmssEnsureDir($state.'/alice');
+        $this->assertFalse(\pmssPikkumiesPreinstallStateClear('alice', $state));
+        $this->assertTrue(is_dir($state.'/alice'));
+        $this->assertFalse(\pmssPikkumiesPreinstallStateClear('../target', $state));
+        $this->assertSame('keep', file_get_contents($root.'/target'));
+
+        symlink($state, $root.'/state-link');
+        $this->assertFalse(\pmssPikkumiesPreinstallStateClear('alice', $root.'/state-link'));
+    }
+
+    public function testLifecycleFlowsClearMarkerAfterAccountAndSkeletonChanges(): void
+    {
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/recreateUser.php' => ['ordered' => [[
+                "pmssRunOrExit('cp -Rp /etc/skel ' . escapeshellarg(\$homeDir));",
+                'pmssPikkumiesPreinstallStateClear($userName)',
+            ]]],
+            'scripts/terminateUser.php' => ['ordered' => [[
+                "array('userdel_groupdel_final', \$userdelCommand)",
+                '} elseif (pmssUserAccountLookup($username) === null) {',
+                'pmssPikkumiesPreinstallStateClear($username)',
+            ]], 'required' => [
+                "'clear_pikkumies_preinstall_state'",
+                'if ($dryRun)',
+            ]],
+        ]);
+    }
+
     public function testAbsentMarkerIsInert(): void
     {
         $this->assertTrue(include_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php');
