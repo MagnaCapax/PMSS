@@ -77,7 +77,7 @@ function pmssWriteHomeMarkerCli(array $argv): int
     }
 
     // The public service identity comes from root-owned provisioning state.
-    // A home marker can be renamed by its account even when its inode is root-owned.
+    // Record the public service identity in root-owned provisioning state.
     if (in_array($marker, ['.billingId', '.billingServiceId', '.billingClientId'], true)) {
         $store = new UserConfigStore();
         if (!pmssWriteHomeMarkerBillingStoreSet($store, $user, $marker, $value)) {

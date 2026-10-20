@@ -1296,8 +1296,8 @@ launcher refuses `hermes` while its authenticated backend is absent. The
 own completed vanilla install and root-owned billing identity, independently
 of the Eternals host marker. Port C uses a generated TLS route at `/` and an
 account-side on-demand launcher; 401 probes guard both backend choices.
-The service permalink is built only from the root-owned provisioning record;
-an account-owned billing dot-file cannot select another service name.
+The service permalink comes from the root-owned provisioning record once it
+exists; see ADR 0128 for the legacy read.
 
 ---
 

@@ -10,19 +10,18 @@ until its own Configure action completes.
 
 ## Context
 
-ADR 0128 reserves port 846 for one account-owned vanilla Hermes window. The
-shared panel origin cannot host the agent UI without mixing browser state across
-accounts. Root does not execute or write account-controlled code (ADR 0121).
-Hermes has a dashboard login, but its loopback TCP listener is reachable by
-other local accounts. A configured external public URL engages its auth gate.
+ADR 0128 reserves port 846 for one account-owned vanilla Hermes window. Each
+account UI gets its own service origin and certificate. Root does not execute
+or write account-controlled code (ADR 0121). Hermes' own login gates its
+loopback listener; a configured public URL engages it.
 
 ## Options considered
 
-- A shared panel path was rejected because the origin and cookies are shared.
+- Each account UI uses a separate service origin and certificate.
 - A customer `custom.d` proxy fragment was rejected because it could replace
   generated routing and would need a path prefix Hermes does not support.
-- A generated port-C route with an account-side on-demand launcher preserves
-  the existing privilege boundary and puts the UI at `/`.
+- A generated port-C route with an account-side on-demand launcher keeps
+  account processes under the account UID and puts the UI at `/`.
 
 ## Decision
 
@@ -66,8 +65,8 @@ port-C session secret and stop its running backend.
 
 ## Consequences and limits
 
-The Hermes backend still binds loopback TCP. Other local accounts can reach
-that socket, so the Hermes login is essential even when nginx is correct.
+The Hermes backend still binds loopback TCP. The Hermes login is required even
+when nginx routing is correct.
 Its login cookies are scoped by host rather than port; the port-B and port-C
 Hermes windows share one browser cookie jar. Signing in to one can sign the
 other out, as Configure discloses.
@@ -78,18 +77,13 @@ the tree then. A customer-started, untracked Hermes process can still write
 during that final copy; the transfer cannot freeze arbitrary account code.
 No root process copies or mutates that tree for this feature.
 
-The upstream advisory list had no published project advisories when reviewed,
-but the GitHub Advisory Database lists older Hermes CVEs, including
-CVE-2026-9369, CVE-2026-10222 and CVE-2026-10221. The pinned release is newer
-than the listed affected version ranges. The source-level risk remains broad:
-an agent session can read account files, run account commands, and use its
-provider key. The public endpoint therefore requires the dedicated login,
+The pinned release was checked against published upstream advisories. An agent
+session acts with the account's permissions and provider key. The public
+endpoint therefore requires the dedicated login,
 origin checks, a private secret file, and an account UID process. No root
 credential is exposed to Hermes.
 
 ## References
 
-ADRs 0121 and 0127; `docs/contracts.md`, `docs/hermes.md`,
-`docs/portManager.md`; [Hermes security policy](https://github.com/NousResearch/hermes-agent/security),
-[Hermes advisory list](https://github.com/NousResearch/hermes-agent/security/advisories),
-[GitHub Advisory Database](https://github.com/advisories?query=hermes-agent).
+ADRs 0121 and 0128; `docs/contracts.md`, `docs/hermes.md`,
+`docs/portManager.md`.

@@ -79,7 +79,7 @@ class UserBillingIdsSafetyTest extends TestCase
         $this->assertSame(0, $result['billingClientId']);
     }
 
-    public function testProvisionedIdentityIgnoresAccountSwaps(): void
+    public function testProvisionedIdentityTakesPrecedenceOverHomeMarkers(): void
     {
         $base = $this->pmssMakeTempDir('pmss-billing-provisioned-');
         $config = $base.'/config';

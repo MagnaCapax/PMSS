@@ -112,8 +112,7 @@ class UserConfigStore
             if (empty($payload['ramMiB'])) {
                 $payload['ramMiB'] = $this->resolveRamMiB($username);
             }
-            // Billing IDs in account-owned directories can be renamed between
-            // root-owned dot-file basenames. Only provisioning state is trusted.
+            // Billing IDs come only from provisioning state.
         }
         return $this->normalise($payload);
     }
