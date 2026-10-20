@@ -928,7 +928,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
   - Billing identity: `.billingServiceId`, legacy `.billingId`, and `.billingClientId`
     have `root:<user> 0640` as their managed state. `writeHomeMarker.php` creates
-    registered billing markers as root (currently `.billingId`); `recreateUser`
+    registered billing markers as root (`.billingId`, `.billingServiceId`, and
+    `.billingClientId`) and records service/client IDs in the root store; `recreateUser`
     restores billing files with identity UID 0, and management-host backfill
     writes them as root. `userTransfer` excludes these markers and retains the
     target's provisioned `.billingId`. Readers require a root-owned regular file.
@@ -1210,6 +1211,9 @@ to the account home. `L` means `Config::localDir()`.
   `L/eternals.off`. The source hold is `L/eternals.hold` with JSON
   `{"until": <ts>}`;
   `hold --until <ts>` applies on both source and target during transfer.
+  Successful transfer writes source `L/eternals.off`, keeps its hold, then
+  releases and ensures the target. Failed transfer releases the source and
+  extends the target hold so a partial copy stays cold.
 - Host marker: `/etc/seedbox/config/pikkumiesEternals.enabled` is root-owned
   and staged on hosts. No `etc/seedbox/config/*.enabled` file is shipped.
 - Lifecycle: Pikkumies' own per-minute user cron tick keeps the Eternals running
