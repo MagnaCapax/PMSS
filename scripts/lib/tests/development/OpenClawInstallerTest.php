@@ -111,6 +111,24 @@ final class OpenClawInstallerTest extends TestCase
         $this->assertFalse(file_exists($root.'/outside'));
     }
 
+    public function testActionLockIsNotInheritedByProcessesStartedUnderIt(): void
+    {
+        // lighttpd and the gateway are started while the lock is held; an inherited lock blocked every later action.
+        if (!is_dir('/proc/self/fd')) throw new SkipTest('needs /proc');
+        $home = $this->pmssMakeTempDir('pmss-oc-lock-');
+        $paths = array('home' => $home);
+        $lock = \ocActionLock($paths);
+        $this->assertTrue($lock !== null);
+        $this->assertSame(null, \ocActionLock($paths));
+        list($rc, $fds) = \ocRun(array('sh', '-c', 'ls -l /proc/$$/fd'));
+        $this->assertSame(0, $rc);
+        $this->assertFalse(strpos($fds, '.openclaw-action.lock') !== false, 'child inherited the action lock: '.$fds);
+        fclose($lock);
+        $again = \ocActionLock($paths);
+        $this->assertTrue($again !== null);
+        fclose($again);
+    }
+
     public function testCommandPathPrefersPathThenFindsSbinOutsideAccountPath(): void
     {
         // A panel-launched install inherits the account login PATH, which has no /usr/sbin (lighttpd lives there).

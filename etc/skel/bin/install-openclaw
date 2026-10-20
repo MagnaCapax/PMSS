@@ -432,14 +432,21 @@ function ocStart(array $paths, bool $reset, int $waitSeconds): bool
     return true;
 }
 
+/** Take the shared action lock; close-on-exec so the gateway and lighttpd started under it never hold it. */
+function ocActionLock(array $paths)
+{
+    $lock = fopen($paths['home'].'/.openclaw-action.lock', 'ce');
+    return $lock && flock($lock, LOCK_EX | LOCK_NB) ? $lock : null;
+}
+
 /** One cron check at a time; five consecutive failures require manual start. */
 function ocCheck(array $paths): void
 {
     if (is_file($paths['state'].'/pmss-stopped')) {
         return;
     }
-    $lock = fopen($paths['home'].'/.openclaw-action.lock', 'c');
-    if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+    $lock = ocActionLock($paths);
+    if ($lock === null) {
         return;
     }
     $adopted = ocPendingProviderApply($paths);
@@ -730,8 +737,8 @@ function ocMain(array $args): int
     // Share the cron lock so start/stop/install cannot race a watchdog restart.
     $actionLock = null;
     if ($command !== 'check' && $command !== 'status' && $command !== 'open-url') {
-        $actionLock = fopen($paths['home'].'/.openclaw-action.lock', 'c');
-        if (!$actionLock || !flock($actionLock, LOCK_EX | LOCK_NB)) {
+        $actionLock = ocActionLock($paths);
+        if ($actionLock === null) {
             throw new RuntimeException('Another OpenClaw action is running');
         }
     }
