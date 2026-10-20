@@ -88,6 +88,10 @@ and Hermes state; the archived home retains their previous data.
   privileged source-side deletion channel.
 - The shared panel origin can frame the launcher from another account page.
   The Fetch Site gate cannot distinguish pages on that origin.
+- Root service launches still have an `su` path without a pseudo-terminal;
+  the terminal-injection class remains in that existing launcher. The shared
+  panel response path also has no confirmed strip for an account-supplied
+  `Service-Worker-Allowed` header. Neither existing surface is widened by A.
 - Hermes loopback TCP listeners need an authenticated gate because other
   accounts can reach loopback. B and C remain closed here. Their sessions may
   share a browser cookie jar when enabled.
