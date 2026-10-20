@@ -100,6 +100,53 @@ final class PikkumiesHermesUiTest extends TestCase
         } finally { fclose($server); }
     }
 
+    public function testRelayForwardsLargeResponseToSlowReader(): void
+    {
+        $socket = $this->pmssMakeTempDir('pmss-relay-', 0700).'/hermes.sock';
+        $size = 3 * 1024 * 1024;
+        $body = '';
+        for ($i = 0; strlen($body) < $size; $i++) $body .= sprintf('%08d|', $i);
+        $body = substr($body, 0, $size);
+        $backend = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+            '$s = stream_socket_server("tcp://127.0.0.1:0"); echo substr(strrchr(stream_socket_get_name($s, false), ":"), 1), "\n";'
+            .' fflush(STDOUT); $c = stream_socket_accept($s, 20); while (($l = fgets($c)) !== false && $l !== "\r\n");'
+            .' $b = ""; for ($i = 0; strlen($b) < '.$size.'; $i++) $b .= sprintf("%08d|", $i);'
+            .' $out = "HTTP/1.1 200 OK\r\nContent-Length: '.$size.'\r\n\r\n".substr($b, 0, '.$size.');'
+            .' while ($out !== "") { $n = fwrite($c, $out); if (!$n) break; $out = (string) substr($out, $n); } fclose($c);'),
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $backendPipes);
+        $this->assertTrue(is_resource($backend));
+        $port = (int) trim((string) fgets($backendPipes[1]));
+        $relay = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+            'require '.var_export(dirname(__DIR__, 4).'/etc/skel/bin/pmssHermesRelay.php', true).';'
+            .' exit(pmssHermesRelayServe('.var_export($socket, true).', '.$port.', static function (): bool { return true; }));'),
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $relayPipes);
+        $this->assertTrue(is_resource($relay));
+        try {
+            for ($i = 0; $i < 50 && @filetype($socket) !== 'socket'; ++$i) usleep(100000);
+            $peer = stream_socket_client('unix://'.$socket, $error, $message, 5);
+            $this->assertTrue($peer !== false, 'relay socket did not accept');
+            stream_set_timeout($peer, 20);
+            fwrite($peer, "GET /big HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+            usleep(500000); // let both socket buffers fill before reading
+            $received = '';
+            while (!feof($peer)) {
+                $chunk = fread($peer, 8192);
+                if ($chunk === false || ($chunk === '' && stream_get_meta_data($peer)['timed_out'])) break;
+                $received .= $chunk;
+            }
+            fclose($peer);
+            $split = strpos($received, "\r\n\r\n");
+            $this->assertTrue($split !== false, 'no response headers');
+            $received = (string) substr($received, $split + 4);
+            $this->assertSame($size, strlen($received));
+            $this->assertSame(sha1($body), sha1($received));
+        } finally {
+            proc_terminate($relay); proc_terminate($backend);
+            foreach (array_merge($relayPipes, $backendPipes) as $pipe) fclose($pipe);
+            proc_close($relay); proc_close($backend);
+        }
+    }
+
     public function testMissingListenerToolStopsRecordedChild(): void
     {
         $home = $this->pmssMakeTempDir('pmss-b-tool-', 0700);

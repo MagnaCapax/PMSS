@@ -38,7 +38,8 @@ function pmssHermesRelayReady(string $socket): bool
     return is_string($status) && preg_match('/^HTTP\/1\.[01] 401(?: |$)/', trim($status)) === 1;
 }
 
-function pmssHermesRelayServe(string $socket, int $port): int
+/** Forward both directions; bytes a non-blocking write could not take wait in that stream's queue. */
+function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null): int
 {
     if ($port < 1024 || $port > 65535 || is_link(dirname($socket))
         || !is_dir(dirname($socket)) || (fileperms(dirname($socket)) & 0077) !== 0) return 1;
@@ -49,37 +50,53 @@ function pmssHermesRelayServe(string $socket, int $port): int
     $server = @stream_socket_server('unix://'.$socket, $error, $message);
     if ($server === false) return 1;
     if (!@chmod($socket, 0600)) { fclose($server); @unlink($socket); return 1; }
-    $peers = array();
+    $peers = array(); $streams = array(); $queue = array(); $ended = array();
+    $close = static function (int $id) use (&$peers, &$streams, &$queue, &$ended): void {
+        foreach (array($id, $peers[$id] ?? null) as $side) {
+            if ($side === null || !isset($streams[$side])) continue;
+            fclose($streams[$side]);
+            unset($streams[$side], $peers[$side], $queue[$side], $ended[$side]);
+        }
+    };
     while (true) {
-        $read = array_merge(array($server), array_values($peers));
-        $write = null; $except = null;
+        $read = array($server); $write = array();
+        foreach ($streams as $id => $stream) {
+            // A stream is read only while its peer has nothing queued, so memory stays bounded.
+            if (!isset($ended[$id]) && ($queue[$peers[$id]] ?? '') === '') $read[] = $stream;
+            if (($queue[$id] ?? '') !== '') $write[] = $stream;
+        }
+        $except = null;
         if (@stream_select($read, $write, $except, 30) === false) break;
+        foreach ($write as $stream) {
+            $id = (int) $stream;
+            if (!isset($streams[$id])) continue;
+            $sent = @fwrite($stream, $queue[$id]);
+            if ($sent === false) { $close($id); continue; }
+            $queue[$id] = (string) substr($queue[$id], $sent);
+            if ($queue[$id] === '' && isset($ended[$peers[$id]])) $close($id);
+        }
         foreach ($read as $source) {
             if ($source === $server) {
                 $client = @stream_socket_accept($server, 0);
                 if ($client === false) continue;
-                $backend = pmssHermesRelayConnect($port);
+                $backend = pmssHermesRelayConnect($port, $owner);
                 if ($backend === false) { fclose($client); continue; }
                 stream_set_blocking($client, false);
                 stream_set_blocking($backend, false);
-                $peers[(int) $client] = $backend;
-                $peers[(int) $backend] = $client;
+                $streams[(int) $client] = $client; $streams[(int) $backend] = $backend;
+                $peers[(int) $client] = (int) $backend; $peers[(int) $backend] = (int) $client;
                 continue;
             }
-            $target = $peers[(int) $source] ?? null;
-            if ($target === null) continue;
+            $id = (int) $source;
+            if (!isset($streams[$id])) continue;
             $data = @fread($source, 16384);
             if ($data === false || $data === '') {
                 if (!feof($source)) continue;
-                unset($peers[(int) $source], $peers[(int) $target]);
-                fclose($source); fclose($target);
+                $ended[$id] = true;
+                if (($queue[$peers[$id]] ?? '') === '') $close($id);
                 continue;
             }
-            while ($data !== '') {
-                $sent = @fwrite($target, $data);
-                if ($sent === false || $sent === 0) break;
-                $data = substr($data, $sent);
-            }
+            $queue[$peers[$id]] = ($queue[$peers[$id]] ?? '').$data;
         }
     }
     fclose($server);
