@@ -27,10 +27,10 @@ final class SysctlProfileSnapshotTest extends TestCase
         $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-profile-proc-', 0700);
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
         $cases = [
-            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '56d73c2c9eff3a9fc0d3801e6639381ee107ee45cf627c49e5f926b6d996c615'],
-            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], 'aba955d478363d1f47d9da6ffad245bbb24c16fc27d32950e093d99159268584'],
-            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], '90def2fd6a4958056eff2b7185143944c38c9064b95db85eba45167a3d284cdd'],
-            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '258a01b256b52f49dc391a8a238e2fb0406fe0719d1cf201f46baba76a629144'],
+            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '4c187f796cc18d2db8fe56955a6fc217dd119a8ccb33d878db0f029c37edffaa'],
+            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], 'c5cc1ecee1ff795c8881b03ffabd0acf20f3d85dfb51a8a3f89da4c9956afce8'],
+            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], 'c3838b52e37d193d2e6740915c29e471d47ca89b4ed7da99ca479f6fad86a051'],
+            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '6165674bef1934011c6912bf0d64794add2f242ecf9d6eac67eeb86a2666a1a8'],
         ];
 
         foreach ($cases as $label => [$profile, $expectedHash]) {

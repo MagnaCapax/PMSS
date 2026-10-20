@@ -46,6 +46,8 @@ function pmssSysctlNetworkSettingsBuild(array $profile): array
         'net.ipv4.tcp_max_tw_buckets' => '1440000',
         'net.ipv4.tcp_tw_reuse' => '1',
         'net.ipv4.ip_local_port_range' => '1024 65535',
+        // Keep account processes below the UI ports unable to bind them.
+        'net.ipv4.ip_unprivileged_port_start' => '1024',
         // Keep the kernel reservation tied to the allocator band (ADR 0026).
         'net.ipv4.ip_local_reserved_ports' => PMSS_PORT_MANAGER_MIN_PORT.'-'.PMSS_PORT_MANAGER_MAX_PORT,
         'net.ipv4.tcp_mem' => '3086631 4115510 6173262',
