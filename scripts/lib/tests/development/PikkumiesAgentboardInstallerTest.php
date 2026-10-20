@@ -7,28 +7,71 @@ require_once dirname(__DIR__, 2).'/update/apps/pikkumiesAgentboard.php';
 
 final class PikkumiesAgentboardInstallerTest extends TestCase
 {
+    /** Build a real release archive from a test-owned source tree. */
+    private function archive(string $temp, string $name, bool $index = true, string $extra = ''): string
+    {
+        $source = $temp.'/source-'.$name;
+        mkdir($source.'/dist/client', 0755, true);
+        file_put_contents($source.'/agentboard', "#!/bin/sh\nexit 0\n");
+        if ($index) file_put_contents($source.'/dist/client/index.html', '<h1>Agentboard</h1>');
+        file_put_contents($source.'/dist/client/app.js', 'console.log(1);');
+        if ($extra === 'symlink') symlink('/etc/passwd', $source.'/dist/client/escape');
+        if ($extra === 'hardlink') link($source.'/dist/client/app.js', $source.'/dist/client/extra.js');
+        $archive = $temp.'/'.$name.'.tar.gz';
+        $transform = $extra === 'traversal' ? " --transform='s|^dist/client/app.js$|../escape|'" : '';
+        exec('tar -czf '.escapeshellarg($archive).$transform.' -C '.escapeshellarg($source)
+            .' agentboard dist/client', $output, $rc);
+        $this->assertSame(0, $rc);
+        return $archive;
+    }
+
     /** A local archive exercises checksum verification and atomic publication. */
     public function testVerifiedArchiveInstallsAndBadChecksumDoesNotPublish(): void
     {
         $temp = $this->pmssMakeTempDir('pmss-agentboard-');
-        $source = $temp.'/source';
         $root = $temp.'/installed';
-        mkdir($source);
-        file_put_contents($source.'/agentboard', "#!/bin/sh\nexit 0\n");
-        $archive = $temp.'/agentboard.tar.gz';
-        exec('tar -czf '.escapeshellarg($archive).' -C '.escapeshellarg($source).' agentboard', $output, $rc);
-        $this->assertSame(0, $rc);
+        $archive = $this->archive($temp, 'good');
         $sha256 = hash_file('sha256', $archive);
         $ownerUid = posix_geteuid();
 
         $this->assertFalse(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', str_repeat('0', 64), $root, $ownerUid));
         $this->assertFalse(file_exists($root));
+        $before = umask(0077);
+        try {
+            $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha256, $root, $ownerUid));
+        } finally {
+            umask($before);
+        }
+        $this->assertSame(0755, fileperms($root) & 0777);
+        $this->assertSame('v1/agentboard', readlink($root.'/agentboard'));
+        $this->assertSame("#!/bin/sh\nexit 0\n", file_get_contents($root.'/agentboard'));
+        $this->assertSame('<h1>Agentboard</h1>', file_get_contents($root.'/v1/dist/client/index.html'));
+        $this->assertSame(0755, fileperms($root.'/v1/dist/client') & 0777);
+        $this->assertSame(0644, fileperms($root.'/v1/dist/client/app.js') & 0777);
+        $inode = fileinode($root.'/v1');
         $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha256, $root, $ownerUid));
         $this->assertSame('v1/agentboard', readlink($root.'/agentboard'));
-        $this->assertSame(file_get_contents($source.'/agentboard'), file_get_contents($root.'/agentboard'));
-        $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha256, $root, $ownerUid));
-        $this->assertSame('v1/agentboard', readlink($root.'/agentboard'));
+        $this->assertSame($inode, fileinode($root.'/v1'));
         $this->assertFalse(\pmssPikkumiesAgentboardArchiveInstall($archive, '../v2', $sha256, $root, $ownerUid));
+    }
+
+    /** Invalid archive entries never replace a working release or leave extraction stages. */
+    public function testUnsafeArchivesDoNotSwitch(): void
+    {
+        $temp = $this->pmssMakeTempDir('pmss-agentboard-unsafe-');
+        $root = $temp.'/installed';
+        $good = $this->archive($temp, 'good');
+        $uid = posix_geteuid();
+        $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($good, 'v1', hash_file('sha256', $good), $root, $uid));
+        foreach (['symlink', 'hardlink', 'traversal', 'missing-index'] as $case) {
+            $archive = $this->archive($temp, $case, $case !== 'missing-index', $case);
+            $this->assertFalse(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v2', hash_file('sha256', $archive), $root, $uid), $case);
+            $this->assertSame('v1/agentboard', readlink($root.'/agentboard'));
+            $this->assertFalse(file_exists($root.'/v2'));
+            $this->assertSame([], glob($root.'/.stage-*'));
+        }
+        $this->assertFalse(\pmssPikkumiesAgentboardArchiveInstall($good, 'v2', str_repeat('0', 64), $root, $uid));
+        $this->assertSame('v1/agentboard', readlink($root.'/agentboard'));
     }
 
     /** A release cannot activate with a version and no verified checksum. */
@@ -56,16 +99,11 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
     public function testInvalidExistingVersionIsQuarantinedAndReplaced(): void
     {
         $temp = $this->pmssMakeTempDir('pmss-agentboard-refresh-');
-        $source = $temp.'/source';
         $root = $temp.'/installed';
-        mkdir($source);
         mkdir($root);
         mkdir($root.'/v2');
-        file_put_contents($source.'/agentboard', "#!/bin/sh\nexit 0\n");
         file_put_contents($root.'/v2/agentboard', 'stale');
-        $archive = $temp.'/agentboard.tar.gz';
-        exec('tar -czf '.escapeshellarg($archive).' -C '.escapeshellarg($source).' agentboard', $output, $rc);
-        $this->assertSame(0, $rc);
+        $archive = $this->archive($temp, 'refresh');
         $before = umask(0077);
         try {
             $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v2', hash_file('sha256', $archive), $root, posix_geteuid()));
@@ -73,11 +111,26 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         } finally {
             umask($before);
         }
-        $this->assertSame(file_get_contents($source.'/agentboard'), file_get_contents($root.'/v2/agentboard'));
+        $this->assertSame("#!/bin/sh\nexit 0\n", file_get_contents($root.'/v2/agentboard'));
+        $this->assertSame('<h1>Agentboard</h1>', file_get_contents($root.'/v2/dist/client/index.html'));
         $this->assertSame(0700, fileperms($root.'/.quarantine') & 0777);
         $retired = glob($root.'/.quarantine/v2-*');
         $this->assertSame(1, count($retired));
         $this->assertSame('stale', file_get_contents($retired[0].'/agentboard'));
+    }
+
+    public function testChangedFrontendRefreshesSameVersion(): void
+    {
+        $temp = $this->pmssMakeTempDir('pmss-agentboard-client-');
+        $root = $temp.'/installed';
+        $archive = $this->archive($temp, 'client');
+        $uid = posix_geteuid();
+        $sha = hash_file('sha256', $archive);
+        $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha, $root, $uid));
+        file_put_contents($root.'/v1/dist/client/app.js', 'changed');
+        $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha, $root, $uid));
+        $this->assertSame('console.log(1);', file_get_contents($root.'/v1/dist/client/app.js'));
+        $this->assertSame(1, count(glob($root.'/.quarantine/v1-*')));
     }
 
     public function testWrongOwnerVersionIsNotTrusted(): void

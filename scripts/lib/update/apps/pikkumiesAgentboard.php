@@ -1,10 +1,11 @@
 <?php
 /** Install the verified baseline build of the account UI binary. */
 require_once __DIR__.'/remoteBinary.php';
+require_once __DIR__.'/../rootOwnedTree.php';
 
-// Fill both pins from one published release. Empty pins deliberately disable installation.
-const PMSS_PIKKUMIES_AGENTBOARD_VERSION = '';
-const PMSS_PIKKUMIES_AGENTBOARD_SHA256 = '';
+// Pin both values from one published release; an empty pin disables installation.
+const PMSS_PIKKUMIES_AGENTBOARD_VERSION = 'v0.36.0-pikkumies.2';
+const PMSS_PIKKUMIES_AGENTBOARD_SHA256 = '755cad071b45d4df8b885ae7c4e8867cad62dc29b5bbc837a4cd98200ebc3e0c';
 const PMSS_PIKKUMIES_AGENTBOARD_ROOT = '/opt/pikkumies-agentboard';
 
 /** Refuse an unpinned archive before tar or any destination write. */
@@ -20,6 +21,58 @@ function pmssPikkumiesAgentboardVersionOwned(string $versionDir, int $ownerUid):
     return is_dir($versionDir) && !is_link($versionDir) && @fileowner($versionDir) === $ownerUid;
 }
 
+/** Accept only the two release members and paths beneath the frontend bundle. */
+function pmssPikkumiesAgentboardArchiveMembersSafe(string $archive): bool
+{
+    $rows = [];
+    exec('tar -tzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null', $rows, $rc);
+    if ($rc !== 0 || $rows === []) return false;
+    foreach ($rows as $path) {
+        $path = rtrim($path, '/');
+        if ($path !== 'agentboard' && $path !== 'dist' && $path !== 'dist/client'
+            && strpos($path, 'dist/client/') !== 0) return false;
+        if (preg_match('/[\x00-\x1f\x7f\\\\]/', $path) === 1
+            || in_array('..', explode('/', $path), true)
+            || in_array('.', explode('/', $path), true)) return false;
+    }
+    return true;
+}
+
+/** Return a sorted content manifest after checking every entry without following links. */
+function pmssPikkumiesAgentboardTreeManifest(string $dir, int $ownerUid, bool $normalize = false)
+{
+    if (!pmssPikkumiesAgentboardVersionOwned($dir, $ownerUid)) return false;
+    if (!$normalize && (fileperms($dir) & 0777) !== 0755) return false;
+    $manifest = [];
+    try {
+        $entries = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($entries as $entry) {
+            $path = $entry->getPathname();
+            $relative = substr($path, strlen($dir) + 1);
+            $stat = @lstat($path);
+            $type = is_array($stat) ? ($stat['mode'] & 0170000) : 0;
+            if (!$stat || $stat['uid'] !== $ownerUid || preg_match('/[\x00-\x1f\x7f]/', $relative) === 1
+                || !pmssPathWithinResolvedRoot($path, $dir)
+                || ($type !== 0040000 && ($type !== 0100000 || $stat['nlink'] !== 1))) return false;
+            $mode = $type === 0040000 ? 0755 : ($relative === 'agentboard' ? 0755 : 0644);
+            if ($normalize ? !@chmod($path, $mode) : ($stat['mode'] & 0777) !== $mode) return false;
+            $digest = $type === 0040000 ? 'dir' : @hash_file('sha256', $path);
+            if ($digest === false) return false;
+            $manifest[$relative] = $digest;
+        }
+    } catch (UnexpectedValueException $exception) {
+        return false;
+    }
+    if (!isset($manifest['agentboard'], $manifest['dist'], $manifest['dist/client'], $manifest['dist/client/index.html'])
+        || $manifest['dist'] !== 'dir' || $manifest['dist/client'] !== 'dir'
+        || $manifest['agentboard'] === 'dir' || $manifest['dist/client/index.html'] === 'dir') return false;
+    ksort($manifest, SORT_STRING);
+    return $manifest;
+}
+
 /** Install one verified archive and switch the stable link by atomic rename. */
 function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version, string $sha256, string $root = PMSS_PIKKUMIES_AGENTBOARD_ROOT, int $ownerUid = 0): bool
 {
@@ -28,16 +81,17 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
         || !pmssPathTargetIsSafe($root, true, false, false)
         || (file_exists($root) && (!is_dir($root) || is_link($root)))) return false;
     if (!is_dir($root) && !@mkdir($root, 0755, true)) return false;
-    if (@fileowner($root) !== $ownerUid) return false;
+    if (@fileowner($root) !== $ownerUid || !@chmod($root, 0755)) return false;
 
     $versionDir = $root.'/'.$version;
     if (is_link($versionDir)) return false;
     $stage = $root.'/.stage-'.bin2hex(random_bytes(8));
     if (!@mkdir($stage, 0700)) return false;
     try {
-        // Only the expected member is extracted; no archive owner or permissions survive.
+        // Reject unexpected paths before tar writes, then inspect every extracted entry.
+        if (!pmssPikkumiesAgentboardArchiveMembersSafe($archive)) return false;
         $command = 'tar -xzf '.escapeshellarg($archive)
-            .' --no-same-owner --no-same-permissions -C '.escapeshellarg($stage).' -- agentboard';
+            .' --no-same-owner --no-same-permissions -C '.escapeshellarg($stage).' -- agentboard dist/client';
         $oldUmask = umask(0022);
         try {
             $extractRc = runStep('Extracting Pikkumies Agentboard', $command);
@@ -45,16 +99,10 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
             umask($oldUmask);
         }
         if ($extractRc !== 0) return false;
-        $entry = @lstat($stage.'/agentboard');
-        if (!is_array($entry) || ($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1) return false;
-        if (!@chmod($stage.'/agentboard', 0755) || !@chmod($stage, 0755)) return false;
+        $staged = pmssPikkumiesAgentboardTreeManifest($stage, $ownerUid, true);
+        if ($staged === false || !@chmod($stage, 0755)) return false;
         if (file_exists($versionDir)) {
-            $ownedDir = pmssPikkumiesAgentboardVersionOwned($versionDir, $ownerUid);
-            $installed = $ownedDir ? @lstat($versionDir.'/agentboard') : false;
-            $valid = $ownedDir && is_array($installed)
-                && ($installed['mode'] & 0170000) === 0100000 && $installed['uid'] === $ownerUid
-                && $installed['nlink'] === 1
-                && @hash_file('sha256', $versionDir.'/agentboard') === @hash_file('sha256', $stage.'/agentboard');
+            $valid = pmssPikkumiesAgentboardTreeManifest($versionDir, $ownerUid) === $staged;
             if (!$valid) {
                 $quarantine = $root.'/.quarantine';
                 if ((!is_dir($quarantine) && !@mkdir($quarantine, 0700))
@@ -73,9 +121,8 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
         if (!$switched) @unlink($next);
         return $switched;
     } finally {
-        // Stage is root-owned and never contains an account-controlled path.
-        if (is_file($stage.'/agentboard') || is_link($stage.'/agentboard')) @unlink($stage.'/agentboard');
-        if (is_dir($stage)) @rmdir($stage);
+        // Remove the extraction tree without following archive links.
+        pmssRootOwnedTreeRemove($stage);
     }
 }
 
@@ -99,7 +146,6 @@ function pmssPikkumiesAgentboardInstall(): void
     }
     if (!pmssPinnedRemoteAmd64OrSkip('Pikkumies Agentboard', 'install')) return;
     $root = PMSS_PIKKUMIES_AGENTBOARD_ROOT;
-    if (is_link($root.'/agentboard') && readlink($root.'/agentboard') === $version.'/agentboard') return;
     $url = 'https://github.com/MagnaCapax/mcxPikkumiesAgentboard/releases/download/'
         .rawurlencode($version).'/agentboard-linux-x64-baseline.tar.gz';
     pmssPinnedRemoteArtifactTempFileUse('Pikkumies Agentboard '.$version, $url, $sha256,

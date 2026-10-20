@@ -207,7 +207,9 @@ function pmssHermesAgentboardStart($home, $origin, $panelOrigin, $launcherUrl)
         if (is_link($dir) || (!is_dir($dir) && !@mkdir($dir, 0700, true))) return false;
         @chmod($dir, 0700);
     }
-    if (!is_file($binary) || !is_executable($binary)) return false;
+    $resolvedBinary = realpath($binary);
+    $staticDir = is_string($resolvedBinary) ? dirname($resolvedBinary).'/dist/client' : '';
+    if (!is_file($binary) || !is_executable($binary) || !is_file($staticDir.'/index.html')) return false;
     if (!is_link($socket) && @fileowner($socket) === posix_geteuid()
         && pmssPikkumiesOpenSocketLive($socket)) {
         if (pmssHermesAgentboardGateProbe($socket)) return true;
@@ -220,6 +222,7 @@ function pmssHermesAgentboardStart($home, $origin, $panelOrigin, $launcherUrl)
         .' AGENTBOARD_MODE=standard AGENTBOARD_SOCKET='.escapeshellarg($socket)
         .' AGENTBOARD_TOKEN_DIR='.escapeshellarg($base.'/tokens')
         .' AGENTBOARD_DATA_DIR='.escapeshellarg($base.'/data')
+        .' AGENTBOARD_STATIC_DIR='.escapeshellarg($staticDir)
         .' AGENTBOARD_ALLOWED_ORIGIN='.escapeshellarg($origin)
         .' AGENTBOARD_FRAME_ANCESTORS='.escapeshellarg($panelOrigin)
         .' AGENTBOARD_LAUNCHER_URL='.escapeshellarg($launcherUrl);
