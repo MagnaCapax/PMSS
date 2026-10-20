@@ -46,6 +46,10 @@ launcher checks listener ownership and probes for a 401 before opening it;
 an ungated instance is stopped. The separate Agentboard mount forwards its
 bearer Authorization header because that fork authenticates every API request
 with it. Both mounts keep the same port-C Origin and Fetch Site checks.
+Port C has two fixed pre-login selector redirects because its two mutually
+exclusive UIs share one origin. Each selector only sets the HttpOnly UI-choice
+cookie and redirects to `/`; it does not proxy an API request or expose account
+content. The Hermes login assets are the other pre-authenticated paths.
 
 The launcher starts Hermes web UI or standard Agentboard on demand as the
 account. Agentboard uses a private Unix socket and single-use, 60-second
