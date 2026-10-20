@@ -39,6 +39,16 @@ function pmssPikkumiesOpenSocketLive($socket)
     return true;
 }
 
+/** A live account transfer hold keeps the launcher out of the copied state. */
+function pmssPikkumiesOpenMoving($local)
+{
+    $path = $local.'/eternals.hold';
+    if (!is_file($path) || is_link($path)) return false;
+    $data = json_decode((string) @file_get_contents($path, false, null, 0, 64), true);
+    return is_array($data) && isset($data['until']) && is_int($data['until'])
+        && $data['until'] > time();
+}
+
 /** Delete expired launch tokens, then publish at most one new 0600 token. */
 function pmssPikkumiesOpenTokenMint($directory)
 {
@@ -179,6 +189,10 @@ $panelOrigin = 'https://'.$host;
 $launcherUrl = $panelOrigin.'/user-'.$name.'/pikkumiesOpen.php';
 $socket = $local.'/ui/ui.sock';
 $started = isset($_GET['started']) && ctype_digit((string) $_GET['started']) ? (int) $_GET['started'] : time();
+if (pmssPikkumiesOpenMoving($local)) {
+    pmssPikkumiesOpenPage('moving', $started);
+    return;
+}
 $certificateState = pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permalink);
 if ($certificateState === 'error') {
     pmssPikkumiesOpenPage('error', $started);
