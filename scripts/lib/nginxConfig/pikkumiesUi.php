@@ -220,7 +220,7 @@ map "\$request_method:\$uri:\$http_sec_fetch_site" \${$variable}_api_ok {
 }
 map \$http_cookie \${$variable}_choice {
     default "";
-    ~(?:^|;[[:space:]]*)__Host-pmss_ui_c=(web|agentboard)(?:;|\$) \$1;
+    "~(?:^|;[[:space:]]*)__Host-pmss_ui_c=(web|agentboard)(?:;|\$)" \$1;
 }
 map \${$variable}_choice \${$variable}_prefix {
     default /__pmss-ui-c;

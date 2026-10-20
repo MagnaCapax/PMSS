@@ -162,7 +162,7 @@ final class PikkumiesUiRoutesTest extends TestCase
     public function testPortCChoiceReadsOnlyTheHostPrefixedCookie(): void
     {
         $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
-        $this->assertTrue(preg_match('/map \$http_cookie \$[a-z0-9_]+ \{\s*default "";\s*~([^ ]+) \$1;/s',
+        $this->assertTrue(preg_match('/map \$http_cookie \$[a-z0-9_]+ \{\s*default "";\s*"~([^"]+)" \$1;/s',
             $block, $match) === 1);
         foreach (['__Host-pmss_ui_c=web' => 'web', 'other=x; __Host-pmss_ui_c=agentboard; x=y' => 'agentboard'] as $cookie => $expected) {
             $this->assertTrue(preg_match('~'.$match[1].'~', $cookie, $value) === 1);
