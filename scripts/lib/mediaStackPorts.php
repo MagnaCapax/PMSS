@@ -18,7 +18,7 @@ function pmssMediaStackPortDefinitions(): array
     $iniPort = '/^[\t ]*port[\t ]*=[\t ]*"?([0-9]{1,5})"?/mi';
     $xmlPort = '/<Port>[\t\r\n ]*([0-9]{1,5})[\t\r\n ]*<\/Port>/i';
 
-    return array(
+    $definitions = array(
         'sabnzbd' => array('path' => '.config/sabnzbd/sabnzbd.ini', 'patterns' => array($iniPort)),
         'radarr' => array('path' => '.config/radarr/config.xml', 'patterns' => array($xmlPort)),
         'prowlarr' => array('path' => '.config/prowlarr/config.xml', 'patterns' => array($xmlPort)),
@@ -34,6 +34,12 @@ function pmssMediaStackPortDefinitions(): array
             ),
         ),
     );
+    // The staged host marker owns B; reserve its loopback port only on enabled hosts.
+    if (is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
+        $definitions['pikkumies-hermes'] = array('path' => '.mcxPikkumies/pikkumies/local/ui/hermes/dashboard.port',
+            'patterns' => array('/^([0-9]{1,5})(?:\r?\n|$)/'));
+    }
+    return $definitions;
 }
 
 /** Read an adoptable port only from a small regular file inside the user's home. */

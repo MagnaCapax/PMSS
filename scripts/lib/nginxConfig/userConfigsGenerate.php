@@ -84,6 +84,16 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
             pmssCreateNginxConfigUserLog($user, '[WARN] Account UI port 844 is owned by another service');
         }
     }
+    if (!$suspended && $mcxHosts !== null && $mcxHosts !== ''
+        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
+        && pmssPikkumiesUiCertificateReady($user, $subdomainBase)) {
+        if (pmssPikkumiesUiPortAvailable(845)) {
+            $serviceHost = explode(' ', $mcxHosts, 2)[0];
+            $config .= "\n".pmssPikkumiesHermesNginxBlock($user, $subdomainBase, $serviceHost, (int) $serverPort);
+        } else {
+            pmssCreateNginxConfigUserLog($user, '[WARN] Account UI port 845 is owned by another service');
+        }
+    }
     // Port C follows only the account's own completed install, never the host marker.
     $status = '/home/'.$user.'/.hermes/pmss-install.status';
     if (!$suspended && $mcxHosts !== null && $mcxHosts !== '' && is_file($status)

@@ -89,6 +89,11 @@ function pmssLighttpdRenderUserConfig(
         && is_file('/opt/pikkumies-agentboard/agentboard')) {
         $config .= pmssLighttpdPikkumiesUiBlock($user);
     }
+    if (is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
+        $bPort = function_exists('pmssReadRegularFileNetworkPort')
+            ? pmssReadRegularFileNetworkPort('/etc/seedbox/runtime/ports/media-stack-pikkumies-hermes-'.$user) : null;
+        if ($bPort !== null) $config .= pmssLighttpdPikkumiesHermesBlock($user, $bPort);
+    }
     // Root reads only the root-owned reservation; the account status merely opts in.
     $status = '/home/'.$user.'/.hermes/pmss-install.status';
     $reservation = '/etc/seedbox/runtime/ports/media-stack-hermes-'.$user;

@@ -6,6 +6,8 @@ commit, install script and package lock before executing code. An existing
 checkout with customer changes is preserved and installation stops with a
 message. The account's primary password is not stored in Hermes; the dashboard
 gets a separate generated password and session secret.
+The dashboard starts with `env -i`, a pinned public URL, and credentials read
+from its private 0600 account file; neither credential appears on argv.
 
 The Web interface selector offers Hermes web UI (default), Agentboard, and
 Agentboard Pikkumies when Pikkumies is installed. The first two use the same

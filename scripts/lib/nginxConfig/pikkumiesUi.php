@@ -118,6 +118,79 @@ function pmssPikkumiesUiDefaultNginxBlock(string $sslBlock): string
         .$sslBlock."    return 444;\n}\n";
 }
 
+/** Port B exposes only Hermes' login surface before its own auth request succeeds. */
+function pmssPikkumiesHermesNginxBlock(string $user, string $host, string $serviceHost, int $lighttpdPort, string $live = '/etc/letsencrypt/live'): string
+{
+    $origin = 'https://'.$serviceHost.':845';
+    $variable = 'pmss_ui_b_'.substr(hash('sha256', $user), 0, 12);
+    $originPattern = preg_quote($origin, '~');
+    $ssl = pmssNginxUserSslBlock($user.'.'.$host, '', $live);
+    return <<<NGINX
+# Account UI B: Hermes login is required even on the shared loopback listener.
+map "\$request_method:\$http_upgrade:\$http_origin" \${$variable}_origin_ok {
+    default 0;
+    ~^GET::\$ 1;
+    ~^[A-Z]+:[^:]*:{$originPattern}\$ 1;
+}
+map "\$request_method:\$uri:\$http_sec_fetch_site" \${$variable}_api_ok {
+    default 1;
+    ~^GET:/api/.*:(same-origin|none)\$ 1;
+    ~^GET:/api/ 0;
+}
+server {
+    listen 845 ssl;
+    server_name {$serviceHost};
+{$ssl}    add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Cache-Control "no-store" always;
+    access_log /var/log/nginx/access.log pmss_ui_b_noargs;
+    if (\${$variable}_origin_ok = 0) { return 403; }
+    if (\${$variable}_api_ok = 0) { return 403; }
+    location = /api/cron/fire { return 404; }
+    location = /__pmss-b-auth {
+        internal;
+        proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b/api/auth/me;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Authorization "";
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Host \$host;
+    }
+    location ~ ^/(?:login(?:/|\$)|auth/password-login(?:/|\$)|api/auth/providers(?:/|\$)|assets/|ds-assets/|fonts/|fonts-terminal/|favicon\.ico\$) {
+        proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b\$request_uri;
+        proxy_set_header Authorization "";
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Host \$host;
+    }
+    location / {
+        auth_request /__pmss-b-auth;
+        proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b\$request_uri;
+        proxy_set_header Authorization "";
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
+        proxy_read_timeout 3600s;
+        limit_conn addr 32;
+        proxy_intercept_errors on;
+        error_page 502 503 = @pikkumies_b_offline;
+    }
+    location @pikkumies_b_offline {
+        root /var/www;
+        try_files /pikkumies/not-running.html =503;
+    }
+}
+NGINX;
+}
+
+function pmssPikkumiesHermesDefaultNginxBlock(string $sslBlock): string
+{
+    return "log_format pmss_ui_b_noargs '\$remote_addr \$request_method \$uri \$status';\n"
+        ."server {\n    listen 845 ssl default_server;\n    server_name _;\n"
+        .$sslBlock."    return 444;\n}\n";
+}
+
 /** Port C is independent of the Eternals marker and exposes one authenticated UI. */
 function pmssHermesUiNginxBlock(string $user, string $host, string $serviceHost, int $lighttpdPort, string $live = '/etc/letsencrypt/live'): string
 {

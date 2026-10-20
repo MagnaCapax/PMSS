@@ -195,6 +195,17 @@ function pmssCreateNginxConfigSetup(): array
         @unlink($uiDefault);
     }
     $hermesDefault = $subdomainConfigDir.'/pmss-hermes-default.conf';
+    $pikkumiesHermesDefault = $subdomainConfigDir.'/pmss-pikkumies-hermes-default.conf';
+    if ($subdomainEnabled && $nginxSslBlock !== ''
+        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled') && pmssPikkumiesUiPortAvailable(845)) {
+        if (!$uiEnabled && !pmssPikkumiesUiPagesInstall())
+            pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
+        if (!pmssWriteManagedFile($pikkumiesHermesDefault, pmssPikkumiesHermesDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
+            pmssCreateNginxConfigSetupWarn('write Pikkumies Hermes UI default', $pikkumiesHermesDefault);
+    } elseif (is_file($pikkumiesHermesDefault) && !is_link($pikkumiesHermesDefault)
+        && pmssPathTargetIsSafe($pikkumiesHermesDefault, false, true)) {
+        @unlink($pikkumiesHermesDefault);
+    }
     if ($subdomainEnabled && $nginxSslBlock !== '' && pmssPikkumiesUiPortAvailable(846)) {
         if (!pmssWriteManagedFile($hermesDefault, pmssHermesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
             pmssCreateNginxConfigSetupWarn('write Hermes UI default', $hermesDefault);

@@ -76,7 +76,11 @@ final class HermesInstallerTest extends TestCase
         $this->assertSame('https://0123456789abcdef.mcx.fi:846/', $env['HERMES_DASHBOARD_PUBLIC_URL']);
         $source = $this->pmssReadRepoFile('etc/skel/bin/pmssHermesRuntime.php');
         $this->assertStringContainsString('proc_open($command,', $source);
-        $this->assertStringContainsString('$pipes, null, $env)', $source);
+        $this->assertStringContainsString('$pipes, null, array())', $source);
+        $command = \pmssHermesStartCommand($paths, $env['HERMES_DASHBOARD_PUBLIC_URL'], 24000, $paths['base'].'/dashboard.log');
+        $this->assertStringContainsString('/usr/bin/env -i', $command);
+        $this->assertFalse(strpos($command, str_repeat('a', 64)) !== false);
+        $this->assertFalse(strpos($command, str_repeat('b', 64)) !== false);
         $process = proc_open('exec sleep 2', array(0 => array('pipe', 'r'),
             1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, $env);
         $this->assertTrue(is_resource($process));

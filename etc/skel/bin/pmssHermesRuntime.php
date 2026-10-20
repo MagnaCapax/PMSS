@@ -81,6 +81,20 @@ function pmssHermesListenerReady(array $paths, int $port): bool
 }
 
 /** Spawn with only approved environment keys; no secret enters argv. */
+function pmssHermesStartCommand(array $paths, string $url, int $port, string $log): string
+{
+    $script = '. "$1"; export HERMES_DASHBOARD_BASIC_AUTH_PASSWORD HERMES_DASHBOARD_BASIC_AUTH_SECRET; '
+        .'exec "$2" dashboard --host 127.0.0.1 --port "$3" --no-open --skip-build';
+    return 'nohup /usr/bin/env -i HOME='.escapeshellarg($paths['home'])
+        .' PATH=/usr/local/bin:/usr/bin:/bin HERMES_HOME='.escapeshellarg($paths['base'])
+        .' HERMES_GATEWAY_LOCK_DIR='.escapeshellarg($paths['base'].'/locks')
+        .' HERMES_DASHBOARD_PUBLIC_URL='.escapeshellarg($url)
+        .' /bin/sh -c '.escapeshellarg($script).' sh '.escapeshellarg($paths['env'])
+        .' '.escapeshellarg($paths['exe']).' '.escapeshellarg((string) $port)
+        .' </dev/null >>'.escapeshellarg($log).' 2>&1 & echo $!';
+}
+
+/** Spawn with only approved environment keys; no secret enters argv. */
 function pmssHermesStart(array $paths): void
 {
     if (!is_file($paths['exe']) || is_link($paths['exe'])) throw new RuntimeException('Hermes is not installed');
@@ -93,13 +107,12 @@ function pmssHermesStart(array $paths): void
         pmssHermesStop($paths);
         throw new RuntimeException('Dashboard login gate is unavailable');
     }
-    $env = pmssHermesEnv($paths, $url);
+    pmssHermesEnv($paths, $url);
     $log = $paths['base'].'/logs/pmss-dashboard.log';
     if (!is_dir(dirname($log))) mkdir(dirname($log), 0700, true);
     if (!is_dir($paths['base'].'/locks')) mkdir($paths['base'].'/locks', 0700);
-    $command = 'nohup '.escapeshellarg($paths['exe']).' dashboard --host 127.0.0.1 --port '
-        .escapeshellarg((string) $port).' --no-open --skip-build </dev/null >>'.escapeshellarg($log).' 2>&1 & echo $!';
-    $process = proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, $env);
+    $command = pmssHermesStartCommand($paths, $url, $port, $log);
+    $process = proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, array());
     if (!is_resource($process)) throw new RuntimeException('Dashboard could not launch');
     fclose($pipes[0]); $pid = trim((string) stream_get_contents($pipes[1])); fclose($pipes[1]); fclose($pipes[2]); proc_close($process);
     if (!preg_match('/^[1-9][0-9]*$/D', $pid)) throw new RuntimeException('Dashboard did not return a PID');

@@ -17,6 +17,22 @@ function pmssLighttpdPikkumiesUiBlock(string $user): string
 LIGHTTPD;
 }
 
+/** Port B reaches only the account's separate Pikkumies Hermes listener. */
+function pmssLighttpdPikkumiesHermesBlock(string $user, int $port): string
+{
+    if (preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1 || $port < 1024 || $port > 65535) return '';
+    return <<<LIGHTTPD
+
+\$HTTP["url"] =~ "^/__pmss-ui-b/" {
+    setenv.set-request-header = ( "Authorization" => "", "X-Forwarded-Proto" => "https" )
+    proxy.server = ( "" => (( "host" => "127.0.0.1", "port" => {$port} )) )
+    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/__pmss-ui-b/" => "/" ) )
+    server.max-read-idle = 3600
+    server.max-write-idle = 3600
+}
+LIGHTTPD;
+}
+
 /** Generated port-C mount; no customer custom.d fragment controls this route. */
 function pmssLighttpdHermesUiBlock(string $user, int $port, string $mode = 'vanilla-hermes-web'): string
 {
