@@ -95,7 +95,10 @@ and Hermes state; the archived home retains their previous data.
 ## Consequences and limits
 
 - The upstream Hermes advisory list showed no published advisory on
-  2026-10-20. That does not close the source-level loopback risk: an
+  2026-10-20, while the GitHub Advisory Database records older Hermes
+  vulnerabilities, including CVE-2026-53869 (WebSocket origin bypass before
+  0.16.0) and CVE-2026-71963 (code execution in 0.18.2 through 0.21.0).
+  This does not close the source-level loopback risk: an
   unauthenticated dashboard can expose the account's agent commands and
   secrets to another tenant. A uses a 256-bit bearer kept in a mode-0600
   account file and carried in the URL fragment, which is not sent in HTTP
@@ -144,4 +147,6 @@ and Hermes state; the archived home retains their previous data.
 
 ADRs 0021, 0023, 0031, 0039, 0090, 0101, 0118, 0121 and 0122;
 `docs/contracts.md`, `docs/portManager.md`,
-[Hermes security advisories](https://github.com/NousResearch/hermes-agent/security/advisories).
+[Hermes security advisories](https://github.com/NousResearch/hermes-agent/security/advisories),
+[Hermes WebSocket advisory](https://github.com/advisories/GHSA-4pqm-j46f-795x),
+[Hermes fsmonitor advisory](https://github.com/advisories/GHSA-cc88-9pxf-j2wv).
