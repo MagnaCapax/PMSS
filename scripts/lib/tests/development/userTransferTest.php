@@ -425,6 +425,19 @@ SNAP;
         $this->assertStringNotContainsString('transfer-hold', $targetHold);
     }
 
+    public function testSuccessfulTransferKeepsSourceColdAndStartsTarget(): void
+    {
+        $this->assertSame(['releaseSource' => false, 'holdTarget' => false, 'releaseTarget' => true, 'ensureTarget' => true],
+            \pmssUserTransferEternalCleanupPlan(true, true, true));
+        $this->assertStringContainsString('eternals.off', \pmssUserTransferBuildEternalSourceOffCommand($this->baseConfig()));
+    }
+
+    public function testFailedTransferResumesSourceAndLeavesTargetHeld(): void
+    {
+        $this->assertSame(['releaseSource' => true, 'holdTarget' => true, 'releaseTarget' => false, 'ensureTarget' => false],
+            \pmssUserTransferEternalCleanupPlan(false, true, true));
+    }
+
     public function testDockerQuiesceProbeBoundsAndStopsSourceSet(): void
     {
         $script = \pmssUserTransferBuildDockerQuiesce($this->baseConfig(), '/root/scratch/docker-ids');

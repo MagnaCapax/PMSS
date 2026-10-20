@@ -11,3 +11,14 @@ function pmssUserTransferTargetEternalCommand(string $user, ?int $until): string
             .$binary.' eternal hold --until '.(string) $until.'; fi';
     return pmssBuildUserShellNoPamCommand($user, $accountCommand);
 }
+
+/** Choose one active side after transfer; a failed copy must leave the target cold. */
+function pmssUserTransferEternalCleanupPlan(bool $complete, bool $sourceHeld, bool $targetHeld): array
+{
+    return [
+        'releaseSource' => $sourceHeld && !$complete,
+        'holdTarget' => $targetHeld && !$complete,
+        'releaseTarget' => $targetHeld && $complete,
+        'ensureTarget' => $targetHeld && $complete,
+    ];
+}

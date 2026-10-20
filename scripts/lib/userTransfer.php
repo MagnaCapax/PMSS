@@ -95,6 +95,7 @@ function pmssUserTransferMain(array $argv): int
         $scratchPaths = pmssUserTransferScratchPaths($scratch);
         $sourceHeld = false;
         $targetHeld = false;
+        $transferComplete = false;
         $cleanup = static function () use ($scratchPaths, $scratch): void {
             pmssUserTransferScratchCleanup($scratch, $scratchPaths);
         };
@@ -191,17 +192,29 @@ function pmssUserTransferMain(array $argv): int
                 return 1;
             }
 
+            pmssUserTransferWriteFile($scratchPaths['sourceReleaseScript'], pmssUserTransferBuildEternalSourceOffCommand($cfg), 0700);
+            if (runStep('Keeping source Eternals off after transfer',
+                pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceReleaseScript']])) !== 0) return 1;
+
             logMessage('[OK] User transfer complete');
+            $transferComplete = true;
             return 0;
         } finally {
-            if ($sourceHeld) {
+            // Exactly one side may resume: source on failure, target on success.
+            $eternalCleanup = pmssUserTransferEternalCleanupPlan($transferComplete, $sourceHeld, $targetHeld);
+            if ($eternalCleanup['releaseSource']) {
                 pmssUserTransferWriteFile($scratchPaths['sourceReleaseScript'], pmssUserTransferBuildEternalSourceCommand($cfg, null), 0700);
                 runStep('Releasing source Eternals', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceReleaseScript']]));
             }
-            if ($targetHeld) {
+            if ($eternalCleanup['holdTarget']) {
+                // The preparation hold is short-lived; a partial copy must stay cold.
+                runStep('Keeping incomplete target Eternals held',
+                    pmssUserTransferTargetEternalCommand($cfg['localUser'], time() + 315360000));
+            }
+            if ($eternalCleanup['releaseTarget']) {
                 runStep('Releasing target Eternals', pmssUserTransferTargetEternalCommand($cfg['localUser'], null));
                 $binary = '/home/'.$cfg['localUser'].'/.mcxPikkumies/pikkumies/bin/pikkumies';
-                runStep('Resuming target Eternals', pmssBuildUserShellNoPamCommand($cfg['localUser'],
+                if ($eternalCleanup['ensureTarget']) runStep('Resuming target Eternals', pmssBuildUserShellNoPamCommand($cfg['localUser'],
                     'if [ -x '.escapeshellarg($binary).' ]; then '.escapeshellarg($binary).' eternal ensure; fi'));
             }
             pmssUserTransferScratchCleanup($scratch, $scratchPaths);

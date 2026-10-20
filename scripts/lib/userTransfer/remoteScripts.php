@@ -113,6 +113,14 @@ function pmssUserTransferBuildEternalSourceCommand(array $cfg, ?int $until): str
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
 }
 
+/** The source must stay cold after a successful hand-over, beyond hold expiry. */
+function pmssUserTransferBuildEternalSourceOffCommand(array $cfg): string
+{
+    $remote = 'umask 077; local="$HOME/.mcxPikkumies/pikkumies/local"; '
+        .'if [ -d "$local" ]; then touch -- "$local/eternals.off"; fi';
+    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
+}
+
 function pmssUserTransferBuildAuthProbe(array $cfg): string
 {
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, '/bin/true')."\n";
