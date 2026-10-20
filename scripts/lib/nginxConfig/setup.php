@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__.'/templates.php';
+require_once __DIR__.'/pikkumiesUi.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../configBackups.php';
 require_once __DIR__.'/../runtime.php';
@@ -175,6 +176,20 @@ function pmssCreateNginxConfigSetup(): array
         pmssDirEnsureExists($subdomainConfigDir, 0755);
     } elseif ($subdomainBase !== '') {
         fwrite(STDERR, "Skipping nginx subdomain vhosts (invalid hostname: {$subdomainBase})\n");
+    }
+
+    // The explicit default consumes unknown Host/SNI values on the UI port.
+    $uiDefault = $subdomainConfigDir.'/pmss-pikkumies-default.conf';
+    $uiEnabled = $subdomainEnabled && $nginxSslBlock !== ''
+        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
+        && is_file('/opt/pikkumies-agentboard/agentboard')
+        && pmssPikkumiesUiPortAvailable(844);
+    if ($uiEnabled) {
+        if (!pmssWriteManagedFile($uiDefault, pmssPikkumiesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644)) {
+            pmssCreateNginxConfigSetupWarn('write account UI default', $uiDefault);
+        }
+    } elseif (is_file($uiDefault) && !is_link($uiDefault) && pmssPathTargetIsSafe($uiDefault, false, true)) {
+        @unlink($uiDefault);
     }
 
     $templates = pmssNginxUserSubdomainTemplates();

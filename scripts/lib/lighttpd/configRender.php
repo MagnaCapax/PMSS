@@ -9,6 +9,7 @@ require_once __DIR__.'/../user/identity.php';
 require_once __DIR__.'/panelSessionLogin.php';
 require_once __DIR__.'/userFileWrite.php';
 require_once __DIR__.'/transmissionProxy.php';
+require_once __DIR__.'/pikkumiesUi.php';
 
 function pmssClampLighttpdBandwidthLimits(string $config): string
 {
@@ -83,7 +84,12 @@ function pmssLighttpdRenderUserConfig(
     );
 
     $config = pmssClampLighttpdBandwidthLimits(is_string($config) ? $config : (string) $template);
-    return pmssLighttpdPanelSessionConfigApply($config, $user, $panelSessionLogin);
+    $config = pmssLighttpdPanelSessionConfigApply($config, $user, $panelSessionLogin);
+    if (is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
+        && is_file('/opt/pikkumies-agentboard/agentboard')) {
+        $config .= pmssLighttpdPikkumiesUiBlock($user);
+    }
+    return $config;
 }
 
 function pmssLighttpdApplyPhpIniContent(string $content, string $user, int $memoryLimitMiB): string

@@ -240,6 +240,7 @@ PHP;
         '.scriptsInc.php',
         'radarr-sonarr.txt',
         'www/console.php',
+        'www/pikkumiesOpen.php',
         'www/apps.php',
         'www/configure.php',
         'www/configureSettings.php',
