@@ -198,6 +198,19 @@ function pmssLogAppendTimestampedLine(string $path, string $message, string $tim
 /** Mirror one message into PMSS log files and the active console stream. */
 function pmssLogWriteMessage(string $primary, string $fallback, string $message, bool $writeToStderr = false): void
 {
-    pmssLogAppendTimestampedLine($primary, $message) || pmssLogAppendTimestampedLine($fallback, $message);
+    $written = pmssLogAppendTimestampedLine($primary, $message);
+    $written || pmssLogAppendTimestampedLine($fallback, $message);
+    // Cron appends a job's output to the same file (">> log 2>&1"); echoing there would write each line twice.
+    if ($written && pmssLogStreamIsFile($writeToStderr ? 'STDERR' : 'STDOUT', $primary)) return;
     $writeToStderr ? fwrite(STDERR, $message.PHP_EOL) : print($message.PHP_EOL);
+}
+
+/** True when the named standard stream is open on the file at $path (same device and inode). */
+function pmssLogStreamIsFile(string $stream, string $path): bool
+{
+    if (!defined($stream)) return false;
+    $open = @fstat(constant($stream));
+    $file = @stat($path);
+    return is_array($open) && is_array($file) && $file['ino'] !== 0
+        && $open['dev'] === $file['dev'] && $open['ino'] === $file['ino'];
 }
