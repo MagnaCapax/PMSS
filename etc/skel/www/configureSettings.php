@@ -2,6 +2,20 @@
 /** Account settings for the customer-owned Configure page. */
 require_once __DIR__.'/scriptsInc.php';
 require_once __DIR__.'/panelSessionAuth.php';
+if (is_file(__DIR__.'/pikkumiesPanel.php')) require_once __DIR__.'/pikkumiesPanel.php';
+
+/** Save the two allowed display modes in a private account-owned file. */
+function pmssPikkumiesInterfaceSave($home, $mode)
+{
+    if (!in_array($mode, array('simplified', 'power-user'), true)) return false;
+    $base = $home.'/.config/pmss';
+    $dir = $base.'/ui';
+    if (is_link($base) || is_link($dir)
+        || (!is_dir($base) && !@mkdir($base, 0700, true))
+        || (!is_dir($dir) && !@mkdir($dir, 0700))) return false;
+    @chmod($dir, 0700);
+    return pmssConfigureFileWrite($dir.'/pikkumies-interface', $mode."\n");
+}
 
 /** Read a bounded regular account file without following symlinks. */
 function pmssConfigureFileRead($path, $limit)
@@ -105,7 +119,24 @@ function pmssConfigureActionRun($home, $action, $request, $ops = array())
 {
     $ok = false;
     $message = 'The setting could not be saved.';
-    if ($action === 'torrentClientSwitch') {
+    if ($action === 'pikkumiesInterface' || $action === 'pikkumiesEternal') {
+        $name = pmssPanelSessionUsername($home);
+        $state = function_exists('pmssPikkumiesPanelStateRead')
+            ? pmssPikkumiesPanelStateRead($home, $name) : array('origin' => '');
+        if ($state['origin'] === '') return array('ok' => false, 'status' => 403, 'message' => 'That did not go through. Try again.');
+        if ($action === 'pikkumiesInterface') {
+            $ok = pmssPikkumiesInterfaceSave($home, $request['mode'] ?? null);
+        } else {
+            $mode = $request['mode'] ?? null;
+            $binary = $home.'/.mcxPikkumies/pikkumies/bin/pikkumies';
+            if (in_array($mode, array('off', 'on'), true) && is_file($binary) && is_executable($binary)) {
+                exec(escapeshellarg($binary).' eternal '.escapeshellarg($mode).' >/dev/null 2>&1', $output, $rc);
+                $ok = $rc === 0;
+            }
+        }
+        return array('ok' => $ok, 'status' => $ok ? 200 : 400,
+            'message' => $ok ? 'Saved.' : 'That did not go through. Try again.');
+    } elseif ($action === 'torrentClientSwitch') {
         if (!is_file(__DIR__.'/configureTorrentClients.php') || !is_file(__DIR__.'/torrentClientsResolve.php'))
             return array('ok' => false, 'status' => 503, 'message' => 'Version switching is unavailable on this host.');
         require_once __DIR__.'/configureTorrentClients.php';

@@ -8,6 +8,24 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/configureSettings.php';
 /** Hermetic account settings and password boundary checks. */
 class ConfigureSettingsTest extends TestCase
 {
+    public function testPikkumiesInterfaceOnlySavesPrivateKnownModes(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-pikkumies-choice-');
+        $path = $home.'/.config/pmss/ui/pikkumies-interface';
+        $this->assertFalse(\pmssPikkumiesInterfaceSave($home, 'unknown'));
+        $this->assertFalse(file_exists($path));
+        $this->assertTrue(\pmssPikkumiesInterfaceSave($home, 'power-user'));
+        $this->assertSame("power-user\n", file_get_contents($path));
+        $this->assertSame(0600, fileperms($path) & 0777);
+        $this->assertSame(0700, fileperms(dirname($path)) & 0777);
+        $this->assertTrue(\pmssPikkumiesInterfaceSave($home, 'simplified'));
+        $this->assertSame("simplified\n", file_get_contents($path));
+        unlink($path);
+        symlink($home.'/outside', $path);
+        $this->assertFalse(\pmssPikkumiesInterfaceSave($home, 'power-user'));
+        $this->assertFalse(file_exists($home.'/outside'));
+    }
+
     private function home(): string
     {
         $home = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-configure-home-').'/alice');

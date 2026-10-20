@@ -48,6 +48,9 @@ $mediaStackStatus = function_exists('pmssMediaStackPanelStatusRead') ? pmssMedia
 $usageAlertsEnabled = is_file($home.'/.usageAlertsEnabled') && !is_link($home.'/.usageAlertsEnabled') && (@fileperms($home.'/.usageAlertsEnabled') & 0777) === 0600;
 $guiFramesLocalOnly = is_file($home.'/.guiFramesLocalOnly') && !is_link($home.'/.guiFramesLocalOnly');
 $settingsState = pmssConfigureSettingsStateRead($home);
+$pmssPikkumiesState = function_exists('pmssPikkumiesPanelStateRead')
+    ? pmssPikkumiesPanelStateRead($home, $username)
+    : array('visible' => false, 'origin' => '', 'mode' => 'simplified', 'off' => false);
 $customRows = $settingsState['customRows'];
 $rtorrentCustom = $settingsState['rtorrentCustom'];
 $certMode = $settingsState['certMode'];
@@ -55,6 +58,9 @@ $certFailed = $settingsState['certFailed'];
 $sections = array('apps' => 'Apps', 'alerts' => 'Usage alert email', 'logins' => 'Passwords and logins',
     'backup' => 'Backup and restore', 'https' => 'HTTPS for your public folder', 'tabs' => 'Custom tabs',
     'rtorrent' => 'rTorrent custom settings', 'panel' => 'Panel', 'more' => 'Find more apps');
+if ($pmssPikkumiesState['origin'] !== '') {
+    $sections = array_merge(array_slice($sections, 0, 1, true), array('agents' => 'AI agents'), array_slice($sections, 1, null, true));
+}
 if (is_file(__DIR__.'/mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {
     $sections = array_merge(array_slice($sections, 0, 1, true), array('media' => 'Media Stack'), array_slice($sections, 1, null, true));
 }
@@ -88,6 +94,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 .configure-layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px}.configure-index{position:sticky;top:12px;align-self:start;display:flex;flex-direction:column;gap:5px}.configure-index a{padding:5px 9px;white-space:nowrap}.configure-card{background:#0f1b2b;border:1px solid #2e3b4f;border-radius:8px;padding:16px;margin-bottom:16px}.configure-card h2{color:#fff;margin-top:0}.configure-card p,.configure-card summary{color:#9fb0c3}.configure-card input,.configure-card textarea{max-width:100%;box-sizing:border-box}.configure-card code{display:block;overflow:auto;margin:5px 0}.configure-row{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}.configure-row input{min-width:0}.configure-row .url{flex:1 1 230px}
 @media(max-width:760px){.configure-layout{display:block}.configure-index{position:sticky;top:0;z-index:2;flex-direction:row;overflow-x:auto;background:#0f1b2b;padding:7px 0;margin-bottom:12px}}
 .configure-index a{padding:6px 10px;border-radius:6px;color:#cfe3f5;text-decoration:none;white-space:nowrap}.configure-index a:hover,.configure-index a:focus{background:#1b2c42;color:#fff}.configure-card button,.configure-card input[type=button],.configure-card input[type=submit]{background:#13708a;color:#fff;border:1px solid #1b8aa8;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;margin:2px 4px 2px 0}.configure-card button:hover{background:#178aa9}.configure-card input[type=text],.configure-card input:not([type]),.configure-card input[type=password],.configure-card textarea{background:#0b1220;color:#e6edf3;border:1px solid #2e3b4f;border-radius:6px;padding:7px 10px;font-size:13px}.configure-card textarea{font-family:monospace;width:100%}.configure-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 0}.configure-actions input[type=password]{flex:0 1 240px}.configure-card h3{color:#e6edf3;font-size:1rem;margin:18px 0 6px}details.catalog{margin:10px 0}details.catalog>summary{cursor:pointer;color:#fff;font-weight:bold;font-size:1.05rem;padding:6px 0}
+.pmss-pikkumies-pill{display:inline-block;padding:4px 10px;border-radius:99px;background:#3a2e12;color:#f0b429}.pmss-pikkumies-pill[data-state="Running"]{background:#12351f;color:#8fd18f}.pmss-pikkumies-segments{display:inline-flex;border:1px solid #2e3b4f;border-radius:8px;overflow:hidden;max-width:100%}.configure-card .pmss-pikkumies-segments button{margin:0;border:0;border-radius:0;background:#0b1220}.configure-card .pmss-pikkumies-segments button[aria-pressed="true"]{background:#13708a}.configure-card .pmss-pikkumies-segments button:focus-visible{outline:2px solid #fff;outline-offset:-2px}
 </style></head><body><div id="pmss-action-notice" role="status" aria-live="polite"></div>
 <div id="wrap"><div id="full_page"><div class="full_top_nohd"></div><div class="full_body"><div class="apps">
 <h1>Configure</h1><p class="note">Apps and settings for your account.</p>
@@ -96,6 +103,22 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <?php if ($torrentVersions): ?><h3>qBittorrent version</h3><p>Running: <?= pmssCustomerHtmlAttr($torrentRunning) ?></p><?php if ($torrentNotice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($torrentNotice) ?></p><?php endif; ?>
 <div class="configure-actions"><select id="configure-qbittorrent-version" aria-label="qBittorrent version"><?php foreach ($torrentVersions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"><?= pmssCustomerHtmlAttr($version) ?></option><?php endforeach; ?></select>
 <input type="password" id="configure-qbittorrent-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'qbittorrent',version:document.getElementById('configure-qbittorrent-version').value,password:document.getElementById('configure-qbittorrent-password').value},'Back up the current configuration and restart qBittorrent with this version?')">Switch version</button></div><?php endif; ?></section>
+<?php if (isset($sections['agents'])): ?>
+<section class="configure-card" id="agents"><h2>AI agents</h2><h3>Pikkumies</h3>
+<p>A small helper that lives on your server. Ask it in plain words to check disk space, fix a stuck app or add a torrent.</p>
+<span class="pmss-pikkumies-pill" id="pmss-pikkumies-pill" data-state="<?= $pmssPikkumiesState['off'] ? 'Off' : 'Starting' ?>"><?= $pmssPikkumiesState['off'] ? 'Off' : 'Starting' ?></span>
+<div class="configure-actions"><button type="button" onclick="pmssPikkumiesToggle('<?= $pmssPikkumiesState['off'] ? 'on' : 'off' ?>')"><?= $pmssPikkumiesState['off'] ? 'Turn on Pikkumies' : 'Turn off Pikkumies' ?></button>
+<?php if ($pmssPikkumiesState['visible']): ?>
+<button type="button" onclick="pmssPikkumiesTabOpen()">Open Pikkumies</button>
+<?php if ($pmssPikkumiesState['mode'] === 'power-user'): ?><a href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a><?php endif; ?>
+<?php endif; ?></div>
+<p>Pikkumies windows, called Eternals, keep running and pick up their conversation after a restart, until you close them.</p>
+<p>Interface</p><div class="pmss-pikkumies-segments" role="group" aria-label="Interface">
+<button type="button" aria-pressed="<?= $pmssPikkumiesState['mode'] === 'simplified' ? 'true' : 'false' ?>" onclick="pmssPikkumiesInterface('simplified')">Simplified (recommended)</button>
+<button type="button" aria-pressed="<?= $pmssPikkumiesState['mode'] === 'power-user' ? 'true' : 'false' ?>" onclick="pmssPikkumiesInterface('power-user')">Power user (opens full Hermes in its own tab)</button></div>
+<p>Hermes web UI and Pikkumies' Hermes share one sign-in: signing in to one signs you out of the other.</p>
+</section>
+<?php endif; ?>
 <?php foreach (array('deluge' => 'Deluge', 'transmission' => 'Transmission') as $client => $label): $versions = $otherTorrentVersions[$client] ?? array(); if ($versions): ?>
 <section class="configure-card" id="<?= $client ?>-version"><h2><?= $label ?> version</h2><p>Running: <?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientOtherRunningVersion($home, $client)) ?></p><?php $notice = trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/'.$client.'.notice', 256)); if ($notice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($notice) ?></p><?php endif; ?>
 <div class="configure-actions"><select id="configure-<?= $client ?>-version" aria-label="<?= $label ?> version"><?php foreach ($versions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"><?= pmssCustomerHtmlAttr($version) ?></option><?php endforeach; ?></select>
@@ -127,6 +150,39 @@ function pmssConfigureSend(action, fields, consequence) {
         success:function(result){pmssConfigureNotice(result.message || 'Saved.', false); if (action === 'delugeRotate' || action === 'torrentClientSwitch') setTimeout(function(){location.reload(true);}, 1500);},
         error:function(xhr){pmssConfigureNotice((xhr.responseJSON && xhr.responseJSON.message) || 'The setting could not be saved.', true);}});
 }
+function pmssPikkumiesTabOpen() {
+    try {
+        var tab = window.parent.document.querySelector('a[href="#pikkumies"]');
+        if (tab) { tab.click(); return; }
+        window.top.location.reload(true);
+    } catch (e) { location.href = 'pikkumiesOpen.php?session=pm1'; }
+}
+function pmssPikkumiesInterface(mode) {
+    $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},
+        data:{action:'pikkumiesInterface',mode:mode},
+        success:function(){pmssConfigureNotice('Saved.', false); window.top.location.reload(true);},
+        error:function(){pmssConfigureNotice('That did not go through. Try again.', true);}});
+}
+function pmssPikkumiesToggle(mode) {
+    if (mode === 'off' && !window.confirm('Turn Pikkumies off? All its windows stop and stay stopped until you turn it back on.')) return;
+    $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},
+        data:{action:'pikkumiesEternal',mode:mode},
+        success:function(){window.top.location.reload(true);},
+        error:function(){pmssConfigureNotice('That did not go through. Try again.', true);}});
+}
+<?php if (isset($sections['agents'])): ?>
+function pmssPikkumiesStatusPoll() {
+    if (!document.getElementById('agents') || document.hidden
+        || (window.frameElement && window.frameElement.offsetParent === null)) return;
+    fetch('pikkumiesOpen.php?view=status', {credentials:'same-origin',cache:'no-store'})
+        .then(function(response){return response.json();}).then(function(state){
+            var pill = document.getElementById('pmss-pikkumies-pill');
+            var label = <?= $pmssPikkumiesState['off'] ? "'Off'" : "(state.setup ? 'Needs setup' : state.ready ? 'Running' : 'Starting')" ?>;
+            pill.textContent = label; pill.setAttribute('data-state', label);
+        }).catch(function(){});
+}
+pmssPikkumiesStatusPoll(); setInterval(pmssPikkumiesStatusPoll, 5000);
+<?php endif; ?>
 function pmssConfigurePreference(button, key, mode) {
     var fields = {}; fields[key] = mode;
     $.ajax({url:'index.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},data:fields,
