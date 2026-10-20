@@ -97,7 +97,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-pk-run-');
         file_put_contents($root.'/marker', '');
         // big: eligible; small: below the floor; noinst: no installer; has: already has Pikkumies; done: tried before
-        $ram = ['big' => 4096, 'small' => 512, 'noinst' => 4096, 'has' => 4096, 'done' => 4096];
+        $ram = ['big' => 4096, 'small' => 256, 'noinst' => 4096, 'has' => 4096, 'done' => 4096];
         foreach (array_keys($ram) as $user) {
             $this->pmssEnsureDir($root.'/home/'.$user.'/bin');
             if ($user !== 'noinst') file_put_contents($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");

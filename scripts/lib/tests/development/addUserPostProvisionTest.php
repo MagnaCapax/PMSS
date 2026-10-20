@@ -104,7 +104,7 @@ final class AddUserPostProvisionTest extends TestCase
         $home = $this->tempDir.'/home';
         $this->pmssEnsureDir($home.'/bin');
         $floor = \pmssUserPikkumiesPreinstallMinRamMiB();
-        $this->assertSame(1000, $floor);
+        $this->assertSame(400, $floor);
         putenv('PATH='.$this->tempDir.'/stub:'.$path);
         try {
             $openclaw = \pmssAddUserOpenClawPreinstallCommand($name);

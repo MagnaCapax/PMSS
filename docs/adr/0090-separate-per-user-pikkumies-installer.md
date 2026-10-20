@@ -192,3 +192,13 @@ Accounts created between the new-account preinstall (2026-10-17) and this
 change, which have since removed `~/.mcxPikkumies`, cannot be told apart from
 accounts that never had it; they stay unmarked. An account that still has
 `~/.mcxPikkumies` is marked by the update hook on a rollout host, as before.
+
+## Amendment 2026-10-20: the preinstall RAM floor is 400 MiB
+
+The 1000 MiB floor above was the media stack's measurement, not Pikkumies'. Pikkumies was measured on
+its own: an install on a 400 MiB plan (the account slice capped at about 400 MiB high and 500 MiB max)
+finished, the slice held about 450 to 470 MiB right after the build, which counts page cache, and a
+question answered afterwards took as long as on a larger plan. The floor
+(`pmssUserPikkumiesPreinstallMinRamMiB`) is therefore 400 MiB, for new accounts and for the update
+hook. Plans below 400 MiB keep the opt-in command. The 1000 MiB media-stack note above stays as
+the record of that measurement.
