@@ -68,6 +68,7 @@ final class PikkumiesUiRoutesTest extends TestCase
             "'pending-ask'", "'pikkumies:draft'", 'queue.length>=5',
             'now-item.ts<3600000', 'crypto.getRandomValues', 'pikkumies:rows:',
             'prefers-reduced-motion', 'pointer:coarse', 'window.top===window',
+            'window.parent.postMessage(name,target)',
         ], $bar);
         $this->assertStringContainsString('pikkumies:reconnect', $offline);
         $this->assertStringContainsString('pmssPikkumiesUiPagesInstall()', $setup);

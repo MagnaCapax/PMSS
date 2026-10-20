@@ -518,8 +518,11 @@ if ($wikiItemsHtml !== '') {
         }
         window.addEventListener('message', function (event) {
             var frame = document.getElementById('pmss-pikkumies-bar-frame');
-            if (event.origin === pmssPikkumiesBarOrigin && frame && event.source === frame.contentWindow
-                && event.data === 'pikkumies:ready') pmssPikkumiesBarReady = true;
+            if (event.origin === pmssPikkumiesBarOrigin && frame && event.source === frame.contentWindow) {
+                if (event.data === 'pikkumies:ready') pmssPikkumiesBarReady = true;
+                if (event.data === 'pikkumies:switch'
+                    && !window.parent.document.querySelector('a[href="#pikkumies"]')) window.top.location.reload(true);
+            }
             if (event.origin === location.origin && event.source === window.parent
                 && event.data === 'pikkumies:bar-ready') pmssPikkumiesBarReady = true;
             if (event.origin === location.origin && event.source === window.parent

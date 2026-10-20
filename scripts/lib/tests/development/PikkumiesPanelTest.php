@@ -88,6 +88,9 @@ final class PikkumiesPanelTest extends TestCase
         $launcher = $this->pmssReadRepoFile('etc/skel/www/pikkumiesOpen.php');
         $this->assertStringContainsString('pikkumies:rows:[1-6]', $index);
         $this->assertStringContainsString('}, 12000)', $index);
+        $this->assertStringContainsString('}, 30000)', $index);
+        $this->assertStringContainsString('if (!state.visible) location.reload()', $index);
+        $this->assertStringContainsString('pikkumies:switch', $welcome);
         $this->assertStringContainsString('title = \'Ask Pikkumies\'', $welcome);
         $this->assertStringContainsString('Your network may be blocking Pikkumies.', $index);
         $this->assertStringContainsString('Power user (opens full Hermes in its own tab)', $configure);

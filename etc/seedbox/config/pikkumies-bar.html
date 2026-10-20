@@ -21,7 +21,8 @@ var key='pending-ask',draft='pikkumies:draft',target='';
 try{target=new URL(document.referrer).origin;}catch(e){}
 if(window.top===window||!/^https:\/\//.test(target))return;
 try{input.value=localStorage.getItem(draft)||'';}catch(e){}
-function post(name){window.top.postMessage(name,target);}
+function post(name){window.top.postMessage(name,target);
+ if(window.parent!==window.top)window.parent.postMessage(name,target);}
 function update(){var text=input.value;input.style.height='auto';
  var lines=Math.min(6,Math.max(1,Math.ceil((input.scrollHeight-24)/22)));
  input.style.height=Math.min(160,Math.max(50,12+lines*22))+'px';send.disabled=!text.trim();

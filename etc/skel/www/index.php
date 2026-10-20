@@ -858,6 +858,12 @@ window.addEventListener('message', function (event) {
    + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';
  }
 });
+// A host rollback removes the marker while an old top frame may stay open.
+setInterval(function () {
+ fetch('pikkumiesOpen.php?view=status', {credentials:'same-origin',cache:'no-store'})
+  .then(function (response) { return response.json(); })
+  .then(function (state) { if (!state.visible) location.reload(); }).catch(function () {});
+}, 30000);
 <?php endif; ?>
 </script>
 
