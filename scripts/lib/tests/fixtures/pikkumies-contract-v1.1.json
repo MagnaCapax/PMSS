@@ -75,6 +75,6 @@
     "selectors": ["simplified", "hermes", "vanilla-hermes-web", "vanilla-agentboard"]
   },
   "ports": ["844", "845", "846"],
-  "adrs": ["ADR 0127", "ADR 0125"],
+  "adrs": ["ADR 0128", "ADR 0125"],
   "binaryTarget": "bun-linux-x64-baseline"
 }

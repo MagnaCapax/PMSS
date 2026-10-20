@@ -266,7 +266,7 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    a customer default link is created only by the Configure switch (ADR 0106).
    The catalog curates fourteen SHA-256-pinned userdocs x86_64 qBittorrent
    static builds, covering 4.3.9 through 5.2.4 with both libtorrent families
-   (ADR 0127). Installed builds appear in the Configure picker through the
+   (ADR 0124). Installed builds appear in the Configure picker through the
    public projection; absent binaries are omitted. The marker remains an
    operator-controlled staged rollout, with more than 3 GiB plus the existing
    store size required free on `/home` before each new installation.

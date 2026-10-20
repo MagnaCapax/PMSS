@@ -1,4 +1,4 @@
-# ADR 0127: Pikkumies Eternals and account web UIs
+# ADR 0128: Pikkumies Eternals and account web UIs
 
 Date: 2026-10-20
 Category: architecture

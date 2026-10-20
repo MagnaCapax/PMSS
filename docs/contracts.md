@@ -1200,7 +1200,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## Pikkumies Eternals and web UIs (contract v1.1)
 
 This is the shared contract for PMSS, mcxPikkumies, and
-mcxPikkumiesAgentboard. ADR 0127 records Eternals and account web UIs;
+mcxPikkumiesAgentboard. ADR 0128 records Eternals and account web UIs;
 ADR 0125 covers vanilla Hermes. Paths beginning with `~` are relative
 to the account home. `L` means `Config::localDir()`.
 
@@ -1263,7 +1263,7 @@ to the account home. `L` means `Config::localDir()`.
   `vanilla-agentboard` (port C, one at a time), and
   `agentboard-pikkumies` (an alias that opens port A only while Pikkumies is
   installed and On).
-- Ports A, B, and C are respectively 844, 845, and 846. ADR 0127 records
+- Ports A, B, and C are respectively 844, 845, and 846. ADR 0128 records
   their account UI routing. Each port serves its UI at `/` on the service
   permalink. A also serves `/bar` from a root-owned host path outside `/home`.
   The host marker gates A and B; C does not depend on it.
