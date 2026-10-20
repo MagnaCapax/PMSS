@@ -10,6 +10,43 @@ require_once dirname(__DIR__).'/userLifecycle.php';
 require_once dirname(__DIR__).'/pathSafety.php';
 require_once __DIR__.'/userConfigStore.php';
 
+/** Account-owned socket trees are removed under the account UID without a PAM session. */
+function pmssTerminateUserAccountSocketSteps(string $username, int $uid): array
+{
+    if (!pmssUsernameIsValid($username) || $uid < 1) {
+        throw new InvalidArgumentException('Refusing unsafe account socket cleanup');
+    }
+    $tmux = '/tmp/tmux-'.$uid;
+    $screen = '/var/run/screen/S-'.$username;
+    $guardedRemove = static function (string $path) use ($username): string {
+        $quoted = escapeshellarg($path);
+        $command = 'if [ -e '.$quoted.' ] || [ -L '.$quoted.' ]; then rm -rf -- '.$quoted.'; fi';
+        return 'timeout --kill-after=5s 45s '.pmssBuildUserShellNoPamCommand($username, $command);
+    };
+
+    return array(
+        'remove_tmux_socket' => $guardedRemove($tmux),
+        'remove_screen_socket' => $guardedRemove($screen),
+    );
+}
+
+/** Wait for the manager to leave active/deactivating before clearing failed state. */
+function pmssTerminateUserResetFailedCommand(int $uid): string
+{
+    if ($uid < 1) {
+        throw new InvalidArgumentException('Refusing unsafe user manager UID');
+    }
+    $unit = escapeshellarg('user@'.$uid.'.service');
+    return 'for attempt in 1 2 3 4 5 6 7 8 9 10; do '
+        .'state=$(timeout --kill-after=1s 5s systemctl is-active '.$unit.' 2>/dev/null); '
+        .'rc=$?; if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then exit "$rc"; fi; '
+        .'case "$state" in active|deactivating) sleep 0.5;; *) break;; esac; '
+        .'done; case "$state" in active|deactivating) exit 1;; esac; '
+        .'if timeout --kill-after=5s 45s systemctl is-failed --quiet '.$unit.'; '
+        .'then timeout --kill-after=5s 45s systemctl reset-failed '.$unit.'; '
+        .'else rc=$?; if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then exit "$rc"; fi; fi';
+}
+
 function pmssTerminateUserRejectUnsafePath(string $username, string $phase, string $path, string $message, string $contextKey = 'path'): bool
 {
     if (!pmssFilesystemPathHasNulByte($path)) {
@@ -104,7 +141,7 @@ function pmssTerminateUserPurgeDirectorySteps(string $label, string $path): arra
 }
 
 /** Return the final line, exit code, and audit status after every purge has run. */
-function pmssTerminateUserCompletion(string $username, array $paths, array $purgeResults, bool $dryRun): array
+function pmssTerminateUserCompletion(string $username, array $paths, array $purgeResults, bool $dryRun, string $lingerRoot = '/var/lib/systemd/linger'): array
 {
     if ($dryRun) {
         return array('line' => '## Done. User termination flow completed (dry run).', 'rc' => 0, 'status' => 'OK');
@@ -123,6 +160,11 @@ function pmssTerminateUserCompletion(string $username, array $paths, array $purg
     }
     if (pmssUserAccountLookup($username) !== null) {
         return array('line' => '## Incomplete: account_still_present', 'rc' => 1, 'status' => 'INCOMPLETE');
+    }
+    $lingerPath = rtrim($lingerRoot, '/').'/'.$username;
+    clearstatcache(true, $lingerPath);
+    if (pmssPathExistsOrLink($lingerPath)) {
+        return array('line' => '## Incomplete: linger_still_present', 'rc' => 1, 'status' => 'INCOMPLETE');
     }
     foreach ($paths as $label => $path) {
         clearstatcache(true, $path);

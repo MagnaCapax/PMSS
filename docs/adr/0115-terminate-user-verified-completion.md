@@ -16,7 +16,7 @@ Status: Accepted
 
 ## Decision
 
-Use the existing purge-step runner's labeled return codes and add an exact purge of `backup-<user>.superseded` after the regular backup. After all cleanup steps, report verified success only if every purge step returned zero, the passwd entry is absent, and the home and both backup paths are absent. Otherwise exit 1 with the first failed step or check. The lifecycle end event records `OK` or `INCOMPLETE`. Dry runs keep their planned-work behavior and use a distinct, unverified final line.
+Use the existing purge-step runner's labeled return codes and add an exact purge of `backup-<user>.superseded` after the regular backup. After all cleanup steps, report verified success only if every required purge step succeeded, the passwd entry and `/var/lib/systemd/linger/<user>` are absent, and the home and both backup paths are absent. The linger check observes state only; it never deletes the file. Otherwise exit 1 with the first failed step or check. The lifecycle end event records `OK` or `INCOMPLETE`. Dry runs keep their planned-work behavior and use a distinct, unverified final line.
 
 ## Consequences
 

@@ -54,19 +54,84 @@ final class TerminateUserContractTest extends TestCase
         $this->assertOrderedStrings([
             "'disable_linger'",
             "'remove_tmux_socket'",
+            "'remove_screen_socket'",
             "'userdel_initial'",
             "'kill_processes_final'",
             "'reset_failed_user_manager'",
             "'userdel_groupdel_final'",
         ], $source);
         $lingerStep = substr($source, strpos($source, "'disable_linger'"), 260);
-        $resetStep = substr($source, strpos($source, "'reset_failed_user_manager'"), 380);
         $this->assertStringContainsString("'if [ -e '.escapeshellarg('/var/lib/systemd/linger/'.\$username)", $lingerStep);
         $this->assertStringContainsString('then timeout --kill-after=5s 45s loginctl disable-linger', $lingerStep);
-        $this->assertStringContainsString('if timeout --kill-after=5s 45s systemctl is-failed --quiet', $resetStep);
-        $this->assertStringContainsString('then timeout --kill-after=5s 45s systemctl reset-failed', $resetStep);
-        $this->assertStringContainsString("pmssBuildUserShellCommand(\$username, 'rm -rf -- /tmp/tmux-\$(id -u)')", $source);
+        $this->assertStringContainsString('pmssTerminateUserResetFailedCommand($uid)', $source);
+        $this->assertStringContainsString('pmssTerminateUserAccountSocketSteps($username, $uid)', $source);
         $this->assertStringNotContainsString("'loginctl disable-linger '.escapeshellarg(\$username).' || true'", $source);
+    }
+
+    /** Exercise socket cleanup through stub timeout/runuser; failures remain visible. */
+    public function testAccountSocketCleanupUsesNoPamRunnerAndPreservesExitCodes(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-terminate-shell-');
+        $bin = $root.'/bin';
+        mkdir($bin);
+        $log = $root.'/calls';
+        file_put_contents($bin.'/timeout', "#!/bin/sh\nprintf 'timeout %s\\n' \"\$*\" >> \"\$PMSS_TEST_LOG\"\nshift 2\n\"\$@\"\n");
+        file_put_contents($bin.'/runuser', "#!/bin/sh\nprintf 'runuser %s\\n' \"\$*\" >> \"\$PMSS_TEST_LOG\"\nexit \"\${PMSS_TEST_RUNUSER_RC:-0}\"\n");
+        chmod($bin.'/timeout', 0755);
+        chmod($bin.'/runuser', 0755);
+        $steps = \pmssTerminateUserAccountSocketSteps('user1234', 1234);
+        $env = 'PATH='.escapeshellarg($bin.':'.getenv('PATH')).' PMSS_TEST_LOG='.escapeshellarg($log);
+
+        foreach ($steps as $step => $command) {
+            $output = [];
+            exec($env.' PMSS_TEST_RUNUSER_RC=7 sh -c '.escapeshellarg($command), $output, $rc);
+            $this->assertSame(7, $rc, $step.' must report runuser failure');
+        }
+        $calls = file($log, FILE_IGNORE_NEW_LINES);
+        $this->assertSame(4, count($calls));
+        $this->assertStringContainsString('runuser --pty -u user1234 -- sh -c', $calls[1]);
+        $this->assertStringContainsString('/tmp/tmux-1234', $calls[1]);
+        $this->assertStringContainsString('/var/run/screen/S-user1234', $calls[3]);
+        $this->assertStringNotContainsString('su user1234', implode("\n", $calls));
+    }
+
+    /** The manager must stop deactivating before its failed state is reset. */
+    public function testResetFailedPollsManagerAndReturnsResetFailure(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-terminate-manager-');
+        $bin = $root.'/bin';
+        mkdir($bin);
+        $log = $root.'/calls';
+        $state = $root.'/state';
+        file_put_contents($state, '0');
+        file_put_contents($bin.'/timeout', "#!/bin/sh\nshift 2\n\"\$@\"\n");
+        file_put_contents($bin.'/sleep', "#!/bin/sh\nexit 0\n");
+        file_put_contents($bin.'/systemctl', <<<'SH'
+#!/bin/sh
+printf '%s\n' "$1" >> "$PMSS_TEST_LOG"
+case "$1" in
+  is-active)
+    n=$(cat "$PMSS_TEST_STATE"); n=$((n + 1)); printf '%s' "$n" > "$PMSS_TEST_STATE"
+    if [ "${PMSS_TEST_ALWAYS_ACTIVE:-0}" = 1 ] || [ "$n" -lt 3 ]; then echo deactivating; else echo inactive; fi
+    exit 3 ;;
+  is-failed) exit 0 ;;
+  reset-failed) exit "${PMSS_TEST_RESET_RC:-0}" ;;
+esac
+exit 1
+SH
+        );
+        foreach (['timeout', 'sleep', 'systemctl'] as $stub) chmod($bin.'/'.$stub, 0755);
+        $env = 'PATH='.escapeshellarg($bin.':'.getenv('PATH')).' PMSS_TEST_LOG='.escapeshellarg($log)
+            .' PMSS_TEST_STATE='.escapeshellarg($state).' PMSS_TEST_RESET_RC=9';
+        $output = [];
+        exec($env.' sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), $output, $rc);
+        $this->assertSame(9, $rc);
+        $this->assertSame(['is-active', 'is-active', 'is-active', 'is-failed', 'reset-failed'], file($log, FILE_IGNORE_NEW_LINES));
+        file_put_contents($state, '0');
+        file_put_contents($log, '');
+        exec($env.' PMSS_TEST_ALWAYS_ACTIVE=1 sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), $output, $rc);
+        $this->assertSame(1, $rc);
+        $this->assertSame(array_fill(0, 10, 'is-active'), file($log, FILE_IGNORE_NEW_LINES));
     }
 
     /**
@@ -247,6 +312,13 @@ final class TerminateUserContractTest extends TestCase
         $this->assertSame('## Incomplete: user_backup_superseded_still_present', \pmssTerminateUserCompletion($username, $paths, $results, false)['line']);
         rmdir($paths['user_backup_superseded']);
         $this->assertSame('## Incomplete: account_still_present', \pmssTerminateUserCompletion('root', $paths, $results, false)['line']);
+        $lingerRoot = $root.'/linger';
+        $this->pmssEnsureDir($lingerRoot);
+        file_put_contents($lingerRoot.'/'.$username, 'enabled');
+        $this->assertSame('## Incomplete: linger_still_present',
+            \pmssTerminateUserCompletion($username, $paths, $results, false, $lingerRoot)['line']);
+        unlink($lingerRoot.'/'.$username);
+        $this->assertSame($complete, \pmssTerminateUserCompletion($username, $paths, $results, false, $lingerRoot));
         $dryRun = \pmssTerminateUserCompletion($username, $paths, $results, true);
         $this->assertSame('## Done. User termination flow completed (dry run).', $dryRun['line']);
         $this->assertSame(0, $dryRun['rc']);

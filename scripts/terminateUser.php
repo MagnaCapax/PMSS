@@ -173,11 +173,13 @@ $crontabSpoolPaths = array(
 );
 $userdelCommand = 'userdel '.escapeshellarg($username);
 $groupdelCommand = 'groupdel '.escapeshellarg($username);
+$socketSteps = pmssTerminateUserAccountSocketSteps($username, $uid);
 pmssUserLifecycleRunSteps('terminate', $username, array(
     array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
     array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
-    // tmux sockets are account-controlled; remove them as the account (ADR 0121).
-    array('remove_tmux_socket', 'timeout --kill-after=5s 45s '.pmssBuildUserShellCommand($username, 'rm -rf -- /tmp/tmux-$(id -u)').' || true'),
+    // Account-owned sockets must be removed before userdel, without opening logind.
+    array('remove_tmux_socket', $socketSteps['remove_tmux_socket']),
+    array('remove_screen_socket', $socketSteps['remove_screen_socket']),
     array('userdel_initial', $userdelCommand),
 ), $dryRun);
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
@@ -196,7 +198,6 @@ pmssUserLifecycleRefreshNginxConfig(
 pmssUserLifecycleRunSteps('terminate', $username, array(
     array('userdel_groupdel_retry', $userdelCommand),
     array('groupdel_retry', $groupdelCommand),
-    array('remove_screen_socket', 'rm -rf -- '.escapeshellarg("/var/run/screen/S-{$username}")),
     array('remove_nginx_user', 'rm -rf -- '.escapeshellarg("/etc/nginx/users/{$username}")),
     array('release_lighttpd_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' lighttpd'),
     array('release_rclone_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' rclone'),
@@ -275,7 +276,7 @@ if (pmssUserAccountLookup($username) !== null) {
 // If attempts 1 and 2 failed, keep the final cleanup order explicit.
 pmssUserLifecycleRunSteps('terminate', $username, array(
     array('kill_processes_final', $killUserCommand),
-    array('reset_failed_user_manager', 'if timeout --kill-after=5s 45s systemctl is-failed --quiet '.escapeshellarg('user@'.$uid.'.service').'; then timeout --kill-after=5s 45s systemctl reset-failed '.escapeshellarg('user@'.$uid.'.service').'; else rc=$?; if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then exit "$rc"; fi; fi'),
+    array('reset_failed_user_manager', pmssTerminateUserResetFailedCommand($uid)),
     array('userdel_groupdel_final', $userdelCommand),
     array('groupdel_final', $groupdelCommand),
     array('cleanup_lock_files', 'rm -f -- '.pmssRuntimeLockDir().'/pmss-*-'.$username.'.lock /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
@@ -288,6 +289,9 @@ if ($dryRun) {
     $cleared = pmssPikkumiesPreinstallStateClear($username);
     pmssUserLifecycleContextLogStatusMessage('terminate', 'clear_pikkumies_preinstall_state', $username,
         $cleared ? 'OK' : 'ERR', $cleared ? 'Marker cleared or absent' : 'Failed to clear marker');
+} else {
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'clear_pikkumies_preinstall_state', $username,
+        'SKIP', 'Passwd entry remains; marker retained');
 }
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore

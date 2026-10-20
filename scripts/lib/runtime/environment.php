@@ -48,6 +48,12 @@ function pmssBuildCommand(string $program, array $args = []): string
 
 function pmssBuildUserShellCommand(string $username, string $command, string $shell = ''): string { return $shell === '' ? 'su '.escapeshellarg($username).' -c '.escapeshellarg($command) : 'su -s '.escapeshellarg($shell).' -c '.escapeshellarg($command).' '.escapeshellarg($username); }
 
+/** Avoid su's logind session; isolate the operator TTY from the account process. */
+function pmssBuildUserShellNoPamCommand(string $username, string $command): string
+{
+    return 'env PATH="${PATH:+$PATH:}/usr/sbin:/sbin" runuser --pty -u '.escapeshellarg($username).' -- sh -c '.escapeshellarg($command);
+}
+
 /** Run the canonical direct-I/O 4 KiB latency probe and return raw output. */
 function pmssIopingProbeOutput(?string $target): ?string
 {
