@@ -1,0 +1,12 @@
+#!/bin/sh
+# Account lock is closed on exec so the dashboard cannot hold it open.
+set -eu
+[ "$(id -u)" -ne 0 ] || {
+	echo 'Run as the account owner' >&2
+	exit 1
+}
+[ -n "${HOME:-}" ] && [ -d "$HOME" ] && [ ! -L "$HOME" ] || exit 1
+[ ! -L "$HOME/.hermes" ] || exit 1
+umask 077
+mkdir -p "$HOME/.hermes"
+exec flock -x -w 10 -o "$HOME/.hermes/pmss.lock" /usr/bin/php "$HOME/bin/pmssHermesCli.php" "$@"
