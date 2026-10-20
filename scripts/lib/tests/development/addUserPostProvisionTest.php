@@ -39,9 +39,10 @@ final class AddUserPostProvisionTest extends TestCase
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/user/add/appProfile.php');
         $loader = strpos($source, 'function pmssAddUserOpenClawInstallerLoad');
         $require = strpos($source, 'require_once $installer;');
-        $this->assertTrue($loader !== false && $require !== false && $require > $loader);
-        $this->assertSame(1, substr_count($source, 'install-openclaw\';'));
-        $this->assertSame(false, strpos($source, "require_once dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw'"));
+        $guard = strpos($source, 'if (!is_file($installer) || is_link($installer)) return false;');
+        // The only require sits inside the loader, after the missing-file guard.
+        $this->assertTrue($loader !== false && $guard !== false && $require !== false && $loader < $guard && $guard < $require);
+        $this->assertSame(1, substr_count($source, 'require_once'.' $installer;') + substr_count($source, "require_once dirname(__DIR__, 4)"));
     }
 
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-add-user-bonus-']; }

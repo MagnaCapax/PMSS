@@ -34,7 +34,7 @@ function pmssAddUserOpenClawPreinstall(array $user, string $home): void
         return;
     }
     $quota = pmssCommandCapture('quota -w -p -u '.escapeshellarg($user['name']), 10);
-    $files = $quota['rc'] === 0 ? ocQuotaFileHeadroom($quota['stdout']) : null;
+    $files = $quota['rc'] === 0 && function_exists('ocQuotaFileHeadroom') ? ocQuotaFileHeadroom($quota['stdout']) : null;
     $reason = pmssAddUserOpenClawGate($user, $home, $files);
     if ($reason !== null) {
         logProvisionMessage('OpenClaw not preinstalled: '.$reason);
