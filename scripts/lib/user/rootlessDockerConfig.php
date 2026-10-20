@@ -4,6 +4,15 @@
 require_once __DIR__.'/../runtime.php';
 pmssRequireRelativeFiles(__DIR__, ['directories.php', 'log.php', '../lighttpd/userFileWrite.php']);
 
+/**
+ * Bridge MTU for rootless Docker networks. dockerd-rootless.sh gives the RootlessKit
+ * tap link (slirp4netns) a 65520 MTU; bridges at Docker's 1500 default make every
+ * container cut TCP into 1460-byte segments that slirp4netns then handles one by one.
+ * The value only exists inside the account's network namespace: slirp4netns opens
+ * normal host sockets, so traffic leaves the host at the real path MTU.
+ */
+const PMSS_ROOTLESS_DOCKER_BRIDGE_MTU = 65520;
+
 /** Return true when daemon.json can be read or replaced safely. */
 function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
 {
@@ -95,9 +104,37 @@ function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int
 }
 
 /**
+ * Fill the bridge MTU keys of a daemon.json payload: "mtu" covers the default
+ * bridge, default-network-opts every network created afterwards (existing networks
+ * keep their MTU until recreated). Keys the account already set, valid or not, are
+ * kept as they are. Returns true when the payload changed.
+ */
+function pmssUserRootlessDockerBridgeMtuApply(array &$data, $mtu): bool
+{
+    if (!is_int($mtu) || $mtu < 1280 || $mtu > 65535) {
+        return false;
+    }
+    $changed = false;
+    if (!array_key_exists('mtu', $data)) {
+        $data['mtu'] = $mtu;
+        $changed = true;
+    }
+    $opts = array_key_exists('default-network-opts', $data) ? $data['default-network-opts'] : [];
+    $bridge = is_array($opts) ? (array_key_exists('bridge', $opts) ? $opts['bridge'] : []) : null;
+    // A non-object value belongs to the account; Docker reports it, PMSS does not repair it.
+    if (is_array($bridge) && !array_key_exists('com.docker.network.driver.mtu', $bridge)) {
+        $bridge['com.docker.network.driver.mtu'] = (string) $mtu;
+        $opts['bridge'] = $bridge;
+        $data['default-network-opts'] = $opts;
+        $changed = true;
+    }
+    return $changed;
+}
+
+/**
  * Converge ~/.config/docker/daemon.json according to the requested policy.
  *
- * @return array{ok:bool,changed:bool,created:bool,removed_storage_driver:bool,configured_storage_driver:bool,disabled_containerd_snapshotter:bool,reason:string,path:string}
+ * @return array{ok:bool,changed:bool,created:bool,removed_storage_driver:bool,configured_storage_driver:bool,disabled_containerd_snapshotter:bool,configured_bridge_mtu:bool,reason:string,path:string}
  */
 function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $uid, int $gid, array $policy): array
 {
@@ -107,6 +144,7 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
         'removed_storage_driver' => false,
         'configured_storage_driver' => false,
         'disabled_containerd_snapshotter' => false,
+        'configured_bridge_mtu' => false,
         'reason' => '', 'path' => $configFile,
     ];
 
@@ -167,6 +205,11 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
             $changed = true;
             $result['disabled_containerd_snapshotter'] = true;
         }
+    }
+
+    if (array_key_exists('bridge_mtu', $policy) && pmssUserRootlessDockerBridgeMtuApply($data, $policy['bridge_mtu'])) {
+        $changed = true;
+        $result['configured_bridge_mtu'] = true;
     }
 
     $createWhenMissing = !empty($policy['create_when_missing']);
