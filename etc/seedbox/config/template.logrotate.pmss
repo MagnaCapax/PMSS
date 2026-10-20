@@ -169,3 +169,51 @@
     copytruncate
     create 0600 root root
 }
+
+# Cron job output that root.cron appends here (">> ... 2>&1"). Without a stanza these grew
+# forever on every host. Same retention as the check*.log watchdog history above.
+/var/log/pmss/backupEtc.log
+/var/log/pmss/certbotRenewalCheck.log
+/var/log/pmss/cgroupBfqWeightApply.log
+/var/log/pmss/cgroupIopsLimitApply.log
+/var/log/pmss/cgroupPolicyRefresh.log
+/var/log/pmss/cgroupRootCheck.log
+/var/log/pmss/cpuStat.log
+/var/log/pmss/iopsLimits.log
+/var/log/pmss/iostatLog.log
+/var/log/pmss/lighttpdAccessLogTrim.log
+/var/log/pmss/liveStatsLog.log
+/var/log/pmss/mdadmCheckarray.log
+/var/log/pmss/mediaStackInstancesCheck.log
+/var/log/pmss/metricsLog.log
+/var/log/pmss/motdGenerate.log
+/var/log/pmss/resourceLog.log
+/var/log/pmss/resourceStats.log
+/var/log/pmss/rootlessDocker.log
+/var/log/pmss/rtorrentPortReservationsReconcile.log
+/var/log/pmss/scheduledConfigBackup.log
+/var/log/pmss/setupNetwork.log
+/var/log/pmss/systemStatsLog.log
+/var/log/pmss/systemdControlChannelCheck.log
+/var/log/pmss/systemdServicesGuard.log
+/var/log/pmss/trafficIngressLog.log
+/var/log/pmss/trafficIngressStats.log
+/var/log/pmss/trafficLimits.log
+/var/log/pmss/trafficLog.log
+/var/log/pmss/transmissionInstancesCheck.log
+/var/log/pmss/updateQuotas.log
+/var/log/pmss/usageAlerts.log
+/var/log/pmss/userTrackerCleaner.log
+/var/log/pmss/webPublicCertsProcess.log
+/var/log/pmss/wireguardPeersRefresh.log {
+    monthly
+    rotate 120
+    minsize 1M
+    maxsize 64M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    sharedscripts
+}
