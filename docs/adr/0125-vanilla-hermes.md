@@ -10,7 +10,7 @@ until its own Configure action completes.
 
 ## Context
 
-ADR 0124 reserves port 846 for one account-owned vanilla Hermes window. The
+ADR 0127 reserves port 846 for one account-owned vanilla Hermes window. The
 shared panel origin cannot host the agent UI without mixing browser state across
 accounts. Root does not execute or write account-controlled code (ADR 0121).
 Hermes has a dashboard login, but its loopback TCP listener is reachable by
@@ -35,7 +35,7 @@ in a private `.env` entry referenced from `model.api_key` by environment name.
 `model.base_url` is the supplied HTTPS endpoint unchanged.
 
 The root-owned billing record supplies the same sha16 service permalink as
-ADR 0124. Port C is `https://<sha16>.mcx.fi:846/`. Its nginx and lighttpd
+ADR 0127. Port C is `https://<sha16>.mcx.fi:846/`. Its nginx and lighttpd
 blocks are generated, independent of the Eternals host marker and enabled by
 the account's completed install. A root-owned default server rejects unknown
 names. The port-C Hermes proxy clears Authorization, forwards HTTPS scheme, omits
@@ -82,7 +82,7 @@ credential is exposed to Hermes.
 
 ## References
 
-ADRs 0121 and 0124; `docs/contracts.md`, `docs/hermes.md`,
+ADRs 0121 and 0127; `docs/contracts.md`, `docs/hermes.md`,
 `docs/portManager.md`; [Hermes security policy](https://github.com/NousResearch/hermes-agent/security),
 [Hermes advisory list](https://github.com/NousResearch/hermes-agent/security/advisories),
 [GitHub Advisory Database](https://github.com/advisories?query=hermes-agent).
