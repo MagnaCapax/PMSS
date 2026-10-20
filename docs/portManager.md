@@ -32,7 +32,10 @@ than allocator slots. The enabled nginx route checks that its port is not
 owned by another listener. Port A has a generated lighttpd Unix-socket proxy.
 An opt-in vanilla Hermes account reserves a `media-stack-hermes` loopback
 backend port, published to `~/.media-stack-port-hermes`; its generated port-C
-route uses 846. Port B remains closed until its own backend gate is present.
+route uses 846. On a host with the Pikkumies marker, port B separately reserves
+`media-stack-pikkumies-hermes` and publishes
+`~/.media-stack-port-pikkumies-hermes`. Its generated route uses 845 and opens
+only through the account-owned Hermes login gate.
 Invalid usernames and service names are rejected before any reservation path is built.
 Persisted assignment files must contain a numeric TCP port; malformed existing
 assignments are treated as errors for that user, while malformed sibling files
