@@ -1011,11 +1011,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Bonus Display – `etc/skel/www/scriptsIncBonus.php`
 
-- `pmssCustomerBonusDisplayStateRead(string $userBonusPath='../.userBonus', string $bonusQuotaPath='../.bonusQuota'): array`
-  - Output: `['unit'=>'percent|gib', 'value'=>int]` for the customer-facing additional-resource banner.
-  - Read order: an unsigned integer `.userBonus` value is authoritative and represents a percentage; otherwise a positive `.bonusQuota` value represents GiB.
+- `pmssCustomerBonusDisplayStateRead(string $bonusPercentPath='../.bonus', string $bonusQuotaPath='../.bonusQuota'): array`
+  - Output: `['unit'=>'percent|gib', 'value'=>int, 'state'=>'applied'|'zero'|'absent']` for the customer-facing additional-resource banner. `state` is what `pmssCustomerBonusDisplayNoteBuild()` switches on.
+  - Read order: an unsigned integer `.bonus` value is authoritative and represents a percentage; otherwise a positive `.bonusQuota` value represents GiB.
   - The GiB fallback is aggregate additional quota and may combine earned bonus with paid addon disk; the customer tree has no source that can split those components.
-  - Missing, zero, malformed, or unsafe values fall back to `['unit'=>'percent', 'value'=>0]`; the helper never derives a percentage from quota bytes.
+  - A `.bonus` of `0` returns `['unit'=>'percent', 'value'=>0, 'state'=>'zero']` and stops — it does **not** fall back to `.bonusQuota`. When `.bonus` is missing, malformed or unsafe the helper tries `.bonusQuota`; if that is also absent it returns `['unit'=>'percent', 'value'=>0, 'state'=>'absent']`. The helper never derives a percentage from quota bytes.
 - `pmssCustomerBonusDisplayTextBuild(array $state): string`
   - Formats loyalty percent states as `BONUS: N%` and aggregate `.bonusQuota` fallback states as `ADDITIONAL DISK SPACE: N GiB` so paid space is not presented as a gift.
 - `pmssCustomerBonusDisplayNoteBuild(array $state): string`

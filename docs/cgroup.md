@@ -179,7 +179,7 @@ Inspect and apply limits per user:
 
 - CPU
   - `CPUWeight=1..10000` (relative CPU priority)
-  - (optional) `CPUQuota=` (hard cap; not set by default to avoid throughput cliffs)
+  - `CPUQuota=` (hard cap; the PMSS default sets 85% of total logical cores — see the defaults above and ADR 0003 — and is configurable per host/SKU)
 - Memory
   - `MemoryHigh=` (soft throttle)
   - `MemoryMax=` (hard cap)
