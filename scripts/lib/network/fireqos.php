@@ -148,6 +148,12 @@ function networkApplyFireqos(string $config): bool
     exec('fireqos start '.escapeshellarg($configPath).' >> '.escapeshellarg($logPath).' 2>&1', $output, $rc);
     if ($rc !== 0) {
         @file_put_contents($logPath, date('c')." fireqos start failed (rc={$rc})\n", FILE_APPEND);
+        // The hourly converge reads this file as the applied state; keep a failed policy out of that path.
+        if (!@rename($configPath, $configPath.'.failed')) {
+            @unlink($configPath);
+        }
+        return false;
     }
-    return $rc === 0;
+    @unlink($configPath.'.failed');
+    return true;
 }

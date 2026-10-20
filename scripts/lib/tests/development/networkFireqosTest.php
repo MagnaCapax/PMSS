@@ -63,9 +63,12 @@ class NetworkFireqosTest extends TestCase
             'PMSS_FIREQOS_CONFIG_PATH' => $configPath,
             'PMSS_FIREQOS_LOG_PATH' => $logPath,
         ], function () use ($configPath, $logPath, $markerPath): void {
+            // A rejected policy from an earlier failed start is cleared once a start succeeds.
+            file_put_contents($configPath.'.failed', "stale\n");
             $this->assertTrue(\networkApplyFireqos("interface eth0\nrate 1000\n"));
 
             $this->assertEquals("interface eth0\nrate 1000\n", (string) @file_get_contents($configPath));
+            $this->assertFalse(file_exists($configPath.'.failed'));
             $this->assertEquals('start '.$configPath, trim((string) @file_get_contents($markerPath)));
             $this->assertStringContainsString('started', (string) @file_get_contents($logPath));
         });
@@ -97,9 +100,12 @@ class NetworkFireqosTest extends TestCase
         $this->pmssWithPathPrefixedEnv($binDir, [
             'PMSS_FIREQOS_CONFIG_PATH' => $configDir.'/fireqos.conf',
             'PMSS_FIREQOS_LOG_PATH' => $logDir.'/fireqos.log',
-        ], function () use ($logDir): void {
+        ], function () use ($configDir, $logDir): void {
             $this->assertFalse(\networkApplyFireqos("interface eth0\n"));
             $this->assertStringContainsString('rc=7', (string) file_get_contents($logDir.'/fireqos.log'));
+            // A failed start must not leave a file the hourly converge would read as applied.
+            $this->assertFalse(file_exists($configDir.'/fireqos.conf'));
+            $this->assertEquals("interface eth0\n", (string) @file_get_contents($configDir.'/fireqos.conf.failed'));
         });
     }
 

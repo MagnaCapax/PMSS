@@ -90,7 +90,7 @@ If no tier matches AND `progressiveThrottleEnabled` is true, `pmssTrafficLimitCo
 
 `.enabled` marker is required to be older than `trafficLimitPeriod` (3 days) of under-limit usage before throttle is removed. `trafficLimits.php` `unlink`s the marker and calls `setRateLimit(user, defaultCap, false)` twice (intentional double-disable to handle router desync).
 
-Clearing the traffic limit removes the marker and stored throttle cap on the next cron run, without waiting for the cooldown. The hourly traffic limits cron compares desired and rendered caps and runs the full `setupNetwork.php` when they differ, updating iptables marks and FireQOS together. Missing rendered config or users group also triggers convergence. A reboot loses the tmpfs marker, so an account inside the cooldown can be released early.
+Clearing the traffic limit removes the marker and stored throttle cap on the next cron run, without waiting for the cooldown. The hourly traffic limits cron compares desired and rendered caps and runs the full `setupNetwork.php` when they differ, updating iptables marks and FireQOS together. Missing rendered config or users group also triggers convergence. A failed `fireqos start` moves the rendered file to `fireqos.conf.failed`, so the next hourly run sees no applied config and retries; `setupNetwork.php` exits 1 when the apply fails. A reboot loses the tmpfs marker, so an account inside the cooldown can be released early.
 
 ## Rendered fireqos.conf Shape
 
@@ -196,4 +196,4 @@ Fix: re-run `/scripts/util/setupNetwork.php` to regenerate iptables rules.
 
 The throttle pipeline crosses 5+ files and 3 state-file conventions (`/home/<user>/.X`, `/var/run/pmss/trafficLimits/<user>.X`, `/etc/seedbox/runtime/trafficLimits/<user>`). Inline code comments are sparse. This file is the architecture summary. For implementation detail, read the source map above in order.
 
-If a per-user throttle is "set in the system" but `tc class show dev eth0` doesn't reflect it, check `/var/log/pmss/fireqos.log` first — fireqos start failures are the most common reason throttling appears configured but isn't enforcing.
+If a per-user throttle is "set in the system" but `tc class show dev eth0` doesn't reflect it, check `/var/log/pmss/fireqos.log` first — fireqos start failures are the most common reason throttling appears configured but isn't enforcing. After a failed start the rejected policy is kept at `/etc/seedbox/config/fireqos.conf.failed` until the next successful start removes it.

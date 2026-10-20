@@ -182,5 +182,5 @@ $fireqosConfig = networkBuildFireqosConfig(
     $users,
     $localnets
 );
-// Load the generated policy into the running FireQOS instance.
-networkApplyFireqos($fireqosConfig);
+// Load the generated policy into the running FireQOS instance; callers log a non-zero exit.
+exit(networkApplyFireqos($fireqosConfig) ? 0 : 1);

@@ -25,6 +25,7 @@ Mark each managed user's OUTPUT packets with the account UID. Render a bare matc
 - All managed accounts' egress now passes the users group, activating balanced fairness and its 95% ceiling.
 - The default guaranteed class rate falls from link/100 to 1 Mbit; low caps remain effective.
 - A convergence-triggered setup reloads iptables and loses at most the current partial five-minute metering window, estimated well under 0.1% per month and in the customer's favour.
+- A failed `fireqos start` leaves no `fireqos.conf` (the rejected policy is kept as `fireqos.conf.failed`), so the hourly converge retries instead of reading the unapplied file as applied. While a start keeps failing, that retry and its metering loss repeat hourly.
 - After reboot, an account inside the three-day cooldown can be released early because its marker was on tmpfs.
 - Forwarded per-user VPN traffic remains unmarked; that path is unchanged and out of scope.
 
