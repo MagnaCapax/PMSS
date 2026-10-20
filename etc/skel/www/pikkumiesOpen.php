@@ -198,18 +198,27 @@ function pmssHermesAgentboardGateProbe($socket)
     return is_string($status) && preg_match('/^HTTP\/1\.[01] 401(?: |$)/', trim($status)) === 1;
 }
 
+/** Resolve one published version for both executable and frontend paths. */
+function pmssHermesAgentboardVersionPaths($link)
+{
+    $binary = realpath($link);
+    if (!is_string($binary)) return false;
+    $staticDir = dirname($binary).'/dist/client';
+    if (!is_file($binary) || !is_executable($binary) || !is_file($staticDir.'/index.html')) return false;
+    return [$binary, $staticDir];
+}
+
 function pmssHermesAgentboardStart($home, $origin, $panelOrigin, $launcherUrl)
 {
-    $binary = '/opt/pikkumies-agentboard/agentboard';
+    $paths = pmssHermesAgentboardVersionPaths('/opt/pikkumies-agentboard/agentboard');
+    if ($paths === false) return false;
+    [$binary, $staticDir] = $paths;
     $base = $home.'/.config/pmss/ui';
     $socket = $base.'/agentboard.sock';
     foreach ([$base, $base.'/tokens', $base.'/data', $base.'/tmp', $base.'/tmux'] as $dir) {
         if (is_link($dir) || (!is_dir($dir) && !@mkdir($dir, 0700, true))) return false;
         @chmod($dir, 0700);
     }
-    $resolvedBinary = realpath($binary);
-    $staticDir = is_string($resolvedBinary) ? dirname($resolvedBinary).'/dist/client' : '';
-    if (!is_file($binary) || !is_executable($binary) || !is_file($staticDir.'/index.html')) return false;
     if (!is_link($socket) && @fileowner($socket) === posix_geteuid()
         && pmssPikkumiesOpenSocketLive($socket)) {
         if (pmssHermesAgentboardGateProbe($socket)) return true;
@@ -248,8 +257,15 @@ function pmssHermesAgentboardStop($home)
     if (!preg_match('/^[1-9][0-9]*$/D', $pid)) return;
     $proc = '/proc/'.$pid;
     $cmd = @file_get_contents($proc.'/cmdline');
-    if (@fileowner($proc) === posix_geteuid() && is_string($cmd)
-        && strpos($cmd, '/opt/pikkumies-agentboard/agentboard') !== false) @posix_kill((int) $pid, SIGTERM);
+    $arguments = is_string($cmd) ? explode("\0", $cmd) : [];
+    foreach ($arguments as $argument) {
+        if (@fileowner($proc) === posix_geteuid()
+            && ($argument === '/opt/pikkumies-agentboard/agentboard'
+                || preg_match('~\A/opt/pikkumies-agentboard/[A-Za-z0-9._-]+/agentboard\z~D', $argument) === 1)) {
+            @posix_kill((int) $pid, SIGTERM);
+            return;
+        }
+    }
 }
 
 /** Older browsers may omit Fetch Site; require the panel's exact Referer origin. */

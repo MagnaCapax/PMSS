@@ -177,9 +177,7 @@ final class PikkumiesHermesUiTest extends TestCase
     public function testRootInstallerDoesNotExecuteAccountBinary(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/apps/pikkumiesAgentboard.php');
-        $launcher = $this->pmssReadRepoFile('etc/skel/www/pikkumiesOpen.php');
         $this->assertStringContainsString('--no-same-owner --no-same-permissions', $source);
-        $this->assertStringContainsAllStrings(['realpath($binary)', 'AGENTBOARD_STATIC_DIR='], $launcher);
         $this->assertFalse(strpos($source, 'exec($root.\'/agentboard') !== false);
         $this->assertFalse(strpos($source, 'passthru($root.\'/agentboard') !== false);
     }

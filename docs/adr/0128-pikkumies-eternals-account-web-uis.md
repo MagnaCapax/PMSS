@@ -95,7 +95,9 @@ an atomically switched stable symlink. A version and SHA-256 pin are required
 before installation; the host marker is also required. Empty pins or an absent
 marker cause a logged skip. A stale version is quarantined under a root-only
 directory before a verified replacement is published. The fork release uses the
-`bun-linux-x64-baseline` target. Account-owned Pikkumies code schedules its
+`bun-linux-x64-baseline` target. The account launcher resolves the version once
+for both the executable and its frontend directory. Account-owned Pikkumies
+code schedules its
 own cron tick through `Update::ensureScheduled`; PMSS does not introduce a
 second root tick.
 
