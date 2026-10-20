@@ -42,6 +42,19 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserSystemdAndTmuxCleanupOrder(): void
     {
+        $source = $this->pmssReadRepoExecutableSource('scripts/terminateUser.php');
+        $this->assertFalse((bool) preg_match('/if\s*\(\s*false\s*\)/', $source), 'cleanup steps must be reachable');
+        $this->assertOrderedStrings([
+            "'disable_linger'",
+            'pmssTerminateUserInitialRemovalSteps($username, $uid)',
+            'pmssTerminateUserPurgeDirectorySteps($label, $path)',
+            'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
+            'pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null)',
+            'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
+        ], $source);
+        $lingerStep = substr($source, strpos($source, "'disable_linger'"), 280);
+        $this->assertStringContainsString('timeout --kill-after=5s 45s loginctl disable-linger', $lingerStep);
+        $this->assertStringNotContainsString('|| true', $lingerStep);
         $initial = array_column(\pmssTerminateUserInitialRemovalSteps('user1234', 1234), 0);
         $final = array_column(\pmssTerminateUserFinalRemovalSteps('user1234', 1234, 'killall -9 -u user1234'), 0);
         $this->assertSame(['remove_tmux_socket', 'remove_screen_socket', 'userdel_initial'], array_slice($initial, -3));
@@ -56,8 +69,7 @@ final class TerminateUserContractTest extends TestCase
         mkdir($bin);
         file_put_contents($bin.'/runuser', <<<'SH'
 #!/bin/sh
-[ "$1" = --pty ] || exit 96
-shift
+[ "$1" = --pty ] && shift
 [ "$1" = -u ] && [ "$2" = user1234 ] && [ "$3" = -- ] || exit 97
 shift 3
 [ "$1" = sh ] && [ "$2" = -c ] || exit 98
@@ -69,7 +81,7 @@ SH
         chmod($bin.'/runuser', 0755);
         $target = $root.'/socket';
         $command = \pmssTerminateUserAccountSocketRemoveCommand('user1234', $target);
-        $this->assertStringContainsString('env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin runuser', $command);
+        $this->assertStringContainsString('env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin ', $command);
         $stubbed = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($bin.':/usr/sbin:/usr/bin:/sbin:/bin'), $command);
         file_put_contents($target, 'socket');
         exec($stubbed, $output, $rc);
@@ -79,8 +91,9 @@ SH
         $this->assertSame(0, $rc, 'absent path is an idempotent no-op');
         mkdir($target);
         file_put_contents($target.'/child', 'keep');
-        // Simulate rm returning failure inside the command passed to runuser.
-        file_put_contents($bin.'/runuser', str_replace('exec sh -c "$1"', 'exec sh -c "$(printf \'%s\' "$1" | sed \'s/rm -rf -- [^;]*/false/\')"', file_get_contents($bin.'/runuser')));
+        // A failing rm must surface through runuser and the outer timeout.
+        file_put_contents($bin.'/rm', "#!/bin/sh\nexit 1\n");
+        chmod($bin.'/rm', 0755);
         exec($stubbed, $output, $rc);
         $this->assertSame(1, $rc, 'inner command failure must not be masked');
         $this->assertTrue(is_file($target.'/child'));
@@ -91,15 +104,57 @@ SH
         $root = $this->pmssMakeTempDir('pmss-terminate-pty-');
         $stub = $root.'/runuser';
         $effect = $root.'/effect';
-        file_put_contents($stub, "#!/bin/sh\n[ \"\$1\" = --pty ] || exit 96\nshift\n[ \"\$1\" = -u ] && [ \"\$2\" = user1234 ] && [ \"\$3\" = -- ] || exit 97\nshift 3\n[ \"\$1\" = sh ] && [ \"\$2\" = -c ] || exit 98\nshift 2\n[ -t 0 ] && exit 99\nexec sh -c \"\$1\"\n");
+        file_put_contents($stub, "#!/bin/sh\n[ \"\$1\" = --pty ] && shift\n[ \"\$1\" = -u ] && [ \"\$2\" = user1234 ] && [ \"\$3\" = -- ] || exit 97\nshift 3\n[ \"\$1\" = sh ] && [ \"\$2\" = -c ] || exit 98\nshift 2\n[ -t 0 ] && exit 99\nexec sh -c \"\$1\"\n");
         chmod($stub, 0755);
         $built = \pmssBuildUserShellNoPamCommand('user1234', '[ -z "$PMSS_TEST_SECRET" ] && touch '.escapeshellarg($effect));
-        $this->assertSame(0, strpos($built, 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin runuser '));
+        $this->assertSame(0, strpos($built, 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin '));
         $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($root.':/usr/sbin:/usr/bin:/sbin:/bin'), $built);
         $output = [];
         exec('PMSS_TEST_SECRET=leak timeout --kill-after=1s 5s script -qec '.escapeshellarg($command).' /dev/null', $output, $rc);
         $this->assertSame(0, $rc, 'pseudo-terminal command must complete before timeout');
         $this->assertTrue(is_file($effect), 'inner command must run with a clean environment');
+    }
+
+    /** Probe each util-linux capability in a fresh PHP process so detection runs once. */
+    public function testNoPamCommandSupportsRunuserWithAndWithoutPty(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-runuser-capability-');
+        $bin = $root.'/bin';
+        mkdir($bin);
+        file_put_contents($bin.'/runuser', <<<'SH'
+#!/bin/sh
+if [ "$1" = --help ]; then
+    [ "$PMSS_TEST_PTY" = 1 ] && echo '  --pty'
+    exit 0
+fi
+[ "$1" = --pty ] && shift
+[ "$1" = -u ] && [ "$2" = user1234 ] && [ "$3" = -- ] || exit 97
+shift 3
+[ "$1" = sh ] && [ "$2" = -c ] || exit 98
+shift 2
+[ -t 0 ] && exit 99
+exec sh -c "$1"
+SH
+        );
+        chmod($bin.'/runuser', 0755);
+        $builder = $root.'/build.php';
+        file_put_contents($builder, '<?php require '.var_export($this->pmssRepoPath('scripts/lib/runtime/environment.php'), true)
+            .'; echo pmssBuildUserShellNoPamCommand("user1234", "touch ".escapeshellarg($argv[1]));');
+        foreach ([true, false] as $pty) {
+            $effect = $root.'/effect-'.($pty ? 'pty' : 'setsid');
+            $env = 'PATH='.escapeshellarg($bin.':'.getenv('PATH')).' PMSS_TEST_PTY='.($pty ? '1' : '0');
+            $output = [];
+            exec($env.' '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($builder).' '.escapeshellarg($effect), $output, $rc);
+            $this->assertSame(0, $rc);
+            $built = implode("\n", $output);
+            $this->assertStringContainsString($pty ? 'runuser --pty -u' : 'setsid runuser -u', $built);
+            $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin',
+                'PATH='.escapeshellarg($bin.':/usr/sbin:/usr/bin:/sbin:/bin'), $built);
+            $output = [];
+            exec($command, $output, $rc);
+            $this->assertSame(0, $rc);
+            $this->assertTrue(is_file($effect));
+        }
     }
 
     /** The manager must leave every active transition before its failed state is reset. */
@@ -153,6 +208,15 @@ SH
         $this->assertSame('SKIP', \pmssTerminateUserClearPreinstallState('user1234', false, true, $state, $log));
         $this->assertSame([['terminate', 'clear_pikkumies_preinstall_state', 'user1234', 'SKIP', 'Passwd entry remains; marker retained']], $events);
         $this->assertSame('preinstalled', file_get_contents($state.'/user1234'));
+    }
+
+    public function testFinalRemovalRejectsInvalidUsernames(): void
+    {
+        foreach (['', '../root', 'bad user', "bad\0user", '-root'] as $username) {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($username): void {
+                \pmssTerminateUserFinalRemovalSteps($username, 1234, 'true');
+            });
+        }
     }
 
     /**

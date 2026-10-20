@@ -49,6 +49,9 @@ function pmssTerminateUserInitialRemovalSteps(string $username, int $uid): array
 /** Build the final process and user manager cleanup in execution order. */
 function pmssTerminateUserFinalRemovalSteps(string $username, int $uid, string $killUserCommand): array
 {
+    if (!pmssUsernameIsValid($username)) {
+        throw new InvalidArgumentException('Refusing unsafe final account cleanup');
+    }
     $userdel = 'userdel '.escapeshellarg($username);
     return array(
         array('kill_processes_final', $killUserCommand),
@@ -60,7 +63,7 @@ function pmssTerminateUserFinalRemovalSteps(string $username, int $uid, string $
 }
 
 /** Keep the preinstall marker while a passwd entry can still own the name. */
-function pmssTerminateUserClearPreinstallState(string $username, bool $dryRun, bool $accountPresent, string $stateDir = '/var/lib/pmss/pikkumies-preinstall', ?callable $logger = null): string
+function pmssTerminateUserClearPreinstallState(string $username, bool $dryRun, bool $accountPresent, ?string $stateDir = null, ?callable $logger = null): string
 {
     if ($dryRun) {
         $status = 'SKIP';
@@ -69,7 +72,9 @@ function pmssTerminateUserClearPreinstallState(string $username, bool $dryRun, b
         $status = 'SKIP';
         $message = 'Passwd entry remains; marker retained';
     } else {
-        $cleared = pmssPikkumiesPreinstallStateClear($username, $stateDir);
+        $cleared = $stateDir === null
+            ? pmssPikkumiesPreinstallStateClear($username)
+            : pmssPikkumiesPreinstallStateClear($username, $stateDir);
         $status = $cleared ? 'OK' : 'ERR';
         $message = $cleared ? 'Marker cleared or absent' : 'Failed to clear marker';
     }

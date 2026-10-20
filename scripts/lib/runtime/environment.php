@@ -51,7 +51,14 @@ function pmssBuildUserShellCommand(string $username, string $command, string $sh
 /** Avoid su's logind session; isolate the operator TTY and environment from the account process. */
 function pmssBuildUserShellNoPamCommand(string $username, string $command): string
 {
-    return 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin runuser --pty -u '.escapeshellarg($username).' -- sh -c '.escapeshellarg($command).' </dev/null';
+    static $supportsPty = null;
+    if ($supportsPty === null) {
+        $help = @shell_exec('runuser --help 2>&1');
+        $supportsPty = is_string($help) && strpos($help, '--pty') !== false;
+        error_log('PMSS no-PAM runuser mode: '.($supportsPty ? 'pty' : 'setsid'));
+    }
+    $runner = $supportsPty ? 'runuser --pty' : 'setsid runuser';
+    return 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin '.$runner.' -u '.escapeshellarg($username).' -- sh -c '.escapeshellarg($command).' </dev/null';
 }
 
 /** Run the canonical direct-I/O 4 KiB latency probe and return raw output. */

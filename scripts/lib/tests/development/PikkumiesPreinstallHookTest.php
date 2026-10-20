@@ -36,6 +36,13 @@ final class PikkumiesPreinstallHookTest extends TestCase
 
     public function testLifecycleFlowsClearMarkerAfterAccountAndSkeletonChanges(): void
     {
+        $terminate = $this->pmssReadRepoExecutableSource('scripts/terminateUser.php');
+        $this->assertFalse((bool) preg_match('/if\s*\(\s*false\s*\)/', $terminate), 'marker cleanup must be reachable');
+        $this->assertOrderedStrings([
+            'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
+            'pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null)',
+            'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
+        ], $terminate);
         $this->pmssAssertRepoFileContractCases([
             'scripts/recreateUser.php' => ['ordered' => [[
                 "pmssRunOrExit('cp -Rp /etc/skel ' . escapeshellarg(\$homeDir));",

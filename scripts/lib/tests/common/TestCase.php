@@ -1497,6 +1497,17 @@ PHP
         return $contents;
     }
 
+    /** Ignore comments when checking that lifecycle calls remain executable. */
+    protected function pmssReadRepoExecutableSource(string $relativePath): string
+    {
+        $source = '';
+        foreach (token_get_all($this->pmssReadRepoFile($relativePath)) as $token) {
+            if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) continue;
+            $source .= is_array($token) ? $token[1] : $token;
+        }
+        return $source;
+    }
+
     /** Read the loader and its delivered parts for source-text contract checks. */
     protected function pmssReadScriptsIncSources(): string
     {
