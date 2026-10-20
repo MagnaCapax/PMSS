@@ -31,10 +31,13 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         $this->assertFalse(\pmssPikkumiesAgentboardArchiveInstall($archive, '../v2', $sha256, $root, $ownerUid));
     }
 
-    /** The release stays inert until both immutable pins are supplied. */
-    public function testPublishedPinsAreBothUnset(): void
+    /** A release cannot activate with a version and no verified checksum. */
+    public function testReleasePinsAreCompleteTogether(): void
     {
-        $this->assertSame('', \PMSS_PIKKUMIES_AGENTBOARD_VERSION);
-        $this->assertSame('', \PMSS_PIKKUMIES_AGENTBOARD_SHA256);
+        if (\PMSS_PIKKUMIES_AGENTBOARD_VERSION === '') {
+            $this->assertSame('', \PMSS_PIKKUMIES_AGENTBOARD_SHA256);
+        } else {
+            $this->assertTrue(preg_match('/^[a-f0-9]{64}$/iD', \PMSS_PIKKUMIES_AGENTBOARD_SHA256) === 1);
+        }
     }
 }
