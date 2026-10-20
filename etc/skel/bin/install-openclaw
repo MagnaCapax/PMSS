@@ -494,15 +494,26 @@ function ocProxyFragment(string $base, int $port): string
         ."  proxy.header = (\n      \"upgrade\" => \"enable\"\n  )\n}";
 }
 
+/** Resolve a binary from PATH, then the sbin dirs an account login PATH omits (lighttpd lives in /usr/sbin). */
+function ocCommandPath(string $name): string
+{
+    $dirs = array_merge(explode(':', (string) getenv('PATH')), array('/usr/sbin', '/sbin'));
+    foreach ($dirs as $dir) {
+        if ($dir !== '' && is_file($dir.'/'.$name) && is_executable($dir.'/'.$name)) return $dir.'/'.$name;
+    }
+    return $name;
+}
+
 /** Restart exactly the account's web processes, as the media-stack installer does. */
 function ocPanelRestart(array $paths): bool
 {
-    list($rc) = ocRun(array('lighttpd', '-tt', '-f', $paths['home'].'/.lighttpd.conf'));
+    $lighttpd = ocCommandPath('lighttpd');
+    list($rc) = ocRun(array($lighttpd, '-tt', '-f', $paths['home'].'/.lighttpd.conf'));
     if ($rc !== 0) return false;
     foreach (array('lighttpd', 'php-cgi') as $name) {
         ocRun(array('pkill', '-9', '-u', (string) posix_geteuid(), $name));
     }
-    list($rc) = ocRun(array('lighttpd', '-f', $paths['home'].'/.lighttpd.conf'));
+    list($rc) = ocRun(array($lighttpd, '-f', $paths['home'].'/.lighttpd.conf'));
     if ($rc !== 0) {
         return false;
     }

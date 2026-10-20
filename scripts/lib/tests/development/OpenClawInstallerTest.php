@@ -111,6 +111,27 @@ final class OpenClawInstallerTest extends TestCase
         $this->assertFalse(file_exists($root.'/outside'));
     }
 
+    public function testCommandPathPrefersPathThenFindsSbinOutsideAccountPath(): void
+    {
+        // A panel-launched install inherits the account login PATH, which has no /usr/sbin (lighttpd lives there).
+        $root = $this->pmssMakeTempDir('pmss-oc-path-');
+        file_put_contents($root.'/lighttpd', "#!/bin/sh\n");
+        chmod($root.'/lighttpd', 0755);
+        $sbin = null;
+        foreach ((array) @scandir('/usr/sbin') as $name) {
+            if ($name !== '.' && $name !== '..' && is_file('/usr/sbin/'.$name) && is_executable('/usr/sbin/'.$name)) { $sbin = $name; break; }
+        }
+        $path = (string) getenv('PATH');
+        putenv('PATH='.$root);
+        try {
+            $this->assertSame($root.'/lighttpd', \ocCommandPath('lighttpd'));
+            $this->assertSame('pmss-oc-absent-binary', \ocCommandPath('pmss-oc-absent-binary'));
+            if ($sbin !== null) $this->assertSame('/usr/sbin/'.$sbin, \ocCommandPath($sbin));
+        } finally {
+            putenv('PATH='.$path);
+        }
+    }
+
     public function testLateProviderDecisionTableProtectsUserChoice(): void
     {
         $key = array('key' => 'private', 'endpoint' => 'https://ai.example/v1');
