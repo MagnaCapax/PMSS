@@ -59,7 +59,8 @@ function pmssUserTransferBuildRsyncCommand(
     }
 
     $namespace = !empty($cfg['namespaceRsync']);
-    $rsync = 'rsync -aHAX --numeric-ids --stats'
+    // One boundary flag retains empty mount directories for customer remounts.
+    $rsync = 'rsync -aHAX --numeric-ids --stats --one-file-system'
         .($namespace ? ' --rsync-path='.escapeshellarg('unshare --map-auto --map-root-user rsync')
             : ' --usermap='.escapeshellarg($cfg['receiver']['sourceUid'].':0')
                 .' --groupmap='.escapeshellarg($cfg['receiver']['sourceGid'].':0'))

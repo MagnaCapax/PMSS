@@ -407,6 +407,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     `~/.config/qBittorrent/qBittorrent.conf`.
   - Final rsync copies session data but excludes the source host's
     `session/rtorrent.lock`; the target keeps its own runtime lock.
+  - Both rsync passes use one `--one-file-system`: recursion leaves separate
+    filesystems as empty mount directories; same-device bind mounts still copy.
+    Explicit source roots retain rsync's normal per-source filesystem boundary.
+    Source and target home statistics use `du -sbx` and `find -xdev`; the existing
+    completeness threshold remains advisory. Nested different-device mount
+    counts and filesystem types are logged without customer paths; unavailable
+    mount information does not fail the probe (ADR 0127).
   - Post-transfer qBittorrent category preservation reads only category-bearing
     source metadata into the private scratch directory, prefers a non-empty
     source `categories.json`, and falls back to legacy `Session\Categories` from

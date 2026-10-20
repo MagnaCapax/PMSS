@@ -136,7 +136,7 @@ class UserTransferTest extends TestCase
             [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -aHAX --numeric-ids', ':/home/deefbox/', '/home/deefbox/', '.rtorrent.rc', '.qbittorrentPort', '.config/pmss-user.json', '.trafficDataIngress', '.trafficDataIngressLocal', '.resourceData', '*.pmss-tmp-*', '/.billingId', '/.billingServiceId', '/.billingClientId'], ['rsync -av' => 'expected no verbose per-file rsync logging', '--exclude={' => 'expected no brace-expanded excludes']],
             [\pmssUserTransferBuildRsyncFinal($cfg), ["rsync -aHAX --numeric-ids", "'-R'", ':/home/deefbox/./session', ':/home/deefbox/./www/public'], ['rsync -av' => 'expected no verbose per-file rsync logging', '{session' => 'expected no brace-expanded sources']],
             [\pmssUserTransferBuildAuthProbe($cfg), ['ssh -F /dev/null -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], []],
-            [\pmssUserTransferBuildRemoteSizeProbe($this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90])), ['-o NumberOfPasswordPrompts=1', "'example.com'", '/home/remote01/', 'du -sb -- "$home"', 'find "$home" -type f -printf .', 'printf "bytes=%s files=%s\\n"'], ['%p' => 'expected no path-printing stat probe output']],
+            [\pmssUserTransferBuildRemoteSizeProbe($this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90])), ['-o NumberOfPasswordPrompts=1', "'example.com'", '/home/remote01/', 'du -sbx -- "$home"', 'find "$home" -xdev -type f -printf .', 'printf "bytes=%s files=%s\\n"'], ['%p' => 'expected no path-printing stat probe output']],
         ] as [$script, $required, $forbidden]) {
             $this->assertStringContainsAndOmitsStrings($required, $forbidden, $script);
         }
@@ -149,6 +149,103 @@ class UserTransferTest extends TestCase
             $this->assertStringContainsString('/session/rtorrent.lock', $script);
             $this->assertStringContainsString(':/home/deefbox/./session', $script);
         }
+    }
+
+    public function testAllRsyncPassesKeepExactlyOneFilesystemBoundary(): void
+    {
+        foreach ([false, true] as $namespaceRsync) {
+            $cfg = $this->baseConfig(['namespaceRsync' => $namespaceRsync]);
+            foreach ([\pmssUserTransferBuildRsyncMain($cfg), \pmssUserTransferBuildRsyncFinal($cfg)] as $script) {
+                $this->assertSame(1, substr_count($script, '--one-file-system'));
+                $this->assertStringContainsString('rsync -aHAX --numeric-ids --stats --one-file-system', $script);
+            }
+        }
+    }
+
+    public function testHomeStatsMountSummaryIsPrivateAndFailsSoft(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-transfer-mount-summary-');
+        $home = $root.'/home';
+        mkdir($home);
+        file_put_contents($home.'/payload', 'owned');
+        $mountinfo = $root.'/mountinfo';
+        $base = "1 0 8:1 / / rw - ext4 /dev/example rw\n"
+            ."2 1 8:2 / $home rw - ext4 /dev/home rw\n";
+        $nested = "3 2 0:99 / $home/private\\040remote rw shared:1 - fuse.rclone private:remote rw\n"
+            ."4 3 0:100 / $home/private\\040remote/nested rw - fuse.mergerfs private rw\n"
+            ."5 2 8:2 / $home/same-device rw - ext4 /dev/home rw\n"
+            ."6 1 0:101 / {$home}-sibling rw - tmpfs tmpfs rw\n";
+        foreach ([[$base, 'nested_mounts=0'], [$base.$nested, 'nested_mounts=2'], ['', 'nested_mounts=unavailable'], [null, 'nested_mounts=unavailable']] as [$contents, $expected]) {
+            if ($contents === null) {
+                unlink($mountinfo);
+            } else {
+                file_put_contents($mountinfo, $contents);
+            }
+            $shell = str_replace('/proc/self/mountinfo', escapeshellarg($mountinfo), \pmssUserTransferBuildHomeStatsShell($home));
+            $result = \pmssCommandCapture(\pmssBuildCommand('bash', ['-ec', $shell]));
+            $this->assertSame(0, $result['rc'], $result['stderr']);
+            $this->assertSame('', $result['stderr']);
+            $this->assertSame(1, \pmssUserTransferParseHomeStats($result['stdout'])['files']);
+            $this->assertStringContainsString($expected, $result['stdout']);
+            $this->assertStringNotContainsString('private', $result['stdout']);
+            $this->assertStringNotContainsString($home, $result['stdout']);
+            if ($contents === $base.$nested) {
+                $this->assertStringContainsString('mount_type_fuse.rclone=1', $result['stdout']);
+                $this->assertStringContainsString('mount_type_fuse.mergerfs=1', $result['stdout']);
+                $this->assertStringNotContainsString('mount_type_ext4', $result['stdout']);
+            }
+        }
+    }
+
+    public function testMountSummaryPersistsWithLocalAndExpectLineEndings(): void
+    {
+        $logDir = $this->pmssMakeTempDir('pmss-transfer-mount-log-');
+        foreach (["\n", "\r\n"] as $ending) {
+            $command = \pmssBuildCommand('printf', ['%s', 'bytes=5 files=1'.$ending
+                .'nested_mounts=2 mount_type_tmpfs=2'.$ending]);
+            list($stats, $output) = $this->pmssCaptureStdout(static function () use ($command): ?array {
+                return \pmssUserTransferMeasureHomeStats('Measuring fixture home size', $command);
+            }, ['PMSS_DRY_RUN' => '0', 'PMSS_LOG_DIR' => $logDir]);
+            $this->assertSame(['bytes' => 5, 'files' => 1], $stats);
+            $this->assertStringContainsString('[INFO] Measuring fixture home size: nested_mounts=2 mount_type_tmpfs=2', $output);
+        }
+    }
+
+    /** Real mounts stay inside a disposable user/mount namespace and temporary fixture. */
+    public function testOneFilesystemCopyAndStatsSkipNestedMounts(): void
+    {
+        $probe = \pmssCommandCapture('command -v rsync >/dev/null && unshare -Urnm true');
+        if ($probe['rc'] !== 0) {
+            throw new SkipTest('requires rsync and unprivileged user/mount namespaces');
+        }
+        $root = $this->pmssMakeTempDir('pmss-transfer-mount-copy-');
+        $source = $root.'/source';
+        $target = $root.'/target';
+        $final = $root.'/final';
+        $this->pmssEnsureDir($source.'/data/remote view');
+        $this->pmssEnsureDir($source.'/.local/mounted');
+        $this->pmssEnsureDir($source.'/bind');
+        file_put_contents($source.'/data/payload', 'owned');
+        $shell = 'set -eu; mount --make-rprivate /; '
+            .'mount -t tmpfs tmpfs '.escapeshellarg($source.'/data/remote view').'; '
+            .'mount -t tmpfs tmpfs '.escapeshellarg($source.'/.local/mounted').'; '
+            .'head -c 131072 /dev/zero > '.escapeshellarg($source.'/data/remote view/remote').'; '
+            .'printf remote > '.escapeshellarg($source.'/.local/mounted/remote').'; '
+            .'mount --bind '.escapeshellarg($source.'/data').' '.escapeshellarg($source.'/bind').'; '
+            .'rsync -aHAX --one-file-system '.escapeshellarg($source.'/').' '.escapeshellarg($target.'/').'; '
+            .'rsync -aHAX --one-file-system -R '.escapeshellarg($source.'/./.local').' '.escapeshellarg($final.'/').'; '
+            .\pmssUserTransferBuildHomeStatsShell($source);
+        $result = \pmssCommandCapture(\pmssBuildCommand('unshare', ['-Urnm', 'bash', '-c', $shell]));
+        $this->assertSame(0, $result['rc'], $result['stderr']);
+        $this->assertSame('owned', file_get_contents($target.'/data/payload'));
+        $this->assertSame('owned', file_get_contents($target.'/bind/payload'));
+        foreach ([$target.'/data/remote view', $target.'/.local/mounted', $final.'/.local/mounted'] as $mount) {
+            $this->assertSame(['.', '..'], scandir($mount));
+        }
+        $stats = \pmssUserTransferParseHomeStats($result['stdout']);
+        $this->assertSame(2, $stats['files']);
+        $this->assertTrue($stats['bytes'] < 131072, 'mounted payload enlarged the home size');
+        $this->assertStringContainsString('nested_mounts=2 mount_type_tmpfs=2', $result['stdout']);
     }
 
     public function testCrossUsernamePayloadOwnershipCheckUsesTargetIds(): void

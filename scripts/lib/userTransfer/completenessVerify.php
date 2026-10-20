@@ -82,11 +82,34 @@ function pmssUserTransferBuildHomeStatsShell(string $home): string
 {
     $home = rtrim($home, '/').'/';
     $lines = [
-        'bytes=$(du -sb -- "$home" 2>/dev/null | awk "NR == 1 {print \$1}")',
-        'files=$(find "$home" -type f -printf . 2>/dev/null | wc -c | tr -d "[:space:]")',
+        'bytes=$(du -sbx -- "$home" 2>/dev/null | awk "NR == 1 {print \$1}")',
+        'files=$(find "$home" -xdev -type f -printf . 2>/dev/null | wc -c | tr -d "[:space:]")',
         'case "$bytes" in ""|*[!0-9]*) exit 1 ;; esac',
         'case "$files" in ""|*[!0-9]*) exit 1 ;; esac',
         'printf "bytes=%s files=%s\n" "$bytes" "$files"',
+        // Resolve the home's device from its longest containing mount. Never emit paths.
+        <<<'SHELL'
+awk -v home="$home" '
+    $5 == "/" || index(home, $5 "/") == 1 {
+        if (length($5) > longest) { longest = length($5); device = $3 }
+    }
+    index($5, home) == 1 {
+        for (i = 7; i < NF; i++) if ($i == "-") {
+            devices[++n] = $3; types[n] = $(i + 1); break
+        }
+    }
+    END {
+        if (device == "") exit 1
+        for (i = 1; i <= n; i++) if (devices[i] != device) {
+            count++
+            if (types[i] ~ /^[a-zA-Z0-9_.-]+$/) totals[types[i]]++
+        }
+        printf "nested_mounts=%d", count
+        for (type in totals) printf " mount_type_%s=%d", type, totals[type]
+        printf "\n"
+    }
+' /proc/self/mountinfo 2>/dev/null || printf 'nested_mounts=unavailable\n'
+SHELL
     ];
 
     return 'home='.escapeshellarg($home)."\n".implode("\n", $lines)."\n";
@@ -162,6 +185,11 @@ function pmssUserTransferMeasureHomeStats(string $description, string $command):
     if ($stats === null) {
         logMessage(sprintf('[WARN] Skipping transfer home statistics: %s returned unreadable output', strtolower($description)));
         return null;
+    }
+
+    // Only aggregate tokens from the source may reach the persistent transfer log.
+    if (preg_match('/^(nested_mounts=(?:[0-9]+|unavailable)(?: mount_type_[a-zA-Z0-9_.-]+=[0-9]+)*)\r?$/m', $stdout, $mounts) === 1) {
+        logMessage('[INFO] '.$description.': '.$mounts[1]);
     }
 
     return $stats;
