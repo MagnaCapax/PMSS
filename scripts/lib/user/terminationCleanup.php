@@ -131,6 +131,13 @@ function pmssTerminateUserUnlinkPath(string $username, string $phase, string $pa
     return false;
 }
 
+/** Build a certbot deletion only for one validated public lineage name. */
+function pmssTerminateUserCertLineageDeleteCommand(string $name): ?string
+{
+    if (preg_match('/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/D', $name) !== 1) return null;
+    return 'certbot delete --non-interactive --cert-name '.escapeshellarg($name);
+}
+
 function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string $path, bool $dryRun): bool
 {
     if (pmssTerminateUserRejectUnsafePath($username, $phase, $path, 'Refusing unsafe directory path')) {

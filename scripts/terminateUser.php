@@ -21,6 +21,9 @@ require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/toggleAppCatalog.php';
 pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/user/terminationCleanup.php']);
 require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
+require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
+require_once __DIR__.'/lib/user/billingIds.php';
+require_once __DIR__.'/lib/nginxUserHosts.php';
 
 pmssStdoutHeartbeatStartForStdout();
 
@@ -83,6 +86,7 @@ if ($accountInfo === null) {
     pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in /etc/passwd');
     die("Refusing to terminate {$username}: no passwd entry found\n");
 }
+$billingServiceId = pmssUserBillingProvisionedDigitsRead($username, 'billingServiceId');
 
 // Invariant: refuse to operate when the resolved home directory is not exactly
 // the expected /home/<username>. Prefix checks are too loose for destructive
@@ -128,6 +132,9 @@ if ($continue == 'N') {
 }
 
 echo "Terminating user {$username}\n";
+$expireRc = pmssUserLifecycleStep('terminate', $username, 'expire_account_before_kill',
+    'usermod --expiredate 1 '.escapeshellarg($username), $dryRun);
+if ($expireRc !== 0 && !$dryRun) exit(1);
 $killUserCommand = 'killall -9 -u '.escapeshellarg($username);
 pmssUserLifecycleStep('terminate', $username, 'kill_processes_initial', $killUserCommand, $dryRun);
 
@@ -266,6 +273,20 @@ pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserFinalRemovalS
 
 // This root-owned marker must not be inherited by a later account with the same name.
 pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null);
+
+// Retire both possible certbot names after the account is gone. The root-owned
+// billing ID was captured before the user record was removed.
+$certHost = strtolower(trim((string) @shell_exec('/bin/hostname -f')));
+$certNames = $billingServiceId === null ? [] : [pmssNginxUserMcxHostname($billingServiceId)];
+if ($certHost !== '') $certNames[] = $username.'.'.$certHost;
+if (pmssUserAccountLookup($username) === null) {
+    foreach ($certNames as $certName) {
+        $certCommand = pmssTerminateUserCertLineageDeleteCommand($certName);
+        if ($certCommand !== null && is_dir('/etc/letsencrypt/live/'.$certName)) {
+            pmssUserLifecycleStep('terminate', $username, 'delete_public_cert_lineage', $certCommand, $dryRun);
+        }
+    }
+}
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 

@@ -8,6 +8,18 @@ require_once dirname(__DIR__, 2).'/user/terminationCleanup.php';
 
 final class TerminateUserContractTest extends TestCase
 {
+    public function testPublicCertificateLineageDeletionIsBoundToTheRetiredAccount(): void
+    {
+        $this->assertSame(null, \pmssTerminateUserCertLineageDeleteCommand('../alice.node.example.com'));
+        $this->assertSame(null, \pmssTerminateUserCertLineageDeleteCommand('localhost'));
+        $this->assertSame("certbot delete --non-interactive --cert-name 'alice.node.example.com'",
+            \pmssTerminateUserCertLineageDeleteCommand('alice.node.example.com'));
+        $source = $this->pmssReadRepoFile('scripts/terminateUser.php');
+        $this->assertTrue(strpos($source, "'expire_account_before_kill'") < strpos($source, "'kill_processes_initial'"));
+        $this->assertTrue(strpos($source, 'pmssTerminateUserCertLineageDeleteCommand') > strpos($source, 'kill_processes_final'));
+        $this->assertStringContainsString('pmssUserAccountLookup($username) === null', $source);
+        $this->assertStringContainsString('pmssNginxUserMcxHostname($billingServiceId)', $source);
+    }
     public function testTerminateUserConfirmationLoopHandlesEof(): void
     {
         $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)']]);
