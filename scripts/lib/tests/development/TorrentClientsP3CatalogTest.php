@@ -69,12 +69,27 @@ final class TorrentClientsP3CatalogTest extends TestCase
     public function testShippedCatalogAndDocumentedVersionPolicy(): void
     {
         $path = dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json';
-        foreach (\pmssTorrentClientsCatalogLoad($path) as $entry) {
-            $this->assertFalse($entry['client'] === 'transmission');
+        $entries = array_values(array_filter(\pmssTorrentClientsCatalogLoad($path), static function ($entry) {
+            return $entry['client'] === 'transmission';
+        }));
+        // Pin the curated pair, including the default policy and socket-only capability.
+        $this->assertSame(['4.1.3', '4.0.5'], array_column($entries, 'version'));
+        $this->assertSame([true, false], array_column($entries, 'isDefault'));
+        $this->assertSame(['4.1', '4.0'], array_column($entries, 'compatFamily'));
+        $this->assertSame([
+            '3fb81fb39f08ceec528fa724c7c3438dc1e43273d3a48a338237eab712382193',
+            '5d3c87a01503f69a9c958dceb99ea44418bff2445558fd0df1c3c919aa935019',
+        ], array_column($entries, 'sha256'));
+        foreach ($entries as $entry) {
+            $this->assertSame('static', $entry['kind']);
+            $this->assertSame(true, $entry['rpcUnixSocket']);
+            $this->assertSame(false, $entry['disabled']);
+            $this->assertSame([], $entry['cve']);
+            $this->assertSame(['https://pulsedmedia.com/remote/pkg/transmission-daemon-'
+                .$entry['version'].'-static-amd64'], $entry['url']);
         }
         $adr = (string) file_get_contents(dirname(__DIR__, 4).'/docs/adr/0108-transmission-socket-integration.md');
         $this->assertStringContainsString('4.1.3 as default and 4.0.5 as legacy', $adr);
-        $this->assertStringContainsString('Do not', $adr);
-        $this->assertStringContainsString('4.0.6', $adr);
+        $this->assertStringContainsString("Do not\npublish 4.0.6 because of its tracker announce race.", $adr);
     }
 }

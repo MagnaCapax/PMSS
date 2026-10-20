@@ -54,3 +54,11 @@ Once an artifact is curated, an account selection can activate the existing
 settings, proxy, and launcher path without another client-specific code change.
 A live canary and the real static artifact are separate build-repository work
 for GH #1063 (see also ADRs 0105 and 0107).
+
+## Curation landing
+
+The curated static 4.1.3 (default) and 4.0.5 (legacy) catalog entries now ship,
+pinned by SHA-256 to PM-built reproducible, fully static musl daemons. The
+integration remains inert until the binaries are hosted on the PM mirror and
+the operator sets `torrentClients.enabled`; this change leaves that marker
+absent. A live canary remains separate build-repository work for GH #1063.

@@ -64,7 +64,9 @@ final class TorrentClientsCatalogTest extends TestCase
         $defaults = array_values(array_filter(\pmssTorrentClientsCatalogLoad($path), static function ($entry) {
             return $entry['isDefault'];
         }));
-        $this->assertSame(['qbittorrent', 'rtorrent', 'deluge'], array_column($defaults, 'client'));
-        $this->assertSame(['system', 'system', 'system'], array_column($defaults, 'kind'));
+        // Pre-installed clients retain system defaults; Transmission has only curated static builds.
+        $this->assertSame(['qbittorrent', 'rtorrent', 'deluge', 'transmission'], array_column($defaults, 'client'));
+        $this->assertSame(['system', 'system', 'system', 'static'], array_column($defaults, 'kind'));
+        $this->assertSame(['system', 'system', 'system', '4.1.3'], array_column($defaults, 'version'));
     }
 }

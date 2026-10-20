@@ -338,5 +338,7 @@
               "sha256": "1613beb1fb1b4f457818c5443e985142ec9e71af391bfb26e583e0353f206792"
           }
       ]
-  }
+  },
+  {"client":"transmission","version":"4.1.3","url":["https://pulsedmedia.com/remote/pkg/transmission-daemon-4.1.3-static-amd64"],"sha256":"3fb81fb39f08ceec528fa724c7c3438dc1e43273d3a48a338237eab712382193","kind":"static","compatFamily":"4.1","cve":[],"disabled":false,"isDefault":true,"rpcUnixSocket":true},
+  {"client":"transmission","version":"4.0.5","url":["https://pulsedmedia.com/remote/pkg/transmission-daemon-4.0.5-static-amd64"],"sha256":"5d3c87a01503f69a9c958dceb99ea44418bff2445558fd0df1c3c919aa935019","kind":"static","compatFamily":"4.0","cve":[],"disabled":false,"isDefault":false,"rpcUnixSocket":true}
 ]
