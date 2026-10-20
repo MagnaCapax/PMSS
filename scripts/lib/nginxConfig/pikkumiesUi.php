@@ -16,10 +16,11 @@ function pmssPikkumiesUiPagesInstall(): bool
     return true;
 }
 
-/** Publish only root-provisioned identity for account-side launchers. */
-function pmssPikkumiesUiIdentityMetadata(string $user): array
+/** Keep the managed writer's account-private ownership contract in one place. */
+function pmssPikkumiesUiIdentityWrite(string $path, string $serviceId, string $user, ?callable $writer = null): bool
 {
-    return ['root', $user, 0640];
+    $writer = $writer ?: 'pmssWriteManagedFile';
+    return $writer($path, $serviceId."\n", 'root', $user, 0640);
 }
 
 function pmssPikkumiesUiIdentityPublish(string $user, ?string $serviceId, string $directory = '/var/lib/pmss/public/billing',
@@ -39,7 +40,7 @@ function pmssPikkumiesUiIdentityPublish(string $user, ?string $serviceId, string
             && $entry['uid'] === 0 && $entry['nlink'] === 1 && @unlink($path);
     }
     if (pmssUnsignedDecimalIntParse($serviceId) === null || (int) $serviceId < 1) return false;
-    return pmssWriteManagedFile($path, $serviceId."\n", ...pmssPikkumiesUiIdentityMetadata($user));
+    return pmssPikkumiesUiIdentityWrite($path, $serviceId, $user);
 }
 
 /** Refuse a port owned by a service other than nginx. */

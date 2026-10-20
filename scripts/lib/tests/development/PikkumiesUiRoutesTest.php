@@ -65,7 +65,13 @@ final class PikkumiesUiRoutesTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-ui-billing-');
         $directory = $root.'/billing';
         $marker = $root.'/enabled';
-        $this->assertSame(['root', 'uitester', 0640], \pmssPikkumiesUiIdentityMetadata('uitester'));
+        $write = [];
+        $writer = static function ($path, $content, $owner, $group, $mode) use (&$write): bool {
+            $write = [$path, $content, $owner, $group, $mode];
+            return true;
+        };
+        $this->assertTrue(\pmssPikkumiesUiIdentityWrite($directory.'/uitester', '123', 'uitester', $writer));
+        $this->assertSame([$directory.'/uitester', "123\n", 'root', 'uitester', 0640], $write);
         $this->assertTrue(\pmssPikkumiesUiIdentityPublish('uitester', '123', $directory, $marker));
         $this->assertFalse(is_dir($directory));
         file_put_contents($marker, '');

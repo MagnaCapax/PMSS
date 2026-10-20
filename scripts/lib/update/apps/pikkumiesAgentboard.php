@@ -14,6 +14,12 @@ function pmssPikkumiesAgentboardArchiveVerified(string $archive, string $sha256)
         && hash_equals(strtolower($sha256), pmssPinnedRemoteChecksum($archive));
 }
 
+/** An existing version is inspected only when its directory has the expected owner. */
+function pmssPikkumiesAgentboardVersionOwned(string $versionDir, int $ownerUid): bool
+{
+    return is_dir($versionDir) && !is_link($versionDir) && @fileowner($versionDir) === $ownerUid;
+}
+
 /** Install one verified archive and switch the stable link by atomic rename. */
 function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version, string $sha256, string $root = PMSS_PIKKUMIES_AGENTBOARD_ROOT, int $ownerUid = 0): bool
 {
@@ -43,7 +49,7 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
         if (!is_array($entry) || ($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1) return false;
         if (!@chmod($stage.'/agentboard', 0755) || !@chmod($stage, 0755)) return false;
         if (file_exists($versionDir)) {
-            $ownedDir = is_dir($versionDir) && @fileowner($versionDir) === $ownerUid;
+            $ownedDir = pmssPikkumiesAgentboardVersionOwned($versionDir, $ownerUid);
             $installed = $ownedDir ? @lstat($versionDir.'/agentboard') : false;
             $valid = $ownedDir && is_array($installed)
                 && ($installed['mode'] & 0170000) === 0100000 && $installed['uid'] === $ownerUid

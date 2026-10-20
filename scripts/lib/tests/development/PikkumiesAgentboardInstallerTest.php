@@ -79,4 +79,16 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         $this->assertSame(1, count($retired));
         $this->assertSame('stale', file_get_contents($retired[0].'/agentboard'));
     }
+
+    public function testWrongOwnerVersionIsNotTrusted(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-agentboard-owner-');
+        $version = $root.'/v3';
+        mkdir($version);
+        $uid = posix_geteuid();
+        $this->assertTrue(\pmssPikkumiesAgentboardVersionOwned($version, $uid));
+        $this->assertFalse(\pmssPikkumiesAgentboardVersionOwned($version, $uid + 1));
+        symlink($version, $root.'/linked');
+        $this->assertFalse(\pmssPikkumiesAgentboardVersionOwned($root.'/linked', $uid));
+    }
 }
