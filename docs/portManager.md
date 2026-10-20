@@ -27,6 +27,10 @@ they are not listening or already reserved; otherwise the next media-stack
 installer run converges its app and proxy to a fresh managed port.
 OpenClaw has no lighttpd proxy. Its separate opt-in installer binds the reserved
 port on loopback and requires a gateway token.
+Pikkumies account UI origins use fixed HTTPS ports 844, 845 and 846 rather
+than allocator slots. The enabled nginx route checks that its port is not
+owned by another listener. Port A has a generated lighttpd Unix-socket proxy;
+the authenticated Hermes backends for ports B and C remain closed.
 Invalid usernames and service names are rejected before any reservation path is built.
 Persisted assignment files must contain a numeric TCP port; malformed existing
 assignments are treated as errors for that user, while malformed sibling files

@@ -1269,6 +1269,13 @@ to the account home. `L` means `Config::localDir()`.
   `bun-linux-x64-baseline` target. The installer is inactive with an empty
   version or sha256 pin.
 
+The PMSS port-A launcher and route are inert until the host marker, pinned
+binary, root-owned billing identity, and per-service certificate exist. The
+launcher refuses the `hermes`, `vanilla-hermes-web`, and
+`vanilla-agentboard` selectors while their authenticated backends are absent.
+The service permalink is built only from the root-owned provisioning record;
+an account-owned billing dot-file cannot select another service name.
+
 ---
 
 ## Notes for Agentic Coding
