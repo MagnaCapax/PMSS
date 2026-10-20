@@ -2,6 +2,20 @@
 /** Fixed port-A routing; the host marker and complete TLS lineage gate output. */
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
+/** Install root-owned static UI pages outside every customer home. */
+function pmssPikkumiesUiPagesInstall(): bool
+{
+    $target = '/var/www/pikkumies';
+    if (!pmssEnsureSafeDir($target, 0755)) return false;
+    foreach (array('bar.html', 'not-running.html') as $page) {
+        $source = '/etc/seedbox/config/pikkumies-'.$page;
+        if (!is_file($source) || is_link($source)) return false;
+        $content = @file_get_contents($source);
+        if (!is_string($content) || !pmssWriteManagedFile($target.'/'.$page, $content, 'root', 'root', 0644)) return false;
+    }
+    return true;
+}
+
 /** Publish only root-provisioned identity for account-side launchers. */
 function pmssPikkumiesUiIdentityPublish(string $user, ?string $serviceId, string $directory = '/var/lib/pmss/public/billing'): bool
 {

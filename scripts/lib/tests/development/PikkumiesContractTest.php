@@ -9,7 +9,7 @@ final class PikkumiesContractTest extends TestCase
     public function testFixtureValuesAppearInContractSection(): void
     {
         $root = dirname(__DIR__, 4);
-        $json = file_get_contents(__DIR__.'/../fixtures/pikkumies-contract-v1.json');
+        $json = file_get_contents(__DIR__.'/../fixtures/pikkumies-contract-v1.1.json');
         $this->assertSame(true, is_string($json));
         $fixture = json_decode($json, true);
         $this->assertSame(JSON_ERROR_NONE, json_last_error());
@@ -17,7 +17,7 @@ final class PikkumiesContractTest extends TestCase
 
         $docs = file_get_contents($root.'/docs/contracts.md');
         $this->assertSame(true, is_string($docs));
-        $start = '## Pikkumies Eternals and web UIs (contract v1)';
+        $start = '## Pikkumies Eternals and web UIs (contract v1.1)';
         $end = '## Notes for Agentic Coding';
         $this->assertSame(1, substr_count($docs, $start));
         $this->assertSame(1, substr_count($docs, $end));
@@ -50,7 +50,7 @@ final class PikkumiesContractTest extends TestCase
     /** UI ports are fixed, distinct, privileged, and outside browser-denied ports. */
     public function testUiPortsArePinned(): void
     {
-        $fixture = json_decode(file_get_contents(__DIR__.'/../fixtures/pikkumies-contract-v1.json'), true);
+        $fixture = json_decode(file_get_contents(__DIR__.'/../fixtures/pikkumies-contract-v1.1.json'), true);
         $ports = array_map('intval', $fixture['ports']);
         $badPorts = [0, 1, 7, 9, 21, 22, 23, 25, 53, 69, 80, 110, 143, 443, 445, 554, 600, 6665, 6666, 6667, 6668, 6669, 6697, 10080];
         $this->assertSame([844, 845, 846], $ports);

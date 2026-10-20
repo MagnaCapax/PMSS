@@ -50,6 +50,16 @@ requests a certificate only when DNS points to the current host and the
 permalink fails TLS verification. Certificate flag changes run as the account.
 The certificate job reads billing IDs from root-owned provisioning state.
 
+The panel adds a local Pikkumies tab after Welcome and a prompt bar in Welcome
+only when the host marker, root-owned billing identity, account install, and
+On state all exist. The bar stays disabled until the read-only status view
+reports the UI ready; its root-owned page then stores a bounded pending-ask
+queue on port A's origin and signals the panel with exact-origin messages.
+Configure presents a two-choice interface control. Power user retains the
+same simplified tab and adds a new-tab launcher action for port B. Port B's
+launcher remains closed by the existing gate because its authenticated
+backend is absent. The panel never embeds B.
+
 The Agentboard binary lives under a versioned root-owned `/opt` directory and
 an atomically switched stable symlink. A version and SHA-256 pin are required
 before installation; empty pins cause a logged skip. The fork release uses the
@@ -77,6 +87,11 @@ and Hermes state; the archived home retains their previous data.
 - UI authentication remains the access boundary: A has single-use bearer
   tokens, while B and C require Hermes' own login before their routes can open.
   Origin and routing checks provide additional protection.
+- The static bar has no bearer or account credential. It can run only in a
+  frame, and the existing frame-ancestor policy limits that frame to the panel
+  origin. Questions and drafts stay in port A's browser storage; no question
+  text is posted to the panel or written to PMSS logs. The interface choice is
+  a private mode-0600 account file. The status response carries no bearer.
 - Accounts without a root-owned billing ID record have no service permalink
   route until a trusted provisioning write supplies the ID. Account-home
   billing dot-files are no longer used to regenerate that root record.

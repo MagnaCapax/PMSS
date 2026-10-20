@@ -11,22 +11,35 @@ function pmssPikkumiesOpenPage($state, $started)
         'moving' => ['Your account is being moved to a new server.', 'Pikkumies returns when the move finishes.'],
         'error' => ['Pikkumies cannot open for this account yet.', 'Please contact support.'],
         'cross-site' => ['Open Pikkumies from your control panel.', ''],
+        'old-browser' => ['Your browser is too old for Pikkumies. Please update it.', ''],
+        'not-running' => ['Pikkumies is not running right now.', 'Open it again from your control panel.'],
     ];
     $copy = $pages[$state] ?? $pages['error'];
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    if ($state === 'ready') header('Refresh: 5');
-    if ($state === 'cross-site') http_response_code(403);
-    $slow = $started > 0 && time() - $started > 180 && $state === 'ready'
+    if ($state === 'ready') header('Refresh: 5; url=pikkumiesOpen.php?session=pm1&started='.(int) $started);
+    if ($state === 'cross-site' || $state === 'old-browser') http_response_code(403);
+    $slow = $started > 0 && time() - $started > ($state === 'ready' ? 900 : 180)
         ? ' Taking longer than usual. Contact support.' : '';
     echo '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
-    echo '<title>Pikkumies</title><style>body{background:#111827;color:#f9fafb;font:14px system-ui;margin:0;padding:16px}'
+    echo '<title>Pikkumies</title><style>html{color-scheme:dark}body{background:#0f1720;color:#f9fafb;font:14px system-ui;margin:0;padding:16px}'
         .'main{max-width:480px;margin:10vh auto;padding:24px;border:1px solid #374151;border-radius:12px}'
         .'h1{font-size:18px}a{color:#93c5fd}</style><main><h1>'.htmlspecialchars($copy[0], ENT_QUOTES, 'UTF-8').'</h1>';
     if ($copy[1] !== '' || $slow !== '') echo '<p>'.htmlspecialchars($copy[1].$slow, ENT_QUOTES, 'UTF-8').'</p>';
     if ($state === 'cross-site') echo '<p><a href="index.php">Open your control panel</a></p>';
+    if ($state === 'not-running') echo '<p><button onclick="location.href=\'pikkumiesOpen.php?session=pm1\'">Reconnect</button></p>';
     if ($state === 'error') echo '<p><a href="mailto:support@pulsedmedia.com">Contact support</a></p>';
     echo '</main></html>';
+}
+
+/** Status never starts the UI or mints a bearer token. */
+function pmssPikkumiesOpenStatusEmit($visible, $ready, $origin = '', $setup = false)
+{
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode(array('visible' => (bool) $visible, 'ready' => (bool) $ready,
+        'setup' => (bool) $setup,
+        'origin' => $visible ? $origin : ''));
 }
 
 /** An account-local socket is live only when it accepts a connection. */
@@ -151,8 +164,14 @@ $home = is_array($account) ? (string) ($account['dir'] ?? '') : '';
 $name = is_array($account) ? (string) ($account['name'] ?? '') : '';
 $sameOrigin = ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'same-origin'
     || ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'none';
+$statusView = ($_GET['view'] ?? '') === 'status';
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET' || !$sameOrigin) {
-    pmssPikkumiesOpenPage('cross-site', 0);
+    pmssPikkumiesOpenPage(!isset($_SERVER['HTTP_SEC_FETCH_SITE'])
+        && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') === 'iframe' ? 'old-browser' : 'cross-site', 0);
+    return;
+}
+if (($_GET['view'] ?? '') === 'not-running') {
+    pmssPikkumiesOpenPage('not-running', 0);
     return;
 }
 
@@ -164,6 +183,7 @@ if (!is_string($ui) || !in_array($ui, ['simplified', 'hermes', 'vanilla-hermes-w
 // B/C remain closed until their separate authenticated backends are provisioned.
 if ($ui !== 'simplified' || $home === '' || $name === ''
     || !is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(false, false); return; }
     pmssPikkumiesOpenPage('error', 0);
     return;
 }
@@ -175,11 +195,13 @@ $billingId = is_array($stat) && ($stat['mode'] & 0170000) === 0100000 && $stat['
     ? trim((string) @file_get_contents($billing)) : '';
 if (!is_file($binary) || !is_executable($binary) || !preg_match('/^[1-9][0-9]*$/D', $billingId)
     || is_file($local.'/eternals.off') || !is_dir($local)) {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(false, false); return; }
     pmssPikkumiesOpenPage('error', 0);
     return;
 }
 $host = strtolower(trim((string) @shell_exec('/bin/hostname -f')));
 if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/D', $host) !== 1) {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(false, false); return; }
     pmssPikkumiesOpenPage('error', 0);
     return;
 }
@@ -190,16 +212,26 @@ $launcherUrl = $panelOrigin.'/user-'.$name.'/pikkumiesOpen.php';
 $socket = $local.'/ui/ui.sock';
 $started = isset($_GET['started']) && ctype_digit((string) $_GET['started']) ? (int) $_GET['started'] : time();
 if (pmssPikkumiesOpenMoving($local)) {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin); return; }
     pmssPikkumiesOpenPage('moving', $started);
     return;
 }
 $certificateState = pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permalink);
 if ($certificateState === 'error') {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin); return; }
     pmssPikkumiesOpenPage('error', $started);
     return;
 }
-if (($_GET['view'] ?? '') === 'status') {
-    pmssPikkumiesOpenPage('ready', $started);
+if ($statusView) {
+    $rows = [];
+    exec('/usr/bin/timeout -k 1s 2s '.escapeshellarg($binary).' eternal list --json 2>/dev/null', $rows, $rowsRc);
+    $eternals = $rowsRc === 0 ? json_decode(implode("\n", $rows), true) : null;
+    $setup = false;
+    if (is_array($eternals)) foreach ($eternals as $eternal) {
+        if (is_array($eternal) && ($eternal['id'] ?? '') === 'pm1'
+            && ($eternal['state'] ?? '') === 'waiting-for-setup') $setup = true;
+    }
+    pmssPikkumiesOpenStatusEmit(true, $certificateState === 'valid' && pmssPikkumiesOpenSocketLive($socket), $origin, $setup);
     return;
 }
 if ($certificateState !== 'valid') {

@@ -185,6 +185,9 @@ function pmssCreateNginxConfigSetup(): array
         && is_file('/opt/pikkumies-agentboard/agentboard')
         && pmssPikkumiesUiPortAvailable(844);
     if ($uiEnabled) {
+        if (!pmssPikkumiesUiPagesInstall()) {
+            pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
+        }
         if (!pmssWriteManagedFile($uiDefault, pmssPikkumiesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644)) {
             pmssCreateNginxConfigSetupWarn('write account UI default', $uiDefault);
         }

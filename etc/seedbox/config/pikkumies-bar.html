@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ask Pikkumies</title><style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;background:#0f1720;color:#e6edf3;font:14px system-ui}
+.box{position:relative;background:#000;border:1px solid #2e3b4f;border-radius:8px;min-height:52px}
+textarea{display:block;width:100%;min-height:50px;max-height:160px;resize:none;background:transparent;border:0;color:#e6edf3;padding:12px 56px 12px 14px;font:16px/22px system-ui;outline:0}
+textarea::placeholder{color:#8b949e}.box:focus-within{outline:2px solid #9dd8f5;outline-offset:-2px}
+button{position:absolute;right:4px;top:4px;width:44px;height:44px;border:0;border-radius:50%;background:#13708a;color:#fff;font:22px system-ui;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.hint,.count{color:#8b949e;font-size:12px}.hint{margin:4px 0 0 2px}.count{position:absolute;right:58px;bottom:5px}
+.error{color:#fca5a5;font-size:12px;min-height:16px;margin:2px 0 0 2px}
+@media(pointer:coarse){.hint{display:none}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important}}
+</style></head><body>
+<div class="box"><textarea id="ask" aria-label="Ask Pikkumies" maxlength="4000" rows="1" placeholder="How can i help you today? -Pikkumies"></textarea>
+<span class="count" id="count" hidden></span><button id="send" type="button" aria-label="Send to Pikkumies" disabled>↑</button></div>
+<div class="hint">Enter to send, Shift+Enter for a new line</div><div class="error" id="error" role="status" aria-live="polite"></div>
+<script>
+(function(){'use strict';
+var input=document.getElementById('ask'),send=document.getElementById('send'),count=document.getElementById('count'),error=document.getElementById('error');
+var key='pending-ask',draft='pikkumies:draft',target='';
+try{target=new URL(document.referrer).origin;}catch(e){}
+if(window.top===window||!/^https:\/\//.test(target))return;
+try{input.value=localStorage.getItem(draft)||'';}catch(e){}
+function post(name){window.top.postMessage(name,target);}
+function update(){var text=input.value;input.style.height='auto';
+ var lines=Math.min(6,Math.max(1,Math.ceil((input.scrollHeight-24)/22)));
+ input.style.height=Math.min(160,Math.max(50,12+lines*22))+'px';send.disabled=!text.trim();
+ count.hidden=text.length<3800;count.textContent=text.length+'/4000';post('pikkumies:rows:'+lines);
+ try{localStorage.setItem(draft,text);}catch(e){}
+}
+function submit(){var text=input.value.replace(/\r\n?/g,'\n');if(!text.trim())return;
+ try{var now=Date.now(),queue=JSON.parse(localStorage.getItem(key)||'[]');
+  if(!Array.isArray(queue))queue=[];queue=queue.filter(function(item){return item&&typeof item.text==='string'&&now-item.ts<3600000&&now-item.ts>=0;});
+  if(queue.length>=5){error.textContent='That did not go through. Try again.';return;}
+  var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+  queue.push({text:text,nonce:Array.from(bytes,function(n){return n.toString(16).padStart(2,'0');}).join(''),ts:now});
+  localStorage.setItem(key,JSON.stringify(queue));localStorage.removeItem(draft);
+  input.value='';error.textContent='';update();post('pikkumies:switch');
+ }catch(e){error.textContent='That did not go through. Try again.';}
+}
+input.addEventListener('input',update);
+input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();submit();}});
+send.addEventListener('click',submit);update();post('pikkumies:ready');
+if(document.hasFocus()&&matchMedia('(pointer:fine)').matches)input.focus();
+})();
+</script></body></html>

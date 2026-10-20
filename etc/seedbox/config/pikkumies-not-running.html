@@ -1,0 +1,4 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pikkumies</title>
+<style>:root{color-scheme:dark}body{margin:0;padding:16px;background:#0f1720;color:#e6edf3;font:14px system-ui}main{max-width:480px;margin:10vh auto;padding:24px;border:1px solid #2e3b4f;border-radius:12px}h1{font-size:18px}button{background:#13708a;color:#fff;border:0;border-radius:6px;padding:10px 16px;cursor:pointer}button:focus-visible{outline:2px solid #9dd8f5;outline-offset:2px}</style></head>
+<body><main><h1>Pikkumies is not running right now.</h1><p>Open it again from your control panel.</p><button id="reconnect" type="button">Reconnect</button></main>
+<script>document.getElementById('reconnect').addEventListener('click',function(){try{var origin=new URL(document.referrer).origin;if(/^https:\/\//.test(origin))window.top.postMessage('pikkumies:reconnect',origin);}catch(e){}});</script></body></html>

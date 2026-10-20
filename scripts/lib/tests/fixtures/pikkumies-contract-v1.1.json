@@ -65,7 +65,9 @@
     ]
   },
   "panel": {
-    "pendingAskJson": "{\"text\": string <= 4000 chars, \"nonce\": string, \"ts\": unix seconds}",
+    "pendingAskKey": "pending-ask",
+    "draftKey": "pikkumies:draft",
+    "pendingAskJson": "{\"text\": string <= 4000 chars, \"nonce\": string, \"ts\": unix milliseconds}",
     "pendingAskTtl": "60 minutes",
     "pendingAskLimit": "up to 5",
     "messages": ["pikkumies:switch", "pikkumies:ready", "pikkumies:reconnect", "pikkumies:rows:1", "pikkumies:rows:2", "pikkumies:rows:3", "pikkumies:rows:4", "pikkumies:rows:5", "pikkumies:rows:6"],

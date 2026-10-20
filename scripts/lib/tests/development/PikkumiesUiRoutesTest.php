@@ -55,4 +55,22 @@ final class PikkumiesUiRoutesTest extends TestCase
         ], $lighttpd);
         $this->assertSame('', \pmssLighttpdPikkumiesUiBlock('../uitester'));
     }
+
+    public function testRootOwnedBarPageKeepsTheAskQueueAndCopyBounded(): void
+    {
+        $bar = $this->pmssReadRepoFile('etc/seedbox/config/pikkumies-bar.html');
+        $offline = $this->pmssReadRepoFile('etc/seedbox/config/pikkumies-not-running.html');
+        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
+        $this->assertTrue(strlen($bar) < 10240);
+        $this->assertStringContainsAllStrings([
+            'lang="en"', 'maxlength="4000"', 'aria-label="Ask Pikkumies"',
+            'How can i help you today? -Pikkumies', 'e.isComposing',
+            "'pending-ask'", "'pikkumies:draft'", 'queue.length>=5',
+            'now-item.ts<3600000', 'crypto.getRandomValues', 'pikkumies:rows:',
+            'prefers-reduced-motion', 'pointer:coarse', 'window.top===window',
+        ], $bar);
+        $this->assertStringContainsString('pikkumies:reconnect', $offline);
+        $this->assertStringContainsString('pmssPikkumiesUiPagesInstall()', $setup);
+        $this->assertFalse(strpos($bar.$offline, 'Try again</button>') !== false);
+    }
 }

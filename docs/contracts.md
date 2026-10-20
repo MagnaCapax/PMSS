@@ -1196,7 +1196,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ---
 
-## Pikkumies Eternals and web UIs (contract v1)
+## Pikkumies Eternals and web UIs (contract v1.1)
 
 This is the shared contract for PMSS, mcxPikkumies, and
 mcxPikkumiesAgentboard. ADR 0124 records Eternals and account web UIs;
@@ -1242,14 +1242,17 @@ to the account home. `L` means `Config::localDir()`.
   `AGENTBOARD_ALLOWED_ORIGIN`, `AGENTBOARD_FRAME_ANCESTORS`,
   `TMUX_SESSION=pikkumies`, and `TERMINAL_MODE=pty`.
 - Welcome-page prompt bar: hands a question to Primary. Pending-ask JSON in
-  the port-A origin's localStorage is a queue of up to 5
-  `{"text": string <= 4000 chars, "nonce": string, "ts": unix seconds}` items,
+  the port-A origin's localStorage key `pending-ask` is a queue of up to 5
+  `{"text": string <= 4000 chars, "nonce": string, "ts": unix milliseconds}` items,
   delivered in order. Its TTL is 60 minutes. The UI frames and panel use
   `pikkumies:switch`, `pikkumies:ready`, `pikkumies:reconnect`,
   `pikkumies:rows:1`, `pikkumies:rows:2`, `pikkumies:rows:3`,
   `pikkumies:rows:4`, `pikkumies:rows:5`, and `pikkumies:rows:6`
   postMessage names, always with
   an exact target origin. UI pages accept no inbound postMessage.
+  The panel accepts messages only from the matching port-A origin and the
+  active tab or bar iframe window. The bar is a root-owned inline page at
+  `/var/www/pikkumies/bar.html`; its draft key is `pikkumies:draft`.
 - `?session=` accepts only `^pm[1-9]$`. Per-UI `ui=` selector values are
   `simplified` (port A, agentboard fork in pikkumies mode), `hermes` (port B,
   Pikkumies' Hermes dashboard, "Power user"), `vanilla-hermes-web`, and
@@ -1263,7 +1266,11 @@ to the account home. `L` means `Config::localDir()`.
   GET that reads state and may place a guarded certificate request; it does
   not start a UI or mint a token. An absent `Sec-Fetch-Site` is denied.
 - Account UI preferences live in `~/.config/pmss/ui/`; absent means Simplified
-  for Pikkumies and Hermes web UI for vanilla Hermes.
+  for Pikkumies and Hermes web UI for vanilla Hermes. The Pikkumies interface
+  choice is `~/.config/pmss/ui/pikkumies-interface`, with `simplified` and
+  `power-user` as its only values. The same-origin launcher status view returns
+  JSON with `visible`, `ready`, `setup`, and `origin`, without starting the UI or
+  minting a token.
 - The Agentboard binary is `/opt/pikkumies-agentboard/<version>/agentboard`,
   reached through `/opt/pikkumies-agentboard/agentboard`. It uses the
   `bun-linux-x64-baseline` target. The installer is inactive with an empty
