@@ -56,6 +56,34 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertSame('', \pmssLighttpdPikkumiesUiBlock('../uitester'));
     }
 
+    public function testPortCUsesPrivateServiceOriginAndSeparateBackendPaths(): void
+    {
+        $live = $this->pmssMakeTempDir('pmss-hermes-ui-cert-', 0700);
+        mkdir($live.'/uitester.node.example.com');
+        file_put_contents($live.'/uitester.node.example.com/fullchain.pem', 'fixture');
+        file_put_contents($live.'/uitester.node.example.com/privkey.pem', 'fixture');
+        $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com',
+            '0123456789abcdef.mcx.fi', 12345, $live);
+        $this->assertStringContainsAllStrings([
+            'listen 846 ssl;', 'server_name 0123456789abcdef.mcx.fi;',
+            'location = /api/cron/fire { return 404; }', 'same-origin|none',
+            'auth_request /__pmss-auth;', 'proxy_set_header Authorization "";',
+            'agentboard $http_authorization;',
+            'proxy_set_header X-Forwarded-Proto https;', 'pmss_ui_noargs',
+            '/__pmss-select-web', '/__pmss-select-agentboard',
+        ], $block);
+        $this->assertFalse(strpos($block, 'X-Forwarded-Prefix') !== false);
+        $this->assertFalse(strpos($block, '$args') !== false);
+        $this->assertStringContainsString('listen 846 ssl default_server;',
+            \pmssHermesUiDefaultNginxBlock("    ssl_certificate /safe/fullchain.pem;\n"));
+        $hermes = \pmssLighttpdHermesUiBlock('uitester', 24000);
+        $agentboard = \pmssLighttpdHermesUiBlock('uitester', 24000, 'vanilla-agentboard');
+        $this->assertStringContainsAllStrings(['^/__pmss-ui-c/', 'X-Forwarded-Proto', '"Authorization" => ""'], $hermes);
+        $this->assertStringContainsString('/home/uitester/.config/pmss/ui/agentboard.sock', $agentboard);
+        $this->assertFalse(strpos($agentboard, '"Authorization" => ""') !== false);
+        $this->assertSame('', \pmssLighttpdHermesUiBlock('../uitester', 24000));
+    }
+
     public function testRootOwnedBarPageKeepsTheAskQueueAndCopyBounded(): void
     {
         $bar = $this->pmssReadRepoFile('etc/seedbox/config/pikkumies-bar.html');

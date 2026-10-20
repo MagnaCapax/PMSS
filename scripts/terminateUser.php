@@ -205,6 +205,7 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('release_media_autobrr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-autobrr'),
     array('release_media_jellyfin_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-jellyfin'),
     array('release_media_openclaw_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-openclaw'),
+    array('release_media_hermes_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-hermes'),
 ), $dryRun);
 foreach ($toggleApps as $toggleApp => $row) {
     foreach (array_merge(array($toggleApp), $row['extraPortServices']) as $service) {

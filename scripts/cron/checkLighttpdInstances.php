@@ -10,6 +10,7 @@ require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogNginxLogReader.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
+require_once __DIR__.'/../lib/lighttpd/hermesUiConverge.php';
 require_once __DIR__.'/../lib/runtime.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
 
@@ -60,6 +61,7 @@ foreach($users AS $thisUser) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
         continue;
     }
+    pmssHermesUiConverge($thisUser, $homeDir);
 
     if (!file_exists($configPath) && is_dir($homeDir)) {
         echo "Config missing for user: {$thisUser} — generating\n";

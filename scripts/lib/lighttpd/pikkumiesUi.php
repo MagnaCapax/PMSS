@@ -16,3 +16,25 @@ function pmssLighttpdPikkumiesUiBlock(string $user): string
 }
 LIGHTTPD;
 }
+
+/** Generated port-C mount; no customer custom.d fragment controls this route. */
+function pmssLighttpdHermesUiBlock(string $user, int $port, string $mode = 'vanilla-hermes-web'): string
+{
+    if (preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1 || $port < 1024 || $port > 65535) return '';
+    $upstream = $mode === 'vanilla-agentboard'
+        ? '"socket" => "/home/'.$user.'/.config/pmss/ui/agentboard.sock"'
+        : '"host" => "127.0.0.1", "port" => '.$port;
+    $prefix = $mode === 'vanilla-agentboard' ? '/__pmss-ui-c-agentboard/' : '/__pmss-ui-c/';
+    $authHeader = $mode === 'vanilla-agentboard' ? '' : '"Authorization" => "", ';
+    return <<<LIGHTTPD
+
+# Port C has a private upstream selected by the account's Configure setting.
+\$HTTP["url"] =~ "^{$prefix}" {
+    setenv.set-request-header = ( {$authHeader}"X-Forwarded-Proto" => "https" )
+    proxy.server = ( "" => (( {$upstream} )) )
+    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "{$prefix}" => "/" ) )
+    server.max-read-idle = 3600
+    server.max-write-idle = 3600
+}
+LIGHTTPD;
+}

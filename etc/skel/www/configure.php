@@ -19,6 +19,13 @@ if (!is_file(__DIR__.'/appsRuntime.php') || !is_file(__DIR__.'/configureSettings
 }
 require_once __DIR__.'/configureSettings.php';
 require_once __DIR__.'/appsRuntime.php';
+if (isset($_GET['hermesStatus'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode(function_exists('pmssHermesPanelStatusRead')
+        ? pmssHermesPanelStatusRead(dirname(__DIR__)) : array('installed' => false, 'state' => ''));
+    return;
+}
 if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()
     || !function_exists('pmssFrontendPostActionRequired')) {
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
@@ -51,6 +58,11 @@ $settingsState = pmssConfigureSettingsStateRead($home);
 $pmssPikkumiesState = function_exists('pmssPikkumiesPanelStateRead')
     ? pmssPikkumiesPanelStateRead($home, $username)
     : array('visible' => false, 'origin' => '', 'mode' => 'simplified', 'off' => false);
+$pmssHermesState = function_exists('pmssHermesPanelStatusRead') ? pmssHermesPanelStatusRead($home)
+    : array('installed' => false, 'state' => '', 'url' => '');
+$pmssHermesChoice = trim(pmssConfigureFileRead($home.'/.config/pmss/ui/hermes-interface', 64));
+if (!in_array($pmssHermesChoice, array('vanilla-hermes-web', 'vanilla-agentboard', 'agentboard-pikkumies'), true))
+    $pmssHermesChoice = 'vanilla-hermes-web';
 $customRows = $settingsState['customRows'];
 $rtorrentCustom = $settingsState['rtorrentCustom'];
 $certMode = $settingsState['certMode'];
@@ -58,7 +70,7 @@ $certFailed = $settingsState['certFailed'];
 $sections = array('apps' => 'Apps', 'alerts' => 'Usage alert email', 'logins' => 'Passwords and logins',
     'backup' => 'Backup and restore', 'https' => 'HTTPS for your public folder', 'tabs' => 'Custom tabs',
     'rtorrent' => 'rTorrent custom settings', 'panel' => 'Panel', 'more' => 'Find more apps');
-if ($pmssPikkumiesState['origin'] !== '') {
+if ($pmssPikkumiesState['origin'] !== '' || is_file($home.'/bin/install-hermes')) {
     $sections = array_merge(array_slice($sections, 0, 1, true), array('agents' => 'AI agents'), array_slice($sections, 1, null, true));
 }
 if (is_file(__DIR__.'/mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {
@@ -104,7 +116,8 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <div class="configure-actions"><select id="configure-qbittorrent-version" aria-label="qBittorrent version"><?php foreach ($torrentVersions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"><?= pmssCustomerHtmlAttr($version) ?></option><?php endforeach; ?></select>
 <input type="password" id="configure-qbittorrent-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'qbittorrent',version:document.getElementById('configure-qbittorrent-version').value,password:document.getElementById('configure-qbittorrent-password').value},'Back up the current configuration and restart qBittorrent with this version?')">Switch version</button></div><?php endif; ?></section>
 <?php if (isset($sections['agents'])): ?>
-<section class="configure-card" id="agents"><h2>AI agents</h2><h3>Pikkumies</h3>
+<section class="configure-card" id="agents"><h2>AI agents</h2>
+<?php if ($pmssPikkumiesState['origin'] !== ''): ?><h3>Pikkumies</h3>
 <p>A small helper that lives on your server. Ask it in plain words to check disk space, fix a stuck app or add a torrent.</p>
 <span class="pmss-pikkumies-pill" id="pmss-pikkumies-pill" data-state="<?= $pmssPikkumiesState['off'] ? 'Off' : 'Starting' ?>"><?= $pmssPikkumiesState['off'] ? 'Off' : 'Starting' ?></span>
 <div class="configure-actions"><button type="button" onclick="pmssPikkumiesToggle('<?= $pmssPikkumiesState['off'] ? 'on' : 'off' ?>')"><?= $pmssPikkumiesState['off'] ? 'Turn on Pikkumies' : 'Turn off Pikkumies' ?></button>
@@ -116,7 +129,26 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <p>Interface</p><div class="pmss-pikkumies-segments" role="group" aria-label="Interface">
 <button type="button" aria-pressed="<?= $pmssPikkumiesState['mode'] === 'simplified' ? 'true' : 'false' ?>" onclick="pmssPikkumiesInterface('simplified')">Simplified (recommended)</button>
 <button type="button" aria-pressed="<?= $pmssPikkumiesState['mode'] === 'power-user' ? 'true' : 'false' ?>" onclick="pmssPikkumiesInterface('power-user')">Power user (opens full Hermes in its own tab)</button></div>
-<p>Hermes web UI and Pikkumies' Hermes share one sign-in: signing in to one signs you out of the other.</p>
+<?php endif; ?>
+<h3>Hermes</h3><p>Your own Hermes agent, separate from Pikkumies.</p>
+<div id="pmss-hermes-card" data-state="<?= pmssCustomerHtmlAttr($pmssHermesState['state']) ?>">
+<?php if (!$pmssHermesState['installed']): ?>
+<span class="pmss-pikkumies-pill" id="pmss-hermes-pill"><?= $pmssHermesState['state'] === 'installing' ? 'Installing…' : ($pmssHermesState['state'] === 'failed' ? 'Install failed' : ($pmssHermesState['state'] === 'customer-updated' ? 'Your Hermes checkout has changes and was left untouched.' : 'Not installed')) ?></span>
+<div class="configure-actions"><button type="button" id="pmss-hermes-install" onclick="pmssHermesInstall()">Install Hermes</button></div>
+<?php else: ?>
+<span class="pmss-pikkumies-pill" id="pmss-hermes-pill">Installed</span>
+<div class="configure-actions"><label for="pmss-hermes-interface">Web interface</label>
+<select id="pmss-hermes-interface" onchange="pmssHermesInterface(this.value)">
+<option value="vanilla-hermes-web"<?= $pmssHermesChoice === 'vanilla-hermes-web' ? ' selected' : '' ?>>Hermes web UI (default)</option>
+<option value="vanilla-agentboard"<?= $pmssHermesChoice === 'vanilla-agentboard' ? ' selected' : '' ?>>Agentboard</option>
+<?php if ($pmssPikkumiesState['visible']): ?><option value="agentboard-pikkumies"<?= $pmssHermesChoice === 'agentboard-pikkumies' ? ' selected' : '' ?>>Agentboard Pikkumies</option><?php endif; ?></select>
+<a href="pikkumiesOpen.php?ui=<?= pmssCustomerHtmlAttr($pmssHermesChoice) ?>" target="_blank" rel="noopener">Open</a>
+<button type="button" onclick="pmssHermesShowLogin()">Show Hermes password</button>
+<input type="password" id="pmss-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password">
+<output id="pmss-hermes-password" hidden></output><button type="button" id="pmss-hermes-copy" hidden onclick="navigator.clipboard.writeText(document.getElementById('pmss-hermes-password').textContent)">Copy password</button></div>
+<p>Only one Hermes window can be open. Opening this one closes the other.</p>
+<p>Signing in to one Hermes window signs you out of the other.</p>
+<?php endif; ?></div>
 </section>
 <?php endif; ?>
 <?php foreach (array('deluge' => 'Deluge', 'transmission' => 'Transmission') as $client => $label): $versions = $otherTorrentVersions[$client] ?? array(); if ($versions): ?>
@@ -170,6 +202,39 @@ function pmssPikkumiesToggle(mode) {
         success:function(){window.top.location.reload(true);},
         error:function(){pmssConfigureNotice('That did not go through. Try again.', true);}});
 }
+function pmssHermesInstall() {
+    $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},
+        data:{action:'hermesInstall'},
+        success:function(){pmssConfigureNotice('Installing… This takes a few minutes.', false); pmssHermesStatusPoll();},
+        error:function(xhr){pmssConfigureNotice((xhr.responseJSON && xhr.responseJSON.message) || 'Install did not finish. Try again, or contact support.', true);}});
+}
+function pmssHermesInterface(mode) {
+    $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},
+        data:{action:'hermesInterface',mode:mode},
+        success:function(){pmssConfigureNotice('Saved.', false); location.reload(true);},
+        error:function(){pmssConfigureNotice('That did not go through. Try again.', true);}});
+}
+function pmssHermesShowLogin() {
+    var field = document.getElementById('pmss-hermes-account-password');
+    $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},
+        data:{action:'hermesShowLogin',password:field.value},
+        success:function(result){var output=document.getElementById('pmss-hermes-password'); output.textContent=result.message; output.hidden=false; document.getElementById('pmss-hermes-copy').hidden=false; field.value='';},
+        error:function(){pmssConfigureNotice('The password you entered was not accepted.', true); field.value='';}});
+}
+function pmssHermesStatusPoll() {
+    var card=document.getElementById('pmss-hermes-card');
+    if (!card || document.hidden) return;
+    fetch('configure.php?hermesStatus=1', {credentials:'same-origin',cache:'no-store'})
+        .then(function(response){return response.json();}).then(function(state){
+            if (state.installed) { location.reload(true); return; }
+            if (state.state !== card.getAttribute('data-state')) {
+                card.setAttribute('data-state',state.state);
+                var pill=document.getElementById('pmss-hermes-pill');
+                if (pill) pill.textContent=state.state==='failed'?'Install failed':state.state==='installing'?'Installing…':state.state==='customer-updated'?'Your Hermes checkout has changes and was left untouched.':'Not installed';
+            }
+        }).catch(function(){});
+}
+setInterval(pmssHermesStatusPoll, 5000);
 <?php if (isset($sections['agents'])): ?>
 function pmssPikkumiesStatusPoll() {
     if (!document.getElementById('agents') || document.hidden

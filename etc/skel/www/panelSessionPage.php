@@ -80,6 +80,9 @@ function pmssPanelSessionLogoutMain(): int
     }
 
     pmssPanelSessionDelete($paths);
+    $hermes = $paths['home'].'/bin/install-hermes';
+    if (is_file($hermes) && !is_link($hermes) && is_executable($hermes))
+        exec(escapeshellarg($hermes).' rotate-session >/dev/null 2>&1');
     pmssPanelSessionLog($paths, 'logout status=ok');
     pmssPanelSessionEmitHeaders([
         'Set-Cookie' => pmssPanelSessionCookieDeleteHeader($username),

@@ -89,6 +89,15 @@ function pmssLighttpdRenderUserConfig(
         && is_file('/opt/pikkumies-agentboard/agentboard')) {
         $config .= pmssLighttpdPikkumiesUiBlock($user);
     }
+    // Root reads only the root-owned reservation; the account status merely opts in.
+    $status = '/home/'.$user.'/.hermes/pmss-install.status';
+    $reservation = '/etc/seedbox/runtime/ports/media-stack-hermes-'.$user;
+    $port = function_exists('pmssReadRegularFileNetworkPort') ? pmssReadRegularFileNetworkPort($reservation) : null;
+    if ($port !== null && is_file($status) && !is_link($status) && @filesize($status) <= 32
+        && trim((string) @file_get_contents($status)) === 'ready') {
+        $config .= pmssLighttpdHermesUiBlock($user, $port)
+            .pmssLighttpdHermesUiBlock($user, $port, 'vanilla-agentboard');
+    }
     return $config;
 }
 

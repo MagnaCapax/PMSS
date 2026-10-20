@@ -1256,13 +1256,15 @@ to the account home. `L` means `Config::localDir()`.
 - `?session=` accepts only `^pm[1-9]$`. Per-UI `ui=` selector values are
   `simplified` (port A, agentboard fork in pikkumies mode), `hermes` (port B,
   Pikkumies' Hermes dashboard, "Power user"), `vanilla-hermes-web`, and
-  `vanilla-agentboard` (port C, one at a time).
+  `vanilla-agentboard` (port C, one at a time), and
+  `agentboard-pikkumies` (an alias that opens port A only while Pikkumies is
+  installed and On).
 - Ports A, B, and C are respectively 844, 845, and 846. ADR 0124 records
   their account UI routing. Each port serves its UI at `/` on the service
   permalink. A also serves `/bar` from a root-owned host path outside `/home`.
   The host marker gates A and B; C does not depend on it.
 - Port C tokens live in `~/.config/pmss/ui/tokens/` (0700, files 0600,
-  single-use, 60 s). The launcher accepts `?view=status` for a same-origin
+  single-use, 60 s, at most eight live tokens). The launcher accepts `?view=status` for a same-origin
   GET that reads state and may place a guarded certificate request; it does
   not start a UI or mint a token. An absent `Sec-Fetch-Site` is denied.
 - Account UI preferences live in `~/.config/pmss/ui/`; absent means Simplified
@@ -1278,8 +1280,11 @@ to the account home. `L` means `Config::localDir()`.
 
 The PMSS port-A launcher and route are inert until the host marker, pinned
 binary, root-owned billing identity, and per-service certificate exist. The
-launcher refuses the `hermes`, `vanilla-hermes-web`, and
-`vanilla-agentboard` selectors while their authenticated backends are absent.
+launcher refuses `hermes` while its authenticated backend is absent. The
+`vanilla-hermes-web` and `vanilla-agentboard` selectors require the account's
+own completed vanilla install and root-owned billing identity, independently
+of the Eternals host marker. Port C uses a generated TLS route at `/` and an
+account-side on-demand launcher; 401 probes guard both backend choices.
 The service permalink is built only from the root-owned provisioning record;
 an account-owned billing dot-file cannot select another service name.
 

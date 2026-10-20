@@ -29,8 +29,10 @@ OpenClaw has no lighttpd proxy. Its separate opt-in installer binds the reserved
 port on loopback and requires a gateway token.
 Pikkumies account UI origins use fixed HTTPS ports 844, 845 and 846 rather
 than allocator slots. The enabled nginx route checks that its port is not
-owned by another listener. Port A has a generated lighttpd Unix-socket proxy;
-the authenticated Hermes backends for ports B and C remain closed.
+owned by another listener. Port A has a generated lighttpd Unix-socket proxy.
+An opt-in vanilla Hermes account reserves a `media-stack-hermes` loopback
+backend port, published to `~/.media-stack-port-hermes`; its generated port-C
+route uses 846. Port B remains closed until its own backend gate is present.
 Invalid usernames and service names are rejected before any reservation path is built.
 Persisted assignment files must contain a numeric TCP port; malformed existing
 assignments are treated as errors for that user, while malformed sibling files

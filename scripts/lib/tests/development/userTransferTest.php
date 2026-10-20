@@ -413,7 +413,10 @@ SNAP;
         $targetHold = \pmssUserTransferTargetEternalCommand('deefbox', 1800000000);
 
         $this->assertStringContainsString('/.mcxPikkumies/pikkumies/local', $main);
+        $this->assertStringContainsString('/.hermes', $main);
         $this->assertStringContainsString('/./.mcxPikkumies/pikkumies/local', $final);
+        $this->assertStringContainsString('/./.hermes', $final);
+        $this->assertStringContainsString('"$HOME/bin/install-hermes" stop', $sourceHold);
         $this->assertStringContainsString('--ignore-missing-args', $final);
         $this->assertStringContainsString('/.mcxPikkumies/pikkumies/local/eternals.hold', $final);
         $this->assertStringContainsString('eternal hold --until 1800000000', $sourceHold);

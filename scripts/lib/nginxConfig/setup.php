@@ -194,6 +194,13 @@ function pmssCreateNginxConfigSetup(): array
     } elseif (is_file($uiDefault) && !is_link($uiDefault) && pmssPathTargetIsSafe($uiDefault, false, true)) {
         @unlink($uiDefault);
     }
+    $hermesDefault = $subdomainConfigDir.'/pmss-hermes-default.conf';
+    if ($subdomainEnabled && $nginxSslBlock !== '' && pmssPikkumiesUiPortAvailable(846)) {
+        if (!pmssWriteManagedFile($hermesDefault, pmssHermesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
+            pmssCreateNginxConfigSetupWarn('write Hermes UI default', $hermesDefault);
+    } elseif (is_file($hermesDefault) && !is_link($hermesDefault) && pmssPathTargetIsSafe($hermesDefault, false, true)) {
+        @unlink($hermesDefault);
+    }
 
     $templates = pmssNginxUserSubdomainTemplates();
     return [

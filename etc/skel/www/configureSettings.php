@@ -3,6 +3,7 @@
 require_once __DIR__.'/scriptsInc.php';
 require_once __DIR__.'/panelSessionAuth.php';
 if (is_file(__DIR__.'/pikkumiesPanel.php')) require_once __DIR__.'/pikkumiesPanel.php';
+if (is_file(__DIR__.'/hermesAgent.php')) require_once __DIR__.'/hermesAgent.php';
 
 /** Save the two allowed display modes in a private account-owned file. */
 function pmssPikkumiesInterfaceSave($home, $mode)
@@ -15,6 +16,21 @@ function pmssPikkumiesInterfaceSave($home, $mode)
         || (!is_dir($dir) && !@mkdir($dir, 0700))) return false;
     @chmod($dir, 0700);
     return pmssConfigureFileWrite($dir.'/pikkumies-interface', $mode."\n");
+}
+
+/** Choose one vanilla Hermes window; the launcher starts only the chosen UI. */
+function pmssHermesInterfaceSave($home, $mode)
+{
+    if (!in_array($mode, array('vanilla-hermes-web', 'vanilla-agentboard', 'agentboard-pikkumies'), true)) return false;
+    if ($mode === 'agentboard-pikkumies'
+        && !is_file($home.'/.mcxPikkumies/pikkumies/bin/pikkumies')) return false;
+    $base = $home.'/.config/pmss';
+    $dir = $base.'/ui';
+    if (is_link($base) || is_link($dir)
+        || (!is_dir($base) && !@mkdir($base, 0700, true))
+        || (!is_dir($dir) && !@mkdir($dir, 0700))) return false;
+    @chmod($dir, 0700);
+    return pmssConfigureFileWrite($dir.'/hermes-interface', $mode."\n");
 }
 
 /** Read a bounded regular account file without following symlinks. */
@@ -102,7 +118,7 @@ function pmssConfigureActionApply($home, $action, $request, $ops = array())
 {
     $paths = pmssPanelSessionPaths($home);
     // These actions can run account commands or publish the username, so they need the account password.
-    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch'), true);
+    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch', 'hermesShowLogin'), true);
     if ($highImpact && (!isset($request['password']) || !is_string($request['password'])
         || !pmssPanelSessionPasswordValid($paths, pmssPanelSessionUsername($home), $request['password']))) {
         $result = array('ok' => false, 'status' => 403, 'message' => 'The password you entered was not accepted. Nothing was changed.');
@@ -119,7 +135,15 @@ function pmssConfigureActionRun($home, $action, $request, $ops = array())
 {
     $ok = false;
     $message = 'The setting could not be saved.';
-    if ($action === 'pikkumiesInterface' || $action === 'pikkumiesEternal') {
+    if ($action === 'hermesInstall' || $action === 'hermesShowLogin') {
+        if (!function_exists('pmssHermesPanelAction'))
+            return array('ok' => false, 'status' => 503, 'message' => 'Hermes is unavailable on this host.');
+        return pmssHermesPanelAction($home, $action === 'hermesInstall' ? 'install' : 'show-login', $request, $ops);
+    } elseif ($action === 'hermesInterface') {
+        $ok = pmssHermesInterfaceSave($home, $request['mode'] ?? null);
+        return array('ok' => $ok, 'status' => $ok ? 200 : 400,
+            'message' => $ok ? 'Saved.' : 'That did not go through. Try again.');
+    } elseif ($action === 'pikkumiesInterface' || $action === 'pikkumiesEternal') {
         $name = pmssPanelSessionUsername($home);
         $state = function_exists('pmssPikkumiesPanelStateRead')
             ? pmssPikkumiesPanelStateRead($home, $name) : array('origin' => '');

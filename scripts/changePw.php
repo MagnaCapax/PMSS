@@ -103,6 +103,12 @@ if ($htpasswdReturnCode !== 0) {
     exit(1);
 }
 
+// A panel password change also invalidates vanilla Hermes browser sessions.
+$hermesInstaller = $homeDir.'/bin/install-hermes';
+if (is_file($hermesInstaller) && !is_link($hermesInstaller) && is_executable($hermesInstaller)) {
+    exec(pmssBuildUserShellCommand($username, escapeshellarg($hermesInstaller).' rotate-session').' >/dev/null 2>&1');
+}
+
 // Sync password to qBittorrent if installed.
 // Deluge is intentionally excluded: its auth file stores passwords in plaintext,
 // making account password sync a security risk (see GH#211).

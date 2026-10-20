@@ -82,6 +82,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.bonusTraffic', '.trafficLimit', '.resourceData', '*.pmss-tmp-*',
         '/.billingId', '/.billingServiceId', '/.billingClientId',
         '/.mcxPikkumies/pikkumies/local',
+        '/.hermes',
     ];
 
     return pmssUserTransferBuildRsyncCommand($cfg, ['/home/'.$cfg['remoteUser'].'/'], $excludes);
@@ -94,6 +95,7 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
         $remoteHome.'/./session', $remoteHome.'/./www/rutorrent/share', $remoteHome.'/./.lighttpd/custom',
         $remoteHome.'/./.lighttpd/custom.d', $remoteHome.'/./.local', $remoteHome.'/./www/public',
         $remoteHome.'/./.mcxPikkumies/pikkumies/local',
+        $remoteHome.'/./.hermes',
     ], ['/session/rtorrent.lock', '/.billingId', '/.billingServiceId', '/.billingClientId', '/.mcxPikkumies/pikkumies/local/eternals.hold'], ['-R', '--ignore-missing-args']);
 }
 
@@ -105,7 +107,9 @@ function pmssUserTransferBuildEternalSourceCommand(array $cfg, ?int $until): str
     $remote = $until === null
         ? 'rm -f -- '.$marker
         : 'if [ -x '.$binary.' ] && [ -f /etc/seedbox/config/pikkumiesEternals.enabled ]; then '
-            .$binary.' eternal hold --until '.(string) $until.'; fi';
+            .$binary.' eternal hold --until '.(string) $until.'; fi'
+            .'; if [ -f "$HOME/.hermes/pmss-install.status" ] && [ -x "$HOME/bin/install-hermes" ]; then '
+            .'"$HOME/bin/install-hermes" stop; fi';
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
 }
 

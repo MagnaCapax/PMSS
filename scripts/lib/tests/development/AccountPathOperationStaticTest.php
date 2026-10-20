@@ -8,7 +8,7 @@ final class AccountPathOperationStaticTest extends TestCase
 {
     /** Fixed commands with an account argument; each entry also pins its reviewed line. */
     private const SAFE = [
-        'scripts/cron/checkLighttpdInstances.php:66' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
+        'scripts/cron/checkLighttpdInstances.php:68' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
         'scripts/cron/webPublicCertsProcess.php:117' => ['cd5455be1bf21155c002ba607313f214d4da6b28', 'fixed config utility with quoted account'],
         'scripts/cron/webPublicCertsProcess.php:153' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
         'scripts/lib/rtorrent/processInspection.php:98' => ['13417f72f7995d00594046ad6921f6924f10f56a', 'process listing with quoted account'],
@@ -16,7 +16,7 @@ final class AccountPathOperationStaticTest extends TestCase
         'scripts/lib/lighttpd/userConfigApply.php:62' => ['af1754514e1c4518bfe8bbc90929d930bb125806', 'fixed port utility with quoted account'],
         'scripts/lib/network/fireqos.php:26' => ['b4712db6815bc3f3adbcce7ab5678ddb8db7a60b', 'uid lookup with quoted account'],
         'scripts/lib/resources/log.php:32' => ['abcdc22775d788f8fa306195c4bbca4a3da976ab', 'uid lookup with quoted account'],
-        'scripts/lib/nginxConfig/userConfigsGenerate.php:175' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
+        'scripts/lib/nginxConfig/userConfigsGenerate.php:188' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
         'scripts/lib/update/users/docker.php:116' => ['b1fd9ef63ccf528d30bc352bef2c0d326d4311b5', 'uid lookup with quoted account'],
     ];
 

@@ -94,7 +94,7 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertStringContainsString('title = \'Ask Pikkumies\'', $welcome);
         $this->assertStringContainsString('Your network may be blocking Pikkumies.', $index);
         $this->assertStringContainsString('Power user (opens full Hermes in its own tab)', $configure);
-        $this->assertStringContainsString('Hermes web UI and Pikkumies\' Hermes share one sign-in:', $configure);
+        $this->assertStringContainsString('Signing in to one Hermes window signs you out of the other.', $configure);
         $this->assertStringContainsString('pmssPikkumiesOpenStatusEmit(true, $certificateState', $launcher);
         foreach (array('Retrying in N min', 'Turn it on to use it', 'Your browser cannot reach Pikkumies') as $removed) {
             $this->assertFalse(strpos($index.$welcome.$configure.$launcher, $removed) !== false);
