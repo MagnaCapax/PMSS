@@ -31,6 +31,7 @@ require_once __DIR__.'/../lib/user/identity.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/homeMarkerRegistry.php';
 require_once __DIR__.'/../lib/runtime/cli.php';
+require_once __DIR__.'/../lib/user/userConfigStore.php';
 
 function pmssWriteHomeMarkerCli(array $argv): int
 {
@@ -63,6 +64,20 @@ function pmssWriteHomeMarkerCli(array $argv): int
     $home = '/home/'.$user;
     if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) {
         return pmssCliReturnWithStderr("Error: home for '{$user}' is missing or unsafe.\n", 5);
+    }
+
+    // The public service identity comes from root-owned provisioning state.
+    // A home marker can be renamed by its account even when its inode is root-owned.
+    if ($marker === '.billingId') {
+        $store = new UserConfigStore();
+        $payload = $store->get($user);
+        if (!is_array($payload)) {
+            return pmssCliReturnWithStderr("Error: root-owned user config is missing.\n", 7);
+        }
+        $payload['billingServiceId'] = $value;
+        if (!$store->set($user, $payload)) {
+            return pmssCliReturnWithStderr("Error: failed to record billing identity.\n", 7);
+        }
     }
 
     // Symlink-safe atomic write with root:user ownership and the ADR-0046 mode.

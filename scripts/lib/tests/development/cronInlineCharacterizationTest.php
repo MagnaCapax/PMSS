@@ -27,14 +27,14 @@ class CronInlineCharacterizationTest extends TestCase
         }
     }
 
-    public function testWebPublicCertFailureMarkerUsesSharedWriter(): void
+    public function testWebPublicCertFlagsUseAccountBoundary(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/webPublicCertsProcess.php', [
-            "require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';",
-            'pmssReplaceAccountFileWithLegacyFallback($user, $home, $failedMarker, gmdate(\'c\')." rc=$rc\\n", 0644);',
-            '@unlink($flag);',
-            '@unlink($failedMarker);',
-        ], ['@file_put_contents($failedMarker' => 'failure marker must use the shared writer']);
+            "require_once __DIR__.'/../lib/user/webCertFlags.php';",
+            'pmssWebCertFlagWrite($user, $home, \'.request-web-certs.failed\'',
+            'pmssWebCertFlagsClear($user, $home)',
+        ], ['@unlink($flag)' => 'root must not unlink account flags',
+            'pmssReplaceAccountFileWithLegacyFallback' => 'root must not replace account flags']);
     }
 
     public function testWebPublicCertActivatesCurrentVhostBeforeCertbot(): void

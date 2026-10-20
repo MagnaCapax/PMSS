@@ -42,6 +42,7 @@ require_once __DIR__.'/../lib/user/billingIds.php';
 require_once __DIR__.'/../lib/nginxUserHosts.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/runtime/filesystem.php';
+require_once __DIR__.'/../lib/user/webCertFlags.php';
 
 if (posix_getuid() !== 0) {
     fwrite(STDERR, "Must run as root.\n");
@@ -95,11 +96,11 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     $requested++;
 
     $requestContent = pmssReadRegularFileContentsVerified($flag, null, 64);
-    $serviceId = pmssUserBillingServiceIdDigitsRead($home, true);
+    $serviceId = pmssUserBillingProvisionedDigitsRead($user, 'billingServiceId');
     $names = pmssWebPublicCertNames($user, $serverFqdn, $serviceId === null ? null : (string) $serviceId, $requestContent);
     $mode = trim((string) $requestContent) === 'username' ? 'username' : 'default';
     if ($names === []) {
-        pmssReplaceAccountFileWithLegacyFallback($user, $home, $failedMarker, gmdate('c')." no-service-id\n", 0644);
+        pmssWebCertFlagWrite($user, $home, '.request-web-certs.failed', gmdate('c')." no-service-id\n");
         $failed++;
         logLine('user='.$user.' result=failed reason=no-service-id mode='.$mode);
         continue;
@@ -140,8 +141,9 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     exec($cmd, $out, $rc);
 
     if ($rc === 0) {
-        @unlink($flag);
-        @unlink($failedMarker);
+        if (!pmssWebCertFlagsClear($user, $home)) {
+            logLine('user='.$user.' result=warning reason=flag-clear-failed');
+        }
         $issued++;
         $changed = true;
         // Regenerate ONLY this user's config so the public vhost picks up the new
@@ -152,7 +154,7 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
         }
         logLine('user='.$user.' result=issued mode='.$mode.' names='.implode(',', $names));
     } else {
-        pmssReplaceAccountFileWithLegacyFallback($user, $home, $failedMarker, gmdate('c')." rc=$rc\n", 0644);
+        pmssWebCertFlagWrite($user, $home, '.request-web-certs.failed', gmdate('c')." rc=$rc\n");
         $failed++;
         logLine('user='.$user.' result=failed mode='.$mode.' rc='.$rc.' names='.implode(',', $names)
             .' tail='.substr(str_replace("\n", ' ', implode(' ', array_slice($out, -3))), 0, 300));

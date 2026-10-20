@@ -112,12 +112,8 @@ class UserConfigStore
             if (empty($payload['ramMiB'])) {
                 $payload['ramMiB'] = $this->resolveRamMiB($username);
             }
-            if (empty($payload['billingServiceId'])) {
-                $payload['billingServiceId'] = $this->readBillingServiceId($username);
-            }
-            if (empty($payload['billingClientId'])) {
-                $payload['billingClientId'] = $this->readBillingClientId($username);
-            }
+            // Billing IDs in account-owned directories can be renamed between
+            // root-owned dot-file basenames. Only provisioning state is trusted.
         }
         return $this->normalise($payload);
     }
@@ -291,21 +287,6 @@ class UserConfigStore
         return pmssWriteManagedFile($path, $encoded, $owner, $group, $mode);
     }
 
-    private function readBillingServiceId(string $username): int
-    {
-        if (pmssTestModeEnabled()) {
-            return 0;
-        }
-        return pmssUserBillingServiceIdRead("/home/{$username}", true);
-    }
-
-    private function readBillingClientId(string $username): int
-    {
-        if (pmssTestModeEnabled()) {
-            return 0;
-        }
-        return pmssUserBillingClientIdRead("/home/{$username}", true);
-    }
 }
 
 require_once __DIR__.'/userConfigPolicy.php';

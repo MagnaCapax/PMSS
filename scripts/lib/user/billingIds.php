@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/identity.php';
 
 /** Read a positive digit-only identifier without following symlinks. */
 function pmssUserBillingDigitsFileRead(string $path, bool $requireRootOwner = false): ?string
@@ -74,4 +75,29 @@ function pmssUserBillingClientIdRead(string $home, bool $requireRootOwner = fals
 {
     $raw = pmssUserBillingClientIdDigitsRead($home, $requireRootOwner);
     return $raw === null ? 0 : (int) $raw;
+}
+
+/** Read a service/client identity only from root-owned provisioning state. */
+function pmssUserBillingProvisionedDigitsRead(
+    string $user,
+    string $key,
+    string $configDir = '/etc/seedbox/config',
+    int $requiredUid = 0
+): ?string {
+    if (!pmssValidateUsername($user) || !in_array($key, ['billingServiceId', 'billingClientId'], true)
+        || is_link($configDir) || is_link($configDir.'/users')) return null;
+    $raw = pmssReadRegularFileContentsVerified($configDir.'/users/'.$user.'.json', $requiredUid, 65536);
+    $payload = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($payload)) {
+        $legacy = pmssReadRegularFileContentsVerified(dirname($configDir).'/runtime/users.json', $requiredUid, 1048576);
+        $users = is_string($legacy) ? json_decode($legacy, true) : null;
+        $records = is_array($users) && is_array($users['users'] ?? null) ? $users['users'] : $users;
+        $payload = is_array($records) ? ($records[$user] ?? null) : null;
+    }
+    if (!is_array($payload)) return null;
+    $value = $payload[$key] ?? ($key === 'billingServiceId' ? ($payload['billingId'] ?? null) : null);
+    if (!is_int($value) && !is_string($value)) return null;
+    $digits = (string) $value;
+    $id = pmssUnsignedDecimalIntParse($digits);
+    return $id !== null && $id > 0 ? $digits : null;
 }
