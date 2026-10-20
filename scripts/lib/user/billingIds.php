@@ -101,3 +101,29 @@ function pmssUserBillingProvisionedDigitsRead(
     $id = pmssUnsignedDecimalIntParse($digits);
     return $id !== null && $id > 0 ? $digits : null;
 }
+
+/** Preserve the legacy home identity until a trusted service ID has been written. */
+function pmssUserBillingIdentityRead(string $user, string $home, string $key,
+    string $configDir = '/etc/seedbox/config', int $requiredUid = 0, ?callable $warn = null,
+    bool $legacyRequireRootOwner = true): ?string
+{
+    if (!in_array($key, ['billingServiceId', 'billingClientId'], true) || !pmssValidateUsername($user)) return null;
+    $trusted = pmssUserBillingProvisionedDigitsRead($user, $key, $configDir, $requiredUid);
+    if ($trusted !== null) return $trusted;
+    // A trusted service ID marks the account as migrated: never mix it with a
+    // home-supplied client ID even if the client field has not arrived yet.
+    if ($key === 'billingClientId'
+        && pmssUserBillingProvisionedDigitsRead($user, 'billingServiceId', $configDir, $requiredUid) !== null) return null;
+    // The fallback is deliberately the former root-owned home-file reader.
+    $legacy = $key === 'billingServiceId'
+        ? pmssUserBillingServiceIdDigitsRead($home, $legacyRequireRootOwner)
+        : pmssUserBillingClientIdDigitsRead($home, $legacyRequireRootOwner);
+    if ($legacy !== null && $warn !== null) {
+        static $warned = [];
+        if (!isset($warned[$user])) {
+            $warned[$user] = true;
+            $warn($user, 'billing id from legacy home file');
+        }
+    }
+    return $legacy;
+}

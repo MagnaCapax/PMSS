@@ -36,6 +36,8 @@ if (!function_exists('pmssHomeMarkerRegistry')) {
             '.bonus'        => ['class' => 'enforced',      'mode' => 0640],
             '.bonusTraffic' => ['class' => 'enforced',      'mode' => 0640],
             '.billingId'    => ['class' => 'authoritative', 'mode' => 0640],
+            '.billingServiceId' => ['class' => 'authoritative', 'mode' => 0640],
+            '.billingClientId' => ['class' => 'authoritative', 'mode' => 0640],
             '.bonusQuota'   => ['class' => 'display',        'mode' => 0644],
             '.trafficLimit' => ['class' => 'display',        'mode' => 0644],
         ];

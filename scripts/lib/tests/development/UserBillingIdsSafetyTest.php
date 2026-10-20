@@ -6,6 +6,68 @@ require_once dirname(__DIR__, 3).'/lib/user/userConfigStore.php';
 
 class UserBillingIdsSafetyTest extends TestCase
 {
+    public function testTrustedStoreWinsAndLegacyHomeIsIgnored(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-billing-trust-');
+        mkdir($base.'/config/users', 0755, true);
+        mkdir($base.'/home');
+        file_put_contents($base.'/config/users/alice.json', json_encode(['billingServiceId' => 123, 'billingClientId' => 456]));
+        file_put_contents($base.'/home/.billingId', '999');
+        file_put_contents($base.'/home/.billingClientId', '888');
+        $warnings = [];
+        $warn = static function ($user, $message) use (&$warnings): void { $warnings[] = [$user, $message]; };
+        $uid = posix_geteuid();
+        $this->assertSame('123', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingServiceId', $base.'/config', $uid, $warn, false));
+        $this->assertSame('456', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingClientId', $base.'/config', $uid, $warn, false));
+        $this->assertSame([], $warnings);
+    }
+
+    public function testAbsentTrustedIdRetainsLegacyHomeOrderAndWarnsOnce(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-billing-legacy-');
+        mkdir($base.'/config/users', 0755, true);
+        mkdir($base.'/home');
+        file_put_contents($base.'/config/users/alice.json', json_encode(['billingServiceId' => 0, 'billingClientId' => 0]));
+        file_put_contents($base.'/home/.billingId', '123');
+        file_put_contents($base.'/home/.billingClientId', '456');
+        $warnings = [];
+        $warn = static function ($user, $message) use (&$warnings): void { $warnings[] = [$user, $message]; };
+        $uid = posix_geteuid();
+        $this->assertSame('123', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingServiceId', $base.'/config', $uid, $warn, false));
+        $this->assertSame('456', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingClientId', $base.'/config', $uid, $warn, false));
+        $this->assertSame([['alice', 'billing id from legacy home file']], $warnings);
+        file_put_contents($base.'/home/.billingServiceId', '789');
+        $this->assertSame('789', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingServiceId', $base.'/config', $uid, $warn, false));
+    }
+
+    public function testTrustedClientIdWinsWhileServiceStillUsesLegacy(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-billing-mixed-');
+        mkdir($base.'/config/users', 0755, true);
+        mkdir($base.'/home');
+        file_put_contents($base.'/config/users/bob.json', json_encode(['billingServiceId' => 0, 'billingClientId' => 456]));
+        file_put_contents($base.'/home/.billingId', '123');
+        file_put_contents($base.'/home/.billingClientId', '999');
+        $uid = posix_geteuid();
+        $this->assertSame('123', \pmssUserBillingIdentityRead('bob', $base.'/home', 'billingServiceId', $base.'/config', $uid, null, false));
+        $this->assertSame('456', \pmssUserBillingIdentityRead('bob', $base.'/home', 'billingClientId', $base.'/config', $uid, null, false));
+    }
+
+    public function testProvisioningWriterMapsBothBillingMarkersToStore(): void
+    {
+        if (!defined('PMSS_TEST_MODE')) define('PMSS_TEST_MODE', true);
+        require_once dirname(__DIR__, 3).'/util/writeHomeMarker.php';
+        $store = new class extends \UserConfigStore {
+            public $payload = ['billingServiceId' => 0, 'billingClientId' => 0];
+            public function get(string $user): ?array { return $this->payload; }
+            public function set(string $user, array $payload): bool { $this->payload = $payload; return true; }
+        };
+        $this->assertTrue(\pmssWriteHomeMarkerBillingStoreSet($store, 'alice', '.billingId', 123));
+        $this->assertTrue(\pmssWriteHomeMarkerBillingStoreSet($store, 'alice', '.billingClientId', 456));
+        $this->assertSame(123, $store->payload['billingServiceId']);
+        $this->assertSame(456, $store->payload['billingClientId']);
+        $this->assertTrue(\pmssHomeMarkerIsKnown('.billingClientId'));
+    }
     public function testMissingProvisionedIdsAreNotRecoveredFromAccountHome(): void
     {
         $base = $this->pmssMakeTempDir('pmss-billing-store-');

@@ -96,7 +96,10 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     $requested++;
 
     $requestContent = pmssReadRegularFileContentsVerified($flag, null, 64);
-    $serviceId = pmssUserBillingProvisionedDigitsRead($user, 'billingServiceId');
+    $serviceId = pmssUserBillingIdentityRead($user, $home, 'billingServiceId',
+        '/etc/seedbox/config', 0, static function (string $account, string $warning): void {
+            logLine('user='.$account.' warning="'.$warning.'"');
+        });
     $names = pmssWebPublicCertNames($user, $serverFqdn, $serviceId === null ? null : (string) $serviceId, $requestContent);
     $mode = trim((string) $requestContent) === 'username' ? 'username' : 'default';
     if ($names === []) {

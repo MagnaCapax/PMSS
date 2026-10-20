@@ -33,6 +33,16 @@ require_once __DIR__.'/../lib/user/homeMarkerRegistry.php';
 require_once __DIR__.'/../lib/runtime/cli.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
+/** Record provisioned billing identity in the root store before writing a marker. */
+function pmssWriteHomeMarkerBillingStoreSet(UserConfigStore $store, string $user, string $marker, int $value): bool
+{
+    $key = $marker === '.billingClientId' ? 'billingClientId' : 'billingServiceId';
+    $payload = $store->get($user);
+    if (!is_array($payload)) return false;
+    $payload[$key] = $value;
+    return $store->set($user, $payload);
+}
+
 function pmssWriteHomeMarkerCli(array $argv): int
 {
     $usage = "Usage: writeHomeMarker.php <user> <marker> <intValue>\n";
@@ -68,14 +78,9 @@ function pmssWriteHomeMarkerCli(array $argv): int
 
     // The public service identity comes from root-owned provisioning state.
     // A home marker can be renamed by its account even when its inode is root-owned.
-    if ($marker === '.billingId') {
+    if (in_array($marker, ['.billingId', '.billingServiceId', '.billingClientId'], true)) {
         $store = new UserConfigStore();
-        $payload = $store->get($user);
-        if (!is_array($payload)) {
-            return pmssCliReturnWithStderr("Error: root-owned user config is missing.\n", 7);
-        }
-        $payload['billingServiceId'] = $value;
-        if (!$store->set($user, $payload)) {
+        if (!pmssWriteHomeMarkerBillingStoreSet($store, $user, $marker, $value)) {
             return pmssCliReturnWithStderr("Error: failed to record billing identity.\n", 7);
         }
     }
@@ -92,4 +97,4 @@ function pmssWriteHomeMarkerCli(array $argv): int
     return 0;
 }
 
-exit(pmssWriteHomeMarkerCli($argv));
+if (!defined('PMSS_TEST_MODE') || !PMSS_TEST_MODE) exit(pmssWriteHomeMarkerCli($argv));
