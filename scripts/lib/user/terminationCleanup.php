@@ -110,10 +110,13 @@ function pmssTerminateUserCompletion(string $username, array $paths, array $purg
         return array('line' => '## Done. User termination flow completed (dry run).', 'rc' => 0, 'status' => 'OK');
     }
 
-    // A later successful retry does not erase an earlier failed purge step.
+    // Every step must have run. The first removal fails by design when immutable files remain
+    // (PMSS writes ~/.trafficData* and ~/.resourceData immutable), so only the immutable clear
+    // and the leftover removal decide; a later successful retry does not erase their failure.
     foreach (array('home', 'user_backup', 'user_backup_superseded') as $label) {
         foreach (array('remove_'.$label.'_initial', 'clear_immutable_'.$label, 'remove_'.$label.'_leftovers') as $step) {
-            if (!isset($purgeResults[$step]) || $purgeResults[$step] !== 0) {
+            if (!isset($purgeResults[$step])
+                || ($purgeResults[$step] !== 0 && $step !== 'remove_'.$label.'_initial')) {
                 return array('line' => '## Incomplete: '.$step, 'rc' => 1, 'status' => 'INCOMPLETE');
             }
         }

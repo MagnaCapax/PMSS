@@ -197,10 +197,17 @@ final class TerminateUserContractTest extends TestCase
         $complete = \pmssTerminateUserCompletion($username, $paths, $results, false);
         $this->assertSame(array('line' => '## Done. User termination verified.', 'rc' => 0, 'status' => 'OK'), $complete);
 
+        // Immutable stats files make the first removal fail; the leftover pass decides.
+        $immutableResidue = $results;
+        $immutableResidue['remove_home_initial'] = 1;
+        $this->assertSame($complete, \pmssTerminateUserCompletion($username, $paths, $immutableResidue, false));
         $failed = $results;
-        $failed['remove_user_backup_initial'] = 1;
-        $this->assertSame('## Incomplete: remove_user_backup_initial', \pmssTerminateUserCompletion($username, $paths, $failed, false)['line']);
+        $failed['remove_user_backup_leftovers'] = 1;
+        $this->assertSame('## Incomplete: remove_user_backup_leftovers', \pmssTerminateUserCompletion($username, $paths, $failed, false)['line']);
         $this->assertSame(1, \pmssTerminateUserCompletion($username, $paths, $failed, false)['rc']);
+        $failed['remove_user_backup_initial'] = 1;
+        $failed['clear_immutable_home'] = 1;
+        $this->assertSame('## Incomplete: clear_immutable_home', \pmssTerminateUserCompletion($username, $paths, $failed, false)['line']);
         unset($failed['remove_user_backup_initial']);
         $this->assertSame(1, \pmssTerminateUserCompletion($username, $paths, $failed, false)['rc'], 'a missing purge step is incomplete');
 
