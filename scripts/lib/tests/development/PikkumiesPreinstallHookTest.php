@@ -42,12 +42,10 @@ final class PikkumiesPreinstallHookTest extends TestCase
                 'pmssPikkumiesPreinstallStateClear($userName)',
             ]]],
             'scripts/terminateUser.php' => ['ordered' => [[
-                "array('userdel_groupdel_final', \$userdelCommand)",
-                '} elseif (pmssUserAccountLookup($username) === null) {',
-                'pmssPikkumiesPreinstallStateClear($username)',
+                'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
+                'pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null)',
             ]], 'required' => [
-                "'clear_pikkumies_preinstall_state'",
-                'if ($dryRun)',
+                'pmssTerminateUserClearPreinstallState',
             ]],
         ]);
     }

@@ -21,7 +21,6 @@ require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/toggleAppCatalog.php';
 pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/user/terminationCleanup.php']);
 require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
-require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
 
 pmssStdoutHeartbeatStartForStdout();
 
@@ -167,21 +166,10 @@ echo "\nDeleting user, user data and HTTP password:\n";
 
 // Clear any per-user crontab before removing the account to avoid leaving stale
 // cron entries behind (Debian keeps them under /var/spool/cron/crontabs/).
-$crontabSpoolPaths = array(
-    "/var/spool/cron/crontabs/{$username}",
-    "/var/spool/cron/{$username}",
-);
 $userdelCommand = 'userdel '.escapeshellarg($username);
 $groupdelCommand = 'groupdel '.escapeshellarg($username);
-$socketSteps = pmssTerminateUserAccountSocketSteps($username, $uid);
-pmssUserLifecycleRunSteps('terminate', $username, array(
-    array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
-    array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
-    // Account-owned sockets must be removed before userdel, without opening logind.
-    array('remove_tmux_socket', $socketSteps['remove_tmux_socket']),
-    array('remove_screen_socket', $socketSteps['remove_screen_socket']),
-    array('userdel_initial', $userdelCommand),
-), $dryRun);
+// Account-owned sockets must be removed before userdel, without opening logind.
+pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserInitialRemovalSteps($username, $uid), $dryRun);
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);
 pmssUserLifecycleRefreshNginxConfig(
@@ -274,25 +262,10 @@ if (pmssUserAccountLookup($username) !== null) {
 
 // If attemps 1 and 2 failed ...
 // If attempts 1 and 2 failed, keep the final cleanup order explicit.
-pmssUserLifecycleRunSteps('terminate', $username, array(
-    array('kill_processes_final', $killUserCommand),
-    array('reset_failed_user_manager', pmssTerminateUserResetFailedCommand($uid)),
-    array('userdel_groupdel_final', $userdelCommand),
-    array('groupdel_final', $groupdelCommand),
-    array('cleanup_lock_files', 'rm -f -- '.pmssRuntimeLockDir().'/pmss-*-'.$username.'.lock /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
-), $dryRun);
+pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand), $dryRun);
 
 // This root-owned marker must not be inherited by a later account with the same name.
-if ($dryRun) {
-    pmssUserLifecycleContextLogStatusMessage('terminate', 'clear_pikkumies_preinstall_state', $username, 'SKIP', 'Dry run; marker not removed');
-} elseif (pmssUserAccountLookup($username) === null) {
-    $cleared = pmssPikkumiesPreinstallStateClear($username);
-    pmssUserLifecycleContextLogStatusMessage('terminate', 'clear_pikkumies_preinstall_state', $username,
-        $cleared ? 'OK' : 'ERR', $cleared ? 'Marker cleared or absent' : 'Failed to clear marker');
-} else {
-    pmssUserLifecycleContextLogStatusMessage('terminate', 'clear_pikkumies_preinstall_state', $username,
-        'SKIP', 'Passwd entry remains; marker retained');
-}
+pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null);
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 

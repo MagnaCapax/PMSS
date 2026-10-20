@@ -9,6 +9,7 @@
 require_once dirname(__DIR__).'/userLifecycle.php';
 require_once dirname(__DIR__).'/pathSafety.php';
 require_once __DIR__.'/userConfigStore.php';
+require_once __DIR__.'/pikkumiesPreinstallState.php';
 
 /** Account-owned socket trees are removed under the account UID without a PAM session. */
 function pmssTerminateUserAccountSocketSteps(string $username, int $uid): array
@@ -18,19 +19,66 @@ function pmssTerminateUserAccountSocketSteps(string $username, int $uid): array
     }
     $tmux = '/tmp/tmux-'.$uid;
     $screen = '/var/run/screen/S-'.$username;
-    $guardedRemove = static function (string $path) use ($username): string {
-        $quoted = escapeshellarg($path);
-        $command = 'if [ -e '.$quoted.' ] || [ -L '.$quoted.' ]; then rm -rf -- '.$quoted.'; fi';
-        return 'timeout --kill-after=5s 45s '.pmssBuildUserShellNoPamCommand($username, $command);
-    };
-
     return array(
-        'remove_tmux_socket' => $guardedRemove($tmux),
-        'remove_screen_socket' => $guardedRemove($screen),
+        'remove_tmux_socket' => pmssTerminateUserAccountSocketRemoveCommand($username, $tmux),
+        'remove_screen_socket' => pmssTerminateUserAccountSocketRemoveCommand($username, $screen),
     );
 }
 
-/** Wait for the manager to leave active/deactivating before clearing failed state. */
+/** Guard account-controlled socket removal and keep the inner rm exit status. */
+function pmssTerminateUserAccountSocketRemoveCommand(string $username, string $path): string
+{
+    $quoted = escapeshellarg($path);
+    $command = 'if [ -e '.$quoted.' ] || [ -L '.$quoted.' ]; then rm -rf -- '.$quoted.'; fi';
+    return 'timeout --kill-after=5s 45s '.pmssBuildUserShellNoPamCommand($username, $command);
+}
+
+/** Build the pre-userdel steps as data so their order can be verified. */
+function pmssTerminateUserInitialRemovalSteps(string $username, int $uid): array
+{
+    $sockets = pmssTerminateUserAccountSocketSteps($username, $uid);
+    return array(
+        array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
+        array('crontab_spool_remove', 'rm -f -- '.escapeshellarg('/var/spool/cron/crontabs/'.$username).' '.escapeshellarg('/var/spool/cron/'.$username).' || true'),
+        array('remove_tmux_socket', $sockets['remove_tmux_socket']),
+        array('remove_screen_socket', $sockets['remove_screen_socket']),
+        array('userdel_initial', 'userdel '.escapeshellarg($username)),
+    );
+}
+
+/** Build the final process and user manager cleanup in execution order. */
+function pmssTerminateUserFinalRemovalSteps(string $username, int $uid, string $killUserCommand): array
+{
+    $userdel = 'userdel '.escapeshellarg($username);
+    return array(
+        array('kill_processes_final', $killUserCommand),
+        array('reset_failed_user_manager', pmssTerminateUserResetFailedCommand($uid)),
+        array('userdel_groupdel_final', $userdel),
+        array('groupdel_final', 'groupdel '.escapeshellarg($username)),
+        array('cleanup_lock_files', 'rm -f -- '.pmssRuntimeLockDir().'/pmss-*-'.$username.'.lock /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
+    );
+}
+
+/** Keep the preinstall marker while a passwd entry can still own the name. */
+function pmssTerminateUserClearPreinstallState(string $username, bool $dryRun, bool $accountPresent, string $stateDir = '/var/lib/pmss/pikkumies-preinstall', ?callable $logger = null): string
+{
+    if ($dryRun) {
+        $status = 'SKIP';
+        $message = 'Dry run; marker not removed';
+    } elseif ($accountPresent) {
+        $status = 'SKIP';
+        $message = 'Passwd entry remains; marker retained';
+    } else {
+        $cleared = pmssPikkumiesPreinstallStateClear($username, $stateDir);
+        $status = $cleared ? 'OK' : 'ERR';
+        $message = $cleared ? 'Marker cleared or absent' : 'Failed to clear marker';
+    }
+    $log = $logger ?? 'pmssUserLifecycleContextLogStatusMessage';
+    $log('terminate', 'clear_pikkumies_preinstall_state', $username, $status, $message);
+    return $status;
+}
+
+/** Wait for the manager to become inactive before clearing failed state. */
 function pmssTerminateUserResetFailedCommand(int $uid): string
 {
     if ($uid < 1) {
@@ -40,8 +88,8 @@ function pmssTerminateUserResetFailedCommand(int $uid): string
     return 'for attempt in 1 2 3 4 5 6 7 8 9 10; do '
         .'state=$(timeout --kill-after=1s 5s systemctl is-active '.$unit.' 2>/dev/null); '
         .'rc=$?; if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then exit "$rc"; fi; '
-        .'case "$state" in active|deactivating) sleep 0.5;; *) break;; esac; '
-        .'done; case "$state" in active|deactivating) exit 1;; esac; '
+        .'case "$state" in active|activating|deactivating|reloading) sleep 0.5;; *) break;; esac; '
+        .'done; case "$state" in active|activating|deactivating|reloading) exit 1;; esac; '
         .'if timeout --kill-after=5s 45s systemctl is-failed --quiet '.$unit.'; '
         .'then timeout --kill-after=5s 45s systemctl reset-failed '.$unit.'; '
         .'else rc=$?; if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then exit "$rc"; fi; fi';

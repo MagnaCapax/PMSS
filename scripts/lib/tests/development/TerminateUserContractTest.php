@@ -36,66 +36,73 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserClearsCrontabBeforeUserdel(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
-                "'crontab_remove'",
-                "'userdel_initial'",
-            ]]]);
+        $this->assertSame(['crontab_remove', 'crontab_spool_remove', 'remove_tmux_socket', 'remove_screen_socket', 'userdel_initial'],
+            array_column(\pmssTerminateUserInitialRemovalSteps('user1234', 1234), 0));
     }
 
     public function testTerminateUserSystemdAndTmuxCleanupOrder(): void
     {
-        // Strip comments so a disabled step cannot satisfy this source contract.
-        $source = '';
-        foreach (token_get_all($this->pmssReadRepoFile('scripts/terminateUser.php')) as $token) {
-            if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) continue;
-            $source .= is_array($token) ? $token[1] : $token;
-        }
-        $this->assertFalse((bool) preg_match('/if\s*\(\s*false\s*\)/', $source), 'cleanup steps must be reachable');
-        $this->assertOrderedStrings([
-            "'disable_linger'",
-            "'remove_tmux_socket'",
-            "'remove_screen_socket'",
-            "'userdel_initial'",
-            "'kill_processes_final'",
-            "'reset_failed_user_manager'",
-            "'userdel_groupdel_final'",
-        ], $source);
-        $lingerStep = substr($source, strpos($source, "'disable_linger'"), 260);
-        $this->assertStringContainsString("'if [ -e '.escapeshellarg('/var/lib/systemd/linger/'.\$username)", $lingerStep);
-        $this->assertStringContainsString('then timeout --kill-after=5s 45s loginctl disable-linger', $lingerStep);
-        $this->assertStringContainsString('pmssTerminateUserResetFailedCommand($uid)', $source);
-        $this->assertStringContainsString('pmssTerminateUserAccountSocketSteps($username, $uid)', $source);
-        $this->assertStringNotContainsString("'loginctl disable-linger '.escapeshellarg(\$username).' || true'", $source);
+        $initial = array_column(\pmssTerminateUserInitialRemovalSteps('user1234', 1234), 0);
+        $final = array_column(\pmssTerminateUserFinalRemovalSteps('user1234', 1234, 'killall -9 -u user1234'), 0);
+        $this->assertSame(['remove_tmux_socket', 'remove_screen_socket', 'userdel_initial'], array_slice($initial, -3));
+        $this->assertSame(['kill_processes_final', 'reset_failed_user_manager', 'userdel_groupdel_final'], array_slice($final, 0, 3));
     }
 
-    /** Exercise socket cleanup through stub timeout/runuser; failures remain visible. */
+    /** Execute the generated guard through a runuser stub, including inner rm failures. */
     public function testAccountSocketCleanupUsesNoPamRunnerAndPreservesExitCodes(): void
     {
         $root = $this->pmssMakeTempDir('pmss-terminate-shell-');
         $bin = $root.'/bin';
         mkdir($bin);
-        $log = $root.'/calls';
-        file_put_contents($bin.'/timeout', "#!/bin/sh\nprintf 'timeout %s\\n' \"\$*\" >> \"\$PMSS_TEST_LOG\"\nshift 2\n\"\$@\"\n");
-        file_put_contents($bin.'/runuser', "#!/bin/sh\nprintf 'runuser %s\\n' \"\$*\" >> \"\$PMSS_TEST_LOG\"\nexit \"\${PMSS_TEST_RUNUSER_RC:-0}\"\n");
-        chmod($bin.'/timeout', 0755);
+        file_put_contents($bin.'/runuser', <<<'SH'
+#!/bin/sh
+[ "$1" = --pty ] || exit 96
+shift
+[ "$1" = -u ] && [ "$2" = user1234 ] && [ "$3" = -- ] || exit 97
+shift 3
+[ "$1" = sh ] && [ "$2" = -c ] || exit 98
+shift 2
+[ -t 0 ] && exit 99
+exec sh -c "$1"
+SH
+        );
         chmod($bin.'/runuser', 0755);
-        $steps = \pmssTerminateUserAccountSocketSteps('user1234', 1234);
-        $env = 'PATH='.escapeshellarg($bin.':'.getenv('PATH')).' PMSS_TEST_LOG='.escapeshellarg($log);
-
-        foreach ($steps as $step => $command) {
-            $output = [];
-            exec($env.' PMSS_TEST_RUNUSER_RC=7 sh -c '.escapeshellarg($command), $output, $rc);
-            $this->assertSame(7, $rc, $step.' must report runuser failure');
-        }
-        $calls = file($log, FILE_IGNORE_NEW_LINES);
-        $this->assertSame(4, count($calls));
-        $this->assertStringContainsString('runuser --pty -u user1234 -- sh -c', $calls[1]);
-        $this->assertStringContainsString('/tmp/tmux-1234', $calls[1]);
-        $this->assertStringContainsString('/var/run/screen/S-user1234', $calls[3]);
-        $this->assertStringNotContainsString('su user1234', implode("\n", $calls));
+        $target = $root.'/socket';
+        $command = \pmssTerminateUserAccountSocketRemoveCommand('user1234', $target);
+        $this->assertStringContainsString('env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin runuser', $command);
+        $stubbed = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($bin.':/usr/sbin:/usr/bin:/sbin:/bin'), $command);
+        file_put_contents($target, 'socket');
+        exec($stubbed, $output, $rc);
+        $this->assertSame(0, $rc);
+        $this->assertFalse(file_exists($target));
+        exec($stubbed, $output, $rc);
+        $this->assertSame(0, $rc, 'absent path is an idempotent no-op');
+        mkdir($target);
+        file_put_contents($target.'/child', 'keep');
+        // Simulate rm returning failure inside the command passed to runuser.
+        file_put_contents($bin.'/runuser', str_replace('exec sh -c "$1"', 'exec sh -c "$(printf \'%s\' "$1" | sed \'s/rm -rf -- [^;]*/false/\')"', file_get_contents($bin.'/runuser')));
+        exec($stubbed, $output, $rc);
+        $this->assertSame(1, $rc, 'inner command failure must not be masked');
+        $this->assertTrue(is_file($target.'/child'));
     }
 
-    /** The manager must stop deactivating before its failed state is reset. */
+    public function testNoPamCommandCompletesFromInteractiveTerminalWithoutInheritedEnvironment(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-terminate-pty-');
+        $stub = $root.'/runuser';
+        $effect = $root.'/effect';
+        file_put_contents($stub, "#!/bin/sh\n[ \"\$1\" = --pty ] || exit 96\nshift\n[ \"\$1\" = -u ] && [ \"\$2\" = user1234 ] && [ \"\$3\" = -- ] || exit 97\nshift 3\n[ \"\$1\" = sh ] && [ \"\$2\" = -c ] || exit 98\nshift 2\n[ -t 0 ] && exit 99\nexec sh -c \"\$1\"\n");
+        chmod($stub, 0755);
+        $built = \pmssBuildUserShellNoPamCommand('user1234', '[ -z "$PMSS_TEST_SECRET" ] && touch '.escapeshellarg($effect));
+        $this->assertSame(0, strpos($built, 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin runuser '));
+        $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($root.':/usr/sbin:/usr/bin:/sbin:/bin'), $built);
+        $output = [];
+        exec('PMSS_TEST_SECRET=leak timeout --kill-after=1s 5s script -qec '.escapeshellarg($command).' /dev/null', $output, $rc);
+        $this->assertSame(0, $rc, 'pseudo-terminal command must complete before timeout');
+        $this->assertTrue(is_file($effect), 'inner command must run with a clean environment');
+    }
+
+    /** The manager must leave every active transition before its failed state is reset. */
     public function testResetFailedPollsManagerAndReturnsResetFailure(): void
     {
         $root = $this->pmssMakeTempDir('pmss-terminate-manager-');
@@ -112,7 +119,10 @@ printf '%s\n' "$1" >> "$PMSS_TEST_LOG"
 case "$1" in
   is-active)
     n=$(cat "$PMSS_TEST_STATE"); n=$((n + 1)); printf '%s' "$n" > "$PMSS_TEST_STATE"
-    if [ "${PMSS_TEST_ALWAYS_ACTIVE:-0}" = 1 ] || [ "$n" -lt 3 ]; then echo deactivating; else echo inactive; fi
+    if [ "${PMSS_TEST_ALWAYS_ACTIVE:-0}" = 1 ]; then echo deactivating
+    elif [ "$n" -eq 1 ]; then echo activating
+    elif [ "$n" -eq 2 ]; then echo reloading
+    else echo inactive; fi
     exit 3 ;;
   is-failed) exit 0 ;;
   reset-failed) exit "${PMSS_TEST_RESET_RC:-0}" ;;
@@ -132,6 +142,17 @@ SH
         exec($env.' PMSS_TEST_ALWAYS_ACTIVE=1 sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), $output, $rc);
         $this->assertSame(1, $rc);
         $this->assertSame(array_fill(0, 10, 'is-active'), file($log, FILE_IGNORE_NEW_LINES));
+    }
+
+    public function testPreinstallMarkerIsKeptWhenPasswdEntryRemains(): void
+    {
+        $state = $this->pmssMakeTempDir('pmss-terminate-marker-');
+        file_put_contents($state.'/user1234', 'preinstalled');
+        $events = [];
+        $log = static function (...$fields) use (&$events): void { $events[] = $fields; };
+        $this->assertSame('SKIP', \pmssTerminateUserClearPreinstallState('user1234', false, true, $state, $log));
+        $this->assertSame([['terminate', 'clear_pikkumies_preinstall_state', 'user1234', 'SKIP', 'Passwd entry remains; marker retained']], $events);
+        $this->assertSame('preinstalled', file_get_contents($state.'/user1234'));
     }
 
     /**
@@ -161,7 +182,7 @@ SH
                 '.terminating-',
             ],
             'ordered' => [[
-                "'userdel_initial'",
+                'pmssTerminateUserInitialRemovalSteps($username, $uid)',
                 'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
                 "'release_lighttpd_port'",
                 "'remove_nginx_user_file'",

@@ -25,6 +25,7 @@ are frequently used during day-to-day operations:
 - `scripts/suspend.php` / `scripts/unsuspend.php` - toggle user suspension state.
 - `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); the home, matching `backup-<user>` recreate backup, and its `.superseded` archive are purged synchronously. Exit 0 with `## Done. User termination verified.` means the account and all three paths are gone; exit 1 with `## Incomplete: ...` identifies the first failed check or purge step.
   When stdout is redirected, the script emits empty lines during silent steps so remote readers remain connected; the completion line remains the last non-empty line. Interactive runs retain their existing output.
+  Account socket cleanup runs under the account UID with a clean environment, isolated pseudo-terminal, and closed stdin. A preinstall marker is retained if the passwd entry remains after the final deletion attempt.
 
 Storage benchmark `fioRun()` releases its private JSON output file in `finally`,
 including when command construction, execution, or output reading throws. The
