@@ -1,4 +1,4 @@
-# ADR 0114: Live stats — node total versus the customer's own share
+# ADR 0126: Live stats — node total versus the customer's own share
 
 Date: 2026-10-17
 Category: architecture
