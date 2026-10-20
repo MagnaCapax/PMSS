@@ -10,6 +10,7 @@ class RepoTemplateTest extends TestCase
     private $tmpSources;
 
     private const TRIXIE_TEMPLATE = 'etc/seedbox/config/template.sources.trixie';
+    private const BULLSEYE_TEMPLATE = 'etc/seedbox/config/template.sources.bullseye';
 
     protected function setUp(): void
     {
@@ -42,5 +43,19 @@ class RepoTemplateTest extends TestCase
         ] as $needle => $message) {
             $this->assertTrue(strpos($data, $needle) !== false, $message);
         }
+    }
+
+    public function testShippedBullseyeTemplateUsesArchivedSecurityPocket(): void
+    {
+        // The live security mirror keeps a frozen bullseye-security index but no longer serves its packages.
+        $data = $this->pmssReadRepoFile(self::BULLSEYE_TEMPLATE);
+        $this->assertTrue(
+            strpos($data, 'deb http://archive.debian.org/debian-security bullseye-security ') !== false,
+            'Expected bullseye template to take the security pocket from archive.debian.org'
+        );
+        $this->assertTrue(
+            strpos($data, 'security.debian.org/debian-security bullseye-security') === false,
+            'Expected bullseye template not to reference the live security mirror'
+        );
     }
 }
