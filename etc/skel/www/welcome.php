@@ -39,6 +39,7 @@ foreach ([
     'webCgroupMemoryStatus.php',
     'userMediaStackPanel.php',
     'userTrafficLimit.php',
+    'pikkumiesPanel.php',
 ] as $pmssWelcomeHelper) {
     pmssWelcomeRequireLocalHelper($pmssWelcomeHelper);
 }
@@ -61,6 +62,7 @@ $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $mediaStackStatus = $pageState['mediaStackStatus'];
 list($home, $username, $hostname) = pmssCustomerAccountContext();
+$pmssPikkumiesState = pmssWelcomePikkumiesStateRead($home, $username);
 $appsStatus = pmssCustomerAppsStatusRead($home, $username, $hostname);
 $billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
@@ -89,6 +91,12 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
     <script type="text/javascript"><?= pmssActionScriptJs() ?></script>
     <?= pmssCustomerAppsCss() ?>
     <style type="text/css">
+        .pmss-pikkumies-bar {flex:0 0 100%;box-sizing:border-box;margin:0 0 10px;max-width:100%;color-scheme:dark;}
+        .pmss-pikkumies-bar button,.pmss-pikkumies-bar iframe {box-sizing:border-box;width:100%;height:84px;border:1px solid #2e3b4f;border-radius:8px;background:#000;color:#8b949e;}
+        .pmss-pikkumies-bar button {padding:12px 14px;text-align:left;font:16px system-ui;cursor:pointer;}
+        .pmss-pikkumies-bar button:focus-visible,.pmss-pikkumies-bar iframe:focus-visible {outline:2px solid #9dd8f5;outline-offset:2px;}
+        .pmss-pikkumies-bar iframe {display:block;}
+        @media(pointer:coarse){.pmss-pikkumies-bar button,.pmss-pikkumies-bar iframe{height:52px;}}
         .pmss-bonus-banner {
             flex: 0 0 100%;
             box-sizing: border-box;
@@ -299,6 +307,11 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
             <div class="full_top_nohd"><!-- top design --></div>
             <div class="full_body">
                 <div class="portfoliobox">
+                    <?php if ($pmssPikkumiesState['visible']): ?>
+                    <div class="pmss-pikkumies-bar" id="pmss-pikkumies-bar">
+                        <button type="button" id="pmss-pikkumies-bar-disabled" aria-disabled="true" title="Click to see what is happening" onclick="pmssPikkumiesTabOpen()">Pikkumies is getting ready…</button>
+                    </div>
+                    <?php endif; ?>
                     <div class="pmss-bonus-banner" role="status">
                         <strong><?php echo pmssCustomerHtmlAttr(pmssCustomerBonusDisplayTextBuild($bonusDisplayState)); ?></strong>
                         <?php if ($bonusDisplayNote !== ''): ?><small class="pmss-bonus-note"><?php echo pmssCustomerHtmlAttr($bonusDisplayNote); ?></small><?php endif; ?>
@@ -465,12 +478,68 @@ if ($wikiItemsHtml !== '') {
 
     <script type="text/javascript">
         pmssMediaStackStatusRefresh();
-        setTimeout(function(){ location = ''; }, 180000);
+        setTimeout(function(){
+            var bar = document.getElementById('pmss-pikkumies-bar-frame');
+            if (!bar || document.activeElement !== bar) location = '';
+        }, 180000);
+        <?php if ($pmssPikkumiesState['visible']): ?>
+        var pmssPikkumiesBarOrigin = <?= json_encode($pmssPikkumiesState['origin']) ?>;
+        var pmssPikkumiesBarReady = false, pmssPikkumiesBarInstalled = false;
+        function pmssPikkumiesTabOpen() {
+            try {
+                var tab = window.parent.document.querySelector('a[href="#pikkumies"]');
+                if (tab) { tab.click(); return; }
+                window.top.location.reload(true);
+            } catch (e) { location.href = 'pikkumiesOpen.php?session=pm1'; }
+        }
+        function pmssPikkumiesBarPoll() {
+            fetch('pikkumiesOpen.php?view=status', {credentials:'same-origin',cache:'no-store'})
+                .then(function (response) { return response.json(); })
+                .then(function (state) {
+                    if (!state.visible) { document.getElementById('pmss-pikkumies-bar').hidden = true; return; }
+                    if (!state.ready || pmssPikkumiesBarInstalled) return;
+                    pmssPikkumiesBarInstalled = true;
+                    var frame = document.createElement('iframe');
+                    frame.id = 'pmss-pikkumies-bar-frame';
+                    frame.title = 'Ask Pikkumies';
+                    frame.setAttribute('aria-label', 'Ask Pikkumies');
+                    frame.src = pmssPikkumiesBarOrigin + '/bar';
+                    frame.addEventListener('focus', function () {
+                        if (window.matchMedia('(pointer:fine)').matches)
+                            window.parent.postMessage('pmss:pikkumies-preload', location.origin);
+                    });
+                    var wrap = document.getElementById('pmss-pikkumies-bar');
+                    wrap.replaceChild(frame, document.getElementById('pmss-pikkumies-bar-disabled'));
+                    setTimeout(function () { if (!pmssPikkumiesBarReady) wrap.hidden = true; }, 6000);
+                    if (window.matchMedia('(pointer:fine)').matches && !sessionStorage.getItem('pmss-pikkumies-bar-focused')) {
+                        sessionStorage.setItem('pmss-pikkumies-bar-focused', '1'); frame.focus();
+                    }
+                }).catch(function () {});
+        }
+        window.addEventListener('message', function (event) {
+            var frame = document.getElementById('pmss-pikkumies-bar-frame');
+            if (event.origin === pmssPikkumiesBarOrigin && frame && event.source === frame.contentWindow
+                && event.data === 'pikkumies:ready') pmssPikkumiesBarReady = true;
+            if (event.origin === location.origin && event.source === window.parent
+                && event.data === 'pikkumies:bar-ready') pmssPikkumiesBarReady = true;
+            if (event.origin === location.origin && event.source === window.parent
+                && event.data === 'pikkumies:tab-ready' && !pmssPikkumiesBarReady && frame) frame.src = pmssPikkumiesBarOrigin + '/bar';
+        });
+        pmssPikkumiesBarPoll(); setInterval(pmssPikkumiesBarPoll, 5000);
+        <?php endif; ?>
     </script>
 </body>
 </html>
 
 <?php
+/** Keep the healed Welcome page usable before the update-only helper arrives. */
+function pmssWelcomePikkumiesStateRead($home, $username)
+{
+    return function_exists('pmssPikkumiesPanelStateRead') && is_file(__DIR__.'/pikkumiesOpen.php')
+        ? pmssPikkumiesPanelStateRead($home, $username)
+        : array('visible' => false, 'origin' => '');
+}
+
 /**
  * Gather the state used by the welcome page before rendering begins.
  *

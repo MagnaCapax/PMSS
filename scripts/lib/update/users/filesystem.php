@@ -241,6 +241,7 @@ PHP;
         'radarr-sonarr.txt',
         'www/console.php',
         'www/pikkumiesOpen.php',
+        'www/pikkumiesPanel.php',
         'www/apps.php',
         'www/configure.php',
         'www/configureSettings.php',

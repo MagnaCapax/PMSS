@@ -17,6 +17,7 @@ $frames   = array();
 $useLocalFrames = false;
 
 if (file_exists(__DIR__.'/welcomeMessage.php')) require_once __DIR__.'/welcomeMessage.php';
+if (is_file(__DIR__.'/pikkumiesPanel.php')) require_once __DIR__.'/pikkumiesPanel.php';
 
 /** Detect frames that must open outside the iframe tab container. */
 function pmssFrameOpensInNewWindow(array $frame)
@@ -523,8 +524,9 @@ $panelVendorName = isset($panelVendor['name']) && is_string($panelVendor['name']
 $panelTitle = trim($panelHostname.' '.$panelVendorName.' Dashboard');
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<html lang="en">
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <script>var u = new URL(location.href); if (u.username || u.password) { u.username = ''; u.password = ''; location.replace(u.href); }</script>
 <title><?=htmlspecialchars($panelTitle, ENT_QUOTES, 'UTF-8');?></title>
 <?=preg_replace('/<title\b[^>]*>.*?<\/title\s*>/is', '', $htmlHead);?>
@@ -577,6 +579,16 @@ hr {background-color: #4b4b4b;}
     display: flex;
     justify-content: center;
 }
+@media (max-width:760px) {
+    .tabs-nav {justify-content:flex-start;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;}
+    .tabs-nav li {flex:none;}
+}
+#pikkumies.tabs-container {padding:0;background:#0f1720;color-scheme:dark;}
+.pmss-pikkumies-header {height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;
+    background:#0f1720;color:#cbd5e1;font:12px Arial,sans-serif;white-space:nowrap;overflow-x:auto;}
+.pmss-pikkumies-header a {color:#9dd8f5;}
+.pmss-pikkumies-header a:focus-visible {outline:2px solid #9dd8f5;outline-offset:2px;}
+#pikkumiesFrame {display:block;background:#0f1720;color-scheme:dark;height:calc(100% - 28px);}
 
 /* Tab container + content-frame styling, inlined so the panel renders correctly even
    when jquery.tabs.css is not yet present (the on-load heal delivers PHP only; without
@@ -588,7 +600,8 @@ hr {background-color: #4b4b4b;}
 .tabs-container {
     border-top: 1px solid #4f4f4f;
     padding: 1em 8px;
-    background: #fff;
+    background: #0f1720;
+    color-scheme: dark;
 }
 
 .full_body {
@@ -617,6 +630,19 @@ if (file_exists('../.delugeEnable') && file_exists('deluge.php') && !isset($pmss
     $frameData['deluge'] = pmssLocalFrameDefinition('deluge/', 'Deluge', 'Deluge - Torrent web UI');
 }
 $frames = array_merge($frames, $frameData);
+$pmssPikkumiesState = array('visible' => false, 'origin' => '', 'mode' => 'simplified');
+if (function_exists('pmssPikkumiesPanelStateRead') && is_file(__DIR__.'/pikkumiesOpen.php')) {
+    list($pmssPikkumiesHome, $pmssPikkumiesName) = pmssPikkumiesPanelAccount();
+    $pmssPikkumiesState = pmssPikkumiesPanelStateRead($pmssPikkumiesHome, $pmssPikkumiesName);
+}
+// Local feature frames always follow Welcome, regardless of remote frame order.
+unset($frames['pikkumies']);
+if ($pmssPikkumiesState['visible'] && isset($frames['welcome'])) {
+    $pmssWelcomePosition = array_search('welcome', array_keys($frames), true) + 1;
+    $frames = array_slice($frames, 0, $pmssWelcomePosition, true)
+        + array('pikkumies' => pmssLocalFrameDefinition('pikkumiesOpen.php?session=pm1', 'Pikkumies', 'Ask Pikkumies, your server helper'))
+        + array_slice($frames, $pmssWelcomePosition, null, true);
+}
 // Remote and customer frame definitions cannot move or duplicate Configure.
 $pmssConfigureFrame = pmssLocalFrameConfigureFrameRead();
 foreach ($frames as $pmssFrameKey => $pmssFrame) {
@@ -679,11 +705,19 @@ foreach($frames AS $thisId => $thisFrame) {
 
     $frameIdHtml  = htmlspecialchars((string) $thisId, ENT_QUOTES, 'UTF-8');
     $frameUrlHtml = htmlspecialchars((string) ($thisFrame['url'] ?? ''), ENT_QUOTES, 'UTF-8');
-    if ($thisId != 'welcome') {
+    $frameNameHtml = htmlspecialchars((string) ($thisFrame['linkText'] ?? $thisId), ENT_QUOTES, 'UTF-8');
+    if ($thisId === 'pikkumies') {
+        echo '<div id="pikkumies" class="tabs-container"><div class="pmss-pikkumies-header">'
+            .'<a href="pikkumiesOpen.php?session=pm1" target="_blank" rel="noopener">Open in its own tab</a>';
+        if ($pmssPikkumiesState['mode'] === 'power-user')
+            echo '<a href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a>';
+        echo '<span id="pmss-pikkumies-hint" hidden>Your network may be blocking Pikkumies.</span></div>'
+            .'<iframe id="pikkumiesFrame" title="Pikkumies" width="100%" src="about:blank" frameborder="0"></iframe></div>';
+    } elseif ($thisId != 'welcome') {
         echo "\t" . '<div id="' . $frameIdHtml . '" class="tabs-container"></div>' . "\n";
     } else {
         echo "\n\t" . '<div id="' . $frameIdHtml . '" class="tabs-container">
-        <iframe id="' . $frameIdHtml . 'Frame" width=100% height=100% src="' . $frameUrlHtml . '" frameborder="0"></iframe>
+        <iframe id="' . $frameIdHtml . 'Frame" title="' . $frameNameHtml . '" width=100% height=100% src="' . $frameUrlHtml . '" frameborder="0"></iframe>
      </div>' . "\n";
     }
 }
@@ -737,13 +771,94 @@ try {
 }
 
 function loadFrame(frameId, frameSrc) {
- var frameIds = frameId + frameSrc;
+ if (frameId === 'pikkumies') { pmssPikkumiesOpen(); return; }
  if ($('#' + frameId).html() == '') {
-  $('#' + frameId).html('<iframe id="' + frameId + 'Frame" width=100% height=100% src="' + frameSrc + '" frameborder="0"></iframe>');
+  var iframe = document.createElement('iframe');
+  iframe.id = frameId + 'Frame'; iframe.title = frameId;
+  iframe.width = '100%'; iframe.height = '100%'; iframe.frameBorder = '0';
+  iframe.src = frameSrc;
+  document.getElementById(frameId).appendChild(iframe);
   setHeights();
  }
 
 }
+<?php if ($pmssPikkumiesState['visible']): ?>
+var pmssPikkumiesOrigin = <?= json_encode($pmssPikkumiesState['origin']) ?>;
+var pmssPikkumiesReady = false, pmssPikkumiesPendingSwitch = false, pmssPikkumiesHintTimer;
+var pmssPikkumiesWelcomeReloaded = false;
+var pmssPikkumiesLastReconnect = 0;
+var pmssPikkumiesLauncher = 'pikkumiesOpen.php?session=pm1';
+function pmssPikkumiesNavigate(url) {
+ pmssPikkumiesReady = false;
+ document.getElementById('pikkumiesFrame').src = url;
+}
+function pmssPikkumiesOpen() {
+ var frame = document.getElementById('pikkumiesFrame');
+ if (!frame) return;
+ if (!pmssPikkumiesReady) pmssPikkumiesNavigate(pmssPikkumiesLauncher);
+ if (window.matchMedia('(pointer:fine)').matches) frame.focus();
+}
+document.getElementById('pikkumiesFrame').addEventListener('load', function () {
+ if (this.src === 'about:blank') return;
+ clearTimeout(pmssPikkumiesHintTimer);
+ document.getElementById('pmss-pikkumies-hint').hidden = true;
+ pmssPikkumiesHintTimer = setTimeout(function () {
+  if (!pmssPikkumiesReady) document.getElementById('pmss-pikkumies-hint').hidden = false;
+ }, 12000);
+ if (window.matchMedia('(pointer:fine)').matches && document.getElementById('pikkumies').offsetParent !== null) this.focus();
+});
+window.addEventListener('message', function (event) {
+ if (event.origin === location.origin && event.source === document.getElementById('welcomeFrame').contentWindow
+     && event.data === 'pmss:pikkumies-preload' && window.matchMedia('(pointer:fine)').matches) {
+  var preload = document.getElementById('pikkumiesFrame');
+  if (preload && preload.src === 'about:blank') pmssPikkumiesNavigate(pmssPikkumiesLauncher);
+  return;
+ }
+ if (event.origin !== pmssPikkumiesOrigin || typeof event.data !== 'string') return;
+ var frame = document.getElementById('pikkumiesFrame');
+ var welcome = document.getElementById('welcomeFrame');
+ var bar = null;
+ try { bar = welcome.contentWindow.document.getElementById('pmss-pikkumies-bar-frame'); } catch (e) {}
+ if (event.source === frame.contentWindow && event.data === 'pikkumies:ready') {
+  pmssPikkumiesReady = true;
+  document.getElementById('pmss-pikkumies-hint').hidden = true;
+  if (pmssPikkumiesPendingSwitch) {
+   pmssPikkumiesPendingSwitch = false;
+   document.querySelector('a[href="#pikkumies"]').click();
+   if (window.matchMedia('(pointer:fine)').matches) frame.focus();
+  }
+  if (welcome) {
+   var disabled = null;
+   try { disabled = welcome.contentWindow.document.getElementById('pmss-pikkumies-bar-disabled'); } catch (e) {}
+   if (disabled && !pmssPikkumiesWelcomeReloaded) {
+    pmssPikkumiesWelcomeReloaded = true;
+    welcome.contentWindow.location.reload();
+   } else welcome.contentWindow.postMessage('pikkumies:tab-ready', location.origin);
+  }
+  return;
+ }
+ if (event.source === frame.contentWindow && event.data === 'pikkumies:reconnect') {
+  var now = Date.now();
+  pmssPikkumiesNavigate(now - pmssPikkumiesLastReconnect >= 30000
+   ? pmssPikkumiesLauncher : 'pikkumiesOpen.php?view=not-running');
+  pmssPikkumiesLastReconnect = now;
+  return;
+ }
+ if (!bar || event.source !== bar.contentWindow) return;
+ if (event.data === 'pikkumies:ready') {
+  welcome.contentWindow.postMessage('pikkumies:bar-ready', location.origin);
+ } else if (event.data === 'pikkumies:switch') {
+  if (!pmssPikkumiesReady) { pmssPikkumiesPendingSwitch = true; pmssPikkumiesNavigate(pmssPikkumiesLauncher); }
+  else {
+   document.querySelector('a[href="#pikkumies"]').click();
+   if (window.matchMedia('(pointer:fine)').matches) frame.focus();
+  }
+ } else if (/^pikkumies:rows:[1-6]$/.test(event.data)) {
+  bar.style.height = ((window.matchMedia('(pointer:coarse)').matches ? 52 : 84)
+   + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';
+ }
+});
+<?php endif; ?>
 </script>
 
 </body>
