@@ -18,7 +18,7 @@ final class PikkumiesHermesUiTest extends TestCase
         $this->assertSame([str_repeat('a', 64), str_repeat('b', 64)], \pmssPikkumiesHermesCredentials($paths));
         $this->assertTrue(\pmssPikkumiesHermesRotate($paths));
         $rotated = \pmssPikkumiesHermesCredentials($paths);
-        $this->assertSame(str_repeat('a', 64), $rotated[0]);
+        $this->assertFalse($rotated[0] === str_repeat('a', 64));
         $this->assertFalse($rotated[1] === str_repeat('b', 64));
         chmod($paths['credentials'], 0644);
         $this->assertSame(null, \pmssPikkumiesHermesCredentials($paths));
@@ -47,37 +47,131 @@ final class PikkumiesHermesUiTest extends TestCase
             '0123456789abcdef.mcx.fi', 12345, $live);
         $this->assertStringContainsAllStrings(['listen 845 ssl;', 'server_name 0123456789abcdef.mcx.fi;',
             'auth_request /__pmss-b-auth;', 'location = /api/cron/fire { return 404; }',
-            'same-origin|none', 'frame-ancestors https://node.example.com',
+            'same-origin|none', "frame-ancestors 'none'",
             'pmss_ui_b_noargs', 'proxy_set_header X-Forwarded-Proto https;'], $block);
         $this->assertFalse(strpos($block, '$args') !== false);
         $this->assertFalse(strpos($block, 'server_name uitester') !== false);
         $this->assertStringContainsString('listen 845 ssl default_server;',
             \pmssPikkumiesHermesDefaultNginxBlock("    ssl_certificate /safe/fullchain.pem;\n"));
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.nginx-conf',
+            'log_format pmss_ui_b_noargs');
         $lighttpd = \pmssLighttpdPikkumiesHermesBlock('uitester', 24000);
-        $this->assertStringContainsAllStrings(['^/__pmss-ui-b/', '"host" => "127.0.0.1"',
+        $this->assertStringContainsAllStrings(['^/__pmss-ui-b/', '"socket" => "/home/uitester/.mcxPikkumies/pikkumies/local/ui/hermes/ui.sock"',
             '"Authorization" => ""', 'X-Forwarded-Proto'], $lighttpd);
         $this->assertSame('', \pmssLighttpdPikkumiesHermesBlock('../uitester', 24000));
     }
 
-    public function testAccountLifecycleStopsUiAndRotatesBothSessions(): void
+    public function testRotationStopsRecordedChildBeforeReadingInvalidCredentials(): void
     {
-        $logout = $this->pmssReadRepoFile('etc/skel/www/panelSessionPage.php');
-        $password = $this->pmssReadRepoFile('scripts/changePw.php');
-        $this->assertStringContainsAllStrings([' ui stop', ' stop-simplified',
-            'pikkumiesHermesUi.php', ' rotate-session'], $logout);
-        $this->assertStringContainsAllStrings(['pmssBuildUserShellNoPamCommand',
-            ' stop-simplified', ' rotate-session'], $password);
+        $home = $this->pmssMakeTempDir('pmss-b-rotation-', 0700);
+        $paths = \pmssPikkumiesHermesPaths($home);
+        $this->assertTrue(\pmssPikkumiesHermesWrite($paths, str_repeat('a', 64), str_repeat('b', 64)));
+        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('sleep(30);')
+            .' dashboard hermes', [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $this->assertTrue(is_resource($process));
+        $pid = proc_get_status($process)['pid'];
+        fclose($pipes[0]); fclose($pipes[1]); fclose($pipes[2]);
+        file_put_contents($paths['pid'], $pid."\n");
+        usleep(100000);
+        chmod($paths['credentials'], 0644);
+        try {
+            $this->assertFalse(\pmssPikkumiesHermesRotate($paths));
+            usleep(100000);
+            $this->assertFalse(strpos((string) @file_get_contents('/proc/'.$pid.'/cmdline'), 'dashboard') !== false);
+        } finally {
+            @posix_kill($pid, SIGKILL);
+            proc_close($process);
+        }
     }
 
-    public function testAccountCronRechecksBackendGateWithoutStartingIt(): void
+    public function testRelayRefusesUnownedListener(): void
     {
-        $runtime = $this->pmssReadRepoFile('etc/skel/bin/pikkumiesHermesRuntime.php');
-        $auth = $this->pmssReadRepoFile('etc/skel/bin/pikkumiesHermesAuth.php');
-        $this->assertStringContainsAllStrings(['* * * * * HOME=',
-            'pmssAgentCronApply', ' ensure >/dev/null'], $runtime);
-        $this->assertStringContainsAllStrings(['function pmssPikkumiesHermesEnsure',
-            'pmssPikkumiesHermesGate($port)', 'pmssPikkumiesHermesStopUngated($port)'], $auth);
-        $this->assertFalse(strpos($auth, 'pmssPikkumiesHermesStart($paths') !== false);
+        $server = stream_socket_server('tcp://127.0.0.1:0');
+        $this->assertTrue($server !== false);
+        $port = (int) substr(strrchr(stream_socket_get_name($server, false), ':'), 1);
+        try {
+            $foreign = static function (): bool { return false; };
+            $owned = static function (): bool { return true; };
+            $this->assertFalse(\pmssHermesRelayListenerOwned($port, $foreign));
+            $this->assertFalse(\pmssHermesRelayConnect($port, $foreign));
+            $peer = \pmssHermesRelayConnect($port, $owned);
+            $this->assertTrue($peer !== false);
+            fclose($peer);
+        } finally { fclose($server); }
+    }
+
+    public function testMissingListenerToolStopsRecordedChild(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-b-tool-', 0700);
+        $paths = \pmssPikkumiesHermesPaths($home);
+        mkdir($paths['base'], 0700, true);
+        file_put_contents($paths['port'], "24000\n");
+        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('sleep(30);')
+            .' dashboard hermes', [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $this->assertTrue(is_resource($process));
+        $pid = proc_get_status($process)['pid'];
+        fclose($pipes[0]); fclose($pipes[1]); fclose($pipes[2]);
+        file_put_contents($paths['pid'], $pid."\n");
+        usleep(100000);
+        $previous = getenv('PATH');
+        putenv('PATH=/does-not-exist');
+        try { $this->assertFalse(\pmssPikkumiesHermesEnsure($paths)); }
+        finally { $previous === false ? putenv('PATH') : putenv('PATH='.$previous); }
+        usleep(100000);
+        $this->assertFalse(strpos((string) @file_get_contents('/proc/'.$pid.'/cmdline'), 'dashboard') !== false);
+        @posix_kill($pid, SIGKILL);
+        proc_close($process);
+    }
+
+    public function testDashboardLoginProbeDistinguishesDeniedAndOpenResponses(): void
+    {
+        foreach ([401 => true, 200 => false] as $status => $expected) {
+            $script = '$server=stream_socket_server("tcp://127.0.0.1:0"); '
+                .'echo stream_socket_get_name($server,false),"\n"; fflush(STDOUT); '
+                .'$peer=stream_socket_accept($server,5); if ($peer) { fread($peer,4096); '
+                .'fwrite($peer,"HTTP/1.1 '.$status.' Status\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"); '
+                .'fclose($peer); } fclose($server);';
+            $process = proc_open(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            $this->assertTrue(is_resource($process));
+            fclose($pipes[0]);
+            $address = fgets($pipes[1]);
+            $this->assertTrue(is_string($address));
+            $port = (int) substr(strrchr(trim($address), ':'), 1);
+            $this->assertSame($expected, \pmssPikkumiesHermesGate($port));
+            fclose($pipes[1]); fclose($pipes[2]);
+            $this->assertSame(0, proc_close($process));
+        }
+    }
+
+    public function testGeneratedPortBConfigParsesWhenNginxIsAvailable(): void
+    {
+        $nginx = trim((string) @shell_exec('command -v nginx 2>/dev/null'));
+        $openssl = trim((string) @shell_exec('command -v openssl 2>/dev/null'));
+        if ($nginx === '' || $openssl === '') throw new SkipTest('nginx or openssl is unavailable');
+        $root = $this->pmssMakeTempDir('pmss-b-nginx-', 0700);
+        mkdir($root.'/uitester.node.example.com');
+        $cert = $root.'/uitester.node.example.com/fullchain.pem';
+        $key = $root.'/uitester.node.example.com/privkey.pem';
+        exec(escapeshellarg($openssl).' req -x509 -newkey rsa:2048 -nodes -subj /CN=uitester.node.example.com'
+            .' -keyout '.escapeshellarg($key).' -out '.escapeshellarg($cert).' -days 1 2>/dev/null', $rows, $rc);
+        $this->assertSame(0, $rc);
+        $block = \pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com',
+            '0123456789abcdef.mcx.fi', 12345, $root);
+        $block .= "\n".\pmssHermesUiNginxBlock('uitester', 'node.example.com',
+            '0123456789abcdef.mcx.fi', 12345, $root);
+        $block = preg_replace('/^    (?:include|ssl_dhparam) \/etc\/letsencrypt\/[^;]+;\n/m', '', $block);
+        $block = str_replace('/var/log/nginx/access.log', $root.'/access.log', $block);
+        $config = "pid {$root}/nginx.pid; events {} http { log_format pmss_ui_b_noargs '\$uri';\n"
+            ."log_format pmss_ui_noargs '\$uri'; limit_conn_zone \$binary_remote_addr zone=addr:10m;\n"
+            .\pmssPikkumiesHermesDefaultNginxBlock('    ssl_certificate '.escapeshellarg($cert).";\n"
+                .'    ssl_certificate_key '.escapeshellarg($key).";\n")
+            .\pmssHermesUiDefaultNginxBlock('    ssl_certificate '.escapeshellarg($cert).";\n"
+                .'    ssl_certificate_key '.escapeshellarg($key).";\n")
+            .$block."\n}";
+        file_put_contents($root.'/nginx.conf', $config);
+        exec(escapeshellarg($nginx).' -t -p '.escapeshellarg($root.'/').' -c '.escapeshellarg($root.'/nginx.conf').' 2>&1', $rows, $rc);
+        $this->assertSame(0, $rc, implode("\n", $rows));
     }
 
     public function testRootInstallerDoesNotExecuteAccountBinary(): void

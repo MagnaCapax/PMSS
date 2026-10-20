@@ -25,7 +25,7 @@ function pmssMediaStackPortDefinitions(): array
         'sonarr' => array('path' => '.config/sonarr/config.xml', 'patterns' => array($xmlPort)),
         'autobrr' => array('path' => '.config/autobrr/config.toml', 'patterns' => array($iniPort)),
         'openclaw' => array('path' => '.openclaw/gateway.port', 'patterns' => array('/^([0-9]{1,5})(?:\r?\n|$)/')),
-        'hermes' => array('path' => '.hermes/pmss-dashboard.port', 'patterns' => array('/^([0-9]{1,5})(?:\r?\n|$)/')),
+        'hermes' => array('path' => '', 'patterns' => array()),
         'jellyfin' => array(
             'path' => '.config/jellyfin/config/network.xml',
             'patterns' => array(
@@ -36,8 +36,7 @@ function pmssMediaStackPortDefinitions(): array
     );
     // The staged host marker owns B; reserve its loopback port only on enabled hosts.
     if (is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
-        $definitions['pikkumies-hermes'] = array('path' => '.mcxPikkumies/pikkumies/local/ui/hermes/dashboard.port',
-            'patterns' => array('/^([0-9]{1,5})(?:\r?\n|$)/'));
+        $definitions['pikkumies-hermes'] = array('path' => '', 'patterns' => array());
     }
     return $definitions;
 }
@@ -45,6 +44,8 @@ function pmssMediaStackPortDefinitions(): array
 /** Read an adoptable port only from a small regular file inside the user's home. */
 function pmssMediaStackConfiguredPortRead(string $home, array $definition): ?int
 {
+    // Dashboard reservations are already held in the root-owned port manager.
+    if (($definition['path'] ?? '') === '') return null;
     $home = rtrim($home, '/');
     $path = $home.'/'.ltrim((string) ($definition['path'] ?? ''), '/');
     $homeReal = realpath($home);

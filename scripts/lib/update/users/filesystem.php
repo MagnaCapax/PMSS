@@ -223,6 +223,7 @@ PHP;
         'bin/pmssHermesCli.php',
         'bin/pmssAccountAgent.php',
         'bin/pmssHermesRuntime.php',
+        'bin/pmssHermesRelay.php',
         'bin/pmssHermesInstall.php',
         'bin/pikkumiesHermesUi.php',
         'bin/pikkumiesHermesAuth.php',

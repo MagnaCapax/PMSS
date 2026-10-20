@@ -132,6 +132,7 @@ final class PikkumiesUiRoutesTest extends TestCase
             'agentboard $http_authorization;',
             'proxy_set_header X-Forwarded-Proto https;', 'pmss_ui_noargs',
             '/__pmss-select-web', '/__pmss-select-agentboard',
+            '__Host-pmss_ui_c=web', 'proxy_cookie_domain ~.+ "";',
         ], $block);
         $this->assertFalse(strpos($block, 'X-Forwarded-Prefix') !== false);
         $this->assertFalse(strpos($block, '$args') !== false);
@@ -140,9 +141,35 @@ final class PikkumiesUiRoutesTest extends TestCase
         $hermes = \pmssLighttpdHermesUiBlock('uitester', 24000);
         $agentboard = \pmssLighttpdHermesUiBlock('uitester', 24000, 'vanilla-agentboard');
         $this->assertStringContainsAllStrings(['^/__pmss-ui-c/', 'X-Forwarded-Proto', '"Authorization" => ""'], $hermes);
+        $this->assertStringContainsString('/home/uitester/.hermes/pmss-dashboard.sock', $hermes);
         $this->assertStringContainsString('/home/uitester/.config/pmss/ui/agentboard.sock', $agentboard);
         $this->assertFalse(strpos($agentboard, '"Authorization" => ""') !== false);
         $this->assertSame('', \pmssLighttpdHermesUiBlock('../uitester', 24000));
+    }
+
+    public function testEncodedAndRepeatedPathSegmentsReturnBadRequest(): void
+    {
+        foreach ([\pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345),
+            \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345)] as $block) {
+            $this->assertTrue(preg_match('/if \(\$request_uri ~\* "([^"]+)"\) \{ return 400; \}/', $block, $match) === 1);
+            foreach (['/%2e/', '/%2F/', '/a/../b', '//api'] as $uri)
+                $this->assertTrue(preg_match('~'.$match[1].'~i', $uri) === 1, $uri);
+            foreach (['/', '/api/auth/me', '/assets/main.js'] as $uri)
+                $this->assertFalse(preg_match('~'.$match[1].'~i', $uri) === 1, $uri);
+        }
+    }
+
+    public function testPortCChoiceReadsOnlyTheHostPrefixedCookie(): void
+    {
+        $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
+        $this->assertTrue(preg_match('/map \$http_cookie \$[a-z0-9_]+ \{\s*default "";\s*~([^ ]+) \$1;/s',
+            $block, $match) === 1);
+        foreach (['__Host-pmss_ui_c=web' => 'web', 'other=x; __Host-pmss_ui_c=agentboard; x=y' => 'agentboard'] as $cookie => $expected) {
+            $this->assertTrue(preg_match('~'.$match[1].'~', $cookie, $value) === 1);
+            $this->assertSame($expected, $value[1]);
+        }
+        foreach (['pmss_ui_c=agentboard', '__Host-pmss_ui_c=other', 'x__Host-pmss_ui_c=web'] as $cookie)
+            $this->assertFalse(preg_match('~'.$match[1].'~', $cookie) === 1);
     }
 
     public function testRootOwnedBarPageKeepsTheAskQueueAndCopyBounded(): void

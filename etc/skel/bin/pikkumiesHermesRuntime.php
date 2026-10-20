@@ -39,7 +39,8 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
         if (file_exists($paths['credentials']) || is_link($paths['credentials'])
             || !pmssPikkumiesHermesWrite($paths, bin2hex(random_bytes(32)), bin2hex(random_bytes(32)))) return false;
     }
-    if (!pmssPikkumiesHermesSchedule($paths) || !pmssPikkumiesHermesEnsure($paths)) return false;
+    if (!pmssPikkumiesHermesSchedule($paths) || pmssAgentCommandPath('ss') === '') return false;
+    pmssPikkumiesHermesEnsure($paths);
     if (pmssPikkumiesHermesReady($paths)) return true;
     // A foreign or ungated listener is never reused.
     if (pmssPikkumiesHermesListenerOwned($port)) {
@@ -53,24 +54,23 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
     @file_put_contents($paths['pid'], $pid."\n");
     @file_put_contents($paths['base'].'/dashboard.port', $port."\n");
     for ($i = 0; $i < 100; ++$i) {
-        if (pmssPikkumiesHermesReady($paths)) return true;
+        if (pmssPikkumiesHermesListenerOwned($port) && pmssPikkumiesHermesGate($port)) {
+            if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port)) return true;
+            break;
+        }
         usleep(100000);
     }
+    pmssPikkumiesHermesStop($paths);
     return false;
 }
 
-/** Rotate the session secret without changing the independent login password. */
+/** Stop the old child before reading credentials; replace both independent values. */
 function pmssPikkumiesHermesRotate(array $paths): bool
 {
+    pmssPikkumiesHermesStop($paths);
     $credentials = pmssPikkumiesHermesCredentials($paths);
     if ($credentials === null) return !file_exists($paths['credentials']);
-    $pid = is_file($paths['pid']) && !is_link($paths['pid']) ? trim((string) @file_get_contents($paths['pid'])) : '';
-    if (preg_match('/^[1-9][0-9]*$/D', $pid)
-        && @fileowner('/proc/'.$pid) === posix_geteuid()) @posix_kill((int) $pid, SIGTERM);
-    $port = pmssAgentReservedPort($paths['port']);
-    $listener = $port !== null ? pmssPikkumiesHermesListenerPid($port) : null;
-    if ($listener !== null && !pmssPikkumiesHermesStopUngated($port)) return false;
-    return pmssPikkumiesHermesWrite($paths, $credentials[0], bin2hex(random_bytes(32)));
+    return pmssPikkumiesHermesWrite($paths, bin2hex(random_bytes(32)), bin2hex(random_bytes(32)));
 }
 
 /** Stop only the account's pinned simplified UI processes on logout. */

@@ -49,7 +49,10 @@ with it. Both mounts keep the same port-C Origin and Fetch Site checks.
 Port C has two fixed pre-login selector redirects because its two mutually
 exclusive UIs share one origin. Each selector only sets the HttpOnly UI-choice
 cookie and redirects to `/`; it does not proxy an API request or expose account
-content. The Hermes login assets are the other pre-authenticated paths.
+content. The choice cookie has a `__Host-` prefix, and the proxy removes backend
+cookie Domain scope. The Hermes login assets are the other pre-authenticated
+paths. The generated Hermes mount uses an account-owned socket under `.hermes`;
+an account-owned relay checks the TCP listener's UID before each connection.
 
 The launcher starts Hermes web UI or standard Agentboard on demand as the
 account. Agentboard uses a private Unix socket and single-use, 60-second

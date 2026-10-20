@@ -134,7 +134,7 @@ function pmssPikkumiesHermesNginxBlock(string $user, string $host, string $servi
     $originPattern = preg_quote($origin, '~');
     $ssl = pmssNginxUserSslBlock($user.'.'.$host, '', $live);
     return <<<NGINX
-# Account UI B: Hermes login is required even on the shared loopback listener.
+# Account UI B: Hermes login is required at the private relay.
 map "\$request_method:\$http_upgrade:\$http_origin" \${$variable}_origin_ok {
     default 0;
     ~^GET::\$ 1;
@@ -148,10 +148,11 @@ map "\$request_method:\$uri:\$http_sec_fetch_site" \${$variable}_api_ok {
 server {
     listen 845 ssl;
     server_name {$serviceHost};
-{$ssl}    add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
+{$ssl}    add_header Content-Security-Policy "frame-ancestors 'none'" always;
     add_header X-Frame-Options "DENY" always;
     add_header Cache-Control "no-store" always;
     access_log /var/log/nginx/access.log pmss_ui_b_noargs;
+    if (\$request_uri ~* "(%2e|%2f|\\.\\.|//)") { return 400; }
     if (\${$variable}_origin_ok = 0) { return 403; }
     if (\${$variable}_api_ok = 0) { return 403; }
     location = /api/cron/fire { return 404; }
@@ -194,8 +195,7 @@ NGINX;
 
 function pmssPikkumiesHermesDefaultNginxBlock(string $sslBlock): string
 {
-    return "log_format pmss_ui_b_noargs '\$remote_addr \$request_method \$uri \$status';\n"
-        ."server {\n    listen 845 ssl default_server;\n    server_name _;\n"
+    return "server {\n    listen 845 ssl default_server;\n    server_name _;\n"
         .$sslBlock."    return 444;\n}\n";
 }
 
@@ -207,7 +207,7 @@ function pmssHermesUiNginxBlock(string $user, string $host, string $serviceHost,
     $originPattern = preg_quote($origin, '~');
     $ssl = pmssNginxUserSslBlock($user.'.'.$host, '', $live);
     return <<<NGINX
-# Account UI C: Hermes enforces its login on the loopback backend.
+# Account UI C: Hermes enforces its login behind the private relay.
 map "\$request_method:\$http_upgrade:\$http_origin" \${$variable}_origin_ok {
     default 0;
     ~^GET::\$ 1;
@@ -218,11 +218,15 @@ map "\$request_method:\$uri:\$http_sec_fetch_site" \${$variable}_api_ok {
     ~^GET:/api/.*:(same-origin|none)\$ 1;
     ~^GET:/api/ 0;
 }
-map \$cookie_pmss_ui_c \${$variable}_prefix {
+map \$http_cookie \${$variable}_choice {
+    default "";
+    ~(?:^|;[[:space:]]*)__Host-pmss_ui_c=(web|agentboard)(?:;|\$) \$1;
+}
+map \${$variable}_choice \${$variable}_prefix {
     default /__pmss-ui-c;
     agentboard /__pmss-ui-c-agentboard;
 }
-map \$cookie_pmss_ui_c \${$variable}_authorization {
+map \${$variable}_choice \${$variable}_authorization {
     default "";
     agentboard \$http_authorization;
 }
@@ -232,22 +236,24 @@ server {
 {$ssl}    add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
     add_header Cache-Control "no-store" always;
     access_log /var/log/nginx/access.log pmss_ui_noargs;
+    proxy_cookie_domain ~.+ "";
+    if (\$request_uri ~* "(%2e|%2f|\\.\\.|//)") { return 400; }
     if (\${$variable}_origin_ok = 0) { return 403; }
     if (\${$variable}_api_ok = 0) { return 403; }
     location = /api/cron/fire { return 404; }
     location = /__pmss-select-web {
-        add_header Set-Cookie "pmss_ui_c=web; Path=/; Secure; HttpOnly; SameSite=Lax" always;
+        add_header Set-Cookie "__Host-pmss_ui_c=web; Path=/; Secure; HttpOnly; SameSite=Lax" always;
         add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
         return 302 /;
     }
     location = /__pmss-select-agentboard {
-        add_header Set-Cookie "pmss_ui_c=agentboard; Path=/; Secure; HttpOnly; SameSite=Lax" always;
+        add_header Set-Cookie "__Host-pmss_ui_c=agentboard; Path=/; Secure; HttpOnly; SameSite=Lax" always;
         add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
         return 302 /;
     }
     location = /__pmss-auth {
         internal;
-        if (\$cookie_pmss_ui_c = agentboard) { return 204; }
+        if (\${$variable}_choice = agentboard) { return 204; }
         proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-c/api/auth/me;
         proxy_pass_request_body off;
         proxy_set_header Content-Length "";
@@ -298,7 +304,6 @@ NGINX;
 
 function pmssHermesUiDefaultNginxBlock(string $sslBlock): string
 {
-    return "log_format pmss_ui_noargs '\$remote_addr \$request_method \$uri \$status';\n"
-        ."server {\n    listen 846 ssl default_server;\n    server_name _;\n"
+    return "server {\n    listen 846 ssl default_server;\n    server_name _;\n"
         .$sslBlock."    return 444;\n}\n";
 }

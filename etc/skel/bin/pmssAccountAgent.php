@@ -1,6 +1,18 @@
 <?php
 /** Shared account-only primitives for agent installers; never load operator /scripts. */
 
+/** The account CLI carries its own command lookup across the /scripts boundary. */
+function pmssAgentCommandPath(string $binary): string
+{
+    if (function_exists('pmssCommandPath')) return pmssCommandPath($binary);
+    if (preg_match('/^[A-Za-z0-9._+-]+$/D', $binary) !== 1) return '';
+    $raw = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
+    if (!is_string($raw) || strpos($raw, "\0") !== false) return '';
+    $path = trim($raw);
+    return strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false
+        && is_executable($path) ? $path : '';
+}
+
 /** Require an ordinary caller and its own non-linked home. */
 function pmssAgentHome(): string
 {

@@ -96,6 +96,17 @@ final class MediaStackPortManagerTest extends TestCase
         $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['radarr']));
     }
 
+    public function testDashboardDefinitionsDoNotReadAccountPortFiles(): void
+    {
+        $definitions = \pmssMediaStackPortDefinitions();
+        $this->pmssWriteFile($this->home.'/.hermes/pmss-dashboard.port', "23004\n");
+        $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['hermes']));
+        if (isset($definitions['pikkumies-hermes'])) {
+            $this->pmssWriteFile($this->home.'/.mcxPikkumies/pikkumies/local/ui/hermes/dashboard.port', "23005\n");
+            $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['pikkumies-hermes']));
+        }
+    }
+
     public function testEnsureRejectsMismatchedHomeScope(): void
     {
         $this->assertSame(array(), \pmssMediaStackPortsEnsure($this->user, dirname($this->home).'/someone-else'));

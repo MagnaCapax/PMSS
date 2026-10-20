@@ -1,6 +1,7 @@
 <?php
 /** Account-owned vanilla Hermes runtime. */
 require_once __DIR__.'/pmssAccountAgent.php';
+require_once __DIR__.'/pmssHermesRelay.php';
 
 function pmssHermesPaths(string $home): array
 {
@@ -8,7 +9,8 @@ function pmssHermesPaths(string $home): array
     return array('home' => $home, 'base' => $base, 'tree' => $base.'/hermes-agent',
         'exe' => $home.'/.local/bin/hermes', 'env' => $base.'/pmss-dashboard.env',
         'port' => $base.'/pmss-dashboard.port', 'pid' => $base.'/pmss-dashboard.pid',
-        'disabled' => $base.'/pmss-dashboard.disabled');
+        'disabled' => $base.'/pmss-dashboard.disabled',
+        'socket' => $base.'/pmss-dashboard.sock', 'relayPid' => $base.'/pmss-relay.pid');
 }
 
 /** Keep the independent service credentials in a private account file. */
@@ -41,6 +43,7 @@ function pmssHermesRunningPid(array $paths): ?int
 
 function pmssHermesStop(array $paths): void
 {
+    pmssHermesRelayStop($paths['relayPid'], $paths['socket']);
     $pid = pmssHermesRunningPid($paths);
     if ($pid === null) return;
     posix_kill($pid, SIGTERM);
@@ -70,14 +73,21 @@ function pmssHermesPublicUrl(string $home): string
 }
 
 /** The listener's PID and HTTP gate are checked on every open. */
-function pmssHermesListenerReady(array $paths, int $port): bool
+function pmssHermesBackendReady(array $paths, int $port): bool
 {
     $pid = pmssHermesRunningPid($paths);
     if ($pid === null) return false;
     $rows = array();
-    exec('/usr/bin/ss -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
+    $ss = pmssAgentCommandPath('ss');
+    if ($ss === '') return false;
+    exec(escapeshellarg($ss).' -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
     return $rc === 0 && strpos(implode("\n", $rows), 'pid='.$pid.',') !== false
         && pmssHermesGateProbe($port);
+}
+
+function pmssHermesListenerReady(array $paths, int $port): bool
+{
+    return pmssHermesBackendReady($paths, $port) && pmssHermesRelayReady($paths['socket']);
 }
 
 /** Spawn with only approved environment keys; no secret enters argv. */
@@ -104,6 +114,8 @@ function pmssHermesStart(array $paths): void
     $url = pmssHermesPublicUrl($paths['home']);
     if (pmssHermesRunningPid($paths) !== null) {
         if (pmssHermesListenerReady($paths, $port)) return;
+        if (pmssHermesBackendReady($paths, $port)
+            && pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port)) return;
         pmssHermesStop($paths);
         throw new RuntimeException('Dashboard login gate is unavailable');
     }
@@ -119,7 +131,10 @@ function pmssHermesStart(array $paths): void
     file_put_contents($paths['pid'], $pid."\n");
     file_put_contents($paths['port'], $port."\n");
     for ($i = 0; $i < 150; ++$i) {
-        if (pmssHermesListenerReady($paths, $port)) return;
+        if (pmssHermesBackendReady($paths, $port)) {
+            if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port)) return;
+            break;
+        }
         usleep(100000);
     }
     pmssHermesStop($paths);

@@ -13,9 +13,11 @@ The Web interface selector offers Hermes web UI (default), Agentboard, and
 Agentboard Pikkumies when Pikkumies is installed. The first two use the same
 private port-C origin at `/`; the last opens the existing Pikkumies UI on port
 A. Only the selected port-C backend is started on demand. The Hermes login
-protects its loopback listener, which other local accounts can reach. The
-launcher checks that gate at every open. Signing in to the port-B Hermes
-window can sign out port C because their cookies share a hostname.
+protects its loopback listener. The generated route uses an account-owned
+socket in the private `.hermes` directory; its relay checks the TCP listener's
+UID before each connection. The launcher checks the login gate at every open.
+The port-C interface choice uses a host-only cookie. Signing in to the port-B
+Hermes window can sign out port C because their login cookies share a hostname.
 
 The account can use `~/bin/install-hermes status`, `start`, `stop`,
 `repair-gate`, `reconcile-key`, and `uninstall`. `uninstall --purge` removes

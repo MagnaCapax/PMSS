@@ -1,6 +1,7 @@
 <?php
 /** Account-owned Hermes dashboard for Pikkumies. No root operation enters this tree. */
 require_once __DIR__.'/pmssAccountAgent.php';
+require_once __DIR__.'/pmssHermesRelay.php';
 
 function pmssPikkumiesHermesPaths(string $home): array
 {
@@ -8,7 +9,8 @@ function pmssPikkumiesHermesPaths(string $home): array
     return array('home' => $home, 'base' => $base,
         'binary' => $home.'/.mcxPikkumies/pikkumies/bin/pikkumies',
         'port' => $home.'/.media-stack-port-pikkumies-hermes',
-        'credentials' => $base.'/credentials', 'pid' => $base.'/dashboard.pid');
+        'credentials' => $base.'/credentials', 'pid' => $base.'/dashboard.pid',
+        'socket' => $base.'/ui.sock', 'relayPid' => $base.'/relay.pid');
 }
 
 /** Only two fixed, shell-safe assignments may enter the clean child environment. */
@@ -48,8 +50,10 @@ function pmssPikkumiesHermesGate(int $port): bool
 /** ss names the actual listener, which may be a child of the Pikkumies wrapper. */
 function pmssPikkumiesHermesListenerPid(int $port): ?int
 {
+    $ss = pmssAgentCommandPath('ss');
+    if ($ss === '') return null;
     $rows = array();
-    exec('/usr/bin/ss -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
+    exec(escapeshellarg($ss).' -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
     if ($rc !== 0) return null;
     foreach ($rows as $row) {
         if (!preg_match('/pid=([1-9][0-9]*),/', $row, $match)) continue;
@@ -86,13 +90,49 @@ function pmssPikkumiesHermesReady(array $paths): bool
 {
     $port = pmssAgentReservedPort($paths['port']);
     return $port !== null && pmssPikkumiesHermesListenerOwned($port)
-        && pmssPikkumiesHermesGate($port);
+        && pmssPikkumiesHermesGate($port) && pmssHermesRelayReady($paths['socket']);
+}
+
+/** Stop the recorded child even if ss cannot inspect its listener. */
+function pmssPikkumiesHermesStop(array $paths): void
+{
+    pmssHermesRelayStop($paths['relayPid'], $paths['socket']);
+    $raw = is_file($paths['pid']) && !is_link($paths['pid']) ? trim((string) @file_get_contents($paths['pid'])) : '';
+    if (preg_match('/^[1-9][0-9]*$/D', $raw)) {
+        $proc = '/proc/'.$raw;
+        $cmd = @file_get_contents($proc.'/cmdline');
+        if (@fileowner($proc) === posix_geteuid() && is_string($cmd)
+            && strpos($cmd, 'dashboard') !== false
+            && (strpos($cmd, 'hermes') !== false || strpos($cmd, 'pikkumies') !== false)) {
+            @posix_kill((int) $raw, SIGTERM);
+            for ($i = 0; $i < 20; ++$i) {
+                $still = @file_get_contents($proc.'/cmdline');
+                if (@fileowner($proc) !== posix_geteuid() || !is_string($still)
+                    || strpos($still, 'dashboard') === false) break;
+                usleep(100000);
+            }
+            $still = @file_get_contents($proc.'/cmdline');
+            if (@fileowner($proc) === posix_geteuid() && is_string($still)
+                && strpos($still, 'dashboard') !== false) @posix_kill((int) $raw, SIGKILL);
+        }
+    }
+    $port = pmssAgentReservedPort($paths['port']);
+    if ($port !== null && pmssPikkumiesHermesListenerOwned($port)) pmssPikkumiesHermesStopUngated($port);
 }
 
 /** The account's cron tick removes any owned listener that lost its login gate. */
 function pmssPikkumiesHermesEnsure(array $paths): bool
 {
     $port = pmssAgentReservedPort($paths['port']);
-    if ($port === null || !pmssPikkumiesHermesListenerOwned($port)) return true;
-    return pmssPikkumiesHermesGate($port) || pmssPikkumiesHermesStopUngated($port);
+    if ($port === null || pmssAgentCommandPath('ss') === '') {
+        pmssPikkumiesHermesStop($paths);
+        return false;
+    }
+    if (!pmssPikkumiesHermesListenerOwned($port)) {
+        pmssHermesRelayStop($paths['relayPid'], $paths['socket']);
+        return true;
+    }
+    if (pmssPikkumiesHermesGate($port) && pmssHermesRelayReady($paths['socket'])) return true;
+    pmssPikkumiesHermesStop($paths);
+    return false;
 }

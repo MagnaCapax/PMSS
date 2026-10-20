@@ -78,9 +78,12 @@ Configure reveals B's separate login password only after an account-password
 challenge; its response is not cached or logged.
 The account installs one tagged per-minute cron check when B first opens. The
 check does not start a backend; it stops an owned listener that loses its login
-gate. The launcher repeats the same check on each open.
-Logout and password change stop the simplified UI as the account and rotate
-the B and C session secrets. The account-side stop helper handles installed
+gate. The launcher repeats the same check on each open. B's generated route
+uses a Unix socket inside its private account directory. An account-owned relay
+checks the TCP listener's UID before every connection and refuses a missing or
+foreign listener. Logout and password change stop the simplified UI as the
+account and rotate B's login password and session secret, plus C's session
+secret. The account-side stop helper handles installed
 Pikkumies versions whose `ui stop` command is absent.
 
 The launcher displays the account memory floor when a v1 cgroup memory limit
