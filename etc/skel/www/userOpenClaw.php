@@ -3,9 +3,24 @@
 require_once __DIR__.'/scriptsInc.php';
 require_once __DIR__.'/userMediaStackPanel.php';
 
+/**
+ * The remote panel heal can leave an older userMediaStackPanel.php beside this file until the next guiv sync.
+ * Older helpers silently ignore the launcher and pid arguments and would start the Media Stack installer.
+ */
+function pmssOpenClawPanelHelpersCurrent(array $minimumParameters = array('pmssMediaStackPanelStartCommandBuild' => 3,
+    'pmssMediaStackPanelPidRead' => 2, 'pmssMediaStackPanelPidRunning' => 3)): bool
+{
+    foreach ($minimumParameters as $function => $minimum) {
+        if (!function_exists($function)) return false;
+        if ((new ReflectionFunction($function))->getNumberOfParameters() < $minimum) return false;
+    }
+    return true;
+}
+
 /** Load the self-contained customer installer without invoking its CLI entrypoint. */
 function pmssOpenClawRuntimeReady(): bool
 {
+    if (!pmssOpenClawPanelHelpersCurrent()) return false;
     $installer = dirname(__DIR__).'/bin/install-openclaw';
     if (!is_file($installer) || is_link($installer)) return false;
     require_once $installer;
@@ -15,6 +30,7 @@ function pmssOpenClawRuntimeReady(): bool
 /** Keep slow installs visible while using the installer's verified gateway identity. */
 function pmssOpenClawStatusRead(string $home, string $fallback): string
 {
+    if (!pmssOpenClawPanelHelpersCurrent()) return $fallback;
     $pid = pmssMediaStackPanelPidRead($home, '.install-openclaw-web.pid');
     foreach (array(array('install', '--yes'), array('start'), array('stop')) as $args) {
         if (pmssMediaStackPanelPidRunning($home, $pid, array_merge(array('/usr/bin/php', $home.'/bin/install-openclaw'), $args))) return 'installing';

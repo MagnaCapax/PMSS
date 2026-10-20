@@ -52,6 +52,20 @@ class AppsCatalogTest extends TestCase
         $this->assertStringContainsAllStrings(array('Restart', 'Turn off', 'Show log', 'action=open', 'target="_blank"'), $html);
     }
 
+    public function testOpenClawRefusesOlderSharedLauncherHelpers(): void
+    {
+        // A healed older userMediaStackPanel.php ignores the launcher argument and would start the Media Stack installer.
+        require_once dirname(__DIR__, 4).'/etc/skel/www/userOpenClaw.php';
+        $this->assertTrue(\pmssOpenClawPanelHelpersCurrent());
+        $this->assertFalse(\pmssOpenClawPanelHelpersCurrent(array('strlen' => 2)));
+        $this->assertFalse(\pmssOpenClawPanelHelpersCurrent(array('pmssOpenClawNoSuchHelper' => 1)));
+        $this->assertTrue(\pmssOpenClawPanelHelpersCurrent(array('str_replace' => 3)));
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/userOpenClaw.php', array(
+            "if (!pmssOpenClawPanelHelpersCurrent()) return false;",
+            "if (!pmssOpenClawPanelHelpersCurrent()) return \$fallback;",
+        ));
+    }
+
     public function testOpenClawLauncherUsesSharedPrivateBackgroundCommand(): void
     {
         $home = '/tmp/pmss-alice home';
