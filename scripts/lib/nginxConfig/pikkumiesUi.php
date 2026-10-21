@@ -234,6 +234,7 @@ server {
     listen 846 ssl;
     server_name {$serviceHost};
 {$ssl}    add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
+    add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
     add_header Cache-Control "no-store" always;
     access_log /var/log/nginx/access.log pmss_ui_noargs;
     proxy_cookie_domain ~.+ "";
@@ -244,11 +245,13 @@ server {
     location = /__pmss-select-web {
         add_header Set-Cookie "__Host-pmss_ui_c=web; Path=/; Secure; HttpOnly; SameSite=Lax" always;
         add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
+        add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
         return 302 /;
     }
     location = /__pmss-select-agentboard {
         add_header Set-Cookie "__Host-pmss_ui_c=agentboard; Path=/; Secure; HttpOnly; SameSite=Lax" always;
         add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
+        add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
         return 302 /;
     }
     location = /__pmss-auth {

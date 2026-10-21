@@ -147,6 +147,14 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertSame('', \pmssLighttpdHermesUiBlock('../uitester', 24000));
     }
 
+    public function testPortCSendsXFrameOptionsWhereverItSendsFrameAncestors(): void
+    {
+        $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
+        $csp = substr_count($block, 'add_header Content-Security-Policy "frame-ancestors https://node.example.com" always;');
+        $this->assertSame(3, $csp);
+        $this->assertSame($csp, substr_count($block, 'add_header X-Frame-Options "ALLOW-FROM https://node.example.com" always;'));
+    }
+
     public function testEncodedAndRepeatedPathSegmentsReturnBadRequest(): void
     {
         foreach ([\pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345),
