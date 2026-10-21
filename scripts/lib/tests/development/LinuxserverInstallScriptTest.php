@@ -52,6 +52,12 @@ case "${1:-} ${2:-}" in
   'info ')
     exit 0
     ;;
+  'run -d')
+    # The initial qBittorrent run must never precede its auth config publication.
+    if [[ "${4:-}" == 'qbittorrent' ]]; then
+      [[ -s "$HOME/docker/qbittorrent/config/qBittorrent/qBittorrent.conf" ]] || exit 1
+    fi
+    ;;
 esac
 exit 0
 BASH;
@@ -94,6 +100,13 @@ BASH;
         ];
     }
 
+    /** Mimic the root-side reservations without touching native port files. */
+    private function reserveTorrentPorts(string $app): void
+    {
+        $this->pmssWriteFile($this->homeDir.'/.media-stack-port-'.$app, "23001\n");
+        $this->pmssWriteFile($this->homeDir.'/.media-stack-port-'.$app.'-peer', "23002\n");
+    }
+
     public function testDryRunJellyfinDoesNotCreateConfigOrMediaDirs(): void
     {
         $result = $this->runHelper(['jellyfin', '--dry-run']);
@@ -118,20 +131,33 @@ BASH;
 
     public function testDryRunQbittorrentUsesDownloadsAndWebUiPort(): void
     {
+        $this->reserveTorrentPorts('qbittorrent');
         $result = $this->runHelper(['qbittorrent', '--dry-run']);
 
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(!is_dir($this->homeDir.'/downloads'), 'dry-run must not create downloads dir');
-        $this->assertStringContainsAllStrings(['WEBUI_PORT=8080', $this->homeDir.'/downloads:/downloads'], $result['output']);
+        $this->assertStringContainsAllStrings([
+            'WEBUI_PORT=8080', $this->homeDir.'/downloads:/downloads',
+            '--label pmss.client=qbittorrent', '-p 127.0.0.1:23001:8080',
+            '-p 0.0.0.0:23002:23002/tcp', '-p 0.0.0.0:23002:23002/udp', 'TORRENTING_PORT=23002',
+            'lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls481@sha256:1ea873647c43d566f251a7122aee330b184509c57ee3257ed19f62dac0f8f24b',
+            'WEBUI_USER=<generated-at-install>', 'PBKDF2',
+        ], $result['output']);
+        $this->assertFalse(is_dir($this->homeDir.'/docker'));
+        $this->assertSame('', $result['dockerLog']);
+        $this->assertStringNotContainsString('--env-file', $result['output']);
     }
 
     public function testTorrentClientDryRunsUseLoopbackAndSharedDownloads(): void
     {
+        $this->reserveTorrentPorts('transmission');
         $result = $this->runHelper(['transmission', '--dry-run']);
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsAllStrings([
             '--label pmss.client=transmission',
-            '-p 127.0.0.1:9091:9091',
+            '-p 127.0.0.1:23001:9091',
+            '-p 0.0.0.0:23002:23002/tcp', '-p 0.0.0.0:23002:23002/udp', 'PEERPORT=23002',
+            'lscr.io/linuxserver/transmission:4.1.3-r0-ls365@sha256:55aaeedf9fc354d34136387e15ee0ba4679096f20398dd2875867e5cd5cf8be5',
             $this->homeDir.'/downloads:/downloads',
             'USER=<generated-at-install>',
             'PASS=<generated-at-install>',
@@ -149,6 +175,7 @@ BASH;
 
     public function testTorrentClientRunRequestsManagedProxyRefresh(): void
     {
+        $this->reserveTorrentPorts('transmission');
         $this->pmssEnsureDir($this->homeDir.'/.lighttpd');
         $result = $this->runHelper(['transmission']);
 
@@ -156,7 +183,8 @@ BASH;
         $this->assertTrue(is_file($this->homeDir.'/.lighttpd/.dockerClientProxyRefresh'));
         $this->assertStringContainsAllStrings([
             '--label pmss.client=transmission',
-            '-p 127.0.0.1:9091:9091',
+            '-p 127.0.0.1:23001:9091',
+            '-p 0.0.0.0:23002:23002/tcp', '-p 0.0.0.0:23002:23002/udp', 'PEERPORT=23002',
             $this->homeDir.'/watch:/watch',
             '--env-file '.$this->homeDir.'/docker/transmission/pmss-credentials.env',
         ], $result['dockerLog']);
@@ -171,6 +199,126 @@ BASH;
         $this->assertTrue((bool) preg_match('/\AUSER=[a-f0-9]{36}\nPASS=[a-f0-9]{36}\n\z/', $contents));
         $this->assertStringNotContainsString($contents, $result['dockerLog']);
         $this->assertStringContainsString($credentialFile, $result['output']);
+        foreach (parse_ini_file($credentialFile) as $secret) {
+            $this->assertStringNotContainsString($secret, $result['output']);
+            $this->assertStringNotContainsString($secret, $result['dockerLog']);
+        }
+    }
+
+    public function testTorrentClientsRefuseMissingOrInvalidReservationsWithoutChanges(): void
+    {
+        foreach (['qbittorrent', 'transmission'] as $app) {
+            $marker = $this->homeDir.'/.media-stack-port-'.$app;
+            foreach ([null, '', "0\n", "65536\n", "12\n13\n", " 23001\n", "23001\n\n", str_repeat('1', 33)] as $invalid) {
+                $this->reserveTorrentPorts($app);
+                unlink($marker);
+                if ($invalid !== null) file_put_contents($marker, $invalid);
+                $before = scandir($this->homeDir);
+                foreach ([[$app], [$app, '--dry-run']] as $args) {
+                    $result = $this->runHelper($args);
+                    $this->assertSame(1, $result['rc']);
+                    $this->assertStringContainsString('PMSS publishes them in its per-account setup', $result['output']);
+                    $this->assertSame('', $result['dockerLog']);
+                    $this->assertSame($before, scandir($this->homeDir));
+                }
+            }
+            $this->reserveTorrentPorts($app);
+            unlink($marker.'-peer');
+            $this->assertSame(1, $this->runHelper([$app])['rc']);
+            file_put_contents($marker.'-peer', "70000\n");
+            $this->assertSame(1, $this->runHelper([$app])['rc']);
+            unlink($marker.'-peer');
+            $this->pmssCreateSymlinkOrSkip($marker, $marker.'-peer');
+            $this->assertSame(1, $this->runHelper([$app])['rc']);
+            unlink($marker.'-peer');
+            mkdir($marker.'-peer');
+            $this->assertSame(1, $this->runHelper([$app])['rc']);
+            $this->assertFalse(is_dir($this->homeDir.'/docker'));
+            $this->assertSame('', $this->pmssReadFileOrEmpty($this->dockerLog));
+        }
+    }
+
+    public function testTorrentClientsRejectHostPortOverrides(): void
+    {
+        foreach (['qbittorrent', 'transmission'] as $app) {
+            $this->reserveTorrentPorts($app);
+            foreach (['', '23003', '8080', 'invalid'] as $port) {
+                $result = $this->runHelper([$app, $port, '--dry-run']);
+                $this->assertSame(1, $result['rc']);
+                $this->assertStringContainsString('HOST_PORT is not accepted', $result['output']);
+                $this->assertSame('', $result['dockerLog']);
+                $this->assertFalse(is_dir($this->homeDir.'/docker'));
+            }
+        }
+    }
+
+    public function testReservedPortReaderMatchesAccountAgentContract(): void
+    {
+        $marker = $this->homeDir.'/port';
+        foreach (["1" => 1, "65535\n" => 65535, "23001\r\n" => 23001, '00001' => 1,
+            '+23001' => null, "23001\r" => 23001, "23001\0" => null, '999999' => null] as $line => $expected) {
+            file_put_contents($marker, (string) $line);
+            clearstatcache();
+            $this->assertSame($expected, \pmssDockerInstallLsioReservedPort($marker));
+        }
+    }
+
+    public function testQbittorrentSeedsPrivateHashedLoginBeforeDockerStart(): void
+    {
+        $this->reserveTorrentPorts('qbittorrent');
+        $this->pmssEnsureDir($this->homeDir.'/.lighttpd');
+        $result = $this->runHelper(['qbittorrent']);
+        $this->assertSame(0, $result['rc']);
+        $config = $this->homeDir.'/docker/qbittorrent/config/qBittorrent/qBittorrent.conf';
+        $credentialFile = $this->homeDir.'/docker/qbittorrent/pmss-credentials.env';
+        foreach ([$config, $credentialFile] as $path) {
+            $this->assertSame(0600, fileperms($path) & 0777);
+            $this->assertSame(posix_geteuid(), fileowner($path));
+        }
+        $credentials = parse_ini_file($credentialFile);
+        $this->assertTrue(preg_match('/^[a-f0-9]{12}$/D', $credentials['WEBUI_USER']) === 1);
+        $this->assertTrue(preg_match('/^[a-f0-9]{36}$/D', $credentials['WEBUI_PASS']) === 1);
+        $content = file_get_contents($config);
+        $this->assertTrue(preg_match('/WebUI\\\\Password_PBKDF2="@ByteArray\(([^:]+):([^)]*)\)"/', $content, $match) === 1);
+        $salt = base64_decode($match[1], true);
+        $hash = base64_decode($match[2], true);
+        $this->assertSame(16, strlen($salt));
+        $this->assertSame(64, strlen($hash));
+        $this->assertSame($hash, hash_pbkdf2('sha512', $credentials['WEBUI_PASS'], $salt, 100000, 64, true));
+        $this->assertStringContainsAllStrings([
+            '[AutoRun]', 'enabled=false', 'program=', '[LegalNotice]', 'Accepted=true', '[Preferences]',
+            'Connection\UPnP=false', 'Connection\PortRangeMin=23002', 'Downloads\SavePath=/downloads/',
+            'Downloads\ScanDirsV2=@Variant(\0\0\0\x1c\0\0\0\0)', 'Downloads\TempPath=/downloads/incomplete/',
+            'WebUI\Address=*', 'WebUI\ServerDomains=*', 'WebUI\Username='.$credentials['WEBUI_USER'],
+            'WebUI\CSRFProtection=true', 'WebUI\ClickjackingProtection=true', 'WebUI\HostHeaderValidation=false',
+        ], $content);
+        foreach ($credentials as $secret) {
+            $this->assertStringNotContainsString($secret, $result['output']);
+            $this->assertStringNotContainsString($secret, $result['dockerLog']);
+        }
+        $this->assertStringNotContainsString($credentials['WEBUI_PASS'], $content);
+        $this->assertStringNotContainsString('--env-file', $result['dockerLog']);
+        $this->assertStringContainsString($credentialFile, $result['output']);
+        $this->assertTrue(is_file($this->homeDir.'/.lighttpd/.dockerClientProxyRefresh'));
+    }
+
+    public function testQbittorrentReinstallPreservesExistingConfigAndCredentials(): void
+    {
+        $this->reserveTorrentPorts('qbittorrent');
+        $this->pmssEnsureDir($this->homeDir.'/.lighttpd');
+        $config = $this->homeDir.'/docker/qbittorrent/config/qBittorrent/qBittorrent.conf';
+        $credentials = $this->homeDir.'/docker/qbittorrent/pmss-credentials.env';
+        $this->pmssWriteFile($config, "[Preferences]\ncustom=value\n");
+        $this->pmssWriteFile($credentials, "customer credentials\n");
+        $result = $this->runHelper(['qbittorrent']);
+        $this->assertSame(0, $result['rc']);
+        $this->assertSame("[Preferences]\ncustom=value\n", file_get_contents($config));
+        $this->assertSame("customer credentials\n", file_get_contents($credentials));
+        $this->assertStringContainsString('credential file left untouched', $result['output']);
+        unlink($credentials);
+        $this->assertSame(0, $this->runHelper(['qbittorrent'])['rc']);
+        $this->assertFalse(file_exists($credentials));
+        $this->assertSame("[Preferences]\ncustom=value\n", file_get_contents($config));
     }
 
     public function testDryRunRadarrUsesMoviesAndSharedDownloads(): void
@@ -303,6 +451,7 @@ BASH;
         $this->pmssEnsureDir($customerBin);
         copy($this->installerPath, $customerBin.'/docker-install-lsio');
         copy($this->helperPath, $customerBin.'/dockerInstallLsio.php');
+        copy(dirname($this->helperPath).'/dockerInstallLsioTorrent.php', $customerBin.'/dockerInstallLsioTorrent.php');
         $this->installerPath = $customerBin.'/docker-install-lsio';
         $this->legacyInstallerPath = $customerBin.'/linuxserverInstall.sh';
         copy(__DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh', $this->legacyInstallerPath);
@@ -332,6 +481,7 @@ BASH;
 
         $this->assertStringContainsString("'bin/docker-install-lsio'", $source);
         $this->assertStringContainsString("'bin/dockerInstallLsio.php'", $source);
+        $this->assertStringContainsString("'bin/dockerInstallLsioTorrent.php'", $source);
         $this->assertStringContainsString("'bin/linuxserverInstall.sh'", $source);
     }
 }

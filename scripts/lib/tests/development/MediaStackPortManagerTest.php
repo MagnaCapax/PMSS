@@ -41,8 +41,8 @@ final class MediaStackPortManagerTest extends TestCase
     {
         $ports = \pmssMediaStackPortsEnsure($this->user, $this->home);
 
-        $this->assertSame(8, count($ports));
-        $this->assertSame(8, count(array_unique($ports)));
+        $this->assertSame(count(\pmssMediaStackPortDefinitions()), count($ports));
+        $this->assertSame(count($ports), count(array_unique($ports)));
         foreach ($ports as $app => $port) {
             $this->assertTrue(\pmssNetworkPortInRange($port, \PMSS_PORT_MANAGER_MIN_PORT, \PMSS_PORT_MANAGER_MAX_PORT));
             $this->assertSame((string) $port, file_get_contents($this->home.'/.media-stack-port-'.$app));
@@ -104,6 +104,15 @@ final class MediaStackPortManagerTest extends TestCase
         if (isset($definitions['pikkumies-hermes'])) {
             $this->pmssWriteFile($this->home.'/.mcxPikkumies/pikkumies/local/ui/hermes/dashboard.port', "23005\n");
             $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['pikkumies-hermes']));
+        }
+    }
+
+    public function testTorrentClientDefinitionsAreIndependentPureReservations(): void
+    {
+        $definitions = \pmssMediaStackPortDefinitions();
+        foreach (['qbittorrent', 'qbittorrent-peer', 'transmission', 'transmission-peer'] as $app) {
+            $this->assertSame(['path' => '', 'patterns' => []], $definitions[$app]);
+            $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions[$app]));
         }
     }
 

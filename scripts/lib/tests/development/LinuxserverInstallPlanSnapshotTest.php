@@ -6,12 +6,23 @@ require_once dirname(__DIR__, 4).'/etc/skel/bin/dockerInstallLsio.php';
 
 class LinuxserverInstallPlanSnapshotTest extends TestCase
 {
+    /** Pure command fixtures use non-default reservation values. */
+    private function appSpec(string $app, string $home, bool $dryRun): array
+    {
+        $spec = \pmssDockerInstallLsioAppSpec($app, $home, $dryRun);
+        if ($spec['reservedPorts']) {
+            $spec['defaultPort'] = '23001';
+            $spec['peerPort'] = 23002;
+        }
+        return $spec;
+    }
+
     public function testLsioAppInstallPlansKeepCommandAndDirectoryShape(): void
     {
         $home = '/srv/pmss-test-home';
         $snapshot = array();
         foreach (array_keys(\pmssDockerInstallLsioAppCatalog()) as $app) {
-            $spec = \pmssDockerInstallLsioAppSpec($app, $home, true);
+            $spec = $this->appSpec($app, $home, true);
             $snapshot[$app] = array(
                 'mkdirPaths' => $spec['mkdirPaths'],
                 'credentialFile' => $spec['credentialFile'],
@@ -31,17 +42,17 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
             ),
             'qbittorrent' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/qbittorrent/config', '/srv/pmss-test-home/downloads'),
-                'credentialFile' => '',
+                'credentialFile' => '/srv/pmss-test-home/docker/qbittorrent/pmss-credentials.env',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'qbittorrent', '--label', 'pmss.client=qbittorrent', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8080:8080', '-e', 'WEBUI_PORT=8080', '-v', '/srv/pmss-test-home/docker/qbittorrent/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/qbittorrent:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'qbittorrent', '--label', 'pmss.client=qbittorrent', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:23001:8080', '-p', '0.0.0.0:23002:23002/tcp', '-p', '0.0.0.0:23002:23002/udp', '-e', 'TORRENTING_PORT=23002', '-e', 'WEBUI_PORT=8080', '-v', '/srv/pmss-test-home/docker/qbittorrent/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '--restart', 'unless-stopped', 'lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls481@sha256:1ea873647c43d566f251a7122aee330b184509c57ee3257ed19f62dac0f8f24b'),
             ),
             'transmission' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/transmission/config', '/srv/pmss-test-home/downloads', '/srv/pmss-test-home/watch'),
                 'credentialFile' => '/srv/pmss-test-home/docker/transmission/pmss-credentials.env',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'transmission', '--label', 'pmss.client=transmission', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:9091:9091', '-e', 'USER=<generated-at-install>', '-e', 'PASS=<generated-at-install>', '-v', '/srv/pmss-test-home/docker/transmission/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '-v', '/srv/pmss-test-home/watch:/watch', '--restart', 'unless-stopped', 'lscr.io/linuxserver/transmission:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'transmission', '--label', 'pmss.client=transmission', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:23001:9091', '-p', '0.0.0.0:23002:23002/tcp', '-p', '0.0.0.0:23002:23002/udp', '-e', 'PEERPORT=23002', '-e', 'USER=<generated-at-install>', '-e', 'PASS=<generated-at-install>', '-v', '/srv/pmss-test-home/docker/transmission/config:/config', '-v', '/srv/pmss-test-home/downloads:/downloads', '-v', '/srv/pmss-test-home/watch:/watch', '--restart', 'unless-stopped', 'lscr.io/linuxserver/transmission:4.1.3-r0-ls365@sha256:55aaeedf9fc354d34136387e15ee0ba4679096f20398dd2875867e5cd5cf8be5'),
             ),
             'radarr' => array(
                 'mkdirPaths' => array('/srv/pmss-test-home/docker/radarr/config', '/srv/pmss-test-home/movies', '/srv/pmss-test-home/downloads'),
@@ -112,7 +123,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
             if ($app === 'jellyfin') {
                 continue;
             }
-            $spec = \pmssDockerInstallLsioAppSpec($app, '/srv/pmss-test-home', true);
+            $spec = $this->appSpec($app, '/srv/pmss-test-home', true);
             $command = \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec, static function (): bool { return true; });
             $this->assertSame(false, in_array('--device', $command, true));
         }
@@ -121,7 +132,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
     public function testEveryCatalogAppPublishesOnLoopbackByDefault(): void
     {
         foreach (array_keys(\pmssDockerInstallLsioAppCatalog()) as $app) {
-            $spec = \pmssDockerInstallLsioAppSpec($app, '/srv/pmss-test-home', true);
+            $spec = $this->appSpec($app, '/srv/pmss-test-home', true);
             $command = \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec);
             $publish = $command[array_search('-p', $command, true) + 1];
             $this->assertSame('127.0.0.1:'.$spec['defaultPort'].':'.$spec['containerPort'], $publish);
@@ -150,8 +161,8 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
 
     public function testTransmissionInstallPlanUsesEnvFileOutsideDryRun(): void
     {
-        $spec = \pmssDockerInstallLsioAppSpec('transmission', '/srv/pmss-test-home', false);
-        $command = \pmssDockerInstallLsioDockerRunCommand('transmission', '9091', 'UTC', $spec);
+        $spec = $this->appSpec('transmission', '/srv/pmss-test-home', false);
+        $command = \pmssDockerInstallLsioDockerRunCommand('transmission', '23001', 'UTC', $spec);
 
         $this->assertSame(['--env-file', '/srv/pmss-test-home/docker/transmission/pmss-credentials.env'], $spec['extraArgs']);
         $this->assertStringNotContainsString('PASS=', implode(' ', $command));

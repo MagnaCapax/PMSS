@@ -23,14 +23,15 @@ final class DockerTorrentClientProxyTest extends TestCase
     public function testTorrentClientCatalogAndRunCommandUseLoopbackAndLabel(): void
     {
         $spec = \pmssDockerInstallLsioAppSpec('transmission', '/srv/customer', false);
+        $spec['peerPort'] = 23002;
         $this->assertSame('127.0.0.1', $spec['bindHost']);
         $this->assertSame('9091', $spec['containerPort']);
         $this->assertSame('/srv/customer/docker/transmission/pmss-credentials.env', $spec['credentialFile']);
         $this->assertSame(['/srv/customer/docker/transmission/config', '/srv/customer/downloads', '/srv/customer/watch'], $spec['mkdirPaths']);
-        $command = \pmssDockerInstallLsioDockerRunCommand('transmission', '9091', 'UTC', $spec);
+        $command = \pmssDockerInstallLsioDockerRunCommand('transmission', '23001', 'UTC', $spec);
         $this->assertSame('pmss.client=transmission', $command[array_search('--label', $command, true) + 1]);
-        $this->assertSame('127.0.0.1:9091:9091', $command[array_search('-p', $command, true) + 1]);
-        $this->assertSame('lscr.io/linuxserver/transmission:latest', end($command));
+        $this->assertSame('127.0.0.1:23001:9091', $command[array_search('-p', $command, true) + 1]);
+        $this->assertSame('lscr.io/linuxserver/transmission:4.1.3-r0-ls365@sha256:55aaeedf9fc354d34136387e15ee0ba4679096f20398dd2875867e5cd5cf8be5', end($command));
         $this->assertSame($spec['credentialFile'], $command[array_search('--env-file', $command, true) + 1]);
         $this->assertFalse(in_array('USER=', $command, true));
         $this->assertFalse(in_array('PASS=', $command, true));
@@ -66,5 +67,28 @@ final class DockerTorrentClientProxyTest extends TestCase
         $this->assertStringContainsString('^/user-customer/transmission/', $transmission);
         $this->assertStringContainsString('"/user-customer/transmission/"  => "/transmission/"', $transmission);
         $this->assertStringContainsString('"port" => 9091', $transmission);
+    }
+
+    public function testQbittorrentInspectIgnoresPeerPublishesButRejectsUnsafeWebui(): void
+    {
+        $fixture = $this->inspectFixture('qbittorrent', '8080');
+        $fixture['NetworkSettings']['Ports']['8080/tcp'][0]['HostPort'] = '23001';
+        foreach (['tcp', 'udp'] as $protocol) {
+            $fixture['NetworkSettings']['Ports']['23002/'.$protocol] = [['HostIp' => '0.0.0.0', 'HostPort' => '23002']];
+        }
+        $this->assertSame(23001, \pmssLighttpdDockerClientPortFromInspect($fixture, 'qbittorrent'));
+        $this->assertSame(23001, \pmssLighttpdDockerClientPort('customer', 'qbittorrent',
+            static function () use ($fixture): string { return json_encode($fixture); }));
+        foreach (['wildcard', 'label', 'stopped', 'name', 'multiple'] as $case) {
+            $invalid = $fixture;
+            if ($case === 'wildcard') $invalid['NetworkSettings']['Ports']['8080/tcp'][0]['HostIp'] = '0.0.0.0';
+            if ($case === 'label') $invalid['Config']['Labels']['pmss.client'] = 'transmission';
+            if ($case === 'stopped') $invalid['State']['Running'] = false;
+            if ($case === 'name') $invalid['Name'] = '/other';
+            if ($case === 'multiple') $invalid['NetworkSettings']['Ports']['8080/tcp'][] = ['HostIp' => '127.0.0.1', 'HostPort' => '23003'];
+            $this->assertSame(null, \pmssLighttpdDockerClientPortFromInspect($invalid, 'qbittorrent'), $case);
+        }
+        $fragment = \pmssLighttpdManagedProxyFragment('qbittorrent', 'customer', 23001);
+        $this->assertStringContainsAllStrings(['^/user-customer/qbittorrent/', '"port" => 23001'], $fragment);
     }
 }

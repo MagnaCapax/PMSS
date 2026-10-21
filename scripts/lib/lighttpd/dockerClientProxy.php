@@ -12,7 +12,7 @@ require_once __DIR__.'/../user/identity.php';
  */
 function pmssLighttpdDockerClientPortFromInspect(array $container, string $app): ?int
 {
-    $ports = ['transmission' => '9091/tcp'];
+    $ports = ['transmission' => '9091/tcp', 'qbittorrent' => '8080/tcp'];
     if (!isset($ports[$app]) || ($container['Name'] ?? null) !== '/'.$app
         || ($container['State']['Running'] ?? null) !== true
         || ($container['Config']['Labels']['pmss.client'] ?? null) !== $app) {
@@ -32,7 +32,7 @@ function pmssLighttpdDockerClientPortFromInspect(array $container, string $app):
 /** Read Docker inspect as the account so root never consults another daemon. */
 function pmssLighttpdDockerClientPort(string $user, string $app, ?callable $inspect = null): ?int
 {
-    if (!pmssValidateUsername($user) || !in_array($app, ['transmission'], true)) {
+    if (!pmssValidateUsername($user) || !in_array($app, ['transmission', 'qbittorrent'], true)) {
         return null;
     }
     if ($inspect === null) {

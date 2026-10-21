@@ -10,6 +10,9 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkQbittorrentInstances.php', [
             "require_once __DIR__.'/../lib/user/watchdog.php';",
             "require_once __DIR__.'/../lib/user/torrentPort.php';",
+            "require_once __DIR__.'/../lib/lighttpd/dockerClientProxy.php';",
+            // A labelled Docker qBittorrent counts as live before any native config or start.
+            "if (pmssLighttpdDockerClientPort(\$thisUser, 'qbittorrent') !== null) return ['qbittorrent-nox' => true];",
             "\$running = pmssTorrentClientLauncherLivenessPids(\$thisUser, 'qbittorrent') !== [];",
             "\$home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.\$thisUser;",
             "if (pmssQbittorrentPortEnsure(\$thisUser, \$home)) {",

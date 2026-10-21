@@ -103,7 +103,13 @@ Publishing ports follows the usual Docker syntax:
 Examples:
 
 - Jellyfin HTTP UI: `-p 127.0.0.1:8096:8096` (open through an SSH tunnel)
-- qBittorrent WebUI: `-p 8080:8080`
+- qBittorrent WebUI: `-p 127.0.0.1:<reserved-webui>:8080`
+- Transmission WebUI: `-p 127.0.0.1:<reserved-webui>:9091`
+
+Use `docker-install-lsio qbittorrent` or `docker-install-lsio transmission` for
+the torrent clients. Their host ports come from PMSS reservations; peer TCP
+and UDP ports publish explicitly on `0.0.0.0`. These presets refuse host-port
+overrides and never fall back to fixed ports or native client port files.
 
 If a `docker run` command fails with a “bind: address already in use” error,
 either you already have a container using that port or another process is
@@ -175,11 +181,15 @@ Once this is working you can reuse the same pattern for other images.
 
 If you want the most common PMSS-ready presets without retyping the full
 `docker run` lines, the default skeleton now includes `~/bin/docker-install-lsio`.
-It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, `prowlarr`,
+It supports `jellyfin`, `qbittorrent`, `transmission`, `radarr`, `sonarr`, `prowlarr`,
 `mariadb`, and `phpmyadmin`, creates the expected home-directory mounts,
 attaches the containers to a shared `pmss-media` Docker network, and keeps
-`--restart unless-stopped` enabled. Every preset binds to
-`127.0.0.1` by default. Loopback is shared by accounts on the same host, so
+`--restart unless-stopped` enabled. Every preset's WebUI binds to
+`127.0.0.1` by default; torrent peer ports publish on `0.0.0.0`.
+qBittorrent and Transmission use versioned `image@sha256` pins recorded in
+[ADR 0112](./adr/0112-rootless-docker-torrent-client-options.md#completion-2026-10-21).
+Other presets still use `:latest` and fixed default host ports.
+Loopback is shared by accounts on the same host, so
 configure application authentication as well. Use the SSH tunnel above for
 the Jellyfin wizard and later browser access. On Intel iGPU hosts with a DRI
 render node, the Jellyfin preset passes `/dev/dri` into the container
@@ -195,25 +205,33 @@ with `DOCKER_HOST` set.
 ### 4.1 qBittorrent (torrent client)
 
 ```bash
-mkdir -p ~/docker/qbittorrent/config ~/downloads
-
-docker run -d \
-  --name qbittorrent \
-  -e PUID=0 \
-  -e PGID=0 \
-  -e TZ=Etc/UTC \
-  -e WEBUI_PORT=8080 \
-  -p 8080:8080 \
-  -p 6881:6881 \
-  -p 6881:6881/udp \
-  -v ~/docker/qbittorrent/config:/config \
-  -v ~/downloads:/downloads \
-  --restart unless-stopped \
-  lscr.io/linuxserver/qbittorrent:latest
+docker-install-lsio qbittorrent --dry-run
+docker-install-lsio qbittorrent
 ```
 
-- Web UI: `http://<your-seedbox-hostname>:8080/`
+- WebUI: your existing panel route `/user-<name>/qbittorrent/` after the
+  lighttpd watchdog refreshes it. A running, labelled Docker container takes
+  this route; otherwise it continues to use native qBittorrent.
+- PMSS reserves the WebUI host port in `~/.media-stack-port-qbittorrent` and
+  peer port in `~/.media-stack-port-qbittorrent-peer`. Missing or invalid
+  markers are published by the per-account HTTP configuration step; there is no fixed-port fallback.
+- The container keeps WebUI port 8080 internally and uses the reserved peer
+  port internally and externally (`TORRENTING_PORT`, TCP and UDP).
+- Before first start, the installer seeds the LSIO config with a random WebUI
+  login and a PBKDF2 password hash. Read your login from
+  `~/docker/qbittorrent/pmss-credentials.env` (mode 0600). It is not a Docker
+  env-file. Reinstalling preserves existing config and credentials.
 - Torrents are stored under `~/downloads`.
+
+For Transmission, use `docker-install-lsio transmission` (or add `--dry-run`).
+Its markers are `~/.media-stack-port-transmission` and
+`~/.media-stack-port-transmission-peer`; WebUI port 9091 stays internal and
+`PEERPORT` sets the reserved peer listener. The panel route is
+`/user-<name>/transmission/`. Its random `USER`/`PASS` login is stored in
+`~/docker/transmission/pmss-credentials.env` (0600) and passed through
+`--env-file`, never secret argv values. The panel's separate Basic login
+currently prevents completing Transmission's own Basic login through that
+route; use an SSH tunnel to its reserved loopback WebUI port for direct access.
 
 ### 4.2 Radarr (movies)
 
@@ -353,9 +371,9 @@ PMSS-tested deployments. PMSS installs and supports Jellyfin as its media
 server; Plex is included here only as an upstream-deferred catalog example.
 The Deluge installer preset is withheld because the LSIO image starts with a
 known WebUI password and offers no supported first-install password setting.
-Transmission writes its generated WebUI username and password to
-`~/docker/transmission/pmss-credentials.env` (mode 0600); the installer prints
-this path after installation.
+qBittorrent and Transmission use reserved ports, digest-pinned images and private
+service login files as described in section 4.1; the installer prints only the
+credential file path. Other installer catalog apps retain `:latest` images.
 
 All examples follow the same baseline:
 
@@ -756,28 +774,14 @@ with `docker compose` in place of `docker-compose`.
 
 ### 5.1 Compose file for a minimal media stack (advanced)
 
-You can also manage the basic media stack via Compose. Example:
+Install qBittorrent with the helper in section 4.1 first so its config and login
+are seeded before start. You can then manage the other media apps via Compose
+on the installer's `pmss-media` network. qBittorrent remains managed by the
+installer's `docker run` command, with its pinned image and reserved ports:
 
 ```yaml
 version: "3.8"
 services:
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    container_name: qbittorrent
-    environment:
-      - PUID=0
-      - PGID=0
-      - TZ=Etc/UTC
-      - WEBUI_PORT=8080
-    volumes:
-      - ~/docker/qbittorrent/config:/config
-      - ~/downloads:/downloads
-    ports:
-      - "8080:8080"
-      - "6881:6881"
-      - "6881:6881/udp"
-    restart: unless-stopped
-
   radarr:
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
@@ -820,6 +824,11 @@ services:
     ports:
       - "9696:9696"
     restart: unless-stopped
+
+networks:
+  default:
+    external: true
+    name: pmss-media
 ```
 
 Usage is the same pattern as in the Heimdall example:

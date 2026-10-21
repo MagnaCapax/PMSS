@@ -80,7 +80,8 @@ function pmssUserConfigLighttpdConfigureUser(
         'qbittorrent' => $homeDir.'/.qbittorrentPort',
     ]);
     $rclonePort = $proxyPorts['rclone'];
-    $qbittorrentPort = $proxyPorts['qbittorrent'];
+    // A running labelled Docker client owns the existing panel route until it stops.
+    $qbittorrentPort = pmssLighttpdDockerClientPort($thisUser, 'qbittorrent') ?? $proxyPorts['qbittorrent'];
 
     // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
     foreach ([

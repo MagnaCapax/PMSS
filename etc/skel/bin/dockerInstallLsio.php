@@ -8,6 +8,9 @@
  * @author PMSS Team
  */
 
+// A partly delivered home keeps the other apps working; torrent apps refuse below.
+if (is_file(__DIR__.'/dockerInstallLsioTorrent.php')) require_once __DIR__.'/dockerInstallLsioTorrent.php';
+
 /** Quote a command without passing account-controlled arguments to the shell. */
 function pmssDockerInstallLsioShellCommand(array $command): string
 {
@@ -39,7 +42,8 @@ function pmssDockerInstallLsioDockerAvailable(): bool
 function pmssDockerInstallLsioUsage(string $scriptName): string
 {
     return sprintf(
-        "Usage: %s APP [HOST_PORT] [--dry-run]\n\nSupported apps: %s\n",
+        "Usage: %s APP [HOST_PORT] [--dry-run]\n\nSupported apps: %s\n"
+            ."qBittorrent and Transmission use reserved ports; HOST_PORT is not accepted.\n",
         $scriptName,
         implode(' ', array_keys(pmssDockerInstallLsioAppCatalog()))
     );
@@ -146,6 +150,12 @@ function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string
     ];
     $payload = implode("\n", $lines)."\n";
 
+    return pmssDockerInstallLsioWritePrivateFile($credentialFile, $payload);
+}
+
+/** Atomically publish a private config or service credential file. */
+function pmssDockerInstallLsioWritePrivateFile(string $credentialFile, string $payload): bool
+{
     // A private same-directory temporary file keeps credentials out of command lines.
     // Refuse links and other non-regular existing targets before replacement.
     $existing = @lstat($credentialFile);
@@ -194,8 +204,16 @@ function pmssDockerInstallLsioAppCatalog(): array
 {
     return [
         'jellyfin' => ['port' => '8096', 'bindHost' => '127.0.0.1', 'volumes' => ['config' => '/config', 'media' => '/data']],
-        'qbittorrent' => ['port' => '8080', 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config' => '/config', 'downloads' => '/downloads']],
-        'transmission' => ['port' => '9091', 'credentials' => true, 'volumes' => ['config' => '/config', 'downloads' => '/downloads', 'watch' => '/watch']],
+        'qbittorrent' => [
+            'port' => '8080', 'reservedPorts' => true,
+            'image' => 'lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls481@sha256:1ea873647c43d566f251a7122aee330b184509c57ee3257ed19f62dac0f8f24b',
+            'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config' => '/config', 'downloads' => '/downloads'],
+        ],
+        'transmission' => [
+            'port' => '9091', 'reservedPorts' => true, 'credentials' => true,
+            'image' => 'lscr.io/linuxserver/transmission:4.1.3-r0-ls365@sha256:55aaeedf9fc354d34136387e15ee0ba4679096f20398dd2875867e5cd5cf8be5',
+            'volumes' => ['config' => '/config', 'downloads' => '/downloads', 'watch' => '/watch'],
+        ],
         'radarr' => ['port' => '7878', 'volumes' => ['config' => '/config', 'movies' => '/movies', 'downloads' => '/downloads']],
         'sonarr' => ['port' => '8989', 'volumes' => ['config' => '/config', 'tv' => '/tv', 'downloads' => '/downloads']],
         'prowlarr' => ['port' => '9696', 'volumes' => ['config' => '/config']],
@@ -227,7 +245,8 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
     ];
 
     $spec = [
-        'image' => 'lscr.io/linuxserver/'.$app.':latest',
+        'image' => $appSpec['image'] ?? 'lscr.io/linuxserver/'.$app.':latest',
+        'reservedPorts' => !empty($appSpec['reservedPorts']),
         'mkdirPaths' => [],
         'bindHost' => (string) ($appSpec['bindHost'] ?? '127.0.0.1'),
         'containerPort' => (string) ($appSpec['containerPort'] ?? $appSpec['port']),
@@ -236,6 +255,10 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
         'volumeArgs' => [],
         'credentialFile' => '',
     ];
+    if ($app === 'qbittorrent') {
+        // qBittorrent reads its hash from config, never from Docker environment.
+        $spec['credentialFile'] = $homeDir.'/docker/qbittorrent/pmss-credentials.env';
+    }
 
     foreach ($appSpec['volumes'] ?? [] as $pathKey => $containerPath) {
         if (!isset($paths[$pathKey]) || $containerPath === '') {
@@ -298,6 +321,10 @@ function pmssDockerInstallLsioDockerRunCommand(string $app, string $hostPort, st
         ? $spec['bindHost'].':'.$hostPort.':'.$spec['containerPort']
         : $hostPort.':'.$spec['containerPort'];
 
+    if (!empty($spec['reservedPorts'])) {
+        $command = array_merge($command, pmssDockerInstallLsioTorrentRunArgs($app, $spec));
+    }
+
     if ($app === 'jellyfin' && ($hasRenderNode ?? 'pmssDockerInstallLsioHasRenderNode')()) {
         $command[] = '--device';
         $command[] = '/dev/dri:/dev/dri';
@@ -352,7 +379,20 @@ function pmssDockerInstallLsioMain(array $argv): int
         return 1;
     }
 
-    $hostPort = pmssDockerInstallLsioHostPort(isset($positionals[1]) ? (string) $positionals[1] : null, (string) $spec['defaultPort']);
+    if ($spec['reservedPorts'] && !function_exists('pmssDockerInstallLsioTorrentPorts')) {
+        fwrite(STDERR, "{$app} installer files are incomplete in this account.\n");
+        return 1;
+    }
+    if ($spec['reservedPorts']) {
+        $ports = pmssDockerInstallLsioTorrentPorts($homeDir, $app, $positionals[1] ?? null);
+        if ($ports === null) {
+            return 1;
+        }
+        $spec['peerPort'] = $ports['peer'];
+        $hostPort = (string) $ports['webui'];
+    } else {
+        $hostPort = pmssDockerInstallLsioHostPort(isset($positionals[1]) ? (string) $positionals[1] : null, (string) $spec['defaultPort']);
+    }
     if ($hostPort === null) {
         fwrite(STDERR, "Invalid host port; expected an integer between 1 and 65535.\n");
         return 1;
@@ -361,6 +401,9 @@ function pmssDockerInstallLsioMain(array $argv): int
     $dockerRun = pmssDockerInstallLsioDockerRunCommand($app, $hostPort, pmssDockerInstallLsioTimezone(), $spec);
 
     if ($dryRun) {
+        if ($app === 'qbittorrent') {
+            echo '[dry-run] Seed absent qBittorrent.conf with WEBUI_USER=<generated-at-install>, WEBUI_PASS=<generated-at-install> (PBKDF2); login file: '.$spec['credentialFile'].PHP_EOL;
+        }
         echo '[dry-run] docker network inspect pmss-media || docker network create pmss-media' . PHP_EOL;
         echo '[dry-run] ' . pmssDockerInstallLsioDisplayCommand($dockerRun) . PHP_EOL;
         return 0;
@@ -387,11 +430,15 @@ function pmssDockerInstallLsioMain(array $argv): int
         }
     }
 
+    if ($app === 'qbittorrent' && !pmssDockerInstallLsioQbittorrentSeed($homeDir, $spec['peerPort'])) {
+        return 1;
+    }
+
     if (!pmssDockerInstallLsioEnsureDirectories($spec['mkdirPaths'])) {
         return 1;
     }
 
-    if ((string) $spec['credentialFile'] !== ''
+    if ($app !== 'qbittorrent' && (string) $spec['credentialFile'] !== ''
         && ($app === 'transmission' || !is_file((string) $spec['credentialFile']))
         && !pmssDockerInstallLsioWriteCredentialFile((string) $spec['credentialFile'], (string) ($spec['dbName'] ?? ''), (string) ($spec['dbUser'] ?? ''), $app)) {
         return 1;
@@ -401,13 +448,8 @@ function pmssDockerInstallLsioMain(array $argv): int
     if ($rc === 0 && (string) $spec['credentialFile'] !== '') {
         echo 'Service credentials: '.$spec['credentialFile'].PHP_EOL;
     }
-    if ($rc === 0 && $app === 'transmission') {
-        // The root-owned lighttpd config is refreshed by its existing watchdog.
-        $marker = $homeDir.'/.lighttpd/.dockerClientProxyRefresh';
-        if (!is_dir(dirname($marker)) || is_link($marker) || (!is_file($marker) && @file_put_contents($marker, '') === false)) {
-            fwrite(STDERR, "Container installed; panel proxy refresh marker could not be written.\n");
-            return 1;
-        }
+    if ($rc === 0 && $spec['reservedPorts'] && !pmssDockerInstallLsioTorrentProxyRefresh($homeDir)) {
+        return 1;
     }
     return $rc;
 }
