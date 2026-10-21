@@ -55,8 +55,11 @@ class NginxDefaultTlsTemplateTest extends TestCase
             [$cert, $key],
             $this->template()
         );
-        $config = "pid {$dir}/nginx.pid;\nerror_log stderr;\nevents {}\nhttp {\naccess_log off;\n"
-            ."ssl_protocols TLSv1.2 TLSv1.3;\nserver { listen 127.0.0.1:443 ssl;\n"
+        // Unprivileged syntax check: no system log, temp or low-port access from a CI runner.
+        $temps = '';
+        foreach (['client_body', 'proxy', 'fastcgi', 'uwsgi', 'scgi'] as $temp) $temps .= "{$temp}_temp_path {$dir}/{$temp};\n";
+        $config = "pid {$dir}/nginx.pid;\nerror_log stderr;\nevents {}\nhttp {\naccess_log off;\n".$temps
+            ."ssl_protocols TLSv1.2 TLSv1.3;\nserver { listen 127.0.0.1:".random_int(40000, 49999)." ssl;\n"
             .$site."\n}\n}\n";
         $path = $dir.'/nginx.conf';
         file_put_contents($path, $config);
