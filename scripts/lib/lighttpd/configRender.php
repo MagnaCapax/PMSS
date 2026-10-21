@@ -109,10 +109,13 @@ function pmssLighttpdRenderUserConfig(
 function pmssLighttpdApplyPhpIniContent(string $content, string $user, int $memoryLimitMiB): string
 {
     // Keep upload temp files quota-bound while replacing managed php.ini lines consistently.
+    // No PMSS page reads upload progress; leaving it on lets any multipart POST to a PHP
+    // script drive the session upload-progress handler, before the script or its own checks run.
     foreach ([
         '/^memory_limit\s*=.*$/m' => 'memory_limit = '.$memoryLimitMiB.'M',
         '/^\s*;?\s*upload_tmp_dir\s*=.*$/m' => 'upload_tmp_dir = /home/'.$user.'/.lighttpd/upload',
         '/^\s*;?\s*error_log\s*=.*$/m' => 'error_log = /home/'.$user.'/.lighttpd/error.log',
+        '/^\s*;?\s*session\.upload_progress\.enabled\s*=.*$/m' => 'session.upload_progress.enabled = Off',
     ] as $pattern => $line) {
         $updated = preg_match($pattern, $content)
             ? preg_replace($pattern, $line, $content, 1)
