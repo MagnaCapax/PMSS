@@ -64,7 +64,8 @@ class rtorrentConfig
         // Localnet publication remains host IO, outside the pure token renderer.
         if (is_readable('/etc/seedbox/config/localnet')) {
             @chmod('/etc/seedbox/config/localnet', 0664);
-            $configFile .= "\nipv4_filter.load = /etc/seedbox/config/localnet, preferred";
+            // catch: builds without ipv4_filter.load (curated store builds) start instead of exiting at parse.
+            $configFile .= "\ncatch = {\"ipv4_filter.load=/etc/seedbox/config/localnet,preferred\"}";
         }
         return array('configFile' => $configFile, 'config' => $config);
     }

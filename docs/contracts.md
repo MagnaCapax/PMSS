@@ -741,7 +741,7 @@ Class `rtorrentConfig`
 
 - createConfig(array $config): array
   - Inputs: requires `'ram'` MiB. Optional: `'scgiPort'`, `'dht'` ('no|yes|auto'), `'pex'` ('no|yes|auto'). Only scgi is reserved; `dhtPort` and `listenPort` are neither reserved nor rendered.
-  - Behavior: Derives peers and upload slots based on `ramBlock` scaling; `pieces.memory.max` uses headroom formula `max(170, ram - clamp(0.25*ram, 250, 1000))`; substitutes placeholders in template; appends `ipv4_filter.load = /etc/seedbox/config/localnet, preferred` if localnet exists.
+  - Behavior: Derives peers and upload slots based on `ramBlock` scaling; `pieces.memory.max` uses headroom formula `max(170, ram - clamp(0.25*ram, 250, 1000))`; substitutes placeholders in template; appends `catch = {"ipv4_filter.load=/etc/seedbox/config/localnet,preferred"}` if localnet exists (applied normally where the command exists; builds without it log a warning and start).
   - Output: `['configFile' => string, 'config' => array]` ready to write.
   - Errors: throws on missing `'ram'` or invalid input.
 
