@@ -16,7 +16,7 @@ final class TrackerCleanerCronFlowTest extends TestCase
                 'forbidden' => ['Torrent::fromFile'],
             ],
             'scripts/lib/trackerCleaner/backup.php' => [
-                'required' => ["'timeout 60 cp -p '.escapeshellarg(\$torrentPath)"],
+                'required' => ["'timeout --kill-after=5s 60 cp -p '.escapeshellarg(\$torrentPath)"],
             ],
             'scripts/lib/trackerCleaner.php' => [
                 'required' => ["'trackerCleaner/policy.php'", "'trackerCleaner/log.php'", "'trackerCleaner/backup.php'", "'trackerCleaner/run.php'"],
