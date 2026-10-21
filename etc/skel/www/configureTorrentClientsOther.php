@@ -88,7 +88,8 @@ function pmssConfigureTorrentClientOtherStart($home, $client, $version)
         $rc = 1;
         @exec('cd '.escapeshellarg($home).' && php ./.rtorrentRestart.php >/dev/null 2>&1', $unused, $rc);
         if ($rc !== 0) return false;
-        for ($attempt = 0; $attempt < 30; $attempt++) {
+        // The executor sleeps 5 s after rTorrent exits before it starts the selected build.
+        for ($attempt = 0; $attempt < 150; $attempt++) {
             if (pmssCustomerNativePidsRead(array($binary)) !== array()) return true;
             usleep(100000);
         }
