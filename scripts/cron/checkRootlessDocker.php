@@ -37,7 +37,10 @@ $userConfigStore = new UserConfigStore();
 foreach ($users as $user) {
     if (pmssUserServicesParked($user)) {
         $logDockerMessage("User {$user} is suspended or moved");
-        runCommand('php '.escapeshellarg('/scripts/util/userDocker.php').' '.escapeshellarg($user).' '.escapeshellarg('stop'), false, $logDockerMessage);
+        // Stop only a daemon that is actually running; parked accounts are checked every 5 minutes.
+        if (pmssUserWatchdogProcessRunning($user, 'dockerd') || pmssUserWatchdogProcessRunning($user, 'rootlesskit')) {
+            runCommand('php '.escapeshellarg('/scripts/util/userDocker.php').' '.escapeshellarg($user).' '.escapeshellarg('stop'), false, $logDockerMessage);
+        }
         continue;
     }
     if (!pmssUserDockerEnabled($user, $userConfigStore)) {

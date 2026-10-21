@@ -66,7 +66,7 @@ function pmssUserMovedApply(string $username, ?string $until, UserConfigStore $s
         $rc = 1;
     }
     pmssUserLifecycleContextLogStatusMessage('moved', 'end', $username, $rc === 0 ? 'OK' : 'ERR',
-        $rc === 0 ? ($until === null ? 'Moved state cleared' : 'Old copy parked') : 'Moved state needs operator attention',
+        $rc === 0 ? ($until === null ? 'Moved state cleared' : 'Old copy parked') : 'Moved state needs attention',
         ['movedUntil' => $until, 'rc' => $rc]);
     return $rc;
 }

@@ -13,7 +13,8 @@ $users = pmssListManagedUsersFromResult(pmssListManagedUsersResult());
 if ($users === null) exit(1);
 foreach ($users as $user) {
     $home = '/home/'.$user;
-    if (pmssUserWatchdogHandleSuspended($user, ['transmission-daemon'], 'Transmission stopped: suspended or moved')) continue;
+    // Parked accounts: stop a leftover daemon without a log line on every 2-minute run.
+    if (pmssUserServicesParked($user)) { pmssUserWatchdogTerminateProcesses($user, ['transmission-daemon']); continue; }
     if (!pmssLighttpdTransmissionSelected($user, $home)) continue;
     // A process and its socket are checked before settings or launch are touched.
     if (pmssTorrentClientLauncherLivenessPids($user, 'transmission') !== []) continue;
