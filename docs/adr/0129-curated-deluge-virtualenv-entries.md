@@ -146,3 +146,35 @@ Remaining follow-ups before enabling customer rollout:
   still upgrades tooling from its configured index before installing our pins.
 - Canary daemon startup, torrent operation and WebUI validation, including
   compatibility of older Deluge releases with the pinned libtorrent runtime.
+
+## Start-tested closure and mirror fetch (2026-10-21)
+
+The 2026-10-20 closure installed but could not run. In a Debian 12 / Python
+3.11.2 container, each version was installed with `--no-index --no-deps` and
+then started:
+
+- Deluge imports `pkg_resources`, which setuptools 81 and later removed.
+  The pinned setuptools 84.2.0 (2.2.0) failed at import.
+- deluged builds its certificate with `OpenSSL.crypto.X509Req`, which the
+  pinned pyOpenSSL 26.4.0 no longer provides. deluged exited at startup on
+  every version, while deluge-web still started.
+
+The closure is re-resolved with `setuptools<81` and `pyopenssl<24.3`. That
+gives setuptools 80.10.2, pyOpenSSL 24.2.1, cryptography 43.0.3, Twisted 25.5.0,
+service_identity 24.2.0 and pyasn1_modules 0.4.2; 2.0.5 also needs six.
+
+With this closure, deluged and deluge-web start for 2.0.5, 2.1.1 and 2.2.0. That
+holds in the PMSS helper order too: the bootstrap upgrades setuptools from the
+index, and the pinned `--no-deps` install then replaces it with 80.10.2.
+
+The reviewed wheel bytes are hosted under PM control at
+`https://pulsedmedia.com/remote/pkg/wheels/`. When a pinned wheel is missing or
+differs from its pin, the installer fetches it into the root-owned
+`/home/.pmss/clients/wheels/` through `pmssInstallPinnedRemoteBinary`. That
+helper verifies the SHA-256 before installing. The existing per-wheel hash and
+ownership check still decides whether pip runs, so a failed or wrong download
+never reaches pip and is retried on the next update.
+
+This supersedes the "operator hosting" and "provisioning the local mirror"
+follow-ups above. The Bullseye closure, the bootstrap pinning and the live canary
+remain open.

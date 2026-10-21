@@ -46,8 +46,8 @@
               "sha256": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9"
           },
           {
-              "file": "cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
-              "sha256": "630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2"
+              "file": "cryptography-43.0.3-cp39-abi3-manylinux_2_28_x86_64.whl",
+              "sha256": "c2e6fc39c4ab499049df3bdf567f768a723a5e8464816e8f009f121a5a9f4405"
           },
           {
               "file": "deluge-2.0.5-py3-none-any.whl",
@@ -82,40 +82,44 @@
               "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
           },
           {
+              "file": "pyOpenSSL-24.2.1-py3-none-any.whl",
+              "sha256": "967d5719b12b243588573f39b0c677637145c7a1ffedcd495a487e58177fbb8d"
+          },
+          {
               "file": "pyasn1-0.6.4-py3-none-any.whl",
               "sha256": "deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"
+          },
+          {
+              "file": "pyasn1_modules-0.4.2-py3-none-any.whl",
+              "sha256": "29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a"
           },
           {
               "file": "pycparser-3.11-py3-none-any.whl",
               "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
           },
           {
-              "file": "pyopenssl-26.4.0-py3-none-any.whl",
-              "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c"
-          },
-          {
               "file": "pyxdg-0.28-py2.py3-none-any.whl",
               "sha256": "bdaf595999a0178ecea4052b7f4195569c1ff4d344567bccdc12dfdf02d545ab"
           },
           {
-              "file": "rencode-1.0.9-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-              "sha256": "005f676ae9ea8bb19f81a7216d97e03f3906498259ac951170e66895ab4d6277"
+              "file": "rencode-1.0.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+              "sha256": "aee6c253ee4a940329fc1cab5a3981dcc373faf4c960713f8ebcf486411c098e"
           },
           {
-              "file": "service_identity-26.1.0-py3-none-any.whl",
-              "sha256": "68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118"
+              "file": "service_identity-24.2.0-py3-none-any.whl",
+              "sha256": "6b047fbd8a84fd0bb0d55ebce4031e400562b9196e1e0d3e0fe2b8a59f6d4a85"
           },
           {
-              "file": "setuptools-80.9.0-py3-none-any.whl",
-              "sha256": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
+              "file": "setuptools-80.10.2-py3-none-any.whl",
+              "sha256": "95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173"
           },
           {
               "file": "six-1.17.0-py2.py3-none-any.whl",
               "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
           },
           {
-              "file": "twisted-26.4.0-py3-none-any.whl",
-              "sha256": "dc25ea0ebf6511c24f03232ee9f4afa54b291c5d897990e3a39cc4d14a1ef4c0"
+              "file": "twisted-25.5.0-py3-none-any.whl",
+              "sha256": "8559f654d01a54a8c3efe66d533d43f383531ebf8d81d9f9ab4769d91ca15df7"
           },
           {
               "file": "typing_extensions-4.16.0-py3-none-any.whl",
@@ -156,8 +160,8 @@
               "sha256": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9"
           },
           {
-              "file": "cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
-              "sha256": "630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2"
+              "file": "cryptography-43.0.3-cp39-abi3-manylinux_2_28_x86_64.whl",
+              "sha256": "c2e6fc39c4ab499049df3bdf567f768a723a5e8464816e8f009f121a5a9f4405"
           },
           {
               "file": "deluge-2.1.1-py3-none-any.whl",
@@ -192,36 +196,40 @@
               "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
           },
           {
+              "file": "pyOpenSSL-24.2.1-py3-none-any.whl",
+              "sha256": "967d5719b12b243588573f39b0c677637145c7a1ffedcd495a487e58177fbb8d"
+          },
+          {
               "file": "pyasn1-0.6.4-py3-none-any.whl",
               "sha256": "deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"
+          },
+          {
+              "file": "pyasn1_modules-0.4.2-py3-none-any.whl",
+              "sha256": "29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a"
           },
           {
               "file": "pycparser-3.11-py3-none-any.whl",
               "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
           },
           {
-              "file": "pyopenssl-26.4.0-py3-none-any.whl",
-              "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c"
-          },
-          {
               "file": "pyxdg-0.28-py2.py3-none-any.whl",
               "sha256": "bdaf595999a0178ecea4052b7f4195569c1ff4d344567bccdc12dfdf02d545ab"
           },
           {
-              "file": "rencode-1.0.9-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-              "sha256": "005f676ae9ea8bb19f81a7216d97e03f3906498259ac951170e66895ab4d6277"
+              "file": "rencode-1.0.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+              "sha256": "aee6c253ee4a940329fc1cab5a3981dcc373faf4c960713f8ebcf486411c098e"
           },
           {
-              "file": "service_identity-26.1.0-py3-none-any.whl",
-              "sha256": "68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118"
+              "file": "service_identity-24.2.0-py3-none-any.whl",
+              "sha256": "6b047fbd8a84fd0bb0d55ebce4031e400562b9196e1e0d3e0fe2b8a59f6d4a85"
           },
           {
-              "file": "setuptools-80.9.0-py3-none-any.whl",
-              "sha256": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
+              "file": "setuptools-80.10.2-py3-none-any.whl",
+              "sha256": "95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173"
           },
           {
-              "file": "twisted-26.4.0-py3-none-any.whl",
-              "sha256": "dc25ea0ebf6511c24f03232ee9f4afa54b291c5d897990e3a39cc4d14a1ef4c0"
+              "file": "twisted-25.5.0-py3-none-any.whl",
+              "sha256": "8559f654d01a54a8c3efe66d533d43f383531ebf8d81d9f9ab4769d91ca15df7"
           },
           {
               "file": "typing_extensions-4.16.0-py3-none-any.whl",
@@ -262,8 +270,8 @@
               "sha256": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9"
           },
           {
-              "file": "cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
-              "sha256": "630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2"
+              "file": "cryptography-43.0.3-cp39-abi3-manylinux_2_28_x86_64.whl",
+              "sha256": "c2e6fc39c4ab499049df3bdf567f768a723a5e8464816e8f009f121a5a9f4405"
           },
           {
               "file": "deluge-2.2.0-py3-none-any.whl",
@@ -298,36 +306,40 @@
               "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
           },
           {
+              "file": "pyOpenSSL-24.2.1-py3-none-any.whl",
+              "sha256": "967d5719b12b243588573f39b0c677637145c7a1ffedcd495a487e58177fbb8d"
+          },
+          {
               "file": "pyasn1-0.6.4-py3-none-any.whl",
               "sha256": "deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"
+          },
+          {
+              "file": "pyasn1_modules-0.4.2-py3-none-any.whl",
+              "sha256": "29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a"
           },
           {
               "file": "pycparser-3.11-py3-none-any.whl",
               "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
           },
           {
-              "file": "pyopenssl-26.4.0-py3-none-any.whl",
-              "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c"
-          },
-          {
               "file": "pyxdg-0.28-py2.py3-none-any.whl",
               "sha256": "bdaf595999a0178ecea4052b7f4195569c1ff4d344567bccdc12dfdf02d545ab"
           },
           {
-              "file": "rencode-1.0.9-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-              "sha256": "005f676ae9ea8bb19f81a7216d97e03f3906498259ac951170e66895ab4d6277"
+              "file": "rencode-1.0.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+              "sha256": "aee6c253ee4a940329fc1cab5a3981dcc373faf4c960713f8ebcf486411c098e"
           },
           {
-              "file": "service_identity-26.1.0-py3-none-any.whl",
-              "sha256": "68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118"
+              "file": "service_identity-24.2.0-py3-none-any.whl",
+              "sha256": "6b047fbd8a84fd0bb0d55ebce4031e400562b9196e1e0d3e0fe2b8a59f6d4a85"
           },
           {
-              "file": "setuptools-84.2.0-py3-none-any.whl",
-              "sha256": "8cc107ac7a403105dc8d6477664171f36135fab26adf8b5e0edaebc313f39b21"
+              "file": "setuptools-80.10.2-py3-none-any.whl",
+              "sha256": "95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173"
           },
           {
-              "file": "twisted-26.4.0-py3-none-any.whl",
-              "sha256": "dc25ea0ebf6511c24f03232ee9f4afa54b291c5d897990e3a39cc4d14a1ef4c0"
+              "file": "twisted-25.5.0-py3-none-any.whl",
+              "sha256": "8559f654d01a54a8c3efe66d533d43f383531ebf8d81d9f9ab4769d91ca15df7"
           },
           {
               "file": "typing_extensions-4.16.0-py3-none-any.whl",

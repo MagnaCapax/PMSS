@@ -63,11 +63,37 @@ final class TorrentClientsP6VenvTest extends TestCase
         [$root, $entry] = $this->fixture();
         $calls = 0;
         $install = static function () use (&$calls): void { $calls++; };
+        $fetched = [];
+        $fetch = static function (string $file) use (&$fetched): void { $fetched[] = $file; };
+        $ops = ['install' => $install, 'fetch' => $fetch];
         file_put_contents($root.'/wheels/'.$entry['wheels'][0]['file'], 'changed');
-        $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', ['install' => $install]));
+        $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', $ops));
         unlink($root.'/wheels/'.$entry['wheels'][0]['file']);
-        $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', ['install' => $install]));
+        $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', $ops));
         $this->assertSame(0, $calls);
+        // A failed mirror fetch is retried on the next run and never reaches pip.
+        $this->assertSame([$entry['wheels'][0]['file'], $entry['wheels'][0]['file']], $fetched);
+    }
+
+    public function testMirrorFetchFillsMissingWheelBeforeHashCheck(): void
+    {
+        [$root, $entry] = $this->fixture();
+        $file = $entry['wheels'][0]['file'];
+        unlink($root.'/wheels/'.$file);
+        $args = [];
+        $fetch = static function (string $name, string $sha256, string $path) use (&$args): void {
+            $args[] = [$name, $sha256, $path];
+            file_put_contents($path, 'fixture wheel');
+        };
+        $install = static function ($dir, $label, $steps, $cli, $link): void {
+            mkdir($dir.'/bin', 0755, true);
+            file_put_contents($cli, 'fixture');
+            file_put_contents($dir.'/bin/deluge-web', 'fixture');
+            symlink($cli, $link);
+        };
+        $this->assertTrue(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1',
+            ['install' => $install, 'fetch' => $fetch]));
+        $this->assertSame([[$file, $entry['wheels'][0]['sha256'], $root.'/wheels/'.$file]], $args);
     }
 
     public function testFailedTemporaryLinkCleanupPreventsPublication(): void

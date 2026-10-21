@@ -4,6 +4,7 @@
 require_once dirname(__DIR__).'/update/apps/pythonVenv.php';
 require_once dirname(__DIR__).'/update/distro.php';
 require_once __DIR__.'/storePaths.php';
+require_once __DIR__.'/store.php';
 
 /** Check the reviewed wheel set's distro, architecture and Python window before pip. */
 function pmssTorrentClientsDelugeVenvCompatible(array $entry): bool
@@ -34,6 +35,12 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
         || !pmssTorrentClientsStorePathChainSafe($storeRoot, 'wheels')) return false;
 
     $wheelDir = $storeRoot.'/wheels';
+    // PM's package mirror fills the root-owned wheel set; the hash check below stays authoritative.
+    $fetch = $ops['fetch'] ?? static function (string $file, string $sha256, string $path): void {
+        pmssInstallPinnedRemoteBinary('Deluge wheel '.$file,
+            'https://pulsedmedia.com/remote/pkg/wheels/'.rawurlencode($file), $sha256, $path, true);
+    };
+    if (!pmssTorrentClientsStoreDirectory($wheelDir)) return false;
     $paths = [];
     $seen = [];
     foreach ($entry['wheels'] as $wheel) {
@@ -42,6 +49,11 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
             || !is_string($wheel['sha256'] ?? null)
             || preg_match('/\A[a-fA-F0-9]{64}\z/', $wheel['sha256']) !== 1) return false;
         $path = $wheelDir.'/'.$wheel['file'];
+        if (!isset($seen[$path]) && (!is_file($path) || is_link($path)
+            || hash_file('sha256', $path) !== strtolower($wheel['sha256']))) {
+            $fetch($wheel['file'], strtolower($wheel['sha256']), $path);
+            clearstatcache(true, $path);
+        }
         $stat = @lstat($path);
         if (isset($seen[$path]) || !is_array($stat) || $stat['uid'] !== pmssTorrentClientsStoreOwnerIds()[0]
             || !is_file($path) || is_link($path)

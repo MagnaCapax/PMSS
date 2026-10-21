@@ -23,23 +23,24 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
         $this->assertSame(['2.0.5', '2.1.1', '2.2.0'], array_column($entries, 'version'));
         $required = ['attrs', 'automat', 'cffi', 'constantly', 'cryptography', 'deluge',
             'hyperlink', 'idna', 'incremental', 'libtorrent', 'mako', 'markupsafe',
-            'packaging', 'pyasn1', 'pycparser', 'pyopenssl', 'pyxdg', 'rencode',
+            'packaging', 'pyasn1', 'pyasn1_modules', 'pycparser', 'pyopenssl', 'pyxdg', 'rencode',
             'service_identity', 'setuptools', 'twisted', 'typing_extensions', 'zope_interface'];
         foreach ($entries as $entry) {
             $expected = $required;
             if ($entry['version'] === '2.0.5') $expected[] = 'six';
             sort($expected);
             $files = array_column($entry['wheels'], 'file');
-            $names = array_map(static function (string $file): string { return explode('-', $file)[0]; }, $files);
+            $names = array_map(static function (string $file): string { return strtolower(explode('-', $file)[0]); }, $files);
             sort($names);
             $this->assertSame($expected, $names);
             $this->assertTrue(in_array('deluge-'.$entry['version'].'-py3-none-any.whl', $files, true));
             $this->assertTrue(in_array(
                 'libtorrent-2.1.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl', $files, true
             ));
-            // Older Deluge imports pkg_resources, which setuptools >=81 removed.
-            $setuptools = $entry['version'] === '2.2.0' ? '84.2.0' : '80.9.0';
-            $this->assertTrue(in_array('setuptools-'.$setuptools.'-py3-none-any.whl', $files, true));
+            // Every Deluge 2.x imports pkg_resources, which setuptools >=81 removed, and
+            // deluged's certificate code needs OpenSSL.crypto.X509Req, gone from newer pyOpenSSL.
+            $this->assertTrue(in_array('setuptools-80.10.2-py3-none-any.whl', $files, true));
+            $this->assertTrue(in_array('pyOpenSSL-24.2.1-py3-none-any.whl', $files, true));
             foreach ($entry['wheels'] as $wheel) {
                 $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $wheel['sha256']));
             }
