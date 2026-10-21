@@ -19,7 +19,8 @@ function pmssPikkumiesHermesCommand(array $paths, string $origin, int $port): st
 {
     $script = '. "$1"; export HERMES_DASHBOARD_BASIC_AUTH_PASSWORD HERMES_DASHBOARD_BASIC_AUTH_SECRET; '
         .'exec "$2" run dashboard --host 127.0.0.1 --port "$3" --no-open --skip-build';
-    return 'nohup /usr/bin/env -i HOME='.escapeshellarg($paths['home'])
+    // Its own session: a process left in php-cgi's group dies when php-cgi recycles (live QA 2026-10-21).
+    return '/usr/bin/setsid nohup /usr/bin/env -i HOME='.escapeshellarg($paths['home'])
         .' PATH=/usr/local/bin:/usr/bin:/bin HERMES_DASHBOARD_PUBLIC_URL='.escapeshellarg($origin.'/')
         .' HERMES_DASHBOARD_BASIC_AUTH_USERNAME='.escapeshellarg(basename($paths['home']))
         .' /bin/sh -c '.escapeshellarg($script).' sh '.escapeshellarg($paths['credentials'])
@@ -53,7 +54,9 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
     if ($rc !== 0 || !preg_match('/^[1-9][0-9]*$/D', $pid)) return false;
     @file_put_contents($paths['pid'], $pid."\n");
     @file_put_contents($paths['base'].'/dashboard.port', $port."\n");
-    for ($i = 0; $i < 100; ++$i) {
+    // A cold Hermes dashboard start took about 20 s to listen on an idle test seedbox (2026-10-21); the Pikkumies
+    // start, which waited 10 s, stopped it before it bound. Wait up to 60 s (the account php.ini allows 90).
+    for ($i = 0; $i < 600; ++$i) {
         if (pmssPikkumiesHermesListenerOwned($port) && pmssPikkumiesHermesGate($port)) {
             if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port)) return true;
             break;

@@ -79,6 +79,8 @@ final class HermesInstallerTest extends TestCase
         $this->assertStringContainsString('$pipes, null, array())', $source);
         $command = \pmssHermesStartCommand($paths, $env['HERMES_DASHBOARD_PUBLIC_URL'], 24000, $paths['base'].'/dashboard.log');
         $this->assertStringContainsString('/usr/bin/env -i', $command);
+        // Its own session: php-cgi signals its whole process group when it recycles (live QA 2026-10-21).
+        $this->assertSame(0, strpos($command, '/usr/bin/setsid nohup '), $command);
         $this->assertFalse(strpos($command, str_repeat('a', 64)) !== false);
         $this->assertFalse(strpos($command, str_repeat('b', 64)) !== false);
         $process = proc_open('exec sleep 2', array(0 => array('pipe', 'r'),

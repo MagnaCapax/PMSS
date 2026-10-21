@@ -32,6 +32,8 @@ final class PikkumiesHermesUiTest extends TestCase
         $command = \pmssPikkumiesHermesCommand($paths, 'https://0123456789abcdef.mcx.fi:845', 24000);
         $this->assertStringContainsAllStrings(['/usr/bin/env -i', 'HERMES_DASHBOARD_PUBLIC_URL=',
             'run dashboard --host 127.0.0.1', $paths['credentials']], $command);
+        // Its own session: php-cgi signals its whole process group when it recycles (live QA 2026-10-21).
+        $this->assertSame(0, strpos($command, '/usr/bin/setsid nohup '), $command);
         $this->assertFalse(strpos($command, str_repeat('a', 64)) !== false);
         $this->assertFalse(strpos($command, str_repeat('b', 64)) !== false);
         $this->assertFalse(\pmssPikkumiesHermesStart($paths, 'http://0123456789abcdef.mcx.fi:845'));

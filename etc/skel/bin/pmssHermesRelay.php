@@ -126,7 +126,7 @@ function pmssHermesRelayStart(string $home, string $pidFile, string $socket, int
         || !@chmod($directory, 0700)) return false;
     $script = $home.'/bin/pmssHermesRelay.php';
     if (!is_file($script) || is_link($script)) return false;
-    $command = 'nohup /usr/bin/php '.escapeshellarg($script).' serve '.escapeshellarg($socket).' '
+    $command = '/usr/bin/setsid nohup /usr/bin/php '.escapeshellarg($script).' serve '.escapeshellarg($socket).' '
         .escapeshellarg((string) $port).' </dev/null >/dev/null 2>&1 & echo $!';
     $rows = array(); exec($command, $rows, $rc);
     $pid = trim((string) ($rows[0] ?? ''));

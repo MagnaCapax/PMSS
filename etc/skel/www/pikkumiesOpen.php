@@ -117,6 +117,15 @@ function pmssPikkumiesOpenTokenMint($directory)
 }
 
 /** Verify the published name against this host's TLS listener. */
+/** Run one account Pikkumies verb detached, once at a time (flock on $lock), appending its output to $log. */
+function pmssPikkumiesOpenBackground($binary, $verb, $lock, $log)
+{
+    if (!is_dir(dirname($lock))) @mkdir(dirname($lock), 0700, true);
+    // setsid: a process left in php-cgi's group dies when php-cgi recycles (live QA 2026-10-21).
+    exec('umask 077 && /usr/bin/setsid flock -n -o '.escapeshellarg($lock).' nohup '.escapeshellarg($binary).' '.$verb
+        .' </dev/null >>'.escapeshellarg($log).' 2>&1 &');
+}
+
 function pmssPikkumiesOpenTlsValid($name, $port = 844)
 {
     if (!in_array($port, [443, 844, 845, 846], true)) return false;
@@ -235,7 +244,7 @@ function pmssHermesAgentboardStart($home, $origin, $panelOrigin, $launcherUrl)
         .' AGENTBOARD_ALLOWED_ORIGIN='.escapeshellarg($origin)
         .' AGENTBOARD_FRAME_ANCESTORS='.escapeshellarg($panelOrigin)
         .' AGENTBOARD_LAUNCHER_URL='.escapeshellarg($launcherUrl);
-    $command = $env.' nohup '.escapeshellarg($binary).' </dev/null >>'.escapeshellarg($base.'/agentboard.log').' 2>&1 & echo $!';
+    $command = $env.' /usr/bin/setsid nohup '.escapeshellarg($binary).' </dev/null >>'.escapeshellarg($base.'/agentboard.log').' 2>&1 & echo $!';
     $rows = []; exec($command, $rows, $rc);
     $pid = trim((string) ($rows[0] ?? ''));
     if ($rc !== 0 || !preg_match('/^[1-9][0-9]*$/D', $pid)) return false;
@@ -408,11 +417,7 @@ if (pmssPikkumiesOpenMemoryLow()) {
 }
 $runtimeReady = is_file($home.'/.mcxPikkumies/pikkumies/include/.hermes-ready');
 if (($_GET['view'] ?? '') === 'setup' && !$runtimeReady) {
-    $lock = $local.'/ui/setup.lock';
-    if (!is_dir(dirname($lock))) @mkdir(dirname($lock), 0700, true);
-    $command = 'umask 077 && flock -n -o '.escapeshellarg($lock).' nohup '
-        .escapeshellarg($binary).' post-update </dev/null >>'.escapeshellarg($local.'/install.log').' 2>&1 &';
-    exec($command);
+    pmssPikkumiesOpenBackground($binary, 'post-update', $local.'/ui/setup.lock', $local.'/install.log');
     pmssPikkumiesOpenPage('setting-up', $started);
     return;
 }
@@ -425,6 +430,14 @@ $certificateState = pmssPikkumiesOpenCertificateState($home, $local, $name, $hos
 if ($certificateState === 'error') {
     if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin); return; }
     pmssPikkumiesOpenPage('error', $started);
+    return;
+}
+// Power user: Hermes' dashboard page is built once, in the background, before its first start. The build takes
+// minutes and the dashboard start below waits seconds (Pikkumies ADR-0033 addendum 2026-10-21, `ui web-build`).
+if ($ui === 'hermes' && !is_file($home.'/.mcxPikkumies/pikkumies/hermes/hermes_cli/web_dist/index.html')) {
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin, true); return; }
+    pmssPikkumiesOpenBackground($binary, 'ui web-build', $local.'/ui/web-build.lock', $local.'/ui/web-build.log');
+    pmssPikkumiesOpenPage('setting-up', $started);
     return;
 }
 if ($statusView) {
