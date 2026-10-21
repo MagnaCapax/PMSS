@@ -5,6 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/add/provisioningRuntime.php';
 require_once dirname(__DIR__, 2).'/user/add/preflight.php';
 require_once dirname(__DIR__, 2).'/user/identity.php';
+require_once dirname(__DIR__, 2).'/user/add/systemUserCreate.php';
 
 class AddUserProvisioningGuardTest extends TestCase
 {
@@ -90,6 +91,125 @@ class AddUserProvisioningGuardTest extends TestCase
         $this->assertTrue(symlink($target, $path));
         $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
         $this->assertSame('keep', file_get_contents($target));
+    }
+
+    public function testScreenSocketPreparePreservesAbsentAndCurrentOwnerTrees(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
+        $path = $dir.'/S-alice';
+        $this->assertSame('absent', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir));
+        $this->screenDirectoryCreate($path);
+        $this->pmssWriteFile($path.'/session', 'keep');
+        $this->assertSame('ready', \pmssAddUserScreenSocketPrepare('alice', fileowner($path), $dir));
+        $this->assertSame('keep', file_get_contents($path.'/session'));
+        $this->assertSame([], glob($dir.'/.pmss-remove-*'));
+    }
+
+    public function testScreenSocketPrepareRemovesStaleTreeWithoutFollowingInnerLinks(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
+        $path = $dir.'/S-alice';
+        $target = $this->pmssWriteFile($dir.'/outside', 'keep');
+        $this->screenDirectoryCreate($path);
+        $this->assertTrue(symlink($target, $path.'/socket'));
+        $this->assertSame('removed', \pmssAddUserScreenSocketPrepare('alice', fileowner($path) + 1, $dir));
+        $this->assertFalse(file_exists($path));
+        $this->assertSame('keep', file_get_contents($target));
+        $this->assertSame([], glob($dir.'/.pmss-remove-*'));
+        // Screen can create a fresh directory on its next account-owned launch.
+        $this->screenDirectoryCreate($path);
+        $this->assertSame('ready', \pmssAddUserScreenSocketPrepare('alice', fileowner($path), $dir));
+    }
+
+    public function testScreenSocketRemovalFailureLeavesWholeTreeInPrivateStage(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
+        $path = $dir.'/S-alice';
+        $this->screenDirectoryCreate($path);
+        $this->pmssWriteFile($path.'/session', 'stale');
+        $uid = fileowner($path);
+        $inode = fileinode($path);
+        $args = $dir.'/rm-args';
+        $bin = $this->pmssMakeExecutableStub('rm', "#!/bin/sh\nprintf '%s\\n' \"\$@\" >\"\$PMSS_TEST_SCREEN_RM_ARGS\"\nexit 1\n", 'pmss-screen-rm-');
+        $this->pmssWithPathPrefixedEnv($bin, ['PMSS_TEST_SCREEN_RM_ARGS' => $args], function () use ($dir, $uid): void {
+            $this->assertSame('remove_failed', \pmssAddUserScreenSocketPrepare('alice', $uid + 1, $dir));
+        });
+        $stages = glob($dir.'/.pmss-remove-*');
+        $this->assertSame(1, count($stages));
+        $this->assertFalse(file_exists($path));
+        $this->assertSame(0700, fileperms($stages[0]) & 07777);
+        $this->assertSame(posix_geteuid(), fileowner($stages[0]));
+        $this->assertSame($inode, fileinode($stages[0].'/tree'));
+        $this->assertSame('stale', file_get_contents($stages[0].'/tree/session'));
+        $this->assertSame(['-rf', '--one-file-system', '--', $stages[0]], file($args, FILE_IGNORE_NEW_LINES));
+    }
+
+    public function testScreenSocketPrepareRejectsInvalidScopeAndUnusualEntries(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
+        foreach (['', '../alice', "alice\0suffix", 'root'] as $name) {
+            $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare($name, 1234, $dir));
+        }
+        foreach ([0, -1] as $uid) {
+            $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', $uid, $dir));
+        }
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir."\0suffix"));
+        $path = $this->pmssWriteFile($dir.'/S-alice', 'keep');
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', fileowner($path) + 1, $dir));
+        $this->assertSame('keep', file_get_contents($path));
+    }
+
+    public function testScreenSocketPrepareRejectsSymlinkedLeafAndParent(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
+        $this->assertTrue(mkdir($dir.'/target'));
+        $this->pmssWriteFile($dir.'/target/keep', 'keep');
+        $this->assertTrue(symlink($dir.'/target', $dir.'/S-alice'));
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir));
+        $this->assertTrue(symlink($dir, $dir.'/redirect'));
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir.'/redirect'));
+        $this->assertTrue(is_link($dir.'/S-alice'));
+        $this->assertSame('keep', file_get_contents($dir.'/target/keep'));
+    }
+
+    public function testScreenSocketPrepareReportsFailedOrIncompleteRemoval(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
+        $path = $dir.'/S-alice';
+        $this->screenDirectoryCreate($path);
+        foreach ([false, true] as $result) {
+            $this->assertSame('remove_failed', \pmssAddUserScreenSocketPrepare('alice', fileowner($path) + 1, $dir,
+                function (string $target) use ($path, $result): bool {
+                    $this->assertSame($path, $target);
+                    return $result;
+                }
+            ));
+            $this->assertTrue(is_dir($path));
+        }
+    }
+
+    public function testScreenSocketGuardRunsBeforeCredentialsAndServiceStarts(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/user/add/systemUserCreate.php', [
+            'pmssAddUserFailureRollbackMarkSystemUserCreated();',
+            "pmssAddUserScreenSocketPrepare(\$user['name'],",
+            "'screen_socket_'.\$screenState",
+            "'Set initial password'",
+        ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/addUser.php', [
+            'pmssAddUserSystemUserCreate($user, $homePath);',
+            '/scripts/startRtorrent',
+        ]);
+    }
+
+    /** Model an ordinary account UID even when the suite runs as root. */
+    private function screenDirectoryCreate(string $path): void
+    {
+        $this->assertTrue(mkdir($path, 0700));
+        if (fileowner($path) === 0) {
+            $this->assertTrue(chown($path, 1234));
+            clearstatcache(true, $path);
+        }
     }
 
     public function testAddUserRejectsReservedRuntimeAndDaemonNames(): void
