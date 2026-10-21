@@ -177,6 +177,32 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $this->assertStringContainsString('Another OpenClaw action is running', $output);
     }
 
+    public function testWatchdogRearmsAnOlderWrapperEvenWhileStopped(): void
+    {
+        if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');
+        $home = $this->pmssMakeTempDir('pmss-oc-rearm-');
+        $paths = \ocPaths($home);
+        mkdir($home.'/bin', 0750);
+        mkdir($paths['state'], 0700);
+        file_put_contents($paths['state'].'/pmss-stopped', '');
+        // No installation: the watchdog leaves ~/bin alone.
+        \ocCheck($paths);
+        $this->assertFalse(file_exists($home.'/bin/openclaw'));
+        mkdir(dirname($paths['entry']), 0700, true);
+        file_put_contents($paths['entry'], '');
+        file_put_contents($home.'/bin/openclaw', "#!/bin/sh\nexec node openclaw.mjs \"\$@\"\n");
+        \ocCheck($paths);
+        $wrapper = file_get_contents($home.'/bin/openclaw');
+        $this->assertStringContainsString("export OPENCLAW_SUPERVISOR_MODE=external\n", $wrapper);
+        $this->assertSame(0750, fileperms($home.'/bin/openclaw') & 0777);
+        $this->assertSame(array('openclaw'), array_values(array_diff(scandir($home.'/bin'), array('.', '..'))));
+        // A current wrapper is left as it is.
+        touch($home.'/bin/openclaw', 1000000000);
+        \ocCheck($paths);
+        clearstatcache();
+        $this->assertSame(1000000000, filemtime($home.'/bin/openclaw'));
+    }
+
     public function testRepeatInstallOnlyReconcilesBrowserWithoutOnboardingOrDownloading(): void
     {
         if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');

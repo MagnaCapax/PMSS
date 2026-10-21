@@ -486,6 +486,11 @@ function ocActionLock(array $paths)
 /** One cron check at a time; five consecutive failures require manual start. */
 function ocCheck(array $paths): void
 {
+    // Installs from before the wrapper exported the supervisor mode stay exposed to
+    // `openclaw update` until re-armed; the watchdog does it even while OpenClaw is stopped.
+    if (is_file($paths['entry'])) {
+        ocWriteCliWrapper($paths);
+    }
     if (is_file($paths['state'].'/pmss-stopped')) {
         return;
     }
@@ -772,14 +777,22 @@ function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, 
     return $useVirsilipas;
 }
 
-/** Install and update both refresh ~/bin/openclaw so older wrappers gain the supervisor export. */
+/** Install, update and the watchdog refresh ~/bin/openclaw so older wrappers gain the supervisor export. */
 function ocWriteCliWrapper(array $paths): void
 {
+    $file = $paths['home'].'/bin/openclaw';
+    $wrapper = ocCliWrapper($paths);
+    if (!is_link($file) && is_file($file) && file_get_contents($file) === $wrapper) {
+        return;
+    }
     if (!is_dir($paths['home'].'/bin')) {
         mkdir($paths['home'].'/bin', 0750);
     }
-    file_put_contents($paths['home'].'/bin/openclaw', ocCliWrapper($paths));
-    chmod($paths['home'].'/bin/openclaw', 0750);
+    // Write beside and rename, so a CLI call never runs a half-written wrapper.
+    $tmp = $file.'.tmp'.getmypid();
+    file_put_contents($tmp, $wrapper);
+    chmod($tmp, 0750);
+    rename($tmp, $file);
 }
 
 /** Replace and finalize the runtime while the caller holds the watchdog's action lock. */
