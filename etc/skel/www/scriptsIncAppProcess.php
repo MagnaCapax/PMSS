@@ -112,7 +112,7 @@ function pmssCustomerTorrentClientToggleStart(string $client, callable $systemSt
  if (is_link($dir)) return;
  $lock = null;
  if (is_dir($dir)) {
-  $lock = @fopen($dir.'/'.$client.'.lock', 'c');
+  $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
   if (!is_resource($lock)) return;
   if (!@flock($lock, LOCK_EX | LOCK_NB)) { fclose($lock); return; }
  }

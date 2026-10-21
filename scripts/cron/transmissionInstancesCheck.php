@@ -26,9 +26,9 @@ foreach ($users as $user) {
     $command = 'cd '.escapeshellarg($home)
         .' && { [ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/transmission.lock; flock -n 9 || exit 0; }; php '
         .escapeshellarg($home.'/www/torrentClientsResolve.php')
-        .' transmission --launch >/dev/null 2>&1; }';
+        .' transmission --launch >/dev/null 2>&1 9>&-; }';
     $output = [];
     $rc = 1;
-    @exec(pmssBuildUserServiceShellCommand($user, $command), $output, $rc);
+    @exec(pmssLockChildClosePrefix().pmssBuildUserServiceShellCommand($user, $command), $output, $rc);
     if ($rc !== 0) pmssUserLog($user, 'Transmission start was not ready.');
 }

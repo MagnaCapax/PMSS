@@ -28,7 +28,7 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     $dir = $home.'/.config/pmss/torrentClients';
     if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
         return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
-    $lock = @fopen($dir.'/'.$client.'.lock', 'c');
+    $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
     if (!is_resource($lock) || !@flock($lock, LOCK_EX | LOCK_NB)) {
         if (is_resource($lock)) fclose($lock);
         return array('ok' => false, 'status' => 409, 'message' => 'A '.$client.' switch is already running.');

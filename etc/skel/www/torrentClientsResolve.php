@@ -99,7 +99,7 @@ function pmssTorrentClientResolverLaunch(string $home, string $client, bool $loc
         $dir = $home.'/.config/pmss/torrentClients';
         if (!is_dir($dir) && !@mkdir($dir, 0700, true)) return false;
         if (is_link($dir)) return false;
-        $lock = @fopen($dir.'/'.$client.'.lock', 'c');
+        $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
         if (!is_resource($lock)) return false;
         if (!@flock($lock, LOCK_EX | LOCK_NB)) { fclose($lock); return true; }
     }

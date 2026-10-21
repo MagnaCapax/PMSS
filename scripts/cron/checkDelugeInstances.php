@@ -18,10 +18,10 @@ $pmssCheckDelugeLock = pmssCronLockAcquire('checkDelugeInstances', 'pmssCronLock
 
 pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 'deluge stopped: suspended or moved', [
     pmssUserWatchdogServiceSpec('deluged', static function (string $thisUser): string {
-        return pmssBuildUserServiceShellCommand($thisUser, "[ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/deluge.lock; flock -n 9 || exit 0; }; [ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluged >/dev/null 2>&1) || (cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info)");
+        return pmssBuildUserServiceShellCommand($thisUser, "[ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/deluge.lock; flock -n 9 || exit 0; }; [ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluged >/dev/null 2>&1) 9>&- || (cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info) 9>&-");
     }, 'deluged start requested'),
     pmssUserWatchdogServiceSpec('deluge-web', static function (string $thisUser): string {
-        return pmssBuildUserServiceShellCommand($thisUser, "[ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/deluge.lock; flock -n 9 || exit 0; }; [ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluge-web >/dev/null 2>&1) || (cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info)");
+        return pmssBuildUserServiceShellCommand($thisUser, "[ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/deluge.lock; flock -n 9 || exit 0; }; [ -L ~/bin/deluge/default ] && [ -f /etc/seedbox/config/torrentClients.enabled ] && (cd ~; php ~/www/torrentClientsResolve.php deluge --launch deluge-web >/dev/null 2>&1) 9>&- || (cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info) 9>&-");
     }, 'deluge-web start requested'),
 ], function (string $thisUser): array {
     $running = pmssUserWatchdogProcessRunning($thisUser, 'deluged');
