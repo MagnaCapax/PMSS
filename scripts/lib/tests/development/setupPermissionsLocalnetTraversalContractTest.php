@@ -26,6 +26,25 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
         );
     }
 
+    public function testToggleAppCatalogPathLosesGroupWriteOnly(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/setupPermissions.php');
+        $this->assertTrue(preg_match('#"(find /etc/skel/www [^"]+)"#', $source, $match) === 1, 'catalog permission step missing');
+        $dir = $this->pmssMakeTempDir('pmss-skel-www-');
+        $catalog = $this->pmssWriteFile($dir.'/toggleAppCatalog.php', "<?php return [];\n");
+        $other = $this->pmssWriteFile($dir.'/other.php', "x\n");
+        chmod($dir, 0770);
+        chmod($catalog, 0660);
+        chmod($other, 0660);
+        $command = str_replace(['\\\\', '/etc/skel/www'], ['\\', escapeshellarg($dir)], $match[1]);
+        exec($command.' 2>&1', $output, $rc);
+        clearstatcache();
+        $this->assertSame(0, $rc, implode("\n", $output));
+        $this->assertSame(0750, fileperms($dir) & 0777);
+        $this->assertSame(0640, fileperms($catalog) & 0777);
+        $this->assertSame(0660, fileperms($other) & 0777);
+    }
+
     public function testConfigDirectoryRootKeepsTraversePermission(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/util/setupPermissions.php', '@chmod($configDir, 0775);');

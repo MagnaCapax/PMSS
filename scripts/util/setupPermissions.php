@@ -124,6 +124,12 @@ foreach ($permissionTargets as $path => $target) {
     pmssEnsureRootOwnership($path, $exitCodes);
 }
 
+// terminateUser reads the toggle-app catalog as root and refuses it when it or its directory is group-writable.
+if (pmssPermissionTargetDirectoryExists('/etc/skel/www')) {
+    $exitCodes[] = runStep('Removing group write from the toggle-app catalog path',
+        "find /etc/skel/www -maxdepth 1 \\( -path /etc/skel/www -o -name toggleAppCatalog.php \\) -not -type l -perm /022 -exec chmod go-w -- {} +");
+}
+
 foreach ($permissionTargets as $path => $target) {
     if (pmssPermissionTargetDirectoryExists($path)) {
         $exitCodes[] = runStep($target['files'][0], $target['files'][1]);
