@@ -137,4 +137,29 @@ final class TorrentClientsStoreTest extends TestCase
         $this->assertSame('0.9.9', readlink($store.'/rtorrent/default'));
         $this->assertSame(0755, fileperms($store.'/rtorrent/0.9.9/rtorrent') & 0777);
     }
+
+    public function testConvergeRestoresTraverseAfterTenantSweep(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-clients-sweep-');
+        $store = $root.'/pmss/clients';
+        // A matching pin keeps the second run on the already-installed fast path.
+        $entry = $this->entry();
+        $entry['sha256'] = hash('sha256', 'newer');
+        $ops = [
+            'root' => $store,
+            'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
+            'size' => static function (): int { return 10; },
+            'install' => static function (array $item, string $binary): bool {
+                return file_put_contents($binary, 'newer') === 5;
+            },
+            'log' => static function (): void {},
+        ];
+        $this->assertSame(['rtorrent/0.9.9' => 'installed'], \pmssTorrentClientsStoreConverge([$entry], $ops));
+        // update-step2 hardens every depth-1 /home directory to 0700, dot-dirs included.
+        chmod($root.'/pmss', 0700);
+        $this->assertSame(['rtorrent/0.9.9' => 'installed'], \pmssTorrentClientsStoreConverge([$entry], $ops));
+        clearstatcache();
+        $this->assertSame(0755, fileperms($root.'/pmss') & 0777);
+        $this->assertSame(0755, fileperms($store) & 0777);
+    }
 }

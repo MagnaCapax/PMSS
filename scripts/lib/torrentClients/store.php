@@ -52,6 +52,12 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
         }
         return false;
     };
+    // The update's /home tenant sweep resets dot-dirs to 0700 before this runs;
+    // restore traverse every time so installed versions stay reachable.
+    if (is_dir($root) && !is_link($root) && pmssTorrentClientsStorePathChainSafe($root)) {
+        pmssTorrentClientsStoreDirectory(dirname($root));
+        pmssTorrentClientsStoreDirectory($root);
+    }
     $results = [];
     foreach ($catalog as $entry) {
         if (!is_array($entry) || !isset($entry['client'], $entry['version'], $entry['kind'])) continue;
