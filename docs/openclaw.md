@@ -85,11 +85,17 @@ install-openclaw update
 
 Updates need 60,000 additional file-quota slots for a few minutes: npm
 installs the new release beside the old one before removing the old one (QA
-on 2026-10-21 measured a peak of 49,505 extra files over 54,857 in use).
+on 2026-10-21 measured peaks of 49,505 and 50,139 extra files over about
+55,000 in use).
 Going over the soft file limit only starts the quota grace period, so when
 quota data is available the installer checks that current usage is within
 the soft limit and that current usage plus 60,000 fits the hard limit before
-stopping the gateway. It holds the watchdog lock, stops the gateway,
+stopping the gateway. PMSS sets 500 files per GiB of disk quota and a hard
+limit 1.25 times that, so an account holding little besides OpenClaw
+(about 55,000 files) can update on a plan of about 184 GiB or more; a smaller
+plan can run OpenClaw but `update` refuses until files are freed.
+
+The update holds the watchdog lock, stops the gateway,
 removes old `openclaw-update-runtime-*` directories directly under the private
 `~/.local/share/openclaw/lib`, installs the current npm release, runs Doctor's
 non-interactive repair and migrations, and starts the gateway again. npm or
