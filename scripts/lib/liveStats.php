@@ -25,7 +25,7 @@ function pmssLiveStatsNodeCountersParse(string $stat, string $meminfo, string $n
     $total = array_sum(array_slice($j, 0, 8));
     if (!preg_match('/^\s*'.preg_quote($iface, '/').':\s*(\d+)(?:\s+\d+){7}\s+(\d+)/m', $netDev, $n)) return null;
     return ['busy' => $total - $j[3] - $j[4], 'total' => $total, 'mem_total' => (int) $mt[1] * 1024,
-        'mem_used' => ((int) $mt[1] - (int) $ma[1]) * 1024, 'rx' => (int) $n[1], 'tx' => (int) $n[2]];
+        'mem_used' => ((int) $mt[1] - (int) $ma[1]) * 1024, 'rx' => (int) $n[1], 'tx' => (int) $n[2], 'steal' => $j[7]];
 }
 
 /** Delta of two snapshots as one ring sample; null for resets or implausible intervals. */
@@ -36,9 +36,13 @@ function pmssLiveStatsNodeSample(array $prev, array $cur, int $now): ?array
     foreach (['busy', 'total', 'rx', 'tx'] as $k) {
         if (!isset($prev[$k], $cur[$k]) || $cur[$k] < $prev[$k]) return null;
     }
-    return ['t' => $now, 'dt' => $dt, 'cb' => round(($cur['busy'] - $prev['busy']) / 100, 2),
+    $sample = ['t' => $now, 'dt' => $dt, 'cb' => round(($cur['busy'] - $prev['busy']) / 100, 2),
         'ct' => round(($cur['total'] - $prev['total']) / 100, 2), 'mu' => $cur['mem_used'], 'mt' => $cur['mem_total'],
         'tx' => $cur['tx'] - $prev['tx'], 'rx' => $cur['rx'] - $prev['rx']];
+    // cs = CPU-seconds the hypervisor took from this VM (steal, already inside cb). Optional: absent until both
+    // snapshots carry the counter, so the first sample after an update has none.
+    if (isset($prev['steal'], $cur['steal']) && $cur['steal'] >= $prev['steal']) $sample['cs'] = round(($cur['steal'] - $prev['steal']) / 100, 2);
+    return $sample;
 }
 
 /** Last line of a regular, non-symlink file (reads only the tail). */

@@ -29,6 +29,7 @@ class LiveStatsTest extends TestCase
         $this->assertSame(614400, $c['mem_used']);
         $this->assertSame(7000, $c['rx']);
         $this->assertSame(3000, $c['tx']);
+        $this->assertSame(0, $c['steal']);
         $this->assertSame(null, \pmssLiveStatsNodeCountersParse($this->stat(100), $meminfo, $this->netDev(1, 1), 'nope0'));
         $this->assertSame(null, \pmssLiveStatsNodeCountersParse('garbage', $meminfo, $this->netDev(1, 1), 'eth0'));
     }
@@ -42,6 +43,17 @@ class LiveStatsTest extends TestCase
         $this->assertSame(null, \pmssLiveStatsNodeSample($prev, ['busy' => 1, 'total' => 1, 'rx' => 1, 'tx' => 1] + $cur, 1300), 'counter reset');
         $this->assertSame(null, \pmssLiveStatsNodeSample($prev, $cur, 1010), 'interval too short');
         $this->assertSame(null, \pmssLiveStatsNodeSample($prev, $cur, 9000), 'interval too long');
+    }
+
+    public function testNodeSampleCarriesStealOnlyWhenBothSnapshotsHaveIt(): void
+    {
+        $prev = ['time' => 1000, 'busy' => 100, 'total' => 1000, 'rx' => 10, 'tx' => 20, 'mem_used' => 1, 'mem_total' => 2, 'steal' => 50];
+        $cur = ['time' => 1300, 'busy' => 400, 'total' => 1600, 'rx' => 110, 'tx' => 220, 'mem_used' => 5, 'mem_total' => 8, 'steal' => 80];
+        $this->assertSame(0.3, \pmssLiveStatsNodeSample($prev, $cur, 1300)['cs']);
+        unset($prev['steal']);
+        $this->assertFalse(array_key_exists('cs', \pmssLiveStatsNodeSample($prev, $cur, 1300)));
+        $prev['steal'] = 90;
+        $this->assertFalse(array_key_exists('cs', \pmssLiveStatsNodeSample($prev, $cur, 1300)), 'steal counter went back');
     }
 
     public function testRingKeepsNewestSlotsAndReplacesDuplicateSlot(): void

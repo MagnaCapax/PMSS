@@ -1057,6 +1057,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - `statsLive.php` (loaded by `stats.php` through `pmssWelcomeRequireLocalHelper()`; the block is simply absent when the helper has not arrived) prints
   the "Node load vs. your share" block from two root-written artifacts: `/var/lib/pmss/public/node-live.json` (node sums) and
   `/var/lib/pmss/live/<own user>.json` (own samples, `root:<user> 0640`). Customers never receive another account's samples (ADR 0126).
+  Each `node-live.json` sample carries `t`, `dt`, `cb` (busy CPU-seconds), `ct` (total CPU-seconds), `mu`/`mt` (memory used/total bytes, used = MemTotal - MemAvailable), `tx`/`rx` (primary-interface bytes) and, once two snapshots carry the counter, `cs` (steal CPU-seconds, already inside `cb`). hallinta reads the file hourly for node statistics (2026-10-21), so keys are additive: renaming or removing one breaks that consumer.
 - `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks and gives legends explicit point markers, width, and spacing (Refs #878).
 - The Storage I/O text block emits explicit newlines between read, write, and
   operations values; PHP template close tags otherwise consume source newlines (Refs #879).
