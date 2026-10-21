@@ -169,7 +169,7 @@ Onboarding and provider configuration are not repeated.
 The gateway and installer-run CLI set `OPENCLAW_SUPERVISOR_MODE=external` and
 `OPENCLAW_SERVICE_REPAIR_POLICY=external`. The generated CLI wrapper exports
 supervisor mode too, so upstream refuses self-update and directs customers to
-their supervisor. Repeat install refreshes older wrappers. The npm package's
+their supervisor. Both update and repeat install rewrite the wrapper, so older installs gain the export. The npm package's
 2026.10.5 `docs/cli/gateway/restart-and-supervision.md` and foreground CLI
 registration were checked: native service mutation is refused, while the
 foreground `gateway run` PMSS uses remains available.

@@ -163,6 +163,8 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
             $this->assertStringNotContainsString('private-doctor-output', $output);
         }
         $this->assertSame('valid', file_get_contents($home.'/doctor-env'));
+        // Update refreshes older wrappers so customers' openclaw update is refused upstream.
+        $this->assertStringContainsString("export OPENCLAW_SUPERVISOR_MODE=external\n", file_get_contents($home.'/bin/openclaw'));
         // Dispatch shares the watchdog lock even before update checks begin.
         $lock = \ocActionLock($paths);
         list($rc, $output) = \ocRun(array(PHP_BINARY, $installer, 'update'), $env);

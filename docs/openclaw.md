@@ -101,9 +101,9 @@ PMSS's private `/proc` mount and can leave large runtime directories behind.
 installing or starting a native service. These policies permit the foreground
 `gateway run` used by PMSS; see upstream's
 [external supervisor documentation](https://docs.openclaw.ai/cli/gateway/restart-and-supervision#external-supervisors).
-Older installations receive the supervisor export in `~/bin/openclaw` only
-after rerunning `install-openclaw install --yes`; `update` itself does not
-rewrite that wrapper.
+`install-openclaw update` and `install-openclaw install --yes` both rewrite
+`~/bin/openclaw`, so older installations gain the supervisor export the first
+time either runs.
 
 Useful commands:
 

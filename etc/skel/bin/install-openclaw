@@ -762,6 +762,16 @@ function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, 
     return $useVirsilipas;
 }
 
+/** Install and update both refresh ~/bin/openclaw so older wrappers gain the supervisor export. */
+function ocWriteCliWrapper(array $paths): void
+{
+    if (!is_dir($paths['home'].'/bin')) {
+        mkdir($paths['home'].'/bin', 0750);
+    }
+    file_put_contents($paths['home'].'/bin/openclaw', ocCliWrapper($paths));
+    chmod($paths['home'].'/bin/openclaw', 0750);
+}
+
 /** Replace and finalize the runtime while the caller holds the watchdog's action lock. */
 function ocUpdate(array $paths): void
 {
@@ -775,6 +785,7 @@ function ocUpdate(array $paths): void
     if ($rc !== 0) {
         throw new RuntimeException('Could not read installed OpenClaw version');
     }
+    ocWriteCliWrapper($paths);
     ocStop($paths);
     try {
         foreach (ocUpdateRuntimeDirs($paths) as $dir) {
@@ -865,12 +876,7 @@ function ocMain(array $args): int
         if ($credentials === null) {
             ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
         }
-        $wrapper = ocCliWrapper($paths);
-        if (!is_dir($paths['home'].'/bin')) {
-            mkdir($paths['home'].'/bin', 0750);
-        }
-        file_put_contents($paths['home'].'/bin/openclaw', $wrapper);
-        chmod($paths['home'].'/bin/openclaw', 0750);
+        ocWriteCliWrapper($paths);
         file_put_contents($paths['port'], $port."\n");
         ocBrowserConfigure($paths, $port);
         ocStop($paths);
