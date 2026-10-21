@@ -17,6 +17,13 @@ function pmssConfigureTorrentClientVersionsRead($path = '/var/lib/pmss/public/to
     return $versions;
 }
 
+/** Offer versions only while the host marker is set; a projection left after opt-out offers none. */
+function pmssConfigureTorrentClientVersionsOffered($client = 'qbittorrent', $marker = '/etc/seedbox/config/torrentClients.enabled',
+    $path = '/var/lib/pmss/public/torrentClients.json')
+{
+    return is_file($marker) ? pmssConfigureTorrentClientVersionsRead($path, $client) : array();
+}
+
 /** Numeric releases, including curated libtorrent suffixes, prove major downgrades. */
 function pmssConfigureTorrentClientMajorDowngrade($previous, $requested): bool
 {

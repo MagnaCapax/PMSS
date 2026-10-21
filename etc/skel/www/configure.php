@@ -85,14 +85,14 @@ $torrentNotice = '';
 $otherTorrentVersions = array();
 if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrentClientsResolve.php')) {
     require_once __DIR__.'/configureTorrentClients.php';
-    $torrentVersions = pmssConfigureTorrentClientVersionsRead();
+    $torrentVersions = pmssConfigureTorrentClientVersionsOffered();
     $torrentRunning = pmssConfigureTorrentClientRunningVersion($home);
     $torrentNotice = trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/qbittorrent.notice', 256));
     if (is_file(__DIR__.'/configureTorrentClientsOther.php') && is_file(__DIR__.'/configureTorrentClientsSwitch.php')
         && is_file(__DIR__.'/transmissionLaunch.php')) {
         require_once __DIR__.'/configureTorrentClientsOther.php';
         foreach (array('deluge', 'transmission', 'rtorrent') as $client)
-            $otherTorrentVersions[$client] = pmssConfigureTorrentClientVersionsRead('/var/lib/pmss/public/torrentClients.json', $client);
+            $otherTorrentVersions[$client] = pmssConfigureTorrentClientVersionsOffered($client);
     }
 }
 ?>

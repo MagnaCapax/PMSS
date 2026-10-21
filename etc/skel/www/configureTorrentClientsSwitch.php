@@ -10,7 +10,7 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     if (!in_array($client, array('deluge', 'transmission', 'rtorrent'), true))
         return array('ok' => false, 'status' => 400, 'message' => 'That torrent client is unavailable.');
     $versions = isset($ops['versions']) ? $ops['versions']
-        : pmssConfigureTorrentClientVersionsRead('/var/lib/pmss/public/torrentClients.json', $client);
+        : pmssConfigureTorrentClientVersionsOffered($client);
     $version = $request['version'] ?? null;
     if (!is_array($versions) || !is_string($version)
         || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) !== 1

@@ -26,6 +26,11 @@ class CustomerPanelRenderHarnessTest extends TestCase
         $this->assertStringContainsString('Find more apps', $html);
         $this->assertStringContainsString('Media Stack is not installed', $html);
         $this->assertStringContainsString("$('details.catalog').prop('open', query !== '')", $html);
+        if (!is_file('/etc/seedbox/config/torrentClients.enabled')) {
+            // A host without the opt-in marker shows no version picker or switch control.
+            $this->assertStringNotContainsString('version</h', $html);
+            $this->assertStringNotContainsString("pmssConfigureSend('torrentClientSwitch'", $html);
+        }
     }
 
     public function testAppsStatusEndpointSurvivesConfigureDelivery(): void

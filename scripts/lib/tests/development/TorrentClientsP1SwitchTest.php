@@ -33,6 +33,35 @@ final class TorrentClientsP1SwitchTest extends TestCase
         $this->assertSame(array(), \pmssConfigureTorrentClientVersionsRead($link));
     }
 
+    public function testProjectionLeftAfterOptOutOffersNoVersions(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-p1-marker-');
+        $path = $root.'/projection.json';
+        $this->pmssWriteFile($path, json_encode(array('versions' => array(
+            array('client' => 'qbittorrent', 'version' => '5.1.0', 'kind' => 'static'),
+            array('client' => 'rtorrent', 'version' => '0.9.8-r16', 'kind' => 'static'),
+        ))));
+        $this->assertSame(array(), \pmssConfigureTorrentClientVersionsOffered('qbittorrent', $root.'/absent', $path));
+        $this->assertSame(array(), \pmssConfigureTorrentClientVersionsOffered('rtorrent', $root.'/absent', $path));
+        $this->pmssWriteFile($root.'/marker', '');
+        $this->assertSame(array('5.1.0'), array_keys(\pmssConfigureTorrentClientVersionsOffered('qbittorrent', $root.'/marker', $path)));
+        $this->assertSame(array('0.9.8-r16'), array_keys(\pmssConfigureTorrentClientVersionsOffered('rtorrent', $root.'/marker', $path)));
+    }
+
+    public function testSwitchWithoutHostMarkerDoesNoWork(): void
+    {
+        if (is_file('/etc/seedbox/config/torrentClients.enabled')) $this->markTestSkipped('Host marker is set on this runner.');
+        foreach (array('qbittorrent', 'deluge', 'transmission', 'rtorrent') as $client) {
+            $home = $this->home();
+            $events = array();
+            $ops = array('backup' => static function () use (&$events): array { $events[] = 'backup'; return array('ok' => true); });
+            $result = \pmssConfigureActionApply($home, 'torrentClientSwitch',
+                array('client' => $client, 'version' => '5.1.0', 'password' => 'secret'), $ops);
+            $this->assertSame(400, $result['status'], $client);
+            $this->assertSame(array(), $events, $client);
+        }
+    }
+
     public function testPasswordAndVersionValidationBeforeCommands(): void
     {
         $home = $this->home();

@@ -85,7 +85,7 @@ function pmssConfigureTorrentClientStart($home, $version)
 /** Snapshot, stop, select and start under one account-owned client lock. */
 function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
 {
-    $versions = isset($ops['versions']) ? $ops['versions'] : pmssConfigureTorrentClientVersionsRead();
+    $versions = isset($ops['versions']) ? $ops['versions'] : pmssConfigureTorrentClientVersionsOffered();
     $version = $request['version'] ?? null;
     if (($request['client'] ?? null) !== 'qbittorrent' || !is_string($version)
         || !isset($versions[$version])) return array('ok' => false, 'status' => 400, 'message' => 'That qBittorrent version is unavailable.');

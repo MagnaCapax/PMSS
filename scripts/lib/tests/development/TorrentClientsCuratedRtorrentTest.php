@@ -120,7 +120,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $root = dirname(__DIR__, 4);
         $configure = file_get_contents($root.'/etc/skel/www/configure.php');
         $this->assertStringContainsString("'rtorrent' => 'rTorrent'", $configure);
-        $this->assertStringContainsString("pmssConfigureTorrentClientVersionsRead('/var/lib/pmss/public/torrentClients.json', \$client)", $configure);
+        $this->assertStringContainsString("pmssConfigureTorrentClientVersionsOffered(\$client)", $configure);
         $delivery = file_get_contents($root.'/scripts/lib/update/users/filesystem.php');
         foreach (['configureTorrentClientsOther.php', 'configureTorrentClientsSwitch.php',
             'configureTorrentClientsVersion.php', 'torrentClientsResolve.php', '.rtorrentRestart.php'] as $file)
