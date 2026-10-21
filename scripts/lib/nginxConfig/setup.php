@@ -79,6 +79,8 @@ function pmssCreateNginxConfigSetup(): array
 {
     $userTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user");
     $suspendedTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user-suspended");
+    $movedTemplate = @file_get_contents('/etc/seedbox/config/template.nginx-user-moved');
+    $movedNoticeTemplate = @file_get_contents('/etc/seedbox/config/template.moved.notice.html');
 
     // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
     foreach (['/etc/nginx', '/etc/nginx/sites-available', '/etc/nginx/sites-enabled'] as $path) {
@@ -217,6 +219,8 @@ function pmssCreateNginxConfigSetup(): array
     return [
         'userTemplate' => $userTemplate,
         'suspendedTemplate' => $suspendedTemplate,
+        'movedTemplate' => $movedTemplate,
+        'movedNoticeTemplate' => $movedNoticeTemplate,
         'subdomainEnabled' => $subdomainEnabled,
         'subdomainBase' => $subdomainBase,
         'subdomainConfigDir' => $subdomainConfigDir,
@@ -226,5 +230,6 @@ function pmssCreateNginxConfigSetup(): array
         'nginxSslBlock' => $nginxSslBlock,
         'publicSubdomainTemplate' => $templates['public'],
         'publicSuspendedTemplate' => $templates['publicSuspended'],
+        'publicMovedTemplate' => $templates['publicMoved'],
     ];
 }

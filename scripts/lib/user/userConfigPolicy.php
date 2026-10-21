@@ -23,6 +23,21 @@ function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $d
     return is_string($value) ? !pmssValueMatchesNormalized($value, ['false', '0', 'no', 'off', '']) : (bool) $value;
 }
 
+/** Accept only a canonical calendar date, without trimming or coercion. */
+function pmssUserMovedDateIsValid($value): bool
+{
+    if (!is_string($value) || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) !== 1) return false;
+    return checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4));
+}
+
+/** Read the removal date; passing the date never automatically unparks services. */
+function pmssUserMovedUntil(string $username, ?UserConfigStore $store = null): ?string
+{
+    if (!pmssValidateUsername($username)) return null;
+    $payload = ($store ?? new UserConfigStore())->get($username);
+    return $payload['movedUntil'] ?? null;
+}
+
 /** Load one validated user's persisted payload for policy checks. */
 function pmssUserConfigResolvePayload(string $username, ?UserConfigStore &$store = null): ?array
 {

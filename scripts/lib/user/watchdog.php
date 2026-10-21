@@ -9,12 +9,19 @@
 require_once dirname(__DIR__).'/runtime.php';
 require_once __DIR__.'/restartSpace.php';
 pmssRequireRelativeFiles(__DIR__, ['log.php', 'selection.php', 'serviceLaunch.php']);
+require_once __DIR__.'/userConfigStore.php';
 
 /** Return true when watchdogs must avoid web-facing services for the user. */
 function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'): bool
 {
     $homeDir = rtrim($homeRoot, '/').'/'.$username;
     return is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www');
+}
+
+/** Park managed services for unavailable web roots and migrated old copies. */
+function pmssUserServicesParked(string $username, string $homeRoot = '/home'): bool
+{
+    return pmssUserWebRootUnavailable($username, $homeRoot) || pmssUserMovedUntil($username) !== null;
 }
 
 /** @param array<int,string> $processNames */
@@ -260,11 +267,11 @@ function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, a
 /** @param array<int,string> $processNames */
 function pmssUserWatchdogHandleSuspended(string $username, array $processNames, string $userLogMessage, string $homeRoot = '/home'): bool
 {
-    if (!pmssValidateUsername($username) || !pmssUserWebRootUnavailable($username, $homeRoot)) {
+    if (!pmssValidateUsername($username) || !pmssUserServicesParked($username, $homeRoot)) {
         return false;
     }
 
-    echo "User: {$username} is suspended\n";
+    echo "User: {$username} is suspended or moved\n";
     pmssUserWatchdogTerminateProcesses($username, $processNames, 9);
     pmssUserLog($username, $userLogMessage);
     return true;

@@ -100,8 +100,15 @@ server {
 NGINX;
     $publicSuspendedTemplate = str_replace('##suspended_locations##', $suspendedLocations, $publicSuspendedTemplate);
 
+    // Both protocols answer directly: no lighttpd, redirect parameters, or JS.
+    $movedLocations = "    location = /css/error-styles.css {\n        root /var/www;\n    }\n    location / {\n        default_type text/html;\n        return 200 '##movedPage';\n    }";
+    $publicMovedTemplate = str_replace(
+        ['# PMSS suspended subdomain', $suspendedLocations],
+        ['# PMSS moved subdomain', $movedLocations], $publicSuspendedTemplate);
+
     return [
         'public' => $publicSubdomainTemplate,
         'publicSuspended' => $publicSuspendedTemplate,
+        'publicMoved' => $publicMovedTemplate,
     ];
 }

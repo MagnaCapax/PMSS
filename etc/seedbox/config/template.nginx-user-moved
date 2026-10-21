@@ -1,0 +1,10 @@
+# The trusted removal date is baked into this static response by the renderer.
+location /user-##username/ {
+    default_type text/html;
+    return 200 '##movedPage';
+}
+
+location /public-##username/ {
+    default_type text/html;
+    return 200 '##movedPage';
+}

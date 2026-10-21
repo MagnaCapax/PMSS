@@ -20,8 +20,8 @@ function pmssTrackerCleanerRunUser(
     $userVerboseLog = pmssTrackerCleanerTimestamp()." run_start user={$username}\n";
     $sessionDir = "/home/{$username}/session";
     $backupsDir = $sessionDir.'/backups';
-    // Check in priority order; later path checks must not run for suspended users.
-    if (pmssUserWebRootUnavailable($username)) $skip = ['suspended', "User {$username} is suspended; skipping.", ''];
+    // Check in priority order; later path checks must not run for parked users.
+    if (pmssUserServicesParked($username)) $skip = ['suspended_or_moved', "User {$username} is suspended or moved; skipping.", ''];
     elseif (file_exists("/home/{$username}/.trackerCleanerDisable")) $skip = ['disabled', '', ''];
     elseif (!pmssPathWithinRootIsSafe($sessionDir, $sessionDir, true)) $skip = ['session_path_unsafe', "SKIP: refusing to operate; session path unsafe for user {$username} ({$sessionDir}).", ' session='.$sessionDir];
     elseif (file_exists($backupsDir) && (!is_dir($backupsDir) || is_link($backupsDir))) $skip = ['backups_path_unsafe', "SKIP: refusing to operate; backups path unsafe for user {$username} ({$backupsDir}).", ' backups='.$backupsDir];

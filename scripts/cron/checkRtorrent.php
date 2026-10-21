@@ -62,10 +62,10 @@ foreach ($users as $user) {
         continue;
     }
 
-    // Suspended users: kill only rtorrent and executor — not all user processes (see GH#210).
-    if (pmssUserWebRootUnavailable($user)) {
+    // Suspended or moved users: kill only rtorrent and executor — not all user processes (see GH#210).
+    if (pmssUserServicesParked($user)) {
         $targets = rtorrentProcessKillManagedPids($user, SIGKILL);
-        pmssCheckRtorrentLogBoth($user, "suspended; cleanup signal requested (signal=KILL targets={$targets})", $debug);
+        pmssCheckRtorrentLogBoth($user, "suspended or moved; cleanup signal requested (signal=KILL targets={$targets})", $debug);
         continue;
     }
 

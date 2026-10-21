@@ -10,7 +10,7 @@ require_once __DIR__.'/../lib/user/watchdog.php';
 
 $pmssCheckRcloneLock = pmssCronLockAcquire('checkRcloneInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
 
-pmssUserWatchdogRunService('Rclone', 'rcloneEnable', ['rclone'], 'rclone stopped due to suspension', [
+pmssUserWatchdogRunService('Rclone', 'rcloneEnable', ['rclone'], 'rclone stopped: suspended or moved', [
     pmssUserWatchdogServiceSpec('rclone', static function (string $thisUser): string {
         $port = pmssReadRegularFileNetworkPort("/home/{$thisUser}/.rclonePort");
         if ($port === null) {

@@ -13,7 +13,8 @@ $users = pmssListManagedUsersFromResult(pmssListManagedUsersResult());
 if ($users === null) exit(1);
 foreach ($users as $user) {
     $home = '/home/'.$user;
-    if (pmssUserWebRootUnavailable($user) || !pmssLighttpdTransmissionSelected($user, $home)) continue;
+    if (pmssUserWatchdogHandleSuspended($user, ['transmission-daemon'], 'Transmission stopped: suspended or moved')) continue;
+    if (!pmssLighttpdTransmissionSelected($user, $home)) continue;
     // A process and its socket are checked before settings or launch are touched.
     if (pmssTorrentClientLauncherLivenessPids($user, 'transmission') !== []) continue;
     $socketPath = $home.'/.lighttpd/transmission.sock';

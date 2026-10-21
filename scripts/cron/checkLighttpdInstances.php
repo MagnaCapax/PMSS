@@ -33,7 +33,7 @@ if ($argUserRaw === '') {
     $portDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', '/etc/seedbox/runtime/ports'), '/');
     $nginxUsersByPort = array();
     foreach ($users as $username) {
-        if (pmssUserWebRootUnavailable($username, $homeRoot) || !pmssUserLighttpdEnabled($username)) {
+        if (pmssUserServicesParked($username, $homeRoot) || !pmssUserLighttpdEnabled($username)) {
             continue;
         }
         $port = pmssReadRegularFileNetworkPort($portDir.'/lighttpd-'.$username);
@@ -51,7 +51,7 @@ if ($argUserRaw === '') {
 foreach($users AS $thisUser) {
     $homeDir = rtrim($homeRoot, '/')."/{$thisUser}";
     $configPath = $homeDir.'/.lighttpd.conf';
-    if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped due to suspension', $homeRoot)) {
+    if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped: suspended or moved', $homeRoot)) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
         continue;
     }

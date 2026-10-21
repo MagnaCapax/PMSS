@@ -95,6 +95,21 @@ class UserConfigStore
         return $this->persist($username, $payload);
     }
 
+    /**
+     * Update moved state only in the root-owned store, without a home cache write.
+     * @param string $username Existing account name.
+     * @param string|null $until Valid removal date, or null to clear.
+     * @return bool Whether the canonical update succeeded.
+     */
+    public function setMovedUntil(string $username, ?string $until): bool
+    {
+        if (($until !== null && !pmssUserMovedDateIsValid($until))
+            || !is_array($payload = $this->get($username))) return false;
+        if ($until === null) unset($payload['movedUntil']);
+        else $payload['movedUntil'] = $until;
+        return $this->set($username, $payload);
+    }
+
     public function persist(string $username, array $payload): bool
     {
         if (!$this->set($username, $payload)) {
@@ -228,6 +243,9 @@ class UserConfigStore
         }
 
         $payload['suspended'] = array_key_exists('suspended', $payload) && (bool)$payload['suspended'];
+
+        // Invalid dates must never reach nginx's static response or its config syntax.
+        if (!pmssUserMovedDateIsValid($payload['movedUntil'] ?? null)) unset($payload['movedUntil']);
 
         $payload['dockerEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled');
         $payload['lighttpdEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');

@@ -138,7 +138,7 @@ class checkRtorrentContractTest extends TestCase
             ],
             'ordered' => [[
                 'needles' => [
-                    'if (pmssUserWebRootUnavailable($user)) {',
+                    'if (pmssUserServicesParked($user)) {',
                     "if (is_file(\$home.'/.rtorrentDisable')) {",
                     "if (!is_file(\$home.'/.rtorrent.rc')) {",
                 ],

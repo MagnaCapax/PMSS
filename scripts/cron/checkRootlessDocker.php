@@ -35,8 +35,9 @@ $users = pmssListManagedUsers();
 $userConfigStore = new UserConfigStore();
 
 foreach ($users as $user) {
-    if (pmssUserWebRootUnavailable($user)) {
-        $logDockerMessage("User {$user} is suspended");
+    if (pmssUserServicesParked($user)) {
+        $logDockerMessage("User {$user} is suspended or moved");
+        runCommand('php '.escapeshellarg('/scripts/util/userDocker.php').' '.escapeshellarg($user).' '.escapeshellarg('stop'), false, $logDockerMessage);
         continue;
     }
     if (!pmssUserDockerEnabled($user, $userConfigStore)) {

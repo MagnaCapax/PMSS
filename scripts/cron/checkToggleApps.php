@@ -13,7 +13,7 @@ $pmssCheckToggleAppsLock = pmssCronLockAcquire('checkToggleApps', 'pmssCronLockS
 try {
     foreach ($catalog as $app => $row) {
         pmssUserWatchdogRunService($row['watchdogLabel'], substr($row['enable'], 1), [$row['watchdogProcess']],
-            $row['watchdogLabel'].' stopped due to suspension', [
+            $row['watchdogLabel'].' stopped: suspended or moved', [
                 pmssUserWatchdogServiceSpec($app, static function (string $user) use ($app): string {
                     return pmssToggleAppPrepare($user, $app) ? pmssToggleAppStartCommand($user, $app) : '';
                 }, $row['watchdogLabel'].' start requested', $row['watchdogLabel'],

@@ -7,6 +7,7 @@
 
 require_once __DIR__.'/userConfigsReconcile.php';
 require_once __DIR__.'/pikkumiesUi.php';
+require_once __DIR__.'/moved.php';
 
 const PMSS_NGINX_USER_CONFIG_GENERATED = 'generated';
 const PMSS_NGINX_USER_CONFIG_SKIPPED = 'skipped';
@@ -59,8 +60,10 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
         $replacements['##port##'] = (string) $serverPort;
     }
 
-    $prefix = $suspended ? 'Suspended' : 'Subdomain';
-    $label = $suspended ? ' suspended' : '';
+    $moved = isset($ctx['movedPage']);
+    if ($moved) $replacements['##movedPage'] = $ctx['movedPage'];
+    $prefix = $suspended ? 'Suspended' : ($moved ? 'Moved' : 'Subdomain');
+    $label = $suspended ? ' suspended' : ($moved ? ' moved' : '');
     // Public vhost also answers the user's stable mcx.fi hostnames (which resolve
     // via the mcx.fi zone builder), serving the same www/public content. This is
     // the per-service name, plus the customer's cluster name when they have one —
@@ -72,7 +75,7 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
     // warning), unchanged.
     $publicSslBlock = pmssNginxUserSslBlock($ownFqdn, $hostSslBlock);
     $config = strtr((string) ($ctx['public'.$prefix.'Template'] ?? ''), $replacements + ['##host##' => $publicHost, '##ssl_block##' => $publicSslBlock]);
-    if (!$suspended && $mcxHosts !== null && $mcxHosts !== ''
+    if (!$suspended && !$moved && $mcxHosts !== null && $mcxHosts !== ''
         && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
         && is_file('/opt/pikkumies-agentboard/agentboard')) {
         if (pmssPikkumiesUiPortAvailable(844)) {
@@ -84,7 +87,7 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
             pmssCreateNginxConfigUserLog($user, '[WARN] Account UI port 844 is owned by another service');
         }
     }
-    if (!$suspended && $mcxHosts !== null && $mcxHosts !== ''
+    if (!$suspended && !$moved && $mcxHosts !== null && $mcxHosts !== ''
         && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
         && pmssPikkumiesUiCertificateReady($user, $subdomainBase)) {
         if (pmssPikkumiesUiPortAvailable(845)) {
@@ -96,7 +99,7 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
     }
     // Port C follows only the account's own completed install, never the host marker.
     $status = '/home/'.$user.'/.hermes/pmss-install.status';
-    if (!$suspended && $mcxHosts !== null && $mcxHosts !== '' && is_file($status)
+    if (!$suspended && !$moved && $mcxHosts !== null && $mcxHosts !== '' && is_file($status)
         && !is_link($status) && @filesize($status) <= 32
         && trim((string) @file_get_contents($status)) === 'ready') {
         if (pmssPikkumiesUiPortAvailable(846)) {
@@ -153,6 +156,8 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     $portFile = $runtimePortDir.'/lighttpd-'.$thisUser;
     $isSuspended = is_dir($homeDir.'/www-disabled');
+    $movedUntil = pmssUserMovedUntil($thisUser, $ctx['userConfigStore'] ?? null);
+    $isMoved = !$isSuspended && $movedUntil !== null;
 
     $suspendedTemplate = $ctx['suspendedTemplate'] ?? false;
     $userTemplate = $ctx['userTemplate'] ?? false;
@@ -188,6 +193,14 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, []);
             return PMSS_NGINX_USER_CONFIG_SKIPPED;
         }
+    } elseif ($isMoved) {
+        $userTemplate = $ctx['movedTemplate'] ?? '';
+        if (!$userTemplate || empty($ctx['movedNoticeTemplate'])
+            || ($subdomainEnabled && empty($ctx['publicMovedTemplate']))) {
+            pmssCreateNginxConfigLogSkippedUser($thisUser, 'missing moved notice templates');
+            return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+        }
+        $ctx['movedPage'] = pmssNginxMovedPage($ctx['movedNoticeTemplate'], $movedUntil);
     } else {
         if (!file_exists($homeDir.'/.rtorrent.rc')) {
             pmssCreateNginxConfigLogSkippedUser($thisUser, 'missing .rtorrent.rc prerequisite');
@@ -221,7 +234,8 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     $template = $isSuspended ? $suspendedTemplate : $userTemplate;
     $replacements = ['##username' => $thisUser];
-    if (!$isSuspended) {
+    if ($isMoved) $replacements['##movedPage'] = $ctx['movedPage'];
+    if (!$isSuspended && !$isMoved) {
         $replacements['##serverPort'] = (string) $serverPort;
         // Older templates may still request the legacy Deluge web port.
         if (strpos($template, '##delugeWebPort') !== false) {
@@ -233,6 +247,6 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     if (!pmssCreateNginxConfigWriteFile($managedPaths['user'], $userConfig, $thisUser, $isSuspended ? 'user suspended config' : 'user config')) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
     $writtenPaths[] = $managedPaths['user'];
     pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $writtenPaths);
-    pmssCreateNginxConfigUserLog($thisUser, $isSuspended ? 'nginx config regenerated (suspended template)' : 'nginx config regenerated');
+    pmssCreateNginxConfigUserLog($thisUser, $isSuspended ? 'nginx config regenerated (suspended template)' : ($isMoved ? 'nginx config regenerated (moved template)' : 'nginx config regenerated'));
     return PMSS_NGINX_USER_CONFIG_GENERATED;
 }
