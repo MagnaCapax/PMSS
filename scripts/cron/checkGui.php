@@ -56,7 +56,7 @@ function pmssCheckGuiUserPathIsSafe(string $path, string $homeDir, bool $directo
 }
 
 /**
- * Apply ownership metadata for a repaired user path.
+ * Confirm a repaired path already belongs to the account that wrote it.
  */
 function pmssCheckGuiApplyOwnership(string $path, string $user, callable $log): bool
 {
@@ -70,11 +70,12 @@ function pmssCheckGuiApplyOwnership(string $path, string $user, callable $log): 
         return false;
     }
 
-    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        if (!@chown($path, $user) || !@chgrp($path, $user)) {
-            $log("Skipping {$user}: unable to apply ownership to {$path}");
-            return false;
-        }
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
+    $stat = @lstat($path);
+    if (!is_array($account) || !is_array($stat)
+        || (int) $stat['uid'] !== (int) $account['uid']) {
+        $log("Skipping {$user}: unable to apply ownership to {$path}");
+        return false;
     }
 
     return true;
@@ -134,12 +135,8 @@ function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string
     }
 
     $log("Restoring {$label} directory for user {$user}");
-    if (!pmssDirEnsureExists($directory, 0755)) {
+    if (!pmssAccountDirectoryEnsure($user, $homeDir, $directory, 0755, 0755)) {
         $log("Skipping {$user}: unable to create {$label} directory at {$directory}");
-        return false;
-    }
-    if (!@chmod($directory, 0755)) {
-        $log("Skipping {$user}: unable to apply mode to {$label} directory at {$directory}");
         return false;
     }
     if (!pmssCheckGuiApplyOwnership($directory, $user, $log)) {
@@ -197,7 +194,9 @@ function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, str
     }
 
     $log("Restoring {$label} for user {$user}");
-    if (!pmssReplaceUserFilePreservingMetadata($targetFile, $content)) {
+    $existing = @lstat($targetFile);
+    $mode = is_array($existing) ? ((int) $existing['mode'] & 0777) : 0644;
+    if (!pmssReplaceAccountFile($user, $homeDir, $targetFile, $content, $mode, true)) {
         $log("Skipping {$user}: unable to atomically replace {$label} at {$targetFile}");
         return false;
     }

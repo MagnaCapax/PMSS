@@ -277,7 +277,7 @@ class CustomerBackupTest extends TestCase
             '<form method="get" action="welcome.php">',
             '<input type="hidden" name="backup" value="download" />',
             '<input type="submit" name="configBackupDownload" value="Download torrent configuration backup" />',
-            '<form method="post" action="welcome.php?restore=config">',
+            '<form method="post" action="welcome.php?restore=config" onsubmit="return pmssWelcomeActionSubmit(this)">',
             '<input type="text" name="archivePath"',
             '<input type="submit" name="torrentConfigRestore" value="Restore torrent configuration" />',
             'Media files are not included.',

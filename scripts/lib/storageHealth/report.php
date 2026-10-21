@@ -48,7 +48,15 @@ function pmssStorageHealthReportSyncUserNotice(string $noticePath, ?array $perfS
         return;
     }
     if ($noticePayload === null && is_file($noticePath)) {
-        @unlink($noticePath);
+        if (pmssManagedAccountHomePath($noticePath)) {
+            $context = pmssRootStageContext($noticePath);
+            if ($context !== null) {
+                pmssAccountPathRun($context[2], $context[1], [$context[1].'/.pmss-notice-check'],
+                    'test ! -L '.escapeshellarg($noticePath).' && rm -f -- '.escapeshellarg($noticePath));
+            }
+        } else {
+            @unlink($noticePath);
+        }
         return;
     }
     $json = $noticePayload === null ? '' : pmssJsonEncodeSafe($noticePayload, JSON_UNESCAPED_SLASHES);

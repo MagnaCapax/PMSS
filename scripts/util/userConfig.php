@@ -25,6 +25,7 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/welcomeMessage.php';
 require_once __DIR__.'/../lib/portManager.php';
+require_once __DIR__.'/../lib/user/directories.php';
 
 /**
  * Main entry point for user configuration changes.
@@ -186,7 +187,7 @@ $qbittorrentConfigDir = sprintf('/home/%s/.config/qBittorrent', $user['name']);
 $qbittorrentConfigFile = $qbittorrentConfigDir.'/qBittorrent.conf';
 if (!file_exists($qbittorrentConfigFile)) {
     $qbittorrentPort = pmssPortManagerAssignServicePort($user['name'], 'qbittorrent');
-    if (!pmssDirEnsureExists($qbittorrentConfigDir, 0770)) {
+    if (!pmssEnsureUserHomeDir($user['name'], '/home/'.$user['name'], '.config/qBittorrent', 0770)) {
         fwrite(STDERR, "Warning: failed to create qBittorrent config directory for {$user['name']}\n");
     }
     if ($qbittorrentPort === null) {

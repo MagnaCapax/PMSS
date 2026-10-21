@@ -872,6 +872,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
+  - Default self-signed TLS site: Inherits TLSv1.2 and TLSv1.3 from the global template and lists only its existing AEAD cipher suites. A complete Let's Encrypt set uses its separate include.
   - Global template copy and default-site write failures emit stderr warnings; setup still reaches the existing nginx config test and restart decision.
   - Reconciliation: Replaces current per-user routes atomically without deleting them first. A full run prunes genuine orphan routes only after every selected user completes without a write failure; single-user runs never prune other accounts. Orphan pruning accepts only validated generated filenames and reports incomplete scans through the existing warning path.
   - Write failures: Keeps the previous route where it is still a safe regular file, emits a prominent warning summary, and returns non-zero only when the affected user has no serviceable primary `/etc/nginx/users/<user>` route. Intentional prerequisite skips retain their historical full-run versus single-user cleanup behavior.
@@ -891,6 +892,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/setupPermissions.php
   - Behavior: Normalizes perms on `/etc/skel` (non-destructive to content); ensures expected modes/ownership.
+  - Config modes: `/etc/seedbox/config/users` stays `0750`, its top-level JSON records stay `0640`, and the general `0775`/`0664` sweep skips that subtree entirely.
 
 - scripts/util/setupRootCron.php
   - Behavior: Installs/updates root cron entries from `/etc/seedbox/config/root.cron`.
@@ -1121,6 +1123,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   existing stderr error before any home-file write.
 
 - scripts/addUser.php USERNAME PASSWORD RAM_MiB QUOTA_GiB [trafficLimitGB]
+  - Library loading: Includes resolve from the script directory, independent of the caller's working directory.
   - Alternate form: `scripts/addUser.php --user=USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=QUOTA_GiB [resource options]`
   - Behavior: Creates Unix user with `/etc/skel`, sets password or generates one,
     sets expiry far future, ensures bash shell, records to per-user config store (`/etc/seedbox/config/users/<user>.json`),
@@ -1145,8 +1148,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
     Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep plus
     `###ADDUSER_JSON:{...}` with explicit `success`/`exit_code` fields for automation.
 
-- scripts/changePw.php [--jsonl] USERNAME [PASSWORD]
+- scripts/changePw.php [--jsonl] [--password-stdin] USERNAME [PASSWORD]
   - Behavior: Sets the Unix password (generated if omitted), writes the per-user htpasswd and any existing qBittorrent config with the account's privileges, and prints the password.
+    Generated credentials are 16 characters drawn entirely from the CSPRNG, with alphanumeric first and last characters.
+    `--password-stdin` reads one line in place of the positional value; an empty line generates a random password and EOF without a line fails. The positional form remains available for existing callers.
     On Debian 11 and newer, shadow and htpasswd receive the same `$2y$` bcrypt hash. Debian 10 and unreadable or nonnumeric Debian versions retain the `passwd` and `htpasswd -B` path. Both shadow paths feed credentials through stdin.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
 

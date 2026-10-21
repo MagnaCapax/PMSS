@@ -115,7 +115,8 @@ PHP;
 
     public function testMissingSentinelUsesSharedReconciler(): void
     {
-        $user = 'dummy';
+        $user = $this->pmssCurrentOwner();
+        if (!\pmssValidateUsername($user)) throw new SkipTest('Host account name is outside PMSS account format');
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-reconcile-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssEnsureDir($homeDir.'/www');
@@ -142,7 +143,8 @@ PHP;
 
     public function testSingleWatchdogRecoveryRestoresPanelAndRutorrentAfterWebRootDeletion(): void
     {
-        $user = 'dummy';
+        $user = $this->pmssCurrentOwner();
+        if (!\pmssValidateUsername($user)) throw new SkipTest('Host account name is outside PMSS account format');
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-full-recovery-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssEnsureDir($homeDir);
@@ -178,7 +180,8 @@ PHP;
 
     public function testWatchdogRecoveryIsIdempotentAfterTheFirstRun(): void
     {
-        $user = 'dummy';
+        $user = $this->pmssCurrentOwner();
+        if (!\pmssValidateUsername($user)) throw new SkipTest('Host account name is outside PMSS account format');
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-idempotent-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssEnsureDir($homeDir);
@@ -280,6 +283,8 @@ PHP;
         $outsideDir = $this->tempDir.'/outside';
         $this->pmssEnsureDir($homeDir);
         $this->pmssEnsureDir($outsideDir);
+        chmod($outsideDir, 0700);
+        $before = lstat($outsideDir);
         symlink($outsideDir, $homeDir.'/www');
         $messages = [];
 
@@ -291,6 +296,10 @@ PHP;
             $homeDir
         ));
         $this->assertTrue(is_link($homeDir.'/www'));
+        clearstatcache(true, $outsideDir);
+        $after = lstat($outsideDir);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
         $this->pmssAssertMessagesContain($messages, 'unsafe www directory target');
     }
 
@@ -300,6 +309,7 @@ PHP;
         $link = $this->tempDir.'/linked.txt';
         symlink($target, $link);
         $owner = fileowner($target);
+        $mode = fileperms($target) & 07777;
         $messages = [];
 
         $this->assertFalse(\pmssCheckGuiApplyOwnership(
@@ -309,6 +319,7 @@ PHP;
         ));
         clearstatcache(true, $target);
         $this->assertSame($owner, fileowner($target));
+        $this->assertSame($mode, fileperms($target) & 07777);
         $this->pmssAssertMessagesContain($messages, 'refusing to apply ownership to symlinked');
     }
 
@@ -345,6 +356,8 @@ PHP;
             $homeDir
         ));
         $this->assertEquals("<?php echo 'ok';\n", file_get_contents($homeDir.'/www/index.php'));
+        $this->assertSame(posix_geteuid(), fileowner($homeDir.'/www/index.php'));
+        $this->assertSame(0644, fileperms($homeDir.'/www/index.php') & 0777);
     }
 
     public function testRestoreUserFileRepairsNonZeroTruncation(): void

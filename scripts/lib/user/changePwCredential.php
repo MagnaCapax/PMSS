@@ -5,6 +5,16 @@
  * @license GPL-3.0-only
  */
 
+/** Read exactly one credential line; null means no line was received. */
+function pmssChangePwPasswordReadLine($stream): ?string
+{
+    $line = is_resource($stream) ? fgets($stream) : false;
+    if (!is_string($line)) {
+        return null;
+    }
+    return preg_replace('/\r?\n$/', '', $line);
+}
+
 /** Use bcrypt only where pam_unix accepts PHP's $2y$ hashes. */
 function pmssChangePwBcryptSupported(string $versionPath = '/etc/debian_version'): bool
 {
@@ -37,8 +47,8 @@ function pmssChangePwShadowUpdate(string $username, string $password, bool $useB
     // Neither the plaintext nor the hash may appear in process arguments.
     $command = $useBcrypt ? 'chpasswd -e' : 'passwd '.escapeshellarg($username);
     $payload = $useBcrypt ? $username.':'.$hash."\n" : $password."\n".$password."\n";
-    $descriptors = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['redirect', 1]];
-    $process = @proc_open($command, $descriptors, $pipes);
+    $descriptors = [0 => ['pipe', 'r'], 1 => ['pipe', 'w']];
+    $process = @proc_open($command.' 2>&1', $descriptors, $pipes);
     if (!is_resource($process)) {
         return [1, ''];
     }

@@ -38,6 +38,9 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)), implode('|', $messages));
         $this->assertTrue(is_dir($this->home.'/www'));
         $this->assertEquals('panel', file_get_contents($this->home.'/www/index.php'));
+        $this->assertSame(posix_geteuid(), fileowner($this->home.'/www/index.php'));
+        $this->assertSame(fileperms($this->skeleton.'/index.php') & 07777,
+            fileperms($this->home.'/www/index.php') & 07777);
         $this->assertEquals('rutorrent', file_get_contents($this->home.'/www/rutorrent/index.html'));
         $this->assertTrue(is_link($this->home.'/www/data'), 'data link missing');
         $this->assertSame('../data', readlink($this->home.'/www/data'));
@@ -192,6 +195,21 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertSame('outside-content', file_get_contents($outside.'/keep.txt'));
         $this->assertFalse(file_exists($outside.'/index.html'));
         $this->assertTrue(is_link($this->home.'/www/rutorrent'));
+    }
+
+    public function testOwnershipCheckDoesNotChangeLinkedTarget(): void
+    {
+        $outside = $this->pmssWriteFile($this->homeRoot.'/outside.txt', 'outside');
+        chmod($outside, 0600);
+        $link = $this->home.'/linked';
+        $this->pmssCreateSymlinkOrSkip($outside, $link);
+        $before = lstat($outside);
+
+        $this->assertTrue(pmssUserWebRootReconcileApplyOwnership($link, $this->user));
+        clearstatcache(true, $outside);
+        $after = lstat($outside);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
     }
     public function testUnreadableSkeletonDirectoryRefusesRestoreAndMerge(): void
     {

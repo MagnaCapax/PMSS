@@ -6,6 +6,92 @@ require_once dirname(__DIR__, 2).'/user/watchdog.php';
 
 class UserLifecycleWatchdogTest extends TestCase
 {
+    public function testRegenerationTimeoutRecordsLighttpdBackoff(): void
+    {
+        $runtime = $this->pmssMakeTempDir('pmss-lighttpd-regen-');
+        $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime, 'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1'], function (): void {
+            $start = microtime(true);
+            $result = pmssUserWatchdogCommandRun('sleep 30', 60, 'alice', 'lighttpd');
+            $this->assertTrue($result['timed_out']);
+            $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
+            $this->assertTrue(pmssUserWatchdogBackoffActive('alice', 'lighttpd'));
+        });
+        $source = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
+        $this->assertSame(3, substr_count($source, "60, \$thisUser, 'lighttpd'"));
+    }
+
+    public function testBackoffSkipsCommandCallable(): void
+    {
+        $runtime = $this->pmssMakeTempDir('pmss-watchdog-callable-');
+        $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime], function (): void {
+            pmssUserWatchdogBackoffRecord('alice', 'demo');
+            $called = false;
+            $spec = pmssUserWatchdogServiceSpec('demo', static function () use (&$called): string {
+                $called = true;
+                return 'true';
+            }, 'start requested');
+            pmssUserWatchdogEnsureServices('alice', [$spec], ['demo' => false]);
+            $this->assertFalse($called);
+        });
+    }
+
+    public function testTimedOutAccountBacksOffWhileNextAccountStarts(): void
+    {
+        $runtime = $this->pmssMakeTempDir('pmss-watchdog-backoff-');
+        $started = $runtime.'/bob-started';
+        $this->pmssWithEnv([
+            'PMSS_RUNTIME_DIR' => $runtime,
+            'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1',
+        ], function () use ($runtime, $started): void {
+            $start = microtime(true);
+            $this->pmssCaptureStdout(function () use ($started): void {
+                pmssUserWatchdogEnsureServices('alice', [
+                    pmssUserWatchdogServiceSpec('demo', 'sleep 30', 'start requested'),
+                ], ['demo' => false]);
+                pmssUserWatchdogEnsureServices('bob', [
+                    pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($started), 'start requested'),
+                ], ['demo' => false]);
+            });
+            $this->assertTrue(file_exists($started));
+            $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
+            $this->assertTrue(pmssUserWatchdogBackoffActive('alice', 'demo'));
+
+            $marker = $runtime.'/alice-ran';
+            $this->pmssCaptureStdout(function () use ($marker): void {
+                pmssUserWatchdogEnsureServices('alice', [
+                    pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'start requested'),
+                ], ['demo' => false]);
+            });
+            $this->assertFalse(file_exists($marker));
+            $this->assertFalse(pmssUserWatchdogBackoffActive('alice', 'demo', time() + 901));
+            file_put_contents(pmssUserWatchdogBackoffPath('alice', 'demo'), (string) (time() - 901));
+            $this->pmssCaptureStdout(function () use ($marker): void {
+                pmssUserWatchdogEnsureServices('alice', [
+                    pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'start requested'),
+                ], ['demo' => false]);
+            });
+            $this->assertTrue(file_exists($marker));
+        });
+    }
+
+    public function testClosedOutputPipesStillRespectDeadlineAndKillGroup(): void
+    {
+        $runtime = $this->pmssMakeTempDir('pmss-watchdog-closed-pipes-');
+        $pidFile = $runtime.'/grandchild.pid';
+        $command = 'exec /bin/sh -c '.escapeshellarg('exec 1>&- 2>&-; sleep 30 & echo $! > '.escapeshellarg($pidFile).'; wait');
+        $start = microtime(true);
+        $result = null;
+        $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime], function () use ($command, &$result): void {
+            $result = pmssUserWatchdogCommandRun($command, 1, 'alice', 'demo');
+        });
+        $this->assertTrue($result['timed_out']);
+        $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
+        $this->assertTrue(file_exists($pidFile));
+        $pid = (int) trim((string) file_get_contents($pidFile));
+        $state = trim((string) @shell_exec('ps -o stat= -p '.(int) $pid));
+        $this->assertTrue($state === '' || $state[0] === 'Z');
+    }
+
     public function testManagedConfigAppliesOnlyWhenServiceIsStopped(): void
     {
         $calledFor = [];
@@ -120,7 +206,7 @@ class UserLifecycleWatchdogTest extends TestCase
         $marker = $this->pmssMakeTempFile('watchdog-start-');
         @unlink($marker);
 
-        list($states,) = $this->pmssCaptureStdout(function () use ($marker): array {
+        list($states, $output) = $this->pmssCaptureStdout(function () use ($marker): array {
             return pmssUserWatchdogEnsureServices('alice', [
                 pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
             ], ['demo' => false]);
@@ -128,6 +214,7 @@ class UserLifecycleWatchdogTest extends TestCase
 
         $this->assertTrue(file_exists($marker));
         $this->assertEquals(['demo' => false], $states);
+        $this->assertTrue(strpos($output, 'Start Demo for user: alice') !== false);
     }
 
     public function testEnsureServicesSkipsStartForRunningServiceFromProvidedState(): void

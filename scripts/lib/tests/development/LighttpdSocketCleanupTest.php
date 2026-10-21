@@ -11,7 +11,7 @@ class LighttpdSocketCleanupTest extends TestCase
         $script = $this->readStartScript();
         $this->assertOrderedStrings([
             'function pmssStartLighttpdEnsureDirectory(',
-            "passthru(pmssLockChildClosePrefix().pmssBuildUserShellCommand(\$user, 'mkdir -p '.escapeshellarg(\$dir)), \$rc);",
+            "pmssUserWatchdogCommandRun(pmssBuildUserShellCommand(\$user, 'mkdir -p '.escapeshellarg(\$dir))",
         ], $script);
         $this->assertOrderedStrings([
             'foreach ($requiredDirs as $dir) {',
@@ -21,7 +21,7 @@ class LighttpdSocketCleanupTest extends TestCase
         $this->assertTrue(strpos($script, "if (\$deflateEnabled) {") !== false);
         $this->assertTrue(strpos($script, "\$requiredDirs[] = \$lighttpdDir.'/compress';") !== false);
         $this->assertTrue(strpos($script, 'pmssStartLighttpdPathWithinHome($dir, $homeDir)') !== false);
-        $this->assertTrue(strpos($script, 'if ($rc !== 0) {') !== false);
+        $this->assertTrue(strpos($script, "if (\$result['rc'] !== 0) {") !== false);
         $this->assertTrue(strpos($script, 'Unable to prepare lighttpd directory') !== false);
     }
 
@@ -30,7 +30,7 @@ class LighttpdSocketCleanupTest extends TestCase
         $script = $this->readStartScript();
         $this->assertOrderedStrings([
             "foreach (glob(rtrim(\$lighttpdDir, '/').'/php.socket*') ?: [] as \$socketPath) {",
-            'pmssStartLighttpdRemoveSocket($homeDir, $socketPath)',
+            'pmssStartLighttpdRemoveSocket($user, $homeDir, $socketPath)',
             "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);",
         ], $script);
         $this->assertTrue(strpos($script, 'is_link($socketPath)') !== false);
@@ -43,7 +43,7 @@ class LighttpdSocketCleanupTest extends TestCase
         $this->assertOrderedStrings([
             '@chdir($homeDir)',
             "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);",
-            'pmssLockChildClosePrefix().pmssBuildUserServiceShellCommand($user, $startCommand)',
+            'pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $startCommand)',
         ], $script);
         $this->assertTrue(strpos($script, "require_once __DIR__.'/lib/user/serviceLaunch.php';") !== false);
         $this->assertTrue(strpos($script, 'fwrite(STDERR, "Unable to enter user home\n");') !== false);
@@ -71,7 +71,8 @@ class LighttpdSocketCleanupTest extends TestCase
         $result = $this->startFixtureRun($fixture);
 
         $this->assertSame(0, $result['rc'], $result['output']);
-        $this->assertFalse(file_exists($fixture['socket']));
+        clearstatcache(true, $fixture['socket']);
+        $this->assertFalse(file_exists($fixture['socket']), $result['output']);
         $this->assertTrue(is_dir($fixture['home'].'/.lighttpd/upload'));
         $this->assertStringContainsString('/usr/sbin/lighttpd -f', (string) file_get_contents($fixture['launchLog']));
     }
@@ -80,7 +81,7 @@ class LighttpdSocketCleanupTest extends TestCase
     {
         $fixture = $this->startFixture(true);
         $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => $fixture['locks']], function () use ($fixture): void {
-            $path = \pmssRuntimeLockPath('pmss-lighttpdStart-fixture.lock');
+            $path = \pmssRuntimeLockPath('pmss-lighttpdStart-'.$fixture['user'].'.lock');
             $marker = $fixture['root'].'/lock-held';
             $process = null;
             $pipes = [];
@@ -125,28 +126,41 @@ class LighttpdSocketCleanupTest extends TestCase
         $this->assertStringContainsString('Unable to remove stale lighttpd socket', $result['output']);
         $this->assertTrue(is_link($fixture['socket']));
         $this->assertSame('', (string) @file_get_contents($fixture['launchLog']));
-        $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => $fixture['locks']], function (): void {
-            $path = \pmssRuntimeLockPath('pmss-lighttpdStart-fixture.lock');
-            $released = \pmssLockFileAcquire($path, true);
-            $this->assertTrue(is_resource($released), 'failed starter must release its lock');
-            if (is_resource($released)) fclose($released);
+        $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => $fixture['locks']], function () use ($fixture): void {
+            $path = \pmssRuntimeLockPath('pmss-lighttpdStart-'.$fixture['user'].'.lock');
+            exec('sudo -n flock -n '.escapeshellarg($path).' true 2>&1', $output, $rc);
+            $this->assertSame(0, $rc, 'failed starter must release its lock');
         });
     }
 
     /** PATH stubs keep process detection and launch away from live services and /proc. */
     private function startFixture(bool $running): array
     {
+        $sudoStatus = 1;
+        exec('sudo -n true 2>/dev/null', $unused, $sudoStatus);
+        if ($sudoStatus !== 0 || !is_array(posix_getpwnam('nobody'))) {
+            throw new SkipTest('Root account fixture unavailable');
+        }
         $root = $this->pmssMakeTempDir('pmss-lighttpd-start-home-');
-        $home = $root.'/fixture';
+        if (getenv('PMSS_TEST_TEMP_ROOT') === dirname($root)) chmod(dirname($root), 0755);
+        $user = 'nobody';
+        $home = $root.'/'.$user;
         $this->pmssEnsureDir($home.'/.lighttpd');
         $this->pmssEnsureDir($home.'/.lighttpd/upload');
         $this->pmssWriteFile($home.'/.lighttpd.conf', 'server.port = 12345'."\n");
         $socket = $home.'/.lighttpd/php.socket-0';
         $this->pmssWriteFile($socket, 'socket data');
+        chmod($home, 0777);
+        chmod($home.'/.lighttpd', 0777);
+        chmod($root, 0711);
+        exec('sudo -n chown nobody '.escapeshellarg($home), $unused, $ownerRc);
+        $this->assertSame(0, $ownerRc);
         $marker = $root.'/running';
         if ($running) $this->pmssWriteFile($marker, '1');
         $bin = $this->pmssMakeTempDir('pmss-lighttpd-start-bin-');
         $launchLog = $root.'/launch.log';
+        $this->pmssWriteFile($launchLog, '');
+        chmod($launchLog, 0666);
         $this->pmssWriteExecutableFiles($bin, [
             'pgrep' => '#!/bin/sh' . "\n" . 'test -f '.escapeshellarg($marker).' || exit 1' . "\n" . 'printf "12345\\n"' . "\n",
             'id' => "#!/bin/sh\nprintf '1234\\n'\n",
@@ -154,17 +168,19 @@ class LighttpdSocketCleanupTest extends TestCase
             'systemd-run' => '#!/bin/sh' . "\n" . 'printf "%s\\n" "$*" >> '.escapeshellarg($launchLog)."\n",
             'ps' => "#!/bin/sh\nexit 0\n",
         ]);
-        return compact('root', 'home', 'socket', 'bin', 'launchLog')
+        return compact('root', 'home', 'user', 'socket', 'bin', 'launchLog')
             + ['locks' => $this->pmssMakeTempDir('pmss-lighttpd-start-locks-', 0700)];
     }
 
     private function startFixtureRun(array $fixture): array
     {
-        return $this->pmssRunRepoPhpScriptCommand('scripts/startLighttpd', ['fixture'], [
-            'PATH' => $fixture['bin'].':'.getenv('PATH'),
-            'PMSS_HOME_DIR' => $fixture['root'],
-            'PMSS_RUNTIME_LOCK_DIR' => $fixture['locks'],
-        ]);
+        $command = 'sudo -n env PATH='.escapeshellarg($fixture['bin'].':'.getenv('PATH'))
+            .' PMSS_HOME_DIR='.escapeshellarg($fixture['root'])
+            .' PMSS_RUNTIME_LOCK_DIR='.escapeshellarg($fixture['locks'])
+            .' '.escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 3).'/startLighttpd')
+            .' '.escapeshellarg($fixture['user']).' 2>&1';
+        exec($command, $output, $rc);
+        return ['rc' => $rc, 'output' => implode("\n", $output)];
     }
 
     private function readStartScript(): string

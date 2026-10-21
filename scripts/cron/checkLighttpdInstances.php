@@ -63,21 +63,25 @@ foreach($users AS $thisUser) {
         continue;
     }
     pmssHermesUiConverge($thisUser, $homeDir);
+    if (pmssUserWatchdogBackoffActive($thisUser, 'lighttpd')) continue;
 
     if (!file_exists($configPath) && is_dir($homeDir)) {
         echo "Config missing for user: {$thisUser} — generating\n";
-        passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
+        $result = pmssUserWatchdogCommandRun(
+            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$thisUser]), 60, $thisUser, 'lighttpd'
+        );
+        if ($result['timed_out']) continue;
         pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
     }
 
     // A successful customer Docker install requests one managed proxy rebuild.
     $dockerProxyRefresh = $homeDir.'/.lighttpd/.dockerClientProxyRefresh';
     if (is_file($dockerProxyRefresh) && !is_link($dockerProxyRefresh)) {
-        $refreshRc = runStep(
-            "Refreshing Docker client proxy for {$thisUser}",
-            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$thisUser])
+        $refresh = pmssUserWatchdogCommandRun(
+            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$thisUser]), 60, $thisUser, 'lighttpd'
         );
-        if ($refreshRc === 0) {
+        if ($refresh['timed_out']) continue;
+        if ($refresh['rc'] === 0) {
             @unlink($dockerProxyRefresh);
         }
     }
@@ -85,12 +89,12 @@ foreach($users AS $thisUser) {
     $nginxRecoveryAction = (string) ($nginxRecoveryActions[$thisUser] ?? '');
     if ($nginxRecoveryAction === 'reconfigure') {
         echo "Persistent nginx upstream 502s remain for user: {$thisUser}; regenerating lighttpd config before restart.\n";
-        $reconfigureRc = runStep(
-            "Regenerating lighttpd config for {$thisUser}",
-            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$thisUser])
+        $reconfigure = pmssUserWatchdogCommandRun(
+            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$thisUser]), 60, $thisUser, 'lighttpd'
         );
+        if ($reconfigure['timed_out']) continue;
         pmssUserLog($thisUser, 'lighttpd config regeneration requested (persistent nginx upstream 502)');
-        if ($reconfigureRc !== 0) {
+        if ($reconfigure['rc'] !== 0) {
             echo "Lighttpd config regeneration failed for user: {$thisUser}; continuing with guarded restart.\n";
         }
     } elseif ($nginxRecoveryAction === 'restart') {

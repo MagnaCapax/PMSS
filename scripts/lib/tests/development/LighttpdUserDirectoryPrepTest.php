@@ -45,7 +45,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
 
         foreach ([0751, 0750, 0644, 0640, 0640] as $mode) {
             chmod($path, $mode);
-            $this->assertTrue(\pmssPrepareLighttpdUserDirectories('testuser', $home, false));
+            $this->assertTrue($this->prepareAsCurrentAccount($home, false));
             clearstatcache(true, $path);
             $this->assertSame(0640, fileperms($path) & 0777);
             $this->assertSame($content, file_get_contents($path));

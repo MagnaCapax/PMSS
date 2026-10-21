@@ -12,7 +12,7 @@ class UserUpdatePluginsTest extends TestCase
     public function testDeprecatedPluginRemovalUsesAccountCommand(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
-        $this->assertStringContainsString("pmssBuildUserShellCommand(\$user, 'rm -rf -- '.escapeshellarg(\"{\$home}/www/rutorrent/plugins/cpuload\"))", $source);
+        $this->assertStringContainsString("pmssRutorrentAccountStep(\$user, \$home, 'Removing deprecated cpuload plugin'", $source);
         $this->assertFalse(strpos($source, "sprintf('rm -rf %s'") !== false);
     }
 
@@ -28,24 +28,17 @@ class UserUpdatePluginsTest extends TestCase
             $ctx = $this->pmssUserUpdateContext($home);
             \pmssUserEnsurePlugins($ctx);
 
-            $expectedSource = sys_get_temp_dir().'/does-not-exist/www/rutorrent/plugins/unpack';
-            $expectedDest   = $home.'/www/rutorrent/plugins/unpack';
-            $expectedCmd = sprintf(
-                'cp -Rp %s %s',
-                escapeshellarg($expectedSource),
-                escapeshellarg($expectedDest)
-            );
-            $this->assertEquals(
-                $expectedCmd,
-                (string) $this->pmssFindProfileCommand('Installing unpack plugin')
-            );
+            $this->assertSame(null, $this->pmssFindProfileCommand('Installing unpack plugin'));
+            $this->assertFalse(file_exists($home.'/www/rutorrent/plugins/unpack'));
         });
     }
 
     public function testEnsurePluginsOwnsRetrackerCleanupAndDirectoryBootstrap(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-plugins-retracker-');
-        $settingsDir = $home.'/www/rutorrent/share/users/dummy/settings';
+        $user = $this->pmssCurrentOwner();
+        $root = $this->pmssMakeTrackedHomeRoot('pmss-plugins-retracker-');
+        $home = $this->pmssEnsureDir($root.'/'.$user);
+        $settingsDir = $home.'/www/rutorrent/share/users/'.$user.'/settings';
         @mkdir($home.'/www/rutorrent/plugins/unpack', 0755, true);
         @mkdir($settingsDir, 0755, true);
         file_put_contents(
@@ -55,17 +48,11 @@ class UserUpdatePluginsTest extends TestCase
 
         $GLOBALS['PMSS_PROFILE'] = [];
 
-        \pmssUserEnsurePlugins($this->pmssUserUpdateContext($home));
+        \pmssUserEnsurePlugins($this->pmssUserUpdateContext($home, $user));
 
         $this->assertTrue(!file_exists($settingsDir.'/retrackers.dat'));
-        $this->assertEquals(
-            sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/users/dummy/torrents')),
-            $this->pmssFindProfileCommand('Creating ruTorrent torrents directory')
-        );
-        $this->assertEquals(
-            sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/settings/rss')),
-            $this->pmssFindProfileCommand('Creating ruTorrent RSS settings directory')
-        );
+        $this->assertTrue(is_dir($home.'/www/rutorrent/share/users/'.$user.'/torrents'));
+        $this->assertTrue(is_dir($home.'/www/rutorrent/share/settings/rss'));
     }
 
 }

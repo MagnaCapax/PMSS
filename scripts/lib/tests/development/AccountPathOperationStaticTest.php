@@ -8,16 +8,19 @@ final class AccountPathOperationStaticTest extends TestCase
 {
     /** Fixed commands with an account argument; each entry also pins its reviewed line. */
     private const SAFE = [
-        'scripts/cron/checkLighttpdInstances.php:68' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
         'scripts/cron/webPublicCertsProcess.php:120' => ['cd5455be1bf21155c002ba607313f214d4da6b28', 'fixed config utility with quoted account'],
         'scripts/cron/webPublicCertsProcess.php:156' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
         'scripts/lib/rtorrent/processInspection.php:98' => ['13417f72f7995d00594046ad6921f6924f10f56a', 'process listing with quoted account'],
-        'scripts/lib/rtorrent/processLifecycle.php:147' => ['12b37a5ae2ed26df531cf9f4d0ea67203ef8646a', 'fixed launcher with quoted account'],
         'scripts/lib/lighttpd/userConfigApply.php:62' => ['af1754514e1c4518bfe8bbc90929d930bb125806', 'fixed port utility with quoted account'],
         'scripts/lib/network/fireqos.php:26' => ['b4712db6815bc3f3adbcce7ab5678ddb8db7a60b', 'uid lookup with quoted account'],
         'scripts/lib/resources/log.php:32' => ['abcdc22775d788f8fa306195c4bbca4a3da976ab', 'uid lookup with quoted account'],
         'scripts/lib/nginxConfig/userConfigsGenerate.php:213' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
         'scripts/lib/update/users/docker.php:116' => ['b1fd9ef63ccf528d30bc352bef2c0d326d4311b5', 'uid lookup with quoted account'],
+        'scripts/lib/update/users/rutorrent.php:60' => ['10019e1ef850eb7765ac7ee4a3ee662f3b5fa53f', 'account step wrapper for deprecated plugin'],
+        'scripts/lib/update/users/rutorrent.php:77' => ['d062608dbb673d40273b90bb95bc14763cd256b9', 'account step wrapper for retracker removal'],
+        'scripts/lib/update/users/rutorrent.php:81' => ['3dd0ae350c20d790277f9d0eabc1cc60d563392f', 'account step wrapper for torrents directory'],
+        'scripts/lib/update/users/rutorrent.php:86' => ['34745298797ba4c2173feeda1eb0bf7a2ba81e66', 'account step wrapper for RSS directory'],
+        'scripts/lib/update/users/rutorrent.php:182' => ['57a8c8d8fd485bc0e56b412d2401ba63a84d6f48', 'account step wrapper for tree move'],
     ];
 
     public function testAccountPathOperationsUseManagedBoundaries(): void
@@ -145,7 +148,7 @@ final class AccountPathOperationStaticTest extends TestCase
             'sysopen(my $handle',
             '$inode[1] != $named[1]',
             'ioctl($handle, 0x80086601, $flags)',
-            'ioctl($handle, 0x40086602, $flags)',
+            'ioctl($handle, 0x40086602, $updated)',
         ]);
     }
 

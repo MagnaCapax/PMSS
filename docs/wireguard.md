@@ -22,6 +22,10 @@ Typical workflow:
    `/etc/wireguard/wg0.conf` from these files, adding a `[Peer]` entry for every
    valid key.
 
+Each account can register at most 8 device keys; extra keys are ignored. An
+assigned address stays with its key for as long as that key remains registered
+on the same account.
+
 If a PMSS-generated single-device `~/wireguard.txt` already exists but its
 matching `~/.wireguard-public-key` entry goes missing, the periodic refresh can
 re-register that first profile automatically from the managed guide.

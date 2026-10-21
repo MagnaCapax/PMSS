@@ -36,6 +36,7 @@ if (substr(__FILE__, 0, 3) === "\xEF\xBB\xBF") {
 /* ===== 1. CLI parsing ===== */
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/shell.php';
+require_once __DIR__.'/lib/user/credentialProcess.php';
 require_once __DIR__.'/lib/user/recreateRestore.php';
 require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
 require_once __DIR__.'/lib/portManager.php';
@@ -232,10 +233,9 @@ if ($stat['uid'] !== $uid || $stat['gid'] !== $gid) {
 }
 
 /* ===== 10. Password ===== */
-$pwArgs = escapeshellarg($userName);
-if ($password !== null && $password !== '') {
-    $pwArgs .= ' ' . escapeshellarg($password);
-}
+$passwordInput = $password !== null && $password !== '' ? $password : null;
+$pwCommand = 'php '.escapeshellarg(__DIR__.'/changePw.php')
+    .($passwordInput !== null ? ' --password-stdin' : '').' '.escapeshellarg($userName);
 echo "[*] Setting password\n";
 // The home remains account-owned so changePw can write the credential as that account.
 $credentialPath = "{$homeDir}/.lighttpd/.htpasswd";
@@ -243,7 +243,7 @@ if (!pmssRecreateCredentialPathIsSafe($credentialPath)) {
     fwrite(STDERR, "Refusing unsafe credential path: {$credentialPath}\n");
     $passwordRc = 1;
 } else {
-    $passwordRc = pmssRun('php ' . __DIR__ . '/changePw.php ' . $pwArgs, false);
+    $passwordRc = pmssCredentialProcessRun($pwCommand, $passwordInput);
 }
 if ($passwordRc !== 0) {
     fwrite(STDERR, "Password update failed (rc={$passwordRc}) for {$userName}\n");

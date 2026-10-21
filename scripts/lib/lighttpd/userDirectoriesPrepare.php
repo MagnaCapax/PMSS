@@ -20,7 +20,7 @@ function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
 function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): array
 {
     $baseSocketPath = rtrim($homeDir, '/').'/.lighttpd/php.socket';
-    $config = (string) @file_get_contents($configPath);
+    $config = (string) (pmssReadRegularFileContentsVerified($configPath, null, 1048576) ?? '');
     $maxProcs = preg_match('/"max-procs"\s*=>\s*([0-9]+)/', $config, $matches) === 1 ? (int) $matches[1] : 0;
     $minProcs = preg_match('/"min-procs"\s*=>\s*([0-9]+)/', $config, $matches) === 1 ? (int) $matches[1] : 0;
 
@@ -130,5 +130,4 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
 
     pmssAccountFileApplyMetadata($user, $homeDir, $lockFile, 0600);
     clearstatcache(true, $lockFile);
-    pmssUserFileApplyOwnership($lighttpdDir, $user);
 }

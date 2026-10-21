@@ -35,6 +35,7 @@ function pmssToggleAppPrepare(string $user, string $app): bool
 {
     $catalog = pmssToggleAppCatalogRead();
     if (!pmssValidateUsername($user) || !isset($catalog[$app])) return false;
+    if (pmssUserWatchdogBackoffActive($user, $app)) return false;
     $port = pmssPortManagerAssignServicePort($user, $app);
     if ($port === null) return false;
     $fragment = pmssLighttpdManagedProxyFragment($app, $user, $port);
@@ -46,8 +47,14 @@ function pmssToggleAppPrepare(string $user, string $app): bool
     $inner = 'php '.escapeshellarg($helper).' bootstrap '.escapeshellarg($app).' '.escapeshellarg((string) $port).' '.escapeshellarg(base64_encode($fragment))
         .' '.escapeshellarg((string) $peerPort);
     $command = pmssBuildUserServiceShellCommand($user, $inner);
-    @exec(pmssLockChildClosePrefix().$command.' >/dev/null 2>&1', $output, $rc);
-    return $rc === 0;
+    return pmssToggleAppBootstrapRun($command, $user, $app);
+}
+
+/** Bound the account bootstrap; a timeout defers further work for this app. */
+function pmssToggleAppBootstrapRun(string $command, string $user, string $app): bool
+{
+    $result = pmssUserWatchdogCommandRun($command.' >/dev/null 2>&1', 15, $user, $app);
+    return $result['rc'] === 0;
 }
 
 /** The shell receives only paths and fixed flags, never the generated password. */

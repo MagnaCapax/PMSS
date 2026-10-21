@@ -27,6 +27,65 @@ class DelugeServicePasswordTest extends TestCase
         );
     }
 
+    public function testTemplatesContainOnlyCredentialPlaceholders(): void
+    {
+        $root = 'etc/seedbox/config/';
+        $auth = $this->pmssReadRepoFile($root.'template.deluge.auth');
+        $hostlist = $this->pmssReadRepoFile($root.'template.deluge.hostlist.conf');
+        $web = $this->pmssReadRepoFile($root.'template.deluge.web.conf');
+        $this->assertStringContainsString('##LOCALCLIENT_PASSWORD##', $auth);
+        $this->assertStringContainsString('##LOCALCLIENT_PASSWORD##', $hostlist);
+        $this->assertStringContainsString('##PWD_SALT##', $web);
+        $this->assertStringContainsString('##PWD_SHA1##', $web);
+        $this->assertMatches('/^localclient:##LOCALCLIENT_PASSWORD##:10$/m', $auth);
+    }
+
+    public function testWatchdogChecksCredentialBeforeEitherStart(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/checkDelugeInstances.php');
+        $gate = strpos($source, 'pmssDelugeCredentialReadyForStart($thisUser)');
+        $managed = strpos($source, 'pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser');
+        $this->assertTrue($gate !== false && $managed !== false && $gate < $managed);
+        $this->assertStringContainsString("return ['deluged' => true, 'deluge-web' => true];", $source);
+    }
+
+    public function testStartGuardRefusesUnrotatedTemplateCredentialAndLogsOnce(): void
+    {
+        $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
+        $authPath = $homeRoot.'/alice/.config/deluge/auth';
+        @mkdir(dirname($authPath), 0755, true);
+        file_put_contents($authPath, "localclient:template-token:10\n");
+        $templatePath = $this->tempDir.'/template.deluge.auth';
+        file_put_contents($templatePath, "localclient:template-token:10\n");
+        $this->pmssTrackEnvOverrides(['PMSS_DELUGE_AUTH_TEMPLATE_PATH' => $templatePath], true);
+        $logPath = $this->tempDir.'/events.jsonl';
+        $previous = $GLOBALS['PMSS_JSON_LOG_PATH'] ?? null;
+        $GLOBALS['PMSS_JSON_LOG_PATH'] = $logPath;
+        try {
+            $this->assertFalse(\pmssDelugeCredentialReadyForStart('alice'));
+        } finally {
+            $GLOBALS['PMSS_JSON_LOG_PATH'] = $previous;
+        }
+        $this->assertSame('template-token', \pmssDelugeAuthLocalclientPasswordRead($authPath));
+        $log = (string) file_get_contents($logPath);
+        $this->assertSame(1, substr_count($log, 'deluge_template_credential_refused'));
+        $this->assertFalse(strpos($log, 'template-token') !== false);
+    }
+
+    public function testStartGuardLeavesWorkingPerAccountCredentialUntouched(): void
+    {
+        $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
+        $authPath = $homeRoot.'/alice/.config/deluge/auth';
+        $webConfPath = $homeRoot.'/alice/.config/deluge/web.conf';
+        @mkdir(dirname($authPath), 0755, true);
+        file_put_contents($authPath, "localclient:account-secret:10\n");
+        $this->pmssWriteDelugeWebConf($webConfPath, str_repeat('1', 40), 'account-secret');
+        $before = (string) file_get_contents($webConfPath);
+        $this->assertTrue(\pmssDelugeCredentialReadyForStart('alice'));
+        $this->assertSame('account-secret', \pmssDelugeAuthLocalclientPasswordRead($authPath));
+        $this->assertSame($before, file_get_contents($webConfPath));
+    }
+
     public function testGenerateServicePasswordLengthAndCharset(): void
     {
         $password = \pmssDelugeServicePasswordGenerate(32);
@@ -75,6 +134,24 @@ class DelugeServicePasswordTest extends TestCase
 
         $this->assertTrue(\pmssDelugeAuthWriteLocalclientPassword($authPath, 'new-secret'));
         $this->assertStringContainsString("localclient:new-secret:10\n", (string) file_get_contents($authPath));
+    }
+
+    public function testReadAndReplaceCrLfLocalclientPreservesOtherUsers(): void
+    {
+        $auth = $this->pmssWriteFile($this->tempDir.'/auth', "localclient:old:10\r\nextra:other-secret:5\r\n");
+        $this->assertSame('old', \pmssDelugeAuthLocalclientPasswordRead($auth));
+        $this->assertTrue(\pmssDelugeAuthWriteLocalclientPassword($auth, 'new-secret'));
+        $this->assertSame('new-secret', \pmssDelugeAuthLocalclientPasswordRead($auth));
+        $this->assertStringContainsString('extra:other-secret:5', file_get_contents($auth));
+        $this->assertSame(1, substr_count(file_get_contents($auth), 'localclient:'));
+    }
+
+    public function testOversizedAuthCannotBeTreatedAsEmptyByWriter(): void
+    {
+        $content = "extra:other-secret:5\n".str_repeat('# padding\n', 9000);
+        $auth = $this->pmssWriteFile($this->tempDir.'/auth', $content);
+        $this->assertFalse(\pmssDelugeAuthWriteLocalclientPassword($auth, 'new-secret'));
+        $this->assertSame($content, file_get_contents($auth));
     }
 
     public function testWriteLocalclientPasswordRejectsSymlinkTarget(): void

@@ -61,9 +61,11 @@ function checkFile(string $path, array &$errors, string $rootDir): void
 			// Case 1: Absolute/String Literal: require 'foo.php';
 			if (is_array($tokens[$j]) && $tokens[$j][0] === T_CONSTANT_ENCAPSED_STRING) {
 				$str = str_replace(['"', "'"], '', $tokens[$j][1]);
-				// Only check absolute paths (start with /)
+				// Production includes must resolve independently of the caller's cwd.
 				if (isset($str[0]) && $str[0] === '/') {
 					verifyPath($path, $tokens[$j][2], $str, false, $errors, $rootDir);
+				} elseif (strpos($path, '/tests/') === false && strpos($path, '/testing/') === false) {
+					$errors[] = "File: $path:{$tokens[$j][2]}\n  Target: $str (Bare relative include)";
 				}
 			}
             

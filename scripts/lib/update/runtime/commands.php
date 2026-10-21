@@ -101,17 +101,6 @@ if (!function_exists('runUserStep')) {
     }
 }
 
-/** Select real account entries before changing owner, skipping multiply linked files. */
-function pmssUserEntryChownCommand(string $path, string $owner, bool $recursive = false): string
-{
-    return sprintf(
-        'find %s %s-not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +',
-        escapeshellarg($path),
-        $recursive ? '' : '-maxdepth 0 ',
-        escapeshellarg($owner)
-    );
-}
-
 /** Select real account entries before changing mode, skipping multiply linked files. */
 function pmssUserEntryChmodCommand(string $path, int $mode, bool $recursive = false): string
 {

@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/delugePasswords.php';
 pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFileWrite.php', 'traffic.php', 'delugeManagedConfig.php', 'passwords.php', '../portManager.php']);
 
 /**
@@ -75,7 +76,7 @@ function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $upload
 /**
  * Persist a Deluge config file through the shared symlink-safe writer.
  */
-function pmssDelugeConfigFileWrite(string $path, string $content, string $label, ?string $owner = null): bool
+function pmssDelugeConfigFileWrite(string $path, string $content, string $label, ?string $owner = null, ?int $modeOverride = null): bool
 {
     $existing = @lstat($path);
     if ($owner !== null && is_array($existing)
@@ -83,7 +84,7 @@ function pmssDelugeConfigFileWrite(string $path, string $content, string $label,
         pmssLogStatus('WARN', sprintf('Refusing Deluge %s config path: %s', $label, $path), 1);
         return false;
     }
-    $mode = is_array($existing) ? ($existing['mode'] & 0777) : 0644;
+    $mode = $modeOverride ?? (is_array($existing) ? ($existing['mode'] & 0777) : 0644);
     if ($owner !== null
         ? pmssWriteUserFile($path, $content, $owner, $mode)
         : pmssReplaceUserFilePreservingMetadata($path, $content, 0644)) {
@@ -150,7 +151,8 @@ function userConfigureDeluge(array $user, array $configuration): void
     }
 
     $scgiPort    = $configuration['config']['scgiPort'] ?? 5000;
-    $existingPort = file_exists("$home/.delugePort") ? (int) @file_get_contents("$home/.delugePort") : 0;
+    $portContents = pmssReadRegularFileContentsVerified("$home/.delugePort", null, 16);
+    $existingPort = $portContents !== null ? (int) $portContents : 0;
     $delugePort   = ($existingPort >= 1024 && $existingPort <= 65000) ? $existingPort : $scgiPort;
     $throttle = pmssReadTorrentThrottle($username);
     $uploadThrottle = ($throttle !== null && $throttle > 0) ? (string) $throttle : '-1.0';
@@ -168,31 +170,55 @@ function userConfigureDeluge(array $user, array $configuration): void
         return;
     }
 
+    $authPath = "$configDir/auth";
+    $localclientPassword = pmssDelugeAuthLocalclientPasswordRead($authPath);
+    if ($localclientPassword !== '' && pmssDelugeLegacyLocalclientPassword($localclientPassword)) {
+        if (!pmssDelugeCredentialReadyForStart($username)) {
+            return;
+        }
+        $localclientPassword = pmssDelugeAuthLocalclientPasswordRead($authPath);
+    }
+    if ($localclientPassword === '') {
+        $localclientPassword = pmssDelugeServicePasswordGenerate();
+        // An absent localclient line must never discard customer-added logins.
+        if (pmssPathExistsOrLink($authPath)) {
+            $authWritten = pmssDelugeAuthWriteLocalclientPassword($authPath, $localclientPassword, $username);
+        } else {
+            $authTemplate = pmssDelugeTemplateRead(pmssDelugeTemplatePath('template.deluge.auth'), 'auth');
+            $authWritten = $authTemplate !== '' && pmssWriteUserFile($authPath,
+                str_replace('##LOCALCLIENT_PASSWORD##', $localclientPassword, $authTemplate), $username, 0600);
+        }
+        if (!$authWritten) {
+            pmssLogStatus('WARN', 'Skipping Deluge configuration because auth could not be written', 1);
+            return;
+        }
+    }
+
     pmssDelugeConfigFileWrite("$configDir/core.conf", $coreConfig, 'core', $username);
-    pmssDelugeConfigFileWrite("$configDir/hostlist.conf", str_replace('##DAEMONPORT', $delugePort, $hostlistTemplate), 'hostlist', $username);
+    pmssDelugeConfigFileWrite("$configDir/hostlist.conf", str_replace(
+        ['##DAEMONPORT', '##LOCALCLIENT_PASSWORD##'], [$delugePort, $localclientPassword], $hostlistTemplate
+    ), 'hostlist', $username, 0600);
     if (!file_exists("$configDir/hostlist.conf.1.2")) {
         runStep('Creating Deluge hostlist compatibility link', pmssBuildUserShellCommand($username,
             'ln -s -- '.escapeshellarg("$configDir/hostlist.conf").' '.escapeshellarg("$configDir/hostlist.conf.1.2")));
     }
 
     $webConfPath = "$configDir/web.conf";
-    $existingWebConfig = @file_get_contents($webConfPath);
-    $webConfig   = str_replace(['##WEBPORT', '##USER'], [$delugeWebPort, $username], $webTemplate);
+    $existingWebConfig = pmssReadRegularFileContentsVerified($webConfPath, null, 1048576);
+    $parsedWebConfig = is_string($existingWebConfig) ? pmssDelugeConfigDecode($existingWebConfig) : null;
+    $salt = is_array($parsedWebConfig) ? ($parsedWebConfig['config']['pwd_salt'] ?? '') : '';
+    if (!is_string($salt) || strlen($salt) !== 40 || !ctype_xdigit($salt)
+        || pmssDelugeLegacySalt($salt)) {
+        $salt = bin2hex(random_bytes(20));
+    }
+    $webConfig = str_replace(
+        ['##WEBPORT', '##USER', '##PWD_SALT##', '##PWD_SHA1##'],
+        [$delugeWebPort, $username, $salt, sha1($salt.$localclientPassword)], $webTemplate
+    );
     $webConfChanged = is_string($existingWebConfig) && $existingWebConfig !== $webConfig;
-    pmssDelugeConfigFileWrite($webConfPath, $webConfig, 'web', $username);
+    pmssDelugeConfigFileWrite($webConfPath, $webConfig, 'web', $username, 0600);
     pmssWriteUserFile("$home/.delugePort", (string) $delugePort, $username, 0644);
 
-    if (!file_exists("$configDir/auth")) {
-        $authTemplate = pmssDelugeTemplatePath('template.deluge.auth');
-        $authContent = @file_get_contents($authTemplate);
-        if (!is_string($authContent)) {
-            pmssLogStatus('WARN', 'Skipping Deluge auth template copy because the template is missing: '.$authTemplate, 1);
-        } else {
-            if (!pmssWriteUserFile("$configDir/auth", $authContent, $username, 0600)) {
-                pmssLogStatus('WARN', 'Failed to write Deluge auth template: '.$configDir.'/auth', 1);
-            }
-        }
-    }
     pmssEnsureDelugeServicePassword($username);
 
     // If the web config changed, restart deluge-web so base/port changes take effect.

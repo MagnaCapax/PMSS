@@ -12,6 +12,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/../lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/update/configPermissions.php';
 
 requireRoot();
 
@@ -167,54 +168,7 @@ if (pmssPermissionTargetDirectoryExists($configDir)) {
         }
     }
 
-    // No committed secrets remain in /etc/seedbox/config: the dead api.* command-and-control
-    // family (config + generator setupApiKey.php + deleted consumer serverApi.php) was removed.
-    // If a live secret is reintroduced, add it here with a 0600 mask.
-    $restrictedFiles = [];
-
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($configDir, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::SELF_FIRST
-    );
-
-    foreach ($iterator as $node) {
-        $path = $node->getPathname();
-        if ($node->isLink()) {
-            logmsg(sprintf('Skipping %s: symlink detected', $path));
-            continue;
-        }
-
-        if ($node->isDir()) {
-            @chmod($path, 0775);
-            continue;
-        }
-
-        if (isset($restrictedFiles[$path])) {
-            @chmod($path, $restrictedFiles[$path]);
-            continue;
-        }
-
-        @chmod($path, 0664);
-    }
-
-    // Ensure the root directory keeps execute permission for traversal.
-    @chmod($configDir, 0775);
-
-    // config/users/<user>.json are the canonical per-user records (billingClientId/ServiceId,
-    // quota, resource limits). The writer (UserConfigStore) creates them 0640 root-owned, but
-    // the blanket 0664 sweep above widens them to world-readable, leaking non-public billing
-    // identifiers to every co-tenant on a shared host. Re-restrict them to 0640 (root-owned
-    // already; chmod-only is sufficient). This is targeted rather than a blanket sweep-default
-    // flip, because other config files (network, vendor, vendorWelcome, welcomeMessages.json)
-    // are legitimately world-read by the per-user panel and must stay 0664.
-    $usersDir = $configDir.'/users';
-    if (is_dir($usersDir) && !is_link($usersDir)) {
-        foreach (glob($usersDir.'/*.json') ?: [] as $userRecord) {
-            if (is_file($userRecord) && !is_link($userRecord)) {
-                @chmod($userRecord, 0640);
-            }
-        }
-    }
+    pmssConfigPermissionsSweep($configDir);
 }
 
 // Minimal secrets audit: tighten common private key locations (best-effort).

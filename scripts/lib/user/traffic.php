@@ -15,6 +15,7 @@
 
 require_once __DIR__.'/../update/runtime/commands.php';
 pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userFileWrite.php', '../traffic/storage.php', 'integerSetting.php']);
+require_once __DIR__.'/../quotaSnapshot.php';
 
 /**
  * Apply or refresh the user-specific traffic cap.
@@ -68,12 +69,11 @@ function userApplyDiskQuota(array $user): void
         return;
     }
 
-    // Keep redirection as the only shell feature so quota output lands in ~/.quota.
-    runStep(
-        'Refreshing quota status file',
-        pmssBuildCommand('quota', ['-u', $user['name'], '-s']).' > '.escapeshellarg($quotaPath)
-    );
-    runStep('Publishing quota status file', pmssBuildCommand('chmod', ['o+r', $quotaPath]));
+    $lines = [];
+    @exec(pmssBuildCommand('quota', ['-u', $user['name'], '-s']).' 2>&1', $lines, $rc);
+    if ($rc > 1 || $lines === [] || !pmssQuotaSnapshotWrite($quotaPath, implode("\n", $lines)."\n")) {
+        pmssLogStatus('error', "Refreshing quota status file failed for {$user['name']}: {$quotaPath}");
+    }
 }
 
 /**

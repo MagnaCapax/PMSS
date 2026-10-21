@@ -386,7 +386,7 @@ PHP;
         $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
         $flowSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/watchdogProcessFlow.php');
 
-        $this->assertSame(1, substr_count($processSource, "@passthru('/scripts/startRtorrent "));
+        $this->assertSame(1, substr_count($processSource, "pmssUserWatchdogCommandRun('/scripts/startRtorrent "));
         $this->assertStringContainsAllStrings([
             'function rtorrentProcessStart(',
             'Refusing to start rTorrent for invalid username',
@@ -400,6 +400,42 @@ PHP;
             'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
         ], $flowSource);
         $this->pmssAssertStringNotContainsString("@passthru('/scripts/startRtorrent ", $watchdogSource);
+    }
+
+    public function testStartRtorrentLoginLaunchTimeoutLeavesCustomRcCounterAlone(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-rtorrent-launch-timeout-');
+        $user = 'alice';
+        $home = $root.'/homes/'.$user;
+        $runtime = $root.'/runtime';
+        mkdir($home.'/session', 0755, true);
+        mkdir($runtime, 0700);
+        file_put_contents($home.'/.rtorrent.rc', 'fixture');
+        file_put_contents($home.'/.rtorrentExecute.php', '.rtorrentExecute.lock flock(');
+        $counter = $runtime.'/startRtorrent-customrc-fail-'.$user.'.count';
+        $launchMarker = $root.'/login-launch';
+        file_put_contents($counter, 'kept');
+        $this->pmssWriteExecutableFiles($root, [
+            'pgrep' => "#!/bin/sh\nexit 1\n",
+            'ps' => "#!/bin/sh\nexit 0\n",
+            'id' => "#!/bin/sh\necho 2002\n",
+            'systemctl' => "#!/bin/sh\nexit 0\n",
+            'systemd-run' => "#!/bin/sh\nwhile [ \"\$1\" != '--' ]; do shift; done\nshift\n\"\$@\"\n",
+            'su' => "#!/bin/sh\n[ \"\$1\" = '-' ] || exit 0\nprintf launch > ".escapeshellarg($launchMarker)."\nsleep 30\n",
+        ]);
+        $env = $this->pmssPathPrefixedEnvironment($root, [
+            'PMSS_HOME_DIR' => $root.'/homes',
+            'PMSS_RUNTIME_DIR' => $runtime,
+            'PMSS_RUNTIME_LOCK_DIR' => $runtime,
+            'PMSS_TEST_MODE' => '1',
+            'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1',
+        ]);
+        $command = 'timeout --kill-after=2s 8s '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->pmssRepoPath('scripts/startRtorrent')).' '.escapeshellarg($user);
+        $result = $this->pmssExecShellCommand($command, $env);
+        $this->assertSame(1, $result['rc']);
+        $this->assertTrue(file_exists($launchMarker));
+        $this->assertSame('kept', file_get_contents($counter));
+        $this->assertTrue(file_exists($runtime.'/watchdog-timeout-'.$user.'-rtorrent.ts'));
     }
 
     public function testProcessStartRejectsInvalidUsernameBeforeLaunch(): void

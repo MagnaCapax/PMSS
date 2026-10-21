@@ -3,8 +3,8 @@
 /**
  * Update a tenant's system and HTTP credentials.
  *
- * - Accepts an optional password argument; otherwise generates one using the
- *   legacy seed algorithm so existing automation keeps predictable entropy.
+ * - Accepts an optional password argument; otherwise generates a 16-character
+ *   credential from the shared character set and random_int().
  * - Shares one bcrypt hash between shadow and htpasswd on Debian 11+;
  *   older or unknown releases retain the legacy password update.
  * - Passwords are echoed to the operator; call sites must ensure the terminal
@@ -16,6 +16,7 @@
  * @license GPL-3.0-only
  */
 $jsonlOutput = false;
+$passwordStdin = false;
 $arguments = [];
 $parseOptions = true;
 foreach (array_slice($argv, 1) as $token) {
@@ -27,6 +28,10 @@ foreach (array_slice($argv, 1) as $token) {
         $jsonlOutput = true;
         continue;
     }
+    if ($parseOptions && $token === '--password-stdin') {
+        $passwordStdin = true;
+        continue;
+    }
 
     $arguments[] = $token;
 }
@@ -34,9 +39,9 @@ foreach (array_slice($argv, 1) as $token) {
 $username = $arguments[0] ?? '';
 $password = $arguments[1] ?? '';
 
-$usage = 'Usage: changePw.php [--jsonl] USERNAME [PASSWORD]';
+$usage = 'Usage: changePw.php [--jsonl] [--password-stdin] USERNAME [PASSWORD]';
 if ($username === '') {
-    die($usage . "\nPassword is optional - random one will be generated if it's empty\n");
+    die($usage . "\nAn empty password or stdin line generates a random password; missing stdin input is an error\n");
 }
 
 require_once __DIR__.'/lib/userLifecycle.php';
@@ -45,8 +50,17 @@ require_once __DIR__.'/lib/user/qbittorrent.php';
 require_once __DIR__.'/lib/torrentClients/identity.php';
 require_once __DIR__.'/lib/user/passwordFile.php';
 require_once __DIR__.'/lib/user/changePwCredential.php';
+require_once __DIR__.'/lib/user/credentialGenerate.php';
 require_once __DIR__.'/lib/lighttpd/htpasswd.php';
 require_once __DIR__.'/lib/user/userFilesystem.php';
+
+if ($passwordStdin) {
+    $password = pmssChangePwPasswordReadLine(STDIN);
+    if ($password === null) {
+        fwrite(STDERR, "Password input is unavailable\n");
+        exit(1);
+    }
+}
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Changing
 // a user's password when /home is unavailable would fail or write to stale paths.
@@ -143,50 +157,7 @@ if ($jsonlOutput) {
 
 function generatePassword(): string
 {
-    $legacySeed = legacyPasswordSeed();
-    $prefix = substr($legacySeed, 0, 2);
-    $suffix = substr($legacySeed, -2);
-
-    $middleLength = random_int(4, 8);
-    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_';
-    $middle = '';
-    $alphabetLength = strlen($alphabet) - 1;
-
-    for ($i = 0; $i < $middleLength; $i++) {
-        $middle .= $alphabet[random_int(0, $alphabetLength)];
-    }
-
-    return $prefix . $middle . $suffix;
-}
-
-/**
- * Reproduce the historic password entropy logic for prefix/suffix material.
- */
-function legacyPasswordSeed(): string
-{
-    $salts = file_get_contents('/etc/hostname').file_get_contents('/etc/debian_version');
-    $salts3 = sha1($salts);
-    $salts = sha1(sha1($salts) . md5(shell_exec('/scripts/listUsers.php')));
-
-    $salts = substr($salts, round(rand(1, 15)), round(rand(2, 35)));
-    $salts2 = md5(time());
-    $salts = sha1(substr($salts2, 3, 5) . $salts);
-    $salts = substr($salts, round(rand(-0.49999, 10)));
-
-    $pw = chr(round(rand(97, 122)));
-    $pw .= chr(round(rand(97, 122)));
-    $pw .= substr($salts, round(rand(0, 48)), 1);
-    $pw .= substr($salts2, round(rand(0, 35)), 1);
-    $pw .= chr(round(rand(97, 122)));
-    $pw .= chr(round(rand(97, 122)));
-    $pw .= chr(round(rand(97, 122)));
-    $pw .= substr($salts3, round(rand(0, 48)), 1);
-    $pw .= substr($salts2, round(rand(0, 35)), 1);
-    $pw .= substr($salts, round(rand(0, 48)), 1);
-    $pw .= substr($salts2, round(rand(0, 32)), 1);
-    $pw .= substr($salts3, round(rand(0, 48)), 1);
-
-    return $pw;
+    return pmssAccountPasswordGenerate();
 }
 
 /**

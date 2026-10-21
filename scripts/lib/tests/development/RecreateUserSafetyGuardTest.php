@@ -390,7 +390,7 @@ class RecreateUserSafetyGuardTest extends TestCase
         $environmentCall = "pmssUpdateUserEnvironment(\$userName, '', \$environmentReason)";
         $reclaimHeading = '/* ===== 11. Reclaim the superseded prior backup';
         $this->assertOrderedStrings([
-            '/changePw.php ',
+            '$pwCommand = \'php \'.escapeshellarg(__DIR__.\'/changePw.php\')',
             "pmssRunOrExit('chown -h ' . escapeshellarg(\$userName.':'.\$userName)",
             $environmentCall,
             $reclaimHeading,

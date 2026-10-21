@@ -104,6 +104,7 @@ class SessionHistoryPermissionsTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-session-directory-');
         $target = $root.'/var/log/wtmp';
         mkdir($target, 0755, true);
+        chmod($target, 0755);
 
         try {
             \pmssSessionHistoryPermissionsHarden($root);

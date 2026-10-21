@@ -157,13 +157,13 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
     public function testAddUserWrapperUsesPreflightHelper(): void
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $this->assertStringContainsAllStrings(["require_once 'lib/user/add/preflight.php';", 'pmssAddUserEnsurePreflightState($userDb, $user, $homePath);'], $src);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/lib/user/add/preflight.php';", 'pmssAddUserEnsurePreflightState($userDb, $user, $homePath);'], $src);
     }
 
     public function testAddUserWrapperInitializesFailureRollback(): void
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $this->assertStringContainsAllStrings(["require_once 'lib/user/add/failureRollback.php';", "pmssAddUserFailureRollbackInit(\$userDb, \$user['name'], \$homePath);"], $src);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/lib/user/add/failureRollback.php';", "pmssAddUserFailureRollbackInit(\$userDb, \$user['name'], \$homePath);"], $src);
     }
 
     public function testProvisioningPhasesMarkRollbackBoundaries(): void

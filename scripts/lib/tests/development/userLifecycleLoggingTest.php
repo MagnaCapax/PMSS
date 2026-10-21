@@ -6,6 +6,43 @@ require_once dirname(__DIR__, 2).'/userLifecycle.php';
 
 class userLifecycleLoggingTest extends TestCase
 {
+    public function testSuspendMoveFailureStillExpiresAndKillsAccount(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 3).'/suspend.php');
+        $source = preg_replace('/^require_once .*;\n/m', '', substr($source, strpos($source, '<?php') + 5));
+        $record = $this->pmssMakeTempPath('pmss-suspend-steps-');
+        $script = <<<'PHP'
+function pmssStdoutHeartbeatStartForStdout() {}
+function pmssRequireHomeMounted($name) {}
+function pmssUserLifecycleRequireUserRoots($argv, $name, $action) {
+    return ['username' => 'alice', 'homeDir' => '/tmp/alice', 'activeRoot' => '/tmp/alice/www', 'disabledRoot' => '/tmp/alice/www-disabled'];
+}
+function pmssUserLifecycleRequireWebRootState($action, $user, $home, $active, $disabled) {
+    return ['activeRootExists' => true, 'disabledRootExists' => false];
+}
+function pmssUserLifecycleContextLogHomeInfo($action, $phase, $user, $home) {}
+function pmssUserLifecycleContextLogStatusMessage($action, $phase, $user, $status, $message, $extra = []) {}
+function pmssUserLifecycleRunSteps($action, $user, $steps, $dryRun) {
+    foreach ($steps as $step) file_put_contents(getenv('PMSS_SUSPEND_STEP_RECORD'), $step[0].' '.$step[1]."\n", FILE_APPEND);
+    return [];
+}
+function pmssAccountPathRun($user, $home, $paths, $command) { return false; }
+eval($GLOBALS['suspendSource']);
+PHP;
+        $script = '$GLOBALS[\'suspendSource\'] = '.var_export($source, true).'; '.$script;
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+            ['PMSS_SUSPEND_STEP_RECORD' => $record]
+        );
+        $this->assertSame(1, $result['rc']);
+        $steps = (string) file_get_contents($record);
+        $this->assertStringContainsString("set_expiry usermod --expiredate 1 'alice'", $steps);
+        $this->assertStringContainsString("kill_processes_after_expiry killall -9 -u 'alice'", $steps);
+        $this->assertTrue(strpos($steps, 'set_expiry') < strpos($steps, 'kill_processes_after_expiry'));
+        // The account is expired before the first kill, so cron cannot start it again during the account-side steps.
+        $this->assertTrue(strpos($steps, 'set_expiry') < strpos($steps, 'kill_processes '));
+    }
+
     public function testFormatTextFieldNormalizesSupportedInputShapes(): void
     {
         $stringable = new class {

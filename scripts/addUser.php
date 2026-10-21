@@ -12,7 +12,7 @@
  * @author PMSS Team
  */
 
-require_once 'lib/user/add/cli.php';
+require_once __DIR__.'/lib/user/add/cli.php';
 
 try {
     $cli = pmssAddUserParseCli(pmssCliArgv($argv ?? null));
@@ -26,22 +26,22 @@ if (!empty($cli['help'])) {
 }
 $user = $cli['user'];
 
-require_once 'lib/runtime.php';
-require_once 'lib/rtorrentConfig.php';
-require_once 'lib/users.php';
-require_once 'lib/userLifecycle.php';
-require_once 'lib/user/log.php';
-require_once 'lib/homeMount.php';
-require_once 'lib/update.php';
-require_once 'lib/update/users.php';
-require_once 'lib/user/trafficLimit.php';
-require_once 'lib/user/add/provisioningRuntime.php';
-require_once 'lib/user/add/failureRollback.php';
-require_once 'lib/user/add/systemUserCreate.php';
-require_once 'lib/user/add/userConfigApply.php';
-require_once 'lib/user/add/artifactVerification.php';
-require_once 'lib/user/add/postProvision.php';
-require_once 'lib/user/add/preflight.php';
+require_once __DIR__.'/lib/runtime.php';
+require_once __DIR__.'/lib/rtorrentConfig.php';
+require_once __DIR__.'/lib/users.php';
+require_once __DIR__.'/lib/userLifecycle.php';
+require_once __DIR__.'/lib/user/log.php';
+require_once __DIR__.'/lib/homeMount.php';
+require_once __DIR__.'/lib/update.php';
+require_once __DIR__.'/lib/update/users.php';
+require_once __DIR__.'/lib/user/trafficLimit.php';
+require_once __DIR__.'/lib/user/add/provisioningRuntime.php';
+require_once __DIR__.'/lib/user/add/failureRollback.php';
+require_once __DIR__.'/lib/user/add/systemUserCreate.php';
+require_once __DIR__.'/lib/user/add/userConfigApply.php';
+require_once __DIR__.'/lib/user/add/artifactVerification.php';
+require_once __DIR__.'/lib/user/add/postProvision.php';
+require_once __DIR__.'/lib/user/add/preflight.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Creating
 // a user when /home is unavailable would write to the wrong location or fail

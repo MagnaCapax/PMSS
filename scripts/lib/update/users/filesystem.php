@@ -11,6 +11,7 @@ require_once dirname(__DIR__, 2).'/pathSafety.php';
 require_once dirname(__DIR__, 2).'/lighttpd/userFileWrite.php';
 require_once dirname(__DIR__, 2).'/user/trafficLimit.php';
 require_once dirname(__DIR__, 2).'/user/directories.php';
+require_once dirname(__DIR__, 2).'/user/identity.php';
 
 /**
  * Confirm that a user maintenance path resolves beneath the configured home root.
@@ -72,8 +73,16 @@ function pmssUserPatchWritableStrings(string $path, array $replacements): void
  */
 function pmssUserDeletePathIfPresent(string $path): void
 {
-    if (pmssUserPathWithinHomeRoot($path) && (is_file($path) || is_link($path)) && file_exists($path)) {
-        @unlink($path);
+    $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
+    if (!pmssUserPathWithinHomeRoot($path) || strpos($path, $homeRoot.'/') !== 0) return;
+    $relative = substr($path, strlen($homeRoot) + 1);
+    $user = strtok($relative, '/');
+    if (!is_string($user) || !pmssValidateUsername($user) || strpos($relative, '/') === false) return;
+    $home = $homeRoot.'/'.$user;
+    if (!pmssAccountPathRun($user, $home, [$home.'/.pmss-delete-check'],
+        'if [ -e '.escapeshellarg($path).' ] || [ -L '.escapeshellarg($path).' ]; then '
+        .'[ ! -d '.escapeshellarg($path).' ] && rm -f -- '.escapeshellarg($path).'; fi')) {
+        logMessage("[user:{$user}] Unable to remove obsolete path: {$path}");
     }
 }
 

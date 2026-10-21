@@ -6,6 +6,29 @@ require_once dirname(__DIR__, 2).'/lighttpd/watchdogErrorPage.php';
 
 class LighttpdWatchdogErrorPageTest extends TestCase
 {
+    public function testHangingConfigProbeReportsInvalidAndBacksOff(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-watchdog-probe-timeout-');
+        $config = $binDir.'/config';
+        file_put_contents($config, 'fixture');
+        $this->pmssWriteExecutableFiles($binDir, [
+            'id' => "#!/bin/sh\necho 2002\n",
+            'lighttpd' => "#!/bin/sh\nsleep 30\n",
+            'systemctl' => "#!/bin/sh\nexit 0\n",
+            'systemd-run' => "#!/bin/sh\nwhile [ \"\$1\" != '--' ]; do shift; done\nshift\n\"\$@\"\n",
+            'su' => "#!/bin/sh\nshift\n[ \"\$1\" = '-c' ] || exit 9\nshift\n/bin/sh -c \"\$1\"\n",
+        ]);
+        $this->pmssWithPathPrefixedEnv($binDir, [
+            'PMSS_RUNTIME_DIR' => $binDir.'/runtime',
+            'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1',
+        ], function () use ($config): void {
+            $started = microtime(true);
+            $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('alice', $config));
+            $this->assertTrue(microtime(true) - $started < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
+            $this->assertTrue(pmssUserWatchdogBackoffActive('alice', 'lighttpd'));
+        });
+    }
+
     public function testProbeCommandsRejectNulWithoutLaunching(): void
     {
         $binDir = $this->pmssMakeTempDir('pmss-watchdog-nul-');

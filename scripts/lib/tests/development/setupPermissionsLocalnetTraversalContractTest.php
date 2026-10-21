@@ -19,7 +19,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
             'scripts/util/setupPermissions.php',
             [
                 "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']",
-                '@chmod($configDir, 0775);',
+                'pmssConfigPermissionsSweep($configDir);',
             ],
             'setupPermissions.php missing traversal substring: ',
             'Parent traversal fix must run before /etc/seedbox/config normalization: '
@@ -47,7 +47,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testConfigDirectoryRootKeepsTraversePermission(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/util/setupPermissions.php', '@chmod($configDir, 0775);');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/configPermissions.php', '$chmod($configDir, 0775);');
     }
 
     public function testPermissionTargetsFilterBeforeChmod(): void
@@ -71,10 +71,10 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
             'function pmssPermissionTargetFileExists(string $path): bool',
             'return !pmssSkipSymlink($path) && is_dir($path);',
             'return !pmssSkipSymlink($path) && is_file($path);',
-            'if ($node->isLink()) {',
             "if (pmssPermissionTargetDirectoryExists('/etc/wireguard')) {",
             "if (pmssPermissionTargetFileExists('/etc/openvpn/ta.key')) {",
         ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/configPermissions.php', 'if ($node->isLink()) {');
     }
 
     public function testSystemTestChecksBothSeedboxTraversalDirectories(): void
@@ -89,7 +89,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
     public function testStartRtorrentKeepsLocalnetReadabilityPreflightAndHint(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/startRtorrent', [
-            "escapeshellarg('test -r '.\$localnet)",
+            "pmssBuildUserShellCommand(\$user, 'test -r '.escapeshellarg(\$localnet), '/bin/sh')",
             "@filesize(\$localnet) === 0",
             'is empty; rTorrent will likely fail with a localnet ip filter error.',
             'ls -ld /etc/seedbox /etc/seedbox/config {$localnet}',
@@ -100,7 +100,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/startRtorrent', [
             "require_once __DIR__.'/lib/lighttpd/userFileWrite.php';",
-            'pmssWriteUserFile($executor, $skelData, $user, 0755)',
+            'pmssReplaceAccountFile($user, $home, $executor, $skelData, 0755, true)',
         ]);
         $this->pmssAssertRepoFileNotContainsString('scripts/startRtorrent', '@copy($skelExecutor, $executor)');
     }

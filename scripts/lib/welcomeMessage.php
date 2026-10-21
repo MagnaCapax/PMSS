@@ -92,24 +92,20 @@ function pmssWelcomeUserMessageSet(string $username, string $userHome, string $t
     }
 
     if (trim($template) === '') {
-        return !is_link($path) && (!is_file($path) || @unlink($path));
+        if (!file_exists($path) && !is_link($path)) return true;
+        return pmssAccountPathRun($username, $userHome, [$userHome.'/.config/.pmss-check'],
+            'test ! -L '.escapeshellarg($path).' && { test ! -e '.escapeshellarg($path)
+            .' || rm -f -- '.escapeshellarg($path).'; }');
     }
 
     $configDir = $userHome.'/.config';
-    if (!function_exists('pmssEnsureSafeDir') || !function_exists('pmssUserFileApplyOwnership') || !pmssEnsureSafeDir($configDir, 0755)) {
+    if (!function_exists('pmssEnsureUserHomeDir')) {
+        require_once __DIR__.'/user/directories.php';
+    }
+    if (!pmssEnsureUserHomeDir($username, $userHome, '.config', 0755)) {
         return false;
     }
-    pmssUserFileApplyOwnership($configDir, $username);
-
-    return function_exists('pmssReplaceUserFile')
-        && function_exists('pmssUserFileApplyMetadata')
-        && pmssReplaceUserFile(
-            $path,
-            $template,
-            static function (string $temporaryPath) use ($username): void {
-                pmssUserFileApplyMetadata($temporaryPath, 'root', 0640, $username);
-            }
-        );
+    return pmssWriteManagedFile($path, $template, 'root', $username, 0640);
 }
 
 /**

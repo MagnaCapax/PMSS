@@ -16,6 +16,8 @@
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
+require_once __DIR__.'/lib/user/directories.php';
+require_once __DIR__.'/lib/lighttpd/userFileWrite.php';
 
 pmssStdoutHeartbeatStartForStdout();
 
@@ -45,7 +47,8 @@ pmssUserLifecycleRunSteps('suspend', $username, array(
 // Best-effort archive of the original web root. We only create a placeholder
 // landing page if the original content is safely moved aside.
 if ($activeRootExists) {
-    if (!@rename($activeRoot, $disabledRoot)) {
+    if (!pmssAccountPathRun($username, $homeDir, [$activeRoot],
+        'mv -T -- '.escapeshellarg($activeRoot).' '.escapeshellarg($disabledRoot))) {
         pmssUserLifecycleContextLogStatusMessage(
             'suspend',
             'archive_web_root',
@@ -55,6 +58,7 @@ if ($activeRootExists) {
             array('active_root' => $activeRoot, 'disabled_root' => $disabledRoot)
         );
         fwrite(STDERR, "Error: failed to archive {$activeRoot}; suspension aborted\n");
+        pmssSuspendExpireAndKill($username);
         exit(1);
     }
 }
@@ -62,10 +66,7 @@ if ($activeRootExists) {
 // The canonical suspended marker is www-disabled. Ensure it exists even when the
 // user did not have a www/ directory at suspend time (rare legacy state).
 if (!file_exists($disabledRoot) && !is_link($disabledRoot)) {
-    if (@mkdir($disabledRoot, 0755, true)) {
-        @chown($disabledRoot, $username);
-        @chgrp($disabledRoot, $username);
-    }
+    pmssEnsureUserHomeDir($username, $homeDir, 'www-disabled', 0755);
 }
 
 // Create placeholder landing only when we did not leave an existing www/ in place.
@@ -79,6 +80,9 @@ if (!is_dir($activeRoot)) {
 } else {
     $landingMessage = 'Existing www/ not replaced; please inspect manually';
 }
+// Account-side file work runs through runuser without PAM account checks, so it works on the expired
+// account; expire again and kill anything left from those steps.
+pmssSuspendExpireAndKill($username);
 
 // Best-effort: mirror the suspension marker into the config store.
 pmssUserLifecycleSyncSuspendedState($username, $disabledRoot);
@@ -96,6 +100,15 @@ pmssUserLifecycleContextLogStatusMessage(
     )
 );
 
+/** Expire the account after account-side work and stop any new processes. */
+function pmssSuspendExpireAndKill(string $username): void
+{
+    pmssUserLifecycleRunSteps('suspend', $username, array(
+        array('set_expiry', 'usermod --expiredate 1 '.escapeshellarg($username)),
+        array('kill_processes_after_expiry', 'killall -9 -u '.escapeshellarg($username)),
+    ), false);
+}
+
 /**
  * Generate the suspended landing page content.
  *
@@ -106,11 +119,11 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
     $suspendRoot = $homeDir.'/www';
     $publicDir = $suspendRoot.'/public';
 
-    if (!pmssDirEnsureExists($suspendRoot, 0755)) {
+    if (!pmssEnsureUserHomeDir($username, $homeDir, 'www', 0755)) {
         echo "Failed to create {$suspendRoot}\n";
         return false;
     }
-    if (!pmssDirEnsureExists($publicDir, 0755)) {
+    if (!pmssEnsureUserHomeDir($username, $homeDir, 'www/public', 0755)) {
         echo "Failed to create {$publicDir}\n";
         return false;
     }
@@ -126,15 +139,9 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
             $template
         );
     }
-    $rootResult = @file_put_contents($suspendRoot.'/index.html', $html);
-    $publicResult = @file_put_contents($publicDir.'/index.html', $html);
-
-    foreach ([$suspendRoot, $publicDir, $suspendRoot.'/index.html', $publicDir.'/index.html'] as $path) {
-        @chown($path, $username);
-        @chgrp($path, $username);
-    }
-
-    return $rootResult !== false && $publicResult !== false;
+    $rootResult = pmssReplaceAccountFile($username, $homeDir, $suspendRoot.'/index.html', $html, 0644, true);
+    $publicResult = pmssReplaceAccountFile($username, $homeDir, $publicDir.'/index.html', $html, 0644, true);
+    return $rootResult && $publicResult;
 }
 
 /**

@@ -26,6 +26,9 @@ if (isset($_GET['backup']) && $_GET['backup'] === 'download') {
 
 $configRestoreResult = null;
 if (isset($_GET['restore']) && $_GET['restore'] === 'config') {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+        pmssFrontendPostActionRequired();
+    }
     $configRestoreResult = $_SERVER['REQUEST_METHOD'] === 'POST'
         ? pmssCustomerBackupRestore(dirname(__DIR__), (string) ($_POST['archivePath'] ?? ''))
         : pmssCustomerBackupRestoreResult(false, 'Use the restore form to choose an uploaded backup archive.');
@@ -297,6 +300,18 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
             });
         }
 
+        function pmssWelcomeActionSubmit(form) {
+            $.ajax({
+                url: form.action,
+                type: 'POST',
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                data: $(form).serialize(),
+                success: function(html) { document.open(); document.write(html); document.close(); },
+                error: function() { pmssShowActionNotice('Action could not be completed.', true); }
+            });
+            return false;
+        }
+
     </script>
 
 </head>
@@ -349,7 +364,7 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
                         <?php echo pmssCustomerAppsSectionHtmlBuild($appsStatus, 'welcome.php?status=1'); ?>
                         <h6>App passwords</h6>
                         <p>Deluge Web UI password: <b><?php echo pmssCustomerHtmlAttr($delugePassword === '' ? 'Unavailable' : $delugePassword); ?></b> (also used for the daemon connection; separate from your account password)</p>
-                        <?php if ($delugePasswordCanRotate): ?><form method="post" action=""><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form><?php else: ?><p><b>Deluge password rotation is unavailable on this host.</b></p><?php endif; ?>
+                        <?php if ($delugePasswordCanRotate): ?><form method="post" action="welcome.php" onsubmit="return pmssWelcomeActionSubmit(this)"><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form><?php else: ?><p><b>Deluge password rotation is unavailable on this host.</b></p><?php endif; ?>
                         <?php if ($delugePasswordNotice !== ''): ?><p><b><?php echo pmssCustomerHtmlAttr($delugePasswordNotice); ?></b></p><?php endif; ?>
                         <p>rclone password is the same as your web access password.</p>
                         <p>qBittorrent username is your own username. Existing setups may use your account password; if the panel prompts you, set a separate WebUI password and use it for future logins.</p>
@@ -372,7 +387,7 @@ if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBui
                         </form>
                         <h6>Torrent configuration restore</h6>
                         <p>Upload the backup with File Manager, stop your torrent client, then restore the uploaded archive path here.</p>
-                        <form method="post" action="welcome.php?restore=config">
+                        <form method="post" action="welcome.php?restore=config" onsubmit="return pmssWelcomeActionSubmit(this)">
                             <input type="text" name="archivePath" value="" placeholder="pmss-torrent-config-YYYYMMDD-HHMMSS.tar.gz" style="width: 360px; max-width: 100%;" />
                             <input type="submit" name="torrentConfigRestore" value="Restore torrent configuration" />
                         </form>
@@ -977,6 +992,7 @@ function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
     $password = '';
 
     if ($canRotate && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
+        pmssFrontendPostActionRequired();
         $newDelugePassword = pmssDelugeServicePasswordRotate((string) $username);
         $passwordNotice = $newDelugePassword !== ''
             ? 'Deluge password rotated. Re-login in Deluge Web UI with the new password below.'

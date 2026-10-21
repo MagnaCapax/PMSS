@@ -129,4 +129,30 @@ class UserDirectoriesEnsureTest extends TestCase
         $mode = @fileperms($dir);
         $this->assertTrue($mode !== false && (($mode & 0777) === 0755), 'Expected leaf mode to converge to 0755');
     }
+
+    public function testLinkedLeafAndParentLeaveOutsideMetadataUntouched(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
+        $outside = $this->pmssEnsureDir($this->tempDir.'/outside', 0700);
+        $before = lstat($outside);
+        symlink($outside, $home.'/linked');
+
+        $this->assertFalse(\pmssEnsureUserHomeDir($this->user, $home, 'linked', 0755));
+        $this->assertFalse(\pmssEnsureUserHomeDir($this->user, $home, 'linked/child', 0755));
+        clearstatcache(true, $outside);
+        $after = lstat($outside);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->assertFalse(file_exists($outside.'/child'));
+    }
+
+    public function testAccountOwnedHomeModeConvergesAsItsOwner(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/home', 0700);
+        chmod($home, 0700);
+        $this->assertTrue(\pmssAccountDirectoryEnsure($this->user, $home, $home, 0755, 0755));
+        clearstatcache(true, $home);
+        $this->assertSame(posix_geteuid(), fileowner($home));
+        $this->assertSame(0755, fileperms($home) & 0777);
+    }
 }

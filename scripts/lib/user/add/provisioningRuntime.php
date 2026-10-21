@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/../../pathSafety.php';
+require_once __DIR__.'/../credentialProcess.php';
 
 /**
  * Provisioning fatal-path tests load this helper in isolation, so defer the
@@ -135,10 +136,11 @@ function pmssAddUserRunRequiredProvisionStep(
     string $command,
     string $failureDetail,
     string $failureCode,
-    ?string $logCommand = null
+    ?string $logCommand = null,
+    ?string $stdin = null
 ): void
 {
-    if (runProvisionStep($description, $command, $logCommand) === 0) {
+    if (runProvisionStep($description, $command, $logCommand, $stdin) === 0) {
         return;
     }
 
@@ -156,7 +158,7 @@ function pmssAddUserRunRequiredProvisionStep(
  *
  * @return int Return code bubbled up from the child command.
  */
-function runProvisionStep(string $description, string $command, ?string $logCommand = null): int
+function runProvisionStep(string $description, string $command, ?string $logCommand = null, ?string $stdin = null): int
 {
     global $user, $provisionStats;
 
@@ -171,7 +173,12 @@ function runProvisionStep(string $description, string $command, ?string $logComm
     }
 
     $startedAt = microtime(true);
-    $result = runCommand($command, false, $logger);
+    if ($stdin !== null) {
+        $logger('[CMD start] '.$logCommand);
+        $result = pmssCredentialProcessRun($command, $stdin);
+    } else {
+        $result = runCommand($command, false, $logger);
+    }
     $duration = round(microtime(true) - $startedAt, 4);
     $provisionStats['steps']++;
     if ($result !== 0) {

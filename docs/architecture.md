@@ -34,8 +34,9 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/lighttpd/accountPath.php** – `pmssAccountPathRun()` checks paths
   against an existing account home and launches account-owned file work as that
   account. `pmssReplaceAccountFile()` in the adjacent managed writer streams
-  content to an atomic replacement. Root-owned managed entries keep their
-  existing writer and ownership contract. Small account-owned directory creation
+  content to an atomic replacement. Root-owned managed entries use a private
+  stage beside the home and one publish rename while keeping their ownership
+  class. Small account-owned directory creation
   and file-mode repairs run as the account, with managed repair for older owners.
 - **scripts/util/lighttpdSymlinkRepair.php** – Explicit root-only repair for stale
   account lighttpd upload and log symlinks. It requires a healthy live quota

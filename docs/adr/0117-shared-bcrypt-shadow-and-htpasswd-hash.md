@@ -24,6 +24,7 @@ On Debian major version 11 or newer, `changePw.php` generates one `$2y$` hash wi
 - A failed shadow update aborts before the htpasswd write. A later htpasswd failure is still reported as a partial credential sync.
 - Debian 10 retains its established hashes and reader limitations.
 - Shadow remains root protected; htpasswd retains the account-owned managed writer and mode. Neither plaintext nor hash is passed on the shadow updater command line. The per-user htpasswd is readable by the account and services using it, so a copied hash exposes offline guessing potential if that account is compromised; reusing the existing file does not widen access.
+- Internal callers pass the account credential to changePw, qBittorrent, and htpasswd on stdin.
 
 ## References
 

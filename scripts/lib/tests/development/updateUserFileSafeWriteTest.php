@@ -18,7 +18,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
             throw new SkipTest('PMSS_SKEL_DIR not set to a temp path');
         }
 
-        $this->user = 'user'.bin2hex(random_bytes(2));
+        $this->user = $this->pmssCurrentOwner();
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-userfile-');
 
         $this->pmssAssignTempDirProperty('skelDirPath', 'pmss-userfile', 0755, $skelBase);

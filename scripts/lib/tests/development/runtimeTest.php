@@ -32,6 +32,31 @@ class RuntimeTest extends TestCase
         $this->assertSame('x', \pmssReadRegularFileContentsVerified($path, null, 1));
     }
 
+    public function testRegularReadersRejectLinkAndFifoWithoutBlocking(): void
+    {
+        if (!function_exists('posix_mkfifo') || trim((string) shell_exec('command -v timeout')) === '') {
+            throw new SkipTest('FIFO or timeout unavailable');
+        }
+        $dir = $this->pmssMakeTempDir('pmss-read-fifo-');
+        $target = $this->pmssWriteFile($dir.'/target', 'kept');
+        chmod($target, 0640);
+        $before = lstat($target);
+        $this->assertTrue(symlink($target, $dir.'/linked'));
+        $this->assertTrue(posix_mkfifo($dir.'/fifo', 0600));
+        $code = 'require '.var_export(dirname(__DIR__, 2).'/runtime.php', true).'; '
+            .'echo json_encode([pmssReadRegularFileContents('.var_export($dir.'/linked', true).'),'
+            .'pmssReadRegularFileContents('.var_export($dir.'/fifo', true).'),'
+            .'pmssReadRegularFileContentsVerified('.var_export($dir.'/fifo', true).')]);';
+        $output = [];
+        exec('timeout --kill-after=2s 5s '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code), $output, $rc);
+        $this->assertSame(0, $rc);
+        $this->assertSame('[null,null,null]', implode("\n", $output));
+        $after = lstat($target);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->assertSame('kept', file_get_contents($target));
+    }
+
     public function testCliDiagnosticReturnPreservesBytesAndContinues(): void
     {
         foreach (['', "failure\n", "  failure  ", "first\nsecond\n", "binary\0payload"] as $message) {

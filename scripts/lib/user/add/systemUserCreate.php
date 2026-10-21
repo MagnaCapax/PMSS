@@ -57,13 +57,14 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
         );
     }
 
-    $safeChangePw = sprintf('/scripts/changePw.php %s [redacted]', escapeshellarg($user['name']));
+    $safeChangePw = sprintf('/scripts/changePw.php --password-stdin %s', escapeshellarg($user['name']));
     pmssAddUserRunRequiredProvisionStep(
         'Set initial password',
-        sprintf('/scripts/changePw.php %s %s', escapeshellarg($user['name']), escapeshellarg($user['password'])),
+        $safeChangePw,
         'Initial password update failed; aborting provisioning',
         'password_failed',
-        $safeChangePw
+        $safeChangePw,
+        $user['password']
     );
 
     runProvisionStep(

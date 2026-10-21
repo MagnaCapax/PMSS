@@ -27,17 +27,6 @@ $logger = new Logger(__FILE__);
 // if another run holds the lock. Hold the handle until exit.
 $updateQuotasLock = pmssCronLockAcquire('updateQuotas');
 
-/**
- * Atomically replace a quota snapshot without exposing a missing-file window.
- *
- * Existing owner/group metadata is preserved when the refresher runs as root so
- * routine writes do not drift away from the current on-disk policy.
- */
-function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0644): bool
-{
-    return pmssReplaceUserFilePreservingMetadata($path, $content, $mode);
-}
-
 $logger->msg('Updating quota information');
 $users = pmssListManagedUsers('/scripts/listUsers.php');
 

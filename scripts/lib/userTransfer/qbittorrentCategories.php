@@ -7,6 +7,7 @@
 
 require_once __DIR__.'/qbittorrentLegacyCategories.php';
 require_once __DIR__.'/remoteScripts.php';
+require_once __DIR__.'/../user/directories.php';
 /** Build a remote probe that stores qBittorrent category-bearing files in scratch. */
 function pmssUserTransferBuildQbittorrentCategoryProbe(array $cfg, string $localConfigPath, string $localCategoriesPath): string
 {
@@ -76,7 +77,9 @@ function pmssUserTransferQbittorrentCategoriesJsonRead(string $path): ?array
     if (!is_file($path)) {
         return [];
     }
-    $raw = trim((string) @file_get_contents($path));
+    $contents = pmssReadRegularFileContents($path);
+    if ($contents === null) return null;
+    $raw = trim($contents);
     if ($raw === '') {
         return [];
     }
@@ -109,12 +112,20 @@ function pmssUserTransferQbittorrentCategoriesMerge(string $targetPath, array $e
     }
 
     ksort($existing, SORT_STRING);
-    if (!pmssDirEnsureExists(dirname($targetPath), 0755)) {
+    $accountPath = pmssManagedAccountHomePath($targetPath);
+    $context = $accountPath ? pmssRootStageContext($targetPath) : null;
+    if (($accountPath && ($context === null || !pmssEnsureUserHomeDir($context[2], $context[1],
+        '.config/qBittorrent', 0755))) || (!$accountPath && !pmssDirEnsureExists(dirname($targetPath), 0755))) {
         logMessage('[WARN] Failed to create qBittorrent config directory for category preservation');
         return 0;
     }
     $json = pmssJsonEncodePrettyLine($existing);
-    if ($json === null || !pmssAtomicWriteFile($targetPath, $json, 0600)) {
+    $written = is_string($json) && ($accountPath
+        ? (is_array(@lstat($targetPath))
+            ? pmssReplaceUserFilePreservingMetadata($targetPath, $json, 0600)
+            : pmssReplaceAccountFile($context[2], $context[1], $targetPath, $json, 0600))
+        : pmssAtomicWriteFile($targetPath, $json, 0600));
+    if (!$written) {
         logMessage('[WARN] Failed to write qBittorrent categories.json');
         return 0;
     }

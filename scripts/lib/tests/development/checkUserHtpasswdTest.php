@@ -58,7 +58,47 @@ class CheckUserHtpasswdTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/util/checkUserHtpasswd.php');
         $this->assertStringContainsString('pmssAppendAccountFile($thisUser, "/home/{$thisUser}", $userHtpasswd, $thisPassword."\\n", 0640)', $source);
-        $this->assertStringContainsString('pmssAppendUserFile($userHtpasswd, $thisPassword."\\n", $thisUser, 0640)', $source);
+        $this->assertStringContainsString('pmssCheckUserHtpasswdLegacyAppend(', $source);
         $this->assertFalse(strpos($source, 'chown_htpasswd') !== false);
+    }
+
+    public function testLegacyAppendRunsUnderAccountAndRejectsLinkedParent(): void
+    {
+        if (!function_exists('posix_geteuid') || posix_geteuid() !== 0) {
+            throw new SkipTest('Root-only account fixture');
+        }
+        $account = posix_getpwnam('nobody');
+        if (!is_array($account)) throw new SkipTest('Fixture account unavailable');
+        $home = $this->pmssEnsureDir($this->tempDir.'/nobody');
+        chown($home, $account['uid']);
+        $lighttpd = $this->pmssEnsureDir($home.'/.lighttpd');
+        chown($lighttpd, $account['uid']);
+        $path = $this->pmssWriteFile($lighttpd.'/.htpasswd', "old:hash\n");
+        chgrp($path, $account['gid']);
+        chmod($path, 0640);
+        clearstatcache(true);
+        $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir], function () use ($path): void {
+            $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'old'));
+        });
+        $this->assertTrue(\pmssCheckUserHtpasswdLegacyAppend('nobody', $home, $path, "new:hash\n"));
+        $this->assertSame("old:hash\nnew:hash\n", file_get_contents($path));
+        $this->assertSame($account['uid'], fileowner($path));
+
+        $this->pmssWriteFile($path, str_repeat('x', 65537));
+        chgrp($path, $account['gid']);
+        chmod($path, 0640);
+        $this->assertFalse(\pmssCheckUserHtpasswdLegacyAppend('nobody', $home, $path, "new:hash\n"));
+        $this->assertSame(65537, filesize($path));
+
+        $outside = $this->pmssEnsureDir($this->tempDir.'/root-only');
+        $outsidePath = $this->pmssWriteFile($outside.'/.htpasswd', "protected\n");
+        chmod($outside, 0700);
+        $this->assertTrue(rename($lighttpd, $home.'/.lighttpd-real'));
+        symlink($outside, $lighttpd);
+        $this->assertFalse(\pmssCheckUserHtpasswdLegacyAppend('nobody', $home, $path, "new:hash\n"));
+        $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir], function () use ($path): void {
+            $this->assertSame(null, \pmssCheckUserHtpasswdHasUserEntry($path, 'nobody'));
+        });
+        $this->assertSame("protected\n", file_get_contents($outsidePath));
     }
 }

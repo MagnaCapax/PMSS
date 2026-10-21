@@ -84,16 +84,8 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     );
 
     // Seed per-user quota file by invoking the same refresher used by cron to avoid duplication.
-    // Then normalize permissions to 0640 to align with userPermissions policy.
+    // The shared snapshot writer applies the root:<user> 0640 policy.
     runProvisionStep('Seed quota file', 'php /scripts/cron/updateQuotas.php');
-    runProvisionStep(
-        'Normalize quota file permissions',
-        sprintf('find %s -maxdepth 0 -type f -links 1 -exec chmod 640 {} +', escapeshellarg("/home/{$user['name']}/.quota"))
-    );
-    runProvisionStep(
-        'Set quota file ownership',
-        sprintf('find %s -maxdepth 0 -type f -links 1 -exec chown -h %s {} +', escapeshellarg("/home/{$user['name']}/.quota"), escapeshellarg('root:'.$user['name']))
-    );
 
     try {
         pmssTrafficSeedInitialState($user['name'], dirname($homePath), null, 'logProvisionMessage')

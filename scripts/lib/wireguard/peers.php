@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+const WG_MAX_KEYS_PER_ACCOUNT = 8;
+
 /**
  * Validate that the supplied string is a base64-encoded 32-byte public key.
  */
@@ -50,30 +52,27 @@ function pmssWireguardPeerPublicKeysFromConfig(string $configPath): array
  *
  * @return array<int,string>
  */
-function wgReadUserPublicKeys(string $user): array
+function wgReadUserPublicKeysResult(string $user): array
 {
     if (!pmssValidateUsername($user)) {
         wgLog('Ignoring WireGuard public keys for invalid user '.$user);
-        return [];
+        return ['status' => 'error', 'keys' => []];
     }
 
     $path = wgUserFilePath($user, '.wireguard-public-key');
-    if (!file_exists($path)) {
-        return [];
-    }
-    if (!pmssRegularFilePathIsReadable($path)) {
-        wgLog('Ignoring unsafe WireGuard public key path for user '.$user.': '.$path);
-        return [];
+    if (!pmssPathExistsOrLink($path)) {
+        return ['status' => 'absent', 'keys' => []];
     }
 
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if ($lines === false) {
-        wgLog('Failed to read '.$path.' for user '.$user);
-        return [];
+    $contents = pmssReadRegularFileContentsVerified($path, null, 65536);
+    if ($contents === null) {
+        wgLog('Unable to read WireGuard public key file for user '.$user);
+        return ['status' => 'error', 'keys' => []];
     }
 
     $result = [];
-    foreach ($lines as $index => $line) {
+    $seen = [];
+    foreach (explode("\n", $contents) as $index => $line) {
         $line = trim($line);
         if ($line === '' || $line[0] === '#' || $line[0] === ';') {
             continue;
@@ -82,10 +81,19 @@ function wgReadUserPublicKeys(string $user): array
             wgLog(sprintf('Ignoring invalid WireGuard public key for user %s at %s line %d', $user, $path, $index + 1));
             continue;
         }
-        $result[] = $line;
+        if (!isset($seen[$line])) {
+            $seen[$line] = true;
+            $result[] = $line;
+        }
     }
 
-    return $result;
+    return ['status' => 'ok', 'keys' => $result];
+}
+
+/** Retain the original key-only reader contract for existing callers. */
+function wgReadUserPublicKeys(string $user): array
+{
+    return wgReadUserPublicKeysResult($user)['keys'];
 }
 
 /**
@@ -125,27 +133,89 @@ function wgDeriveClientIp(string $key, array $usedIps): string
  */
 function wgPeerState(): array
 {
-    $used         = [];
-    $entriesFound = false;
-    $assigned     = [];
-
-    foreach (wgListHomeUsers() as $user) {
-        if ($user === '') {
-            continue;
-        }
-        foreach (wgReadUserPublicKeys($user) as $key) {
-            $entriesFound = true;
-            $ip = wgDeriveClientIp($key, $used);
-            if ($ip === '') {
-                wgLog('Unable to assign WireGuard IP for user '.$user.' (exhausted address space?)');
+    $pins = [];
+    $pinOrder = [];
+    $pinIps = [];
+    $config = pmssWireguardConfigLines(wgConfigDir().'/wg0.conf');
+    if ($config['status'] === 'ok') {
+        foreach (wgConfigPeerBlocksFromLines($config['lines']) as $peer) {
+            $user = $peer['user'];
+            $key = $peer['key'];
+            $ip = $peer['ip'];
+            if (!pmssValidateUsername($user) || !wgValidatePublicKey($key)
+                || !preg_match('/^10\.90\.90\.(?:[2-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-4])$/', $ip)) {
                 continue;
             }
-            $used[$ip] = true;
+            if (isset($pins[$user][$key]) || isset($pinIps[$ip])) {
+                wgLog('Ignoring duplicate WireGuard peer assignment for user '.$user);
+                continue;
+            }
+            $pins[$user][$key] = $ip;
+            $pinIps[$ip] = true;
+            $pinOrder[] = ['user' => $user, 'key' => $key, 'ip' => $ip];
+        }
+    }
+
+    $users = wgListHomeUsers();
+    if (!$users && $pinOrder) {
+        wgLog('Keeping recorded WireGuard peers while the user list is empty');
+        return ['entriesFound' => true, 'assigned' => $pinOrder];
+    }
+
+    $keysByUser = [];
+    $activePins = [];
+    $reserved = [];
+    $owners = [];
+    foreach ($users as $user) {
+        $result = wgReadUserPublicKeysResult($user);
+        $keysByUser[$user] = $result['status'] === 'error' ? array_keys($pins[$user] ?? []) : $result['keys'];
+        if ($result['status'] === 'error' && isset($pins[$user])) {
+            wgLog('Keeping recorded WireGuard peers after key read failed for user '.$user);
+        }
+        foreach ($keysByUser[$user] as $key) {
+            if (!isset($pins[$user][$key])) {
+                continue;
+            }
+            if (isset($owners[$key])) {
+                wgLog('Ignoring WireGuard key already assigned to another account');
+                continue;
+            }
+            $ip = $pins[$user][$key];
+            $activePins[$user][$key] = $ip;
+            $reserved[$ip] = true;
+            $owners[$key] = $user;
+        }
+    }
+
+    $assigned = [];
+    foreach ($users as $user) {
+        $count = count($activePins[$user] ?? []);
+        foreach ($keysByUser[$user] as $key) {
+            if (isset($owners[$key]) && $owners[$key] !== $user) {
+                wgLog('Ignoring WireGuard key already assigned to another account');
+                continue;
+            }
+            if (isset($activePins[$user][$key])) {
+                $ip = $activePins[$user][$key];
+            } else {
+                if ($count >= WG_MAX_KEYS_PER_ACCOUNT) {
+                    wgLog('Ignoring WireGuard key over account limit for user '.$user);
+                    continue;
+                }
+                $ip = wgDeriveClientIp($key, $reserved);
+                if ($ip === '') {
+                    wgLog('Unable to assign WireGuard IP for user '.$user.' (exhausted address space?)');
+                    continue;
+                }
+                $reserved[$ip] = true;
+                $owners[$key] = $user;
+                $count++;
+            }
             $assigned[] = ['user' => $user, 'key' => $key, 'ip' => $ip];
         }
     }
 
-    return ['entriesFound' => $entriesFound, 'assigned' => $assigned];
+    return ['entriesFound' => (bool) array_filter($keysByUser) || (bool) $assigned, 'assigned' => $assigned];
 }
 
 /**

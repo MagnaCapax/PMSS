@@ -45,7 +45,8 @@ $userConfigStore = new UserConfigStore();
 
 foreach($users AS $thisUser) {
     $userTrafficLimitFile = "/etc/seedbox/runtime/trafficLimits/{$thisUser}";
-    $trafficDataFile = "/home/{$thisUser}/.trafficData";
+    // Root's runtime copy (0600); the home copy sits in a directory the account can change.
+    $trafficDataFile = pmssTrafficStatsPath($thisUser);
     $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
     $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, "/home/{$thisUser}/.bonusTraffic");
     if ($trafficLimitState['effectiveLimitGiB'] <= 0) {

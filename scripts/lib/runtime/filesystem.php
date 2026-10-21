@@ -115,7 +115,8 @@ function pmssReadRegularFileContentsVerified(string $path, ?int $requiredUid = n
     $entry = @lstat($path);
     if (!is_array($entry) || (($entry['mode'] ?? 0) & 0170000) !== 0100000 || ($entry['nlink'] ?? 0) !== 1) return null;
 
-    $handle = @fopen($path, 'rb');
+    // Non-blocking open keeps a substituted FIFO from stalling the caller.
+    $handle = @fopen($path, 'rbn');
     if (!pmssStreamHandleIsOpen($handle)) return null;
     try {
         $opened = @fstat($handle);
@@ -153,7 +154,25 @@ function pmssLockFileHandleMatchesPath($handle, string $path, ?array $pathStat =
         && (int) $handleStat['dev'] === (int) $pathStat['dev'] && (int) $handleStat['ino'] === (int) $pathStat['ino'];
 }
 
-function pmssReadRegularFileContents(string $path): ?string { return (!pmssRegularFilePathIsReadable($path) || !is_string($contents = @file_get_contents($path))) ? null : $contents; }
+/** Read only the same single-link regular inode observed before the non-blocking open. */
+function pmssReadRegularFileContents(string $path): ?string
+{
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return null;
+    clearstatcache(true, $path);
+    $entry = @lstat($path);
+    if (!is_array($entry) || ($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1) return null;
+    $handle = @fopen($path, 'rbn');
+    if (!pmssStreamHandleIsOpen($handle)) return null;
+    try {
+        $opened = @fstat($handle);
+        if (!is_array($opened) || ($opened['mode'] & 0170000) !== 0100000 || $opened['nlink'] !== 1
+            || $opened['dev'] !== $entry['dev'] || $opened['ino'] !== $entry['ino']) return null;
+        $contents = @stream_get_contents($handle);
+        return is_string($contents) ? $contents : null;
+    } finally {
+        @fclose($handle);
+    }
+}
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
 function pmssReadRegularFileNonEmptyLines(string $path): array { $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? ''); return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen')); }
 

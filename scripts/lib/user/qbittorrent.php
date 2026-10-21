@@ -9,6 +9,7 @@
 require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/qbittorrentVersion.php';
+require_once __DIR__.'/credentialProcess.php';
 
 /**
  * Resolve the canonical qBittorrent config path for a user.
@@ -163,13 +164,8 @@ function pmssQbittorrentConfigMutate(string $username, callable $mutator, ?strin
 
     $mode = @fileperms($configFile);
 
-    return pmssReplaceUserFileWithMetadata(
-        $configFile,
-        $updatedConfig,
-        is_int($mode) ? ($mode & 0777) : 0600,
-        $username,
-        $username
-    );
+    return pmssReplaceUserFilePreservingMetadata($configFile, $updatedConfig,
+        is_int($mode) ? ($mode & 0777) : 0600);
 }
 
 /**
@@ -282,10 +278,13 @@ if (!is_array($account)
     || !posix_initgroups($argv[1], (int) $account['gid'])
     || !posix_setgid((int) $account['gid'])
     || !posix_setuid((int) $account['uid'])) exit(1);
-exit(pmssUpdateQbittorrentPassword($argv[1], $argv[2]) ? 0 : 1);
+$password = fgets(STDIN);
+if (!is_string($password)) exit(1);
+$password = preg_replace('/\r?\n$/', '', $password);
+exit(is_string($password) && $password !== '' && pmssUpdateQbittorrentPassword($argv[1], $password) ? 0 : 1);
 PHP;
     $output = [];
-    $status = 1;
-    exec(pmssBuildCommand(PHP_BINARY, ['-r', $code, $username, $password]).' 2>/dev/null', $output, $status);
+    $command = pmssBuildCommand(PHP_BINARY, ['-r', $code, $username]);
+    $status = pmssCredentialProcessRun($command, $password, $output);
     return $status === 0;
 }

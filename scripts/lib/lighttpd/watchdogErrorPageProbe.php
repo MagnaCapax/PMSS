@@ -9,6 +9,7 @@ if (!function_exists('pmssCommandPath') && is_file(__DIR__.'/../runtime.php')) {
     require_once __DIR__.'/../runtime.php';
 }
 require_once __DIR__.'/../user/serviceLaunch.php';
+require_once __DIR__.'/../user/watchdogTimeout.php';
 
 /** Parse the reported root inode-use percentage from `df -i` output. */
 function pmssLighttpdWatchdogParseDfInodeUsePercent(string $output): ?int
@@ -60,8 +61,9 @@ function pmssLighttpdWatchdogRootInodesExhausted(string $mountPath = '/'): bool
 }
 
 /** Return true when `lighttpd -t -f` reports a config problem. */
-function pmssLighttpdWatchdogConfigInvalid(string $username, string $configPath): bool
+function pmssLighttpdWatchdogConfigInvalid(string $username, string $configPath, int $timeoutSec = 30): bool
 {
+    if (pmssUserWatchdogBackoffActive($username, 'lighttpd')) return true;
     if (strpos($configPath, "\0") !== false || !file_exists($configPath)) {
         return true;
     }
@@ -75,7 +77,13 @@ function pmssLighttpdWatchdogConfigInvalid(string $username, string $configPath)
         return false;
     }
 
-    return pmssCommandCapture($command)['rc'] !== 0;
+    $timeoutSec = pmssUserWatchdogTimeoutSeconds($timeoutSec);
+    $result = pmssCommandPipedCapture('/bin/bash -c '.escapeshellarg(pmssLockChildClosePrefix().$command),
+        $command, $timeoutSec, 1048576);
+    if ($result['timed_out']) {
+        pmssUserWatchdogBackoffRecord($username, 'lighttpd');
+    }
+    return $result['rc'] !== 0;
 }
 
 /** Diagnose the most helpful 502 status page for an unhealthy user web stack. */

@@ -61,12 +61,12 @@ final class AddUserPostProvisionTest extends TestCase
 
     public function testQuotaMetadataStepsSelectRegularFileEntry(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/add/postProvision.php', [
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/postProvision.php',
+            "runProvisionStep('Seed quota file', 'php /scripts/cron/updateQuotas.php')");
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/user/add/postProvision.php', [
             'find %s -maxdepth 0 -type f -links 1 -exec chmod 640 {} +',
             'find %s -maxdepth 0 -type f -links 1 -exec chown -h %s {} +',
         ]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/user/add/postProvision.php',
-            "sprintf('chown root:%s %s'");
     }
 
     public function testBonusQuotaPersistenceIsOptionalAtomicAndSymlinkSafe(): void

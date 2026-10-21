@@ -297,6 +297,46 @@ class WireGuardInstallerTest extends TestCase
         $this->assertEquals('600', substr(sprintf('%o', fileperms($keyPath)), -3));
     }
 
+    public function testBootstrapUserGuideNeverCopiesALinkedKeyFileTarget(): void
+    {
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $this->pmssEnsureDir($homeBase.'/alice');
+        $outside = $this->pmssMakeTempDir('pmss-wireguard-outside-', 0700).'/root-only.txt';
+        file_put_contents($outside, "outside-marker-line\n");
+        symlink($outside, $homeBase.'/alice/.wireguard-public-key');
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'           => $homeBase,
+            'PMSS_WG_CLIENT_PRIVATE_KEY'  => 'client-private',
+            'PMSS_WG_CLIENT_PUBLIC_KEY'   => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        ], function (): void {
+            \wgBootstrapUserGuide('alice', \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820));
+        });
+
+        foreach (['.wireguard-public-key', 'wireguard.txt'] as $name) {
+            $path = $homeBase.'/alice/'.$name;
+            $contents = is_link($path) ? false : @file_get_contents($path);
+            $this->assertTrue($contents === false || strpos($contents, 'outside-marker-line') === false, $name.' must not receive the link target');
+        }
+        $this->assertTrue(is_link($homeBase.'/alice/.wireguard-public-key'), 'a linked key file is left untouched');
+        $this->assertFalse(file_exists($homeBase.'/alice/wireguard.txt'), 'no guide is written while the key file cannot be read');
+        $this->assertEquals("outside-marker-line\n", (string) file_get_contents($outside));
+    }
+
+    public function testGuideCodeReadsAccountFilesOnlyThroughTheVerifiedReader(): void
+    {
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/wireguard/guides.php' => [
+                'required' => [
+                    'pmssReadRegularFileContentsVerified($guidePath, null, 65536)',
+                    'pmssReadRegularFileContentsVerified($publicKeyPath, null, 65536)',
+                    'pmssReadRegularFileContentsVerified($target, null, 65536)',
+                ],
+                'forbidden' => ['file_get_contents($guidePath)', 'file_get_contents($publicKeyPath)', 'file_get_contents($target)'],
+            ],
+        ]);
+    }
+
     public function testBootstrapUserGuideSkipsExistingManualGuide(): void
     {
         $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);

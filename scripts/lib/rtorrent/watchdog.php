@@ -58,21 +58,17 @@ function pmssCheckRtorrentRefreshExecutorFromSkel(string $user, string $home, bo
     $userScript = rtrim($home, '/').'/.rtorrentExecute.php';
     if (!is_file($skelScript) || !is_file($userScript)) return;
 
-    $skelHash = @md5_file($skelScript);
-    $userHash = @md5_file($userScript);
-    if (!is_string($skelHash) || !is_string($userHash)) {
+    // The account controls its copy: read it without following links and with a size bound, so a link
+    // or a large file cannot make this root cron read elsewhere or stall; then write it as the account.
+    $skelContent = @file_get_contents($skelScript);
+    $userContent = pmssReadRegularFileContentsVerified($userScript, null, 1048576, $userMeta);
+    if (!is_string($skelContent) || $userContent === null) {
         pmssCheckRtorrentLogBoth($user, 'executor refresh skipped (checksum unavailable)', $debug);
         return;
     }
-    if ($skelHash === $userHash) return;
+    if ($userContent === $skelContent) return;
 
-    $skelContent = @file_get_contents($skelScript);
-    if (!is_string($skelContent)) {
-        pmssCheckRtorrentLogBoth($user, 'executor refresh failed (copy error)', $debug);
-        return;
-    }
-    $mode = @fileperms($userScript);
-    if (!pmssWriteUserFile($userScript, $skelContent, $user, is_int($mode) ? $mode & 0777 : 0750)) {
+    if (!pmssReplaceAccountFile($user, $home, $userScript, $skelContent, (int) $userMeta['mode'] & 0777, true)) {
         pmssCheckRtorrentLogBoth($user, 'executor refresh failed (copy error)', $debug);
         return;
     }

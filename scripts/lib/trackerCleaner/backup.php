@@ -64,7 +64,7 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
         pmssTrackerCleanerLog("ERR: Backup target unsafe for user {$username} ({$backupTarget}).");
         return pmssTrackerCleanerBackupFailedResult('backup_path_unsafe', 'backup_target='.pmssTrackerCleanerLogValue($backupTarget));
     }
-    $backupRc = pmssUserLifecycleStep('trackerCleaner', $username, 'backup_torrent', pmssBuildUserShellCommand($username, 'cp -p '.escapeshellarg($torrentPath).' '.escapeshellarg($backupTarget).' && chmod '.$sourceModeText.' '.escapeshellarg($backupTarget), '/bin/bash'), false);
+    $backupRc = pmssUserLifecycleStep('trackerCleaner', $username, 'backup_torrent', pmssBuildUserShellCommand($username, 'timeout 60 cp -p '.escapeshellarg($torrentPath).' '.escapeshellarg($backupTarget).' && chmod '.$sourceModeText.' '.escapeshellarg($backupTarget), '/bin/bash'), false);
     $backupSize = @filesize($backupTarget);
     $backupSizeText = $backupSize === false ? 'unknown' : (string) $backupSize;
     $backupOk = $backupRc === 0 && $sourceSize !== false && $backupSize !== false && $backupSize === $sourceSize

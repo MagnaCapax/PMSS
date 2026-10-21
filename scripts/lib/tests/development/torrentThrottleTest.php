@@ -119,16 +119,12 @@ class TorrentThrottleTest extends TestCase
 
         userApplyDiskQuota(['name' => $this->user, 'quota' => 10]);
 
-        $quotaPath = $this->homeRoot.'/'.$this->user.'/.quota';
         $commands = $this->pmssProfileCommands();
-        $this->assertStringContainsString(
-            pmssBuildCommand('quota', ['-u', $this->user, '-s']).' > '.escapeshellarg($quotaPath),
-            implode("\n", $commands)
-        );
-        $this->assertStringContainsString(
-            pmssBuildCommand('chmod', ['o+r', $quotaPath]),
-            implode("\n", $commands)
-        );
+        $this->assertStringContainsString('setquota', implode("\n", $commands));
+        $this->assertStringNotContainsString(' > ', implode("\n", $commands));
+        $this->assertStringNotContainsString('chmod o+r', implode("\n", $commands));
+        $source = $this->pmssReadRepoFile('scripts/lib/user/traffic.php');
+        $this->assertStringContainsString('pmssQuotaSnapshotWrite($quotaPath', $source);
         foreach ($commands as $command) {
             $this->assertStringNotContainsString(';', $command, 'Quota refresh commands must not be shell-chained');
         }

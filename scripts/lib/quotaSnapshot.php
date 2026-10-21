@@ -7,6 +7,15 @@
  */
 
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/lighttpd/rootStage.php';
+
+/** Publish the root-owned quota artifact with the account read group. */
+function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0640): bool
+{
+    $context = pmssRootStageContext($path);
+    if ($context === null) return false;
+    return pmssRootStageFileWrite($path, $content, $context[2], $mode);
+}
 
 /** @return array<int,array<int,string>> Parse quota data rows for one filesystem prefix. */
 function pmssQuotaSnapshotDataRows(string $content, string $pathPrefix = '/'): array

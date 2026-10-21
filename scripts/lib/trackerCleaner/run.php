@@ -1,6 +1,9 @@
 <?php
 /** Bounded per-user tracker-cleaner run flow. @license GPL-3.0-only */
 
+/** Largest .torrent file read; real ones are kilobytes to a few MiB. */
+const PMSS_TRACKER_CLEANER_MAX_TORRENT_BYTES = 67108864;
+
 function pmssTrackerCleanerTorrentCandidates(string $sessionDir, int $maxTorrents): array { $torrents = glob($sessionDir.'/*.torrent'); if (!is_array($torrents) || $torrents === []) return []; shuffle($torrents); return count($torrents) > $maxTorrents ? array_slice($torrents, 0, $maxTorrents) : $torrents; }
 
 function pmssTrackerCleanerStopReason(int $runDeadline, int $modifiedCount, int $maxModifiedTorrents): string { if (time() >= $runDeadline) return 'runtime_limit'; return $modifiedCount >= $maxModifiedTorrents ? 'modify_limit' : ''; }
@@ -40,6 +43,9 @@ function pmssTrackerCleanerRunUser(
     }
 
     $changes = [];
+    // Torrents are read only when the opened file belongs to the account (see the read below).
+    $account = function_exists("posix_getpwnam") ? @posix_getpwnam($username) : false;
+    $accountUid = is_array($account) ? (int) $account["uid"] : -1;
     $backupDirectory = $backupsDir.'/'.date('Y-m-d_Hi');
     $processed = $private = $changed = 0;
     $stopReason = '';
@@ -55,8 +61,15 @@ function pmssTrackerCleanerRunUser(
         if (!pmssRegularFilePathIsReadable($torrentPath) || !pmssPathWithinRootIsSafe($torrentPath, $sessionDir)) {
             continue;
         }
+        // One bounded read of the entry checked above: no link, no FIFO wait, no oversized file, and only a file
+        // the account owns, so a session directory swapped for a link to another account's tree yields nothing.
+        $torrentBytes = pmssReadRegularFileContentsVerified($torrentPath, $accountUid, PMSS_TRACKER_CLEANER_MAX_TORRENT_BYTES);
+        if ($torrentBytes === null) {
+            $userVerboseLog .= pmssTrackerCleanerTimestamp()." torrent_skip reason=unreadable file=".basename($torrentPath)."\n";
+            continue;
+        }
         try {
-            $torrent = \Devristo\Torrent\Torrent::fromFile($torrentPath);
+            $torrent = \Devristo\Torrent\Torrent::fromString($torrentBytes);
         } catch (\Throwable $e) {
             $message = str_replace("\n", ' ', $e->getMessage());
             pmssTrackerCleanerLog("WARN: Failed to parse torrent for user {$username} (file=".basename($torrentPath)."): {$message}");

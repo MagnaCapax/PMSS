@@ -2,11 +2,130 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/lighttpd/userFileWrite.php';
+require_once dirname(__DIR__, 2).'/user/integerSetting.php';
+require_once dirname(__DIR__, 2).'/network/fireqos.php';
 require_once __DIR__.'/../common/TestCase.php';
 
 final class ManagedFileWriteSafetyTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-managed-file-write-']; }
+
+    public function testPinnedPublishRejectsParentOutsideHomeAndDifferentDevice(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
+        $inside = $this->pmssEnsureDir($home.'/inside');
+        $outside = $this->pmssEnsureDir($this->tempDir.'/outside');
+        $stage = $this->pmssWriteFile($this->tempDir.'/stage', 'new');
+        $this->pmssWriteFile($outside.'/target', 'kept');
+        $device = (int) stat($stage)['dev'];
+        foreach ([[$outside, $device], [$inside, $device + 1]] as $scenario) {
+            $command = \pmssRootStagePublishCommand($scenario[0], $home, $stage, 'target', $scenario[1]);
+            exec($command.' 2>/dev/null', $output, $rc);
+            $this->assertTrue($rc !== 0);
+            $this->assertSame('new', file_get_contents($stage));
+        }
+        $this->assertSame('kept', file_get_contents($outside.'/target'));
+        $this->assertFalse(file_exists($inside.'/target'));
+    }
+
+    public function testPinnedPublishMovesOnlyIntoThePinnedHomeParent(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
+        $inside = $this->pmssEnsureDir($home.'/inside');
+        $stage = $this->pmssWriteFile($this->tempDir.'/stage', 'new');
+        $device = (int) stat($stage)['dev'];
+        $command = \pmssRootStagePublishCommand($inside, $home, $stage, 'target', $device);
+        exec($command.' 2>/dev/null', $output, $rc);
+        $this->assertSame(0, $rc);
+        $this->assertSame('new', file_get_contents($inside.'/target'));
+        $this->assertFalse(file_exists($stage));
+    }
+
+    public function testRootStagePublishesOwnerModeAndRejectsLinkedTargets(): void
+    {
+        if (!function_exists('posix_geteuid') || posix_geteuid() !== 0) {
+            throw new SkipTest('Root-only staging fixture');
+        }
+        $account = posix_getpwnam('nobody');
+        $group = is_array($account) ? posix_getgrgid($account['gid']) : false;
+        if (!is_array($account) || !is_array($group)) throw new SkipTest('Fixture account unavailable');
+        $prior = getenv('PMSS_HOME_DIR');
+        putenv('PMSS_HOME_DIR='.$this->tempDir);
+        try {
+            $home = $this->pmssEnsureDir($this->tempDir.'/nobody');
+            chown($home, $account['uid']);
+            $inside = $this->pmssEnsureDir($home.'/inside');
+            chown($inside, $account['uid']);
+            $outside = $this->pmssWriteFile($this->tempDir.'/outside', 'kept');
+            chmod($outside, 0600);
+            $before = lstat($outside);
+            $this->assertTrue(\pmssRootStageFileWrite($inside.'/managed', 'payload', $group['name'], 0640));
+            $managed = lstat($inside.'/managed');
+            $this->assertSame(0, $managed['uid']);
+            $this->assertSame($account['gid'], $managed['gid']);
+            $this->assertSame(0640, $managed['mode'] & 0777);
+            $this->assertSame('payload', file_get_contents($inside.'/managed'));
+            $integerPath = $home.'/.trafficLimit';
+            $this->assertTrue(\pmssRootStageFileWrite($integerPath, '1', $group['name'], 0640));
+            $this->assertTrue(\pmssIntegerSettingFileWrite($integerPath, 2));
+            $integer = lstat($integerPath);
+            $this->assertSame([0, $account['gid'], 0640, '2'],
+                [$integer['uid'], $integer['gid'], $integer['mode'] & 0777, file_get_contents($integerPath)]);
+            $throttle = $home.'/.throttle';
+            $this->assertTrue(\pmssIntegerSettingFileWrite($throttle, 25));
+            $throttleStat = lstat($throttle);
+            $this->assertSame(0, $throttleStat['uid']);
+            $this->assertSame(0, ($throttleStat['mode'] & 0777) & 0022);
+            $state = $this->pmssEnsureDir($this->tempDir.'/traffic-limits');
+            $this->pmssWriteFile($state.'/nobody.enabled', '1');
+            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $state], function (): void {
+                $caps = \networkFireqosUserCaps(['throttle' => ['max' => 100]], ['nobody']);
+                $this->assertSame(25, $caps['nobody']['cap']);
+            });
+            $accountOwned = $home.'/.account-setting';
+            $this->pmssWriteFile($accountOwned, '1');
+            chown($accountOwned, $account['uid']);
+            chmod($accountOwned, 0600);
+            clearstatcache(true, $accountOwned);
+            $this->assertTrue(\pmssIntegerSettingFileWrite($accountOwned, 3));
+            $this->assertSame($account['uid'], lstat($accountOwned)['uid']);
+            $this->assertSame(0600, lstat($accountOwned)['mode'] & 0777);
+            symlink($outside, $inside.'/linked');
+            $this->assertFalse(\pmssRootStageFileWrite($inside.'/linked', 'new', $group['name'], 0640));
+            symlink($inside, $home.'/linked-parent');
+            $this->assertFalse(\pmssRootStageFileWrite($home.'/linked-parent/managed', 'new', $group['name'], 0640));
+            $outsideDir = $this->pmssEnsureDir($this->tempDir.'/outside-dir/deeper');
+            symlink(dirname($outsideDir), $inside.'/linked-intermediate');
+            $this->assertFalse(\pmssRootStageFileWrite($inside.'/linked-intermediate/deeper/managed',
+                'new', $group['name'], 0640));
+            $this->assertFalse(file_exists($outsideDir.'/managed'));
+            $this->assertFalse(\pmssRootStageImmutableSet($inside.'/managed',
+                ['dev' => $managed['dev'], 'ino' => $managed['ino'] + 1], true));
+            $this->assertSame('payload', file_get_contents($inside.'/managed'));
+            $after = lstat($outside);
+            $this->assertSame([$before['uid'], $before['mode'] & 07777, 'kept'],
+                [$after['uid'], $after['mode'] & 07777, file_get_contents($outside)]);
+            $this->assertSame([], glob($this->tempDir.'/.pmss-root-stage-*'));
+        } finally {
+            $prior === false ? putenv('PMSS_HOME_DIR') : putenv('PMSS_HOME_DIR='.$prior);
+        }
+    }
+
+    public function testRootStageSweepRemovesOnlyOldEmptyPrivateDirectories(): void
+    {
+        if (!function_exists('posix_geteuid') || posix_geteuid() !== 0) {
+            throw new SkipTest('Root-only staging fixture');
+        }
+        $old = $this->pmssEnsureDir($this->tempDir.'/.pmss-root-stage-old', 0700);
+        $nonempty = $this->pmssEnsureDir($this->tempDir.'/.pmss-root-stage-nonempty', 0700);
+        $fresh = $this->pmssEnsureDir($this->tempDir.'/.pmss-root-stage-fresh', 0700);
+        $wrongMode = $this->pmssEnsureDir($this->tempDir.'/.pmss-root-stage-mode', 0755);
+        $this->pmssWriteFile($nonempty.'/file', 'kept');
+        foreach ([$old, $nonempty, $wrongMode] as $path) touch($path, time() - 7200);
+        \pmssRootStageSweep($this->tempDir);
+        $this->assertFalse(file_exists($old));
+        foreach ([$nonempty, $fresh, $wrongMode] as $path) $this->assertTrue(is_dir($path));
+    }
 
     public function testEnsureSafeDirTightensAnExistingDirectoryMode(): void
     {

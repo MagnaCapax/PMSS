@@ -7,6 +7,7 @@
 
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/credentialProcess.php';
 
 /** Return the htpasswd status and capture diagnostics without exposing the secret. */
 function pmssUserHtpasswdPasswordUpdate(string $username, string $password, string $path, array &$output): int
@@ -16,19 +17,21 @@ function pmssUserHtpasswdPasswordUpdate(string $username, string $password, stri
         return 1;
     }
 
-    $htpasswdCommand = is_file($path) ? 'htpasswd -b -B' : 'htpasswd -c -b -B';
+    $htpasswdCommand = is_file($path) ? 'htpasswd -i -B' : 'htpasswd -c -i -B';
     $command = sprintf(
-        'umask 0077; %s %s %s %s',
+        'umask 0077; %s %s %s',
         $htpasswdCommand,
         escapeshellarg($path),
-        escapeshellarg($username),
-        escapeshellarg($password)
+        escapeshellarg($username)
     );
     $identity = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
     $alreadyAccount = is_array($identity) && function_exists('posix_geteuid')
         && (int) $identity['uid'] === posix_geteuid();
-    $status = 0;
-    exec(($alreadyAccount ? $command : pmssBuildUserShellCommand($username, $command)).' 2>&1', $output, $status);
+    $status = pmssCredentialProcessRun(
+        $alreadyAccount ? $command : pmssBuildUserShellCommand($username, $command),
+        $password,
+        $output
+    );
 
     return $status !== 0 || !pmssUserFilePathIsSafe($path) || !is_file($path) ? ($status ?: 1) : 0;
 }

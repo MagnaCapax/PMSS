@@ -230,6 +230,56 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertSame(null, \pmssUserWebRootMigrationSnapshot($target, true));
     }
 
+    public function testCopyRefusesLinkedDestinationWithoutChangingTarget(): void
+    {
+        $source = $this->home.'/www/public';
+        $outside = $this->pmssEnsureDir($this->homeRoot.'/outside-copy', 0700);
+        chmod($outside, 0700);
+        $target = $this->home.'/www/copy';
+        $this->pmssCreateSymlinkOrSkip($outside, $target);
+        $before = lstat($outside);
+
+        $this->assertFalse(\pmssUserWebRootMigrationCopyTree($this->user, $this->home, $source, $target));
+        clearstatcache(true, $outside);
+        $after = lstat($outside);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->assertTrue(is_link($target));
+    }
+
+    public function testCopyRefusesLinkedDestinationParentWithoutChangingTarget(): void
+    {
+        $outside = $this->pmssEnsureDir($this->homeRoot.'/outside-copy-parent', 0700);
+        $before = lstat($outside);
+        $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/www/linked');
+
+        $this->assertFalse(\pmssUserWebRootMigrationCopyTree(
+            $this->user, $this->home, $this->home.'/www/public', $this->home.'/www/linked/copy'
+        ));
+        clearstatcache(true, $outside);
+        $after = lstat($outside);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->assertFalse(file_exists($outside.'/copy'));
+    }
+
+    public function testCopyRefusesLinkedSourceWithoutChangingTarget(): void
+    {
+        $outside = $this->pmssEnsureDir($this->homeRoot.'/outside-copy-source', 0700);
+        $before = lstat($outside);
+        $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/linked-source');
+        $target = $this->home.'/www/copied-source';
+
+        $this->assertFalse(\pmssUserWebRootMigrationCopyTree(
+            $this->user, $this->home, $this->home.'/linked-source', $target
+        ));
+        clearstatcache(true, $outside);
+        $after = lstat($outside);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->assertFalse(file_exists($target));
+    }
+
     public function testExistingDurableTreeGetsLinkBackWhenSourceIsMissing(): void
     {
         $target = $this->home.'/.local/share/pmss/rutorrent/share';

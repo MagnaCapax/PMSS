@@ -12,10 +12,9 @@ if (!pmssTorrentClientsMarkerEnabled()) exit(0);
 $users = pmssListManagedUsersFromResult(pmssListManagedUsersResult());
 if ($users === null) exit(1);
 foreach ($users as $user) {
+    if (pmssUserWatchdogBackoffActive($user, 'transmission')) continue;
     $home = '/home/'.$user;
-    // Parked accounts: stop a leftover daemon without a log line on every 2-minute run.
-    if (pmssUserServicesParked($user)) { pmssUserWatchdogTerminateProcesses($user, ['transmission-daemon']); continue; }
-    if (!pmssLighttpdTransmissionSelected($user, $home)) continue;
+    if (pmssUserWebRootUnavailable($user) || !pmssLighttpdTransmissionSelected($user, $home)) continue;
     // A process and its socket are checked before settings or launch are touched.
     if (pmssTorrentClientLauncherLivenessPids($user, 'transmission') !== []) continue;
     $socketPath = $home.'/.lighttpd/transmission.sock';
@@ -26,9 +25,9 @@ foreach ($users as $user) {
     $command = 'cd '.escapeshellarg($home)
         .' && { [ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/transmission.lock; flock -n 9 || exit 0; }; php '
         .escapeshellarg($home.'/www/torrentClientsResolve.php')
-        .' transmission --launch >/dev/null 2>&1 9>&-; }';
-    $output = [];
-    $rc = 1;
-    @exec(pmssLockChildClosePrefix().pmssBuildUserServiceShellCommand($user, $command), $output, $rc);
+        .' transmission --launch >/dev/null 2>&1; }';
+    $result = pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $command),
+        90, $user, 'transmission');
+    $rc = $result['rc'];
     if ($rc !== 0) pmssUserLog($user, 'Transmission start was not ready.');
 }

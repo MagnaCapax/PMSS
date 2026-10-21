@@ -10,6 +10,7 @@ require_once dirname(__DIR__).'/runtime.php';
 require_once __DIR__.'/restartSpace.php';
 pmssRequireRelativeFiles(__DIR__, ['log.php', 'selection.php', 'serviceLaunch.php']);
 require_once __DIR__.'/userConfigStore.php';
+require_once __DIR__.'/watchdogTimeout.php';
 
 /** Return true when watchdogs must avoid web-facing services for the user. */
 function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'): bool
@@ -221,7 +222,9 @@ function pmssUserWatchdogGatedStartAllowed(string $username, string $home, array
     if (!empty(pmssUserWatchdogCrashState($username, $app, $state)['storageError'])) return false;
     $helper = $home.'/www/toggleAppRuntime.php';
     $command = pmssBuildUserServiceShellCommand($username, 'php '.escapeshellarg($helper).' state '.escapeshellarg($app).' '.escapeshellarg($display));
-    @exec(pmssLockChildClosePrefix().$command.' >/dev/null 2>&1');
+    if (!pmssUserWatchdogBackoffActive($username, $app)) {
+        pmssUserWatchdogCommandRun($command.' >/dev/null 2>&1', 15, $username, $app);
+    }
     if (!$secured) pmssUserLog($username, $app.' start skipped: not secured');
     return $secured && !$running && $state['failures'] < 5;
 }
@@ -249,14 +252,21 @@ function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, a
         if ($processName === '') {
             continue;
         }
+        $running = (bool) ($runningStates[$processName] ?? pmssUserWatchdogProcessRunning($username, $processName));
+        if (pmssUserWatchdogBackoffActive($username, $processName)) {
+            $runningStates[$processName] = $running;
+            continue;
+        }
         $command = $serviceSpec['command'] ?? '';
         is_callable($command) && $command = (string) $command($username);
-        $running = (bool) ($runningStates[$processName] ?? pmssUserWatchdogProcessRunning($username, $processName));
         $home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$username;
         $allowed = pmssUserWatchdogGatedStartAllowed($username, $home, $serviceSpec, $running);
-        if (!$running && $allowed && (string) $command !== '' && pmssUserWatchdogGatedStartRecord($username, $serviceSpec)) {
+        $service = $processName;
+        if (!$running && $allowed && (string) $command !== ''
+            && !pmssUserWatchdogBackoffActive($username, $service)
+            && pmssUserWatchdogGatedStartRecord($username, $serviceSpec)) {
             echo 'Start '.(string) ($serviceSpec['serviceLabel'] ?? $processName).' for user: '.$username."\n";
-            passthru(pmssLockChildClosePrefix().(string) $command);
+            pmssUserWatchdogCommandRun((string) $command, 90, $username, $service);
             pmssUserLog($username, (string) ($serviceSpec['userLogMessage'] ?? ($processName.' start requested')));
         }
         $runningStates[$processName] = $running;

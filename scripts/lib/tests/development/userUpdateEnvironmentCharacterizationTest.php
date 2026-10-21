@@ -224,8 +224,6 @@ PHP
 
         $expectedPhases = [
             'Configuring lighttpd vhost',
-            'Installing ruTorrent theme Agent34',
-            'Installing unpack plugin',
             'Refreshing user permissions',
         ];
         $this->assertEquals(

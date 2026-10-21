@@ -1,6 +1,8 @@
 <?php
 /** Tracker-cleaner operator and user log output. @license GPL-3.0-only */
 
+require_once __DIR__.'/../user/watchdogTimeout.php';
+
 function pmssTrackerCleanerTimestamp(): string { return '['.date('Y-m-d H:i:s').']'; }
 
 function pmssTrackerCleanerLog(string $message): void { echo pmssTrackerCleanerTimestamp().' '.$message."\n"; }
@@ -41,35 +43,10 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     $userHome = "/home/{$username}";
     $userLogsDir = $userHome.'/.logs';
     $userLogFile = $userLogsDir.'/trackerCleaner.log';
-    $tmpLogPath = pmssCreatePrivateTempFile('pmss-trackerCleaner-');
-    if ($tmpLogPath === null) {
-        return;
-    }
-    try {
-        // Never append a truncated verbose report to the user's log.
-        if (!pmssFileWriteComplete($tmpLogPath, $payload)) return;
-        if (!@chown($tmpLogPath, $username)) {
-            pmssTrackerCleanerLog("WARN: Unable to chown temp log {$tmpLogPath} for user {$username}; skipping per-user verbose log.");
-            return;
-        }
-        @chgrp($tmpLogPath, $username); @chmod($tmpLogPath, 0640);
-
-        pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', pmssBuildUserShellCommand($username, 'mkdir -p ~/.logs', '/bin/bash'), false);
-        if (!is_dir($userLogsDir) || !pmssPathWithinRootIsSafe($userLogsDir, $userHome, true)) {
-            pmssTrackerCleanerLog("WARN: User log directory is unsafe or missing for {$username} ({$userLogsDir}); skipping per-user verbose log.");
-            return;
-        }
-        if (file_exists($userLogFile) && is_link($userLogFile)) {
-            pmssTrackerCleanerLog("WARN: User log file is symlink for {$username} ({$userLogFile}); skipping per-user verbose log.");
-            return;
-        }
-
-        pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', pmssBuildUserShellCommand($username, 'cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log', '/bin/bash'), false);
-        if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
-            pmssUserFileApplyOwnership($userLogFile, $username);
-        }
-    } finally {
-        @unlink($tmpLogPath);
+    pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir',
+        pmssBuildUserShellCommand($username, 'mkdir -p ~/.logs', '/bin/bash'), false);
+    if (!pmssTrackerCleanerAccountLogAppend($username, $userHome, $userLogFile, $payload)) {
+        pmssTrackerCleanerLog("WARN: Unable to append verbose log for {$username} ({$userLogFile}).");
     }
 }
 /** Resolve the per-user tracker-cleaner change log path after boundary checks. */
@@ -105,13 +82,21 @@ function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes,
         return $log;
     }
 
-    if (!pmssFileWriteComplete($userLogPath, $log, FILE_APPEND | LOCK_EX)) {
+    $userHome = dirname($userLogPath);
+    if (!pmssTrackerCleanerAccountLogAppend($username, $userHome, $userLogPath, $log)) {
         pmssTrackerCleanerLog("WARN: Failed to append tracker change log for user {$username} ({$userLogPath}).");
         return $log;
     }
-    $userHome = dirname($userLogPath);
-    if (file_exists($userLogPath) && !is_link($userLogPath) && pmssPathWithinRootIsSafe($userLogPath, $userHome)) {
-        pmssUserFileApplyOwnership($userLogPath, $username);
-    }
     return $log;
+}
+
+/** A timed-out append backs off both account logs without delaying later accounts. */
+function pmssTrackerCleanerAccountLogAppend(string $username, string $home, string $path, string $content): bool
+{
+    if (pmssUserWatchdogBackoffActive($username, 'tracker-cleaner')) return false;
+    $timedOut = false;
+    $ok = pmssAppendAccountFile($username, $home, $path, $content, 0640,
+        pmssUserWatchdogTimeoutSeconds(15), $timedOut);
+    if ($timedOut) pmssUserWatchdogBackoffRecord($username, 'tracker-cleaner');
+    return $ok;
 }

@@ -150,7 +150,7 @@ function pmssUserWebRootMigrationPrepareParent(string $user, string $home, strin
         return false;
     }
 
-    if (!pmssEnsureDir($path, 0755, $user, $user, $logger, 0755)) {
+    if (!pmssAccountDirectoryEnsure($user, $home, $path, 0755, 0755, $logger)) {
         pmssUserWebRootMigrationLog($user, $logger, 'Unable to create web-root migration parent: '.$path);
         return false;
     }
@@ -229,6 +229,8 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
     if (!is_array($before)) {
         return false;
     }
+    $targetStat = @lstat($target);
+    $rootTargetSafe = !is_array($targetStat) || (int) $targetStat['uid'] === 0;
     $command = 'mv -T -- '.escapeshellarg($source).' '.escapeshellarg($target);
     $uid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
     $account = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
@@ -239,6 +241,8 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
         && @fileowner($home) === $uid;
     $rootAccount = $uid === 0 && is_array($account) && isset($account['uid'])
         && (int) $account['uid'] === 0
+        && (int) $before['uid'] === 0
+        && $rootTargetSafe
         && pmssUserWebRootMigrationRootParentsSafe($home, [$source, $target]);
     $moved = false;
     if ($sameAccount || $rootAccount) {
@@ -251,6 +255,8 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
         // substituted by the tenant while root performs watchdog recovery.
         $homeStat = @lstat($home);
         $moved = function_exists('posix_geteuid') && @posix_geteuid() === 0
+            && (int) $before['uid'] === 0
+            && $rootTargetSafe
             && is_array($homeStat) && (int) $homeStat['uid'] === 0
             && (((int) $homeStat['mode']) & 0022) === 0
             && pmssPathTargetIsSafe($home, true)
@@ -266,110 +272,18 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
         && $after['dev'] === $before['dev'] && $after['ino'] === $before['ino'];
 }
 
-/** Apply metadata captured from lstat() without treating failures as fatal. */
-function pmssUserWebRootMigrationApplyMetadata(string $path, array $stat): void
+/** Copy and remove migration staging only with the account's authority. */
+function pmssUserWebRootMigrationCopyTree(string $user, string $home, string $source, string $target): bool
 {
-    if (isset($stat['uid'])) {
-        @chown($path, (int) $stat['uid']);
-    }
-    if (isset($stat['gid'])) {
-        @chgrp($path, (int) $stat['gid']);
-    }
-    @chmod($path, ((int) $stat['mode']) & 07777);
-    if (isset($stat['mtime'])) {
-        @touch($path, (int) $stat['mtime'], (int) ($stat['atime'] ?? $stat['mtime']));
-    }
+    return !is_link($source) && !pmssPathExistsOrLink($target)
+        && pmssUserWebRootMigrationRun($user, $home, [$source, $target],
+            'cp -aT -- '.escapeshellarg($source).' '.escapeshellarg($target));
 }
 
-/** Copy a tree without following symlinks, preserving bytes and basic metadata. */
-function pmssUserWebRootMigrationCopyTree(string $source, string $target): bool
+function pmssUserWebRootMigrationRemoveCopy(string $user, string $home, string $path): void
 {
-    if (is_link($source) || pmssPathExistsOrLink($target) || !is_array($stat = @lstat($source))) {
-        return false;
-    }
-
-    if (is_file($source)) {
-        if (!@copy($source, $target)) {
-            return false;
-        }
-        pmssUserWebRootMigrationApplyMetadata($target, $stat);
-        return true;
-    }
-    if (!is_dir($source) || !@mkdir($target, ((int) $stat['mode']) & 07777)) {
-        return false;
-    }
-    $children = pmssDirectoryEntriesRead($source);
-    if (!is_array($children)) {
-        return false;
-    }
-    foreach ($children as $child) {
-        if (!pmssUserWebRootMigrationCopyTree($source.'/'.$child, $target.'/'.$child)) {
-            return false;
-        }
-    }
-    pmssUserWebRootMigrationApplyMetadata($target, $stat);
-    return true;
-}
-
-/** Remove a temporary copy tree produced by this migrator without following links. */
-function pmssUserWebRootMigrationRemoveCopy(string $path): void
-{
-    if (is_link($path)) {
-        return;
-    }
-    if (is_file($path)) {
-        @unlink($path);
-        return;
-    }
-    if (!is_dir($path)) {
-        return;
-    }
-
-    $children = pmssDirectoryEntriesRead($path);
-    if (is_array($children)) {
-        foreach ($children as $child) {
-            pmssUserWebRootMigrationRemoveCopy($path.'/'.$child);
-        }
-    }
-    @rmdir($path);
-}
-
-/** Best-effort recursive ownership convergence for copied durable customer state. */
-function pmssUserWebRootMigrationChownTreeToUser(string $path, string $user): bool
-{
-    if (!function_exists('posix_geteuid') || posix_geteuid() !== 0 || !function_exists('posix_getpwnam')) {
-        return true;
-    }
-    $account = @posix_getpwnam($user);
-    if (!is_array($account) || !isset($account['uid'], $account['gid'])) {
-        return true;
-    }
-
-    return pmssUserWebRootMigrationChownTreeToIds($path, (int) $account['uid'], (int) $account['gid']);
-}
-
-/** Chown a tree by numeric ids after the symlink-refusing snapshot has passed. */
-function pmssUserWebRootMigrationChownTreeToIds(string $path, int $uid, int $gid): bool
-{
-    if (is_link($path) || !is_array(@lstat($path))
-        || !@chown($path, $uid) || !@chgrp($path, $gid)) {
-        return false;
-    }
-    if (!is_dir($path)) {
-        return true;
-    }
-
-    $children = pmssDirectoryEntriesRead($path);
-    if (!is_array($children)) {
-        return false;
-    }
-    foreach ($children as $child) {
-        if (!pmssUserWebRootMigrationChownTreeToIds($path.'/'.$child, $uid, $gid)) {
-            return false;
-        }
-    }
-
-    return true;
+    $command = 'rm -rf -- '.escapeshellarg($path);
+    pmssUserWebRootMigrationRun($user, $home, [$path], $command);
 }
 
 /** Copy a pre-#727 basename-collapsed userTransfer tree into durable storage. */
@@ -429,45 +343,39 @@ function pmssUserMigrateWebRootBasenameCollapsePath(
     }
 
     $temporary = dirname($target).'/.'.basename($target).'.pmss-misfile-copy-'.getmypid().'-'.bin2hex(random_bytes(6));
-    if (!pmssUserWebRootMigrationCopyTree($misfile, $temporary)) {
-        pmssUserWebRootMigrationRemoveCopy($temporary);
+    if (!pmssUserWebRootMigrationCopyTree($user, $home, $misfile, $temporary)) {
+        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
         pmssUserWebRootMigrationLog($user, $logger, 'Unable to copy misfiled '.$misfileRelative.' to durable storage');
         return;
     }
 
     $after = pmssUserWebRootMigrationSnapshot($temporary);
     if ($after === null || $before !== $after) {
-        pmssUserWebRootMigrationRemoveCopy($temporary);
+        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
         pmssUserWebRootMigrationLog($user, $logger, 'Verification failed; removed incomplete copy for '.$misfileRelative);
         return;
     }
-    if (!pmssUserWebRootMigrationChownTreeToUser($temporary, $user)) {
-        pmssUserWebRootMigrationRemoveCopy($temporary);
-        pmssUserWebRootMigrationLog($user, $logger, 'Unable to set ownership on copied '.$misfileRelative);
-        return;
-    }
-
     if (is_link($target)) {
-        pmssUserWebRootMigrationRemoveCopy($temporary);
+        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
         pmssUserWebRootMigrationLog($user, $logger, 'Preserving symlink destination conflict at '.$targetRelative);
         return;
     }
     if (file_exists($target)) {
         if (!is_dir($target)) {
-            pmssUserWebRootMigrationRemoveCopy($temporary);
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
             pmssUserWebRootMigrationLog($user, $logger, 'Preserving non-directory destination conflict at '.$targetRelative);
             return;
         }
         if (!pmssUserWebRootMigrationDirectoryIsEmpty($target)
             || !pmssUserWebRootMigrationRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target))) {
-            pmssUserWebRootMigrationRemoveCopy($temporary);
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
             pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
             return;
         }
     }
 
     if (!pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)) {
-        pmssUserWebRootMigrationRemoveCopy($temporary);
+        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
         pmssUserWebRootMigrationLog($user, $logger, 'Unable to copy misfiled '.$misfileRelative.' to durable storage');
         return;
     }

@@ -100,6 +100,18 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
     } else {
         $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
         pmssProcessPipesClose([$pipes[1], $pipes[2]]);
+        // A child can close both output pipes and keep running. Never enter
+        // proc_close() until it exits or the same group deadline fires.
+        if (!$capture['timed_out'] && $timeoutSec > 0) {
+            while (true) {
+                $status = proc_get_status($process);
+                $lastStatus = is_array($status) ? $status : $lastStatus;
+                if (!is_array($status)) { $capture['timed_out'] = true; break; }
+                if (empty($status['running'])) break;
+                if (microtime(true) - $startedAt >= $timeoutSec) { $capture['timed_out'] = true; break; }
+                usleep(100000);
+            }
+        }
     }
     $rc = $capture['timed_out']
         ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)

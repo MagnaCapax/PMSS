@@ -4,6 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../user/passwordFile.php';
 require_once __DIR__.'/../../user/changePwCredential.php';
+require_once __DIR__.'/../../user/credentialGenerate.php';
 require_once __DIR__.'/../../lighttpd/htpasswd.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/panelSessionAuth.php';
 
@@ -18,7 +19,8 @@ class changePwPasswdFailureGuardTest extends TestCase
                 'required' => [
                     'pmssChangePwShadowUpdate($username, $password, $useBcrypt, $passwdOutput);',
                     'pmssUserHtpasswdHashWrite($htpasswdFile, $username, $passwordHash, $username)',
-                    '$alphabet = \'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_\';',
+                    'return pmssAccountPasswordGenerate();',
+                    "require_once __DIR__.'/lib/user/credentialGenerate.php';",
                     '$jsonlOutput = false;',
                     '$parseOptions = true;',
                     "if (\$parseOptions && \$token === '--jsonl') {",
@@ -41,6 +43,22 @@ class changePwPasswdFailureGuardTest extends TestCase
         ]);
     }
 
+    public function testGeneratedAccountCredentialsUseSharedCharacterSet(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/changePw.php');
+        foreach (['legacyPasswordSeed', 'rand(', 'mt_rand('] as $legacyCall) {
+            $this->assertTrue(strpos($source, $legacyCall) === false);
+        }
+        for ($i = 0; $i < 1000; $i++) {
+            $password = \pmssAccountPasswordGenerate();
+            $this->assertSame(16, strlen($password));
+            $this->assertMatches('/^[A-Za-z0-9][A-Za-z0-9_-]{14}[A-Za-z0-9]$/', $password);
+            foreach (['!', '@', '#', '$', '%', '&', ':'] as $forbidden) {
+                $this->assertTrue(strpos($password, $forbidden) === false);
+            }
+        }
+    }
+
     public function testPasswdFailureExitsBeforeHttpCredentialSync(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
@@ -48,12 +66,12 @@ class changePwPasswdFailureGuardTest extends TestCase
             [
                 'pmssChangePwShadowUpdate($username, $password, $useBcrypt, $passwdOutput);',
                 'if ($passwdReturnCode !== 0) {',
-                'exit(1);',
                 'pmssUserHtpasswdHashWrite($htpasswdFile, $username, $passwordHash, $username)',
             ],
             'changePw missing guard substring: ',
             'changePw guard order changed near: '
         );
+        $this->pmssAssertRepoFileMatches('scripts/changePw.php', '/if \(\$passwdReturnCode !== 0\) \{.*?exit\(1\);/s');
     }
 
     public function testHtpasswdFailureExitsBeforeQbittorrentSync(): void
@@ -163,17 +181,24 @@ class changePwPasswdFailureGuardTest extends TestCase
         $stub = <<<'SH'
 #!/bin/sh
 if [ "$1" = -c ]; then shift; fi
-if [ "$1" = -b ]; then shift; else exit 2; fi
+if [ "$1" = -i ]; then shift; else exit 2; fi
 if [ "$1" = -B ]; then shift; else exit 2; fi
-php -r '$hash = password_hash($argv[3], PASSWORD_BCRYPT); $rows = is_file($argv[1]) ? file($argv[1]) : []; $rows = array_filter($rows, function ($row) use ($argv) { return strpos($row, $argv[2].":") !== 0; }); $rows[] = $argv[2].":".$hash."\n"; file_put_contents($argv[1], implode("", $rows));' "$@"
+printf '%s' "$*" > "$PMSS_TEST_ARGS"
+IFS= read -r password
+printf '%s' "$password" > "$PMSS_TEST_INPUT"
+printf '%s' "$password" | php -r '$hash = password_hash(stream_get_contents(STDIN), PASSWORD_BCRYPT); $rows = is_file($argv[1]) ? file($argv[1]) : []; $rows = array_filter($rows, function ($row) use ($argv) { return strpos($row, $argv[2].":") !== 0; }); $rows[] = $argv[2].":".$hash."\n"; file_put_contents($argv[1], implode("", $rows));' "$@"
 SH;
         file_put_contents($binDir.'/htpasswd', $stub."\n");
         chmod($binDir.'/htpasswd', 0700);
         $originalPath = getenv('PATH');
         putenv('PATH='.$binDir.':'.$originalPath);
+        putenv('PMSS_TEST_ARGS='.$this->tempDir.'/htpasswd-args');
+        putenv('PMSS_TEST_INPUT='.$this->tempDir.'/htpasswd-input');
         $output = [];
         try {
             $this->assertEquals(0, \pmssUserHtpasswdPasswordUpdate($username, 'test-pass-1', $path, $output));
+            $this->assertSame('test-pass-1', (string) file_get_contents($this->tempDir.'/htpasswd-input'));
+            $this->assertFalse(strpos((string) file_get_contents($this->tempDir.'/htpasswd-args'), 'test-pass-1') !== false);
             $this->assertEquals(0600, fileperms($path) & 0777);
             $line = trim((string) file_get_contents($path));
             $this->assertTrue(strpos($line, $username.':') === 0);
@@ -186,6 +211,8 @@ SH;
             $this->assertEquals(0, \pmssUserHtpasswdPasswordUpdate($username, 'test-pass-2', $path, $output));
         } finally {
             putenv('PATH='.$originalPath);
+            putenv('PMSS_TEST_ARGS');
+            putenv('PMSS_TEST_INPUT');
         }
         $lines = file($path, FILE_IGNORE_NEW_LINES);
         $this->assertEquals(2, count($lines));

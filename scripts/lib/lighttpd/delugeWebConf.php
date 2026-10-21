@@ -26,7 +26,7 @@ function pmssDelugeNormalizeEmptySessionsObject(array &$config): bool
 
 function pmssDelugeReadWebConf(string $path): ?array
 {
-    $raw = pmssReadRegularFileContents($path);
+    $raw = pmssReadRegularFileContentsVerified($path, null, 1048576);
 
     return is_string($raw) ? pmssDelugeConfigDecode($raw) : null;
 }

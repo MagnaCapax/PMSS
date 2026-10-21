@@ -10,6 +10,18 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/toggleAppRuntime.php';
 /** Security contracts for the two opt-in toggle apps. */
 class ToggleAppTest extends TestCase
 {
+    public function testHangingBootstrapBacksOffApp(): void
+    {
+        $runtime = $this->pmssMakeTempDir('pmss-toggle-timeout-');
+        $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime, 'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1'], function (): void {
+            $start = microtime(true);
+            $this->assertFalse(\pmssToggleAppBootstrapRun('sleep 30', 'alice', 'slskd'));
+            $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
+            $this->assertTrue(\pmssUserWatchdogBackoffActive('alice', 'slskd'));
+            $this->assertTrue(\pmssToggleAppBootstrapRun('true', 'bob', 'slskd'));
+        });
+    }
+
     public function testCatalogIsPureDataAndKeepsLegacyValues(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/toggleAppCatalog.php');

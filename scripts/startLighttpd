@@ -30,6 +30,8 @@ if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/user/serviceLaunch.php';
 require_once __DIR__.'/lib/user/watchdog.php';
+require_once __DIR__.'/lib/lighttpd/accountPath.php';
+require_once __DIR__.'/lib/runtime/filesystem.php';
 $user = pmssUsernameNormalizeIfValid((string) $argv[1]);
 if ($user === null) die("Invalid username\n");
 $homeDir = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$user;
@@ -62,9 +64,9 @@ function pmssStartLighttpdEnsureDirectory(string $user, string $homeDir, string 
     }
 
     if (!is_dir($dir)) {
-        $rc = 0;
-        passthru(pmssLockChildClosePrefix().pmssBuildUserShellCommand($user, 'mkdir -p '.escapeshellarg($dir)), $rc);
-        if ($rc !== 0) {
+        $result = pmssUserWatchdogCommandRun(pmssBuildUserShellCommand($user, 'mkdir -p '.escapeshellarg($dir)),
+            15, $user, 'lighttpd');
+        if ($result['rc'] !== 0) {
             return false;
         }
     }
@@ -75,13 +77,19 @@ function pmssStartLighttpdEnsureDirectory(string $user, string $homeDir, string 
 }
 
 /** Remove one stale socket path only after validating the delete target. */
-function pmssStartLighttpdRemoveSocket(string $homeDir, string $socketPath): bool
+function pmssStartLighttpdRemoveSocket(string $user, string $homeDir, string $socketPath): bool
 {
     if (is_link($socketPath) || !pmssStartLighttpdPathWithinHome($socketPath, $homeDir)) {
         return false;
     }
 
-    return @unlink($socketPath) || !file_exists($socketPath);
+    $timedOut = false;
+    $removed = pmssAccountPathRun($user, $homeDir, [$socketPath],
+        'test ! -L '.escapeshellarg($socketPath).' && { test ! -e '.escapeshellarg($socketPath)
+        .' || rm -f -- '.escapeshellarg($socketPath).'; }', null,
+        pmssUserWatchdogTimeoutSeconds(15), $timedOut);
+    if ($timedOut) pmssUserWatchdogBackoffRecord($user, 'lighttpd');
+    return $removed;
 }
 
 /** Wait briefly for another starter; only a busy lock is worth retrying. */
@@ -120,7 +128,7 @@ function pmssStartLighttpdRun(string $user, string $homeDir, string $configPath)
 
         $lighttpdDir = $homeDir.'/.lighttpd';
         $uploadDir   = $lighttpdDir.'/upload';
-        $config      = @file_get_contents($configPath);
+        $config      = pmssReadRegularFileContentsVerified($configPath, null, 1048576);
         $deflateEnabled = is_string($config) && preg_match('/^[ \t]*deflate\.cache-dir/m', $config);
 
         $requiredDirs = [$lighttpdDir, $uploadDir];
@@ -135,7 +143,7 @@ function pmssStartLighttpdRun(string $user, string $homeDir, string $configPath)
             return 1;
         }
         foreach (glob(rtrim($lighttpdDir, '/').'/php.socket*') ?: [] as $socketPath) {
-            if (pmssStartLighttpdRemoveSocket($homeDir, $socketPath)) {
+            if (pmssStartLighttpdRemoveSocket($user, $homeDir, $socketPath)) {
                 continue;
             }
             fwrite(STDERR, "Unable to remove stale lighttpd socket: {$socketPath}\n");
@@ -148,9 +156,10 @@ function pmssStartLighttpdRun(string $user, string $homeDir, string $configPath)
             return 1;
         }
         $startCommand = 'cd '.escapeshellarg($homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg($configPath);
-        $startRc = 0;
-        passthru(pmssLockChildClosePrefix().pmssBuildUserServiceShellCommand($user, $startCommand), $startRc);
-        if ($startRc !== 0) {
+        $result = pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $startCommand),
+            30, $user, 'lighttpd');
+        if ($result['timed_out']) pmssUserWatchdogTerminateProcesses($user, ['lighttpd', 'php-cgi']);
+        if ($result['rc'] !== 0) {
             fwrite(STDERR, "Unable to start lighttpd inside user slice\n");
             return 1;
         }

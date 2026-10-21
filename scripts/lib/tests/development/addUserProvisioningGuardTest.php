@@ -9,6 +9,22 @@ require_once dirname(__DIR__, 2).'/user/add/systemUserCreate.php';
 
 class AddUserProvisioningGuardTest extends TestCase
 {
+    public function testHelpLoadsLibrariesFromScriptDirectory(): void
+    {
+        $cwd = $this->pmssMakeTempDir('pmss-adduser-cwd-', 0777);
+        mkdir($cwd.'/lib/user/add', 0777, true);
+        $marker = $cwd.'/loaded';
+        file_put_contents($cwd.'/lib/user/add/cli.php', '<?php file_put_contents('.var_export($marker, true).', "yes");');
+        $command = 'cd '.escapeshellarg($cwd).' && '.escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($this->pmssRepoPath('scripts/addUser.php')).' --help 2>&1';
+        $output = [];
+        $status = 1;
+        exec($command, $output, $status);
+        $this->assertSame(0, $status);
+        $this->assertFalse(file_exists($marker));
+        $this->assertTrue(strpos(implode("\n", $output), 'Usage') !== false);
+    }
+
     public function testAddUserSourceContractsStayWired(): void
     {
         $this->assertTrue(function_exists('\pmssAddUserRuntimeInit'));
@@ -18,9 +34,9 @@ class AddUserProvisioningGuardTest extends TestCase
                 'required' => [
                     'pmss-addUser-',
                     'pmssLockFileAcquire(',
-                    "require_once 'lib/update.php';",
-                    "require_once 'lib/update/users.php';",
-                    "require_once 'lib/user/trafficLimit.php';",
+                    "require_once __DIR__.'/lib/update.php';",
+                    "require_once __DIR__.'/lib/update/users.php';",
+                    "require_once __DIR__.'/lib/user/trafficLimit.php';",
                     "if (!pmssUpdateUserEnvironment(\$user['name'])) {",
                     "'web_root_convergence_failed'",
                     'pmssTrafficLimitCliTargetModes($user[\'name\'], $homePath)',

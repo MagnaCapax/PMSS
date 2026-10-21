@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/trackerCleaner/log.php';
 
 class LighttpdUserFileWriteTest extends TestCase
 {
@@ -51,6 +52,22 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertSame([], glob($home.'/config.pmss-tmp-*'));
     }
 
+    public function testAccountFileWriteFailureLeavesExistingBytesAndMode(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/account');
+        $path = $this->pmssWriteFile($home.'/config', 'original');
+        chmod($path, 0640);
+        chmod($home, 0555);
+        try {
+            $this->assertFalse(\pmssReplaceAccountFile($this->pmssCurrentOwner(), $home, $path, 'new', 0600));
+            clearstatcache(true, $path);
+            $this->assertSame('original', file_get_contents($path));
+            $this->assertSame(0640, fileperms($path) & 0777);
+        } finally {
+            chmod($home, 0755);
+        }
+    }
+
     public function testAccountFileReplacementRejectsPathsOutsideHome(): void
     {
         $home = $this->tempDir.'/account';
@@ -68,6 +85,24 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertTrue(@symlink($home.'/original', $home.'/linked'));
         $this->assertFalse(\pmssReplaceAccountFile($this->pmssCurrentOwner(), $home, $home.'/linked', 'new', 0600));
         $this->assertSame('kept', file_get_contents($home.'/original'));
+    }
+
+    public function testLegacyOwnerOptionStillRejectsLinkedTarget(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/account');
+        $target = $this->pmssWriteFile($this->tempDir.'/outside', 'kept');
+        chmod($target, 0600);
+        $before = lstat($target);
+        $this->pmssCreateSymlinkOrSkip($target, $home.'/linked');
+
+        $this->assertFalse(\pmssReplaceAccountFile(
+            $this->pmssCurrentOwner(), $home, $home.'/linked', 'new', 0644, true
+        ));
+        clearstatcache(true, $target);
+        $after = lstat($target);
+        $this->assertSame($before['uid'], $after['uid']);
+        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->assertSame('kept', file_get_contents($target));
     }
 
     public function testAccountFileReplacementRejectsMissingParentAndBadMode(): void
@@ -119,6 +154,23 @@ class LighttpdUserFileWriteTest extends TestCase
         $outside = $this->tempDir.'/outside';
         $this->assertFalse(\pmssAccountPathRun($owner, $home, [$outside], 'mkdir -- '.escapeshellarg($outside)));
         $this->assertFalse(is_dir($outside));
+    }
+
+    public function testAccountPathRunBoundsClosedOutputAndKeepsDefaultUnchanged(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/account-timeout');
+        $owner = $this->pmssCurrentOwner();
+        $timedOut = false;
+        $started = microtime(true);
+        $this->assertFalse(\pmssAccountPathRun($owner, $home, [$home.'/target'],
+            'exec 1>&- 2>&-; sleep 30', null, 1, $timedOut));
+        $this->assertTrue($timedOut);
+        $this->assertTrue(microtime(true) - $started < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
+        $this->assertTrue(\pmssAccountPathRun($owner, $home, [$home.'/target'], 'true'));
+        $this->assertTrue(\pmssAccountPathRun($owner, $home, [$home.'/target'],
+            'cat > '.escapeshellarg($home.'/target'), 'bounded input', 1, $timedOut));
+        $this->assertFalse($timedOut);
+        $this->assertSame('bounded input', file_get_contents($home.'/target'));
     }
 
     public function testAccountFileMetadataConvergesOnlySafeOwnedFile(): void
@@ -213,6 +265,33 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertTrue(\pmssAppendAccountFile($owner, $home, $path, "second:hash\n", 0640));
         $this->assertSame("first:hash\nsecond:hash\n", file_get_contents($path));
         $this->assertSame(0640, fileperms($path) & 0777);
+    }
+
+    public function testAccountAppendFailsWithinBoundWhenLockIsHeld(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/account');
+        $path = $this->pmssWriteFile($home.'/log', 'old');
+        $holder = proc_open('timeout --kill-after=1s 5s flock -x '.escapeshellarg($path).' sh -c '.escapeshellarg('echo ready; sleep 30'),
+            [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        $this->assertTrue(is_resource($holder));
+        try {
+            $this->assertSame("ready\n", fgets($pipes[1]));
+            $start = microtime(true);
+            $this->pmssWithEnv(['PMSS_TEST_MODE' => '1', 'PMSS_RUNTIME_DIR' => $this->tempDir,
+                'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1'], function () use ($home, $path): void {
+                $owner = $this->pmssCurrentOwner();
+                if (!\pmssValidateUsername($owner)) $owner = 'pmsslog';
+                $this->assertFalse(\pmssTrackerCleanerAccountLogAppend($owner, $home, $path, 'new'));
+                $this->assertTrue(\pmssUserWatchdogBackoffActive($owner, 'tracker-cleaner'));
+                $this->assertFalse(\pmssTrackerCleanerAccountLogAppend($owner, $home, $path, 'new'));
+            });
+            $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
+            $this->assertSame('old', file_get_contents($path));
+        } finally {
+            fclose($pipes[1]);
+            proc_terminate($holder);
+            proc_close($holder);
+        }
     }
 
     public function testAccountAppendRejectsUnsafeTargets(): void
@@ -370,7 +449,7 @@ class LighttpdUserFileWriteTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/util/checkUserHtpasswd.php',
-            ['pmssAppendAccountFile(', 'pmssAppendUserFile(', 'Unable to append legacy credential to per-user htpasswd'],
+            ['pmssAppendAccountFile(', 'pmssCheckUserHtpasswdLegacyAppend(', 'Unable to append legacy credential to per-user htpasswd'],
             ['file_put_contents($userHtpasswd']
         );
     }

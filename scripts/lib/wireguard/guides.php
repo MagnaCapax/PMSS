@@ -178,8 +178,14 @@ function wgBootstrapUserGuide(string $user, string $clientGuide): void
     $publicKeyPath = wgUserFilePath($user, '.wireguard-public-key');
     $guidePath     = wgUserFilePath($user, 'wireguard.txt');
     $guideExists   = is_file($guidePath);
-    $guide         = $guideExists ? @file_get_contents($guidePath) : false;
-    $publicKeyText = is_file($publicKeyPath) ? @file_get_contents($publicKeyPath) : false;
+    // Account-controlled files: one no-follow, bounded read each (as peers.php reads the key file).
+    $guide         = $guideExists ? (pmssReadRegularFileContentsVerified($guidePath, null, 65536) ?? false) : false;
+    $publicKeyText = pmssReadRegularFileContentsVerified($publicKeyPath, null, 65536) ?? false;
+    if (($guideExists && $guide === false) || ($publicKeyText === false && pmssPathExistsOrLink($publicKeyPath))) {
+        // Never replace a guide or key file that exists but could not be read safely.
+        wgLog('Unable to read WireGuard guide or public key file for user '.$user);
+        return;
+    }
     $managedGuide  = $guide !== false
         && $guide !== ''
         && preg_match('/^PrivateKey = <client private key>$/m', $guide) !== 1;
@@ -272,7 +278,7 @@ function wgSyncUserGuideAddresses(
 
         $target       = wgUserFilePath($entry['user'], 'wireguard.txt');
         $targetExists = is_file($target);
-        $guide        = $targetExists ? @file_get_contents($target) : false;
+        $guide        = $targetExists ? (pmssReadRegularFileContentsVerified($target, null, 65536) ?? false) : false;
         if ($guide === false || $guide === '') {
             if ($fallbackGuide === '') {
                 continue;

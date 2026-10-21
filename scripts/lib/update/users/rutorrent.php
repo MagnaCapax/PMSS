@@ -8,6 +8,47 @@
  * @author PMSS Team
  */
 
+/** Keep account file work in the user-step profiler under that account. */
+function pmssRutorrentAccountStep(string $user, string $home, string $label, string $command): int
+{
+    $account = pmssAccountPathIdentity($user, $home);
+    if (is_array($account) && @posix_geteuid() === $account['uid']) {
+        return pmssAccountPathRun($user, $home, [$home.'/.pmss-rutorrent-check'], $command) ? 0 : 1;
+    }
+    return runUserStep($user, $label, pmssBuildUserShellCommand($user, $command, '/bin/sh'));
+}
+
+/** Make root-only skeleton content readable for one account-side extraction. */
+function pmssRutorrentInstallSkeletonTree(string $user, string $home, string $source, string $destination, string $label): bool
+{
+    if (!pmssPathTargetIsSafe($source, true) || !is_dir($destination)
+        || !pmssPathWithinResolvedRoot($destination.'/.pmss-check', $home)) return false;
+    $account = pmssAccountPathIdentity($user, $home);
+    if (!is_array($account)) return false;
+    if (@posix_geteuid() === $account['uid']) {
+        return pmssAccountPathRun($user, $home, [$destination.'/'.basename($source)],
+            'cp -R -- '.escapeshellarg($source).' '.escapeshellarg($destination));
+    }
+    $context = pmssRootStageContext($destination.'/'.basename($source));
+    if ($context === null || $context[1] !== $home || $context[2] !== $user) return false;
+    $stage = $context[0].'/.pmss-skel-source-'.bin2hex(random_bytes(12));
+    if (!@mkdir($stage, 0700)) return false;
+    $archive = $stage.'/source.tar';
+    try {
+        $sourceCommand = 'umask 077; tar -C '.escapeshellarg(dirname($source))
+            .' -cf '.escapeshellarg($archive).' -- '.escapeshellarg(basename($source));
+        if (runStep("[user:{$user}] Preparing {$label}", $sourceCommand) !== 0
+            || !is_file($archive) || !@chgrp($archive, $account['gid']) || !@chmod($archive, 0640)
+            || !@chgrp($stage, $account['gid']) || !@chmod($stage, 0750)) return false;
+        $extract = 'tar --no-same-owner --no-same-permissions -xf '.escapeshellarg($archive)
+            .' -C '.escapeshellarg($destination);
+        return pmssRutorrentAccountStep($user, $home, $label, $extract) === 0;
+    } finally {
+        @unlink($archive);
+        @rmdir($stage);
+    }
+}
+
 /**
  * Keep ruTorrent plugin maintenance in the main user update module.
  */
@@ -16,35 +57,33 @@ function pmssUserEnsurePlugins(array $ctx): void
     [$user, $home] = pmssUserContextIdentity($ctx);
 
     if (file_exists("{$home}/www/rutorrent/plugins/cpuload")) {
-        runUserStep($user, 'Removing deprecated cpuload plugin', pmssBuildUserShellCommand($user, 'rm -rf -- '.escapeshellarg("{$home}/www/rutorrent/plugins/cpuload")));
+        pmssRutorrentAccountStep($user, $home, 'Removing deprecated cpuload plugin', 'rm -rf -- '.escapeshellarg("{$home}/www/rutorrent/plugins/cpuload"));
     }
 
     $unpackPath = "{$home}/www/rutorrent/plugins/unpack";
     if (!file_exists($unpackPath)) {
         $source = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent/plugins/unpack';
-        $unpackArg = escapeshellarg($unpackPath);
-        runUserStep($user, 'Installing unpack plugin', sprintf('cp -Rp %s %s', escapeshellarg($source), $unpackArg));
-        runUserStep($user, 'Adjusting unpack plugin ownership', pmssUserEntryChownCommand($unpackPath, $user.':'.$user, true));
-        runUserStep($user, 'Setting unpack plugin permissions', pmssUserEntryChmodCommand($unpackPath, 0755, true));
+        if (pmssRutorrentInstallSkeletonTree($user, $home, $source, dirname($unpackPath), 'Installing unpack plugin')) {
+            pmssRutorrentAccountStep($user, $home, 'Setting unpack plugin permissions', pmssUserEntryChmodCommand($unpackPath, 0755, true));
+        }
     }
 
     $userShareDir = "{$home}/www/rutorrent/share/users/{$user}";
     $retrackerConfigPath = "{$userShareDir}/settings";
     $retrackerFile = "{$retrackerConfigPath}/retrackers.dat";
-    if (file_exists($retrackerFile)
-        && in_array(sha1(trim((string) file_get_contents($retrackerFile))), ['9958caa274c2df67ea6702772821856365bc1201', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
-        unlink($retrackerFile);
+    $retrackerContent = pmssReadRegularFileContentsVerified($retrackerFile, null, 1048576);
+    if (is_string($retrackerContent)
+        && in_array(sha1(trim($retrackerContent)), ['9958caa274c2df67ea6702772821856365bc1201', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
+        pmssRutorrentAccountStep($user, $home, 'Removing legacy retrackers', 'rm -f -- '.escapeshellarg($retrackerFile));
     }
 
     if (!file_exists($userShareDir.'/torrents') && file_exists($userShareDir)) {
-        runUserStep($user, 'Creating ruTorrent torrents directory', sprintf('mkdir -p %s', escapeshellarg($userShareDir.'/torrents')));
-        runUserStep($user, 'Adjusting retracker ownership', pmssUserEntryChownCommand($retrackerConfigPath, $user.':'.$user));
+        pmssRutorrentAccountStep($user, $home, 'Creating ruTorrent torrents directory', sprintf('mkdir -p %s', escapeshellarg($userShareDir.'/torrents')));
     }
 
     $rssDir = "{$home}/www/rutorrent/share/settings/rss";
     if (!file_exists($rssDir)) {
-        runUserStep($user, 'Creating ruTorrent RSS settings directory', sprintf('mkdir -p %s', escapeshellarg($rssDir)));
-        runUserStep($user, 'Adjusting RSS settings ownership', pmssUserEntryChownCommand($rssDir, $user.':'.$user));
+        pmssRutorrentAccountStep($user, $home, 'Creating ruTorrent RSS settings directory', sprintf('mkdir -p %s', escapeshellarg($rssDir)));
         echo "\t*** Created RSS Settings folder\n";
     }
 }
@@ -100,15 +139,8 @@ function pmssUserUpdateThemes(array $ctx): void
             continue;
         }
 
-        runUserStep(
-            $user,
-            "Installing ruTorrent theme {$theme}",
-            sprintf('cp -r %s %s',
-                escapeshellarg($skelThemesPath.$theme),
-                escapeshellarg($themesPath)
-            )
-        );
-        runUserStep($user, "Adjusting theme {$theme} ownership", pmssUserEntryChownCommand($themesPath.$theme, $user.':'.$user, true));
+        pmssRutorrentInstallSkeletonTree($user, $home, $skelThemesPath.$theme,
+            rtrim($themesPath, '/'), "Installing ruTorrent theme {$theme}");
     }
 }
 
@@ -125,11 +157,12 @@ function pmssUserUpgradeRutorrent(array $ctx): void
     $legacyPath    = "{$home}/www/oldRutorrent-3";
     $sharePath     = $rutorrentPath.'/share';
     $durableShare  = "{$home}/.local/share/pmss/rutorrent/share";
+    $currentIndex = pmssReadRegularFileContentsVerified($rutorrentPath.'/index.html', null, 1048576);
 
     if ($expectedSha === ''
-        || !file_exists($rutorrentPath.'/index.html')
+        || $currentIndex === null
         || file_exists($legacyPath)
-        || $expectedSha === sha1(file_get_contents($rutorrentPath.'/index.html'))) {
+        || $expectedSha === sha1($currentIndex)) {
         return;
     }
 
@@ -146,31 +179,26 @@ function pmssUserUpgradeRutorrent(array $ctx): void
 
     echo "****** Updating ruTorrent\n";
     echo "******* Backing up old as 'oldRutorrent-3'\n";
-    if (runUserStep($user, 'Backing up existing ruTorrent', sprintf('mv %s %s', escapeshellarg($rutorrentPath), escapeshellarg($legacyPath))) !== 0) {
+    if (pmssRutorrentAccountStep($user, $home, 'Backing up existing ruTorrent', sprintf('mv %s %s', escapeshellarg($rutorrentPath), escapeshellarg($legacyPath))) !== 0) {
         throw new RuntimeException('Unable to back up ruTorrent before upgrade');
     }
     echo "******* Copying new ruTorrent from skel\n";
-    if (runUserStep(
-        $user,
-        'Copying new ruTorrent from skel',
-        sprintf('cp -Rp %s %s',
-            escapeshellarg(pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent'),
-            escapeshellarg("{$home}/www/")
-        )
-    ) !== 0) {
+    if (!pmssRutorrentInstallSkeletonTree($user, $home,
+        pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent', "{$home}/www", 'Copying new ruTorrent from skel')) {
         throw new RuntimeException('Unable to copy ruTorrent skeleton during upgrade');
     }
     echo "******* Configuring\n";
-    if (runUserStep(
+    if (pmssRutorrentAccountStep(
         $user,
+        $home,
         'Restoring ruTorrent config.php',
-        sprintf('cp -p %s %s', escapeshellarg($legacyPath.'/conf/config.php'), escapeshellarg($rutorrentPath.'/conf/'))
+        sprintf('cp %s %s', escapeshellarg($legacyPath.'/conf/config.php'), escapeshellarg($rutorrentPath.'/conf/'))
     ) !== 0) {
         throw new RuntimeException('Unable to restore ruTorrent configuration');
     }
 
     $shareDescription = 'Restoring ruTorrent share directory';
-    $shareCommand = sprintf('cp -rp %s %s', escapeshellarg($legacyPath.'/share/.'), escapeshellarg($sharePath.'/'));
+    $shareCommand = sprintf('cp -r %s %s', escapeshellarg($legacyPath.'/share/.'), escapeshellarg($sharePath.'/'));
     if ($usesDurableShare) {
         // ADR 0041 makes the durable store authoritative; discard only the fresh skeleton placeholder.
         $shareDescription = 'Restoring durable ruTorrent share link';
@@ -180,12 +208,11 @@ function pmssUserUpgradeRutorrent(array $ctx): void
             escapeshellarg($shareLink)
         );
     }
-    if (runUserStep($user, $shareDescription, $shareCommand) !== 0
+    if (pmssRutorrentAccountStep($user, $home, $shareDescription, $shareCommand) !== 0
         || ($usesDurableShare && (!is_link($sharePath) || @readlink($sharePath) !== $shareLink))) {
         throw new RuntimeException('Unable to restore ruTorrent share state');
     }
 
     updateRutorrentConfig($user, 1);
-    runUserStep($user, 'Setting ruTorrent ownership', pmssUserEntryChownCommand($rutorrentPath, $user.':'.$user, true));
-    runUserStep($user, 'Setting ruTorrent permissions', pmssUserEntryChmodCommand($rutorrentPath, 0751, true));
+    pmssRutorrentAccountStep($user, $home, 'Setting ruTorrent permissions', pmssUserEntryChmodCommand($rutorrentPath, 0751, true));
 }

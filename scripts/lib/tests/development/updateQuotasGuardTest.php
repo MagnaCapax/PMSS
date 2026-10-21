@@ -30,11 +30,8 @@ class UpdateQuotasGuardTest extends TestCase
             [
                 '$quotaFile = "/home/{$thisUser}/.quota";',
                 "pmssReadRegularFileContents(\$quotaFile) ?? ''",
-                'function pmssQuotaSnapshotWrite',
                 "require_once __DIR__.'/../lib/quotaSnapshot.php';",
-                "require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';",
                 '$realHome === false || $realHome !== $expectedHome',
-                'pmssReplaceUserFilePreservingMetadata($path, $content',
                 'pmssQuotaSnapshotWrite($quotaFile, $fallbackContent)',
                 'pmssQuotaSnapshotWrite($quotaFile, $content)',
                 'pmssQuotaSnapshotNormalizeHumanReadableOutput($content)',

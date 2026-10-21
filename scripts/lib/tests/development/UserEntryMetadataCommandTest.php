@@ -34,12 +34,8 @@ final class UserEntryMetadataCommandTest extends TestCase
     public function testCommandsQuotePathsAndBoundSingleEntryChanges(): void
     {
         $path = "/tmp/account path'quoted";
-        $owner = 'demo:demo';
-        $ownerCommand = \pmssUserEntryChownCommand($path, $owner);
         $modeCommand = \pmssUserEntryChmodCommand($path, 0750);
 
-        $this->assertStringContainsString(escapeshellarg($path).' -maxdepth 0 -not -type l', $ownerCommand);
-        $this->assertStringContainsString('-links 1 \\) -exec chown -h '.escapeshellarg($owner), $ownerCommand);
         $this->assertStringContainsString(escapeshellarg($path).' -maxdepth 0 -not -type l', $modeCommand);
         $this->assertStringContainsString('-links 1 \\) -exec chmod 0750', $modeCommand);
         $this->assertThrows(\InvalidArgumentException::class, static function () use ($path): void {
@@ -54,7 +50,8 @@ final class UserEntryMetadataCommandTest extends TestCase
     {
         $rutorrent = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
         $http = $this->pmssReadRepoFile('scripts/lib/update/users/http.php');
-        $this->assertSame(5, substr_count($rutorrent, 'pmssUserEntryChownCommand('));
+        $this->assertSame(0, substr_count($rutorrent, 'pmssUserEntryChownCommand('));
+        $this->assertStringContainsString('pmssRutorrentAccountStep(', $rutorrent);
         $this->assertSame(2, substr_count($rutorrent, 'pmssUserEntryChmodCommand('));
         $this->assertStringContainsString('pmssBuildUserShellCommand($user, $copyCommand)', $http);
         $this->assertFalse(strpos($http, 'pmssUserEntryChownCommand($irssiDir') !== false);

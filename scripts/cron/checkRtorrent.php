@@ -78,6 +78,7 @@ foreach ($users as $user) {
         pmssCheckRtorrentLogBoth($user, "rtorrent disabled by user (.rtorrentDisable); cleanup signal requested (signal=TERM targets={$targets})", $debug);
         continue;
     }
+    if (pmssUserWatchdogBackoffActive($user, 'rtorrent')) continue;
 
     if (!is_file($home.'/.rtorrent.rc')) {
         if (!pmssCheckRtorrentRecoverMissingConfig($user, $home, $debug)) {

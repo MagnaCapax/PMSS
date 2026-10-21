@@ -7,6 +7,25 @@ require_once dirname(__DIR__, 2).'/user/transmissionSettings.php';
 
 final class TorrentClientsP3LaunchTest extends TestCase
 {
+    public function testTransmissionWatchdogHangingLauncherBacksOff(): void
+    {
+        $bin = $this->pmssMakeTempDir('pmss-transmission-watchdog-');
+        $this->pmssWriteExecutableFiles($bin, [
+            'id' => "#!/bin/sh\necho 2002\n",
+            'systemctl' => "#!/bin/sh\nexit 0\n",
+            'systemd-run' => "#!/bin/sh\nwhile [ \"\$1\" != '--' ]; do shift; done\nshift\n\"\$@\"\n",
+            'su' => "#!/bin/sh\nshift\n[ \"\$1\" = '-c' ] || exit 9\nshift\n/bin/sh -c \"\$1\"\n",
+        ]);
+        $this->pmssWithPathPrefixedEnv($bin, ['PMSS_RUNTIME_DIR' => $bin.'/runtime'], function (): void {
+            $command = \pmssBuildUserServiceShellCommand('alice', 'sleep 30');
+            $result = \pmssUserWatchdogCommandRun($command, 1, 'alice', 'transmission');
+            $this->assertTrue($result['timed_out']);
+            $this->assertTrue(\pmssUserWatchdogBackoffActive('alice', 'transmission'));
+        });
+        $source = $this->pmssReadRepoFile('scripts/cron/transmissionInstancesCheck.php');
+        $this->assertTrue(strpos($source, 'pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $command)') !== false);
+    }
+
     private function fixture(): array
     {
         $root = $this->pmssMakeTempDir('pmss-p3-launch-');

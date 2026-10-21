@@ -111,6 +111,56 @@ final class DelugeConfigWriteSafetyTest extends TestCase
             $this->assertSame($uid, fileowner($path), 'Wrong owner for '.$name);
         }
         $this->assertSame(0600, fileperms($configDir.'/auth') & 0777);
+        $this->assertSame(0600, fileperms($configDir.'/hostlist.conf') & 0777);
+        $this->assertSame(0600, fileperms($configDir.'/web.conf') & 0777);
         $this->assertSame($uid, fileowner($home.'/.delugePort'));
+        $password = \pmssDelugeAuthLocalclientPasswordRead($configDir.'/auth');
+        $hostlist = \pmssDelugeConfigDecode((string) file_get_contents($configDir.'/hostlist.conf'));
+        $web = \pmssDelugeReadWebConf($configDir.'/web.conf');
+        $this->assertTrue($password !== '' && $password !== '##LOCALCLIENT_PASSWORD##');
+        $this->assertSame($password, $hostlist['config']['hosts'][0][4]);
+        $this->assertSame(sha1($web['config']['pwd_salt'].$password), $web['config']['pwd_sha1']);
+    }
+
+    public function testExistingAuthUsersSurviveConfiguration(): void
+    {
+        foreach ([
+            'missing' => "extra:thin-client-secret:5\n",
+            'crlf' => "localclient:kept-secret:10\r\nextra:thin-client-secret:5\r\n",
+            'lf' => "localclient:kept-secret:10\nextra:thin-client-secret:5\n",
+            'empty' => "localclient::10\nextra:thin-client-secret:5\n",
+            'no-final-newline' => 'extra:thin-client-secret:5',
+        ] as $case => $content) {
+            [$username, $home] = $this->accountFixture();
+            $configDir = $this->pmssEnsureDir($home.'/.config/deluge');
+            $auth = $this->pmssWriteFile($configDir.'/auth', $content);
+            file_put_contents($home.'/.delugeWebPort', '6201');
+
+            \userConfigureDeluge(['name' => $username, 'memory' => 4], ['config' => ['scgiPort' => 6200]]);
+
+            $after = file_get_contents($auth);
+            $this->assertStringContainsString('extra:thin-client-secret:5', $after, $case);
+            $this->assertSame(1, substr_count($after, 'localclient:'), $case);
+            $password = \pmssDelugeAuthLocalclientPasswordRead($auth);
+            $this->assertTrue($password !== '', $case);
+            if ($case === 'crlf' || $case === 'lf') $this->assertSame('kept-secret', $password, $case);
+        }
+    }
+
+    public function testRefusedExistingAuthIsNeverReplacedFromTemplate(): void
+    {
+        foreach (['oversized', 'hardlinked'] as $case) {
+            [$username, $home] = $this->accountFixture();
+            $configDir = $this->pmssEnsureDir($home.'/.config/deluge');
+            $content = "extra:thin-client-secret:5\n".($case === 'oversized' ? str_repeat('# padding\n', 9000) : '');
+            $auth = $this->pmssWriteFile($configDir.'/auth', $content);
+            if ($case === 'hardlinked') $this->assertTrue(link($auth, $configDir.'/auth-copy'));
+            file_put_contents($home.'/.delugeWebPort', '6201');
+
+            \userConfigureDeluge(['name' => $username, 'memory' => 4], ['config' => ['scgiPort' => 6200]]);
+
+            $this->assertSame($content, file_get_contents($auth), $case);
+            $this->assertFalse(file_exists($configDir.'/core.conf'), $case);
+        }
     }
 }

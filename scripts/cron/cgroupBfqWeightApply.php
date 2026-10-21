@@ -79,7 +79,8 @@ function pmssBfqUserBonusPercentRead(string $user): int
         return 0;
     }
 
-    $raw = @file_get_contents($path, false, null, 0, 64);
+    require_once __DIR__.'/../lib/runtime/filesystem.php';
+    $raw = pmssReadRegularFileContentsVerified($path, null, 64);
     // #945 fairness clamp: ~/.bonus is tenant-writable, so a tenant can pad the percent
     // to self-grant maximum I/O weight (observed live: a marker holding 999999). The
     // applied weight is already kernel-clamped, but an inflated percent still lifts a

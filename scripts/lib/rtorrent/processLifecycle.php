@@ -143,8 +143,9 @@ function rtorrentProcessStart(string $user, callable $logFn, ?string $startMarke
         return 1;
     }
 
-    $rc = 0;
-    @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
+    if (pmssUserWatchdogBackoffActive($user, 'rtorrent')) return 1;
+    $result = pmssUserWatchdogCommandRun('/scripts/startRtorrent '.escapeshellarg($user), 330, $user, 'rtorrent');
+    $rc = $result['rc'];
     $logFn("startRtorrent {$user} completed (rc={$rc})", true);
 
     $now = (string) time();

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/credentialGenerate.php';
 pmssRequireRelativeFiles(__DIR__, ['delugeManagedConfig.php', '../lighttpd/userConfigApply.php', '../lighttpd/userFileWrite.php']);
 
 /**
@@ -14,15 +15,7 @@ pmssRequireRelativeFiles(__DIR__, ['delugeManagedConfig.php', '../lighttpd/userC
  */
 function pmssDelugeServicePasswordGenerate(int $length = 24): string
 {
-    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_';
-    $maxIndex = strlen($alphabet) - 1;
-    $password = '';
-
-    for ($position = 0; $position < $length; $position++) {
-        $password .= $alphabet[random_int(0, $maxIndex)];
-    }
-
-    return $password;
+    return pmssCredentialGenerate($length);
 }
 
 /**
@@ -43,12 +36,12 @@ function pmssDelugeWebConfPath(string $username): string
 
 function pmssDelugeAuthLocalclientPasswordRead(string $authPath): string
 {
-    $content = pmssReadRegularFileContents($authPath);
+    $content = pmssReadRegularFileContentsVerified($authPath, null, 65536);
     if ($content === null || $content === '') {
         return '';
     }
 
-    return preg_match('/^localclient:([^:\r\n]+):[0-9]+$/m', $content, $matches) === 1
+    return preg_match('/^localclient:([^:\r\n]+):[0-9]+\r?$/m', $content, $matches) === 1
         ? $matches[1]
         : '';
 }
@@ -70,14 +63,14 @@ function pmssDelugeAuthWriteLocalclientPassword(string $authPath, string $passwo
         return false;
     }
 
-    $lines = @file($authPath, FILE_IGNORE_NEW_LINES);
-    if (!is_array($lines)) {
-        $lines = [];
-    }
+    $content = pmssReadRegularFileContentsVerified($authPath, null, 65536);
+    // A refused existing file is not an empty auth file; keep all its users.
+    if ($content === null && ($existing !== false || pmssPathExistsOrLink($authPath))) return false;
+    $lines = $content !== null ? explode("\n", rtrim($content, "\r\n")) : [];
 
     $replaced = false;
     foreach ($lines as $index => $line) {
-        if (preg_match('/^localclient:[^:\r\n]*:[0-9]+$/', $line) === 1) {
+        if (preg_match('/^localclient:[^:\r\n]*:[0-9]+\r?$/', $line) === 1) {
             $lines[$index] = 'localclient:'.$password.':10';
             $replaced = true;
             break;
@@ -109,7 +102,55 @@ function pmssDelugeTemplateLocalclientPassword(): string
     }
 
     $password = pmssDelugeAuthLocalclientPasswordRead($templatePath);
-    return $password !== '' ? $password : 'db1f077e3ae178fad7608c327f2cd12dfe63ca67';
+    return $password !== '##LOCALCLIENT_PASSWORD##' ? $password : '';
+}
+
+/** Match retired template values by digest, never by stored plaintext. */
+function pmssDelugeLegacyLocalclientPassword(string $password): bool
+{
+    return hash_equals('d6ca4397ddd1d7b35e756e545ce4552baf64469f86db5723b5b335f9c88c1e97', hash('sha256', $password));
+}
+
+/** Identify the retired Web UI hash without storing it in plaintext. */
+function pmssDelugeLegacyWebHash(string $hash): bool
+{
+    return hash_equals('bca610a7023647b092271916e97db7a519494d5f328a93545e0af5d5b62b55e4', hash('sha256', $hash));
+}
+
+/** Replace the retired shared salt while preserving account-specific salts. */
+function pmssDelugeLegacySalt(string $salt): bool
+{
+    return hash_equals('6c2c241e0585805d6f2159ad2e62397d913a515c54cac1f218d8bedff3526961', hash('sha256', $salt));
+}
+
+/** Recognize the retired shared values without retaining them in source. */
+function pmssDelugeLegacyCredentialPresent(string $username): bool
+{
+    $password = pmssDelugeAuthLocalclientPasswordRead(pmssDelugeAuthPath($username));
+    $templatePassword = pmssDelugeTemplateLocalclientPassword();
+    $web = pmssDelugeReadWebConf(pmssDelugeWebConfPath($username));
+    $webHash = is_array($web) ? ($web['config']['pwd_sha1'] ?? '') : '';
+    return $password === '' || $password === '##LOCALCLIENT_PASSWORD##'
+        || ($templatePassword !== '' && hash_equals($templatePassword, $password))
+        || pmssDelugeLegacyLocalclientPassword($password)
+        || !is_string($webHash) || $webHash === '' || $webHash === '##PWD_SHA1##'
+        || pmssDelugeLegacyWebHash($webHash);
+}
+
+/** Retry a legacy credential once, then keep both Deluge services stopped. */
+function pmssDelugeCredentialReadyForStart(string $username): bool
+{
+    pmssEnsureDelugeServicePassword($username, false);
+    if (!pmssDelugeLegacyCredentialPresent($username)) {
+        return true;
+    }
+    pmssDelugeServicePasswordRotate($username, false);
+    if (!pmssDelugeLegacyCredentialPresent($username)) {
+        return true;
+    }
+    pmssLogStatus('WARN', 'Deluge start refused: account credential is unavailable or shared', 1);
+    pmssLogJson(['event' => 'deluge_template_credential_refused', 'level' => 'WARN']);
+    return false;
 }
 
 /**
@@ -128,7 +169,8 @@ function pmssDelugeWebPasswordWrite(string $webConfPath, string $password, strin
 
     $config = $parsed['config'];
     $salt = $config['pwd_salt'] ?? '';
-    if (!is_string($salt) || strlen($salt) !== 40 || !ctype_xdigit($salt)) {
+    if (!is_string($salt) || strlen($salt) !== 40 || !ctype_xdigit($salt)
+        || pmssDelugeLegacySalt($salt)) {
         $salt = bin2hex(random_bytes(20));
     }
 
@@ -179,22 +221,25 @@ function pmssDelugeServicePasswordApply(string $username, string $password): boo
 /**
  * Ensure Deluge uses a per-user service credential (not the shared template token).
  */
-function pmssEnsureDelugeServicePassword(string $username): string
+function pmssEnsureDelugeServicePassword(string $username, bool $logFailure = true): string
 {
     $authPath = pmssDelugeAuthPath($username);
     $currentPassword = pmssDelugeAuthLocalclientPasswordRead($authPath);
     $templatePassword = pmssDelugeTemplateLocalclientPassword();
 
-    if ($currentPassword !== '' && $currentPassword !== $templatePassword) {
-        if (!pmssDelugeWebPasswordWrite(pmssDelugeWebConfPath($username), $currentPassword, $username) && function_exists('pmssLogStatus')) {
+    if ($currentPassword !== '' && $currentPassword !== $templatePassword
+        && !pmssDelugeLegacyLocalclientPassword($currentPassword)) {
+        if (!pmssDelugeWebPasswordWrite(pmssDelugeWebConfPath($username), $currentPassword, $username) && $logFailure && function_exists('pmssLogStatus')) {
             pmssLogStatus('WARN', 'Deluge Web UI password hash sync failed', 1);
         }
         return $currentPassword;
     }
 
     $newPassword = pmssDelugeServicePasswordGenerate();
-    if (!pmssDelugeServicePasswordApply($username, $newPassword) && function_exists('pmssLogStatus')) {
-        pmssLogStatus('WARN', 'Deluge service credential sync failed', 1);
+    if (!pmssDelugeServicePasswordApply($username, $newPassword)) {
+        if ($logFailure && function_exists('pmssLogStatus')) {
+            pmssLogStatus('WARN', 'Deluge service credential sync failed', 1);
+        }
         return $currentPassword;
     }
 
@@ -204,11 +249,11 @@ function pmssEnsureDelugeServicePassword(string $username): string
 /**
  * Rotate the Deluge service credential and keep daemon/web auth in sync.
  */
-function pmssDelugeServicePasswordRotate(string $username): string
+function pmssDelugeServicePasswordRotate(string $username, bool $logFailure = true): string
 {
     $newPassword = pmssDelugeServicePasswordGenerate();
     if (!pmssDelugeServicePasswordApply($username, $newPassword)) {
-        if (function_exists('pmssLogStatus')) {
+        if ($logFailure && function_exists('pmssLogStatus')) {
             pmssLogStatus('WARN', 'Deluge service credential rotation failed', 1);
         }
         return '';

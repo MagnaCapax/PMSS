@@ -213,6 +213,27 @@ if (defined('FM_EMBED')) {
     restore_error_handler();
 }
 
+// PMSS: keep the action token in TFM's existing per-user session.
+if (empty($_SESSION[FM_SESSION_ID]['action_token'])) {
+    $_SESSION[FM_SESSION_ID]['action_token'] = bin2hex(random_bytes(32));
+}
+function fm_action_required()
+{
+    $token = $_POST['action_token'] ?? '';
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && is_string($token)
+        && hash_equals($_SESSION[FM_SESSION_ID]['action_token'], $token)) {
+        return;
+    }
+    http_response_code(403);
+    exit('Action token required');
+}
+// Legacy changing URLs must fail explicitly; copy and chmod display remain GET.
+if (isset($_GET['logout']) || isset($_GET['del']) || isset($_GET['new'])
+    || isset($_GET['ren']) || isset($_GET['unzip'])
+    || (isset($_GET['copy']) && isset($_GET['finish']))) {
+    fm_action_required();
+}
+
 if (empty($auth_users)) {
     $use_auth = false;
 }
@@ -239,7 +260,8 @@ defined('FM_ROOT_URL') || define('FM_ROOT_URL', ($is_https ? 'https' : 'http') .
 defined('FM_SELF_URL') || define('FM_SELF_URL', ($is_https ? 'https' : 'http') . '://' . $http_host . $_SERVER['PHP_SELF']);
 
 // logout
-if (isset($_GET['logout'])) {
+if (isset($_POST['logout'])) {
+    fm_action_required();
     unset($_SESSION[FM_SESSION_ID]['logged']);
     fm_redirect(FM_SELF_URL);
 }
@@ -418,9 +440,16 @@ unset($p, $use_auth, $iconv_input_encoding, $use_highlightjs, $highlightjs_style
 
 // AJAX Request
 if (isset($_POST['ajax']) && !FM_READONLY) {
+    if (!is_string($_POST['type'] ?? null)) {
+        http_response_code(403);
+        exit('Invalid action type');
+    }
+    if (!in_array($_POST['type'], array('search', 'pwdhash'), true)) {
+        fm_action_required();
+    }
 
     // save
-    if (isset($_POST['type']) && $_POST['type'] == "save") {
+    if (isset($_POST['type']) && $_POST['type'] === "save") {
         // get current path
         $path = FM_ROOT_PATH;
         if (FM_PATH != '') {
@@ -452,7 +481,7 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
     }
 
     //search : get list of files from the current folder
-    if(isset($_POST['type']) && $_POST['type']=="search") {
+    if(isset($_POST['type']) && $_POST['type']==="search") {
         $dir = FM_ROOT_PATH;
         $response = scan(fm_clean_path($_POST['path']), $_POST['content']);
         echo json_encode($response);
@@ -460,7 +489,7 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
     }
     
     // backup files
-    if (isset($_POST['type']) && $_POST['type'] == "backup" && !empty($_POST['file'])) {
+    if (isset($_POST['type']) && $_POST['type'] === "backup" && !empty($_POST['file'])) {
         $fileName = $_POST['file'];
         $fullPath = FM_ROOT_PATH . '/';
         if (!empty($_POST['path'])) {
@@ -485,7 +514,7 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
     }
 
     // Save Config
-    if (isset($_POST['type']) && $_POST['type'] == "settings") {
+    if (isset($_POST['type']) && $_POST['type'] === "settings") {
         global $cfg, $lang, $report_errors, $show_hidden_files, $lang_list, $hide_Cols, $calc_folder;
         $newLng = $_POST['js-language'];
         fm_get_translations([]);
@@ -526,13 +555,13 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
     }
 
     // new password hash
-    if (isset($_POST['type']) && $_POST['type'] == "pwdhash") {
+    if (isset($_POST['type']) && $_POST['type'] === "pwdhash") {
         $res = isset($_POST['inputPassword2']) && !empty($_POST['inputPassword2']) ? password_hash($_POST['inputPassword2'], PASSWORD_DEFAULT) : '';
         echo $res;
     }
 
     //upload using url
-    if(isset($_POST['type']) && $_POST['type'] == "upload" && !empty($_REQUEST["uploadurl"])) {
+    if(isset($_POST['type']) && $_POST['type'] === "upload" && !empty($_REQUEST["uploadurl"])) {
         $path = FM_ROOT_PATH;
         if (FM_PATH != '') {
             $path .= '/' . FM_PATH;
@@ -586,8 +615,9 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
 }
 
 // Delete file / folder
-if (isset($_GET['del']) && !FM_READONLY) {
-    $del = str_replace( '/', '', fm_clean_path( $_GET['del'] ) );
+if (isset($_POST['del']) && !FM_READONLY) {
+    fm_action_required();
+    $del = str_replace( '/', '', fm_clean_path( $_POST['del'] ) );
     if ($del != '' && $del != '..' && $del != '.') {
         $path = FM_ROOT_PATH;
         if (FM_PATH != '') {
@@ -608,15 +638,16 @@ if (isset($_GET['del']) && !FM_READONLY) {
 }
 
 // Create folder
-if (isset($_GET['new']) && isset($_GET['type']) && !FM_READONLY) {
-    $type = $_GET['type'];
-    $new = str_replace( '/', '', fm_clean_path( strip_tags( $_GET['new'] ) ) );
+if (isset($_POST['new']) && isset($_POST['type']) && !FM_READONLY) {
+    fm_action_required();
+    $type = $_POST['type'];
+    $new = str_replace( '/', '', fm_clean_path( strip_tags( $_POST['new'] ) ) );
     if (fm_isvalid_filename($new) && $new != '' && $new != '..' && $new != '.') {
         $path = FM_ROOT_PATH;
         if (FM_PATH != '') {
             $path .= '/' . FM_PATH;
         }
-        if ($_GET['type'] == "file") {
+        if ($_POST['type'] == "file") {
             if (!file_exists($path . '/' . $new)) {
                 if(fm_is_valid_ext($new)) {
                     @fopen($path . '/' . $new, 'w') or die('Cannot open file:  ' . $new);
@@ -643,9 +674,10 @@ if (isset($_GET['new']) && isset($_GET['type']) && !FM_READONLY) {
 }
 
 // Copy folder / file
-if (isset($_GET['copy'], $_GET['finish']) && !FM_READONLY) {
+if (isset($_POST['copy'], $_POST['finish']) && !FM_READONLY) {
+    fm_action_required();
     // from
-    $copy = $_GET['copy'];
+    $copy = $_POST['copy'];
     $copy = fm_clean_path($copy);
     // empty path
     if ($copy == '') {
@@ -661,7 +693,7 @@ if (isset($_GET['copy'], $_GET['finish']) && !FM_READONLY) {
     }
     $dest .= '/' . basename($from);
     // move?
-    $move = isset($_GET['move']);
+    $move = isset($_POST['move']);
     // copy/move/duplicate
     if ($from != $dest) {
         $msg_from = trim(FM_PATH . '/' . basename($from), '/');
@@ -715,6 +747,7 @@ if (isset($_GET['copy'], $_GET['finish']) && !FM_READONLY) {
 
 // Mass copy files/ folders
 if (isset($_POST['file'], $_POST['copy_to'], $_POST['finish']) && !FM_READONLY) {
+    fm_action_required();
     // from
     $path = FM_ROOT_PATH;
     if (FM_PATH != '') {
@@ -775,13 +808,14 @@ if (isset($_POST['file'], $_POST['copy_to'], $_POST['finish']) && !FM_READONLY) 
 }
 
 // Rename
-if (isset($_GET['ren'], $_GET['to']) && !FM_READONLY) {
+if (isset($_POST['ren'], $_POST['to']) && !FM_READONLY) {
+    fm_action_required();
     // old name
-    $old = $_GET['ren'];
+    $old = $_POST['ren'];
     $old = fm_clean_path($old);
     $old = str_replace('/', '', $old);
     // new name
-    $new = $_GET['to'];
+    $new = $_POST['to'];
     $new = fm_clean_path(strip_tags($new));
     $new = str_replace('/', '', $new);
     // path
@@ -822,6 +856,7 @@ if (isset($_GET['dl'])) {
 
 // Upload
 if (!empty($_FILES) && !FM_READONLY) {
+    fm_action_required();
     $override_file_name = false;
     $f = $_FILES;
     $path = FM_ROOT_PATH;
@@ -893,6 +928,7 @@ if (!empty($_FILES) && !FM_READONLY) {
 
 // Mass deleting
 if (isset($_POST['group'], $_POST['delete']) && !FM_READONLY) {
+    fm_action_required();
     $path = FM_ROOT_PATH;
     if (FM_PATH != '') {
         $path .= '/' . FM_PATH;
@@ -923,6 +959,7 @@ if (isset($_POST['group'], $_POST['delete']) && !FM_READONLY) {
 
 // Pack files
 if (isset($_POST['group']) && (isset($_POST['zip']) || isset($_POST['tar'])) && !FM_READONLY) {
+    fm_action_required();
     $path = FM_ROOT_PATH;
     $ext = 'zip';
     if (FM_PATH != '') {
@@ -971,8 +1008,9 @@ if (isset($_POST['group']) && (isset($_POST['zip']) || isset($_POST['tar'])) && 
 }
 
 // Unpack
-if (isset($_GET['unzip']) && !FM_READONLY) {
-    $unzip = $_GET['unzip'];
+if (isset($_POST['unzip']) && !FM_READONLY) {
+    fm_action_required();
+    $unzip = $_POST['unzip'];
     $unzip = fm_clean_path($unzip);
     $unzip = str_replace('/', '', $unzip);
     $isValid = false;
@@ -999,7 +1037,7 @@ if (isset($_GET['unzip']) && !FM_READONLY) {
     if ($isValid) {
         //to folder
         $tofolder = '';
-        if (isset($_GET['tofolder'])) {
+        if (isset($_POST['tofolder'])) {
             $tofolder = pathinfo($zip_path, PATHINFO_FILENAME);
             if (fm_mkdir($path . '/' . $tofolder, true)) {
                 $path .= '/' . $tofolder;
@@ -1037,6 +1075,7 @@ if (isset($_GET['unzip']) && !FM_READONLY) {
 
 // Change Perms (not for Windows)
 if (isset($_POST['chmod']) && !FM_READONLY && !FM_IS_WIN) {
+    fm_action_required();
     $path = FM_ROOT_PATH;
     if (FM_PATH != '') {
         $path .= '/' . FM_PATH;
@@ -1167,7 +1206,8 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                     <?php echo lng('DestinationFolder') ?>: <?php echo fm_enc(fm_convert_win(FM_ROOT_PATH . '/' . FM_PATH)) ?>
                 </p>
 
-                <form action="<?php echo htmlspecialchars(FM_SELF_URL) . '?p=' . fm_enc(FM_PATH) ?>" class="dropzone card-tabs-container" id="fileUploader" enctype="multipart/form-data">
+                <form action="<?php echo htmlspecialchars(FM_SELF_URL) . '?p=' . fm_enc(FM_PATH) ?>" method="post" class="dropzone card-tabs-container" id="fileUploader" enctype="multipart/form-data">
+                    <input type="hidden" name="action_token" value="<?php echo fm_enc($_SESSION[FM_SESSION_ID]['action_token']) ?>">
                     <input type="hidden" name="p" value="<?php echo fm_enc(FM_PATH) ?>">
                     <input type="hidden" name="fullpath" id="fullpath" value="<?php echo fm_enc(FM_PATH) ?>">
                     <div class="fallback">
@@ -1177,6 +1217,7 @@ if (isset($_GET['upload']) && !FM_READONLY) {
 
                 <div class="upload-url-wrapper card-tabs-container hidden" id="urlUploader">
                     <form id="js-form-url-upload" class="form-inline" onsubmit="return upload_from_url(this);" method="POST" action="">
+                        <input type="hidden" name="action_token" value="<?php echo fm_enc($_SESSION[FM_SESSION_ID]['action_token']) ?>">
                         <input type="hidden" name="type" value="upload" aria-label="hidden" aria-hidden="true">
                         <input type="url" placeholder="URL" name="uploadurl" required class="form-control" style="width: 80%">
                         <button type="submit" class="btn btn-primary ml-3"><?php echo lng('Upload') ?></button>
@@ -1195,6 +1236,7 @@ if (isset($_GET['upload']) && !FM_READONLY) {
             acceptedFiles : "<?php echo getUploadExt() ?>",
             init: function () {
                 this.on("sending", function (file, xhr, formData) {
+                    formData.append('action_token', <?php echo json_encode($_SESSION[FM_SESSION_ID]['action_token']) ?>);
                     let _path = (file.fullPath) ? file.fullPath : file.name;
                     document.getElementById("fullpath").value = _path;
                     xhr.ontimeout = (function() {
@@ -1234,6 +1276,7 @@ if (isset($_POST['copy']) && !FM_READONLY) {
             </div>
             <div class="card-body">
                 <form action="" method="post">
+                    <input type="hidden" name="action_token" value="<?php echo fm_enc($_SESSION[FM_SESSION_ID]['action_token']) ?>">
                     <input type="hidden" name="p" value="<?php echo fm_enc(FM_PATH) ?>">
                     <input type="hidden" name="finish" value="1">
                     <?php
@@ -1279,8 +1322,8 @@ if (isset($_GET['copy']) && !isset($_GET['finish']) && !FM_READONLY) {
             Destination folder: <?php echo fm_enc(fm_convert_win(FM_ROOT_PATH . '/' . FM_PATH)) ?>
         </p>
         <p>
-            <b><a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1"><i class="fa fa-check-circle"></i> Copy</a></b> &nbsp;
-            <b><a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1&amp;move=1"><i class="fa fa-check-circle"></i> Move</a></b> &nbsp;
+            <b><a href="#" onclick="fm_action_post('p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1');return false;"><i class="fa fa-check-circle"></i> Copy</a></b> &nbsp;
+            <b><a href="#" onclick="fm_action_post('p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1&amp;move=1');return false;"><i class="fa fa-check-circle"></i> Move</a></b> &nbsp;
             <b><a href="?p=<?php echo urlencode(FM_PATH) ?>"><i class="fa fa-times-circle"></i> Cancel</a></b>
         </p>
         <p><i>Select folder</i></p>
@@ -1319,6 +1362,7 @@ if (isset($_GET['settings']) && !FM_READONLY) {
             </h6>
             <div class="card-body">
                 <form id="js-settings-form" action="" method="post" data-type="ajax" onsubmit="return save_settings(this)">
+                    <input type="hidden" name="action_token" value="<?php echo fm_enc($_SESSION[FM_SESSION_ID]['action_token']) ?>">
                     <input type="hidden" name="type" value="settings" aria-label="hidden" aria-hidden="true">
                     <div class="form-group row">
                         <label for="js-language" class="col-sm-3 col-form-label"><?php echo lng('Language') ?></label>
@@ -1589,8 +1633,8 @@ if (isset($_GET['view'])) {
                     if (!FM_READONLY && ($is_zip || $is_gzip) && $filenames !== false) {
                         $zip_name = pathinfo($file_path, PATHINFO_FILENAME);
                         ?>
-                        <b><a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;unzip=<?php echo urlencode($file) ?>"><i class="fa fa-check-circle"></i> <?php echo lng('UnZip') ?></a></b> &nbsp;
-                        <b><a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;unzip=<?php echo urlencode($file) ?>&amp;tofolder=1" title="UnZip to <?php echo fm_enc($zip_name) ?>"><i class="fa fa-check-circle"></i>
+                        <b><a href="#" onclick="fm_action_post('p=<?php echo urlencode(FM_PATH) ?>&amp;unzip=<?php echo urlencode($file) ?>');return false;"><i class="fa fa-check-circle"></i> <?php echo lng('UnZip') ?></a></b> &nbsp;
+                        <b><a href="#" onclick="fm_action_post('p=<?php echo urlencode(FM_PATH) ?>&amp;unzip=<?php echo urlencode($file) ?>&amp;tofolder=1');return false;" title="UnZip to <?php echo fm_enc($zip_name) ?>"><i class="fa fa-check-circle"></i>
                                 <?php echo lng('UnZipToFolder') ?></a></b> &nbsp;
                         <?php
                     }
@@ -1697,6 +1741,7 @@ if (isset($_GET['edit'])) {
 
     // Save File
     if (isset($_POST['savedata'])) {
+        fm_action_required();
         $writedata = $_POST['savedata'];
         $fd = fopen($file_path, "w");
         @fwrite($fd, $writedata);
@@ -1795,6 +1840,7 @@ if (isset($_GET['chmod']) && !FM_READONLY && !FM_IS_WIN) {
                     Full path: <?php echo $file_path ?><br>
                 </p>
                 <form action="" method="post">
+                    <input type="hidden" name="action_token" value="<?php echo fm_enc($_SESSION[FM_SESSION_ID]['action_token']) ?>">
                     <input type="hidden" name="p" value="<?php echo fm_enc(FM_PATH) ?>">
                     <input type="hidden" name="chmod" value="<?php echo fm_enc($file) ?>">
 
@@ -1851,6 +1897,7 @@ $all_files_size = 0;
 $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white";
 ?>
 <form action="" method="post" class="pt-3">
+    <input type="hidden" name="action_token" value="<?php echo fm_enc($_SESSION[FM_SESSION_ID]['action_token']) ?>">
     <input type="hidden" name="p" value="<?php echo fm_enc(FM_PATH) ?>">
     <input type="hidden" name="group" value="1">
     <div class="table-responsive">
@@ -1935,7 +1982,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                         <td><?php echo $owner['name'] . ':' . $group['name'] ?></td>
                     <?php endif; ?>
                     <td class="inline-actions"><?php if (!FM_READONLY): ?>
-                            <a title="<?php echo lng('Delete')?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>" onclick="return confirm('<?php echo lng('Delete').' '.lng('Folder').'?'; ?>\n \n ( <?php echo urlencode($f) ?> )');"> <i class="fa fa-trash-o" aria-hidden="true"></i></a>
+                            <a title="<?php echo lng('Delete')?>" href="#" onclick="if (confirm('<?php echo lng('Delete').' '.lng('Folder').'?'; ?>\n \n ( <?php echo urlencode($f) ?> )')) fm_action_post('p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>');return false;"> <i class="fa fa-trash-o" aria-hidden="true"></i></a>
                             <a title="<?php echo lng('Rename')?>" href="#" onclick="rename('<?php echo fm_enc(FM_PATH) ?>', '<?php echo fm_enc(addslashes($f)) ?>');return false;"><i class="fa fa-pencil-square-o" aria-hidden="true"></i></a>
                             <a title="<?php echo lng('CopyTo')?>..." href="?p=&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o" aria-hidden="true"></i></a>
                         <?php endif; ?>
@@ -1999,7 +2046,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     <td class="inline-actions">
                         <a title="<?php echo lng('Preview') ?>" href="<?php echo $filelink.'&quickView=1'; ?>" data-toggle="lightbox" data-gallery="tiny-gallery" data-title="<?php echo fm_convert_win($f) ?>" data-max-width="100%" data-width="100%"><i class="fa fa-eye"></i></a>
                         <?php if (!FM_READONLY): ?>
-                            <a title="<?php echo lng('Delete') ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>" onclick="return confirm('<?php echo lng('Delete').' '.lng('File').'?'; ?>\n \n ( <?php echo urlencode($f) ?> )');"> <i class="fa fa-trash-o"></i></a>
+                            <a title="<?php echo lng('Delete') ?>" href="#" onclick="if (confirm('<?php echo lng('Delete').' '.lng('File').'?'; ?>\n \n ( <?php echo urlencode($f) ?> )')) fm_action_post('p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>');return false;"> <i class="fa fa-trash-o"></i></a>
                             <a title="<?php echo lng('Rename') ?>" href="#" onclick="rename('<?php echo fm_enc(FM_PATH) ?>', '<?php echo fm_enc(addslashes($f)) ?>');return false;"><i class="fa fa-pencil-square-o"></i></a>
                             <a title="<?php echo lng('CopyTo') ?>..."
                                href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o"></i></a>
@@ -3562,7 +3609,7 @@ function fm_show_nav_path($path)
                             <a title="<?php echo lng('Settings') ?>" class="dropdown-item nav-link" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;settings=1"><i class="fa fa-cog" aria-hidden="true"></i> <?php echo lng('Settings') ?></a>
                             <?php endif ?>
                             <a title="<?php echo lng('Help') ?>" class="dropdown-item nav-link" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;help=2"><i class="fa fa-exclamation-circle" aria-hidden="true"></i> <?php echo lng('Help') ?></a>
-                            <a title="<?php echo lng('Logout') ?>" class="dropdown-item nav-link" href="?logout=1"><i class="fa fa-sign-out" aria-hidden="true"></i> <?php echo lng('Logout') ?></a>
+                            <a title="<?php echo lng('Logout') ?>" class="dropdown-item nav-link" href="#" onclick="fm_action_post('logout=1');return false;"><i class="fa fa-sign-out" aria-hidden="true"></i> <?php echo lng('Logout') ?></a>
                         </div>
                     </li>
                     <?php else: ?>
@@ -3932,6 +3979,20 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
     <script>hljs.initHighlightingOnLoad(); var isHighlightingEnabled = true;</script>
 <?php endif; ?>
 <script>
+    function fm_action_post(query) {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '?p=' + encodeURIComponent(new URLSearchParams(query).get('p') || '');
+        var fields = new URLSearchParams(query);
+        fields.set('action_token', <?php echo json_encode($_SESSION[FM_SESSION_ID]['action_token']) ?>);
+        fields.forEach(function(value, name) {
+            var input = document.createElement('input');
+            input.type = 'hidden'; input.name = name; input.value = value;
+            form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+    }
     $(document).on('click', '[data-toggle="lightbox"]', function(event) {
         event.preventDefault();
         var reInitHighlight = function() { if(typeof isHighlightingEnabled !== "undefined" && isHighlightingEnabled) { setTimeout(function () { $('.ekko-lightbox-container pre code').each(function (i, e) { hljs.highlightBlock(e) }); }, 555); } };
@@ -3949,9 +4010,9 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
     }
     function newfolder(e) {
         var t = document.getElementById("newfilename").value, n = document.querySelector('input[name="newfile"]:checked').value;
-        null !== t && "" !== t && n && (window.location.hash = "#", window.location.search = "p=" + encodeURIComponent(e) + "&new=" + encodeURIComponent(t) + "&type=" + encodeURIComponent(n))
+        null !== t && "" !== t && n && fm_action_post("p=" + encodeURIComponent(e) + "&new=" + encodeURIComponent(t) + "&type=" + encodeURIComponent(n))
     }
-    function rename(e, t) {var n = prompt("New name", t);null !== n && "" !== n && n != t && (window.location.search = "p=" + encodeURIComponent(e) + "&ren=" + encodeURIComponent(t) + "&to=" + encodeURIComponent(n))}
+    function rename(e, t) {var n = prompt("New name", t);null !== n && "" !== n && n != t && fm_action_post("p=" + encodeURIComponent(e) + "&ren=" + encodeURIComponent(t) + "&to=" + encodeURIComponent(n))}
     function change_checkboxes(e, t) { for (var n = e.length - 1; n >= 0; n--) e[n].checked = "boolean" == typeof t ? t : !e[n].checked }
     function get_checkboxes() { for (var e = document.getElementsByName("file[]"), t = [], n = e.length - 1; n >= 0; n--) (e[n].type = "checkbox") && t.push(e[n]); return t }
     function select_all() { change_checkboxes(get_checkboxes(), !0) }
@@ -3960,7 +4021,7 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
     function checkbox_toggle() { var e = get_checkboxes(); e.push(this), change_checkboxes(e) }
     function backup(e, t) { //Create file backup with .bck
         var n = new XMLHttpRequest,
-            a = "path=" + e + "&file=" + t + "&type=backup&ajax=true";
+            a = "path=" + e + "&file=" + t + "&type=backup&ajax=true&action_token=" + encodeURIComponent(<?php echo json_encode($_SESSION[FM_SESSION_ID]['action_token']) ?>);
         return n.open("POST", "", !0), n.setRequestHeader("Content-type", "application/x-www-form-urlencoded"), n.onreadystatechange = function () {
             4 == n.readyState && 200 == n.status && toast(n.responseText)
         }, n.send(a), !1
@@ -3972,7 +4033,7 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         var n = "ace" == t ? editor.getSession().getValue() : document.getElementById("normal-editor").value;
         if (n) {
             if(true){
-                var data = {ajax: true, content: n, type: 'save'};
+                var data = {ajax: true, content: n, type: 'save', action_token: <?php echo json_encode($_SESSION[FM_SESSION_ID]['action_token']) ?>};
                 
                 $.ajax({
                     type: "POST",

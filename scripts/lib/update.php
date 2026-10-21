@@ -15,6 +15,8 @@ require_once __DIR__.'/rutorrent/config.php';
 // so update helpers always keep the context-aware logging contract.
 require_once __DIR__.'/update/logging.php';
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
+require_once __DIR__.'/user/directories.php';
 pmssRequireRelativeFiles(__DIR__, ['version.php', 'update/apt.php', 'update/osRelease.php']);
 
 /**
@@ -66,29 +68,6 @@ function pmssUpdateUserPathIsInsideHome(string $path, string $homeDir): bool
 function pmssUpdateUserCandidatePathIsInsideHome(string $path, string $homeDir): bool
 {
     return $path !== '' && $path !== '/' && $homeDir !== '' && pmssPathWithinResolvedRoot($path, $homeDir);
-}
-
-/**
- * Apply tenant ownership only after proving the resolved target is in that home.
- */
-function pmssApplyUserPathPermissions(string $path, string $user, string $homeDir, string $label): bool
-{
-    if (!pmssUpdateUserPathIsInsideHome($path, $homeDir)) {
-        logMessage("[ERROR] Refusing to chown path outside user home for {$user}: {$label}");
-        return false;
-    }
-
-    if (!@chmod($path, 0755)) {
-        logMessage("[WARN] Failed to chmod 0755: {$label}");
-    }
-    if (!@chown($path, (string) $user)) {
-        logMessage("[WARN] Failed to chown {$user}: {$label}");
-    }
-    if (!@chgrp($path, (string) $user)) {
-        logMessage("[WARN] Failed to chgrp {$user}: {$label}");
-    }
-
-    return true;
 }
 
 /**
@@ -200,32 +179,10 @@ function updateUserFile($file, $user) {
             return;
         }
 
-        $prefix = rtrim($homeDir, '/');
-        $relative = substr($parent, strlen($prefix));
-        $relative = ltrim($relative, '/');
-        if ($relative !== '') {
-            $path = $prefix;
-            foreach (explode('/', $relative) as $segment) {
-                if ($segment === '') {
-                    continue;
-                }
-                $path .= '/'.$segment;
-                if (is_dir($path)) {
-                    continue;
-                }
-                if (file_exists($path)) {
-                    logMessage("[user:{$user}] Cannot create directory, path exists: {$path}");
-                    return;
-                }
-                if (!@mkdir($path, 0755)) {
-                    logMessage("[user:{$user}] Failed to create directory: {$path}");
-                    return;
-                }
-                if (!pmssApplyUserPathPermissions($path, (string) $user, $realHomeDir, $path)) {
-                    return;
-                }
-                logMessage("[user:{$user}] Created directory: {$path}");
-            }
+        $relative = ltrim(substr($parent, strlen(rtrim($homeDir, '/'))), '/');
+        if ($relative !== '' && !pmssEnsureUserHomeDir((string) $user, $realHomeDir, $relative, 0755)) {
+            logMessage("[user:{$user}] Failed to create directory: {$parent}");
+            return;
         }
     }
 
@@ -245,8 +202,8 @@ function updateUserFile($file, $user) {
         return;
     }
     $sourceContent = file_get_contents($sourceFile);
-    $targetContent = file_get_contents($targetFile);
-    if ($sourceContent === false || $targetContent === false) {
+    $targetContent = pmssReadRegularFileContents($targetFile);
+    if ($sourceContent === false || $targetContent === null) {
         logMessage("[user:{$user}] Error reading file contents for comparison: {$file}");
         return;
     }
@@ -269,44 +226,20 @@ function updateUserFile($file, $user) {
  * @return bool True when the file was copied into place.
  */
 function copyToUserSpace($sourceFile, $targetFile, $user) {
-    $parent = dirname($targetFile);
     $homeDir = pmssUpdateUserHomeDir((string) $user);
     if ($homeDir === '' || !pmssUpdateUserCandidatePathIsInsideHome($targetFile, $homeDir) || is_link($targetFile)) {
         logMessage("[ERROR] Refusing to copy user file outside home for {$user}: {$targetFile}");
         return false;
     }
 
-    if (!is_dir($parent)) {
-        logMessage("[user:{$user}] Failed to copy; parent directory missing: {$parent}");
+    if (!is_dir(dirname($targetFile))) {
+        logMessage("[user:{$user}] Failed to copy; parent directory missing: ".dirname($targetFile));
         return false;
     }
-
-    $applyPermissions = static function (string $path) use ($targetFile, $user, $homeDir): bool {
-        return pmssApplyUserPathPermissions($path, (string) $user, $homeDir, $targetFile);
-    };
-
-    $tempFile = @tempnam($parent, 'pmss-userfile-');
-    if ($tempFile === false) {
-        logMessage("[user:{$user}] Failed to create temp file in {$parent}");
+    $content = pmssReadRegularFileContents((string) $sourceFile);
+    if ($content === null || !pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true)) {
+        logMessage("[user:{$user}] Failed to copy {$sourceFile} to {$targetFile}");
         return false;
     }
-    if (!copy($sourceFile, $tempFile)) {
-        @unlink($tempFile);
-        logMessage("[user:{$user}] Failed to copy {$sourceFile} to temp file for {$targetFile}");
-        return false;
-    }
-
-    if (!$applyPermissions($tempFile)) {
-        @unlink($tempFile);
-        return false;
-    }
-
-    if (!@rename($tempFile, $targetFile)) {
-        @unlink($tempFile);
-        logMessage("[user:{$user}] Failed to move temp file into place: {$targetFile}");
-        return false;
-    }
-
-    // Avoid shelling out for simple chmod/chown: fork failures are common during updates.
-    return $applyPermissions($targetFile);
+    return true;
 }

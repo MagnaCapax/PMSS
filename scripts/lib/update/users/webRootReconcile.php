@@ -95,20 +95,17 @@ function pmssUserWebRootReconcileTreeIsSafe(string $path, string $home, bool $pl
     return true;
 }
 
-/** Apply tenant ownership without following links; copy already applied modes. */
+/** Confirm an account-created tree has the expected owner without changing it. */
 function pmssUserWebRootReconcileApplyOwnership(string $path, string $user): bool
 {
     if (is_link($path)) {
         return true;
     }
-    if (!is_array(@lstat($path))) {
-        return false;
-    }
-    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        if (!@chown($path, $user) || !@chgrp($path, $user)) {
-            return false;
-        }
-    }
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
+    $stat = @lstat($path);
+    $currentUid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
+    $expectedUid = is_array($account) ? (int) $account['uid'] : ($currentUid > 0 ? $currentUid : -1);
+    if (!is_array($stat) || (int) $stat['uid'] !== $expectedUid) return false;
     if (!is_dir($path)) {
         return true;
     }
@@ -132,19 +129,21 @@ function pmssUserWebRootReconcileInstallFile(
     string $target,
     int $mode,
     bool $noReplace,
-    ?array &$stats = null
+    ?array &$stats = null,
+    ?string $user = null,
+    string $home = ''
 ): bool
 {
-    $temporary = @tempnam(dirname($target), '.pmss-web-root-');
-    if ($temporary === false || is_link($temporary) || !@copy($source, $temporary)) {
-        if (is_string($temporary)) {
-            @unlink($temporary);
-        }
-        return false;
-    }
-    @chmod($temporary, $mode);
-    $installed = $noReplace ? @link($temporary, $target) : @rename($temporary, $target);
-    @unlink($temporary);
+    if ($user === null) return false;
+    $template = dirname($target).'/.pmss-web-root-XXXXXXXX';
+    $targetArg = escapeshellarg($target);
+    $command = 'tmp=$(mktemp -- '.escapeshellarg($template).') || exit 1; '
+        .'trap \'rm -f -- "$tmp"\' EXIT; '
+        .'cp -- '.escapeshellarg($source).' "$tmp"'
+        .' && chmod '.sprintf('%04o', $mode).' -- "$tmp"'
+        .' && test ! -L '.$targetArg
+        .' && '.($noReplace ? 'ln -- "$tmp" '.$targetArg : 'mv -T -- "$tmp" '.$targetArg);
+    $installed = pmssUserWebRootMigrationRun($user, $home, [$target], $command);
     if ($installed && $stats !== null) {
         $stats['files_restored'] = (int) ($stats['files_restored'] ?? 0) + 1;
     }
@@ -159,10 +158,11 @@ function pmssUserWebRootReconcileCopyEntry(
     string $relative = '',
     ?array &$stats = null,
     ?string $user = null,
-    ?callable $logger = null
+    ?callable $logger = null,
+    bool $merge = false
 ): bool
 {
-    $merge = $user !== null;
+    if ($user === null) return false;
     if ($merge && (is_link($target) || (file_exists($target) && !is_dir($target) && !is_file($target)))) {
         pmssUserWebRootMigrationLog($user, $logger, 'Refusing conflicting web-root path: '.$relative);
         return true;
@@ -189,10 +189,8 @@ function pmssUserWebRootReconcileCopyEntry(
         $installed = is_string($linkTarget)
             && pmssUserWebRootReconcileLinkTargetIsSafe($target, $linkTarget, $home)
             && ($merge || (!file_exists($target) && !is_link($target)))
-            && ($merge
-                ? pmssUserWebRootMigrationRun($user, $home, [$target],
-                    'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($target))
-                : @symlink($linkTarget, $target));
+            && pmssUserWebRootMigrationRun($user, $home, [$target],
+                'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($target));
         if ($merge && !$installed) {
             pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe skeleton symlink: '.$relative);
         }
@@ -210,15 +208,10 @@ function pmssUserWebRootReconcileCopyEntry(
         }
         $created = !is_dir($target);
         $mode = $stat['mode'] & 07777;
-        $createdSuccessfully = !$created || ($merge
-            ? pmssUserWebRootMigrationRun($user, $home, [$target],
-                'mkdir -m 0700 -- '.escapeshellarg($target))
-            : @mkdir($target, $mode));
+        $createdSuccessfully = !$created || pmssUserWebRootMigrationRun($user, $home, [$target],
+            'mkdir -m 0700 -- '.escapeshellarg($target));
         if ($created && !$createdSuccessfully) {
             return $merge;
-        }
-        if (!$merge) {
-            @chmod($target, $mode);
         }
         foreach ($entries as $child) {
             $childRelative = $relative === '' ? $child : $relative.'/'.$child;
@@ -227,7 +220,7 @@ function pmssUserWebRootReconcileCopyEntry(
             if (pmssUserWebRootReconcileMergeExcluded($childRelative) && ($merge || !$baselineShare)) {
                 continue;
             }
-            if (!pmssUserWebRootReconcileCopyEntry($source.'/'.$child, $target.'/'.$child, $home, $childRelative, $stats, $user, $logger)) {
+            if (!pmssUserWebRootReconcileCopyEntry($source.'/'.$child, $target.'/'.$child, $home, $childRelative, $stats, $user, $logger, $merge)) {
                 return false;
             }
         }
@@ -235,30 +228,16 @@ function pmssUserWebRootReconcileCopyEntry(
             pmssUserWebRootMigrationRun($user, $home, [$target],
                 'chmod '.escapeshellarg(sprintf('%04o', $mode)).' -- '.escapeshellarg($target));
         }
+        if (!$merge && !pmssUserWebRootMigrationRun($user, $home, [$target],
+            'chmod '.sprintf('%04o', $mode).' -- '.escapeshellarg($target))) return false;
         return true;
     }
     if (!is_file($source) || pmssPathExistsOrLink($target)) {
         return $merge;
     }
 
-    $installed = pmssUserWebRootReconcileInstallFile($source, $target, $stat['mode'] & 07777, $merge, $stats);
+    $installed = pmssUserWebRootReconcileInstallFile($source, $target, $stat['mode'] & 07777, $merge, $stats, $user, $home);
     return $merge || $installed;
-}
-
-/** Remove only a staging tree created by this reconciler. */
-function pmssUserWebRootReconcileRemoveTree(string $path): void
-{
-    if (is_link($path) || is_file($path)) {
-        @unlink($path);
-        return;
-    }
-    if (!is_dir($path)) {
-        return;
-    }
-    foreach (pmssDirectoryEntriesRead($path) ?: [] as $child) {
-        pmssUserWebRootReconcileRemoveTree($path.'/'.$child);
-    }
-    @rmdir($path);
 }
 
 /** Customer-owned paths are restored by the migration/link helper, never skel-merged. */
@@ -289,12 +268,14 @@ function pmssUserWebRootReconcileFull(
         pmssUserWebRootMigrationLog($user, $logger, 'Unable to create web-root staging name');
         return false;
     }
-    if (!pmssPathAbsoluteStringIsSafe($stage, ['allowRoot' => false]) || !@mkdir($stage, 0700)) {
+    if (!pmssPathAbsoluteStringIsSafe($stage, ['allowRoot' => false])
+        || !pmssUserWebRootMigrationRun($user, $home, [$stage],
+            'mkdir -m 0700 -- '.escapeshellarg($stage))) {
         return false;
     }
 
     $success = pmssUserWebRootReconcileTreeIsSafe($skeleton, $home, false)
-        && pmssUserWebRootReconcileCopyEntry($skeleton, $stage, $home, '', $stats)
+        && pmssUserWebRootReconcileCopyEntry($skeleton, $stage, $home, '', $stats, $user)
         && pmssUserWebRootReconcileTreeIsSafe($stage, $home)
         && pmssUserWebRootReconcileApplyOwnership($stage, $user);
     if ($success) {
@@ -304,7 +285,7 @@ function pmssUserWebRootReconcileFull(
             && pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www);
     }
     if (!$success) {
-        pmssUserWebRootReconcileRemoveTree($stage);
+        pmssUserWebRootMigrationRemoveCopy($user, $home, $stage);
         pmssUserWebRootMigrationLog($user, $logger, 'Full web-root restore refused or failed');
         return false;
     }
@@ -396,7 +377,7 @@ function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
             ? pmssUserWebRootReconcileFull($www, $skeleton, $home, $user, $runLogger, $stats)
             : true;
         if (!$fullRestore) {
-            $result = pmssUserWebRootReconcileCopyEntry($skeleton, $www, $home, '', $stats, $user, $runLogger);
+            $result = pmssUserWebRootReconcileCopyEntry($skeleton, $www, $home, '', $stats, $user, $runLogger, true);
         }
         if (!$result) {
             $reason = 'restore-failed';

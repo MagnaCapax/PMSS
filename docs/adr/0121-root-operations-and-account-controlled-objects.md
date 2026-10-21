@@ -57,6 +57,15 @@ is needed for every root step that encounters such objects.
 Shared `/opt/<App>` ARR installs are also covered. Updates check existing
 trees, replace those with non-root-owned entries, and leave other trees alone.
 
+The per-account GUI watchdog, web-root reconciler and migrator, and home
+directory repair helpers are covered by the same rule: account-controlled
+paths are created, copied, repaired, and removed with the account identity.
+
+The shared writer, appender, and reader cover account-controlled paths. Root
+places an ADR 0046 Authoritative or Enforced file in an account directory only
+through a root-only stage beside the home and a single-rename publish; the
+account identity handles account-owned files.
+
 ## Related ADRs
 
 - ADR 0005: validation at trust boundaries for internal tool output.

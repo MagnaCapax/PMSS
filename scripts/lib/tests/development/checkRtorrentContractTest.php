@@ -99,13 +99,15 @@ class checkRtorrentContractTest extends TestCase
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/rtorrent/watchdog.php' => [
                 'required' => [
-                    '$skelHash = @md5_file($skelScript);',
-                    '$userHash = @md5_file($userScript);',
+                    '$userContent = pmssReadRegularFileContentsVerified($userScript, null, 1048576, $userMeta);',
                     'executor refresh skipped (checksum unavailable)',
-                    'pmssWriteUserFile($userScript, $skelContent, $user, is_int($mode) ? $mode & 0777 : 0750)',
+                    'pmssReplaceAccountFile($user, $home, $userScript, $skelContent, (int) $userMeta[\'mode\'] & 0777, true)',
                     'executor refresh failed (copy error)',
                 ],
                 'forbidden' => [
+                    '@md5_file($userScript)',
+                    '@fileperms($userScript)',
+                    'pmssWriteUserFile($userScript',
                     'copy($skelScript, $userScript);',
                     '@chown($userScript, $user);',
                     '$throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;',

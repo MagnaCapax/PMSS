@@ -139,7 +139,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 'required' => [
                     "/etc/seedbox/config/template.suspended.notice.html",
                     "pmssSuspendedFallbackHtml(\$username)",
-                    "@file_put_contents(\$suspendRoot.'/index.html', \$html)",
+                    "pmssReplaceAccountFile(\$username, \$homeDir, \$suspendRoot.'/index.html', \$html, 0644, true)",
                 ],
                 'forbidden' => [
                     'function pmssRender'.'SuspendedHtml(' => 'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()',

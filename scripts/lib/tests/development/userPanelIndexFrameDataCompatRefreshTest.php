@@ -10,7 +10,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
 {
     private $homeRoot;
     private $home;
-    private $user = 'paneluser';
+    private $user = 'panelusr';
     private $skelIndex;
 
     protected function setUp(): void

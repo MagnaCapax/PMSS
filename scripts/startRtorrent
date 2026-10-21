@@ -35,37 +35,38 @@ if ($user === null) {
     exit(1);
 }
 
-$home = '/home/'.$user;
+$home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$user;
 
 /**
  * Start rTorrent for the user (legacy direct start or executor wrapper).
  */
-function pmssStartRtorrentLaunch(string $user, string $home, string $executor): void
+function pmssStartRtorrentLaunch(string $user, string $home, string $executor): bool
 {
     if (!file_exists($executor)) {
         // If old version of master GUI, call rTorrent directly.
         logmsg("Starting rTorrent for {$user} (legacy mode)");
-        $sessionPrefix = $home.'/session/rtorrent.';
-        $candidates = glob($sessionPrefix.'*');
-        if (is_array($candidates)) {
-            foreach ($candidates as $path) {
-                if (strpos($path, $sessionPrefix) !== 0) {
-                    continue;
-                }
-                if (is_file($path) || is_link($path)) {
-                    @unlink($path);
-                }
-            }
+        $session = $home.'/session';
+        $remove = 'for path in '.escapeshellarg($session).'/rtorrent.*; do '
+            .'[ -e "$path" ] || [ -L "$path" ] || continue; '
+            .'[ -f "$path" ] || [ -L "$path" ] || continue; '
+            .'rm -f -- "$path" || exit 1; done';
+        $timedOut = false;
+        if (!pmssAccountPathRun($user, $home, [$session.'/rtorrent.lock'], $remove, null,
+            pmssUserWatchdogTimeoutSeconds(15), $timedOut)) {
+            if ($timedOut) pmssUserWatchdogBackoffRecord($user, 'rtorrent');
+            logmsg("[WARN] Failed to clear legacy session files for {$user}");
+            return !$timedOut;
         }
         $cmd = pmssBuildUserServiceShellCommand($user, 'screen -S rtorrent -fa -d -m rtorrent', true);
-        passthru($cmd);
-        return;
+        $result = pmssUserWatchdogCommandRun($cmd, 60, $user, 'rtorrent');
+        return !$result['timed_out'];
     }
 
     // Newer versions use .rtorrentExecute.php wrapper.
     logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
     $cmd = pmssBuildUserServiceShellCommand($user, 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php', true);
-    passthru($cmd);
+    $result = pmssUserWatchdogCommandRun($cmd, 60, $user, 'rtorrent');
+    return !$result['timed_out'];
 }
 
 /**
@@ -114,13 +115,13 @@ if ($lockBusy) {
 $executor = $home.'/.rtorrentExecute.php';
 $skelExecutor = '/etc/skel/.rtorrentExecute.php';
 if (is_file($executor) && is_file($skelExecutor) && !is_link($executor)) {
-    $executorData = @file_get_contents($executor);
+    $executorData = pmssReadRegularFileContentsVerified($executor, null, 1048576);
     $executorHasLock = is_string($executorData) && $executorData !== '' && strpos($executorData, '.rtorrentExecute.lock') !== false && strpos($executorData, 'flock(') !== false;
 
     $skelData = @file_get_contents($skelExecutor);
     $skelHasLock = is_string($skelData) && $skelData !== '' && strpos($skelData, '.rtorrentExecute.lock') !== false && strpos($skelData, 'flock(') !== false;
     if (!$executorHasLock && $skelHasLock) {
-        if (pmssWriteUserFile($executor, $skelData, $user, 0755)) {
+        if (pmssReplaceAccountFile($user, $home, $executor, $skelData, 0755, true)) {
             logmsg("[INFO] Refreshed {$executor} from {$skelExecutor} (added lock guard)");
         } else {
             logmsg("[WARN] Failed to refresh {$executor} from {$skelExecutor}");
@@ -157,11 +158,10 @@ if ($executorRc !== 0 && $executorRc !== 1) {
 //   "Could not open ip filter file: /etc/seedbox/config/localnet"
 $localnet = '/etc/seedbox/config/localnet';
 if (file_exists($localnet)) {
-    $checkCmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('test -r '.$localnet);
-    $output = [];
-    $rc = 0;
-    exec($checkCmd, $output, $rc);
-    if ($rc !== 0) {
+    $checkCmd = pmssBuildUserShellCommand($user, 'test -r '.escapeshellarg($localnet), '/bin/sh');
+    $checkResult = pmssUserWatchdogCommandRun($checkCmd, 10, $user, 'rtorrent');
+    if ($checkResult['timed_out']) exit(1);
+    if ($checkResult['rc'] !== 0) {
         logmsg("[WARN] {$localnet} exists but is not readable by {$user}; rTorrent will likely fail with a localnet ip filter error.");
         logmsg("[HINT] Run '/scripts/util/setupPermissions.php' as root or check: ls -ld /etc/seedbox /etc/seedbox/config {$localnet}");
     }
@@ -175,11 +175,12 @@ if (file_exists($localnet)) {
 if (!is_dir($home.'/session')) {
     logmsg("Creating rTorrent session directory for {$user}");
     $sessionCommand = pmssBuildUserShellCommand($user, 'mkdir -m 755 -p -- '.escapeshellarg($home.'/session'));
-    @exec($sessionCommand);
+    $sessionResult = pmssUserWatchdogCommandRun($sessionCommand, 15, $user, 'rtorrent');
+    if ($sessionResult['timed_out']) exit(1);
 }
 
 // Finally execute rTorrent inside a screen session.
-pmssStartRtorrentLaunch($user, $home, $executor);
+if (pmssUserWatchdogBackoffActive($user, 'rtorrent') || !pmssStartRtorrentLaunch($user, $home, $executor)) exit(1);
 
 // Output a small process snapshot so operators can see whether rTorrent or the
 // wrapper stayed up, without relying on grep parsing.
@@ -205,7 +206,7 @@ if ($psRc === 0 && !empty($psLines)) {
 $startupWaitSeconds = 30;
 $startupStabilitySeconds = 30;
 $customConfigFailureLimit = 4;
-$stateDir = '/run/pmss';
+$stateDir = pmssRuntimeDir();
 $legacyStateFile = $stateDir.'/startRtorrent-customrc-fail-'.$user.'.ts';
 $failureStateFile = $stateDir.'/startRtorrent-customrc-fail-'.$user.'.count';
 
@@ -263,7 +264,7 @@ if (!empty($executorPids)) {
     usleep(250000);
 }
 
-pmssStartRtorrentLaunch($user, $home, $executor);
+if (pmssUserWatchdogBackoffActive($user, 'rtorrent') || !pmssStartRtorrentLaunch($user, $home, $executor)) exit(1);
 logmsg(
     "[INFO] Re-checking rTorrent stability for {$user} after quarantining custom config"
 );

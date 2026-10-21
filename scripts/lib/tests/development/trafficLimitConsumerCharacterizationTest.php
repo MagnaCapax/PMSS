@@ -97,7 +97,10 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
                 'forbidden' => ['function '.$showTrafficReader, 'unserialize('],
             ],
             'scripts/lib/resources/show.php' => ['required' => ['pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")'], 'forbidden' => ['unserialize(']],
-            'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser)'], 'forbidden' => ['function '.$trafficLimitsReader, '@unserialize']],
+            'scripts/cron/trafficLimits.php' => [
+                'required' => ['$trafficDataFile = pmssTrafficStatsPath($thisUser);', 'pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser)'],
+                'forbidden' => ['function '.$trafficLimitsReader, '@unserialize', '"/home/{$thisUser}/.trafficData"'],
+            ],
         ]);
     }
 }

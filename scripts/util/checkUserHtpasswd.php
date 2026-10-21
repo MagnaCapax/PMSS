@@ -28,16 +28,50 @@ function pmssCheckUserHtpasswdHasUserEntry(string $path, string $username)
         return false;
     }
 
-    if (!is_file($path)) {
+    if (!file_exists($path) && !is_link($path)) {
         return false;
     }
 
-    $contents = @file_get_contents($path);
-    if ($contents === false) {
+    if (pmssManagedAccountHomePath($path)) {
+        $identity = pmssAccountHomeIdentity($path);
+        if ($identity === null || !pmssUserFilePathIsSafe($path)) return null;
+        list($home, $user) = $identity;
+        $target = escapeshellarg($path);
+        // Both the size check and content search execute as the account.
+        if (!pmssAccountPathRun($user, $home, [$path],
+            'test -f '.$target.' && test -r '.$target
+            .' && test "$(stat -c %s -- '.$target.')" -le 65536')) return null;
+        return pmssAccountPathRun($user, $home, [$path],
+            'grep -Fq -- '.escapeshellarg($username).' '.$target);
+    }
+
+    $contents = pmssReadRegularFileContents($path);
+    if ($contents === null) {
         return null;
     }
 
     return strpos($contents, $username) !== false;
+}
+
+/** Copy a legacy file and append as the account; root never reads through its directory. */
+function pmssCheckUserHtpasswdLegacyAppend(string $username, string $home, string $path, string $content): bool
+{
+    $account = pmssAccountPathIdentity($username, $home);
+    $entry = @lstat($path);
+    if (!is_array($account) || !is_array($entry) || $entry['uid'] !== 0
+        || ($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1
+        || @fileowner(dirname($path)) !== $account['uid']
+        || !pmssUserFilePathIsSafe($path)) return false;
+    $target = escapeshellarg($path);
+    $temporary = escapeshellarg(dirname($path).'/.htpasswd.pmss-tmp-XXXXXXXX');
+    $command = 'test ! -L '.$target.' && test -f '.$target
+        .' && test "$(stat -c %h -- '.$target.')" -eq 1'
+        .' && test "$(stat -c %s -- '.$target.')" -le 65536'
+        .' && tmp=$(mktemp -- '.$temporary.') || exit 1; '
+        .'trap \'rm -f -- "$tmp"\' EXIT; '
+        .'cat -- '.$target.' > "$tmp" && cat >> "$tmp"'
+        .' && chmod 640 -- "$tmp" && mv -T -- "$tmp" '.$target;
+    return pmssAccountPathRun($username, $home, [$path], $command, $content);
 }
 
 function pmssCheckUserHtpasswdMain(array $argv): int
@@ -92,9 +126,10 @@ function pmssCheckUserHtpasswdMain(array $argv): int
             $account = function_exists('posix_getpwnam') ? @posix_getpwnam($thisUser) : false;
             $olderOwner = is_array($account) && is_file($userHtpasswd)
                 && @fileowner($userHtpasswd) !== $account['uid'];
-            // Older files need one managed write to normalize their owner.
+            // Older files are replaced as the account through their writable parent.
             $written = $olderOwner
-                ? pmssAppendUserFile($userHtpasswd, $thisPassword."\n", $thisUser, 0640)
+                ? pmssCheckUserHtpasswdLegacyAppend(
+                    $thisUser, "/home/{$thisUser}", $userHtpasswd, $thisPassword."\n")
                 : pmssAppendAccountFile($thisUser, "/home/{$thisUser}", $userHtpasswd, $thisPassword."\n", 0640);
             if (!$written) {
                 pmssUserLifecycleContextLogStatusMessage('htpasswd',

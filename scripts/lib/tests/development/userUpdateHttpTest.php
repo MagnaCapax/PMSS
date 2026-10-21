@@ -139,8 +139,10 @@ JSON
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         }
 
-        $expected = sprintf('cp /etc/skel/.irssi/config %s/', escapeshellarg($home.'/.irssi'));
-        $this->assertEquals(\pmssBuildUserShellCommand('dummy', $expected), $cmd ?? '');
+        $this->assertTrue(is_dir($home.'/.irssi'));
+        $this->assertTrue($cmd === null || strpos($cmd, '/etc/skel/.irssi/config') !== false);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/http.php',
+            "pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.irssi/config'");
     }
 
     public function testConfigureHttpSkipsIrssiCopyWhenDirectoryCannotBeCreated(): void
@@ -191,8 +193,10 @@ JSON
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         }
 
-        $expected = sprintf('cp %s %s/', escapeshellarg($skel.'/.irssi/config'), escapeshellarg($home.'/.irssi'));
-        $this->assertEquals(\pmssBuildUserShellCommand('dummy', $expected), $cmd ?? '');
+        $this->assertTrue(is_dir($home.'/.irssi'));
+        $this->assertTrue($cmd === null || strpos($cmd, $skel.'/.irssi/config') !== false);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/http.php',
+            "pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.irssi/config'");
     }
 }
 

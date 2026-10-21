@@ -145,9 +145,8 @@ class UserConfigStore
         if (is_link($configDir)) {
             return;
         }
-        if (!is_dir($configDir) && pmssDirEnsureExists($configDir, 0755)) {
-            pmssUserFileApplyOwnership($configDir, $username);
-        }
+        require_once __DIR__.'/directories.php';
+        if (!is_dir($configDir) && !pmssEnsureUserHomeDir($username, $home, '.config', 0755)) return;
 
         $payload = $this->normalise($payload);
         $path = $configDir.'/pmss-user.json';
@@ -293,7 +292,12 @@ class UserConfigStore
     private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
     {
         $dir = dirname($path);
-        if (!pmssDirEnsureExists($dir, 0750)) {
+        if (pmssManagedAccountHomePath($dir)) {
+            $context = pmssRootStageContext($dir.'/.pmss-check');
+            $identity = pmssAccountHomeIdentity($dir.'/.pmss-check');
+            if ($identity === null || ($context === null && @posix_geteuid() !== $identity[2])
+                || (!is_dir($dir) && !pmssAccountDirectoryEnsure($identity[1], $identity[0], $dir, 0750, 0755))) return false;
+        } elseif (!pmssDirEnsureExists($dir, 0750)) {
             return false;
         }
         $encoded = pmssJsonEncodePretty($payload);

@@ -83,9 +83,15 @@ function pmssIntegerSettingFileRead(string $path, callable $parser, int $default
 
 function pmssIntegerSettingFileWrite(string $path, int $value): bool
 {
-    return $value >= 0
-        && function_exists('pmssAtomicWriteFile')
-        && pmssAtomicWriteFile($path, (string) $value);
+    if ($value < 0 || !function_exists('pmssAtomicWriteFile')) return false;
+    if (pmssManagedAccountHomePath($path)) {
+        // New operator settings keep their historical root ownership.
+        if (@lstat($path) === false) {
+            return pmssRootStageFileWrite($path, (string) $value, 'root', 0644);
+        }
+        return pmssReplaceUserFilePreservingMetadata($path, (string) $value, 0600);
+    }
+    return pmssAtomicWriteFile($path, (string) $value);
 }
 
 /** Resolve an integer-setting runtime bucket path for one user. */
@@ -96,6 +102,22 @@ function pmssUserHomeFilePath(string $username, string $filename, ?string $homeD
 
 function pmssIntegerSettingPathModeConverge(string $path, int $mode): bool
 {
+    if (pmssManagedAccountHomePath($path)) {
+        $context = pmssRootStageContext($path);
+        if ($context === null || $mode < 0 || $mode > 0777) return false;
+        $entry = @lstat($path);
+        if (!is_array($entry) || ($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1) return false;
+        if ($entry['uid'] === 0) {
+            $group = @posix_getgrgid($entry['gid']);
+            $content = pmssReadRegularFileContents($path);
+            return is_array($group) && is_string($content)
+                && pmssRootStageFileWrite($path, $content, $group['name'], $mode);
+        }
+        $account = @posix_getpwnam($context[2]);
+        if (!is_array($account) || $entry['uid'] !== $account['uid']) return false;
+        return pmssAccountPathRun($context[2], $context[1], [$path],
+            'test ! -L '.escapeshellarg($path).' && chmod '.sprintf('%o', $mode).' -- '.escapeshellarg($path));
+    }
     if ((!is_file($path) && !is_dir($path)) || is_link($path)) {
         return false;
     }
@@ -112,6 +134,11 @@ function pmssIntegerSettingPathModeConverge(string $path, int $mode): bool
 
 function pmssIntegerSettingFileRemove(string $path): bool
 {
+    if (pmssManagedAccountHomePath($path)) {
+        $context = pmssRootStageContext($path);
+        return $context !== null && pmssAccountPathRun($context[2], $context[1],
+            [$context[1].'/.pmss-delete-check'], 'rm -f -- '.escapeshellarg($path));
+    }
     if (!pmssLockFilePathIsSafe($path)) {
         return false;
     }

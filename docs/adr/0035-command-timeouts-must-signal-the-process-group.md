@@ -106,6 +106,16 @@ on existing hosts would trigger a from-source recompile across the fleet on the 
 
 ## Consequences
 
+Root waits on account-run watchdog commands have fixed deadlines that signal the
+process group. The account's own processes remain in its user slice; a deadline
+fire records a root-side 15-minute backoff for that account and service, so
+later accounts in the cron loop are not delayed on every run.
+Lighttpd config regeneration and Docker proxy refresh commands share that backoff.
+Toggle-app bootstrap commands also have a 15-second bound and skip active backoff.
+Tracker-cleaner account log appends also limit lock acquisition to 10 seconds
+and the account command to 15 seconds before logging failure and moving on.
+A fired append deadline backs off both account logs through the same root-side state.
+
 - Positive: every timeout-wrapped command in the tree now bounds the CHILD, not only the
   parent's wait. Worst case for a daemonizing grandchild goes from unbounded to the deadline
   plus the kill-after window.

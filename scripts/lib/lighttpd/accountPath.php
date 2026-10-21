@@ -20,6 +20,20 @@ function pmssAccountPathShellCommand(int $effectiveUid, int $accountUid, string 
             .' -- sh -c '.escapeshellarg($command);
 }
 
+/** Resolve a real account; development fixtures may run as their own non-root UID. */
+function pmssAccountPathIdentity(string $username, string $home)
+{
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
+    if (is_array($account) && isset($account['uid'])) return $account;
+    $uid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
+    if ($uid > 0 && getenv('PMSS_TEST_MODE') === '1'
+        && preg_match('/^[a-z][a-z0-9]{0,7}$/D', $username) === 1
+        && @fileowner($home) === $uid) {
+        return ['uid' => $uid, 'gid' => @posix_getegid(), 'name' => $username];
+    }
+    return false;
+}
+
 /**
  * Run one command for paths within an account home.
  *
@@ -29,9 +43,10 @@ function pmssAccountPathShellCommand(int $effectiveUid, int $accountUid, string 
  * changes made by the account between validation and command execution.
  * Input is streamed over stdin, never placed in the command string.
  */
-function pmssAccountPathRun(string $username, string $home, array $paths, string $command, ?string $input = null): bool
+function pmssAccountPathRun(string $username, string $home, array $paths, string $command, ?string $input = null, int $timeoutSec = 0, ?bool &$timedOut = null): bool
 {
-    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
+    $timedOut = false;
+    $account = pmssAccountPathIdentity($username, $home);
     $effectiveUid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
     if (!is_array($account) || !isset($account['uid']) || $username === '' || $command === ''
         || strpos($command, "\0") !== false || $paths === []
@@ -48,6 +63,10 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
     }
 
     $shellCommand = pmssAccountPathShellCommand($effectiveUid, $account['uid'], $username, $command);
+    if ($timeoutSec > 0) {
+        require_once __DIR__.'/../runtime.php';
+        $shellCommand = pmssCommandProcessGroupWrap($shellCommand, $timeoutSec);
+    }
     $process = @proc_open($shellCommand, [
         0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'],
     ], $pipes);
@@ -55,12 +74,36 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
 
     $written = 0;
     $length = strlen($input ?? '');
+    $startedAt = microtime(true);
+    if ($timeoutSec > 0 && !@stream_set_blocking($pipes[0], false)) {
+        @fclose($pipes[0]);
+        pmssCommandTimeoutTerminate($process);
+        @proc_close($process);
+        return false;
+    }
     while ($written < $length) {
+        if ($timeoutSec > 0 && microtime(true) - $startedAt >= $timeoutSec) { $timedOut = true; break; }
+        if ($timeoutSec > 0) {
+            $read = []; $write = [$pipes[0]]; $except = [];
+            if (@stream_select($read, $write, $except, 0, 200000) !== 1) continue;
+        }
         $count = @fwrite($pipes[0], substr($input, $written));
-        if (!is_int($count) || $count < 1) break;
+        if (!is_int($count) || ($count < 1 && $timeoutSec === 0)) break;
+        if ($count < 1) continue;
         $written += $count;
     }
     @fclose($pipes[0]);
-    $status = @proc_close($process);
-    return $written === $length && $status === 0;
+    $state = null;
+    if ($timeoutSec > 0 && !$timedOut) {
+        while (true) {
+            $state = @proc_get_status($process);
+            if (!is_array($state)) { $timedOut = true; break; }
+            if (empty($state['running'])) break;
+            if (microtime(true) - $startedAt >= $timeoutSec) { $timedOut = true; break; }
+            usleep(100000);
+        }
+    }
+    $status = $timedOut ? pmssCommandTimeoutClose($process, $shellCommand, $timeoutSec, $startedAt)
+        : ($timeoutSec > 0 ? pmssProcessCloseExitCode($process, $state) : @proc_close($process));
+    return !$timedOut && $written === $length && $status === 0;
 }
