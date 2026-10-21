@@ -7,6 +7,170 @@ require_once dirname(__DIR__, 2).'/mediaStackPorts.php';
 
 final class OpenClawInstallerTest extends TestCase
 {
+    public function testUsageAndAllowlistIncludeUpdate(): void
+    {
+        $installer = dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw';
+        list($rc, $output) = \ocRun(array(PHP_BINARY, $installer));
+        $this->assertSame(0, $rc);
+        $this->assertStringContainsString(' | update | ', $output);
+        // A recognized action reaches the root or HOME guard, never the usage fallback.
+        $env = getenv();
+        $env['HOME'] = '';
+        list($rc, $output) = \ocRun(array(PHP_BINARY, $installer, 'update'), $env);
+        $this->assertSame(1, $rc);
+        $this->assertStringNotContainsString('Usage:', $output);
+        $this->assertStringContainsString(posix_geteuid() === 0 ? 'not root' : 'HOME must', $output);
+    }
+
+    public function testUpdateQuotaPreflightRequiresFiftyThousandExtraFiles(): void
+    {
+        $this->assertSame(50000, OC_UPDATE_REQUIRED_FILES);
+        foreach (array(
+            array(0, 50000, false), array(25000, 75000, false), array(24999, 75000, false),
+            array(25001, 75000, true), array(0, 49999, true), array(76000, 75000, true),
+            array(PHP_INT_MAX - 49999, PHP_INT_MAX, true),
+            array(PHP_INT_MAX - 50000, PHP_INT_MAX, false),
+        ) as $row) {
+            $files = \ocQuotaFileHeadroom('/dev/md4 123 1000 1250 '.$row[0].' '.$row[1].' '.$row[1]);
+            $threw = false;
+            try { \ocUpdateQuotaPreflight($files); }
+            catch (\RuntimeException $error) {
+                $threw = true;
+                foreach (array('50000', (string) $row[0], (string) $row[1]) as $number) {
+                    $this->assertStringContainsString($number, $error->getMessage());
+                }
+            }
+            $this->assertSame($row[2], $threw);
+        }
+        // Missing/unlimited quota data retains the manual install policy.
+        \ocUpdateQuotaPreflight(null);
+    }
+
+    public function testUpdateRuntimeSelectionOnlyRemovesDirectOwnedDirectoriesWithoutFollowingLinks(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-oc-debris-');
+        $paths = \ocPaths($home);
+        $lib = $home.'/.local/share/openclaw/lib';
+        $this->assertSame(array(), \ocUpdateRuntimeDirs($paths));
+        mkdir($lib.'/node_modules/openclaw-update-runtime-nested', 0700, true);
+        mkdir($lib.'/openclaw-update-runtime-old');
+        mkdir($lib.'/openclaw-update-runtime-second');
+        mkdir($lib.'/openclaw-update-runtime');
+        mkdir($lib.'/other-openclaw-update-runtime-old');
+        $outside = $this->pmssMakeTempDir('pmss-oc-debris-outside-');
+        file_put_contents($outside.'/keep', 'kept');
+        file_put_contents($lib.'/openclaw-update-runtime-file', 'kept');
+        symlink($outside, $lib.'/openclaw-update-runtime-link');
+        symlink($outside.'/missing', $lib.'/openclaw-update-runtime-broken');
+        symlink($outside, $lib.'/openclaw-update-runtime-old/redirect');
+        $expected = array($lib.'/openclaw-update-runtime-old', $lib.'/openclaw-update-runtime-second');
+        $actual = \ocUpdateRuntimeDirs($paths);
+        sort($expected);
+        sort($actual);
+        $this->assertSame($expected, $actual);
+        foreach ($actual as $dir) \ocRemoveTree($dir);
+        $this->assertSame(array(), \ocUpdateRuntimeDirs($paths));
+        foreach (array('node_modules/openclaw-update-runtime-nested', 'openclaw-update-runtime',
+            'other-openclaw-update-runtime-old', 'openclaw-update-runtime-file') as $kept) {
+            $this->assertTrue(file_exists($lib.'/'.$kept));
+        }
+        $this->assertTrue(is_link($lib.'/openclaw-update-runtime-link'));
+        $this->assertTrue(is_link($lib.'/openclaw-update-runtime-broken'));
+        $this->assertSame('kept', file_get_contents($outside.'/keep'));
+        // A redirected lib or ancestor must not authorize cleanup outside the private prefix.
+        rename($lib, $lib.'-saved');
+        symlink($lib.'-saved', $lib);
+        $this->assertSame(array(), \ocUpdateRuntimeDirs($paths));
+        unlink($lib);
+        rename($lib.'-saved', $lib);
+        rename($home.'/.local', $home.'/.local-saved');
+        symlink($home.'/.local-saved', $home.'/.local');
+        $this->assertSame(array(), \ocUpdateRuntimeDirs($paths));
+    }
+
+    public function testUpdateRefusesMissingEntryBeforeQuotaOrGatewayWork(): void
+    {
+        $paths = \ocPaths($this->pmssMakeTempDir('pmss-oc-missing-'));
+        try {
+            \ocUpdate($paths);
+            $this->assertTrue(false, 'Missing installation accepted');
+        } catch (\RuntimeException $error) {
+            $this->assertStringContainsString('not installed', $error->getMessage());
+        }
+        $this->assertFalse(file_exists($paths['state']));
+    }
+
+    public function testUpdateRecoversAfterNpmAndDoctorFailuresUsingPrivateEnvironment(): void
+    {
+        if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');
+        $home = $this->pmssMakeTempDir('pmss-oc-update-');
+        $paths = \ocPaths($home);
+        mkdir(dirname($paths['node']), 0700, true);
+        symlink(PHP_BINARY, $paths['node']);
+        mkdir(dirname($paths['entry']), 0700, true);
+        mkdir(dirname($paths['npm']), 0700, true);
+        mkdir($paths['state'], 0700);
+        mkdir($home.'/stubs', 0700);
+        \ocEnsureToken($paths);
+        $token = file_get_contents($paths['env']);
+        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        file_put_contents($home.'/stubs/quota', "#!/bin/sh\ncat \"\$HOME/quota-output\"\n");
+        chmod($home.'/stubs/quota', 0700);
+        file_put_contents($paths['entry'], '<?php
+$command = $argv[1] ?? "";
+file_put_contents(getenv("HOME")."/calls", $command."\\n", FILE_APPEND);
+if ($command === "--version") echo "2026.10.5";
+if ($command === "config") echo "token";
+if ($command === "doctor") {
+    $valid = array_slice($argv, 2) === array("--fix", "--yes", "--non-interactive")
+        && getenv("OPENCLAW_SUPERVISOR_MODE") === "external"
+        && getenv("OPENCLAW_SERVICE_REPAIR_POLICY") === "external"
+        && preg_match("/^[a-f0-9]{64}$/D", getenv("OPENCLAW_GATEWAY_TOKEN"));
+    file_put_contents(getenv("HOME")."/doctor-env", $valid ? "valid" : "invalid");
+    echo "private-doctor-output";
+    exit(1);
+}');
+        file_put_contents($paths['npm'], '<?php
+file_put_contents(getenv("HOME")."/calls", "npm\\n", FILE_APPEND);
+file_put_contents(getenv("HOME")."/npm-path", explode(":", getenv("PATH"))[0]);
+echo getenv("OC_TEST_NPM_ERROR");
+exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
+        $env = getenv();
+        $env['HOME'] = $home;
+        $env['PATH'] = $home.'/stubs:'.$env['PATH'];
+        $installer = dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw';
+        file_put_contents($home.'/quota-output', '/dev/md4 123 1000 1250 25001 75000 93750');
+        list($rc, $output) = \ocRun(array(PHP_BINARY, $installer, 'update'), $env);
+        $this->assertSame(1, $rc);
+        $this->assertStringContainsString('50000 additional files', $output);
+        $this->assertFalse(file_exists($home.'/calls'));
+        file_put_contents($home.'/quota-output', '/dev/md4 123 1000 1250 25000 75000 93750');
+        // The fake gateway exits immediately: verify each failure still reaches a restart attempt.
+        foreach (array('ENOENT mid-extract', 'EDQUOT', 'errno -122', '') as $npmError) {
+            @unlink($home.'/calls');
+            $env['OC_TEST_NPM_ERROR'] = $npmError;
+            mkdir($paths['npmCache'], 0700);
+            list($rc, $output) = \ocRun(array(PHP_BINARY, $installer, 'update'), $env);
+            $this->assertSame(1, $rc);
+            $this->assertSame("--version\nnpm\n".($npmError === '' ? "doctor\n" : '')."config\ngateway\n", file_get_contents($home.'/calls'));
+            $this->assertStringContainsString($npmError === '' ? 'Doctor failed' : ($npmError === 'ENOENT mid-extract' ? $npmError : 'file-count quota was reached'), $output);
+            $this->assertStringContainsString('~/.openclaw/logs', $output);
+            $this->assertSame(dirname($paths['node']), file_get_contents($home.'/npm-path'));
+            $this->assertFalse(is_dir($paths['npmCache']));
+            $this->assertFalse(file_exists($paths['state'].'/pmss-stopped'));
+            $this->assertSame($token, file_get_contents($paths['env']));
+            $this->assertStringNotContainsString(trim(substr($token, strlen('OPENCLAW_GATEWAY_TOKEN='))), $output);
+            $this->assertStringNotContainsString('private-doctor-output', $output);
+        }
+        $this->assertSame('valid', file_get_contents($home.'/doctor-env'));
+        // Dispatch shares the watchdog lock even before update checks begin.
+        $lock = \ocActionLock($paths);
+        list($rc, $output) = \ocRun(array(PHP_BINARY, $installer, 'update'), $env);
+        fclose($lock);
+        $this->assertSame(1, $rc);
+        $this->assertStringContainsString('Another OpenClaw action is running', $output);
+    }
+
     public function testRepeatInstallOnlyReconcilesBrowserWithoutOnboardingOrDownloading(): void
     {
         if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');
@@ -320,6 +484,7 @@ final class OpenClawInstallerTest extends TestCase
         $this->assertFalse(in_array('--custom-api-key', $args, true));
         $this->assertSame(false, strpos(implode(' ', $args), $credentials['key']));
         $wrapper = \ocCliWrapper(array('node' => $home.'/node/bin/node', 'entry' => $home.'/openclaw.mjs'));
+        $this->assertStringContainsString("export OPENCLAW_SUPERVISOR_MODE=external\n", $wrapper);
         $this->assertSame(false, strpos($wrapper, $credentials['key']));
         $this->assertTrue(strpos($wrapper, 'ocVirsilipasCredentials') !== false);
     }
@@ -383,6 +548,8 @@ final class OpenClawInstallerTest extends TestCase
         $paths = array('env' => $root.'/gateway.env', 'node' => $root.'/node/bin/node', 'state' => $root);
         \ocEnsureToken($paths);
         $env = \ocGatewayEnv($paths);
+        $this->assertSame('external', $env['OPENCLAW_SUPERVISOR_MODE']);
+        $this->assertSame('external', $env['OPENCLAW_SERVICE_REPAIR_POLICY']);
         $this->assertSame($root.'/npm-cache', $env['npm_config_cache']);
         $this->assertSame($root.'/node/bin', explode(':', $env['PATH'])[0]);
     }

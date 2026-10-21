@@ -6,10 +6,13 @@ exercise that access. Give chat access only to your own identity.
 
 ## Requirements
 
-OpenClaw needs about 55,000 files and 1.3 GB of disk space. The installer
-refuses accounts whose file-count quota cannot fit the installation. The
-first gateway start can take a minute or two on a busy server. Allow at least
-2048 MiB of account RAM (the gateway and helpers used about 1.6 GB in QA).
+QA on 2026-10-21 measured 52,535 additional files and 0.87 GB of disk quota
+for an install taking 106 seconds. The installer refuses accounts whose
+file-count quota cannot fit the installation. The four OpenClaw processes
+used 0.87–1.0 GB PSS at idle over 15 minutes; the whole account peaked at
+1.42 GB at gateway start. Allow at least 2048 MiB of account RAM: the 1 GB
+tier cannot hold the idle gateway plus the account's other processes. The
+first gateway start can take a minute or two on a busy server.
 
 In **Configure → Apps**, choose **Turn on** and accept the account command-access
 and AI credit consent. The install runs in the background; allow about three
@@ -71,6 +74,36 @@ channels, binds loopback, and stores a reference to
 The fresh Virsilipas setup uses a reference to `CUSTOM_API_KEY`; the installer
 reads the current value from `~/.virsilipasKey` into the process environment
 at startup.
+
+## Updating
+
+Run the PMSS supervisor's update command as your own account:
+
+```sh
+install-openclaw update
+```
+
+Updates need 50,000 additional file-quota slots for npm's temporary swap
+(the measured peak was about 44,000). When quota data is available, the
+installer checks that current usage plus 50,000 fits the soft file limit
+before stopping the gateway. It holds the watchdog lock, stops the gateway,
+removes old `openclaw-update-runtime-*` directories directly under the private
+`~/.local/share/openclaw/lib`, installs the current npm release, runs Doctor's
+non-interactive repair and migrations, and starts the gateway again. npm or
+Doctor failure still triggers a start attempt; inspect `~/.openclaw/logs`
+if recovery fails. Existing configuration and service credentials are reused.
+
+`openclaw update` is refused by design on PMSS through
+`OPENCLAW_SUPERVISOR_MODE=external`. PMSS's cron watchdog owns the lifecycle;
+the upstream self-updater cannot complete its process-ancestry checks under
+PMSS's private `/proc` mount and can leave large runtime directories behind.
+`OPENCLAW_SERVICE_REPAIR_POLICY=external` also keeps installer-run Doctor from
+installing or starting a native service. These policies permit the foreground
+`gateway run` used by PMSS; see upstream's
+[external supervisor documentation](https://docs.openclaw.ai/cli/gateway/restart-and-supervision#external-supervisors).
+Older installations receive the supervisor export in `~/bin/openclaw` only
+after rerunning `install-openclaw install --yes`; `update` itself does not
+rewrite that wrapper.
 
 Useful commands:
 

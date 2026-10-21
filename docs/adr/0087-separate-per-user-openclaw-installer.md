@@ -147,3 +147,41 @@ cover fragment equality, rollback, handoff validation, late-provider decisions,
 shared rows, tab detection and provisioning gates. After deployment, verify
 browser chat/websocket handoff, panel recovery, start/stop, late-key adoption,
 and the read-only system tests on a QA account.
+
+## Amendment: supervisor-owned updates (2026-10-21)
+
+`install-openclaw update` owns runtime replacement under the existing action
+lock. Upstream self-update fails under PMSS's private `/proc` mount because
+root-owned ancestors are invisible, leaving hard-linked runtime trees behind.
+Changing host privacy settings or patching upstream process validation is
+rejected. The installer instead checks 50,000 file slots of temporary headroom
+(measured peak about 44,000), stops the verified gateway, removes only owned,
+non-symlink `openclaw-update-runtime-*` direct children of the private lib
+directory, and reuses the install npm command and private Node PATH. Missing
+quota information retains manual install's best-effort policy.
+
+Doctor then repairs and migrates state with the private gateway environment
+before PMSS restarts the gateway. Both npm and Doctor failure attempt a restart
+before reporting the original failure; runtime rollback is not promised after
+a partial npm failure. No persistent stop marker is written during the update.
+Onboarding and provider configuration are not repeated.
+
+The gateway and installer-run CLI set `OPENCLAW_SUPERVISOR_MODE=external` and
+`OPENCLAW_SERVICE_REPAIR_POLICY=external`. The generated CLI wrapper exports
+supervisor mode too, so upstream refuses self-update and directs customers to
+their supervisor. Repeat install refreshes older wrappers. The npm package's
+2026.10.5 `docs/cli/gateway/restart-and-supervision.md` and foreground CLI
+registration were checked: native service mutation is refused, while the
+foreground `gateway run` PMSS uses remains available.
+
+The existing SSRF (CVE-2026-26322) and local token-disclosure
+(GHSA-v3j7-34xh-6g3w) advisories remain relevant: exposure grants the account's
+agent/shell authority, not root directly. Updates reuse the separate random
+service token from the account-owned private environment file; no primary
+password is read or reused. Doctor gets secrets only in its environment and
+its captured output is not printed. npm uses the existing install environment
+and diagnostics. Token permissions, loopback binding and the authenticated
+panel exposure remain as specified above. Hermetic checks exercise quota
+boundaries, debris selection and symlinks, supervisor exports and recovery
+attempts. A live update on a QA account on 2026-10-21 passed for the same
+version and for 2026.10.5 to a beta release, with the gateway healthy after.

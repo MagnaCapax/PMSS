@@ -6,6 +6,7 @@ const OC_NODE_VERSION = '24.21.0';
 const OC_NODE_SHA256 = 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6';
 const OC_CRON_TAG = '# pmss-openclaw';
 const OC_REQUIRED_FILES = 60000;
+const OC_UPDATE_REQUIRED_FILES = 50000;
 
 /** Keep all process paths under the caller's own home. */
 function ocPaths(?string $home = null): array
@@ -86,6 +87,7 @@ function ocOnboardArgs(int $port, ?array $credentials): array
 function ocCliWrapper(array $paths): string
 {
     return "#!/bin/sh\nPATH=".escapeshellarg(dirname($paths['node'])).":\$PATH\nexport PATH\n"
+        ."export OPENCLAW_SUPERVISOR_MODE=external\n"
         ."if [ -z \"\${CUSTOM_API_KEY+x}\" ] && [ -f \"\$HOME/.openclaw/pmss-virsilipas\" ]; then\n"
         ."  # The PHP expression is intentionally single-quoted for the shell.\n  # shellcheck disable=SC2016\n"
         ."  CUSTOM_API_KEY=\$(php -r 'ob_start(); require getenv(\"HOME\").\"/bin/install-openclaw\"; ob_end_clean(); \$c=ocVirsilipasCredentials(getenv(\"HOME\")); if (\$c !== null) echo \$c[\"key\"];')\n"
@@ -140,6 +142,14 @@ function ocQuotaFileHeadroom(string $quotaOutput): ?array
         }
     }
     return null;
+}
+
+/** Like manual install, enforce a known soft file limit without guessing missing quota data. */
+function ocUpdateQuotaPreflight(?array $files): void
+{
+    if ($files !== null && $files['used'] > $files['soft'] - OC_UPDATE_REQUIRED_FILES) {
+        throw new RuntimeException('OpenClaw update needs '.OC_UPDATE_REQUIRED_FILES.' additional files; '.$files['used'].' files are currently used and the account file limit is '.$files['soft'].'. Updating would exceed the account file-count quota.');
+    }
 }
 
 /** Preserve every foreign crontab byte; manage only trailing PMSS lines. */
@@ -219,6 +229,9 @@ function ocGatewayEnv(array $paths): array
     }
     $env = getenv();
     $env['OPENCLAW_GATEWAY_TOKEN'] = $match[1];
+    // PMSS cron owns lifecycle and updates; Doctor must not install a native service.
+    $env['OPENCLAW_SUPERVISOR_MODE'] = 'external';
+    $env['OPENCLAW_SERVICE_REPAIR_POLICY'] = 'external';
     $marker = isset($paths['state']) ? $paths['state'].'/pmss-virsilipas' : null;
     if ($marker !== null && isset($paths['home']) && is_file($marker) && !is_link($marker)
         && !isset($env['CUSTOM_API_KEY'])) {
@@ -339,6 +352,27 @@ function ocRemoveTree(string $path): void
         }
         rmdir($path);
     }
+}
+
+/** Select only account-owned self-update debris directly inside the private lib directory. */
+function ocUpdateRuntimeDirs(array $paths): array
+{
+    $lib = $paths['home'];
+    // Reject redirected ancestors as well as redirected candidates before recursive removal.
+    foreach (array('', '/.local', '/share', '/openclaw', '/lib') as $part) {
+        $lib .= $part;
+        if (is_link($lib) || !is_dir($lib) || fileowner($lib) !== posix_geteuid()) {
+            return array();
+        }
+    }
+    $dirs = array();
+    foreach (new DirectoryIterator($lib) as $entry) {
+        if (strpos($entry->getFilename(), 'openclaw-update-runtime-') === 0
+            && !$entry->isLink() && $entry->isDir() && $entry->getOwner() === posix_geteuid()) {
+            $dirs[] = $entry->getPathname();
+        }
+    }
+    return $dirs;
 }
 
 /** OpenClaw runs with the pinned interpreter and a token from the private env. */
@@ -669,10 +703,9 @@ function ocPendingProviderApply(array $paths): bool
     return true;
 }
 
-/** Bootstrap missing program files without repeating onboarding on existing installs. */
-function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, int $port): bool
+/** Share the private Node PATH, npm cache cleanup and quota diagnostics for install and update. */
+function ocNpmInstall(array $paths): void
 {
-    ocInstallNode($paths);
     $env = getenv();
     $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
     list($rc, $output) = ocRun(ocNpmInstallArgs($paths), $env);
@@ -683,6 +716,13 @@ function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, 
         }
         throw new RuntimeException('npm install failed: '.$output);
     }
+}
+
+/** Bootstrap missing program files without repeating onboarding on existing installs. */
+function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, int $port): bool
+{
+    ocInstallNode($paths);
+    ocNpmInstall($paths);
     if (!is_file($paths['entry'])) {
         throw new RuntimeException('npm did not install the OpenClaw entry point');
     }
@@ -722,19 +762,60 @@ function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, 
     return $useVirsilipas;
 }
 
+/** Replace and finalize the runtime while the caller holds the watchdog's action lock. */
+function ocUpdate(array $paths): void
+{
+    if (!is_file($paths['entry'])) {
+        throw new RuntimeException('OpenClaw is not installed; run install-openclaw install first');
+    }
+    list($rc, $output) = ocRun(array('quota', '-w', '-p', '-u'));
+    ocUpdateQuotaPreflight($rc === 0 ? ocQuotaFileHeadroom($output) : null);
+    $env = ocGatewayEnv($paths);
+    list($rc, $old) = ocCli($paths, array('--version'), $env);
+    if ($rc !== 0) {
+        throw new RuntimeException('Could not read installed OpenClaw version');
+    }
+    ocStop($paths);
+    try {
+        foreach (ocUpdateRuntimeDirs($paths) as $dir) {
+            ocRemoveTree($dir);
+        }
+        ocNpmInstall($paths);
+        list($rc) = ocCli($paths, array('doctor', '--fix', '--yes', '--non-interactive'), $env);
+        if ($rc !== 0) {
+            throw new RuntimeException('OpenClaw Doctor failed; inspect ~/.openclaw/logs');
+        }
+    } catch (Throwable $error) {
+        // Keep the original failure even if the best-effort gateway recovery also fails.
+        try { $recovered = ocStart($paths, true, 120); }
+        catch (Throwable $restartError) { $recovered = false; }
+        throw new RuntimeException($error->getMessage().($recovered ? '' : ' Gateway restart also failed; inspect ~/.openclaw/logs/gateway.log'), 0, $error);
+    }
+    if (!ocStart($paths, true, 120)) {
+        throw new RuntimeException('Gateway did not stay running; inspect ~/.openclaw/logs/gateway.log');
+    }
+    list($rc, $new) = ocCli($paths, array('--version'), $env);
+    if ($rc !== 0) {
+        throw new RuntimeException('Could not read updated OpenClaw version');
+    }
+    $old = trim($old);
+    $new = trim($new);
+    echo $old === $new ? 'OpenClaw already current: '.$new."\n" : 'OpenClaw updated: '.$old.' -> '.$new."\n";
+}
+
 /** One entry point keeps include-only test calls hermetic. */
 function ocMain(array $args): int
 {
     $command = $args[1] ?? '';
-    if (!in_array($command, array('install', 'start', 'stop', 'status', 'check', 'uninstall', 'open-url'), true)) {
-        echo "Usage: install-openclaw install [--yes] | start | stop | status [--show-token] | check | open-url | uninstall [--purge]\n";
+    if (!in_array($command, array('install', 'update', 'start', 'stop', 'status', 'check', 'uninstall', 'open-url'), true)) {
+        echo "Usage: install-openclaw install [--yes] | update | start | stop | status [--show-token] | check | open-url | uninstall [--purge]\n";
         return $command === '' ? 0 : 1;
     }
     if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
         throw new RuntimeException('Run as your own account, not root');
     }
     $paths = ocPaths();
-    // Share the cron lock so start/stop/install cannot race a watchdog restart.
+    // Share the cron lock so start/stop/install/update cannot race a watchdog restart.
     $actionLock = null;
     if ($command !== 'check' && $command !== 'status' && $command !== 'open-url') {
         $actionLock = ocActionLock($paths);
@@ -751,6 +832,10 @@ function ocMain(array $args): int
             throw new RuntimeException('Could not create an OpenClaw dashboard handoff.');
         }
         echo ocDashboardUrlRewrite($json, ocPublicOrigin(), ocBasePath($paths), ocReservedPort($paths['port']))."\n";
+        return 0;
+    }
+    if ($command === 'update') {
+        ocUpdate($paths);
         return 0;
     }
     if ($command === 'install') {
