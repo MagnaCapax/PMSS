@@ -154,8 +154,9 @@ and the read-only system tests on a QA account.
 lock. Upstream self-update fails under PMSS's private `/proc` mount because
 root-owned ancestors are invisible, leaving hard-linked runtime trees behind.
 Changing host privacy settings or patching upstream process validation is
-rejected. The installer instead checks 50,000 file slots of temporary headroom
-(measured peak about 44,000), stops the verified gateway, removes only owned,
+rejected. The installer instead requires usage within the soft file limit and
+60,000 file slots under the hard limit (the swap is transient and the soft
+limit has a grace period; measured peak 49,505 extra files), stops the verified gateway, removes only owned,
 non-symlink `openclaw-update-runtime-*` direct children of the private lib
 directory, and reuses the install npm command and private Node PATH. Missing
 quota information retains manual install's best-effort policy.

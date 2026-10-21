@@ -22,25 +22,29 @@ final class OpenClawInstallerTest extends TestCase
         $this->assertStringContainsString(posix_geteuid() === 0 ? 'not root' : 'HOME must', $output);
     }
 
-    public function testUpdateQuotaPreflightRequiresFiftyThousandExtraFiles(): void
+    public function testUpdateQuotaPreflightNeedsSoftRoomNowAndHardRoomForThePeak(): void
     {
-        $this->assertSame(50000, OC_UPDATE_REQUIRED_FILES);
+        $this->assertSame(60000, OC_UPDATE_REQUIRED_FILES);
+        // Rows: used, soft, hard, expected limit named in the refusal (null = allowed).
         foreach (array(
-            array(0, 50000, false), array(25000, 75000, false), array(24999, 75000, false),
-            array(25001, 75000, true), array(0, 49999, true), array(76000, 75000, true),
-            array(PHP_INT_MAX - 49999, PHP_INT_MAX, true),
-            array(PHP_INT_MAX - 50000, PHP_INT_MAX, false),
+            array(55000, 100000, 125000, null), array(65000, 100000, 125000, null),
+            array(65001, 100000, 125000, 'hard'), array(100000, 100000, 160000, null),
+            array(100001, 100000, 160000, 'soft'), array(0, 49999, 0, null),
+            array(0, 49999, 49999, 'hard'), array(60000, 50000, 0, 'soft'),
+            array(PHP_INT_MAX - 60000, PHP_INT_MAX, PHP_INT_MAX, null),
+            array(PHP_INT_MAX - 59999, PHP_INT_MAX, PHP_INT_MAX, 'hard'),
         ) as $row) {
-            $files = \ocQuotaFileHeadroom('/dev/md4 123 1000 1250 '.$row[0].' '.$row[1].' '.$row[1]);
-            $threw = false;
+            $files = \ocQuotaFileHeadroom('/dev/md4 123 1000 1250 '.$row[0].' '.$row[1].' '.$row[2]);
+            $refused = null;
             try { \ocUpdateQuotaPreflight($files); }
             catch (\RuntimeException $error) {
-                $threw = true;
-                foreach (array('50000', (string) $row[0], (string) $row[1]) as $number) {
+                $refused = strpos($error->getMessage(), 'hard file limit') !== false ? 'hard' : 'soft';
+                $numbers = $refused === 'hard' ? array('60000', (string) $row[0], (string) $row[2]) : array((string) $row[0], (string) $row[1]);
+                foreach ($numbers as $number) {
                     $this->assertStringContainsString($number, $error->getMessage());
                 }
             }
-            $this->assertSame($row[2], $threw);
+            $this->assertSame($row[3], $refused, implode(',', $row));
         }
         // Missing/unlimited quota data retains the manual install policy.
         \ocUpdateQuotaPreflight(null);
@@ -139,10 +143,10 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $env['HOME'] = $home;
         $env['PATH'] = $home.'/stubs:'.$env['PATH'];
         $installer = dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw';
-        file_put_contents($home.'/quota-output', '/dev/md4 123 1000 1250 25001 75000 93750');
+        file_put_contents($home.'/quota-output', '/dev/md4 123 1000 1250 43751 75000 93750');
         list($rc, $output) = \ocRun(array(PHP_BINARY, $installer, 'update'), $env);
         $this->assertSame(1, $rc);
-        $this->assertStringContainsString('50000 additional files', $output);
+        $this->assertStringContainsString('60000 additional files', $output);
         $this->assertFalse(file_exists($home.'/calls'));
         file_put_contents($home.'/quota-output', '/dev/md4 123 1000 1250 25000 75000 93750');
         // The fake gateway exits immediately: verify each failure still reaches a restart attempt.

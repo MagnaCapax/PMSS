@@ -6,7 +6,7 @@ const OC_NODE_VERSION = '24.21.0';
 const OC_NODE_SHA256 = 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6';
 const OC_CRON_TAG = '# pmss-openclaw';
 const OC_REQUIRED_FILES = 60000;
-const OC_UPDATE_REQUIRED_FILES = 50000;
+const OC_UPDATE_REQUIRED_FILES = 60000;
 
 /** Keep all process paths under the caller's own home. */
 function ocPaths(?string $home = null): array
@@ -144,11 +144,17 @@ function ocQuotaFileHeadroom(string $quotaOutput): ?array
     return null;
 }
 
-/** Like manual install, enforce a known soft file limit without guessing missing quota data. */
+/** npm's swap is transient: going over the soft limit only starts the grace period, so the peak must fit the hard limit. */
 function ocUpdateQuotaPreflight(?array $files): void
 {
-    if ($files !== null && $files['used'] > $files['soft'] - OC_UPDATE_REQUIRED_FILES) {
-        throw new RuntimeException('OpenClaw update needs '.OC_UPDATE_REQUIRED_FILES.' additional files; '.$files['used'].' files are currently used and the account file limit is '.$files['soft'].'. Updating would exceed the account file-count quota.');
+    if ($files === null) {
+        return;
+    }
+    if ($files['used'] > $files['soft']) {
+        throw new RuntimeException($files['used'].' files are currently used, over the account soft file limit of '.$files['soft'].'. Free some files before updating OpenClaw.');
+    }
+    if ($files['hard'] > 0 && $files['used'] > $files['hard'] - OC_UPDATE_REQUIRED_FILES) {
+        throw new RuntimeException('OpenClaw update needs '.OC_UPDATE_REQUIRED_FILES.' additional files for a few minutes; '.$files['used'].' files are currently used and the account hard file limit is '.$files['hard'].'. Updating would exceed the account file-count quota.');
     }
 }
 
