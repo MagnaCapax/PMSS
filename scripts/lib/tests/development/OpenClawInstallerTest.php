@@ -495,6 +495,39 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $this->assertTrue(strpos($wrapper, 'ocVirsilipasCredentials') !== false);
     }
 
+    public function testWrapperLoadsGatewayTokenFromPrivateEnvForGatewayCommands(): void
+    {
+        if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');
+        $home = $this->pmssMakeTempDir('pmss-oc-wrapper-');
+        $paths = \ocPaths($home);
+        mkdir(dirname($paths['node']), 0700, true);
+        symlink(PHP_BINARY, $paths['node']);
+        mkdir(dirname($paths['entry']), 0700, true);
+        mkdir($paths['state'], 0700);
+        \ocEnsureToken($paths);
+        $token = trim(substr(file_get_contents($paths['env']), strlen('OPENCLAW_GATEWAY_TOKEN=')));
+        file_put_contents($paths['entry'], '<?php echo getenv("OPENCLAW_GATEWAY_TOKEN"), "|", getenv("OPENCLAW_SUPERVISOR_MODE"), "|", implode(" ", array_slice($argv, 1));');
+        $wrapper = $home.'/openclaw-wrapper';
+        file_put_contents($wrapper, \ocCliWrapper($paths));
+        chmod($wrapper, 0700);
+        $env = getenv();
+        $env['HOME'] = $home;
+        unset($env['OPENCLAW_GATEWAY_TOKEN'], $env['CUSTOM_API_KEY']);
+        list($rc, $output) = \ocRun(array($wrapper, 'gateway', 'restart'), $env);
+        $this->assertSame(0, $rc);
+        $this->assertSame($token.'|external|gateway restart', $output);
+        // A caller's own token wins, and a linked or malformed env file is never read.
+        $env['OPENCLAW_GATEWAY_TOKEN'] = 'caller';
+        $this->assertSame('caller|external|x', \ocRun(array($wrapper, 'x'), $env)[1]);
+        unset($env['OPENCLAW_GATEWAY_TOKEN']);
+        rename($paths['env'], $home.'/elsewhere.env');
+        symlink($home.'/elsewhere.env', $paths['env']);
+        $this->assertSame('|external|x', \ocRun(array($wrapper, 'x'), $env)[1]);
+        unlink($paths['env']);
+        file_put_contents($paths['env'], "OPENCLAW_GATEWAY_TOKEN=\$(touch pwned)\n");
+        $this->assertSame('|external|x', \ocRun(array($wrapper, 'x'), $env)[1]);
+        $this->assertFalse(file_exists($home.'/pwned'));
+    }
     public function testCronMergeMigratesLegacyMarkedLine(): void
     {
         $legacy = "@reboot php \$HOME/install-openclaw.php check # pmss-openclaw\n";

@@ -88,6 +88,10 @@ function ocCliWrapper(array $paths): string
 {
     return "#!/bin/sh\nPATH=".escapeshellarg(dirname($paths['node'])).":\$PATH\nexport PATH\n"
         ."export OPENCLAW_SUPERVISOR_MODE=external\n"
+        // Gateway commands (restart, health, doctor) resolve the token by env reference, as the gateway does.
+        ."if [ -z \"\${OPENCLAW_GATEWAY_TOKEN+x}\" ] && [ -f \"\$HOME/.openclaw/gateway.env\" ] && [ ! -L \"\$HOME/.openclaw/gateway.env\" ]; then\n"
+        ."  OPENCLAW_GATEWAY_TOKEN=\$(sed -n 's/^OPENCLAW_GATEWAY_TOKEN=\\([a-f0-9]\\{64\\}\\)\$/\\1/p' \"\$HOME/.openclaw/gateway.env\")\n"
+        ."  [ -z \"\$OPENCLAW_GATEWAY_TOKEN\" ] || export OPENCLAW_GATEWAY_TOKEN\nfi\n"
         ."if [ -z \"\${CUSTOM_API_KEY+x}\" ] && [ -f \"\$HOME/.openclaw/pmss-virsilipas\" ]; then\n"
         ."  # The PHP expression is intentionally single-quoted for the shell.\n  # shellcheck disable=SC2016\n"
         ."  CUSTOM_API_KEY=\$(php -r 'ob_start(); require getenv(\"HOME\").\"/bin/install-openclaw\"; ob_end_clean(); \$c=ocVirsilipasCredentials(getenv(\"HOME\")); if (\$c !== null) echo \$c[\"key\"];')\n"

@@ -106,7 +106,10 @@ installing or starting a native service. These policies permit the foreground
 [external supervisor documentation](https://docs.openclaw.ai/cli/gateway/restart-and-supervision#external-supervisors).
 `install-openclaw update` and `install-openclaw install --yes` both rewrite
 `~/bin/openclaw`, so older installations gain the supervisor export the first
-time either runs.
+time either runs. The wrapper also loads the gateway token from
+`~/.openclaw/gateway.env`, so standard gateway commands such as
+`~/bin/openclaw health` and `~/bin/openclaw gateway restart` work; under
+external supervision a restart hands over to a fresh gateway process.
 
 Useful commands:
 
