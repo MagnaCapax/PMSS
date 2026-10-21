@@ -92,9 +92,9 @@ class UserMovedTest extends TestCase
     public function testLifecyclePersistsBeforeStopAndClearDoesNotStartAnything(): void
     {
         $this->store();
-        // Namespace injection keeps lifecycle audit logging and all shell work hermetic.
+        // Keep logging/shell work hermetic; subclass internal exceptions since PHP cannot alias them.
         $script = 'namespace MovedLifecycleFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/user/moved.php'), true).';';
-        $script .= 'class_alias("UserConfigStore", __NAMESPACE__."\\\\UserConfigStore"); class_alias("RuntimeException", __NAMESPACE__."\\\\RuntimeException");';
+        $script .= 'class_alias("UserConfigStore", __NAMESPACE__."\\\\UserConfigStore"); class RuntimeException extends \\RuntimeException {}';
         $script .= 'function pmssUserLifecycleContextLogHomeInfo(...$args) {} function pmssUserLifecycleContextLogStatusMessage(...$args) {}';
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/moved.php', 'MovedLifecycleFixture');
         $script .= '$store = new UserConfigStore('.var_export($this->tempDir.'/config', true).'); $events = [];';
