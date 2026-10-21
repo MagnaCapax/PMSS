@@ -283,6 +283,30 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertSame('keep', (string) file_get_contents($target));
     }
 
+    public function testMigrateLegacyLocalnetLineWrapsOnlyTheTrailingLegacyLine(): void
+    {
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-localnet-');
+        $home = $this->pmssUserHomePath($homeRoot, 'dummy');
+        $this->pmssEnsureDir($home);
+        $path = $home.'/.rtorrent.rc';
+        $cfg = $this->rtorrentConfigFixture();
+        $wrapped = "catch = {\"ipv4_filter.load=/etc/seedbox/config/localnet,preferred\"}";
+
+        // A config rendered before the catch wrapper, with and without a trailing newline.
+        foreach (["", "\n"] as $tail) {
+            $this->pmssWriteFile($path, "a = b\nipv4_filter.load = /etc/seedbox/config/localnet, preferred".$tail);
+            $this->assertTrue($cfg->migrateLegacyLocalnetLine('dummy'));
+            $this->assertSame("a = b\n".$wrapped.$tail, (string) file_get_contents($path));
+            $this->assertSame(null, $cfg->migrateLegacyLocalnetLine('dummy'));
+        }
+
+        // Anything else is left as it is.
+        $this->pmssWriteFile($path, "ipv4_filter.load = /etc/seedbox/config/localnet, preferred\nc = d\n");
+        $this->assertSame(null, $cfg->migrateLegacyLocalnetLine('dummy'));
+        unlink($path);
+        $this->assertSame(null, $cfg->migrateLegacyLocalnetLine('dummy'));
+    }
+
     public function testPortReservationRejectsUnsafeTypeBeforeFilesystemTouch(): void
     {
         $portRoot = $this->pmssMakeTempPath('pmss-rtorrent-ports-');

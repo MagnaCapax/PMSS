@@ -26,6 +26,9 @@ class rtorrentConfig
     private const TEMPLATE_PATH = '/etc/seedbox/config/template.rtorrent.rc';
     private const TEMPLATE_OVERRIDE_PATH = '/etc/seedbox/config/template.rtorrentrc';
     private const DEFAULT_RESOURCE_CONFIG = ['ramBlock' => 250, 'peers' => ['minimum' => 6, 'maximum' => 32], 'uploadSlots' => 7];
+    // catch: builds without ipv4_filter.load (curated store builds) start instead of exiting at parse.
+    private const LOCALNET_LINE = "catch = {\"ipv4_filter.load=/etc/seedbox/config/localnet,preferred\"}";
+    private const LEGACY_LOCALNET_LINE = "ipv4_filter.load = /etc/seedbox/config/localnet, preferred";
     protected $_resourceConfig;
     protected $_template;
     /**
@@ -64,10 +67,23 @@ class rtorrentConfig
         // Localnet publication remains host IO, outside the pure token renderer.
         if (is_readable('/etc/seedbox/config/localnet')) {
             @chmod('/etc/seedbox/config/localnet', 0664);
-            // catch: builds without ipv4_filter.load (curated store builds) start instead of exiting at parse.
-            $configFile .= "\ncatch = {\"ipv4_filter.load=/etc/seedbox/config/localnet,preferred\"}";
+            $configFile .= "\n".self::LOCALNET_LINE;
         }
         return array('configFile' => $configFile, 'config' => $config);
+    }
+    /**
+     * Replace the pre-2026-10-21 trailing localnet line in an existing account config.
+     * @param string $user Target username.
+     * @return bool|null Write result, or null when the config does not end with the legacy line.
+     */
+    public function migrateLegacyLocalnetLine($user)
+    {
+        $data = pmssReadRegularFileContents($this->userConfigFilePath($user));
+        $legacy = "\n".self::LEGACY_LOCALNET_LINE;
+        $body = is_string($data) ? rtrim($data, "\n") : '';
+        if ($body === '' || substr($body, -strlen($legacy)) !== $legacy) return null;
+        return $this->writeConfig($user, substr($body, 0, -strlen($legacy))."\n".self::LOCALNET_LINE
+            .substr($data, strlen($body)));
     }
     /**
      * Persist rendered configuration text to the user's `.rtorrent.rc` file.

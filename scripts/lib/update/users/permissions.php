@@ -38,6 +38,17 @@ function pmssUserRefreshPermissions(array $ctx): void
         pmssUserLog($user, sprintf('[WARN] userPermissions returned rc=%d', $rc));
     }
 
+    // Accounts created before 2026-10-21 end their config with the unwrapped localnet line.
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        try {
+            $migrated = (new rtorrentConfig())->migrateLegacyLocalnetLine($user);
+            if ($migrated === true) pmssUserLog($user, 'Updated .rtorrent.rc localnet line');
+            elseif ($migrated === false) pmssUserLog($user, '[WARN] .rtorrent.rc localnet line update failed');
+        } catch (\Throwable $error) {
+            pmssUserLog($user, '[WARN] .rtorrent.rc localnet line update failed: '.$error->getMessage());
+        }
+    }
+
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
     $rcCustomContent = pmssReadRegularFileContents($rcCustomPath);
     // Seed only genuinely absent paths; retain every existing-file migration guard.
