@@ -62,3 +62,15 @@ pinned by SHA-256 to PM-built reproducible, fully static musl daemons. The
 integration remains inert until the binaries are hosted on the PM mirror and
 the operator sets `torrentClients.enabled`; this change leaves that marker
 absent. A live canary remains separate build-repository work for GH #1063.
+
+## Unix-socket RPC fix (2026-10-21)
+
+An end-to-end test on a fresh Debian 12 host found that both first static builds
+exited on the first connection to the RPC unix socket ("getnameinfo failed:
+Unrecognized address family"). The bundled libevent names every accepted peer
+with `getnameinfo()`, musl rejects `AF_UNIX`, and libevent treats that as fatal.
+The `-r2` builds patch `third-party/libevent/http.c` so `name_from_addr()`
+returns a fixed name for `AF_UNIX` peers before calling the resolver. Nothing
+else in the recipe changed. The catalog pins the `-r2` artifacts; the original
+files stay on the mirror untouched, and hosts holding a first build reinstall
+on their next update because its SHA-256 no longer matches.

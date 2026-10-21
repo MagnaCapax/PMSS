@@ -77,8 +77,8 @@ final class TorrentClientsP3CatalogTest extends TestCase
         $this->assertSame([true, false], array_column($entries, 'isDefault'));
         $this->assertSame(['4.1', '4.0'], array_column($entries, 'compatFamily'));
         $this->assertSame([
-            '3fb81fb39f08ceec528fa724c7c3438dc1e43273d3a48a338237eab712382193',
-            '5d3c87a01503f69a9c958dceb99ea44418bff2445558fd0df1c3c919aa935019',
+            'cff6d66bd7527f9eed7eaaaf931dccc061544efcada4e8b0ac3dbecb2422aab0',
+            'd3dce8aaa8f5d013e0cd29a3246b46ba482217b16f74740d2a321c884a1ec45f',
         ], array_column($entries, 'sha256'));
         foreach ($entries as $entry) {
             $this->assertSame('static', $entry['kind']);
@@ -86,7 +86,7 @@ final class TorrentClientsP3CatalogTest extends TestCase
             $this->assertSame(false, $entry['disabled']);
             $this->assertSame([], $entry['cve']);
             $this->assertSame(['https://pulsedmedia.com/remote/pkg/transmission-daemon-'
-                .$entry['version'].'-static-amd64'], $entry['url']);
+                .$entry['version'].'-static-amd64-r2'], $entry['url']);
         }
         $adr = (string) file_get_contents(dirname(__DIR__, 4).'/docs/adr/0108-transmission-socket-integration.md');
         $this->assertStringContainsString('4.1.3 as default and 4.0.5 as legacy', $adr);
