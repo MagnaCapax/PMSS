@@ -55,7 +55,7 @@ class NginxDefaultTlsTemplateTest extends TestCase
             [$cert, $key],
             $this->template()
         );
-        $config = "pid {$dir}/nginx.pid;\nerror_log stderr;\nevents {}\nhttp {\n"
+        $config = "pid {$dir}/nginx.pid;\nerror_log stderr;\nevents {}\nhttp {\naccess_log off;\n"
             ."ssl_protocols TLSv1.2 TLSv1.3;\nserver { listen 127.0.0.1:443 ssl;\n"
             .$site."\n}\n}\n";
         $path = $dir.'/nginx.conf';
