@@ -2,7 +2,7 @@
 /** Shared, inert metadata for the secured customer toggle apps. */
 return array(
     'slskd' => array(
-        'label' => 'slskd', 'description' => 'Soulseek client', 'listingDescription' => 'Web client for the Soulseek network',
+        'label' => 'slskd', 'description' => 'Soulseek client. Set account and shares in ~/.config/slskd/slskd.env (mode 0600), then restart.', 'listingDescription' => 'Web client for the Soulseek network',
         'listingCategory' => 'Downloads and requests', 'listingIndex' => 2, 'listingAvailable' => true,
         'enable' => '.slskdEnable', 'exe' => '/opt/slskd/slskd',
         'securedMarker' => '.pmss/apps/slskd.secured', 'stateFile' => '.pmss/apps/slskd.state',
@@ -10,7 +10,7 @@ return array(
         'binaries' => array('/opt/slskd/slskd'), 'processNeedle' => 'slskd', 'processFull' => false,
         'launch' => array('/opt/slskd/slskd', '--config', '{config}'), 'workingDirectory' => '/opt/slskd',
         'config' => '.config/slskd/slskd.yml', 'configRenderer' => 'pmssToggleAppSlskdConfig',
-        'extraPortServices' => array('slskd-peer'), 'credentialMode' => 'config',
+        'extraPortServices' => array('slskd-peer'), 'credentialMode' => 'config', 'ownerEnv' => '.config/slskd/slskd.env',
         'watchdogLabel' => 'slskd', 'watchdogProcess' => 'slskd',
     ),
     'copyparty' => array(

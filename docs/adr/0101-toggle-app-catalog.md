@@ -37,3 +37,47 @@ An additional secured app needs one catalog row, one customer config renderer, a
 ## Added catalog apps (2026-10-16)
 
 qui uses credential mode `qui`: its account CLI receives a random service password on stdin before the secured marker is written. A missing `qui.db` forces account setup again. Scryer uses `config`: the account writes a private environment file and separate password file before the secured marker, with authentication enabled at every launch. The env file also sets SCRYER_DISABLE_DEFAULT_ADMIN=true: Scryer keeps a built-in `admin` account with no password next to the named one, and the flag disables it once the named admin exists. Its displayed password is an initial password that the user replaces at first login. Both use loopback binds and preserve their URL prefixes. A leaked service password can access the app's data and actions under that account, but is separate from the PMSS account credential. qui's published CORS advisory CVE-2026-30924 affects versions before 1.15.0; the pinned release is 1.32.0. No matching Scryer advisory was found during this addition; its unauthenticated default remains the principal exposure risk.
+
+## Owner settings for slskd (2026-10-21, Refs #1129)
+
+The generated slskd YAML has no Soulseek account or shares. Owner edits to it
+fail the exact-byte check and trigger regeneration, including the web login.
+The slskd catalog row therefore names an optional `ownerEnv` file,
+`~/.config/slskd/slskd.env`. PMSS never creates or rewrites this file. The
+account creates it with mode 0600, using shell assignments such as:
+
+```sh
+SLSKD_SLSK_USERNAME='your-soulseek-name'
+SLSKD_SLSK_PASSWORD='a-separate-soulseek-password'
+SLSKD_SHARED_DIR='/absolute/path/to/music;/absolute/path/to/other music'
+```
+
+Single-quote values to preserve spaces, dollar signs, double quotes and the
+semicolon separating share paths; escape any embedded single quote using shell
+quoting. Use a separate Soulseek password, never the PMSS account password.
+After saving, restart slskd from Configure to load the environment.
+
+The existing launch shell sources owner settings under the account UID before
+any managed environment. It skips missing, symlinked, non-regular, non-0600,
+foreign-owned or syntactically malformed files. This is shell code, like the
+existing Scryer environment, and runs only with the account's authority. Root
+builds a command from the trusted catalog and never reads the file. Settings
+remain outside the web root; neither credentials nor contents enter argv or logs.
+
+[slskd 0.26.1 configuration](https://github.com/slskd/slskd/blob/0.26.1/docs/config.md)
+documents environment variables below YAML in precedence. The unchanged managed
+YAML therefore continues to pin the web bind, port, URL base, authentication and
+peer listener, while the environment supplies the missing account and shares.
+Exact-byte validation, generated service credentials and secured-marker gates
+remain intact. Parsing or merging owner edits into managed YAML was rejected
+under ADR 0036; keeping owner settings separate follows ADRs 0046 and 0121.
+
+Security review checked the upstream
+[advisory list](https://github.com/slskd/slskd/security/advisories), which showed
+no published advisories on 2026-10-21. Known exposure paths remain the web UI/API,
+shared files, peer listener and account-readable environment. A leaked Soulseek
+secret exposes that external account; a leaked service login exposes slskd data
+and actions as the account. Neither grants the primary PMSS credential. Remote
+configuration and script execution remain upstream attack surfaces; this change
+does not enable either. Rollback removes `ownerEnv` from the catalog, leaving
+the owner file intact and returning to the previous launch behavior.

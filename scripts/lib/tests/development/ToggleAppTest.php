@@ -24,8 +24,8 @@ class ToggleAppTest extends TestCase
             array($catalog['slskd']['enable'], $catalog['slskd']['config'], $catalog['slskd']['extraPortServices']));
         $this->assertSame(array('.copypartyEnable', '.config/copyparty/copyparty.conf', array()),
             array($catalog['copyparty']['enable'], $catalog['copyparty']['config'], $catalog['copyparty']['extraPortServices']));
-        $this->assertSame("cd '/opt/slskd' && nohup '/opt/slskd/slskd' '--config' '/home/bo/.config/slskd/slskd.yml'",
-            \pmssToggleAppLaunchCommand($catalog['slskd'], '/home/bo/'.$catalog['slskd']['config'], '/home/bo'));
+        $this->assertSame('.config/slskd/slskd.env', $catalog['slskd']['ownerEnv']);
+        $this->assertStringContainsString('~/.config/slskd/slskd.env', $catalog['slskd']['description']);
         $this->assertSame("nohup 'python3' '/usr/local/bin/copyparty-sfx.py' '-c' '/home/bo/.config/copyparty/copyparty.conf'",
             \pmssToggleAppLaunchCommand($catalog['copyparty'], '/home/bo/'.$catalog['copyparty']['config'], '/home/bo'));
         $this->assertSame(array('.config/slskd/slskd.yml' => "web:\n  port: 23001\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-bo/slskd\n  authentication:\n    disabled: false\n    username: bo\n    password: secret\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: 23002\n"),
@@ -61,6 +61,98 @@ PROXY;
             $this->assertSame(str_replace(array('{LABEL}', '{ID}'), array($row['label'], $app), $expectedProxy)."\n",
                 \pmssLighttpdManagedProxyFragment($app, 'bo', 23001));
         }
+    }
+
+    public function testSlskdOwnerEnvironmentLaunchPreservesQuotedValuesAndManagedPrecedence(): void
+    {
+        $home = $this->pmssMakeTempDir("toggle-owner-'quote-");
+        $values = array("network 'name", 'network $" secret', $home.'/music one;'.$home.'/music two');
+        $contents = '';
+        foreach (array_combine(array('SLSKD_SLSK_USERNAME', 'SLSKD_SLSK_PASSWORD', 'SLSKD_SHARED_DIR'), $values) as $key => $value) {
+            $contents .= $key.'='.escapeshellarg($value)."\n";
+        }
+        $path = $this->pmssWriteFile($home.'/.config/slskd/slskd.env', $contents, 0700);
+        chmod($path, 0600);
+        $this->assertSame($values, $this->slskdOwnerEnvironmentLaunch($home));
+        // If a future app combines both sources, managed environment must win.
+        $this->pmssWriteFile($home.'/.config/slskd/slskd.yml', "SLSKD_SLSK_USERNAME='managed'\n");
+        $this->assertSame(array('managed', $values[1], $values[2]), $this->slskdOwnerEnvironmentLaunch($home, true));
+        $this->assertSame($contents, file_get_contents($path));
+        $this->assertSame(0600, fileperms($path) & 0777);
+    }
+
+    public function testSlskdOptionalOwnerEnvironmentSkipsUnsafeOrMalformedFiles(): void
+    {
+        foreach (array('missing', 'empty', 'malformed', 'public', 'readonly', 'symlink', 'directory') as $case) {
+            $home = $this->pmssMakeTempDir('toggle-owner-'.$case.'-');
+            $path = $home.'/.config/slskd/slskd.env';
+            if ($case !== 'missing') {
+                $this->pmssWriteFile($path, $case === 'malformed' ? "SLSKD_SLSK_PASSWORD='unfinished\n"
+                    : ($case === 'empty' ? '' : "SLSKD_SLSK_USERNAME='unexpected'\n"), 0700);
+                chmod($path, $case === 'public' ? 0644 : ($case === 'readonly' ? 0400 : 0600));
+                if ($case === 'symlink') {
+                    rename($path, $path.'.target');
+                    symlink($path.'.target', $path);
+                } elseif ($case === 'directory') {
+                    unlink($path);
+                    mkdir($path, 0700);
+                }
+            }
+            $this->assertSame(array('', '', ''), $this->slskdOwnerEnvironmentLaunch($home), $case);
+        }
+    }
+
+    public function testSlskdBootstrapPreservesOwnerSettingsAndStillRepairsManagedConfig(): void
+    {
+        $home = $this->pmssMakeTempDir('toggle-owner-bootstrap-');
+        $this->pmssWithEnv(array('PMSS_TEST_MODE' => '1'), function () use ($home): void {
+            $proxy = \pmssLighttpdManagedProxyFragment('slskd', 'alice', 23001);
+            $bootstrap = static function () use ($home, $proxy): bool {
+                return \pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy, 23002);
+            };
+            $this->assertTrue($bootstrap());
+            $owner = $home.'/.config/slskd/slskd.env';
+            $this->assertFalse(file_exists($owner));
+            $config = $home.'/.config/slskd/slskd.yml';
+            $login = $home.'/.pmss/apps/slskd.login';
+            $managed = file_get_contents($config);
+            $credentials = file_get_contents($login);
+            foreach (array('first', 'edited') as $value) {
+                $contents = "SLSKD_SLSK_USERNAME='{$value}'\nSLSKD_SHARED_DIR='/music'\n";
+                $this->pmssWriteFile($owner, $contents);
+                chmod($owner, 0600);
+                $inode = fileinode($owner);
+                for ($cycle = 0; $cycle < 2; $cycle++) $this->assertTrue($bootstrap());
+                clearstatcache();
+                $this->assertSame($contents, file_get_contents($owner));
+                $this->assertSame($inode, fileinode($owner));
+                $this->assertSame(0600, fileperms($owner) & 0777);
+                $this->assertSame($credentials, file_get_contents($login));
+                $this->assertSame($managed, file_get_contents($config));
+            }
+            // The new settings channel must not make exact-byte security validation unreachable.
+            file_put_contents($config, "web:\n  authentication:\n    disabled: true\n");
+            $this->assertTrue($bootstrap());
+            $this->assertTrue($credentials !== file_get_contents($login));
+            $this->assertSame($contents, file_get_contents($owner));
+            $this->assertSame(\pmssToggleAppConfigs('slskd', 'alice', $home, 23001,
+                explode("\n", trim(file_get_contents($login)))[1], 23002)['.config/slskd/slskd.yml'], file_get_contents($config));
+        });
+    }
+
+    /** Execute the real launch shell with a harmless stand-in for the app. */
+    private function slskdOwnerEnvironmentLaunch(string $home, bool $managed = false): array
+    {
+        $row = (require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php'))['slskd'];
+        $keys = array('SLSKD_SLSK_USERNAME', 'SLSKD_SLSK_PASSWORD', 'SLSKD_SHARED_DIR');
+        $row['launch'] = array(PHP_BINARY, '-r', 'echo json_encode(array_map("strval", array_map("getenv", '.var_export($keys, true).')));');
+        $row['workingDirectory'] = '{home}';
+        $row['sourceEnv'] = $managed;
+        $command = \pmssToggleAppLaunchCommand($row, $home.'/'.$row['config'], $home);
+        $this->assertStringNotContainsString('network $" secret', $command);
+        $result = $this->pmssExecShellCommand($command.' </dev/null', array_fill_keys($keys, ''));
+        $this->assertSame(0, $result['rc'], $result['output']);
+        return $this->pmssDecodeJsonArray($result['output']);
     }
 
     public function testRootCatalogGuardRefusesUnsafeFilesAndDirectories(): void

@@ -61,8 +61,18 @@ function pmssToggleAppLaunchCommand(array $row, string $config, string $home): s
     }, $row['launch']);
     // The launch otherwise inherits root's working directory, which the account cannot read.
     $cd = $row['workingDirectory'] !== '' ? 'cd '.escapeshellarg($expand($row['workingDirectory'])).' && ' : '';
-    if (!empty($row['sourceEnv'])) {
-        $shell = 'set -a; . '.escapeshellarg($config).'; set +a; exec '.implode(' ', $tokens);
+    $sources = '';
+    if (!empty($row['ownerEnv'])) {
+        // Only the account shell reads owner settings; malformed or non-private files are optional.
+        $ownerEnv = escapeshellarg($expand('{home}/'.$row['ownerEnv']));
+        $sources = 'if [ -f '.$ownerEnv.' ] && [ ! -L '.$ownerEnv.' ]'
+            .' && [ "$(stat -c %u:%a -- '.$ownerEnv.')" = "$(id -u):600" ]'
+            .' && /bin/sh -n '.$ownerEnv.' >/dev/null 2>&1; then . '.$ownerEnv.'; fi; ';
+    }
+    // Managed environment follows owner settings, so managed values keep precedence.
+    if (!empty($row['sourceEnv'])) $sources .= '. '.escapeshellarg($config).'; ';
+    if ($sources !== '') {
+        $shell = 'set -a; '.$sources.'set +a; exec '.implode(' ', $tokens);
         return $cd.'nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell);
     }
     return $cd.'nohup '.implode(' ', $tokens);
