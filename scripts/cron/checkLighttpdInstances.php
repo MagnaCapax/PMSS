@@ -12,6 +12,7 @@ require_once __DIR__.'/../lib/lighttpd/watchdogNginxLogReader.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
 require_once __DIR__.'/../lib/lighttpd/hermesUiConverge.php';
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/update/runtime/commands.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
 
 $argUserRaw = trim((string) ($argv[1] ?? ''));

@@ -7,6 +7,7 @@
  */
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/lighttpd/symlinkRepair.php';
+require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 requireRoot();
 $username = $argc === 2 ? pmssUsernameNormalizeIfValid((string) $argv[1]) : null;
