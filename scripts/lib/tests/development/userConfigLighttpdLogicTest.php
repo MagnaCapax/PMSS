@@ -264,13 +264,13 @@ LIGHTTPD;
     public function testPhpIniContentRendererKeepsExistingDirectivesStable(): void
     {
         $updated = \pmssLighttpdApplyPhpIniContent(
-            "; Keep this comment\n[PHP]\nengine = On\nmemory_limit = 64M\n; upload_tmp_dir = /tmp\n; error_log = php_errors.log\n",
-            'alice',
+            "; Keep this comment\n[PHP]\nengine = On\nmemory_limit = 64M\n; upload_tmp_dir = /tmp\n; error_log = php_errors.log\n;session.upload_progress.enabled = On\n",
+            'fixtureacct',
             512
         );
 
         $this->assertSame(
-            "; Keep this comment\n[PHP]\nengine = On\nmemory_limit = 512M\nupload_tmp_dir = /home/alice/.lighttpd/upload\nerror_log = /home/alice/.lighttpd/error.log\n",
+            "; Keep this comment\n[PHP]\nengine = On\nmemory_limit = 512M\nupload_tmp_dir = /home/fixtureacct/.lighttpd/upload\nerror_log = /home/fixtureacct/.lighttpd/error.log\nsession.upload_progress.enabled = Off\n",
             $updated
         );
     }
@@ -280,7 +280,7 @@ LIGHTTPD;
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
         $rendered = \pmssLighttpdRenderUserConfig(
             $template,
-            'alice',
+            'fixtureacct',
             31234,
             0,
             0,
@@ -288,7 +288,7 @@ LIGHTTPD;
         );
 
         $this->assertStringContainsString(
-            '"bin-path"              => "/usr/bin/php-cgi -c /home/alice/.lighttpd/php.ini",',
+            '"bin-path"              => "/usr/bin/php-cgi -c /home/fixtureacct/.lighttpd/php.ini",',
             $rendered
         );
         $this->assertStringContainsString(
@@ -302,20 +302,33 @@ LIGHTTPD;
 
     public function testPhpIniContentRendererAppendsMissingDirectives(): void
     {
-        $updated = \pmssLighttpdApplyPhpIniContent("engine = On\n", 'bob', 256);
+        $updated = \pmssLighttpdApplyPhpIniContent("engine = On\n", 'fixtureuser', 256);
 
         $this->assertSame(
-            "engine = On\nmemory_limit = 256M\nupload_tmp_dir = /home/bob/.lighttpd/upload\nerror_log = /home/bob/.lighttpd/error.log\n",
+            "engine = On\nmemory_limit = 256M\nupload_tmp_dir = /home/fixtureuser/.lighttpd/upload\nerror_log = /home/fixtureuser/.lighttpd/error.log\nsession.upload_progress.enabled = Off\n",
             $updated
         );
         foreach (['', '; error_log = php_errors.log', 'error_log = syslog', 'error_log =', '  ; error_log = /tmp/errors'] as $line) {
-            $rendered = \pmssLighttpdApplyPhpIniContent("engine = On\n".$line."\n", 'bob', 256);
-            $this->assertSame(4, substr_count($rendered, "\n"));
+            $rendered = \pmssLighttpdApplyPhpIniContent("engine = On\n".$line."\n", 'fixtureuser', 256);
+            $this->assertSame(5, substr_count($rendered, "\n"));
             $path = $this->pmssMakeTempFile('pmss-http-phpini-');
             file_put_contents($path, $rendered);
-            $this->assertSame('/home/bob/.lighttpd/error.log', parse_ini_file($path)['error_log']);
-            $this->assertSame($rendered, \pmssLighttpdApplyPhpIniContent($rendered, 'bob', 256));
+            $this->assertSame('/home/fixtureuser/.lighttpd/error.log', parse_ini_file($path)['error_log']);
+            $this->assertSame($rendered, \pmssLighttpdApplyPhpIniContent($rendered, 'fixtureuser', 256));
         }
+    }
+
+    public function testPhpIniContentRendererTurnsSessionUploadProgressOff(): void
+    {
+        foreach (['session.upload_progress.enabled = On', '  ;session.upload_progress.enabled = On', 'session.upload_progress.enabled=1', ''] as $line) {
+            $rendered = \pmssLighttpdApplyPhpIniContent("[Session]\n".$line."\n", 'fixtureuser', 256);
+            $this->assertSame(1, substr_count($rendered, 'session.upload_progress.enabled'));
+            $path = $this->pmssMakeTempFile('pmss-http-phpini-');
+            file_put_contents($path, $rendered);
+            $this->assertSame('', parse_ini_file($path)['session.upload_progress.enabled']);
+        }
+        $skel = $this->pmssReadRepoFile('etc/skel/.lighttpd/php.ini');
+        $this->assertSame(1, preg_match('/^session\.upload_progress\.enabled = Off$/m', $skel));
     }
 
     public function testUserConfigApplyFacadeLoadsFocusedHelpers(): void
