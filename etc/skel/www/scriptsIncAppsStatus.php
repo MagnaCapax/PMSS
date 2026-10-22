@@ -83,8 +83,12 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
             if (isset($definition[$field])) $apps[$name][$field] = $definition[$field];
         }
         if (isset($definition['statusHelperFile'], $definition['statusHelper'])) {
-            pmssWelcomeRequireLocalHelper($definition['statusHelperFile']);
-            if (function_exists($definition['statusHelper'])) $apps[$name]['state'] = $definition['statusHelper']($home, $apps[$name]['state']);
+            try {
+                pmssWelcomeRequireLocalHelper($definition['statusHelperFile']);
+                if (function_exists($definition['statusHelper'])) $apps[$name]['state'] = $definition['statusHelper']($home, $apps[$name]['state']);
+            } catch (Throwable $error) {
+                // Optional status must preserve the marker-derived state when delivery or runtime fails.
+            }
         }
         if (isset($toggleCatalog[$name])) {
             $row = $toggleCatalog[$name];

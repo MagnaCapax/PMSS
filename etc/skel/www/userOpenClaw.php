@@ -24,7 +24,8 @@ function pmssOpenClawRuntimeReady(): bool
     $installer = dirname(__DIR__).'/bin/install-openclaw';
     if (!is_file($installer) || is_link($installer)) return false;
     require_once $installer;
-    return true;
+    // The panel heal can precede step2's installer refresh; old ocPaths ignores the explicit home.
+    return function_exists('ocPaths') && (new ReflectionFunction('ocPaths'))->getNumberOfParameters() >= 1;
 }
 
 /** Keep slow installs visible while using the installer's verified gateway identity. */

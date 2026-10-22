@@ -21,6 +21,18 @@ separate browser tab with a single-use login handoff. **Restart** and **Turn off
 use the same account installer; Turn off persists across cron checks.
 Uninstall remains an SSH command.
 
+The panel and installer arrive through separate delivery channels:
+
+| Files | Delivery |
+| --- | --- |
+| `www/userOpenClaw.php`, `www/scriptsIncAppsStatus.php`, `www/welcome.php`, `www/configure.php` | guiv panel heal |
+| `bin/install-openclaw` | `update.php` step2 per-account refresh |
+
+When the panel arrives first, an installer without explicit-home support is
+unavailable to panel controls until step2 refreshes it. Status keeps its existing
+marker-derived value; an OpenClaw helper failure leaves Welcome, Configure, and
+the other app rows available. Installer-first delivery retains normal status.
+
 Browser access uses `https://<server>/user-<user>/openclaw/`, protected by your
 panel login and gateway token. The canonical server hostname may ask for your
 panel login once when you entered through another hostname. The OpenClaw panel
