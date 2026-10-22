@@ -13,8 +13,8 @@ class PanelSessionLighttpdConfigTest extends TestCase
     private function legacyRender(string $template, string $user = 'alice'): string
     {
         $config = str_replace(
-            ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##"],
-            [$user, 31234, 32345, 33456, \pmssWebdavWwwPolicyBlock($user), ''],
+            ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##", "##PMSS_AGENT_WEB_LOGIN_REQUIRE##"],
+            [$user, 31234, 32345, 33456, \pmssWebdavWwwPolicyBlock($user), '', ''],
             $template
         );
         $config = preg_replace(

@@ -68,6 +68,7 @@ there is no second password store and no plaintext primary credential. The new
 session value is a random bearer token, scoped to one host/path by omitting
 `Domain` and using `Path=/user-<user>/`, and stored only in the user's own
 `~/.lighttpd/panel-session`.
+ADR 0151 amends the no-second-password-store statement for an optional temporary agent bcrypt entry in that same htpasswd file.
 
 The main attack surfaces are session theft, CSRF/login CSRF, credential guessing,
 header smuggling/auth bypass classes in HTTP servers, and accidental policy drift

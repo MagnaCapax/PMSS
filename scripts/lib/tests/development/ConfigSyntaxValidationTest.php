@@ -97,8 +97,8 @@ class ConfigSyntaxValidationTest extends TestCase
 
         // Substitute placeholders with valid test values
         $rendered = str_replace(
-            array('##username', '##serverPort', '##PMSS_WEBDAV_WWW_POLICY##'),
-            array('testuser', '30000', ''),
+            array('##username', '##serverPort', '##PMSS_WEBDAV_WWW_POLICY##', '##PMSS_AGENT_WEB_LOGIN_REQUIRE##'),
+            array('testuser', '30000', '', ''),
             $template
         );
 

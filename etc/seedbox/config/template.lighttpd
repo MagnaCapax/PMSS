@@ -71,7 +71,7 @@ auth.require = (
     (
         "method" => "basic",
         "realm" => "Password protected area (##username)",
-        "require" => "user=##username"
+        "require" => "user=##username##PMSS_AGENT_WEB_LOGIN_REQUIRE##"
     ),
  "/webdav-##username/" =>
     (

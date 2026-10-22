@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/../user/identity.php';
+require_once __DIR__.'/agentWebLogin.php';
 require_once __DIR__.'/panelSessionLogin.php';
 require_once __DIR__.'/userFileWrite.php';
 require_once __DIR__.'/transmissionProxy.php';
@@ -71,9 +72,12 @@ function pmssLighttpdRenderUserConfig(
             && pmssLighttpdTransmissionSelected($user, '/home/'.$user);
     }
     $config = str_replace(
-        ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##"],
+        ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##",
+            "##PMSS_AGENT_WEB_LOGIN_REQUIRE##"],
         [$user, $serverPort, $rclonePort, $qbittorrentPort, pmssWebdavWwwPolicyBlock($user),
-            $transmissionSelected ? pmssLighttpdTransmissionProxyBlock($user) : ''],
+            $transmissionSelected ? pmssLighttpdTransmissionProxyBlock($user) : '',
+            // Panel zone only; empty without the host marker (ADR 0151).
+            pmssAgentWebLoginRequireSuffix($user)],
         (string) $template
     );
     $config = preg_replace(
