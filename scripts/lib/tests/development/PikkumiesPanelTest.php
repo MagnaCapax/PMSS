@@ -55,6 +55,24 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertSame('', \pmssPikkumiesPanelStateRead($home, 'alice', $home.'/marker', $home.'/billing', -1)['origin']);
     }
 
+    public function testAgentsSectionNeedsTheHostMarkerForHermes(): void
+    {
+        $home = $this->fixture();
+        mkdir($home.'/bin');
+        file_put_contents($home.'/bin/install-hermes', "#!/bin/sh\n");
+        $none = array('visible' => false, 'origin' => '', 'mode' => 'simplified', 'off' => false);
+        $this->assertTrue(\pmssAgentsSectionVisible($none, $home, $home.'/marker'));
+        unlink($home.'/marker');
+        $this->assertFalse(\pmssAgentsSectionVisible($none, $home, $home.'/marker'));
+        symlink($home.'/billing/alice', $home.'/marker');
+        $this->assertFalse(\pmssAgentsSectionVisible($none, $home, $home.'/marker'));
+        unlink($home.'/marker');
+        file_put_contents($home.'/marker', '');
+        unlink($home.'/bin/install-hermes');
+        $this->assertFalse(\pmssAgentsSectionVisible($none, $home, $home.'/marker'));
+        $this->assertTrue(\pmssAgentsSectionVisible($this->state($home), $home, $home.'/marker'));
+    }
+
     public function testOffHidesTabButKeepsConfigureState(): void
     {
         $home = $this->fixture();

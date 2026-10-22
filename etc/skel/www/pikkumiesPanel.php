@@ -35,3 +35,13 @@ function pmssPikkumiesPanelStateRead($home, $name, $marker = '/etc/seedbox/confi
         'origin' => 'https://'.substr(hash('sha256', 'mcx.fi:service:'.ltrim($id, '0')), 0, 16).'.mcx.fi:844',
         'mode' => $mode, 'off' => $off);
 }
+
+/**
+ * Configure shows the AI agents section only where it can work: Pikkumies is eligible, or the host carries the
+ * Eternals marker that Hermes needs. Without the marker the Hermes install has no service address and always fails.
+ */
+function pmssAgentsSectionVisible(array $pikkumiesState, $home, $marker = '/etc/seedbox/config/pikkumiesEternals.enabled')
+{
+    if (($pikkumiesState['origin'] ?? '') !== '') return true;
+    return is_file($marker) && !is_link($marker) && is_file($home.'/bin/install-hermes');
+}

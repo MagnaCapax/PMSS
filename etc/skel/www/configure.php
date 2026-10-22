@@ -74,7 +74,7 @@ $certFailed = $settingsState['certFailed'];
 $sections = array('apps' => 'Apps', 'alerts' => 'Usage alert email', 'logins' => 'Passwords and logins',
     'backup' => 'Backup and restore', 'https' => 'HTTPS for your public folder', 'tabs' => 'Custom tabs',
     'rtorrent' => 'rTorrent custom settings', 'panel' => 'Panel', 'more' => 'Find more apps');
-if ($pmssPikkumiesState['origin'] !== '' || is_file($home.'/bin/install-hermes')) {
+if (function_exists('pmssAgentsSectionVisible') && pmssAgentsSectionVisible($pmssPikkumiesState, $home)) {
     $sections = array_merge(array_slice($sections, 0, 1, true), array('agents' => 'AI agents'), array_slice($sections, 1, null, true));
 }
 if (is_file(__DIR__.'/mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {
