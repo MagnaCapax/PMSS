@@ -140,12 +140,12 @@ function pmssPikkumiesOpenTlsValid($name, $port = 844)
     return true;
 }
 
-/** Request one username-free lineage only after DNS points at this host. */
+/**
+ * Report whether the permalink already serves a valid certificate. Never requests one: only the customer turns on a
+ * public certificate, from Configure (ADR 0150).
+ */
 function pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permalink, $port = 844)
 {
-    $flag = $home.'/.request-web-certs';
-    if (is_file($flag.'.failed')) return 'error';
-    if (file_exists($flag) || is_link($flag)) return 'pending';
     $serviceAddresses = @gethostbynamel($permalink);
     $hostAddresses = @gethostbynamel($host);
     if (!is_array($serviceAddresses) || !is_array($hostAddresses)
@@ -160,14 +160,7 @@ function pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permali
             @chmod($cache, 0600);
         }
     }
-    if ($valid) return 'valid';
-    $mode = pmssPikkumiesOpenTlsValid($name.'.'.$host, 443) ? 'username' : 'default';
-    $file = @fopen($flag, 'x');
-    if (!is_resource($file)) return 'pending';
-    $ok = @chmod($flag, 0644) && @fwrite($file, $mode."\n") === strlen($mode) + 1;
-    fclose($file);
-    if (!$ok) { @unlink($flag); return 'error'; }
-    return 'pending';
+    return $valid ? 'valid' : 'pending';
 }
 
 /** Check and spawn inside an account-local flock whose fd closes before the child. */

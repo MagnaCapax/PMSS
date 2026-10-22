@@ -17,43 +17,6 @@ function pmssHermesPanelStatusRead($home): array
         'url' => $url);
 }
 
-/** Verify the service name against the current host's TLS listener. */
-function pmssHermesTlsValid($host, $port): bool
-{
-    $context = stream_context_create(array('ssl' => array('verify_peer' => true,
-        'verify_peer_name' => true, 'peer_name' => $host, 'SNI_enabled' => true,
-        'SNI_server_name' => $host)));
-    $stream = @stream_socket_client('ssl://127.0.0.1:'.$port, $errno, $error, 2,
-        STREAM_CLIENT_CONNECT, $context);
-    if (!is_resource($stream)) return false;
-    fclose($stream);
-    return true;
-}
-
-/** A guarded certificate request is written by this account, not by root. */
-function pmssHermesCertificateRequest($home): void
-{
-    $name = basename($home);
-    $billing = '/var/lib/pmss/public/billing/'.$name;
-    $stat = @lstat($billing);
-    $id = is_array($stat) && ($stat['mode'] & 0170000) === 0100000
-        && $stat['uid'] === 0 && $stat['nlink'] === 1 ? trim((string) @file_get_contents($billing)) : '';
-    if (!preg_match('/^[1-9][0-9]*$/D', $id)) return;
-    $permalink = substr(hash('sha256', 'mcx.fi:service:'.ltrim($id, '0')), 0, 16).'.mcx.fi';
-    $host = strtolower(trim((string) @shell_exec('/bin/hostname -f')));
-    if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/D', $host) !== 1) return;
-    $serviceAddresses = @gethostbynamel($permalink);
-    $hostAddresses = @gethostbynamel($host);
-    if (!is_array($serviceAddresses) || !is_array($hostAddresses)
-        || array_intersect($serviceAddresses, $hostAddresses) === array()) return;
-    $flag = $home.'/.request-web-certs';
-    if (file_exists($flag) || is_link($flag) || file_exists($flag.'.failed')) return;
-    if (pmssHermesTlsValid($permalink, 846)) return;
-    $mode = pmssHermesTlsValid($name.'.'.$host, 443) ? 'username' : 'default';
-    $file = @fopen($flag, 'x');
-    if (is_resource($file)) { @chmod($flag, 0644); fwrite($file, $mode."\n"); fclose($file); }
-}
-
 /** Configure's POST and password gate have already run before this helper. */
 function pmssHermesPanelAction($home, $action, $request, $ops = array()): array
 {
@@ -76,7 +39,6 @@ function pmssHermesPanelAction($home, $action, $request, $ops = array()): array
     $limit = function_exists('pmssMediaStackPanelMemoryLimitBytesRead') ? pmssMediaStackPanelMemoryLimitBytesRead() : null;
     if ($limit !== null && $limit < 1000 * 1048576)
         return array('ok' => false, 'status' => 409, 'message' => 'Hermes needs at least 1000 MiB of account memory.');
-    pmssHermesCertificateRequest($home);
     $base = $home.'/.hermes';
     if (is_link($base) || (!is_dir($base) && !@mkdir($base, 0700)))
         return array('ok' => false, 'status' => 409, 'message' => 'Hermes state is unavailable.');
