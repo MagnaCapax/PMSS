@@ -292,7 +292,7 @@ LIGHTTPD;
             $rendered
         );
         $this->assertStringContainsString(
-            '$HTTP["url"] =~ "(?i)^/jellyfin/System/Restart" {' . "\n" .
+            '$HTTP["url"] =~ "(?i)^/jellyfin/System/(Restart|Shutdown)" {' . "\n" .
             '    url.access-deny = ( "" )' . "\n" .
             '}',
             $rendered

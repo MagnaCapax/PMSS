@@ -1110,7 +1110,7 @@ abstract class TestCase
         $shims = <<<'PHP'
 function tempnam($directory, $prefix) {
     ++$GLOBALS['tempCalls'];
-    return $GLOBALS['mode'] === %s ? false : \tempnam($directory, $prefix);
+    return $GLOBALS['mode'] === %1$s ? false : \tempnam($directory, $prefix);
 }
 function file_put_contents($path, $bytes, $flags = 0) {
     $mode = $GLOBALS['mode'];
@@ -1120,6 +1120,19 @@ function file_put_contents($path, $bytes, $flags = 0) {
     return \file_put_contents($path, $mode === 'short' ? substr($bytes, 0, -1) : $bytes, $flags);
 }
 function pmssFileWriteComplete($path, $bytes, $flags = 0) { return file_put_contents($path, $bytes, $flags) === strlen($bytes); }
+// Writers that stage through an exclusive-create handle: count and fail the create, fault the writes.
+function fopen($path, $mode, ...$rest) {
+    if (strpos($mode, 'x') === false) return \fopen($path, $mode, ...$rest);
+    ++$GLOBALS['tempCalls'];
+    return $GLOBALS['mode'] === %1$s ? false : \fopen($path, $mode, ...$rest);
+}
+function fwrite($handle, $bytes, ...$rest) {
+    $mode = $GLOBALS['mode'];
+    if ($mode === 'writeThrow' || $mode === 'writeError') throw $GLOBALS['throwable'];
+    if ($mode === 'false') return false;
+    if ($mode === 'zero') return 0;
+    return \fwrite($handle, $mode === 'short' ? substr($bytes, 0, -1) : $bytes, ...$rest);
+}
 function chmod($path, $permissions) {
     if ($GLOBALS['mode'] === 'chmodThrow') throw $GLOBALS['throwable'];
     return $GLOBALS['mode'] === 'chmod' ? false : \chmod($path, $permissions);

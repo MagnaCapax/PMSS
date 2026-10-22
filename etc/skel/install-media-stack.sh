@@ -102,6 +102,7 @@ MEDIA_STACK_APP_START_WAIT=600
 MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)
 MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)
 MEDIA_STACK_CREDENTIALS_FILE="$HOME/.media-stack-credentials.txt"
+PMSS_MEDIA_STACK_SEED_PRIVATE=0
 AUTOBRR_BASE_URL="/public-$(id -un)/autobrr/"
 
 # Overrides (initialized empty)
@@ -1789,6 +1790,37 @@ servarr_host_config_url() {
 	printf 'http://127.0.0.1:%s%s/api/%s/config/host' "$seed_port" "${url_base%/}" "$api_version"
 }
 
+# Send shell state on stdin so passwords never become unshare/bash arguments.
+# A separate tmux server is essential: the account's existing server is outside
+# this namespace and would otherwise start the seed on the shared loopback.
+media_stack_auth_seed_private() {
+	local variable
+	if ! command -v unshare >/dev/null 2>&1 || ! command -v ip >/dev/null 2>&1; then
+		log_err "Private login setup requires unshare and ip; no app was started."
+		return 1
+	fi
+	if ! {
+		printf 'set -Eeuo pipefail\n'
+		declare -f
+		for variable in "${!MEDIA_STACK_@}" "${!JELLYFIN_@}" "${!AUTOBRR_@}" "${!C_@}" DOTNET_ROOT_PATH OVR_JELLYFIN_FFMPEG HOME HOSTNAME USERNAME; do
+			declare -p "$variable" 2>/dev/null || true
+		done
+		cat <<'SEED'
+PMSS_MEDIA_STACK_SEED_PRIVATE=1
+ip link set lo up || { log_err "Private loopback setup failed; no app was started."; exit 1; }
+seed_tmux_dir=$(mktemp -d)
+tmux() { command tmux -S "$seed_tmux_dir/socket" "$@"; }
+trap 'tmux kill-server >/dev/null 2>&1 || true; rm -f -- "$seed_tmux_dir/socket"; rmdir -- "$seed_tmux_dir"' EXIT
+SEED
+		printf 'if '
+		printf '%q ' "$@"
+		printf '; then exit 0; else exit 1; fi\n'
+	} | unshare --user --map-root-user --net bash -s; then
+		log_err "Private login setup failed; user/network namespaces must be available. No shared-loopback fallback; app not started for normal use."
+		return 1
+	fi
+}
+
 # Stop a seed process before removing the owner-only request files it used.
 media_stack_auth_seed_cleanup() {
 	local session="$1"
@@ -1818,6 +1850,10 @@ servarr_auth_seed() {
 			servarr_credentials_mark_existing_unknown "$app" "$install_name"
 		fi
 		return 0
+	fi
+	if [[ "${PMSS_MEDIA_STACK_SEED_PRIVATE:-0}" != 1 ]]; then
+		media_stack_auth_seed_private servarr_auth_seed "$@"
+		return $?
 	fi
 
 	seed_port="$desired_port"
@@ -1919,11 +1955,37 @@ servarr_auth_seed() {
 	log_ok "${install_name} app-level auth configured"
 }
 
+# The read-only query cannot initialize or modify a previous database.
+autobrr_user_count() {
+	sqlite3 -readonly "$1" 'SELECT COUNT(*) FROM users;' 2>/dev/null
+}
+
 autobrr_auth_seed() {
 	local datadir="$1" password="$2" seed_port="$3" session="autobrr-auth-seed"
-	local db_file="$datadir/autobrr.db" had_db=0
+	local db_file="$datadir/autobrr.db" had_db=0 user_count existing_password
 
 	[[ -s "$db_file" ]] && had_db=1
+	if [[ "$had_db" -eq 1 ]]; then
+		user_count=$(autobrr_user_count "$db_file") || user_count=unknown
+		if [[ "$user_count" == 1 ]]; then
+			log_warn "Autobrr user already exists or could not be changed; preserving existing Autobrr credentials"
+			existing_password=$(media_stack_credentials_value AUTOBRR_PASSWORD)
+			AUTOBRR_PASSWORD="${existing_password:-[existing Autobrr password preserved; not known to installer]}"
+			return 0
+		fi
+		if [[ "$user_count" != 0 ]]; then
+			log_err "Autobrr user count is not exactly one or cannot be read; stop and reinstall. No users or config were deleted."
+			return 1
+		fi
+	fi
+	if [[ "${PMSS_MEDIA_STACK_SEED_PRIVATE:-0}" != 1 ]]; then
+		if ! command -v sqlite3 >/dev/null 2>&1; then
+			log_err "sqlite3 is required to verify Autobrr users; app not started."
+			return 1
+		fi
+		media_stack_auth_seed_private autobrr_auth_seed "$@"
+		return $?
+	fi
 	if [[ "$had_db" -eq 0 ]]; then
 		media_stack_session_kill_owned "$session"
 		tmux new-session -d -s "$session" \
@@ -1940,13 +2002,12 @@ autobrr_auth_seed() {
 	fi
 
 	if printf '%s\n' "$password" | "$HOME/.bin/autobrr/autobrrctl" --config "$datadir" create-user "$MEDIA_STACK_AUTH_USERNAME" >/dev/null 2>&1; then
+		user_count=$(autobrr_user_count "$db_file") || user_count=unknown
+		if [[ "$user_count" != 1 ]]; then
+			log_err "Autobrr user count is not exactly one; stop and reinstall. No users or config were deleted."
+			return 1
+		fi
 		log_ok "Autobrr app-level auth configured"
-		return 0
-	fi
-
-	if [[ "$had_db" -eq 1 ]]; then
-		log_warn "Autobrr user already exists or could not be changed; preserving existing Autobrr credentials"
-		AUTOBRR_PASSWORD="[existing Autobrr password preserved; not known to installer]"
 		return 0
 	fi
 
@@ -1991,11 +2052,28 @@ jellyfin_startup_base_url() {
 }
 
 jellyfin_auth_seed() {
-	local password="$1" seed_port="$2" session base_url payload_json auth_json code
+	local password="$1" seed_port="$2" session base_url payload_json auth_json curl_config code existing_password
+	local seed_pending="$JELLYFIN_CONFIG_DIR/.pmss-auth-seed-pending"
+	if [[ -e "$seed_pending" || -L "$seed_pending" ]]; then
+		log_err "Jellyfin login setup is incomplete; stop and reinstall. Existing users and config are retained."
+		return 1
+	fi
+	if grep -qi '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>' "$JELLYFIN_CONFIG_DIR/system.xml" 2>/dev/null; then
+		log_info "Jellyfin app-level auth already configured; preserving existing credentials"
+		existing_password=$(media_stack_credentials_value JELLYFIN_PASSWORD)
+		JELLYFIN_PASSWORD="${existing_password:-[existing Jellyfin password preserved; not known to installer]}"
+		return 0
+	fi
+	if [[ "${PMSS_MEDIA_STACK_SEED_PRIVATE:-0}" != 1 ]]; then
+		media_stack_auth_seed_private jellyfin_auth_seed "$@"
+		return $?
+	fi
 	session="jellyfin-auth-seed"
 	base_url="http://127.0.0.1:${seed_port}"
 	payload_json=$(mktemp)
 	auth_json=$(mktemp)
+	curl_config=$(mktemp)
+	chmod 600 "$payload_json" "$auth_json" "$curl_config"
 
 	media_stack_session_kill_owned "$session"
 	tmux new-session -d -s "$session" \
@@ -2010,31 +2088,37 @@ jellyfin_auth_seed() {
 		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "illegal instruction\|SIGILL\|signal 4"; then
 			log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
 		fi
-		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
 	if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" "$MEDIA_STACK_APP_START_WAIT"); then
 		log_err "Jellyfin startup API never answered HTTP 200, with or without BaseUrl (see $JELLYFIN_LOG_DIR/jellyfin-auth-seed.log)"
-		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
 
 	if ! curl -fsS --max-time 10 "${base_url}/Startup/User" >/dev/null; then
 		log_err "Jellyfin startup user initialization failed"
-		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
 	jellyfin_auth_payload_write "$payload_json" "$password"
 	code=$(media_stack_http_code "${base_url}/Startup/User" -X POST -H 'Content-Type: application/json' --data-binary "@${payload_json}")
 	if [[ "$code" != "204" ]]; then
 		log_err "Jellyfin rejected startup admin creation (HTTP ${code})"
-		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
+		return 1
+	fi
+	# Keep failed verification from becoming an 'already configured' skip on rerun.
+	if ! (umask 077 && set -o noclobber && printf 'Login verification pending\n' >"$seed_pending"); then
+		log_err "Could not record Jellyfin login verification state; app not started."
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
 	code=$(media_stack_http_code "${base_url}/Startup/Complete" -X POST)
 	if [[ "$code" != "204" ]]; then
 		log_err "Jellyfin rejected startup completion (HTTP ${code})"
-		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
 
@@ -2045,15 +2129,25 @@ jellyfin_auth_seed() {
 		media_stack_json_escape "$password"
 		printf '}'
 	} >"$auth_json"
-	code=$(media_stack_http_code "${base_url}/Users/AuthenticateByName" -X POST -H 'Content-Type: application/json' -H 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1"' --data-binary "@${auth_json}")
+	code=$(media_stack_http_code "${base_url}/Users/AuthenticateByName" -X POST -H 'Content-Type: application/json' -H 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1"' --data-binary "@${auth_json}" -o "$payload_json")
 	if [[ "$code" != "200" ]]; then
 		log_err "Jellyfin admin login verification failed (HTTP ${code})"
-		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json"
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
+		return 1
+	fi
+	# Use an owner-only curl config for the returned token; never put it in argv.
+	# shellcheck disable=SC2016
+	if ! php -r '$data = json_decode(file_get_contents($argv[1]), true); $token = $data["AccessToken"] ?? null; if (!is_string($token) || !preg_match("/^[a-zA-Z0-9]+$/", $token)) { exit(1); } echo "header = \"X-Emby-Token: ".$token."\"\n";' "$payload_json" >"$curl_config" ||
+		! curl -fsS --max-time 10 --config "$curl_config" "${base_url}/Users" -o "$payload_json" ||
+		! MEDIA_STACK_AUTH_USERNAME="$MEDIA_STACK_AUTH_USERNAME" php -r '$users = json_decode(file_get_contents($argv[1]), true); exit(is_array($users) && count($users) === 1 && ($users[0]["Name"] ?? null) === getenv("MEDIA_STACK_AUTH_USERNAME") ? 0 : 1);' "$payload_json"; then
+		log_err "Jellyfin must have exactly one expected user; stop and reinstall. No users or config were deleted."
+		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
 
 	media_stack_session_kill_owned "$session"
-	rm -f "$payload_json" "$auth_json" "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" 2>/dev/null || true
+	rm -f -- "$seed_pending"
+	rm -f "$payload_json" "$auth_json" "$curl_config" "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" 2>/dev/null || true
 	log_ok "Jellyfin admin account configured"
 }
 

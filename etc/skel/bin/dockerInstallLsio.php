@@ -7,6 +7,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/dockerLsioSeed.php';
 
 // A partly delivered home keeps the other apps working; torrent apps refuse below.
 if (is_file(__DIR__.'/dockerInstallLsioTorrent.php')) require_once __DIR__.'/dockerInstallLsioTorrent.php';
@@ -137,7 +138,7 @@ function pmssDockerInstallLsioEnsureDirectories(array $paths): bool
 /**
  * Persist generated service credentials with restrictive permissions.
  */
-function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string $dbName, string $dbUser, string $app = 'mariadb'): bool
+function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string $dbName, string $dbUser, string $app = 'mariadb', bool $exclusive = false): bool
 {
     $lines = $app === 'transmission' ? [
         'USER='.pmssDockerInstallLsioRandomSecret(),
@@ -150,11 +151,11 @@ function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string
     ];
     $payload = implode("\n", $lines)."\n";
 
-    return pmssDockerInstallLsioWritePrivateFile($credentialFile, $payload);
+    return pmssDockerInstallLsioWritePrivateFile($credentialFile, $payload, $exclusive);
 }
 
 /** Atomically publish a private config or service credential file. */
-function pmssDockerInstallLsioWritePrivateFile(string $credentialFile, string $payload): bool
+function pmssDockerInstallLsioWritePrivateFile(string $credentialFile, string $payload, bool $exclusive = false): bool
 {
     // A private same-directory temporary file keeps credentials out of command lines.
     // Refuse links and other non-regular existing targets before replacement.
@@ -169,7 +170,8 @@ function pmssDockerInstallLsioWritePrivateFile(string $credentialFile, string $p
     $written = is_string($temporary) && dirname($temporary) === dirname($credentialFile)
         && @chmod($temporary, 0600)
         && @file_put_contents($temporary, $payload) === strlen($payload)
-        && @rename($temporary, $credentialFile);
+        // New first-run files use atomic no-replacement publication, including concurrent installs.
+        && ($exclusive ? @link($temporary, $credentialFile) : @rename($temporary, $credentialFile));
     if (is_string($temporary) && is_file($temporary)) {
         @unlink($temporary);
     }
@@ -254,6 +256,7 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
         'extraArgs' => $appSpec['extraArgs'] ?? [],
         'volumeArgs' => [],
         'credentialFile' => '',
+        'seedCredentialFile' => $homeDir.'/docker/'.$app.'/pmss-credentials.env',
     ];
     if ($app === 'qbittorrent') {
         // qBittorrent reads its hash from config, never from Docker environment.
@@ -401,10 +404,17 @@ function pmssDockerInstallLsioMain(array $argv): int
     $dockerRun = pmssDockerInstallLsioDockerRunCommand($app, $hostPort, pmssDockerInstallLsioTimezone(), $spec);
 
     if ($dryRun) {
+        $recipe = pmssDockerLsioSeedCatalog()[$app] ?? null;
         if ($app === 'qbittorrent') {
             echo '[dry-run] Seed absent qBittorrent.conf with WEBUI_USER=<generated-at-install>, WEBUI_PASS=<generated-at-install> (PBKDF2); login file: '.$spec['credentialFile'].PHP_EOL;
         }
         echo '[dry-run] docker network inspect pmss-media || docker network create pmss-media' . PHP_EOL;
+        if ($recipe !== null) {
+            echo '[dry-run] Phase 1: '.pmssDockerInstallLsioDisplayCommand(pmssDockerLsioSeedPrivateCommand($dockerRun)).PHP_EOL;
+            echo '[dry-run] Phase 2: seed '.$app.' via docker exec; credentials saved with mode 0600'.PHP_EOL;
+            echo '[dry-run] Phase 3: require HTTP 401/403 without credentials on '.$recipe['probe'].PHP_EOL;
+            echo '[dry-run] Phase 4: stop/remove only the new container; reuse its image and config volume'.PHP_EOL;
+        }
         echo '[dry-run] ' . pmssDockerInstallLsioDisplayCommand($dockerRun) . PHP_EOL;
         return 0;
     }
@@ -424,6 +434,12 @@ function pmssDockerInstallLsioMain(array $argv): int
         return 1;
     }
 
+    $recipe = pmssDockerLsioSeedCatalog()[$app] ?? null;
+    if ($recipe !== null && !pmssDockerLsioSeedFresh($spec)) {
+        fwrite(STDERR, "No port published for {$app}: existing config or credentials must be preserved; use a fresh installation.\n");
+        return 1;
+    }
+
     if (pmssDockerInstallLsioCheck(['docker', 'network', 'inspect', 'pmss-media']) !== 0) {
         if (pmssDockerInstallLsioPassthru(['docker', 'network', 'create', 'pmss-media']) !== 0) {
             return 1;
@@ -436,6 +452,10 @@ function pmssDockerInstallLsioMain(array $argv): int
 
     if (!pmssDockerInstallLsioEnsureDirectories($spec['mkdirPaths'])) {
         return 1;
+    }
+
+    if ($recipe !== null) {
+        return pmssDockerLsioSeedInstall($app, $spec, $dockerRun, $recipe);
     }
 
     if ($app !== 'qbittorrent' && (string) $spec['credentialFile'] !== ''

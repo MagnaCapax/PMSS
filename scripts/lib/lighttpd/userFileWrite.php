@@ -90,6 +90,24 @@ function pmssEnsureSafeDir(string $path, int $mode): bool
 /** Ensure each managed directory exists, reporting unsafe paths through the callback. */
 function pmssManagedDirsEnsure(array $directories, callable $failureLogger): void { foreach ($directories as $dir => $mode) { pmssEnsureSafeDir((string) $dir, (int) $mode) || $failureLogger((string) $dir); } }
 
+/** A /proc/self/fd/N path names an inode this process already holds open. */
+function pmssUserFileOpenedPathIs(string $path): bool { return preg_match('#\A/proc/self/fd/[0-9]+\z#', $path) === 1; }
+
+/**
+ * Set owner and group on one managed entry. Real paths use lchown/lchgrp so a
+ * planted link is never followed. An opened-inode path must be followed:
+ * lchown on the procfs link would change only that link, not the file.
+ */
+function pmssUserFileOwnershipSet(string $path, $owner, $group): bool
+{
+    if (pmssUserFileOpenedPathIs($path)) {
+        $ownerSet = @chown($path, $owner);
+        return @chgrp($path, $group) && $ownerSet;
+    }
+    $ownerSet = @lchown($path, $owner);
+    return @lchgrp($path, $group) && $ownerSet;
+}
+
 /** Apply owner/group metadata only when the caller is root. */
 function pmssUserFileApplyOwnership(string $path, string $owner, ?string $group = null): void
 {
@@ -99,19 +117,23 @@ function pmssUserFileApplyOwnership(string $path, string $owner, ?string $group 
         return;
     }
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        @lchown($path, $owner);
-        @lchgrp($path, ($group === null || $group === '') ? $owner : $group);
+        pmssUserFileOwnershipSet($path, $owner, ($group === null || $group === '') ? $owner : $group);
     }
 }
 
-/** Apply file mode plus root-only ownership metadata to a managed user path. */
+/**
+ * Apply file mode plus root-only ownership metadata to a managed user path.
+ * Account-home paths retain their account/root-stage routing (ADR 0121).
+ * Other real paths must be single-link regular files; metadata changes use
+ * the opened inode so later name changes cannot redirect chmod/chown.
+ */
 function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?string $group = null): void
 {
     if (pmssManagedAccountHomePath($path)) {
         $context = pmssRootStageContext($path);
         $entry = @lstat($path);
         $identity = pmssAccountHomeIdentity($path);
-        if ($identity === null || !is_array($entry) || $mode < 0 || $mode > 0777) {
+        if ($identity === null || !pmssUserFileStatIsSingleRegular($entry) || $mode < 0 || $mode > 0777) {
             error_log("Unable to update managed metadata: {$path}");
             return;
         }
@@ -133,8 +155,134 @@ function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?stri
         error_log("Unable to update managed metadata: {$path}");
         return;
     }
-    @chmod($path, $mode);
-    pmssUserFileApplyOwnership($path, $owner, $group);
+    if (pmssUserFileOpenedPathIs($path)) {
+        @chmod($path, $mode);
+        pmssUserFileApplyOwnership($path, $owner, $group);
+        return;
+    }
+
+    $handle = pmssUserFileOpenVerified($path, 'rbn');
+    if ($handle === null) {
+        return;
+    }
+    try {
+        $openedPath = pmssUserFileHandleProcPath($handle);
+        $openedPath === null || pmssUserFileApplyMetadata($openedPath, $owner, $mode, $group);
+    } finally {
+        @fclose($handle);
+    }
+}
+
+/** True for lstat/fstat data describing a regular file with exactly one name. */
+function pmssUserFileStatIsSingleRegular($stat): bool
+{
+    return is_array($stat) && (($stat['mode'] ?? 0) & 0170000) === 0100000 && ($stat['nlink'] ?? 0) === 1;
+}
+
+/** Confirm a directory entry is the single-link regular file behind an open handle. */
+function pmssUserFileHandleMatchesEntry($handle, string $path): bool
+{
+    clearstatcache(true, $path);
+    $entry = @lstat($path);
+    return pmssUserFileStatIsSingleRegular($entry)
+        && pmssLockFileHandleMatchesPath($handle, $path, $entry, $opened)
+        && pmssUserFileStatIsSingleRegular($opened);
+}
+
+/**
+ * Open an existing single-link regular file and prove the handle is that entry.
+ * PHP resolves links in user space before open(2) and may reuse its realpath
+ * cache, so the post-open comparison, not the pre-open lstat, is the guarantee.
+ * The mode must not create files; 'n' keeps a swapped-in FIFO from blocking.
+ *
+ * @return resource|null
+ */
+function pmssUserFileOpenVerified(string $path, string $mode)
+{
+    clearstatcache(true);
+    if (!pmssUserFilePathIsSafe($path) || !pmssUserFileStatIsSingleRegular(@lstat($path))) {
+        return null;
+    }
+    $handle = @fopen($path, $mode);
+    if (!pmssStreamHandleIsOpen($handle)) {
+        return null;
+    }
+    if (!pmssUserFileHandleMatchesEntry($handle, $path)) {
+        @fclose($handle);
+        return null;
+    }
+    return $handle;
+}
+
+/**
+ * Return /proc/self/fd/N for an open handle, found by matching device and inode.
+ * Metadata calls on that path act on the opened inode whatever its name now is.
+ */
+function pmssUserFileHandleProcPath($handle): ?string
+{
+    $opened = pmssStreamHandleIsOpen($handle) ? @fstat($handle) : false;
+    $entries = pmssDirectoryEntriesRead('/proc/self/fd');
+    if (!is_array($opened) || !is_array($entries)) {
+        return null;
+    }
+    foreach ($entries as $entry) {
+        $candidate = '/proc/self/fd/'.$entry;
+        clearstatcache(true, $candidate);
+        $stat = ctype_digit((string) $entry) ? @stat($candidate) : false;
+        if (is_array($stat) && $stat['dev'] === $opened['dev'] && $stat['ino'] === $opened['ino']) {
+            return $candidate;
+        }
+    }
+    return null;
+}
+
+/** Write the whole payload through an open handle; any failed or short write reports false. */
+function pmssUserFileHandleWriteComplete($handle, string $content): bool
+{
+    return ($content === '' || @fwrite($handle, $content) === strlen($content)) && @fflush($handle);
+}
+
+/**
+ * Create a private staging file beside $path under a random name.
+ * The handle is returned only when the new name is a single-link regular file
+ * that is the opened inode; $tmp receives that name.
+ *
+ * @return resource|null
+ */
+function pmssUserFileTempCreate(string $path, ?string &$tmp)
+{
+    $tmp = null;
+    // Same bound tempnam() applied to prefixes, so long basenames stay valid names.
+    $prefix = dirname($path).'/'.substr(basename($path).'.pmss-tmp-', 0, 63);
+    for ($attempt = 0; $attempt < 4; $attempt++) {
+        try {
+            $candidate = $prefix.bin2hex(random_bytes(6));
+        } catch (\Throwable $error) {
+            return null;
+        }
+        clearstatcache(true);
+        $umask = umask(0077);
+        try {
+            $handle = @fopen($candidate, 'xb');
+        } finally {
+            umask($umask);
+        }
+        if (!pmssStreamHandleIsOpen($handle)) {
+            clearstatcache(true, $candidate);
+            if (pmssPathExistsOrLink($candidate)) {
+                continue;
+            }
+            return null;
+        }
+        if (pmssUserFileHandleMatchesEntry($handle, $candidate)) {
+            $tmp = $candidate;
+            return $handle;
+        }
+        // The open did not land on the entry just named; that entry is not ours to remove.
+        @fclose($handle);
+        return null;
+    }
+    return null;
 }
 
 /** Converge an account file's mode as its owner; older ownership is repaired by the managed path. */
@@ -156,6 +304,10 @@ function pmssAccountFileApplyMetadata(string $username, string $home, string $pa
 /**
  * Atomically replace a regular file, with optional temp-file preparation.
  * Incomplete writes leave the destination untouched and remove the temp file.
+ * The directory may be writable by the account, which can rename or replace
+ * the staging name at any moment. Content is therefore written through the
+ * open handle, and $prepareTemp receives /proc/self/fd/N for that handle, not
+ * the staging name, so its chmod/chown calls reach only the staged inode.
  */
 function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTemp = null): bool
 {
@@ -163,20 +315,23 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
         return false;
     }
 
-    $tmp = @tempnam(dirname($path), basename($path).'.pmss-tmp-');
-    if (!is_string($tmp) || !pmssRegularFilePathIsReadable($tmp)) {
-        if (is_string($tmp)) @unlink($tmp);
+    $handle = pmssUserFileTempCreate($path, $tmp);
+    if ($handle === null) {
         return false;
     }
 
     try {
-        if (!pmssFileWriteComplete($tmp, $content)) {
+        if (!pmssUserFileHandleWriteComplete($handle, $content)) {
             return false;
         }
-        if ($prepareTemp !== null && $prepareTemp($tmp) === false) {
-            return false;
+        if ($prepareTemp !== null) {
+            $openedPath = pmssUserFileHandleProcPath($handle);
+            if ($openedPath === null || $prepareTemp($openedPath) === false) {
+                return false;
+            }
         }
-        if (!pmssRegularFilePathIsReadable($tmp) || !pmssUserFilePathIsSafe($path) || !@rename($tmp, $path)) {
+        // Publish only the staged inode: the name must still be that single-link file.
+        if (!pmssUserFileHandleMatchesEntry($handle, $tmp) || !pmssUserFilePathIsSafe($path) || !@rename($tmp, $path)) {
             return false;
         }
 
@@ -184,6 +339,7 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
         return true;
     } finally {
         // Failed operations and thrown I/O errors must not strand staging files.
+        @fclose($handle);
         if (is_string($tmp)) @unlink($tmp);
     }
 }
@@ -198,7 +354,7 @@ function pmssUserFilePrepareMetadata(string $path, int $mode, ?string $owner, ?s
         return true;
     }
 
-    return @lchown($path, $owner) && @lchgrp($path, ($group === null || $group === '') ? $owner : $group);
+    return pmssUserFileOwnershipSet($path, $owner, ($group === null || $group === '') ? $owner : $group);
 }
 
 function pmssReplaceUserFileWithMetadata(string $path, string $content, int $mode, ?string $owner = null, ?string $group = null): bool
@@ -258,11 +414,9 @@ function pmssReplaceUserFilePreservingMetadata(string $path, string $content, in
     }
 
     return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($group, $mode, $owner): bool {
-        if (!pmssUserFilePrepareMetadata($tmpPath, $mode, null, null)) {
-            return false;
-        }
-        return ($owner === null || @chown($tmpPath, $owner))
-            && ($group === null || @chgrp($tmpPath, $group));
+        // Owner and group are captured together; numeric ids from stat() stay numeric.
+        return pmssUserFilePrepareMetadata($tmpPath, $mode, null, null)
+            && ($owner === null || pmssUserFileOwnershipSet($tmpPath, $owner, $group));
     });
 }
 
@@ -468,6 +622,11 @@ function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, c
  * This keeps legacy append workflows on the same path validation rules as the
  * atomic writer so symlinks and non-regular targets are rejected consistently.
  * A short append reports failure; bytes already appended cannot be rolled back.
+ *
+ * A missing file is staged under a random name and published by rename: PHP
+ * resolves a link planted at the predictable name before open(2), so creating
+ * it in place could create a file elsewhere. An existing file must be a
+ * single-link regular file and is written and chmodded through its handle.
  */
 function pmssAppendUserFile(string $path, string $content, string $owner, int $mode): bool
 {
@@ -480,13 +639,34 @@ function pmssAppendUserFile(string $path, string $content, string $owner, int $m
         return false;
     }
 
-    if (!pmssFileWriteComplete($path, $content, FILE_APPEND | LOCK_EX)) {
-        return false;
+    clearstatcache(true, $path);
+    if (!pmssPathExistsOrLink($path) && pmssReplaceUserFile($path, $content,
+        static function (string $openedPath) use ($path, $owner, $mode): bool {
+            pmssUserFileApplyMetadata($openedPath, $owner, $mode);
+            // If another writer has already published, append to its file below.
+            clearstatcache(true, $path);
+            return !pmssPathExistsOrLink($path);
+        })) {
+        return true;
     }
 
-    pmssUserFileApplyMetadata($path, $owner, $mode);
-
-    return true;
+    // 'r+' never creates, so a swapped-in dangling link cannot make a new file.
+    $handle = pmssUserFileOpenVerified($path, 'r+bn');
+    if ($handle === null) {
+        return false;
+    }
+    try {
+        if (!@flock($handle, LOCK_EX) || !pmssUserFileHandleMatchesEntry($handle, $path)
+            || @fseek($handle, 0, SEEK_END) !== 0
+            || !pmssUserFileHandleWriteComplete($handle, $content)) {
+            return false;
+        }
+        $openedPath = pmssUserFileHandleProcPath($handle);
+        $openedPath === null || pmssUserFileApplyMetadata($openedPath, $owner, $mode);
+        return true;
+    } finally {
+        @fclose($handle);
+    }
 }
 
 /** Append to an account-owned file while holding its append lock. */

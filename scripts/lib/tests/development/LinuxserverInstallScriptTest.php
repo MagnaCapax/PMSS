@@ -58,6 +58,34 @@ case "${1:-} ${2:-}" in
       [[ -s "$HOME/docker/qbittorrent/config/qBittorrent/qBittorrent.conf" ]] || exit 1
     fi
     ;;
+  'inspect --format')
+    printf 'sha256:%064d\n' 0
+    exit 0
+    ;;
+  'exec -i')
+    app="$3"
+    config=$(cat)
+    code=200
+    body='{}'
+    case "$config" in
+      *'/Startup/User'*|*'/Startup/Complete'*) [[ "$config" == *'request = "POST"'* ]] && code=204 ;;
+      *'/Users/AuthenticateByName'*) body='{"AccessToken":"testtoken"}' ;;
+      *'/Users"'*)
+        if [[ "$config" == *'X-Emby-Token:'* ]]; then
+          user=$(sed -n 's/^USER=//p' "$HOME/docker/$app/pmss-credentials.env")
+          body="[{\"Name\":\"$user\"}]"
+        else code="${PMSS_TEST_DOCKER_UNAUTH_CODE:-401}"; fi
+        ;;
+      *'/config/host/1'*) code="${PMSS_TEST_DOCKER_PUT_CODE:-202}" ;;
+      *'/system/status'*) code="${PMSS_TEST_DOCKER_UNAUTH_CODE:-401}" ;;
+    esac
+    printf '%s\n%s' "$body" "$code"
+    exit 0
+    ;;
+  'exec radarr'|'exec sonarr'|'exec prowlarr')
+    printf '<Config><ApiKey>0123456789abcdef0123456789abcdef</ApiKey></Config>'
+    exit 0
+    ;;
 esac
 exit 0
 BASH;
@@ -330,6 +358,94 @@ BASH;
         $this->assertStringContainsAllStrings([$this->homeDir.'/movies:/movies', $this->homeDir.'/downloads:/downloads'], $result['output']);
     }
 
+    public function testFirstRunDryPlansPublishOnlyAfterVerification(): void
+    {
+        foreach (['jellyfin', 'radarr', 'sonarr', 'prowlarr'] as $app) {
+            $result = $this->runHelper([$app, '--dry-run']);
+            $lines = explode("\n", $result['output']);
+            $this->assertSame(0, $result['rc']);
+            $this->assertStringNotContainsString(' -p ', $lines[1]);
+            $this->assertStringContainsString('--restart no', $lines[1]);
+            $this->assertOrderedStrings(['Phase 1:', 'Phase 2:', 'Phase 3:', 'Phase 4:', '-p 127.0.0.1:'], $result['output']);
+            $this->assertSame('', $result['dockerLog']);
+        }
+    }
+
+    public function testFirstRunSeedsInsideContainerThenReusesImageAndVolume(): void
+    {
+        foreach (['jellyfin', 'radarr', 'sonarr', 'prowlarr'] as $app) {
+            @unlink($this->dockerLog);
+            $result = $this->runHelper([$app]);
+            $this->assertSame(0, $result['rc'], $result['output']);
+            $this->assertOrderedStrings(['run -d --name '.$app, 'exec -i '.$app.' curl', 'stop '.$app, 'rm '.$app, '-p 127.0.0.1:'], $result['dockerLog']);
+            $runs = array_values(array_filter(explode("\n", $result['dockerLog']), static function ($line): bool {
+                return strpos($line, 'run -d') === 0;
+            }));
+            $this->assertSame(2, count($runs));
+            $this->assertStringNotContainsString(' -p ', $runs[0]);
+            $this->assertStringContainsString($this->homeDir.'/docker/'.$app.'/config:/config', $runs[1]);
+            $this->assertStringContainsString('sha256:'.str_repeat('0', 64), $runs[1]);
+            $file = $this->homeDir.'/docker/'.$app.'/pmss-credentials.env';
+            $this->assertSame(0600, fileperms($file) & 0777);
+            $credentials = parse_ini_file($file);
+            foreach ($credentials as $secret) {
+                $this->assertStringNotContainsString($secret, $result['output'].$result['dockerLog']);
+            }
+        }
+    }
+
+    public function testFirstRunPutFailureKeepsUnpublishedContainerAndCredentials(): void
+    {
+        $result = $this->runHelper(['radarr'], ['PMSS_TEST_DOCKER_PUT_CODE' => '500']);
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('no port published', $result['output']);
+        $this->assertStringNotContainsString(' -p ', $result['dockerLog']);
+        $this->assertStringNotContainsString('rm radarr', $result['dockerLog']);
+        $this->assertTrue(is_file($this->homeDir.'/docker/radarr/pmss-credentials.env'));
+    }
+
+    public function testFirstRunRequiresExplicitUnauthenticatedRefusal(): void
+    {
+        $originalPath = getenv('PATH');
+        foreach (['200', '302', '404', '500', '000'] as $code) {
+            $app = 'radarr';
+            $spec = \pmssDockerInstallLsioAppSpec($app, $this->homeDir, false);
+            putenv('PATH='.$this->fakeBinDir.':'.getenv('PATH'));
+            putenv('PMSS_TEST_DOCKER_UNAUTH_CODE='.$code);
+            try {
+                $this->assertFalse(\pmssDockerLsioSeedLogin($app, $spec, \pmssDockerLsioSeedCatalog()[$app], ['USER' => 'test', 'PASS' => 'secret']));
+            } finally {
+                putenv('PMSS_TEST_DOCKER_UNAUTH_CODE');
+                putenv('PATH='.$originalPath);
+            }
+        }
+    }
+
+    public function testFirstRunPreservesPriorConfigAndCredentialBytes(): void
+    {
+        $config = $this->homeDir.'/docker/sonarr/config';
+        $this->pmssEnsureDir($config);
+        file_put_contents($config.'/config.xml', 'prior-config');
+        $file = dirname($config).'/pmss-credentials.env';
+        file_put_contents($file, 'prior-credentials');
+        $result = $this->runHelper(['sonarr']);
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringNotContainsString('run -d', $result['dockerLog']);
+        $this->assertSame('prior-config', file_get_contents($config.'/config.xml'));
+        $this->assertSame('prior-credentials', file_get_contents($file));
+    }
+
+    public function testFirstRunCredentialPublicationNeverReplacesAnotherInstall(): void
+    {
+        $file = $this->homeDir.'/credentials.env';
+        $this->assertTrue(\pmssDockerInstallLsioWriteCredentialFile($file, '', '', 'transmission', true));
+        $original = file_get_contents($file);
+        $this->assertSame(0600, fileperms($file) & 0777);
+        $this->assertFalse(\pmssDockerInstallLsioWriteCredentialFile($file, '', '', 'transmission', true));
+        $this->assertSame($original, file_get_contents($file));
+        $this->assertSame([], glob($this->homeDir.'/.pmss-lsio-*'));
+    }
+
     public function testCustomPortOverrideAppliesToSonarr(): void
     {
         $result = $this->runHelper(['sonarr', '18989', '--dry-run']);
@@ -452,6 +568,9 @@ BASH;
         copy($this->installerPath, $customerBin.'/docker-install-lsio');
         copy($this->helperPath, $customerBin.'/dockerInstallLsio.php');
         copy(dirname($this->helperPath).'/dockerInstallLsioTorrent.php', $customerBin.'/dockerInstallLsioTorrent.php');
+        foreach (['dockerLsioSeed.php', 'dockerLsioSeedHttp.php'] as $helper) {
+            copy(dirname($this->helperPath).'/'.$helper, $customerBin.'/'.$helper);
+        }
         $this->installerPath = $customerBin.'/docker-install-lsio';
         $this->legacyInstallerPath = $customerBin.'/linuxserverInstall.sh';
         copy(__DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh', $this->legacyInstallerPath);

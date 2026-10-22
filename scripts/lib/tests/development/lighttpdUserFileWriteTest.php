@@ -196,9 +196,46 @@ class LighttpdUserFileWriteTest extends TestCase
     public function testOwnershipMetadataUsesEntryAwareCalls(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/userFileWrite.php');
-        $this->assertStringContainsString('@lchown($path, $owner)', $source);
-        $this->assertStringContainsString('@lchgrp($path, ($group === null || $group === \'\') ? $owner : $group)', $source);
-        $this->assertFalse(strpos($source, '@chown($path, $owner)') !== false);
+        $this->assertStringContainsString('$ownerSet = @lchown($path, $owner);', $source);
+        $this->assertStringContainsString('return @lchgrp($path, $group) && $ownerSet;', $source);
+        // Link-following ownership calls live only in the opened-inode branch of one helper.
+        $this->assertSame(1, substr_count($source, '@chown('));
+        $this->assertSame(1, substr_count($source, '@chgrp('));
+        $this->assertOrderedStrings(['if (pmssUserFileOpenedPathIs($path)) {', '@chown($path, $owner)', '@lchown($path, $owner)'], $source);
+    }
+
+    public function testOpenedPathRecognitionIsExact(): void
+    {
+        $this->assertTrue(\pmssUserFileOpenedPathIs('/proc/self/fd/7'));
+        foreach (['/proc/self/fd/', '/proc/self/fd/7/x', '/proc/self/fd/7a', '/proc/1/fd/7', "/proc/self/fd/7\n", 'proc/self/fd/7', '/srv/managed/.htpasswd'] as $path) {
+            $this->assertFalse(\pmssUserFileOpenedPathIs($path), $path);
+        }
+    }
+
+    public function testApplyMetadataRefusesLinkedEntriesAndConvergesRegularFiles(): void
+    {
+        $outside = $this->tempDir.'/outside';
+        $this->pmssWriteFile($outside, 'kept');
+        $this->assertTrue(chmod($outside, 0644));
+        $directory = $this->tempDir.'/user';
+        $this->assertTrue(@mkdir($directory));
+        $this->assertTrue(@symlink($outside, $directory.'/symlinked'));
+        $this->assertTrue(@link($outside, $directory.'/hardlinked'));
+
+        foreach (['symlinked', 'hardlinked', 'missing'] as $name) {
+            \pmssUserFileApplyMetadata($directory.'/'.$name, $this->pmssCurrentOwner(), 0600);
+            clearstatcache();
+            $this->assertSame(0644, fileperms($outside) & 0777, $name);
+        }
+        $this->assertSame('kept', file_get_contents($outside));
+
+        $regular = $directory.'/regular';
+        $this->pmssWriteFile($regular, 'content');
+        $this->assertTrue(chmod($regular, 0644));
+        \pmssUserFileApplyMetadata($regular, $this->pmssCurrentOwner(), 0600);
+        clearstatcache(true, $regular);
+        $this->assertSame(0600, fileperms($regular) & 0777);
+        $this->assertSame('content', file_get_contents($regular));
     }
 
     public function testAppendUserFileWritesNewFile(): void
@@ -226,6 +263,27 @@ class LighttpdUserFileWriteTest extends TestCase
 
         $this->assertFalse(\pmssAppendUserFile($linkPath, "other:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertEquals("user:hash\n", file_get_contents($realPath));
+    }
+
+    public function testAppendUserFileRefusesLinkedTargetsWithoutTouchingThem(): void
+    {
+        $outside = $this->tempDir.'/outside.htpasswd';
+        $this->pmssWriteFile($outside, "user:hash\n");
+        $this->assertTrue(chmod($outside, 0644));
+        $directory = $this->tempDir.'/user';
+        $this->assertTrue(@mkdir($directory));
+        $this->assertTrue(@symlink($outside, $directory.'/symlinked'));
+        $this->assertTrue(@link($outside, $directory.'/hardlinked'));
+        $this->assertTrue(@symlink($this->tempDir.'/created-elsewhere', $directory.'/dangling'));
+
+        foreach (['symlinked', 'hardlinked', 'dangling'] as $name) {
+            $this->assertFalse(\pmssAppendUserFile($directory.'/'.$name, "other:hash\n", $this->pmssCurrentOwner(), 0600), $name);
+            clearstatcache();
+            $this->assertSame("user:hash\n", file_get_contents($outside), $name);
+            $this->assertSame(0644, fileperms($outside) & 0777, $name);
+        }
+        $this->assertFalse(file_exists($this->tempDir.'/created-elsewhere'));
+        $this->assertSame([], glob($directory.'/*.pmss-tmp-*'));
     }
 
     public function testAppendUserFileRejectsMissingParentDirectory(): void
@@ -384,17 +442,150 @@ class LighttpdUserFileWriteTest extends TestCase
     public function testReplaceUserFileRejectsPrepareTempSymlinkSwap(): void
     {
         $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
-        $outsidePath = $this->tempDir.'/outside.htpasswd';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($outsidePath, "outside:hash\n");
+        $outsidePath = $this->stagingSwapFixture($path);
 
-        $this->assertFalse(\pmssReplaceUserFile($path, "user:hash\n", static function (string $tmp) use ($outsidePath): void {
-            @unlink($tmp);
-            symlink($outsidePath, $tmp);
+        $this->assertFalse(\pmssReplaceUserFile($path, "user:hash\n", function (string $tmp) use ($path, $outsidePath): void {
+            $this->swapStagedFileForLink($path, $outsidePath);
         }));
 
-        $this->assertFalse(file_exists($path));
-        $this->assertEquals("outside:hash\n", file_get_contents($outsidePath));
+        $this->assertStagingSwapLeftOutsideUntouched($path, $outsidePath);
+    }
+
+    public function testReplaceUserFilePrepareTempMetadataStaysOnStagedInodeAfterSwap(): void
+    {
+        $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
+        $outsidePath = $this->stagingSwapFixture($path);
+
+        $this->assertFalse(\pmssReplaceUserFile($path, "user:hash\n", function (string $tmp) use ($path, $outsidePath): void {
+            $this->swapStagedFileForLink($path, $outsidePath);
+            // Callers chmod the path they are given; it must not reach the linked file.
+            chmod($tmp, 0600);
+            \pmssUserFileApplyMetadata($tmp, $this->pmssCurrentOwner(), 0600);
+        }));
+
+        $this->assertStagingSwapLeftOutsideUntouched($path, $outsidePath);
+    }
+
+    public function testReplaceUserFileGivesPrepareTempTheOpenedStagingFile(): void
+    {
+        $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
+        @mkdir(dirname($path), 0755, true);
+        $seen = [];
+
+        $this->assertTrue(\pmssReplaceUserFile($path, "user:hash\n", static function (string $tmp) use (&$seen): bool {
+            $seen = [$tmp, (string) file_get_contents($tmp)];
+            return chmod($tmp, 0640);
+        }));
+
+        $this->assertTrue(\pmssUserFileOpenedPathIs($seen[0]));
+        $this->assertSame("user:hash\n", $seen[1]);
+        clearstatcache(true, $path);
+        $this->assertSame("user:hash\n", file_get_contents($path));
+        $this->assertSame(0640, fileperms($path) & 0777);
+        $this->assertSame([], glob(dirname($path).'/.htpasswd.pmss-tmp-*'));
+    }
+
+    public function testReplaceUserFileStagesPrivatelyWithoutPrepareTemp(): void
+    {
+        $path = $this->tempDir.'/user/'.str_repeat('n', 200);
+        @mkdir(dirname($path), 0755, true);
+
+        $this->assertTrue(\pmssReplaceUserFile($path, 'payload'));
+        $this->assertSame('payload', file_get_contents($path));
+        $this->assertSame(0600, fileperms($path) & 0777);
+        $this->assertSame([$path], glob(dirname($path).'/*'));
+    }
+
+    public function testReplaceUserFileRejectsRegularStagingReplacementAndExtraLink(): void
+    {
+        $path = $this->tempDir.'/managed';
+        $this->pmssWriteFile($path, 'original');
+        foreach (['replacement', 'hardlink'] as $kind) {
+            $this->assertFalse(\pmssReplaceUserFile($path, 'new', function (string $opened) use ($path, $kind): void {
+                $staged = glob($path.'.pmss-tmp-*');
+                $this->assertSame(1, count($staged));
+                if ($kind === 'replacement') {
+                    $this->assertTrue(unlink($staged[0]));
+                    $this->pmssWriteFile($staged[0], 'substitute');
+                } else {
+                    $this->assertTrue(link($staged[0], $path.'.extra'));
+                }
+            }));
+            $this->assertSame('original', file_get_contents($path));
+            $this->assertSame([], glob($path.'.pmss-tmp-*'));
+        }
+    }
+
+    public function testExclusiveStagingRetriesCollisionsAndRestoresUmask(): void
+    {
+        foreach ([0, 1, 3, 4, 'entropy'] as $collisions) {
+            $root = $this->pmssEnsureDir($this->tempDir.'/collisions-'.$collisions);
+            $script = <<<'PHP'
+namespace StagingCollisionFixture;
+function random_bytes($length) {
+    if ($GLOBALS['collisions'] === 'entropy') throw new \RuntimeException('unavailable');
+    return str_repeat(chr(++$GLOBALS['attempts']), $length);
+}
+PHP;
+            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'StagingCollisionFixture');
+            $script .= '$root = '.var_export($root, true).'; $GLOBALS["collisions"] = '.var_export($collisions, true).';';
+            $script .= <<<'PHP'
+$GLOBALS['attempts'] = 0;
+$path = $root.'/managed';
+$kept = [];
+for ($i = 1; is_int($GLOBALS['collisions']) && $i <= $GLOBALS['collisions']; $i++) {
+    $name = $path.'.pmss-tmp-'.bin2hex(str_repeat(chr($i), 6));
+    \file_put_contents($name, 'existing');
+    $kept[] = $name;
+}
+$prior = umask(0000);
+$permissions = null;
+try {
+    $ok = pmssReplaceUserFile($path, 'payload', static function ($opened) use (&$permissions) {
+        $permissions = fileperms($opened) & 0777;
+    });
+    $restored = umask();
+} finally { umask($prior); }
+$contents = array_map('file_get_contents', $kept);
+echo json_encode(['ok' => $ok, 'attempts' => $GLOBALS['attempts'], 'mode' => $permissions,
+    'umask' => $restored, 'kept' => $contents, 'temporary' => glob($path.'.pmss-tmp-*')]);
+PHP;
+            $result = $this->pmssRunInlinePhpJson($script);
+            $success = is_int($collisions) && $collisions < 4;
+            $this->assertSame($success, $result['ok']);
+            $this->assertSame($collisions === 'entropy' ? 0 : min(4, $collisions + 1), $result['attempts']);
+            $this->assertSame($success ? 0600 : null, $result['mode']);
+            $this->assertSame(0, $result['umask']);
+            $this->assertSame(array_fill(0, (int) $collisions, 'existing'), $result['kept']);
+            $this->assertSame((int) $collisions, count($result['temporary']));
+        }
+    }
+
+    /** Create the managed directory and an outside file the account could aim a link at. */
+    private function stagingSwapFixture(string $path): string
+    {
+        $outsidePath = $this->tempDir.'/outside.htpasswd';
+        @mkdir(dirname($path), 0755, true);
+        $this->pmssWriteFile($outsidePath, "outside:hash\n");
+        $this->assertTrue(chmod($outsidePath, 0644));
+        return $outsidePath;
+    }
+
+    /** Replace the real staging name with a link, as an account owning the directory can. */
+    private function swapStagedFileForLink(string $path, string $target): void
+    {
+        $staged = glob(dirname($path).'/'.basename($path).'.pmss-tmp-*') ?: [];
+        $this->assertSame(1, count($staged));
+        $this->assertTrue(@unlink($staged[0]) && @symlink($target, $staged[0]));
+    }
+
+    private function assertStagingSwapLeftOutsideUntouched(string $path, string $outsidePath): void
+    {
+        clearstatcache();
+        $this->assertFalse(file_exists($path) || is_link($path));
+        $this->assertSame("outside:hash\n", file_get_contents($outsidePath));
+        $this->assertSame(0644, fileperms($outsidePath) & 0777);
+        $this->assertSame([], glob(dirname($path).'/'.basename($path).'.pmss-tmp-*'));
     }
 
     public function testReplaceUserFileRejectsParentDirectorySwapBeforeRename(): void
@@ -465,6 +656,37 @@ class LighttpdUserFileWriteTest extends TestCase
                 $this->assertSame([], $result['temporary']);
                 $this->assertSame($existing === null ? null : 0600, $result['mode']);
             }
+        }
+    }
+
+    public function testHandleWriterDoesNotRetryAShortWrite(): void
+    {
+        $script = <<<'PHP'
+namespace HandleWriteFixture;
+function fwrite($handle, $bytes) {
+    // A second call would succeed, so retrying would hide the initial short write.
+    $bytes = ++$GLOBALS['calls'] === 1 ? substr($bytes, 0, $GLOBALS['limit']) : $bytes;
+    return \fwrite($handle, $bytes);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'HandleWriteFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach ([0, 1, 3, 7, 8] as $limit) {
+    $GLOBALS['calls'] = 0;
+    $GLOBALS['limit'] = $limit;
+    $handle = \fopen('php://temp', 'w+b');
+    try {
+        $ok = pmssUserFileHandleWriteComplete($handle, 'complete');
+        rewind($handle);
+        $results[] = [$ok, $GLOBALS['calls'], stream_get_contents($handle)];
+    } finally { fclose($handle); }
+}
+echo json_encode($results);
+PHP;
+        foreach ($this->pmssRunInlinePhpJson($script) as $index => $result) {
+            $limit = [0, 1, 3, 7, 8][$index];
+            $this->assertSame([$limit === 8, 1, substr('complete', 0, $limit)], $result);
         }
     }
 

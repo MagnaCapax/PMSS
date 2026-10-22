@@ -189,9 +189,26 @@ attaches the containers to a shared `pmss-media` Docker network, and keeps
 qBittorrent and Transmission use versioned `image@sha256` pins recorded in
 [ADR 0112](./adr/0112-rootless-docker-torrent-client-options.md#completion-2026-10-21).
 Other presets still use `:latest` and fixed default host ports.
+
+For new Jellyfin, Radarr, Sonarr and Prowlarr installations, the helper starts
+with no published port or restart policy, seeds a separate random service login
+using `docker exec`, and requires an unauthenticated API request to return
+401/403. Only then does it recreate the same image with the same config volume
+and a `127.0.0.1` port mapping. Credentials are saved in the app's
+`~/docker/APP/pmss-credentials.env` with mode 0600; they are not account passwords.
+An existing container, nonempty config directory or credential file is preserved
+and refused. A setup failure leaves the new container unpublished and retains
+its config and credentials for inspection. Do not publish it manually before
+resolving the failure. qBittorrent retains its pre-start config seeding with a
+PBKDF2 password hash; it does not use a temporary-password bootstrap.
+Transmission, MariaDB and phpMyAdmin retain their existing credential/database
+login paths.
+
+The API recipe table is in `etc/skel/bin/dockerLsioSeed.php`; its source basis
+and the outstanding container lab checks are recorded in ADR 0143.
 Loopback is shared by accounts on the same host, so
-configure application authentication as well. Use the SSH tunnel above for
-the Jellyfin wizard and later browser access. On Intel iGPU hosts with a DRI
+use the generated application credentials. Use the SSH tunnel above for
+browser access. On Intel iGPU hosts with a DRI
 render node, the Jellyfin preset passes `/dev/dri` into the container
 automatically. The legacy `~/bin/linuxserverInstall.sh` wrapper remains
 available for compatibility.

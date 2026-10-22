@@ -586,6 +586,7 @@ BASH
             'DOTNET_ROOT_PATH=/opt/dotnet',
             'MEDIA_STACK_APP_START_WAIT=600',
             'MEDIA_STACK_AUTH_USERNAME=pmss',
+            'PMSS_MEDIA_STACK_SEED_PRIVATE=1',
             'servarr_config_auth_configured() { return 1; }',
             'servarr_config_xml_tag_converge() { printf "tag:%s=%s\\n" "$2" "$3" >> "$TRACE"; }',
             'media_stack_credentials_value() { :; }',
@@ -651,7 +652,120 @@ BASH
             'autobrrctl" --config "$datadir" create-user "$MEDIA_STACK_AUTH_USERNAME"',
             'Autobrr user already exists or could not be changed; preserving existing Autobrr credentials',
             'Autobrr auth seeding failed; not starting media stack',
+            'sqlite3 -readonly "$1" \'SELECT COUNT(*) FROM users;\'',
         ], $this->script);
+    }
+
+    public function testSeedPrivateWrapperKeepsRequestsAndTmuxInOneNamespace(): void
+    {
+        $bin = $this->pmssMakeTempDir('pmss-seed-private-bin-');
+        $trace = $bin.'/trace';
+        $this->pmssWriteExecutableFile($bin.'/unshare', <<<'BASH'
+#!/usr/bin/env bash
+printf 'unshare:%s\n' "$*" >>"$TRACE"
+export PMSS_TEST_PRIVATE=1
+shift 3
+exec "$@"
+BASH
+        );
+        $this->pmssWriteExecutableFile($bin.'/ip', <<<'BASH'
+#!/usr/bin/env bash
+[[ "${PMSS_TEST_PRIVATE:-0}" == 1 ]] || exit 90
+printf 'ip:%s\n' "$*" >>"$TRACE"
+BASH
+        );
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+[[ "${PMSS_TEST_PRIVATE:-0}" == 1 && "$1" == -S && "$2" == */socket ]] || exit 91
+printf 'tmux:%s\n' "${*:3}" >>"$TRACE"
+BASH
+        );
+        $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
+            .'export PATH='.escapeshellarg($bin).':$PATH' ."\n"
+            .'export TRACE='.escapeshellarg($trace)."\n"
+            .'MEDIA_STACK_AUTH_USERNAME=expected' ."\n"
+            .'log_err() { echo "$*" >&2; }' ."\n"
+            .'seed_probe() { [[ "$PMSS_TEST_PRIVATE" == 1 && "$PMSS_MEDIA_STACK_SEED_PRIVATE" == 1 && "$MEDIA_STACK_AUTH_USERNAME" == expected && "$1" == \'secret with $quotes\' ]] || return 92; tmux new-session -d -s auth-seed; echo seeded; }' ."\n"
+            .$this->pmssExtractShellFunction($this->script, 'media_stack_auth_seed_private')."\n"
+            .'media_stack_auth_seed_private seed_probe \'secret with $quotes\'' ."\n";
+        $this->assertSame('seeded', trim($this->pmssRunShellHarness($script)));
+        $log = file_get_contents($trace);
+        $this->assertOrderedStrings(['unshare:--user --map-root-user --net bash -s', 'ip:link set lo up', 'tmux:new-session', 'tmux:kill-server'], $log);
+        $this->assertStringNotContainsString('secret', $log);
+    }
+
+    public function testPrivateSeedFailureNeverCallsTheSeedOnSharedLoopback(): void
+    {
+        foreach (['unshare', 'ip'] as $failedTool) {
+            $bin = $this->pmssMakeTempDir('pmss-seed-refusal-bin-');
+            $this->pmssWriteExecutableFile($bin.'/unshare', "#!/usr/bin/env bash\n"
+                .($failedTool === 'unshare' ? 'cat >/dev/null; exit 1' : 'shift 3; exec "$@"')."\n");
+            $this->pmssWriteExecutableFile($bin.'/ip', "#!/usr/bin/env bash\nexit 1\n");
+            $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
+                .'export PATH='.escapeshellarg($bin).':$PATH' ."\n"
+                .'log_err() { echo "$*"; }' ."\n"
+                .'seed_probe() { echo must-not-run; }' ."\n"
+                .$this->pmssExtractShellFunction($this->script, 'media_stack_auth_seed_private')."\n"
+                .'if media_stack_auth_seed_private seed_probe; then exit 99; fi' ."\n";
+            $output = $this->pmssRunShellHarness($script);
+            $this->assertStringNotContainsString('must-not-run', $output);
+            $this->assertStringContainsString('No shared-loopback fallback', $output);
+        }
+    }
+
+    public function testSeedDispatchPreservesConfiguredAppsBeforeCheckingNamespaces(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-seed-dispatch-');
+        $this->pmssEnsureDir($home.'/jellyfin');
+        $this->pmssEnsureDir($home.'/autobrr');
+        file_put_contents($home.'/jellyfin/system.xml', '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>');
+        file_put_contents($home.'/autobrr/autobrr.db', 'prior-database');
+        $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
+            .'HOME='.escapeshellarg($home)."\nJELLYFIN_CONFIG_DIR=\"\$HOME/jellyfin\"\n"
+            .'log_info() { :; }; log_warn() { :; }; log_err() { echo "$*"; }' ."\n"
+            .'media_stack_credentials_value() { echo preserved; }; media_stack_app_key() { echo RADARR; }' ."\n"
+            .'servarr_config_auth_configured() { return 0; }; autobrr_user_count() { echo 1; }' ."\n"
+            .'media_stack_auth_seed_private() { echo dispatched:$1; return 17; }' ."\n"
+            .$this->pmssExtractShellFunctions($this->script, ['servarr_auth_seed', 'autobrr_auth_seed', 'jellyfin_auth_seed'])."\n"
+            .'servarr_auth_seed radarr Radarr Radarr.dll 7878 v3 secret' ."\n"
+            .'autobrr_auth_seed "$HOME/autobrr" secret 7474' ."\n"
+            .'jellyfin_auth_seed secret 8096' ."\n"
+            .'[[ "$AUTOBRR_PASSWORD" == preserved && "$JELLYFIN_PASSWORD" == preserved ]] || exit 93' ."\n"
+            .'echo preserved' ."\n"
+            .'servarr_config_auth_configured() { return 1; }; autobrr_user_count() { echo 0; }' ."\n"
+            .'JELLYFIN_CONFIG_DIR="$HOME/empty"' ."\n"
+            .'servarr_auth_seed radarr Radarr Radarr.dll 7878 v3 secret || echo rc:$?' ."\n"
+            .'autobrr_auth_seed "$HOME/autobrr" secret 7474 || echo rc:$?' ."\n"
+            .'jellyfin_auth_seed secret 8096 || echo rc:$?' ."\n";
+        // Avoid the real sqlite binary; this dispatch test needs only a command preflight.
+        $script = str_replace('set -euo pipefail', "set -euo pipefail\nsqlite3() { :; }", $script);
+        $this->assertSame("preserved\ndispatched:servarr_auth_seed\nrc:17\ndispatched:autobrr_auth_seed\nrc:17\ndispatched:jellyfin_auth_seed\nrc:17", trim($this->pmssRunShellHarness($script)));
+        $this->assertSame('prior-database', file_get_contents($home.'/autobrr/autobrr.db'));
+    }
+
+    public function testAutobrrPostSeedUserCountsFailWithoutDeletingDatabase(): void
+    {
+        foreach (['0', '1', '2', 'unknown'] as $count) {
+            $home = $this->pmssMakeTempDir('pmss-autobrr-count-');
+            $this->pmssEnsureDir($home.'/.bin/autobrr');
+            $this->pmssEnsureDir($home.'/config');
+            file_put_contents($home.'/config/autobrr.db', 'preserve-me');
+            $this->pmssWriteExecutableFile($home.'/.bin/autobrr/autobrrctl', "#!/usr/bin/env bash\ncat >/dev/null\n");
+            $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
+                .'HOME='.escapeshellarg($home)."\nPMSS_MEDIA_STACK_SEED_PRIVATE=1\nMEDIA_STACK_AUTH_USERNAME=expected\n"
+                .'log_ok() { echo ok; }; log_err() { echo "$*"; }' ."\n"
+                .'autobrr_user_count() { if [[ ! -f "$HOME/counted" ]]; then touch "$HOME/counted"; echo 0; else echo '.escapeshellarg($count).'; fi; }' ."\n"
+                .$this->pmssExtractShellFunction($this->script, 'autobrr_auth_seed')."\n"
+                .'autobrr_auth_seed "$HOME/config" secret 7474 || echo refused' ."\n";
+            $output = $this->pmssRunShellHarness($script);
+            if ($count === '1') {
+                $this->assertSame('ok', trim($output));
+            } else {
+                $this->assertStringContainsString('stop and reinstall', $output);
+                $this->assertStringContainsString('refused', $output);
+            }
+            $this->assertSame('preserve-me', file_get_contents($home.'/config/autobrr.db'));
+        }
     }
 
     public function testJellyfinStartupWizardAdminIsSeededAndVerified(): void
@@ -665,6 +779,42 @@ BASH
             'Jellyfin admin login verification failed',
             'Jellyfin auth seeding failed; not starting media stack',
         ], $this->script);
+    }
+
+    public function testJellyfinPostSeedRequiresExactlyTheExpectedUser(): void
+    {
+        foreach (['[]', '[{"Name":"expected"}]', '[{"Name":"other"}]', '[{"Name":"expected"},{"Name":"other"}]', '{}', 'invalid'] as $users) {
+            $home = $this->pmssMakeTempDir('pmss-jellyfin-count-');
+            $this->pmssEnsureDir($home.'/config');
+            $this->pmssEnsureDir($home.'/tmp');
+            file_put_contents($home.'/config/system.xml', '<ServerConfiguration/>');
+            $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
+                .'export HOME='.escapeshellarg($home)."\nexport TMPDIR=\"\$HOME/tmp\"\n"
+                .'USERS='.escapeshellarg($users)."\n"
+                .'JELLYFIN_CONFIG_DIR="$HOME/config"; JELLYFIN_LOG_DIR="$HOME"; JELLYFIN_DATA_DIR="$HOME/data"' ."\n"
+                .'DOTNET_ROOT_PATH=/opt/dotnet; MEDIA_STACK_APP_START_WAIT=1; MEDIA_STACK_AUTH_USERNAME=expected; PMSS_MEDIA_STACK_SEED_PRIVATE=1' ."\n"
+                .'log_info() { :; }; log_ok() { echo ok; }; log_err() { echo "$*"; }' ."\n"
+                .'media_stack_session_kill_owned() { :; }; tmux() { :; }' ."\n"
+                .'media_stack_wait_http_ok() { return 0; }; jellyfin_startup_base_url() { echo "$1"; }' ."\n"
+                .'jellyfin_auth_payload_write() { printf "{}" >"$1"; }; media_stack_json_escape() { printf \'"%s"\' "$1"; }' ."\n"
+                .'media_stack_http_code() { local url="$1"; shift; if [[ "$url" == */Users/AuthenticateByName ]]; then while (($#)); do if [[ "$1" == -o ]]; then printf \'{"AccessToken":"testtoken"}\' >"$2"; break; fi; shift; done; printf 200; else printf 204; fi; }' ."\n"
+                .'curl() { if [[ "$*" != *"/Users"* ]]; then return 0; fi; local target=""; while (($#)); do if [[ "$1" == --config ]]; then [[ "$(stat -c %a "$2")" == 600 ]] || return 1; fi; if [[ "$1" == -o ]]; then target="$2"; fi; shift; done; printf "%s" "$USERS" >"$target"; }' ."\n"
+                .$this->pmssExtractShellFunctions($this->script, ['media_stack_auth_seed_cleanup', 'jellyfin_auth_seed'])."\n"
+                .'jellyfin_auth_seed secret 8096 || echo refused' ."\n"
+                .'if [[ -e "$JELLYFIN_CONFIG_DIR/.pmss-auth-seed-pending" ]]; then jellyfin_auth_seed secret 8096 || echo pending-refused; fi' ."\n";
+            $output = trim($this->pmssRunShellHarness($script));
+            if ($users === '[{"Name":"expected"}]') {
+                $this->assertSame('ok', $output);
+            } else {
+                $this->assertStringContainsString('stop and reinstall', $output);
+                $this->assertStringContainsString('refused', $output);
+                $this->assertStringContainsString('pending-refused', $output);
+                $this->assertSame(0600, fileperms($home.'/config/.pmss-auth-seed-pending') & 0777);
+            }
+            $this->assertStringNotContainsString('testtoken', $output);
+            $this->assertSame('<ServerConfiguration/>', file_get_contents($home.'/config/system.xml'));
+            $this->assertSame([], glob($home.'/tmp/*'));
+        }
     }
 
     public function testJellyfinStartupBaseUrlWaitsForHttp200WithOrWithoutPrefix(): void

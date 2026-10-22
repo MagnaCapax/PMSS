@@ -311,7 +311,7 @@ docker compose up -d
 
 All media stack applications bind to `127.0.0.1` only and are reverse-proxied through the user's lighttpd instance under `/public-<username>/<app>/`.
 Generated lighttpd proxy fragments enable HTTP upgrade forwarding so WebSocket-capable apps can keep live connections through the same per-user proxy path.
-The per-user lighttpd config blocks URL paths starting with `/jellyfin/System/Restart` (case-insensitive) before proxying; existing installs receive this at the next PMSS update.
+The per-user lighttpd config blocks URL paths starting with `/jellyfin/System/Restart` or `/jellyfin/System/Shutdown` (case-insensitive) before proxying; existing installs receive this at the next PMSS update.
 
 The `/public-<username>/` path is **intentionally unauthenticated** at the proxy level — it exists for web hosting, file sharing, and public-facing services. App-level authentication is configured by the installer for newly installed media-stack apps.
 
@@ -325,6 +325,22 @@ The `/public-<username>/` path is **intentionally unauthenticated** at the proxy
 | Autobrr | Admin user created with `autobrrctl create-user` | Use credentials from `~/.media-stack-credentials.txt` |
 
 If the installer detects existing app auth on a rerun, it preserves it rather than overwriting the password. If the original generated credential file is missing and the existing password cannot be recovered safely, the installer warns instead of claiming a new password was set.
+
+First-run Jellyfin, Autobrr and Servarr login setup runs with the app and all
+seeding requests inside one private network namespace (`unshare --user
+--map-root-user --net`, loopback enabled), using a separate temporary tmux
+server. If user/network namespaces or the required tools are unavailable,
+setup stops with a clear message; it never seeds on the shared loopback.
+Already-configured apps skip this step. Autobrr requires the existing sqlite3
+tool to read its user count without modifying the database.
+
+After setup, Autobrr must have exactly one user and Jellyfin's authenticated
+user list must contain exactly the expected administrator. A mismatch stops
+installation and asks the customer to reinstall; user databases and config are
+retained. Jellyfin records pending verification before completing its wizard,
+so a failed count/login check cannot become an already-configured skip on a
+later run. Its pending marker remains on failure. See ADR 0144 for the process
+boundary and verification basis.
 
 The welcome-page media stack panel also reads each installed app's local auth config and shows it as **Protected** or **Exposed**. For exposed PMSS-managed apps, the panel's **Secure this app** action delegates to `install-media-stack.sh --secure-app=<app>` as the customer user and writes any generated app credential to `~/.media-stack-credentials.txt`.
 
