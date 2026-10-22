@@ -371,7 +371,7 @@ if ($ui === 'vanilla-hermes-web' || $ui === 'vanilla-agentboard') {
     $token = pmssPikkumiesOpenTokenMint($home.PMSS_PIKKUMIES_UI_TOKEN_DIR);
     if ($token === '') { pmssPikkumiesOpenPage('error', $started); return; }
     header('Cache-Control: no-store');
-    header('Location: '.$origin.'/__pmss-select-agentboard#t='.$token, true, 302);
+    header('Location: '.$origin.'/__pmss-select-agentboard#token='.$token, true, 302);
     return;
 }
 if (($ui !== 'simplified' && $ui !== 'hermes') || $home === '' || $name === ''
@@ -489,4 +489,4 @@ if (!pmssPikkumiesOpenSocketLive($socket)
 $token = pmssPikkumiesOpenTokenMint($local.'/ui/tokens');
 if ($token === '') { pmssPikkumiesOpenPage('error', $started); return; }
 header('Cache-Control: no-store');
-header('Location: '.$origin.'/?session=pm1#t='.$token, true, 302);
+header('Location: '.$origin.'/?session=pm1#token='.$token, true, 302);

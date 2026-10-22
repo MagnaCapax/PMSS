@@ -152,7 +152,10 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header Cache-Control "no-store" always;
     access_log /var/log/nginx/access.log pmss_ui_b_noargs;
-    if (\$request_uri ~* "(%2e|%2f|\\.\\.|//)") { return 400; }
+    # Hermes answers with its relay prefix in login redirects and cookie paths; the browser only knows /.
+    proxy_redirect /__pmss-ui-b/ /;
+    proxy_cookie_path /__pmss-ui-b/ /;
+    if (\$request_uri ~* "^[^?]*(%2e|%2f|\\.\\.|//)") { return 400; }
     if (\${$variable}_origin_ok = 0) { return 403; }
     if (\${$variable}_api_ok = 0) { return 403; }
     location = /api/cron/fire { return 404; }
@@ -183,7 +186,14 @@ server {
         proxy_read_timeout 3600s;
         limit_conn addr 32;
         proxy_intercept_errors on;
+        error_page 401 = @pikkumies_b_login;
         error_page 502 503 = @pikkumies_b_offline;
+    }
+    # Not logged in: pages go to the Hermes login form; API calls and WebSocket upgrades keep their 401.
+    location @pikkumies_b_login {
+        if (\$uri ~ ^/api/) { return 401; }
+        if (\$http_upgrade != "") { return 401; }
+        return 302 /login;
     }
     location @pikkumies_b_offline {
         root /var/www;
@@ -218,9 +228,12 @@ map "\$request_method:\$uri:\$http_sec_fetch_site" \${$variable}_api_ok {
     ~^GET:/api/.*:(same-origin|none)\$ 1;
     ~^GET:/api/ 0;
 }
-map \$http_cookie \${$variable}_choice {
+# The Agentboard client sends its API calls without cookies: its token exchange and bearer calls pick it directly.
+map "\$request_method:\$request_uri:\$http_authorization:\$http_cookie" \${$variable}_choice {
     default "";
-    "~(?:^|;[[:space:]]*)__Host-pmss_ui_c=(web|agentboard)(?:;|\$)" \$1;
+    "~^POST:/api/auth(?:\\?[^:]*)?::" agentboard;
+    "~^[A-Z]+:/api/[^:]*:Bearer " agentboard;
+    "~(?:^|[:;][[:space:]]*)__Host-pmss_ui_c=(web|agentboard)(?:;|\$)" \$1;
 }
 map \${$variable}_choice \${$variable}_prefix {
     default /__pmss-ui-c;
@@ -238,7 +251,10 @@ server {
     add_header Cache-Control "no-store" always;
     access_log /var/log/nginx/access.log pmss_ui_noargs;
     proxy_cookie_domain ~.+ "";
-    if (\$request_uri ~* "(%2e|%2f|\\.\\.|//)") { return 400; }
+    # Hermes answers with its relay prefix in login redirects and cookie paths; the browser only knows /.
+    proxy_redirect /__pmss-ui-c/ /;
+    proxy_cookie_path /__pmss-ui-c/ /;
+    if (\$request_uri ~* "^[^?]*(%2e|%2f|\\.\\.|//)") { return 400; }
     if (\${$variable}_origin_ok = 0) { return 403; }
     if (\${$variable}_api_ok = 0) { return 403; }
     location = /api/cron/fire { return 404; }

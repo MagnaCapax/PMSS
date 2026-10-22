@@ -155,6 +155,15 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertSame($csp, substr_count($block, 'add_header X-Frame-Options "ALLOW-FROM https://node.example.com" always;'));
     }
 
+    public function testPortBSendsLoggedOutPagesToTheLoginFormAndKeepsHermesCookiesOnRoot(): void
+    {
+        $block = \pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
+        $this->assertStringContainsString('proxy_redirect /__pmss-ui-b/ /;', $block);
+        $this->assertStringContainsString('proxy_cookie_path /__pmss-ui-b/ /;', $block);
+        $this->assertStringContainsString('error_page 401 = @pikkumies_b_login;', $block);
+        $this->assertTrue(preg_match('#location @pikkumies_b_login \{\s+if \(\$uri ~ \^/api/\) \{ return 401; \}\s+if \(\$http_upgrade != ""\) \{ return 401; \}\s+return 302 /login;\s+\}#', $block) === 1);
+    }
+
     public function testEncodedAndRepeatedPathSegmentsReturnBadRequest(): void
     {
         foreach ([\pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345),
@@ -162,22 +171,34 @@ final class PikkumiesUiRoutesTest extends TestCase
             $this->assertTrue(preg_match('/if \(\$request_uri ~\* "([^"]+)"\) \{ return 400; \}/', $block, $match) === 1);
             foreach (['/%2e/', '/%2F/', '/a/../b', '//api'] as $uri)
                 $this->assertTrue(preg_match('~'.$match[1].'~i', $uri) === 1, $uri);
-            foreach (['/', '/api/auth/me', '/assets/main.js'] as $uri)
+            // Hermes login redirects carry ?next=%2F; only the path part is checked.
+            foreach (['/', '/api/auth/me', '/assets/main.js', '/login?next=%2F'] as $uri)
                 $this->assertFalse(preg_match('~'.$match[1].'~i', $uri) === 1, $uri);
         }
     }
 
-    public function testPortCChoiceReadsOnlyTheHostPrefixedCookie(): void
+    public function testPortCChoiceReadsOnlyTheHostPrefixedCookieOrTheAgentboardApiSignals(): void
     {
         $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
-        $this->assertTrue(preg_match('/map \$http_cookie \$[a-z0-9_]+ \{\s*default "";\s*"~([^"]+)" \$1;/s',
-            $block, $match) === 1);
-        foreach (['__Host-pmss_ui_c=web' => 'web', 'other=x; __Host-pmss_ui_c=agentboard; x=y' => 'agentboard'] as $cookie => $expected) {
-            $this->assertTrue(preg_match('~'.$match[1].'~', $cookie, $value) === 1);
-            $this->assertSame($expected, $value[1]);
-        }
-        foreach (['pmss_ui_c=agentboard', '__Host-pmss_ui_c=other', 'x__Host-pmss_ui_c=web'] as $cookie)
-            $this->assertFalse(preg_match('~'.$match[1].'~', $cookie) === 1);
+        $this->assertStringContainsString('proxy_redirect /__pmss-ui-c/ /;', $block);
+        $this->assertStringContainsString('proxy_cookie_path /__pmss-ui-c/ /;', $block);
+        $this->assertTrue(preg_match('/map "\$request_method:\$request_uri:\$http_authorization:\$http_cookie" \$[a-z0-9_]+_choice \{\s*default "";\s*((?:"~[^"]+" [^;]+;\s*)+)\}/s',
+            $block, $map) === 1);
+        $this->assertTrue(preg_match_all('/"~([^"]+)" ([^;]+);/', $map[1], $rules, PREG_SET_ORDER) === 3);
+        // nginx takes the first matching regex; the value is a literal or the cookie's capture.
+        $choose = function ($key) use ($rules) {
+            foreach ($rules as $rule) {
+                if (preg_match('~'.$rule[1].'~', $key, $m) === 1) return $rule[2] === '$1' ? $m[1] : $rule[2];
+            }
+            return '';
+        };
+        $this->assertSame('web', $choose('GET:/::__Host-pmss_ui_c=web'));
+        $this->assertSame('agentboard', $choose('GET:/ws::other=x; __Host-pmss_ui_c=agentboard; x=y'));
+        $this->assertSame('agentboard', $choose('POST:/api/auth::'));
+        $this->assertSame('agentboard', $choose('GET:/api/sessions:Bearer abc:'));
+        foreach (['GET:/api/auth::', 'POST:/api/auth/me::', 'GET:/::pmss_ui_c=agentboard', 'GET:/::__Host-pmss_ui_c=other',
+            'GET:/::x__Host-pmss_ui_c=web', 'GET:/api/sessions:Basic abc:'] as $key)
+            $this->assertSame('', $choose($key), $key);
     }
 
     public function testRootOwnedBarPageKeepsTheAskQueueAndCopyBounded(): void
