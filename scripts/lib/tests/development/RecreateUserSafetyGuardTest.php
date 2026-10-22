@@ -229,6 +229,73 @@ class RecreateUserSafetyGuardTest extends TestCase
         $this->assertSame('hash', file_get_contents($home.'/.lighttpd/.htpasswd'));
     }
 
+    public function testCredentialRestoreIsAccountOwnedAndLeavesNoStagingFile(): void
+    {
+        [$home, $backup] = $this->fixture('credential-owner');
+        $this->pmssWriteFile($backup.'/.lighttpd/.htpasswd', "account:hash\nextra:hash\n");
+
+        $this->restore($home, $backup);
+
+        $restored = $home.'/.lighttpd/.htpasswd';
+        $this->assertFalse(is_link($restored));
+        $this->assertSame("account:hash\nextra:hash\n", file_get_contents($restored));
+        $this->assertSame(posix_geteuid(), fileowner($restored));
+        $this->assertSame(posix_getegid(), filegroup($restored));
+        $this->assertSame(0640, fileperms($restored) & 0777);
+        $this->assertSame(['.', '..', '.htpasswd'], scandir($home.'/.lighttpd'));
+        $this->assertSame("account:hash\nextra:hash\n", file_get_contents($backup.'/.lighttpd/.htpasswd'));
+    }
+
+    public function testCredentialSourceThatIsNotTheCheckedRegularFileStopsRestore(): void
+    {
+        foreach (['link', 'parent-link', 'hardlink', 'directory', 'fifo'] as $kind) {
+            [$home, $backup, $base] = $this->fixture('credential-'.$kind);
+            $this->pmssWriteFile($base.'/outside/.htpasswd', 'outside');
+            $source = $backup.'/.lighttpd/.htpasswd';
+            if ($kind === 'parent-link') {
+                $this->assertTrue(symlink($base.'/outside', $backup.'/.lighttpd'));
+            } else {
+                $this->pmssEnsureDir($backup.'/.lighttpd');
+            }
+            if ($kind === 'link') {
+                $this->assertTrue(symlink($base.'/outside/.htpasswd', $source));
+            } elseif ($kind === 'hardlink') {
+                $this->assertTrue(link($base.'/outside/.htpasswd', $source));
+            } elseif ($kind === 'directory') {
+                $this->pmssEnsureDir($source);
+            } elseif ($kind === 'fifo') {
+                if (!function_exists('posix_mkfifo') || !posix_mkfifo($source, 0600)) {
+                    throw new SkipTest('FIFO creation unavailable');
+                }
+            }
+
+            $this->assertThrowsRuntime(function () use ($home, $backup): void {
+                $this->restore($home, $backup);
+            }, 'Refusing unverified credential file');
+
+            $this->assertFalse(file_exists($home.'/.lighttpd/.htpasswd') || is_link($home.'/.lighttpd/.htpasswd'), $kind);
+            $this->assertSame(['.', '..'], scandir($home.'/.lighttpd'), $kind);
+            $this->assertSame('outside', file_get_contents($base.'/outside/.htpasswd'), $kind);
+        }
+    }
+
+    public function testCopyRefusesSourceWithAnotherOwnerAndKeepsDestination(): void
+    {
+        [$home, $backup] = $this->fixture('credential-foreign-owner');
+        $source = $backup.'/.htpasswd';
+        $destination = $home.'/.htpasswd';
+        $this->pmssWriteFile($source, 'source');
+        $this->pmssWriteFile($destination, 'existing');
+
+        $this->assertFalse(\pmssRecreateCopyFile($source, $destination, posix_geteuid() + 1, posix_geteuid(), posix_getegid()));
+
+        $this->assertSame('existing', file_get_contents($destination));
+        $this->assertSame(['.', '..', '.htpasswd'], scandir($home));
+        $this->assertTrue(\pmssRecreateCopyFile($source, $destination, posix_geteuid(), posix_geteuid(), posix_getegid()));
+        $this->assertSame('source', file_get_contents($destination));
+        $this->assertSame(['.', '..', '.htpasswd'], scandir($home));
+    }
+
     public function testLinkedRestoreDestinationsLeaveTargetsUntouched(): void
     {
         $locations = ['data', 'session', '.local/share/pmss', '.lighttpd/.htpasswd',

@@ -4,6 +4,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/recreateRestoreSafety.php';
+require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
 
 /** Move one whole home directory under its trusted parent without overwriting data. */
 function pmssRecreateMoveTopDirectory(string $source, string $destination): void
@@ -41,18 +42,20 @@ function pmssRecreatePurgeSupersededDirectory(string $path): bool
     return !file_exists($path) && !is_link($path);
 }
 
-/** Copy a regular source file to a regular-file destination beneath real directories. */
+/** Copy the checked single-link regular source inode to a regular-file destination beneath real directories. */
 function pmssRecreateCopyFile(string $source, string $destination, ?int $requiredUid = null, ?int $targetUid = null, ?int $targetGid = null): bool
 {
     if (!file_exists($source) && !is_link($source)) {
         return false;
     }
-    $sourceStat = @lstat($source);
     clearstatcache(true, $source);
     if (is_link($source) || !pmssPathTargetIsSafe($source, false, true)
-        || pmssRecreateHasLinkedParent($source)
-        || !is_array($sourceStat) || ($sourceStat['mode'] & 0170000) !== 0100000
-        || ($requiredUid !== null && $sourceStat['uid'] !== $requiredUid)) {
+        || pmssRecreateHasLinkedParent($source)) {
+        return false;
+    }
+    // One non-blocking open: the handle must be the lstat-named inode (regular, one link, required owner).
+    $content = pmssReadRegularFileContentsVerified($source, $requiredUid, 1048576);
+    if ($content === null) {
         return false;
     }
     clearstatcache(true, $destination);
@@ -61,16 +64,26 @@ function pmssRecreateCopyFile(string $source, string $destination, ?int $require
         || (file_exists($destination) && !is_file($destination))) {
         throw new RuntimeException('Unsafe restore file: '.$destination);
     }
-    if (!@copy($source, $destination)) {
+    // Stage a private exclusive file beside the destination, set metadata on the opened inode, then rename it.
+    $handle = pmssUserFileTempCreate($destination, $tmp);
+    if ($handle === null) {
         throw new RuntimeException('Unable to copy restore file: '.$source);
     }
-    clearstatcache(true, $destination);
-    if (!pmssPathTargetIsSafe($destination, false, true) || !is_file($destination) || is_link($destination)) {
-        throw new RuntimeException('Unsafe restored file: '.$destination);
-    }
-    if ($targetUid !== null && ($targetGid === null || !@chown($destination, $targetUid)
-        || !@chgrp($destination, $targetGid) || !@chmod($destination, 0640))) {
-        throw new RuntimeException('Unable to set restored file ownership: '.$destination);
+    try {
+        $opened = pmssUserFileHandleWriteComplete($handle, $content) ? pmssUserFileHandleProcPath($handle) : null;
+        if ($opened === null || !@chmod($opened, 0640)
+            || ($targetUid !== null && ($targetGid === null || !pmssUserFileOwnershipSet($opened, $targetUid, $targetGid)))) {
+            throw new RuntimeException('Unable to set restored file ownership: '.$destination);
+        }
+        clearstatcache(true, $destination);
+        if (!pmssUserFileHandleMatchesEntry($handle, $tmp) || is_link($destination)
+            || (file_exists($destination) && !is_file($destination)) || !@rename($tmp, $destination)) {
+            throw new RuntimeException('Unable to copy restore file: '.$source);
+        }
+        $tmp = null;
+    } finally {
+        @fclose($handle);
+        if (is_string($tmp)) @unlink($tmp);
     }
     return true;
 }
@@ -124,8 +137,8 @@ function pmssRecreateRestoreHome(string $home, string $backup, bool $hadHome, in
     }
     $credential = $backup.'/.lighttpd/.htpasswd';
     if ((file_exists($credential) || is_link($credential))
-        && !pmssRecreateCopyFile($credential, $home.'/.lighttpd/.htpasswd')) {
-        throw new RuntimeException('Refusing non-regular credential file: '.$credential);
+        && !pmssRecreateCopyFile($credential, $home.'/.lighttpd/.htpasswd', $uid, $uid, $gid)) {
+        throw new RuntimeException('Refusing unverified credential file: '.$credential);
     }
     // These customer overrides are intentionally retained for manual review.
     foreach (['.config/pmss', '.rtorrent.rc.custom', '.lighttpd/custom', '.lighttpd/custom.d',

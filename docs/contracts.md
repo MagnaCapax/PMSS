@@ -1196,9 +1196,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
     and destination parent on the same device before placeholder removal and
     verify the moved inode after rename. Then restores root-owned billing/contact
     files (`.billingServiceId`, legacy `.billingId`,
-    `.billingClientId`, and `.notifyEmail`) and regular `.htpasswd`. Billing
-    files retain `root:<user> 0640`. Billing sources outside the file-type or
-    ownership contract stay in the backup and are reported.
+    `.billingClientId`, and `.notifyEmail`) and the account-owned `.htpasswd`.
+    Each source is read once through a non-blocking handle that must be the
+    named single-link regular inode with the required owner; the copy is
+    written to a private exclusive file beside the destination and renamed
+    into place. Billing files retain `root:<user> 0640`; `.htpasswd` becomes
+    `<user>:<user> 0640`. Billing sources outside the file-type or
+    ownership contract stay in the backup and are reported; a `.htpasswd`
+    outside it stops the rebuild.
     The home is handed to the user only after restore, before service configuration,
     nginx regeneration, and permissions. Ownership is validated, then the home
     remains account-owned for the `changePw.php` password reset. The backup stays
