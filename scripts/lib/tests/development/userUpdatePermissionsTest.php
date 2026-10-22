@@ -58,15 +58,24 @@ class UserUpdatePermissionsTest extends TestCase
 # Restore cached ruTorrent channel rates once its SCGI socket is ready.
 schedule2 = throttle_init,5,0,"execute.nothrow=sh,-c,php ~/.rtorrentThrottleInit.php& exit 0"
 RC;
-        $legacy = str_replace($hookBlock, '', $skeleton, $replacements);
+        $catchBlock = <<<'RC'
+# rTorrent 0.16 has no socket_critical log group; catch keeps the line from stopping it.
+catch = {"log.add_output=socket_critical,rtorrent.log"}
+RC;
+        // The skeleton before the 0.16 catch line, and the one before the throttle hook.
+        $previous = str_replace($catchBlock, 'log.add_output = "socket_critical", "rtorrent.log"', $skeleton, $catches);
+        $legacy = str_replace($hookBlock, '', $previous, $replacements);
 
+        $this->assertSame(1, $catches, 'Expected one socket_critical catch in the skeleton');
         $this->assertSame(1, $replacements, 'Expected one throttle startup hook in the skeleton');
+        $this->assertSame('434fb08e9ca2c9dbcd7abdbf89d5b95b7c898022', sha1($previous));
         $this->assertSame('81d37b0b09345e3bfa5c2e79e66a3ef055f65905', sha1($legacy));
-        $result = $this->runRefreshPermissionsWithStepRc(0, $legacy);
-
-        $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
-        $this->assertSame($skeleton, $result['content']);
-        $this->assertSame(0640, $result['mode']);
+        foreach ([$previous, $legacy] as $old) {
+            $result = $this->runRefreshPermissionsWithStepRc(0, $old);
+            $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
+            $this->assertSame($skeleton, $result['content']);
+            $this->assertSame(0640, $result['mode']);
+        }
     }
 
     public function testRefreshPermissionsPreservesCustomizedRtorrentConfig(): void

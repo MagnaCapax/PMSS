@@ -36,7 +36,7 @@ function pmssRtorrentRestartLockPid(string $lockPath): int
 
 /**
  * Verify a PID is an rTorrent process owned by the current customer UID.
- * A running rTorrent names its main thread 'rtorrent main', a just-started one 'rtorrent'.
+ * A running rTorrent names its main thread 'rtorrent main' (0.9.8) or 'rtorrent-main' (0.16), a just-started one 'rtorrent'.
  */
 function pmssRtorrentRestartPidIsRtorrent(int $pid, int $uid): bool
 {
@@ -55,7 +55,7 @@ function pmssRtorrentRestartPidIsRtorrent(int $pid, int $uid): bool
     if (preg_match('/^\s*(\d+)\s+(.+?)\s*$/', (string) $line, $m) !== 1) {
       continue;
     }
-    if ((int) $m[1] === $uid && preg_match('/^rtorrent( main)?$/', $m[2]) === 1) {
+    if ((int) $m[1] === $uid && preg_match('/^rtorrent([ -]main)?$/', $m[2]) === 1) {
       return true;
     }
   }
@@ -70,7 +70,7 @@ function pmssRtorrentRestartUserPids(int $uid): array
 {
   $output = [];
   $rc = 1;
-  @exec('pgrep -u ' . (int) $uid . " -x 'rtorrent( main)?'", $output, $rc);
+  @exec('pgrep -u ' . (int) $uid . " -x 'rtorrent([ -]main)?'", $output, $rc);
   if ($rc !== 0) {
     return [];
   }

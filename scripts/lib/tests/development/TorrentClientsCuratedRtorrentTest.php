@@ -126,7 +126,55 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             'configureTorrentClientsVersion.php', 'torrentClientsResolve.php', '.rtorrentRestart.php'] as $file)
             $this->assertStringContainsString("'".($file[0] === '.' ? '' : 'www/').$file."'", $delivery);
         $restart = file_get_contents($root.'/etc/skel/.rtorrentRestart.php');
-        $this->assertStringContainsString("'rtorrent( main)?'", $restart);
+        $this->assertStringContainsString("'rtorrent([ -]main)?'", $restart);
         $this->assertStringContainsString('screen -fa -d -m ./.rtorrentExecute.php', $restart);
+    }
+    public function testRtorrent016EntryIsPinnedOptInAndLaunchesWithDeprecatedRedirects(): void
+    {
+        $entry = $this->entries()[2];
+        $this->assertSame('0.16.25', $entry['version']);
+        $this->assertSame('static', $entry['kind']);
+        $this->assertSame('0.16', $entry['compatFamily']);
+        $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-0.16.25-static-amd64-r1'], $entry['url']);
+        $this->assertSame('84f2b40561f353249fa463d1f79a8d3f6c5ce886cbd974372d4e5553201e2f49', $entry['sha256']);
+        $this->assertFalse($entry['isDefault']);
+        $root = $this->pmssMakeTempDir('pmss-rtorrent-016-');
+        $store = $root.'/clients';
+        $projection = $root.'/catalog.json';
+        $rows = [];
+        foreach ($this->entries() as $row) {
+            if ($row['kind'] === 'system') continue;
+            mkdir($store.'/rtorrent/'.$row['version'], 0755, true);
+            // The fixture prints its argv so the test sees the exact launch arguments.
+            file_put_contents($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\nprintf '%s|' \"\$@\"\n");
+            chmod($store.'/rtorrent/'.$row['version'].'/rtorrent', 0755);
+            $rows[] = $row;
+        }
+        $this->assertTrue(\pmssTorrentClientsProjectionWrite($rows, $projection));
+        $home = $root.'/t';
+        mkdir($home.'/bin/rtorrent', 0755, true);
+        symlink($store.'/rtorrent/0.16.25', $home.'/bin/rtorrent/default');
+        $output = [];
+        exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
+        $this->assertSame([0, ['-D|']], [$rc, $output]);
+        unlink($home.'/bin/rtorrent/default');
+        symlink($store.'/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
+        $output = [];
+        exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
+        $this->assertSame([0, []], [$rc, $output]);
+        $this->assertFalse(\pmssRtorrentDeprecatedRedirects('0.16.25', $root.'/missing.json'));
+    }
+
+    public function testTemplateGuardsTheOnlyRcLinesThatDifferBetweenFamilies(): void
+    {
+        $rc = file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.rtorrent.rc');
+        // 0.16 rejects encoding.add even with -D; it must only run inside the 0.9.8 branch.
+        $this->assertSame(1, preg_match_all('/encoding\.add/', preg_replace('/^#.*$/m', '', $rc)));
+        $this->assertStringContainsString('branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
+            .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))', $rc);
+        $this->assertSame(0, preg_match('/^encoding\.add/m', $rc));
+        $this->assertSame(1, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent-main'));
+        $this->assertSame(1, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent main'));
+        $this->assertSame(0, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent-disk'));
     }
 }

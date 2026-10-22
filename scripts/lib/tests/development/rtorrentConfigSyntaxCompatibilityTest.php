@@ -80,7 +80,8 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
             'Skeleton custom config should not enable tracker_debug logging by default'
         );
         $this->assertStringContainsString('log.add_output = "storage_critical", "rtorrent.log"', $content);
-        $this->assertStringContainsString('log.add_output = "socket_critical", "rtorrent.log"', $content);
+        $this->assertStringContainsString('catch = {"log.add_output=socket_critical,rtorrent.log"}', $content);
+        $this->assertSame(0, preg_match('/^\s*log\.add_output\s*=\s*"socket_critical"/m', $content));
     }
 
     /**

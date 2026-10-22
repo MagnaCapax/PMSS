@@ -86,8 +86,22 @@ function pmssRtorrentExecutorCommand(
 {
     $binary = pmssTorrentClientResolve($home, 'rtorrent', $projectionPath, $storeRoot);
     $storePrefix = rtrim($storeRoot, '/').'/rtorrent/';
-    return $binary !== null && strpos($binary, $storePrefix) === 0
-        ? escapeshellarg($binary) : '/usr/local/bin/rtorrent';
+    if ($binary === null || strpos($binary, $storePrefix) !== 0) return '/usr/local/bin/rtorrent';
+    return escapeshellarg($binary)
+        .(pmssRtorrentDeprecatedRedirects(basename(dirname($binary)), $projectionPath) ? ' -D' : '');
+}
+
+/** rTorrent 0.16 renamed rc and RPC commands; -D keeps the old names the template and ruTorrent use. */
+function pmssRtorrentDeprecatedRedirects(string $version, string $projectionPath): bool
+{
+    $raw = @file_get_contents($projectionPath);
+    $data = is_string($raw) ? json_decode($raw, true) : null;
+    foreach ((array) ($data['versions'] ?? []) as $entry) {
+        if (($entry['client'] ?? null) !== 'rtorrent' || ($entry['version'] ?? null) !== $version) continue;
+        $family = (string) ($entry['compatFamily'] ?? '');
+        return preg_match('/\A[0-9]+(\.[0-9]+)*\z/', $family) === 1 && version_compare($family, '0.16', '>=');
+    }
+    return false;
 }
 
 /** Start a selected client as the account while excluding a concurrent switch. */

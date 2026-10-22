@@ -90,7 +90,13 @@ function pmssConfigureTorrentClientOtherStart($home, $client, $version)
         if ($rc !== 0) return false;
         // The executor sleeps 5 s after rTorrent exits before it starts the selected build.
         for ($attempt = 0; $attempt < 150; $attempt++) {
-            if (pmssCustomerNativePidsRead(array($binary)) !== array()) return true;
+            $pids = pmssCustomerNativePidsRead(array($binary));
+            if ($pids !== array()) {
+                // A build that rejects the account's rc exits at once and the executor retries every
+                // 5 s, so only a process still running after that counts as started.
+                sleep(7);
+                return array_intersect($pids, pmssCustomerNativePidsRead(array($binary))) !== array();
+            }
             usleep(100000);
         }
         return false;
