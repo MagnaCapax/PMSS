@@ -43,8 +43,9 @@ qui uses credential mode `qui`: its account CLI receives a random service passwo
 The generated slskd YAML has no Soulseek account or shares. Owner edits to it
 fail the exact-byte check and trigger regeneration, including the web login.
 The slskd catalog row therefore names an optional `ownerEnv` file,
-`~/.config/slskd/slskd.env`. PMSS never creates or rewrites this file. The
-account creates it with mode 0600, using shell assignments such as:
+`~/.config/slskd/slskd.env`. Root never creates, reads or rewrites this file;
+the bootstrap never touches it. The account can create it with mode 0600,
+using shell assignments such as:
 
 ```sh
 SLSKD_SLSK_USERNAME='your-soulseek-name'
@@ -55,7 +56,7 @@ SLSKD_SHARED_DIR='/absolute/path/to/music;/absolute/path/to/other music'
 Single-quote values to preserve spaces, dollar signs, double quotes and the
 semicolon separating share paths; escape any embedded single quote using shell
 quoting. Use a separate Soulseek password, never the PMSS account password.
-After saving, restart slskd from Configure to load the environment.
+After hand-editing, restart slskd from Apps in Configure to load the environment.
 
 The existing launch shell sources owner settings under the account UID before
 any managed environment. It skips missing, symlinked, non-regular, non-0600,
@@ -81,3 +82,52 @@ and actions as the account. Neither grants the primary PMSS credential. Remote
 configuration and script execution remain upstream attack surfaces; this change
 does not enable either. Rollback removes `ownerEnv` from the catalog, leaving
 the owner file intact and returning to the previous launch behavior.
+
+## Owner settings form for slskd (2026-10-22, Refs #1129)
+
+Writing the environment file by hand left a shell step for every customer. The
+Configure page now has a Soulseek form when slskd is available. After checking
+the account password, account-UID panel PHP validates the username, a separate
+Soulseek password and optional absolute shared folders, then serializes them
+as single-quoted assignments in fixed key order, one per line. Values must be
+valid UTF-8 without control characters: username 1–64 bytes after trimming,
+password 1–256 bytes, at most 32 semicolon-separated folder entries, and at
+most 4096 bytes for the serialized file. Non-empty folders must exist.
+
+The panel atomically replaces `~/.config/slskd/slskd.env` at mode 0600, keeps
+the previous file as `slskd.env.prev` (also 0600), and refuses symlinked
+`.config`, `.config/slskd`, environment and backup paths. Directory creation
+and permission changes run as the account. Oversized, unreadable, non-regular
+or NUL-containing existing files are left untouched rather than losing their
+content during backup. If slskd has a regular, non-symlink enable marker, the
+panel stops it and writes the existing restart marker for the watchdog.
+Otherwise it saves without enabling slskd and directs the owner to Apps.
+
+The panel never displays, logs or returns the Soulseek password, or places it
+on argv. A blank password field keeps the saved value only when the file
+matches the panel's canonical format, including key order and quoting. Custom
+shell content is never evaluated or patched: saving requires a new credential,
+warns that the file will be replaced, and preserves its bytes in `.prev`.
+The panel refuses a Soulseek password that validates as the PMSS account
+password, including a retained password after an account-password change.
+Empty credentials are rejected; this form does not delete the owner file.
+
+Root's role is unchanged: it builds the launch from the trusted catalog, never
+reads the file, and the account launch shell's ownership, mode, symlink and
+`sh -n` checks decide whether it is sourced. Hand-editing remains supported.
+Rejected: a root-side writer (ADR 0121) and merging owner settings into managed
+YAML (ADR 0036). Rollback removes the form; owner files stay intact and keep
+working through the existing loader.
+
+Security review rechecked the upstream [advisory list](https://github.com/slskd/slskd/security/advisories)
+on 2026-10-22 and found no published slskd advisories. The pinned
+[configuration documentation](https://github.com/slskd/slskd/blob/0.26.1/docs/config.md)
+confirms the three environment keys and warns that enabling remote
+configuration can expose YAML secrets to an attacker with app access. The
+existing web UI/API, peer listener, shared files and account-readable process
+environment remain exposure paths. Compromise of the external Soulseek
+credential exposes that external account; it does not supply the separate
+PMSS login. Managed web authentication and loopback bind, the allocated peer
+port, and disabled remote configuration/script execution defaults are unchanged.
+The existing POST/XHR guard and account-password check protect this new writer;
+audit logging records only action and success/failure.

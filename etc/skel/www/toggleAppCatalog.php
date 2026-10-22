@@ -2,7 +2,7 @@
 /** Shared, inert metadata for the secured customer toggle apps. */
 return array(
     'slskd' => array(
-        'label' => 'slskd', 'description' => 'Soulseek client. Set account and shares in ~/.config/slskd/slskd.env (mode 0600), then restart.', 'listingDescription' => 'Web client for the Soulseek network',
+        'label' => 'slskd', 'description' => 'Soulseek client. Set your Soulseek account and shared folders in Configure.', 'listingDescription' => 'Web client for the Soulseek network',
         'listingCategory' => 'Downloads and requests', 'listingIndex' => 2, 'listingAvailable' => true,
         'enable' => '.slskdEnable', 'exe' => '/opt/slskd/slskd',
         'securedMarker' => '.pmss/apps/slskd.secured', 'stateFile' => '.pmss/apps/slskd.state',

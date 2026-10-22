@@ -80,6 +80,11 @@ if ($pmssPikkumiesState['origin'] !== '' || is_file($home.'/bin/install-hermes')
 if (is_file(__DIR__.'/mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {
     $sections = array_merge(array_slice($sections, 0, 1, true), array('media' => 'Media Stack'), array_slice($sections, 1, null, true));
 }
+$ownerCards = function_exists('pmssAppOwnerSettingsCards') ? pmssAppOwnerSettingsCards($home, $status) : array();
+foreach ($ownerCards as $cardId => $card) {
+    $sections = array_merge(array_slice($sections, 0, 1, true), array($cardId => $card['label']), array_slice($sections, 1, null, true));
+}
+$reloadActions = array_merge(array('delugeRotate', 'torrentClientSwitch'), function_exists('pmssAppOwnerSettingsActions') ? pmssAppOwnerSettingsActions() : array());
 $urls = pmssAppsAllowedUrlsRead();
 $lsioCatalog = is_file(__DIR__.'/appsLsioCatalog.php') ? require __DIR__.'/appsLsioCatalog.php' : array();
 if (!is_array($lsioCatalog)) $lsioCatalog = array();
@@ -119,6 +124,10 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <?php if ($torrentVersions): ?><h3>qBittorrent version</h3><p>Running: <?= pmssCustomerHtmlAttr($torrentRunning) ?></p><?php if ($torrentNotice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($torrentNotice) ?></p><?php endif; ?>
 <div class="configure-actions"><select id="configure-qbittorrent-version" aria-label="qBittorrent version"><?php foreach ($torrentVersions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"><?= pmssCustomerHtmlAttr($version) ?></option><?php endforeach; ?></select>
 <input type="password" id="configure-qbittorrent-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'qbittorrent',version:document.getElementById('configure-qbittorrent-version').value,password:document.getElementById('configure-qbittorrent-password').value},'Back up the current configuration and restart qBittorrent with this version?')">Switch version</button></div><?php endif; ?></section>
+<?php foreach ($ownerCards as $cardId => $card): ?>
+<section class="configure-card" id="<?= pmssCustomerHtmlAttr($cardId) ?>"><h2><?= pmssCustomerHtmlAttr($card['label']) ?></h2>
+<?= $card['html'] ?></section>
+<?php endforeach; ?>
 <?php if (isset($sections['agents'])): ?>
 <section class="configure-card" id="agents"><h2>AI agents</h2><div class="pmss-apps-section pmss-agents-section"><div class="list">
 <?php if ($pmssPikkumiesState['origin'] !== ''): $pmssPikkumiesLabel = $pmssPikkumiesState['off'] ? 'Off' : 'Starting'; ?>
@@ -178,13 +187,15 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 </section></main></div></div></div><div class="full_bottom"></div></div></div>
 <script>
 function pmssConfigureNotice(message, error) { var node = document.getElementById('pmss-action-notice'); node.textContent = message; node.style.display = 'block'; node.className = error ? 'pmss-error' : ''; }
+var pmssConfigureReloadActions = <?= json_encode($reloadActions) ?>;
 function pmssConfigureSend(action, fields, consequence) {
     if (consequence && !window.confirm(consequence)) return;
     fields.action = action;
     pmssConfigureNotice('Saving...', false);
     $.ajax({url:'configure.php',type:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},data:fields,
-        success:function(result){pmssConfigureNotice(result.message || 'Saved.', false); if (action === 'delugeRotate' || action === 'torrentClientSwitch') setTimeout(function(){location.reload(true);}, 1500);},
-        error:function(xhr){pmssConfigureNotice((xhr.responseJSON && xhr.responseJSON.message) || 'The setting could not be saved.', true);}});
+        success:function(result){pmssConfigureNotice(result.message || 'Saved.', false); if (pmssConfigureReloadActions.indexOf(action) >= 0) setTimeout(function(){location.reload(true);}, 1500);},
+        error:function(xhr){pmssConfigureNotice((xhr.responseJSON && xhr.responseJSON.message) || 'The setting could not be saved.', true);},
+        complete:function(){document.querySelectorAll('[data-pmss-clear]').forEach(function(node){node.value='';});}});
 }
 function pmssPikkumiesTabOpen() {
     try {

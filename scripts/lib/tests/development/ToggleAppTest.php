@@ -6,6 +6,7 @@ require_once dirname(__DIR__, 2).'/user/watchdog.php';
 require_once dirname(__DIR__, 2).'/user/toggleApp.php';
 require_once dirname(__DIR__, 2).'/lighttpd/proxyFragments.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/toggleAppRuntime.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/configureSettings.php';
 
 /** Security contracts for the two opt-in toggle apps. */
 class ToggleAppTest extends TestCase
@@ -37,7 +38,7 @@ class ToggleAppTest extends TestCase
         $this->assertSame(array('.copypartyEnable', '.config/copyparty/copyparty.conf', array()),
             array($catalog['copyparty']['enable'], $catalog['copyparty']['config'], $catalog['copyparty']['extraPortServices']));
         $this->assertSame('.config/slskd/slskd.env', $catalog['slskd']['ownerEnv']);
-        $this->assertStringContainsString('~/.config/slskd/slskd.env', $catalog['slskd']['description']);
+        $this->assertSame('Soulseek client. Set your Soulseek account and shared folders in Configure.', $catalog['slskd']['description']);
         $this->assertSame("nohup 'python3' '/usr/local/bin/copyparty-sfx.py' '-c' '/home/bo/.config/copyparty/copyparty.conf'",
             \pmssToggleAppLaunchCommand($catalog['copyparty'], '/home/bo/'.$catalog['copyparty']['config'], '/home/bo'));
         $this->assertSame(array('.config/slskd/slskd.yml' => "web:\n  port: 23001\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-bo/slskd\n  authentication:\n    disabled: false\n    username: bo\n    password: secret\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: 23002\n"),
@@ -91,6 +92,19 @@ PROXY;
         $this->assertSame(array('managed', $values[1], $values[2]), $this->slskdOwnerEnvironmentLaunch($home, true));
         $this->assertSame($contents, file_get_contents($path));
         $this->assertSame(0600, fileperms($path) & 0777);
+    }
+
+    public function testPanelWrittenSlskdEnvIsSourcedByLoader(): void
+    {
+        $home = $this->pmssEnsureDir($this->pmssMakeTempDir("toggle-panel-'quote-").'/exampleu');
+        $this->pmssWriteFile($home.'/.lighttpd/.htpasswd', 'exampleu:'.crypt('secret', '$6$rounds=5000$pmssconfigure$')."\n");
+        $values = array("network 'name", 'network \'$" ; $(touch forbidden) `id` \\ secret',
+            $this->pmssEnsureDir($home.'/music one').';'.$this->pmssEnsureDir($home.'/music \'$" two'));
+        $result = \pmssConfigureActionApply($home, 'slskdSettings', array('password' => 'secret',
+            'username' => $values[0], 'soulseekPassword' => $values[1], 'sharedDir' => $values[2]));
+        $this->assertTrue($result['ok']);
+        $this->assertSame($values, $this->slskdOwnerEnvironmentLaunch($home));
+        $this->assertFalse(file_exists($home.'/forbidden'));
     }
 
     public function testSlskdOptionalOwnerEnvironmentSkipsUnsafeOrMalformedFiles(): void
@@ -220,7 +234,7 @@ PROXY;
                 $this->pmssRepoPath('scripts/lib/lighttpd/proxyFragments.php'),
                 $this->pmssRepoPath('scripts/terminateUser.php')));
         foreach ($paths as $path) {
-            if (in_array(basename($path), array('toggleAppCatalog.php', 'toggleAppRuntime.php', 'slskd.php', 'copyparty.php'), true)) continue;
+            if (in_array(basename($path), array('toggleAppCatalog.php', 'toggleAppRuntime.php', 'slskd.php', 'copyparty.php', 'configureAppOwnerSettings.php'), true)) continue;
             // DroppedNeedle's description names slskd as the client it drives; that is display copy, not wiring.
             $source = str_replace('drive your own slskd or SABnzbd', '', (string) file_get_contents($path));
             $this->assertFalse((bool) preg_match('/slskd|copyparty/i', $source), $path);
@@ -494,6 +508,7 @@ PHP
             $this->pmssAssertRepoFileContainsString('etc/skel/www/scriptsIncAppProcess.php', "'endpoint' => 'toggleApp.php?app='");
         }
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/toggleAppRuntime.php'");
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/configureAppOwnerSettings.php'");
         $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', 'checkToggleApps.php');
     }
 

@@ -4,6 +4,7 @@ require_once __DIR__.'/scriptsInc.php';
 require_once __DIR__.'/panelSessionAuth.php';
 if (is_file(__DIR__.'/pikkumiesPanel.php')) require_once __DIR__.'/pikkumiesPanel.php';
 if (is_file(__DIR__.'/hermesAgent.php')) require_once __DIR__.'/hermesAgent.php';
+if (is_file(__DIR__.'/configureAppOwnerSettings.php')) require_once __DIR__.'/configureAppOwnerSettings.php';
 
 /** Save the two allowed display modes in a private account-owned file. */
 function pmssPikkumiesInterfaceSave($home, $mode)
@@ -130,7 +131,8 @@ function pmssConfigureActionApply($home, $action, $request, $ops = array())
 {
     $paths = pmssPanelSessionPaths($home);
     // These actions can run account commands or publish the username, so they need the account password.
-    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch', 'hermesShowLogin', 'pikkumiesHermesShowLogin'), true);
+    $highImpact = in_array($action, array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch', 'hermesShowLogin', 'pikkumiesHermesShowLogin'), true)
+        || (function_exists('pmssAppOwnerSettingsActions') && in_array($action, pmssAppOwnerSettingsActions(), true));
     if ($highImpact && (!isset($request['password']) || !is_string($request['password'])
         || !pmssPanelSessionPasswordValid($paths, pmssPanelSessionUsername($home), $request['password']))) {
         $result = array('ok' => false, 'status' => 403, 'message' => 'The password you entered was not accepted. Nothing was changed.');
@@ -154,6 +156,8 @@ function pmssConfigureActionRun($home, $action, $request, $ops = array())
         $password = $state['origin'] !== '' ? pmssPikkumiesHermesLoginRead($home) : '';
         return array('ok' => $password !== '', 'status' => $password !== '' ? 200 : 409,
             'message' => $password !== '' ? $password : 'Pikkumies Hermes login is unavailable.');
+    } elseif (function_exists('pmssAppOwnerSettingsActions') && in_array($action, pmssAppOwnerSettingsActions(), true)) {
+        return pmssAppOwnerSettingsAction($home, $action, $request);
     } elseif ($action === 'hermesInstall' || $action === 'hermesShowLogin') {
         if (!function_exists('pmssHermesPanelAction'))
             return array('ok' => false, 'status' => 503, 'message' => 'Hermes is unavailable on this host.');

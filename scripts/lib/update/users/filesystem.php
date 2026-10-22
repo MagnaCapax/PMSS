@@ -269,6 +269,7 @@ PHP;
         'www/apps.php',
         'www/configure.php',
         'www/configureSettings.php',
+        'www/configureAppOwnerSettings.php',
         'www/hermesAgent.php',
         'www/configureTorrentClients.php',
         'www/configureTorrentClientsOther.php',
