@@ -67,3 +67,20 @@ keep `/usr/local/bin/rtorrent`.
 
 - Issues #1066 and #1068; ADRs 0105, 0120 and 0130
 - [rTorrent 0.16.25 release](https://github.com/rakshasa/rtorrent/releases/tag/v0.16.25)
+
+## Amendment 2026-10-22: 0.16.25 and jesec 0.9.8-r16 disabled
+
+A full ruTorrent check (not only the torrent list) on a QA host showed the
+bundled ruTorrent 3.10 is not compatible with 0.16.25. rTorrent 0.16 requires a
+string target as the first parameter of every RPC call, in both XML-RPC
+backends, and ruTorrent 3.10 sends calls such as `to_kb` and `execute_capture`
+without one. ruTorrent then cannot read the account's uid, directory or session
+and reports errors, and the ratio and rutracker_check plugins disable
+themselves. jesec 0.9.8-r16 shows a similar loss: the uid is not detected and
+`system.api_version` returns an out-of-range value. stickz 7.2 behaves like the
+system build.
+
+Both entries are `disabled: true`. The projection no longer offers a disabled
+entry even when an earlier run installed it, so an account that selected one
+resolves to the system build again. The builds, the `-D` launch rule and the rc
+guard stay in place for when ruTorrent support for these builds lands.

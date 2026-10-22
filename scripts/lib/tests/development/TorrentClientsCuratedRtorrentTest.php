@@ -33,7 +33,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame('974c367b92eca69b85de8afde4937559b8396dc996694da2e7cb4fdc38dc8b40', $entry['sha256']);
         $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $entry['sha256']));
         $this->assertFalse($entry['isDefault']);
-        $this->assertFalse($entry['disabled']);
+        // Disabled until the bundled ruTorrent handles this build (ADR 0141 amendment).
+        $this->assertTrue($entry['disabled']);
         $this->assertFalse(file_exists(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.enabled'));
     }
 
@@ -46,6 +47,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         // Executable fixture bytes stand in for the separately verified upstream artifact.
         $bytes = "#!/bin/sh\nprintf 'selected-rtorrent'\n";
         $entry['sha256'] = hash('sha256', $bytes);
+        // Exercise the mechanism, not the catalog's current offer.
+        $entry['disabled'] = false;
         $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
         putenv('PMSS_TORRENT_CLIENTS_STORE_ROOT='.$store);
         try {
@@ -138,6 +141,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-0.16.25-static-amd64-r1'], $entry['url']);
         $this->assertSame('84f2b40561f353249fa463d1f79a8d3f6c5ce886cbd974372d4e5553201e2f49', $entry['sha256']);
         $this->assertFalse($entry['isDefault']);
+        $this->assertTrue($entry['disabled']);
         $root = $this->pmssMakeTempDir('pmss-rtorrent-016-');
         $store = $root.'/clients';
         $projection = $root.'/catalog.json';
@@ -148,6 +152,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             // The fixture prints its argv so the test sees the exact launch arguments.
             file_put_contents($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\nprintf '%s|' \"\$@\"\n");
             chmod($store.'/rtorrent/'.$row['version'].'/rtorrent', 0755);
+            $row['disabled'] = false;
             $rows[] = $row;
         }
         $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
@@ -194,5 +199,32 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame('726f9ce28d2675425d45a624b95957b22f2777d4ccacf3634e5f9f7da3cf003c', $entry['sha256']);
         $this->assertFalse($entry['isDefault']);
         $this->assertFalse($entry['disabled']);
+    }
+    public function testProjectionDoesNotOfferDisabledInstalledBuilds(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-rtorrent-disabled-');
+        $store = $root.'/clients';
+        $projection = $root.'/catalog.json';
+        $rows = [];
+        foreach ($this->entries() as $row) {
+            if ($row['kind'] === 'system') continue;
+            mkdir($store.'/rtorrent/'.$row['version'], 0755, true);
+            file_put_contents($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\n");
+            $rows[] = $row;
+        }
+        $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
+        putenv('PMSS_TORRENT_CLIENTS_STORE_ROOT='.$store);
+        try {
+            $this->assertTrue(\pmssTorrentClientsProjectionWrite($rows, $projection));
+        } finally {
+            putenv($oldRoot === false ? 'PMSS_TORRENT_CLIENTS_STORE_ROOT' : 'PMSS_TORRENT_CLIENTS_STORE_ROOT='.$oldRoot);
+        }
+        // Every installed build is on disk; only the enabled one is offered.
+        $this->assertSame(['0.9.8-stickz7.2'], array_keys(\pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent')));
+        $home = $root.'/t';
+        mkdir($home.'/bin/rtorrent', 0755, true);
+        symlink($store.'/rtorrent/0.16.25', $home.'/bin/rtorrent/default');
+        // An account that selected a now-disabled build runs the system build again.
+        $this->assertSame('/usr/local/bin/rtorrent', \pmssRtorrentExecutorCommand($home, $projection, $store));
     }
 }
