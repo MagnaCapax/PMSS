@@ -1,7 +1,7 @@
 # ADR 0147: Welcome is a status-first home: quick stats with the bonus among them, apps, connect, one news list
 
 Date: 2026-10-22
-Category: customer panel
+Category: domain
 
 ## Status
 Accepted (operator-directed, 2026-10-22)
