@@ -45,6 +45,32 @@ class OpenClawPanelCompatibilityTest extends TestCase
         });
     }
 
+    /**
+     * Loading the installer must print nothing into panel pages. PHP 7.x echoes an included file's shebang line
+     * (PHP 8 does not), so the echo marker makes this fail without the output guard on every PHP version.
+     */
+    public function testInstallerLoadOutputNeverReachesPanelPages(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $this->pmssEnsureDir($home.'/bin', 0700);
+            $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
+            $this->pmssWriteFile($home.'/bin/install-openclaw', "#!/usr/bin/env php\n<?php echo 'INSTALLER-LOAD-OUTPUT';\n"
+                .'function ocPaths(?string $home = null): array { throw new RuntimeException("not under test"); }');
+            $this->pmssWriteFile($home.'/www/openclaw-probe.php', '<?php require __DIR__."/userOpenClaw.php";'
+                .'var_export(pmssOpenClawRuntimeReady());');
+            $probe = $render('openclaw-probe.php', array('minBytes' => 1));
+            $this->assertSame('', $probe['stderr']);
+            $this->assertSame('true', $probe['stdout']);
+            foreach (array('welcome.php' => 10000, 'welcome.php?news=1' => 1, 'configure.php' => 4000) as $page => $minimum) {
+                $parts = explode('?', $page, 2);
+                $result = $render($parts[0], array('minBytes' => $minimum, 'query' => $parts[1] ?? ''));
+                $this->assertSame('', $result['stderr'], $page);
+                $this->assertStringNotContainsString('#!/usr/bin/env php', $result['stdout'], $page);
+                $this->assertStringNotContainsString('INSTALLER-LOAD-OUTPUT', $result['stdout'], $page);
+            }
+        });
+    }
+
     public function testOptionalStatusThrowablesPreserveFallbackAndOtherAppRows(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {

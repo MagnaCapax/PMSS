@@ -23,7 +23,13 @@ function pmssOpenClawRuntimeReady(): bool
     if (!pmssOpenClawPanelHelpersCurrent()) return false;
     $installer = dirname(__DIR__).'/bin/install-openclaw';
     if (!is_file($installer) || is_link($installer)) return false;
-    require_once $installer;
+    // PHP 7.x prints an included file's shebang line; keep it (and any load-time output) out of panel pages and JSON.
+    ob_start();
+    try {
+        require_once $installer;
+    } finally {
+        ob_end_clean();
+    }
     // The panel heal can precede step2's installer refresh; old ocPaths ignores the explicit home.
     return function_exists('ocPaths') && (new ReflectionFunction('ocPaths'))->getNumberOfParameters() >= 1;
 }
