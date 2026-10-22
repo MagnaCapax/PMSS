@@ -80,6 +80,7 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
 
 // Welcome home view model (ADR 0147). Every number comes from an existing reader; nothing is recomputed here.
 if (isset($_GET['credits'])) { pmssWelcomeHomeCreditsEmit(dirname(__DIR__)); exit; }
+if (isset($_GET['support'])) { pmssWelcomeHomeSupportEmit(dirname(__DIR__)); exit; }
 if (isset($_GET['news'])) { pmssWelcomeHomeNewsEmit(dirname(__DIR__)); exit; }
 $homeTrafficState = pmssWelcomeHomeTrafficStateBuild(
     pmssWelcomeSerializedArrayRead('../.trafficData'),
@@ -160,7 +161,27 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
 <?php endif; ?>
                 <section class="h-card" aria-labelledby="h-help-title">
                     <h2 id="h-help-title" class="h-label">Help</h2>
+                    <details class="h-get-help" id="h-get-help">
+                        <summary>Get help</summary>
+                        <form id="h-support-form" autocomplete="on" onsubmit="return pmssSupportSend(this)">
+                            <label for="h-support-text">What's wrong?</label>
+                            <textarea id="h-support-text" name="text" rows="4" maxlength="8000" required></textarea>
+                            <div class="h-support-topics" role="radiogroup" aria-label="Topic">
+<?php foreach (pmssWelcomeHomeSupportTopics() as $pmssTopicId => $pmssTopicLabel): ?>
+                                <label><input type="radio" name="topic" value="<?= $pmssTopicId ?>"<?= $pmssTopicId === 'working' ? ' checked' : '' ?>> <?= $pmssTopicLabel ?></label>
+<?php endforeach; ?>
+                            </div>
+                            <label for="h-support-email">Reply to</label>
+                            <input id="h-support-email" name="email" type="email" required value="<?= pmssWelcomeHtmlAttr(pmssWelcomeHomeSupportEmailDefault(dirname(__DIR__))) ?>">
+                            <p class="h-muted h-support-note">Keep passwords out of the text; common forms are removed before it is sent.<?= $homeCreditsKey ? '' : ' Opens in the client area.' ?></p>
+                            <button type="submit">Send</button>
+                            <p class="h-support-result" id="h-support-result" role="status" hidden></p>
+                        </form>
+                    </details>
                     <nav class="h-help">
+<?php if ((int) $billingServiceId > 0): ?>
+                        <a href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id=<?= (int) $billingServiceId ?>" target="_blank" rel="noopener">Your service in the client area</a>
+<?php endif; ?>
                         <a href="https://wiki.pulsedmedia.com/index.php/Getting_Started_with_the_Seedbox_Dashboard" target="_blank" rel="noopener">Getting started</a>
                         <a href="https://pulsedmedia.com/clients/knowledgebase.php" target="_blank" rel="noopener">Knowledge base</a>
                         <a href="https://wiki.pulsedmedia.com" target="_blank" rel="noopener">Wiki</a>
@@ -416,6 +437,27 @@ if (file_exists('openvpn-config.tgz')) {
                 }).catch(function () {});
         })();
 <?php endif; ?>
+
+        /* Get help: opens a ticket through the account's AI key (no credits spent); billing and accounts without a key go to the client area. */
+        function pmssSupportSend(form) {
+            var result = document.getElementById('h-support-result'), button = form.querySelector('button[type=submit]');
+            var topic = (form.querySelector('input[name=topic]:checked') || {}).value || 'working';
+            var clientArea = 'https://pulsedmedia.com/clients/submitticket.php';
+            var show = function (text, link) {
+                result.textContent = text;
+                if (link) { var a = document.createElement('a'); a.href = clientArea; a.target = '_blank'; a.rel = 'noopener'; a.textContent = ' Open the client area form'; result.appendChild(a); }
+                result.hidden = false;
+            };
+            if (topic === 'billing' || <?= $homeCreditsKey ? 'false' : 'true' ?>) { show('This one goes through the client area.', true); return false; }
+            button.disabled = true; show('Sending…', false);
+            var body = new URLSearchParams({topic: topic, text: form.text.value, email: form.email.value});
+            fetch('welcome.php?support=1', {method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+                .then(function (response) { return response.json(); })
+                .then(function (answer) { show(answer.message || 'Support could not be reached just now.', !answer.ok); if (answer.ok) form.text.value = ''; })
+                .catch(function () { show('Support could not be reached just now.', true); })
+                .then(function () { button.disabled = false; });
+            return false;
+        }
     </script>
 </body>
 </html>
@@ -1068,6 +1110,9 @@ function pmssWelcomeHomeCss()
 .h-foot{margin:10px 0 0;color:var(--muted);font-size:12px}
 /* What's new */
 .h-news{list-style:none;margin:0;padding:0}
+.h-get-help{margin:0 0 10px}.h-get-help summary{display:inline-block;cursor:pointer;background:var(--accent);color:#06121b;font-weight:600;border-radius:7px;padding:6px 12px;list-style:none}.h-get-help summary::-webkit-details-marker{display:none}
+.h-get-help form{display:grid;gap:6px;margin-top:10px}.h-get-help label{color:var(--muted);font-size:12px}.h-get-help textarea,.h-get-help input[type=email]{box-sizing:border-box;width:100%;background:#0b1118;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 8px;font:inherit}
+.h-support-topics{display:flex;flex-wrap:wrap;gap:4px 12px}.h-support-topics label{color:var(--text)}.h-support-note{margin:0;font-size:12px}.h-get-help button{justify-self:start;background:var(--accent);color:#06121b;border:0;border-radius:7px;padding:6px 14px;font-weight:600;cursor:pointer}.h-support-result{margin:0}.h-support-result a{margin-left:4px}
 .h-news li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line)}
 .h-news-part+.h-news-part{margin-top:12px}.h-news-sub{margin:0 0 4px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}.h-news-sub a{margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0}
 .h-news li:first-child{border-top:0;padding-top:0}
@@ -1620,6 +1665,88 @@ function pmssWelcomeHomeCreditsEmit($home)
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
     echo json_encode(pmssWelcomeHomeCreditsRead($home));
+}
+/* Get help (operator 2026-10-22: "build a open support ticket form, which is, it looks like normal ... just get this
+ * released"). Step one: a plain ticket through the AI-key ticket route (pulsedmedia.com/remote/ticket.php); it spends
+ * no AI credits. Without a usable key, and for billing, the client-area form. Pikkumies-first comes in step two. */
+
+/** The topics on the form; billing goes to the client area, never through the key route (it carries no account authority). */
+function pmssWelcomeHomeSupportTopics()
+{
+    return array('working' => 'Not working', 'slow' => 'Slow', 'down' => 'Server down', 'billing' => 'Billing / account');
+}
+
+/** Common password and key forms removed before anything leaves the account. */
+function pmssWelcomeHomeSupportRedact($text)
+{
+    $text = preg_replace('/\b(vsk|sk|pk|ghp|gho|xox[abpr])[-_][A-Za-z0-9_-]{12,}/', '[removed key]', (string) $text);
+    // After ":" or "=" any value of 4+ characters goes; after "is" only one with a digit, so "password is not working" stays.
+    $text = preg_replace('/\b(pass(word|wd)?|pwd|secret|token|api[-_ ]?key)(\s*[:=]\s*)\S{4,}/i', '$1$3[removed]', $text);
+    return preg_replace('/\b(pass(word|wd)?|pwd|secret|token|api[-_ ]?key)(\s+is\s+)(?=\S*[0-9])\S+/i', '$1$3[removed]', $text);
+}
+
+/** The ticket request: subject from the topic and the first line, message with where it came from. */
+function pmssWelcomeHomeSupportRequestBuild($topic, $text, $email)
+{
+    $topics = pmssWelcomeHomeSupportTopics();
+    $label = isset($topics[$topic]) ? $topics[$topic] : 'Other';
+    $clean = trim(pmssWelcomeHomeSupportRedact(str_replace(array("\r\n", "\r"), "\n", (string) $text)));
+    $first = trim((string) strtok($clean, "\n"));
+    if (function_exists('mb_strimwidth')) $first = mb_strimwidth($first, 0, 80, '…', 'UTF-8');
+    else $first = strlen($first) > 80 ? substr($first, 0, 79).'…' : $first;
+    return array('email' => trim((string) $email), 'subject' => $label.': '.$first,
+        'message' => $clean."\n\n(Sent from the panel's Get help form, topic: ".$label.')', 'priority' => 'Medium');
+}
+
+/** What the customer is told for each answer of the ticket route. */
+function pmssWelcomeHomeSupportAnswer($code, $body)
+{
+    $data = is_string($body) ? json_decode($body, true) : null;
+    $ticket = is_array($data) && isset($data['ticket']) && preg_match('/^[A-Za-z0-9-]{1,32}$/D', (string) $data['ticket']) ? (string) $data['ticket'] : '';
+    if ($code === 201) return array('ok' => true, 'ticket' => $ticket, 'message' => $ticket !== '' ? 'Ticket #'.$ticket.' opened. You can follow it in the client area.' : 'Your ticket was opened. You can follow it in the client area.');
+    $map = array(
+        401 => 'The email or the account key was not accepted. Use the email of your Pulsed Media account.',
+        429 => 'Too many tickets were opened just now. Try again later, or use the client area.',
+        413 => 'The message is too long. Shorten it and send again.',
+        400 => 'The ticket could not be opened as written. Check the text and the email.',
+    );
+    return array('ok' => false, 'ticket' => '', 'message' => isset($map[$code]) ? $map[$code] : 'Support could not be reached just now. Use the client area or email support@pulsedmedia.com.');
+}
+
+/** POST welcome.php?support=1 (XHR only, ADR 0133): opens the ticket, answers JSON. Never echoes the key. */
+function pmssWelcomeHomeSupportEmit($home)
+{
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    if (function_exists('pmssFrontendPostActionRequired')) pmssFrontendPostActionRequired();
+    elseif (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || strcasecmp((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') !== 0) { http_response_code(403); exit; }
+    $topic = isset($_POST['topic']) && is_string($_POST['topic']) ? $_POST['topic'] : '';
+    $text = isset($_POST['text']) && is_string($_POST['text']) ? $_POST['text'] : '';
+    $email = isset($_POST['email']) && is_string($_POST['email']) ? $_POST['email'] : '';
+    $credentials = pmssWelcomeHomeCreditsKeyRead($home);
+    if ($topic === 'billing' || $credentials === null) {
+        echo json_encode(array('ok' => false, 'ticket' => '', 'clientArea' => true, 'message' => 'Open this one in the client area.'));
+        return;
+    }
+    if (trim($text) === '' || (function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text)) > 8000 || !filter_var(trim($email), FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(array('ok' => false, 'ticket' => '', 'message' => 'Write what is wrong (up to 8000 characters) and a valid email.'));
+        return;
+    }
+    $body = json_encode(pmssWelcomeHomeSupportRequestBuild($topic, $text, $email), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $context = stream_context_create(array('http' => array('method' => 'POST', 'timeout' => 30, 'ignore_errors' => true, 'content' => $body,
+        'header' => "Authorization: Bearer ".$credentials['key']."\r\nContent-Type: application/json\r\nAccept: application/json\r\n")));
+    $raw = @file_get_contents('https://pulsedmedia.com/remote/ticket.php', false, $context, 0, 65536);
+    $code = isset($http_response_header[0]) && preg_match('#^HTTP/\S+\s+(\d{3})#', $http_response_header[0], $m) ? (int) $m[1] : 0;
+    echo json_encode(pmssWelcomeHomeSupportAnswer($code, $raw));
+}
+
+/** The account's notification email, to prefill the form (a regular own file only). */
+function pmssWelcomeHomeSupportEmailDefault($home)
+{
+    $file = rtrim((string) $home, '/').'/.notifyEmail';
+    if (!is_file($file) || is_link($file) || filesize($file) > 512) return '';
+    $email = trim((string) @file_get_contents($file));
+    return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
 }
 
 ?>

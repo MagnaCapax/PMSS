@@ -319,4 +319,100 @@ final class WelcomeHomeTest extends TestCase
         $this->assertSame(false, $byId['sonarr']['open']);
         $this->assertSame(false, $byId['radarr']['open'], 'An app without a URL has nothing to open');
     }
+
+    public function testSupportRedactRemovesPasswordsAndKeysButKeepsOrdinaryText(): void
+    {
+        $ordinary = "rTorrent stopped after the update.\nPassing traffic is slow since Monday.\nMy password is not working, the token is expired. Pass: 2 of 3.";
+        $result = $this->runWelcomeHome('echo json_encode(array_map("pmssWelcomeHomeSupportRedact", '.var_export(array(
+            'password' => 'password: hunter2',
+            'pwd' => 'my pwd is abc123',
+            'key' => 'see vsk-abcdefghij0123456789 here',
+            'ordinary' => $ordinary,
+        ), true).'));');
+
+        $this->assertSame('password: [removed]', $result['password']);
+        $this->assertSame('my pwd is [removed]', $result['pwd']);
+        $this->assertSame('see [removed key] here', $result['key']);
+        $this->assertSame($ordinary, $result['ordinary']);
+        $this->pmssAssertStringNotContainsString('hunter2', json_encode($result));
+        $this->pmssAssertStringNotContainsString('vsk-', json_encode($result));
+    }
+
+    public function testSupportRequestBuildTakesSubjectFromTopicAndFirstLine(): void
+    {
+        $long = str_repeat('x', 120);
+        $result = $this->runWelcomeHome('echo json_encode(array('
+            .'"down" => pmssWelcomeHomeSupportRequestBuild("down", "rTorrent stopped\r\nmore", "  user@example.test \n"),'
+            .'"long" => pmssWelcomeHomeSupportRequestBuild("working", '.var_export($long."\nsecond line", true).', "user@example.test"),'
+            .'"unknown" => pmssWelcomeHomeSupportRequestBuild("nonsense", "Something odd", "user@example.test")'
+            .'));');
+
+        $down = $result['down'];
+        $this->assertSame('Server down: rTorrent stopped', $down['subject']);
+        $this->assertSame('user@example.test', $down['email']);
+        $this->assertSame('Medium', $down['priority']);
+        $this->assertStringContainsAllStrings(array("rTorrent stopped\nmore", "(Sent from the panel's Get help form, topic: Server down)"), $down['message']);
+
+        $this->assertSame('Not working: '.str_repeat('x', 79).'…', $result['long']['subject'], 'A long first line is cut to 80 characters');
+        $this->assertStringContainsString($long."\nsecond line", $result['long']['message'], 'The message keeps the whole text');
+
+        $this->assertSame('Other: Something odd', $result['unknown']['subject']);
+        $this->assertStringContainsString('topic: Other)', $result['unknown']['message']);
+    }
+
+    public function testSupportAnswerTellsTheCustomerWhatHappened(): void
+    {
+        $cases = array(
+            'opened' => array(201, '{"ticket":"123456"}'),
+            'malformedTicket' => array(201, '{"ticket":"12 34<b>"}'),
+            'unauthorized' => array(401, '{"error":"unauthorized"}'),
+            'rateLimited' => array(429, ''),
+            'tooLong' => array(413, ''),
+            'badRequest' => array(400, '{"error":"bad"}'),
+            'unreachable' => array(0, false),
+            'serverError' => array(503, '<html>'),
+        );
+        $result = $this->runWelcomeHome('$result = array(); foreach ('.var_export($cases, true).' as $name => $case) {'
+            .' $result[$name] = pmssWelcomeHomeSupportAnswer($case[0], $case[1]); } echo json_encode($result);');
+
+        $this->assertSame(true, $result['opened']['ok']);
+        $this->assertSame('123456', $result['opened']['ticket']);
+        $this->assertStringContainsString('Ticket #123456 opened', $result['opened']['message']);
+
+        $this->assertSame(true, $result['malformedTicket']['ok']);
+        $this->assertSame('', $result['malformedTicket']['ticket']);
+        $this->pmssAssertStringNotContainsString('<b>', $result['malformedTicket']['message']);
+
+        $failures = array('unauthorized', 'rateLimited', 'tooLong', 'badRequest');
+        foreach (array_merge($failures, array('unreachable', 'serverError')) as $name) {
+            $this->assertSame(false, $result[$name]['ok'], $name);
+            $this->assertSame('', $result[$name]['ticket'], $name);
+        }
+        $this->assertStringContainsString('not accepted', $result['unauthorized']['message']);
+        $this->assertStringContainsString('Too many tickets', $result['rateLimited']['message']);
+        $this->assertStringContainsString('too long', $result['tooLong']['message']);
+        $this->assertStringContainsString('could not be opened as written', $result['badRequest']['message']);
+        $messages = array_map(function (string $name) use ($result): string { return $result[$name]['message']; }, $failures);
+        $this->assertSame(count($failures), count(array_unique($messages)), 'Each refusal has its own message');
+        foreach (array('unreachable', 'serverError') as $name) {
+            $this->assertStringContainsString('could not be reached', $result[$name]['message'], $name);
+        }
+    }
+
+    public function testSupportEmailDefaultReadsOnlyARegularFileWithAValidEmail(): void
+    {
+        $valid = $this->pmssMakeTempDir('pmss-welcome-support-', 0700);
+        $this->pmssWriteFile($valid.'/.notifyEmail', " user@example.test\n");
+        $invalid = $this->pmssMakeTempDir('pmss-welcome-support-', 0700);
+        $this->pmssWriteFile($invalid.'/.notifyEmail', "not an email\n");
+        $link = $this->pmssMakeTempDir('pmss-welcome-support-', 0700);
+        $this->pmssCreateSymlinkOrSkip($valid.'/.notifyEmail', $link.'/.notifyEmail');
+        $missing = $this->pmssMakeTempDir('pmss-welcome-support-', 0700);
+
+        $result = $this->runWelcomeHome('$result = array(); foreach ('.var_export(array(
+            'valid' => $valid, 'invalid' => $invalid, 'symlink' => $link, 'missing' => $missing,
+        ), true).' as $name => $home) { $result[$name] = pmssWelcomeHomeSupportEmailDefault($home); } echo json_encode($result);');
+
+        $this->assertSame(array('valid' => 'user@example.test', 'invalid' => '', 'symlink' => '', 'missing' => ''), $result);
+    }
 }

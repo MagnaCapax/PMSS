@@ -92,6 +92,74 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $this->assertStringNotContainsString('id="h-credits"', $loose['stdout']);
         });
     }
+
+    /** The Help card's Get help form renders with and without an AI key; only the key-less form says it opens in the client area. */
+    public function testWelcomeRendersGetHelpFormWithAndWithoutAKey(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $this->pmssWriteFile($home.'/.notifyEmail', "render@example.test\n");
+            $expectations = \pmssCustomerPanelRenderExpectations();
+            $form = array(
+                'id="h-support-form"',
+                'onsubmit="return pmssSupportSend(this)"',
+                '<input type="radio" name="topic" value="working" checked> Not working',
+                '<input type="radio" name="topic" value="slow"> Slow',
+                '<input type="radio" name="topic" value="down"> Server down',
+                '<input type="radio" name="topic" value="billing"> Billing / account',
+                '<input id="h-support-email" name="email" type="email" required value="render@example.test">',
+            );
+
+            $keyless = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+            $this->assertStringContainsAllStrings($form, $keyless);
+            $this->assertSame(4, substr_count($keyless, 'name="topic"'));
+            $this->assertStringContainsString('Opens in the client area.', $keyless);
+            $this->assertStringNotContainsString('vsk-', $keyless);
+
+            $key = $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1\nkey=vsk-".str_repeat('a', 24)."\n");
+            $this->assertTrue(chmod($key, 0600));
+            $keyed = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+            $this->assertStringContainsAllStrings($form, $keyed);
+            $this->assertStringNotContainsString('Opens in the client area.', $keyed);
+            $this->assertStringNotContainsString('vsk-', $keyed);
+
+            // The billing service page link appears only when the account knows its service id (the harness seeds 12345).
+            $this->assertStringContainsString('clientarea.php?action=productdetails&amp;id=12345" target="_blank" rel="noopener">Your service in the client area</a>', $keyed);
+            $this->assertTrue(unlink($home.'/.billingServiceId') && unlink($home.'/.billingId'));
+            $unbilled = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+            $this->assertStringNotContainsString('Your service in the client area', $unbilled);
+        });
+    }
+
+    /**
+     * An Eternals host shows the Pikkumies ask bar between Your account and Your apps.
+     * The real state reader needs a root-owned host marker, so the copied customer tree's reader is stubbed.
+     */
+    public function testWelcomeRendersPikkumiesAskBarWhenVisible(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $panel = $home.'/www/pikkumiesPanel.php';
+            $this->assertTrue(is_file($home.'/www/pikkumiesOpen.php'), 'The bar is offered only next to pikkumiesOpen.php');
+            $source = (string) file_get_contents($panel);
+            $this->assertStringContainsString('function pmssPikkumiesPanelStateRead(', $source);
+            $this->pmssWriteFile($panel, preg_replace('/\?>\s*$/', '', str_replace(
+                'function pmssPikkumiesPanelStateRead(', 'function pmssPikkumiesPanelStateReadReal(', $source))
+                ."\nfunction pmssPikkumiesPanelStateRead(\$home, \$name) { return array('visible' => true, 'origin' => 'https://example.test', 'mode' => 'simplified', 'off' => false); }\n");
+            $expectations = \pmssCustomerPanelRenderExpectations();
+
+            $html = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+
+            $this->assertStringContainsAllStrings(array(
+                '<div class="pmss-pikkumies-bar" id="pmss-pikkumies-bar">',
+                'Pikkumies is getting ready…</button>',
+                'var pmssPikkumiesBarOrigin = "https:\/\/example.test";',
+            ), $html);
+            $account = strpos($html, 'id="h-status-title"');
+            $bar = strpos($html, 'id="pmss-pikkumies-bar"');
+            $apps = strpos($html, 'id="h-apps-title"');
+            $this->assertTrue($account !== false && $bar !== false && $apps !== false, 'Account, bar and apps all render');
+            $this->assertTrue($account < $bar && $bar < $apps, 'The ask bar sits after Your account and before Your apps');
+        });
+    }
     public function testWelcomeTrafficUsageRendersWhenLimitFileIsMissing(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
