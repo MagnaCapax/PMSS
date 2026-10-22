@@ -50,6 +50,23 @@ class CustomerContextFatalScanTest extends TestCase
         $this->assertStringContainsString('etc/skel/bin/pmssToolLib.php:2 - pmssOperatorOnly() (operator tree definition: scripts/lib/operatorOnly.php)', $result['output']);
     }
 
+    public function testBracelessIfFunctionExistsIsAGuard(): void
+    {
+        $root = $this->pmssCustomerContextFixtureRoot([
+            'etc/skel/www/index.php' => "<?php\nfunction pmssLocalPath(string \$b): string\n{\n    if (function_exists('pmssOperatorPath')) return pmssOperatorPath(\$b);\n    return '';\n}\n",
+            'scripts/lib/operatorPath.php' => "<?php\nfunction pmssOperatorPath(string \$b): string { return \$b; }\n",
+        ]);
+        $this->assertSame(0, $this->pmssCustomerContextRunScan($root)['rc']);
+
+        foreach (["if (!function_exists('pmssOperatorPath')) return pmssOperatorPath(\$b);", "if (function_exists('pmssOperatorPath') || \$b === '') return pmssOperatorPath(\$b);"] as $line) {
+            $leak = $this->pmssCustomerContextFixtureRoot([
+                'etc/skel/www/index.php' => "<?php\nfunction pmssLocalPath(string \$b): string\n{\n    $line\n    return '';\n}\n",
+                'scripts/lib/operatorPath.php' => "<?php\nfunction pmssOperatorPath(string \$b): string { return \$b; }\n",
+            ]);
+            $this->assertSame(1, $this->pmssCustomerContextRunScan($leak)['rc'], $line);
+        }
+    }
+
     public function testIgnoresCommentsStringsMethodsAndConstructors(): void
     {
         $root = $this->pmssCustomerContextFixtureRoot([

@@ -207,11 +207,30 @@ final class PmssCustomerContextFatalScanner
         for ($i = $this->boundary($tokens, $call) + 1; $i < $call; $i++) {
             $guard = $this->functionExistsAt($tokens, $i, $guards);
             if ($guard === null) continue;
+            if (!$guard['negated'] && $this->bracelessIfGuards($tokens, $i, $call)) return true;
             for ($j = $guard['end'] + 1; $j < $call; $j++) {
                 $text = $this->text($tokens[$j]);
                 if ((!$guard['negated'] && ($this->is($tokens[$j], T_BOOLEAN_AND) || $text === '&&' || $text === '?'))
                     || ($guard['negated'] && ($this->is($tokens[$j], T_BOOLEAN_OR) || $text === '||'))
                 ) return true;
+            }
+        }
+        return false;
+    }
+
+    /** `if (function_exists('f')) f();`: the guard sits in the condition of a braceless if whose body holds the call. */
+    private function bracelessIfGuards(array $tokens, int $guard, int $call): bool
+    {
+        for ($i = $this->boundary($tokens, $call) + 1; $i < $guard; $i++) {
+            if (!$this->is($tokens[$i], T_IF)) continue;
+            $open = $this->walk($tokens, $i, 1);
+            if ($open === null || $this->text($tokens[$open]) !== '(') continue;
+            $depth = 0;
+            for ($j = $open; $j < $call; $j++) {
+                $text = $this->text($tokens[$j]);
+                if ($this->is($tokens[$j], T_BOOLEAN_OR) || $this->is($tokens[$j], T_LOGICAL_OR)) return false;
+                if ($text === '(') $depth++;
+                if ($text === ')' && --$depth === 0) return $j > $guard;
             }
         }
         return false;
