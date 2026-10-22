@@ -20,12 +20,13 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             }));
     }
 
-    public function testPinnedStaticEntryPreservesExactSystemDefault(): void
+    public function testPinnedStaticEntryPreservesSystemBuildWith016Default(): void
     {
         [$system, $entry] = $this->entries();
         $this->assertSame(['client' => 'rtorrent', 'version' => 'system', 'url' => [], 'sha256' => '',
             'kind' => 'system', 'compatFamily' => 'rtorrent', 'cve' => [], 'disabled' => false,
-            'isDefault' => true, 'binary' => '/usr/local/bin/rtorrent'], $system);
+            'isDefault' => false, 'binary' => '/usr/local/bin/rtorrent'], $system);
+        $this->assertTrue($this->entries()[2]['isDefault']);
         $this->assertSame('0.9.8-r16', $entry['version']);
         $this->assertSame('static', $entry['kind']);
         $this->assertSame('0.9.8', $entry['compatFamily']);
@@ -33,8 +34,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame('974c367b92eca69b85de8afde4937559b8396dc996694da2e7cb4fdc38dc8b40', $entry['sha256']);
         $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $entry['sha256']));
         $this->assertFalse($entry['isDefault']);
-        // Disabled until the bundled ruTorrent handles this build (ADR 0141 amendment).
-        $this->assertTrue($entry['disabled']);
+        // Offered again with the bundled ruTorrent compatibility patches (ADR 0142).
+        $this->assertFalse($entry['disabled']);
         $this->assertFalse(file_exists(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.enabled'));
     }
 
@@ -132,7 +133,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertStringContainsString("'rtorrent([ -]main)?'", $restart);
         $this->assertStringContainsString('screen -fa -d -m ./.rtorrentExecute.php', $restart);
     }
-    public function testRtorrent016EntryIsPinnedOptInAndLaunchesWithDeprecatedRedirects(): void
+    public function testRtorrent016EntryIsPinnedDefaultAndLaunchesWithDeprecatedRedirects(): void
     {
         $entry = $this->entries()[2];
         $this->assertSame('0.16.25', $entry['version']);
@@ -140,8 +141,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame('0.16', $entry['compatFamily']);
         $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-0.16.25-static-amd64-r1'], $entry['url']);
         $this->assertSame('84f2b40561f353249fa463d1f79a8d3f6c5ce886cbd974372d4e5553201e2f49', $entry['sha256']);
-        $this->assertFalse($entry['isDefault']);
-        $this->assertTrue($entry['disabled']);
+        $this->assertTrue($entry['isDefault']);
+        $this->assertFalse($entry['disabled']);
         $root = $this->pmssMakeTempDir('pmss-rtorrent-016-');
         $store = $root.'/clients';
         $projection = $root.'/catalog.json';
@@ -210,6 +211,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             if ($row['kind'] === 'system') continue;
             mkdir($store.'/rtorrent/'.$row['version'], 0755, true);
             file_put_contents($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\n");
+            // Model withdrawal independently of which versions the shipped catalog offers.
+            $row['disabled'] = $row['version'] !== '0.9.8-stickz7.2';
+            $row['isDefault'] = false;
             $rows[] = $row;
         }
         $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');

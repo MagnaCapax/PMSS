@@ -91,6 +91,19 @@ function pmssRtorrentExecutorCommand(
         .(pmssRtorrentDeprecatedRedirects(basename(dirname($binary)), $projectionPath) ? ' -D' : '');
 }
 
+/** Keep a failed store command on the system build until the resolved selection changes. */
+function pmssRtorrentExecutorFallbackCommand(string $command, string $lastFailedCommand, int $fastExits): string
+{
+    return $command === $lastFailedCommand && $fastExits >= 3 ? '/usr/local/bin/rtorrent' : $command;
+}
+
+/** Count only consecutive short runs of the same store command; a long run clears the count. */
+function pmssRtorrentExecutorFastExits(string $command, string $lastFailedCommand, int $fastExits, float $runtime): int
+{
+    if ($command === '/usr/local/bin/rtorrent' || $runtime >= 20) return 0;
+    return $command === $lastFailedCommand ? $fastExits + 1 : 1;
+}
+
 /** rTorrent 0.16 renamed rc and RPC commands; -D keeps the old names the template and ruTorrent use. */
 function pmssRtorrentDeprecatedRedirects(string $version, string $projectionPath): bool
 {

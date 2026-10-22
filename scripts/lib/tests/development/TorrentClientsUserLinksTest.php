@@ -22,7 +22,8 @@ final class TorrentClientsUserLinksTest extends TestCase
             exec($command, $output, $rc);
             return $rc === 0;
         };
-        $ops = ['root' => $root.'/store', 'homeRoot' => $root, 'run' => $run];
+        $ops = ['root' => $root.'/store', 'homeRoot' => $root, 'run' => $run,
+            'catalog' => dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json'];
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
         $versionLink = $home.'/bin/qbittorrent/5.1.0';
         $defaultLink = $home.'/bin/qbittorrent/default';

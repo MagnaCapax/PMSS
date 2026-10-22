@@ -58,15 +58,15 @@ final class TorrentClientsCatalogTest extends TestCase
         $this->assertSame([], $this->load([$entry]));
     }
 
-    public function testShippedManifestKeepsSystemDefaults(): void
+    public function testShippedManifestDefaultsToCuratedRtorrentAndTransmission(): void
     {
         $path = dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json';
         $defaults = array_values(array_filter(\pmssTorrentClientsCatalogLoad($path), static function ($entry) {
             return $entry['isDefault'];
         }));
-        // Pre-installed clients retain system defaults; Transmission has only curated static builds.
+        // qBittorrent and Deluge retain system defaults; rTorrent and Transmission use store builds.
         $this->assertSame(['qbittorrent', 'rtorrent', 'deluge', 'transmission'], array_column($defaults, 'client'));
-        $this->assertSame(['system', 'system', 'system', 'static'], array_column($defaults, 'kind'));
-        $this->assertSame(['system', 'system', 'system', '4.1.3'], array_column($defaults, 'version'));
+        $this->assertSame(['system', 'static', 'system', 'static'], array_column($defaults, 'kind'));
+        $this->assertSame(['system', '0.16.25', 'system', '4.1.3'], array_column($defaults, 'version'));
     }
 }

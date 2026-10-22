@@ -262,8 +262,16 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    The torrent-client store hook is dormant until
    `/etc/seedbox/config/torrentClients.enabled` exists. Without that marker it
    loads no store code and changes no downloads, links, or public projection.
-   With the marker, account version links and the public projection are prepared;
-   a customer default link is created only by the Configure switch (ADR 0106).
+   With the marker, account version links and the public projection are prepared.
+   The installed rTorrent store default also gets an account default link when
+   neither a selection nor a prior-switch `lastRun` record exists, its custom rc
+   is absent or matches the readable current skeleton, and all three ruTorrent
+   compatibility markers occur in regular non-symlink account files (ADR 0142).
+   Tenant checks run as the account. rTorrent defaults to 0.16.25, and jesec
+   0.9.8-r16 is offered again; qBittorrent and Deluge keep system defaults,
+   while Transmission stays opt-in.
+   After three consecutive store runs under 20 seconds, the rTorrent executor
+   uses the system build until its resolved selection changes.
    The catalog curates fourteen SHA-256-pinned userdocs x86_64 qBittorrent
    static builds, covering 4.3.9 through 5.2.4 with both libtorrent families
    (ADR 0124). Installed builds appear in the Configure picker through the

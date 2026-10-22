@@ -1,4 +1,9 @@
 <?php
+// Default seeding requires evidence of each bundled ruTorrent 0.16 compatibility patch.
+const PMSS_RUTORRENT_RPC_SETTINGS_MARKER = 'new rXMLRPCCommand("convert.kb", array(\'\', floatval(1024)))';
+const PMSS_RUTORRENT_RPC_HTTPRPC_MARKER = '$addReq = ($trusted && count($add))';
+const PMSS_RUTORRENT_RPC_ERASEDATA_MARKER = 'execute.nothrow={sh,-c,';
+
 /**
  * Return exact legacy-to-skeleton edits for existing accounts without a full refresh.
  *

@@ -84,3 +84,5 @@ Both entries are `disabled: true`. The projection no longer offers a disabled
 entry even when an earlier run installed it, so an account that selected one
 resolves to the system build again. The builds, the `-D` launch rule and the rc
 guard stay in place for when ruTorrent support for these builds lands.
+
+ADR 0142 re-enables both offers with ruTorrent 3.10 compatibility patches and guarded 0.16.25 default seeding.

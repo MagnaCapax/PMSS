@@ -24,6 +24,8 @@ if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
 
 writeLog('executor started');
 sleep((int) round(rand(2, 8))); // avoid flooding a bit.
+$rtorrentFailedCommand = '';
+$rtorrentFastExits = 0;
 
 // Infinite loop: start rTorrent and restart when it exits.
 while (true) {
@@ -46,6 +48,8 @@ while (true) {
       @include_once __DIR__.'/www/torrentClientsResolve.php';
       if (function_exists('pmssRtorrentExecutorCommand')) {
         $rtorrentCommand = pmssRtorrentExecutorCommand(__DIR__);
+        if ($rtorrentCommand !== $rtorrentFailedCommand) $rtorrentFastExits = 0;
+        $rtorrentCommand = pmssRtorrentExecutorFallbackCommand($rtorrentCommand, $rtorrentFailedCommand, $rtorrentFastExits);
       }
     }
   } catch (Throwable $error) {
@@ -55,9 +59,17 @@ while (true) {
   // Clear process runtime of the session, otherwise ... issues.
   system('rm -rf ~/session/rtorrent.*');
 
-  writeLog('starting rtorrent');
+  writeLog('starting rtorrent: '.$rtorrentCommand);
   $rtorrentRc = 0;
+  $rtorrentStartedAt = microtime(true);
   passthru($rtorrentCommand, $rtorrentRc);
+  // System fallback runs must not erase the failed selection's count.
+  if ($rtorrentCommand !== '/usr/local/bin/rtorrent') {
+    $rtorrentFastExits = pmssRtorrentExecutorFastExits($rtorrentCommand, $rtorrentFailedCommand,
+      $rtorrentFastExits, microtime(true) - $rtorrentStartedAt);
+    $rtorrentFailedCommand = $rtorrentCommand;
+    if ($rtorrentFastExits === 3) writeLog('rTorrent store build exited in under 20 seconds three times; using /usr/local/bin/rtorrent until selection changes');
+  }
   writeLog('rtorrent exited (rc='.$rtorrentRc.'); sleeping 5 seconds then restarting');
   sleep(5); // avoid overloading the server
 }
