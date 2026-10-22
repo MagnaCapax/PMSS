@@ -10,8 +10,10 @@
  * public name, or open an nginx port, so a new one fails CI instead of shipping silently.
  *
  * Rules (shipped tree only: etc/ and scripts/, tests excluded):
- *   R1  lives in scripts/lib/tests/development/NoForcedCertificateRequestStaticTest.php:
- *       only the ADR 0150 Decision 4 opt-in paths write `.request-web-certs`.
+ *   R1  `.request-web-certs` (the per-account certificate request flag) appears only in the
+ *       ADR 0150 Decision 4 opt-in files and the cron that consumes them. The static test
+ *       NoForcedCertificateRequestStaticTest pins the same set for the dev suite; this lint
+ *       also runs before a push.
  *   R2  certbot / ACME / DNS-update primitives appear only in the pinned files below.
  *   R3  an nginx `listen` uses only the ports PMSS already opens (80, 443, and 844-846 for
  *       the Pikkumies UIs on the host FQDN, ADR 0150 Decision 3) or a loopback address.
@@ -36,6 +38,13 @@ for ($i = 1; $i < count($argv); $i++) {
 }
 if ($root === false || !is_dir($root . '/scripts')) { fwrite(STDERR, "public-exposure-lint: cannot resolve repo root\n"); exit(2); }
 
+// R1: ADR 0150 Decision 4, the only writers of the certificate request flag, plus its consumer.
+$r1Pinned = [
+    'etc/skel/www/configureSettings.php',
+    'etc/skel/bin/createWebPublicCerts',
+    'scripts/lib/user/webCertFlags.php',
+    'scripts/cron/webPublicCertsProcess.php',
+];
 // R2: host certificate setup and renewal (ADR 0039 opt-in path, termination cleanup, package lists).
 $r2Pinned = [
     'etc/seedbox/config/root.cron',
@@ -77,6 +86,8 @@ $r5Callers = [
 ];
 
 $rules = [
+    'R1' => ['re' => '/\.request-web-certs/', 'pinned' => $r1Pinned,
+        'why' => 'requests a public certificate; ADR 0150 allows only the Configure page opt-in'],
     'R2' => ['re' => '/certbot|acme-challenge|\bnsupdate\b|acme\.sh/i', 'pinned' => $r2Pinned,
         'why' => 'certificate or DNS publishing primitive outside the pinned files'],
     'R4' => ['re' => '/[\'"]mcx\.fi:|\.mcx\.fi[\'"]/', 'pinned' => $r4Pinned,
@@ -110,7 +121,7 @@ foreach ($files as $file) {
     }
 }
 
-foreach (array_merge($r2Pinned, $r4Pinned, $r5Callers) as $pin) {
+foreach (array_merge($r1Pinned, $r2Pinned, $r4Pinned, $r5Callers) as $pin) {
     if (!is_file($root . '/' . $pin)) { $violations[] = "PIN {$pin} no longer exists; remove it from the pin list"; }
 }
 $violations = array_values(array_unique($violations));
