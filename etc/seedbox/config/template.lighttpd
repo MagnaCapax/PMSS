@@ -38,8 +38,9 @@ server.stream-request-body = 2
 index-file.names           = ( "index.php", "index.html",
                                "index.lighttpd.html" )
 url.access-deny            = ( "~", ".inc" )
-# Jellyfin lets local callers restart or stop it without authentication; every request through this proxy is local.
-$HTTP["url"] =~ "(?i)^/jellyfin/System/(Restart|Shutdown)" {
+# Jellyfin lets local callers restart it without authentication; every request through this proxy is local.
+# Jellyfin also serves these routes under its /emby and /mediabrowser aliases.
+$HTTP["url"] =~ "(?i)^/jellyfin(/(emby|mediabrowser))?/System/(Restart|Shutdown)" {
     url.access-deny = ( "" )
 }
 static-file.exclude-extensions = ( ".php", ".pl", ".fcgi" )
