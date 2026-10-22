@@ -338,30 +338,74 @@ PHP;
         $this->assertSame('unsafe_config_file', $reason);
     }
 
-    public function testRootlessDockerConfigShortWritePreservesExistingFile(): void
+    public function testRootlessDockerConfigWriteRunsAsAccountWhenRoot(): void
+    {
+        $script = <<<'PHP'
+namespace RootlessDockerAccountWriteFixture;
+function posix_geteuid() { return 0; }
+function posix_getpwuid($uid) { return ['gid' => 1002]; }
+function pmssAccountHomeIdentity($path) { return $GLOBALS['identity']; }
+function pmssReplaceAccountFile(...$args) { $GLOBALS['calls'][] = $args; return $GLOBALS['written']; }
+function pmssReplaceUserFile(...$args) { throw new \RuntimeException('Root must use the account writer'); }
+function pmssLockFilePathIsSafe($path) { return true; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerAccountWriteFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach ([
+    [1001, 1002, ['/srv/pmss-test-home', 'alice', 1001], true],
+    [1001, 1002, null, true],
+    [1003, 1002, ['/srv/pmss-test-home', 'alice', 1001], true],
+    [0, 1002, ['/home/root', 'root', 0], true],
+    [1001, 1003, ['/srv/pmss-test-home', 'alice', 1001], true],
+    [1001, 1002, ['/srv/pmss-test-home', 'alice', 1001], false],
+] as [$uid, $gid, $identity, $written]) {
+    $GLOBALS['identity'] = $identity;
+    $GLOBALS['written'] = $written;
+    $GLOBALS['calls'] = [];
+    $reason = 'old';
+    $ok = pmssUserRootlessDockerConfigWrite('/srv/pmss-test-home/.config/docker/daemon.json', '{}', $uid, $gid, $reason);
+    $results[] = [$ok, $reason, $GLOBALS['calls']];
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script);
+        $expectedCall = ['alice', '/srv/pmss-test-home', '/srv/pmss-test-home/.config/docker/daemon.json', '{}', 0600, true];
+        $this->assertSame([true, null, [$expectedCall]], $results[0]);
+        foreach ([1, 2, 3, 4] as $index) {
+            $this->assertSame([false, 'write_failed', []], $results[$index]);
+        }
+        $this->assertSame([false, 'write_failed', [$expectedCall]], $results[5]);
+    }
+
+    public function testRootlessDockerConfigFailedPublicationPreservesExistingFile(): void
     {
         $root = $this->pmssMakeTempDir('pmss-rootless-docker-short-write-');
         $script = <<<'PHP'
 namespace RootlessDockerConfigWriteFixture;
 PHP;
         $script .= $this->pmssInlinePhpAtomicPublicationShims('temp');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'RootlessDockerConfigWriteFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerConfigWriteFixture');
         $script .= <<<'PHP'
-$GLOBALS['mode'] = 'short';
+$GLOBALS['mode'] = getenv('PMSS_TEST_WRITE_FAILURE');
 $GLOBALS['tempCalls'] = 0;
 $path = getenv('PMSS_TEST_DOCKER_CONFIG_ROOT').'/daemon.json';
 \file_put_contents($path, '{"keep":true}');
 $reason = null;
 $result = pmssUserRootlessDockerConfigWrite($path, '{"exec-opts":[]}', 0, 0, $reason);
 echo json_encode(['result' => $result, 'reason' => $reason, 'bytes' => \file_get_contents($path),
-    'temporaryFiles' => glob(dirname($path).'/.daemon.json.*')]);
+    'temporaryFiles' => glob($path.'.pmss-tmp-*')]);
 PHP;
-        $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_DOCKER_CONFIG_ROOT' => $root]);
-
-        $this->assertFalse($result['result']);
-        $this->assertSame('write_failed', $result['reason']);
-        $this->assertSame('{"keep":true}', $result['bytes']);
-        $this->assertSame([], $result['temporaryFiles']);
+        foreach (['short', 'zero', 'false', 'temp', 'chmod', 'rename'] as $mode) {
+            $result = $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_DOCKER_CONFIG_ROOT' => $root, 'PMSS_TEST_WRITE_FAILURE' => $mode,
+            ]);
+            $this->assertFalse($result['result'], $mode);
+            $this->assertSame('write_failed', $result['reason'], $mode);
+            $this->assertSame('{"keep":true}', $result['bytes'], $mode);
+            $this->assertSame([], $result['temporaryFiles'], $mode);
+        }
     }
 
     private function assertDaemonConfigContainsCgroupfs(string $home): array

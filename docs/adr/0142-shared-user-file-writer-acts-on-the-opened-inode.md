@@ -84,9 +84,31 @@ The shared fault shims support both `tempnam`/`file_put_contents` and exclusive
 `fopen`/`fwrite` writers. Tests run on the development sandbox; deployment and
 live-host verification remain a separate release step.
 
+Rootless Docker `daemon.json` convergence also uses these existing boundaries.
+Root callers resolve the home account, match the requested UID and primary GID,
+and use `pmssReplaceAccountFile()` with mode `0600` and legacy-owner repair.
+Account callers use the shared opened-inode writer. Failed publication reports
+`write_failed` without changing the previous config; unsafe targets still report
+`unsafe_config_file`. Deluge's metadata-preserving writer and the skeleton-copy
+helper already dispatch through the shared/account writers and retain their
+existing ownership behavior. This applies ADR 0121 rather than adding a new
+ownership policy.
+
+The review considered Deluge's documented WebUI file-read and script-loading
+issues and runc's rootless cgroup write issue. Account-writable configuration
+can affect that account's daemon and files, so root config preparation must not
+inherit the authority of the calling cron or updater. No account or service
+credentials, listener addresses, or ports change in this batch. Docker configs
+remain account-owned and mode `0600`; failure reporting contains no config
+payload. Deluge's separate service credentials and existing config modes remain
+on their current writer paths.
+
 ## References
 
 - [ADR 0121: Root operations and account-controlled objects](0121-root-operations-and-account-controlled-objects.md)
 - [ADR 0046: Per-user config ownership classes](0046-provisioned-in-home-file-ownership-and-enforcement-classes.md)
 - [PHP fopen modes](https://www.php.net/manual/en/function.fopen.php)
 - [PHP fwrite return values](https://www.php.net/manual/en/function.fwrite.php)
+- [Deluge WebUI findings](https://securitylab.github.com/advisories/GHSL-2024-188_GHSL-2024-191_Deluge/)
+- [runc rootless cgroup write advisory](https://github.com/opencontainers/runc/security/advisories/GHSA-m8cg-xc2p-r3fc)
+- [Docker rootless mode](https://docs.docker.com/engine/security/rootless/)

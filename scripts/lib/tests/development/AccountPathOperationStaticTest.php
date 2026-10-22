@@ -81,6 +81,37 @@ final class AccountPathOperationStaticTest extends TestCase
         ]);
     }
 
+    public function testConfigAndSkeletonWritesKeepSharedWriterRouting(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/deluge.php', [
+            "pmssDelugeConfigFileWrite(\$configFile, \$updated, 'upload throttle')",
+            'pmssWriteUserFile($path, $content, $owner, $mode)',
+            'pmssReplaceUserFilePreservingMetadata($path, $content, 0644)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/userFileWrite.php', [
+            'function pmssReplaceUserFilePreservingMetadata(',
+            "pmssRootStageFileWrite(\$path, \$content, \$group['name'], \$mode)",
+            'pmssReplaceAccountFile($user, $home, $path, $content, $mode, true)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update.php', [
+            'pmssReadRegularFileContents((string) $sourceFile)',
+            'pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/rootlessDockerConfig.php', [
+            'pmssAccountHomeIdentity($configFile)',
+            '$identity[2] === $uid',
+            'pmssReplaceAccountFile($identity[1], $identity[0], $configFile, $json, 0600, true)',
+            'pmssReplaceUserFile($configFile, $json, static function (string $openedPath): bool',
+            '@chmod($openedPath, 0600)',
+        ]);
+        foreach (['scripts/lib/user/deluge.php', 'scripts/lib/update.php', 'scripts/lib/user/rootlessDockerConfig.php'] as $file) {
+            $source = $this->pmssReadRepoFile($file);
+            foreach (['tempnam(', 'rename(', 'copy('] as $operation) {
+                $this->assertStringNotContainsString($operation, $source, $file);
+            }
+        }
+    }
+
     public function testTransferSessionRewriteUsesVerifiedOpenInode(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userTransfer/sessionRewrite.php', [

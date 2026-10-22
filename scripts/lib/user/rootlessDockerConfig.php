@@ -2,7 +2,7 @@
 /** Rootless Docker daemon.json convergence helper. */
 
 require_once __DIR__.'/../runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['directories.php', 'log.php']);
+pmssRequireRelativeFiles(__DIR__, ['directories.php', 'log.php', '../lighttpd/userFileWrite.php']);
 
 /** Return true when daemon.json can be read or replaced safely. */
 function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
@@ -68,7 +68,7 @@ function pmssUserDockerLingerEnsureCommands(string $user, int $uid): array
     ];
 }
 
-/** Atomically write daemon.json without following unsafe existing targets. */
+/** Atomically replace daemon.json as its account; other callers use the opened-inode writer. */
 function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int $uid, int $gid, ?string &$reason = null): bool
 {
     $reason = null;
@@ -77,32 +77,20 @@ function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int
         return false;
     }
 
-    $directory = dirname($configFile);
-    $tempFile = @tempnam($directory, '.daemon.json.');
-    if (!is_string($tempFile)) {
-        $reason = 'temp_failed';
-        return false;
-    }
-
-    $ok = false;
     $isRoot = function_exists('posix_geteuid') && (int) @posix_geteuid() === 0;
-    if (!pmssFileWriteComplete($tempFile, $json)) {
-        $reason = 'write_failed';
-    } elseif ($isRoot && !@chown($tempFile, $uid)) {
-        $reason = 'chown_failed';
-    } elseif ($isRoot && !@chgrp($tempFile, $gid)) {
-        $reason = 'chgrp_failed';
-    } elseif (!@chmod($tempFile, 0600)) {
-        $reason = 'chmod_failed';
-    } elseif (!@rename($tempFile, $configFile)) {
-        $reason = 'rename_failed';
+    if ($isRoot) {
+        $identity = pmssAccountHomeIdentity($configFile);
+        $account = function_exists('posix_getpwuid') ? @posix_getpwuid($uid) : false;
+        // The account writer keeps all staging and publication under the account identity.
+        $ok = $uid > 0 && $identity !== null && $identity[2] === $uid
+            && is_array($account) && $account['gid'] === $gid
+            && pmssReplaceAccountFile($identity[1], $identity[0], $configFile, $json, 0600, true);
     } else {
-        $ok = true;
+        $ok = pmssReplaceUserFile($configFile, $json, static function (string $openedPath): bool {
+            return @chmod($openedPath, 0600);
+        });
     }
-
-    if (!$ok && is_file($tempFile)) {
-        @unlink($tempFile);
-    }
+    if (!$ok) $reason = 'write_failed';
     return $ok;
 }
 
