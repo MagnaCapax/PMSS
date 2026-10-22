@@ -183,4 +183,16 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame(1, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent main'));
         $this->assertSame(0, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent-disk'));
     }
+    public function testStickzForkEntryIsPinnedOptInZeroNineEightFamily(): void
+    {
+        $entry = $this->entries()[3];
+        $this->assertSame('0.9.8-stickz7.2', $entry['version']);
+        $this->assertSame('static', $entry['kind']);
+        // Same rc and process-name family as 0.9.8, so it launches without -D.
+        $this->assertSame('0.9.8', $entry['compatFamily']);
+        $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-stickz-7.2-static-amd64-r1'], $entry['url']);
+        $this->assertSame('726f9ce28d2675425d45a624b95957b22f2777d4ccacf3634e5f9f7da3cf003c', $entry['sha256']);
+        $this->assertFalse($entry['isDefault']);
+        $this->assertFalse($entry['disabled']);
+    }
 }

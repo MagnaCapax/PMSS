@@ -45,6 +45,15 @@ The main thread is named `rtorrent-main` instead of `rtorrent main`.
   from 0.16 stops it. The watchdogs already match the `^rtorrent` prefix, and
   the Configure switch identifies processes by executable path.
 
+The stickz/rtorrent community fork (v7.2, rTorrent 0.9.8 with libtorrent 0.13.8)
+is built the same way: static musl, XMLRPC via tinyxml2, async DNS via udns, from
+the release tag tarball (SHA-256
+`5091b54add2b913437512f4e10122423ada9408b2a101db2b6aae0814e569988`). It is hosted
+at `https://pulsedmedia.com/remote/pkg/rtorrent-stickz-7.2-static-amd64-r1`,
+SHA-256 `726f9ce28d2675425d45a624b95957b22f2777d4ccacf3634e5f9f7da3cf003c`, as
+`0.9.8-stickz7.2` with `compatFamily: 0.9.8`. It reports client version 0.9.8,
+so it takes the template's 0.9.8 branch and launches without `-D`.
+
 ## Consequences
 
 0.16.25 is a customer-selectable version wherever the client store is enabled.
