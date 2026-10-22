@@ -65,7 +65,8 @@ final class PmssCustomerContextFatalScanner
     {
         if (!is_dir($this->www)) return [];
 
-        $wwwFiles = array_merge($this->files($this->www, false), $this->binPhpFiles());
+        // ~/bin carries .php libraries next to the commands that require them (install-openclaw, docker-install-lsio).
+        $wwwFiles = array_merge($this->files($this->www, false), $this->files($this->skel.'/bin', false), $this->binPhpFiles());
         $customerDefs = $this->definitions(array_merge($this->files($this->skel, false), $wwwFiles));
         $operatorDefs = $this->definitions($this->files($this->root.'/scripts/lib', true));
         $violations = [];

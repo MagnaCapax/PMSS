@@ -31,6 +31,25 @@ class CustomerContextFatalScanTest extends TestCase
         $this->assertStringContainsString('[customer-context-fatal-scan] OK', $result['output']);
     }
 
+    public function testCountsSkelBinLibrariesAsCustomerPhp(): void
+    {
+        $root = $this->pmssCustomerContextFixtureRoot([
+            'etc/skel/www/index.php' => "<?php\necho 'ok';\n",
+            'etc/skel/bin/pmssToolLib.php' => "<?php\nfunction pmssToolLibValue(): string { return 'ok'; }\n",
+            'etc/skel/bin/tool' => "#!/usr/bin/env php\n<?php\nrequire_once __DIR__.'/pmssToolLib.php';\necho pmssToolLibValue();\n",
+        ]);
+        $this->assertSame(0, $this->pmssCustomerContextRunScan($root)['rc']);
+
+        $leak = $this->pmssCustomerContextFixtureRoot([
+            'etc/skel/www/index.php' => "<?php\necho 'ok';\n",
+            'etc/skel/bin/pmssToolLib.php' => "<?php\nfunction pmssToolLibValue(): string { return pmssOperatorOnly(); }\n",
+            'scripts/lib/operatorOnly.php' => "<?php\nfunction pmssOperatorOnly(): string { return 'x'; }\n",
+        ]);
+        $result = $this->pmssCustomerContextRunScan($leak);
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('etc/skel/bin/pmssToolLib.php:2 - pmssOperatorOnly() (operator tree definition: scripts/lib/operatorOnly.php)', $result['output']);
+    }
+
     public function testIgnoresCommentsStringsMethodsAndConstructors(): void
     {
         $root = $this->pmssCustomerContextFixtureRoot([
