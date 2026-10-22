@@ -70,9 +70,6 @@ $appsStatus = pmssCustomerAppsStatusRead($home, $username, $hostname);
 $billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
-$announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
-$articleItemsHtml      = pmssWelcomePanelFeedItemsHtmlBuild('article', 4);
-$wikiItemsHtml         = pmssWelcomePanelFeedItemsHtmlBuild('wiki', 10);
 $storageHealthNoticeHtml = pmssWelcomeStorageHealthNoticeHtmlRead();
 
 $guiFramesLocalOnly = is_file('../.guiFramesLocalOnly') && !is_link('../.guiFramesLocalOnly');
@@ -80,283 +77,100 @@ $usageAlertsPermissions = @fileperms('../.usageAlertsEnabled');
 $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAlertsEnabled')
     && is_int($usageAlertsPermissions) && ($usageAlertsPermissions & 0777) === 0600;
 
+
+// Welcome home view model (ADR 0147). Every number comes from an existing reader; nothing is recomputed here.
+if (isset($_GET['news'])) { pmssWelcomeHomeNewsEmit(dirname(__DIR__)); exit; }
+$homeTrafficState = pmssWelcomeHomeTrafficStateBuild(
+    pmssWelcomeSerializedArrayRead('../.trafficData'),
+    pmssWelcomeSerializedArrayRead('../.trafficDataIngress'),
+    $trafficLimitState,
+    $trafficBandwidthState
+);
+$homeQuotaState = pmssWelcomeHomeQuotaStateBuild($quotaInfo);
+$homeMemoryState = function_exists('pmssWelcomeMemoryStateBuild') ? pmssWelcomeMemoryStateBuild() : array();
+$homeAgentFirst = pmssWelcomeHomeAgentFirst($appsStatus);
+$homeAlertsHtml = $storageHealthNoticeHtml
+    .pmssWelcomeHomeAlertsHtmlBuild($homeQuotaState, $homeTrafficState, $homeMemoryState, $trafficBandwidthState, $billingServiceId);
+$homeStatusChipsHtml = pmssWelcomeHomeStatusChipsHtmlBuild($bonusDisplayState, $billingServiceId);
+$homeMetricsHtml = pmssWelcomeHomeQuotaMetricHtmlBuild($homeQuotaState, $billingServiceId)
+    .pmssWelcomeHomeTrafficMetricHtmlBuild($homeTrafficState, $billingServiceId)
+    .pmssWelcomeHomeMemoryMetricHtmlBuild($homeMemoryState)
+    .pmssWelcomeHomeServerMetricHtmlBuild();
+$homeApps = pmssWelcomeHomeAppsBuild($appsStatus, $homeAgentFirst);
+$homeAppsHtml = pmssWelcomeHomeAppsHtmlBuild($homeApps);
+
+$homeConnectHtml = pmssWelcomeHomeConnectHtmlBuild($username, $appsStatus, $homeAgentFirst);
+$homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
+
 ?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <script>var u = new URL(location.href); if (u.username || u.password) { u.username = ''; u.password = ''; location.replace(u.href); }</script>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title><?= $vendor['name']; ?> Seedbox</title>
-    <!-- Stylesheets -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><?= pmssWelcomeHtmlAttr($vendor['name']); ?> Seedbox</title>
     <link href="screen.css" rel="stylesheet" type="text/css" media="screen" />
-    <!-- Javascript -->
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script type="text/javascript"><?= pmssActionScriptJs() ?></script>
     <?= pmssCustomerAppsCss() ?>
+    <script type="text/javascript">function pmssWelcomeTabOpen(hash, link) { try { var tab = window.parent !== window ? window.parent.document.querySelector('a[href="' + hash + '"]') : null; if (tab) { tab.click(); return false; } } catch (e) {} return true; }</script>
     <style type="text/css">
-        .pmss-pikkumies-bar {flex:0 0 100%;box-sizing:border-box;margin:0 0 10px;max-width:100%;color-scheme:dark;}
-        /* The bar page draws the one visible box (and its focus ring); the frame is a borderless window onto it. */
-        .pmss-pikkumies-bar button,.pmss-pikkumies-bar iframe {box-sizing:border-box;display:block;width:100%;height:52px;}
-        .pmss-pikkumies-bar button {border:1px solid #2e3b4f;border-radius:8px;background:#000;color:#8b949e;padding:0 14px;text-align:left;font:16px system-ui;cursor:pointer;}
-        .pmss-pikkumies-bar button:focus-visible {outline:2px solid #9dd8f5;outline-offset:2px;}
-        .pmss-pikkumies-bar iframe {border:0;background:transparent;}
-        .pmss-bonus-banner {
-            flex: 0 0 100%;
-            box-sizing: border-box;
-            margin: 0 0 8px;
-            padding: 18px 20px;
-            border: 1px solid #4fc3f7;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #12334a 0%, #1d3d55 100%);
-            color: #ffffff;
-            text-align: center;
-        }
-
-        .pmss-bonus-banner strong {
-            display: block;
-            font-size: 2.4rem;
-            letter-spacing: 0.04em;
-            line-height: 1.1;
-        }
-
-        #pmss-action-notice {
-            display: none;
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 9999;
-            max-width: 580px;
-            padding: 8px 12px;
-            border: 1px solid #78a5d6;
-            background-color: #edf4ff;
-            color: #1a3d66;
-            font-weight: bold;
-        }
-        #pmss-action-notice.pmss-error {
-            border-color: #cc8f8f;
-            background-color: #fff1f1;
-            color: #7a1a1a;
-        }
-        .pmss-action-loading {
-            margin-left: 6px;
-            color: #666;
-            font-size: 0.9em;
-        }
-        .pmss-media-stack-box {
-            margin: 10px 0 14px;
-            padding: 12px 14px;
-            border: 1px solid #78a5d6;
-            background: #edf4ff;
-            color: #1a3d66;
-        }
-        .pmss-media-stack-state-installed {
-            border-color: #6aaf71;
-            background: #edf9ef;
-            color: #234f27;
-        }
-        .pmss-media-stack-state-failed,
-        .pmss-media-stack-state-blocked {
-            border-color: #cc8f8f;
-            background: #fff1f1;
-            color: #7a1a1a;
-        }
-        .pmss-media-stack-box ul {
-            margin: 8px 0 0 18px;
-        }
-        .pmss-media-stack-apps {
-            margin-left: 0 !important;
-            padding-left: 0;
-            list-style: none;
-        }
-        .pmss-media-stack-apps li {
-            margin-top: 6px;
-        }
-        .pmss-media-stack-auth-badge {
-            display: inline-block;
-            min-width: 64px;
-            margin: 0 6px;
-            padding: 2px 6px;
-            border: 1px solid #999;
-            border-radius: 4px;
-            background: #fff;
-            font-weight: bold;
-            text-align: center;
-        }
-        .pmss-media-stack-auth-badge-protected {
-            border-color: #3f8f48;
-            background: #dff3e2;
-            color: #234f27;
-        }
-        .pmss-media-stack-auth-badge-exposed {
-            border-color: #b66a6a;
-            background: #ffe8e8;
-            color: #7a1a1a;
-        }
-        .pmss-media-stack-secure {
-            margin-left: 6px;
-        }
-        .pmss-core-service-status {
-            display: inline-block;
-            margin-left: 6px;
-            vertical-align: middle;
-        }
-        .pmss-media-stack-box pre {
-            margin-top: 10px;
-            max-height: 220px;
-            overflow: auto;
-            padding: 10px;
-            background: #fff;
-            border: 1px solid #c8d7eb;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        .pmss-raid-notice {
-            margin: 12px 0 18px;
-            padding: 12px 14px;
-            border: 1px solid #d8a55a;
-            background: #fff6e5;
-            color: #5f3b00;
-        }
-        .pmss-raid-notice-error {
-            border-color: #cc8f8f;
-            background: #fff1f1;
-            color: #7a1a1a;
-        }
-        .pmss-raid-notice p {
-            margin: 8px 0 0;
-        }
-        .pmss-raid-icon {
-            color: #b22222;
-            margin-right: 6px;
-        }
-        .pmss-raid-meta {
-            margin-top: 8px;
-            font-weight: bold;
-        }
-        .pmss-traffic-disclosure {
-            margin-top: 8px;
-            padding: 8px 10px;
-            border: 1px solid #d8a55a;
-            background: #fff6e5;
-            color: #5f3b00;
-            line-height: 1.45;
-        }
-        /* Feed rows are one line at every width: the right column measures 451px at 1280 and
-           277px at 768, so truncation must be CSS, not a PHP character budget. */
-        .pmss-feed-list { margin: 0 0 6px 0; padding-left: 1.1em; }
-        .pmss-feed-row {
-            /* markers INSIDE: overflow:hidden clips an outside marker, which would silently
-               strip the bullets the Announcements list already had. */
-            list-style-position: inside;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-        }
-        .pmss-traffic-disclosure-active {
-            border-color: #cc8f8f;
-            background: #fff1f1;
-            color: #7a1a1a;
-        }
+<?= pmssWelcomeHomeCss() ?>
     </style>
-    <script type="text/javascript">
-
-
-        function pmssGuiFramesModeApply(button, mode) {
-            pmssSetActionLoading(button, true);
-            pmssShowActionNotice('Saving frame source preference...', false);
-            $.ajax({
-                url: 'index.php',
-                type: 'POST',
-                cache: false,
-                headers: {'X-Requested-With': 'XMLHttpRequest'},
-                data: {guiFramesMode: mode},
-                success: function() {
-                    window.top.location.reload(true);
-                },
-                error: function() {
-                    pmssSetActionLoading(button, false);
-                    pmssShowActionNotice('Frame source preference could not be saved.', true);
-                }
-            });
-        }
-
-        function pmssUsageAlertsModeApply(button, mode) {
-            pmssSetActionLoading(button, true);
-            pmssShowActionNotice('Saving usage alert preference...', false);
-            $.ajax({
-                url: 'index.php',
-                type: 'POST',
-                cache: false,
-                headers: {'X-Requested-With': 'XMLHttpRequest'},
-                data: {usageAlertsMode: mode},
-                success: function() {
-                    window.setTimeout(function() { location.reload(true); }, 500);
-                },
-                error: function() {
-                    pmssSetActionLoading(button, false);
-                    pmssShowActionNotice('Usage alert preference could not be saved.', true);
-                }
-            });
-        }
-
-        function pmssWelcomeActionSubmit(form) {
-            $.ajax({
-                url: form.action,
-                type: 'POST',
-                headers: {'X-Requested-With': 'XMLHttpRequest'},
-                data: $(form).serialize(),
-                success: function(html) { document.open(); document.write(html); document.close(); },
-                error: function() { pmssShowActionNotice('Action could not be completed.', true); }
-            });
-            return false;
-        }
-
-    </script>
-
 </head>
-<body>
+<body class="h-body">
     <div id="pmss-action-notice" role="status" aria-live="polite"></div>
-    <div id="wrap">
-        <div id="full_page">
-            <div class="full_top_nohd"><!-- top design --></div>
-            <div class="full_body">
-                <div class="portfoliobox">
-                    <?php if ($pmssPikkumiesState['visible']): ?>
-                    <div class="pmss-pikkumies-bar" id="pmss-pikkumies-bar">
-                        <button type="button" id="pmss-pikkumies-bar-disabled" aria-disabled="true" title="Click to see what is happening" onclick="pmssPikkumiesTabOpen()">Pikkumies is getting ready…</button>
-                    </div>
-                    <?php endif; ?>
-                    <div class="pmss-bonus-banner" role="status">
-                        <strong><?php echo pmssCustomerHtmlAttr(pmssCustomerBonusDisplayTextBuild($bonusDisplayState)); ?></strong>
-                        <?php if ($bonusDisplayNote !== ''): ?><small class="pmss-bonus-note"><?php echo pmssCustomerHtmlAttr($bonusDisplayNote); ?></small><?php endif; ?>
-                    </div>
-                    <div class="portfolioimg">
-                        <?php
-                        echo $welcomeHeadingHtml;
-                        echo $storageHealthNoticeHtml;
-                        ?>
-                        <h6>Basic Usage</h6>
-                        <p><b>watch directory</b><br />
-                           &nbsp; just upload torrents to this directory to start them automatically.
-                        </p>
-                        <ul>
-                            <li><a href="rutorrent/">access ruTorrent</a></li>
-                            <li><a href="data/"><b>access Data directory directly for HTTP downloads</b></a></li>
-                            <hr />
-                            <li><a href="https://www.putty.org/" target="_blank">Download PuTTY (SSH access)</a></li>
-                            <li><a href="https://winscp.net/eng/download.php" target="_blank">Download WinSCP (SFTP/SCP access)</a></li>
-                        </ul>
-                        <b>SFTP/FTP Client options</b>
-                        <ul>
-                            <li><a href="https://filezilla-project.org/download.php?platform=win64" target="_blank">FileZilla - Popular opensource client</a></li>
-                        </ul>
-
-<?php if ($pmssConfigureAvailable): ?>
-                        <h6>Apps and settings</h6>
-                        <p>Start, stop and restart your apps, and change account settings, in the ⚙ Configure tab.</p>
-                        <p><a href="configure.php" style="display:inline-block;padding:8px 14px;background:#3a3f4b;color:#fff;text-decoration:none;border-radius:4px" onclick="try { var a = window.parent.document.querySelector('a[href=&quot;#pmssconfigure&quot;]'); if (a) { a.click(); return false; } } catch (e) {}">Open Configure</a></p>
-<?php else: ?>
+    <main class="h" data-user="<?= pmssWelcomeHtmlAttr($username) ?>">
+<?php if ($homeAlertsHtml !== ''): ?>
+        <section class="h-alerts" aria-label="Alerts"><?= $homeAlertsHtml ?></section>
+<?php endif; ?>
+        <section class="h-card h-status" aria-labelledby="h-status-title">
+            <div class="h-status-head">
+                <h1 id="h-status-title" class="h-label">Your account</h1>
+                <div class="h-chips"><?= $homeStatusChipsHtml ?></div>
+            </div>
+            <div class="h-metrics"><?= $homeMetricsHtml ?></div>
+        </section>
+<?php if ($pmssPikkumiesState['visible']): ?>
+        <div class="h-ask">
+            <div class="pmss-pikkumies-bar" id="pmss-pikkumies-bar">
+                <button type="button" id="pmss-pikkumies-bar-disabled" aria-disabled="true" title="Click to see what is happening" onclick="pmssPikkumiesTabOpen()">Pikkumies is getting ready…</button>
+            </div>
+        </div>
+<?php endif; ?>
+        <div class="h-main">
+            <div class="h-col">
+                <section class="h-card" aria-labelledby="h-apps-title">
+                    <div class="h-head"><h2 id="h-apps-title" class="h-label">Your apps</h2><a class="h-head-link" href="configure.php#apps" onclick="return pmssWelcomeTabOpen('#pmssconfigure', this)">Manage apps</a></div>
+                    <?= $homeAppsHtml ?>
+                </section>
+                <?= $homeConnectHtml ?>
+            </div>
+            <div class="h-col">
+                <section class="h-card" aria-labelledby="h-news-title">
+                    <div class="h-head"><h2 id="h-news-title" class="h-label">What's new</h2><a class="h-head-link" href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">All news</a></div>
+                    <div id="h-news" data-src="welcome.php?news=1"><?= $homeNewsHtml ?></div>
+                </section>
+<?php if (trim(strip_tags($welcomeHeadingHtml)) !== ''): ?>
+                <section class="h-card h-tip" aria-label="Tip"><?= $welcomeHeadingHtml ?></section>
+<?php endif; ?>
+                <section class="h-card" aria-labelledby="h-help-title">
+                    <h2 id="h-help-title" class="h-label">Help</h2>
+                    <nav class="h-help">
+                        <a href="https://wiki.pulsedmedia.com/index.php/Getting_Started_with_the_Seedbox_Dashboard" target="_blank" rel="noopener">Getting started</a>
+                        <a href="https://pulsedmedia.com/clients/knowledgebase.php" target="_blank" rel="noopener">Knowledge base</a>
+                        <a href="https://wiki.pulsedmedia.com" target="_blank" rel="noopener">Wiki</a>
+                        <a href="https://discord.gg/cGBz52HJtx" target="_blank" rel="noopener">Discord</a>
+                        <a href="mailto:support@pulsedmedia.com">support@pulsedmedia.com</a>
+                        <a href="mailto:billing@pulsedmedia.com">billing@pulsedmedia.com</a>
+                    </nav>
+                </section>
+            </div>
+        </div>
+<?php if (!$pmssConfigureAvailable): ?>
+        <section class="h-card h-legacy" aria-labelledby="h-legacy-title">
+            <h2 id="h-legacy-title" class="h-label">Apps and settings</h2>
                         <h6>Usage alert email</h6>
                         <p>Opt in to email when traffic reaches 80% of the monthly allowance, disk usage reaches 90% of quota, or a monitored media-stack service is reported down. Alerts reset after the condition clears.</p>
                         <input type="button" name="usageAlertsMode" value="<?php echo $usageAlertsEnabled ? 'Disable usage alert email' : 'Enable usage alert email'; ?>" onClick="pmssUsageAlertsModeApply(this, '<?php echo $usageAlertsEnabled ? 'disabled' : 'enabled'; ?>');" />
@@ -414,92 +228,115 @@ if (file_exists('openvpn-config.tgz')) {
                         <h6>Panel frame source<?php echo pmssCustomerContextualHelpLinkBuild('panelFrameSource'); ?></h6>
                         <p>Remote-updated frame definitions are the default. Local definitions avoid that frame-definition request, but receive navigation changes only with server PMSS updates. Other panel content may still use remote resources.</p>
                         <input type="button" name="guiFramesMode" value="<?php echo $guiFramesLocalOnly ? 'Use remote-updated frames' : 'Use local frame definitions'; ?>" onClick="pmssGuiFramesModeApply(this, '<?php echo $guiFramesLocalOnly ? 'remote' : 'local'; ?>');" />
+        </section>
 <?php endif; ?>
-
-                    </div>
-
-                    <div class="portfoliodesc">
-                        <?php
-                        echo quotaCreateSection($quotaInfo, $bonusQuota, $bonusDisplayState);
-
-                        $trafficLimit = (int) $trafficLimitState['limitGiB'];
-                        $trafficData = pmssWelcomeSerializedArrayRead('../.trafficData');
-                        if ($trafficData !== null) {
-                            trafficCreateSection($trafficData, $trafficLimit, pmssWelcomeSerializedArrayRead('../.trafficDataIngress'), $bonusTraffic, $trafficBandwidthState, $billingServiceId);
-                        } elseif (@file_exists('../.trafficLimit')) {
-                            if ($trafficLimit > 0) {
-                                $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
-                                $trafficLimitText = number_format($effectiveLimit) . ' GiB';
-                                if ($bonusTraffic > 0) {
-                                    $trafficLimitText .= ' (Bonus traffic: ' . number_format($bonusTraffic) . ' GiB)';
-                                }
-                            } else {
-                                $trafficLimitText = 'Unlimited';
-                            }
-                            echo "Traffic limit: {$trafficLimitText}<br />";
-                            echo pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId).'<br />';
-                        }
-
-                        echo pmssWelcomeMemorySectionHtmlBuild();
-                        echo pmssWelcomeServerInfoHtmlBuild();
-
-                        if ($billingServiceId > 0) {
-                            echo <<<EOF
-                            <h6>Need more resources?</h6>
-                    <p>Need more disk space, traffic, or RAM?</p>
-                            <p>You can upgrade fast and easy — activation usually within few minutes! Just check out your <a href="https://pulsedmedia.com/clients/upgrade.php?type=configoptions&id={$billingServiceId}" target="_blank">Upgrade Options!</a></p>
-EOF;
-                        }
-                        ?>
-
-                        <h6>Announcements</h6>
-                        <ul>
-<?php
-echo $announcementItemsHtml;
-?>
-                        </ul>
-
-<?php
-// Two dense, title-only blocks, placed directly beneath Announcements so the three feed blocks
-// read as one group. Each renders only if its source produced rows, so a failed fetch leaves no
-// empty heading behind. They occupy what was eight <br/> of dead space (~144px) further down.
-if ($articleItemsHtml !== '') {
-    echo "                        <h6>Latest Writing</h6>\n                        <ul class=\"pmss-feed-list\">\n"
-       . $articleItemsHtml
-       . "                        </ul>\n";
-}
-if ($wikiItemsHtml !== '') {
-    echo "                        <h6>Wiki Updates</h6>\n                        <ul class=\"pmss-feed-list\">\n"
-       . $wikiItemsHtml
-       . "                        </ul>\n";
-}
-?>
-
-                        <h6>Need support?</h6>
-                        <ul>
-                            <li><a href="https://pulsedmedia.com/clients/knowledgebase.php" title="Browse Pulsed Media Knowledgebase">Browse Knowledgebase</a></li>
-                            <li><a href="https://wiki.pulsedmedia.com" title="Pulsed Media Wiki">Browse Wiki</a></li>
-                            <li><a href="https://discord.gg/cGBz52HJtx" target="_blank" title="Join Pulsed Media on Discord">Discord</a></li>
-                            <li>Technical: <a href="mailto:support@pulsedmedia.com" title="E-Mail Support">support@pulsedmedia.com</a></li>
-                            <li>Billing: <a href="mailto:billing@pulsedmedia.com" title="E-Mail Billing">billing@pulsedmedia.com</a></li>
-                        </ul>
-                        <br /><br />
-                    </div>
-                </div>
-            </div>
-            <div class="full_bottom"></div>
-        </div>
-    </div>
+    </main>
 
     <script type="text/javascript">
+        /* Legacy controls (shown before the Configure tab reaches the server). */
+        function pmssGuiFramesModeApply(button, mode) {
+            pmssSetActionLoading(button, true);
+            pmssShowActionNotice('Saving frame source preference...', false);
+            $.ajax({url: 'index.php', type: 'POST', cache: false, headers: {'X-Requested-With': 'XMLHttpRequest'}, data: {guiFramesMode: mode},
+                success: function() { window.top.location.reload(true); },
+                error: function() { pmssSetActionLoading(button, false); pmssShowActionNotice('Frame source preference could not be saved.', true); }});
+        }
+        function pmssUsageAlertsModeApply(button, mode) {
+            pmssSetActionLoading(button, true);
+            pmssShowActionNotice('Saving usage alert preference...', false);
+            $.ajax({url: 'index.php', type: 'POST', cache: false, headers: {'X-Requested-With': 'XMLHttpRequest'}, data: {usageAlertsMode: mode},
+                success: function() { window.setTimeout(function() { location.reload(true); }, 500); },
+                error: function() { pmssSetActionLoading(button, false); pmssShowActionNotice('Usage alert preference could not be saved.', true); }});
+        }
+        function pmssWelcomeActionSubmit(form) {
+            $.ajax({url: form.action, type: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}, data: $(form).serialize(),
+                success: function(html) { document.open(); document.write(html); document.close(); },
+                error: function() { pmssShowActionNotice('Action could not be completed.', true); }});
+            return false;
+        }
+<?php if (!$pmssConfigureAvailable): ?>
         pmssMediaStackStatusRefresh();
-        setTimeout(function(){
-            var bar = document.getElementById('pmss-pikkumies-bar-frame');
-            if (!bar || document.activeElement !== bar) location = '';
-        }, 180000);
-        <?php if ($pmssPikkumiesState['visible']): ?>
+<?php endif; ?>
+
+        /* Welcome home. */
+        (function () {
+            var main = document.querySelector('main.h');
+            var user = main ? main.getAttribute('data-user') : '';
+            // Every account on a server shares one browser origin, so keys carry the account name.
+            function store(key, value) {
+                try { if (value === undefined) return localStorage.getItem('pmss:' + user + ':' + key); localStorage.setItem('pmss:' + user + ':' + key, value); }
+                catch (e) { return null; }
+            }
+            // The panel hides this frame's tab (display:none) when another tab is open. The frame's own viewport keeps its
+            // size then, so ask the panel (same origin) whether the frame element is still rendered.
+            function visible() {
+                if (document.hidden) return false;
+                try { if (window.frameElement) return window.frameElement.getClientRects().length > 0; } catch (e) {}
+                return window.innerHeight > 0 && window.innerWidth > 0;
+            }
+            window.pmssWelcomeVisible = visible;
+
+            document.addEventListener('click', function (event) {
+                var button = event.target && event.target.closest ? event.target.closest('.h-copy') : null;
+                if (!button) return;
+                var value = button.getAttribute('data-copy');
+                function done() { button.textContent = 'Copied'; setTimeout(function () { button.textContent = 'Copy'; }, 1500); }
+                if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(value).then(done, function () {}); return; }
+                var area = document.createElement('textarea');
+                area.value = value; document.body.appendChild(area); area.select();
+                try { document.execCommand('copy'); done(); } catch (e) {}
+                document.body.removeChild(area);
+            });
+
+            var news = document.getElementById('h-news');
+            function newsMark() {
+                var now = Math.floor(Date.now() / 1000), seen = parseInt(store('news-seen') || '0', 10) || now - 7 * 86400;
+                var rows = news.querySelectorAll('li[data-ts]');
+                for (var i = 0; i < rows.length; i++) {
+                    if (parseInt(rows[i].getAttribute('data-ts'), 10) > seen) rows[i].className += ' h-new';
+                }
+                if (rows.length) store('news-seen', String(now));
+            }
+            if (news && news.querySelector('.h-news-wait') && window.fetch) {
+                fetch(news.getAttribute('data-src'), {credentials: 'same-origin', cache: 'no-store'})
+                    .then(function (response) { return response.ok ? response.text() : ''; })
+                    .then(function (html) { if (html) { news.innerHTML = html; newsMark(); } })
+                    .catch(function () {});
+            } else if (news) {
+                newsMark();
+            }
+
+            var words = {'running': ['Running', 'h-state-run'], 'installing': ['Setting up', 'h-state-warn'], 'not-running': ['Not running', 'h-state-warn'],
+                'stopped': ['Stopped', 'h-state-warn'], 'not secured': ['Needs a login', 'h-state-warn'], 'gave up': ['Gave up', 'h-state-bad'], 'failed': ['Failed', 'h-state-bad']};
+            function appsRefresh() {
+                if (!visible() || !window.fetch || !document.querySelector('.h-app')) return;
+                fetch('welcome.php?status=1', {credentials: 'same-origin', cache: 'no-store'})
+                    .then(function (response) { return response.json(); })
+                    .then(function (status) {
+                        var tiles = document.querySelectorAll('.h-app[data-app]');
+                        for (var i = 0; i < tiles.length; i++) {
+                            var app = status.apps && status.apps[tiles[i].getAttribute('data-app')];
+                            var word = app && words[app.state], label = tiles[i].querySelector('[data-state-word]');
+                            if (word && label) { label.textContent = word[0]; label.className = 'h-state ' + word[1]; }
+                        }
+                    }).catch(function () {});
+            }
+            setInterval(appsRefresh, 30000);
+
+            // Reload for fresh figures only when the customer comes back after a long absence, never while typing.
+            var hiddenSince = 0;
+            setInterval(function () {
+                if (!visible()) { if (!hiddenSince) hiddenSince = Date.now(); return; }
+                var away = hiddenSince ? Date.now() - hiddenSince : 0, active = document.activeElement;
+                hiddenSince = 0;
+                if (away > 600000 && !(active && /^(INPUT|TEXTAREA|SELECT|IFRAME)$/.test(active.tagName))) location.reload();
+            }, 15000);
+        })();
+<?php if ($pmssPikkumiesState['visible']): ?>
+
+        /* Pikkumies ask bar. */
         var pmssPikkumiesBarOrigin = <?= json_encode($pmssPikkumiesState['origin']) ?>;
-        var pmssPikkumiesBarReady = false, pmssPikkumiesBarInstalled = false;
+        var pmssPikkumiesBarReady = false, pmssPikkumiesBarInstalled = false, pmssPikkumiesBarTimer = 0;
         function pmssPikkumiesTabOpen() {
             try {
                 var tab = window.parent.document.querySelector('a[href="#pikkumies"]');
@@ -508,12 +345,15 @@ if ($wikiItemsHtml !== '') {
             } catch (e) { location.href = 'pikkumiesOpen.php?session=pm1'; }
         }
         function pmssPikkumiesBarPoll() {
+            if (pmssPikkumiesBarInstalled) { clearInterval(pmssPikkumiesBarTimer); return; }
+            if (!window.pmssWelcomeVisible()) return;
             fetch('pikkumiesOpen.php?view=status', {credentials:'same-origin',cache:'no-store'})
                 .then(function (response) { return response.json(); })
                 .then(function (state) {
-                    if (!state.visible) { document.getElementById('pmss-pikkumies-bar').hidden = true; return; }
+                    if (!state.visible) { document.getElementById('pmss-pikkumies-bar').hidden = true; clearInterval(pmssPikkumiesBarTimer); return; }
                     if (!state.ready || pmssPikkumiesBarInstalled) return;
                     pmssPikkumiesBarInstalled = true;
+                    clearInterval(pmssPikkumiesBarTimer);
                     var frame = document.createElement('iframe');
                     frame.id = 'pmss-pikkumies-bar-frame';
                     frame.title = 'Ask Pikkumies';
@@ -543,12 +383,11 @@ if ($wikiItemsHtml !== '') {
             if (event.origin === location.origin && event.source === window.parent
                 && event.data === 'pikkumies:tab-ready' && !pmssPikkumiesBarReady && frame) frame.src = pmssPikkumiesBarOrigin + '/bar';
         });
-        pmssPikkumiesBarPoll(); setInterval(pmssPikkumiesBarPoll, 5000);
-        <?php endif; ?>
+        pmssPikkumiesBarPoll(); pmssPikkumiesBarTimer = setInterval(pmssPikkumiesBarPoll, 5000);
+<?php endif; ?>
     </script>
 </body>
 </html>
-
 <?php
 /** Keep the healed Welcome page usable before the update-only helper arrives. */
 function pmssWelcomePikkumiesStateRead($home, $username)
@@ -866,37 +705,6 @@ function pmssWelcomeServerUptimeTextBuild($seconds) {
     return implode(' ', $parts);
 }
 
-/** Render fail-soft host uptime and shared load averages on the welcome page. */
-function pmssWelcomeServerInfoHtmlBuild($uptimePath = '/proc/uptime', $loadAveragePath = '/proc/loadavg') {
-    $uptimeText = 'unavailable';
-    $uptimeRaw = pmssCustomerTrimmedFileRead($uptimePath);
-    $uptimeFields = is_string($uptimeRaw) && $uptimeRaw !== '' ? preg_split('/\s+/', $uptimeRaw) : array();
-    if (is_array($uptimeFields) && isset($uptimeFields[0])) {
-        $formattedUptime = pmssWelcomeServerUptimeTextBuild($uptimeFields[0]);
-        if (is_string($formattedUptime) && $formattedUptime !== '') $uptimeText = $formattedUptime;
-    }
-
-    $loadText = 'unavailable';
-    $loadRaw = pmssCustomerTrimmedFileRead($loadAveragePath);
-    $loadFields = is_string($loadRaw) && $loadRaw !== '' ? preg_split('/\s+/', $loadRaw) : array();
-    $loadAverages = array();
-    for ($index = 0; $index < 3; $index++) {
-        $loadAverage = is_array($loadFields) && isset($loadFields[$index])
-            ? pmssCustomerNonnegativeFloat($loadFields[$index])
-            : null;
-        if ($loadAverage === null) {
-            $loadAverages = array();
-            break;
-        }
-        $loadAverages[] = number_format($loadAverage, 2, '.', '');
-    }
-    if (count($loadAverages) === 3) $loadText = implode(' / ', $loadAverages);
-
-    return pmssWelcomeMetricSectionHtmlBuild(
-        'Server Info',
-        "\nServer uptime: {$uptimeText}<br />\nServer load average (1 / 5 / 15 min, shared server): {$loadText}\n"
-    );
-}
 
 /**
  * Calculate a finite percentage for quota, traffic, and RAM gauges.
@@ -1014,7 +822,7 @@ function pmssWelcomeHtmlAttr($value) { return pmssCustomerHtmlAttr($value); }
 
 function pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage) {
     $html = '';
-    $welcomeHeading = pmssWelcomeRemoteFetch('https://pulsedmedia.com/remote/welcomeHeadingText.php');
+    $welcomeHeading = pmssWelcomeHomeCachedFetch(dirname(__DIR__), 'https://pulsedmedia.com/remote/welcomeHeadingText.php');
     if ($welcomeHeading !== false) {
         $html .= $welcomeHeading;
     }
@@ -1039,14 +847,6 @@ function pmssWelcomeAnnouncementItemsHtmlBuild() {
     return pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rssRaw);
 }
 
-function pmssWelcomePanelFeedItemsHtmlBuild($category, $limit) {
-    $raw = pmssWelcomeRemoteFetch('https://pulsedmedia.com/data/v1/panel-feed.xml');
-    if ($raw === false || !function_exists('pmssWelcomeAnnouncementItemsHtmlBuildFromRaw')) {
-        return '';
-    }
-
-    return pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($raw, $category, $limit);
-}
 
 function pmssWelcomeRemoteFetch($url) {
     if (!is_string($url) || $url === '' || strlen($url) > 2048 || preg_match('/[\x00-\x1F\x7F]/', $url)) {
@@ -1095,61 +895,6 @@ function pmssWelcomeTrafficMonthValueRead($trafficState) {
         : null;
 }
 
-function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingServiceId = 0) {
-    if (!is_array($trafficData) || empty($trafficData)) {
-        return;
-    }
-
-    $trafficUsedRaw = pmssWelcomeTrafficMonthValueRead($trafficData);
-    if ($trafficUsedRaw === null) {
-        $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
-        echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\nTraffic usage data is unavailable right now.<br />\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\n");
-        return;
-    }
-
-    $outboundMonth = $trafficUsedRaw;
-    $trafficUsedRaw = round($trafficUsedRaw);
-    $trafficUsed = round($trafficUsedRaw / 1024) . ' GiB';
-    $inboundMonth = pmssWelcomeTrafficMonthValueRead($trafficIngress);
-    $inboundLine = $inboundMonth !== null ? '<br />Inbound (30 days): '.round($inboundMonth / 1024).' GiB' : '';
-    $ratioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($outboundMonth, $inboundMonth) : array('available' => false);
-    $ratioLine = !empty($ratioState['available'])
-        ? '<br />Inbound:Outbound ratio (30 days): <span style="color: '.$ratioState['color'].'">'.$ratioState['display'].'</span>'
-        : '';
-
-    if ($trafficLimit <= 0) {
-        $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
-        echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\nTraffic used (30 days): {$trafficUsed}<br />\nTraffic limit: Unlimited{$inboundLine}{$ratioLine}<br />\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
-        return;
-    }
-
-    $bonusTraffic = max(0, (int) $bonusTraffic);
-    $limitTotal = $trafficLimit + $bonusTraffic;
-    $trafficUsedGiB = $trafficUsedRaw / 1024;
-    $percent = pmssWelcomePercent($trafficUsedGiB, $limitTotal, 0);
-    $overCap = $trafficUsedGiB > $limitTotal;
-    $isReduced = !empty($trafficBandwidthState['isReduced']);
-    $trafficDisclosure = pmssWelcomeTrafficDisclosureHtmlBuild(pmssWelcomePercent($trafficUsedGiB, $limitTotal, 1), $trafficBandwidthState, $billingServiceId, $overCap);
-
-    $warning = '';
-    if ($overCap) {
-        $capMbit = is_numeric($trafficBandwidthState['effectiveCapMbit'] ?? null)
-            ? max(0, (int) $trafficBandwidthState['effectiveCapMbit']) : 0;
-        $speedText = $isReduced
-            ? 'Datacenter external outbound (TO internet) bandwidth is limited to '.number_format($capMbit).' Mbps.'
-            : 'While over the cap, datacenter external outbound (TO internet) bandwidth can be limited to '.number_format($capMbit).' Mbps.';
-        $warningTitle = 'OVER TRAFFIC LIMIT WARNING'.($isReduced ? ' - REDUCED BANDWIDTH' : '');
-        $warning = '<br /><b style="color: red;">'.$warningTitle.'</b><br />You are beyond your traffic limit. '
-            .pmssWelcomeTrafficUpgradeLinkHtmlBuild($billingServiceId).'.<br />'.$speedText
-            .' Datacenter internal and inbound bandwidth is unrestricted.';
-    }
-    $titleText = "{$trafficUsed} / {$limitTotal} GiB";
-    $bonusLine = ($bonusTraffic > 0) ? 'Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
-    $usageLine = 'Used: '.$trafficUsed.' / Limit: '.number_format($limitTotal).' GiB (30-day window)';
-    $gauge = createGauge($titleText, $bonusLine, $percent);
-
-    echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\n{$usageLine}<br />\n{$gauge}\n{$warning}\n{$trafficDisclosure}\n{$inboundLine}{$ratioLine}\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
-}
 
 function createStackedGauge($titleText, $footerText, $percent, $segments) {
     if (!is_finite($percent)) $percent = 0;
@@ -1209,57 +954,523 @@ function gaugeColor($percent) {
     return dechex($startColor[0] - round(($startColor[0] - $endColor[0]) * ($percent / 100))).dechex($startColor[1] - round(($startColor[1] - $endColor[1]) * ($percent / 100))).dechex($startColor[2] - round(($startColor[2] - $endColor[2]) * ($percent / 100)));
 }
 
-function quotaCreateSection($quotaInfo, $bonusQuota = 0, $bonusDisplayState = array()) {
-    if (!is_array($quotaInfo) || empty($quotaInfo)) return '';
 
-    $quotaMissingWarning = '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
-    $quotaFields = array();
-    foreach (array('hardLimit', 'totalSpace', 'usedBytes') as $field) {
-        $value = isset($quotaInfo[$field]) ? pmssCustomerNonnegativeFloat($quotaInfo[$field]) : null;
-        if ($value === null) return $quotaMissingWarning;
-        $quotaFields[$field] = $value;
-    }
 
-    $hardLimit  = $quotaFields['hardLimit'];
-    $totalSpace = $quotaFields['totalSpace'];
-    $usedBytes  = $quotaFields['usedBytes'];
-
-    if ($hardLimit == 0 || $totalSpace == 0) {
-        return $quotaMissingWarning;
-    }
-
-    $percent = pmssWelcomePercent($usedBytes, $totalSpace, 1);
-    $percentFromBurst = pmssWelcomePercent($usedBytes, $hardLimit, 0);
-    if ($percent < 100 && $totalSpace > 0) {
-        $percentFromBurst = pmssWelcomePercent($usedBytes, $totalSpace, 1);
-    }
-
-    $readableUsed   = pmssFormatBytes($usedBytes, 2, 0, true);
-    $readableQuota  = pmssFormatBytes($totalSpace, 2, 0, true);
-    $readableBurst  = pmssFormatBytes($hardLimit, 2, 0, true);
-
-    $bonusQuotaLine = ($bonusQuota != 0) ? '<br />Additional disk space: ' . number_format($bonusQuota, 0, '.', '') . ' GiB' : '';
-
-    if ($percent > 100) {
-        $warning = <<<EOF
-        <br /><b style="color: red;">OVER QUOTA WARNING</b><br />
-        If you go over your burst limit, some applications will not operate and will shut down automatically, and will not restart until you are within quota limit. You are allowed to burst quota up to 7 days.
-EOF;
-    } else {
-        $warning = '';
-    }
-
-    $titleText = "{$readableUsed}/{$readableQuota}";
-    if ($percent > 100) $titleText .= " Burst limit: {$readableBurst}";
-
-    $gauge = createGauge($titleText, $titleText . $bonusQuotaLine, $percent, $percentFromBurst);
-
-    return <<<EOF
-<h6>Quota Info</h6>
-{$gauge}
-{$warning}
-<hr />
-EOF;
+/** Welcome styles. Inline because the guiv heal delivers welcome.php but not screen.css (ADR 0022). */
+function pmssWelcomeHomeCss()
+{
+    return <<<'CSS'
+:root{--bg:#0d131b;--surface:#141c27;--surface-2:#1a2433;--line:#243143;--text:#e6edf3;--muted:#9aa9bc;--faint:#7a899c;--accent:#4fc3f7;--ok:#3fb950;--warn:#d29922;--bad:#f85149;color-scheme:dark}
+.h-body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif}
+.h-body *{box-sizing:border-box}
+.h a{color:var(--accent);text-decoration:none}.h a:hover{text-decoration:underline}
+.h :focus-visible{outline:2px solid #9dd8f5;outline-offset:2px;border-radius:6px}
+.h{max-width:1280px;margin:0 auto;padding:12px 14px 24px}
+.h-label{margin:0;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.h-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.h-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.h .h-head-link{font-size:12px}
+.h-muted{color:var(--muted)}.h-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.h code{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text)}
+/* Alerts: only when something needs attention */
+.h-alerts{display:grid;gap:8px;margin-bottom:10px}
+.h-alert,.h-alerts .pmss-raid-notice{margin:0;padding:10px 14px;border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;background:var(--surface-2);color:var(--text)}
+.h-alert-bad,.h-alerts .pmss-raid-notice-error{border-left-color:var(--bad)}
+.h-alert strong,.h-alerts .pmss-raid-notice strong{display:block;margin-bottom:2px}
+.h-alert p,.h-alerts .pmss-raid-notice p{margin:3px 0 0;color:var(--muted)}
+.h-alerts .pmss-raid-icon{color:var(--warn);margin-right:6px}.h-alerts .pmss-raid-meta{color:var(--text)}
+.h-alert .pmss-traffic-disclosure{margin:4px 0 0;padding:0;border:0;background:none;color:var(--muted)}
+.h-alert .pmss-traffic-disclosure span{color:inherit!important;font-size:inherit!important}
+/* Status strip: the quick stats, with the bonus among them */
+.h-status{margin-bottom:10px}
+.h-status-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-bottom:10px}
+.h-chips{display:flex;flex-wrap:wrap;gap:6px}
+.h .h-chip{display:inline-flex;align-items:center;gap:5px;min-height:26px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);color:var(--text);font-size:12px}
+.h .h-chip:hover{border-color:#35506a;text-decoration:none}
+.h-chip b{font-weight:600}.h-chip-bonus b{color:var(--accent)}
+.h-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.h-metric{min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.h-metric-l{color:var(--muted);font-size:12px}
+.h-metric-v{margin:1px 0 7px;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-metric-v span{margin-left:5px;color:var(--muted);font-size:12px;font-weight:400}
+.h-bar{display:flex;height:6px;overflow:hidden;border-radius:3px;background:#0b1119}
+.h-bar i{display:block;height:100%}.h-bar-none{background:transparent}
+.h-bar .s-base{background:var(--accent)}.h-bar .s-cache{background:#4b5b70}.h-bar .t-warn{background:var(--warn)}.h-bar .t-bad{background:var(--bad)}
+.h-metric-m{margin-top:6px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4}
+.h-metric-m b{color:var(--warn);font-weight:600}
+/* Ask bar (Pikkumies) */
+.h-ask{margin-bottom:10px}
+.pmss-pikkumies-bar{box-sizing:border-box;max-width:100%;color-scheme:dark}
+.pmss-pikkumies-bar button,.pmss-pikkumies-bar iframe{box-sizing:border-box;display:block;width:100%;height:52px}
+.pmss-pikkumies-bar button{border:1px solid #2e3b4f;border-radius:8px;background:#000;color:#8b949e;padding:0 14px;text-align:left;font:16px system-ui;cursor:pointer}
+.pmss-pikkumies-bar button:focus-visible{outline:2px solid #9dd8f5;outline-offset:2px}
+.pmss-pikkumies-bar iframe{border:0;background:transparent}
+/* Main grid */
+.h-main{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:10px;align-items:start}
+.h-col{display:grid;gap:10px;min-width:0}
+/* Apps */
+.h-apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.h-app{display:flex;flex-direction:column;gap:5px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.h-app-top{display:flex;align-items:center;gap:8px;min-width:0}
+.h-app-n{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-app-d{color:var(--muted);font-size:12px;line-height:1.35}
+.h-apps-empty{margin:0 0 8px}.h-app-ghost{border-style:dashed;background:transparent}.h-app-ghost .h-app-n{color:var(--muted);font-weight:500}.h-app-ghost .h-ico{stroke:var(--faint)}
+.h-app-hero{grid-column:1/-1;flex-direction:row;align-items:center;gap:14px;border-color:#2c4a63;background:linear-gradient(90deg,#16283a,var(--surface-2))}
+.h-app-hero .h-app-top{flex:0 0 auto;min-width:200px}.h-app-hero .h-app-d{flex:1}.h-app-hero .h-btn{margin-top:0}
+.h-ico{flex:0 0 auto;width:18px;height:18px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.h-state{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;white-space:nowrap}
+.h-state::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.h-state-run::before{background:var(--ok)}.h-state-warn::before{background:var(--warn)}.h-state-bad::before{background:var(--bad)}
+.h .h-btn{display:inline-flex;align-items:center;justify-content:center;min-height:28px;margin-top:auto;padding:4px 14px;border:1px solid #2c4a63;border-radius:7px;background:#13293d;color:#f8fafc;font-size:12px;font-weight:600;align-self:flex-start}
+.h .h-btn:hover{background:#18354f;text-decoration:none}
+.h .h-btn-quiet{background:transparent;border-color:var(--line);color:var(--text);font-weight:500}
+/* Try next */
+.h-try-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 14px;margin:0;padding:0;list-style:none}
+.h-try-list li{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:12px;line-height:1.4}
+.h-try-list b{color:var(--text);font-weight:600}
+/* Connect */
+.h-kv{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:6px 12px;align-items:center;margin:0}
+.h-kv dt{color:var(--muted);font-size:12px}
+.h-kv dd{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h .h-copy{min-height:24px;padding:2px 10px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer}
+.h .h-copy:hover{color:var(--text);border-color:#35506a}
+.h-foot{margin:10px 0 0;color:var(--muted);font-size:12px}
+/* What's new */
+.h-news{list-style:none;margin:0;padding:0}
+.h-news li{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line)}
+.h-news li:first-child{border-top:0;padding-top:0}
+.h-tag{color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.h .h-news a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.h .h-news a:hover{color:var(--accent)}
+.h-news time{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.h-news .h-new a{color:#fff}
+.h-news .h-new a::before{content:"";display:inline-block;width:6px;height:6px;margin:0 6px 2px 0;border-radius:50%;background:var(--accent)}
+.h-news-legacy{margin:0;padding-left:16px}.h-news-legacy li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Tip: the remote message slot, kept quiet whatever markup it carries */
+.h-tip{color:var(--muted);font-size:12.5px;line-height:1.5}
+.h-tip h1,.h-tip h2,.h-tip h3,.h-tip h4,.h-tip h5,.h-tip h6{display:block;margin:0 0 3px;color:var(--text)!important;font-size:12.5px;font-weight:600;text-transform:none;letter-spacing:0}
+.h-tip p{margin:0}
+.h-help{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px}
+/* Legacy controls (before the Configure tab reaches the server, ADR 0103) */
+.h-legacy{margin-top:10px}.h-legacy h6{margin:12px 0 4px;color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.h-legacy p{margin:0 0 6px}
+#pmss-action-notice{display:none;position:fixed;top:10px;right:10px;z-index:9999;max-width:580px;padding:8px 12px;border:1px solid #2c4a63;border-radius:8px;background:#13293d;color:#e6edf3;font-weight:600}
+#pmss-action-notice.pmss-error{border-color:#7a2a2a;background:#2a1414;color:#ffd7d7}
+.pmss-action-loading{margin-left:6px;color:var(--muted);font-size:.9em}
+.pmss-media-stack-box{margin:8px 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.pmss-media-stack-box ul{margin:8px 0 0 18px}.pmss-media-stack-apps{margin-left:0!important;padding-left:0;list-style:none}.pmss-media-stack-apps li{margin-top:6px}
+.pmss-media-stack-auth-badge{display:inline-block;min-width:64px;margin:0 6px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;font-weight:600;text-align:center}
+.pmss-media-stack-auth-badge-protected{color:var(--ok)}.pmss-media-stack-auth-badge-exposed{color:var(--bad)}
+.pmss-media-stack-box pre{margin-top:10px;max-height:220px;overflow:auto;padding:10px;white-space:pre-wrap;word-break:break-word}
+.pmss-feed-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1099px){.h-main{grid-template-columns:minmax(0,1fr)}.h-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:599px){.h{padding:10px 10px 22px}.h-metrics{gap:8px}.h-metric{padding:9px 10px}.h-metric-v{font-size:16px}
+.h-app-hero{flex-direction:column;align-items:flex-start}.h-app-hero .h-app-top{min-width:0}.h-kv{grid-template-columns:max-content minmax(0,1fr)}.h-kv .h-copy{display:none}.h-kv dd{white-space:normal;word-break:break-all}.h-metric-v{white-space:normal}.h-metric-v span{display:block;margin:2px 0 0}}
+@media (prefers-reduced-motion:reduce){.h-body *{transition:none!important;animation:none!important}}
+CSS;
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * Welcome home (ADR 0147): status strip, apps, connect, what's new. View helpers only: every
+ * figure comes from the readers above (quota snapshot, traffic files, cgroup memory, app status).
+ * ------------------------------------------------------------------------------------------- */
+
+/** Remote content is fetched at most every 15 minutes per account and served stale when the fetch fails. */
+function pmssWelcomeHomeCachedFetch($home, $url, $maxAge = 900, $allowNetwork = true)
+{
+    $dir = rtrim((string) $home, '/').'/.cache/pmss-welcome';
+    $file = $dir.'/'.substr(sha1((string) $url), 0, 16).'.cache';
+    $cached = (!is_link($file) && is_file($file)) ? @file_get_contents($file, false, null, 0, 1048576) : false;
+    $age = is_string($cached) ? time() - (int) @filemtime($file) : PHP_INT_MAX;
+    if (is_string($cached) && $age >= 0 && $age < $maxAge) return $cached;
+    if (!$allowNetwork) return is_string($cached) ? $cached : false;
+    $body = pmssWelcomeRemoteFetch($url);
+    if ($body === false) return is_string($cached) ? $cached : false;
+    if ((is_dir($dir) && !is_link($dir)) || (!file_exists($dir) && @mkdir($dir, 0700, true))) {
+        $tmp = $file.'.'.getmypid().'.tmp';
+        if (@file_put_contents($tmp, $body) === strlen($body)) @rename($tmp, $file); else @unlink($tmp);
+    }
+    return $body;
+}
+
+/** Whether the cached copy of every news source is fresh enough to render without the network. */
+function pmssWelcomeHomeNewsCacheFresh($home)
+{
+    foreach (array('https://pulsedmedia.com/clients/announcementsrss.php', 'https://pulsedmedia.com/data/v1/panel-feed.xml') as $url) {
+        $file = rtrim((string) $home, '/').'/.cache/pmss-welcome/'.substr(sha1($url), 0, 16).'.cache';
+        if (is_link($file) || !is_file($file) || time() - (int) @filemtime($file) >= 900) return false;
+    }
+    return true;
+}
+
+/**
+ * Pick the rows for What's new: the newest announcements first (they are the time-sensitive notices and must not be
+ * pushed out by blog or wiki activity), then the newest blog posts and wiki changes, one row format for all.
+ *
+ * @return array<int,array{kind:string,title:string,link:string,time:int}>
+ */
+function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, array $wiki, $limit = 6)
+{
+    $rows = array();
+    foreach (array_slice($announcements, 0, 2) as $item) $rows[] = array('kind' => 'News') + $item;
+    $rest = array();
+    foreach (array_slice($articles, 0, $limit) as $item) $rest[] = array('kind' => 'Blog') + $item;
+    foreach (array_slice($wiki, 0, 2) as $item) $rest[] = array('kind' => 'Wiki') + $item;
+    usort($rest, function ($a, $b) { return $b['time'] - $a['time']; });
+    foreach ($rest as $item) {
+        if (count($rows) >= $limit) break;
+        $rows[] = $item;
+    }
+    return $rows;
+}
+
+/** Render What's new from the account cache; with $allowNetwork the stale sources are refetched first. */
+function pmssWelcomeHomeNewsHtmlRead($home, $allowNetwork)
+{
+    if (!function_exists('pmssWelcomeFeedItemsRead')) {
+        // The heal can deliver this page before the helper that parses feeds into rows: keep the old list.
+        $legacy = pmssWelcomeAnnouncementItemsHtmlBuild();
+        return $legacy === '' ? '' : '<ul class="h-news-legacy">'.$legacy.'</ul>';
+    }
+    if (!$allowNetwork && !pmssWelcomeHomeNewsCacheFresh($home)) {
+        return '<p class="h-muted h-news-wait">Loading the latest news…</p>';
+    }
+    $ann = pmssWelcomeHomeCachedFetch($home, 'https://pulsedmedia.com/clients/announcementsrss.php', 900, $allowNetwork);
+    $feed = pmssWelcomeHomeCachedFetch($home, 'https://pulsedmedia.com/data/v1/panel-feed.xml', 900, $allowNetwork);
+    $rows = pmssWelcomeHomeNewsSelect(
+        is_string($ann) ? pmssWelcomeFeedItemsRead($ann, '', 10) : array(),
+        is_string($feed) ? pmssWelcomeFeedItemsRead($feed, 'article', 10) : array(),
+        is_string($feed) ? pmssWelcomeFeedItemsRead($feed, 'wiki', 10) : array()
+    );
+    if ($rows === array()) return '<p class="h-muted">News is unavailable right now. <a href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">Read the announcements</a>.</p>';
+    $html = '<ul class="h-news">';
+    foreach ($rows as $row) {
+        $title = $row['kind'] === 'Wiki' ? 'Wiki page updated' : $row['kind'];
+        $html .= '<li data-ts="'.(int) $row['time'].'"><span class="h-tag" title="'.$title.'">'.$row['kind'].'</span>'
+            .'<a href="'.pmssWelcomeHtmlAttr($row['link']).'" target="_blank" rel="noopener" title="'.pmssWelcomeHtmlAttr($row['title']).'">'
+            .pmssWelcomeHtmlAttr($row['title']).'</a>'
+            .'<time datetime="'.gmdate('Y-m-d', $row['time']).'">'.gmdate('j M', $row['time']).'</time></li>';
+    }
+    return $html.'</ul>';
+}
+
+/** GET welcome.php?news=1: refresh the cache and answer the list fragment (read-only, same origin). */
+function pmssWelcomeHomeNewsEmit($home)
+{
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo pmssWelcomeHomeNewsHtmlRead($home, true);
+}
+
+/** @return array{state:string,used:float,total:float,hard:float,percent:float} */
+function pmssWelcomeHomeQuotaStateBuild($quotaInfo)
+{
+    if (!is_array($quotaInfo) || $quotaInfo === array()) return array('state' => 'none', 'used' => 0.0, 'total' => 0.0, 'hard' => 0.0, 'percent' => 0.0);
+    $fields = array();
+    foreach (array('hardLimit', 'totalSpace', 'usedBytes') as $field) {
+        $fields[$field] = isset($quotaInfo[$field]) ? pmssCustomerNonnegativeFloat($quotaInfo[$field]) : null;
+    }
+    if (in_array(null, $fields, true) || $fields['hardLimit'] == 0 || $fields['totalSpace'] == 0) {
+        return array('state' => 'missing', 'used' => 0.0, 'total' => 0.0, 'hard' => 0.0, 'percent' => 0.0);
+    }
+    $percent = pmssWelcomePercent($fields['usedBytes'], $fields['totalSpace'], 1);
+    return array('state' => $percent > 100 ? 'over' : 'ok', 'used' => $fields['usedBytes'], 'total' => $fields['totalSpace'],
+        'hard' => $fields['hardLimit'], 'percent' => $percent);
+}
+
+/** Traffic over the rolling 30 days, using the same limit and bonus readers as before. */
+function pmssWelcomeHomeTrafficStateBuild($trafficData, $trafficIngress, $trafficLimitState, $bandwidthState)
+{
+    $usedMiB = is_array($trafficData) ? pmssWelcomeTrafficMonthValueRead($trafficData) : null;
+    $limit = (int) ($trafficLimitState['limitGiB'] ?? 0);
+    $bonus = max(0, (int) ($trafficLimitState['bonusGiB'] ?? 0));
+    $state = array('available' => $usedMiB !== null, 'usedGiB' => $usedMiB === null ? 0.0 : $usedMiB / 1024,
+        'limitGiB' => $limit > 0 ? $limit + $bonus : 0, 'bonusGiB' => $bonus, 'percent' => 0.0, 'overCap' => false,
+        'inboundGiB' => null, 'ratio' => null, 'reduced' => !empty($bandwidthState['isReduced']));
+    $inbound = is_array($trafficIngress) ? pmssWelcomeTrafficMonthValueRead($trafficIngress) : null;
+    if ($inbound !== null) $state['inboundGiB'] = $inbound / 1024;
+    if ($usedMiB !== null && function_exists('pmssTrafficRatioStateBuild')) {
+        $ratio = pmssTrafficRatioStateBuild($usedMiB, $inbound);
+        if (!empty($ratio['available'])) $state['ratio'] = $ratio;
+    }
+    if ($state['limitGiB'] > 0 && $usedMiB !== null) {
+        $state['percent'] = pmssWelcomePercent($state['usedGiB'], $state['limitGiB'], 1);
+        $state['overCap'] = $state['usedGiB'] > $state['limitGiB'];
+    }
+    return $state;
+}
+
+/** One status card: label, value, a bar made of segments, and one meta line. */
+function pmssWelcomeHomeMetricHtmlBuild($label, $valueHtml, $ofText, array $segments, $metaHtml, $title = '')
+{
+    $bar = '';
+    foreach ($segments as $segment) {
+        $width = max(0, min(100, (float) $segment[1]));
+        if ($width > 0) $bar .= '<i class="'.$segment[0].'" style="width:'.round($width, 2).'%"></i>';
+    }
+    return '<div class="h-metric"'.($title !== '' ? ' title="'.pmssWelcomeHtmlAttr($title).'"' : '').'>'
+        .'<div class="h-metric-l">'.$label.'</div>'
+        .'<div class="h-metric-v">'.$valueHtml.($ofText !== '' ? '<span>'.$ofText.'</span>' : '').'</div>'
+        .'<div class="h-bar'.($bar === '' ? ' h-bar-none' : '').'" role="presentation">'.$bar.'</div>'
+        .'<div class="h-metric-m">'.$metaHtml.'</div></div>';
+}
+
+/** Bar tone follows the thresholds the usage alerts use (90% disk, 80% traffic), always next to a number. */
+function pmssWelcomeHomeTone($percent, $warnAt)
+{
+    return $percent > 100 ? 't-bad' : ($percent >= $warnAt ? 't-warn' : 's-base');
+}
+
+function pmssWelcomeHomeUpgradeLink($billingServiceId, $text)
+{
+    return '<a href="'.pmssCustomerHtmlAttr(pmssWelcomeTrafficUpgradeUrlBuild($billingServiceId)).'" target="_blank" rel="noopener">'.$text.'</a>';
+}
+
+function pmssWelcomeHomeQuotaMetricHtmlBuild(array $quota, $billingServiceId)
+{
+    if ($quota['state'] === 'none' || $quota['state'] === 'missing') {
+        return pmssWelcomeHomeMetricHtmlBuild('Storage', '—', '', array(), $quota['state'] === 'missing' ? 'Quota info is missing' : 'Open from the panel to see usage');
+    }
+    $meta = number_format($quota['percent'], 1).'% used';
+    if ($quota['state'] === 'over') $meta .= ' · burst limit '.pmssFormatBytes($quota['hard'], 2, 0, true);
+    if ($quota['percent'] >= 90 && (int) $billingServiceId > 0) $meta .= ' · '.pmssWelcomeHomeUpgradeLink($billingServiceId, 'Add storage');
+    return pmssWelcomeHomeMetricHtmlBuild('Storage', pmssFormatBytes($quota['used'], 2, 0, true), 'of '.pmssFormatBytes($quota['total'], 2, 0, true),
+        array(array(pmssWelcomeHomeTone($quota['percent'], 90), $quota['percent'])), $meta);
+}
+
+function pmssWelcomeHomeTrafficMetricHtmlBuild(array $traffic, $billingServiceId)
+{
+    if (!$traffic['available']) return pmssWelcomeHomeMetricHtmlBuild('Traffic · 30 days', '—', '', array(), 'Usage data is unavailable right now');
+    $details = array();
+    if ($traffic['inboundGiB'] !== null) $details[] = 'in '.number_format(round($traffic['inboundGiB'])).' GiB';
+    if (is_array($traffic['ratio']) && $traffic['usedGiB'] >= 1) $details[] = 'ratio <span style="color:'.pmssCustomerHtmlAttr($traffic['ratio']['color']).'">'.pmssCustomerHtmlAttr($traffic['ratio']['display']).'</span>';
+    $details[] = $traffic['reduced'] ? '<b>speed reduced</b>' : 'full port speed';
+    if ($traffic['limitGiB'] <= 0) {
+        return pmssWelcomeHomeMetricHtmlBuild('Traffic · 30 days', number_format(round($traffic['usedGiB'])).' GiB', 'out · unlimited', array(),
+            implode(' · ', $details));
+    }
+    $meta = number_format($traffic['percent'], 1).'% · '.implode(' · ', $details);
+    if ($traffic['bonusGiB'] > 0) $meta .= ' · bonus '.number_format($traffic['bonusGiB']).' GiB';
+    if ($traffic['percent'] >= 80 && (int) $billingServiceId > 0) $meta .= ' · '.pmssWelcomeHomeUpgradeLink($billingServiceId, 'Add traffic');
+    return pmssWelcomeHomeMetricHtmlBuild('Traffic · 30 days', number_format(round($traffic['usedGiB'])).' GiB', 'of '.number_format($traffic['limitGiB']).' GiB',
+        array(array(pmssWelcomeHomeTone($traffic['percent'], 80), $traffic['percent'])), $meta,
+        'Rolling past 30 days of outbound traffic');
+}
+
+function pmssWelcomeHomeMemoryMetricHtmlBuild(array $memory)
+{
+    $limit = isset($memory['limitBytes']) ? $memory['limitBytes'] : null;
+    $process = isset($memory['processBytes']) ? $memory['processBytes'] : null;
+    $cache = isset($memory['cacheBytes']) ? $memory['cacheBytes'] : null;
+    $current = isset($memory['currentBytes']) ? $memory['currentBytes'] : null;
+    $shown = $process !== null ? $process : $current;
+    if ($shown === null) return pmssWelcomeHomeMetricHtmlBuild('Memory', '—', '', array(), 'RAM usage data is unavailable right now');
+    $percent = $limit > 0 ? pmssWelcomePercent($shown, $limit, 1) : 0;
+    $segments = $limit > 0 ? array(array(pmssWelcomeHomeTone($percent, 80), $percent)) : array();
+    if ($limit > 0 && $cache !== null && $process !== null) $segments[] = array('s-cache', pmssWelcomePercent($cache, $limit, 1));
+    $pressure = is_array($memory['pressureStatus'] ?? null) ? (string) $memory['pressureStatus']['status'] : '';
+    $meta = ($cache !== null ? 'cache '.pmssFormatBytes($cache, 2, 0, true).' · ' : '').($pressure !== '' ? 'pressure '.strtolower(pmssCustomerHtmlAttr($pressure)) : number_format($percent, 1).'% used');
+    return pmssWelcomeHomeMetricHtmlBuild('Memory', pmssFormatBytes($shown, 2, 0, true), $limit > 0 ? 'of '.pmssFormatBytes($limit, 2, 0, true) : '',
+        $segments, $meta, 'Process memory; page cache is shown in grey and is reclaimed when needed');
+}
+
+/** Server uptime stays (customer request, #820); the host-wide load average is not the account's load and is dropped. */
+function pmssWelcomeHomeServerMetricHtmlBuild($uptimePath = '/proc/uptime')
+{
+    $raw = pmssCustomerTrimmedFileRead($uptimePath);
+    $fields = is_string($raw) && $raw !== '' ? preg_split('/\s+/', $raw) : array();
+    $uptime = isset($fields[0]) ? pmssWelcomeServerUptimeTextBuild($fields[0]) : null;
+    return pmssWelcomeHomeMetricHtmlBuild('Server', is_string($uptime) && $uptime !== '' ? pmssWelcomeHtmlAttr($uptime) : '—', '', array(),
+        is_string($uptime) && $uptime !== '' ? 'uptime · shared server' : 'uptime unavailable');
+}
+
+/** Alerts appear only when something needs the customer's attention, each with what it means and what to do. */
+function pmssWelcomeHomeAlertsHtmlBuild(array $quota, array $traffic, array $memory, $bandwidthState, $billingServiceId)
+{
+    $alerts = '';
+    if ($quota['state'] === 'missing') {
+        $alerts .= '<div class="h-alert"><strong>Quota info is missing</strong><p>If this persists for more than an hour, contact support.</p></div>';
+    } elseif ($quota['state'] === 'over') {
+        $alerts .= '<div class="h-alert h-alert-bad"><strong>Over your storage quota</strong><p>If you go over your burst limit, some applications will not operate and will shut down automatically, and will not restart until you are within quota limit. You are allowed to burst quota up to 7 days.</p></div>';
+    }
+    if ($traffic['available'] && $traffic['limitGiB'] > 0 && ($traffic['overCap'] || $traffic['reduced'])) {
+        $alerts .= '<div class="h-alert'.($traffic['reduced'] ? ' h-alert-bad' : '').'"><strong>'.($traffic['overCap'] ? 'Over your monthly traffic limit' : 'Traffic speed is reduced').'</strong>'
+            .pmssWelcomeTrafficDisclosureHtmlBuild($traffic['percent'], $bandwidthState, $billingServiceId, $traffic['overCap'])
+            .($traffic['overCap'] ? '<p>'.pmssWelcomeHomeOverCapSpeedText($bandwidthState).'</p>' : '')
+            .'<p>'.pmssWelcomeTrafficUpgradeLinkHtmlBuild($billingServiceId).'.</p></div>';
+    }
+    $limit = isset($memory['limitBytes']) ? $memory['limitBytes'] : null;
+    $process = isset($memory['processBytes']) ? $memory['processBytes'] : (isset($memory['currentBytes']) ? $memory['currentBytes'] : null);
+    $pressure = is_array($memory['pressureStatus'] ?? null) ? $memory['pressureStatus'] : array();
+    if (($pressure['status'] ?? '') === 'THROTTLED' && empty($pressure['oom_events']) && empty($pressure['max_events'])) {
+        $alerts .= '<div class="h-alert"><strong>RAM throttle active</strong><p>Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.</p></div>';
+    } elseif ($limit > 0 && $process !== null && pmssWelcomePercent($process, $limit, 1) > 100) {
+        $alerts .= '<div class="h-alert h-alert-bad"><strong>RAM limit exceeded</strong><p>Processes may be killed (OOM) until memory usage drops.</p></div>';
+    }
+    return $alerts;
+}
+
+/** The loyalty bonus sits with the other figures; "0%" is shown only when the server records a zero. */
+function pmssWelcomeHomeStatusChipsHtmlBuild($bonusDisplayState, $billingServiceId)
+{
+    $policy = 'https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Free_Bonus_Disk_Policy';
+    $state = is_array($bonusDisplayState) ? $bonusDisplayState : array();
+    $value = max(0, (int) ($state['value'] ?? 0));
+    if (($state['unit'] ?? '') === 'gib') {
+        $chip = 'Bonus disk <b>+'.number_format($value).' GiB</b>';
+    } elseif (($state['state'] ?? '') === 'applied') {
+        $chip = 'Loyalty bonus <b>+'.number_format($value).'%</b>';
+    } elseif (($state['state'] ?? '') === 'zero') {
+        $chip = 'Loyalty bonus <b>0%</b>';
+    } else {
+        $chip = 'Loyalty bonus · <b>how it works</b>';
+    }
+    $note = function_exists('pmssCustomerBonusDisplayNoteBuild') ? pmssCustomerBonusDisplayNoteBuild($state) : '';
+    $html = '<a class="h-chip h-chip-bonus" href="'.$policy.'" target="_blank" rel="noopener" title="'.pmssWelcomeHtmlAttr($note !== '' ? $note.' How the bonus works' : 'How the bonus works').'">'.$chip.'</a>';
+    if ((int) $billingServiceId > 0) $html .= '<a class="h-chip" href="'.pmssCustomerHtmlAttr(pmssWelcomeTrafficUpgradeUrlBuild($billingServiceId)).'" target="_blank" rel="noopener">Upgrade</a>';
+    return $html;
+}
+
+/** An account whose main app is OpenClaw: OpenClaw installed and no torrent client switched on. */
+function pmssWelcomeHomeAgentFirst(array $appsStatus)
+{
+    $apps = is_array($appsStatus['apps'] ?? null) ? $appsStatus['apps'] : array();
+    if (!isset($apps['openclaw']) || ($apps['openclaw']['state'] ?? 'off') === 'off') return false;
+    foreach (array('rtorrent', 'qBittorrent', 'Deluge') as $id) {
+        if (isset($apps[$id]) && ($apps[$id]['state'] ?? 'off') !== 'off') return false;
+    }
+    return true;
+}
+
+/** Visible apps in display order, with name, description, state word and where Open goes. */
+function pmssWelcomeHomeAppsBuild(array $appsStatus, $agentFirst)
+{
+    $apps = is_array($appsStatus['apps'] ?? null) ? $appsStatus['apps'] : array();
+    $names = array('jellyfin' => 'Jellyfin', 'sonarr' => 'Sonarr', 'radarr' => 'Radarr', 'prowlarr' => 'Prowlarr',
+        'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr', 'cloudplow' => 'Cloudplow', 'rtorrent' => 'ruTorrent',
+        'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone', 'openclaw' => 'OpenClaw');
+    $toggle = is_file(__DIR__.'/toggleAppCatalog.php') ? (require __DIR__.'/toggleAppCatalog.php') : array();
+    foreach ($toggle as $id => $row) $names[$id] = $row['label'];
+    $descriptions = function_exists('pmssCustomerAppsDescriptionsRead') ? pmssCustomerAppsDescriptionsRead() : array();
+    $descriptions['ruTorrent'] = $descriptions['rTorrent + ruTorrent'] ?? 'Your main torrent client';
+    $list = array();
+    foreach ($apps as $id => $app) {
+        $state = (string) ($app['state'] ?? '');
+        if ($id === 'lighttpd' || $state === 'off') continue;
+        $name = $names[$id] ?? (string) $id;
+        $url = (string) ($app['url'] ?? '');
+        $ready = $state === 'running' || ($id === 'rtorrent' && $state === 'not-running');
+        $list[] = array('id' => (string) $id, 'name' => $name, 'desc' => (string) ($descriptions[$name] ?? ''),
+            'state' => $state, 'url' => $url, 'open' => $ready && $url !== '', 'hero' => $agentFirst && $id === 'openclaw');
+    }
+    usort($list, function ($a, $b) { return $b['hero'] - $a['hero']; });
+    return $list;
+}
+
+function pmssWelcomeHomeStateWord($state)
+{
+    $words = array('running' => array('Running', 'h-state-run'), 'installing' => array('Setting up', 'h-state-warn'),
+        'not-running' => array('Not running', 'h-state-warn'), 'stopped' => array('Stopped', 'h-state-warn'),
+        'not secured' => array('Needs a login', 'h-state-warn'), 'gave up' => array('Gave up', 'h-state-bad'),
+        'failed' => array('Failed', 'h-state-bad'));
+    return $words[$state] ?? array('Status unavailable', '');
+}
+
+function pmssWelcomeHomeAppIcon($id)
+{
+    $media = array('jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'autobrr', 'Scryer');
+    $paths = array(
+        'torrent' => '<path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/>',
+        'media' => '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l4 2-4 2z"/><path d="M8 20h8"/>',
+        'cloud' => '<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18z"/>',
+        'agent' => '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',
+        'files' => '<path d="M4 6h6l2 2h8v10H4z"/>',
+    );
+    $kind = in_array($id, array('rtorrent', 'qBittorrent', 'Deluge', 'qui'), true) ? 'torrent'
+        : (in_array($id, $media, true) ? 'media' : (in_array($id, array('rclone', 'cloudplow'), true) ? 'cloud'
+        : ($id === 'openclaw' ? 'agent' : 'files')));
+    return '<svg class="h-ico" viewBox="0 0 24 24" aria-hidden="true">'.$paths[$kind].'</svg>';
+}
+
+function pmssWelcomeHomeAppsHtmlBuild(array $apps)
+{
+    $html = $apps === array() ? '<p class="h-muted h-apps-empty">No apps are switched on yet. Pick one to start:</p>' : '';
+    $html .= '<div class="h-apps">';
+    foreach (array_merge($apps, pmssWelcomeHomeSuggestions($apps)) as $app) {
+        if (!empty($app['ghost'])) {
+            $html .= '<div class="h-app h-app-ghost"><div class="h-app-top">'.pmssWelcomeHomeAppIcon($app['id']).'<span class="h-app-n">'.$app['name'].'</span><span class="h-state">Not set up</span></div>'
+                .'<div class="h-app-d">'.$app['desc'].'</div><a class="h-btn h-btn-quiet" href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)">Set up<span class="h-sr"> '.$app['name'].'</span></a></div>';
+            continue;
+        }
+        list($word, $class) = pmssWelcomeHomeStateWord($app['state']);
+        $action = $app['open']
+            ? '<a class="h-btn" href="'.pmssWelcomeHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open<span class="h-sr"> '.pmssWelcomeHtmlAttr($app['name']).'</span></a>'
+            : '<a class="h-btn h-btn-quiet" href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)">Manage<span class="h-sr"> '.pmssWelcomeHtmlAttr($app['name']).'</span></a>';
+        $html .= '<div class="h-app'.($app['hero'] ? ' h-app-hero' : '').'" data-app="'.pmssWelcomeHtmlAttr($app['id']).'">'
+            .'<div class="h-app-top">'.pmssWelcomeHomeAppIcon($app['id']).'<span class="h-app-n">'.pmssWelcomeHtmlAttr($app['name']).'</span>'
+            .'<span class="h-state '.$class.'" data-state-word>'.$word.'</span></div>'
+            .($app['desc'] !== '' ? '<div class="h-app-d">'.pmssWelcomeHtmlAttr($app['desc']).'</div>' : '')
+            .$action.'</div>';
+    }
+    return $html.'</div>';
+}
+
+/** Apps the account does not run yet, as quiet tiles that complete the last row of three; none once it runs six or more. */
+function pmssWelcomeHomeSuggestions(array $apps)
+{
+    if (count($apps) >= 6) return array();
+    $have = array();
+    foreach ($apps as $app) $have[$app['id']] = true;
+    $ideas = array(
+        'jellyfin' => array('Jellyfin', 'Stream your library to TV, phone and browser'),
+        'qBittorrent' => array('qBittorrent', 'A second torrent client with a modern web UI'),
+        'openclaw' => array('OpenClaw', 'An AI agent that works in your account, on your AI credits'),
+        'rclone' => array('rclone', 'Sync files to and from cloud storage'),
+        'sonarr' => array('Sonarr', 'Finds and downloads TV episodes'),
+    );
+    // A featured app spans its own row, so only the ordinary tiles count towards the row being completed.
+    $tiles = count(array_filter($apps, function ($app) { return empty($app['hero']); }));
+    $list = array();
+    foreach ($ideas as $id => $idea) {
+        if (isset($have[$id]) || count($list) >= 3 - $tiles % 3) continue;
+        $list[] = array('id' => $id, 'name' => $idea[0], 'desc' => $idea[1], 'ghost' => true);
+    }
+    return $list;
+}
+/** Connection details with copy buttons; client download links only to sites checked live. */
+function pmssWelcomeHomeConnectHtmlBuild($username, array $appsStatus, $agentFirst)
+{
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $host = preg_match('/^[a-z0-9.-]{1,253}$/', $host) ? $host : strtolower((string) (function_exists('gethostname') ? gethostname() : ''));
+    $rows = array(array('Host', $host), array('Username', (string) $username), array('SFTP / SSH port', '22'));
+    $html = '<section class="h-card" aria-labelledby="h-connect-title"><div class="h-head"><h2 id="h-connect-title" class="h-label">Connect</h2>'
+        .'<a class="h-head-link" href="data/">Browse files over HTTP</a></div><dl class="h-kv">';
+    foreach ($rows as $row) {
+        $html .= '<dt>'.$row[0].'</dt><dd>'.pmssWelcomeHtmlAttr($row[1]).'</dd><button type="button" class="h-copy" data-copy="'.pmssWelcomeHtmlAttr($row[1]).'" aria-label="Copy '.strtolower($row[0]).'">Copy</button>';
+    }
+    $html .= '</dl>';
+    $apps = is_array($appsStatus['apps'] ?? null) ? $appsStatus['apps'] : array();
+    if (!$agentFirst && isset($apps['rtorrent']) && ($apps['rtorrent']['state'] ?? 'off') !== 'off') {
+        $html .= '<p class="h-foot">Drop .torrent files into the <code>watch</code> folder and rTorrent starts them automatically.</p>';
+    }
+    $data = dirname(__DIR__).'/data';
+    $entries = is_dir($data) ? @scandir($data) : false;
+    if (is_array($entries) && count($entries) <= 2 && !$agentFirst) {
+        $html .= '<p class="h-foot">New here? The <a href="https://wiki.pulsedmedia.com/index.php/Getting_Started_with_the_Seedbox_Dashboard" target="_blank" rel="noopener">getting started guide</a> walks through the first steps.</p>';
+    }
+    return $html.'<p class="h-foot">Guides: <a href="https://wiki.pulsedmedia.com/index.php/Connecting_via_SFTP_using_filezilla" target="_blank" rel="noopener">SFTP with FileZilla</a> · '
+        .'<a href="https://wiki.pulsedmedia.com/index.php/How_to_connect_via_SSH" target="_blank" rel="noopener">SSH</a> · Clients: '
+        .'<a href="https://filezilla-project.org/download.php?type=client" target="_blank" rel="noopener">FileZilla</a> · '
+        .'<a href="https://winscp.net/eng/download.php" target="_blank" rel="noopener">WinSCP</a></p></section>';
+}
+
+/** The outbound speed rule while over the traffic limit, worded as the old over-limit warning worded it. */
+function pmssWelcomeHomeOverCapSpeedText($bandwidthState)
+{
+    $capMbit = is_numeric($bandwidthState['effectiveCapMbit'] ?? null) ? max(0, (int) $bandwidthState['effectiveCapMbit']) : 0;
+    return (!empty($bandwidthState['isReduced'])
+            ? 'Datacenter external outbound (TO internet) bandwidth is limited to '.number_format($capMbit).' Mbps.'
+            : 'While over the cap, datacenter external outbound (TO internet) bandwidth can be limited to '.number_format($capMbit).' Mbps.')
+        .' Datacenter internal and inbound bandwidth is unrestricted.';
+}
 ?>

@@ -89,7 +89,7 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertStringContainsString('pikkumies:rows:[1-6]', $index);
         // The frame is exactly the bar page's box: 52px for one row, +22px per extra row, no border of its own.
         $this->assertStringContainsString("bar.style.height = (52 + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';", $index);
-        $this->assertStringContainsString('.pmss-pikkumies-bar iframe {border:0;background:transparent;}', $welcome);
+        $this->assertStringContainsString('.pmss-pikkumies-bar iframe{border:0;background:transparent}', $welcome);
         $this->assertFalse(strpos($welcome, 'height:84px') !== false);
         $this->assertStringContainsString('}, 12000)', $index);
         $this->assertStringContainsString('}, 30000)', $index);

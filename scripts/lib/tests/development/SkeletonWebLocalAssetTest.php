@@ -36,25 +36,41 @@ class SkeletonWebLocalAssetTest extends TestCase
         );
     }
 
-    public function testWelcomeBonusBannerStylesStayWithGuivDeliveredPage(): void
+    /**
+     * The guiv heal delivers welcome.php far more often than update.php refreshes screen.css, so the
+     * Welcome home styles (status strip, bonus chip, metric cards) live inline in welcome.php itself.
+     */
+    public function testWelcomeHomeStylesStayWithGuivDeliveredPage(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/welcome.php',
             [
-                '.pmss-bonus-banner {',
-                'flex: 0 0 100%;',
-                '.pmss-bonus-banner strong {',
-                'font-size: 2.4rem;',
+                'function pmssWelcomeHomeCss()',
+                '<?= pmssWelcomeHomeCss() ?>',
+                '.h-status{',
+                '.h-metrics{',
+                '.h-chip-bonus b{',
             ],
-            []
+            [
+                '.pmss-bonus-banner',
+                'class="portfoliobox"',
+            ]
+        );
+        // Compact density: the Welcome body keeps the 13px panel text size.
+        $this->assertMatches(
+            '/\.h-body\{[^}]*font:13px\/1\.45 /',
+            $this->pmssReadRepoFile('etc/skel/www/welcome.php'),
+            'welcome.php must keep the compact 13px/1.45 body font on .h-body.'
         );
 
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/screen.css',
             [],
             [
-                '.pmss-bonus-banner {',
-                '.pmss-bonus-banner strong {',
+                '.h-status',
+                '.h-metrics',
+                '.h-chip-bonus',
+                '.pmss-bonus-banner',
             ]
         );
     }
@@ -69,15 +85,21 @@ class SkeletonWebLocalAssetTest extends TestCase
     public function testPortfolioboxDirectChildStylesStayWithGuivPage(): void
     {
         $candidates = [];
+        $portfolioboxPages = [];
         foreach (glob($this->pmssRepoPath('etc/skel/www/*.php')) ?: [] as $path) {
             $source = $this->pmssReadRepoFile('etc/skel/www/'.basename($path));
+            if (strpos($source, 'class="portfoliobox"') !== false) {
+                $portfolioboxPages[] = basename($path);
+            }
             $classes = $this->customerPanelPortfolioboxDirectChildClasses($source);
             if ($classes !== []) {
                 $candidates['etc/skel/www/'.basename($path)] = [$source, $classes];
             }
         }
 
-        $this->assertTrue($candidates !== [], 'Expected a portfoliobox panel source with a pmss-* child.');
+        // Welcome no longer uses portfoliobox (ADR 0147); info.php still does, so the scan stays meaningful.
+        $this->assertTrue(in_array('info.php', $portfolioboxPages, true), 'Expected info.php to keep its portfoliobox layout.');
+        $this->assertFalse(in_array('welcome.php', $portfolioboxPages, true), 'welcome.php must not reintroduce the portfoliobox layout.');
         $screenCss = $this->pmssReadRepoFile('etc/skel/www/screen.css');
         foreach ($candidates as $path => [$source, $classes]) {
             preg_match_all('/<style\b[^>]*>(.*?)<\/style>/is', $source, $styleMatches);
@@ -216,7 +238,9 @@ class SkeletonWebLocalAssetTest extends TestCase
 
         $startup = $this->welcomeStartupPhpBlock($welcome);
         preg_match_all('/\b(pmss[A-Za-z0-9_]*)\s*\(/', $startup, $callMatches);
-        $calls = array_unique($callMatches[1]);
+        // A call behind function_exists() is an optional helper from a separately healed file; it cannot fatal.
+        preg_match_all('/function_exists\(\s*[\'"](pmss[A-Za-z0-9_]*)[\'"]\s*\)/', $startup, $guardedMatches);
+        $calls = array_diff(array_unique($callMatches[1]), $guardedMatches[1]);
         sort($calls);
 
         $definitions = array_fill_keys(array_merge(

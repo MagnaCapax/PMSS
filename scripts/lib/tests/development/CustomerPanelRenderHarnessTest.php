@@ -9,10 +9,12 @@ class CustomerPanelRenderHarnessTest extends TestCase
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
             $new = $render('welcome.php', array('minBytes' => 10000))['stdout'];
-            $this->assertStringContainsString('<h6>Apps and settings</h6>', $new);
+            $this->assertStringContainsString('href="configure.php#apps"', $new);
+            $this->assertStringNotContainsString('id="h-legacy-title"', $new);
             $this->assertStringNotContainsString('<h6>Usage alert email</h6>', $new);
             $this->assertTrue(unlink($home.'/www/configureSettings.php'));
             $old = $render('welcome.php', array('minBytes' => 10000))['stdout'];
+            $this->assertStringContainsString('<h2 id="h-legacy-title" class="h-label">Apps and settings</h2>', $old);
             $this->assertStringContainsString('<h6>Usage alert email</h6>', $old);
             $this->assertStringContainsString('<h6>App passwords</h6>', $old);
         });
@@ -54,7 +56,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
         $this->assertFalse(is_dir($payload['environmentRoot']), 'Harness must clean its synthetic customer home');
     }
 
-    public function testWelcomeTrafficGaugeOmitsDuplicateUsedLimitFooter(): void
+    public function testWelcomeTrafficMetricShowsUsedOfLimitOnce(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
 
@@ -67,7 +69,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $expectations = \pmssCustomerPanelRenderExpectations();
             $result = $render('welcome.php', $expectations['welcome.php']);
 
-            $this->assertStringContainsString('Used: 35240 GiB / Limit: 100,000 GiB (30-day window)', $result['stdout']);
+            $this->assertStringContainsString('<div class="h-metric-v">35,240 GiB<span>of 100,000 GiB</span></div>', $result['stdout']);
+            $this->assertSame(1, substr_count($result['stdout'], 'of 100,000 GiB'));
             $this->assertStringNotContainsString('>35240 GiB / 100000 GiB</span>', $result['stdout']);
         });
     }
@@ -78,11 +81,11 @@ class CustomerPanelRenderHarnessTest extends TestCase
             @unlink($home.'/.trafficLimit');
 
             $result = $render('welcome.php',
-                ['minBytes' => 1024, 'markers' => ['Traffic Info']]
+                ['minBytes' => 1024, 'markers' => ['Traffic · 30 days']]
             );
 
-            $this->assertStringContainsString('Traffic used (30 days): 15 GiB', $result['stdout']);
-            $this->assertStringContainsString('Traffic limit: Unlimited', $result['stdout']);
+            $this->assertStringContainsString('<div class="h-metric-v">15 GiB<span>out · unlimited</span></div>', $result['stdout']);
+            $this->assertStringNotContainsString('Over your monthly traffic limit', $result['stdout']);
         });
     }
 
@@ -96,11 +99,13 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $result = [];
             $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $render): void {
                 $result = $render('welcome.php',
-                    ['minBytes' => 1024, 'markers' => ['Traffic Info']]
+                    ['minBytes' => 1024, 'markers' => ['Traffic · 30 days']]
                 );
             });
 
-            $this->assertStringContainsString('Current effective: full plan port speed', $result['stdout']);
+            $this->assertStringContainsString('full port speed', $result['stdout']);
+            $this->assertStringNotContainsString('<b>speed reduced</b>', $result['stdout']);
+            $this->assertStringNotContainsString('Traffic speed is reduced', $result['stdout']);
             $this->assertStringNotContainsString('Current effective: 25 Mbps (reduced)', $result['stdout']);
             $this->assertStringNotContainsString('Throttle cooldown active', $result['stdout']);
         });
@@ -117,10 +122,12 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $result = [];
             $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $render): void {
                 $result = $render('welcome.php',
-                    ['minBytes' => 1024, 'markers' => ['Traffic Info']]
+                    ['minBytes' => 1024, 'markers' => ['Traffic · 30 days']]
                 );
             });
 
+            $this->assertStringContainsString('Traffic speed is reduced', $result['stdout']);
+            $this->assertStringContainsString('<b>speed reduced</b>', $result['stdout']);
             $this->assertStringContainsString('Current effective: 25 Mbps (reduced)', $result['stdout']);
             $this->assertStringContainsString('Throttle cooldown active', $result['stdout']);
         });
@@ -140,11 +147,12 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $result = [];
             $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $render): void {
                 $result = $render('welcome.php',
-                    ['minBytes' => 1024, 'markers' => ['Traffic Info']]
+                    ['minBytes' => 1024, 'markers' => ['Traffic · 30 days']]
                 );
             });
 
-            $this->assertStringContainsString('OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH', $result['stdout']);
+            $this->assertStringContainsString('Over your monthly traffic limit', $result['stdout']);
+            $this->assertStringContainsString('bandwidth is limited to 100 Mbps.', $result['stdout']);
             $this->assertStringContainsString('Current effective: 100 Mbps (reduced)', $result['stdout']);
             $this->assertStringContainsString('Throttled to 100 Mbps', $result['stdout']);
             $this->assertStringNotContainsString('Current effective: full plan port speed', $result['stdout']);

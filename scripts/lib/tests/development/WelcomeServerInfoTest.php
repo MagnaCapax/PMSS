@@ -3,107 +3,110 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
+/** The Welcome status strip's Server card: host uptime only, the host-wide load average is gone (ADR 0147). */
 final class WelcomeServerInfoTest extends TestCase
 {
-    /** Load only the customer-tree helpers exercised by these hermetic tests. */
-    private function loadServerInfoHelpers(): void
+    /**
+     * Render the Server card once per uptime path in a child process. Everything in welcome.php
+     * from pmssWelcomeTrafficUpgradeUrlBuild() on is function definitions only, so the tail loads
+     * without running the page.
+     *
+     * @return array<int,string>
+     */
+    private function renderServerMetrics(array $uptimePaths): array
     {
-        if (function_exists('pmssWelcomeServerInfoHtmlBuild')) return;
-
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $start = strpos($source, 'function pmssWelcomeMetricSectionHtmlBuild');
-        $end = strpos($source, 'function pmssWelcomePercent');
-        $this->assertTrue($start !== false && $end !== false && $end > $start, 'Welcome server-info helpers should remain grouped');
+        $start = strpos($source, 'function pmssWelcomeTrafficUpgradeUrlBuild');
+        $this->assertTrue($start !== false, 'welcome.php view helpers should remain present');
 
-        $fixture = $this->pmssMakeTempPath('pmss-welcome-server-info-', '.php');
-        $scriptsHelper = $this->pmssRepoPath('etc/skel/www/scriptsInc.php');
-        $helpers = str_replace('pmssWelcomeHtmlAttr($title)', 'pmssCustomerHtmlAttr($title)', substr($source, $start, $end - $start));
-        require_once $this->pmssWriteFile(
+        $fixture = $this->pmssWriteFile(
+            $this->pmssMakeTempPath('pmss-welcome-server-info-', '.php'),
+            "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).";\n"
+            .preg_replace('/\?>\s*$/', '', substr($source, $start))
+        );
+        $output = $this->pmssRunInlinePhpRequire(
             $fixture,
-            "<?php\nrequire_once ".var_export($scriptsHelper, true).";\n"
-            .$helpers
+            '$html = array(); foreach ('.var_export(array_values($uptimePaths), true).' as $path) { $html[] = pmssWelcomeHomeServerMetricHtmlBuild($path); }'
+            .'echo json_encode($html);',
+            [],
+            '2>&1'
         );
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+        $this->pmssAssertStringNotContainsString('Warning', $output);
+        return $this->pmssDecodeJsonArray($output);
     }
 
-    /** Write uptime/load fixtures and return their paths. */
-    private function writeServerInfoFiles(string $uptime, string $load): array
+    private function writeUptimeFile(string $uptime): string
     {
-        $dir = $this->pmssMakeTempDir('pmss-welcome-server-info-data-');
-        return array(
-            $this->pmssWriteFile($dir.'/uptime', $uptime),
-            $this->pmssWriteFile($dir.'/loadavg', $load),
-        );
+        return $this->pmssWriteFile($this->pmssMakeTempDir('pmss-welcome-server-info-data-').'/uptime', $uptime);
     }
 
-    public function testValidMetricsRenderSharedServerLabels(): void
+    public function testValidUptimeRendersSharedServerLabel(): void
     {
-        $this->loadServerInfoHelpers();
-        list($uptimePath, $loadPath) = $this->writeServerInfoFiles("90061.25 1.00\n", "1.25 2.5 3.75 2/100 123\n");
+        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("90061.25 1.00\n")));
 
-        $html = \pmssWelcomeServerInfoHtmlBuild($uptimePath, $loadPath);
         $this->assertStringContainsAllStrings(array(
-            '<h6>Server Info</h6>',
-            'Server uptime: 1 day 1 hour',
-            'Server load average (1 / 5 / 15 min, shared server): 1.25 / 2.50 / 3.75',
+            '<div class="h-metric-l">Server</div>',
+            '<div class="h-metric-v">1 day 1 hour</div>',
+            'uptime · shared server',
         ), $html);
     }
 
     public function testSubMinuteUptimeDoesNotRoundUp(): void
     {
-        $this->loadServerInfoHelpers();
-        list($uptimePath, $loadPath) = $this->writeServerInfoFiles("59.99 10\n", "0 0 0 1/1 1\n");
+        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("59.99 10\n")));
 
-        $this->assertStringContainsString('Server uptime: under 1 minute', \pmssWelcomeServerInfoHtmlBuild($uptimePath, $loadPath));
+        $this->assertStringContainsString('<div class="h-metric-v">under 1 minute</div>', $html);
     }
 
-    public function testMissingUptimePreservesValidLoad(): void
+    public function testMissingUptimeFailsSoft(): void
     {
-        $this->loadServerInfoHelpers();
-        list($unusedUptimePath, $loadPath) = $this->writeServerInfoFiles("1 1\n", "0.1 0.2 0.3 1/1 1\n");
+        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("1 1\n").'.missing'));
 
-        $html = \pmssWelcomeServerInfoHtmlBuild($unusedUptimePath.'.missing', $loadPath);
-        $this->assertStringContainsAllStrings(array('Server uptime: unavailable', '0.10 / 0.20 / 0.30'), $html);
-    }
-
-    public function testMalformedLoadInputsFailSoft(): void
-    {
-        $this->loadServerInfoHelpers();
-        foreach (array('', '1 2', '1 nope 3', '1 -2 3', 'INF 2 3') as $load) {
-            list($uptimePath, $loadPath) = $this->writeServerInfoFiles("3600 1\n", $load);
-            $html = \pmssWelcomeServerInfoHtmlBuild($uptimePath, $loadPath);
-            $this->assertStringContainsAllStrings(array('Server uptime: 1 hour', 'shared server): unavailable'), $html);
-        }
+        $this->assertStringContainsAllStrings(array('<div class="h-metric-v">—</div>', 'uptime unavailable'), $html);
+        $this->pmssAssertStringNotContainsString('shared server', $html);
     }
 
     public function testInvalidUptimeInputsFailSoft(): void
     {
-        $this->loadServerInfoHelpers();
+        $paths = array();
         foreach (array('', '-1 1', 'nope 1', 'INF 1', 'NAN 1') as $uptime) {
-            list($uptimePath, $loadPath) = $this->writeServerInfoFiles($uptime, "1 2 3 1/1 1\n");
-            $html = \pmssWelcomeServerInfoHtmlBuild($uptimePath, $loadPath);
-            $this->assertStringContainsAllStrings(array('Server uptime: unavailable', '1.00 / 2.00 / 3.00'), $html);
+            $paths[] = $this->writeUptimeFile($uptime);
+        }
+
+        foreach ($this->renderServerMetrics($paths) as $index => $html) {
+            $this->assertStringContainsString('uptime unavailable', $html, 'uptime case '.$index);
         }
     }
 
-    public function testSymlinkedMetricFilesAreRejected(): void
+    public function testSymlinkedUptimeFileIsRejected(): void
     {
-        $this->loadServerInfoHelpers();
-        list($uptimeTarget, $loadTarget) = $this->writeServerInfoFiles("3600 1\n", "1 2 3 1/1 1\n");
-        $uptimeLink = $uptimeTarget.'.link';
-        $loadLink = $loadTarget.'.link';
-        $this->pmssCreateSymlinkOrSkip($uptimeTarget, $uptimeLink);
-        $this->pmssCreateSymlinkOrSkip($loadTarget, $loadLink);
+        $target = $this->writeUptimeFile("3600 1\n");
+        $link = $target.'.link';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
-        $html = \pmssWelcomeServerInfoHtmlBuild($uptimeLink, $loadLink);
-        $this->assertStringContainsAllStrings(array('Server uptime: unavailable', 'shared server): unavailable'), $html);
+        list($linked, $direct) = $this->renderServerMetrics(array($link, $target));
+        $this->assertStringContainsString('uptime unavailable', $linked);
+        $this->assertStringContainsString('<div class="h-metric-v">1 hour</div>', $direct);
     }
 
-    public function testWelcomeRendersServerInfoAfterRamInfo(): void
+    public function testServerCardDropsHostLoadAverage(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("3600 1\n")));
+
+        $this->pmssAssertStringNotContainsString('load', strtolower($html));
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', array(), array(
+            '/proc/loadavg',
+            'Server load average',
+            'function pmssWelcomeServerInfoHtmlBuild(',
+        ));
+    }
+
+    public function testWelcomeRendersServerCardAfterMemoryCard(): void
+    {
         $this->assertOrderedStrings(array(
-            'echo pmssWelcomeMemorySectionHtmlBuild();',
-            'echo pmssWelcomeServerInfoHtmlBuild();',
-        ), $source);
+            '.pmssWelcomeHomeMemoryMetricHtmlBuild($homeMemoryState)',
+            '.pmssWelcomeHomeServerMetricHtmlBuild();',
+        ), $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
     }
 }

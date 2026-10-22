@@ -1060,7 +1060,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Server Status – `etc/skel/www/welcome.php` and `stats.php`
 
-- Traffic Info uses the same over-cap result for its warning and disclosure. An over-cap account without an active throttle marker reports the cap as policy, not current speed; an active marker reports its effective Mbps value. Approaching and over-cap states link to the service's traffic upgrade, or KB article 36 when the billing service ID is unavailable. Unlimited plans retain their separate path.
+- Welcome is a status-first home (ADR 0147): a status strip (storage, traffic over the rolling 30 days, memory, server uptime) with the loyalty bonus chip in its header, alerts only when something needs the customer, app tiles from the shared app status reader, a Connect card, and one What's new list. Every figure comes from the existing readers (quota snapshot, traffic files, cgroup memory state); nothing is recomputed.
+- The traffic card and the traffic alert use the same over-cap result. An over-cap account without an active throttle marker reports the cap as policy, not current speed; an active marker reports its effective Mbps value. The over-cap or throttled alert links to the service's traffic upgrade, or KB article 36 when the billing service ID is unavailable; the card offers Add traffic from 80% when the billing service ID is known. Unlimited plans show used traffic without a bar.
+- The bonus chip reads `Loyalty bonus +N%` (`.bonus`), `Bonus disk +N GiB` (`.bonusQuota`), `Loyalty bonus 0%` only for a recorded zero, and `Loyalty bonus · how it works` when nothing is recorded.
+- What's new pins the two newest WHMCS announcements, then the newest blog posts and at most two wiki changes, six rows in one format. Remote content (announcements RSS, panel feed, remote heading) is cached per account in `~/.cache/pmss-welcome/` for 15 minutes and served stale when a fetch fails; `welcome.php?news=1` refreshes it after paint.
 - When the update-only `statsHelpers.php` has not arrived, `stats.php` returns
   HTTP 200 with a short reload notice instead of failing during the guiv heal.
 - `statsLive.php` (loaded by `stats.php` through `pmssWelcomeRequireLocalHelper()`; the block is simply absent when the helper has not arrived) prints
@@ -1072,9 +1075,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
   operations values; PHP template close tags otherwise consume source newlines (Refs #879).
 - The Storage I/O text uses saved display values when present and formats raw
   read/write bytes for month, week, day, and hour when display values are absent.
-- `pmssWelcomeServerInfoHtmlBuild()` renders host uptime plus the 1/5/15-minute load averages after the per-account RAM section.
-- Load is explicitly labeled as shared-server data rather than a per-account metric.
-- `/proc/uptime` and `/proc/loadavg` are read directly from the customer tree without shelling; each unavailable or malformed metric fails soft to `unavailable` without hiding the other metric.
+- `pmssWelcomeHomeServerMetricHtmlBuild()` renders host uptime as the server card after the memory card, labeled as shared-server data. The host-wide load average is not shown on Welcome (it is the server's run queue, not the account's load); the Info tab keeps its own load view.
+- `/proc/uptime` is read directly from the customer tree without shelling and fails soft to `unavailable`.
 - `info.php` renders the `/home` RAID notice first, then a full-width standing
   Server storage row. The row is absent when `/proc/pressure/io` is missing,
   unavailable when it cannot be read or parsed, and heavy when live five-minute

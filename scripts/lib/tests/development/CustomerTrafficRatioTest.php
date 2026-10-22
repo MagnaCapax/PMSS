@@ -30,7 +30,7 @@ final class CustomerTrafficRatioTest extends TestCase
     {
         $this->pmssAssertRepoFileContractCases([
             'etc/skel/www/welcome.php' => [
-                'required' => ['pmssTrafficRatioStateBuild($outboundMonth, $inboundMonth)', '$ratioState[\'color\']'],
+                'required' => ['pmssTrafficRatioStateBuild($usedMiB, $inbound)', '$traffic[\'ratio\'][\'color\']'],
                 'forbidden' => ['$ratio >= 2.0', '$ratio >= 1.0', '$ratio'.'Color'],
             ],
             'etc/skel/www/statsHelpers.php' => [

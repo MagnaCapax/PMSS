@@ -90,7 +90,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomeSourceContractsUseSafeCustomerHelpers(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', [
-            'if ($hardLimit == 0 || $totalSpace == 0)',
+            "\$fields['hardLimit'] == 0 || \$fields['totalSpace'] == 0",
             'Deluge Web UI password:',
             'pmssDelugeServicePasswordRotate((string) $username)',
             "pmssCustomerSerializedArrayFileRead('/etc/seedbox/config/vendor', 4096)",
@@ -100,6 +100,8 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             'Deluge password: <b>',
             'pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)',
             '$vendor = @unserialize($vendor)',
+            'function quotaCreateSection(',
+            'function trafficCreateSection(',
         ]);
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/webCgroupMemoryStatus.php', [
             '$readPressureStatus = pmssWebCgroupMemoryStatusRead();',
@@ -231,99 +233,177 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $this->assertSame(0, $this->runWelcomePageStateBonusQuota($home));
     }
 
-    public function testWelcomeQuotaSectionHandlesMalformedPayloadWithoutNotice(): void
+    /**
+     * Build the Welcome home quota and traffic view models in a child process and return the
+     * rendered status cards plus the alerts strip, exactly as welcome.php composes them.
+     *
+     * @return array{quotaState:string,quota:string,traffic:string,alerts:string}
+     */
+    private function renderWelcomeHome(array $quotaInfo, ?int $trafficMonthMiB, int $limitGiB, array $bandwidthState = array(), int $billingServiceId = 0, array $memory = array()): array
+    {
+        $traffic = $trafficMonthMiB === null ? array('raw' => array()) : array('raw' => array('month' => $trafficMonthMiB));
+        $bandwidthState += array('effectiveCapMbit' => 100, 'isReduced' => false);
+        $limitState = array('limitGiB' => $limitGiB, 'bonusGiB' => 0, 'effectiveLimitGiB' => $limitGiB);
+        $output = $this->runWelcomeUsageScript(
+            '$bandwidth = '.var_export($bandwidthState, true).';'
+            .'$quota = pmssWelcomeHomeQuotaStateBuild('.var_export($quotaInfo, true).');'
+            .'$traffic = pmssWelcomeHomeTrafficStateBuild('.var_export($traffic, true).', array(), '.var_export($limitState, true).', $bandwidth);'
+            .'echo json_encode(array('
+            .'"quotaState" => $quota["state"],'
+            .'"quota" => pmssWelcomeHomeQuotaMetricHtmlBuild($quota, '.$billingServiceId.'),'
+            .'"traffic" => pmssWelcomeHomeTrafficMetricHtmlBuild($traffic, '.$billingServiceId.'),'
+            .'"alerts" => pmssWelcomeHomeAlertsHtmlBuild($quota, $traffic, '.var_export($memory, true).', $bandwidth, '.$billingServiceId.')'
+            .'));',
+            '2>&1'
+        );
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+        return $this->pmssDecodeJsonArray($output);
+    }
+
+    public function testWelcomeHomeQuotaMetricHandlesMalformedPayloadWithoutNotice(): void
+    {
+        $home = $this->renderWelcomeHome(array('hardLimit' => 100, 'totalSpace' => 50), null, 0);
+        $this->assertSame('missing', $home['quotaState']);
+        $this->assertStringContainsString('Quota info is missing', $home['quota']);
+        $this->assertStringContainsAllStrings(array('Quota info is missing', 'If this persists for more than an hour, contact support.'), $home['alerts']);
+
+        foreach (array(array('hardLimit' => 0, 'totalSpace' => 50, 'usedBytes' => 10), array('hardLimit' => 100, 'totalSpace' => 0, 'usedBytes' => 10)) as $zeroLimit) {
+            $this->assertSame('missing', $this->renderWelcomeHome($zeroLimit, null, 0)['quotaState']);
+        }
+
+        $absent = $this->renderWelcomeHome(array(), null, 0);
+        $this->assertSame('none', $absent['quotaState']);
+        $this->assertStringContainsString('Open from the panel to see usage', $absent['quota']);
+        $this->pmssAssertStringNotContainsString('Quota info is missing', $absent['alerts']);
+    }
+
+    public function testWelcomeHomeQuotaMetricShowsUsedOfTotalWithoutBonusNote(): void
+    {
+        $home = $this->renderWelcomeHome(array('hardLimit' => 100, 'totalSpace' => 50, 'usedBytes' => 10), null, 0);
+
+        $this->assertSame('ok', $home['quotaState']);
+        $this->assertStringContainsAllStrings(array('<div class="h-metric-l">Storage</div>', '10 B<span>of 50 B</span>', '20.0% used'), $home['quota']);
+        $this->pmssAssertStringNotContainsString('burst limit', $home['quota']);
+        $this->pmssAssertStringNotContainsString('No bonus is applied', $home['quota']);
+        $this->assertSame('', $home['alerts']);
+    }
+
+    public function testWelcomeHomeQuotaMetricFlagsOverQuotaBurstLimit(): void
+    {
+        $home = $this->renderWelcomeHome(array('hardLimit' => 200, 'totalSpace' => 100, 'usedBytes' => 150), null, 0, array(), 42);
+
+        $this->assertSame('over', $home['quotaState']);
+        $this->assertStringContainsAllStrings(array('150.0% used · burst limit 200 B', 'class="t-bad"', 'Add storage', 'type=configoptions&amp;id=42'), $home['quota']);
+        $this->assertStringContainsAllStrings(array('Over your storage quota', 'You are allowed to burst quota up to 7 days.'), $home['alerts']);
+    }
+
+    public function testWelcomeHomeTrafficMetricHandlesMalformedPayloadWithoutNotice(): void
+    {
+        $home = $this->renderWelcomeHome(array(), null, 100);
+
+        $this->assertStringContainsString('Usage data is unavailable right now', $home['traffic']);
+        $this->assertSame('', $home['alerts']);
+    }
+
+    public function testWelcomeHomeTrafficMetricShowsUsedAndLimit(): void
+    {
+        $home = $this->renderWelcomeHome(array(), 433152, 1000);
+
+        $this->assertStringContainsAllStrings(
+            array('<div class="h-metric-l">Traffic · 30 days</div>', '423 GiB', '<span>of 1,000 GiB</span>', '42.3% · ', 'full port speed'),
+            $home['traffic']
+        );
+        $this->pmssAssertStringNotContainsString('Add traffic', $home['traffic']);
+        $this->assertSame('', $home['alerts']);
+    }
+
+    public function testWelcomeHomeTrafficMetricOffersAddTrafficFromEightyPercent(): void
+    {
+        $home = $this->renderWelcomeHome(array(), 819200, 1000, array(), 42);
+
+        $this->assertStringContainsAllStrings(array('80.0% · ', 'class="t-warn"', 'Add traffic', 'type=configoptions&amp;id=42'), $home['traffic']);
+        $this->assertSame('', $home['alerts']);
+
+        $unbilled = $this->renderWelcomeHome(array(), 819200, 1000);
+        $this->pmssAssertStringNotContainsString('Add traffic', $unbilled['traffic']);
+    }
+
+    public function testWelcomeTrafficDisclosureShowsApproachWarning(): void
     {
         $this->assertWelcomeUsageScriptContains(
-            'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50));',
-            ['Quota info is missing']
+            'echo pmssWelcomeTrafficDisclosureHtmlBuild(80.0, array("effectiveCapMbit" => 100, "isReduced" => false), 42, false);',
+            ['Current effective: full plan port speed', 'Usage: <b>80.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42']
         );
     }
 
-    public function testWelcomeQuotaSectionOmitsBonusStateNote(): void
-    {
-        $output = $this->assertWelcomeUsageScriptContains(
-            'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50, "usedBytes" => 10), 0, array("unit" => "percent", "value" => 0, "state" => "absent"));',
-            ['10 B/50 B']
-        );
-        $this->pmssAssertStringNotContainsString(
-            'No bonus is applied on this server yet. Earned bonus is added on top of your base resources, never taken from them.',
-            $output
-        );
-    }
-
-    public function testWelcomeQuotaSectionLabelsAggregateQuotaAsAdditionalDiskSpace(): void
-    {
-        $output = $this->assertWelcomeUsageScriptContains(
-            'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50, "usedBytes" => 10), 1925);',
-            ['Additional disk space: 1925 GiB']
-        );
-        $this->pmssAssertStringNotContainsString('Bonus disk space:', $output);
-    }
-
-    public function testWelcomeTrafficSectionHandlesMalformedPayloadWithoutNotice(): void
-    {
-        $this->assertWelcomeUsageScriptContains(
-            'ob_start(); trafficCreateSection(array("raw" => array()), 100); echo ob_get_clean();',
-            ['Traffic usage data is unavailable right now.']
-        );
-    }
-
-    public function testWelcomeTrafficSectionShowsRawUsedAndLimitLine(): void
-    {
-        $this->assertWelcomeUsageScriptContains(
-            'ob_start(); trafficCreateSection(array("raw" => array("month" => 433152)), 1000); echo ob_get_clean();',
-            ['Used: 423 GiB / Limit: 1,000 GiB (30-day window)', 'Current effective: full plan port speed']
-        );
-    }
-
-    public function testWelcomeTrafficSectionShowsApproachDisclosure(): void
-    {
-        $this->assertWelcomeUsageScriptContains(
-            'ob_start(); trafficCreateSection(array("raw" => array("month" => 819200)), 1000, null, 0, array(), 42); echo ob_get_clean();',
-            ['Usage: <b>80.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42']
-        );
-    }
-
-    public function testWelcomeTrafficSectionShowsOverCapWithoutThrottle(): void
+    public function testWelcomeHomeAlertsShowOverCapWithoutThrottle(): void
     {
         foreach (array(120 => 1228800, 248 => 2539520) as $percent => $month) {
-            $output = $this->assertWelcomeUsageScriptContains(
-                'ob_start(); trafficCreateSection(array("raw" => array("month" => '.$month.')), 1000, null, 0, array("effectiveCapMbit" => 25, "isReduced" => false), 42); echo ob_get_clean();',
-                ['Over monthly traffic cap', number_format($percent - 100, 1).'% over cap',
-                    'can be limited to 25 Mbps', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42']
+            $home = $this->renderWelcomeHome(array(), $month, 1000, array('effectiveCapMbit' => 25, 'isReduced' => false), 42);
+
+            $this->assertStringContainsAllStrings(
+                array('Over your monthly traffic limit', 'Over monthly traffic cap', number_format($percent - 100, 1).'% over cap',
+                    'While over the cap, datacenter external outbound (TO internet) bandwidth can be limited to 25 Mbps.',
+                    'Datacenter internal and inbound bandwidth is unrestricted.', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42'),
+                $home['alerts']
             );
-            $this->pmssAssertStringNotContainsString('Approaching monthly traffic cap', $output);
-            $this->pmssAssertStringNotContainsString('Current effective: full plan port speed', $output);
-            $this->pmssAssertStringNotContainsString('REDUCED BANDWIDTH', $output);
+            $this->pmssAssertStringNotContainsString('Approaching monthly traffic cap', $home['alerts']);
+            $this->pmssAssertStringNotContainsString('Current effective: full plan port speed', $home['alerts']);
+            $this->pmssAssertStringNotContainsString('Throttled to', $home['alerts']);
+            $this->pmssAssertStringNotContainsString('h-alert-bad', $home['alerts']);
+            $this->assertStringContainsAllStrings(array('class="t-bad"', 'full port speed', 'Add traffic', 'type=configoptions&amp;id=42'), $home['traffic']);
         }
     }
 
-    public function testWelcomeTrafficSectionShowsActiveThrottleDisclosure(): void
+    public function testWelcomeHomeAlertsShowActiveThrottleDisclosure(): void
     {
         $state = array('defaultCapMbit' => 100, 'effectiveCapMbit' => 25, 'isReduced' => true);
-        $this->assertWelcomeUsageScriptContains(
-            'ob_start(); trafficCreateSection(array("raw" => array("month" => 1536000)), 1000, null, 0, '.var_export($state, true).'); echo ob_get_clean();',
-            ['Throttled to 25 Mbps', '50.0% over cap', 'bandwidth is limited to 25 Mbps',
-                'Throttle lift requires 3 consecutive days under cap.', 'Add extra traffic to your plan', 'id=36']
+        $home = $this->renderWelcomeHome(array(), 1536000, 1000, $state);
+
+        $this->assertStringContainsAllStrings(
+            array('h-alert h-alert-bad', 'Over your monthly traffic limit', 'Current effective: 25 Mbps (reduced)', 'Throttled to 25 Mbps', '50.0% over cap',
+                'Throttle lift requires 3 consecutive days under cap.', 'Datacenter external outbound (TO internet) bandwidth is limited to 25 Mbps.',
+                'Add extra traffic to your plan', 'knowledgebase.php?action=displayarticle&amp;id=36'),
+            $home['alerts']
         );
+        $this->pmssAssertStringNotContainsString('can be limited to', $home['alerts']);
+        $this->assertStringContainsString('<b>speed reduced</b>', $home['traffic']);
     }
 
-    public function testWelcomeTrafficSectionLeavesUnlimitedPlanWithoutOverCapWarning(): void
+    public function testWelcomeHomeLeavesUnlimitedPlanWithoutOverCapWarning(): void
     {
-        $output = $this->assertWelcomeUsageScriptContains(
-            'ob_start(); trafficCreateSection(array("raw" => array("month" => 2539520)), 0); echo ob_get_clean();',
-            ['Traffic limit: Unlimited', 'Current effective: full plan port speed']
-        );
-        $this->pmssAssertStringNotContainsString('OVER TRAFFIC LIMIT WARNING', $output);
+        $home = $this->renderWelcomeHome(array(), 2539520, 0);
+
+        $this->assertStringContainsAllStrings(array('2,480 GiB', '<span>out · unlimited</span>', 'full port speed'), $home['traffic']);
+        $this->pmssAssertStringNotContainsString('of 0 GiB', $home['traffic']);
+        $this->assertSame('', $home['alerts']);
     }
 
-    public function testWelcomeTrafficSectionShowsCooldownDisclosure(): void
+    public function testWelcomeHomeAlertsShowCooldownDisclosure(): void
     {
         $state = array('defaultCapMbit' => 100, 'effectiveCapMbit' => 25, 'isReduced' => true, 'throttleFileMtime' => time() - 86400);
-        $this->assertWelcomeUsageScriptContains(
-            'ob_start(); trafficCreateSection(array("raw" => array("month" => 921600)), 1000, null, 0, '.var_export($state, true).'); echo ob_get_clean();',
-            ['Throttle cooldown active', 'current ceiling is 25 Mbps', 'remaining under-cap cooldown: about 2 days']
+        $home = $this->renderWelcomeHome(array(), 921600, 1000, $state);
+
+        $this->assertStringContainsAllStrings(
+            array('Traffic speed is reduced', 'Throttle cooldown active', 'current ceiling is 25 Mbps', 'remaining under-cap cooldown: about 2 days', 'Add extra traffic to your plan'),
+            $home['alerts']
         );
+        $this->pmssAssertStringNotContainsString('Over your monthly traffic limit', $home['alerts']);
+        $this->pmssAssertStringNotContainsString('can be limited to', $home['alerts']);
+    }
+
+    public function testWelcomeHomeAlertsReportMemoryThrottleAndOverLimit(): void
+    {
+        $throttled = array('status' => 'THROTTLED', 'oom_events' => 0, 'max_events' => 0);
+        $cases = array(
+            'throttled' => array(array('limitBytes' => 100, 'processBytes' => 50, 'pressureStatus' => $throttled), 'RAM throttle active'),
+            'over' => array(array('limitBytes' => 100, 'processBytes' => 150), 'RAM limit exceeded'),
+            'overAfterOom' => array(array('limitBytes' => 100, 'processBytes' => 150, 'pressureStatus' => array('oom_events' => 1) + $throttled), 'RAM limit exceeded'),
+        );
+        foreach ($cases as $name => list($memory, $expected)) {
+            $this->assertStringContainsString($expected, $this->renderWelcomeHome(array(), null, 0, array(), 0, $memory)['alerts'], $name);
+        }
+        $this->assertSame('', $this->renderWelcomeHome(array(), null, 0, array(), 0, array('limitBytes' => 100, 'processBytes' => 50))['alerts']);
     }
 
     public function testWelcomeMemorySectionSnapshots(): void

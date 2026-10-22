@@ -45,7 +45,7 @@ final class CustomerStatsLayoutTest extends TestCase
         $stats = $this->pmssRenderCustomerPanelPage('stats.php');
 
         $this->assertOrderedStrings(
-            array('<div class="pmss-bonus-banner" role="status">', 'ADDITIONAL DISK SPACE: 50 GiB', 'Additional disk space is included in your quota on this server.', '<div class="portfolioimg">'),
+            array('<section class="h-card h-status"', 'Bonus disk <b>+50 GiB</b>', '<div class="h-metrics">'),
             $welcome,
             'Missing welcome bonus layout marker: ',
             'Welcome bonus order changed at: '

@@ -21,8 +21,51 @@ require_once __DIR__.'/scriptsInc.php';
  */
 function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw, string $category = '', int $limit = 4): string
 {
-    if ($rssRaw === '') {
+    $rssXml = pmssWelcomeFeedXmlParse($rssRaw);
+    if ($rssXml === null) {
         return '';
+    }
+
+    $itemsHtml = '';
+    $renderedItems = 0;
+ $limit = ($limit > 0 && $limit <= 20) ? $limit : 4;
+ // Dates earn their ~8 characters only on time-sensitive notices. Evergreen article and wiki
+ // rows are title-only: at 768px the column holds ~51 characters, so a (dd/mm) prefix costs
+ // 10-16%% of the scan line and manufactures a staleness impression on content that has none.
+ $showDate = ($category === '' || $category === 'announcement');
+    foreach (pmssWelcomeFeedItemsFromXml($rssXml, $category) as $item) {
+        $datePrefix = $showDate ? '('.date('d/m', $item['time']).') ' : '';
+        $itemsHtml .= '<li class="pmss-feed-row">'.$datePrefix.'<a href="'.pmssCustomerHtmlAttr($item['link']).'" target="_blank">'
+            .pmssCustomerHtmlAttr($item['title'])."</a></li>\n";
+        if (++$renderedItems === $limit) {
+            break;
+        }
+    }
+
+    return $itemsHtml;
+}
+
+/**
+ * Structured feed items for the Welcome "What's new" list: same parsing and hardening as the
+ * HTML builder above, returned as data so the page owns one row format for every source.
+ *
+ * @return array<int,array{title:string,link:string,time:int,category:string}>
+ */
+function pmssWelcomeFeedItemsRead(string $rssRaw, string $category = '', int $limit = 20): array
+{
+    $rssXml = pmssWelcomeFeedXmlParse($rssRaw);
+    if ($rssXml === null) {
+        return array();
+    }
+    $limit = ($limit > 0 && $limit <= 40) ? $limit : 20;
+    return array_slice(pmssWelcomeFeedItemsFromXml($rssXml, $category), 0, $limit);
+}
+
+/** Parse a feed fail-soft: malformed XML, invalid UTF-8 and parser exceptions all yield null. */
+function pmssWelcomeFeedXmlParse(string $rssRaw): ?SimpleXMLElement
+{
+    if ($rssRaw === '') {
+        return null;
     }
 
     if (
@@ -48,17 +91,17 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw, string $ca
         }
     }
 
-    if ($rssXml === false || !isset($rssXml->channel->item)) {
-        return '';
-    }
+    return ($rssXml === false || !isset($rssXml->channel->item)) ? null : $rssXml;
+}
 
-    $itemsHtml = '';
-    $renderedItems = 0;
- $limit = ($limit > 0 && $limit <= 20) ? $limit : 4;
- // Dates earn their ~8 characters only on time-sensitive notices. Evergreen article and wiki
- // rows are title-only: at 768px the column holds ~51 characters, so a (dd/mm) prefix costs
- // 10-16%% of the scan line and manufactures a staleness impression on content that has none.
- $showDate = ($category === '' || $category === 'announcement');
+/**
+ * The items of a parsed feed, newest first as the feed lists them, restricted to $category when given.
+ *
+ * @return array<int,array{title:string,link:string,time:int,category:string}>
+ */
+function pmssWelcomeFeedItemsFromXml(SimpleXMLElement $rssXml, string $category = ''): array
+{
+    $items = array();
     foreach ($rssXml->channel->item as $thisItem) {
         if (!isset($thisItem->pubDate, $thisItem->link, $thisItem->title)) {
             continue;
@@ -67,7 +110,8 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw, string $ca
         // Third-party feed items can carry a hostile link. Restrict the scheme to http(s) and
         // escape the href exactly as the title already is (CWE-79).
         // One merged feed carries every category; a block renders only its own.
-        if ($category !== '' && strtolower(trim((string) $thisItem->category)) !== $category) {
+        $itemCategory = strtolower(trim((string) $thisItem->category));
+        if ($category !== '' && $itemCategory !== $category) {
             continue;
         }
 
@@ -87,13 +131,9 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw, string $ca
             $itemTitle = $trimmedTitle;
         }
 
-        $datePrefix = $showDate ? '('.date('d/m', strtotime((string) $thisItem->pubDate)).') ' : '';
-        $itemsHtml .= '<li class="pmss-feed-row">'.$datePrefix.'<a href="'.pmssCustomerHtmlAttr($itemLink).'" target="_blank">'
-            .pmssCustomerHtmlAttr($itemTitle)."</a></li>\n";
-        if (++$renderedItems === $limit) {
-            break;
-        }
+        $time = strtotime((string) $thisItem->pubDate);
+        $items[] = array('title' => $itemTitle, 'link' => $itemLink, 'time' => $time === false ? 0 : $time, 'category' => $itemCategory);
     }
 
-    return $itemsHtml;
+    return $items;
 }
