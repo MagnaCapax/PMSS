@@ -284,6 +284,31 @@ PHP, <<<'PHP'
 		if($req->success($trusted && !array_diff($ss, array("superseed", "ulslots", "pex", "peers_min", "peers_max", "tracker_numwant"))))
 PHP
         ],
+        // rTorrent 0.16 serves the port getters only on trusted calls; client-added getters stay untrusted.
+        ['plugins/httprpc/action.php', <<<'PHP'
+		$req = new rXMLRPCRequest( new rXMLRPCCommand( "dht_statistics" ) );
+		foreach( $cmds as $cmd )
+			$req->addCommand( new rXMLRPCCommand( $cmd ) );	
+		foreach( $add as $prm )
+			$req->addCommand( new rXMLRPCCommand( $prm ) );	
+		if($req->success(false))
+		{
+	        	$result = array();
+PHP, <<<'PHP'
+		$req = new rXMLRPCRequest( new rXMLRPCCommand( "dht_statistics" ) );
+		foreach( $cmds as $cmd )
+			$req->addCommand( new rXMLRPCCommand( $cmd ) );	
+		// The fixed getters above may need a trusted call; client-named getters never get one.
+		$addReq = ($trusted && count($add)) ? new rXMLRPCRequest() : $req;
+		foreach( $add as $prm )
+			$addReq->addCommand( new rXMLRPCCommand( $prm ) );	
+		if($req->success($trusted) && (($addReq === $req) || $addReq->success(false)))
+		{
+			if($addReq !== $req)
+				$req->val = array_merge($req->val, $addReq->val);
+	        	$result = array();
+PHP
+        ],
     ];
 }
 

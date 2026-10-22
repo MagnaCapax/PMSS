@@ -174,10 +174,14 @@ switch($mode)
 		$req = new rXMLRPCRequest( new rXMLRPCCommand( "dht_statistics" ) );
 		foreach( $cmds as $cmd )
 			$req->addCommand( new rXMLRPCCommand( $cmd ) );	
+		// The fixed getters above may need a trusted call; client-named getters never get one.
+		$addReq = ($trusted && count($add)) ? new rXMLRPCRequest() : $req;
 		foreach( $add as $prm )
-			$req->addCommand( new rXMLRPCCommand( $prm ) );	
-		if($req->success(false))
+			$addReq->addCommand( new rXMLRPCCommand( $prm ) );	
+		if($req->success($trusted) && (($addReq === $req) || $addReq->success(false)))
 		{
+			if($addReq !== $req)
+				$req->val = array_merge($req->val, $addReq->val);
 	        	$result = array();
 			$dht_active = $req->val[0];
                         $dht = $req->val[1];

@@ -327,7 +327,12 @@ PHP;
             $block = substr($source, $start, strpos($source, "\tcase ", $start+1)-$start);
             $this->assertStringContainsString('$req->success($trusted)', $block, $mode);
         }
-        foreach (['list', 'stg', 'ttl', 'prp', 'trkall', 'setsettings', 'setul', 'setdl', 'getchunks'] as $mode) {
+        $start = strpos($source, 'case "stg":');
+        $stg = substr($source, $start, strpos($source, "\tcase ", $start+1)-$start);
+        $this->assertStringContainsString('$req->success($trusted)', $stg);
+        $this->assertStringContainsString('$addReq->success(false)', $stg);
+        $this->assertStringContainsString('$addReq = ($trusted && count($add)) ? new rXMLRPCRequest() : $req;', $stg);
+        foreach (['list', 'ttl', 'prp', 'trkall', 'setsettings', 'setul', 'setdl', 'getchunks'] as $mode) {
             $start = strpos($source, 'case "'.$mode.'":');
             $end = strpos($source, "\tcase ", $start+1);
             if ($end === false) $end = strpos($source, "\tdefault:", $start+1);
