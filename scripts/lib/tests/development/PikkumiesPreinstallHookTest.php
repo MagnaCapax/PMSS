@@ -34,6 +34,36 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->assertFalse(\pmssPikkumiesPreinstallStateClear('alice', $root.'/state-link'));
     }
 
+    public function testAskStateClearRemovesOnlyThatAccountsFilesAndNoLinkTarget(): void
+    {
+        require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-ask-');
+        $dir = $root.'/ask';
+        $this->pmssEnsureDir($dir);
+        foreach (['.out', '.in', '.lock', '.out.rc'] as $suffix) {
+            file_put_contents($dir.'/alice'.$suffix, 'x');
+        }
+        file_put_contents($dir.'/alicebob.out', 'other account');
+        file_put_contents($root.'/target', 'keep');
+        unlink($dir.'/alice.in');
+        symlink($root.'/target', $dir.'/alice.in');
+
+        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $dir));
+        foreach (['.out', '.in', '.lock', '.out.rc'] as $suffix) {
+            $this->assertFalse(file_exists($dir.'/alice'.$suffix) || is_link($dir.'/alice'.$suffix));
+        }
+        $this->assertSame('other account', file_get_contents($dir.'/alicebob.out'));
+        $this->assertSame('keep', file_get_contents($root.'/target'));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $dir));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $root.'/missing'));
+
+        $this->pmssEnsureDir($dir.'/alice.out');
+        $this->assertFalse(\pmssPikkumiesAskStateClear('alice', $dir));
+        $this->assertFalse(\pmssPikkumiesAskStateClear('../target', $dir));
+        symlink($dir, $root.'/ask-link');
+        $this->assertFalse(\pmssPikkumiesAskStateClear('alice', $root.'/ask-link'));
+    }
+
     public function testLifecycleFlowsClearMarkerAfterAccountAndSkeletonChanges(): void
     {
         $terminate = $this->pmssReadRepoExecutableSource('scripts/terminateUser.php');

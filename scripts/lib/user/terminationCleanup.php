@@ -80,6 +80,11 @@ function pmssTerminateUserClearPreinstallState(string $username, bool $dryRun, b
     }
     $log = $logger ?? 'pmssUserLifecycleContextLogStatusMessage';
     $log('terminate', 'clear_pikkumies_preinstall_state', $username, $status, $message);
+    if (!$dryRun && !$accountPresent && $stateDir === null) {
+        $askCleared = pmssPikkumiesAskStateClear($username);
+        $log('terminate', 'clear_pikkumies_ask_state', $username, $askCleared ? 'OK' : 'ERR',
+            $askCleared ? 'Detached-ask files cleared or absent' : 'Failed to clear detached-ask files');
+    }
     return $status;
 }
 
