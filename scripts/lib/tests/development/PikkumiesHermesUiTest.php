@@ -59,7 +59,7 @@ final class PikkumiesHermesUiTest extends TestCase
             'log_format pmss_ui_b_noargs');
         $lighttpd = \pmssLighttpdPikkumiesHermesBlock('uitester', 24000);
         $this->assertStringContainsAllStrings(['^/__pmss-ui-b/', '"socket" => "/home/uitester/.mcxPikkumies/pikkumies/local/ui/hermes/ui.sock"',
-            '"Authorization" => ""', 'X-Forwarded-Proto'], $lighttpd);
+            '"Authorization" => ""'], $lighttpd);
         $this->assertSame('', \pmssLighttpdPikkumiesHermesBlock('../uitester', 24000));
     }
 

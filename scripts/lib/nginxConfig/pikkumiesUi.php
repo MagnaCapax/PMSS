@@ -46,6 +46,9 @@ function pmssPikkumiesHermesLoginLocations(string $prefix, int $lighttpdPort, st
         proxy_pass http://127.0.0.1:{$lighttpdPort}{$prefix}/__pmss-session;
         proxy_set_header Authorization "";
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
     }
 
@@ -203,12 +206,18 @@ server {
         proxy_set_header Content-Length "";
         proxy_set_header Authorization "";
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
     }
     location ~ ^/(?:login(?:/|\$)|auth/password-login(?:/|\$)|api/auth/providers(?:/|\$)|assets/|ds-assets/|fonts/|fonts-terminal/|favicon\.ico\$) {
         proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b\$request_uri;
         proxy_set_header Authorization "";
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
     }
     location / {
@@ -216,6 +225,9 @@ server {
         proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b\$request_uri;
         proxy_set_header Authorization "";
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -318,12 +330,18 @@ server {
         proxy_set_header Content-Length "";
         proxy_set_header Authorization "";
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
     }
     location ~ ^/(?:login(?:/|\$)|auth/password-login(?:/|\$)|api/auth/providers(?:/|\$)|assets/|ds-assets/|fonts/|fonts-terminal/|favicon\.ico\$) {
         proxy_pass http://127.0.0.1:{$lighttpdPort}\${$variable}_prefix\$request_uri;
         proxy_set_header Authorization \${$variable}_authorization;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
     }
     location /api/ {
@@ -331,6 +349,9 @@ server {
         proxy_pass http://127.0.0.1:{$lighttpdPort}\${$variable}_prefix\$request_uri;
         proxy_set_header Authorization \${$variable}_authorization;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -344,6 +365,9 @@ server {
         proxy_pass http://127.0.0.1:{$lighttpdPort}\${$variable}_prefix\$request_uri;
         proxy_set_header Authorization \${$variable}_authorization;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
         proxy_set_header Host \$host;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";

@@ -25,7 +25,7 @@ function pmssLighttpdPikkumiesHermesBlock(string $user, int $port): string
     return <<<LIGHTTPD
 
 \$HTTP["url"] =~ "^/__pmss-ui-b/" {
-    setenv.set-request-header = ( "Authorization" => "", "X-Forwarded-Proto" => "https" )
+    setenv.set-request-header = ( "Authorization" => "" )
     proxy.server = ( "" => (( "socket" => "{$socket}" )) )
     proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/__pmss-ui-b/" => "/" ) )
     server.max-read-idle = 3600
@@ -42,13 +42,12 @@ function pmssLighttpdHermesUiBlock(string $user, int $port, string $mode = 'vani
         ? '"socket" => "/home/'.$user.'/.config/pmss/ui/agentboard.sock"'
         : '"socket" => "/home/'.$user.'/.hermes/pmss-dashboard.sock"';
     $prefix = $mode === 'vanilla-agentboard' ? '/__pmss-ui-c-agentboard/' : '/__pmss-ui-c/';
-    $authHeader = $mode === 'vanilla-agentboard' ? '' : '"Authorization" => "", ';
+    $authHeader = $mode === 'vanilla-agentboard' ? '' : "    setenv.set-request-header = ( \"Authorization\" => \"\" )\n";
     return <<<LIGHTTPD
 
 # Port C has a private upstream selected by the account's Configure setting.
 \$HTTP["url"] =~ "^{$prefix}" {
-    setenv.set-request-header = ( {$authHeader}"X-Forwarded-Proto" => "https" )
-    proxy.server = ( "" => (( {$upstream} )) )
+{$authHeader}    proxy.server = ( "" => (( {$upstream} )) )
     proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "{$prefix}" => "/" ) )
     server.max-read-idle = 3600
     server.max-write-idle = 3600

@@ -20,6 +20,8 @@ server.modules              = (
         # mod_deflate disabled (2025-11): single-tenant vhosts gain negligible benefit; revisit post-2028 and remove packages/config if still unused.
         #"mod_deflate",
         "mod_accesslog",
+        # Gives lighttpd the scheme nginx received; settings after the custom includes (ADR 0153).
+        "mod_extforward",
 )
 #See https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions
 server.port = ##serverPort
@@ -62,6 +64,12 @@ include_shell "/usr/share/lighttpd/create-mime*pl"
 ##PMSS_TRANSMISSION_PROXY##
 include "/home/##username/.lighttpd/custom"
 include "/home/##username/.lighttpd/custom.d/*.conf"
+
+# ADR 0153: nginx connects from 127.0.0.2 and sends X-PMSS-Proxy-Hop: 127.0.0.1, so lighttpd uses
+# the scheme from X-Forwarded-Proto and keeps 127.0.0.1 as the client address. "+=" after the
+# includes merges with any extforward settings an account sets in its custom files.
+extforward.forwarder += ( "127.0.0.2" => "trust" )
+extforward.headers += ( "X-PMSS-Proxy-Hop" )
 
 auth.backend = "htpasswd"
 auth.backend.htpasswd.userfile = "/home/##username/.lighttpd/.htpasswd"

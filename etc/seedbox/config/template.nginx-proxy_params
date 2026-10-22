@@ -8,6 +8,12 @@ proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_set_header X-Forwarded-Proto $scheme;
+# RFC 7239 form of the client address and scheme for apps that read it. Quoting assumes IPv4
+# listeners (IPv6 needs for="[addr]").
+proxy_set_header Forwarded "for=\"$remote_addr\";proto=$scheme";
+# ADR 0153: lighttpd reads the scheme only from connections from 127.0.0.2 carrying this header.
+proxy_bind 127.0.0.2;
+proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
 proxy_set_header Authorization $http_authorization;
 proxy_read_timeout 300s;
 proxy_send_timeout 300s;

@@ -140,7 +140,7 @@ final class PikkumiesUiRoutesTest extends TestCase
             \pmssHermesUiDefaultNginxBlock("    ssl_certificate /safe/fullchain.pem;\n"));
         $hermes = \pmssLighttpdHermesUiBlock('uitester', 24000);
         $agentboard = \pmssLighttpdHermesUiBlock('uitester', 24000, 'vanilla-agentboard');
-        $this->assertStringContainsAllStrings(['^/__pmss-ui-c/', 'X-Forwarded-Proto', '"Authorization" => ""'], $hermes);
+        $this->assertStringContainsAllStrings(['^/__pmss-ui-c/', '"Authorization" => ""'], $hermes);
         $this->assertStringContainsString('/home/uitester/.hermes/pmss-dashboard.sock', $hermes);
         $this->assertStringContainsString('/home/uitester/.config/pmss/ui/agentboard.sock', $agentboard);
         $this->assertFalse(strpos($agentboard, '"Authorization" => ""') !== false);
