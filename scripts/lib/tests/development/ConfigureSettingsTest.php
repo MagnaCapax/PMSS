@@ -338,6 +338,16 @@ class ConfigureSettingsTest extends TestCase
         $this->assertSame("# retained\nopenclaw||||50\ncustom0|Help|Docs|/docs|20\n", file_get_contents($path));
     }
 
+    public function testCustomFramesActionWithNoRowsRemovesTheLastTab(): void
+    {
+        $home = $this->home();
+        $path = $home.'/.customFrames';
+        $this->pmssWriteFile($path, "# retained\nopenclaw||||50\ncustom0|Help|Docs|/docs|20\n");
+        $this->assertTrue(\pmssConfigureActionApply($home, 'customFrames', array('password' => 'secret'))['ok']);
+        $this->assertSame("# retained\nopenclaw||||50\n", file_get_contents($path));
+        $this->assertFalse(\pmssConfigureActionApply($home, 'customFrames', array('password' => 'secret', 'rows' => 'not-a-list'))['ok']);
+    }
+
     public function testRtorrentBoundsAndSymlinkTarget(): void
     {
         $home = $this->home();

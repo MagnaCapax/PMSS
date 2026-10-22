@@ -206,7 +206,8 @@ function pmssConfigureActionRun($home, $action, $request, $ops = array())
         $path = $home.'/.customFrames';
         // Refuse oversized existing files rather than silently dropping rows.
         $value = is_file($path) && @filesize($path) > 4096 ? null
-            : pmssConfigureFramesBuild(isset($request['rows']) ? $request['rows'] : null,
+            // Removing the last custom tab sends no rows field at all (jQuery omits an empty array): an empty list.
+            : pmssConfigureFramesBuild(isset($request['rows']) ? $request['rows'] : array(),
                 pmssConfigureFileRead($path, 4096));
         $ok = $value !== null && pmssConfigureFileWrite($path, $value);
         $message = $ok ? 'Custom tabs saved. Reload the panel to see them.' : 'Check the custom tab fields and try again.';
