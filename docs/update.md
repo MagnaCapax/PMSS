@@ -266,7 +266,7 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    The installed rTorrent store default also gets an account default link when
    neither a selection nor a prior-switch `lastRun` record exists, its custom rc
    is absent or matches the readable current skeleton, and all three ruTorrent
-   compatibility markers occur in regular non-symlink account files (ADR 0142).
+   compatibility markers occur in regular non-symlink account files (ADR 0146).
    Tenant checks run as the account. rTorrent defaults to 0.16.25, and jesec
    0.9.8-r16 is offered again; qBittorrent and Deluge keep system defaults,
    while Transmission stays opt-in.

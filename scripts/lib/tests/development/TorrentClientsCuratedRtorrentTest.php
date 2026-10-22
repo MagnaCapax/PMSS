@@ -34,7 +34,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame('974c367b92eca69b85de8afde4937559b8396dc996694da2e7cb4fdc38dc8b40', $entry['sha256']);
         $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $entry['sha256']));
         $this->assertFalse($entry['isDefault']);
-        // Offered again with the bundled ruTorrent compatibility patches (ADR 0142).
+        // Offered again with the bundled ruTorrent compatibility patches (ADR 0146).
         $this->assertFalse($entry['disabled']);
         $this->assertFalse(file_exists(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.enabled'));
     }

@@ -1,4 +1,4 @@
-# ADR 0142: rTorrent store default and fast-exit fallback
+# ADR 0146: rTorrent store default and fast-exit fallback
 
 Date: 2026-10-22
 Category: architecture
