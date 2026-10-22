@@ -126,11 +126,31 @@ function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version,
         if (!@symlink($version.'/agentboard', $next)) return false;
         $switched = @rename($next, $link);
         if (!$switched) @unlink($next);
+        // Record what was published so the next update run can skip the download (a missing stamp only costs one).
+        if ($switched) @file_put_contents($root.'/.installed-'.$version, pmssPikkumiesAgentboardStamp($sha256, $staged)."\n");
         return $switched;
     } finally {
         // Remove the extraction tree without following archive links.
         pmssRootOwnedTreeRemove($stage);
     }
+}
+
+/** The installed-release stamp: the archive pin plus the content manifest that was published from it. */
+function pmssPikkumiesAgentboardStamp(string $sha256, array $manifest): string
+{
+    return strtolower($sha256).' '.hash('sha256', json_encode($manifest));
+}
+
+/** True when this pinned release is published, linked and unchanged since it was installed. */
+function pmssPikkumiesAgentboardInstalled(string $version, string $sha256, string $root = PMSS_PIKKUMIES_AGENTBOARD_ROOT, int $ownerUid = 0): bool
+{
+    $link = $root.'/agentboard';
+    $stamp = $root.'/.installed-'.$version;
+    if (!is_link($link) || @readlink($link) !== $version.'/agentboard') return false;
+    if (!is_file($stamp) || is_link($stamp) || @fileowner($stamp) !== $ownerUid) return false;
+    $manifest = pmssPikkumiesAgentboardTreeManifest($root.'/'.$version, $ownerUid);
+    return $manifest !== false
+        && trim((string) @file_get_contents($stamp, false, null, 0, 256)) === pmssPikkumiesAgentboardStamp($sha256, $manifest);
 }
 
 /** Keep the update hook a logged no-op until the release has immutable pins. */
@@ -153,6 +173,10 @@ function pmssPikkumiesAgentboardInstall(): void
     }
     if (!pmssPinnedRemoteAmd64OrSkip('Pikkumies Agentboard', 'install')) return;
     $root = PMSS_PIKKUMIES_AGENTBOARD_ROOT;
+    if (pmssPikkumiesAgentboardInstalled($version, $sha256, $root)) {
+        logmsg('[SKIP] Pikkumies Agentboard '.$version.' is already installed');
+        return;
+    }
     $url = 'https://github.com/MagnaCapax/mcxPikkumiesAgentboard/releases/download/'
         .rawurlencode($version).'/agentboard-linux-x64-baseline.tar.gz';
     pmssPinnedRemoteArtifactTempFileUse('Pikkumies Agentboard '.$version, $url, $sha256,

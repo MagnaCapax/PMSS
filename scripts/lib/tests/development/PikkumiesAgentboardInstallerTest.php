@@ -149,6 +149,32 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         $this->assertSame(1, count(glob($root.'/.quarantine/v1-*')));
     }
 
+    /** An unchanged published release skips the download; any change or a new pin downloads again. */
+    public function testInstalledReleaseIsDetectedOnlyWhenUnchanged(): void
+    {
+        $temp = $this->pmssMakeTempDir('pmss-agentboard-installed-');
+        $root = $temp.'/installed';
+        $archive = $this->archive($temp, 'stamp');
+        $uid = posix_geteuid();
+        $sha = hash_file('sha256', $archive);
+        $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid));
+        $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha, $root, $uid));
+        $this->assertTrue(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid));
+        $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', str_repeat('a', 64), $root, $uid), 'new pin');
+        $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v2', $sha, $root, $uid), 'other version');
+        $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid + 1), 'other owner');
+        file_put_contents($root.'/v1/dist/client/app.js', 'changed');
+        $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid), 'changed content');
+        $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha, $root, $uid));
+        $this->assertTrue(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid));
+        unlink($root.'/agentboard');
+        $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid), 'link removed');
+        symlink('v1/agentboard', $root.'/agentboard');
+        unlink($root.'/.installed-v1');
+        symlink($temp.'/stamp.tar.gz', $root.'/.installed-v1');
+        $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid), 'linked stamp');
+    }
+
     public function testWrongOwnerVersionIsNotTrusted(): void
     {
         $root = $this->pmssMakeTempDir('pmss-agentboard-owner-');
