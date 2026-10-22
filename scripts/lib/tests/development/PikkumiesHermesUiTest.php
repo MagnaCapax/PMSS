@@ -149,6 +149,216 @@ final class PikkumiesHermesUiTest extends TestCase
         }
     }
 
+    /** One private launcher token as pikkumiesOpen.php writes it. */
+    private function loginToken(string $directory, int $age = 0): string
+    {
+        if (!is_dir($directory)) mkdir($directory, 0700, true);
+        $token = bin2hex(random_bytes(32));
+        file_put_contents($directory.'/'.$token, $token."\n");
+        chmod($directory.'/'.$token, 0600);
+        if ($age > 0) touch($directory.'/'.$token, time() - $age);
+        clearstatcache();
+        return $token;
+    }
+
+    /** A loopback Hermes stand-in: logs each request and answers the password login with $status. */
+    private function fakeHermes(string $log, int $status): array
+    {
+        $cookies = $status === 200 ? '"set-cookie: __Host-hermes_session_at=\"at=\"; HttpOnly; Max-Age=43200; Path=/; SameSite=lax; Secure\r\n'
+            .'set-cookie: __Host-hermes_session_rt=rt; HttpOnly; Max-Age=2592000; Path=/; SameSite=lax; Secure\r\n"' : '""';
+        $script = '$s = stream_socket_server("tcp://127.0.0.1:0"); echo substr(strrchr(stream_socket_get_name($s, false), ":"), 1), "\n"; fflush(STDOUT);'
+            .' while ($c = @stream_socket_accept($s, 30)) { $r = "";'
+            .' while (($l = fgets($c)) !== false) { $r .= $l; if ($l === "\r\n") break; }'
+            .' $n = preg_match("/^content-length: *([0-9]+)/mi", $r, $m) ? (int) $m[1] : 0;'
+            .' $b = ""; while (strlen($b) < $n && !feof($c)) $b .= fread($c, $n - strlen($b));'
+            .' file_put_contents('.var_export($log, true).', $r.$b."\n--END--\n", FILE_APPEND);'
+            .' $out = strpos($r, "POST /auth/password-login ") === 0'
+            .' ? "HTTP/1.1 '.$status.' X\r\n".'.$cookies.'."Content-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}"'
+            .' : "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nplain";'
+            .' fwrite($c, $out); fclose($c); }';
+        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $this->assertTrue(is_resource($process));
+        return [$process, $pipes, (int) trim((string) fgets($pipes[1]))];
+    }
+
+    private function startRelay(string $socket, int $port, string $credentials): array
+    {
+        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+            'require '.var_export(dirname(__DIR__, 4).'/etc/skel/bin/pmssHermesRelay.php', true).';'
+            .' exit(pmssHermesRelayServe('.var_export($socket, true).', '.$port.', static function (): bool { return true; }, '
+            .var_export($credentials, true).', "exampleuser"));'),
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $this->assertTrue(is_resource($process));
+        for ($i = 0; $i < 50 && @filetype($socket) !== 'socket'; ++$i) usleep(100000);
+        return [$process, $pipes];
+    }
+
+    private function relayRequest(string $socket, string $request): string
+    {
+        $peer = stream_socket_client('unix://'.$socket, $error, $message, 5);
+        $this->assertTrue($peer !== false, 'relay socket did not accept');
+        stream_set_timeout($peer, 10);
+        fwrite($peer, $request);
+        $received = '';
+        while (!feof($peer)) {
+            $chunk = fread($peer, 8192);
+            if ($chunk === false || ($chunk === '' && stream_get_meta_data($peer)['timed_out'])) break;
+            $received .= $chunk;
+        }
+        fclose($peer);
+        return $received;
+    }
+
+    private static function signInRequest(string $body): string
+    {
+        return "POST /__pmss-session HTTP/1.0\r\nHost: 0123456789abcdef.mcx.fi\r\nContent-Type: text/plain\r\n"
+            ."Content-Length: ".strlen($body)."\r\n\r\n".$body;
+    }
+
+    private function stopAll(array $processes): void
+    {
+        foreach ($processes as [$process, $pipes]) {
+            proc_terminate($process);
+            foreach ($pipes as $pipe) fclose($pipe);
+            proc_close($process);
+        }
+    }
+
+    public function testRelaySignInSpendsOneTokenAndForwardsEverythingElseUnchanged(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-relay-login-', 0700);
+        // Short paths: a Unix socket path is limited to 108 bytes wherever the test temp root is.
+        $paths = ['base' => $home.'/h', 'credentials' => $home.'/h/credentials', 'socket' => $home.'/h/ui.sock'];
+        $this->assertTrue(\pmssPikkumiesHermesWrite($paths, str_repeat('a', 64), str_repeat('b', 64)));
+        $log = $home.'/hermes.log';
+        [$backend, $backendPipes, $port] = $this->fakeHermes($log, 200);
+        [$relay, $relayPipes] = $this->startRelay($paths['socket'], $port, $paths['credentials']);
+        try {
+            $token = $this->loginToken($paths['base'].'/login-tokens');
+            $answer = $this->relayRequest($paths['socket'], self::signInRequest($token));
+            $this->assertSame(0, strpos($answer, "HTTP/1.1 204 No Content\r\n"), $answer);
+            $this->assertStringContainsAllStrings([
+                "\r\nSet-Cookie: __Host-hermes_session_at=\"at=\"; HttpOnly; Max-Age=43200; Path=/; SameSite=lax; Secure\r\n",
+                "\r\nSet-Cookie: __Host-hermes_session_rt=rt; HttpOnly; Max-Age=2592000; Path=/; SameSite=lax; Secure\r\n",
+                "\r\nCache-Control: no-store\r\n"], $answer);
+            $this->assertFalse(strpos($answer, str_repeat('a', 64)) !== false, 'the password never reaches the browser');
+            $this->assertFalse(file_exists($paths['base'].'/login-tokens/'.$token), 'the token is spent');
+            $this->assertStringContainsAllStrings(["POST /auth/password-login HTTP/1.1\r\n", "\r\nHost: 127.0.0.1\r\n",
+                "\r\nX-Forwarded-Proto: https\r\n", "\r\nContent-Type: application/json\r\n",
+                '{"provider":"basic","username":"exampleuser","password":"'.str_repeat('a', 64).'","next":"\/"}'],
+                (string) file_get_contents($log));
+            // The same token again, malformed bodies, and a body that is not a token: nothing reaches Hermes.
+            foreach ([$token, strtoupper($token), substr($token, 1), '', str_repeat('g', 64)] as $body) {
+                $this->assertSame(0, strpos($this->relayRequest($paths['socket'], self::signInRequest($body)),
+                    "HTTP/1.1 403 Forbidden\r\n"), $body);
+            }
+            $chunked = "POST /__pmss-session HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n40\r\n".$this->loginToken($paths['base'].'/login-tokens')."\r\n0\r\n\r\n";
+            $this->assertSame(0, strpos($this->relayRequest($paths['socket'], $chunked), "HTTP/1.1 403 Forbidden\r\n"));
+            $this->assertSame(1, substr_count((string) file_get_contents($log), '/auth/password-login'));
+            $this->assertFalse(strpos((string) file_get_contents($log), '__pmss-session') !== false);
+            // Any other request is forwarded byte for byte, including look-alike paths.
+            foreach (["GET /api/status?x=1 HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Custom: kept\r\n\r\n",
+                "POST /__pmss-session?next=/ HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 2\r\n\r\nab"] as $request) {
+                $answer = $this->relayRequest($paths['socket'], $request);
+                $this->assertSame("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nplain", $answer);
+                $this->assertSame(1, substr_count((string) file_get_contents($log), $request."\n--END--\n"), $request);
+            }
+        } finally {
+            $this->stopAll([[$relay, $relayPipes], [$backend, $backendPipes]]);
+        }
+    }
+
+    public function testRelaySignInFailsClosedWhenHermesRefusesTheLogin(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-relay-refused-', 0700);
+        // Short paths: a Unix socket path is limited to 108 bytes wherever the test temp root is.
+        $paths = ['base' => $home.'/h', 'credentials' => $home.'/h/credentials', 'socket' => $home.'/h/ui.sock'];
+        $this->assertTrue(\pmssPikkumiesHermesWrite($paths, str_repeat('a', 64), str_repeat('b', 64)));
+        $log = $home.'/hermes.log';
+        [$backend, $backendPipes, $port] = $this->fakeHermes($log, 401);
+        [$relay, $relayPipes] = $this->startRelay($paths['socket'], $port, $paths['credentials']);
+        try {
+            $token = $this->loginToken($paths['base'].'/login-tokens');
+            $answer = $this->relayRequest($paths['socket'], self::signInRequest($token));
+            $this->assertSame("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n", $answer);
+            $this->assertSame(1, substr_count((string) file_get_contents($log), '/auth/password-login'));
+            $this->assertFalse(file_exists($paths['base'].'/login-tokens/'.$token), 'a refused login still spends the token');
+        } finally {
+            $this->stopAll([[$relay, $relayPipes], [$backend, $backendPipes]]);
+        }
+    }
+
+    public function testSignInTokenMustBeAFreshPrivateSingleLinkFile(): void
+    {
+        $directory = $this->pmssMakeTempDir('pmss-relay-tokens-', 0700);
+        $valid = $this->loginToken($directory);
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, strtoupper($valid)));
+        $this->assertTrue(\pmssHermesRelayTokenClaim($directory, $valid));
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $valid), 'reused');
+        $expired = $this->loginToken($directory, 61);
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $expired), 'expired');
+        $outside = $this->pmssMakeTempDir('pmss-relay-outside-', 0700);
+        $linked = bin2hex(random_bytes(32));
+        file_put_contents($outside.'/'.$linked, $linked."\n");
+        chmod($outside.'/'.$linked, 0600);
+        symlink($outside.'/'.$linked, $directory.'/'.$linked);
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $linked), 'symlinked');
+        $this->assertTrue(is_file($outside.'/'.$linked));
+        $hard = $this->loginToken($directory);
+        link($directory.'/'.$hard, $directory.'/second-name');
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $hard), 'hard-linked');
+        $readable = $this->loginToken($directory);
+        chmod($directory.'/'.$readable, 0644);
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $readable), 'group or world readable');
+        $mismatch = $this->loginToken($directory);
+        file_put_contents($directory.'/'.$mismatch, str_repeat('0', 64)."\n");
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $mismatch), 'content mismatch');
+        $open = $this->loginToken($directory);
+        chmod($directory, 0755);
+        $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $open), 'shared token directory');
+        chmod($directory, 0700);
+        $this->assertTrue(\pmssHermesRelayTokenClaim($directory, $open));
+    }
+
+    public function testSignInRequestClassificationDecidesOnTheFirstDifferentByte(): void
+    {
+        $this->assertFalse(\pmssHermesRelayLoginRequest('G'));
+        $this->assertFalse(\pmssHermesRelayLoginRequest("POST /__pmss-session?x HTTP/1.1\r\n\r\n"));
+        $this->assertFalse(\pmssHermesRelayLoginRequest("POST /__pmss-sessions HTTP/1.1\r\n\r\n"));
+        $this->assertSame(null, \pmssHermesRelayLoginRequest('POST /__pmss-sess'));
+        $this->assertSame(null, \pmssHermesRelayLoginRequest("POST /__pmss-session HTTP/1.1\r\nContent-Length: 4\r\n\r\nab"));
+        $this->assertSame('abcd', \pmssHermesRelayLoginRequest("POST /__pmss-session HTTP/1.1\r\nContent-Length: 4\r\n\r\nabcd"));
+        $this->assertSame('', \pmssHermesRelayLoginRequest("POST /__pmss-session HTTP/1.1\r\nContent-Length: 4\r\n\r\nabcde"));
+        $this->assertSame('', \pmssHermesRelayLoginRequest("POST /__pmss-session HTTP/1.1\r\n\r\n"));
+        $this->assertSame('', \pmssHermesRelayLoginRequest("POST /__pmss-session HTTP/1.1\r\nContent-Length: 999\r\n\r\n"));
+        $this->assertSame('', \pmssHermesRelayLoginRequest("POST /__pmss-session HTTP/1.1\r\nContent-Length: 1\r\nContent-Length: 1\r\n\r\na"));
+        $this->assertSame('', \pmssHermesRelayLoginRequest('POST /__pmss-session HTTP/1.1'.str_repeat('x', 9000)));
+    }
+
+    public function testRelayWithoutTheCredentialsArgumentIsNotCurrent(): void
+    {
+        $directory = $this->pmssMakeTempDir('pmss-relay-current-', 0700);
+        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('sleep(30);')
+            .' /home/exampleuser/bin/pmssHermesRelay.php serve '.escapeshellarg($directory.'/ui.sock').' 24000 '
+            .escapeshellarg($directory.'/credentials'), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $this->assertTrue(is_resource($process));
+        $pid = proc_get_status($process)['pid'];
+        file_put_contents($directory.'/relay.pid', $pid."\n");
+        usleep(200000);
+        try {
+            $this->assertTrue(\pmssHermesRelayCurrent($directory.'/relay.pid', $directory.'/ui.sock', $directory.'/credentials'));
+            $this->assertFalse(\pmssHermesRelayCurrent($directory.'/relay.pid', $directory.'/ui.sock', $directory.'/other'));
+            $this->assertFalse(\pmssHermesRelayCurrent($directory.'/relay.pid', $directory.'/other.sock', $directory.'/credentials'));
+            $this->assertFalse(\pmssHermesRelayCurrent($directory.'/missing.pid', $directory.'/ui.sock', $directory.'/credentials'));
+        } finally {
+            $this->stopAll([[$process, $pipes]]);
+        }
+        $start = $this->pmssReadRepoFile('etc/skel/bin/pikkumiesHermesRuntime.php')
+            .$this->pmssReadRepoFile('etc/skel/bin/pmssHermesRuntime.php');
+        $this->assertSame(0, substr_count($start, "\$paths['socket'], \$port)"), 'every relay start passes its credentials file');
+    }
+
     public function testMissingListenerToolStopsRecordedChild(): void
     {
         $home = $this->pmssMakeTempDir('pmss-b-tool-', 0700);

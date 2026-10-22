@@ -209,6 +209,9 @@ function pmssCreateNginxConfigSetup(): array
         @unlink($pikkumiesHermesDefault);
     }
     if ($subdomainEnabled && $nginxSslBlock !== '' && pmssPikkumiesUiPortAvailable(846)) {
+        // Port C serves the Hermes sign-in page and its offline page even where ports A and B are off.
+        if (!pmssPikkumiesUiPagesInstall())
+            pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
         if (!pmssWriteManagedFile($hermesDefault, pmssHermesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
             pmssCreateNginxConfigSetupWarn('write Hermes UI default', $hermesDefault);
     } elseif (is_file($hermesDefault) && !is_link($hermesDefault) && pmssPathTargetIsSafe($hermesDefault, false, true)) {

@@ -42,7 +42,11 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
     }
     if (!pmssPikkumiesHermesSchedule($paths) || pmssAgentCommandPath('ss') === '') return false;
     pmssPikkumiesHermesEnsure($paths);
-    if (pmssPikkumiesHermesReady($paths)) return true;
+    if (pmssPikkumiesHermesReady($paths)) {
+        // A relay from before the sign-in exchange keeps forwarding but cannot sign in; replace it.
+        return pmssHermesRelayCurrent($paths['relayPid'], $paths['socket'], $paths['credentials'])
+            || pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port, $paths['credentials']);
+    }
     // A foreign or ungated listener is never reused.
     if (pmssPikkumiesHermesListenerOwned($port)) {
         pmssPikkumiesHermesStopUngated($port);
@@ -58,7 +62,7 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
     // start, which waited 10 s, stopped it before it bound. Wait up to 60 s (the account php.ini allows 90).
     for ($i = 0; $i < 600; ++$i) {
         if (pmssPikkumiesHermesListenerOwned($port) && pmssPikkumiesHermesGate($port)) {
-            if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port)) return true;
+            if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port, $paths['credentials'])) return true;
             break;
         }
         usleep(100000);

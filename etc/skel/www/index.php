@@ -854,8 +854,8 @@ window.addEventListener('message', function (event) {
    if (window.matchMedia('(pointer:fine)').matches) frame.focus();
   }
  } else if (/^pikkumies:rows:[1-6]$/.test(event.data)) {
-  bar.style.height = ((window.matchMedia('(pointer:coarse)').matches ? 52 : 84)
-   + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';
+  // 52px is one row of the bar page's box; each extra row adds one 22px line.
+  bar.style.height = (52 + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';
  }
 });
 // A host rollback removes the marker while an old top frame may stay open.

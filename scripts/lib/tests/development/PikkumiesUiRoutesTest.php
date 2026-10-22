@@ -150,9 +150,61 @@ final class PikkumiesUiRoutesTest extends TestCase
     public function testPortCSendsXFrameOptionsWhereverItSendsFrameAncestors(): void
     {
         $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
-        $csp = substr_count($block, 'add_header Content-Security-Policy "frame-ancestors https://node.example.com" always;');
-        $this->assertSame(3, $csp);
+        $csp = preg_match_all('/add_header Content-Security-Policy "[^"]*frame-ancestors https:\/\/node\.example\.com" always;/', $block);
+        $this->assertSame(4, $csp);
         $this->assertSame($csp, substr_count($block, 'add_header X-Frame-Options "ALLOW-FROM https://node.example.com" always;'));
+    }
+
+    /** One exact location's body from a rendered server block. */
+    private function exactLocation(string $block, string $path): string
+    {
+        $this->assertTrue(preg_match('/\n    location = '.preg_quote($path, '/').' \{\n(.*?)\n    \}\n/s', $block, $match) === 1, $path);
+        return $match[1];
+    }
+
+    public function testHermesPortsServeTheSignInPageAndSingleUseExchangeOutsideTheLoginGate(): void
+    {
+        $blocks = [
+            ['/__pmss-ui-b', "frame-ancestors 'none'", 'DENY',
+                \pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345)],
+            ['/__pmss-ui-c', 'frame-ancestors https://node.example.com', 'ALLOW-FROM https://node.example.com',
+                \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345)],
+        ];
+        foreach ($blocks as [$prefix, $frame, $frameOptions, $block]) {
+            $page = $this->exactLocation($block, '/__pmss-login');
+            // A location's own add_header drops every server-level one, so the page repeats them all.
+            $this->assertStringContainsAllStrings(['alias /var/www/pikkumies/hermes-login.html;', 'default_type text/html;',
+                "default-src 'none'", "connect-src 'self'", "form-action 'none'", $frame.'" always;',
+                'add_header X-Frame-Options "'.$frameOptions.'" always;', 'add_header Cache-Control "no-store" always;',
+                'add_header Referrer-Policy "no-referrer" always;'], $page);
+            $session = $this->exactLocation($block, '/__pmss-session');
+            $this->assertStringContainsAllStrings(['limit_except POST { deny all; }', 'client_max_body_size 1k;',
+                'proxy_pass http://127.0.0.1:12345'.$prefix.'/__pmss-session;', 'proxy_set_header Authorization "";',
+                'proxy_set_header X-Forwarded-Proto https;'], $session);
+            $this->assertFalse(strpos($page.$session, 'auth_request') !== false);
+            $this->assertFalse(strpos($session, 'add_header') !== false, 'the exchange keeps the server-level headers');
+            // The server-level Origin check runs before every location, so only the service origin can POST.
+            $this->assertTrue(strpos($block, 'origin_ok = 0) { return 403; }') < strpos($block, 'location = /__pmss-session'));
+        }
+        $this->assertStringContainsString('return 302 /__pmss-login;', $this->exactLocation($blocks[1][3], '/__pmss-select-web'));
+        $this->assertStringContainsString('return 302 /;', $this->exactLocation($blocks[1][3], '/__pmss-select-agentboard'));
+    }
+
+    public function testHermesSignInPageCspPinsItsOnlyInlineScriptAndStyle(): void
+    {
+        $html = $this->pmssReadRepoFile('etc/seedbox/config/pikkumies-hermes-login.html');
+        $csp = \pmssPikkumiesHermesLoginCsp("'none'");
+        foreach (['script', 'style'] as $tag) {
+            $this->assertSame(1, preg_match_all('#<'.$tag.'>(.*?)</'.$tag.'>#s', $html, $bodies));
+            $this->assertSame(1, substr_count($html, '<'.$tag));
+            $this->assertStringContainsString($tag."-src 'sha256-".base64_encode(hash('sha256', $bodies[1][0], true))."'", $csp);
+        }
+        $this->assertStringContainsAllStrings(['/^#token=([0-9a-f]{64})$/', "history.replaceState(null,'',location.pathname)",
+            "fetch('/__pmss-session'", "method:'POST'", "credentials:'same-origin'", "r.status===204?'/':'/login'"], $html);
+        $this->assertFalse(strpos($html, '?token') !== false, 'the token never travels in a query string');
+        $this->assertStringContainsString("'hermes-login.html'", $this->pmssReadRepoFile('scripts/lib/nginxConfig/pikkumiesUi.php'));
+        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
+        $this->assertSame(3, substr_count($setup, 'pmssPikkumiesUiPagesInstall()'), 'ports A, B and C each install the pages');
     }
 
     public function testPortBSendsLoggedOutPagesToTheLoginFormAndKeepsHermesCookiesOnRoot(): void
@@ -218,5 +270,15 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertStringContainsString('pikkumies:reconnect', $offline);
         $this->assertStringContainsString('pmssPikkumiesUiPagesInstall()', $setup);
         $this->assertFalse(strpos($bar.$offline, 'Try again</button>') !== false);
+        // One single-line box: an empty textarea (28px padding + one 22px line) counts as 1 row, the frame
+        // shows the box and nothing else, and the keyboard hint lives in the title, not a line under the box.
+        $this->assertStringContainsAllStrings([
+            'Math.round((input.scrollHeight-28)/22)', "input.style.height=(28+lines*22)+'px'",
+            'padding:14px 56px 14px 14px', 'overflow:hidden;background:transparent',
+            'title="Enter to send, Shift+Enter for a new line"',
+        ], $bar);
+        $this->assertSame(1, (int) round((50 - 28) / 22));
+        $this->assertFalse(strpos($bar, 'class="hint"') !== false);
+        $this->assertFalse(strpos($bar, 'min-height:16px') !== false);
     }
 }

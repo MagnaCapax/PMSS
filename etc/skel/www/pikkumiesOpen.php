@@ -360,8 +360,10 @@ if ($ui === 'vanilla-hermes-web' || $ui === 'vanilla-agentboard') {
         pmssHermesAgentboardStop($home);
         exec(escapeshellarg($installer).' start >/dev/null 2>&1', $lines, $rc);
         if ($rc !== 0) { pmssPikkumiesOpenPage('error', $started); return; }
+        // Single-use sign-in; the fragment reaches no server log. Without a token Hermes asks for its password.
+        $token = pmssPikkumiesOpenTokenMint($home.'/.hermes/login-tokens');
         header('Cache-Control: no-store');
-        header('Location: '.$origin.'/__pmss-select-web', true, 302);
+        header('Location: '.$origin.'/__pmss-select-web'.($token !== '' ? '#token='.$token : ''), true, 302);
         return;
     }
     exec(escapeshellarg($installer).' stop >/dev/null 2>&1');
@@ -471,8 +473,10 @@ if ($ui === 'hermes') {
     if (!is_file($runner) || is_link($runner)) { pmssPikkumiesOpenPage('error', $started); return; }
     exec('HOME='.escapeshellarg($home).' /usr/bin/php '.escapeshellarg($runner).' start '.escapeshellarg($origin).' >/dev/null 2>&1', $unused, $backendRc);
     if ($backendRc !== 0) { pmssPikkumiesOpenPage('error', $started); return; }
+    // Single-use sign-in; the fragment reaches no server log. Without a token Hermes asks for its password.
+    $token = pmssPikkumiesOpenTokenMint($home.'/.mcxPikkumies/pikkumies/local/ui/hermes/login-tokens');
     header('Cache-Control: no-store');
-    header('Location: '.$origin.'/', true, 302);
+    header('Location: '.$origin.($token !== '' ? '/__pmss-login#token='.$token : '/'), true, 302);
     return;
 }
 $list = [];

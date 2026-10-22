@@ -116,9 +116,11 @@ function pmssHermesStart(array $paths): void
     if (is_link($paths['disabled']) || is_link($paths['port'])) throw new RuntimeException('Dashboard state is unsafe');
     $url = pmssHermesPublicUrl($paths['home']);
     if (pmssHermesRunningPid($paths) !== null) {
-        if (pmssHermesListenerReady($paths, $port)) return;
+        // A relay from before the sign-in exchange keeps forwarding but cannot sign in; it is replaced below.
+        if (pmssHermesListenerReady($paths, $port)
+            && pmssHermesRelayCurrent($paths['relayPid'], $paths['socket'], $paths['env'])) return;
         if (pmssHermesBackendReady($paths, $port)
-            && pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port)) return;
+            && pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port, $paths['env'])) return;
         pmssHermesStop($paths);
         throw new RuntimeException('Dashboard login gate is unavailable');
     }
@@ -137,7 +139,7 @@ function pmssHermesStart(array $paths): void
     // start, which waited 10 s, stopped it before it bound. Wait up to 60 s (the account php.ini allows 90).
     for ($i = 0; $i < 600; ++$i) {
         if (pmssHermesBackendReady($paths, $port)) {
-            if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port)) return;
+            if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port, $paths['env'])) return;
             break;
         }
         usleep(100000);

@@ -95,11 +95,11 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
     <?= pmssCustomerAppsCss() ?>
     <style type="text/css">
         .pmss-pikkumies-bar {flex:0 0 100%;box-sizing:border-box;margin:0 0 10px;max-width:100%;color-scheme:dark;}
-        .pmss-pikkumies-bar button,.pmss-pikkumies-bar iframe {box-sizing:border-box;width:100%;height:84px;border:1px solid #2e3b4f;border-radius:8px;background:#000;color:#8b949e;}
-        .pmss-pikkumies-bar button {padding:12px 14px;text-align:left;font:16px system-ui;cursor:pointer;}
-        .pmss-pikkumies-bar button:focus-visible,.pmss-pikkumies-bar iframe:focus-visible {outline:2px solid #9dd8f5;outline-offset:2px;}
-        .pmss-pikkumies-bar iframe {display:block;}
-        @media(pointer:coarse){.pmss-pikkumies-bar button,.pmss-pikkumies-bar iframe{height:52px;}}
+        /* The bar page draws the one visible box (and its focus ring); the frame is a borderless window onto it. */
+        .pmss-pikkumies-bar button,.pmss-pikkumies-bar iframe {box-sizing:border-box;display:block;width:100%;height:52px;}
+        .pmss-pikkumies-bar button {border:1px solid #2e3b4f;border-radius:8px;background:#000;color:#8b949e;padding:0 14px;text-align:left;font:16px system-ui;cursor:pointer;}
+        .pmss-pikkumies-bar button:focus-visible {outline:2px solid #9dd8f5;outline-offset:2px;}
+        .pmss-pikkumies-bar iframe {border:0;background:transparent;}
         .pmss-bonus-banner {
             flex: 0 0 100%;
             box-sizing: border-box;

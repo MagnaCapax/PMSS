@@ -63,6 +63,10 @@ $pmssHermesState = function_exists('pmssHermesPanelStatusRead') ? pmssHermesPane
 $pmssHermesChoice = trim(pmssConfigureFileRead($home.'/.config/pmss/ui/hermes-interface', 64));
 if (!in_array($pmssHermesChoice, array('vanilla-hermes-web', 'vanilla-agentboard', 'agentboard-pikkumies'), true))
     $pmssHermesChoice = 'vanilla-hermes-web';
+// Hermes install state => pill text, pill colour class, hover hint. The status poll uses the same map.
+$pmssHermesPills = array('' => array('Not installed', 'p-off', ''), 'installing' => array('Installing…', 'p-warn', ''),
+    'failed' => array('Install failed', 'p-stop', ''),
+    'customer-updated' => array('Left unchanged', 'p-warn', 'Your Hermes copy has your own changes, so it was left as it is.'));
 $customRows = $settingsState['customRows'];
 $rtorrentCustom = $settingsState['rtorrentCustom'];
 $certMode = $settingsState['certMode'];
@@ -106,7 +110,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 .configure-layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px}.configure-index{position:sticky;top:12px;align-self:start;display:flex;flex-direction:column;gap:5px}.configure-index a{padding:5px 9px;white-space:nowrap}.configure-card{background:#0f1b2b;border:1px solid #2e3b4f;border-radius:8px;padding:16px;margin-bottom:16px}.configure-card h2{color:#fff;margin-top:0}.configure-card p,.configure-card summary{color:#9fb0c3}.configure-card input,.configure-card textarea{max-width:100%;box-sizing:border-box}.configure-card code{display:block;overflow:auto;margin:5px 0}.configure-row{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}.configure-row input{min-width:0}.configure-row .url{flex:1 1 230px}
 @media(max-width:760px){.configure-layout{display:block}.configure-index{position:sticky;top:0;z-index:2;flex-direction:row;overflow-x:auto;background:#0f1b2b;padding:7px 0;margin-bottom:12px}}
 .configure-index a{padding:6px 10px;border-radius:6px;color:#cfe3f5;text-decoration:none;white-space:nowrap}.configure-index a:hover,.configure-index a:focus{background:#1b2c42;color:#fff}.configure-card button,.configure-card input[type=button],.configure-card input[type=submit]{background:#13708a;color:#fff;border:1px solid #1b8aa8;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;margin:2px 4px 2px 0}.configure-card button:hover{background:#178aa9}.configure-card input[type=text],.configure-card input:not([type]),.configure-card input[type=password],.configure-card textarea{background:#0b1220;color:#e6edf3;border:1px solid #2e3b4f;border-radius:6px;padding:7px 10px;font-size:13px}.configure-card textarea{font-family:monospace;width:100%}.configure-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 0}.configure-actions input[type=password]{flex:0 1 240px}.configure-card h3{color:#e6edf3;font-size:1rem;margin:18px 0 6px}details.catalog{margin:10px 0}details.catalog>summary{cursor:pointer;color:#fff;font-weight:bold;font-size:1.05rem;padding:6px 0}
-.pmss-pikkumies-pill{display:inline-block;padding:4px 10px;border-radius:99px;background:#3a2e12;color:#f0b429}.pmss-pikkumies-pill[data-state="Running"]{background:#12351f;color:#8fd18f}.pmss-pikkumies-segments{display:inline-flex;border:1px solid #2e3b4f;border-radius:8px;overflow:hidden;max-width:100%}.configure-card .pmss-pikkumies-segments button{margin:0;border:0;border-radius:0;background:#0b1220}.configure-card .pmss-pikkumies-segments button[aria-pressed="true"]{background:#13708a}.configure-card .pmss-pikkumies-segments button:focus-visible{outline:2px solid #fff;outline-offset:-2px}
+.configure-card select{background:#0b1220;color:#e6edf3;border:1px solid #2e3b4f;border-radius:6px;padding:6px 8px;font-size:13px;max-width:100%;color-scheme:dark}.pmss-agents-section .row label.name{display:block}.pmss-agents-signin{margin:12px 0 0}.pmss-agents-signin summary{cursor:pointer}.pmss-agents-signin p{margin:8px 0}
 </style></head><body><div id="pmss-action-notice" role="status" aria-live="polite"></div>
 <div id="wrap"><div id="full_page"><div class="full_top_nohd"></div><div class="full_body"><div class="apps">
 <h1>Configure</h1><p class="note">Apps and settings for your account.</p>
@@ -116,40 +120,40 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <div class="configure-actions"><select id="configure-qbittorrent-version" aria-label="qBittorrent version"><?php foreach ($torrentVersions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"><?= pmssCustomerHtmlAttr($version) ?></option><?php endforeach; ?></select>
 <input type="password" id="configure-qbittorrent-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'qbittorrent',version:document.getElementById('configure-qbittorrent-version').value,password:document.getElementById('configure-qbittorrent-password').value},'Back up the current configuration and restart qBittorrent with this version?')">Switch version</button></div><?php endif; ?></section>
 <?php if (isset($sections['agents'])): ?>
-<section class="configure-card" id="agents"><h2>AI agents</h2>
-<?php if ($pmssPikkumiesState['origin'] !== ''): ?><h3>Pikkumies</h3>
-<p>A small helper that lives on your server. Ask it in plain words to check disk space, fix a stuck app or add a torrent.</p>
-<span class="pmss-pikkumies-pill" id="pmss-pikkumies-pill" data-state="<?= $pmssPikkumiesState['off'] ? 'Off' : 'Starting' ?>"><?= $pmssPikkumiesState['off'] ? 'Off' : 'Starting' ?></span>
-<div class="configure-actions"><button type="button" onclick="pmssPikkumiesToggle('<?= $pmssPikkumiesState['off'] ? 'on' : 'off' ?>')"><?= $pmssPikkumiesState['off'] ? 'Turn on Pikkumies' : 'Turn off Pikkumies' ?></button>
-<?php if ($pmssPikkumiesState['visible']): ?>
-<button type="button" onclick="pmssPikkumiesTabOpen()">Open Pikkumies</button>
-<?php if ($pmssPikkumiesState['mode'] === 'power-user'): ?><a href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a><button type="button" onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button><span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span><input type="password" id="pmss-pikkumies-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><output id="pmss-pikkumies-hermes-password" hidden></output><?php endif; ?>
-<?php endif; ?></div>
-<p>Pikkumies windows, called Eternals, keep running and pick up their conversation after a restart, until you close them.</p>
-<p>Interface</p><div class="pmss-pikkumies-segments" role="group" aria-label="Interface">
-<button type="button" aria-pressed="<?= $pmssPikkumiesState['mode'] === 'simplified' ? 'true' : 'false' ?>" onclick="pmssPikkumiesInterface('simplified')">Simplified (recommended)</button>
-<button type="button" aria-pressed="<?= $pmssPikkumiesState['mode'] === 'power-user' ? 'true' : 'false' ?>" onclick="pmssPikkumiesInterface('power-user')">Power user (opens full Hermes in its own tab)</button></div>
+<section class="configure-card" id="agents"><h2>AI agents</h2><div class="pmss-apps-section pmss-agents-section"><div class="list">
+<?php if ($pmssPikkumiesState['origin'] !== ''): $pmssPikkumiesLabel = $pmssPikkumiesState['off'] ? 'Off' : 'Starting'; ?>
+<div class="row"><div class="main"><div class="name">Pikkumies</div><div class="desc">A small helper on your server. Ask it in plain words to check disk space, fix a stuck app or add a torrent. Its windows keep running and pick up where you left off after a restart, until you close them.</div></div>
+<span class="pill <?= $pmssPikkumiesState['off'] ? 'p-off' : 'p-warn' ?>" id="pmss-pikkumies-pill" data-state="<?= $pmssPikkumiesLabel ?>"><?= $pmssPikkumiesLabel ?></span>
+<div class="acts"><?php if ($pmssPikkumiesState['visible']): ?><button type="button" class="b b-pri" onclick="pmssPikkumiesTabOpen()">Open</button>
+<?php if ($pmssPikkumiesState['mode'] === 'power-user'): ?><a class="b" href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a><?php endif; ?>
+<?php endif; ?><button type="button" class="b<?= $pmssPikkumiesState['off'] ? ' b-pri' : '' ?>" onclick="pmssPikkumiesToggle('<?= $pmssPikkumiesState['off'] ? 'on' : 'off' ?>')"><?= $pmssPikkumiesState['off'] ? 'Turn on' : 'Turn off' ?></button></div></div>
 <?php endif; ?>
-<h3>Hermes</h3><p>Your own Hermes agent, separate from Pikkumies.</p>
-<div id="pmss-hermes-card" data-state="<?= pmssCustomerHtmlAttr($pmssHermesState['state']) ?>">
-<?php if (!$pmssHermesState['installed']): ?>
-<span class="pmss-pikkumies-pill" id="pmss-hermes-pill"><?= $pmssHermesState['state'] === 'installing' ? 'Installing…' : ($pmssHermesState['state'] === 'failed' ? 'Install failed' : ($pmssHermesState['state'] === 'customer-updated' ? 'Your Hermes checkout has changes and was left untouched.' : 'Not installed')) ?></span>
-<div class="configure-actions"><button type="button" id="pmss-hermes-install" onclick="pmssHermesInstall()">Install Hermes</button></div>
+<div class="row" id="pmss-hermes-card" data-state="<?= pmssCustomerHtmlAttr($pmssHermesState['state']) ?>"><div class="main"><div class="name">Hermes</div><div class="desc">Your own Hermes agent, separate from Pikkumies.</div></div>
+<?php if (!$pmssHermesState['installed']): $pmssHermesPill = $pmssHermesPills[$pmssHermesState['state']] ?? $pmssHermesPills['']; ?>
+<span class="pill <?= $pmssHermesPill[1] ?>" id="pmss-hermes-pill" title="<?= pmssCustomerHtmlAttr($pmssHermesPill[2]) ?>"><?= $pmssHermesPill[0] ?></span>
+<div class="acts"><button type="button" class="b b-pri" id="pmss-hermes-install" onclick="pmssHermesInstall()">Install</button></div>
 <?php else: ?>
-<span class="pmss-pikkumies-pill" id="pmss-hermes-pill">Installed</span>
-<div class="configure-actions"><label for="pmss-hermes-interface">Web interface</label>
-<select id="pmss-hermes-interface" onchange="pmssHermesInterface(this.value)">
+<div class="acts"><a class="b b-pri" href="pikkumiesOpen.php?ui=<?= pmssCustomerHtmlAttr($pmssHermesChoice) ?>" target="_blank" rel="noopener">Open</a></div>
+<?php endif; ?></div></div>
+<?php $pmssPikkumiesSignIn = $pmssPikkumiesState['visible'] && $pmssPikkumiesState['mode'] === 'power-user'; ?>
+<?php if ($pmssPikkumiesState['origin'] !== '' || $pmssHermesState['installed']): ?><div class="group">Settings</div><div class="list">
+<?php if ($pmssPikkumiesState['origin'] !== ''): ?><div class="row"><div class="main"><label class="name" for="pmss-pikkumies-interface">Pikkumies view</label></div>
+<div class="acts"><select id="pmss-pikkumies-interface" onchange="pmssPikkumiesInterface(this.value)">
+<option value="simplified"<?= $pmssPikkumiesState['mode'] === 'simplified' ? ' selected' : '' ?>>Simple (recommended)</option>
+<option value="power-user"<?= $pmssPikkumiesState['mode'] === 'power-user' ? ' selected' : '' ?>>Full Hermes, in its own tab</option></select></div></div><?php endif; ?>
+<?php if ($pmssHermesState['installed']): ?><div class="row"><div class="main"><label class="name" for="pmss-hermes-interface">Hermes opens in</label><div class="desc">Only one Hermes window works at a time: opening one closes the other.</div></div>
+<div class="acts"><select id="pmss-hermes-interface" onchange="pmssHermesInterface(this.value)">
 <option value="vanilla-hermes-web"<?= $pmssHermesChoice === 'vanilla-hermes-web' ? ' selected' : '' ?>>Hermes web UI (default)</option>
 <option value="vanilla-agentboard"<?= $pmssHermesChoice === 'vanilla-agentboard' ? ' selected' : '' ?>>Agentboard</option>
-<?php if ($pmssPikkumiesState['visible']): ?><option value="agentboard-pikkumies"<?= $pmssHermesChoice === 'agentboard-pikkumies' ? ' selected' : '' ?>>Agentboard Pikkumies</option><?php endif; ?></select>
-<a href="pikkumiesOpen.php?ui=<?= pmssCustomerHtmlAttr($pmssHermesChoice) ?>" target="_blank" rel="noopener">Open</a>
-<button type="button" onclick="pmssHermesShowLogin()">Show Hermes password</button><span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span>
-<input type="password" id="pmss-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password">
-<output id="pmss-hermes-password" hidden></output><button type="button" id="pmss-hermes-copy" hidden onclick="navigator.clipboard.writeText(document.getElementById('pmss-hermes-password').textContent)">Copy password</button></div>
-<p>Only one Hermes window can be open. Opening this one closes the other.</p>
-<p>Signing in to one Hermes window signs you out of the other.</p>
-<?php endif; ?></div>
-</section>
+<?php if ($pmssPikkumiesState['visible']): ?><option value="agentboard-pikkumies"<?= $pmssHermesChoice === 'agentboard-pikkumies' ? ' selected' : '' ?>>Agentboard Pikkumies</option><?php endif; ?></select></div></div><?php endif; ?>
+</div><?php endif; ?>
+<?php if ($pmssPikkumiesSignIn || $pmssHermesState['installed']): ?><details class="pmss-agents-signin"><summary>Sign in to Hermes yourself</summary>
+<p>Enter your account password to see the Hermes password. <span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span></p>
+<?php if ($pmssPikkumiesSignIn): ?><div class="configure-actions"><input type="password" id="pmss-pikkumies-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button><output id="pmss-pikkumies-hermes-password" hidden></output></div><?php endif; ?>
+<?php if ($pmssHermesState['installed']): ?><div class="configure-actions"><input type="password" id="pmss-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssHermesShowLogin()">Show Hermes password</button>
+<output id="pmss-hermes-password" hidden></output><button type="button" id="pmss-hermes-copy" hidden onclick="navigator.clipboard.writeText(document.getElementById('pmss-hermes-password').textContent)">Copy password</button></div><?php endif; ?>
+</details><?php endif; ?>
+</div></section>
 <?php endif; ?>
 <?php foreach (array('deluge' => 'Deluge', 'transmission' => 'Transmission', 'rtorrent' => 'rTorrent') as $client => $label): $versions = $otherTorrentVersions[$client] ?? array(); if ($versions): ?>
 <section class="configure-card" id="<?= $client ?>-version"><h2><?= $label ?> version</h2><p>Running: <?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientOtherRunningVersion($home, $client)) ?></p><?php $notice = trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/'.$client.'.notice', 256)); if ($notice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($notice) ?></p><?php endif; ?>
@@ -228,29 +232,34 @@ function pmssPikkumiesHermesShowLogin() {
         success:function(result){var output=document.getElementById('pmss-pikkumies-hermes-password'); output.textContent=result.message; output.hidden=false; field.value='';},
         error:function(){pmssConfigureNotice('The password you entered was not accepted.', true); field.value='';}});
 }
+// Poll only while an install runs: reload once when it finishes, never on an already installed Hermes.
+var pmssHermesPills = <?= json_encode($pmssHermesPills) ?>, pmssHermesPollTimer = null;
+function pmssHermesPollLater() { clearTimeout(pmssHermesPollTimer); pmssHermesPollTimer = setTimeout(pmssHermesStatusPoll, 5000); }
 function pmssHermesStatusPoll() {
     var card=document.getElementById('pmss-hermes-card');
-    if (!card || document.hidden) return;
+    if (!card) return;
+    if (document.hidden) { pmssHermesPollLater(); return; }
     fetch('configure.php?hermesStatus=1', {credentials:'same-origin',cache:'no-store'})
         .then(function(response){return response.json();}).then(function(state){
             if (state.installed) { location.reload(true); return; }
-            if (state.state !== card.getAttribute('data-state')) {
-                card.setAttribute('data-state',state.state);
-                var pill=document.getElementById('pmss-hermes-pill');
-                if (pill) pill.textContent=state.state==='failed'?'Install failed':state.state==='installing'?'Installing…':state.state==='customer-updated'?'Your Hermes checkout has changes and was left untouched.':'Not installed';
-            }
-        }).catch(function(){});
+            card.setAttribute('data-state',state.state);
+            var pill=document.getElementById('pmss-hermes-pill'), shown=pmssHermesPills[state.state] || pmssHermesPills[''];
+            if (pill) { pill.textContent=shown[0]; pill.className='pill '+shown[1]; pill.title=shown[2]; }
+            if (state.state === 'installing') pmssHermesPollLater();
+        }).catch(pmssHermesPollLater);
 }
-setInterval(pmssHermesStatusPoll, 5000);
+(function(){ var card=document.getElementById('pmss-hermes-card'); if (card && card.getAttribute('data-state') === 'installing') pmssHermesPollLater(); })();
 <?php if (isset($sections['agents'])): ?>
 function pmssPikkumiesStatusPoll() {
-    if (!document.getElementById('agents') || document.hidden
+    if (!document.getElementById('pmss-pikkumies-pill') || document.hidden
         || (window.frameElement && window.frameElement.offsetParent === null)) return;
     fetch('pikkumiesOpen.php?view=status', {credentials:'same-origin',cache:'no-store'})
         .then(function(response){return response.json();}).then(function(state){
             var pill = document.getElementById('pmss-pikkumies-pill');
+            if (!pill) return;
             var label = <?= $pmssPikkumiesState['off'] ? "'Off'" : "(state.setup ? 'Needs setup' : state.ready ? 'Running' : 'Starting')" ?>;
             pill.textContent = label; pill.setAttribute('data-state', label);
+            pill.className = 'pill ' + (label === 'Running' ? 'p-run' : label === 'Off' ? 'p-off' : 'p-warn');
         }).catch(function(){});
 }
 pmssPikkumiesStatusPoll(); setInterval(pmssPikkumiesStatusPoll, 5000);

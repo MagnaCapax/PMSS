@@ -87,16 +87,26 @@ final class PikkumiesPanelTest extends TestCase
         $configure = $this->pmssReadRepoFile('etc/skel/www/configure.php');
         $launcher = $this->pmssReadRepoFile('etc/skel/www/pikkumiesOpen.php');
         $this->assertStringContainsString('pikkumies:rows:[1-6]', $index);
+        // The frame is exactly the bar page's box: 52px for one row, +22px per extra row, no border of its own.
+        $this->assertStringContainsString("bar.style.height = (52 + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';", $index);
+        $this->assertStringContainsString('.pmss-pikkumies-bar iframe {border:0;background:transparent;}', $welcome);
+        $this->assertFalse(strpos($welcome, 'height:84px') !== false);
         $this->assertStringContainsString('}, 12000)', $index);
         $this->assertStringContainsString('}, 30000)', $index);
         $this->assertStringContainsString('if (!state.visible) location.reload()', $index);
         $this->assertStringContainsString('pikkumies:switch', $welcome);
         $this->assertStringContainsString('title = \'Ask Pikkumies\'', $welcome);
         $this->assertStringContainsString('Your network may be blocking Pikkumies.', $index);
-        $this->assertStringContainsString('Power user (opens full Hermes in its own tab)', $configure);
-        $this->assertStringContainsString('Signing in to one Hermes window signs you out of the other.', $configure);
-        // Both Hermes sign-in forms ask for a user name too: the account name, shown next to each password reveal.
-        $this->assertSame(2, substr_count($configure, 'password</button><span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span>'));
+        $this->assertStringContainsString('>Full Hermes, in its own tab</option>', $configure);
+        $this->assertStringContainsString('Only one Hermes window works at a time: opening one closes the other.', $configure);
+        // Both Hermes password reveals sit in one fallback sign-in box that shows the account name once.
+        $this->assertStringContainsString('<summary>Sign in to Hermes yourself</summary>', $configure);
+        $this->assertSame(1, substr_count($configure, '<span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span>'));
+        $this->assertStringContainsString('onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button>', $configure);
+        $this->assertStringContainsString('onclick="pmssHermesShowLogin()">Show Hermes password</button>', $configure);
+        // The Hermes status poll runs only during an install; an installed Hermes must not reload Configure.
+        $this->assertStringNotContainsString('setInterval(pmssHermesStatusPoll', $configure);
+        $this->assertStringContainsString("if (state.state === 'installing') pmssHermesPollLater();", $configure);
         $this->assertStringContainsString('pmssPikkumiesOpenStatusEmit(true, $certificateState', $launcher);
         foreach (array('Retrying in N min', 'Turn it on to use it', 'Your browser cannot reach Pikkumies') as $removed) {
             $this->assertFalse(strpos($index.$welcome.$configure.$launcher, $removed) !== false);

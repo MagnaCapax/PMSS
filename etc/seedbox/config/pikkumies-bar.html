@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ask Pikkumies</title><style>
-:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;background:#0f1720;color:#e6edf3;font:14px system-ui}
-.box{position:relative;background:#000;border:1px solid #2e3b4f;border-radius:8px;min-height:52px}
-textarea{display:block;width:100%;min-height:50px;max-height:160px;resize:none;background:transparent;border:0;color:#e6edf3;padding:12px 56px 12px 14px;font:16px/22px system-ui;outline:0}
-textarea::placeholder{color:#8b949e}.box:focus-within{outline:2px solid #9dd8f5;outline-offset:-2px}
-button{position:absolute;right:4px;top:4px;width:44px;height:44px;border:0;border-radius:50%;background:#13708a;color:#fff;font:22px system-ui;cursor:pointer}
-button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:2px solid #fff;outline-offset:2px}
-.hint,.count{color:#8b949e;font-size:12px}.hint{margin:4px 0 0 2px}.count{position:absolute;right:58px;bottom:5px}
-.error{color:#fca5a5;font-size:12px;min-height:16px;margin:2px 0 0 2px}
-@media(pointer:coarse){.hint{display:none}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important}}
+/* One box: the frame is exactly the box (52px = 50px textarea + 1px border each side, +22px per extra row). */
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;overflow:hidden;background:transparent;color:#e6edf3;font:14px system-ui}
+.box{position:relative;background:#000;border:1px solid #2e3b4f;border-radius:8px}
+textarea{display:block;width:100%;height:50px;min-height:50px;max-height:160px;resize:none;background:transparent;border:0;color:#e6edf3;padding:14px 56px 14px 14px;font:16px/22px system-ui;outline:0}
+textarea::placeholder{color:#8b949e}.box:focus-within{border-color:#9dd8f5;box-shadow:inset 0 0 0 1px #9dd8f5}
+button{position:absolute;right:3px;bottom:3px;width:44px;height:44px;border:0;border-radius:50%;background:#13708a;color:#fff;font:22px system-ui;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:2px solid #fff;outline-offset:-4px}
+.count,.error{position:absolute;bottom:1px;font:11px/12px system-ui;pointer-events:none}.count{right:58px;color:#8b949e}
+.error{left:14px;right:120px;color:#fca5a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important}}
 </style></head><body>
-<div class="box"><textarea id="ask" aria-label="Ask Pikkumies" maxlength="4000" rows="1" placeholder="How can i help you today? -Pikkumies"></textarea>
-<span class="count" id="count" hidden></span><button id="send" type="button" aria-label="Send to Pikkumies" disabled>↑</button></div>
-<div class="hint">Enter to send, Shift+Enter for a new line</div><div class="error" id="error" role="status" aria-live="polite"></div>
+<div class="box"><textarea id="ask" aria-label="Ask Pikkumies" maxlength="4000" rows="1" title="Enter to send, Shift+Enter for a new line" placeholder="How can i help you today? -Pikkumies"></textarea>
+<span class="count" id="count" hidden></span><div class="error" id="error" role="status" aria-live="polite"></div><button id="send" type="button" aria-label="Send to Pikkumies" disabled>↑</button></div>
 <script>
 (function(){'use strict';
 var input=document.getElementById('ask'),send=document.getElementById('send'),count=document.getElementById('count'),error=document.getElementById('error');
@@ -23,9 +23,10 @@ if(window.top===window||!/^https:\/\//.test(target))return;
 try{input.value=localStorage.getItem(draft)||'';}catch(e){}
 function post(name){window.top.postMessage(name,target);
  if(window.parent!==window.top)window.parent.postMessage(name,target);}
+// Rows from the content height: 28px vertical padding + 22px per line, so an empty box is 1 row.
 function update(){var text=input.value;input.style.height='auto';
- var lines=Math.min(6,Math.max(1,Math.ceil((input.scrollHeight-24)/22)));
- input.style.height=Math.min(160,Math.max(50,12+lines*22))+'px';send.disabled=!text.trim();
+ var lines=Math.min(6,Math.max(1,Math.round((input.scrollHeight-28)/22)));
+ input.style.height=(28+lines*22)+'px';send.disabled=!text.trim();
  count.hidden=text.length<3800;count.textContent=text.length+'/4000';post('pikkumies:rows:'+lines);
  try{localStorage.setItem(draft,text);}catch(e){}
 }

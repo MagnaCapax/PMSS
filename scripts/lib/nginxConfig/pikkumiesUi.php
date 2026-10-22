@@ -7,13 +7,49 @@ function pmssPikkumiesUiPagesInstall(): bool
 {
     $target = '/var/www/pikkumies';
     if (!pmssEnsureSafeDir($target, 0755)) return false;
-    foreach (array('bar.html', 'not-running.html') as $page) {
+    foreach (array('bar.html', 'not-running.html', 'hermes-login.html') as $page) {
         $source = '/etc/seedbox/config/pikkumies-'.$page;
         if (!is_file($source) || is_link($source)) return false;
         $content = @file_get_contents($source);
         if (!is_string($content) || !pmssWriteManagedFile($target.'/'.$page, $content, 'root', 'root', 0644)) return false;
     }
     return true;
+}
+
+/** Policy for the Hermes sign-in page: only its own inline script and style (hashes are pinned by a test). */
+function pmssPikkumiesHermesLoginCsp(string $frameAncestors): string
+{
+    return "default-src 'none'; script-src 'sha256-xXVfKKpYclN4U3VubqbW/KtXwxmEgEpYynRuDvxAVds='; "
+        ."style-src 'sha256-rFLJF6Eeitnq7ESukREg5se00WyD23kPbRye5XqTRHA='; connect-src 'self'; "
+        ."base-uri 'none'; form-action 'none'; frame-ancestors ".$frameAncestors;
+}
+
+/**
+ * The sign-in page and its single-use token exchange. The token rides in the page URL fragment, so no server
+ * logs it; the page posts it to the account relay, which spends it and answers with Hermes' own session cookies.
+ */
+function pmssPikkumiesHermesLoginLocations(string $prefix, int $lighttpdPort, string $frameAncestors, string $frameOptions): string
+{
+    $csp = pmssPikkumiesHermesLoginCsp($frameAncestors);
+    return <<<NGINX
+    location = /__pmss-login {
+        alias /var/www/pikkumies/hermes-login.html;
+        default_type text/html;
+        add_header Content-Security-Policy "{$csp}" always;
+        add_header X-Frame-Options "{$frameOptions}" always;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+    }
+    location = /__pmss-session {
+        limit_except POST { deny all; }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:{$lighttpdPort}{$prefix}/__pmss-session;
+        proxy_set_header Authorization "";
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Host \$host;
+    }
+
+NGINX;
 }
 
 /** Keep the managed writer's account-private ownership contract in one place. */
@@ -133,6 +169,7 @@ function pmssPikkumiesHermesNginxBlock(string $user, string $host, string $servi
     $variable = 'pmss_ui_b_'.substr(hash('sha256', $user), 0, 12);
     $originPattern = preg_quote($origin, '~');
     $ssl = pmssNginxUserSslBlock($user.'.'.$host, '', $live);
+    $login = pmssPikkumiesHermesLoginLocations('/__pmss-ui-b', $lighttpdPort, "'none'", 'DENY');
     return <<<NGINX
 # Account UI B: Hermes login is required at the private relay.
 map "\$request_method:\$http_upgrade:\$http_origin" \${$variable}_origin_ok {
@@ -159,7 +196,7 @@ server {
     if (\${$variable}_origin_ok = 0) { return 403; }
     if (\${$variable}_api_ok = 0) { return 403; }
     location = /api/cron/fire { return 404; }
-    location = /__pmss-b-auth {
+{$login}    location = /__pmss-b-auth {
         internal;
         proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b/api/auth/me;
         proxy_pass_request_body off;
@@ -216,6 +253,8 @@ function pmssHermesUiNginxBlock(string $user, string $host, string $serviceHost,
     $variable = 'pmss_ui_c_'.substr(hash('sha256', $user), 0, 12);
     $originPattern = preg_quote($origin, '~');
     $ssl = pmssNginxUserSslBlock($user.'.'.$host, '', $live);
+    // Only the Hermes web choice has a password sign-in; the session exchange always targets that relay.
+    $login = pmssPikkumiesHermesLoginLocations('/__pmss-ui-c', $lighttpdPort, 'https://'.$host, 'ALLOW-FROM https://'.$host);
     return <<<NGINX
 # Account UI C: Hermes enforces its login behind the private relay.
 map "\$request_method:\$http_upgrade:\$http_origin" \${$variable}_origin_ok {
@@ -262,7 +301,8 @@ server {
         add_header Set-Cookie "__Host-pmss_ui_c=web; Path=/; Secure; HttpOnly; SameSite=Lax" always;
         add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
         add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
-        return 302 /;
+        # The browser keeps the launcher's #token fragment across this redirect.
+        return 302 /__pmss-login;
     }
     location = /__pmss-select-agentboard {
         add_header Set-Cookie "__Host-pmss_ui_c=agentboard; Path=/; Secure; HttpOnly; SameSite=Lax" always;
@@ -270,7 +310,7 @@ server {
         add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
         return 302 /;
     }
-    location = /__pmss-auth {
+{$login}    location = /__pmss-auth {
         internal;
         if (\${$variable}_choice = agentboard) { return 204; }
         proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-c/api/auth/me;
