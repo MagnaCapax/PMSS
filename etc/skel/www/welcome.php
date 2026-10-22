@@ -1137,7 +1137,7 @@ function pmssWelcomeHomeNewsCacheFresh($home)
 
 /** News in two parts (operator 2026-10-22: "Maybe two segments, announcements and vainamoinen articles ... like 10 of
  *  them. Wiki updates, probably not needed"): the newest announcements and the newest articles, each newest first. */
-function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, $announcementLimit = 3, $articleLimit = 10)
+function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, $announcementLimit = 4, $articleLimit = 10)
 {
     $newest = function (array $items, $limit) {
         usort($items, function ($a, $b) { return $b['time'] - $a['time']; });
@@ -1146,8 +1146,9 @@ function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, $annou
     return array('announcements' => $newest($announcements, $announcementLimit), 'articles' => $newest($articles, $articleLimit));
 }
 
-/** One news part: a small heading, an optional "all" link, rows of title and date (data-ts drives the unread dot). */
-function pmssWelcomeHomeNewsPartHtmlBuild($heading, array $rows, $allUrl = '')
+/** One news part: a small heading, an optional "all" link, one-line rows (data-ts drives the unread dot). Dates only where
+ *  recency is the point: announcements yes, articles no (operator 2026-09: "not really much more than the title"). */
+function pmssWelcomeHomeNewsPartHtmlBuild($heading, array $rows, $allUrl = '', $dates = true)
 {
     if ($rows === array()) return '';
     $html = '<div class="h-news-part"><h3 class="h-news-sub">'.$heading
@@ -1155,7 +1156,7 @@ function pmssWelcomeHomeNewsPartHtmlBuild($heading, array $rows, $allUrl = '')
     foreach ($rows as $row) {
         $html .= '<li data-ts="'.(int) $row['time'].'"><a href="'.pmssWelcomeHtmlAttr($row['link']).'" target="_blank" rel="noopener" title="'.pmssWelcomeHtmlAttr($row['title']).'">'
             .pmssWelcomeHtmlAttr($row['title']).'</a>'
-            .'<time datetime="'.gmdate('Y-m-d', $row['time']).'">'.gmdate('j M', $row['time']).'</time></li>';
+            .($dates ? '<time datetime="'.gmdate('Y-m-d', $row['time']).'">'.gmdate('j M', $row['time']).'</time>' : '').'</li>';
     }
     return $html.'</ul></div>';
 }
@@ -1177,7 +1178,7 @@ function pmssWelcomeHomeNewsHtmlRead($home, $allowNetwork)
         is_string($feed) ? pmssWelcomeFeedItemsRead($feed, 'article', 12) : array()
     );
     $html = pmssWelcomeHomeNewsPartHtmlBuild('Announcements', $news['announcements'], 'https://pulsedmedia.com/clients/announcements.php')
-        .pmssWelcomeHomeNewsPartHtmlBuild('Väinämöinen\'s articles', $news['articles']);
+        .pmssWelcomeHomeNewsPartHtmlBuild('Väinämöinen\'s articles', $news['articles'], '', false);
     if ($html === '') return '<p class="h-muted">News is unavailable right now. <a href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">Read the announcements</a>.</p>';
     return $html;
 }

@@ -52,9 +52,10 @@ What the code did on 2026-10-22:
    is built but not shipped: the bar only appears where the host's Eternals marker and the account's billing id exist,
    and no testing machine carried both on 2026-10-22, so its end-to-end checks could not run. The bar keeps today's
    behaviour. `welcome.php?credits=1` already answers the figures it needs, including the question estimate.
-5. **News in two parts.** The News card (ADR 0147's single What's new list) shows the three newest announcements
-   (WHMCS announcements feed, with an All link) and the ten newest of Väinämöinen's articles (the panel feed's article
-   category). Wiki edits are no longer shown. Each row keeps its title, date and unread dot.
+5. **News in two parts.** The News card (ADR 0147's single What's new list) shows the four newest announcements
+   (WHMCS announcements feed, with dates and an All link) and the ten newest of Väinämöinen's articles (the panel feed's
+   article category, title only). Wiki edits are no longer shown. Every row keeps its unread dot. Announcements keep
+   their own direct read, cached 15 minutes per account.
 
 ## Consequences
 

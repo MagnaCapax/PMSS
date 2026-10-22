@@ -46,11 +46,11 @@ final class WelcomeHomeTest extends TestCase
             .var_export($announcements, true).', '.var_export($articles, true).'));');
     }
 
-    public function testNewsSelectKeepsThreeAnnouncementsAndTenArticlesNewestFirst(): void
+    public function testNewsSelectKeepsFourAnnouncementsAndTenArticlesNewestFirst(): void
     {
         $news = $this->newsSelect($this->newsItems('A', 5, 100), array_reverse($this->newsItems('B', 12, 200)));
 
-        $this->assertSame(['A1', 'A2', 'A3'], array_column($news['announcements'], 'title'));
+        $this->assertSame(['A1', 'A2', 'A3', 'A4'], array_column($news['announcements'], 'title'));
         $this->assertSame(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10'], array_column($news['articles'], 'title'));
         $this->assertSame(['title' => 'A1', 'link' => 'https://example.test/A1', 'time' => 100], $news['announcements'][0]);
     }
@@ -68,11 +68,14 @@ final class WelcomeHomeTest extends TestCase
     {
         $html = $this->runWelcomeHome('echo json_encode(array('
             .'pmssWelcomeHomeNewsPartHtmlBuild("Announcements", '.var_export($this->newsItems('A', 1, 100), true).', "https://example.test/all"),'
-            .'pmssWelcomeHomeNewsPartHtmlBuild("Articles", array())));');
+            .'pmssWelcomeHomeNewsPartHtmlBuild("Articles", array()),'
+            .'pmssWelcomeHomeNewsPartHtmlBuild("Articles", '.var_export($this->newsItems('B', 1, 200), true).', "", false)));');
 
         $this->assertStringContainsString('<h3 class="h-news-sub">Announcements <a href="https://example.test/all"', $html[0]);
         $this->assertStringContainsString('<li data-ts="100">', $html[0]);
         $this->assertSame('', $html[1]);
+        $this->assertStringContainsString('<time', $html[0]);
+        $this->assertStringNotContainsString('<time', $html[2]);
     }
     public function testStatusChipsRenderEachBonusState(): void
     {
