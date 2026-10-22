@@ -43,10 +43,14 @@ function pmssAddUserOpenClawPreinstall(array $user, string $home): void
     runProvisionStep('Queue OpenClaw preinstall', pmssAddUserOpenClawPreinstallCommand($user['name']));
 }
 
-/** Keep background scope placement and account-local logging reviewable without launching. */
+/**
+ * Keep background scope placement and account-local logging reviewable without launching. The shell records its
+ * pid and execs the installer, so the panel's status reader (userOpenClaw.php) sees this first install as "installing"
+ * exactly as it sees an install started from the panel (same pid file, same /usr/bin/php command line).
+ */
 function pmssAddUserOpenClawPreinstallCommand(string $username): string
 {
     $launch = pmssBuildUserServiceShellCommand($username,
-        'umask 077; php "$HOME/bin/install-openclaw" install --yes >"$HOME/.install-openclaw.log" 2>&1', true);
+        'umask 077; echo $$ >"$HOME/.install-openclaw-web.pid"; exec /usr/bin/php "$HOME/bin/install-openclaw" install --yes >"$HOME/.install-openclaw.log" 2>&1', true);
     return 'nohup sh -c '.escapeshellarg($launch).' >/dev/null 2>&1 &';
 }
