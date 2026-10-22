@@ -165,9 +165,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertSame([0, ['-D|']], [$rc, $output]);
         unlink($home.'/bin/rtorrent/default');
         symlink($store.'/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
-        $output = [];
-        exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
-        $this->assertSame([0, []], [$rc, $output]);
+        // 0.9.8-family selections launch with no arguments, exactly as before.
+        $this->assertSame(escapeshellarg($store.'/rtorrent/0.9.8-r16/rtorrent'),
+            \pmssRtorrentExecutorCommand($home, $projection, $store));
         $this->assertFalse(\pmssRtorrentDeprecatedRedirects('0.16.25', $root.'/missing.json'));
     }
 
