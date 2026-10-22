@@ -42,7 +42,7 @@ What existed on 2026-10-22:
    to the client-area form. The text stays in the box on failure.
 4. **Pikkumies first, where it runs.** When the Pikkumies ask bar is shown (ADR 0148: Eternals on the host, Pikkumies
    installed, billing id) and the account has an AI key, the form says that for Not working and Slow, Pikkumies looks
-   first on the customer's own AI credits (a check like this often uses 30,000 to 60,000) and opens the ticket with what it found when it
+   first on the customer's own AI credits (a check like this uses about 10,000 to 60,000) and opens the ticket with what it found when it
    cannot fix it. Send then posts `welcome.php?support=pikkumies`, which hands the text, inside a fixed frame with the
    customer's consent to that ticket and the reply email, to `pikkumies ask --nonce=<random>` run as the account (at
    most 4,000 characters, the same redaction). The ticket itself goes through Pikkumies' own ticket tool. Server down
