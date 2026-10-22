@@ -139,16 +139,16 @@ foreach ($classes as $class) {
     foreach ($instance->run() as [$status, $method, $message]) {
         $total++;
         if ($status === true) {
-            echo "[PASS] {$class}::{$method}\n";
+            fwrite(STDOUT, "[PASS] {$class}::{$method}\n");
         } elseif ($status === 'skip') {
             $skips++;
-            echo "[SKIP] {$class}::{$method} - {$message}\n";
+            fwrite(STDOUT, "[SKIP] {$class}::{$method} - {$message}\n");
         } else {
             $failures++;
-            echo "[FAIL] {$class}::{$method} - {$message}\n";
+            fwrite(STDOUT, "[FAIL] {$class}::{$method} - {$message}\n");
         }
     }
 }
 
-echo "\nTests: {$total}, Failures: {$failures}, Skipped: {$skips}\n";
+fwrite(STDOUT, "\nTests: {$total}, Failures: {$failures}, Skipped: {$skips}\n");
 exit($failures === 0 ? 0 : 1);
