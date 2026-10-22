@@ -79,6 +79,7 @@ instead of restating details.
 - Plaintext prohibition: Plaintext storage of primary credentials is forbidden regardless of legacy behavior or "service requires it" arguments.
 - Attack surface analysis (MANDATORY): Before implementation, research the target service's CVE history and known attack vectors. Analyze blast radius if the stored value is exposed (SSH, web UI, API, shell access). Document the findings in the commit message or issue comment.
 - Security review gate: Verification MUST explicitly check primary vs service credential separation, logging/redaction behavior, file permissions for secrets, and exposure paths (default binds/ports, web endpoints, file-read vectors).
+- No forced public exposure (ADR 0150): a feature never adds a public name, DNS record, public-CA certificate or listening port. Account features run locally and are reached through the existing panel path `/user-<name>/`. Only the end user turns on a public certificate or record. `scripts/testing/public-exposure-lint.php` enforces this; adding to its pin lists needs the operator's ruling.
 
 ## Validation Constraint Protection
 

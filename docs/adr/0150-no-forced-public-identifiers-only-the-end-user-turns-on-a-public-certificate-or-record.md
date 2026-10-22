@@ -5,6 +5,7 @@ Category: security
 
 ## Status
 Accepted (operator-directed, 2026-10-22). Supersedes the implicit-certificate clauses of ADR 0128.
+Amended the same day: Decision 3 now keeps account features local, under the existing panel path.
 
 ## Context
 
@@ -19,12 +20,13 @@ ADR 0039 made per-name HTTPS opt-in and rejected auto-issue. ADR 0128 then allow
 the Pikkumies web UIs. As built, a status poll that runs when the panel loads, and the Hermes install, write the
 account's certificate request without asking the customer. Every account that reaches "Pikkumies ready"
 therefore gets a public certificate. A per-account hostname was chosen to give each account its own browser
-origin. A per-account port on the server's existing host certificate gives the same origin isolation without any
-new certificate.
+origin. That requirement came from the design itself; no request for the feature contained it. Pikkumies is an
+agent that runs inside the customer's account, and its web screens are pages of that account's panel, like the
+browser console (ADR 0031) and OpenClaw (ADR 0087).
 
 The operator ruled on 2026-10-22: "nothing should force enable Let's Encrypt personal keys or other PII leaks,
 privacy leaks. only end user can choose to do that". The same day: "this doesn't require let's encrypt, the design
-is fucked if it does".
+is fucked if it does", and "It is not to run externally but locally".
 
 ## Decision
 
@@ -36,9 +38,10 @@ is fucked if it does".
 2. **No side effects.** A page load, a status poll, an install, a default, an update, a migration, a cron job or a
    rollout never counts as that action. None of them may write a certificate request or publish such an
    identifier.
-3. **Features work without it.** A feature that needs HTTPS or its own browser origin uses what is already
-   public: the server's host certificate and FQDN, with a per-account port or path. A feature that cannot work
-   that way is not built on a forced public identifier. It waits for the user's own opt-in.
+3. **Account features run locally.** A feature runs inside the account, on a unix socket or loopback, and is
+   reached only through the existing panel path `/user-<name>/...` on the server's own FQDN and host certificate.
+   It adds no public name, DNS record, certificate or listening port. A design that seems to need one is wrong,
+   and the design changes.
 4. **Allowed paths today.** The only writers of a certificate request are the HTTPS card in Configure (with its
    CT acknowledgement) and `createWebPublicCerts` (with its typed confirmation), per ADR 0039. Any other writer of
    `~/.request-web-certs` is a defect.
@@ -46,14 +49,17 @@ is fucked if it does".
 ## Consequences
 
 - ADR 0128's implicit certificates are superseded: its per-account service certificate, the launcher's certificate
-  request and its quota note. The Pikkumies UIs move to an origin that needs no new certificate. The launcher stops
-  writing certificate requests and stops waiting for one.
+  request and its quota note. The Pikkumies UIs move under the account's panel path, served locally through the
+  account's web server; their per-account hostnames and ports 844-846 are removed. The launcher stops writing
+  certificate requests and stops waiting for one.
 - Rollout pacing never comes from a CA quota, because rollouts no longer issue certificates.
 - Certificates already issued without the user's own action stay in CT logs and cannot be withdrawn. They are
   counted and reported. Their lineages are retired unless the user opts in.
 - Records that already publish account-linked names without a user action conflict with this ADR. They get their
   own decision: the per-service and cluster `mcx.fi` records (ADR 0040).
 - A test fails the build when any file outside the allowed paths in Decision 4 writes a certificate request.
+- `scripts/testing/public-exposure-lint.php` fails the build on a new certificate, ACME or DNS path, a new public
+  name derivation or a new nginx port. Adding to its pin lists needs the operator's ruling.
 - In review, "it is only a hash" is not enough. A label derived from a sequential or guessable id can be
   reversed by enumeration.
 
@@ -63,9 +69,10 @@ is fucked if it does".
   disclosure the customer never chose, and pacing only spreads it out.
 - **Wildcard certificate.** Rejected per ADR 0039 (one key on many hosts).
 - **Private CA.** Rejected per ADR 0039 (users would have to trust a PM root).
-- **Shared origin under the server hostname, separated by path.** Rejected for the account UIs, because one
-  account's backend could script another account's UI (ADR 0128). Fine for content that does not need origin
-  isolation.
+- **A per-account browser origin (own hostname or own port) for account UIs.** Rejected: it publishes or opens
+  something new for every customer. Pages of all accounts on one server share the server's origin. That is a
+  property of the whole platform, already accepted for the console and OpenClaw, and it is changed for the whole
+  platform if ever, never by giving one feature per-customer names or ports.
 
 ## References
 
