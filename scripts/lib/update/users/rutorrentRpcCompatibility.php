@@ -3,6 +3,8 @@
 const PMSS_RUTORRENT_RPC_SETTINGS_MARKER = 'new rXMLRPCCommand("convert.kb", array(\'\', floatval(1024)))';
 const PMSS_RUTORRENT_RPC_HTTPRPC_MARKER = '$addReq = ($trusted && count($add))';
 const PMSS_RUTORRENT_RPC_ERASEDATA_MARKER = 'execute.nothrow={sh,-c,';
+// Held outside the heredocs so the docblock lint does not read vendored ruTorrent code as a method here.
+const PMSS_RUTORRENT_RATIO_GROUP_SIGNATURE = "\tpublic function getRatioGroupCommand(\$ratio,\$cmd,\$args)\n";
 
 /**
  * Return exact legacy-to-skeleton edits for existing accounts without a full refresh.
@@ -111,14 +113,12 @@ PHP, <<<'PHP'
 PHP
         ],
         // F3: Only modern group setters need an extra target argument.
-        ['php/settings.php', <<<'PHP'
-	public function getRatioGroupCommand($ratio,$cmd,$args)
+        ['php/settings.php', PMSS_RUTORRENT_RATIO_GROUP_SIGNATURE . <<<'PHP'
 	{
 		$prefix = ($this->iVersion >= 0x904) && in_array($cmd,$this->ratioCmds) ? "group2." : "group.";
 		return( new rXMLRPCCommand( $prefix.$ratio.".".$cmd, $args ) );
 	}
-PHP, <<<'PHP'
-	public function getRatioGroupCommand($ratio,$cmd,$args)
+PHP, PMSS_RUTORRENT_RATIO_GROUP_SIGNATURE . <<<'PHP'
 	{
 		if($this->iVersion >= 0x1000)
 		{
