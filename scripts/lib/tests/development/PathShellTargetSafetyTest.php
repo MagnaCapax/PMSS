@@ -21,6 +21,35 @@ class PathShellTargetSafetyTest extends TestCase
         $this->assertSame(null, \pmssPathShellTarget($this->tempDir.'/missing.dat'));
     }
 
+    public function testShellTargetRejectsNulBeforeFilesystemAccess(): void
+    {
+        $path = $this->tempDir.'/state.dat';
+        file_put_contents($path, 'unchanged');
+
+        // Cover literal paths and every character that selects the glob branch.
+        foreach (["\0", "\0".$path, $path."\0", $path."\0ignored",
+            $this->tempDir."/\0*", $this->tempDir."/*\0",
+            $this->tempDir."/?\0", $this->tempDir."/[s]\0", $this->tempDir."/]\0"] as $invalid) {
+            $this->assertSame([], \pmssPathShellTargetPaths($invalid));
+            $this->assertSame(null, \pmssPathShellTarget($invalid));
+        }
+
+        $this->assertSame('unchanged', file_get_contents($path));
+    }
+
+    public function testShellTargetPreservesGlobOrderAndLiteralShellCharacters(): void
+    {
+        $paths = [$this->tempDir."/a 'quoted'.dat", $this->tempDir.'/b file.dat'];
+        foreach ($paths as $path) file_put_contents($path, 'ok');
+
+        $this->assertSame($paths, \pmssPathShellTargetPaths($this->tempDir.'/*.dat'));
+        $this->assertSame(implode(' ', array_map('escapeshellarg', $paths)), \pmssPathShellTarget($this->tempDir.'/*.dat'));
+        foreach ($paths as $path) {
+            $this->assertSame([$path], \pmssPathShellTargetPaths($path));
+            $this->assertSame(escapeshellarg($path), \pmssPathShellTarget($path));
+        }
+    }
+
     public function testShellTargetRejectsLeafSymlink(): void
     {
         [, $link] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/target.dat', $this->tempDir.'/link.dat', 'target');

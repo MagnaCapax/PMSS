@@ -101,48 +101,48 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->loadIndexFrameHelpers();
         $marker = $this->pmssMakeTempPath('pmss-gui-frames-local-only-');
 
-        $this->assertFalse($this->guiFramesLocalOnlyEnabled($marker));
-        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('local', $marker));
-        $this->assertTrue($this->guiFramesLocalOnlyEnabled($marker));
-        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('local', $marker), 'local mode should be idempotent');
-        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('remote', $marker));
-        $this->assertFalse($this->guiFramesLocalOnlyEnabled($marker));
-        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('remote', $marker), 'remote mode should be idempotent');
+        $this->assertFalse(\pmssGuiFramesLocalOnlyEnabled($marker));
+        $this->assertTrue(\pmssGuiFramesLocalOnlyPreferenceApply('local', $marker));
+        $this->assertTrue(\pmssGuiFramesLocalOnlyEnabled($marker));
+        $this->assertTrue(\pmssGuiFramesLocalOnlyPreferenceApply('local', $marker), 'local mode should be idempotent');
+        $this->assertTrue(\pmssGuiFramesLocalOnlyPreferenceApply('remote', $marker));
+        $this->assertFalse(\pmssGuiFramesLocalOnlyEnabled($marker));
+        $this->assertTrue(\pmssGuiFramesLocalOnlyPreferenceApply('remote', $marker), 'remote mode should be idempotent');
     }
 
     public function testLocalOnlyFramePreferenceRejectsInvalidAndUnsafeTargets(): void
     {
         $this->loadIndexFrameHelpers();
         $marker = $this->pmssMakeTempPath('pmss-gui-frames-invalid-');
-        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('invalid', $marker));
+        $this->assertFalse(\pmssGuiFramesLocalOnlyPreferenceApply('invalid', $marker));
         $this->assertFalse(file_exists($marker));
 
         $directory = $this->pmssMakeTempDir('pmss-gui-frames-directory-');
-        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('local', $directory));
-        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('remote', $directory));
+        $this->assertFalse(\pmssGuiFramesLocalOnlyPreferenceApply('local', $directory));
+        $this->assertFalse(\pmssGuiFramesLocalOnlyPreferenceApply('remote', $directory));
 
         $target = $this->pmssMakeTempFile('pmss-gui-frames-target-');
         $link = $this->pmssMakeTempPath('pmss-gui-frames-link-');
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('local', $link));
-        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('remote', $link));
-        $this->assertFalse($this->guiFramesLocalOnlyEnabled($link));
+        $this->assertFalse(\pmssGuiFramesLocalOnlyPreferenceApply('local', $link));
+        $this->assertFalse(\pmssGuiFramesLocalOnlyPreferenceApply('remote', $link));
+        $this->assertFalse(\pmssGuiFramesLocalOnlyEnabled($link));
     }
 
     public function testFramePreferenceWriteRequiresSameOriginAjaxPost(): void
     {
         $this->loadIndexFrameHelpers();
-        $this->assertTrue($this->guiFramesPreferenceRequestAllowed(array(
+        $this->assertTrue(\pmssGuiFramesPreferenceRequestAllowed(array(
             'REQUEST_METHOD' => 'POST',
             'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
         )));
-        $this->assertTrue($this->guiFramesPreferenceRequestAllowed(array(
+        $this->assertTrue(\pmssGuiFramesPreferenceRequestAllowed(array(
             'REQUEST_METHOD' => 'POST',
             'HTTP_X_REQUESTED_WITH' => 'xmlhttprequest',
         )));
-        $this->assertFalse($this->guiFramesPreferenceRequestAllowed(array('REQUEST_METHOD' => 'GET')));
-        $this->assertFalse($this->guiFramesPreferenceRequestAllowed(array('REQUEST_METHOD' => 'POST')));
-        $this->assertFalse($this->guiFramesPreferenceRequestAllowed(array(
+        $this->assertFalse(\pmssGuiFramesPreferenceRequestAllowed(array('REQUEST_METHOD' => 'GET')));
+        $this->assertFalse(\pmssGuiFramesPreferenceRequestAllowed(array('REQUEST_METHOD' => 'POST')));
+        $this->assertFalse(\pmssGuiFramesPreferenceRequestAllowed(array(
             'REQUEST_METHOD' => 'POST',
             'HTTP_X_REQUESTED_WITH' => 'fetch',
         )));
@@ -179,33 +179,33 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->loadIndexFrameHelpers();
         $marker = $this->pmssMakeTempPath('pmss-usage-alerts-enabled-');
 
-        $this->assertFalse($this->usageAlertsEnabled($marker));
-        $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
-        $this->assertTrue($this->usageAlertsEnabled($marker));
+        $this->assertFalse(\pmssUsageAlertsEnabled($marker));
+        $this->assertTrue(\pmssUsageAlertsPreferenceApply('enabled', $marker));
+        $this->assertTrue(\pmssUsageAlertsEnabled($marker));
         $this->assertSame(0600, fileperms($marker) & 0777);
-        $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
+        $this->assertTrue(\pmssUsageAlertsPreferenceApply('enabled', $marker));
         chmod($marker, 0644);
         clearstatcache(true, $marker);
-        $this->assertFalse($this->usageAlertsEnabled($marker));
-        $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
+        $this->assertFalse(\pmssUsageAlertsEnabled($marker));
+        $this->assertTrue(\pmssUsageAlertsPreferenceApply('enabled', $marker));
         $this->assertSame(0600, fileperms($marker) & 0777);
-        $this->assertTrue($this->usageAlertsPreferenceApply('disabled', $marker));
-        $this->assertFalse($this->usageAlertsEnabled($marker));
+        $this->assertTrue(\pmssUsageAlertsPreferenceApply('disabled', $marker));
+        $this->assertFalse(\pmssUsageAlertsEnabled($marker));
     }
 
     public function testUsageAlertPreferenceRejectsInvalidAndUnsafeTargets(): void
     {
         $this->loadIndexFrameHelpers();
         $marker = $this->pmssMakeTempPath('pmss-usage-alerts-invalid-');
-        $this->assertFalse($this->usageAlertsPreferenceApply('invalid', $marker));
+        $this->assertFalse(\pmssUsageAlertsPreferenceApply('invalid', $marker));
 
         $directory = $this->pmssMakeTempDir('pmss-usage-alerts-directory-');
-        $this->assertFalse($this->usageAlertsPreferenceApply('enabled', $directory));
+        $this->assertFalse(\pmssUsageAlertsPreferenceApply('enabled', $directory));
         $target = $this->pmssMakeTempFile('pmss-usage-alerts-target-');
         $link = $this->pmssMakeTempPath('pmss-usage-alerts-link-');
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        $this->assertFalse($this->usageAlertsPreferenceApply('enabled', $link));
-        $this->assertFalse($this->usageAlertsPreferenceApply('disabled', $link));
+        $this->assertFalse(\pmssUsageAlertsPreferenceApply('enabled', $link));
+        $this->assertFalse(\pmssUsageAlertsPreferenceApply('disabled', $link));
     }
 
     public function testWelcomePageOffersUsageAlertControl(): void
@@ -247,7 +247,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             ."       /dev/md4    594G   1380G   1725G            5642    690k    863k\n"
         );
 
-        $quotaInfo = $this->quotaInfoFromWelcomeUrl($this->localFrameWelcomeUrlBuild($quotaPath));
+        $quotaInfo = $this->quotaInfoFromWelcomeUrl(\pmssLocalFrameWelcomeUrlBuild($quotaPath));
 
         $this->assertSame(
             array(
@@ -272,7 +272,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             ."                  1.5T      2T      3T               0       0       0\n"
         );
 
-        $quotaInfo = $this->localFrameQuotaInfoRead($quotaPath);
+        $quotaInfo = \pmssLocalFrameQuotaInfoRead($quotaPath);
 
         $this->assertSame((int) round(1.5 * $tib), $quotaInfo['usedBytes']);
         $this->assertSame((int) round(2 * $tib), $quotaInfo['totalSpace']);
@@ -288,7 +288,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             ."       /dev/md4      4T      2T      3T               0       0       0\n"
         );
 
-        $quotaInfo = $this->localFrameQuotaInfoRead($quotaPath);
+        $quotaInfo = \pmssLocalFrameQuotaInfoRead($quotaPath);
 
         $this->assertSame(true, $quotaInfo['overQuota']);
         $this->assertTrue($quotaInfo['freeSpace'] < 0, 'Quota payload should preserve over-soft-limit free-space debt.');
@@ -300,8 +300,8 @@ class IndexSkeletonFrameDataTest extends TestCase
         $missingPath = $this->pmssMakeTempPath('pmss-index-missing-quota-', '.txt');
         $invalidPath = $this->writeQuotaSnapshotContent("Disk quotas for user panel (uid 1000):\ninvalid\n");
 
-        $this->assertSame('welcome.php', $this->localFrameWelcomeUrlBuild($missingPath));
-        $this->assertSame('welcome.php', $this->localFrameWelcomeUrlBuild($invalidPath));
+        $this->assertSame('welcome.php', \pmssLocalFrameWelcomeUrlBuild($missingPath));
+        $this->assertSame('welcome.php', \pmssLocalFrameWelcomeUrlBuild($invalidPath));
     }
 
     public function testRemoteDisabledRenderCarriesQuotaInWelcomeIframe(): void
@@ -516,7 +516,7 @@ class IndexSkeletonFrameDataTest extends TestCase
                     'title' => 'Second tooltip',
                 ),
             ),
-            $this->localFrameCustomFramesRead($path)
+            \pmssLocalFrameCustomFramesRead($path)
         );
     }
 
@@ -642,7 +642,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $this->assertSame(
             array('custom0' => array('url' => 'https://example.test/', 'linkText' => 'Label', 'title' => 'Tip')),
-            $this->localFrameCustomFramesRead($path)
+            \pmssLocalFrameCustomFramesRead($path)
         );
     }
 
@@ -743,70 +743,6 @@ class IndexSkeletonFrameDataTest extends TestCase
         $fixture = $this->pmssMakeTempPath('pmss-index-frame-helpers-', '.php');
         file_put_contents($fixture, "<?php\n".substr($source, $start, $end - $start));
         require_once $fixture;
-    }
-
-    private function localFrameWelcomeUrlBuild(string $quotaPath): string
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(string): string $builder */
-        $builder = 'pmssLocalFrameWelcomeUrlBuild';
-        return $builder($quotaPath);
-    }
-
-    private function localFrameQuotaInfoRead(string $quotaPath): array
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(string): array<string,mixed> $reader */
-        $reader = 'pmssLocalFrameQuotaInfoRead';
-        return $reader($quotaPath);
-    }
-
-    private function localFrameCustomFramesRead(string $path): array
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(string): array<string,array<string,string>> $reader */
-        $reader = 'pmssLocalFrameCustomFramesRead';
-        return $reader($path);
-    }
-
-    private function guiFramesLocalOnlyEnabled(string $path): bool
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(string): bool $reader */
-        $reader = 'pmssGuiFramesLocalOnlyEnabled';
-        return $reader($path);
-    }
-
-    private function guiFramesLocalOnlyPreferenceApply(string $mode, string $path): bool
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(string,string): bool $writer */
-        $writer = 'pmssGuiFramesLocalOnlyPreferenceApply';
-        return $writer($mode, $path);
-    }
-
-    private function guiFramesPreferenceRequestAllowed(array $server): bool
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(array<string,string>): bool $gate */
-        $gate = 'pmssGuiFramesPreferenceRequestAllowed';
-        return $gate($server);
-    }
-
-    private function usageAlertsEnabled(string $path): bool
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(string): bool $reader */
-        $reader = 'pmssUsageAlertsEnabled';
-        return $reader($path);
-    }
-
-    private function usageAlertsPreferenceApply(string $mode, string $path): bool
-    {
-        $this->loadIndexFrameHelpers();
-        /** @var callable(string,string): bool $writer */
-        $writer = 'pmssUsageAlertsPreferenceApply';
-        return $writer($mode, $path);
     }
 
     private function writeQuotaSnapshotContent(string $content): string

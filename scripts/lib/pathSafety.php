@@ -160,11 +160,15 @@ function pmssPathSegmentsAreSafe(
 
 /**
  * Return existing targets for a path or glob, rejecting symlinked path segments.
+ * NUL-containing inputs return no targets before glob or filesystem access.
  *
  * @return array<int,string>
  */
 function pmssPathShellTargetPaths(string $path): array
 {
+    // glob() can throw on NUL bytes before the per-match path guard runs.
+    if (strpos($path, "\0") !== false) return [];
+
     $matches = strpbrk($path, '*?[]') !== false ? glob($path) : [$path];
     $targets = [];
     foreach (is_array($matches) ? $matches : [] as $match) {

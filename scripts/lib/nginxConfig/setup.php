@@ -37,6 +37,22 @@ function pmssCreateNginxConfigSetupWrite(string $path, string $content): bool
     return false;
 }
 
+/** Report directory preparation failures while retaining fail-soft setup. */
+function pmssCreateNginxConfigSetupDirectory(string $path): bool
+{
+    if (pmssDirEnsureExists($path, 0755)) return true;
+    pmssCreateNginxConfigSetupWarn('prepare directory for', $path);
+    return false;
+}
+
+/** Keep the existing stale-default guards and report a failed removal. */
+function pmssCreateNginxConfigSetupRemoveDefault(string $path): void
+{
+    if (is_file($path) && !is_link($path) && pmssPathTargetIsSafe($path, false, true)) {
+        if (!@unlink($path)) pmssCreateNginxConfigSetupWarn('remove obsolete account UI default', $path);
+    }
+}
+
 /** Keep the host name inside one OpenSSL subject argument. */
 function pmssNginxConfigSelfSignedCertCommand(string $hostname): ?string
 {
@@ -84,7 +100,7 @@ function pmssCreateNginxConfigSetup(): array
 
     // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
     foreach (['/etc/nginx', '/etc/nginx/sites-available', '/etc/nginx/sites-enabled'] as $path) {
-        pmssDirEnsureExists($path, 0755);
+        pmssCreateNginxConfigSetupDirectory($path);
     }
 
     foreach ([
@@ -161,7 +177,7 @@ function pmssCreateNginxConfigSetup(): array
         }
     }
     // Create SSL config if required!
-    pmssDirEnsureExists('/etc/nginx/ssl', 0755);
+    pmssCreateNginxConfigSetupDirectory('/etc/nginx/ssl');
 
     if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
         // Generate a self-signed cert if Let's Encrypt not present yet (ignore errors on systems without openssl)
@@ -175,7 +191,7 @@ function pmssCreateNginxConfigSetup(): array
     }
 
     if ($subdomainEnabled) {
-        pmssDirEnsureExists($subdomainConfigDir, 0755);
+        pmssCreateNginxConfigSetupDirectory($subdomainConfigDir);
     } elseif ($subdomainBase !== '') {
         fwrite(STDERR, "Skipping nginx subdomain vhosts (invalid hostname: {$subdomainBase})\n");
     }
@@ -193,8 +209,8 @@ function pmssCreateNginxConfigSetup(): array
         if (!pmssWriteManagedFile($uiDefault, pmssPikkumiesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644)) {
             pmssCreateNginxConfigSetupWarn('write account UI default', $uiDefault);
         }
-    } elseif (is_file($uiDefault) && !is_link($uiDefault) && pmssPathTargetIsSafe($uiDefault, false, true)) {
-        @unlink($uiDefault);
+    } else {
+        pmssCreateNginxConfigSetupRemoveDefault($uiDefault);
     }
     $hermesDefault = $subdomainConfigDir.'/pmss-hermes-default.conf';
     $pikkumiesHermesDefault = $subdomainConfigDir.'/pmss-pikkumies-hermes-default.conf';
@@ -204,9 +220,8 @@ function pmssCreateNginxConfigSetup(): array
             pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
         if (!pmssWriteManagedFile($pikkumiesHermesDefault, pmssPikkumiesHermesDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
             pmssCreateNginxConfigSetupWarn('write Pikkumies Hermes UI default', $pikkumiesHermesDefault);
-    } elseif (is_file($pikkumiesHermesDefault) && !is_link($pikkumiesHermesDefault)
-        && pmssPathTargetIsSafe($pikkumiesHermesDefault, false, true)) {
-        @unlink($pikkumiesHermesDefault);
+    } else {
+        pmssCreateNginxConfigSetupRemoveDefault($pikkumiesHermesDefault);
     }
     if ($subdomainEnabled && $nginxSslBlock !== ''
         && is_file('/etc/seedbox/config/pikkumiesEternals.enabled') && pmssPikkumiesUiPortAvailable(846)) {
@@ -216,8 +231,8 @@ function pmssCreateNginxConfigSetup(): array
             pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
         if (!pmssWriteManagedFile($hermesDefault, pmssHermesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
             pmssCreateNginxConfigSetupWarn('write Hermes UI default', $hermesDefault);
-    } elseif (is_file($hermesDefault) && !is_link($hermesDefault) && pmssPathTargetIsSafe($hermesDefault, false, true)) {
-        @unlink($hermesDefault);
+    } else {
+        pmssCreateNginxConfigSetupRemoveDefault($hermesDefault);
     }
 
     $templates = pmssNginxUserSubdomainTemplates();

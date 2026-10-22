@@ -64,6 +64,65 @@ class NginxDefaultServerTest extends TestCase
         }
     }
 
+    public function testSetupDirectoryFailuresUseStderrAndKeepExistingEntries(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-nginx-setup-dir-', 0700);
+        $this->pmssWriteFile($root.'/file', 'keep');
+        $stderr = $root.'/stderr';
+        $paths = [$root, $root.'/nested/dir', $root.'/file', $root.'/file/child',
+            $root.'/file/child/deeper', '', $root."/nul\0dir"];
+        $script = '$results = []; foreach ('.var_export($paths, true).' as $path) {'
+            .' $results[] = pmssCreateNginxConfigSetupDirectory($path); } echo json_encode($results);';
+        $results = $this->pmssRunRepoInlinePhpRequireJson('scripts/lib/nginxConfig/setup.php',
+            $script, [], '2>'.escapeshellarg($stderr));
+        $this->assertSame([true, true, false, false, false, false, false], $results);
+        $warnings = '';
+        foreach (array_slice($paths, 2) as $path) {
+            $warnings .= '[WARN] Failed to prepare directory for nginx config: '.$path.PHP_EOL;
+        }
+        $this->assertSame($warnings, file_get_contents($stderr));
+        $this->assertSame('keep', file_get_contents($root.'/file'));
+        $this->assertSame(0700, fileperms($root) & 0777);
+        $this->assertTrue(is_dir($root.'/nested/dir'));
+    }
+
+    public function testSetupDefaultCleanupRetainsGuardsAndReportsRemovalFailure(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-nginx-setup-remove-', 0700);
+        $this->pmssWriteFile($root.'/remove.conf', 'obsolete');
+        $this->pmssWriteFile($root.'/keep.conf', 'keep');
+        mkdir($root.'/directory');
+        symlink($root.'/keep.conf', $root.'/linked.conf');
+        symlink($root.'/missing', $root.'/dangling.conf');
+        symlink($root, $root.'/redirected');
+        mkdir($root.'/locked');
+        $this->pmssWriteFile($root.'/locked/default.conf', 'retry later');
+        chmod($root.'/locked', 0500);
+        try {
+            // Root can unlink despite mode 0500; exercise this failure only without that privilege.
+            $denied = !is_writable($root.'/locked');
+            $paths = [$root.'/remove.conf', $root.'/missing', $root.'/directory',
+                $root.'/linked.conf', $root.'/dangling.conf', $root.'/redirected/keep.conf'];
+            if ($denied) $paths[] = $root.'/locked/default.conf';
+            $script = 'foreach ('.var_export($paths, true).' as $path) {'
+                .' pmssCreateNginxConfigSetupRemoveDefault($path); } echo "continued";';
+            $stderr = $root.'/stderr';
+            $output = $this->pmssRunRepoInlinePhpRequire('scripts/lib/nginxConfig/setup.php',
+                $script, [], '2>'.escapeshellarg($stderr));
+            $this->assertSame('continued', $output);
+            $this->assertSame($denied
+                ? '[WARN] Failed to remove obsolete account UI default nginx config: '.$root.'/locked/default.conf'.PHP_EOL
+                : '', file_get_contents($stderr));
+            $this->assertFalse(file_exists($root.'/remove.conf'));
+            $this->assertSame('keep', file_get_contents($root.'/keep.conf'));
+            $this->assertSame('retry later', file_get_contents($root.'/locked/default.conf'));
+            $this->assertTrue(is_dir($root.'/directory'));
+            $this->assertTrue(is_link($root.'/linked.conf') && is_link($root.'/dangling.conf'));
+        } finally {
+            chmod($root.'/locked', 0700);
+        }
+    }
+
     public function testNormalRenderingPreservesExactConfigContract(): void
     {
         require_once dirname(__DIR__, 2).'/nginxConfig/setup.php';
