@@ -1,6 +1,6 @@
 <?php
 /**
- * LinuxServer.io container installer shared by tenant and operator entrypoints.
+ * LinuxServer.io container installer run by the account (the operator entrypoint hands installs to it).
  *
  * Delivered into each account's bin directory; no operator-tree dependencies.
  *
