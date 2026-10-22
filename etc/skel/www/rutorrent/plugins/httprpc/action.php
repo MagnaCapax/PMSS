@@ -78,7 +78,8 @@ function makeSimpleCall($cmds,$hash)
 	foreach($hash as $h)
 		foreach($cmds as $cmd)	
 			$req->addCommand( new rXMLRPCCommand( $cmd, $h ) );
-       	return($req->success(false) ? $req->val : false);
+	// Only fixed server-side commands reach this trusted call; hashes remain parameters.
+	return($req->success(rTorrentSettings::get()->iVersion >= 0x1000) ? $req->val : false);
 }
 
 $result = null;

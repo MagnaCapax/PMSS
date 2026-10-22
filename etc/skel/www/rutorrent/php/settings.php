@@ -216,6 +216,14 @@ class rTorrentSettings
 			{
 				require_once( 'methods-0.9.4.php' );
 			}
+			if($this->iVersion >= 0x1010)
+			{
+				$this->aliases = array_merge($this->aliases,array
+				(
+					"get_proxy_address" => array( "name"=>"network.proxy.global", "prm"=>0 ),
+					"set_proxy_address" => array( "name"=>"network.proxy.global.set", "prm"=>1 ),
+				));
+			}
 			
 			$this->apiVersion = 0;
 			if($this->iVersion>=0x901)
@@ -226,21 +234,9 @@ class rTorrentSettings
 					$this->apiVersion = $req->val[0];
 			}
 
-			if($this->apiVersion >= 11)	// at current moment (2019.07.20) this is feature-bind branch of rtorrent
-			{
-				$this->aliases = array_merge($this->aliases,array
-				(
-					"get_port_open"	=> array( "name"=>"network.listen.is_open", "prm"=>0 ),
-					"get_port_random" => array( "name"=>"network.port.randomize", "prm"=>0 ),
-					"get_port_range" => array( "name"=>"network.port.range", "prm"=>0 ),
-					"set_port_open"	=> array( "name"=>"network.listen.open", "prm"=>1 ),
-					"set_port_random" => array( "name"=>"network.port.randomize.set", "prm"=>1 ),
-					"set_port_range" => array( "name"=>"network.port.range.set", "prm"=>1 ),
-					"network.listen.port" => array( "name"=>"network.port", "prm"=>0 ),
-				));
-			}
-
-                        $req = new rXMLRPCRequest( new rXMLRPCCommand("to_kb", floatval(1024)) );
+			$req = new rXMLRPCRequest( $this->iVersion >= 0x1000
+				? new rXMLRPCCommand("convert.kb", array('', floatval(1024)))
+				: new rXMLRPCCommand("to_kb", floatval(1024)) );
 			if($req->run())
 			{
 				if(!$req->fault)
@@ -315,7 +311,17 @@ class rTorrentSettings
 	}
 	public function getRatioGroupCommand($ratio,$cmd,$args)
 	{
-		$prefix = ($this->iVersion >= 0x904) && in_array($cmd,$this->ratioCmds) ? "group2." : "group.";
+		if($this->iVersion >= 0x1000)
+		{
+			$prefix = "group.";
+			if(substr($cmd, -4) === ".set")
+			{
+				if(!is_array($args)) $args = array($args);
+				array_unshift($args, "");
+			}
+		}
+		else
+			$prefix = ($this->iVersion >= 0x904) && in_array($cmd,$this->ratioCmds) ? "group2." : "group.";
 		return( new rXMLRPCCommand( $prefix.$ratio.".".$cmd, $args ) );
 	}
 	public function getEventCommand($cmd1,$cmd2,$args)
@@ -361,8 +367,11 @@ class rTorrentSettings
 		if(!isset($schedule_rand))
 			$schedule_rand = 10;
 		$tm = getdate();
+		$interval = (int)$interval;
+		if($interval<1)
+			$interval = 30;
 		$startAt = mktime($tm["hours"],
-			((integer)($tm["minutes"]/$interval))*$interval+$interval,
+			((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),
 			0,$tm["mon"],$tm["mday"],$tm["year"])-$tm[0]+rand(0,$schedule_rand);
 		if($startAt<0)
 			$startAt = 0;

@@ -110,7 +110,7 @@ PHP;
     $snoopyAcceptPatched = "\tvar \$accept\t\t\t=\t\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\";";
 
     // Apply each legacy replacement in order, preserving per-patch writes.
-    foreach ([
+    foreach (array_merge([
         ['php/settings.php', $settingsIntervalGuardLegacy, $settingsIntervalGuardPatched],
         ['php/settings.php', '((integer)($tm["minutes"]/$interval))*$interval+$interval,', '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),'],
         ['php/Snoopy.class.inc', $snoopyAcceptLegacy, $snoopyAcceptPatched],
@@ -118,9 +118,138 @@ PHP;
         ['plugins/hddquota/action.php', 'return $field;', 'return (int) $field;'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_upload_rate", 0 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 0 )'],
-    ] as [$path, $legacy, $patched]) {
+    ], pmssUserRutorrentRpcCompatibilityPatches()) as [$path, $legacy, $patched]) {
         pmssUserPatchWritableStrings($ctx['home'].'/www/rutorrent/'.$path, [['legacy' => $legacy, 'patched' => $patched]]);
     }
+}
+
+/**
+ * Return exact legacy-to-skeleton edits for existing accounts without a full refresh.
+ *
+ * The six non-overlapping anchors retain 0.9.x RPCs except the obsolete API-11 aliases.
+ * @return array<int, array{0:string,1:string,2:string}>
+ */
+function pmssUserRutorrentRpcCompatibilityPatches(): array
+{
+    return [
+        // F1: Modern conversion requires an explicit string target.
+        ['php/settings.php', <<<'PHP'
+                        $req = new rXMLRPCRequest( new rXMLRPCCommand("to_kb", floatval(1024)) );
+PHP, <<<'PHP'
+			$req = new rXMLRPCRequest( $this->iVersion >= 0x1000
+				? new rXMLRPCCommand("convert.kb", array('', floatval(1024)))
+				: new rXMLRPCCommand("to_kb", floatval(1024)) );
+PHP
+        ],
+        // F2: API versions above 10 no longer imply the feature-bind aliases.
+        ['php/settings.php', <<<'PHP'
+			$this->apiVersion = 0;
+			if($this->iVersion>=0x901)
+			{
+				$req = new rXMLRPCRequest( new rXMLRPCCommand("system.api_version") );
+				$req->important = false;
+				if($req->success())
+					$this->apiVersion = $req->val[0];
+			}
+
+			if($this->apiVersion >= 11)	// at current moment (2019.07.20) this is feature-bind branch of rtorrent
+			{
+				$this->aliases = array_merge($this->aliases,array
+				(
+					"get_port_open"	=> array( "name"=>"network.listen.is_open", "prm"=>0 ),
+					"get_port_random" => array( "name"=>"network.port.randomize", "prm"=>0 ),
+					"get_port_range" => array( "name"=>"network.port.range", "prm"=>0 ),
+					"set_port_open"	=> array( "name"=>"network.listen.open", "prm"=>1 ),
+					"set_port_random" => array( "name"=>"network.port.randomize.set", "prm"=>1 ),
+					"set_port_range" => array( "name"=>"network.port.range.set", "prm"=>1 ),
+					"network.listen.port" => array( "name"=>"network.port", "prm"=>0 ),
+				));
+			}
+PHP, <<<'PHP'
+			$this->apiVersion = 0;
+			if($this->iVersion>=0x901)
+			{
+				$req = new rXMLRPCRequest( new rXMLRPCCommand("system.api_version") );
+				$req->important = false;
+				if($req->success())
+					$this->apiVersion = $req->val[0];
+			}
+PHP
+        ],
+        // F3: Only modern group setters need an extra target argument.
+        ['php/settings.php', <<<'PHP'
+	public function getRatioGroupCommand($ratio,$cmd,$args)
+	{
+		$prefix = ($this->iVersion >= 0x904) && in_array($cmd,$this->ratioCmds) ? "group2." : "group.";
+		return( new rXMLRPCCommand( $prefix.$ratio.".".$cmd, $args ) );
+	}
+PHP, <<<'PHP'
+	public function getRatioGroupCommand($ratio,$cmd,$args)
+	{
+		if($this->iVersion >= 0x1000)
+		{
+			$prefix = "group.";
+			if(substr($cmd, -4) === ".set")
+			{
+				if(!is_array($args)) $args = array($args);
+				array_unshift($args, "");
+			}
+		}
+		else
+			$prefix = ($this->iVersion >= 0x904) && in_array($cmd,$this->ratioCmds) ? "group2." : "group.";
+		return( new rXMLRPCCommand( $prefix.$ratio.".".$cmd, $args ) );
+	}
+PHP
+        ],
+        // F4: Replace the removed proxy address commands from 0.16.16 onward.
+        ['php/settings.php', <<<'PHP'
+			if($this->iVersion>=0x904)
+			{
+				require_once( 'methods-0.9.4.php' );
+			}
+PHP, <<<'PHP'
+			if($this->iVersion>=0x904)
+			{
+				require_once( 'methods-0.9.4.php' );
+			}
+			if($this->iVersion >= 0x1010)
+			{
+				$this->aliases = array_merge($this->aliases,array
+				(
+					"get_proxy_address" => array( "name"=>"network.proxy.global", "prm"=>0 ),
+					"set_proxy_address" => array( "name"=>"network.proxy.global.set", "prm"=>1 ),
+				));
+			}
+PHP
+        ],
+        // F5: Trust only the server-selected torrent lifecycle commands.
+        ['plugins/httprpc/action.php', "\t\t\t\$req->addCommand( new rXMLRPCCommand( \$cmd, \$h ) );\n       \treturn(\$req->success(false) ? \$req->val : false);", <<<'PHP'
+			$req->addCommand( new rXMLRPCCommand( $cmd, $h ) );
+	// Only fixed server-side commands reach this trusted call; hashes remain parameters.
+	return($req->success(rTorrentSettings::get()->iVersion >= 0x1000) ? $req->val : false);
+PHP
+        ],
+        // F6: Modern rTorrent lacks file.append; keep the worker's list format.
+        ['plugins/erasedata/init.php', <<<'PHP'
+$req = new rXMLRPCRequest( array(
+	$theSettings->getOnEraseCommand(array('erasedata0'.getUser(),
+		getCmd('d.open').'= ; '.getCmd('branch=').getCmd('d.get_custom5').'=,"'.
+			getCmd('f.multicall').'=,\"'.getCmd('file.append').'=(cat,'.$listPath.'/,$'.getCmd('system.pid').'=,.tmp),$'.getCmd('f.get_frozen_path').'=\""')),
+PHP, <<<'PHP'
+$eraseCommand = getCmd('d.open').'= ; '.getCmd('branch=').getCmd('d.get_custom5').'=,"'.
+	getCmd('f.multicall').'=,\"'.getCmd('file.append').'=(cat,'.$listPath.'/,$'.getCmd('system.pid').'=,.tmp),$'.getCmd('f.get_frozen_path').'=\""';
+if($theSettings->iVersion >= 0x1000)
+{
+	// Pass filenames as shell arguments and retain the cleanup worker's line format.
+	$x = 'execute.nothrow={sh,-c,"printf \'%s\\\\n\' \\"$0\\" >> \\"$1/$2.tmp\\"",$'.getCmd('f.get_frozen_path').'=,'.$listPath.',$'.getCmd('system.pid').'=}';
+	$eraseCommand = getCmd('d.open').'= ; '.getCmd('branch=').getCmd('d.get_custom5').'=,"'.getCmd('f.multicall').'=,\"'.addcslashes(addcslashes($x, '"\\'), '"\\').'\""';
+}
+
+$req = new rXMLRPCRequest( array(
+	$theSettings->getOnEraseCommand(array('erasedata0'.getUser(), $eraseCommand)),
+PHP
+        ],
+    ];
 }
 
 /**

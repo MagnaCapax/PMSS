@@ -128,6 +128,108 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->pmssAssertStringNotContainsString('image/x-xbitmap', $content);
     }
 
+    public function testCompatibilityRebuildsSkeletonFilesAndIsIdempotent(): void
+    {
+        $cases = $this->compatPatchCases();
+        foreach (['php/settings.php', 'plugins/httprpc/action.php', 'plugins/erasedata/init.php'] as $relative) {
+            $path = 'www/rutorrent/'.$relative;
+            $expected = $this->pmssReadRepoFile('etc/skel/'.$path);
+            $legacy = $expected;
+            // Reverse all applicable patches, including the pre-existing interval fixes.
+            foreach (array_reverse($cases) as $case) {
+                if ($case['path'] !== $path) continue;
+                $patched = substr($case['patched'], strlen("prefix\n"), -strlen("\nsuffix\n"));
+                $original = substr($case['legacy'], strlen("prefix\n"), -strlen("\nsuffix\n"));
+                $this->assertSame(1, substr_count($legacy, $patched), $relative);
+                $legacy = str_replace($patched, $original, $legacy);
+            }
+            $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', dirname($path));
+            $target = $this->pmssWriteRelativeFile($home, $path, $legacy);
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertSame($expected, file_get_contents($target), $relative);
+            $metadata = stat($target);
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            clearstatcache(true, $target);
+            $this->assertSame($expected, file_get_contents($target), $relative.' second pass');
+            $this->assertSame($metadata['ino'], stat($target)['ino'], $relative.' must not be rewritten');
+        }
+    }
+
+    public function testRatioGroupCommandsPreserveLegacyArgumentsAndAdaptModernSetters(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-rutorrent-ratio-');
+        // Capture this helper's arguments before XMLRPC's separate legacy alias handling.
+        $this->pmssWriteRelativeFile($dir, 'xmlrpc.php', <<<'PHP'
+<?php
+class rXMLRPCCommand {
+    public $command;
+    public $args;
+    public function __construct($command, $args) { $this->command = $command; $this->args = $args; }
+}
+PHP
+        );
+        $this->pmssWriteRelativeFile($dir, 'cache.php', '<?php');
+        $script = 'set_include_path('.var_export($dir, true).'); require '
+            .var_export($this->pmssRepoPath('etc/skel/www/rutorrent/php/settings.php'), true).';'
+            . <<<'PHP'
+$settings = (new ReflectionClass('rTorrentSettings'))->newInstanceWithoutConstructor();
+$result = [];
+foreach ([0x903, 0x904, 0x908, 0xfff, 0x1000, 0x100f, 0x1010, 0x1019] as $version) {
+    $settings->iVersion = $version;
+    foreach (['view', 'ratio.min', 'ratio.max', 'ratio.upload', 'enable'] as $name) {
+        foreach ([$name, $name.'.set'] as $command) {
+            foreach ([12, [12], [], null, ''] as $args) {
+                $rpc = $settings->getRatioGroupCommand('rat_1', $command, $args);
+                $result[] = [$version, $command, $args, $rpc->command, $rpc->args];
+            }
+        }
+    }
+}
+echo json_encode($result);
+PHP;
+        $rows = $this->pmssRunInlinePhpJson($script);
+        $this->assertSame(400, count($rows));
+        foreach ($rows as [$version, $command, $args, $name, $actual]) {
+            $modern = $version >= 0x1000;
+            $prefix = !$modern && $version >= 0x904 && strpos($command, 'enable') !== 0 ? 'group2.' : 'group.';
+            $expected = $args;
+            if ($modern && substr($command, -4) === '.set') {
+                $expected = is_array($args) ? $args : [$args];
+                array_unshift($expected, '');
+            }
+            $this->assertSame($prefix.'rat_1.'.$command, $name);
+            $this->assertSame($expected, $actual);
+        }
+    }
+
+    public function testRpcCompatibilityAnchorsAreUniqueAndDoNotOverlap(): void
+    {
+        $byPath = [];
+        foreach (\pmssUserRutorrentRpcCompatibilityPatches() as [$path, $legacy, $patched]) {
+            $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/'.$path);
+            $this->assertSame(1, substr_count($source, $patched), $path);
+            $byPath[$path][] = [$legacy, $patched];
+        }
+        foreach ($byPath as $path => $replacements) {
+            $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/'.$path);
+            foreach (array_reverse($replacements) as [$legacy, $patched]) {
+                $source = str_replace($patched, $legacy, $source);
+            }
+            $end = 0;
+            $ranges = [];
+            foreach ($replacements as [$legacy]) {
+                $this->assertSame(1, substr_count($source, $legacy), $path);
+                $start = strpos($source, $legacy);
+                $ranges[] = [$start, $start + strlen($legacy)];
+            }
+            sort($ranges);
+            foreach ($ranges as [$start, $stop]) {
+                $this->assertTrue($start >= $end, $path.' overlapping anchors');
+                $end = $stop;
+            }
+        }
+    }
+
     private function assertCompatibilityContentUntouched(array $case, string $content): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);
@@ -139,7 +241,7 @@ class UserRutorrentCompatPatchTest extends TestCase
 
     private function compatPatchCases(): array
     {
-        return [
+        $cases = [
             [
                 'dir' => 'www/rutorrent/php',
                 'path' => 'www/rutorrent/php/settings.php',
@@ -181,6 +283,18 @@ class UserRutorrentCompatPatchTest extends TestCase
                 'unexpected' => "new rXMLRPCCommand( \"set_upload_rate\", MAX_SPEED )\nnew rXMLRPCCommand( \"set_download_rate\", MAX_SPEED )",
             ],
         ];
+        // One fixture per new delivery entry extends every existing safety scenario.
+        foreach (\pmssUserRutorrentRpcCompatibilityPatches() as [$path, $legacy, $patched]) {
+            $cases[] = [
+                'dir' => 'www/rutorrent/'.dirname($path),
+                'path' => 'www/rutorrent/'.$path,
+                'legacy' => "prefix\n".$legacy."\nsuffix\n",
+                'patched' => "prefix\n".$patched."\nsuffix\n",
+                'expected' => $patched,
+                'unexpected' => "prefix\n".$legacy."\nsuffix\n",
+            ];
+        }
+        return $cases;
     }
 
 }
