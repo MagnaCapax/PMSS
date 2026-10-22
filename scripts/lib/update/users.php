@@ -11,7 +11,7 @@ require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/../torrentClients/postSetup.php';
 pmssRequireRelativeFiles(__DIR__, [
     'users/filesystem.php', 'users/webRoot.php', 'users/webRootReconcile.php',
-    'users/rutorrent.php', 'users/context.php', 'users/http.php', 'users/permissions.php',
+    'users/rutorrent.php', 'users/rutorrentRpcCompatibility.php', 'users/context.php', 'users/http.php', 'users/permissions.php',
     '../user/directories.php', '../user/delugeManagedConfig.php', '../user/qbittorrent.php', '../user/qbittorrentWebUiAuth.php',
     '../rtorrentConfig.php',
 ]);

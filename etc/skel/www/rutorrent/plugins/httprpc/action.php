@@ -72,14 +72,18 @@ function makeMulticall($cmds,$hash,$add,$prefix)
 	return(false);
 }
 
+// Only server-selected commands may bypass rTorrent's untrusted method filter.
+$trusted = rTorrentSettings::get()->iVersion >= 0x1000;
+
 function makeSimpleCall($cmds,$hash)
 {
+	global $trusted;
 	$req = new rXMLRPCRequest();
 	foreach($hash as $h)
 		foreach($cmds as $cmd)	
 			$req->addCommand( new rXMLRPCCommand( $cmd, $h ) );
 	// Only fixed server-side commands reach this trusted call; hashes remain parameters.
-	return($req->success(rTorrentSettings::get()->iVersion >= 0x1000) ? $req->val : false);
+	return($req->success($trusted) ? $req->val : false);
 }
 
 $result = null;
@@ -222,7 +226,7 @@ switch($mode)
 		$req = new rXMLRPCRequest();
 		foreach($vs as $ndx=>$value)
 			$req->addCommand( new rXMLRPCCommand( "t.set_enabled", array($hash[0], intval($value), intval($ss[0])) ) );
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}
@@ -232,7 +236,7 @@ switch($mode)
 		foreach($vs as $v)
 			$req->addCommand( new rXMLRPCCommand( "f.set_priority", array($hash[0], intval($v), intval($ss[0])) ) );
 		$req->addCommand( new rXMLRPCCommand("d.update_priorities", $hash[0]) );
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}
@@ -271,7 +275,7 @@ switch($mode)
 		$req = new rXMLRPCRequest();
 		foreach($hash as $ndx=>$h)
 			$req->addCommand( new rXMLRPCCommand( "d.set_priority", array($h, intval($vs[0])) ) );
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}
@@ -280,7 +284,7 @@ switch($mode)
 		$req = new rXMLRPCRequest();
 		foreach($hash as $ndx=>$h)
 			$req->addCommand( new rXMLRPCCommand( "d.set_custom1", array($h, $vs[0]) ) );
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}
@@ -383,7 +387,8 @@ switch($mode)
 			}
 			$req->addCommand($cmd);
 		}
-		if($req->success(false))
+		// Every client-selected property must name a setter used by the bundled UI.
+		if($req->success($trusted && !array_diff($ss, array("superseed", "ulslots", "pex", "peers_min", "peers_max", "tracker_numwant"))))
 	        	$result = $req->val;
 		break;
 	}
@@ -408,7 +413,7 @@ switch($mode)
 		$req = new rXMLRPCRequest();
                 foreach($vs as $v)
 			$req->addCommand( new rXMLRPCCommand("p.snubbed.set", array($hash[0].":p".$v,$on)) );
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}
@@ -420,7 +425,7 @@ switch($mode)
 			$req->addCommand( new rXMLRPCCommand("p.banned.set", array($hash[0].":p".$v,1)) );
 			$req->addCommand( new rXMLRPCCommand("p.disconnect", $hash[0].":p".$v) );
 		}
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}
@@ -429,7 +434,7 @@ switch($mode)
 		$req = new rXMLRPCRequest();
                 foreach($vs as $v)
 			$req->addCommand( new rXMLRPCCommand("p.disconnect", $hash[0].":p".$v) );
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}
@@ -437,7 +442,7 @@ switch($mode)
 	{
 		$req = new rXMLRPCRequest(
 			new rXMLRPCCommand( "add_peer", array($hash[0], $vs[0]) ) );
-		if($req->success(false))
+		if($req->success($trusted))
 	        	$result = $req->val;
 		break;
 	}

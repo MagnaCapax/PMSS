@@ -131,6 +131,14 @@ class UserRutorrentCompatPatchTest extends TestCase
     public function testCompatibilityRebuildsSkeletonFilesAndIsIdempotent(): void
     {
         $cases = $this->compatPatchCases();
+        // Alternative legacy anchors share a final block; reverse each block once.
+        $seen = [];
+        $cases = array_values(array_filter($cases, static function ($case) use (&$seen) {
+            $key = $case['path']."\0".$case['patched'];
+            if (isset($seen[$key])) return false;
+            $seen[$key] = true;
+            return true;
+        }));
         foreach (['php/settings.php', 'plugins/httprpc/action.php', 'plugins/erasedata/init.php'] as $relative) {
             $path = 'www/rutorrent/'.$relative;
             $expected = $this->pmssReadRepoFile('etc/skel/'.$path);
@@ -202,30 +210,166 @@ PHP;
         }
     }
 
+    public function testRoundOneAccountsConvergeToSkeletonWithoutRewritingOnSecondPass(): void
+    {
+        $groups = [];
+        foreach (\pmssUserRutorrentRpcCompatibilityPatches() as [$path, $legacy, $patched]) {
+            $groups[$path][$patched][] = $legacy;
+        }
+        foreach (['php/settings.php', 'plugins/httprpc/action.php'] as $relative) {
+            $expected = $this->pmssReadRepoFile('etc/skel/www/rutorrent/'.$relative);
+            $roundOne = $expected;
+            foreach (array_reverse($groups[$relative], true) as $patched => $alternatives) {
+                // Only the alias/function alternatives and fixed setters changed in round 2.
+                if (count($alternatives) === 1 && strpos($patched, '$req->success($trusted') === false) continue;
+                $this->assertSame(1, substr_count($roundOne, $patched), $relative);
+                $roundOne = str_replace($patched, end($alternatives), $roundOne);
+            }
+            $this->assertTrue($roundOne !== $expected, $relative.' needs round-2 changes');
+            $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/'.dirname($relative));
+            $target = $this->pmssWriteRelativeFile($home, 'www/rutorrent/'.$relative, $roundOne);
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertSame($expected, file_get_contents($target), $relative);
+            $inode = stat($target)['ino'];
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            clearstatcache(true, $target);
+            $this->assertSame($expected, file_get_contents($target), $relative.' second pass');
+            $this->assertSame($inode, stat($target)['ino']);
+        }
+    }
+
+    public function testRutorrentBackupOperationKeepsItsOriginalLine(): void
+    {
+        $lines = explode("\n", $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php'));
+        $this->assertStringContainsString("'Backing up existing ruTorrent'", $lines[181]);
+    }
+
+    public function testObtainUsesVersionedDhtAndPortAliases(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-rutorrent-aliases-');
+        $this->pmssWriteRelativeFile($dir, 'xmlrpc.php', <<<'PHP'
+<?php
+class rXMLRPCCommand {
+    public $command;
+    public function __construct($command, $args = null) { $this->command = $command; }
+}
+class rXMLRPCRequest {
+    public $val = [];
+    public $important;
+    private $command;
+    public function __construct($command) { $this->command = $command->command; }
+    public function run() {
+        $this->val = [$GLOBALS['version']];
+        return $this->command === 'system.client_version';
+    }
+    public function success() { $this->val = [13]; return true; }
+}
+PHP
+        );
+        $this->pmssWriteRelativeFile($dir, 'cache.php', '<?php');
+        $phpDir = $this->pmssRepoPath('etc/skel/www/rutorrent/php');
+        foreach (['0.9.8', '0.15.255', '0.16.0', '0.16.15', '0.16.16', '0.16.17', '0.16.18', '0.16.25'] as $version) {
+            // A separate process respects methods-0.9.4.php's require_once lifecycle.
+            $script = '$version = '.var_export($version, true).'; set_include_path('
+                .var_export($dir.PATH_SEPARATOR.$phpDir, true).'); require '
+                .var_export($phpDir.'/settings.php', true).';'
+                .'$settings = (new ReflectionClass("rTorrentSettings"))->newInstanceWithoutConstructor();'
+                .'$settings->obtain(); echo json_encode([$settings->iVersion, $settings->aliases]);';
+            [$numeric, $aliases] = $this->pmssRunInlinePhpJson($script);
+            $this->assertSame($numeric >= 0x1000 ? ['name' => 'dht.mode.set', 'prm' => 1] : null, $aliases['dht'] ?? null, $version);
+            foreach (['range', 'random'] as $name) {
+                $prefix = $numeric >= 0x1012 ? 'network.listen.port.' : 'network.port_';
+                $this->assertSame(['name' => $prefix.$name, 'prm' => 0], $aliases['get_port_'.$name], $version);
+                $this->assertSame(['name' => $prefix.$name.'.set', 'prm' => 1], $aliases['set_port_'.$name], $version);
+            }
+            foreach (['get_port_open' => 0, 'set_port_open' => 1, 'port_open' => 0] as $name => $parameters) {
+                if ($numeric >= 0x1012) $this->assertSame(['name' => 'cat', 'prm' => $parameters], $aliases[$name], $version);
+                else $this->assertTrue(!isset($aliases[$name]) || $aliases[$name]['name'] !== 'cat', $version);
+            }
+        }
+    }
+
+    public function testSetpropsTrustRequiresEveryNameToBeFromBundledUi(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/plugins/httprpc/action.php');
+        preg_match('/if\(\$req->success\((\$trusted && [^\n]+)\)\)/', $source, $match);
+        $this->assertTrue(isset($match[1]), 'setprops trust decision must be present');
+        $script = '$decision = '.var_export($match[1], true).';'. <<<'PHP'
+$rows = [];
+$allowed = ['superseed', 'ulslots', 'pex', 'peers_min', 'peers_max', 'tracker_numwant'];
+$cases = array_merge([[], $allowed, ['pex', 'pex']], array_map(function ($s) { return [$s]; }, $allowed));
+foreach (['', 'custom1', 'execute', 'peers_max.set', 'peers_max=', 'PEX', 'peers_min ', '<methodName>execute</methodName>'] as $name) {
+    $cases[] = [$name];
+    $cases[] = ['pex', $name];
+    $cases[] = [$name, 'pex'];
+}
+foreach ([0x908, 0xfff, 0x1000, 0x1019] as $version) {
+    $trusted = $version >= 0x1000;
+    foreach ($cases as $ss) $rows[] = [$version, $ss, eval('return '.$decision.';')];
+}
+echo json_encode($rows);
+PHP;
+        foreach ($this->pmssRunInlinePhpJson($script) as [$version, $properties, $actual]) {
+            $expected = $version >= 0x1000;
+            foreach ($properties as $property) {
+                if (!in_array($property, ['superseed', 'ulslots', 'pex', 'peers_min', 'peers_max', 'tracker_numwant'], true)) $expected = false;
+            }
+            $this->assertSame($expected, $actual, json_encode([$version, $properties]));
+        }
+    }
+
+    public function testOnlyFixedHttprpcModesUseTrustedCalls(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/plugins/httprpc/action.php');
+        $this->assertSame(1, substr_count($source, '$trusted = rTorrentSettings::get()->iVersion >= 0x1000;'));
+        foreach (['trkstate', 'setprio', 'dsetprio', 'setlabel', 'snub', 'ban', 'kick', 'add_peer'] as $mode) {
+            $start = strpos($source, 'case "'.$mode.'":');
+            $block = substr($source, $start, strpos($source, "\tcase ", $start+1)-$start);
+            $this->assertStringContainsString('$req->success($trusted)', $block, $mode);
+        }
+        foreach (['list', 'stg', 'ttl', 'prp', 'trkall', 'setsettings', 'setul', 'setdl', 'getchunks'] as $mode) {
+            $start = strpos($source, 'case "'.$mode.'":');
+            $end = strpos($source, "\tcase ", $start+1);
+            if ($end === false) $end = strpos($source, "\tdefault:", $start+1);
+            $block = substr($source, $start, $end-$start);
+            $this->assertStringContainsString('$req->success(false)', $block, $mode);
+            $this->pmssAssertStringNotContainsString('$req->success($trusted', $block);
+        }
+        $this->assertStringContainsString('rXMLRPCRequest::send($HTTP_RAW_POST_DATA,false)', $source);
+        $this->assertStringContainsString('$req->success(false)', substr($source, strpos($source, 'function makeMulticall'), strpos($source, 'function makeSimpleCall')-strpos($source, 'function makeMulticall')));
+    }
+
     public function testRpcCompatibilityAnchorsAreUniqueAndDoNotOverlap(): void
     {
         $byPath = [];
         foreach (\pmssUserRutorrentRpcCompatibilityPatches() as [$path, $legacy, $patched]) {
             $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/'.$path);
             $this->assertSame(1, substr_count($source, $patched), $path);
-            $byPath[$path][] = [$legacy, $patched];
+            // Check both supported input generations independently, including alternatives.
+            $byPath[$path][$patched][] = $legacy;
         }
-        foreach ($byPath as $path => $replacements) {
-            $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/'.$path);
-            foreach (array_reverse($replacements) as [$legacy, $patched]) {
-                $source = str_replace($patched, $legacy, $source);
-            }
-            $end = 0;
-            $ranges = [];
-            foreach ($replacements as [$legacy]) {
-                $this->assertSame(1, substr_count($source, $legacy), $path);
-                $start = strpos($source, $legacy);
-                $ranges[] = [$start, $start + strlen($legacy)];
-            }
-            sort($ranges);
-            foreach ($ranges as [$start, $stop]) {
-                $this->assertTrue($start >= $end, $path.' overlapping anchors');
-                $end = $stop;
+        foreach ($byPath as $path => $groups) {
+            foreach ([0, 1] as $variant) {
+                $replacements = [];
+                foreach ($groups as $patched => $alternatives) {
+                    $replacements[] = [$alternatives[min($variant, count($alternatives)-1)], $patched];
+                }
+                $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/'.$path);
+                foreach (array_reverse($replacements) as [$legacy, $patched]) {
+                    $source = str_replace($patched, $legacy, $source);
+                }
+                $end = 0;
+                $ranges = [];
+                foreach ($replacements as [$legacy]) {
+                    $this->assertSame(1, substr_count($source, $legacy), $path);
+                    $start = strpos($source, $legacy);
+                    $ranges[] = [$start, $start + strlen($legacy)];
+                }
+                sort($ranges);
+                foreach ($ranges as [$start, $stop]) {
+                    $this->assertTrue($start >= $end, $path.' overlapping anchors');
+                    $end = $stop;
+                }
             }
         }
     }

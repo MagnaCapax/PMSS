@@ -224,7 +224,27 @@ class rTorrentSettings
 					"set_proxy_address" => array( "name"=>"network.proxy.global.set", "prm"=>1 ),
 				));
 			}
-			
+			if($this->iVersion >= 0x1000)
+			{
+				$this->aliases = array_merge($this->aliases,array
+				(
+					"dht" => array( "name"=>"dht.mode.set", "prm"=>1 ),
+				));
+			}
+			if($this->iVersion >= 0x1012)
+			{
+				// Deprecated port_open is inert; cat preserves that behavior.
+				$this->aliases = array_merge($this->aliases,array
+				(
+					"get_port_range" => array( "name"=>"network.listen.port.range", "prm"=>0 ),
+					"set_port_range" => array( "name"=>"network.listen.port.range.set", "prm"=>1 ),
+					"get_port_random" => array( "name"=>"network.listen.port.random", "prm"=>0 ),
+					"set_port_random" => array( "name"=>"network.listen.port.random.set", "prm"=>1 ),
+					"get_port_open" => array( "name"=>"cat", "prm"=>0 ),
+					"set_port_open" => array( "name"=>"cat", "prm"=>1 ),
+					"port_open" => array( "name"=>"cat", "prm"=>0 ),
+				));
+			}
 			$this->apiVersion = 0;
 			if($this->iVersion>=0x901)
 			{
