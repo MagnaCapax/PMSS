@@ -208,8 +208,10 @@ function pmssCreateNginxConfigSetup(): array
         && pmssPathTargetIsSafe($pikkumiesHermesDefault, false, true)) {
         @unlink($pikkumiesHermesDefault);
     }
-    if ($subdomainEnabled && $nginxSslBlock !== '' && pmssPikkumiesUiPortAvailable(846)) {
-        // Port C serves the Hermes sign-in page and its offline page even where ports A and B are off.
+    if ($subdomainEnabled && $nginxSslBlock !== ''
+        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled') && pmssPikkumiesUiPortAvailable(846)) {
+        // Port C serves the Hermes sign-in and offline pages, only on hosts with the marker like ports A and B
+        // (ADR 0150: no new public listener on a host that has not turned the feature on).
         if (!pmssPikkumiesUiPagesInstall())
             pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
         if (!pmssWriteManagedFile($hermesDefault, pmssHermesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
