@@ -31,7 +31,7 @@ function pmssCustomerPanelRenderRequiredMarkers(): array
 {
     return pmssEnvFlagEnabled('PMSS_CUSTOMER_PANEL_RENDER_DISABLE_MARKERS')
         ? []
-        : ['Your account', 'Traffic · 30 days', 'Memory', 'Your apps', "What's new", 'ruTorrent'];
+        : ['Your account', 'Traffic · 30 days', 'Memory', 'Your apps', 'News', 'ruTorrent'];
 }
 
 /** Render one customer panel page and classify runtime errors. */

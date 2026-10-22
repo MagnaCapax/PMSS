@@ -338,6 +338,64 @@ function pmssLocalFrameCustomFramesRead($path = '../.customFrames')
     return $frameData;
 }
 
+/**
+ * Tab priorities from ~/.customFrames (ADR 0148): an optional fifth field, a whole number from -99 to 99.
+ * A line with a priority and no URL only moves an existing tab: `openclaw||||50`. Higher sits further left.
+ *
+ * @return array<string,int> lower-case tab key => priority
+ */
+function pmssLocalFramePrioritiesRead($path = '../.customFrames')
+{
+    $priorities = array();
+    if (!is_file($path) || is_link($path) || filesize($path) > 4096) return $priorities;
+    foreach (preg_split('/\r?\n/', (string) file_get_contents($path)) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') continue;
+        $fields = explode('|', $line);
+        if (count($fields) >= 5 && $fields[0] !== '' && preg_match('/^-?\d{1,2}$/D', trim($fields[4])) === 1) {
+            $priorities[strtolower($fields[0])] = (int) trim($fields[4]);
+        }
+    }
+    return $priorities;
+}
+
+/**
+ * Order the tabs after Welcome by priority, highest first, keeping today's order among equals. Welcome stays first,
+ * so the panel still opens on it (ADR 0021 #3). Defaults: Pikkumies 40 (right after Welcome, as before), OpenClaw 50
+ * on an account whose rTorrent is off, the OpenClaw-first product (operator 2026-10-22). The account's own lines win.
+ *
+ * @param array<string,array<string,string>> $frames
+ * @param array<string,int> $priorities
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFramePriorityOrder(array $frames, array $priorities, $openClawFirst)
+{
+    $defaults = array('pikkumies' => 40);
+    if ($openClawFirst) $defaults['openclaw'] = 50;
+    $rows = array();
+    $position = 0;
+    foreach ($frames as $key => $frame) {
+        $lower = strtolower((string) $key);
+        $priority = $lower === 'welcome' ? 1000 : (isset($priorities[$lower]) ? $priorities[$lower] : (isset($defaults[$lower]) ? $defaults[$lower] : 0));
+        $rows[] = array($priority, $position++, $key, $frame);
+    }
+    usort($rows, function ($a, $b) { return $a[0] === $b[0] ? $a[1] - $b[1] : $b[0] - $a[0]; });
+    $ordered = array();
+    foreach ($rows as $row) $ordered[$row[2]] = $row[3];
+    return $ordered;
+}
+
+/** Drop the ruTorrent tab while rTorrent is switched off: a disabled feature has no tab (ADR 0021 #2). */
+function pmssLocalFrameDisabledRtorrentDrop(array $frames, $disabled)
+{
+    if (!$disabled) return $frames;
+    foreach ($frames as $key => $frame) {
+        $url = isset($frame['url']) ? (string) $frame['url'] : '';
+        if (strtolower((string) $key) === 'rutorrent' || preg_match('#(^|/)rutorrent/?$#i', $url) === 1) unset($frames[$key]);
+    }
+    return $frames;
+}
+
 /** Return whether this customer selected bundled frame definitions only. */
 function pmssGuiFramesLocalOnlyEnabled($markerPath = '../.guiFramesLocalOnly')
 {
@@ -643,6 +701,9 @@ if ($pmssPikkumiesState['visible'] && isset($frames['welcome'])) {
         + array('pikkumies' => pmssLocalFrameDefinition('pikkumiesOpen.php?session=pm1', 'Pikkumies', 'Ask Pikkumies, your server helper'))
         + array_slice($frames, $pmssWelcomePosition, null, true);
 }
+$pmssRtorrentDisabled = file_exists('../.rtorrentDisable');
+$frames = pmssLocalFrameDisabledRtorrentDrop($frames, $pmssRtorrentDisabled);
+$frames = pmssLocalFramePriorityOrder($frames, pmssLocalFramePrioritiesRead(), $pmssRtorrentDisabled);
 // Remote and customer frame definitions cannot move or duplicate Configure.
 $pmssConfigureFrame = pmssLocalFrameConfigureFrameRead();
 foreach ($frames as $pmssFrameKey => $pmssFrame) {

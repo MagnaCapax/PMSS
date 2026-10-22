@@ -79,6 +79,7 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
 
 
 // Welcome home view model (ADR 0147). Every number comes from an existing reader; nothing is recomputed here.
+if (isset($_GET['credits'])) { pmssWelcomeHomeCreditsEmit(dirname(__DIR__)); exit; }
 if (isset($_GET['news'])) { pmssWelcomeHomeNewsEmit(dirname(__DIR__)); exit; }
 $homeTrafficState = pmssWelcomeHomeTrafficStateBuild(
     pmssWelcomeSerializedArrayRead('../.trafficData'),
@@ -96,6 +97,8 @@ $homeMetricsHtml = pmssWelcomeHomeQuotaMetricHtmlBuild($homeQuotaState, $billing
     .pmssWelcomeHomeTrafficMetricHtmlBuild($homeTrafficState, $billingServiceId)
     .pmssWelcomeHomeMemoryMetricHtmlBuild($homeMemoryState)
     .pmssWelcomeHomeServerMetricHtmlBuild();
+$homeCreditsKey = pmssWelcomeHomeCreditsKeyRead(dirname(__DIR__)) !== null;
+if ($homeCreditsKey) $homeMetricsHtml .= pmssWelcomeHomeCreditsMetricHtmlBuild();
 $homeApps = pmssWelcomeHomeAppsBuild($appsStatus, $homeAgentFirst);
 $homeAppsHtml = pmssWelcomeHomeAppsHtmlBuild($homeApps);
 
@@ -130,7 +133,7 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
                 <h1 id="h-status-title" class="h-label">Your account</h1>
                 <div class="h-chips"><?= $homeStatusChipsHtml ?></div>
             </div>
-            <div class="h-metrics"><?= $homeMetricsHtml ?></div>
+            <div class="h-metrics<?= $homeCreditsKey ? ' h-m5' : '' ?>"><?= $homeMetricsHtml ?></div>
         </section>
 <?php if ($pmssPikkumiesState['visible']): ?>
         <div class="h-ask">
@@ -149,7 +152,7 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
             </div>
             <div class="h-col">
                 <section class="h-card" aria-labelledby="h-news-title">
-                    <div class="h-head"><h2 id="h-news-title" class="h-label">What's new</h2><a class="h-head-link" href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">All news</a></div>
+                    <div class="h-head"><h2 id="h-news-title" class="h-label">News</h2></div>
                     <div id="h-news" data-src="welcome.php?news=1"><?= $homeNewsHtml ?></div>
                 </section>
 <?php if (trim(strip_tags($welcomeHeadingHtml)) !== ''): ?>
@@ -384,6 +387,34 @@ if (file_exists('openvpn-config.tgz')) {
                 && event.data === 'pikkumies:tab-ready' && !pmssPikkumiesBarReady && frame) frame.src = pmssPikkumiesBarOrigin + '/bar';
         });
         pmssPikkumiesBarPoll(); pmssPikkumiesBarTimer = setInterval(pmssPikkumiesBarPoll, 5000);
+<?php endif; ?>
+<?php if ($homeCreditsKey): ?>
+
+        /* AI credits: the status-strip card (ADR 0148). */
+        (function () {
+            var card = document.getElementById('h-credits');
+            if (!card || !window.fetch) return;
+            fetch('welcome.php?credits=1', {credentials: 'same-origin', cache: 'no-store'})
+                .then(function (response) { return response.json(); })
+                .then(function (credits) {
+                    if (credits.state !== 'ok') {
+                        var strip = card.parentNode;
+                        card.parentNode.removeChild(card);
+                        if (strip) strip.className = strip.className.replace(/\s*h-m5\b/, '');
+                        return;
+                    }
+                    card.querySelector('[data-credits-value]').textContent = credits.value;
+                    card.querySelector('[data-credits-meta]').textContent = credits.meta;
+                    if (credits.pct_left !== null) {
+                        var fill = document.createElement('i');
+                        fill.className = credits.pct_left < 10 ? 't-warn' : 's-base';
+                        fill.style.width = Math.max(0, Math.min(100, credits.pct_left)).toFixed(2) + '%';
+                        var meter = card.querySelector('[data-credits-bar]');
+                        meter.className = 'h-bar';
+                        meter.appendChild(fill);
+                    }
+                }).catch(function () {});
+        })();
 <?php endif; ?>
     </script>
 </body>
@@ -988,7 +1019,7 @@ function pmssWelcomeHomeCss()
 .h .h-chip{display:inline-flex;align-items:center;gap:5px;min-height:26px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);color:var(--text);font-size:12px}
 .h .h-chip:hover{border-color:#35506a;text-decoration:none}
 .h-chip b{font-weight:600}.h-chip-bonus b{color:var(--accent)}
-.h-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.h-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.h-metrics.h-m5{grid-template-columns:repeat(5,minmax(0,1fr))}
 .h-metric{min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
 .h-metric-l{color:var(--muted);font-size:12px}
 .h-metric-v{margin:1px 0 7px;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1037,7 +1068,8 @@ function pmssWelcomeHomeCss()
 .h-foot{margin:10px 0 0;color:var(--muted);font-size:12px}
 /* What's new */
 .h-news{list-style:none;margin:0;padding:0}
-.h-news li{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line)}
+.h-news li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line)}
+.h-news-part+.h-news-part{margin-top:12px}.h-news-sub{margin:0 0 4px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}.h-news-sub a{margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0}
 .h-news li:first-child{border-top:0;padding-top:0}
 .h-tag{color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .h .h-news a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
@@ -1063,7 +1095,7 @@ function pmssWelcomeHomeCss()
 .pmss-media-stack-auth-badge-protected{color:var(--ok)}.pmss-media-stack-auth-badge-exposed{color:var(--bad)}
 .pmss-media-stack-box pre{margin-top:10px;max-height:220px;overflow:auto;padding:10px;white-space:pre-wrap;word-break:break-word}
 .pmss-feed-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media (max-width:1099px){.h-main{grid-template-columns:minmax(0,1fr)}.h-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1099px){.h-main{grid-template-columns:minmax(0,1fr)}.h-metrics,.h-metrics.h-m5{grid-template-columns:repeat(2,minmax(0,1fr))}.h-m5 .h-metric:last-child{grid-column:1/-1}}
 @media (max-width:599px){.h{padding:10px 10px 22px}.h-metrics{gap:8px}.h-metric{padding:9px 10px}.h-metric-v{font-size:16px}
 .h-app-hero{flex-direction:column;align-items:flex-start}.h-app-hero .h-app-top{min-width:0}.h-kv{grid-template-columns:max-content minmax(0,1fr)}.h-kv .h-copy{display:none}.h-kv dd{white-space:normal;word-break:break-all}.h-metric-v{white-space:normal}.h-metric-v span{display:block;margin:2px 0 0}}
 @media (prefers-reduced-motion:reduce){.h-body *{transition:none!important;animation:none!important}}
@@ -1103,27 +1135,30 @@ function pmssWelcomeHomeNewsCacheFresh($home)
     return true;
 }
 
-/**
- * Pick the rows for What's new: the newest announcements first (they are the time-sensitive notices and must not be
- * pushed out by blog or wiki activity), then the newest blog posts and wiki changes, one row format for all.
- *
- * @return array<int,array{kind:string,title:string,link:string,time:int}>
- */
-function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, array $wiki, $limit = 6)
+/** News in two parts (operator 2026-10-22: "Maybe two segments, announcements and vainamoinen articles ... like 10 of
+ *  them. Wiki updates, probably not needed"): the newest announcements and the newest articles, each newest first. */
+function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, $announcementLimit = 3, $articleLimit = 10)
 {
-    $rows = array();
-    foreach (array_slice($announcements, 0, 2) as $item) $rows[] = array('kind' => 'News') + $item;
-    $rest = array();
-    foreach (array_slice($articles, 0, $limit) as $item) $rest[] = array('kind' => 'Blog') + $item;
-    foreach (array_slice($wiki, 0, 2) as $item) $rest[] = array('kind' => 'Wiki') + $item;
-    usort($rest, function ($a, $b) { return $b['time'] - $a['time']; });
-    foreach ($rest as $item) {
-        if (count($rows) >= $limit) break;
-        $rows[] = $item;
-    }
-    return $rows;
+    $newest = function (array $items, $limit) {
+        usort($items, function ($a, $b) { return $b['time'] - $a['time']; });
+        return array_slice($items, 0, $limit);
+    };
+    return array('announcements' => $newest($announcements, $announcementLimit), 'articles' => $newest($articles, $articleLimit));
 }
 
+/** One news part: a small heading, an optional "all" link, rows of title and date (data-ts drives the unread dot). */
+function pmssWelcomeHomeNewsPartHtmlBuild($heading, array $rows, $allUrl = '')
+{
+    if ($rows === array()) return '';
+    $html = '<div class="h-news-part"><h3 class="h-news-sub">'.$heading
+        .($allUrl !== '' ? ' <a href="'.pmssWelcomeHtmlAttr($allUrl).'" target="_blank" rel="noopener">All</a>' : '').'</h3><ul class="h-news">';
+    foreach ($rows as $row) {
+        $html .= '<li data-ts="'.(int) $row['time'].'"><a href="'.pmssWelcomeHtmlAttr($row['link']).'" target="_blank" rel="noopener" title="'.pmssWelcomeHtmlAttr($row['title']).'">'
+            .pmssWelcomeHtmlAttr($row['title']).'</a>'
+            .'<time datetime="'.gmdate('Y-m-d', $row['time']).'">'.gmdate('j M', $row['time']).'</time></li>';
+    }
+    return $html.'</ul></div>';
+}
 /** Render What's new from the account cache; with $allowNetwork the stale sources are refetched first. */
 function pmssWelcomeHomeNewsHtmlRead($home, $allowNetwork)
 {
@@ -1137,21 +1172,14 @@ function pmssWelcomeHomeNewsHtmlRead($home, $allowNetwork)
     }
     $ann = pmssWelcomeHomeCachedFetch($home, 'https://pulsedmedia.com/clients/announcementsrss.php', 900, $allowNetwork);
     $feed = pmssWelcomeHomeCachedFetch($home, 'https://pulsedmedia.com/data/v1/panel-feed.xml', 900, $allowNetwork);
-    $rows = pmssWelcomeHomeNewsSelect(
+    $news = pmssWelcomeHomeNewsSelect(
         is_string($ann) ? pmssWelcomeFeedItemsRead($ann, '', 10) : array(),
-        is_string($feed) ? pmssWelcomeFeedItemsRead($feed, 'article', 10) : array(),
-        is_string($feed) ? pmssWelcomeFeedItemsRead($feed, 'wiki', 10) : array()
+        is_string($feed) ? pmssWelcomeFeedItemsRead($feed, 'article', 12) : array()
     );
-    if ($rows === array()) return '<p class="h-muted">News is unavailable right now. <a href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">Read the announcements</a>.</p>';
-    $html = '<ul class="h-news">';
-    foreach ($rows as $row) {
-        $title = $row['kind'] === 'Wiki' ? 'Wiki page updated' : $row['kind'];
-        $html .= '<li data-ts="'.(int) $row['time'].'"><span class="h-tag" title="'.$title.'">'.$row['kind'].'</span>'
-            .'<a href="'.pmssWelcomeHtmlAttr($row['link']).'" target="_blank" rel="noopener" title="'.pmssWelcomeHtmlAttr($row['title']).'">'
-            .pmssWelcomeHtmlAttr($row['title']).'</a>'
-            .'<time datetime="'.gmdate('Y-m-d', $row['time']).'">'.gmdate('j M', $row['time']).'</time></li>';
-    }
-    return $html.'</ul>';
+    $html = pmssWelcomeHomeNewsPartHtmlBuild('Announcements', $news['announcements'], 'https://pulsedmedia.com/clients/announcements.php')
+        .pmssWelcomeHomeNewsPartHtmlBuild('Väinämöinen\'s articles', $news['articles']);
+    if ($html === '') return '<p class="h-muted">News is unavailable right now. <a href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">Read the announcements</a>.</p>';
+    return $html;
 }
 
 /** GET welcome.php?news=1: refresh the cache and answer the list fragment (read-only, same origin). */
@@ -1428,6 +1456,10 @@ function pmssWelcomeHomeSuggestions(array $apps)
         'rclone' => array('rclone', 'Sync files to and from cloud storage'),
         'sonarr' => array('Sonarr', 'Finds and downloads TV episodes'),
     );
+    // An OpenClaw-first account starts with its torrent clients off; it is not nudged back to one.
+    foreach ($apps as $app) {
+        if (!empty($app['hero'])) { unset($ideas['qBittorrent']); break; }
+    }
     // A featured app spans its own row, so only the ordinary tiles count towards the row being completed.
     $tiles = count(array_filter($apps, function ($app) { return empty($app['hero']); }));
     $list = array();
@@ -1472,5 +1504,121 @@ function pmssWelcomeHomeOverCapSpeedText($bandwidthState)
             ? 'Datacenter external outbound (TO internet) bandwidth is limited to '.number_format($capMbit).' Mbps.'
             : 'While over the cap, datacenter external outbound (TO internet) bandwidth can be limited to '.number_format($capMbit).' Mbps.')
         .' Datacenter internal and inbound bandwidth is unrestricted.';
+}/* AI credits (operator 2026-10-22: "the dashboard should show Virsilipas tokens and credits if key is there"; the ask bar
+ * shows only with credits, with roughly how many questions they buy, a customer suggestion the operator endorsed).
+ * The account's own key (~/.virsilipasKey, ADR 0090) is sent only to the PM credit service named in it; the page
+ * gets numbers back, never the key. OpenClaw-profile accounts have no Pikkumies, so this does not depend on it. */
+
+
+/** The account's key and endpoint, under the same gate the account agent uses (no links, own file, mode 600), or null. */
+function pmssWelcomeHomeCreditsKeyRead($home)
+{
+    // The PM credit service; this file runs top to bottom, so a top-level const here would not exist yet when the page calls this.
+    $ourEndpoint = 'https://virsilipas.mcx.fi/v1';
+    $file = rtrim((string) $home, '/').'/.virsilipasKey';
+    clearstatcache(true, $file);
+    if (!is_file($file) || is_link($file) || (function_exists('posix_geteuid') && fileowner($file) !== posix_geteuid())
+        || (fileperms($file) & 0077) !== 0 || filesize($file) > 4096) return null;
+    $settings = @parse_ini_string((string) @file_get_contents($file), false, INI_SCANNER_RAW);
+    $key = is_array($settings) && is_string($settings['key'] ?? null) ? trim($settings['key']) : '';
+    $endpoint = is_array($settings) && is_string($settings['endpoint'] ?? null) ? rtrim(trim($settings['endpoint']), '/') : $ourEndpoint;
+    if (preg_match('/^vsk-[A-Za-z0-9_-]{16,128}$/D', $key) !== 1 || $endpoint !== $ourEndpoint) return null;
+    return array('key' => $key, 'endpoint' => $endpoint);
 }
+
+/** The figures from GET /usage: balance, tokens used in 30 days, share left of the newest grant. null on any failure. */
+function pmssWelcomeHomeCreditsFetch(array $credentials)
+{
+    $context = stream_context_create(array('http' => array('method' => 'GET', 'timeout' => 4, 'ignore_errors' => true,
+        'header' => "Authorization: Bearer ".$credentials['key']."\r\nAccept: application/json\r\n")));
+    $raw = @file_get_contents($credentials['endpoint'].'/usage?days=30&grants=10', false, $context, 0, 1048576);
+    $status = isset($http_response_header[0]) && preg_match('#^HTTP/\S+\s+(\d{3})#', $http_response_header[0], $m) ? (int) $m[1] : 0;
+    $data = is_string($raw) && $status === 200 ? json_decode($raw, true) : null;
+    if (!is_array($data) || !is_numeric($data['balance'] ?? null)) return null;
+    $tokens = 0;
+    foreach (is_array($data['daily'] ?? null) ? $data['daily'] : array() as $day) {
+        if (is_array($day)) $tokens += (int) ($day['prompt_tokens'] ?? 0) + (int) ($day['completion_tokens'] ?? 0);
+    }
+    $grant = 0;
+    foreach (is_array($data['grants'] ?? null) ? $data['grants'] : array() as $row) {
+        $amount = is_array($row) ? (int) ($row['credits'] ?? 0) : 0;
+        if ($amount > 0) { $grant = $amount; break; }
+    }
+    $balance = (int) $data['balance'];
+    return array('balance' => $balance, 'tokens_30d' => $tokens,
+        'pct_left' => $grant > 0 ? max(0.0, min(100.0, $balance / $grant * 100)) : null);
+}
+
+/** @return array{state:string,balance:int,pct_left:?float,tokens_30d:?int,questions:?int,text:string,value:string,meta:string}
+ *  state: none (no usable key), unknown (could not read), ok. Cached per account for 60 s, a stale copy kept for an hour. */
+function pmssWelcomeHomeCreditsRead($home)
+{
+    $result = array('state' => 'unknown', 'balance' => 0, 'pct_left' => null, 'tokens_30d' => null, 'questions' => null, 'text' => '', 'value' => '', 'meta' => '');
+    $credentials = pmssWelcomeHomeCreditsKeyRead($home);
+    if ($credentials === null) { $result['state'] = 'none'; return $result; }
+    $dir = rtrim((string) $home, '/').'/.cache/pmss-welcome';
+    $cache = $dir.'/credits.json';
+    $cached = is_file($cache) && !is_link($cache) ? json_decode((string) @file_get_contents($cache, false, null, 0, 65536), true) : null;
+    $age = is_array($cached) ? time() - (int) ($cached['at'] ?? 0) : PHP_INT_MAX;
+    $keyTag = substr(hash('sha256', $credentials['key']), 0, 12);
+    $figures = is_array($cached) && ($cached['key'] ?? '') === $keyTag && $age >= 0 && $age < 60 ? $cached['figures'] : null;
+    if ($figures === null) {
+        $figures = pmssWelcomeHomeCreditsFetch($credentials);
+        if ($figures !== null && (is_dir($dir) || @mkdir($dir, 0700, true)) && !is_link($dir)) {
+            $tmp = @tempnam($dir, 'credits.');
+            if ($tmp !== false && @file_put_contents($tmp, json_encode(array('at' => time(), 'key' => $keyTag, 'figures' => $figures))) !== false) {
+                @chmod($tmp, 0600);
+                if (!@rename($tmp, $cache)) @unlink($tmp);
+            } elseif ($tmp !== false) {
+                @unlink($tmp);
+            }
+        } elseif ($figures === null && is_array($cached) && ($cached['key'] ?? '') === $keyTag && $age < 3600) {
+            $figures = $cached['figures'];
+        }
+    }
+    if (!is_array($figures)) return $result;
+    $balance = (int) $figures['balance'];
+    $result['state'] = 'ok';
+    $result['balance'] = $balance;
+    $result['pct_left'] = $figures['pct_left'];
+    $result['tokens_30d'] = (int) $figures['tokens_30d'];
+    $result['value'] = $balance > 0 ? pmssWelcomeHomeCreditsCompact($balance) : '0';
+    $used = $result['tokens_30d'] > 0 ? pmssWelcomeHomeCreditsCompact($result['tokens_30d']).' tokens used in 30 days' : 'no tokens used in 30 days';
+    if ($balance <= 0) { $result['meta'] = $used.' · more are added with each paid invoice'; return $result; }
+    // Average credits per Pikkumies question on the default model (wiki "Pikkumies on PMSS", What it costs).
+    $questions = intdiv($balance, 18000);
+    $result['questions'] = $questions;
+    $result['text'] = $questions >= 1
+        ? 'About '.number_format($questions).' Pikkumies question'.($questions === 1 ? '' : 's').' left on the default model'
+        : 'Less than one typical question left';
+    $result['meta'] = ($questions >= 1 ? '≈'.number_format($questions).' question'.($questions === 1 ? '' : 's') : 'under one question').' · '.$used;
+    return $result;
+}
+
+/** 4,960,000 -> 4.9M, 35,400 -> 35.4k; always rounded down so it never shows more than is there. */
+function pmssWelcomeHomeCreditsCompact($credits)
+{
+    if ($credits >= 1000000) return rtrim(rtrim(number_format(floor($credits / 100000) / 10, 1, '.', ''), '0'), '.').'M';
+    if ($credits >= 1000) return rtrim(rtrim(number_format(floor($credits / 100) / 10, 1, '.', ''), '0'), '.').'k';
+    return (string) (int) $credits;
+}
+
+/** The status-strip card; the page fills it from ?credits=1 so a slow read never holds the page. */
+function pmssWelcomeHomeCreditsMetricHtmlBuild()
+{
+    return '<div class="h-metric" id="h-credits" title="AI credits on this account\'s key: what Pikkumies and OpenClaw spend. Unused credits stay on the account.">'
+        .'<div class="h-metric-l">AI credits</div>'
+        .'<div class="h-metric-v" data-credits-value>…</div>'
+        .'<div class="h-bar h-bar-none" role="presentation" data-credits-bar></div>'
+        .'<div class="h-metric-m" data-credits-meta>reading the balance</div></div>';
+}
+
+/** GET welcome.php?credits=1: the account's own credit figures (numbers only, never the key). */
+function pmssWelcomeHomeCreditsEmit($home)
+{
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode(pmssWelcomeHomeCreditsRead($home));
+}
+
 ?>

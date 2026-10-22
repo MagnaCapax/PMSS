@@ -75,6 +75,23 @@ class CustomerPanelRenderHarnessTest extends TestCase
         });
     }
 
+    /** A real request runs the page top to bottom: the AI credits card must render with a key present (ADR 0148). */
+    public function testWelcomeRendersAiCreditsCardWhenTheAccountHasAKey(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $key = $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1\nkey=vsk-".str_repeat('a', 24)."\n");
+            $this->assertTrue(chmod($key, 0600));
+            $expectations = \pmssCustomerPanelRenderExpectations();
+            $result = $render('welcome.php', $expectations['welcome.php']);
+            $this->assertStringContainsString('id="h-credits"', $result['stdout']);
+            $this->assertStringContainsString('class="h-metrics h-m5"', $result['stdout']);
+            $this->assertStringNotContainsString('vsk-', $result['stdout']);
+
+            $this->assertTrue(chmod($key, 0644));
+            $loose = $render('welcome.php', $expectations['welcome.php']);
+            $this->assertStringNotContainsString('id="h-credits"', $loose['stdout']);
+        });
+    }
     public function testWelcomeTrafficUsageRendersWhenLimitFileIsMissing(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {

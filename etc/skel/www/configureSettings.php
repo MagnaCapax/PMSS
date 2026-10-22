@@ -76,6 +76,7 @@ function pmssConfigureFramesBuild($rows, $existing)
     // Existing comments belong to the customer and survive every edited row set.
     foreach (explode("\n", $existing) as $line) {
         if (isset($line[0]) && $line[0] === '#') $comments .= $line."\n";
+        elseif (preg_match('/^[A-Za-z0-9_-]{1,40}\|\|\|\|-?\d{1,2}$/D', trim($line)) === 1) $comments .= trim($line)."\n";
     }
     $result = $comments;
     $index = 0;
@@ -85,13 +86,15 @@ function pmssConfigureFramesBuild($rows, $existing)
         $label = isset($row['label']) && is_string($row['label']) ? $row['label'] : '';
         $tooltip = isset($row['tooltip']) && is_string($row['tooltip']) ? $row['tooltip'] : '';
         $url = isset($row['url']) && is_string($row['url']) ? $row['url'] : '';
+        $position = isset($row['position']) && is_string($row['position']) ? trim($row['position']) : '';
+        if ($position !== '' && preg_match('/^-?\d{1,2}$/D', $position) !== 1) return null;
         if (strlen($label) < 1 || strlen($label) > 40 || strlen($tooltip) > 80 || $url === ''
             || strpbrk($label.$tooltip.$url, "|\r\n\0") !== false || strpos($url, '\\') !== false
             || !(preg_match('~^https?://[^[:space:]]+$~i', $url) === 1
                 || ($url[0] !== '/' || substr($url, 0, 2) !== '//')
                     && strpos($url, '..') === false && preg_match('~^[^/:?#]+:~', $url) !== 1
                     && preg_match('~^[^[:space:]]+$~', $url) === 1)) return null;
-        $result .= 'custom'.$index.'|'.$tooltip.'|'.$label.'|'.$url."\n";
+        $result .= 'custom'.$index.'|'.$tooltip.'|'.$label.'|'.$url.($position !== '' ? '|'.(int) $position : '')."\n";
         $index++;
     }
     return strlen($result) <= 4096 ? $result : null;
@@ -114,8 +117,9 @@ function pmssConfigureSettingsStateRead($home)
     $rows = array();
     foreach (explode("\n", $customFrames) as $line) {
         if ($line === '' || $line[0] === '#') continue;
-        $parts = explode('|', $line, 4);
-        if (count($parts) === 4) $rows[] = array('tooltip' => $parts[1], 'label' => $parts[2], 'url' => $parts[3]);
+        $parts = explode('|', $line);
+        if (count($parts) >= 4 && $parts[3] !== '') $rows[] = array('tooltip' => $parts[1], 'label' => $parts[2], 'url' => $parts[3],
+            'position' => isset($parts[4]) && preg_match('/^-?\d{1,2}$/D', trim($parts[4])) === 1 ? trim($parts[4]) : '');
     }
     $certMode = trim(pmssConfigureFileRead($home.'/.request-web-certs', 32));
     return array(

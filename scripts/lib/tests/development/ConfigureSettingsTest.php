@@ -287,6 +287,57 @@ class ConfigureSettingsTest extends TestCase
         $this->assertSame(0600, fileperms($path) & 0777);
     }
 
+    public function testCustomFramesPositionAddsFifthFieldOnlyWhenSet(): void
+    {
+        $row = array('label' => 'Guide', 'tooltip' => 'Help', 'url' => 'https://example.com');
+        $this->assertSame("custom0|Help|Guide|https://example.com|10\n",
+            \pmssConfigureFramesBuild(array($row + array('position' => '10')), ''));
+        $this->assertSame("custom0|Help|Guide|https://example.com|-5\n",
+            \pmssConfigureFramesBuild(array($row + array('position' => ' -5 ')), ''));
+        // An empty or absent position keeps the 4-field line byte-for-byte, so older readers see no change.
+        $legacy = "custom0|Help|Guide|https://example.com\n";
+        $this->assertSame($legacy, \pmssConfigureFramesBuild(array($row), ''));
+        $this->assertSame($legacy, \pmssConfigureFramesBuild(array($row + array('position' => '')), ''));
+        $this->assertSame($legacy, \pmssConfigureFramesBuild(array($row + array('position' => array('10'))), ''));
+        foreach (array('x', '100', '-100', '1.5', '+5', '5x') as $position) {
+            $this->assertSame(null, \pmssConfigureFramesBuild(array($row + array('position' => $position)), ''), $position);
+        }
+    }
+
+    public function testCustomFramesRebuildKeepsPositionOnlyLinesAndComments(): void
+    {
+        $existing = "# keep\nopenclaw||||50\npikkumies||||-5\nold|tip|Old|/old|7\nnotaposition||||100\n";
+        $rows = array(array('label' => 'Guide', 'tooltip' => '', 'url' => 'https://example.com', 'position' => '3'));
+        $this->assertSame("# keep\nopenclaw||||50\npikkumies||||-5\ncustom0||Guide|https://example.com|3\n",
+            \pmssConfigureFramesBuild($rows, $existing));
+        $this->assertSame("# keep\nopenclaw||||50\npikkumies||||-5\n", \pmssConfigureFramesBuild(array(), $existing));
+    }
+
+    public function testSettingsStateReadsPositionAndSkipsPositionOnlyLines(): void
+    {
+        $home = $this->home();
+        $this->pmssWriteFile($home.'/.customFrames', "# comment\nopenclaw||||50\ncustom0|Help|Docs|/docs|10\n"
+            ."custom1|Tip|Guide|https://example.com\ncustom2|Odd|Odd|/odd|abc\n");
+        $this->assertSame(array(
+            array('tooltip' => 'Help', 'label' => 'Docs', 'url' => '/docs', 'position' => '10'),
+            array('tooltip' => 'Tip', 'label' => 'Guide', 'url' => 'https://example.com', 'position' => ''),
+            array('tooltip' => 'Odd', 'label' => 'Odd', 'url' => '/odd', 'position' => ''),
+        ), \pmssConfigureSettingsStateRead($home)['customRows']);
+    }
+
+    public function testCustomFramesActionSavesPositionAndKeepsPositionOnlyLines(): void
+    {
+        $home = $this->home();
+        $path = $home.'/.customFrames';
+        $this->pmssWriteFile($path, "# retained\nopenclaw||||50\nold|Old|Old|/old\n");
+        $request = array('password' => 'secret', 'rows' => array(array('label' => 'Docs', 'tooltip' => 'Help', 'url' => '/docs', 'position' => '20')));
+        $this->assertTrue(\pmssConfigureActionApply($home, 'customFrames', $request)['ok']);
+        $this->assertSame("# retained\nopenclaw||||50\ncustom0|Help|Docs|/docs|20\n", file_get_contents($path));
+        $request['rows'][0]['position'] = '100';
+        $this->assertFalse(\pmssConfigureActionApply($home, 'customFrames', $request)['ok']);
+        $this->assertSame("# retained\nopenclaw||||50\ncustom0|Help|Docs|/docs|20\n", file_get_contents($path));
+    }
+
     public function testRtorrentBoundsAndSymlinkTarget(): void
     {
         $home = $this->home();

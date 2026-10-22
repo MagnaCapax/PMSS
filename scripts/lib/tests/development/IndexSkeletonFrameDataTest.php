@@ -520,6 +520,166 @@ class IndexSkeletonFrameDataTest extends TestCase
         );
     }
 
+    /** Build frames keyed as given, each carrying distinct values so reordering can be checked whole. */
+    private function priorityFrames(array $keys): array
+    {
+        $this->loadIndexFrameHelpers();
+        $frames = array();
+        foreach ($keys as $key) {
+            $frames[$key] = \pmssLocalFrameDefinition(strtolower($key).'/', $key, $key.' tooltip');
+        }
+        return $frames;
+    }
+
+    public function testPriorityOrderKeepsWelcomeFirstAgainstHighestPriority(): void
+    {
+        $frames = $this->priorityFrames(array('rutorrent', 'welcome', 'wiki'));
+        $ordered = \pmssLocalFramePriorityOrder($frames, array('wiki' => 99, 'welcome' => -99), false);
+
+        $this->assertSame(array('welcome', 'wiki', 'rutorrent'), array_keys($ordered));
+        $this->assertSame($frames['wiki'], $ordered['wiki'], 'Reordering must carry each frame definition unchanged');
+        $this->assertSame($frames['welcome'], $ordered['welcome']);
+    }
+
+    public function testPriorityOrderPutsPikkumiesRightAfterWelcomeByDefault(): void
+    {
+        $frames = $this->priorityFrames(array('welcome', 'rutorrent', 'files', 'pikkumies'));
+
+        $this->assertSame(
+            array('welcome', 'pikkumies', 'rutorrent', 'files'),
+            array_keys(\pmssLocalFramePriorityOrder($frames, array(), false))
+        );
+    }
+
+    public function testPriorityOrderLeadsWithOpenClawOnlyOnOpenClawFirstAccounts(): void
+    {
+        $frames = $this->priorityFrames(array('welcome', 'pikkumies', 'rutorrent', 'openclaw', 'wiki'));
+
+        $this->assertSame(
+            array('welcome', 'openclaw', 'pikkumies', 'rutorrent', 'wiki'),
+            array_keys(\pmssLocalFramePriorityOrder($frames, array(), true))
+        );
+        $this->assertSame(
+            array('welcome', 'pikkumies', 'rutorrent', 'openclaw', 'wiki'),
+            array_keys(\pmssLocalFramePriorityOrder($frames, array(), false))
+        );
+    }
+
+    public function testPriorityOrderLetsAccountLinesOverrideDefaults(): void
+    {
+        $frames = $this->priorityFrames(array('welcome', 'pikkumies', 'rutorrent', 'openclaw', 'wiki'));
+
+        $this->assertSame(
+            array('welcome', 'pikkumies', 'rutorrent', 'wiki', 'openclaw'),
+            array_keys(\pmssLocalFramePriorityOrder($frames, array('openclaw' => -5), true)),
+            'An explicit negative priority moves OpenClaw after the priority-0 tabs'
+        );
+        $this->assertSame(
+            array('welcome', 'openclaw', 'rutorrent', 'pikkumies', 'wiki'),
+            array_keys(\pmssLocalFramePriorityOrder(
+                $this->priorityFrames(array('welcome', 'rutorrent', 'pikkumies', 'openclaw', 'wiki')),
+                array('pikkumies' => 0),
+                true
+            )),
+            'An explicit 0 returns Pikkumies to its place among the other tabs'
+        );
+    }
+
+    public function testPriorityOrderIsStableAmongEqualPriorities(): void
+    {
+        $keys = array('welcome', 'rutorrent', 'files', 'Custom0', 'wiki', 'custom1');
+        $frames = $this->priorityFrames($keys);
+
+        $this->assertSame($keys, array_keys(\pmssLocalFramePriorityOrder($frames, array(), false)));
+        $this->assertSame(
+            array('welcome', 'Custom0', 'custom1', 'rutorrent', 'files', 'wiki'),
+            array_keys(\pmssLocalFramePriorityOrder($frames, array('custom1' => 10, 'custom0' => 10), false)),
+            'Equal priorities keep their original order; frame keys match priorities case-insensitively'
+        );
+    }
+
+    public function testPrioritiesReaderAcceptsOnlyBoundedFifthField(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $path = $this->pmssMakeTempPath('pmss-index-priorities-', '.txt');
+        $this->pmssWriteFile(
+            $path,
+            "# comment|t|l|u|50\n"
+            ."custom0|Tip|Label|https://example.test/|10\r\n"
+            ."openclaw||||-5\n"
+            ."Wiki||||99\n"
+            ."lowest||||-99\n"
+            ."spaced|t|l|u| 3 \n"
+            ."toohigh||||100\n"
+            ."toolow||||-100\n"
+            ."word||||abc\n"
+            ."plain|t|l|u\n"
+            ."||||7\n"
+            ."\n"
+        );
+
+        $this->assertSame(
+            array('custom0' => 10, 'openclaw' => -5, 'wiki' => 99, 'lowest' => -99, 'spaced' => 3),
+            \pmssLocalFramePrioritiesRead($path)
+        );
+        $this->assertSame(array(), \pmssLocalFramePrioritiesRead($this->pmssMakeTempPath('pmss-index-priorities-missing-')));
+
+        $link = $this->pmssMakeTempPath('pmss-index-priorities-link-');
+        $this->pmssCreateSymlinkOrSkip($path, $link);
+        $this->assertSame(array(), \pmssLocalFramePrioritiesRead($link), 'A symlinked ~/.customFrames is not trusted');
+
+        $large = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-priorities-large-'), "big||||9\n".str_repeat('#', 4096));
+        $this->assertSame(array(), \pmssLocalFramePrioritiesRead($large));
+    }
+
+    public function testPositionOnlyLinesDoNotBecomeCustomTabs(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $path = $this->pmssWriteFile(
+            $this->pmssMakeTempPath('pmss-index-position-lines-', '.txt'),
+            "openclaw||||50\ncustom0|Tip|Label|https://example.test/|10\n"
+        );
+
+        $this->assertSame(
+            array('custom0' => array('url' => 'https://example.test/', 'linkText' => 'Label', 'title' => 'Tip')),
+            $this->localFrameCustomFramesRead($path)
+        );
+    }
+
+    public function testDisabledRtorrentDropsRutorrentTabByKeyOrUrl(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $frames = array(
+            'welcome' => \pmssLocalFrameDefinition('welcome.php', 'welcome', 'Welcome'),
+            'RuTorrent' => \pmssLocalFrameDefinition('somewhere/', 'ruTorrent', 'ruTorrent'),
+            'torrents' => \pmssLocalFrameDefinition('rutorrent/', 'Torrents', 'Torrents'),
+            'absolute' => \pmssLocalFrameDefinition('/user-alice/ruTorrent', 'Absolute', 'Absolute'),
+            'lookalike' => \pmssLocalFrameDefinition('rutorrent-extra/', 'Lookalike', 'Lookalike'),
+            'nourl' => array('linkText' => 'No URL', 'title' => 'No URL'),
+        );
+
+        $this->assertSame(
+            array('welcome', 'lookalike', 'nourl'),
+            array_keys(\pmssLocalFrameDisabledRtorrentDrop($frames, true))
+        );
+        $this->assertSame($frames, \pmssLocalFrameDisabledRtorrentDrop($frames, false));
+    }
+
+    public function testIndexAppliesRtorrentDropBeforePriorityOrderAndConfigure(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'etc/skel/www/index.php',
+            array(
+                '$pmssRtorrentDisabled = file_exists(\'../.rtorrentDisable\');',
+                '$frames = pmssLocalFrameDisabledRtorrentDrop($frames, $pmssRtorrentDisabled);',
+                '$frames = pmssLocalFramePriorityOrder($frames, pmssLocalFramePrioritiesRead(), $pmssRtorrentDisabled);',
+                '$pmssConfigureFrame = pmssLocalFrameConfigureFrameRead();',
+            ),
+            'Missing index.php tab priority wiring: ',
+            'index.php tab priority wiring order changed at: '
+        );
+    }
+
     public function testUserSkeletonSyncIncludesIndexTemplate(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/index.php',");
