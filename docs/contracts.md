@@ -1303,7 +1303,7 @@ to the account home. `L` means `Config::localDir()`.
   account-side setup action and shows the 1000 MiB memory floor.
 - Port C tokens live in `~/.config/pmss/ui/tokens/` (0700, files 0600,
   single-use, 60 s, at most eight live tokens). The launcher accepts `?view=status` for a same-origin
-  GET that reads state and may place a guarded certificate request; it does
+  GET that only reads state and never requests a certificate (ADR 0150); it does
   not start a UI or mint a token. An absent `Sec-Fetch-Site` is denied.
 - Account UI preferences live in `~/.config/pmss/ui/`; absent means Simplified
   for Pikkumies and Hermes web UI for vanilla Hermes. The Pikkumies interface

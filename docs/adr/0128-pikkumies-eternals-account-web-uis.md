@@ -50,9 +50,9 @@ The launcher is account-side PHP with no includes. It derives identity from
 its effective UID, accepts only same-origin or `none` Fetch Site requests
 (or an exact same-origin Referer when Fetch Site is absent),
 and keeps A tokens in `L/ui/tokens/` with a 60-second lifetime and an eight
-token cap. `?view=status` does not start a UI or mint a token. The launcher
-requests a certificate only when DNS points to the current host and the
-permalink fails TLS verification. Certificate flag changes run as the account.
+token cap. `?view=status` does not start a UI or mint a token. Since ADR 0150
+the launcher never requests a certificate; it only reports whether the
+permalink already serves a valid one.
 The certificate job prefers root-owned provisioning state. Until a trusted
 service ID has been written for an account, nginx and the certificate job keep
 their former root-owned home-marker reads and warn once per account per run.
@@ -147,10 +147,9 @@ and Hermes state; the archived home retains their previous data.
 - Certificate Transparency records issued permalink names.
 - The account Pikkumies updater follows its existing unsigned main channel.
   The Agentboard binary itself is pinned by SHA-256.
-- The existing 1,000–3,000 certificates per registered domain per seven days
-  quota and renewal exemption apply to implicit certificates (ADR 0039).
-  About 2,331 services across 42 days mean roughly 390 new certificates per
-  week at the staged pace. No new global quota counter is added.
+- No certificate is issued implicitly (ADR 0150). A certificate exists only
+  when the customer turns on HTTPS for their own name (ADR 0039), under that
+  ADR's quota.
 
 ## References
 
