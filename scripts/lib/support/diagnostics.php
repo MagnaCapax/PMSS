@@ -14,6 +14,28 @@ require_once dirname(__DIR__).'/runtime.php';
 pmssRequireRelativeFiles(__DIR__, ['stream.php', '../lighttpd/userFileWrite.php', '../user/billingIds.php']);
 
 /**
+ * Read the caller's own billing marker copy from its home.
+ *
+ * The support command runs as the account, which cannot read the root store
+ * (ADR 0016). The request is the account's own report, so its own marker copy
+ * is used when the store is unreadable. Nothing root-side reads this value.
+ *
+ * @param list<string> $fileNames
+ */
+function pmssSupportOwnBillingMarkerRead(string $home, array $fileNames): ?string
+{
+    $home = rtrim($home, '/');
+    if ($home === '' || $home[0] !== '/') return null;
+    foreach ($fileNames as $fileName) {
+        $raw = pmssReadRegularFileContentsVerified($home.'/'.$fileName, 0, 256);
+        $digits = is_string($raw) ? trim($raw, " \t\r\n") : '';
+        $id = pmssUnsignedDecimalIntParse($digits);
+        if ($id !== null && $id > 0) return $digits;
+    }
+    return null;
+}
+
+/**
  * Resolve the current caller identity from trusted process state.
  *
  * @return array<string,string>
@@ -105,9 +127,12 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
     $username = (string) $identity['username'];
     $home = (string) $identity['home'];
     $hostname = (string) (gethostname() ?: 'unknown-host');
-    $billingServiceId = pmssUserBillingServiceIdRead($home, true);
-    $billingClientId = pmssUserBillingClientIdRead($home, true);
-    $versionPath = pmssResolvePathFromEnv('PMSS_VERSION_FILE', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/version');
+    $configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+    $billingServiceId = (int) (pmssUserBillingIdentityRead($username, 'billingServiceId', $configDir)
+        ?? pmssSupportOwnBillingMarkerRead($home, ['.billingServiceId', '.billingId']));
+    $billingClientId = (int) (pmssUserBillingIdentityRead($username, 'billingClientId', $configDir)
+        ?? pmssSupportOwnBillingMarkerRead($home, ['.billingClientId']));
+    $versionPath = pmssResolvePathFromEnv('PMSS_VERSION_FILE', $configDir.'/version');
     $pmssVersion = is_file($versionPath) ? trim((string) @file_get_contents($versionPath)) : 'unknown';
     $commands = [
         'uptime' => ['uptime'],

@@ -147,9 +147,9 @@ function wgApplyPeerToGuide(string $content, string $publicKey, string $endpoint
 }
 
 /** Prefer the stable service hostname only when it resolves to this host. */
-function wgUserGuideEndpoint(string $home, string $endpoint): string
+function wgUserGuideEndpoint(string $user, string $endpoint): string
 {
-    $serviceId = pmssUserBillingServiceIdDigitsRead($home, true);
+    $serviceId = pmssUserBillingIdentityRead($user, 'billingServiceId');
     if ($serviceId === null) {
         return $endpoint;
     }
@@ -295,7 +295,7 @@ function wgSyncUserGuideAddresses(
         // Interface-only/manual guides keep the legacy address sync without gaining peer lines.
         if (preg_match('/^\[Peer\]\r?$/m', $guide) === 1) {
             if (preg_match('/^Endpoint = .*$/m', $guide) === 1) {
-                $guideEndpoint = wgUserGuideEndpoint(dirname($target), $endpoint);
+                $guideEndpoint = wgUserGuideEndpoint($entry['user'], $endpoint);
                 $updated = wgApplyPeerToGuide($updated, $serverPublicKey, $guideEndpoint, $listenPort);
             } else {
                 $updated = wgApplyPeerToGuide($updated, $serverPublicKey, $endpoint, $listenPort);

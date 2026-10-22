@@ -86,7 +86,7 @@ if ($accountInfo === null) {
     pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in /etc/passwd');
     die("Refusing to terminate {$username}: no passwd entry found\n");
 }
-$billingServiceId = pmssUserBillingProvisionedDigitsRead($username, 'billingServiceId');
+$billingServiceId = pmssUserBillingIdentityRead($username, 'billingServiceId');
 
 // Invariant: refuse to operate when the resolved home directory is not exactly
 // the expected /home/<username>. Prefix checks are too loose for destructive

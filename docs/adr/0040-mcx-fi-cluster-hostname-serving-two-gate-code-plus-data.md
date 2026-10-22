@@ -48,9 +48,9 @@ Cluster-hostname serving is a **two-gate feature, per node**:
 1. **Code gate** — `pmssNginxUserMcxClusterHostname()` in
    `scripts/lib/nginxUserHosts.php`, wired in `nginxConfig/userConfigsGenerate.php`
    (Option B). Rolls out via `update.php`.
-2. **Data gate** — `.billingClientId` present in the user's home. Read via the canonical
-   `pmssUserBillingServiceIdDigitsRead`-style reader; NO fallback exists for the client
-   id (unlike the service id's `.billingId` fallback), so it must be explicitly written.
+2. **Data gate** — the client id present in the root provisioning store, read via
+   `pmssUserBillingIdentityRead` (ADR 0152; the home `.billingClientId` marker is a
+   copy and is not read). It must be explicitly written.
 
 The client id is populated by TWO complementary paths: **order-time** for new customers
 (Option C, infra side, tracked separately) and **backfill** for the existing fleet

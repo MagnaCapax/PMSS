@@ -166,8 +166,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     $mcxHost = null;
 
     if ($subdomainEnabled) {
-        $billingServiceId = pmssUserBillingIdentityRead($thisUser, $homeDir, 'billingServiceId',
-            '/etc/seedbox/config', 0, 'pmssCreateNginxConfigUserLog');
+        $billingServiceId = pmssUserBillingIdentityRead($thisUser, 'billingServiceId');
         if (!pmssPikkumiesUiIdentityPublish($thisUser, $billingServiceId)) {
             pmssCreateNginxConfigUserLog($thisUser, '[WARN] Root-owned UI billing identity was not published');
         }
@@ -177,8 +176,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             // across their nodes by the zone builder. The client id is already on
             // this node, so no remote lookup is needed. Single-service users get a
             // name that never resolves — inert, nginx never sees a request for it.
-            $billingClientId = pmssUserBillingIdentityRead($thisUser, $homeDir, 'billingClientId',
-                '/etc/seedbox/config', 0, 'pmssCreateNginxConfigUserLog');
+            $billingClientId = pmssUserBillingIdentityRead($thisUser, 'billingClientId');
             if ($billingClientId !== null) {
                 $mcxHost .= ' '.pmssNginxUserMcxClusterHostname($billingClientId);
             }

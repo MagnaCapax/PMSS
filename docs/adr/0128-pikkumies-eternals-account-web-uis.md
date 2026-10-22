@@ -53,12 +53,10 @@ and keeps A tokens in `L/ui/tokens/` with a 60-second lifetime and an eight
 token cap. `?view=status` does not start a UI or mint a token. Since ADR 0150
 the launcher never requests a certificate; it only reports whether the
 permalink already serves a valid one.
-The certificate job prefers root-owned provisioning state. Until a trusted
-service ID has been written for an account, nginx and the certificate job keep
-their former root-owned home-marker reads and warn once per account per run.
-The provisioning marker CLI records both service and client IDs in the root
-store. Once the trusted service ID is present, account-home billing files are
-ignored for both names.
+The certificate job and nginx read billing identity only from root-owned
+provisioning state (ADR 0152). The provisioning marker CLI records both service
+and client IDs in the root store; account-home billing files are never read
+for either name.
 
 The panel adds a local Pikkumies tab after Welcome and a prompt bar in Welcome
 only when the host marker, root-owned billing identity, account install, and

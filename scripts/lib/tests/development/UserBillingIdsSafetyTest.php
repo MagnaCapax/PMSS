@@ -6,51 +6,49 @@ require_once dirname(__DIR__, 3).'/lib/user/userConfigStore.php';
 
 class UserBillingIdsSafetyTest extends TestCase
 {
-    public function testTrustedStoreWinsAndLegacyHomeIsIgnored(): void
+    /** Build a config dir with an optional per-user record and account home markers. */
+    private function billingFixture(string $prefix, ?array $record, array $homeFiles): string
     {
-        $base = $this->pmssMakeTempDir('pmss-billing-trust-');
-        mkdir($base.'/config/users', 0755, true);
-        mkdir($base.'/home');
-        file_put_contents($base.'/config/users/alice.json', json_encode(['billingServiceId' => 123, 'billingClientId' => 456]));
-        file_put_contents($base.'/home/.billingId', '999');
-        file_put_contents($base.'/home/.billingClientId', '888');
-        $warnings = [];
-        $warn = static function ($user, $message) use (&$warnings): void { $warnings[] = [$user, $message]; };
-        $uid = posix_geteuid();
-        $this->assertSame('123', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingServiceId', $base.'/config', $uid, $warn, false));
-        $this->assertSame('456', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingClientId', $base.'/config', $uid, $warn, false));
-        $this->assertSame([], $warnings);
+        $base = $this->pmssMakeTempDir($prefix);
+        $this->pmssEnsureDir($base.'/config/users');
+        $this->pmssEnsureDir($base.'/home');
+        if ($record !== null) {
+            file_put_contents($base.'/config/users/alice.json', json_encode($record));
+        }
+        foreach ($homeFiles as $name => $value) {
+            file_put_contents($base.'/home/'.$name, $value);
+        }
+        return $base;
     }
 
-    public function testAbsentTrustedIdRetainsLegacyHomeOrderAndWarnsOnce(): void
+    public function testStoreValueWinsOverLegacyHomeFiles(): void
     {
-        $base = $this->pmssMakeTempDir('pmss-billing-legacy-');
-        mkdir($base.'/config/users', 0755, true);
-        mkdir($base.'/home');
-        file_put_contents($base.'/config/users/alice.json', json_encode(['billingServiceId' => 0, 'billingClientId' => 0]));
-        file_put_contents($base.'/home/.billingId', '123');
-        file_put_contents($base.'/home/.billingClientId', '456');
-        $warnings = [];
-        $warn = static function ($user, $message) use (&$warnings): void { $warnings[] = [$user, $message]; };
+        $base = $this->billingFixture('pmss-billing-trust-', ['billingServiceId' => 123, 'billingClientId' => 456],
+            ['.billingServiceId' => '999', '.billingId' => '998', '.billingClientId' => '888']);
         $uid = posix_geteuid();
-        $this->assertSame('123', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingServiceId', $base.'/config', $uid, $warn, false));
-        $this->assertSame('456', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingClientId', $base.'/config', $uid, $warn, false));
-        $this->assertSame([['alice', 'billing id from legacy home file']], $warnings);
-        file_put_contents($base.'/home/.billingServiceId', '789');
-        $this->assertSame('789', \pmssUserBillingIdentityRead('alice', $base.'/home', 'billingServiceId', $base.'/config', $uid, $warn, false));
+        $this->assertSame('123', \pmssUserBillingIdentityRead('alice', 'billingServiceId', $base.'/config', $uid));
+        $this->assertSame('456', \pmssUserBillingIdentityRead('alice', 'billingClientId', $base.'/config', $uid));
     }
 
-    public function testTrustedClientIdWinsWhileServiceStillUsesLegacy(): void
+    public function testLegacyHomeFilesAreIgnoredWhenStoreHasNoValue(): void
     {
-        $base = $this->pmssMakeTempDir('pmss-billing-mixed-');
-        mkdir($base.'/config/users', 0755, true);
-        mkdir($base.'/home');
-        file_put_contents($base.'/config/users/bob.json', json_encode(['billingServiceId' => 0, 'billingClientId' => 456]));
-        file_put_contents($base.'/home/.billingId', '123');
-        file_put_contents($base.'/home/.billingClientId', '999');
+        $homeFiles = ['.billingServiceId' => '789', '.billingId' => '123', '.billingClientId' => '456'];
         $uid = posix_geteuid();
-        $this->assertSame('123', \pmssUserBillingIdentityRead('bob', $base.'/home', 'billingServiceId', $base.'/config', $uid, null, false));
-        $this->assertSame('456', \pmssUserBillingIdentityRead('bob', $base.'/home', 'billingClientId', $base.'/config', $uid, null, false));
+        // A record without positive IDs, and no record at all, both yield no identity.
+        foreach ([['billingServiceId' => 0, 'billingClientId' => 0], null] as $record) {
+            $base = $this->billingFixture('pmss-billing-legacy-', $record, $homeFiles);
+            $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'billingServiceId', $base.'/config', $uid));
+            $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'billingClientId', $base.'/config', $uid));
+        }
+    }
+
+    public function testLegacyAggregateStoreIsReadWhenUserRecordIsMissing(): void
+    {
+        $base = $this->billingFixture('pmss-billing-aggregate-', null, ['.billingId' => '999']);
+        $this->pmssWriteFile($base.'/runtime/users.json', json_encode(['users' => ['alice' => ['billingId' => 321]]]));
+        $uid = posix_geteuid();
+        $this->assertSame('321', \pmssUserBillingIdentityRead('alice', 'billingServiceId', $base.'/config', $uid));
+        $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'billingClientId', $base.'/config', $uid));
     }
 
     public function testProvisioningWriterMapsBothBillingMarkersToStore(): void
@@ -68,6 +66,7 @@ class UserBillingIdsSafetyTest extends TestCase
         $this->assertSame(456, $store->payload['billingClientId']);
         $this->assertTrue(\pmssHomeMarkerIsKnown('.billingClientId'));
     }
+
     public function testMissingProvisionedIdsAreNotRecoveredFromAccountHome(): void
     {
         $base = $this->pmssMakeTempDir('pmss-billing-store-');
@@ -79,86 +78,36 @@ class UserBillingIdsSafetyTest extends TestCase
         $this->assertSame(0, $result['billingClientId']);
     }
 
-    public function testProvisionedIdentityTakesPrecedenceOverHomeMarkers(): void
+    public function testStoreReadRejectsUnsafeInputsAndEntries(): void
     {
-        $base = $this->pmssMakeTempDir('pmss-billing-provisioned-');
+        $base = $this->billingFixture('pmss-billing-provisioned-', ['billingServiceId' => 123, 'billingClientId' => 456], []);
         $config = $base.'/config';
-        mkdir($config);
-        mkdir($config.'/users');
         $record = $config.'/users/alice.json';
-        file_put_contents($record, json_encode(['billingServiceId' => 123, 'billingClientId' => 456]));
         $uid = posix_geteuid();
-        $this->assertSame('123', \pmssUserBillingProvisionedDigitsRead('alice', 'billingServiceId', $config, $uid));
-        $this->assertSame('456', \pmssUserBillingProvisionedDigitsRead('alice', 'billingClientId', $config, $uid));
-        $this->assertSame(null, \pmssUserBillingProvisionedDigitsRead('alice', 'other', $config, $uid));
-        $this->assertSame(null, \pmssUserBillingProvisionedDigitsRead('../bob', 'billingServiceId', $config, $uid));
-        $this->assertSame(null, \pmssUserBillingProvisionedDigitsRead('alice', 'billingServiceId', $config, $uid + 1));
-        file_put_contents($record, json_encode(['billingServiceId' => 0]));
-        $this->assertSame(null, \pmssUserBillingProvisionedDigitsRead('alice', 'billingServiceId', $config, $uid));
+        $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'other', $config, $uid));
+        $this->assertSame(null, \pmssUserBillingIdentityRead('../bob', 'billingServiceId', $config, $uid));
+        $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'billingServiceId', $config, $uid + 1));
+        // A hard-linked record is not a single regular entry.
+        $this->assertTrue(link($record, $base.'/second.json'));
+        $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'billingServiceId', $config, $uid));
+        unlink($base.'/second.json');
+        $this->assertSame('123', \pmssUserBillingIdentityRead('alice', 'billingServiceId', $config, $uid));
         unlink($record);
-        symlink($base.'/outside', $record);
         file_put_contents($base.'/outside', json_encode(['billingServiceId' => 999]));
-        $this->assertSame(null, \pmssUserBillingProvisionedDigitsRead('alice', 'billingServiceId', $config, $uid));
+        symlink($base.'/outside', $record);
+        $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'billingServiceId', $config, $uid));
     }
-    public function testBillingFileNameGuardAcceptsKnownDotFiles(): void
+
+    public function testStoreReadRejectsUnsupportedValues(): void
     {
-        foreach (['.billingServiceId', '.billingId', '.billingClientId'] as $fileName) {
-            $this->assertTrue(\pmssUserBillingFileNameIsSafe($fileName), 'expected safe billing file name: '.$fileName);
+        $base = $this->billingFixture('pmss-billing-values-', null, []);
+        $record = $base.'/config/users/alice.json';
+        $uid = posix_geteuid();
+        foreach ([0, -1, '0', '-1', '12x', ' 42', (string) PHP_INT_MAX.'0', 1.5, true, null, []] as $value) {
+            file_put_contents($record, json_encode(['billingServiceId' => $value]));
+            $this->assertSame(null, \pmssUserBillingIdentityRead('alice', 'billingServiceId', $base.'/config', $uid), var_export($value, true));
         }
-    }
-
-    public function testBillingFileNameGuardRejectsPathLikeNames(): void
-    {
-        $invalid = ['', '../outside', '/absolute', '.nested/id', ".billingId\0suffix", 'billingId', '.'];
-        foreach ($invalid as $fileName) {
-            $this->assertFalse(\pmssUserBillingFileNameIsSafe($fileName), 'expected unsafe billing file name: '.$fileName);
-        }
-    }
-
-    public function testBillingDigitsReadSkipsUnsafeFileNamesBeforeFallback(): void
-    {
-        $root = $this->pmssMakeTempDir('pmss-billing-ids-');
-        $home = $root.'/user';
-        $this->pmssEnsureDir($home);
-        file_put_contents($root.'/outside', "444\n");
-        file_put_contents($home.'/.billingServiceId', "555\n");
-
-        $this->assertSame('555', \pmssUserBillingDigitsRead($home, ['../outside', '.billingServiceId']));
-    }
-
-    public function testBillingDigitsReadDoesNotTraverseOutsideHome(): void
-    {
-        $root = $this->pmssMakeTempDir('pmss-billing-ids-');
-        $home = $root.'/user';
-        $this->pmssEnsureDir($home);
-        file_put_contents($root.'/outside', "777\n");
-
-        $this->assertSame(null, \pmssUserBillingDigitsRead($home, ['../outside']));
-    }
-
-    public function testBillingDigitsReadRejectsUnsupportedEntriesAndValues(): void
-    {
-        $home = $this->pmssMakeTempDir('pmss-billing-values-');
-        $path = $home.'/.billingServiceId';
-        foreach (['0', '-1', '12x', "42\0", (string) PHP_INT_MAX.'0', str_repeat('1', 257)] as $value) {
-            file_put_contents($path, $value);
-            $this->assertSame(null, \pmssUserBillingServiceIdDigitsRead($home), $value);
-        }
-        file_put_contents($path, "00042\n");
-        $this->assertSame('00042', \pmssUserBillingServiceIdDigitsRead($home));
-
-        $second = $home.'/.billingClientId';
-        $this->assertTrue(link($path, $second));
-        $this->assertSame(null, \pmssUserBillingServiceIdDigitsRead($home));
-        $this->assertSame(null, \pmssUserBillingClientIdDigitsRead($home));
-    }
-
-    public function testManagedOwnerRequirementUsesTheOpenedEntry(): void
-    {
-        $home = $this->pmssMakeTempDir('pmss-billing-owner-');
-        $path = $home.'/.billingClientId';
-        file_put_contents($path, "123\n");
-        $this->assertSame('123', \pmssUserBillingClientIdDigitsRead($home));
-        $this->assertSame(fileowner($path) === 0 ? '123' : null, \pmssUserBillingClientIdDigitsRead($home, true));
+        file_put_contents($record, json_encode(['billingServiceId' => '00042']));
+        $this->assertSame('00042', \pmssUserBillingIdentityRead('alice', 'billingServiceId', $base.'/config', $uid));
     }
 }

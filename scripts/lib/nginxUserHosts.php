@@ -21,14 +21,6 @@ function pmssNginxUserHostIsValidFqdn(string $hostname): bool
     return $trimmed !== '' && strpos($trimmed, '.') !== false && pmssHostnameIsValid($trimmed, false);
 }
 
-/**
- * Read and validate the billing service ID stored in user homes.
- */
-function pmssNginxUserBillingServiceIdFromHome(string $home): ?string
-{
-    return pmssUserBillingServiceIdDigitsRead($home, true);
-}
-
 /** Derive the published mcx.fi label from a billing identifier. */
 function pmssMcxLabel(string $kind, string $id): string
 {
@@ -78,8 +70,8 @@ function pmssWebPublicCertNames(string $user, string $serverFqdn, ?string $servi
  * as multi-A round-robin across every node holding one of that customer's
  * services, so each node must answer for it to serve the customer's content.
  *
- * The client id is already on the node (.billingClientId, read via
- * pmssUserBillingClientIdRead) — no remote lookup is needed to derive this.
+ * The client id is already on the node (root provisioning store, read via
+ * pmssUserBillingIdentityRead) — no remote lookup is needed to derive this.
  *
  * The builder only emits a cluster record for customers with 2+ active
  * services. A single-service user therefore gets a server_name entry that never

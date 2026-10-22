@@ -50,36 +50,6 @@ class SupportCommandTest extends TestCase
         });
     }
 
-    public function testBillingServiceIdReadAcceptsPositiveInteger(): void
-    {
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingServiceId', "42\n");
-
-        $this->assertEquals(42, \pmssUserBillingServiceIdRead($this->homeRoot.'/'.$this->user));
-    }
-
-    public function testBillingServiceIdReadFallsBackToLegacyName(): void
-    {
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingId', "43\n");
-
-        $this->assertEquals(43, \pmssUserBillingServiceIdRead($this->homeRoot.'/'.$this->user));
-    }
-
-    public function testBillingClientIdReadAcceptsPositiveInteger(): void
-    {
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingClientId', "99\n");
-
-        $this->assertEquals(99, \pmssUserBillingClientIdRead($this->homeRoot.'/'.$this->user));
-    }
-
-    public function testBillingServiceIdReadRejectsSymlink(): void
-    {
-        $target = $this->homeRoot.'/'.$this->user.'/billing-id-target';
-        file_put_contents($target, "41\n");
-        symlink($target, $this->homeRoot.'/'.$this->user.'/.billingServiceId');
-
-        $this->assertEquals(0, \pmssUserBillingServiceIdRead($this->homeRoot.'/'.$this->user));
-    }
-
     public function testConfigReadHonorsExplicitConfigPathOverride(): void
     {
         $customPath = $this->configDir.'/support-custom.php';
@@ -150,19 +120,37 @@ class SupportCommandTest extends TestCase
 
     public function testDiagnosticsBuildCarriesBillingIdentifiers(): void
     {
-        $servicePath = $this->homeRoot.'/'.$this->user.'/.billingServiceId';
-        $clientPath = $this->homeRoot.'/'.$this->user.'/.billingClientId';
-        file_put_contents($servicePath, "42\n");
-        file_put_contents($clientPath, "99\n");
+        // Identity comes from the root-owned store record; home markers are ignored.
+        $record = $this->pmssWriteFile($this->configDir.'/users/'.$this->user.'.json',
+            json_encode(['billingServiceId' => 42, 'billingClientId' => 99]));
+        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingServiceId', "7\n");
+        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingClientId', "8\n");
 
         $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner());
 
-        $serviceId = fileowner($servicePath) === 0 ? 42 : 0;
-        $clientId = fileowner($clientPath) === 0 ? 99 : 0;
+        $serviceId = fileowner($record) === 0 ? 42 : 0;
+        $clientId = fileowner($record) === 0 ? 99 : 0;
         $this->assertSame($serviceId, $diagnostics['billingServiceId']);
         $this->assertSame($clientId, $diagnostics['billingClientId']);
         $this->assertStringContainsString('billing_service_id='.$serviceId, $diagnostics['body']);
         $this->assertStringContainsString('billing_client_id='.$clientId, $diagnostics['body']);
+    }
+
+    public function testDiagnosticsBuildUsesOwnMarkersWhenStoreHasNoValue(): void
+    {
+        // The account cannot read the store; its own root-owned marker copy is reported.
+        $servicePath = $this->homeRoot.'/'.$this->user.'/.billingId';
+        $clientPath = $this->homeRoot.'/'.$this->user.'/.billingClientId';
+        file_put_contents($servicePath, "42\n");
+        file_put_contents($clientPath, "99\n");
+        $linkTarget = $this->homeRoot.'/'.$this->user.'/billing-id-target';
+        file_put_contents($linkTarget, "41\n");
+        symlink($linkTarget, $this->homeRoot.'/'.$this->user.'/.billingServiceId');
+
+        $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner());
+
+        $this->assertSame(fileowner($servicePath) === 0 ? 42 : 0, $diagnostics['billingServiceId']);
+        $this->assertSame(fileowner($clientPath) === 0 ? 99 : 0, $diagnostics['billingClientId']);
     }
 
     public function testSnapshotWriteCreatesPrivateFile(): void

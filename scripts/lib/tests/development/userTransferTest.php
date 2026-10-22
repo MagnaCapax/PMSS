@@ -643,7 +643,7 @@ SNAP;
     }
 
     /** Root-only local rehearsal: no network or host account mutation. */
-    public function testNamespacedReceiverPreservesPayloadAndBillingFallback(): void
+    public function testNamespacedReceiverPreservesPayloadAndTargetBillingMarker(): void
     {
         if (!function_exists('posix_geteuid') || posix_geteuid() !== 0) {
             throw new SkipTest('requires root for user-namespace ownership mapping');
@@ -721,7 +721,7 @@ SNAP;
         $this->assertSame(100000, fileowner($target.'/data/subordinate'));
         $this->assertSame(100000, filegroup($target.'/data/subordinate'));
         $this->assertSame(0, fileowner($target.'/.billingId'));
-        $this->assertSame(98765, \pmssUserBillingServiceIdRead($target, true));
+        $this->assertSame("98765\n", file_get_contents($target.'/.billingId'));
         $this->assertFalse(file_exists($target.'/.billingServiceId'));
         $this->assertFalse(file_exists($target.'/.billingClientId'));
         $this->assertTrue(fileowner($target.'/data/setuid') !== 0);

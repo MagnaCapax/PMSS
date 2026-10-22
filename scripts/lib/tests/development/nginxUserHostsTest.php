@@ -45,50 +45,6 @@ class NginxUserHostsTest extends TestCase
         }
     }
 
-    public function testBillingServiceIdFromHomeAcceptsValidDigits(): void
-    {
-        $valid = [
-            "123\n" => '123',
-            "456" => '456',
-            "0007\n" => '0007',
-            "9" => '9',
-            "10001" => '10001',
-        ];
-
-        foreach ($valid as $raw => $expected) {
-            $home = $this->pmssMakeTempDir('nginx-hosts-home-');
-            file_put_contents($home.'/.billingServiceId', $raw);
-            $this->assertSame($expected, \pmssUserBillingServiceIdDigitsRead($home));
-            $this->assertSame(fileowner($home.'/.billingServiceId') === 0 ? $expected : null, \pmssNginxUserBillingServiceIdFromHome($home));
-        }
-    }
-
-    public function testBillingServiceIdFromHomeFallsBackToLegacyName(): void
-    {
-        $home = $this->pmssMakeTempDir('nginx-hosts-legacy-');
-        file_put_contents($home.'/.billingId', "0008\n");
-
-        $this->assertSame('0008', \pmssUserBillingServiceIdDigitsRead($home));
-        $this->assertSame(fileowner($home.'/.billingId') === 0 ? '0008' : null, \pmssNginxUserBillingServiceIdFromHome($home));
-    }
-
-    public function testBillingServiceIdFromHomeRejectsInvalidValues(): void
-    {
-        $invalid = [
-            "",
-            "0",
-            "abc",
-            "12a3",
-            "   ",
-        ];
-
-        foreach ($invalid as $raw) {
-            $home = $this->pmssMakeTempDir('nginx-hosts-invalid-');
-            file_put_contents($home.'/.billingServiceId', $raw);
-            $this->assertEquals(null, \pmssNginxUserBillingServiceIdFromHome($home));
-        }
-    }
-
     public function testMcxLabelsMatchPublishedVectors(): void
     {
         $vectors = json_decode((string) file_get_contents(__DIR__.'/../fixtures/mcx-label-vectors.json'), true);

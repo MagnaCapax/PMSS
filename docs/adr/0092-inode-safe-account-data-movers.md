@@ -54,9 +54,10 @@ order. A skipped legitimate migration is a data-preservation failure.
   the password prompt.
 - The main and final receives exclude root-managed `.billingId`,
   `.billingServiceId`, and `.billingClientId`. Provisioning writes the target
-  `.billingId` before transfer. The canonical service-ID reader falls back to
-  that file, and the management-host backfill recreates `.billingClientId`.
-  The latter may remain absent until the next backfill run. Rsync does not
+  `.billingId` through `writeHomeMarker.php`, which first records it in the
+  target's root store, before transfer. Billing
+  identity is read from that store (ADR 0152); the client ID is present once
+  it is recorded there. Rsync does not
   interpret sender `user.rsync.*` fake-super xattrs as privileged metadata.
 - `recreateUser.php` renames the top-level home and backup only between checked
   real directories under the same parent, then verifies the moved inode.

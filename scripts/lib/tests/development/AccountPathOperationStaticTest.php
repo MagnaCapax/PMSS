@@ -8,13 +8,13 @@ final class AccountPathOperationStaticTest extends TestCase
 {
     /** Fixed commands with an account argument; each entry also pins its reviewed line. */
     private const SAFE = [
-        'scripts/cron/webPublicCertsProcess.php:120' => ['cd5455be1bf21155c002ba607313f214d4da6b28', 'fixed config utility with quoted account'],
-        'scripts/cron/webPublicCertsProcess.php:156' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
+        'scripts/cron/webPublicCertsProcess.php:114' => ['cd5455be1bf21155c002ba607313f214d4da6b28', 'fixed config utility with quoted account'],
+        'scripts/cron/webPublicCertsProcess.php:150' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
         'scripts/lib/rtorrent/processInspection.php:98' => ['13417f72f7995d00594046ad6921f6924f10f56a', 'process listing with quoted account'],
         'scripts/lib/lighttpd/userConfigApply.php:62' => ['af1754514e1c4518bfe8bbc90929d930bb125806', 'fixed port utility with quoted account'],
         'scripts/lib/network/fireqos.php:26' => ['b4712db6815bc3f3adbcce7ab5678ddb8db7a60b', 'uid lookup with quoted account'],
         'scripts/lib/resources/log.php:32' => ['abcdc22775d788f8fa306195c4bbca4a3da976ab', 'uid lookup with quoted account'],
-        'scripts/lib/nginxConfig/userConfigsGenerate.php:213' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
+        'scripts/lib/nginxConfig/userConfigsGenerate.php:211' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
         'scripts/lib/update/users/docker.php:116' => ['b1fd9ef63ccf528d30bc352bef2c0d326d4311b5', 'uid lookup with quoted account'],
         'scripts/lib/update/users/rutorrent.php:60' => ['10019e1ef850eb7765ac7ee4a3ee662f3b5fa53f', 'account step wrapper for deprecated plugin'],
         'scripts/lib/update/users/rutorrent.php:77' => ['d062608dbb673d40273b90bb95bc14763cd256b9', 'account step wrapper for retracker removal'],

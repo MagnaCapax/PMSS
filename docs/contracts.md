@@ -401,8 +401,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     subordinate IDs map to the target allocation; unmappable ownership fails
     the transfer. Both
     rsync passes exclude `.billingId`, `.billingServiceId`, and
-    `.billingClientId`; target provisioning and the canonical fallback reader
-    retain service identity, while client ID returns after fleet backfill.
+    `.billingClientId`; target provisioning records service identity in the
+    target's root store (ADR 0152); the client ID is present once recorded there.
   - Main rsync excludes server-specific torrent client configs such as
     `~/.config/qBittorrent/qBittorrent.conf`.
   - Final rsync copies session data but excludes the source host's
@@ -885,7 +885,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Reconciliation: Replaces current per-user routes atomically without deleting them first. A full run prunes genuine orphan routes only after every selected user completes without a write failure; single-user runs never prune other accounts. Orphan pruning accepts only validated generated filenames and reports incomplete scans through the existing warning path.
   - Write failures: Keeps the previous route where it is still a safe regular file, emits a prominent warning summary, and returns non-zero only when the affected user has no serviceable primary `/etc/nginx/users/<user>` route. Intentional prerequisite skips retain their historical full-run versus single-user cleanup behavior.
   - Public proxy contract: `/public-<user>/` forwards the original scheme via `X-Forwarded-Proto` and only restores generic lighttpd redirects back under `/public-<user>/`; per-app media-stack Location rewriting stays in the user's `~/.lighttpd/custom.d/media-stack.conf` fragment, while Set-Cookie Path rewriting stays in nginx `proxy_cookie_path` rules because lighttpd `map-urlpath` does not rewrite `Set-Cookie`.
-  - Subdomains: `USERNAME.<host>` proxies to `/public-<user>/` and also serves the published mcx.fi service and cluster names. Both labels use the first 16 hex characters of SHA256 over `mcx.fi:<kind>:<canonicalId>`, where kind is `service` or `customer` and canonicalId is the digit-only billing ID without leading zeroes (`0` if all zeroes). Hostname and certificate decisions accept positive IDs within the PHP integer range from root-owned, regular, singly linked files; `.billingServiceId` retains the `.billingId` legacy fallback. The old 64-hex private hash vhost never resolved and generated `pmss-user-<user>-hash.conf` files are removed during reconciliation.
+  - Subdomains: `USERNAME.<host>` proxies to `/public-<user>/` and also serves the published mcx.fi service and cluster names. Both labels use the first 16 hex characters of SHA256 over `mcx.fi:<kind>:<canonicalId>`, where kind is `service` or `customer` and canonicalId is the digit-only billing ID without leading zeroes (`0` if all zeroes). Hostname and certificate decisions accept positive IDs within the PHP integer range from the root-owned provisioning store only (ADR 0152); account-home billing markers are not read. The old 64-hex private hash vhost never resolved and generated `pmss-user-<user>-hash.conf` files are removed during reconciliation.
   - The subdomain renderer retains only active and suspended public templates. Reconciliation still removes generated files from the retired private hash route.
   - Legacy `##delugeWebPort` templates use bounded, root-owned regular port files and accept only ports from 1024 through 65535; `.delugePort` retains its one-port offset.
   - 502 pages: private user proxies route upstream failures to `/error-502-<user>.html`, which falls back to the shared `/error-502.html`; the lighttpd watchdog refreshes those per-user files under `/var/www` while the stack is unhealthy.
@@ -942,7 +942,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     `.billingClientId`) and records service/client IDs in the root store; `recreateUser`
     restores billing files with identity UID 0, and management-host backfill
     writes them as root. `userTransfer` excludes these markers and retains the
-    target's provisioned `.billingId`. Readers require a root-owned regular file.
+    target's provisioned `.billingId`. Root-side readers use the provisioning store, not these files (ADR 0152).
     This permission pass
     normalizes ownership and mode only for a root-owned regular file; it logs and
     leaves non-root-owned, symlinked, or other non-regular entries unchanged.
@@ -1017,7 +1017,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/supportCommand.php <message>
   - Behavior: Saves a read-only support snapshot under `/home/<user>/.support/requests/` and submits the same snapshot to the configured support inbox.
-  - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, optional root-owned `/home/<user>/.billingServiceId` with `.billingId` legacy fallback, and optional root-owned `/home/<user>/.billingClientId`.
+  - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, and the optional service and client IDs from the root-owned provisioning store `/etc/seedbox/config/users/<user>.json` (0 when absent or unreadable).
   - Flags and overrides: `-h`/`--help` prints usage and exits successfully; `PMSS_SUPPORT_CONFIG_PATH` overrides the support config file path before the `PMSS_CONFIG_DIR` default is consulted.
   - Delivery: Prefers a local `sendmail` binary when present, otherwise attempts direct MX SMTP delivery to the configured support inbox.
 

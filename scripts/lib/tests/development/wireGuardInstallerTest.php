@@ -7,15 +7,13 @@ require_once dirname(__DIR__, 2).'/wireguard.php';
 
 class WireGuardInstallerTest extends TestCase
 {
-    public function testGuideEndpointRequiresManagedBillingEntryOwner(): void
+    public function testGuideEndpointWithoutStoreRecordKeepsHostEndpoint(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-wireguard-billing-');
-        $path = $home.'/.billingServiceId';
-        file_put_contents($path, "42\n");
-
-        $this->pmssWithEnv(['PMSS_WG_DNS_IP' => '198.51.100.10'], function () use ($home, $path): void {
-            $expected = fileowner($path) === 0 ? \pmssNginxUserMcxHostname('42') : 'seed.example.com';
-            $this->assertSame($expected, \wgUserGuideEndpoint($home, 'seed.example.com'));
+        $user = 'wg'.bin2hex(random_bytes(3));
+        $this->pmssWithEnv(['PMSS_WG_DNS_IP' => '198.51.100.10'], function () use ($user): void {
+            // No root store record exists for this account, so the host endpoint stays.
+            $this->assertSame('seed.example.com', \wgUserGuideEndpoint($user, 'seed.example.com'));
+            $this->assertSame('seed.example.com', \wgUserGuideEndpoint('../bad', 'seed.example.com'));
         });
     }
 
@@ -554,7 +552,7 @@ class WireGuardInstallerTest extends TestCase
         $this->assertStringNotContainsString('old.example.com:12345', $updated);
     }
 
-    public function testSyncUserGuideAddressesRequiresManagedOwnerForMcxServiceEndpoint(): void
+    public function testSyncUserGuideAddressesIgnoresLegacyHomeBillingMarker(): void
     {
         $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
         $clientPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
@@ -579,11 +577,9 @@ class WireGuardInstallerTest extends TestCase
             );
         });
 
-        $billingPath = $homeBase.'/alice/.billingId';
-        $serviceEndpoint = fileowner($billingPath) === 0
-            ? \pmssNginxUserMcxHostname('696') : '198.51.100.10';
+        // The home marker is not a billing identity source; the host endpoint stays.
         $this->assertStringContainsString(
-            'Endpoint = '.$serviceEndpoint.":51820\n",
+            "Endpoint = 198.51.100.10:51820\n",
             (string) file_get_contents($homeBase.'/alice/wireguard.txt')
         );
     }

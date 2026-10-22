@@ -33,11 +33,8 @@ const WEBROOT = '/var/www/acme-challenge';
 const FAILED_BACKOFF_SECONDS = 21600; // 6h — do not retry a failing request sooner
 const LOG_PREFIX = 'webPublicCerts';
 
-// Canonical billing-id reader: reads .billingServiceId with a fallback to the
-// legacy .billingId (the whole fleet is still in the migration window and carries
-// only .billingId). Reading .billingServiceId raw here silently dropped the mcx.fi
-// SAN fleet-wide, so the cert only covered the per-server subdomain (verified
-// 2026-08-04 on le4-0-106-225wardrobe/mcxstati). Same fallback the serving path uses.
+// Canonical billing-id reader: the service ID comes from the root provisioning
+// store, the same source the nginx serving path uses (docs/adr/0152).
 require_once __DIR__.'/../lib/user/billingIds.php';
 require_once __DIR__.'/../lib/nginxUserHosts.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
@@ -96,10 +93,7 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     $requested++;
 
     $requestContent = pmssReadRegularFileContentsVerified($flag, null, 64);
-    $serviceId = pmssUserBillingIdentityRead($user, $home, 'billingServiceId',
-        '/etc/seedbox/config', 0, static function (string $account, string $warning): void {
-            logLine('user='.$account.' warning="'.$warning.'"');
-        });
+    $serviceId = pmssUserBillingIdentityRead($user, 'billingServiceId');
     $names = pmssWebPublicCertNames($user, $serverFqdn, $serviceId === null ? null : (string) $serviceId, $requestContent);
     $mode = trim((string) $requestContent) === 'username' ? 'username' : 'default';
     if ($names === []) {
