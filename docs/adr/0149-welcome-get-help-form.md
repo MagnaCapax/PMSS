@@ -40,9 +40,23 @@ What existed on 2026-10-22:
    form instead, because the key carries no account authority.
 3. **What the customer sees.** One line under the form: "Ticket #N opened" on success, or what went wrong and a link
    to the client-area form. The text stays in the box on failure.
-4. **Not in this change: Pikkumies first.** Letting Pikkumies look at the problem before a ticket opens, with its
-   latest activity line shown, needs Eternals on the host and its own end-to-end checks on an Eternals testing machine.
-5. **Service link.** When the account has a billing service id, the Help links start with "Your service in the client
+4. **Pikkumies first, where it runs.** When the Pikkumies ask bar is shown (ADR 0148: Eternals on the host, Pikkumies
+   installed, billing id) and the account has an AI key, the form says that for Not working and Slow, Pikkumies looks
+   first on the customer's own AI credits (a check like this often uses 30,000 to 60,000) and opens the ticket with what it found when it
+   cannot fix it. Send then posts `welcome.php?support=pikkumies`, which hands the text, inside a fixed frame with the
+   customer's consent to that ticket and the reply email, to `pikkumies ask --nonce=<random>` run as the account (at
+   most 4,000 characters, the same redaction). The ticket itself goes through Pikkumies' own ticket tool. Server down
+   and Billing / account never go to Pikkumies: a fault is never charged to the customer's credits. "Skip Pikkumies,
+   send to support now" sends the plain ticket of item 2. A refusal from `ask` (setup unfinished, busy, unsent text,
+   rate cap, starting) is told in plain words with the skip offered. Below 40,000 credits the form says they are too
+   low and does not start Pikkumies: the credit service refuses a request it cannot cover up front, and a QA check was
+   refused with 39,504 left.
+5. **Activity line.** While Pikkumies works, the form shows its state and latest activity line from
+   `welcome.php?support=activity` (`pikkumies eternal activity --json`, polled every 4 seconds while the page is in
+   view, at most 15 minutes), cleaned of control characters and cut to 200 characters, and an "Open Pikkumies" button.
+   A Pikkumies without that command shows no line. When 15 answered polls (about a minute) show neither work nor a
+   line from this question, the form says Pikkumies has not started on it, with Open Pikkumies and the skip.
+6. **Service link.** When the account has a billing service id, the Help links start with "Your service in the client
    area", the billing service details page.
 
 ## Consequences

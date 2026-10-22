@@ -163,7 +163,7 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
                     <h2 id="h-help-title" class="h-label">Help</h2>
                     <details class="h-get-help" id="h-get-help">
                         <summary>Get help</summary>
-                        <form id="h-support-form" autocomplete="on" onsubmit="return pmssSupportSend(this)">
+                        <form id="h-support-form" autocomplete="on" onsubmit="return pmssSupportSend(this)" data-pikkumies="<?= !empty($pmssPikkumiesState['visible']) && $homeCreditsKey ? '1' : '0' ?>">
                             <label for="h-support-text">What's wrong?</label>
                             <textarea id="h-support-text" name="text" rows="4" maxlength="8000" required></textarea>
                             <div class="h-support-topics" role="radiogroup" aria-label="Topic">
@@ -174,8 +174,17 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
                             <label for="h-support-email">Reply to</label>
                             <input id="h-support-email" name="email" type="email" required value="<?= pmssWelcomeHtmlAttr(pmssWelcomeHomeSupportEmailDefault(dirname(__DIR__))) ?>">
                             <p class="h-muted h-support-note">Keep passwords out of the text; common forms are removed before it is sent.<?= $homeCreditsKey ? '' : ' Opens in the client area.' ?></p>
+<?php if (!empty($pmssPikkumiesState['visible']) && $homeCreditsKey): ?>
+                            <p class="h-muted h-support-note" id="h-support-pikkumies">For Not working and Slow, Pikkumies looks first, on your AI credits (a check like this often uses 30,000 to 60,000). If it cannot fix it, it opens the ticket with what it found.</p>
+<?php endif; ?>
                             <button type="submit">Send</button>
+<?php if (!empty($pmssPikkumiesState['visible']) && $homeCreditsKey): ?>
+                            <button type="button" class="h-support-skip" onclick="return pmssSupportSend(this.form, true)">Skip Pikkumies, send to support now</button>
+<?php endif; ?>
                             <p class="h-support-result" id="h-support-result" role="status" hidden></p>
+<?php if (!empty($pmssPikkumiesState['visible']) && $homeCreditsKey): ?>
+                            <div class="h-support-activity" id="h-support-activity" hidden><span class="h-muted">Pikkumies:</span> <span id="h-support-activity-line">starting…</span> <button type="button" onclick="pmssPikkumiesTabOpen()">Open Pikkumies</button></div>
+<?php endif; ?>
                         </form>
                     </details>
                     <nav class="h-help">
@@ -438,8 +447,9 @@ if (file_exists('openvpn-config.tgz')) {
         })();
 <?php endif; ?>
 
-        /* Get help: opens a ticket through the account's AI key (no credits spent); billing and accounts without a key go to the client area. */
-        function pmssSupportSend(form) {
+        /* Get help (ADR 0149): a ticket through the account's AI key (no credits spent); billing and accounts without a key go
+           to the client area. Where Pikkumies runs, Not working and Slow go to Pikkumies first unless the customer skips it. */
+        function pmssSupportSend(form, skip) {
             var result = document.getElementById('h-support-result'), button = form.querySelector('button[type=submit]');
             var topic = (form.querySelector('input[name=topic]:checked') || {}).value || 'working';
             var clientArea = 'https://pulsedmedia.com/clients/submitticket.php';
@@ -449,14 +459,54 @@ if (file_exists('openvpn-config.tgz')) {
                 result.hidden = false;
             };
             if (topic === 'billing' || <?= $homeCreditsKey ? 'false' : 'true' ?>) { show('This one goes through the client area.', true); return false; }
-            button.disabled = true; show('Sending…', false);
-            var body = new URLSearchParams({topic: topic, text: form.text.value, email: form.email.value});
-            fetch('welcome.php?support=1', {method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+            if (form.reportValidity && !form.reportValidity()) return false;
+            var viaPikkumies = !skip && form.getAttribute('data-pikkumies') === '1' && (topic === 'working' || topic === 'slow');
+            var fields = {topic: topic, text: form.text.value, email: form.email.value};
+            if (viaPikkumies) fields.nonce = pmssSupportNonce();
+            button.disabled = true; show(viaPikkumies ? 'Handing it to Pikkumies…' : 'Sending…', false);
+            fetch('welcome.php?support=' + (viaPikkumies ? 'pikkumies' : '1'), {method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams(fields)})
                 .then(function (response) { return response.json(); })
-                .then(function (answer) { show(answer.message || 'Support could not be reached just now.', !answer.ok); if (answer.ok) form.text.value = ''; })
+                .then(function (answer) {
+                    show(answer.message || 'Support could not be reached just now.', !answer.ok && !answer.pikkumies);
+                    if (answer.ok && answer.pikkumies) pmssSupportActivityWatch(answer.sent);
+                    else if (answer.ok) form.text.value = '';
+                })
                 .catch(function () { show('Support could not be reached just now.', true); })
                 .then(function () { button.disabled = false; });
             return false;
+        }
+        function pmssSupportNonce() {
+            var bytes = new Uint8Array(16), hex = '';
+            (window.crypto || window.msCrypto).getRandomValues(bytes);
+            for (var i = 0; i < bytes.length; i++) hex += ('0' + bytes[i].toString(16)).slice(-2);
+            return hex;
+        }
+        /* While Pikkumies works: its state and latest activity line, every 4 s for up to 15 minutes. A question Pikkumies
+           never starts on (e.g. the credit service refused it) says so after about a minute of answered polls. */
+        function pmssSupportActivityWatch(sent) {
+            var box = document.getElementById('h-support-activity'), line = document.getElementById('h-support-activity-line');
+            if (!box || !line || box.getAttribute('data-watching') === '1') return;
+            box.setAttribute('data-watching', '1'); box.hidden = false; line.textContent = 'starting…';
+            var started = Date.now(), sentAt = (sent || Math.floor(started / 1000)) - 2, seenBusy = false, polls = 0, timer = setInterval(function () {
+                if (Date.now() - started > 15 * 60 * 1000) { clearInterval(timer); box.removeAttribute('data-watching'); return; }
+                if (window.pmssWelcomeVisible && !window.pmssWelcomeVisible()) return;
+                fetch('welcome.php?support=activity', {credentials: 'same-origin', cache: 'no-store'})
+                    .then(function (response) { return response.json(); })
+                    .then(function (activity) {
+                        if (activity.state === 'busy') seenBusy = true;
+                        var fresh = activity.line && activity.at >= sentAt;  /* a line from an earlier question is not this one */
+                        /* Done: idle after a busy poll, or already idle with this question's answer (a quick answer can finish between polls). */
+                        if ((seenBusy && (activity.state === 'idle' || activity.state === 'held')) || (activity.state === 'idle' && fresh)) {
+                            line.textContent = 'finished. Its answer is in the Pikkumies tab.';
+                            clearInterval(timer); box.removeAttribute('data-watching'); return;
+                        }
+                        if (!seenBusy && !fresh && ++polls >= 15) {
+                            line.textContent = 'has not started on it. Open Pikkumies to see why, or send this to support now.';
+                            clearInterval(timer); box.removeAttribute('data-watching'); return;
+                        }
+                        line.textContent = fresh ? activity.line : (seenBusy ? 'working…' : 'starting…');
+                    }).catch(function () {});
+            }, 4000);
         }
     </script>
 </body>
@@ -1112,7 +1162,7 @@ function pmssWelcomeHomeCss()
 .h-news{list-style:none;margin:0;padding:0}
 .h-get-help{margin:0 0 10px}.h-get-help summary{display:inline-block;cursor:pointer;background:var(--accent);color:#06121b;font-weight:600;border-radius:7px;padding:6px 12px;list-style:none}.h-get-help summary::-webkit-details-marker{display:none}
 .h-get-help form{display:grid;gap:6px;margin-top:10px}.h-get-help label{color:var(--muted);font-size:12px}.h-get-help textarea,.h-get-help input[type=email]{box-sizing:border-box;width:100%;background:#0b1118;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 8px;font:inherit}
-.h-support-topics{display:flex;flex-wrap:wrap;gap:4px 12px}.h-support-topics label{color:var(--text)}.h-support-note{margin:0;font-size:12px}.h-get-help button{justify-self:start;background:var(--accent);color:#06121b;border:0;border-radius:7px;padding:6px 14px;font-weight:600;cursor:pointer}.h-support-result{margin:0}.h-support-result a{margin-left:4px}
+.h-support-topics{display:flex;flex-wrap:wrap;gap:4px 12px}.h-support-topics label{color:var(--text)}.h-support-note{margin:0;font-size:12px}.h-get-help button{justify-self:start;background:var(--accent);color:#06121b;border:0;border-radius:7px;padding:6px 14px;font-weight:600;cursor:pointer}.h-support-result{margin:0}.h-support-result a{margin-left:4px}.h-get-help .h-support-skip,.h-support-activity button{background:transparent;color:var(--accent);border:1px solid var(--line);font-weight:500}.h-support-activity{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px}.h-support-activity[hidden]{display:none}#h-support-activity-line{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
 .h-news li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line)}
 .h-news-part+.h-news-part{margin-top:12px}.h-news-sub{margin:0 0 4px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}.h-news-sub a{margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0}
 .h-news li:first-child{border-top:0;padding-top:0}
@@ -1716,6 +1766,8 @@ function pmssWelcomeHomeSupportAnswer($code, $body)
 /** POST welcome.php?support=1 (XHR only, ADR 0133): opens the ticket, answers JSON. Never echoes the key. */
 function pmssWelcomeHomeSupportEmit($home)
 {
+    $mode = is_string($_GET['support'] ?? null) ? $_GET['support'] : '1';
+    if ($mode === 'activity') { pmssWelcomeHomeSupportActivityEmit($home); return; }
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
     if (function_exists('pmssFrontendPostActionRequired')) pmssFrontendPostActionRequired();
@@ -1730,6 +1782,11 @@ function pmssWelcomeHomeSupportEmit($home)
     }
     if (trim($text) === '' || (function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text)) > 8000 || !filter_var(trim($email), FILTER_VALIDATE_EMAIL)) {
         echo json_encode(array('ok' => false, 'ticket' => '', 'message' => 'Write what is wrong (up to 8000 characters) and a valid email.'));
+        return;
+    }
+    if ($mode === 'pikkumies') {
+        $nonce = isset($_POST['nonce']) && is_string($_POST['nonce']) ? $_POST['nonce'] : '';
+        echo json_encode(pmssWelcomeHomeSupportPikkumiesSend($home, $topic, $text, $nonce, $email));
         return;
     }
     $body = json_encode(pmssWelcomeHomeSupportRequestBuild($topic, $text, $email), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -1748,5 +1805,109 @@ function pmssWelcomeHomeSupportEmailDefault($home)
     $email = trim((string) @file_get_contents($file));
     return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
 }
+
+/* Get help, step two: where Pikkumies runs, "Not working" and "Slow" go to Pikkumies first, on the customer's own
+ * AI credits; Server down and Billing / account never do. Pikkumies opens the ticket itself when it cannot fix it. */
+
+/** The question handed to Pikkumies: the customer's text inside a fixed frame, at most 4000 characters in all. */
+function pmssWelcomeHomeSupportPikkumiesPrompt($topic, $text, $email = '')
+{
+    $topics = pmssWelcomeHomeSupportTopics();
+    $head = 'Support request from the panel\'s Get help form (topic: '.(isset($topics[$topic]) ? $topics[$topic] : 'Other').").\n\n";
+    $tail = "\n\nPlease look into this on my seedbox. If you fix it, tell me what you changed and ask whether I still want a"
+        .' support ticket. If you cannot fix it, or the cause is on Pulsed Media\'s side (server, network, hardware), stop'
+        .' and open a support ticket with your written findings; I agree to that ticket being sent. Do not attach logs or'
+        .' this conversation unless I say so.'
+        .(filter_var(trim((string) $email), FILTER_VALIDATE_EMAIL) ? ' My email for the ticket: '.trim((string) $email).'.' : '');
+    $clean = trim(pmssWelcomeHomeSupportRedact(str_replace(array("\r\n", "\r"), "\n", (string) $text)));
+    $room = 4000 - strlen($head) - strlen($tail);
+    if (function_exists('mb_substr')) $clean = mb_substr($clean, 0, $room, 'UTF-8');
+    else $clean = substr($clean, 0, $room);
+    return $head.$clean.$tail;
+}
+
+/**
+ * The account's Pikkumies command, only when the installed build has the command's own code file (e.g. EternalAsk.php).
+ * Pikkumies treats words it does not know as a question to the AI, which spends the customer's credits: a build
+ * without `eternal activity` answered that "command" with a 4-minute AI run (QA VM, 2026-10-22). Never rely on the
+ * word being recognised; require its code file.
+ */
+function pmssWelcomeHomeSupportPikkumiesBinary($home, $lib)
+{
+    $root = rtrim((string) $home, '/').'/.mcxPikkumies/pikkumies';
+    $binary = $root.'/bin/pikkumies';
+    return is_file($binary) && is_executable($binary) && preg_match('/^[A-Za-z]+\.php$/D', (string) $lib) && is_file($root.'/lib/'.$lib) ? $binary : '';
+}
+
+/** Runs the Pikkumies command as the account with $stdin; returns array(exit code, first output line). */
+function pmssWelcomeHomeSupportPikkumiesRun($binary, array $args, $stdin, $seconds)
+{
+    $command = 'timeout '.(int) $seconds.' '.escapeshellarg($binary).' '.implode(' ', array_map('escapeshellarg', $args));
+    $process = @proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes);
+    if (!is_resource($process)) return array(-1, '');
+    fwrite($pipes[0], (string) $stdin);
+    fclose($pipes[0]);
+    $out = (string) stream_get_contents($pipes[1], 65536);
+    $err = (string) stream_get_contents($pipes[2], 4096);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $code = proc_close($process);
+    return array($code, trim($out !== '' ? $out : $err));
+}
+
+/** What the customer reads for each `pikkumies ask` exit code (mcxPikkumies ADR 0075); ok only for 0. */
+function pmssWelcomeHomeSupportPikkumiesAnswer($code)
+{
+    if ($code === 0) return array('ok' => true, 'pikkumies' => true, 'message' => 'Pikkumies is looking at it. If it cannot fix it, it opens the ticket with what it found.');
+    $map = array(
+        2 => 'Pikkumies needs its one-time setup first. Open the Pikkumies tab, or send this to support now.',
+        3 => 'Pikkumies has unsent text in its window. Send or clear it there, or send this to support now.',
+        4 => 'Pikkumies took several questions just now. Try again in a minute, or send this to support now.',
+        5 => 'Pikkumies is starting. Try again shortly, or send this to support now.',
+        6 => 'Pikkumies is busy with another question. Try again shortly, or send this to support now.',
+    );
+    return array('ok' => false, 'pikkumies' => true, 'message' => isset($map[$code]) ? $map[$code] : 'Pikkumies could not take it just now. Send this to support now instead.');
+}
+
+/** POST welcome.php?support=pikkumies: hands the form to Pikkumies (already behind the POST/XHR guard). */
+function pmssWelcomeHomeSupportPikkumiesSend($home, $topic, $text, $nonce, $email = '')
+{
+    if ($topic !== 'working' && $topic !== 'slow') return array('ok' => false, 'pikkumies' => true, 'message' => 'This topic goes straight to support.');
+    list($dir, $name) = function_exists('pmssPikkumiesPanelAccount') ? pmssPikkumiesPanelAccount() : array('', '');
+    $state = pmssWelcomePikkumiesStateRead($home, $name);
+    $binary = pmssWelcomeHomeSupportPikkumiesBinary($home, 'EternalAsk.php');
+    if (empty($state['visible']) || $binary === '') return array('ok' => false, 'pikkumies' => true, 'message' => 'Pikkumies is not available on this account. Send this to support now.');
+    // The credit service refuses a request it cannot cover up front, so a check stops early well before the balance is
+    // 0: QA support checks used about 30,000 to 60,000 credits each, and one was refused with 39,504 left (2026-10-22).
+    $credits = pmssWelcomeHomeCreditsRead($home);
+    if ($credits['state'] === 'ok' && (float) $credits['balance'] < 40000) return array('ok' => false, 'pikkumies' => true, 'message' => 'Your AI credits are too low for Pikkumies to look into this. Send this to support now.');
+    if (!preg_match('/^[A-Za-z0-9_-]{8,64}$/D', (string) $nonce)) return array('ok' => false, 'pikkumies' => true, 'message' => 'Reload the page and try again.');
+    list($code) = pmssWelcomeHomeSupportPikkumiesRun($binary, array('ask', '--nonce='.$nonce), pmssWelcomeHomeSupportPikkumiesPrompt($topic, $text, $email), 20);
+    return pmssWelcomeHomeSupportPikkumiesAnswer($code) + array('sent' => time());
+}
+
+/** GET welcome.php?support=activity: Pikkumies' state and latest activity line, for the form while it works. */
+function pmssWelcomeHomeSupportActivityEmit($home)
+{
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $answer = array('state' => '', 'line' => '', 'at' => 0);
+    // Only where Pikkumies windows run: elsewhere `eternal ...` is a question to the AI, not a command.
+    $entry = function_exists('posix_geteuid') && function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
+    $state = pmssWelcomePikkumiesStateRead($home, is_array($entry) ? (string) ($entry['name'] ?? '') : '');
+    $binary = empty($state['visible']) ? '' : pmssWelcomeHomeSupportPikkumiesBinary($home, 'EternalActivity.php');
+    if ($binary !== '') {
+        list($code, $out) = pmssWelcomeHomeSupportPikkumiesRun($binary, array('eternal', 'activity', '--json'), '', 8);
+        $data = $code === 0 ? json_decode($out, true) : null;
+        if (is_array($data)) {
+            $answer['state'] = preg_match('/^[a-z]{1,16}$/D', (string) ($data['state'] ?? '')) ? (string) $data['state'] : '';
+            $line = preg_replace('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', ' ', (string) ($data['line'] ?? ''));
+            $answer['at'] = isset($data['at']) && is_int($data['at']) && $data['at'] > 0 ? $data['at'] : 0;
+            $answer['line'] = function_exists('mb_strimwidth') ? mb_strimwidth(trim($line), 0, 200, '…', 'UTF-8') : substr(trim($line), 0, 200);
+        }
+    }
+    echo json_encode($answer);
+}
+
 
 ?>

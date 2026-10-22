@@ -415,4 +415,186 @@ final class WelcomeHomeTest extends TestCase
 
         $this->assertSame(array('valid' => 'user@example.test', 'invalid' => '', 'symlink' => '', 'missing' => ''), $result);
     }
+
+    public function testSupportPikkumiesPromptFramesTheTextAndStaysUnder4000(): void
+    {
+        $result = $this->runWelcomeHome('$tail = "unless I say so.";'
+            .' $email = " My email for the ticket: a@example.test.";'
+            .' $length = function ($text) { return function_exists("mb_strlen") ? mb_strlen($text, "UTF-8") : strlen($text); };'
+            .' $long = pmssWelcomeHomeSupportPikkumiesPrompt("working", str_repeat("z", 10000), "a@example.test");'
+            .' $wide = pmssWelcomeHomeSupportPikkumiesPrompt("slow", str_repeat("ä", 10000));'
+            .' echo json_encode(array('
+            .'"short" => pmssWelcomeHomeSupportPikkumiesPrompt("working", "rTorrent stopped\r\npassword: hunter2", " a@example.test "),'
+            .'"noEmail" => pmssWelcomeHomeSupportPikkumiesPrompt("slow", "It is slow", "not an email"),'
+            .'"unknown" => pmssWelcomeHomeSupportPikkumiesPrompt("nonsense", "Something odd"),'
+            .'"longLength" => $length($long), "longEnd" => substr($long, -strlen($email)) === $email, "longHead" => strpos($long, "Support request from the panel") === 0,'
+            .'"wideLength" => $length($wide), "wideEnd" => substr($wide, -strlen($tail)) === $tail'
+            .'));');
+
+        $this->assertStringContainsAllStrings(array(
+            "Support request from the panel's Get help form (topic: Not working).",
+            "rTorrent stopped\npassword: [removed]",
+            'open a support ticket with your written findings',
+            'My email for the ticket: a@example.test.',
+        ), $result['short']);
+        $this->pmssAssertStringNotContainsString('hunter2', $result['short'], 'A password in the text never reaches Pikkumies');
+        $this->pmssAssertStringNotContainsString("\r", $result['short']);
+
+        $this->assertStringContainsAllStrings(array('topic: Slow', 'It is slow', 'open a support ticket with your written findings'), $result['noEmail']);
+        $this->pmssAssertStringNotContainsString('My email for the ticket', $result['noEmail'], 'An invalid email is left out');
+        $this->assertStringContainsString('topic: Other', $result['unknown']);
+        $this->pmssAssertStringNotContainsString('My email for the ticket', $result['unknown']);
+
+        $this->assertTrue($result['longLength'] <= 4000, 'A 10,000-character text is cut to fit 4000 characters in all: '.$result['longLength']);
+        $this->assertTrue($result['longLength'] > 3500, 'The cut keeps as much text as fits: '.$result['longLength']);
+        $this->assertSame(true, $result['longHead'], 'The frame head stays');
+        $this->assertSame(true, $result['longEnd'], 'The frame tail and email stay after the cut');
+        $this->assertTrue($result['wideLength'] <= 4000, 'Multibyte text is counted in characters: '.$result['wideLength']);
+        $this->assertSame(true, $result['wideEnd'], 'The frame tail stays after a multibyte cut');
+    }
+
+    public function testSupportPikkumiesAnswerMapsAskExitCodes(): void
+    {
+        $result = $this->runWelcomeHome('$result = array(); foreach (array(0, 2, 3, 4, 5, 6, 1, 127, 124, -1) as $code) {'
+            .' $result["c".$code] = pmssWelcomeHomeSupportPikkumiesAnswer($code); } echo json_encode($result);');
+
+        $this->assertSame(true, $result['c0']['ok']);
+        $this->assertSame(true, $result['c0']['pikkumies']);
+        $this->assertStringContainsString('Pikkumies is looking at it', $result['c0']['message']);
+
+        $known = array();
+        foreach (array(2, 3, 4, 5, 6) as $code) {
+            $answer = $result['c'.$code];
+            $this->assertSame(false, $answer['ok'], 'exit '.$code);
+            $this->assertSame(true, $answer['pikkumies'], 'exit '.$code);
+            $this->assertStringContainsString('support now', $answer['message'], 'exit '.$code);
+            $known[] = $answer['message'];
+        }
+        $this->assertSame(5, count(array_unique($known)), 'Each known refusal has its own message');
+        $this->assertStringContainsString('one-time setup', $result['c2']['message']);
+        $this->assertStringContainsString('busy with another question', $result['c6']['message']);
+
+        $fallback = $result['c1']['message'];
+        $this->assertStringContainsString('support now', $fallback);
+        $this->assertFalse(in_array($fallback, $known, true), 'An unknown exit code does not borrow a known message');
+        foreach (array(1, 127, 124, -1) as $code) {
+            $this->assertSame(false, $result['c'.$code]['ok'], 'exit '.$code);
+            $this->assertSame($fallback, $result['c'.$code]['message'], 'exit '.$code);
+        }
+    }
+
+    /** A temporary account home; with $script, an executable fake ~/.mcxPikkumies/pikkumies/bin/pikkumies running it under /bin/sh. */
+    private function supportPikkumiesHome(?string $script, array $libs = array('EternalAsk.php', 'EternalActivity.php')): string
+    {
+        $home = $this->pmssMakeTempDir('pmss-welcome-pikkumies-', 0700);
+        if ($script !== null) {
+            $this->pmssWriteExecutableFile($home.'/.mcxPikkumies/pikkumies/bin/pikkumies', "#!/bin/sh\n".$script, 0700, 0700);
+            foreach ($libs as $lib) {
+                $this->pmssWriteFile($home.'/.mcxPikkumies/pikkumies/lib/'.$lib, "<?php\n");
+            }
+        }
+        return $home;
+    }
+
+    public function testSupportPikkumiesSendRefusesServerDownAndBillingWithoutRunningAnything(): void
+    {
+        // The fake leaves a marker next to itself when run; the state reader stub records every call.
+        $armed = $this->supportPikkumiesHome("touch \"\$0.ran\"\nexit 0\n");
+        $binary = $armed.'/.mcxPikkumies/pikkumies/bin/pikkumies';
+        $cases = array(
+            'down' => array($armed, 'down'),
+            'billing' => array($armed, 'billing'),
+            'other' => array($armed, 'nonsense'),
+            'noBinary' => array($this->supportPikkumiesHome(null), 'working'),
+            'noBinarySlow' => array($this->supportPikkumiesHome(null), 'slow'),
+        );
+        $result = $this->runWelcomeHome('function pmssWelcomePikkumiesStateRead($home, $name) { $GLOBALS["stateReads"][] = $home;'
+            .' return array("visible" => true, "origin" => "https://example.test"); }'
+            .' $GLOBALS["stateReads"] = array(); $result = array(); foreach ('.var_export($cases, true).' as $name => $case) {'
+            .' $before = count($GLOBALS["stateReads"]);'
+            .' $result[$name] = pmssWelcomeHomeSupportPikkumiesSend($case[0], $case[1], "rTorrent stopped", "abcdef0123456789", "a@example.test");'
+            .' $result[$name]["stateRead"] = count($GLOBALS["stateReads"]) > $before; } echo json_encode($result);', true);
+
+        foreach (array('down', 'billing', 'other') as $name) {
+            $this->assertSame(false, $result[$name]['ok'], $name);
+            $this->assertSame(true, $result[$name]['pikkumies'], $name);
+            $this->assertSame('This topic goes straight to support.', $result[$name]['message'], $name);
+            $this->assertSame(false, $result[$name]['stateRead'], $name.' is refused before anything is read');
+        }
+        $this->assertFalse(file_exists($binary.'.ran'), 'Server down and Billing never run Pikkumies');
+
+        foreach (array('noBinary', 'noBinarySlow') as $name) {
+            $this->assertSame(false, $result[$name]['ok'], $name);
+            $this->assertSame('Pikkumies is not available on this account. Send this to support now.', $result[$name]['message'], $name);
+        }
+    }
+
+    public function testSupportPikkumiesSendNeedsEnoughCreditsForACheck(): void
+    {
+        // Each home has an armed fake, a key and a fresh credit cache; the fake leaves a marker when run.
+        $homes = array();
+        foreach (array('low' => 39504, 'empty' => 0, 'enough' => 40000) as $name => $balance) {
+            $home = $this->supportPikkumiesHome("touch \"\$0.ran\"\nexit 0\n");
+            $this->pmssWriteFile($home.'/.virsilipasKey', 'key='.self::CREDITS_KEY."\n");
+            chmod($home.'/.virsilipasKey', 0600);
+            $this->creditsCacheWrite($home, self::CREDITS_KEY, 5, array('balance' => $balance, 'tokens_30d' => 0, 'pct_left' => null));
+            $homes[$name] = $home;
+        }
+        $result = $this->runWelcomeHome('function pmssWelcomePikkumiesStateRead($home, $name) { return array("visible" => true); }'
+            .' $result = array(); foreach ('.var_export($homes, true).' as $name => $home) {'
+            .' $result[$name] = pmssWelcomeHomeSupportPikkumiesSend($home, "working", "rTorrent stopped", "abcdef0123456789"); } echo json_encode($result);', true);
+
+        foreach (array('low', 'empty') as $name) {
+            $this->assertSame(false, $result[$name]['ok'], $name);
+            $this->assertSame('Your AI credits are too low for Pikkumies to look into this. Send this to support now.', $result[$name]['message'], $name);
+            $this->assertFalse(file_exists($homes[$name].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), $name.' never runs Pikkumies');
+        }
+        $this->assertSame(true, $result['enough']['ok']);
+        $this->assertTrue(file_exists($homes['enough'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), '40,000 credits hand it to Pikkumies');
+    }
+
+    public function testSupportActivityReadsTheCommandAndCleansTheLine(): void
+    {
+        // The fake answers only `eternal activity --json`, from a JSON file written next to it.
+        $answerer = "if [ \"\$*\" = \"eternal activity --json\" ]; then cat \"\$0.json\"; exit 0; fi\nexit 1\n";
+        $homes = array();
+        $line = "Checking rTorrent\u{0007}now\u{0085}".str_repeat('y', 300);
+        foreach (array(
+            'busy' => array('state' => 'busy', 'line' => $line),
+            'badState' => array('state' => '<b>BUSY</b>', 'line' => 'reading the log'),
+        ) as $name => $answer) {
+            $homes[$name] = $this->supportPikkumiesHome($answerer);
+            $this->pmssWriteFile($homes[$name].'/.mcxPikkumies/pikkumies/bin/pikkumies.json', (string) json_encode($answer));
+        }
+        $homes['notJson'] = $this->supportPikkumiesHome("echo 'not json'\nexit 0\n");
+        $homes['failed'] = $this->supportPikkumiesHome("echo '{\"state\":\"busy\",\"line\":\"x\"}'\nexit 1\n");
+        $homes['noBinary'] = $this->supportPikkumiesHome(null);
+        // A build without the command's code would take the words as a question to the AI: never run it.
+        $homes['oldBuild'] = $this->supportPikkumiesHome("touch \"\$0.ran\"\nexit 0\n", array('EternalAsk.php'));
+        // Where Pikkumies windows do not run, `eternal ...` is a question too.
+        $homes['notVisible'] = $this->supportPikkumiesHome("touch \"\$0.ran\"\nexit 0\n");
+        $this->pmssWriteFile($homes['notVisible'].'/.invisible', "1\n");
+
+        // ActivityEmit sends headers (ignored by the CLI) and echoes JSON; each answer is captured on its own.
+        $raw = $this->runWelcomeHome('function pmssWelcomePikkumiesStateRead($home, $name) { return array("visible" => !is_file($home . "/.invisible"), "origin" => ""); }'
+            .' $result = array(); foreach ('.var_export($homes, true).' as $name => $home) {'
+            .' ob_start(); pmssWelcomeHomeSupportActivityEmit($home); $result[$name] = ob_get_clean(); } echo json_encode($result);', true);
+        $result = array();
+        foreach ($raw as $name => $body) {
+            $result[$name] = $this->pmssDecodeJsonArray($body, $name.' answers JSON');
+        }
+
+        $this->assertSame('busy', $result['busy']['state']);
+        $this->assertStringContainsString('Checking rTorrent now', $result['busy']['line'], 'Control characters become spaces');
+        $this->assertSame(0, preg_match('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', $result['busy']['line']), 'No control characters reach the page');
+        $length = function_exists('mb_strlen') ? mb_strlen($result['busy']['line'], 'UTF-8') : strlen($result['busy']['line']);
+        $this->assertTrue($length <= 200, 'The line is cut to 200 characters: '.$length);
+
+        $this->assertSame(array('state' => '', 'line' => 'reading the log', 'at' => 0), $result['badState']);
+        foreach (array('notJson', 'failed', 'noBinary', 'oldBuild', 'notVisible') as $name) {
+            $this->assertSame(array('state' => '', 'line' => '', 'at' => 0), $result[$name], $name);
+        }
+        $this->assertFalse(file_exists($homes['oldBuild'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), 'A build without the activity command is never run');
+        $this->assertFalse(file_exists($homes['notVisible'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), 'Pikkumies is never run where its windows do not run');
+    }
 }

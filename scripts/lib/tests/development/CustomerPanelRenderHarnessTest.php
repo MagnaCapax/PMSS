@@ -160,6 +160,57 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $this->assertTrue($account < $bar && $bar < $apps, 'The ask bar sits after Your account and before Your apps');
         });
     }
+
+    /**
+     * Get help, step two: the form offers Pikkumies first only where the ask bar shows AND the account has an AI key.
+     * Without the stub the real state reader stays hidden: the synthetic home has no ~/.mcxPikkumies command.
+     */
+    public function testWelcomeOffersPikkumiesFirstOnlyWithTheBarAndAKey(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $expectations = \pmssCustomerPanelRenderExpectations();
+            $pikkumiesFirst = array(
+                'data-pikkumies="1"',
+                'id="h-support-pikkumies"',
+                '<button type="button" class="h-support-skip" onclick="return pmssSupportSend(this.form, true)">Skip Pikkumies, send to support now</button>',
+                'id="h-support-activity"',
+            );
+            $assertPlainForm = function (string $html, string $case): void {
+                $this->assertStringContainsString('id="h-support-form"', $html, $case);
+                $this->assertStringContainsString('data-pikkumies="0"', $html, $case);
+                foreach (array('data-pikkumies="1"', 'id="h-support-pikkumies"', 'class="h-support-skip"',
+                    'Skip Pikkumies, send to support now', 'id="h-support-activity"') as $needle) {
+                    $this->assertStringNotContainsString($needle, $html, $case.': '.$needle);
+                }
+            };
+
+            $key = $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1\nkey=vsk-".str_repeat('a', 24)."\n");
+            $this->assertTrue(chmod($key, 0600));
+            $hidden = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+            $this->assertStringNotContainsString('id="pmss-pikkumies-bar"', $hidden, 'No ask bar without the stub');
+            $assertPlainForm($hidden, 'key without the bar');
+
+            $panel = $home.'/www/pikkumiesPanel.php';
+            $source = (string) file_get_contents($panel);
+            $this->assertStringContainsString('function pmssPikkumiesPanelStateRead(', $source);
+            $this->pmssWriteFile($panel, preg_replace('/\?>\s*$/', '', str_replace(
+                'function pmssPikkumiesPanelStateRead(', 'function pmssPikkumiesPanelStateReadReal(', $source))
+                ."\nfunction pmssPikkumiesPanelStateRead(\$home, \$name) { return array('visible' => true, 'origin' => 'https://example.test', 'mode' => 'simplified', 'off' => false); }\n");
+
+            $offered = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+            $this->assertStringContainsString('id="pmss-pikkumies-bar"', $offered);
+            $this->assertStringContainsAllStrings($pikkumiesFirst, $offered);
+            $this->assertStringNotContainsString('data-pikkumies="0"', $offered);
+            $this->assertStringNotContainsString('vsk-', $offered);
+
+            $this->assertTrue(unlink($key));
+            $keyless = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+            $this->assertStringContainsString('id="pmss-pikkumies-bar"', $keyless, 'The bar still shows without a key');
+            $assertPlainForm($keyless, 'bar without a key');
+            $this->assertStringContainsString('Opens in the client area.', $keyless);
+        });
+    }
+
     public function testWelcomeTrafficUsageRendersWhenLimitFileIsMissing(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
