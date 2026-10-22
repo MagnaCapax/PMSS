@@ -56,8 +56,9 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
         return false;
     }
     foreach ($paths as $path) {
+        // The home itself was checked above; every other path must lie inside it.
         if (!is_string($path) || !pmssPathSegmentsAreSafe($path, false, true)
-            || !pmssPathWithinResolvedRoot($path, $home)) {
+            || (rtrim($path, '/') !== rtrim($home, '/') && !pmssPathWithinResolvedRoot($path, $home))) {
             return false;
         }
     }

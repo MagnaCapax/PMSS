@@ -159,29 +159,29 @@ function pmssPathSegmentsAreSafe(
 }
 
 /**
+ * Return existing targets for a path or glob, rejecting symlinked path segments.
+ *
+ * @return array<int,string>
+ */
+function pmssPathShellTargetPaths(string $path): array
+{
+    $matches = strpbrk($path, '*?[]') !== false ? glob($path) : [$path];
+    $targets = [];
+    foreach (is_array($matches) ? $matches : [] as $match) {
+        if (file_exists($match) && pmssPathSegmentsAreSafe($match)) {
+            $targets[] = $match;
+        }
+    }
+    return $targets;
+}
+
+/**
  * Return shell-safe existing targets while rejecting symlinked path segments.
  */
 function pmssPathShellTarget(string $path): ?string
 {
-    $hasGlob = strpbrk($path, '*?[]') !== false;
-
-    if ($hasGlob) {
-        $matches = glob($path);
-        if ($matches === false || $matches === []) {
-            return null;
-        }
-
-        $targets = [];
-        foreach ($matches as $match) {
-            if (file_exists($match) && pmssPathSegmentsAreSafe($match)) {
-                $targets[] = escapeshellarg($match);
-            }
-        }
-
-        return $targets === [] ? null : implode(' ', $targets);
-    }
-
-    return file_exists($path) && pmssPathSegmentsAreSafe($path) ? escapeshellarg($path) : null;
+    $targets = pmssPathShellTargetPaths($path);
+    return $targets === [] ? null : implode(' ', array_map('escapeshellarg', $targets));
 }
 
 /**

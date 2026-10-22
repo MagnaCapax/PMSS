@@ -4,10 +4,14 @@
 /** Run a repair command, retaining the first failure for the final summary. */
 function pmssUserPermissionsRun(string $command): void
 {
-    if (pmssRun($command) === 0) {
-        return;
+    if (pmssRun($command) !== 0) {
+        pmssUserPermissionsFailed($command);
     }
+}
 
+/** Record one failed repair; the first one is named in the final summary. */
+function pmssUserPermissionsFailed(string $command): void
+{
     if (empty($GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'])) {
         $GLOBALS['PMSS_USER_PERMISSIONS_FIRST_FAILED_COMMAND'] = $command;
     }

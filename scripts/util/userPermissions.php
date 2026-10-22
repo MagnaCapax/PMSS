@@ -11,6 +11,7 @@
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/shell.php';
 require_once __DIR__.'/../lib/user/permissionsCommands.php';
+require_once __DIR__.'/../lib/user/permissionsApply.php';
 require_once __DIR__.'/../lib/user/billingPermissions.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
@@ -27,41 +28,10 @@ if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
 $userIds = function_exists('pmssUserAccountLookup') ? pmssUserAccountLookup($thisUser) : null;
 if (!is_array($userIds)) die("No such user\n");
 
-function chmodPath(string $path, int $perm, bool $recursive = false): void
-{
-    // Hardening prompted by a security disclosure from Samanta.
-    $target = pmssPathShellTarget($path);
-    if ($target === null) {
-        return;
-    }
-
-    if ($recursive) {
-        $mode = sprintf('%04o', $perm);
-        pmssUserPermissionsRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
-        return;
-    }
-
-    pmssUserPermissionsRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +', $target, $perm));
-}
-
-function chownPath(string $path, string $owner, bool $recursive = false): void
-{
-    $target = pmssPathShellTarget($path);
-    if ($target === null) {
-        return;
-    }
-
-    if ($recursive) {
-        $predicate = pmssFindOwnerMismatchPredicate($owner);
-        if ($predicate !== '') {
-            pmssUserPermissionsRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +', $target, $predicate, escapeshellarg($owner)));
-            return;
-        }
-    }
-
-    // Quote owner spec as a single argument; chown accepts quoted 'user.group'
-    pmssUserPermissionsRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +', $target, escapeshellarg($owner)));
-}
+// Each repair acts on the object it checked (scripts/lib/user/permissionsApply.php):
+// modes change as the account or through an opened root-owned file, and owners change
+// with chown -h run by -execdir from a find that starts at the home.
+$accountUid = (int) $userIds['uid'];
 
 function pmssFindOwnerMismatchPredicate(string $owner): string
 {
@@ -95,7 +65,7 @@ if ($homeOwner !== false && $homeGroup !== false &&
             $userIds['gid']
         )
     );
-    chownPath($homeDir, $userIds['uid'].':'.$userIds['gid']);
+    pmssUserPermissionsOwnerApply($homeDir, $homeDir, $userIds['uid'].':'.$userIds['gid']);
     pmssUserLog(
         $thisUser,
         sprintf(
@@ -107,17 +77,6 @@ if ($homeOwner !== false && $homeGroup !== false &&
         )
     );
 }
-pmssUserPermissionsRun(sprintf(
-    'find %s -path %s -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
-    escapeshellarg('/home/'.$thisUser),
-    escapeshellarg("/home/{$thisUser}/.local")
-));
-
-// Existing-home residue of the #781 skel-mode regression: served ~/www content was
-// copied carrying the exec bit. Strip exec from ~/www FILES (dirs are already normalised
-// to 0750 by the walk above). Bounded to ~/www so large payload trees under ~/data are
-// untouched; the explicit chmodItems below re-apply any file that legitimately keeps exec.
-pmssUserPermissionsRun(sprintf('find %s -type f -links 1 -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
 
 // Ensure ~/.bin and ~/bin exist with safe permissions and ownership.
 foreach ([
@@ -181,7 +140,7 @@ $trafficPaths = pmssTrafficDataPaths($thisUser);
 
 $chownItems = [
     ["/home/{$thisUser}/.lighttpd/.htpasswd", "{$thisUser}:{$thisUser}"],
-    ["/home/{$thisUser}/.lighttpd/", "{$thisUser}:{$thisUser}", true],
+    ["/home/{$thisUser}/.lighttpd", "{$thisUser}:{$thisUser}", true],
     // NOTE: Avoid blanket chown -R on the whole home; exclude known root-owned files/dirs first.
     // The remaining tree is handled by a targeted find below.
     ["/home/{$thisUser}/.quota", "root:{$thisUser}"],
@@ -225,16 +184,6 @@ foreach (['.billingServiceId', '.billingId', '.billingClientId'] as $billingName
 // Ensure traffic files are mutable while ownership and permissions are repaired.
 foreach ($trafficFiles as $trafficFile) {
     pmssTrafficSetImmutable($trafficFile, false);
-}
-
-foreach ($chmodItems as $item) {
-    $path = $item[0];
-    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
-        continue;
-    }
-    $perm = $item[1];
-    $recursive = isset($item[2]) ? (bool)$item[2] : false;
-    chmodPath($path, $perm, $recursive);
 }
 
 // Targeted chown of the home tree excluding known root-owned paths, app-managed
@@ -299,15 +248,43 @@ foreach ($chownItems as $item) {
     }
     $owner = $item[1];
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
-    chownPath($path, $owner, $recursive);
+    $predicate = $recursive ? pmssFindOwnerMismatchPredicate($owner) : '';
+    pmssUserPermissionsOwnerApply($homeDir, $path, $owner, $predicate, $predicate !== '');
+}
+
+// Modes are set after ownership so account-owned entries already belong to the
+// account that changes them; directories it does not own are left out. Directories
+// first; the explicit items below override.
+pmssUserPermissionsAccountRun($thisUser, $homeDir, [$homeDir], sprintf(
+    'find %s \( -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
+    escapeshellarg('/home/'.$thisUser),
+    escapeshellarg("/home/{$thisUser}/.local"),
+    $accountUid
+));
+
+// Existing-home residue of the #781 skel-mode regression: served ~/www content was
+// copied carrying the exec bit. Strip exec from ~/www FILES (dirs are already normalised
+// to 0750 by the walk above). Bounded to ~/www so large payload trees under ~/data are
+// untouched; the explicit chmodItems below re-apply any file that legitimately keeps exec.
+$wwwDir = "/home/{$thisUser}/www";
+pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf('find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +', escapeshellarg($wwwDir), $accountUid, $accountUid));
+
+foreach ($chmodItems as $item) {
+    $path = $item[0];
+    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
+        continue;
+    }
+    $perm = $item[1];
+    $recursive = isset($item[2]) ? (bool)$item[2] : false;
+    pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive);
+}
+
+if (file_exists("/home/{$thisUser}/.ssh")) {
+    pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, "/home/{$thisUser}/.ssh", 0750);
 }
 
 foreach ($trafficFiles as $trafficFile) {
     pmssTrafficSetImmutable($trafficFile, true);
-}
-
-if (file_exists("/home/{$thisUser}/.ssh")) {
-    chmodPath("/home/{$thisUser}/.ssh", 0750);
 }
 
 exit(pmssUserPermissionsResult());
