@@ -161,14 +161,17 @@ function pmssQuotaCommandRun(string $command, ?callable $runner = null): array
     return ['ok' => $rc === 0, 'rc' => $rc, 'output' => $stdout.$stderr];
 }
 
-/** Warn when /home declares more quota types than the kernel has enabled. */
-function pmssQuotaHomeEnforcementWarn(?callable $runner = null, ?callable $logger = null, ?string $fstabPath = null): void
+/**
+ * Count the quota types /home declares in fstab and, when any, how many the kernel has on.
+ *
+ * @return ?array{declared:int,enabled:int} null when fstab or its /home entry cannot be read
+ */
+function pmssQuotaHomeEnforcementCounts(?callable $runner, callable $log, ?string $fstabPath, string $context): ?array
 {
-    $log = $logger ?: 'logMessage';
-    $lines = pmssFstabLinesRead($fstabPath ?? '/etc/fstab', $log, 'quota enforcement verification.');
+    $lines = pmssFstabLinesRead($fstabPath ?? '/etc/fstab', $log, $context);
     $entry = $lines === null ? null : pmssFstabMountEntryRead($lines, '/home');
     if ($entry === null) {
-        return;
+        return null;
     }
 
     // Each type counts once even if both journaled and plain options appear.
@@ -180,14 +183,57 @@ function pmssQuotaHomeEnforcementWarn(?callable $runner = null, ?callable $logge
     }
     $declared = (int) $user + (int) $group;
     if ($declared === 0) {
-        return;
+        return ['declared' => 0, 'enabled' => 0];
     }
 
     // quotaon -p returns the number of enabled types, not a success status.
-    $enabled = pmssQuotaCommandRun('quotaon -p /home', $runner)['rc'];
+    return ['declared' => $declared, 'enabled' => pmssQuotaCommandRun('quotaon -p /home', $runner)['rc']];
+}
+
+/** Stamp quotaFix writes after a completed recalculation with enforcement verified on. */
+function pmssQuotaRecalculationStampPath(): string
+{
+    return pmssStateDir().'/quota-recalculation.complete';
+}
+
+/**
+ * Whether a routine update needs quotaFix's quotaoff/quotacheck/quotaon cycle (ADR 0140).
+ *
+ * quotacheck writes back the limits it read when it started, so any limit set while it runs
+ * is lost. The cycle runs when the last one did not complete (no stamp: killed, failed, never
+ * run) or /home has fewer quota types on than fstab declares. An unreadable fstab or a /home
+ * declaring none keeps the previous always-run behaviour. Call it before the update remounts
+ * /home: a remount turns journaled quota back on without recounting usage.
+ */
+function pmssQuotaHomeRecalculationNeeded(?callable $runner = null, ?callable $logger = null, ?string $fstabPath = null, ?string $stampPath = null): bool
+{
+    if (!is_file($stampPath ?? pmssQuotaRecalculationStampPath())) {
+        return true;
+    }
+    $counts = pmssQuotaHomeEnforcementCounts($runner, $logger ?: 'logMessage', $fstabPath, 'quota recalculation check.');
+
+    return $counts === null || $counts['declared'] === 0 || $counts['enabled'] < $counts['declared'];
+}
+
+/**
+ * Warn when /home declares more quota types than the kernel has enabled.
+ *
+ * @return ?array{declared:int,enabled:int}
+ */
+function pmssQuotaHomeEnforcementWarn(?callable $runner = null, ?callable $logger = null, ?string $fstabPath = null): ?array
+{
+    $log = $logger ?: 'logMessage';
+    $counts = pmssQuotaHomeEnforcementCounts($runner, $log, $fstabPath, 'quota enforcement verification.');
+    if ($counts === null || $counts['declared'] === 0) {
+        return $counts;
+    }
+
+    ['declared' => $declared, 'enabled' => $enabled] = $counts;
     if ($enabled < $declared) {
         $log('[quotaFix] WARNING: /home declares '.$declared.' quota type(s) in fstab but '.$enabled.' are on');
     }
+
+    return $counts;
 }
 
 /**

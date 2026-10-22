@@ -449,6 +449,9 @@ $GLOBALS['PMSS_PACKAGES_READY'] = true;
 putenv('PMSS_PACKAGE_PHASE=complete');
 pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
 
+// Decide before the quota-mount step: its remount turns journaled quota back on
+// without recounting usage (ADR 0140).
+$pmssQuotaRecalculationNeeded = pmssQuotaHomeRecalculationNeeded(null, 'logmsg');
 pmssRunProfiledCallableBatch([
     ['Migrating legacy localnet config path', 'pmssMigrateLegacyLocalnet'],
     ['Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED],
@@ -458,7 +461,11 @@ pmssRunProfiledCallableBatch([
     ['Applying hostname configuration', 'pmssApplyHostnameConfig', ['logmsg']],
     ['Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']],
 ]);
-runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
+if ($pmssQuotaRecalculationNeeded) {
+    runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
+} else {
+    logmsg('[SKIP] Recalculating quota integrity: the last recalculation completed and quota is on for every type /home declares (ADR 0140)');
+}
 pmssRunProfiledCallableBatch([
     ['Applying boot defaults', 'pmssEnsureBootDefaults', ['logmsg']],
     ['Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']],

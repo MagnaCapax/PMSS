@@ -21,6 +21,10 @@
  *   5. Re-enable quotas (quotaon -av)
  *   6. Report final state for comparison
  *
+ * The completion stamp (pmssQuotaRecalculationStampPath) is removed before quotaoff
+ * and written only after a clean run with every declared /home quota type on, so a
+ * killed or failed run makes the next update recalculate again (ADR 0140).
+ *
  * Exit codes:
  *   0 - Success (quota recalculation completed)
  *   1 - Failure (not root or quota commands failed)
@@ -40,6 +44,11 @@ requireRoot();
 $exitCode = 0;
 
 logMessage('[quotaFix] Starting quota integrity check');
+$quotaFixStamp = pmssQuotaRecalculationStampPath();
+if (file_exists($quotaFixStamp) && !@unlink($quotaFixStamp)) {
+    logMessage('[quotaFix] WARNING: cannot remove completion stamp '.$quotaFixStamp);
+    $exitCode = 1;
+}
 
 // 1. Report current status before any changes
 pmssQuotaFixRunCommand('[quotaFix] Current quota state:', 'repquota -as', false, $exitCode);
@@ -82,7 +91,13 @@ pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, $ex
 // whether enforcement is on or off. quotaon -ap reads the kernel's actual
 // state, not just our intent.
 pmssQuotaFixRunCommand('[quotaFix] Verifying quota enforcement state:', 'quotaon -ap', false, $exitCode, true);
-pmssQuotaHomeEnforcementWarn();
+$quotaCounts = pmssQuotaHomeEnforcementWarn();
+if ($exitCode === 0 && $quotaCounts !== null && $quotaCounts['declared'] > 0 && $quotaCounts['enabled'] >= $quotaCounts['declared']) {
+    $stampDir = dirname($quotaFixStamp);
+    if ((!is_dir($stampDir) && !@mkdir($stampDir, 0755, true)) || @file_put_contents($quotaFixStamp, gmdate('c').PHP_EOL) === false) {
+        logMessage('[quotaFix] WARNING: cannot write completion stamp '.$quotaFixStamp);
+    }
+}
 
 // 7. Report final status for visual comparison
 pmssQuotaFixRunCommand('[quotaFix] Final quota state:', 'repquota -as', false, $exitCode);

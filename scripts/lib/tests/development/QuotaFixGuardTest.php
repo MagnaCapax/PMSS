@@ -120,6 +120,78 @@ class QuotaFixGuardTest extends TestCase
         }
     }
 
+    public function testHomeQuotaRecalculationNeededUnlessLastRunCompletedAndEveryTypeIsOn(): void
+    {
+        $cases = [
+            ['usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1', 2, true, false],
+            ['usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1', 2, false, true],
+            ['usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1', 1, true, true],
+            ['usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1', 0, true, true],
+            ['usrquota', 1, true, false],
+            ['defaults', 0, true, true],
+        ];
+        foreach ($cases as [$options, $enabled, $stamped, $expected]) {
+            ['dir' => $dir, 'fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-recalc-', "UUID=abc /srv ext4 usrquota 0 0\nUUID=def /home ext4 {$options} 0 0\n");
+            $stamp = $dir.'/quota-recalculation.complete';
+            if ($stamped) {
+                file_put_contents($stamp, "2026-10-22T00:00:00+00:00\n");
+            }
+            $commands = [];
+            $logs = [];
+            $needed = \pmssQuotaHomeRecalculationNeeded(
+                static function (string $command) use ($enabled, &$commands): array {
+                    $commands[] = $command;
+                    return ['rc' => $enabled, 'stdout' => '', 'stderr' => ''];
+                },
+                $this->pmssMakeArrayLogger($logs),
+                $fstab,
+                $stamp
+            );
+            $label = $options.' with '.$enabled.' on, stamp '.($stamped ? 'present' : 'missing');
+            $this->assertSame($expected, $needed, $label);
+            $this->assertSame(!$stamped || $options === 'defaults' ? [] : ['quotaon -p /home'], $commands, $label);
+            $this->assertSame([], $logs, $label);
+        }
+
+        ['dir' => $dir] = $this->pmssMountFixtureCreate('pmss-quota-recalc-', '');
+        file_put_contents($dir.'/stamp', "x\n");
+        $logs = [];
+        $this->assertTrue(\pmssQuotaHomeRecalculationNeeded(static function (): array {
+            return ['rc' => 2, 'stdout' => '', 'stderr' => ''];
+        }, $this->pmssMakeArrayLogger($logs), $dir.'/missing/fstab', $dir.'/stamp'));
+        $this->assertSame(1, count($logs));
+    }
+
+    public function testUpdateDecidesRecalculationBeforeRemountAndQuotaFixStampsOnlyAfterVerify(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
+            'ordered' => [[
+                'needles' => [
+                    "\$pmssQuotaRecalculationNeeded = pmssQuotaHomeRecalculationNeeded(null, 'logmsg');",
+                    "['Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']],",
+                    "if (\$pmssQuotaRecalculationNeeded) {",
+                    "runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');",
+                ],
+                'missingPrefix' => 'update-step2 missing quota recalculation gate: ',
+                'orderPrefix' => 'update-step2 quota recalculation gate order changed near: ',
+            ]],
+        ]);
+        $this->pmssAssertRepoFileContract('scripts/util/quotaFix.php', [
+            'ordered' => [[
+                'needles' => [
+                    "\$quotaFixStamp = pmssQuotaRecalculationStampPath();",
+                    "!@unlink(\$quotaFixStamp)",
+                    "'quotaoff -av'",
+                    "'quotaon -av'",
+                    "\$quotaCounts = pmssQuotaHomeEnforcementWarn();",
+                    "@file_put_contents(\$quotaFixStamp",
+                ],
+                'missingPrefix' => 'quotaFix missing completion stamp guard: ',
+                'orderPrefix' => 'quotaFix completion stamp order changed near: ',
+            ]],
+        ]);
+    }
+
     public function testQuotaFixSkipsQuotacheckWhenQuotaoffFails(): void
     {
         $this->pmssAssertRepoFileContract('scripts/util/quotaFix.php', [
