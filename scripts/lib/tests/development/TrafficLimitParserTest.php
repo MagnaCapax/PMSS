@@ -51,6 +51,20 @@ PHP,
         $this->assertTrue($result['operatorWriterLoaded']);
     }
 
+    public function testCliTargetModesWriteTheDisplayFileInTheAccountHome(): void
+    {
+        // Runs the real resolver in a clean process: other tests stub this function.
+        $script = sprintf(
+            'require_once %s; echo json_encode(array_keys(pmssTrafficLimitCliTargetModes("alice", "/srv/home/alice")));',
+            var_export($this->pmssRepoPath('scripts/lib/user/trafficLimit.php'), true)
+        );
+        $keys = $this->pmssRunInlinePhpJson($script);
+
+        $this->assertSame(2, count($keys));
+        $this->assertSame('/srv/home/alice/.trafficLimit', $keys[1]);
+        $this->assertSame('/trafficLimits/alice', substr($keys[0], -strlen('/trafficLimits/alice')));
+    }
+
     public function testRejectsInvalidGiBValues(): void
     {
         $cases = [

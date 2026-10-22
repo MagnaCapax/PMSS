@@ -4,10 +4,14 @@
  */
 
 if (!function_exists('pmssTrafficLimitCliTargetModes')) {
-    /** @return array<string,int> */
+    /**
+     * $homeDir is the account's own home directory (as in the bonus-traffic resolver), not the /home base.
+     *
+     * @return array<string,int>
+     */
     function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array
     {
-        return [pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName) => 0600, pmssUserHomeFilePath($userName, '.trafficLimit', $homeDir) => 0664];
+        return [pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName) => 0600, $homeDir.'/.trafficLimit' => 0664];
     }
 }
 
