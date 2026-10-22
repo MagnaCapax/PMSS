@@ -69,12 +69,9 @@ function pmssHermesProviderKeyRefresh(array $paths): void
     $credentials = pmssAgentVirsilipasCredentials($paths['home']);
     $file = $paths['base'].'/.env';
     $receipt = $paths['base'].'/pmss-provider-endpoint';
-    clearstatcache(true, $file);
     if ($credentials === null || !is_file($receipt) || is_link($receipt)
         || trim((string) @file_get_contents($receipt)) !== $credentials['endpoint']
-        || !is_file($file) || is_link($file)
-        || fileowner($file) !== posix_geteuid() || (fileperms($file) & 0077) !== 0
-        || filesize($file) > 65536) return;
+        || !pmssAgentPrivateFileIsSafe($file, 65536)) return;
     $old = (string) file_get_contents($file);
     $new = pmssHermesKeyReconcile($old, $credentials['key']);
     if ($new === $old) return;

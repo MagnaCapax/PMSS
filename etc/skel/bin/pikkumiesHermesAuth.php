@@ -17,9 +17,7 @@ function pmssPikkumiesHermesPaths(string $home): array
 function pmssPikkumiesHermesCredentials(array $paths): ?array
 {
     $file = $paths['credentials'];
-    clearstatcache(true, $file); // chmod() does not clear PHP's stat cache before 8.3
-    if (!is_file($file) || is_link($file) || fileowner($file) !== posix_geteuid()
-        || (fileperms($file) & 0077) !== 0 || filesize($file) > 256) return null;
+    if (!pmssAgentPrivateFileIsSafe($file, 256)) return null;
     $raw = (string) @file_get_contents($file);
     if (!preg_match('/^HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=([a-f0-9]{64})\nHERMES_DASHBOARD_BASIC_AUTH_SECRET=([a-f0-9]{64})\n$/D', $raw, $match)) return null;
     return array($match[1], $match[2]);
@@ -48,49 +46,29 @@ function pmssPikkumiesHermesGate(int $port): bool
     return preg_match('/^HTTP\/1\.[01] 401(?: |$)/', $http_response_header[0] ?? '') === 1;
 }
 
-/** ss names the actual listener, which may be a child of the Pikkumies wrapper. */
-function pmssPikkumiesHermesListenerPid(int $port): ?int
-{
-    $ss = pmssAgentCommandPath('ss');
-    if ($ss === '') return null;
-    $rows = array();
-    exec(escapeshellarg($ss).' -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
-    if ($rc !== 0) return null;
-    foreach ($rows as $row) {
-        if (!preg_match('/pid=([1-9][0-9]*),/', $row, $match)) continue;
-        if (@fileowner('/proc/'.$match[1]) === posix_geteuid()) return (int) $match[1];
-    }
-    return null;
-}
-
-function pmssPikkumiesHermesListenerOwned(int $port): bool
-{
-    return pmssPikkumiesHermesListenerPid($port) !== null;
-}
-
 /** A stale dashboard is stopped only when its command line identifies it. */
 function pmssPikkumiesHermesStopUngated(int $port): bool
 {
-    $pid = pmssPikkumiesHermesListenerPid($port);
+    $pid = pmssAgentTcpListenerPid($port);
     if ($pid === null) return false;
     $cmd = @file_get_contents('/proc/'.$pid.'/cmdline');
     if (!is_string($cmd) || strpos($cmd, 'dashboard') === false
         || (strpos($cmd, 'hermes') === false && strpos($cmd, 'pikkumies') === false)) return false;
     if (!@posix_kill($pid, SIGTERM)) return false;
     for ($i = 0; $i < 20; ++$i) {
-        if (pmssPikkumiesHermesListenerPid($port) !== $pid) return true;
+        if (pmssAgentTcpListenerPid($port) !== $pid) return true;
         usleep(100000);
     }
     $still = @file_get_contents('/proc/'.$pid.'/cmdline');
-    if (pmssPikkumiesHermesListenerPid($port) === $pid && is_string($still)
+    if (pmssAgentTcpListenerPid($port) === $pid && is_string($still)
         && strpos($still, 'dashboard') !== false) @posix_kill($pid, SIGKILL);
-    return pmssPikkumiesHermesListenerPid($port) !== $pid;
+    return pmssAgentTcpListenerPid($port) !== $pid;
 }
 
 function pmssPikkumiesHermesReady(array $paths): bool
 {
     $port = pmssAgentReservedPort($paths['port']);
-    return $port !== null && pmssPikkumiesHermesListenerOwned($port)
+    return $port !== null && pmssAgentTcpListenerPid($port) !== null
         && pmssPikkumiesHermesGate($port) && pmssHermesRelayReady($paths['socket']);
 }
 
@@ -119,7 +97,7 @@ function pmssPikkumiesHermesStop(array $paths): void
         }
     }
     $port = pmssAgentReservedPort($paths['port']);
-    if ($port !== null && pmssPikkumiesHermesListenerOwned($port)) pmssPikkumiesHermesStopUngated($port);
+    if ($port !== null && pmssAgentTcpListenerPid($port) !== null) pmssPikkumiesHermesStopUngated($port);
 }
 
 /** The account's cron tick removes any owned listener that lost its login gate. */
@@ -130,7 +108,7 @@ function pmssPikkumiesHermesEnsure(array $paths): bool
         pmssPikkumiesHermesStop($paths);
         return false;
     }
-    if (!pmssPikkumiesHermesListenerOwned($port)) {
+    if (pmssAgentTcpListenerPid($port) === null) {
         pmssHermesRelayStop($paths['relayPid'], $paths['socket']);
         return true;
     }

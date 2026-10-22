@@ -4,16 +4,7 @@
 function pmssHermesRelayListenerOwned(int $port, ?callable $owner = null): bool
 {
     if ($owner !== null) return $owner($port) === true;
-    $ss = pmssAgentCommandPath('ss');
-    if ($ss === '') return false;
-    $rows = array();
-    exec(escapeshellarg($ss).' -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
-    if ($rc !== 0) return false;
-    foreach ($rows as $row) {
-        if (!preg_match('/pid=([1-9][0-9]*),/', $row, $match)) continue;
-        if (@fileowner('/proc/'.$match[1]) === posix_geteuid()) return true;
-    }
-    return false;
+    return pmssAgentTcpListenerPid($port) !== null;
 }
 
 /** Verify the destination before accepting any bytes from the Unix peer. */

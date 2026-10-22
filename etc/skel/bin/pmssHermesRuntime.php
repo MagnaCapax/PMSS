@@ -17,9 +17,7 @@ function pmssHermesPaths(string $home): array
 function pmssHermesEnv(array $paths, string $publicUrl): array
 {
     $file = $paths['env'];
-    clearstatcache(true, $file);
-    if (!is_file($file) || is_link($file) || fileowner($file) !== posix_geteuid()
-        || (fileperms($file) & 0077) !== 0 || filesize($file) > 2048) throw new RuntimeException('Dashboard credential file is absent or insecure');
+    if (!pmssAgentPrivateFileIsSafe($file, 2048)) throw new RuntimeException('Dashboard credential file is absent or insecure');
     $raw = (string) file_get_contents($file);
     if (!preg_match('/^HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=([a-f0-9]{64})\nHERMES_DASHBOARD_BASIC_AUTH_SECRET=([a-f0-9]{64})\n?$/D', $raw, $m))
         throw new RuntimeException('Dashboard credential file is invalid');
@@ -79,11 +77,7 @@ function pmssHermesBackendReady(array $paths, int $port): bool
 {
     $pid = pmssHermesRunningPid($paths);
     if ($pid === null) return false;
-    $rows = array();
-    $ss = pmssAgentCommandPath('ss');
-    if ($ss === '') return false;
-    exec(escapeshellarg($ss).' -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
-    return $rc === 0 && strpos(implode("\n", $rows), 'pid='.$pid.',') !== false
+    return strpos(implode("\n", pmssAgentTcpListenerRows($port)), 'pid='.$pid.',') !== false
         && pmssHermesGateProbe($port);
 }
 

@@ -48,7 +48,7 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
             || pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port, $paths['credentials']);
     }
     // A foreign or ungated listener is never reused.
-    if (pmssPikkumiesHermesListenerOwned($port)) {
+    if (pmssAgentTcpListenerPid($port) !== null) {
         pmssPikkumiesHermesStopUngated($port);
         return false;
     }
@@ -61,7 +61,7 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
     // A cold Hermes dashboard start took about 20 s to listen on an idle test seedbox (2026-10-21); the Pikkumies
     // start, which waited 10 s, stopped it before it bound. Wait up to 60 s (the account php.ini allows 90).
     for ($i = 0; $i < 600; ++$i) {
-        if (pmssPikkumiesHermesListenerOwned($port) && pmssPikkumiesHermesGate($port)) {
+        if (pmssAgentTcpListenerPid($port) !== null && pmssPikkumiesHermesGate($port)) {
             if (pmssHermesRelayStart($paths['home'], $paths['relayPid'], $paths['socket'], $port, $paths['credentials'])) return true;
             break;
         }

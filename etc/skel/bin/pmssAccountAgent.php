@@ -28,13 +28,39 @@ function pmssAgentHome(): string
     return rtrim($home, '/');
 }
 
+/** Check private account files without changing caller-owned parsing or read warnings. */
+function pmssAgentPrivateFileIsSafe(string $file, int $maxBytes): bool
+{
+    clearstatcache(true, $file); // chmod() leaves stale stat data before PHP 8.3.
+    return is_file($file) && !is_link($file) && fileowner($file) === posix_geteuid()
+        && (fileperms($file) & 0077) === 0 && filesize($file) <= $maxBytes;
+}
+
+/** Query listeners once; callers retain their own PID matching policy. */
+function pmssAgentTcpListenerRows(int $port): array
+{
+    $ss = pmssAgentCommandPath('ss');
+    if ($ss === '') return array();
+    $rows = array();
+    exec(escapeshellarg($ss).' -H -ltnp '.escapeshellarg('sport = :'.$port).' 2>/dev/null', $rows, $rc);
+    return $rc === 0 ? $rows : array();
+}
+
+/** ss names the actual listener, which may be a child of an account wrapper. */
+function pmssAgentTcpListenerPid(int $port): ?int
+{
+    foreach (pmssAgentTcpListenerRows($port) as $row) {
+        if (!preg_match('/pid=([1-9][0-9]*),/', $row, $match)) continue;
+        if (@fileowner('/proc/'.$match[1]) === posix_geteuid()) return (int) $match[1];
+    }
+    return null;
+}
+
 /** Copy OpenClaw's credential gate: no links, foreign ownership or loose mode. */
 function pmssAgentVirsilipasCredentials(string $home): ?array
 {
     $file = $home.'/.virsilipasKey';
-    clearstatcache(true, $file);
-    if (!is_file($file) || is_link($file) || fileowner($file) !== posix_geteuid()
-        || (fileperms($file) & 0077) !== 0 || filesize($file) > 4096) return null;
+    if (!pmssAgentPrivateFileIsSafe($file, 4096)) return null;
     $settings = @parse_ini_string((string) file_get_contents($file), false, INI_SCANNER_RAW);
     $key = is_array($settings) ? ($settings['key'] ?? '') : '';
     $endpoint = is_array($settings) ? ($settings['endpoint'] ?? '') : '';

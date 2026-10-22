@@ -7,6 +7,19 @@ require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssHermesCli.php';
 /** Installer decisions are tested without network or account writes. */
 final class HermesInstallerTest extends TestCase
 {
+    public function testSharedPrivateFileGateKeepsBoundsAndFreshModes(): void
+    {
+        $file = $this->pmssWriteFile($this->pmssMakeTempDir('agent-private').'/value', '1234');
+        foreach ([[4, 0600, true], [3, 0600, false], [4, 0644, false], [4, 0600, true]] as $case) {
+            chmod($file, $case[1]);
+            $this->assertSame($case[2], \pmssAgentPrivateFileIsSafe($file, $case[0]));
+        }
+        $this->assertFalse(\pmssAgentPrivateFileIsSafe($file.'.missing', 4));
+        $this->assertFalse(\pmssAgentPrivateFileIsSafe(dirname($file), 4096));
+        symlink($file, $file.'.link');
+        $this->assertFalse(\pmssAgentPrivateFileIsSafe($file.'.link', 4));
+    }
+
     public function testPinnedReleaseAndHashesMustAllMatch(): void
     {
         $this->assertSame('v2026.9.24', \HERMES_TAG);
