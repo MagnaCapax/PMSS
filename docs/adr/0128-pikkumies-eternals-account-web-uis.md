@@ -8,6 +8,10 @@ Category: architecture
 Accepted. Ports A and B are gated by the host marker. Port C has a separate
 account install gate.
 
+Partly superseded by ADR 0150 (2026-10-22): the implicit per-account
+certificate is withdrawn. The UIs must not request a public certificate or wait
+for one; they move to an origin on the server's existing host certificate.
+
 ## Context
 
 Pikkumies keeps account-owned conversations alive through its per-minute cron
