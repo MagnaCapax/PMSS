@@ -123,7 +123,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <div class="configure-actions"><button type="button" onclick="pmssPikkumiesToggle('<?= $pmssPikkumiesState['off'] ? 'on' : 'off' ?>')"><?= $pmssPikkumiesState['off'] ? 'Turn on Pikkumies' : 'Turn off Pikkumies' ?></button>
 <?php if ($pmssPikkumiesState['visible']): ?>
 <button type="button" onclick="pmssPikkumiesTabOpen()">Open Pikkumies</button>
-<?php if ($pmssPikkumiesState['mode'] === 'power-user'): ?><a href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a><button type="button" onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button><input type="password" id="pmss-pikkumies-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><output id="pmss-pikkumies-hermes-password" hidden></output><?php endif; ?>
+<?php if ($pmssPikkumiesState['mode'] === 'power-user'): ?><a href="pikkumiesOpen.php?ui=hermes" target="_blank" rel="noopener">Open full Hermes</a><button type="button" onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button><span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span><input type="password" id="pmss-pikkumies-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><output id="pmss-pikkumies-hermes-password" hidden></output><?php endif; ?>
 <?php endif; ?></div>
 <p>Pikkumies windows, called Eternals, keep running and pick up their conversation after a restart, until you close them.</p>
 <p>Interface</p><div class="pmss-pikkumies-segments" role="group" aria-label="Interface">
@@ -143,7 +143,7 @@ if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrent
 <option value="vanilla-agentboard"<?= $pmssHermesChoice === 'vanilla-agentboard' ? ' selected' : '' ?>>Agentboard</option>
 <?php if ($pmssPikkumiesState['visible']): ?><option value="agentboard-pikkumies"<?= $pmssHermesChoice === 'agentboard-pikkumies' ? ' selected' : '' ?>>Agentboard Pikkumies</option><?php endif; ?></select>
 <a href="pikkumiesOpen.php?ui=<?= pmssCustomerHtmlAttr($pmssHermesChoice) ?>" target="_blank" rel="noopener">Open</a>
-<button type="button" onclick="pmssHermesShowLogin()">Show Hermes password</button>
+<button type="button" onclick="pmssHermesShowLogin()">Show Hermes password</button><span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span>
 <input type="password" id="pmss-hermes-account-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password">
 <output id="pmss-hermes-password" hidden></output><button type="button" id="pmss-hermes-copy" hidden onclick="navigator.clipboard.writeText(document.getElementById('pmss-hermes-password').textContent)">Copy password</button></div>
 <p>Only one Hermes window can be open. Opening this one closes the other.</p>

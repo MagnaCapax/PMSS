@@ -95,6 +95,8 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertStringContainsString('Your network may be blocking Pikkumies.', $index);
         $this->assertStringContainsString('Power user (opens full Hermes in its own tab)', $configure);
         $this->assertStringContainsString('Signing in to one Hermes window signs you out of the other.', $configure);
+        // Both Hermes sign-in forms ask for a user name too: the account name, shown next to each password reveal.
+        $this->assertSame(2, substr_count($configure, 'password</button><span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span>'));
         $this->assertStringContainsString('pmssPikkumiesOpenStatusEmit(true, $certificateState', $launcher);
         foreach (array('Retrying in N min', 'Turn it on to use it', 'Your browser cannot reach Pikkumies') as $removed) {
             $this->assertFalse(strpos($index.$welcome.$configure.$launcher, $removed) !== false);
