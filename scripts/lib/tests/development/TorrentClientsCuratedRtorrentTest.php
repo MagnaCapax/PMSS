@@ -150,7 +150,13 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             chmod($store.'/rtorrent/'.$row['version'].'/rtorrent', 0755);
             $rows[] = $row;
         }
-        $this->assertTrue(\pmssTorrentClientsProjectionWrite($rows, $projection));
+        $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
+        putenv('PMSS_TORRENT_CLIENTS_STORE_ROOT='.$store);
+        try {
+            $this->assertTrue(\pmssTorrentClientsProjectionWrite($rows, $projection));
+        } finally {
+            putenv($oldRoot === false ? 'PMSS_TORRENT_CLIENTS_STORE_ROOT' : 'PMSS_TORRENT_CLIENTS_STORE_ROOT='.$oldRoot);
+        }
         $home = $root.'/t';
         mkdir($home.'/bin/rtorrent', 0755, true);
         symlink($store.'/rtorrent/0.16.25', $home.'/bin/rtorrent/default');

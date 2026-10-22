@@ -1,4 +1,4 @@
-# ADR 0140: rTorrent 0.16 family launch and rc guard
+# ADR 0141: rTorrent 0.16 family launch and rc guard
 
 Date: 2026-10-22
 Category: architecture
