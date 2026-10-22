@@ -17,9 +17,8 @@ function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPa
         return null;
     }
 
-    foreach ($lines as $line) {
-        $columns = pmssConfigLineColumns((string) $line, 5, []);
-        if ($columns === [] || ($columns[1] ?? '') !== 'LISTEN') {
+    foreach (pmssConfigRows($lines, 5, []) as $columns) {
+        if (($columns[1] ?? '') !== 'LISTEN') {
             continue;
         }
 

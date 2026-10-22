@@ -28,9 +28,8 @@ function pmssQuotaSnapshotMountDeclaresJournaledQuota(string $mountPath, string 
 function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
 {
     $rows = [];
-    foreach ($lines as $line) {
-        $tokens = pmssConfigLineColumns((string) $line, 2, []);
-        if ($tokens === [] || preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
+    foreach (pmssConfigRows($lines, 2, []) as $tokens) {
+        if (preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
             continue;
         }
 

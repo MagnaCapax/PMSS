@@ -54,7 +54,7 @@ function pmssLiveStatsLastLine(string $path): ?string
     fclose($h);
     // A line still being appended has no newline yet: ignore it rather than parse half a number.
     if ($tail !== '' && substr($tail, -1) !== "\n") $tail = ($pos = strrpos($tail, "\n")) === false ? '' : substr($tail, 0, $pos + 1);
-    $lines = array_values(array_filter(explode("\n", $tail), 'strlen'));
+    $lines = pmssNonEmptyStrings(explode("\n", $tail));
     return $lines === [] ? null : end($lines);
 }
 

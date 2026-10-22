@@ -2,14 +2,15 @@
 /** Root-owned Pikkumies preinstall markers: the path a marker is written to, and its cleanup for account lifecycle flows. */
 
 require_once __DIR__.'/identity.php';
+require_once dirname(__DIR__).'/pathSafety.php';
 
 /** Clear a validated account's marker without traversing a link or directory. */
 function pmssPikkumiesPreinstallStateClear(
     string $username,
     string $stateDir = '/var/lib/pmss/pikkumies-preinstall'
 ): bool {
-    if (!pmssValidateUsername($username) || is_link($stateDir)
-        || (file_exists($stateDir) && !is_dir($stateDir))) {
+    // Check the whole directory chain before constructing a destructive leaf path.
+    if (!pmssValidateUsername($username) || is_link($stateDir) || !pmssPathTargetIsSafe($stateDir, true)) {
         return false;
     }
 
@@ -32,7 +33,7 @@ function pmssPikkumiesPreinstallStateClear(
  */
 function pmssPikkumiesAskStateClear(string $username, string $stateDir = '/var/lib/pmss/pikkumies-ask'): bool
 {
-    if (!pmssValidateUsername($username) || is_link($stateDir) || (file_exists($stateDir) && !is_dir($stateDir))) {
+    if (!pmssValidateUsername($username) || is_link($stateDir) || !pmssPathTargetIsSafe($stateDir, true)) {
         return false;
     }
     $ok = true;
@@ -59,7 +60,7 @@ function pmssPikkumiesPreinstallStateMarkerPath(
     string $username,
     string $stateDir = '/var/lib/pmss/pikkumies-preinstall'
 ): ?string {
-    if (!pmssValidateUsername($username) || is_link($stateDir)) {
+    if (!pmssValidateUsername($username) || is_link($stateDir) || !pmssPathTargetIsSafe($stateDir, true)) {
         return null;
     }
     if (!is_dir($stateDir) && !@mkdir($stateDir, 0700, true) && !is_dir($stateDir)) {

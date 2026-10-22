@@ -74,9 +74,8 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
     if (!is_array($mounts = @file($mountsPath, FILE_IGNORE_NEW_LINES))) {
         return null;
     }
-    foreach ($mounts as $line) {
-        $fields = pmssConfigLineColumns($line, 2, []);
-        if ($fields === [] || str_replace('\\040', ' ', (string) $fields[1]) !== '/home') {
+    foreach (pmssConfigRows($mounts, 2, []) as $fields) {
+        if (str_replace('\\040', ' ', (string) $fields[1]) !== '/home') {
             continue;
         }
         $source = str_replace('\\040', ' ', (string) $fields[0]);

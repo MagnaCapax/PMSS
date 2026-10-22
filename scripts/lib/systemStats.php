@@ -31,11 +31,7 @@ function pmssSystemStatsKbToHuman(int $kb): string
 function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
 {
     $items = [];
-    foreach ($rows as $line) {
-        if (($parts = pmssConfigLineColumns((string) $line, 2, [])) === []) {
-            continue;
-        }
-
+    foreach (pmssConfigRows($rows, 2, []) as $parts) {
         $command = (string) $parts[0];
         $rssKiB = (string) $parts[1];
         if (preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || !pmssSystemStatsCounterIsValid($rssKiB)) {
@@ -119,8 +115,7 @@ function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
     $stats = [];
     if ($raw === null) return $stats;
 
-    foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
-        if (($parts = pmssConfigLineColumns($line, 13, [])) === []) continue;
+    foreach (pmssConfigRows(preg_split('/\r?\n/', $raw) ?: [], 13, []) as $parts) {
         $name = $parts[2];
         $ioTime = $parts[12];
         if (pmssBlockDeviceNameIsDataDevice($name) && pmssSystemStatsCounterIsValid($ioTime)) {

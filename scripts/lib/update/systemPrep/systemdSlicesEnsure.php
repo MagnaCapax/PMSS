@@ -263,10 +263,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         if ($rc !== 0 || $stdout === '') {
             return;
         }
-        foreach (preg_split('/\r?\n/', $stdout) as $line) {
-            if (($parts = pmssConfigLineColumns((string) $line, 1, [])) === []) {
-                continue;
-            }
+        foreach (pmssConfigRows(preg_split('/\r?\n/', $stdout), 1, []) as $parts) {
             $unit = (string) $parts[0];
             if ($unit === 'user-0.slice' || preg_match('/^user-\d+\.slice$/', $unit) !== 1) {
                 continue;

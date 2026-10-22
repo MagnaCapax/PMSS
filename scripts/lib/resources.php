@@ -72,7 +72,7 @@ function pmssResourceLogPayloadFields(int $payloadCount): ?array
 /** Parse one resource cron text record into the accumulator sample schema. */
 function pmssResourceLogLineParse($line)
 {
-    $tokens = preg_split('/\s+/', trim((string) $line)) ?: [];
+    $tokens = pmssConfigLineColumns((string) $line, 0, []);
     $fields = pmssResourceLogPayloadFields(count($tokens) - 2);
     if ($fields === null || ($timestamp = strtotime($tokens[0].' '.$tokens[1])) === false) return false;
 

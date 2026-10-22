@@ -26,9 +26,7 @@ function pmssMountHardeningReadMounts(string $mountsPath, ?bool &$readSucceeded 
     $readSucceeded = false;
     if (!pmssMountHardeningReadablePath($mountsPath) || ($lines = @file($mountsPath, FILE_IGNORE_NEW_LINES)) === false) return $mounts;
     $readSucceeded = true;
-    foreach ($lines as $line) {
-        $columns = pmssConfigLineColumns($line, 4, []);
-        if ($columns === []) continue;
+    foreach (pmssConfigRows($lines, 4, []) as $columns) {
         $mounts[$columns[1]] = ['type' => $columns[2], 'options' => pmssNonEmptyStrings(explode(',', $columns[3]))];
     }
     return $mounts;

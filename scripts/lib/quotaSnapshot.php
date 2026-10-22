@@ -20,7 +20,7 @@ function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0640)
 /** @return array<int,array<int,string>> Parse quota data rows for one filesystem prefix. */
 function pmssQuotaSnapshotDataRows(string $content, string $pathPrefix = '/'): array
 {
-    $rows = []; foreach (preg_split('/\r?\n/', $content) ?: [] as $line) if (($columns = pmssConfigLineColumns($line, 4, [])) !== [] && strpos($columns[0], $pathPrefix) === 0) $rows[] = $columns;
+    $rows = []; foreach (pmssConfigRows(preg_split('/\r?\n/', $content) ?: [], 4, []) as $columns) if (strpos($columns[0], $pathPrefix) === 0) $rows[] = $columns;
     return $rows;
 }
 

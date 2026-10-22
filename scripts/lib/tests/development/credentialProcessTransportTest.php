@@ -138,13 +138,8 @@ class CredentialProcessTransportTest extends TestCase
 
     public function testProcOpenDescriptorsDoNotUsePhp74RedirectType(): void
     {
-        $scripts = dirname(__DIR__, 4).'/scripts';
-        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($scripts));
         $descriptor = '/\[\s*[\'\"]'.'redirect'.'[\'\"]\s*,\s*\d+\s*\]/';
-        foreach ($files as $file) {
-            if (!$file->isFile() || substr($file->getFilename(), -4) !== '.php') {
-                continue;
-            }
+        foreach ($this->pmssRepoFiles('scripts', '/\.php$/D') as $file) {
             $source = file_get_contents($file->getPathname());
             $this->assertFalse(is_string($source) && preg_match($descriptor, $source) === 1, $file->getPathname());
         }

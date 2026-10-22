@@ -25,7 +25,9 @@ function pmssPikkumiesPreinstallExistingRun(
         };
         $run = $ops['run'] ?? static function (string $command): void { exec($command); };
         $homeBase = $ops['homeBase'] ?? '/home';
-        if (is_link($stateDir) || (!is_dir($stateDir) && !mkdir($stateDir, 0700, true) && !is_dir($stateDir))) {
+        // Reject redirected ancestors before mkdir or any marker work, not just a linked leaf.
+        if (is_link($stateDir) || !pmssPathTargetIsSafe($stateDir, true)
+            || (!is_dir($stateDir) && !mkdir($stateDir, 0700, true) && !is_dir($stateDir))) {
             error_log('[WARN] pikkumies preinstall: cannot create '.$stateDir);
             return;
         }

@@ -174,7 +174,7 @@ function pmssReadRegularFileContents(string $path): ?string
     }
 }
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
-function pmssReadRegularFileNonEmptyLines(string $path): array { $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? ''); return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen')); }
+function pmssReadRegularFileNonEmptyLines(string $path): array { $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? ''); return pmssNonEmptyStrings(is_array($lines) ? $lines : []); }
 
 function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
 {

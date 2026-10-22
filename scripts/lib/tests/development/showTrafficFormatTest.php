@@ -49,7 +49,14 @@ class ShowTrafficFormatTest extends TestCase
                 'forbidden' => ["exec(escapeshellarg(__DIR__.'/listUsers.php')"],
             ],
             'scripts/lib/traffic/report.php' => [
-                'required' => ["pmssListManagedUsersResult(\$listUsersScript)", 'pmssShowTrafficRawCounters($data)', "pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"],
+                'required' => ["require_once __DIR__.'/reportModel.php';", "require_once __DIR__.'/reportDisplay.php';"],
+            ],
+            'scripts/lib/traffic/reportModel.php' => [
+                'required' => ['pmssListManagedUsersResult($listUsersScript)', 'pmssShowTrafficRawCounters($data)'],
+            ],
+            'scripts/lib/traffic/reportDisplay.php' => [
+                'required' => ["pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"],
+                'forbidden' => ['pmssReadSerializedArrayFile(', 'pmssTrafficLimitReadGiBFile('],
             ],
         ]);
     }
@@ -128,9 +135,8 @@ class ShowTrafficFormatTest extends TestCase
             'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
             'missingStatsUsers' => ['ghost'],
         ], \pmssShowTrafficJsonPayload([
-            'rows' => [$row], 'dataMonthTotal' => 1536.25, 'dataMonthTotalLocal' => 512.0,
-            'baseUsers' => ['alice' => true, 'bob' => false],
-            'overLimitCount' => 0, 'nearLimitCount' => 1, 'missingStats' => ['ghost'],
+            'rows' => [$row], 'totals' => ['monthMiB' => 1536.25, 'monthLocalMiB' => 512.0, 'monthTiB' => 1536.25 / 1024 / 1024, 'monthLocalTiB' => 512.0 / 1024 / 1024],
+            'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1], 'missingStats' => ['ghost'],
         ]));
     }
 
@@ -165,7 +171,8 @@ class ShowTrafficFormatTest extends TestCase
             'summary' => ['totalUsers' => 3, 'usersWithStats' => 2, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
             'missingStatsUsers' => ['ghost'],
         ], \pmssShowTrafficJsonPayload($report));
-        $this->assertSame(['bob' => true, 'alice' => true, 'ghost' => false], $report['baseUsers']);
+        $this->assertSame(3, $report['summary']['totalUsers']);
+        $this->assertSame(2, $report['summary']['usersWithStats']);
         $duplicateReport = \pmssShowTrafficReportBuild(['alice', 'alice'], $statsDir);
         $this->assertSame(1, \pmssShowTrafficJsonPayload($duplicateReport)['summary']['usersWithStats']);
     }
@@ -173,9 +180,8 @@ class ShowTrafficFormatTest extends TestCase
     public function testTextSummaryMatchesExistingLayouts(): void
     {
         $report = [
-            'missingStats' => ['ghost'], 'dataMonthTotal' => 1048576.0,
-            'dataMonthTotalLocal' => 524288.0, 'baseUsers' => ['alice' => true, 'bob' => true],
-            'overLimitCount' => 1, 'nearLimitCount' => 0,
+            'missingStats' => ['ghost'], 'totals' => ['monthTiB' => 1.0, 'monthLocalTiB' => 0.5],
+            'summary' => ['totalUsers' => 2, 'overLimit' => 1, 'nearLimit' => 0],
         ];
         [, $plain] = $this->pmssCaptureStdout(static function () use ($report): void {
             \pmssShowTrafficPrintSummary($report, false, true);
@@ -186,5 +192,50 @@ class ShowTrafficFormatTest extends TestCase
         });
         $line = str_repeat('-', 72)."\n";
         $this->assertSame($line." Total users: 2  |  Over limit: 1  |  Near limit (>=80%): 0\n Month egress: 1.00TiB  |  Local: 0.50TiB\n Missing stats: 1 users (--show-missing to list)\n".$line, $extended);
+    }
+
+    public function testReportSummaryCharacterizesDuplicatesLocalOnlyAndRejectedPayloads(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-traffic-summary-lock-');
+        $statsDir = $root.'/stats';
+        mkdir($statsDir);
+        mkdir($root.'/alpha');
+        file_put_contents($root.'/alpha/.trafficLimit', "1\n");
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root]);
+        // Preserve raw numeric strings, extra fields, and their original insertion order.
+        $raw = ['week' => '700', 'month' => '900.125', 'day' => 144, 'hour' => '36', '15min' => 15, 'extra' => 'kept'];
+        file_put_contents($statsDir.'/alpha', serialize(['raw' => $raw]));
+        file_put_contents($statsDir.'/zed-localnet', serialize(['raw' => array_replace($raw, ['month' => '100.25'])]));
+        file_put_contents($statsDir.'/broken', 'invalid serialized payload');
+        file_put_contents($statsDir.'/zero', serialize(['raw' => array_replace($raw, ['month' => 0])]));
+        file_put_contents($statsDir.'/bad', serialize(['raw' => array_replace($raw, ['hour' => 'bad'])]));
+        $report = \pmssShowTrafficReportBuild(['zed-localnet', 'broken', 'zero', 'bad', 'alpha', 'alpha', 'absent', 'zed-localnet'], $statsDir);
+        $payload = \pmssShowTrafficJsonPayload($report);
+        $this->assertSame(['monthMiB' => 2000.75, 'monthLocalMiB' => 200.5, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0], $payload['totals']);
+        $this->assertSame(['totalUsers' => 6, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 2, 'missingStats' => 1], $payload['summary']);
+        $this->assertSame(['absent'], $payload['missingStatsUsers']);
+        $this->assertSame($raw, $payload['users'][1]['rawMiB']);
+        $this->assertSame(['week' => '700MiB', 'month' => '900.13MiB', 'day' => '144MiB'], $payload['users'][1]['display']);
+        $this->assertSame(87.9, $payload['users'][1]['pctUsed']);
+        [, $plain] = $this->pmssCaptureStdout(static function () use ($report): void {
+            \pmssShowTrafficPrintSummary($report, false, true);
+        });
+        $this->assertSame("* Month Total: 0.00TiB - Local Total: 0.00TiB\n* Missing traffic stats for 1 users (run trafficStats to rebuild).\n* Missing: absent\n", $plain);
+    }
+
+    public function testReportSummationPrecedesSortingAndKeepsEmptyFloatTotals(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-traffic-total-order-');
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root]);
+        $empty = \pmssShowTrafficJsonPayload(\pmssShowTrafficReportBuild([], $root));
+        $this->assertSame(['monthMiB' => 0.0, 'monthLocalMiB' => 0.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0], $empty['totals']);
+        $this->assertSame(['totalUsers' => 0, 'usersWithStats' => 0, 'overLimit' => 0, 'nearLimit' => 0, 'missingStats' => 0], $empty['summary']);
+        foreach (['alpha' => 1.0e16, 'beta' => -1.0e16, 'gamma' => 1.0] as $user => $month) {
+            file_put_contents($root.'/'.$user, serialize(['raw' => ['month' => $month, 'week' => 1, 'day' => 1, 'hour' => 1, '15min' => 1]]));
+        }
+        $report = \pmssShowTrafficReportBuild(['alpha', 'beta', 'gamma'], $root);
+        \pmssShowTrafficRowsSort($report['rows'], 'month');
+        $this->assertSame(['alpha', 'gamma', 'beta'], array_column($report['rows'], 'user'));
+        $this->assertSame(1.0, \pmssShowTrafficJsonPayload($report)['totals']['monthMiB']);
     }
 }

@@ -92,7 +92,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $trafficLimitsReader = 'pmssRead'.'TrafficData';
 
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/traffic/report.php' => [
+            'scripts/lib/traffic/reportModel.php' => [
                 'required' => ['pmssTrafficStatsPath($thisUser, $statsDir)', 'pmssReadSerializedArrayFile($statsPath)', 'pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)'],
                 'forbidden' => ['function '.$showTrafficReader, 'unserialize('],
             ],

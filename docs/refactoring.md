@@ -226,6 +226,13 @@ verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
+Pikkumies preinstall markers and detached-job cleanup validate the entire state
+directory path with the shared path guard before creating directories or touching
+account files. Empty, relative, NUL-containing, dot-segment and redirected paths
+use the existing false/null or updater skip results. Valid missing directories,
+trailing slashes, marker names and leaf-symlink cleanup keep their prior behavior;
+`PikkumiesPreinstallHookTest` covers rejected ancestors and unchanged file bytes.
+
 Pinned remote installers share the version-match and guarded stale-binary
 decision. The stale-binary helper handles absent paths as success; its path
 safety and failed-removal checks remain in one place.

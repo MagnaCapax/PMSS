@@ -165,8 +165,7 @@ function pmssResourceLogReadMemoryStatFields(string $path, array $fields): array
     $raw = pmssReadRegularFileContents($path);
     if ($raw === null || trim($raw) === '') return [];
     $wanted = array_fill_keys($fields, true); $values = []; $seen = [];
-    foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-        [$name, $value] = array_pad(pmssConfigLineColumns((string) $line, 0, [], 2), 2, null);
+    foreach (pmssConfigRows(preg_split('/\r?\n/', trim($raw)), 2, [], 2) as [$name, $value]) {
         if (!isset($wanted[$name]) || isset($seen[$name]) || !ctype_digit((string) $value)) continue;
         $seen[$name] = true; $parsed = (int) $value;
         if ($parsed >= 0 && $parsed < PMSS_RESOURCE_COUNTER_SENTINEL) $values[$name] = $parsed;
@@ -195,8 +194,7 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
         }
 
         $breakdown = [];
-        foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-            [$field, $value] = array_pad(pmssConfigLineColumns($line, 0, [], 2), 2, null);
+        foreach (pmssConfigRows(preg_split('/\r?\n/', trim($raw)), 2, [], 2) as [$field, $value]) {
             if (!isset($memoryFields[$field]) || !ctype_digit((string) $value)) {
                 continue;
             }

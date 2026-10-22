@@ -365,16 +365,9 @@ class SkeletonWebLocalAssetTest extends TestCase
     /** @return array<int, string> */
     private function customerPanelReferenceSourceFiles(): array
     {
-        $root = $this->pmssRepoPath('etc/skel/www');
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
-        );
         $files = [];
-        foreach ($iterator as $file) {
-            if (!$file->isFile() || !preg_match('/\.(?:php|html|css|js)$/i', $file->getFilename())) {
-                continue;
-            }
-            $files[] = 'etc/skel/www/'.str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1));
+        foreach ($this->pmssRepoFiles('etc/skel/www', '/\.(?:php|html|css|js)$/i') as $path => $file) {
+            $files[] = 'etc/skel/www/'.str_replace('\\', '/', substr($path, strlen('etc/skel/www/')));
         }
         sort($files);
 

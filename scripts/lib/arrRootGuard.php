@@ -125,8 +125,8 @@ function pmssRootGuardListeningSocketInodes(string $procNetRoot): array
     $inodes = array();
     foreach (array('tcp', 'tcp6') as $table) {
         $lines = @file($procNetRoot.'/'.$table, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ((array) $lines as $line) {
-            if (($fields = pmssConfigLineColumns((string) $line, 10, [])) === [] || ($fields[3] ?? '') !== '0A') {
+        foreach (pmssConfigRows((array) $lines, 10, []) as $fields) {
+            if (($fields[3] ?? '') !== '0A') {
                 continue;
             }
 

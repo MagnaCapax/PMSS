@@ -57,11 +57,7 @@ function pmssSysctlSwapIsFast(): bool
     }
 
     $sysClassBlockRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_BLOCK_PATH', '/sys/class/block');
-    foreach (array_slice(pmssReadRegularFileNonEmptyLines('/proc/swaps'), 1) as $line) {
-        if (($columns = pmssConfigLineColumns($line, 1, [])) === []) {
-            continue;
-        }
-
+    foreach (pmssConfigRows(array_slice(pmssReadRegularFileNonEmptyLines('/proc/swaps'), 1), 1, []) as $columns) {
         $path = (string) $columns[0];
         $resolvedPath = realpath($path);
         $deviceName = basename($resolvedPath !== false ? $resolvedPath : $path);
@@ -83,9 +79,8 @@ function pmssSysctlNicSpeedMbps(): int
 
     $routePath = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_NET_ROUTE_PATH', '/proc/net/route');
     $iface = '';
-    foreach (array_slice(pmssReadRegularFileNonEmptyLines($routePath), 1) as $line) {
-        $columns = pmssConfigLineColumns($line, 2, []);
-        if ($columns !== [] && $columns[1] === '00000000') {
+    foreach (pmssConfigRows(array_slice(pmssReadRegularFileNonEmptyLines($routePath), 1), 2, []) as $columns) {
+        if ($columns[1] === '00000000') {
             $iface = pmssNetworkInterfaceNameNormalize((string) $columns[0], 15);
             if ($iface === '') {
                 continue;

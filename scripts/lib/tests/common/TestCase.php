@@ -1501,6 +1501,25 @@ PHP
         return $this->pmssRepoRoot().'/'.ltrim($relativePath, '/');
     }
 
+    /**
+     * Walk repository files without following directory symlinks, retaining iterator order.
+     * Callers own exclusions, content reads, and any rejection of file symlinks.
+     *
+     * @return \Generator<string, \SplFileInfo> Repository-relative paths and file metadata.
+     */
+    protected function pmssRepoFiles(string $directory, ?string $filenamePattern = null): \Generator
+    {
+        $root = $this->pmssRepoRoot();
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($this->pmssRepoPath($directory), \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($files as $file) {
+            if ($file->isFile() && ($filenamePattern === null || preg_match($filenamePattern, $file->getFilename()) === 1)) {
+                yield substr($file->getPathname(), strlen($root) + 1) => $file;
+            }
+        }
+    }
+
     /** Read a repository file and fail the test when it is unavailable. */
     protected function pmssReadRepoFile(string $relativePath): string
     {

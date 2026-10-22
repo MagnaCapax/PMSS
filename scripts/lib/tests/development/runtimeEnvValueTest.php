@@ -41,6 +41,15 @@ class RuntimeEnvValueTest extends TestCase
         $this->assertSame(['#', 'kept as data'], \pmssConfigLineColumns('# kept as data', 2, [], 2));
     }
 
+    public function testConfigRowsPreserveKeysAndColumnPolicies(): void
+    {
+        $this->assertSame([], iterator_to_array(\pmssConfigRows(['', ' ', '# comment', 'short'], 2)));
+        $this->assertSame([7 => ['a', 'b'], 12 => ['c', 'd']], iterator_to_array(\pmssConfigRows([3 => '', 7 => " a\tb\r\n", 9 => 'short', 12 => 'c d'], 2)));
+        $this->assertSame(['row' => ['rss', "123\textra"]], iterator_to_array(\pmssConfigRows(['row' => "rss 123\textra"], 2, [], 2)));
+        $this->assertSame([1 => ['#', 'data']], iterator_to_array(\pmssConfigRows(['#123', '# data'], 2, [])));
+        $this->assertSame([2 => ['0']], iterator_to_array(\pmssConfigRows(['; comment', '# comment', '0'], 1, [';', '#'])));
+    }
+
     public function testNormalizationCharacterizationMatrix(): void
     {
         $cases = [

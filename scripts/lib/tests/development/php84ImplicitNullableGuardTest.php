@@ -10,24 +10,14 @@ class Php84ImplicitNullableGuardTest extends TestCase
 {
     public function testScriptsDoNotUseImplicitNullableParameterTypes(): void
     {
-        $repoRoot = $this->pmssRepoRoot();
         $paths = [
-            $repoRoot.'/scripts',
-            $repoRoot.'/etc/skel/www',
+            'scripts',
+            'etc/skel/www',
         ];
         $violations = [];
 
         foreach ($paths as $path) {
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS)
-            );
-
-            foreach ($iterator as $file) {
-                if (!$file->isFile() || substr($file->getFilename(), -4) !== '.php') {
-                    continue;
-                }
-
-                $relativePath = substr($file->getPathname(), strlen($repoRoot) + 1);
+            foreach ($this->pmssRepoFiles($path, '/\.php$/D') as $relativePath => $file) {
                 if (strpos($relativePath, 'scripts/lib/devristo/') === 0 || strpos($relativePath, 'scripts/lib/tests/') === 0) {
                     continue;
                 }

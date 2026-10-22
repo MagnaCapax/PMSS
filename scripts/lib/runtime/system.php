@@ -88,7 +88,7 @@ function pmssCgroupSelfEntries(string $path = '/proc/self/cgroup'): array
     foreach (is_array($lines) ? $lines : [] as $line) {
         $parts = explode(':', (string) $line, 3);
         if (count($parts) !== 3 || trim($parts[2]) === '') continue;
-        $entries[] = ['hierarchy' => trim($parts[0]), 'controllers' => $parts[1] === '' ? [] : array_values(array_filter(array_map('trim', explode(',', $parts[1])), 'strlen')), 'path' => '/'.ltrim(trim($parts[2]), '/')];
+        $entries[] = ['hierarchy' => trim($parts[0]), 'controllers' => pmssNonEmptyStrings(array_map('trim', explode(',', $parts[1]))), 'path' => '/'.ltrim(trim($parts[2]), '/')];
     }
     return $entries;
 }

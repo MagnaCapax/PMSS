@@ -187,6 +187,16 @@ function pmssConfigLineColumns(string $line, int $minColumns = 0, array $comment
     return is_array($columns) && count($columns) >= $minColumns ? $columns : [];
 }
 
+/** Yield accepted column rows lazily, preserving source keys and caller-owned validation. */
+function pmssConfigRows(array $lines, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): \Generator
+{
+    foreach ($lines as $index => $line) {
+        if (($columns = pmssConfigLineColumns((string) $line, $minColumns, $commentPrefixes, $limit)) !== []) {
+            yield $index => $columns;
+        }
+    }
+}
+
 function pmssConfigOptionsUpdatePlan(string $optionList, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false): array
 {
     $options = pmssNonEmptyStrings(explode(',', $optionList));

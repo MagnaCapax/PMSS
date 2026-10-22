@@ -18,13 +18,10 @@ final class NoForcedCertificateRequestStaticTest extends TestCase
 
     public function testOnlyOptInPathsNameTheCertificateRequestFlag(): void
     {
-        $root = dirname(__DIR__, 4);
         $found = [];
         foreach (['etc', 'scripts'] as $directory) {
-            $entries = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root.'/'.$directory, \FilesystemIterator::SKIP_DOTS));
-            foreach ($entries as $entry) {
-                if (!$entry->isFile() || $entry->isLink()) continue;
-                $path = substr($entry->getPathname(), strlen($root) + 1);
+            foreach ($this->pmssRepoFiles($directory) as $path => $entry) {
+                if ($entry->isLink()) continue;
                 if (strpos($path, 'scripts/lib/tests/') === 0) continue;
                 if (strpos((string) file_get_contents($entry->getPathname()), 'request-web-certs') !== false) $found[] = $path;
             }

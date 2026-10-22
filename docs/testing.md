@@ -22,6 +22,9 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
+`RuntimeEnvValueTest` covers `pmssConfigRows()` source keys, short-row filtering,
+comment policies and bounded remainders; consumers retain field validation.
+
 For in-process tests, `TestCase::pmssCaptureStdout($callback, $environment)`
 returns `[result, output]` and restores temporary environment overrides on success
 or exception. Pass `pmssPathPrefixedEnvironment()` for command stubs; keep

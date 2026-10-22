@@ -27,9 +27,8 @@ function pmssFstabLinesRead(string $fstabPath, callable $logger, string $context
  */
 function pmssFstabMountEntryRead(array $lines, string $mountPoint, ?string $fsType = null): ?array
 {
-    foreach ($lines as $index => $line) {
-        $columns = pmssConfigLineColumns($line, 4);
-        if ($columns === [] || $columns[1] !== $mountPoint || ($fsType !== null && $columns[2] !== $fsType)) continue;
+    foreach (pmssConfigRows($lines, 4) as $index => $columns) {
+        if ($columns[1] !== $mountPoint || ($fsType !== null && $columns[2] !== $fsType)) continue;
         return ['index' => (int) $index, 'columns' => $columns];
     }
     return null;

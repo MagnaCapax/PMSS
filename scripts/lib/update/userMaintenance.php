@@ -208,7 +208,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
 
             logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: %s", $userTrim, $reason));
             pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
-            pmssCommandProfileRecord('updateUser '.$userTrim, '', 'ERR', 1, $userDuration, false, '', substr(preg_replace('/\s+/', ' ', $reason), 0, 300));
+            pmssCommandProfileRecord('updateUser '.$userTrim, '', 'ERR', 1, $userDuration, false, '', substr(pmssLogWhitespaceCollapse($reason), 0, 300));
         }
     }
 

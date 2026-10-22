@@ -64,6 +64,68 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->assertFalse(\pmssPikkumiesAskStateClear('alice', $root.'/ask-link'));
     }
 
+    public function testStateHelpersRejectUnsafeDirectoryChainsWithoutChangingFiles(): void
+    {
+        require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-state-path-');
+        $state = $root.'/target/state';
+        $this->pmssEnsureDir($state);
+        $names = ['alice', 'alice.out', 'alice.in', 'alice.lock', 'alice.out.rc'];
+        foreach ($names as $name) file_put_contents($state.'/'.$name, 'keep');
+        symlink($root.'/target', $root.'/parent-link');
+        symlink($state, $root.'/state-link');
+        file_put_contents($root.'/file', 'keep');
+
+        // Include a linked leaf with a trailing slash: is_link alone misses it.
+        foreach (['', '/', 'relative-state', $root.'/target/../target/state',
+            "\0".$state, $state."\0", $root.'/parent-link/state',
+            $root.'/parent-link/new-state', $root.'/state-link/', $root.'/file'] as $unsafe) {
+            $this->assertFalse(\pmssPikkumiesPreinstallStateClear('alice', $unsafe));
+            $this->assertFalse(\pmssPikkumiesAskStateClear('alice', $unsafe));
+            $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('bob', $unsafe));
+        }
+        foreach ($names as $name) $this->assertSame('keep', file_get_contents($state.'/'.$name));
+        $this->assertSame('keep', file_get_contents($root.'/file'));
+        $this->assertFalse(file_exists($state.'/bob'));
+        $this->assertFalse(file_exists($root.'/target/new-state'));
+    }
+
+    public function testUpdaterRejectsLinkedAncestorsBeforeStateCreationOrUserScan(): void
+    {
+        require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-hook-path-');
+        file_put_contents($root.'/marker', '');
+        $this->pmssEnsureDir($root.'/target/state');
+        file_put_contents($root.'/target/state/alice', 'keep');
+        symlink($root.'/target', $root.'/parent-link');
+        $calls = [];
+        $ops = [
+            'users' => static function () use (&$calls): array { $calls[] = 'users'; return ['alice']; },
+            'run' => static function () use (&$calls): void { $calls[] = 'run'; },
+        ];
+        foreach (['state', 'new-state'] as $leaf) {
+            \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/parent-link/'.$leaf, $ops);
+        }
+        $this->assertSame([], $calls);
+        $this->assertSame('keep', file_get_contents($root.'/target/state/alice'));
+        $this->assertFalse(file_exists($root.'/target/new-state'));
+    }
+
+    public function testStateHelpersPreserveMissingAndTrailingSlashDirectoryBehavior(): void
+    {
+        require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-state-valid-');
+        $state = $root.'/new/parent/state/';
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $state));
+        $this->assertSame($state.'/alice', \pmssPikkumiesPreinstallStateMarkerPath('alice', $state));
+        file_put_contents($state.'/alice', 'done');
+        file_put_contents($state.'/alice.out', 'output');
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $state));
+        $this->assertSame([], glob($state.'*'));
+    }
+
     public function testLifecycleFlowsClearMarkerAfterAccountAndSkeletonChanges(): void
     {
         $terminate = $this->pmssReadRepoExecutableSource('scripts/terminateUser.php');

@@ -56,14 +56,7 @@ class ProcHidepidIsolationGuardTest extends TestCase
         // future file could reintroduce it. Scan the whole scripts/ tree.
         $root = $this->pmssRepoPath('scripts');
         $offenders = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
-        );
-        foreach ($iterator as $file) {
-            $ext = $file->getExtension();
-            if ($ext !== 'php' && $ext !== 'sh') {
-                continue;
-            }
+        foreach ($this->pmssRepoFiles('scripts', '/\.(?:php|sh)$/D') as $file) {
             $path = $file->getPathname();
             if (strpos($path, '/tests/') !== false) {
                 continue; // this guard legitimately names the forbidden patterns

@@ -12,41 +12,50 @@ class ArchitectureSmokeTest extends TestCase
         // 'functionA|functionB' => 'Keep separate: explain the concrete contract or safety reason here.',
     ];
 
+    /** Keep shared discovery's extension, regular-file, and symlink policies explicit. */
+    public function testRepositoryFileDiscoveryPreservesScanBoundaries(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-repo-scan-');
+        foreach (['tree/a.php', 'tree/nested/b.PHP', 'tree/.hidden.sh', "tree/edge.php\n", 'outside/hidden.php'] as $path) {
+            $this->pmssWriteFile($root.'/'.$path, 'fixture');
+        }
+        $this->pmssEnsureDir($root.'/tree/empty.php');
+        $this->pmssCreateSymlinkOrSkip($root.'/outside', $root.'/tree/linked-directory');
+        $this->pmssCreateSymlinkOrSkip($root.'/tree/a.php', $root.'/tree/linked.php');
+        $this->pmssCreateSymlinkOrSkip($root.'/absent', $root.'/tree/dangling.php');
+        $scanner = new class($root) extends TestCase {
+            private $root;
+            public function __construct(string $root) { $this->root = $root; }
+            protected function pmssRepoRoot(): string { return $this->root; }
+            public function files(?string $pattern): array { return array_keys(iterator_to_array($this->pmssRepoFiles('tree', $pattern))); }
+        };
+        foreach ([
+            [null, ['tree/a.php', 'tree/nested/b.PHP', 'tree/.hidden.sh', "tree/edge.php\n", 'tree/linked.php']],
+            ['/\.php$/D', ['tree/a.php', 'tree/linked.php']],
+            ['/\.php$/iD', ['tree/a.php', 'tree/nested/b.PHP', 'tree/linked.php']],
+            ['/\.sh$/D', ['tree/.hidden.sh']],
+            ['/\.txt$/D', []],
+        ] as [$pattern, $expected]) {
+            $actual = $scanner->files($pattern);
+            sort($expected);
+            sort($actual);
+            $this->assertSame($expected, $actual, (string) $pattern);
+        }
+    }
+
     /**
      * Prevent long sibling helpers from differing only by a few string literals.
      */
     public function testNoNearDuplicateFunctionPairs(): void
     {
-        $repoRoot = $this->pmssRepoRoot();
-        $functions = $this->collectFunctionBodies($repoRoot.'/scripts/lib/update', $repoRoot);
+        $functions = [];
+        foreach ($this->pmssRepoFiles('scripts/lib/update', '/\.php$/D') as $relativePath => $file) {
+            $source = (string) file_get_contents($file->getPathname());
+            $functions = array_merge($functions, $this->extractNamedFunctions($source, $relativePath));
+        }
         $pairs = $this->findNearDuplicatePairs($functions);
 
         $this->assertEquals([], $pairs, $this->formatNearDuplicatePairs($pairs));
-    }
-
-    /**
-     * Collect named function bodies from first-party update-library PHP files.
-     *
-     * @return array<int, array{name:string,path:string,line:int,body:string,preview:array<int,string>}>
-     */
-    private function collectFunctionBodies(string $path, string $repoRoot): array
-    {
-        $functions = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS)
-        );
-
-        foreach ($iterator as $file) {
-            if (!$file->isFile() || substr($file->getFilename(), -4) !== '.php') {
-                continue;
-            }
-
-            $source = (string) file_get_contents($file->getPathname());
-            $relativePath = substr($file->getPathname(), strlen($repoRoot) + 1);
-            $functions = array_merge($functions, $this->extractNamedFunctions($source, $relativePath));
-        }
-
-        return $functions;
     }
 
     /**

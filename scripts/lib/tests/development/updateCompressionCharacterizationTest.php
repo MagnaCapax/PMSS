@@ -199,18 +199,19 @@ class UpdateCompressionCharacterizationTest extends TestCase
         ]);
     }
 
-    public function testShowTrafficKeepsLocalnetSplitAndBarRenderingInline(): void
+    public function testShowTrafficReusesLocalnetKeysAndKeepsBarInDisplay(): void
     {
         $splitSymbol = 'pmssShowTrafficSplit'.'LocalnetUser';
         $barSymbol = 'pmssShowTrafficRender'.'Bar';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/report.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/reportModel.php', [
             'pmssListManagedUsersResult($listUsersScript)',
             'pmssTrafficUserKeyBaseUser($thisUser)',
+        ], ['function '.$splitSymbol.'(' => 'showTraffic should reuse shared traffic user-key helpers']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/reportDisplay.php', [
             "str_repeat('#', \$filled)",
             "str_repeat('-', 10 - \$filled)",
         ], [
-            'function '.$splitSymbol.'(' => 'showTraffic.php should reuse shared traffic user-key helpers instead of adding a local splitter',
             'function '.$barSymbol.'(' => 'showTraffic.php should keep the extended output bar rendering in the shared report helper',
         ]);
     }

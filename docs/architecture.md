@@ -73,6 +73,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/cgroup/readIopsPolicy.php** – Derived read-IOPS policy loads the runtime value helpers directly; passive ceiling computation remains in `cgroup/ioCeiling.php`.
 - **scripts/lib/nginxConfig/** – Generates the public user subdomain route and reconciles obsolete private hash routes. The template catalog contains only active and suspended public variants.
 - **scripts/lib/resources/log.php** – Resource-log entrypoint. `resources/counters.php` owns cgroup reads shared with performance telemetry; `resources/counterState.php` owns locked delta persistence shared with traffic ingress (ADR 0078).
+- **scripts/lib/traffic/report.php** – Stable traffic CLI facade. `reportModel.php` reads accepted rows and derives totals and summary counts before sorting; `reportDisplay.php` projects that model to JSON and terminal output without filesystem reads (ADR 0153).
 
 ## Package Strategy
 - Per-release bootstrap baselines live under `scripts/lib/update/dpkg/`; the installer only ensures core tools. System-level apps are built via update-step2 modules, while per-account media-stack apps stay in the skeleton/user maintenance tooling.

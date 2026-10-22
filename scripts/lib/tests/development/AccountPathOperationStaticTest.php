@@ -25,14 +25,10 @@ final class AccountPathOperationStaticTest extends TestCase
 
     public function testAccountPathOperationsUseManagedBoundaries(): void
     {
-        $root = dirname(__DIR__, 4);
         $offenders = [];
         $reviewed = [];
         foreach (['scripts/cron', 'scripts/lib', 'scripts/util'] as $directory) {
-            $entries = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root.'/'.$directory));
-            foreach ($entries as $entry) {
-                if (!$entry->isFile() || !preg_match('/\.(?:php|sh)$/', $entry->getFilename())) continue;
-                $path = substr($entry->getPathname(), strlen($root) + 1);
+            foreach ($this->pmssRepoFiles($directory, '/\.(?:php|sh)$/') as $path => $entry) {
                 if (preg_match('~/(?:tests|testing|devristo|vendor)/~', $path)) continue;
                 foreach ($this->scanFile($entry->getPathname()) as $line => $operation) {
                     $key = $path.':'.$line;
