@@ -7,6 +7,11 @@ const OC_NODE_SHA256 = 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49
 const OC_CRON_TAG = '# pmss-openclaw';
 const OC_REQUIRED_FILES = 60000;
 const OC_UPDATE_REQUIRED_FILES = 60000;
+const OC_KOKKO_VERSION = 'v0.1.1';
+const OC_KOKKO_SHA256 = '973fcf8d61f664aa719df28b5b8a8d80f0bcc338c36d7c9fca14b108312f7cea';
+
+require_once __DIR__.'/pmssOpenClawProvider.php';
+require_once __DIR__.'/pmssOpenClawKokko.php';
 
 /** Keep all process paths under the caller's own home. */
 function ocPaths(?string $home = null): array
@@ -705,7 +710,9 @@ function ocPendingProviderApply(array $paths): bool
     if ($decision !== 'apply') return false;
     $provider = array('baseUrl' => $credentials['endpoint'],
         'apiKey' => array('source' => 'env', 'provider' => 'default', 'id' => 'CUSTOM_API_KEY'),
-        'api' => 'openai-completions', 'models' => array(array('id' => 'default', 'name' => 'default (Custom Provider)')));
+        'api' => 'openai-completions', 'models' => array(ocVirsilipasModel()));
+    // An existing provider with this name belongs to the user; delayed adoption must not replace it.
+    if (isset($config['models']['providers']['virsilipas'])) return false;
     $env = ocGatewayEnv($paths);
     $env['CUSTOM_API_KEY'] = $credentials['key'];
     foreach (array('models.providers.virsilipas' => json_encode($provider), 'agents.defaults.model.primary' => 'virsilipas/default') as $key => $value) {
@@ -769,6 +776,7 @@ function ocInstallFresh(array $paths, ?array $credentials, bool $useVirsilipas, 
         throw new RuntimeException('Onboarding failed; see OpenClaw diagnostics.');
     }
     if ($useVirsilipas) {
+        ocVirsilipasModelApply($paths, $env, true);
         $marker = $paths['state'].'/pmss-virsilipas';
         if (file_put_contents($marker, "virsilipas\n") !== strlen("virsilipas\n") || !chmod($marker, 0600)) {
             throw new RuntimeException('Could not mark the Virsilipas runtime configuration');
@@ -819,6 +827,8 @@ function ocUpdate(array $paths): void
         if ($rc !== 0) {
             throw new RuntimeException('OpenClaw Doctor failed; inspect ~/.openclaw/logs');
         }
+        ocVirsilipasModelApply($paths, $env);
+        ocKokkoApply($paths);
     } catch (Throwable $error) {
         // Keep the original failure even if the best-effort gateway recovery also fails.
         try { $recovered = ocStart($paths, true, 120); }
@@ -900,6 +910,7 @@ function ocMain(array $args): int
             ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
         }
         ocWriteCliWrapper($paths);
+        ocKokkoApply($paths);
         file_put_contents($paths['port'], $port."\n");
         ocBrowserConfigure($paths, $port);
         ocStop($paths);
@@ -916,6 +927,7 @@ function ocMain(array $args): int
         return 0;
     }
     if ($command === 'uninstall') {
+        ocKokkoApply($paths, true);
         ocStop($paths);
         ocCronApply($paths, false);
         ocProxyApply($paths, null);
@@ -942,6 +954,7 @@ function ocMain(array $args): int
         $version = is_file($paths['entry']) ? trim((string) ocCli($paths, array('--version'))[1]) : 'missing';
         echo 'Gateway: '.($pid === null ? 'stopped' : 'running').' pid='.($pid ?? '-').' port='.($port ?? '-').' listening='.(ocPortListening($port) ? 'yes' : 'no')."\n";
         echo "Check: {$state}\nNode: {$node}\nOpenClaw: {$version}\n";
+        echo 'PM skills: '.ocKokkoStatus($paths)."\n";
         if (in_array('--show-token', $args, true)) {
             echo 'Token: '.ocGatewayEnv($paths)['OPENCLAW_GATEWAY_TOKEN']."\n";
         }
@@ -969,6 +982,7 @@ function ocMain(array $args): int
         return 0;
     }
     ocCheck($paths);
+    echo 'PM skills: '.ocKokkoStatus($paths)."\n";
     return 0;
 }
 

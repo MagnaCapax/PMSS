@@ -19,6 +19,9 @@ class OpenClawPanelCompatibilityTest extends TestCase
                 .'echo json_encode(array(pmssOpenClawRuntimeReady(), pmssOpenClawStatusRead(dirname(__DIR__), "fallback")));');
             $installer = $home.'/bin/install-openclaw';
             $current = $this->pmssReadRepoFile('etc/skel/bin/install-openclaw');
+            foreach (array('pmssOpenClawProvider.php', 'pmssOpenClawKokko.php', 'pmssOpenClawKokkoArchive.php') as $helper) {
+                $this->pmssWriteFile($home.'/bin/'.$helper, $this->pmssReadRepoFile('etc/skel/bin/'.$helper));
+            }
             // An old no-argument callee must never run, even though PHP accepts the caller's extra argument.
             $legacy = '<?php function ocPaths(): array { throw new RuntimeException("HOME must be an existing directory"); }';
             foreach (array('legacy', 'current', 'missing', 'no-path-helper', 'symlink') as $version) {

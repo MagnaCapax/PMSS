@@ -26,7 +26,7 @@ The panel and installer arrive through separate delivery channels:
 | Files | Delivery |
 | --- | --- |
 | `www/userOpenClaw.php`, `www/scriptsIncAppsStatus.php`, `www/welcome.php`, `www/configure.php` | guiv panel heal |
-| `bin/install-openclaw` | `update.php` step2 per-account refresh |
+| `bin/install-openclaw`, `bin/pmssOpenClaw*.php` | `update.php` step2 per-account refresh |
 
 When the panel arrives first, an installer without explicit-home support is
 unavailable to panel controls until step2 refreshes it. Status keeps its existing
@@ -86,6 +86,35 @@ channels, binds loopback, and stores a reference to
 The fresh Virsilipas setup uses a reference to `CUSTOM_API_KEY`; the installer
 reads the current value from `~/.virsilipasKey` into the process environment
 at startup.
+
+The PMSS-managed `virsilipas/default` model declares `input: ["text"]` because
+the AI credit endpoint rejects image and audio content. Its
+`compat.supportsUsageInStreaming: true` enables streamed token and cost
+accounting. Fresh onboarding, late-key adoption and `install-openclaw update`
+apply these fields. Updates require the PMSS marker, matching account endpoint,
+single `default` model and environment SecretRef; user-created providers and
+other provider settings remain untouched.
+
+## Pulsed Media skills
+
+Install and update also install the optional Apache-2.0
+[mcxKokko v0.1.1 pack](https://github.com/MagnaCapax/mcxKokko/tree/v0.1.1).
+Its AgentSkills teach OpenClaw to use Pulsed Media services with your own
+account keys. PMSS verifies a pinned SHA256 before extraction, stages privately
+under your home, and selects the completed version through
+`~/.openclaw/pmss-kokko`. A new pack release requires a PMSS update to the pin.
+Download or verification failures leave OpenClaw working and retain any older
+pack. Tests use an offline copy of that exact release archive, including its
+license and notice.
+
+The installer appends `~/.openclaw/pmss-kokko/skills` to
+`skills.load.extraDirs` once, preserving your existing entries. To disable the
+pack, create `~/.openclaw/pmss-kokko-disabled` and run
+`install-openclaw install --yes` or `install-openclaw update`; this removes only
+PMSS's load entry and skips installation. Remove the file and rerun either
+command to enable it again. `status` and `check` report the pack version or
+disabled/absent state. `uninstall` removes the managed pack and its load entry
+even when keeping the rest of your OpenClaw state.
 
 ## Updating
 

@@ -381,6 +381,10 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $this->assertSame(2, substr_count($calls, "\n"));
         $this->assertStringContainsString('CUSTOM_API_KEY', $calls);
         $this->assertStringNotContainsString('private-test-service-key', $calls);
+        $providerCall = json_decode(explode("\n", $calls)[0], true);
+        $provider = json_decode($providerCall[3], true);
+        $this->assertSame(array('text'), $provider['models'][0]['input']);
+        $this->assertSame(true, $provider['models'][0]['compat']['supportsUsageInStreaming']);
         $this->assertSame(0600, fileperms($paths['state'].'/pmss-virsilipas') & 0777);
         $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
         \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
@@ -393,6 +397,241 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $this->assertFalse(\ocPendingProviderApply($paths));
         $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
         $this->assertSame($calls, file_get_contents($home.'/calls'));
+    }
+
+    /** A fake CLI persists config exactly as config set does, without network or services. */
+    private function openClawConfigFixture(array $config = array()): array
+    {
+        $paths = \ocPaths($this->pmssMakeTempDir('pmss-oc-config-'));
+        mkdir($paths['state'], 0700);
+        $paths['node'] = PHP_BINARY;
+        $paths['entry'] = $paths['home'].'/cli.php';
+        \ocEnsureToken($paths);
+        file_put_contents($paths['home'].'/.virsilipasKey', "endpoint=https://ai.example/v1\nkey=private-test-service-key\n");
+        chmod($paths['home'].'/.virsilipasKey', 0600);
+        file_put_contents($paths['state'].'/openclaw.json', json_encode($config));
+        file_put_contents($paths['entry'], '<?php
+$file = __DIR__."/.openclaw/openclaw.json";
+file_put_contents(__DIR__."/calls", json_encode(array_slice($argv, 1))."\\n", FILE_APPEND);
+$config = json_decode(file_get_contents($file), true);
+if (($argv[1] ?? "") === "onboard") {
+    if (($argv[2] ?? "") === "--help") { echo implode(" ", ocTestOnboardFlags()); exit; }
+    $config["models"]["providers"]["virsilipas"] = array("baseUrl" => "https://ai.example/v1",
+        "apiKey" => array("id" => "CUSTOM_API_KEY", "source" => "env", "provider" => "default"),
+        "api" => "openai-completions", "models" => array(array("id" => "default", "name" => "onboarded name")));
+} elseif (($argv[1] ?? "") === "config" && ($argv[2] ?? "") === "set") {
+    $target =& $config;
+    foreach (explode(".", $argv[3]) as $key) $target =& $target[$key];
+    $target = json_decode($argv[4], true) ?? $argv[4];
+    unset($target);
+}
+if (($argv[1] ?? "") === "config" && ($argv[2] ?? "") === "get") echo "token";
+if (($argv[1] ?? "") === "--version") echo "2026.10.5";
+file_put_contents($file, json_encode($config));
+function ocTestOnboardFlags() { return array("--non-interactive", "--accept-risk", "--skip-daemon", "--skip-channels",
+    "--gateway-token-ref-env", "--custom-base-url", "--custom-model-id", "--custom-provider-id", "--custom-compatibility", "--secret-input-mode"); }
+');
+        return $paths;
+    }
+
+    public function testFreshOnboardingAddsMetadataAndPreservesSecretReference(): void
+    {
+        $paths = $this->openClawConfigFixture();
+        // A pinned-node shim and npm no-op exercise the real fresh-install orchestration.
+        $paths['node'] = $paths['home'].'/node';
+        file_put_contents($paths['node'], '#!'.PHP_BINARY."\n".'<?php
+if (($argv[1] ?? "") === "--version") { echo "v'.OC_NODE_VERSION.'"; exit; }
+$file = $argv[1]; array_shift($argv); require $file;');
+        chmod($paths['node'], 0700);
+        $paths['npm'] = $paths['home'].'/npm.php';
+        file_put_contents($paths['npm'], '<?php // No network.');
+        $this->assertTrue(\ocInstallFresh($paths, \ocVirsilipasCredentials($paths['home']), true, 23000));
+        $provider = \ocConfigRead($paths)['models']['providers']['virsilipas'];
+        $this->assertSame('onboarded name', $provider['models'][0]['name']);
+        $this->assertSame(array('text'), $provider['models'][0]['input']);
+        $this->assertSame(true, $provider['models'][0]['compat']['supportsUsageInStreaming']);
+        $this->assertSame(array('id' => 'CUSTOM_API_KEY', 'source' => 'env', 'provider' => 'default'), $provider['apiKey']);
+        $this->assertStringNotContainsString('private-test-service-key', file_get_contents($paths['home'].'/calls'));
+    }
+
+    public function testProviderMigrationIsIdempotentAndProtectsUserProviders(): void
+    {
+        $provider = array('baseUrl' => 'https://ai.example/v1', 'api' => 'openai-completions',
+            'apiKey' => array('source' => 'env', 'provider' => 'default', 'id' => 'CUSTOM_API_KEY'),
+            'models' => array(array('id' => 'default', 'name' => 'preserved', 'cost' => array('input' => 0),
+                'compat' => array('supportsStore' => false))));
+        $paths = $this->openClawConfigFixture(array('models' => array('providers' => array('virsilipas' => $provider, 'mine' => $provider))));
+        $this->assertFalse(\ocVirsilipasModelApply($paths, \ocGatewayEnv($paths)));
+        \ocPrivateMarkerWrite($paths['state'].'/pmss-virsilipas', "virsilipas\n");
+        $this->assertTrue(\ocVirsilipasModelApply($paths, \ocGatewayEnv($paths)));
+        $this->assertFalse(\ocVirsilipasModelApply($paths, \ocGatewayEnv($paths)));
+        $actual = \ocConfigRead($paths)['models']['providers'];
+        $this->assertSame($provider, $actual['mine']);
+        $this->assertSame($provider['apiKey'], $actual['virsilipas']['apiKey']);
+        $this->assertSame(false, $actual['virsilipas']['models'][0]['compat']['supportsStore']);
+        $this->assertSame(array('input' => 0), $actual['virsilipas']['models'][0]['cost']);
+        $this->assertSame(1, substr_count(file_get_contents($paths['home'].'/calls'), "\n"));
+        foreach (array('endpoint', 'model', 'secret', 'multiple', 'api') as $case) {
+            $custom = $provider;
+            if ($case === 'endpoint') $custom['baseUrl'] = 'https://own.example/v1';
+            if ($case === 'model') $custom['models'][0]['id'] = 'custom';
+            if ($case === 'secret') $custom['apiKey'] = 'user-private-key';
+            if ($case === 'multiple') $custom['models'][] = array('id' => 'other');
+            if ($case === 'api') $custom['api'] = 'openai-responses';
+            $config = array('models' => array('providers' => array('virsilipas' => $custom)));
+            file_put_contents($paths['state'].'/openclaw.json', json_encode($config));
+            $this->assertFalse(\ocVirsilipasModelApply($paths, \ocGatewayEnv($paths)), $case);
+            $this->assertSame($config, \ocConfigRead($paths));
+        }
+        // A pending marker cannot overwrite a provider installed by the user, even with no primary.
+        \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
+        $this->assertFalse(\ocPendingProviderApply($paths));
+        $this->assertSame($config, \ocConfigRead($paths));
+    }
+
+    public function testKokkoPinnedInstallAppendsUserDirsAndUpdatesIdempotently(): void
+    {
+        $paths = $this->openClawConfigFixture(array('skills' => array('load' => array('extraDirs' => array('/my/skills', '/other/skills')))));
+        $downloads = 0;
+        $fixture = __DIR__.'/../fixtures/mcxKokko-v0.1.1.tar.gz';
+        $download = function (string $url, string $archive) use ($paths, $fixture, &$downloads): bool {
+            ++$downloads;
+            $this->assertSame('https://github.com/MagnaCapax/mcxKokko/archive/refs/tags/v0.1.1.tar.gz', $url);
+            $this->assertSame($paths['home'], dirname($archive, 2));
+            $this->assertSame(0700, fileperms(dirname($archive)) & 0777);
+            $this->assertSame('pmss-kokko-v0.1.0', readlink($paths['state'].'/pmss-kokko'));
+            return copy($fixture, $archive);
+        };
+        // Only marked older versions can be pruned.
+        $old = $paths['state'].'/pmss-kokko-v0.1.0';
+        mkdir($old, 0700);
+        \ocPrivateMarkerWrite($old.'/.pmss-kokko', "v0.1.0\n".str_repeat('a', 64)."\n");
+        symlink(basename($old), $paths['state'].'/pmss-kokko');
+        mkdir($paths['state'].'/pmss-kokko-v0.0.1', 0700);
+        \ocKokkoApply($paths, false, $download);
+        $this->assertSame(1, $downloads);
+        $this->assertSame(OC_KOKKO_VERSION, \ocKokkoStatus($paths));
+        $live = $paths['state'].'/pmss-kokko';
+        $this->assertSame('pmss-kokko-v0.1.1', readlink($live));
+        $this->assertTrue(is_file($live.'/skills/pm-ai-credits/SKILL.md'));
+        $this->assertSame(posix_geteuid(), fileowner($live.'/skills/pm-ai-credits/SKILL.md'));
+        $this->assertSame(array('/my/skills', '/other/skills', $live.'/skills'), \ocConfigRead($paths)['skills']['load']['extraDirs']);
+        $this->assertFalse(is_dir($old));
+        $this->assertTrue(is_dir($paths['state'].'/pmss-kokko-v0.0.1'));
+        $calls = file_get_contents($paths['home'].'/calls');
+        $stat = lstat($live);
+        \ocKokkoApply($paths, false, $download);
+        $this->assertSame(1, $downloads);
+        $this->assertSame($calls, file_get_contents($paths['home'].'/calls'));
+        $this->assertSame($stat['ino'], lstat($live)['ino']);
+        $this->assertSame(array(), glob($paths['home'].'/.openclaw-kokko-*'));
+        // Disable only removes our load path; uninstall removes marked payloads too.
+        touch($paths['state'].'/pmss-kokko-disabled');
+        \ocKokkoApply($paths, false, $download);
+        $this->assertSame(array('/my/skills', '/other/skills'), \ocConfigRead($paths)['skills']['load']['extraDirs']);
+        $this->assertStringContainsString('disabled', \ocKokkoStatus($paths));
+        $this->assertTrue(is_link($live));
+        \ocKokkoApply($paths, true, $download);
+        $this->assertFalse(is_link($live));
+        $this->assertFalse(is_dir($live.'-'.OC_KOKKO_VERSION));
+        $this->assertTrue(is_dir($paths['state'].'/pmss-kokko-v0.0.1'));
+        $this->assertSame(1, $downloads);
+    }
+
+    public function testKokkoDownloadFailuresAndHashMismatchLeaveConfigAndCleanStaging(): void
+    {
+        foreach (array('failure', 'mismatch', 'exception') as $case) {
+            $paths = $this->openClawConfigFixture(array('skills' => array('load' => array('extraDirs' => array('/user/skills')))));
+            $before = file_get_contents($paths['state'].'/openclaw.json');
+            $old = $paths['state'].'/pmss-kokko-v0.1.0';
+            mkdir($old, 0700);
+            \ocPrivateMarkerWrite($old.'/.pmss-kokko', "v0.1.0\n".str_repeat('a', 64)."\n");
+            symlink(basename($old), $paths['state'].'/pmss-kokko');
+            \ocKokkoApply($paths, false, static function (string $url, string $archive) use ($case): bool {
+                if ($case === 'exception') throw new \RuntimeException('private-test-service-key');
+                file_put_contents($archive, 'not a tar archive');
+                return $case !== 'failure';
+            });
+            $this->assertSame($before, file_get_contents($paths['state'].'/openclaw.json'));
+            $this->assertSame(basename($old), readlink($paths['state'].'/pmss-kokko'));
+            $this->assertSame(array(), glob($paths['home'].'/.openclaw-kokko-*'));
+            $this->assertFalse(file_exists($paths['home'].'/calls'));
+        }
+    }
+
+    public function testKokkoEmptyExtraDirsOptOutAndForeignPaths(): void
+    {
+        foreach (array(array(), array('skills' => array('load' => array('extraDirs' => array())))) as $config) {
+            $paths = $this->openClawConfigFixture($config);
+            $this->assertTrue(\ocKokkoExtraDirs($paths, true));
+            $this->assertSame(array($paths['state'].'/pmss-kokko/skills'), \ocConfigRead($paths)['skills']['load']['extraDirs']);
+            $this->assertFalse(\ocKokkoExtraDirs($paths, true));
+            $this->assertTrue(\ocKokkoExtraDirs($paths, false));
+            $this->assertFalse(\ocKokkoExtraDirs($paths, false));
+        }
+        $download = static function (): bool { throw new \RuntimeException('Must not download'); };
+        touch($paths['state'].'/pmss-kokko-disabled');
+        \ocKokkoApply($paths, false, $download);
+        unlink($paths['state'].'/pmss-kokko-disabled');
+        mkdir($paths['state'].'/pmss-kokko', 0700);
+        file_put_contents($paths['state'].'/pmss-kokko/keep', 'user data');
+        \ocKokkoApply($paths, false, $download);
+        \ocKokkoApply($paths, true, $download);
+        $this->assertSame('user data', file_get_contents($paths['state'].'/pmss-kokko/keep'));
+    }
+
+    public function testUpdateMigratesManagedProviderBeforeTheExistingGatewayRestart(): void
+    {
+        $provider = array('baseUrl' => 'https://ai.example/v1', 'api' => 'openai-completions',
+            'apiKey' => array('source' => 'env', 'provider' => 'default', 'id' => 'CUSTOM_API_KEY'),
+            'models' => array(array('id' => 'default', 'name' => 'default')));
+        $paths = $this->openClawConfigFixture(array('models' => array('providers' => array('virsilipas' => $provider))));
+        $paths['npm'] = $paths['home'].'/npm.php';
+        file_put_contents($paths['npm'], '<?php // No network.');
+        \ocPrivateMarkerWrite($paths['state'].'/pmss-virsilipas', "virsilipas\n");
+        touch($paths['state'].'/pmss-kokko-disabled');
+        mkdir($paths['home'].'/stubs', 0700);
+        file_put_contents($paths['home'].'/stubs/quota', "#!/bin/sh\nexit 0\n");
+        chmod($paths['home'].'/stubs/quota', 0700);
+        file_put_contents($paths['home'].'/.media-stack-port-openclaw', "23000\n");
+        $prior = getenv('PATH');
+        putenv('PATH='.$paths['home'].'/stubs:'.$prior);
+        try {
+            // The fake gateway exits; no real service or listening socket is created.
+            $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Gateway did not stay running');
+        } finally { $prior === false ? putenv('PATH') : putenv('PATH='.$prior); }
+        $model = \ocConfigRead($paths)['models']['providers']['virsilipas']['models'][0];
+        $this->assertSame(array('text'), $model['input']);
+        $this->assertSame(true, $model['compat']['supportsUsageInStreaming']);
+        $calls = array_map(static function (string $line): array { return json_decode($line, true); },
+            explode("\n", trim(file_get_contents($paths['home'].'/calls'))));
+        $this->assertSame(array('--version', 'doctor', 'config', 'config', 'gateway'), array_column($calls, 0));
+        $this->assertSame('models.providers.virsilipas.models', $calls[2][2]);
+    }
+
+    /** Minimal tar headers let tests express unsafe names and links without extracting them. */
+    private function openClawTarFixture(string $name, string $type = '0'): string
+    {
+        $header = str_pad($name, 100, "\0").sprintf('%07o', 0644)."\0".str_repeat("0000000\0", 2)
+            ."00000000000\0"."00000000000\0".str_repeat(' ', 8).$type.str_pad('target', 100, "\0")
+            ."ustar\0".'00';
+        $header = str_pad($header, 512, "\0");
+        $sum = array_sum(unpack('C*', $header));
+        $header = substr_replace($header, sprintf('%06o', $sum)."\0 ", 148, 8);
+        $archive = $this->pmssMakeTempPath('pmss-oc-tar-', '.tar.gz');
+        file_put_contents($archive, gzencode($header.str_repeat("\0", 1024)));
+        return $archive;
+    }
+
+    public function testKokkoArchiveRejectsTraversalAbsoluteLinksAndForeignRoot(): void
+    {
+        \ocKokkoArchiveValidate(__DIR__.'/../fixtures/mcxKokko-v0.1.1.tar.gz');
+        foreach (array(array('/absolute'), array('mcxKokko-0.1.1/../escape'), array('other/skills/file'),
+            array('mcxKokko-0.1.1/link', '1'), array('mcxKokko-0.1.1/link', '2'),
+            array('mcxKokko-0.1.1/device', '3'), array("mcxKokko-0.1.1/new\nline")) as $row) {
+            $archive = $this->openClawTarFixture($row[0], $row[1] ?? '0');
+            $this->assertThrowsRuntime(static function () use ($archive): void { \ocKokkoArchiveValidate($archive); });
+        }
     }
 
     public function testCmdlineAcceptsEntryAndExactRewrittenTitles(): void
