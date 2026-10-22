@@ -41,19 +41,19 @@ Unchanged metadata makes no config call and causes no additional restart;
 the existing runtime update still stops/starts the gateway. Late-key adoption
 also refuses to replace an existing provider named `virsilipas`.
 
-Pin mcxKokko to `v0.1.1`, SHA256
-`973fcf8d61f664aa719df28b5b8a8d80f0bcc338c36d7c9fca14b108312f7cea`,
-from `https://github.com/MagnaCapax/mcxKokko/archive/refs/tags/v0.1.1.tar.gz`.
+Pin mcxKokko to `v0.2.0`, SHA256
+`4eb7f837dc75dedbbde3e2b92c2d27e65673185d1a1912c11f2122b0fd086a12`,
+from `https://github.com/MagnaCapax/mcxKokko/archive/refs/tags/v0.2.0.tar.gz`.
 A new pack release requires a PMSS commit changing the tag and checksum.
 The downloader is injectable for offline tests; the production pin is fixed.
-The test fixture is the original 23,538-byte release tarball with its license
+The test fixture is the original 29,618-byte release tarball with its license
 and notice, verified against that same pin.
 
 Create a new 0700 staging directory under the account's home, never `/tmp`.
 Verify SHA256 before listing or extracting. Validate tar's effective member
 names and types: reject absolute names, `..`, links, special files, escaped
-names and anything outside `mcxKokko-0.1.1/`. Extract without foreign ownership
-or permissions. Rename the completed tree to `~/.openclaw/pmss-kokko-v0.1.1`,
+names and anything outside `mcxKokko-0.2.0/`. Extract without foreign ownership
+or permissions. Rename the completed tree to `~/.openclaw/pmss-kokko-v0.2.0`,
 then atomically replace the relative `pmss-kokko` symlink. Only owned version
 directories bearing the installer's private marker authorize replacement or
 cleanup. An unsuccessful download or verification retains the old selection,
@@ -101,4 +101,4 @@ preserved extraDirs and idempotent updates.
 
 - [ADR 0087](0087-separate-per-user-openclaw-installer.md)
 - [OpenClaw custom providers](https://docs.openclaw.ai/gateway/config-tools/custom-providers)
-- [mcxKokko v0.1.1](https://github.com/MagnaCapax/mcxKokko/tree/v0.1.1)
+- [mcxKokko v0.2.0](https://github.com/MagnaCapax/mcxKokko/tree/v0.2.0)

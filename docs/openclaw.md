@@ -98,7 +98,7 @@ other provider settings remain untouched.
 ## Pulsed Media skills
 
 Install and update also install the optional Apache-2.0
-[mcxKokko v0.1.1 pack](https://github.com/MagnaCapax/mcxKokko/tree/v0.1.1).
+[mcxKokko v0.2.0 pack](https://github.com/MagnaCapax/mcxKokko/tree/v0.2.0).
 Its AgentSkills teach OpenClaw to use Pulsed Media services with your own
 account keys. PMSS verifies a pinned SHA256 before extraction, stages privately
 under your home, and selects the completed version through

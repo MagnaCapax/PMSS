@@ -7,8 +7,8 @@ const OC_NODE_SHA256 = 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49
 const OC_CRON_TAG = '# pmss-openclaw';
 const OC_REQUIRED_FILES = 60000;
 const OC_UPDATE_REQUIRED_FILES = 60000;
-const OC_KOKKO_VERSION = 'v0.1.1';
-const OC_KOKKO_SHA256 = '973fcf8d61f664aa719df28b5b8a8d80f0bcc338c36d7c9fca14b108312f7cea';
+const OC_KOKKO_VERSION = 'v0.2.0';
+const OC_KOKKO_SHA256 = '4eb7f837dc75dedbbde3e2b92c2d27e65673185d1a1912c11f2122b0fd086a12';
 
 require_once __DIR__.'/pmssOpenClawProvider.php';
 require_once __DIR__.'/pmssOpenClawKokko.php';

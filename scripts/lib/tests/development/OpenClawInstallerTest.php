@@ -493,10 +493,10 @@ $file = $argv[1]; array_shift($argv); require $file;');
     {
         $paths = $this->openClawConfigFixture(array('skills' => array('load' => array('extraDirs' => array('/my/skills', '/other/skills')))));
         $downloads = 0;
-        $fixture = __DIR__.'/../fixtures/mcxKokko-v0.1.1.tar.gz';
+        $fixture = __DIR__.'/../fixtures/mcxKokko-v0.2.0.tar.gz';
         $download = function (string $url, string $archive) use ($paths, $fixture, &$downloads): bool {
             ++$downloads;
-            $this->assertSame('https://github.com/MagnaCapax/mcxKokko/archive/refs/tags/v0.1.1.tar.gz', $url);
+            $this->assertSame('https://github.com/MagnaCapax/mcxKokko/archive/refs/tags/v0.2.0.tar.gz', $url);
             $this->assertSame($paths['home'], dirname($archive, 2));
             $this->assertSame(0700, fileperms(dirname($archive)) & 0777);
             $this->assertSame('pmss-kokko-v0.1.0', readlink($paths['state'].'/pmss-kokko'));
@@ -512,9 +512,11 @@ $file = $argv[1]; array_shift($argv); require $file;');
         $this->assertSame(1, $downloads);
         $this->assertSame(OC_KOKKO_VERSION, \ocKokkoStatus($paths));
         $live = $paths['state'].'/pmss-kokko';
-        $this->assertSame('pmss-kokko-v0.1.1', readlink($live));
+        $this->assertSame('pmss-kokko-v0.2.0', readlink($live));
         $this->assertTrue(is_file($live.'/skills/pm-ai-credits/SKILL.md'));
         $this->assertSame(posix_geteuid(), fileowner($live.'/skills/pm-ai-credits/SKILL.md'));
+        // The ordering skill runs its helper directly, so extraction must keep it executable for the account only.
+        $this->assertSame(0700, fileperms($live.'/skills/pm-order/bin/pm-order') & 0777);
         $this->assertSame(array('/my/skills', '/other/skills', $live.'/skills'), \ocConfigRead($paths)['skills']['load']['extraDirs']);
         $this->assertFalse(is_dir($old));
         $this->assertTrue(is_dir($paths['state'].'/pmss-kokko-v0.0.1'));
@@ -625,10 +627,10 @@ $file = $argv[1]; array_shift($argv); require $file;');
 
     public function testKokkoArchiveRejectsTraversalAbsoluteLinksAndForeignRoot(): void
     {
-        \ocKokkoArchiveValidate(__DIR__.'/../fixtures/mcxKokko-v0.1.1.tar.gz');
-        foreach (array(array('/absolute'), array('mcxKokko-0.1.1/../escape'), array('other/skills/file'),
-            array('mcxKokko-0.1.1/link', '1'), array('mcxKokko-0.1.1/link', '2'),
-            array('mcxKokko-0.1.1/device', '3'), array("mcxKokko-0.1.1/new\nline")) as $row) {
+        \ocKokkoArchiveValidate(__DIR__.'/../fixtures/mcxKokko-v0.2.0.tar.gz');
+        foreach (array(array('/absolute'), array('mcxKokko-0.2.0/../escape'), array('other/skills/file'),
+            array('mcxKokko-0.2.0/link', '1'), array('mcxKokko-0.2.0/link', '2'),
+            array('mcxKokko-0.2.0/device', '3'), array("mcxKokko-0.2.0/new\nline")) as $row) {
             $archive = $this->openClawTarFixture($row[0], $row[1] ?? '0');
             $this->assertThrowsRuntime(static function () use ($archive): void { \ocKokkoArchiveValidate($archive); });
         }
