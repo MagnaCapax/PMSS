@@ -47,5 +47,8 @@ function pmssCgroupPolicyRefreshRun(): int
         }
     }
 
+    // systemd set-property can overwrite direct BFQ weights; restore them after the batch.
+    runStep('Restoring direct BFQ weights after cgroup policy refresh', '/scripts/cron/cgroupBfqWeightApply.php');
+
     return 0;
 }

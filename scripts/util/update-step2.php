@@ -573,6 +573,8 @@ pmssRunProfiledStep('Adjusting lighttpd security settings', static function (): 
 // template changes.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
 $userMaintenanceSummary = pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [$rutorrentIndexSha]);
+// User maintenance can reload systemd or set slice properties, overwriting direct BFQ weights.
+runStep('Restoring direct BFQ weights after user maintenance', '/scripts/cron/cgroupBfqWeightApply.php');
 pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);
 // Ensure the standard download speed test file exists
 $testfilePath = '/var/www/testfile';
@@ -654,6 +656,8 @@ if ((int) $storageBenchmarkRc !== 0) {
 // phase-2 handoff window; we want it back for normal operations.
 pmssRunProfiledCallable('Ensuring cron service is active before root cron restore', 'pmssEnsureCronServiceActive', ['update-step2 root cron restore']);
 pmssRunProfiledCallable('Ensuring weekly TRIM timer', 'pmssEnsureFstrimTimer');
+// Later service setup can reload systemd again; leave direct weights restored before cron resumes.
+runStep('Restoring direct BFQ weights before root cron restore', '/scripts/cron/cgroupBfqWeightApply.php');
 runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
 $pmssRootCronRestored = true;
 

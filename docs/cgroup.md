@@ -164,6 +164,11 @@ Inspect and apply limits per user:
   - `/scripts/cron/cgroupPolicyRefresh.php` runs at boot and every 2 hours from `root.cron`.
 - Cgroup-v1 BFQ hosts get a direct kernel weight refresh:
   - `/scripts/cron/cgroupBfqWeightApply.php` runs at boot and every 5 minutes from `root.cron`.
+  - Policy refresh and update-step2 also run this writer after their per-user
+    batches; update-step2 repeats it after later service setup, before restoring
+    root cron. This restores bonus-adjusted weights overwritten by systemd
+    without waiting for cron. Writer failures are logged and remain fail-soft; its
+    existing runtime and BFQ guards still apply.
   - It keeps the systemd slice settings as the operator-facing source of truth, then writes
     `/sys/fs/cgroup/blkio/.../blkio.bfq.weight` directly so Debian 12/systemd 252
     BFQ translation caps do not collapse weights above `IOWeight=200`.

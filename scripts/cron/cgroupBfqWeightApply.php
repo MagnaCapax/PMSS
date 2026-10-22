@@ -8,7 +8,8 @@
  * cgroup-v1 hosts, collapsing tier differentiation. Direct write to
  * /sys/fs/cgroup/blkio/user.slice/user-N.slice/blkio.bfq.weight restores
  * the full kernel 1..1000 range. The cron self-heals systemd overwrites
- * (daemon-reload, set-property) within the 60-second interval.
+ * (daemon-reload, set-property) on its five-minute schedule. Policy refresh
+ * and update-step2 also invoke it after their per-user policy batches.
  *
  * Per-user IOWeight in /etc/seedbox/config/users/<user>.json drives the
  * target, clamped to [1, 1000] (the kernel BFQ range) for every user.
