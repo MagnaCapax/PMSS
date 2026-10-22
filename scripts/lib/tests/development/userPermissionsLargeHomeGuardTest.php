@@ -56,13 +56,14 @@ PHP;
     {
         $this->pmssAssertRepoFileContract('scripts/util/setupUserHomePermissions.php', [
             'required' => [
-                "'find '.\$rtorrentRcTarget.' -maxdepth 0 -not -type l \\( ! -type f -o -links 1 \\) -exec chown -h root:root {} +'",
-                "'find '.\$rutorrentConfTarget.' -maxdepth 0 -not -type l \\( ! -type f -o -links 1 \\) -exec chmod 775 {} +'",
-                "'find '.\$lighttpdDirTarget.' -maxdepth 0 -not -type l -exec chmod 750 {} +'",
+                "pmssUserPermissionsOwnerApply(\$homeDir, \$target, 'root:root');",
+                "pmssUserPermissionsModeApply(\$userName, \$homeDir, \$accountUid, \$target, 0775);",
+                "pmssUserPermissionsModeApply(\$userName, \$homeDir, \$accountUid, \$lighttpdDir, 0750);",
             ],
             'forbidden' => [
-                "'chown root:root '.\$rtorrentRcTarget" => 'Direct ownership must stay out of account paths',
-                "'chmod 775 '.\$rutorrentConfTarget" => 'Direct mode changes must stay out of account paths',
+                '-exec chown' => 'Owners change through -execdir from a find anchored at the home',
+                '-exec chmod' => 'Modes change as the account or through the opened file',
+                "'chown root:root '" => 'Direct ownership must stay out of account paths',
             ],
         ]);
     }
