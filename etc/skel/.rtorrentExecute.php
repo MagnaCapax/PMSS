@@ -7,6 +7,9 @@
 **/
 require_once '.scriptsInc.php';
 
+// Remember this version before waiting for the first child to start.
+$executorHash = @hash_file('sha256', __FILE__);
+
 // Ensure we never run multiple executors for the same user. Multiple executors
 // will spawn multiple rtorrent processes and corrupt the session directory.
 $lockHandle = @fopen('.rtorrentExecute.lock', 'c');
@@ -24,6 +27,16 @@ sleep((int) round(rand(2, 8))); // avoid flooding a bit.
 
 // Infinite loop: start rTorrent and restart when it exits.
 while (true) {
+  // Only hand over between children; unreadable probes are not proof of staleness.
+  clearstatcache(true, __FILE__);
+  $executorExe = @readlink('/proc/self/exe');
+  $currentExecutorHash = @hash_file('sha256', __FILE__);
+  if (($executorExe !== false && substr($executorExe, -10) === ' (deleted)') ||
+      ($executorHash !== false && $currentExecutorHash !== false && $executorHash !== $currentExecutorHash)) {
+    writeLog('executor stale; exiting for watchdog restart');
+    break;
+  }
+
   file_put_contents('.rtorrentExecuteRun', (string) time());
 
   // Recheck the account selection after each exit; keep the system command on resolver failure.
@@ -48,4 +61,9 @@ while (true) {
   writeLog('rtorrent exited (rc='.$rtorrentRc.'); sleeping 5 seconds then restarting');
   sleep(5); // avoid overloading the server
 }
+
+// Let panel restart and the watchdog start a fresh executor under the same lock.
+file_put_contents('.rtorrentExecuteRun', '0');
+flock($lockHandle, LOCK_UN);
+fclose($lockHandle);
 

@@ -729,6 +729,12 @@ read-only probes used by baseline sanitization and source-build guards.
   on stderr and exit non-zero without partial stdout.
 - The per-user `.rtorrentExecute.php` supervisor launches the PMSS-built
   `/usr/local/bin/rtorrent` directly, regardless of its inherited `PATH`.
+  Between child runs, a deleted PHP executable or a changed launcher checksum
+  makes it clear its run marker and release its executor lock before exiting.
+  The existing watchdog (or panel restart) then starts a fresh launcher. Failed
+  freshness reads preserve supervision; running rTorrent is never interrupted.
+  This detection takes effect once the updated launcher has first been started;
+  an already-running older launcher must first exit through existing recovery.
 - `etc/skel/.rtorrentThrottleInit.php`
   - Runs once in the background from the skeleton `.rtorrent.rc.custom` five seconds after rTorrent starts, so rTorrent remains free to serve the helper's SCGI request.
   - Derives the customer name from the executing UID, loads the customer's existing ruTorrent throttle plugin, and re-applies its cached named channel rates through `rThrottle::obtain()`.
