@@ -68,7 +68,7 @@ class CheckWireguardSafetyTest extends TestCase
         $homeBase = $this->pmssMakeNamedTempDir('pmss-check-wireguard-home-', 0700);
         $outsideDir = $this->pmssMakeNamedTempDir('pmss-check-wireguard-outside-', 0700);
         $unsafeUser = '../'.basename($outsideDir);
-        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', $this->validPeerA."\n", 0700);
+        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', " \n # ignored\n ; ignored\n ".$this->validPeerA." \n".$this->validPeerA."\n", 0700);
         $this->pmssWriteFile($outsideDir.'/.wireguard-public-key', $this->validPeerB."\n", 0700);
 
         $this->pmssWithEnv(['PMSS_WG_HOME_BASE' => $homeBase], function () use ($homeBase, $outsideDir, $unsafeUser): void {
@@ -87,6 +87,10 @@ class CheckWireguardSafetyTest extends TestCase
             ["wireguard 118784 0\n", true],
             ["wireguarded 118784 0\n", false],
             ["foo_wireguard 118784 0\n", false],
+            ["\n \t\r\nwireguard\t118784 0\r\n", true],
+            ["# wireguard 118784 0\n", false],
+            ["0\nwireguard\n", true],
+            [" \t\r\n", false],
         ] as [$output, $expected]) {
             $this->assertSame($expected, \pmssWireguardLsmodOutputHasModule($output));
         }

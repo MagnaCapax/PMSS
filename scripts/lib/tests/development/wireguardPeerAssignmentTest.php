@@ -41,7 +41,7 @@ class WireguardPeerAssignmentTest extends TestCase
 
     private function peer(string $user, string $key, string $ip): string
     {
-        return "[Peer]\n# user={$user}\nPublicKey = {$key}\nAllowedIPs = {$ip}/32\n";
+        return "\n [Peer] \r\n\t# user={$user} \r\n PublicKey = {$key} \r\n AllowedIPs = {$ip}/32 \r\n";
     }
 
     public function testMigrationKeepsRenderedConfigByteIdentical(): void

@@ -14,6 +14,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/runtime/environment.php';
+
 const PMSS_ARP_KEEPALIVE_MARKER = '/etc/seedbox/config/arp-keepalive';
 
 /** Read and validate the target from the marker. Null = feature off or invalid. */
@@ -43,9 +45,8 @@ function pmssArpKeepaliveIsOnLink(string $routeGetOutput): bool
  */
 function pmssArpKeepaliveNeighbourState(string $procNetArp, string $ip): string
 {
-    foreach (preg_split('/\R/', $procNetArp) ?: [] as $line) {
-        $cols = preg_split('/\s+/', trim($line));
-        if (count($cols) >= 4 && $cols[0] === $ip) {
+    foreach (pmssConfigRows(preg_split('/\R/', $procNetArp) ?: [], 4, []) as $cols) {
+        if ($cols[0] === $ip) {
             return $cols[2] === '0x0' ? 'incomplete' : 'complete';
         }
     }

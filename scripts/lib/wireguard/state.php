@@ -49,11 +49,8 @@ function wgConfigPeerBlocksFromLines(array $lines): array
     $peers = [];
     $current = ['user' => '', 'key' => '', 'ip' => ''];
 
-    foreach (array_merge($lines, ['[Peer]']) as $line) {
-        $trimmed = trim((string) $line);
-        if ($trimmed === '') {
-            continue;
-        }
+    // PMSS's # user markers are data, so retain comment-prefixed lines here.
+    foreach (pmssConfigLines(array_merge($lines, ['[Peer]']), []) as $trimmed) {
         if (stripos($trimmed, '[Peer]') === 0) {
             if ($current['user'] !== '' || $current['key'] !== '' || $current['ip'] !== '') {
                 $peers[] = $current;

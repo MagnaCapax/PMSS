@@ -72,11 +72,7 @@ function wgReadUserPublicKeysResult(string $user): array
 
     $result = [];
     $seen = [];
-    foreach (explode("\n", $contents) as $index => $line) {
-        $line = trim($line);
-        if ($line === '' || $line[0] === '#' || $line[0] === ';') {
-            continue;
-        }
+    foreach (pmssConfigLines(explode("\n", $contents), ['#', ';']) as $index => $line) {
         if (!wgValidatePublicKey($line)) {
             wgLog(sprintf('Ignoring invalid WireGuard public key for user %s at %s line %d', $user, $path, $index + 1));
             continue;

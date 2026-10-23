@@ -352,6 +352,10 @@ complete message and status unchanged; the helper does not exit or add a newline
 Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
 library. Pass the existing minimum column count and `[]` for command output
 whose `#` tokens are data; keep field validation and failure reporting in callers.
+ARP and module tables use `pmssConfigRows()`. WireGuard peer blocks keep `# user`
+markers with `[]`; account public-key lists filter `['#', ';']` while retaining
+source indices for diagnostics. Monitoring rules and legacy port cleanup use the
+default `#` policy. Default-route and running-peer readers keep every nonempty row.
 Line-oriented readers use `pmssConfigLines()` for lazy trimming and empty/comment
 filtering while retaining source keys, internal spacing, inline comments, and
 literal `0` rows. Pass `[]` when every nonempty line is data, including diagnostic

@@ -37,9 +37,8 @@ function pmssWireguardCommandCapture(string $program, array $args, int $timeoutS
 /** Parse lsmod output without shell pipelines or regexing command strings. */
 function pmssWireguardLsmodOutputHasModule(string $output): bool
 {
-    foreach (preg_split('/\R/', $output) ?: [] as $line) {
-        $columns = pmssConfigLineColumns($line, 1, []);
-        if (($columns[0] ?? '') === 'wireguard') {
+    foreach (pmssConfigRows(preg_split('/\R/', $output) ?: [], 1, []) as $columns) {
+        if ($columns[0] === 'wireguard') {
             return true;
         }
     }
@@ -71,9 +70,8 @@ function pmssWireguardRunningPeerPublicKeys(): array
     }
 
     $keys = [];
-    $output = trim($result['stdout']) === '' ? [] : (preg_split('/\R/', trim($result['stdout'])) ?: []);
-    foreach ($output as $line) {
-        $key = trim($line);
+    $output = preg_split('/\R/', trim($result['stdout'])) ?: [];
+    foreach (pmssConfigLines($output, []) as $key) {
         if (wgValidatePublicKey($key)) {
             $keys[$key] = true;
         }

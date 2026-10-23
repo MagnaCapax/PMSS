@@ -31,7 +31,7 @@ class NetworkHelpersTest extends TestCase
 
     public function testParseMonitoringCommandsIgnoresCommentsAndFlush(): void
     {
-        $raw = "# comment\n".
+        $raw = " \n\t# comment\r\n0\n".
                " /sbin/iptables    -F INPUT\n".
                " /sbin/iptables -A FORWARD -j ACCEPT\n".
                "iptables   -t nat   -A POSTROUTING -j MASQUERADE\n";

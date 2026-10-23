@@ -321,11 +321,7 @@ function pmssTerminateUserRtorrentLegacyPorts(string $username, string $portFile
         return $ports;
     }
 
-    foreach ($configLines as $line) {
-        $line = trim($line);
-        if ($line === '' || $line[0] === '#') {
-            continue;
-        }
+    foreach (pmssConfigLines($configLines) as $line) {
         foreach (pmssTerminateUserRtorrentLegacyPatterns() as $type => $pattern) {
             if (isset($ports[$type]) || preg_match($pattern, $line, $matches) !== 1) {
                 continue;

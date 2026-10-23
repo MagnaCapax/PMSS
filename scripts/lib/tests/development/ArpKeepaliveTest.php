@@ -67,7 +67,7 @@ class ArpKeepaliveTest extends TestCase
 
     public function testUnansweredOnLinkTargetSendsOneDatagram(): void
     {
-        $arp = self::ARP_HEADER."10.0.0.9         0x1         0x0         00:00:00:00:00:00     *        eth0\n";
+        $arp = self::ARP_HEADER."\n \t\n10.0.0.9\t0x1 0x0\n 10.0.0.9\t0x1\t0x0 00:00:00:00:00:00 * eth0 \r\n";
         $out = $this->runKeepalive($this->marker(" 10.0.0.9 \n"), "10.0.0.9 dev eth0 src 10.0.0.2\n", $arp, $sent);
         $this->assertTrue($sent);
         $this->assertTrue(strpos($out, 'arp-keepalive sent target=10.0.0.9 neighbour=incomplete') !== false);
