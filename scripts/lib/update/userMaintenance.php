@@ -110,6 +110,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
     $totalUsers = count($users);
     $processedUsers = 0;
     $skippedUsers = 0;
+    $incompleteUsers = 0;
     $refreshSignature = pmssUserRefreshSignature($rutorrentIndexSha);
     $dockerPackagesChanged = getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1';
     $skipReasons = [];
@@ -158,6 +159,8 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
         }
 
         $userStart = microtime(true);
+        // A retry in this process starts with fresh per-user refresh state.
+        pmssUserLighttpdRefreshFailed($userTrim, false);
 
         try {
             if ($resumeAlreadyDone || !pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)) {
@@ -185,8 +188,17 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
 
             $userDuration = microtime(true) - $userStart;
             pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
-            pmssCommandProfileRecord('updateUser '.$userTrim, '', 'OK', 0, $userDuration, false);
-            pmssUserRefreshMarkDone($userTrim, $refreshSignature);
+            $lighttpdFailed = pmssUserLighttpdRefreshFailed($userTrim);
+            if ($lighttpdFailed) {
+                $incompleteUsers++;
+                pmssUserLog($userTrim, '[WARN] Skipping user refresh marker: lighttpd refresh incomplete; will retry next update');
+                pmssCommandProfileRecord('updateUser '.$userTrim, '', 'ERR', 1, $userDuration, false);
+            } else {
+                pmssCommandProfileRecord('updateUser '.$userTrim, '', 'OK', 0, $userDuration, false);
+                pmssUserRefreshMarkDone($userTrim, $refreshSignature);
+            }
+            // Processed includes completed passes with a deferred marker;
+            // skipped remains reserved for accounts whose maintenance aborted.
             $processedUsers++;
         } catch (\Throwable $throwable) {
             $skippedUsers++;
@@ -200,7 +212,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
         }
     }
 
-    $summaryStatus = $processedUsers < $totalUsers ? 'warn' : 'ok';
+    $summaryStatus = $processedUsers < $totalUsers || $incompleteUsers > 0 ? 'warn' : 'ok';
     logMessage(sprintf('%sProcessed %d of %d users', $summaryStatus === 'warn' ? '[WARN] ' : '', $processedUsers, $totalUsers));
     pmssLogJson([
         'event'     => 'user_maintenance_summary',

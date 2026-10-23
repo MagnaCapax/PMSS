@@ -8,6 +8,16 @@
  * @author PMSS Team
  */
 
+/** Track lighttpd refresh failures per user, including for standalone HTTP callers. */
+function pmssUserLighttpdRefreshFailed(string $user, ?bool $failed = null): bool
+{
+    static $failures = [];
+    if ($failed !== null) {
+        $failures[$user] = $failed;
+    }
+    return $failures[$user] ?? false;
+}
+
 /**
  * Configure per-user HTTP stack pieces (lighttpd vhost, ruTorrent temp paths).
  *
@@ -23,9 +33,10 @@ function pmssUserConfigureHttp(array $ctx): void
     $userLog = static function (string $message) use ($user): void { pmssUserLog($user, $message); };
 
     $rc = runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
-    // userMaintenance catches this before marking the account refreshed.
+    // Defer the completion marker without interrupting this user's other work.
+    pmssUserLighttpdRefreshFailed($user, $rc !== 0);
     if ($rc !== 0) {
-        throw new RuntimeException('lighttpd configuration refresh failed (rc='.$rc.')');
+        $userLog('[WARN] lighttpd configuration refresh failed (rc='.$rc.'); continuing user maintenance');
     }
 
     // Refresh the PMSS-managed qBittorrent safety defaults on every pass.

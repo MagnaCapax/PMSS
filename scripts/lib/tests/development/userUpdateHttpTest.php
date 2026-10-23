@@ -11,9 +11,46 @@ class UserUpdateHttpTest extends TestCase
 {
     protected function setUp(): void
     {
-        // These fixtures exercise HTTP maintenance after a successful CLI step.
+        // Success fixtures use dry runs; the failure fixture injects the CLI result.
         // Keep the installed /scripts command out of the hermetic test path.
         $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1']);
+    }
+
+    public function testFailedLighttpdRefreshContinuesRemainingHttpMaintenance(): void
+    {
+        $script = <<<'PHP'
+namespace HttpRefreshFixture;
+function pmssUserContextIdentity($ctx) { return [$ctx['user'], $ctx['home']]; }
+function runUserStep(...$args) { return $GLOBALS['rc']; }
+function pmssUserLog($user, $message) { $GLOBALS['logs'][] = $message; }
+function pmssQbittorrentWebUiAuthEnsure(...$args) { $GLOBALS['continued'][] = 'qbittorrent-auth'; }
+function pmssQbittorrentApplyManagedConfig(...$args) { $GLOBALS['continued'][] = 'qbittorrent'; return true; }
+function pmssDelugeApplyManagedConfig(...$args) { $GLOBALS['continued'][] = 'deluge'; return true; }
+function file_exists($path) { return true; }
+function pmssUserFilePathIsSafe($path) { $GLOBALS['continued'][] = 'php.ini'; return false; }
+function is_dir($path) { return false; }
+function pmssEnsureUserHomeDir($user, $home, $path, ...$args) { $GLOBALS['continued'][] = $path; return false; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/users/http.php', 'HttpRefreshFixture');
+        $script .= <<<'PHP'
+$runs = [];
+foreach ([['alice', 1], ['bob', 0], ['alice', 0]] as [$user, $rc]) {
+    $GLOBALS['rc'] = $rc;
+    $GLOBALS['logs'] = $GLOBALS['continued'] = [];
+    pmssUserConfigureHttp(['user' => $user, 'home' => '/fixture/'.$user, 'user_esc' => escapeshellarg($user)]);
+    $runs[] = ['continued' => $GLOBALS['continued'], 'logs' => implode("\n", $GLOBALS['logs']),
+        'failed' => [pmssUserLighttpdRefreshFailed('alice'), pmssUserLighttpdRefreshFailed('bob')]];
+}
+echo json_encode($runs);
+PHP;
+        $runs = $this->pmssRunInlinePhpJson($script);
+        foreach ($runs as $run) {
+            $this->assertSame(['qbittorrent-auth', 'qbittorrent', 'deluge', 'php.ini', '.tmp', '.irssi', 'www/recycle'], $run['continued']);
+        }
+        $this->assertStringContainsString('[WARN] lighttpd configuration refresh failed (rc=1)', $runs[0]['logs']);
+        $this->assertSame([true, false], $runs[0]['failed']);
+        $this->assertSame([true, false], $runs[1]['failed'], 'clean account cannot clear another account failure');
+        $this->assertSame([false, false], $runs[2]['failed'], 'a clean retry clears the prior failure');
     }
 
     public function testConfigureHttpRestoresQbittorrentWebUiProtections(): void
