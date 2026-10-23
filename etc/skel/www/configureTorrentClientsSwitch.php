@@ -9,6 +9,7 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     $client = $request['client'] ?? null;
     if (!in_array($client, array('deluge', 'transmission', 'rtorrent'), true))
         return array('ok' => false, 'status' => 400, 'message' => 'That torrent client is unavailable.');
+    $label = array('deluge' => 'Deluge', 'transmission' => 'Transmission', 'rtorrent' => 'rTorrent')[$client];
     $versions = isset($ops['versions']) ? $ops['versions']
         : pmssConfigureTorrentClientVersionsOffered($client);
     $version = $request['version'] ?? null;
@@ -50,7 +51,7 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
         ? basename($old) : (is_string($old) ? 'custom' : 'system');
     $lastRun = trim(pmssConfigureFileRead($dir.'/'.$client.'.lastRun', 64));
     if (pmssConfigureTorrentClientMajorDowngrade($lastRun, $version)) {
-        $message = 'Downgrading '.ucfirst($client).' from '.$lastRun.' to '.$version
+        $message = 'Downgrading '.$label.' from '.$lastRun.' to '.$version
             .' can corrupt existing data; switch refused — open a ticket for a data-preserving rollback.';
         pmssConfigureFileWrite($dir.'/'.$client.'.notice', $message."\n");
         flock($lock, LOCK_UN);
@@ -77,12 +78,12 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
         if ($restored) pmssConfigureFileWrite($dir.'/'.$client.'.lastRun', $restore."\n");
     }
     pmssConfigureFileWrite($dir.'/'.$client.'.notice', $ok
-        ? ucfirst($client).' selected: '.$version."\n" : ($restored
-            ? ucfirst($client).' switch failed; previous version restored.'
-            : ucfirst($client).' switch failed; manual recovery is needed.')."\n");
+        ? $label.' selected: '.$version."\n" : ($restored
+            ? $label.' switch failed; previous version restored.'
+            : $label.' switch failed; manual recovery is needed.')."\n");
     flock($lock, LOCK_UN);
     fclose($lock);
     return array('ok' => $ok, 'status' => $ok ? 200 : 503,
-        'message' => $ok ? ucfirst($client).' switched to '.$version.'.' : ($restored
+        'message' => $ok ? $label.' switched to '.$version.'.' : ($restored
             ? 'The switch failed; the previous version was restored.' : 'The switch failed; manual recovery is needed.'));
 }
