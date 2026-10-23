@@ -609,7 +609,7 @@ iptables helpers:
 ## Resource Statistics
 
 - Cgroup-v1 billing and performance collectors share `resources/v1.php` acquisition
-  (ADR 0160). Their projections retain field order, integer types, zero counters,
+  (ADR 0161). Their projections retain field order, integer types, zero counters,
   and missing-source omission. Billing requests only its source fields, prefers
   hierarchical memory totals, and records IO bytes, ops, and source atomically.
   Telemetry retains local memory counters and available IO bytes even when ops

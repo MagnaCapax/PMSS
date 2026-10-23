@@ -1,4 +1,4 @@
-# ADR 0160: One cgroup-v1 acquisition path for resource collectors
+# ADR 0161: One cgroup-v1 acquisition path for resource collectors
 
 Date: 2026-10-23
 Category: architecture
