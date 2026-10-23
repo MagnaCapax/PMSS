@@ -64,7 +64,7 @@ final class CustomerStatsLayoutTest extends TestCase
             'Resource summary order changed at: '
         );
         $this->pmssAssertRepoFileContractCases(array(
-            'etc/skel/www/statsHelpers.php' => array('required' => array(
+            'etc/skel/www/statsResourceRender.php' => array('required' => array(
                 'class="stats-block resource-summary-block"',
                 'class="resource-summary-strip"',
                 'class="resource-summary-label">CPU</span>',
@@ -134,10 +134,14 @@ final class CustomerStatsLayoutTest extends TestCase
                 ),
                 'forbidden' => array('function pmssStatsSerializedStateRead(', 'PMSS_STATS'.'_HELPERS_ONLY'),
             ),
-            'etc/skel/www/statsHelpers.php' => array('required' => array(
+            'etc/skel/www/statsStatus.php' => array('required' => array(
                 'function pmssStatsNetworkInterfaceStatus(',
                 'function pmssStatsDockerInactiveNote(',
+            )),
+            'etc/skel/www/statsCharts.php' => array('required' => array(
                 'function pmssStatsRenderLineChart(',
+            )),
+            'etc/skel/www/statsResourceRender.php' => array('required' => array(
                 'function pmssStatsRenderResourceBlocks(',
             )),
         ));
@@ -155,6 +159,18 @@ final class CustomerStatsLayoutTest extends TestCase
                 $this->assertStringNotContainsString('Fatal error', $result['stdout'].$result['stderr']);
             }
         });
+    }
+
+    public function testStatsPageKeepsReloadNoticeDuringPartialModuleDelivery(): void
+    {
+        foreach (array('statsState', 'statsStatus', 'statsTraffic', 'statsResourceModel', 'statsResourceRender', 'statsCharts') as $module) {
+            $this->pmssWithCustomerPanelRender(function (string $home, callable $render) use ($module): void {
+                $this->assertTrue(unlink($home.'/www/'.$module.'.php'));
+                $result = $render('stats.php', array('minBytes' => 1, 'query' => ''));
+                $this->assertStringContainsString('The Info page is being updated on this server. Reload it in a few minutes.', $result['stdout']);
+                $this->assertStringNotContainsString('Fatal error', $result['stdout'].$result['stderr']);
+            });
+        }
     }
 
     public function testTrafficUsageRendersRawOnlyTrafficSnapshots(): void

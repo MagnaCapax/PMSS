@@ -18,7 +18,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
                 'required' => ['pmssStatsRenderTrafficUsageBlock(', 'pmssStatsSerializedStateRead('],
                 'forbidden' => ["file_get_contents('../.trafficLimit')", "file_get_contents('../.bonusTraffic')", '@unserialize(@file_get_contents('],
             ],
-            'etc/skel/www/statsHelpers.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssStatsSerializedStateRead(']],
+            'etc/skel/www/statsTraffic.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssStatsSerializedStateRead(']],
             'etc/skel/www/welcome.php' => [
                 'required' => ['pmssTrafficLimitStateRead(', 'pmssCustomerSerializedArrayFileRead('],
                 'forbidden' => ["file_get_contents('../.trafficLimit')", "pmssWelcomeInteger"."FileRead('../.bonusTraffic'", '@unserialize(trim(@file_get_contents('],

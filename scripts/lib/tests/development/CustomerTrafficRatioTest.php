@@ -33,7 +33,7 @@ final class CustomerTrafficRatioTest extends TestCase
                 'required' => ['pmssTrafficRatioStateBuild($usedMiB, $inbound)', '$traffic[\'ratio\'][\'color\']'],
                 'forbidden' => ['$ratio >= 2.0', '$ratio >= 1.0', '$ratio'.'Color'],
             ],
-            'etc/skel/www/statsHelpers.php' => [
+            'etc/skel/www/statsTraffic.php' => [
                 'required' => ['pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth)', '$trafficRatioState[\'class\']'],
                 'forbidden' => ['$trafficRatio'.'GoodMin', '$trafficRatio'.'WarnMin', '$trafficRatio >='],
             ],

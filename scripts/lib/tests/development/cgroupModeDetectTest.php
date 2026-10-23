@@ -47,9 +47,10 @@ class cgroupModeDetectTest extends TestCase
 
         $this->assertSame($expected, \pmssCgroupSelfEntries($path));
         $this->assertSame('/user.slice/session.scope', \pmssCgroupSelfPath($path));
-        $this->assertSame([], \pmssCgroupSelfEntries($path.'.missing'));
-        $this->assertSame([], \pmssCgroupSelfEntries($path."\0suffix"));
-        $this->assertSame([], \pmssCgroupSelfEntries("\0".$path));
-        $this->assertSame('', \pmssCgroupSelfPath($path."\0suffix"));
+        // Missing and malformed filenames share the read-failure contract on every PHP version.
+        foreach (['', $path.'.missing', "\0", $path."\0", $path."\0suffix", "\0".$path] as $invalidPath) {
+            $this->assertSame([], \pmssCgroupSelfEntries($invalidPath));
+            $this->assertSame('', \pmssCgroupSelfPath($invalidPath));
+        }
     }
 }

@@ -7,6 +7,25 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/statsHelpers.php';
 /** Characterize the persisted-resource projection and Chart.js output bytes. */
 final class StatsResourceContractTest extends TestCase
 {
+    public function testSerializedStateKeepsMissingInvalidAndValidResults(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-stats-state-');
+        $path = $root.'/state';
+        $missing = array('data' => null, 'time' => null, 'error' => null);
+        $this->assertSame($missing, \pmssStatsSerializedStateRead($path, 'invalid'));
+        foreach (array('bad', serialize(false), serialize('text'), serialize(array()), serialize(array('raw' => array('month' => 12)))) as $content) {
+            file_put_contents($path, $content);
+            clearstatcache(true, $path);
+            $expected = @unserialize($content, array('allowed_classes' => false));
+            $this->assertSame(array('data' => is_array($expected) ? $expected : null,
+                'time' => filemtime($path), 'error' => is_array($expected) ? null : 'invalid'),
+                \pmssStatsSerializedStateRead($path, 'invalid'));
+        }
+        symlink($path, $root.'/link');
+        $this->assertSame($missing, \pmssStatsSerializedStateRead($root.'/link', 'invalid'));
+        $this->assertSame($missing, \pmssStatsSerializedStateRead($root, 'invalid'));
+    }
+
     public function testEmptyResourceModelKeepsItsCompleteShape(): void
     {
         $expected = array(

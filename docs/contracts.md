@@ -1072,6 +1072,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - What's new pins the two newest WHMCS announcements, then the newest blog posts and at most two wiki changes, six rows in one format. Remote content (announcements RSS, panel feed, remote heading) is cached per account in `~/.cache/pmss-welcome/` for 15 minutes and served stale when a fetch fails; `welcome.php?news=1` refreshes it after paint.
 - When the update-only `statsHelpers.php` has not arrived, `stats.php` returns
   HTTP 200 with a short reload notice instead of failing during the guiv heal.
+  The facade checks its complete set of local statistics modules before loading
+  any of them; partial module delivery retains that same reload notice. Collection,
+  service status, traffic, resource projection, resource HTML and Chart.js output
+  have separate owners (ADR 0156). Existing helper names and rendered bytes remain
+  stable; saved resource display values still precede raw numeric fallbacks.
 - `statsLive.php` (loaded by `stats.php` through `pmssWelcomeRequireLocalHelper()`; the block is simply absent when the helper has not arrived) prints
   the "Node load vs. your share" block from two root-written artifacts: `/var/lib/pmss/public/node-live.json` (node sums) and
   `/var/lib/pmss/live/<own user>.json` (own samples, `root:<user> 0640`). Customers never receive another account's samples (ADR 0126).
