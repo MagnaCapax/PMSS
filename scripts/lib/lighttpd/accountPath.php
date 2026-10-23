@@ -68,9 +68,11 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
         require_once __DIR__.'/../runtime.php';
         $shellCommand = pmssCommandProcessGroupWrap($shellCommand, $timeoutSec);
     }
+    // Start in /: the caller's directory (often /root) is unreadable to the account, and
+    // GNU find exits 1 when it cannot return there.
     $process = @proc_open($shellCommand, [
         0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'],
-    ], $pipes);
+    ], $pipes, '/');
     if (!is_resource($process)) return false;
 
     $written = 0;

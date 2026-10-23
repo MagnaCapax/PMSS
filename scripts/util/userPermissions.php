@@ -172,7 +172,12 @@ $chownItems = [
     ["/home/{$thisUser}/.lighttpd.conf", "root:root"],
 ];
 
-$trafficFiles = array_values($trafficPaths);
+// Toggle only the traffic files present now: an optional one never written (often the
+// localnet ingress file) has no flag to change. One that vanishes before the final set still logs.
+$trafficFiles = array_values(array_filter($trafficPaths, static function (string $path): bool {
+    clearstatcache(true, $path);
+    return @lstat($path) !== false;
+}));
 
 // Check each identity entry once with lstat before either repair phase.
 $billingRepairable = [];

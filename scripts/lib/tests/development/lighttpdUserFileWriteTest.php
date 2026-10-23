@@ -156,6 +156,26 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertFalse(is_dir($outside));
     }
 
+    public function testAccountPathRunStartsOutsideTheCallerDirectory(): void
+    {
+        $home = $this->pmssEnsureDir($this->tempDir.'/account-cwd');
+        $owner = $this->pmssCurrentOwner();
+        // The caller's directory may be unreadable to the account (root runs from /root).
+        $locked = $this->pmssEnsureDir($this->tempDir.'/locked');
+        $previous = getcwd();
+        $this->assertTrue(chdir($locked));
+        chmod($locked, 0);
+        try {
+            $this->assertTrue(\pmssAccountPathRun($owner, $home, [$home.'/cwd'], 'pwd > '.escapeshellarg($home.'/cwd')));
+            $this->assertTrue(\pmssAccountPathRun($owner, $home, [$home],
+                'find '.escapeshellarg($home).' -maxdepth 0 -type d -exec true {} +'));
+        } finally {
+            chmod($locked, 0700);
+            chdir($previous);
+        }
+        $this->assertSame("/\n", file_get_contents($home.'/cwd'));
+    }
+
     public function testAccountPathRunBoundsClosedOutputAndKeepsDefaultUnchanged(): void
     {
         $home = $this->pmssEnsureDir($this->tempDir.'/account-timeout');

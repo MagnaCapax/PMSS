@@ -233,6 +233,8 @@ class UserPermissionsApplyTest extends TestCase
             ],
         ]);
         $this->assertOrderedStrings([
+            'return @lstat($path) !== false;',
+            'pmssTrafficSetImmutable($trafficFile, false);',
             "\$findParts[] = '-execdir chown -h';",
             'pmssUserPermissionsOwnerApply($homeDir, $path, $owner',
             "'find %s \( -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +'",
