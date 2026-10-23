@@ -548,7 +548,7 @@ final class WelcomeHomeTest extends TestCase
     {
         // Each home has an armed fake, a key and a fresh credit cache; the fake leaves a marker when run.
         $homes = array();
-        foreach (array('low' => 39504, 'empty' => 0, 'enough' => 40000) as $name => $balance) {
+        foreach (array('low' => 44602, 'empty' => 0, 'enough' => 60000) as $name => $balance) {
             $home = $this->supportPikkumiesHome("touch \"\$0.ran\"\nexit 0\n");
             $this->pmssWriteFile($home.'/.virsilipasKey', 'key='.self::CREDITS_KEY."\n");
             chmod($home.'/.virsilipasKey', 0600);
@@ -565,7 +565,7 @@ final class WelcomeHomeTest extends TestCase
             $this->assertFalse(file_exists($homes[$name].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), $name.' never runs Pikkumies');
         }
         $this->assertSame(true, $result['enough']['ok']);
-        $this->assertTrue(file_exists($homes['enough'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), '40,000 credits hand it to Pikkumies');
+        $this->assertTrue(file_exists($homes['enough'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), '60,000 credits hand it to Pikkumies');
     }
 
     public function testSupportActivityReadsTheCommandAndCleansTheLine(): void

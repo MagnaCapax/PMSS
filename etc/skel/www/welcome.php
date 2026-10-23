@@ -1991,8 +1991,10 @@ function pmssWelcomeHomeSupportPikkumiesSend($home, $topic, $text, $nonce, $emai
     if (empty($state['visible']) || $binary === '') return array('ok' => false, 'pikkumies' => true, 'message' => 'Pikkumies is not available on this account. Send this to support now.');
     // The credit service refuses a request it cannot cover up front, so a check stops early well before the balance is
     // 0: QA support checks used about 10,000 to 60,000 credits each, and one was refused with 39,504 left (2026-10-22).
+    // The reservation covers the call's prompt, which grows with Pikkumies' session: a check was refused with 44,602
+    // left (2026-10-23). Hand it over only with the top of that range left.
     $credits = pmssWelcomeHomeCreditsRead($home);
-    if ($credits['state'] === 'ok' && (float) $credits['balance'] < 40000) return array('ok' => false, 'pikkumies' => true, 'message' => 'Your AI credits are too low for Pikkumies to look into this. Send this to support now.');
+    if ($credits['state'] === 'ok' && (float) $credits['balance'] < 60000) return array('ok' => false, 'pikkumies' => true, 'message' => 'Your AI credits are too low for Pikkumies to look into this. Send this to support now.');
     if (!preg_match('/^[A-Za-z0-9_-]{8,64}$/D', (string) $nonce)) return array('ok' => false, 'pikkumies' => true, 'message' => 'Reload the page and try again.');
     list($code) = pmssWelcomeHomeSupportPikkumiesRun($binary, array('ask', '--nonce='.$nonce), pmssWelcomeHomeSupportPikkumiesPrompt($topic, $text, $email), 20);
     return pmssWelcomeHomeSupportPikkumiesAnswer($code) + array('sent' => time());

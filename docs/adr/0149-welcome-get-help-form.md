@@ -88,3 +88,6 @@ promtp should always say no ticket needed if all is fine ... always stadnard, an
 - `~/.pmss/support-log.jsonl` in the account gets one row per send (route, topic, outcome, length of the text, never
   the text) and one per Pikkumies answer (its Result line), written by the panel, not by the AI. It keeps the newest 500
   rows.
+- The form and the log take only the Result sentence of Pikkumies' answer; the rest of it is in the Pikkumies tab.
+- Item 4's credit floor is 60,000, not 40,000: the credit service reserves for the call's prompt, which grows with
+  Pikkumies' session, and a QA check was refused with 44,602 left (2026-10-23).
