@@ -221,6 +221,7 @@ class SkeletonWebLocalAssetTest extends TestCase
                 "'www/panelSessionLogout.php',",
                 "'www/pmssTabs.js',",
                 "'www/qbittorrent.php',",
+                "'www/transmission.php',",
                 "'www/rclone.php',",
                 "'www/screen.css',",
                 "'www/stats.php',",

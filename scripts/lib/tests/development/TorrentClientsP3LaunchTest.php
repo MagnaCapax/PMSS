@@ -48,6 +48,45 @@ final class TorrentClientsP3LaunchTest extends TestCase
         return [$home, $store, $projection, $binary];
     }
 
+    public function testDisableMarkerSkipsCronAndEverySharedLaunch(): void
+    {
+        [$home, $store, $projection] = $this->fixture();
+        $marker = $home.'/.transmissionDisable';
+        $this->assertTrue(\pmssTransmissionAccountEnabled($home));
+        file_put_contents($marker, '');
+        $this->assertFalse(\pmssTransmissionAccountEnabled($home));
+        $unexpected = static function (): void { throw new \RuntimeException('Disabled launch did work'); };
+        $this->assertFalse(\pmssTransmissionLaunch($home, [
+            'storeRoot' => $store, 'projection' => $projection,
+            'native' => $unexpected, 'probe' => $unexpected, 'run' => $unexpected,
+        ]));
+        $source = $this->pmssReadRepoFile('scripts/cron/transmissionInstancesCheck.php');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/transmissionInstancesCheck.php', [
+            'pmssCronLockAcquire(', 'pmssUserWatchdogBackoffActive(',
+            'pmssLighttpdTransmissionSelected(', 'pmssTransmissionAccountEnabled($home)',
+            'pmssTorrentClientLauncherLivenessPids(', 'pmssTransmissionSettingsApply(',
+        ]);
+        $this->assertStringContainsString('if (!pmssTransmissionAccountEnabled($home)) continue;', $source);
+    }
+
+    public function testMarkerSymlinkIsNeverFollowedAndCountsAsDisabled(): void
+    {
+        [$home] = $this->fixture();
+        $marker = $home.'/.transmissionDisable';
+        $target = $home.'/marker-target';
+        file_put_contents($target, 'unchanged');
+        $this->pmssCreateSymlinkOrSkip($target, $marker);
+        $this->assertFalse(\pmssTransmissionAccountEnabled($home));
+        $this->assertSame('unchanged', file_get_contents($target));
+        // A dangling link must answer the same as a live one, or root leaks whether the target exists.
+        unlink($target);
+        clearstatcache();
+        $this->assertFalse(\pmssTransmissionAccountEnabled($home));
+        unlink($marker);
+        mkdir($marker);
+        $this->assertTrue(\pmssTransmissionAccountEnabled($home));
+    }
+
     public function testLaunchUsesConfigLockAndCertificateBundle(): void
     {
         [$home, $store, $projection] = $this->fixture();

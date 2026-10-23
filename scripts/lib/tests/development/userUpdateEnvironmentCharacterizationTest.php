@@ -160,6 +160,7 @@ file_put_contents($home.'/www/rutorrent/php/settings.php', "\t\t\$tm = getdate()
 file_put_contents($home.'/www/rutorrent/plugins/rss/action.php', "before\nob_flush();\nafter\n");
 copy($repoRoot.'/etc/skel/www/deluge.php', $skelRoot.'/www/deluge.php');
 copy($repoRoot.'/etc/skel/www/qbittorrent.php', $skelRoot.'/www/qbittorrent.php');
+copy($repoRoot.'/etc/skel/www/transmission.php', $skelRoot.'/www/transmission.php');
 file_put_contents($skelRoot.'/www/rutorrent/plugins/hddquota/action.php', "return \$field;\n");
 file_put_contents($skelRoot.'/.irssi/config', "test\n");
 file_put_contents($skelRoot.'/www/rutorrent/plugins/hddquota/sample.txt', "quota\n");
@@ -187,6 +188,7 @@ PHP
     'filemanager' => (string) file_get_contents($home.'/www/filemanager.php'),
     'deluge' => (string) file_get_contents($home.'/www/deluge.php'),
     'qbittorrent_frontend' => (string) file_get_contents($home.'/www/qbittorrent.php'),
+    'transmission_frontend' => (string) file_get_contents($home.'/www/transmission.php'),
     'settings' => (string) file_get_contents($home.'/www/rutorrent/php/settings.php'),
     'rss' => (string) file_get_contents($home.'/www/rutorrent/plugins/rss/action.php'),
     'hddquota' => (string) file_get_contents($home.'/www/rutorrent/plugins/hddquota/action.php'),
@@ -215,6 +217,7 @@ PHP
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['qbittorrent_frontend']);
         $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
         $this->assertStringNotContainsString('.qbittorrentPort.py', $result['qbittorrent_frontend']);
+        $this->assertSame($this->pmssReadRepoFile('etc/skel/www/transmission.php'), $result['transmission_frontend']);
         $this->assertStringContainsString('$interval = (int)$interval;', $result['settings']);
         $this->assertStringContainsString('if($interval<1)', $result['settings']);
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));

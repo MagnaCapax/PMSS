@@ -10,7 +10,7 @@ function pmssCustomerAppsDescriptionsRead(): array
         'Prowlarr' => 'Manages indexers for Sonarr and Radarr', 'SABnzbd' => 'Usenet downloader',
         'Autobrr' => 'Grabs releases from IRC announces', 'Cloudplow' => 'Moves finished files to cloud storage',
         'rTorrent + ruTorrent' => 'Your main torrent client', 'qBittorrent' => 'Second torrent client',
-        'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage',
+        'Deluge' => 'Second torrent client', 'Transmission' => 'Torrent client', 'rclone' => 'Sync to and from cloud storage',
         'OpenClaw' => 'AI agent with shell access; uses your Pulsed Media AI credits by default',
         );
     foreach (require __DIR__.'/toggleAppCatalog.php' as $row) $descriptions[$row['label']] = $row['description'];
@@ -112,12 +112,12 @@ if (!function_exists('pmssCustomerAppsSectionHtmlBuild')) {
 function pmssCustomerAppsSectionHtmlBuild(array $status, string $statusUrl = 'apps.php?status=1'): string
 {
     $rows = array();
-    foreach (array('rtorrent', 'qBittorrent', 'Deluge', 'rclone', 'lighttpd') as $id) {
+    foreach (array('rtorrent', 'qBittorrent', 'Deluge', 'Transmission', 'rclone', 'lighttpd') as $id) {
         if (isset($status['apps'][$id])) $rows[$id] = pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id], !empty($status['mediaAppControl']));
     }
     $toggleRows = '';
     foreach (pmssCustomerManagedAppDefinitions() as $id => $row) {
-        if (in_array($id, array('qBittorrent', 'Deluge', 'rclone'), true)) continue;
+        if (in_array($id, array('qBittorrent', 'Deluge', 'Transmission', 'rclone'), true)) continue;
         if (isset($status['apps'][$id])) $toggleRows .= pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id]);
     }
     $startAll = !empty($status['installed']) && empty($status['poll']) && !empty($status['canRestart'])
@@ -131,7 +131,7 @@ function pmssCustomerAppsSectionHtmlBuild(array $status, string $statusUrl = 'ap
 <div class="group">Web server</div><div class="list">WEB_ROW</div></section>', array('STATUS_URL' => pmssCustomerHtmlAttr($statusUrl),
         'START_ALL' => $startAll, 'INSTALLING' => !empty($status['poll']) ? '1' : '0',
         'MEDIA_ROWS' => pmssCustomerAppsMediaRowsBuild($status),
-        'TORRENT_ROWS' => ($rows['rtorrent'] ?? '').($rows['qBittorrent'] ?? '').($rows['Deluge'] ?? ''),
+        'TORRENT_ROWS' => ($rows['rtorrent'] ?? '').($rows['qBittorrent'] ?? '').($rows['Deluge'] ?? '').($rows['Transmission'] ?? ''),
         'TRANSFER_ROWS' => $rows['rclone'] ?? '', 'TOGGLE_ROWS' => $toggleRows, 'WEB_ROW' => $rows['lighttpd'] ?? ''));
 }
 }

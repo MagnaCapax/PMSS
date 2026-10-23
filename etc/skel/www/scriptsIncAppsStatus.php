@@ -68,7 +68,8 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
     foreach (pmssCustomerManagedAppDefinitions() as $name => $definition) {
         if (isset($definition['portMarker']) && !is_file(pmssCustomerHomePath($home, $definition['portMarker']))) continue;
         if (empty($definition['installable']) && !pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
-        $enabled = is_file(pmssCustomerHomePath($home, preg_replace('#^\.\./#', '', $definition['enable'])));
+        $enabled = !isset($definition['enable'])
+            || is_file(pmssCustomerHomePath($home, preg_replace('#^\.\./#', '', $definition['enable'])));
         if (isset($definition['disable']) && is_file(pmssCustomerHomePath($home, $definition['disable']))) $enabled = false;
         $apps[$name] = array('kind' => 'managed', 'state' => !$enabled ? 'off'
             : (pmssCustomerNativePidsRead($definition['binaries']) !== array() ? 'running' : 'not-running'),

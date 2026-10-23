@@ -15,6 +15,7 @@ foreach ($users as $user) {
     if (pmssUserWatchdogBackoffActive($user, 'transmission')) continue;
     $home = '/home/'.$user;
     if (pmssUserWebRootUnavailable($user) || !pmssLighttpdTransmissionSelected($user, $home)) continue;
+    if (!pmssTransmissionAccountEnabled($home)) continue;
     // A process and its socket are checked before settings or launch are touched.
     if (pmssTorrentClientLauncherLivenessPids($user, 'transmission') !== []) continue;
     $socketPath = $home.'/.lighttpd/transmission.sock';

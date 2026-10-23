@@ -107,7 +107,8 @@ function pmssConfigureTorrentClientOtherStart($home, $client, $version)
         return false;
     }
     if ($client === 'transmission') {
-        return pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home);
+        return !is_file($home.'/.transmissionDisable')
+            && pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home);
     }
     if ($version !== 'system') return pmssTorrentClientDelugeLaunch($home);
     $rc = 1;

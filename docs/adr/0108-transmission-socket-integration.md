@@ -80,3 +80,30 @@ a SHA-256-pinned web client archive. Root-side store convergence installs its
 `public_html` directory next to the binary, including for already installed
 daemons. The shared account launcher locates it via `TRANSMISSION_WEB_HOME`;
 the root watchdog uses that same launcher.
+
+## Apps opt-out (2026-10-23)
+
+An account's `~/.transmissionDisable` marker means stop and stay stopped.
+The root watchdog checks it after selection and before settings or launch work;
+the shared account launcher and Configure start path also refuse it. Configure
+requires starting Transmission in Apps before switching versions. Root only
+calls `is_file()` on the literal marker path, matching rTorrent: a symlink to a
+regular file counts as present, while a dangling symlink does not. Root never
+opens or modifies this marker.
+
+Apps and Welcome show a Transmission row after Deluge only for a valid store
+selection, with live native-process status, `transmission/web/`, and start,
+restart and turn-off controls. The account-owned `transmission.php` endpoint
+uses the existing AJAX POST gate, native stop helper and resolver CLI under the
+client switch lock. Turn off persists the marker before stopping; start removes
+it; restart refuses disabled accounts. Home transfer preserves the marker and
+termination removes it with the rest of the home without special handling.
+
+Security review: this control retains the existing htpasswd-protected panel
+route and mode-0700 Unix RPC socket; it adds no listener, credential or secret
+logging. Account and service credentials are unchanged. The relevant upstream
+risks are RPC DNS rebinding ([CVE-2018-5702](https://nvd.nist.gov/vuln/detail/CVE-2018-5702))
+and the CORS anti-CSRF nonce leak fixed in
+[4.1.3](https://github.com/transmission/transmission/releases/tag/4.1.3).
+Compromise of the panel's account access already permits actions as that UID;
+the controls retain UID, executable and mount-namespace process scoping.

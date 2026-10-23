@@ -96,6 +96,9 @@ function pmssTransmissionSettingsPrepare(string $home): bool
 /** Keep flock as the foreground daemon's parent for its whole lifetime. */
 function pmssTransmissionLaunch(string $home, array $ops = []): bool
 {
+    // Every account-side launch path must preserve the Apps opt-out, including CLI launches.
+    $marker = $home.'/.transmissionDisable';
+    if (is_link($marker) || is_file($marker)) return false;
     $binary = pmssTorrentClientResolve($home, 'transmission',
         $ops['projection'] ?? '/var/lib/pmss/public/torrentClients.json',
         $ops['storeRoot'] ?? '/home/.pmss/clients');

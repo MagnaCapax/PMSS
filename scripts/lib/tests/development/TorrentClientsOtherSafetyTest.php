@@ -8,6 +8,23 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsSwitch.ph
 /** Reject unsafe path shapes and preserve socket-only RPC preparation. */
 final class TorrentClientsOtherSafetyTest extends TestCase
 {
+    public function testTransmissionSwitchAndStartRefuseDisabledAccountsBeforeWork(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-transmission-disabled-');
+        $this->pmssEnsureDir($home.'/bin/transmission');
+        $this->pmssWriteFile($home.'/.transmissionDisable', '');
+        $unexpected = static function (): void { throw new \RuntimeException('Disabled switch did work'); };
+        $result = \pmssConfigureTorrentClientOtherSwitch($home,
+            ['client' => 'transmission', 'version' => '4.1.3'],
+            ['versions' => ['4.1.3' => ['kind' => 'static', 'rpcUnixSocket' => true]],
+                'backup' => $unexpected, 'stop' => $unexpected, 'start' => $unexpected]);
+        $this->assertSame(409, $result['status']);
+        $this->assertSame('Start Transmission in Apps before switching versions.', $result['message']);
+        $this->assertFalse(is_dir($home.'/.config'));
+        $this->assertFalse(\pmssConfigureTorrentClientOtherStart($home, 'transmission', '4.1.3'));
+        $this->assertFalse(is_dir($home.'/.config'));
+    }
+
     public function testProjectionFiltersEachClientAndRejectsUnsafeData(): void
     {
         $root = $this->pmssMakeTempDir('pmss-other-projection-');

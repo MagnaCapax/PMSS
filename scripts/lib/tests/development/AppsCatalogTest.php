@@ -112,7 +112,7 @@ class AppsCatalogTest extends TestCase
             'scriptsIncFrontend', 'scriptsIncBonus', 'scriptsIncCgroup', 'scriptsIncBackup',
             'scriptsIncRestoreTar', 'scriptsIncRestore', 'scriptsIncAppProcess', 'scriptsIncAppsHtml',
             'scriptsIncAppsStatus', 'scriptsIncActionJs', 'userMediaStackPanel', 'qbittorrent', 'qbittorrentPasswordRequired',
-            'deluge', 'rclone', 'slskd', 'copyparty', 'toggleApp', 'toggleAppCatalog', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
+            'deluge', 'transmission', 'rclone', 'slskd', 'copyparty', 'toggleApp', 'toggleAppCatalog', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
         foreach ($guiv as $name) {
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
             $tokens = token_get_all($source);
@@ -164,6 +164,49 @@ class AppsCatalogTest extends TestCase
             $this->assertSame('off', $appsStatus['apps']['jellyfin']['state']);
             $this->assertSame(true, $appsStatus['mediaAppControl']);
         });
+    }
+
+    public function testTransmissionRowNeedsSelectionAndHonoursDisableMarker(): void
+    {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
+            // Keep the real selection validator, replacing only its fixed store root in the copied tree.
+            $path = $home.'/www/scriptsIncAppProcess.php';
+            file_put_contents($path, str_replace('/home/.pmss/clients/', $home.'/store/', file_get_contents($path)));
+            $read = static function () use ($render): array {
+                return json_decode($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true)['apps'];
+            };
+            $this->assertFalse(isset($read()['Transmission']));
+            $this->pmssEnsureDir($home.'/bin/transmission');
+            $store = $this->pmssEnsureDir($home.'/store/transmission/4.1.3');
+            $binary = $this->pmssWriteFile($store.'/transmission-daemon', 'fixture daemon');
+            $link = $home.'/bin/transmission/default';
+            $this->pmssCreateSymlinkOrSkip($store, $link);
+            $app = $read()['Transmission'];
+            $this->assertSame('not-running', $app['state']);
+            $this->assertSame('transmission/web/', $app['url']);
+            $this->assertSame('transmission.php', $app['endpoint']);
+            $this->pmssWriteFile($home.'/.transmissionDisable', '');
+            $this->assertSame('off', $read()['Transmission']['state']);
+            $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
+            $this->assertStringContainsString('"Transmission":"transmission.php"', $html);
+            $this->assertStringContainsString('data-app="Transmission"', $html);
+            unlink($binary);
+            $this->assertFalse(isset($read()['Transmission']));
+        });
+    }
+
+    public function testTransmissionUsesSharedButtonsAfterDeluge(): void
+    {
+        $app = ['kind' => 'managed', 'state' => 'running', 'url' => 'transmission/web/'];
+        $html = \pmssCustomerAppRowHtmlBuild('Transmission', $app);
+        $this->assertStringContainsAllStrings(['href="transmission/web/"', 'Open', 'Restart', 'Turn off'], $html);
+        $app['state'] = 'off';
+        $this->assertStringContainsString('Turn on', \pmssCustomerAppRowHtmlBuild('Transmission', $app));
+        $html = \pmssCustomerAppsSectionHtmlBuild(['apps' => ['Deluge' => $app, 'Transmission' => $app],
+            'installed' => false, 'message' => '']);
+        $this->assertTrue(strpos($html, 'data-app="Deluge"') < strpos($html, 'data-app="Transmission"'));
+        $this->assertTrue(strpos($html, 'data-app="Transmission"') < strpos($html, 'id="pmss-transfer-apps"'));
+        $this->assertSame(1, substr_count($html, 'data-app="Transmission"'));
     }
 
     public function testHealedWelcomeWorksBeforeUpdateOnlyAppsFilesArrive(): void
@@ -558,7 +601,7 @@ class AppsCatalogTest extends TestCase
     public function testEveryStateEndpointRejectsGetAndAcceptsAjaxPostGate(): void
     {
         $this->pmssWithLegacyAppsRender(function (string $home): void {
-            foreach (array('qbittorrent.php', 'deluge.php', 'rclone.php', 'slskd.php', 'copyparty.php', 'rtorrentRestart.php',
+            foreach (array('qbittorrent.php', 'deluge.php', 'transmission.php', 'rclone.php', 'slskd.php', 'copyparty.php', 'rtorrentRestart.php',
                 'lighttpdRestart.php', 'mediaStack.php') as $endpoint) {
                 $action = $endpoint === 'mediaStack.php' ? 'app-stop' : 'unknown';
                 $get = $this->pmssAppsEndpointProbe($home, $endpoint, $action, 'GET', true);

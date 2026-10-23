@@ -6,6 +6,8 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
  function pmssCustomerManagedAppDefinitions() { $definitions = array(
    'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php', 'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')),
    'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')),
+   'Transmission' => array('disable' => '.transmissionDisable', 'endpoint' => 'transmission.php',
+       'binaries' => array(), 'url' => 'transmission/web/'),
    'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php',      'binaries' => array('/usr/bin/rclone')),
    'openclaw' => array('enable' => '../.openclaw/gateway.env', 'disable' => '.openclaw/pmss-stopped',
        'endpoint' => 'apps.php?managed=openclaw', 'binaries' => array(dirname(__DIR__).'/.local/share/openclaw/lib/node_modules/openclaw/openclaw.mjs'),
@@ -18,8 +20,10 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
    $definitions[$id] = array('enable' => '../'.$row['enable'], 'endpoint' => 'toggleApp.php?app='.$id, 'binaries' => $row['binaries']);
   }
   // A version picked in Configure runs from the account's store link: status, Open and Turn off must see it too.
-  foreach (array('qBittorrent' => 'qbittorrent', 'Deluge' => 'deluge') as $name => $client) {
+  foreach (array('qBittorrent' => 'qbittorrent', 'Deluge' => 'deluge', 'Transmission' => 'transmission') as $name => $client) {
    $selected = pmssCustomerTorrentClientSelectedBinary($client);
+   // Transmission has no system fallback and is visible only after an explicit store selection.
+   if ($client === 'transmission' && $selected === null) unset($definitions[$name]);
    if ($selected === null) continue;
    $definitions[$name]['binaries'][] = $selected;
    if ($client === 'deluge') $definitions[$name]['binaries'][] = dirname($selected).'/deluge-web';
@@ -34,7 +38,8 @@ if (!function_exists('pmssCustomerTorrentClientSelectedBinary')) {
  * which the healed welcome files cannot require.
  */
 function pmssCustomerTorrentClientSelectedBinary(string $client): ?string {
- $names = array('qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent', 'deluge' => 'bin/deluged');
+ $names = array('qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent', 'deluge' => 'bin/deluged',
+     'transmission' => 'transmission-daemon');
  if (!isset($names[$client])) return null;
  $target = @readlink(dirname(__DIR__).'/bin/'.$client.'/default');
  $store = '/home/.pmss/clients/'.$client.'/';

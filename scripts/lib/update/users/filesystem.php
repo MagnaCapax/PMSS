@@ -296,6 +296,7 @@ PHP;
         'www/qbittorrent.php',
         'www/qbittorrentPasswordRequired.php',
         'www/torrentClientsResolve.php',
+        'www/transmission.php',
         'www/transmissionLaunch.php',
         'www/slskd.php',
         'www/copyparty.php',

@@ -26,6 +26,8 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
         return array('ok' => false, 'status' => 503, 'message' => 'The client link directory is unavailable.');
     if ($client === 'rtorrent' && is_file($home.'/.rtorrentDisable'))
         return array('ok' => false, 'status' => 409, 'message' => 'Start rTorrent in Apps before switching versions.');
+    if ($client === 'transmission' && is_file($home.'/.transmissionDisable'))
+        return array('ok' => false, 'status' => 409, 'message' => 'Start Transmission in Apps before switching versions.');
     $dir = $home.'/.config/pmss/torrentClients';
     if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
         return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');

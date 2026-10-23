@@ -4,6 +4,13 @@
 require_once __DIR__.'/../torrentClients/identity.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
+/** Opt-out marker test for root: lstat only, so a planted link is never followed and any link counts as disabled. */
+function pmssTransmissionAccountEnabled(string $home): bool
+{
+    $marker = $home.'/.transmissionDisable';
+    return !(is_link($marker) || is_file($marker));
+}
+
 /** Reject tenant-controlled links before the root cron probes a socket. */
 function pmssTransmissionSocketPathIsSymlink(string $socketPath): bool
 {
