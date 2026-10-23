@@ -6,6 +6,21 @@
  */
 
 /**
+ * Parse a positive PID without allowing PHP's coercion or integer saturation.
+ *
+ * @param mixed $pid Candidate process identifier.
+ * @return int|null Validated PID, retaining ordinary whitespace normalization.
+ */
+function rtorrentProcessPidParse($pid): ?int
+{
+    if ((!is_int($pid) && !is_string($pid)) || (is_string($pid) && strpos($pid, "\0") !== false)) {
+        return null;
+    }
+    $value = pmssUnsignedDecimalIntParse(trim((string) $pid));
+    return $value !== null && $value > 0 ? $value : null;
+}
+
+/**
  * Normalize a PID list to unique positive integers.
  *
  * @param mixed $pids Candidate PID list from a probe callback.
@@ -20,8 +35,8 @@ function rtorrentProcessNormalizePids($pids): array
 
     $normalized = [];
     foreach ($pids as $pid) {
-        $pid = (int) $pid;
-        if ($pid > 0) $normalized[$pid] = $pid;
+        $pid = rtorrentProcessPidParse($pid);
+        if ($pid !== null) $normalized[$pid] = $pid;
     }
 
     return array_values($normalized);
@@ -112,8 +127,8 @@ function rtorrentProcessExecutorPids(string $user, ?int &$rc = null, ?array &$ou
         if (!preg_match('/^(\\d+)\\s+(\\S+)\\s+(.+)$/', $line, $m)) {
             continue;
         }
-        $pid = (int) $m[1];
-        if ($pid <= 0) {
+        $pid = rtorrentProcessPidParse($m[1]);
+        if ($pid === null) {
             continue;
         }
         $comm = strtolower((string) $m[2]);
@@ -167,8 +182,8 @@ function rtorrentProcessStateFromPsLine(string $line): ?array
         return null;
     }
 
-    $pid = (int) $m[1];
-    if ($pid <= 0) {
+    $pid = rtorrentProcessPidParse($m[1]);
+    if ($pid === null) {
         return null;
     }
 

@@ -279,6 +279,86 @@ PHP;
         $this->assertTrue(true, 'No exception thrown');
     }
 
+    public function testPidParserPreservesPositiveIntegersAndDecimalStrings(): void
+    {
+        foreach ([1, 17, '17', '0017', " \t17\r\n", PHP_INT_MAX, '000'.PHP_INT_MAX] as $pid) {
+            $this->assertSame((int) $pid, rtorrentProcessPidParse($pid));
+        }
+    }
+
+    public function testPidParserRejectsMalformedAndUnrepresentableValues(): void
+    {
+        foreach ([null, false, true, [], [17], new \stdClass(), 17.0, INF, NAN,
+            '', ' ', 0, '000', -1, '-17', '+17', '17suffix', '1e2', '17.0',
+            "\017", "17\0", "1\07", (string) PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0'] as $pid) {
+            $this->assertSame(null, rtorrentProcessPidParse($pid));
+        }
+    }
+
+    public function testPidNormalizationRetainsOrderAndUniqueness(): void
+    {
+        $this->assertSame([17, 9, PHP_INT_MAX], rtorrentProcessNormalizePids([
+            '0017', 9, '17', " 9\n", true, '9suffix', (string) PHP_INT_MAX.'0', PHP_INT_MAX,
+        ]));
+        foreach ([null, false, 17, '17', new \stdClass()] as $pids) {
+            $this->assertSame([], rtorrentProcessNormalizePids($pids));
+        }
+    }
+
+    public function testProcessStateParserRejectsOverflowAndKeepsValidBoundaries(): void
+    {
+        foreach (['0', '000', (string) PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0', '-17', '17x'] as $pid) {
+            $this->assertSame(null, rtorrentProcessStateFromPsLine($pid.' Sl+ futex_wait_queue'));
+        }
+        foreach (['0017' => 17, (string) PHP_INT_MAX => PHP_INT_MAX] as $raw => $pid) {
+            $this->assertSame(['pid' => $pid, 'stat' => 'Sl+', 'wchan' => ''],
+                rtorrentProcessStateFromPsLine($raw.' Sl+'));
+        }
+    }
+
+    public function testExecutorPidsSkipOverflowAndPreserveProbeDetails(): void
+    {
+        $lines = ['0 php .rtorrentExecute.php', PHP_INT_MAX.'0 php .rtorrentExecute.php',
+            '0017 php .rtorrentExecute.php', '9 screen .rtorrentExecute.php',
+            PHP_INT_MAX.' other .rtorrentExecute.php'];
+        $binDir = $this->pmssMakeLineOutputStub('ps', $lines, 'executor-pids-');
+        $this->pmssWithPathPrefix($binDir, function () use ($lines): void {
+            $rc = null;
+            $output = null;
+            $this->assertSame(['php' => [17], 'screen' => [9], 'all' => [17, 9, PHP_INT_MAX]],
+                rtorrentProcessExecutorPids('alice', $rc, $output));
+            $this->assertSame(0, $rc);
+            $this->assertSame($lines, $output);
+        });
+    }
+
+    public function testSignalBoundariesRejectMalformedPidsWithoutRealSignals(): void
+    {
+        $script = <<<'PHP'
+namespace RtorrentSignalFixture;
+function function_exists($name) { return $name === 'posix_kill' && $GLOBALS['posix']; }
+function posix_kill($pid, $signal) { $GLOBALS['calls'][] = [$pid, $signal]; return true; }
+function exec($command) { $GLOBALS['calls'][] = $command; }
+PHP;
+        $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true).';';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/processInspection.php', 'RtorrentSignalFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/processLifecycle.php', 'RtorrentSignalFixture');
+        $script .= <<<'PHP'
+$result = [];
+foreach ([true, false] as $posix) {
+    $GLOBALS['posix'] = $posix;
+    $GLOBALS['calls'] = [];
+    rtorrentProcessKillPids([null, true, false, [], [17], new \stdClass(), 17.9,
+        0, -1, '', '+17', '17tail', '1e2', "\00017", "17\0", PHP_INT_MAX.'0',
+        17, '0017', " 9\n"], 15);
+    $result[] = $GLOBALS['calls'];
+}
+echo json_encode($result);
+PHP;
+        $this->assertSame([[[17, 15], [17, 15], [9, 15]], ['kill -15 17', 'kill -15 17', 'kill -15 9']],
+            $this->pmssRunInlinePhpJson($script));
+    }
+
     /**
      * Test process snapshot returns array for nonexistent user.
      */

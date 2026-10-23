@@ -159,6 +159,13 @@ The per-user watchdog PID reader also rejects zero and integer-overflow lines
 from `pgrep` before returning process targets. Raw probe output remains available
 to callers for diagnostics.
 
+rTorrent process inspection and signal delivery share positive, representable PID
+validation before integer conversion. Malformed types, NUL bytes, numeric prefixes,
+and overflow cannot become process targets. Valid integer and decimal-string PIDs,
+surrounding whitespace, normalization order, raw probe details, and repeated signal
+calls retain their previous behavior. `RtorrentProcessTest` covers parsing and both
+signal backends with recording stubs that never signal real processes.
+
 Monthly IOPS enforcement uses the managed-user scan result, returning a nonzero
 cron status when the scan fails or emits diagnostics. A successful empty scan
 still returns success without changing any per-user state; `IopsLimitHelpersTest`

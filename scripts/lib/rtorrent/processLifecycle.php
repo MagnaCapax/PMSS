@@ -53,8 +53,9 @@ function rtorrentProcessScgiUnresponsiveDecision(
 function rtorrentProcessKillPids(array $pids, int $signal): void
 {
     foreach ($pids as $pid) {
-        $pid = (int) $pid;
-        if ($pid <= 0) {
+        // Validate at the signal boundary even when callers already normalized.
+        $pid = rtorrentProcessPidParse($pid);
+        if ($pid === null) {
             continue;
         }
         if (function_exists('posix_kill')) {
