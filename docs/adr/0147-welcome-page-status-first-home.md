@@ -81,3 +81,17 @@ styles are inline because the heal does not deliver `screen.css` (ADR 0022). If 
   helpers keeps working); the gauge builders it calls stay in `welcome.php` until that builder is removed.
 - The remote heading text is still edited on the website side; the tip card styles any markup it carries.
 - Feed-side duplicates (the same story syndicated twice) are the panel feed generator's to fix.
+
+## Amendment 2026-10-23: three rows of common apps, one-click start
+
+Operator, 2026-10-23: "now it's super heavy on the right pane and light on left .... atleast add to 3 rows of most
+common apps and easy expandability to those with single click installs and management done, and then a link which opens
+the configure tab", and "announcements should be 5."
+
+- Item 4 changes: the apps an account runs come first, then the common apps it does not run (ruTorrent, qBittorrent,
+  Deluge, Jellyfin, Sonarr, Radarr, Prowlarr, rclone, OpenClaw) until nine tiles fill three rows of three. The suggestion
+  tiles that stopped at six apps are gone. Every other app the panel knows is under "More apps".
+- A tile starts an app that is off or stopped with one click and restarts a running one, through the same endpoints,
+  consent prompts and qBittorrent password prompt as the Configure tab's Apps list. A media app that was never installed
+  says "Set up" and opens Configure, which installs the media stack. "All apps and settings in Configure" opens that tab.
+- News shows five announcements.

@@ -168,19 +168,27 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
                             <textarea id="h-support-text" name="text" rows="4" maxlength="8000" required></textarea>
                             <div class="h-support-topics" role="radiogroup" aria-label="Topic">
 <?php foreach (pmssWelcomeHomeSupportTopics() as $pmssTopicId => $pmssTopicLabel): ?>
-                                <label><input type="radio" name="topic" value="<?= $pmssTopicId ?>"<?= $pmssTopicId === 'working' ? ' checked' : '' ?>> <?= $pmssTopicLabel ?></label>
+                                <label><input type="radio" name="topic" value="<?= $pmssTopicId ?>"<?= $pmssTopicId === 'working' ? ' checked' : '' ?>><span><?= $pmssTopicLabel ?></span></label>
 <?php endforeach; ?>
                             </div>
+<?php $pmssSupportEmail = pmssWelcomeHomeSupportEmailDefault(dirname(__DIR__)); ?>
+<?php if ($pmssSupportEmail !== ''): ?>
+                            <input name="email" type="hidden" value="<?= pmssWelcomeHtmlAttr($pmssSupportEmail) ?>">
+<?php else: ?>
                             <label for="h-support-email">Reply to</label>
-                            <input id="h-support-email" name="email" type="email" required value="<?= pmssWelcomeHtmlAttr(pmssWelcomeHomeSupportEmailDefault(dirname(__DIR__))) ?>">
-                            <p class="h-muted h-support-note">Keep passwords out of the text; common forms are removed before it is sent.<?= $homeCreditsKey ? '' : ' Opens in the client area.' ?></p>
-<?php if (!empty($pmssPikkumiesState['visible']) && $homeCreditsKey): ?>
-                            <p class="h-muted h-support-note" id="h-support-pikkumies">For Not working and Slow, Pikkumies looks first, on your AI credits (a check like this uses about 10,000 to 60,000). If it cannot fix it, it opens the ticket with what it found.</p>
+                            <input id="h-support-email" name="email" type="email" required value="">
 <?php endif; ?>
-                            <button type="submit">Send</button>
 <?php if (!empty($pmssPikkumiesState['visible']) && $homeCreditsKey): ?>
-                            <button type="button" class="h-support-skip" onclick="return pmssSupportSend(this.form, true)">Skip Pikkumies, send to support now</button>
+                            <p class="h-muted h-support-note" id="h-support-pikkumies">Not working and Slow: Pikkumies checks first, on your AI credits (about 10,000 to 60,000 a check), and tells you if no ticket is needed. Passwords are removed before anything is sent.</p>
+<?php else: ?>
+                            <p class="h-muted h-support-note">Passwords are removed before anything is sent.<?= $homeCreditsKey ? '' : ' Opens in the client area.' ?></p>
 <?php endif; ?>
+                            <div class="h-support-buttons">
+                                <button type="submit">Send</button>
+<?php if (!empty($pmssPikkumiesState['visible']) && $homeCreditsKey): ?>
+                                <button type="button" class="h-support-skip" onclick="return pmssSupportSend(this.form, true)">Send to support instead</button>
+<?php endif; ?>
+                            </div>
                             <p class="h-support-result" id="h-support-result" role="status" hidden></p>
 <?php if (!empty($pmssPikkumiesState['visible']) && $homeCreditsKey): ?>
                             <div class="h-support-activity" id="h-support-activity" hidden><span class="h-muted">Pikkumies:</span> <span id="h-support-activity-line">starting…</span> <button type="button" onclick="pmssPikkumiesTabOpen()">Open Pikkumies</button></div>
@@ -191,12 +199,9 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
 <?php if ((int) $billingServiceId > 0): ?>
                         <a href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id=<?= (int) $billingServiceId ?>" target="_blank" rel="noopener">Your service in the client area</a>
 <?php endif; ?>
-                        <a href="https://wiki.pulsedmedia.com/index.php/Getting_Started_with_the_Seedbox_Dashboard" target="_blank" rel="noopener">Getting started</a>
                         <a href="https://pulsedmedia.com/clients/knowledgebase.php" target="_blank" rel="noopener">Knowledge base</a>
-                        <a href="https://wiki.pulsedmedia.com" target="_blank" rel="noopener">Wiki</a>
                         <a href="https://discord.gg/cGBz52HJtx" target="_blank" rel="noopener">Discord</a>
                         <a href="mailto:support@pulsedmedia.com">support@pulsedmedia.com</a>
-                        <a href="mailto:billing@pulsedmedia.com">billing@pulsedmedia.com</a>
                     </nav>
                 </section>
             </div>
@@ -447,6 +452,37 @@ if (file_exists('openvpn-config.tgz')) {
         })();
 <?php endif; ?>
 
+        /* App tiles (operator 2026-10-23: "single click installs and management"): Start and Restart call the same endpoints
+           as Configure's Apps list, through its request helper (XHR header, consent prompts, the qBittorrent password). */
+        function pmssAppsMoreToggle(button) {
+            var open = document.getElementById('h-apps').classList.toggle('h-apps-all');
+            button.setAttribute('aria-expanded', open ? 'true' : 'false');
+            button.textContent = open ? 'Fewer apps' : button.textContent.replace('Fewer apps', 'More apps');
+        }
+        $(document).on('click', '.h-app[data-app] button[data-tile-action]', function () {
+            var button = this, tile = $(button).closest('.h-app'), id = tile.attr('data-app'), action = $(button).attr('data-tile-action');
+            var managed = window.pmssManagedAppEndpoints && pmssManagedAppEndpoints[id], kind = id === 'rtorrent' ? 'rtorrent' : (managed ? 'managed' : 'media');
+            if (kind === 'managed' && action === 'start' && pmssManagedAppConsent[id] && !window.confirm(pmssManagedAppConsent[id])) return;
+            var url = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : managed + (managed.indexOf('?') >= 0 ? '&action=' : '?action=') + action);
+            var note = tile.find('.h-app-note');
+            tile.find('button').prop('disabled', true); note.text(action === 'restart' ? 'Restarting…' : 'Starting…');
+            pmssActionRequest({url: url, data: kind === 'media' ? {app: id} : null, passwordField: id === 'qBittorrent' ? 'qbittorrentPassword' : ''}).done(function () {
+                var deadline = Date.now() + ((window.pmssManagedAppWaitSeconds && pmssManagedAppWaitSeconds[id]) || 60) * 1000;
+                (function wait() {
+                    window.setTimeout(function () {
+                        $.getJSON('welcome.php?status=1', function (status) {
+                            var state = status.apps && status.apps[id] && status.apps[id].state;
+                            if (state === 'running') { location.reload(); return; }
+                            if (Date.now() < deadline) { wait(); return; }
+                            note.text('It has not started yet. Check it in Configure.'); tile.find('button').prop('disabled', false);
+                        }).fail(function () { if (Date.now() < deadline) wait(); else { note.text('Could not read the app status.'); tile.find('button').prop('disabled', false); } });
+                    }, 3000);
+                })();
+            }).fail(function (xhr, cancelled) {
+                tile.find('button').prop('disabled', false);
+                note.text(cancelled ? '' : ((xhr && xhr.responseJSON && xhr.responseJSON.message) || 'That did not work. Try again, or open Configure.'));
+            });
+        });
         /* Get help (ADR 0149): a ticket through the account's AI key (no credits spent); billing and accounts without a key go
            to the client area. Where Pikkumies runs, Not working and Slow go to Pikkumies first unless the customer skips it. */
         function pmssSupportSend(form, skip) {
@@ -481,30 +517,31 @@ if (file_exists('openvpn-config.tgz')) {
             for (var i = 0; i < bytes.length; i++) hex += ('0' + bytes[i].toString(16)).slice(-2);
             return hex;
         }
-        /* While Pikkumies works: its state and latest activity line, every 4 s for up to 15 minutes. A question Pikkumies
-           never starts on (e.g. the credit service refused it) says so after about a minute of answered polls. */
+        /* While Pikkumies works: its state and its own latest words (never a command), every 4 s for up to 15 minutes; at
+           the end its Result line when it gave one. A question Pikkumies never starts on (e.g. the credit service refused
+           it) says so after about a minute of answered polls. */
         function pmssSupportActivityWatch(sent) {
             var box = document.getElementById('h-support-activity'), line = document.getElementById('h-support-activity-line');
             if (!box || !line || box.getAttribute('data-watching') === '1') return;
-            box.setAttribute('data-watching', '1'); box.hidden = false; line.textContent = 'starting…';
-            var started = Date.now(), sentAt = (sent || Math.floor(started / 1000)) - 2, seenBusy = false, polls = 0, timer = setInterval(function () {
-                if (Date.now() - started > 15 * 60 * 1000) { clearInterval(timer); box.removeAttribute('data-watching'); return; }
+            box.setAttribute('data-watching', '1'); box.hidden = false; line.textContent = 'is starting…';
+            var started0 = Date.now(), sentAt = (sent || Math.floor(started0 / 1000)) - 2, seenBusy = false, polls = 0, timer = setInterval(function () {
+                if (Date.now() - started0 > 15 * 60 * 1000) { clearInterval(timer); box.removeAttribute('data-watching'); return; }
                 if (window.pmssWelcomeVisible && !window.pmssWelcomeVisible()) return;
                 fetch('welcome.php?support=activity', {credentials: 'same-origin', cache: 'no-store'})
                     .then(function (response) { return response.json(); })
                     .then(function (activity) {
                         if (activity.state === 'busy') seenBusy = true;
-                        var fresh = activity.line && activity.at >= sentAt;  /* a line from an earlier question is not this one */
-                        /* Done: idle after a busy poll, or already idle with this question's answer (a quick answer can finish between polls). */
-                        if ((seenBusy && (activity.state === 'idle' || activity.state === 'held')) || (activity.state === 'idle' && fresh)) {
-                            line.textContent = 'finished. Its answer is in the Pikkumies tab.';
+                        var started = activity.at >= sentAt, said = activity.said && activity.said_at >= sentAt ? activity.said : '';  /* earlier questions are not this one */
+                        /* Done: idle after a busy poll, or already idle with this question's activity (a quick answer can finish between polls). */
+                        if ((seenBusy && (activity.state === 'idle' || activity.state === 'held')) || (activity.state === 'idle' && started)) {
+                            line.textContent = said.indexOf('Result:') === 0 ? said.replace(/^Result:\s*/, '') + ' More in the Pikkumies tab.' : 'is done. Its answer is in the Pikkumies tab.';
                             clearInterval(timer); box.removeAttribute('data-watching'); return;
                         }
-                        if (!seenBusy && !fresh && ++polls >= 15) {
+                        if (!seenBusy && !started && ++polls >= 15) {
                             line.textContent = 'has not started on it. Open Pikkumies to see why, or send this to support now.';
                             clearInterval(timer); box.removeAttribute('data-watching'); return;
                         }
-                        line.textContent = fresh ? activity.line : (seenBusy ? 'working…' : 'starting…');
+                        line.textContent = said !== '' ? said : (seenBusy || started ? 'is checking your seedbox… (' + Math.round((Date.now() - started0) / 1000) + ' s)' : 'is starting…');
                     }).catch(function () {});
             }, 4000);
         }
@@ -1132,12 +1169,14 @@ function pmssWelcomeHomeCss()
 .h-main{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:10px;align-items:start}
 .h-col{display:grid;gap:10px;min-width:0}
 /* Apps */
-.h-apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.h-apps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .h-app{display:flex;flex-direction:column;gap:5px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
 .h-app-top{display:flex;align-items:center;gap:8px;min-width:0}
 .h-app-n{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .h-app-d{color:var(--muted);font-size:12px;line-height:1.35}
 .h-apps-empty{margin:0 0 8px}.h-app-ghost{border-style:dashed;background:transparent}.h-app-ghost .h-app-n{color:var(--muted);font-weight:500}.h-app-ghost .h-ico{stroke:var(--faint)}
+.h-app-more{display:none}.h-apps-all .h-app-more{display:flex}.h-app-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}.h-app-acts .h-btn{margin-top:0}.h-app-note{color:var(--muted);font-size:12px;min-height:0}.h-app-note:empty{display:none}
+.h-apps-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
 .h-app-hero{grid-column:1/-1;flex-direction:row;align-items:center;gap:14px;border-color:#2c4a63;background:linear-gradient(90deg,#16283a,var(--surface-2))}
 .h-app-hero .h-app-top{flex:0 0 auto;min-width:200px}.h-app-hero .h-app-d{flex:1}.h-app-hero .h-btn{margin-top:0}
 .h-ico{flex:0 0 auto;width:18px;height:18px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -1162,7 +1201,7 @@ function pmssWelcomeHomeCss()
 .h-news{list-style:none;margin:0;padding:0}
 .h-get-help{margin:0 0 10px}.h-get-help summary{display:inline-block;cursor:pointer;background:var(--accent);color:#06121b;font-weight:600;border-radius:7px;padding:6px 12px;list-style:none}.h-get-help summary::-webkit-details-marker{display:none}
 .h-get-help form{display:grid;gap:6px;margin-top:10px}.h-get-help label{color:var(--muted);font-size:12px}.h-get-help textarea,.h-get-help input[type=email]{box-sizing:border-box;width:100%;background:#0b1118;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 8px;font:inherit}
-.h-support-topics{display:flex;flex-wrap:wrap;gap:4px 12px}.h-support-topics label{color:var(--text)}.h-support-note{margin:0;font-size:12px}.h-get-help button{justify-self:start;background:var(--accent);color:#06121b;border:0;border-radius:7px;padding:6px 14px;font-weight:600;cursor:pointer}.h-support-result{margin:0}.h-support-result a{margin-left:4px}.h-get-help .h-support-skip,.h-support-activity button{background:transparent;color:var(--accent);border:1px solid var(--line);font-weight:500}.h-support-activity{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px}.h-support-activity[hidden]{display:none}#h-support-activity-line{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
+.h-support-topics{display:flex;flex-wrap:wrap;gap:6px}.h-support-topics label{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 6px;border:1px solid var(--line);border-radius:999px;color:var(--text);font-size:13px;cursor:pointer}.h-support-topics label:has(input:checked){border-color:var(--accent);background:#10212f}.h-support-buttons{display:flex;flex-wrap:wrap;gap:8px}.h-support-note{margin:0;font-size:12px}.h-get-help button{justify-self:start;background:var(--accent);color:#06121b;border:0;border-radius:7px;padding:6px 14px;font-weight:600;cursor:pointer}.h-support-result{margin:0}.h-support-result a{margin-left:4px}.h-get-help .h-support-skip,.h-support-activity button{background:transparent;color:var(--accent);border:1px solid var(--line);font-weight:500}.h-support-activity{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px}.h-support-activity[hidden]{display:none}#h-support-activity-line{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
 .h-news li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line)}
 .h-news-part+.h-news-part{margin-top:12px}.h-news-sub{margin:0 0 4px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}.h-news-sub a{margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0}
 .h-news li:first-child{border-top:0;padding-top:0}
@@ -1193,6 +1232,7 @@ function pmssWelcomeHomeCss()
 @media (max-width:1099px){.h-main{grid-template-columns:minmax(0,1fr)}.h-metrics,.h-metrics.h-m5{grid-template-columns:repeat(2,minmax(0,1fr))}.h-m5 .h-metric:last-child{grid-column:1/-1}}
 @media (max-width:599px){.h{padding:10px 10px 22px}.h-metrics{gap:8px}.h-metric{padding:9px 10px}.h-metric-v{font-size:16px}
 .h-app-hero{flex-direction:column;align-items:flex-start}.h-app-hero .h-app-top{min-width:0}.h-kv{grid-template-columns:max-content minmax(0,1fr)}.h-kv .h-copy{display:none}.h-kv dd{white-space:normal;word-break:break-all}.h-metric-v{white-space:normal}.h-metric-v span{display:block;margin:2px 0 0}}
+@media (max-width:599px){.h-apps{grid-template-columns:minmax(0,1fr)}}
 @media (prefers-reduced-motion:reduce){.h-body *{transition:none!important;animation:none!important}}
 CSS;
 }
@@ -1232,7 +1272,7 @@ function pmssWelcomeHomeNewsCacheFresh($home)
 
 /** News in two parts (operator 2026-10-22: "Maybe two segments, announcements and vainamoinen articles ... like 10 of
  *  them. Wiki updates, probably not needed"): the newest announcements and the newest articles, each newest first. */
-function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, $announcementLimit = 4, $articleLimit = 10)
+function pmssWelcomeHomeNewsSelect(array $announcements, array $articles, $announcementLimit = 5, $articleLimit = 10)
 {
     $newest = function (array $items, $limit) {
         usort($items, function ($a, $b) { return $b['time'] - $a['time']; });
@@ -1467,6 +1507,19 @@ function pmssWelcomeHomeAgentFirst(array $appsStatus)
 }
 
 /** Visible apps in display order, with name, description, state word and where Open goes. */
+/** The common apps that fill the first three rows when the account does not run them yet, in this order. */
+function pmssWelcomeHomeCommonApps()
+{
+    return array('rtorrent', 'qBittorrent', 'Deluge', 'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'rclone', 'openclaw');
+}
+
+/**
+ * Every app tile for Welcome, in order: the apps the account runs (a featured OpenClaw first), then the common apps it
+ * does not run, until nine plain tiles fill three rows; everything after that is in "More apps" ('more' => true).
+ * action: open (ready with a URL), start (one click: off or stopped), setup (a media app not installed: the
+ * Configure tab installs the media stack), manage (needs a step in Configure, e.g. a login), none (setting up).
+ * restart: a running app can be restarted from its tile.
+ */
 function pmssWelcomeHomeAppsBuild(array $appsStatus, $agentFirst)
 {
     $apps = is_array($appsStatus['apps'] ?? null) ? $appsStatus['apps'] : array();
@@ -1477,18 +1530,77 @@ function pmssWelcomeHomeAppsBuild(array $appsStatus, $agentFirst)
     foreach ($toggle as $id => $row) $names[$id] = $row['label'];
     $descriptions = function_exists('pmssCustomerAppsDescriptionsRead') ? pmssCustomerAppsDescriptionsRead() : array();
     $descriptions['ruTorrent'] = $descriptions['rTorrent + ruTorrent'] ?? 'Your main torrent client';
-    $list = array();
-    foreach ($apps as $id => $app) {
-        $state = (string) ($app['state'] ?? '');
-        if ($id === 'lighttpd' || $state === 'off') continue;
+    $ideas = array('qBittorrent' => 'A second torrent client with a modern web UI', 'Deluge' => 'A torrent client with a web UI',
+        'jellyfin' => 'Stream your library to TV, phone and browser', 'sonarr' => 'Finds and downloads TV episodes',
+        'radarr' => 'Finds and downloads movies', 'prowlarr' => 'One indexer list for Sonarr and Radarr',
+        'rclone' => 'Sync files to and from cloud storage', 'openclaw' => 'An AI agent that works in your account, on your AI credits');
+    $media = array('jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'autobrr', 'cloudplow');
+    $tile = function ($id, $app) use ($names, $descriptions, $ideas, $agentFirst) {
         $name = $names[$id] ?? (string) $id;
-        $url = (string) ($app['url'] ?? '');
+        $state = $app === null ? 'absent' : (string) ($app['state'] ?? '');
+        $url = $app === null ? '' : (string) ($app['url'] ?? '');
         $ready = $state === 'running' || ($id === 'rtorrent' && $state === 'not-running');
-        $list[] = array('id' => (string) $id, 'name' => $name, 'desc' => (string) ($descriptions[$name] ?? ''),
-            'state' => $state, 'url' => $url, 'open' => $ready && $url !== '', 'hero' => $agentFirst && $id === 'openclaw');
+        if ($state === 'absent') $action = 'setup';
+        elseif ($ready && $url !== '') $action = 'open';
+        elseif (in_array($state, array('off', 'stopped', 'not-running', 'failed', 'gave up'), true)) $action = 'start';
+        elseif ($state === 'installing') $action = 'none';
+        else $action = 'manage';
+        $desc = (string) ($descriptions[$name] ?? '');
+        return array('id' => (string) $id, 'name' => $name, 'desc' => $desc !== '' ? $desc : ($ideas[$id] ?? ''), 'state' => $state, 'url' => $url,
+            'open' => $action === 'open', 'action' => $action, 'restart' => $state === 'running',
+            'hero' => $agentFirst && $id === 'openclaw' && $state !== 'off' && $state !== 'absent', 'more' => false);
+    };
+    $active = $inactive = array();
+    foreach ($apps as $id => $app) {
+        if ($id === 'lighttpd') continue;
+        $t = $tile($id, is_array($app) ? $app : array());
+        if ($t['state'] === 'off') $inactive[$t['id']] = $t; else $active[$t['id']] = $t;
     }
-    usort($list, function ($a, $b) { return $b['hero'] - $a['hero']; });
-    return $list;
+    // A media app the account has never installed is not in the status list; the common ones still get a tile.
+    foreach (pmssWelcomeHomeCommonApps() as $id) {
+        if (!isset($active[$id]) && !isset($inactive[$id]) && in_array($id, $media, true)) $inactive[$id] = $tile($id, null);
+    }
+    $rank = array_flip(pmssWelcomeHomeCommonApps());
+    $order = function ($a, $b) use ($rank) {
+        if ($a['hero'] !== $b['hero']) return $b['hero'] - $a['hero'];
+        return ($rank[$a['id']] ?? 99) - ($rank[$b['id']] ?? 99) ?: strcmp($a['name'], $b['name']);
+    };
+    uasort($active, $order);
+    uasort($inactive, $order);
+    $list = array_values($active);
+    $plain = count(array_filter($list, function ($t) { return !$t['hero']; }));
+    foreach ($inactive as $t) {
+        // An OpenClaw-first account is not nudged back to a second torrent client in the first rows.
+        $nudge = isset($rank[$t['id']]) && !($agentFirst && in_array($t['id'], array('qBittorrent', 'Deluge'), true));
+        $t['more'] = !($nudge && $plain < 9);
+        if (!$t['more']) $plain++;
+        $list[] = $t;
+    }
+    // PHP 7 sorts are not stable, so the order is kept by splitting rather than sorting.
+    return array_merge(array_values(array_filter($list, function ($t) { return !$t['more']; })), array_values(array_filter($list, function ($t) { return $t['more']; })));
+}
+
+/** One app tile: state, a one-click action where the panel has one, Restart while it runs. */
+function pmssWelcomeHomeAppTileHtml(array $app)
+{
+    $label = pmssWelcomeHtmlAttr($app['name']);
+    $sr = '<span class="h-sr"> '.$label.'</span>';
+    $configure = 'href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)"';
+    if ($app['action'] === 'open') $button = '<a class="h-btn" href="'.pmssWelcomeHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open'.$sr.'</a>';
+    elseif ($app['action'] === 'start') $button = '<button type="button" class="h-btn" data-tile-action="start">Start'.$sr.'</button>';
+    elseif ($app['action'] === 'setup') $button = '<a class="h-btn h-btn-quiet" '.$configure.'>Set up'.$sr.'</a>';
+    elseif ($app['action'] === 'manage') $button = '<a class="h-btn h-btn-quiet" '.$configure.'>Manage'.$sr.'</a>';
+    else $button = '';
+    if (!empty($app['restart'])) $button .= '<button type="button" class="h-btn h-btn-quiet" data-tile-action="restart">Restart'.$sr.'</button>';
+    if ($app['state'] === 'absent') list($word, $class) = array('Not set up', '');
+    elseif ($app['state'] === 'off') list($word, $class) = array('Off', '');
+    else list($word, $class) = pmssWelcomeHomeStateWord($app['state']);
+    $classes = 'h-app'.($app['hero'] ? ' h-app-hero' : '').(in_array($app['state'], array('off', 'absent'), true) ? ' h-app-ghost' : '').(!empty($app['more']) ? ' h-app-more' : '');
+    return '<div class="'.$classes.'" data-app="'.pmssWelcomeHtmlAttr($app['id']).'">'
+        .'<div class="h-app-top">'.pmssWelcomeHomeAppIcon($app['id']).'<span class="h-app-n">'.$label.'</span>'
+        .'<span class="h-state '.$class.'" data-state-word>'.$word.'</span></div>'
+        .($app['desc'] !== '' ? '<div class="h-app-d">'.pmssWelcomeHtmlAttr($app['desc']).'</div>' : '')
+        .'<div class="h-app-acts">'.$button.'</div><div class="h-app-note" role="status"></div></div>';
 }
 
 function pmssWelcomeHomeStateWord($state)
@@ -1518,52 +1630,12 @@ function pmssWelcomeHomeAppIcon($id)
 
 function pmssWelcomeHomeAppsHtmlBuild(array $apps)
 {
-    $html = $apps === array() ? '<p class="h-muted h-apps-empty">No apps are switched on yet. Pick one to start:</p>' : '';
-    $html .= '<div class="h-apps">';
-    foreach (array_merge($apps, pmssWelcomeHomeSuggestions($apps)) as $app) {
-        if (!empty($app['ghost'])) {
-            $html .= '<div class="h-app h-app-ghost"><div class="h-app-top">'.pmssWelcomeHomeAppIcon($app['id']).'<span class="h-app-n">'.$app['name'].'</span><span class="h-state">Not set up</span></div>'
-                .'<div class="h-app-d">'.$app['desc'].'</div><a class="h-btn h-btn-quiet" href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)">Set up<span class="h-sr"> '.$app['name'].'</span></a></div>';
-            continue;
-        }
-        list($word, $class) = pmssWelcomeHomeStateWord($app['state']);
-        $action = $app['open']
-            ? '<a class="h-btn" href="'.pmssWelcomeHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open<span class="h-sr"> '.pmssWelcomeHtmlAttr($app['name']).'</span></a>'
-            : '<a class="h-btn h-btn-quiet" href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)">Manage<span class="h-sr"> '.pmssWelcomeHtmlAttr($app['name']).'</span></a>';
-        $html .= '<div class="h-app'.($app['hero'] ? ' h-app-hero' : '').'" data-app="'.pmssWelcomeHtmlAttr($app['id']).'">'
-            .'<div class="h-app-top">'.pmssWelcomeHomeAppIcon($app['id']).'<span class="h-app-n">'.pmssWelcomeHtmlAttr($app['name']).'</span>'
-            .'<span class="h-state '.$class.'" data-state-word>'.$word.'</span></div>'
-            .($app['desc'] !== '' ? '<div class="h-app-d">'.pmssWelcomeHtmlAttr($app['desc']).'</div>' : '')
-            .$action.'</div>';
-    }
-    return $html.'</div>';
-}
-
-/** Apps the account does not run yet, as quiet tiles that complete the last row of three; none once it runs six or more. */
-function pmssWelcomeHomeSuggestions(array $apps)
-{
-    if (count($apps) >= 6) return array();
-    $have = array();
-    foreach ($apps as $app) $have[$app['id']] = true;
-    $ideas = array(
-        'jellyfin' => array('Jellyfin', 'Stream your library to TV, phone and browser'),
-        'qBittorrent' => array('qBittorrent', 'A second torrent client with a modern web UI'),
-        'openclaw' => array('OpenClaw', 'An AI agent that works in your account, on your AI credits'),
-        'rclone' => array('rclone', 'Sync files to and from cloud storage'),
-        'sonarr' => array('Sonarr', 'Finds and downloads TV episodes'),
-    );
-    // An OpenClaw-first account starts with its torrent clients off; it is not nudged back to one.
-    foreach ($apps as $app) {
-        if (!empty($app['hero'])) { unset($ideas['qBittorrent']); break; }
-    }
-    // A featured app spans its own row, so only the ordinary tiles count towards the row being completed.
-    $tiles = count(array_filter($apps, function ($app) { return empty($app['hero']); }));
-    $list = array();
-    foreach ($ideas as $id => $idea) {
-        if (isset($have[$id]) || count($list) >= 3 - $tiles % 3) continue;
-        $list[] = array('id' => $id, 'name' => $idea[0], 'desc' => $idea[1], 'ghost' => true);
-    }
-    return $list;
+    $more = count(array_filter($apps, function ($app) { return !empty($app['more']); }));
+    $html = '<div class="h-apps" id="h-apps">';
+    foreach ($apps as $app) $html .= pmssWelcomeHomeAppTileHtml($app);
+    $html .= '</div><div class="h-apps-foot">';
+    if ($more > 0) $html .= '<button type="button" class="h-btn h-btn-quiet" id="h-apps-more" aria-expanded="false" onclick="pmssAppsMoreToggle(this)">More apps ('.$more.')</button>';
+    return $html.'<a class="h-head-link" href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)">All apps and settings in Configure</a></div>';
 }
 /** Connection details with copy buttons; client download links only to sites checked live. */
 function pmssWelcomeHomeConnectHtmlBuild($username, array $appsStatus, $agentFirst)
@@ -1786,7 +1858,10 @@ function pmssWelcomeHomeSupportEmit($home)
     }
     if ($mode === 'pikkumies') {
         $nonce = isset($_POST['nonce']) && is_string($_POST['nonce']) ? $_POST['nonce'] : '';
-        echo json_encode(pmssWelcomeHomeSupportPikkumiesSend($home, $topic, $text, $nonce, $email));
+        $answer = pmssWelcomeHomeSupportPikkumiesSend($home, $topic, $text, $nonce, $email);
+        pmssWelcomeHomeSupportLog($home, array('event' => 'sent', 'route' => 'pikkumies', 'topic' => $topic,
+            'outcome' => !empty($answer['ok']) ? 'accepted' : 'refused', 'message' => (string) ($answer['message'] ?? ''), 'chars' => strlen($text)));
+        echo json_encode($answer);
         return;
     }
     $body = json_encode(pmssWelcomeHomeSupportRequestBuild($topic, $text, $email), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -1794,7 +1869,37 @@ function pmssWelcomeHomeSupportEmit($home)
         'header' => "Authorization: Bearer ".$credentials['key']."\r\nContent-Type: application/json\r\nAccept: application/json\r\n")));
     $raw = @file_get_contents('https://pulsedmedia.com/remote/ticket.php', false, $context, 0, 65536);
     $code = isset($http_response_header[0]) && preg_match('#^HTTP/\S+\s+(\d{3})#', $http_response_header[0], $m) ? (int) $m[1] : 0;
-    echo json_encode(pmssWelcomeHomeSupportAnswer($code, $raw));
+    $answer = pmssWelcomeHomeSupportAnswer($code, $raw);
+    pmssWelcomeHomeSupportLog($home, array('event' => 'sent', 'route' => 'ticket', 'topic' => $topic, 'outcome' => !empty($answer['ok']) ? 'opened' : 'failed',
+        'http' => $code, 'ticket' => (string) ($answer['ticket'] ?? ''), 'chars' => strlen($text)));
+    echo json_encode($answer);
+}
+
+/**
+ * One row in the account's Get help log, ~/.pmss/support-log.jsonl (operator 2026-10-23: "deterministic log additions"):
+ * when, which route, what happened and Pikkumies' Result line; never the question text. The newest 500 rows are kept.
+ */
+function pmssWelcomeHomeSupportLog($home, array $row)
+{
+    $dir = rtrim((string) $home, '/').'/.pmss';
+    if ((!is_dir($dir) && !@mkdir($dir, 0700)) || is_link($dir)) return;
+    $file = $dir.'/support-log.jsonl';
+    if (is_link($file)) return;
+    @file_put_contents($file, json_encode(array('ts' => gmdate('c')) + $row, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n", FILE_APPEND | LOCK_EX);
+    if ((int) @filesize($file) > 262144) {
+        $rows = @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($rows) && count($rows) > 500) @file_put_contents($file, implode("\n", array_slice($rows, -500))."\n", LOCK_EX);
+    }
+}
+
+/** The said_at of the newest "answered" row in the log, so each Pikkumies answer is logged once. */
+function pmssWelcomeHomeSupportLogLastAnswer($home)
+{
+    $file = rtrim((string) $home, '/').'/.pmss/support-log.jsonl';
+    if (!is_file($file) || is_link($file)) return 0;
+    $size = (int) @filesize($file);
+    $tail = (string) @file_get_contents($file, false, null, max(0, $size - 16384));
+    return preg_match_all('/"event":"answered"[^\n]*"said_at":(\d+)/', $tail, $m) ? (int) max($m[1]) : 0;
 }
 
 /** The account's notification email, to prefill the form (a regular own file only). */
@@ -1814,10 +1919,17 @@ function pmssWelcomeHomeSupportPikkumiesPrompt($topic, $text, $email = '')
 {
     $topics = pmssWelcomeHomeSupportTopics();
     $head = 'Support request from the panel\'s Get help form (topic: '.(isset($topics[$topic]) ? $topics[$topic] : 'Other').").\n\n";
-    $tail = "\n\nPlease look into this on my seedbox. If you fix it, tell me what you changed and ask whether I still want a"
-        .' support ticket. If you cannot fix it, or the cause is on Pulsed Media\'s side (server, network, hardware), stop'
-        .' and open a support ticket with your written findings; I agree to that ticket being sent. Do not attach logs or'
-        .' this conversation unless I say so.'
+    $tail = "\n\nPlease check this on my seedbox. Write for me, not for a technician: plain words, with no commands, file"
+        ." paths, code or logs, also in anything you write while you work.\n"
+        ."Start your answer with exactly one of these lines, keeping the word Result: in English:\n"
+        ."Result: All fine, no ticket needed.\n"
+        ."Result: Fixed, no ticket needed: <what you changed, in a few words>.\n"
+        ."Result: Not fixed, I opened ticket #<number>.\n"
+        ."Result: Not fixed, ticket not sent: <why>.\n"
+        ."Then at most five short lines on what you checked and what you found.\n"
+        .'If everything is fine, or you fixed it, do not open a ticket. If you cannot fix it, or the cause is on Pulsed'
+        .' Media\'s side (server, network, hardware), open a support ticket with your findings; I agree to that ticket being'
+        .' sent. Do not attach logs or this conversation unless I say so.'
         .(filter_var(trim((string) $email), FILTER_VALIDATE_EMAIL) ? ' My email for the ticket: '.trim((string) $email).'.' : '');
     $clean = trim(pmssWelcomeHomeSupportRedact(str_replace(array("\r\n", "\r"), "\n", (string) $text)));
     $room = 4000 - strlen($head) - strlen($tail);
@@ -1858,7 +1970,7 @@ function pmssWelcomeHomeSupportPikkumiesRun($binary, array $args, $stdin, $secon
 /** What the customer reads for each `pikkumies ask` exit code (mcxPikkumies ADR 0075); ok only for 0. */
 function pmssWelcomeHomeSupportPikkumiesAnswer($code)
 {
-    if ($code === 0) return array('ok' => true, 'pikkumies' => true, 'message' => 'Pikkumies is looking at it. If it cannot fix it, it opens the ticket with what it found.');
+    if ($code === 0) return array('ok' => true, 'pikkumies' => true, 'message' => 'Pikkumies is checking it now. If all is fine it tells you no ticket is needed; if it cannot fix it, it opens the ticket.');
     $map = array(
         2 => 'Pikkumies needs its one-time setup first. Open the Pikkumies tab, or send this to support now.',
         3 => 'Pikkumies has unsent text in its window. Send or clear it there, or send this to support now.',
@@ -1886,12 +1998,16 @@ function pmssWelcomeHomeSupportPikkumiesSend($home, $topic, $text, $nonce, $emai
     return pmssWelcomeHomeSupportPikkumiesAnswer($code) + array('sent' => time());
 }
 
-/** GET welcome.php?support=activity: Pikkumies' state and latest activity line, for the form while it works. */
+/**
+ * GET welcome.php?support=activity: Pikkumies' state for the form while it works. at = its newest activity of any kind
+ * (to tell started and finished); said / said_at = its newest own words, never a tool call line, so no command, path or
+ * argument reaches the page (operator 2026-10-23: "with shell commands shown"). A build without said shows none.
+ */
 function pmssWelcomeHomeSupportActivityEmit($home)
 {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
-    $answer = array('state' => '', 'line' => '', 'at' => 0);
+    $answer = array('state' => '', 'at' => 0, 'said' => '', 'said_at' => 0);
     // Only where Pikkumies windows run: elsewhere `eternal ...` is a question to the AI, not a command.
     $entry = function_exists('posix_geteuid') && function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
     $state = pmssWelcomePikkumiesStateRead($home, is_array($entry) ? (string) ($entry['name'] ?? '') : '');
@@ -1901,9 +2017,13 @@ function pmssWelcomeHomeSupportActivityEmit($home)
         $data = $code === 0 ? json_decode($out, true) : null;
         if (is_array($data)) {
             $answer['state'] = preg_match('/^[a-z]{1,16}$/D', (string) ($data['state'] ?? '')) ? (string) $data['state'] : '';
-            $line = preg_replace('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', ' ', (string) ($data['line'] ?? ''));
             $answer['at'] = isset($data['at']) && is_int($data['at']) && $data['at'] > 0 ? $data['at'] : 0;
-            $answer['line'] = function_exists('mb_strimwidth') ? mb_strimwidth(trim($line), 0, 200, '…', 'UTF-8') : substr(trim($line), 0, 200);
+            $said = preg_replace('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', ' ', (string) ($data['said'] ?? ''));
+            $answer['said'] = function_exists('mb_strimwidth') ? mb_strimwidth(trim($said), 0, 200, '…', 'UTF-8') : substr(trim($said), 0, 200);
+            $answer['said_at'] = $answer['said'] !== '' && isset($data['said_at']) && is_int($data['said_at']) && $data['said_at'] > 0 ? $data['said_at'] : 0;
+            if (strncmp($answer['said'], 'Result:', 7) === 0 && $answer['said_at'] > pmssWelcomeHomeSupportLogLastAnswer($home)) {
+                pmssWelcomeHomeSupportLog($home, array('event' => 'answered', 'route' => 'pikkumies', 'result' => $answer['said'], 'said_at' => $answer['said_at']));
+            }
         }
     }
     echo json_encode($answer);

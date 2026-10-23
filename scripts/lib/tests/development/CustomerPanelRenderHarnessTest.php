@@ -102,11 +102,11 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $form = array(
                 'id="h-support-form"',
                 'onsubmit="return pmssSupportSend(this)"',
-                '<input type="radio" name="topic" value="working" checked> Not working',
-                '<input type="radio" name="topic" value="slow"> Slow',
-                '<input type="radio" name="topic" value="down"> Server down',
-                '<input type="radio" name="topic" value="billing"> Billing / account',
-                '<input id="h-support-email" name="email" type="email" required value="render@example.test">',
+                '<input type="radio" name="topic" value="working" checked><span>Not working</span>',
+                '<input type="radio" name="topic" value="slow"><span>Slow</span>',
+                '<input type="radio" name="topic" value="down"><span>Server down</span>',
+                '<input type="radio" name="topic" value="billing"><span>Billing / account</span>',
+                '<input name="email" type="hidden" value="render@example.test">',
             );
 
             $keyless = $render('welcome.php', $expectations['welcome.php'])['stdout'];
@@ -172,14 +172,14 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $pikkumiesFirst = array(
                 'data-pikkumies="1"',
                 'id="h-support-pikkumies"',
-                '<button type="button" class="h-support-skip" onclick="return pmssSupportSend(this.form, true)">Skip Pikkumies, send to support now</button>',
+                '<button type="button" class="h-support-skip" onclick="return pmssSupportSend(this.form, true)">Send to support instead</button>',
                 'id="h-support-activity"',
             );
             $assertPlainForm = function (string $html, string $case): void {
                 $this->assertStringContainsString('id="h-support-form"', $html, $case);
                 $this->assertStringContainsString('data-pikkumies="0"', $html, $case);
                 foreach (array('data-pikkumies="1"', 'id="h-support-pikkumies"', 'class="h-support-skip"',
-                    'Skip Pikkumies, send to support now', 'id="h-support-activity"') as $needle) {
+                    'Send to support instead', 'id="h-support-activity"') as $needle) {
                     $this->assertStringNotContainsString($needle, $html, $case.': '.$needle);
                 }
             };

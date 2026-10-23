@@ -46,11 +46,11 @@ final class WelcomeHomeTest extends TestCase
             .var_export($announcements, true).', '.var_export($articles, true).'));');
     }
 
-    public function testNewsSelectKeepsFourAnnouncementsAndTenArticlesNewestFirst(): void
+    public function testNewsSelectKeepsFiveAnnouncementsAndTenArticlesNewestFirst(): void
     {
-        $news = $this->newsSelect($this->newsItems('A', 5, 100), array_reverse($this->newsItems('B', 12, 200)));
+        $news = $this->newsSelect($this->newsItems('A', 7, 100), array_reverse($this->newsItems('B', 12, 200)));
 
-        $this->assertSame(['A1', 'A2', 'A3', 'A4'], array_column($news['announcements'], 'title'));
+        $this->assertSame(['A1', 'A2', 'A3', 'A4', 'A5'], array_column($news['announcements'], 'title'));
         $this->assertSame(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10'], array_column($news['articles'], 'title'));
         $this->assertSame(['title' => 'A1', 'link' => 'https://example.test/A1', 'time' => 100], $news['announcements'][0]);
     }
@@ -153,22 +153,26 @@ final class WelcomeHomeTest extends TestCase
             .'));'
         );
 
-        foreach (['plain', 'agent'] as $mode) {
-            $ids = array_column($result[$mode], 'id');
-            sort($ids);
-            $this->assertSame(['openclaw', 'qBittorrent', 'rtorrent', 'sonarr'], $ids, $mode);
-        }
+        $first = function (array $tiles) { return array_column(array_filter($tiles, function ($t) { return !$t['more']; }), 'id'); };
+        // Running apps first, then the common apps the account does not run, to fill three rows of three.
+        $this->assertSame(['rtorrent', 'qBittorrent', 'sonarr', 'openclaw', 'Deluge', 'jellyfin', 'radarr', 'prowlarr'], $first($result['plain']));
+        $this->assertFalse(in_array('lighttpd', array_column($result['plain'], 'id'), true), 'lighttpd is not an app tile');
 
         $plain = array_column($result['plain'], null, 'id');
         $this->assertSame('ruTorrent', $plain['rtorrent']['name']);
         $this->assertSame('Your main torrent client', $plain['rtorrent']['desc']);
-        $this->assertSame(true, $plain['rtorrent']['open']);
-        $this->assertSame(false, $plain['qBittorrent']['open'], 'A stopped app offers Manage, not Open');
+        $this->assertSame(['open', true], [$plain['rtorrent']['action'], $plain['rtorrent']['restart']]);
+        $this->assertSame(['start', false], [$plain['qBittorrent']['action'], $plain['qBittorrent']['open']], 'A stopped app starts with one click');
+        $this->assertSame('start', $plain['Deluge']['action'], 'An app switched off starts with one click');
+        $this->assertSame('setup', $plain['radarr']['action'], 'A media app never installed is set up in Configure');
+        $this->assertSame('absent', $plain['radarr']['state']);
         $this->assertSame([false], array_values(array_unique(array_column($result['plain'], 'hero'))));
 
         $this->assertSame('openclaw', $result['agent'][0]['id']);
         $this->assertSame(true, $result['agent'][0]['hero']);
         $this->assertSame(1, count(array_filter(array_column($result['agent'], 'hero'))));
+        $agentMore = array_column(array_filter($result['agent'], function ($t) { return $t['more']; }), 'id');
+        $this->assertTrue(in_array('Deluge', $agentMore, true),'An OpenClaw-first account is not nudged back to a torrent client in the first rows');
     }
 
     private const CREDITS_KEY = 'vsk-abcdefghijklmnopqrstuvwx';
@@ -293,17 +297,21 @@ final class WelcomeHomeTest extends TestCase
         );
     }
 
-    public function testSuggestionsSkipQbittorrentNextToFeaturedApp(): void
+    public function testAppsGridFillsThreeRowsAndKeepsTheRestUnderMoreApps(): void
     {
-        $result = $this->runWelcomeHome('echo json_encode(array('
-            .'"hero" => pmssWelcomeHomeSuggestions(array(array("id" => "openclaw", "hero" => true))),'
-            .'"plain" => pmssWelcomeHomeSuggestions(array(array("id" => "openclaw", "hero" => false)))'
-            .'));');
+        $status = ['apps' => ['rtorrent' => ['state' => 'running', 'url' => 'https://render.test/user-alice/rutorrent/'],
+            'qBittorrent' => ['state' => 'off'], 'Deluge' => ['state' => 'off'], 'rclone' => ['state' => 'off'], 'openclaw' => ['state' => 'off'],
+            'slskd' => ['state' => 'off'], 'sabnzbd' => ['state' => 'running', 'url' => 'https://render.test/sabnzbd/']]];
+        $tiles = $this->runWelcomeHome('echo json_encode(pmssWelcomeHomeAppsBuild('.var_export($status, true).', false));');
+        $first = array_column(array_filter($tiles, function ($t) { return !$t['more']; }), 'id');
+        $this->assertSame(['rtorrent', 'sabnzbd', 'qBittorrent', 'Deluge', 'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'rclone'], $first,
+            'nine tiles: what runs, then the common apps');
+        $more = array_column(array_filter($tiles, function ($t) { return $t['more']; }), 'id');
+        $this->assertSame(['openclaw', 'slskd'], $more, 'the rest is one click away under More apps');
 
-        $hero = array_column($result['hero'], 'id');
-        $this->assertSame(array('jellyfin', 'rclone', 'sonarr'), $hero);
-        $this->assertFalse(in_array('qBittorrent', $hero, true), 'An OpenClaw-first account is not nudged back to a torrent client');
-        $this->assertSame(array('jellyfin', 'qBittorrent'), array_column($result['plain'], 'id'));
+        $html = $this->runWelcomeHome('echo json_encode(array("html" => pmssWelcomeHomeAppsHtmlBuild(pmssWelcomeHomeAppsBuild('.var_export($status, true).', false))));')['html'];
+        $this->assertStringContainsAllStrings(array('data-tile-action="start"', 'data-tile-action="restart"', 'More apps (2)',
+            'All apps and settings in Configure', "pmssWelcomeTabOpen('#pmssconfigure', this)", 'h-app h-app-ghost h-app-more" data-app="slskd"'), $html);
     }
 
     public function testAppsBuildOpensRtorrentWhileItIsNotRunning(): void
@@ -434,13 +442,20 @@ final class WelcomeHomeTest extends TestCase
         $this->assertStringContainsAllStrings(array(
             "Support request from the panel's Get help form (topic: Not working).",
             "rTorrent stopped\npassword: [removed]",
-            'open a support ticket with your written findings',
+            'open a support ticket with your findings',
             'My email for the ticket: a@example.test.',
+            "Result: All fine, no ticket needed.\n",
+            "Result: Fixed, no ticket needed: <what you changed, in a few words>.\n",
+            "Result: Not fixed, I opened ticket #<number>.\n",
+            "Result: Not fixed, ticket not sent: <why>.\n",
+            'no commands, file paths, code or logs',
+            'If everything is fine, or you fixed it, do not open a ticket.',
         ), $result['short']);
+        $this->pmssAssertStringNotContainsString('whether I still want', $result['short'], 'The answer says no ticket is needed; it does not ask');
         $this->pmssAssertStringNotContainsString('hunter2', $result['short'], 'A password in the text never reaches Pikkumies');
         $this->pmssAssertStringNotContainsString("\r", $result['short']);
 
-        $this->assertStringContainsAllStrings(array('topic: Slow', 'It is slow', 'open a support ticket with your written findings'), $result['noEmail']);
+        $this->assertStringContainsAllStrings(array('topic: Slow', 'It is slow', 'open a support ticket with your findings'), $result['noEmail']);
         $this->pmssAssertStringNotContainsString('My email for the ticket', $result['noEmail'], 'An invalid email is left out');
         $this->assertStringContainsString('topic: Other', $result['unknown']);
         $this->pmssAssertStringNotContainsString('My email for the ticket', $result['unknown']);
@@ -460,7 +475,7 @@ final class WelcomeHomeTest extends TestCase
 
         $this->assertSame(true, $result['c0']['ok']);
         $this->assertSame(true, $result['c0']['pikkumies']);
-        $this->assertStringContainsString('Pikkumies is looking at it', $result['c0']['message']);
+        $this->assertStringContainsString('Pikkumies is checking it now', $result['c0']['message']);
 
         $known = array();
         foreach (array(2, 3, 4, 5, 6) as $code) {
@@ -560,8 +575,10 @@ final class WelcomeHomeTest extends TestCase
         $homes = array();
         $line = "Checking rTorrent\u{0007}now\u{0085}".str_repeat('y', 300);
         foreach (array(
-            'busy' => array('state' => 'busy', 'line' => $line),
+            'busy' => array('state' => 'busy', 'line' => 'terminal: cat ~/.rtorrent.rc', 'at' => 1760000005, 'said' => $line, 'said_at' => 1760000004),
             'badState' => array('state' => '<b>BUSY</b>', 'line' => 'reading the log'),
+            'lineOnly' => array('state' => 'busy', 'line' => 'terminal: df -h /home', 'at' => 1760000009),
+            'answered' => array('state' => 'idle', 'line' => 'read_file: /home/x', 'at' => 1760000020, 'said' => 'Result: All fine, no ticket needed. Your disk is 41% full.', 'said_at' => 1760000019),
         ) as $name => $answer) {
             $homes[$name] = $this->supportPikkumiesHome($answerer);
             $this->pmssWriteFile($homes[$name].'/.mcxPikkumies/pikkumies/bin/pikkumies.json', (string) json_encode($answer));
@@ -585,14 +602,34 @@ final class WelcomeHomeTest extends TestCase
         }
 
         $this->assertSame('busy', $result['busy']['state']);
-        $this->assertStringContainsString('Checking rTorrent now', $result['busy']['line'], 'Control characters become spaces');
-        $this->assertSame(0, preg_match('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', $result['busy']['line']), 'No control characters reach the page');
-        $length = function_exists('mb_strlen') ? mb_strlen($result['busy']['line'], 'UTF-8') : strlen($result['busy']['line']);
-        $this->assertTrue($length <= 200, 'The line is cut to 200 characters: '.$length);
+        $this->assertSame(1760000005, $result['busy']['at']);
+        $this->assertStringContainsString('Checking rTorrent now', $result['busy']['said'], 'Control characters become spaces');
+        $this->assertSame(0, preg_match('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', $result['busy']['said']), 'No control characters reach the page');
+        $length = function_exists('mb_strlen') ? mb_strlen($result['busy']['said'], 'UTF-8') : strlen($result['busy']['said']);
+        $this->assertTrue($length <= 200, 'Pikkumies\' words are cut to 200 characters: '.$length);
+        foreach ($result as $name => $answer) {
+            $this->assertFalse(array_key_exists('line', $answer), $name.': the raw activity line (a command, path or argument) never reaches the page');
+            $this->pmssAssertStringNotContainsString('terminal:', (string) json_encode($answer), $name);
+        }
+        // A Pikkumies build without said: progress shows no words at all, never the tool line.
+        $this->assertSame(array('state' => 'busy', 'at' => 1760000009, 'said' => '', 'said_at' => 0), $result['lineOnly']);
 
-        $this->assertSame(array('state' => '', 'line' => 'reading the log', 'at' => 0), $result['badState']);
+        $this->assertSame(array('state' => '', 'at' => 0, 'said' => '', 'said_at' => 0), $result['badState']);
         foreach (array('notJson', 'failed', 'noBinary', 'oldBuild', 'notVisible') as $name) {
-            $this->assertSame(array('state' => '', 'line' => '', 'at' => 0), $result[$name], $name);
+            $this->assertSame(array('state' => '', 'at' => 0, 'said' => '', 'said_at' => 0), $result[$name], $name);
+        }
+
+        // The answer start is logged once, by the server, with no question text.
+        $log = $homes['answered'].'/.pmss/support-log.jsonl';
+        $rows = array_map(function ($row) { return json_decode($row, true); }, file($log, FILE_IGNORE_NEW_LINES));
+        $this->assertSame(1, count($rows), 'one answered row');
+        $this->assertSame(array('answered', 'pikkumies', 'Result: All fine, no ticket needed. Your disk is 41% full.', 1760000019),
+            array($rows[0]['event'], $rows[0]['route'], $rows[0]['result'], $rows[0]['said_at']));
+        $this->runWelcomeHome('function pmssWelcomePikkumiesStateRead($home, $name) { return array("visible" => true, "origin" => ""); }'
+            .' ob_start(); pmssWelcomeHomeSupportActivityEmit('.var_export($homes['answered'], true).'); ob_end_clean(); echo "[]";', true);
+        $this->assertSame(1, count(file($log)), 'a second poll of the same answer adds no row');
+        foreach (array('busy', 'lineOnly') as $name) {
+            $this->assertFalse(is_file($homes[$name].'/.pmss/support-log.jsonl'), $name.': no Result, no row');
         }
         $this->assertFalse(file_exists($homes['oldBuild'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), 'A build without the activity command is never run');
         $this->assertFalse(file_exists($homes['notVisible'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), 'Pikkumies is never run where its windows do not run');

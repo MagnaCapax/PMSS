@@ -70,3 +70,21 @@ What existed on 2026-10-22:
 
 - Sending the ticket by mail from the server: the billing site would have no proof of which account sent it.
 - Waiting for step two: the operator asked for the release now, and most hosts do not run Eternals yet.
+
+## Amendment 2026-10-23: a standard Pikkumies answer, no commands on the page, a support log
+
+Operator, 2026-10-23: "the interface sucks, is over complicated, non user friend, with shell commands shown etc. the
+promtp should always say no ticket needed if all is fine ... always stadnard, and deterministic log additions".
+
+- The prompt asks Pikkumies to start its answer with one fixed line: "Result: All fine, no ticket needed.", "Result:
+  Fixed, no ticket needed: ...", "Result: Not fixed, I opened ticket #...", or "Result: Not fixed, ticket not sent:
+  ...", then at most five plain lines, with no commands, file paths, code or logs in anything it writes. It opens a
+  ticket only when it cannot fix the problem.
+- Item 5 changes: the form never shows Pikkumies' activity line, which is often a command. It shows Pikkumies' own newest
+  words (`said` from `pikkumies eternal activity --json`, mcxPikkumies ADR-0075 amendment 2026-10-23), else "checking
+  your seedbox" with the seconds elapsed. When Pikkumies is done, the form shows its Result line.
+- The form is shorter: topic chips, the email field only when the account has none on file, one note, Send and a
+  visible "Send to support instead", and four links.
+- `~/.pmss/support-log.jsonl` in the account gets one row per send (route, topic, outcome, length of the text, never
+  the text) and one per Pikkumies answer (its Result line), written by the panel, not by the AI. It keeps the newest 500
+  rows.
