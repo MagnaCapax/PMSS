@@ -44,7 +44,7 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
                     'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
                 ],
             ],
-            'scripts/lib/update/runtime/stepPolicy.php' => [
+            'scripts/lib/update/runtime/userMaintenanceState.php' => [
                 'required' => [
                     'processed_users_mismatch',
                     'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL',
@@ -65,7 +65,7 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
      */
     public function testMismatchClassificationIsSoftFailNotMustSucceed(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/stepPolicy.php');
+        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/userMaintenanceState.php');
         $start = strpos($src, 'processed_users_mismatch');
         $this->assertTrue($start !== false, 'processed_users_mismatch policy missing from stepPolicy.php');
 

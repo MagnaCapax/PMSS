@@ -13,23 +13,64 @@ require_once __DIR__.'/../../update/runtime/stepPolicy.php';
  */
 class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
 {
+    public function testSummaryPreservesMarkerAndClassifiedFailurePayloads(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-step2-state-');
+        $marker = $dir.'/incomplete.json';
+        $previousLogPath = $GLOBALS['PMSS_JSON_LOG_PATH'] ?? null;
+        $cases = [
+            [['processed' => 3, 'total' => 15, 'skip_reasons' => ['u1', 'u2']], 'processed_users_mismatch:3_of_15 skipped=[u1; u2]'],
+            [['total' => 2], 'processed_users_mismatch:0_of_2'],
+            [['processed' => '1', 'total' => '2', 'skip_reasons' => 'invalid'], 'processed_users_mismatch:1_of_2'],
+            [['processed' => -1, 'total' => 0], 'processed_users_mismatch:-1_of_0'],
+            [['processed' => 0, 'total' => 12, 'skip_reasons' => range(1, 12)], 'processed_users_mismatch:0_of_12 skipped=[1; 2; 3; 4; 5; 6; 7; 8; 9; 10]'],
+        ];
+        try {
+            $this->pmssWithEnv(['PMSS_INCOMPLETE_USER_MAINTENANCE_PATH' => $marker], function () use ($dir, $marker, $cases): void {
+                foreach ($cases as $index => [$summary, $reason]) {
+                    $GLOBALS['PMSS_JSON_LOG_PATH'] = $dir.'/events-'.$index.'.jsonl';
+                    pmssUpdateStep2HandleUserMaintenanceSummary($summary);
+                    $stored = $this->pmssReadJsonArrayFile($marker);
+                    unset($stored['ts']);
+                    $this->assertSame([
+                        'processed' => (int) ($summary['processed'] ?? 0), 'total' => (int) $summary['total'],
+                        'skipped' => is_array($summary['skip_reasons'] ?? null) ? array_values($summary['skip_reasons']) : [],
+                    ], $stored);
+                    $events = array_map(static function ($line) { return json_decode($line, true); }, file($GLOBALS['PMSS_JSON_LOG_PATH']));
+                    $failures = array_values(array_filter($events, static function ($event): bool { return $event['event'] === 'step_failed'; }));
+                    $this->assertSame(1, count($failures));
+                    unset($failures[0]['ts'], $failures[0]['pmss_correlation_id']);
+                    $this->assertSame([
+                        'event' => 'step_failed', 'severity' => 'warn', 'classification' => 'soft_fail',
+                        'step' => 'Updating all user environments', 'rc' => 1, 'reason' => $reason,
+                    ], $failures[0]);
+                }
+                // Invalid summaries leave existing evidence; complete/overcomplete runs clear it.
+                foreach ([null, false, 'invalid', 0] as $invalid) pmssUpdateStep2HandleUserMaintenanceSummary($invalid);
+                $this->assertTrue(is_file($marker));
+                foreach ([[], ['processed' => 2, 'total' => 2], ['processed' => 3, 'total' => 2]] as $complete) {
+                    file_put_contents($marker, '{}');
+                    pmssUpdateStep2HandleUserMaintenanceSummary($complete);
+                    $this->assertFalse(is_file($marker));
+                }
+            });
+        } finally {
+            $GLOBALS['PMSS_JSON_LOG_PATH'] = $previousLogPath;
+        }
+    }
+
     public function testMismatchIsSoftFailNotMustSucceed(): void
     {
-        $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/stepPolicy.php');
+        $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/userMaintenanceState.php');
         // The processed_users_mismatch call must classify SOFT_FAIL.
         $this->assertTrue(
-            strpos($data, "PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,\n        1,\n        pmssUpdateStep2UserMaintenanceMismatchReason") !== false
-            || preg_match('/pmssUpdateStep2HandleClassifiedFailure\(\s*\'Updating all user environments\',\s*PMSS_UPDATE_STEP_CLASS_SOFT_FAIL/s', $data) === 1,
+            preg_match('/pmssUpdateStep2HandleClassifiedFailure\(\s*\'Updating all user environments\',\s*PMSS_UPDATE_STEP_CLASS_SOFT_FAIL/s', $data) === 1,
             'processed_users_mismatch must be SOFT_FAIL (GH#592), not MUST_SUCCEED'
         );
         // Guard against naive re-promotion: the mismatch block must NOT use MUST_SUCCEED.
         $this->assertTrue(
             preg_match('/\'Updating all user environments\',\s*PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED/s', $data) !== 1,
             'the user-mismatch step must not be re-promoted to MUST_SUCCEED without revisiting GH#592/#302'
-        );
-        $this->assertSame(
-            'processed_users_mismatch:3_of_15 skipped=[u1; u2]',
-            pmssUpdateStep2UserMaintenanceMismatchReason(3, 15, ['u1', 'u2'])
         );
     }
 
@@ -97,7 +138,7 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
     public function testFullCompletionClearsStaleMarker(): void
     {
         // The policy helper clears the marker on a clean run.
-        $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/stepPolicy.php');
+        $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/userMaintenanceState.php');
         $this->assertTrue(
             strpos($data, 'pmssUpdateClearIncompleteUserMaintenance()') !== false,
             'a clean run (all users processed) must clear a stale incomplete-tail marker'
