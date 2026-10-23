@@ -34,9 +34,9 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
 
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $dir], function () use ($escapePath): void {
             $invalidUser = '../'.basename($escapePath);
-            ob_start();
-            pmssUserRefreshMarkDone($invalidUser, 'sig');
-            $output = (string) ob_get_clean();
+            [, $output] = $this->pmssCaptureStdout(static function () use ($invalidUser): void {
+                pmssUserRefreshMarkDone($invalidUser, 'sig');
+            });
 
             $this->assertSame('', pmssUserRefreshMarkerPath($invalidUser));
             $this->assertFalse(pmssUserRefreshAlreadyDone($invalidUser, 'sig'));
@@ -51,9 +51,9 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $unsafeDir = $root.'/state/../escape';
 
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $unsafeDir], function () use ($root): void {
-            ob_start();
-            pmssUserRefreshMarkDone('alice', 'sig');
-            $output = (string) ob_get_clean();
+            [, $output] = $this->pmssCaptureStdout(static function (): void {
+                pmssUserRefreshMarkDone('alice', 'sig');
+            });
 
             $this->assertSame('', pmssUserRefreshMarkerPath('alice'));
             $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'sig'));
@@ -111,13 +111,10 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-urefresh-create-', 0700);
         $stateDir = $root.'/state';
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $stateDir], function () use ($stateDir): void {
-            ob_start();
-            try {
+            [, $output] = $this->pmssCaptureStdout(static function (): void {
                 pmssUserRefreshMarkDone('alice', 'old-signature');
                 pmssUserRefreshMarkDone('alice', 'new-signature');
-            } finally {
-                $output = (string) ob_get_clean();
-            }
+            });
 
             $this->assertSame('', $output);
             $this->assertSame($stateDir.'/alice', pmssUserRefreshMarkerPath('alice'));
@@ -132,24 +129,18 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $stateDir = $this->pmssMakeTempDir('pmss-urefresh-short-', 0700);
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $stateDir], function () use ($stateDir): void {
             foreach ([false, 0, 2] as $written) {
-                ob_start();
-                try {
+                [, $output] = $this->pmssCaptureStdout(static function () use ($written): void {
                     pmssUserRefreshMarkDone('alice', 'new-signature', static function () use ($written) { return $written; });
-                } finally {
-                    $output = (string) ob_get_clean();
-                }
+                });
                 $this->assertStringContainsString('Unable to write user refresh marker', $output);
                 $this->assertFalse(file_exists($stateDir.'/alice'));
             }
 
-            ob_start();
-            try {
+            [, $output] = $this->pmssCaptureStdout(static function (): void {
                 pmssUserRefreshMarkDone('alice', 'new-signature', static function (string $path, string $payload): int {
                     return file_put_contents($path, $payload);
                 });
-            } finally {
-                $output = (string) ob_get_clean();
-            }
+            });
             $this->assertSame('', $output);
             $this->assertSame("new-signature\n", file_get_contents($stateDir.'/alice'));
         });
@@ -163,12 +154,9 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         ], function (): void {
             $this->assertSame('', pmssUserRefreshMarkerPath('alice'));
             $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'old-signature'));
-            ob_start();
-            try {
+            [, $output] = $this->pmssCaptureStdout(static function (): void {
                 pmssUserRefreshMarkDone('alice', 'new-signature');
-            } finally {
-                $output = (string) ob_get_clean();
-            }
+            });
             $this->assertStringContainsString('Refusing to write unsafe user refresh marker', $output);
         });
     }

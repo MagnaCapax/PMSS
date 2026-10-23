@@ -59,30 +59,31 @@ class QuotaFixGuardTest extends TestCase
         $logs = [];
         $exitCode = 0;
 
-        ob_start();
-        $queryResult = \pmssQuotaFixRunCommand(
-            '[quotaFix] Verifying quota enforcement state:',
-            'quotaon -ap',
-            false,
-            $exitCode,
-            true,
-            static function (string $command): array {
-                return ['rc' => 2, 'stdout' => "quota state\n", 'stderr' => ''];
-            },
-            $this->pmssMakeArrayLogger($logs)
-        );
-        $criticalResult = \pmssQuotaFixRunCommand(
-            '[quotaFix] Re-enabling quotas',
-            'quotaon -av',
-            true,
-            $exitCode,
-            false,
-            static function (string $command): array {
-                return ['rc' => 5, 'stdout' => '', 'stderr' => "quotaon failed\n"];
-            },
-            $this->pmssMakeArrayLogger($logs)
-        );
-        $output = ob_get_clean();
+        [[$queryResult, $criticalResult], $output] = $this->pmssCaptureStdout(function () use (&$exitCode, &$logs): array {
+            $queryResult = \pmssQuotaFixRunCommand(
+                '[quotaFix] Verifying quota enforcement state:',
+                'quotaon -ap',
+                false,
+                $exitCode,
+                true,
+                static function (string $command): array {
+                    return ['rc' => 2, 'stdout' => "quota state\n", 'stderr' => ''];
+                },
+                $this->pmssMakeArrayLogger($logs)
+            );
+            $criticalResult = \pmssQuotaFixRunCommand(
+                '[quotaFix] Re-enabling quotas',
+                'quotaon -av',
+                true,
+                $exitCode,
+                false,
+                static function (string $command): array {
+                    return ['rc' => 5, 'stdout' => '', 'stderr' => "quotaon failed\n"];
+                },
+                $this->pmssMakeArrayLogger($logs)
+            );
+            return [$queryResult, $criticalResult];
+        });
 
         $this->assertSame(2, $queryResult['rc']);
         $this->assertSame(5, $criticalResult['rc']);

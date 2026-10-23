@@ -78,10 +78,10 @@ class UserSystemdWatchdogTest extends TestCase
 
     public function testPendingObservationAndUnannouncedRecoveryStayQuiet(): void
     {
-        ob_start();
-        \pmssUserSystemdWatchdogLogTransition('alice', ['state' => 'pending'], []);
-        \pmssUserSystemdWatchdogLogTransition('alice', ['state' => 'healthy'], ['state' => 'pending']);
-        $output = (string) ob_get_clean();
+        [, $output] = $this->pmssCaptureStdout(static function (): void {
+            \pmssUserSystemdWatchdogLogTransition('alice', ['state' => 'pending'], []);
+            \pmssUserSystemdWatchdogLogTransition('alice', ['state' => 'healthy'], ['state' => 'pending']);
+        });
 
         $this->assertSame('', $output);
     }

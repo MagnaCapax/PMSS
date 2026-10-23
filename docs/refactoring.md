@@ -363,6 +363,11 @@ Parser compression retains source positions and result bytes. Certbot keeps only
 the last summary marker and its excerpt offset; whole-file and tail reads share
 the same summary path. Quota normalization preserves trailing empty split fields,
 and PSI fields share one unavailable-value path while keeping their existing bounds.
+Both Certbot file-read branches enforce the requested byte budget, including
+when file size is unavailable or the log grows after stat. Nonpositive budgets
+return the existing empty-log summary before file-size or data reads. Stable
+whole-file and tail summaries, read-failure summaries, and exception propagation
+remain unchanged; `CertbotRenewalLogTest` injects these boundary conditions.
 
 Systemd skip reporting belongs in `pmssSystemdActionSkip()`: pass the existing
 reason and description, with `false` for legacy callers that do not record a

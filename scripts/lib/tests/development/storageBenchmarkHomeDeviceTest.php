@@ -112,12 +112,12 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
             $calls[] = [$path, $count, $skip];
             return ['rc' => 0, 'mbps' => 123.45, 'secs' => 1.5];
         };
-        ob_start();
-        \storageBenchmarkHomeDeviceRunTests($log, \storageBenchmarkEntryBase('now', '', 'run'),
-            ['device' => '/dev/md0', 'rota' => 0, 'size' => 1024 * 1024 * 1024,
-                'mode' => 'home-device', 'md' => ['array_state' => 'clean', 'degraded' => 0]],
-            2 * 1024 * 1024, 30, false, null, $dd);
-        $output = ob_get_clean();
+        [, $output] = $this->pmssCaptureStdout(static function () use ($log, $dd): void {
+            \storageBenchmarkHomeDeviceRunTests($log, \storageBenchmarkEntryBase('now', '', 'run'),
+                ['device' => '/dev/md0', 'rota' => 0, 'size' => 1024 * 1024 * 1024,
+                    'mode' => 'home-device', 'md' => ['array_state' => 'clean', 'degraded' => 0]],
+                2 * 1024 * 1024, 30, false, null, $dd);
+        });
         $rows = array_map('json_decode', file($log, FILE_IGNORE_NEW_LINES));
         $this->assertSame('home-device-randread-4k', $rows[0]->test);
         $this->assertSame(false, $rows[0]->measured);
@@ -155,11 +155,11 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
             return ['ok' => true, 'result' => ['read_bw_MBps' => 10.0,
                 'read_iops' => 20.0, 'read_p95_ms' => 1.0]];
         };
-        ob_start();
-        \storageBenchmarkHomeDeviceRunTests($log, \storageBenchmarkEntryBase('now', '', 'run'),
-            ['device' => '/dev/md0', 'rota' => null, 'size' => 1024 * 1024,
-                'mode' => 'home-device'], 0, 17, true, $fio);
-        ob_end_clean();
+        $this->pmssCaptureStdout(static function () use ($log, $fio): void {
+            \storageBenchmarkHomeDeviceRunTests($log, \storageBenchmarkEntryBase('now', '', 'run'),
+                ['device' => '/dev/md0', 'rota' => null, 'size' => 1024 * 1024,
+                    'mode' => 'home-device'], 0, 17, true, $fio);
+        });
         $rows = array_map('json_decode', file($log, FILE_IGNORE_NEW_LINES));
         $this->assertSame(2, count($jobs));
         $this->assertSame(['home-device-randread-4k', 'home-device-seqread-1M'],

@@ -304,22 +304,22 @@ class UserTransferTest extends TestCase
             return 7;
         };
 
-        ob_start();
-        \pmssUserTransferRunRtorrentRestart($home, 'alice', $runner);
-        $failedOutput = (string) ob_get_clean();
+        [, $failedOutput] = $this->pmssCaptureStdout(static function () use ($home, $runner): void {
+            \pmssUserTransferRunRtorrentRestart($home, 'alice', $runner);
+        });
         $this->assertEquals(1, count($commands));
         $this->assertStringContainsString('restart command failed; skipping reload verification', $failedOutput);
         $this->assertStringNotContainsString('verification skipped', $failedOutput);
 
-        ob_start();
-        \pmssUserTransferRunRtorrentRestart($home, 'alice', static function (): int { return 0; });
-        $successOutput = (string) ob_get_clean();
+        [, $successOutput] = $this->pmssCaptureStdout(static function () use ($home): void {
+            \pmssUserTransferRunRtorrentRestart($home, 'alice', static function (): int { return 0; });
+        });
         $this->assertStringContainsString('verification skipped: no session torrent files found', $successOutput);
 
         unlink($home.'/.rtorrentRestart.php');
-        ob_start();
-        \pmssUserTransferRunRtorrentRestart($home, 'alice', $runner);
-        $missingOutput = (string) ob_get_clean();
+        [, $missingOutput] = $this->pmssCaptureStdout(static function () use ($home, $runner): void {
+            \pmssUserTransferRunRtorrentRestart($home, 'alice', $runner);
+        });
         $this->assertEquals(1, count($commands));
         $this->assertStringContainsString('restart script missing or unsafe', $missingOutput);
     }

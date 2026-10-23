@@ -92,6 +92,61 @@ class CertbotRenewalLogTest extends TestCase
         $this->assertTrue($summary['event_ts'] === null);
     }
 
+    public function testWholeFileReadsStayBoundedWhenSizeFailsOrBecomesStale(): void
+    {
+        // Real fixture reads with only metadata and the read boundary intercepted.
+        $script = <<<'PHP'
+namespace CertbotBoundedReadFixture;
+function filesize($path) {
+    $GLOBALS['stats']++;
+    return $GLOBALS['mode'] === 'stat-false' ? false : 1;
+}
+function file_get_contents($path, $includePath = false, $context = null, $offset = 0, $length = null) {
+    $GLOBALS['reads'][] = [$includePath, $context, $offset, $length];
+    if ($GLOBALS['mode'] === 'read-false') return false;
+    if (strpos($GLOBALS['mode'], 'read-') === 0) throw $GLOBALS['failure'];
+    if ($GLOBALS['mode'] === 'growth') {
+        \file_put_contents($path, "All renewals failed.\n", FILE_APPEND);
+    }
+    return $length === null ? \file_get_contents($path) : \file_get_contents($path, false, null, $offset, $length);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/certbotRenewal.php', 'CertbotBoundedReadFixture');
+        $script .= <<<'PHP'
+[$path, $GLOBALS['mode'], $budget] = json_decode(getenv('PMSS_TEST_CERTBOT_BOUND'), true);
+$GLOBALS['stats'] = 0;
+$GLOBALS['reads'] = [];
+$GLOBALS['failure'] = $GLOBALS['mode'] === 'read-error'
+    ? new \Error('read failed') : new \RuntimeException('read failed');
+$summary = null;
+$sameException = false;
+try {
+    $summary = pmssCertbotRenewalSummaryFromFile($path, $budget);
+} catch (\Throwable $error) {
+    $sameException = $error === $GLOBALS['failure'];
+}
+echo json_encode([$summary, $sameException, $GLOBALS['stats'], $GLOBALS['reads']]);
+PHP;
+        $path = $this->pmssMakeTempFile('pmss-certbot-bound-');
+        $log = "No renewals were attempted.\n";
+        foreach (['normal', 'growth', 'stat-false', 'read-false', 'read-exception', 'read-error'] as $mode) {
+            file_put_contents($path, $log.($mode === 'growth' ? '' : "All renewals failed.\n"));
+            $throws = in_array($mode, ['read-exception', 'read-error'], true);
+            $expected = $throws ? null : \pmssCertbotRenewalSummaryFromLog($mode === 'read-false' ? '' : $log);
+            $this->assertSame([$expected, $throws, 1, [[false, null, 0, strlen($log)]]],
+                $this->pmssRunInlinePhpJson($script, [
+                    'PMSS_TEST_CERTBOT_BOUND' => json_encode([$path, $mode, strlen($log)]),
+                ]));
+        }
+        // Invalid budgets must reach neither file-size nor data reads.
+        foreach ([0, -1, PHP_INT_MIN] as $budget) {
+            $this->assertSame([\pmssCertbotRenewalSummaryFromLog(''), false, 0, []],
+                $this->pmssRunInlinePhpJson($script, [
+                    'PMSS_TEST_CERTBOT_BOUND' => json_encode([$path, 'stat-false', $budget]),
+                ]));
+        }
+    }
+
     public function testTailReadFailuresCloseStreamAndPreserveExceptions(): void
     {
         // Intercept only the failing boundaries; open, seek and close real temp files.

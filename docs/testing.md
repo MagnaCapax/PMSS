@@ -36,6 +36,8 @@ For in-process tests, `TestCase::pmssCaptureStdout($callback, $environment)`
 returns `[result, output]` and restores temporary environment overrides on success
 or exception. Pass `pmssPathPrefixedEnvironment()` for command stubs; keep
 assertions outside the capture so only the operation's output is collected.
+Use the same helper for discarded output and multi-operation captures, returning
+an array from the callback when several results must be asserted together.
 
 Child-process fault-injection tests use `pmssInlinePhpLibraryInNamespace()` to
 load a library behind namespace-local shims, preserving its `__DIR__` includes.

@@ -124,6 +124,11 @@ function pmssCertbotRenewalSummaryFromFile(string $path, int $maxBytes = 262144)
         ];
     }
 
+    // A nonpositive budget cannot yield log data, even if stat fails.
+    if ($maxBytes <= 0) {
+        return pmssCertbotRenewalSummaryFromLog('');
+    }
+
     $size = @filesize($path);
     if ($size !== false && $size > $maxBytes) {
         // Read only the tail to keep runtime bounded on long-lived hosts.
@@ -148,7 +153,8 @@ function pmssCertbotRenewalSummaryFromFile(string $path, int $maxBytes = 262144)
             fclose($fp);
         }
     } else {
-        $data = @file_get_contents($path);
+        // Stat may fail or become stale while the log grows; bound this read too.
+        $data = @file_get_contents($path, false, null, 0, $maxBytes);
     }
     return pmssCertbotRenewalSummaryFromLog(is_string($data) ? $data : '');
 }

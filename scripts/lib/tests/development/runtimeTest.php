@@ -217,12 +217,10 @@ class RuntimeTest extends TestCase
 
     public function testCreatePrivateTempDirRejectsUnsafePrefix(): void
     {
-        ob_start();
-        try {
-            $this->assertSame(null, \pmssCreatePrivateTempDir('../pmss-runtime-private'));
-        } finally {
-            ob_end_clean();
-        }
+        [$result] = $this->pmssCaptureStdout(static function () {
+            return \pmssCreatePrivateTempDir('../pmss-runtime-private');
+        });
+        $this->assertSame(null, $result);
     }
 
     public function testRuntimeKeepsCliGuardStubCompatibility(): void
@@ -469,12 +467,9 @@ class RuntimeTest extends TestCase
             foreach ([[false, false], [true, false], [false, true], [true, true]] as $options) {
                 $logs = [];
                 $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => 'stale', 'stderr' => 'stale'];
-                ob_start();
-                try {
-                    $rc = \runCommand($command, $options[0], function (string $message) use (&$logs): void { $logs[] = $message; }, $options[1]);
-                } finally {
-                    $stdout = ob_get_clean();
-                }
+                [$rc, $stdout] = $this->pmssCaptureStdout(static function () use ($command, $options, &$logs): int {
+                    return \runCommand($command, $options[0], function (string $message) use (&$logs): void { $logs[] = $message; }, $options[1]);
+                });
                 $this->assertSame(1, $rc);
                 $this->assertSame('', $stdout);
                 $this->assertSame(['[WARN] unsafe proc_open command'], $logs);

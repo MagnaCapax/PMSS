@@ -9,12 +9,12 @@ class RtorrentThrottleGetTest extends TestCase
     public function testReadsBothLiveLimitsAndPreservesUnlimitedZero(): void
     {
         $calls = [];
-        ob_start();
-        $exitCode = \pmssRtorrentThrottleGetCli(['script', 'alice'], static function ($socket, $method) use (&$calls) {
-            $calls[] = [$socket, $method];
-            return strpos($method, 'global_up') !== false ? 0 : 2048;
+        [$exitCode, $output] = $this->pmssCaptureStdout(static function () use (&$calls): int {
+            return \pmssRtorrentThrottleGetCli(['script', 'alice'], static function ($socket, $method) use (&$calls) {
+                $calls[] = [$socket, $method];
+                return strpos($method, 'global_up') !== false ? 0 : 2048;
+            });
         });
-        $output = ob_get_clean();
 
         $this->assertSame(0, $exitCode);
         $this->assertSame("upload_bytes_per_second=0\ndownload_bytes_per_second=2048\n", $output);
@@ -26,20 +26,21 @@ class RtorrentThrottleGetTest extends TestCase
 
     public function testFailedOrMalformedReadsNeverEmitPartialOutput(): void
     {
-        ob_start();
-        $firstFailure = \pmssRtorrentThrottleGetCli(['script', 'alice'], static function () {
-            return false;
+        [$firstFailure, $output] = $this->pmssCaptureStdout(static function (): int {
+            return \pmssRtorrentThrottleGetCli(['script', 'alice'], static function () {
+                return false;
+            });
         });
         $this->assertSame(2, $firstFailure);
-        $this->assertSame('', ob_get_clean());
+        $this->assertSame('', $output);
 
         foreach ([false, -1, '2048', null] as $badRate) {
             $calls = 0;
-            ob_start();
-            $exitCode = \pmssRtorrentThrottleGetCli(['script', 'alice'], static function () use (&$calls, $badRate) {
-                return ++$calls === 1 ? 1024 : $badRate;
+            [$exitCode, $output] = $this->pmssCaptureStdout(static function () use (&$calls, $badRate): int {
+                return \pmssRtorrentThrottleGetCli(['script', 'alice'], static function () use (&$calls, $badRate) {
+                    return ++$calls === 1 ? 1024 : $badRate;
+                });
             });
-            $output = ob_get_clean();
 
             $this->assertSame(2, $exitCode);
             $this->assertSame('', $output);
@@ -50,12 +51,12 @@ class RtorrentThrottleGetTest extends TestCase
     {
         foreach ([[], ['script'], ['script', '../root'], ['script', 'ALICE'], ['script', 'alice', 'extra']] as $argv) {
             $calls = 0;
-            ob_start();
-            $exitCode = \pmssRtorrentThrottleGetCli($argv, static function () use (&$calls) {
-                $calls++;
-                return 0;
+            [$exitCode, $output] = $this->pmssCaptureStdout(static function () use ($argv, &$calls): int {
+                return \pmssRtorrentThrottleGetCli($argv, static function () use (&$calls) {
+                    $calls++;
+                    return 0;
+                });
             });
-            $output = ob_get_clean();
 
             $this->assertSame(1, $exitCode);
             $this->assertSame(0, $calls);
