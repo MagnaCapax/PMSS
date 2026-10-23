@@ -114,6 +114,24 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertStringContainsString('[ -f /etc/seedbox/config/torrentClients.enabled ]', $launcher);
     }
 
+    public function testInstalledDelugeVenvSelectionSurvivesTheUpdatePass(): void
+    {
+        // A Deluge store version is a virtualenv whose daemon lives in bin/ (ADR 0110), not at the top level.
+        [$root, $home, $ops, $events] = $this->fixture('deluge-venv');
+        $this->pmssWriteFile($root.'/enabled', '1');
+        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/enabled');
+        $this->pmssEnsureDir($home.'/bin/deluge');
+        $target = $root.'/store/deluge/2.2.0';
+        $this->pmssWriteFile($target.'/bin/deluged', '#!/usr/bin/python3');
+        $this->pmssWriteFile($target.'/bin/deluge-web', '#!/usr/bin/python3');
+        $this->pmssWriteFile($root.'/projection.json', '{"versions":[{"client":"deluge","version":"2.2.0","kind":"venv"}]}');
+        symlink($target, $home.'/bin/deluge/default');
+        \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
+        $this->assertSame($target, readlink($home.'/bin/deluge/default'));
+        $this->assertFalse(is_file($home.'/.config/pmss/torrentClients/deluge.notice'));
+        $this->assertSame([], $events->logs);
+    }
+
     public function testUnavailableSelectionUsesInstalledNonSystemDefault(): void
     {
         [$root, $home, $ops, $events] = $this->fixture('static-default');

@@ -44,10 +44,12 @@ function pmssTorrentClientsPostSetupFallback(string $user, string $home, string 
     foreach (array_keys($available[$client] ?? []) as $version) {
         if ($version === 'system') continue;
         $path = $prefix.$version;
+        // Store Deluge versions are virtualenvs with the daemon under bin/ (ADR 0110); the others are flat.
+        $binary = pmssTorrentClientsStoreBinaryPath($root, $client, $version, $client === 'deluge' ? 'venv' : 'static');
         $command .= 'if [ "$selected" = '.escapeshellarg($path)
             .' ] && [ -d "$selected" ] && [ ! -L "$selected" ]'
-            .' && [ -f "$selected/'. $binaries[$client].'" ]'
-            .' && [ ! -L "$selected/'. $binaries[$client].'" ]; then exit 1; fi; ';
+            .' && [ -f '.escapeshellarg($binary).' ]'
+            .' && [ ! -L '.escapeshellarg($binary).' ]; then exit 1; fi; ';
     }
     if ($default === 'system') {
         $command .= 'rm -f -- '.escapeshellarg($link).' || exit 1; ';
