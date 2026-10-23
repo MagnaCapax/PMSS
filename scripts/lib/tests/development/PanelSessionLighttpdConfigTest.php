@@ -134,9 +134,10 @@ class PanelSessionLighttpdConfigTest extends TestCase
     {
         $this->assertTrue(is_file($this->pmssRepoPath('scripts/lib/lighttpd/panelSessionGate.lua')));
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/update.php', [
-            '// Stage /scripts with an atomic rename swap.',
-            '$scriptsSource = $tmp.\'/scripts\';',
-            'pmssAtomicSwapDirectory(\'/scripts\', $scriptsStaging, $scriptsBackup, \'scripts\');',
+            'pmssAtomicSwapDirectory($target, $staging, $backup, $label);',
+            'function stageSnapshot(string $tmp, bool $dryRun): void',
+            "'scripts' => '[DRY RUN] Would atomically swap /scripts from '",
+            'pmssStageSnapshotDirectory($source, \'/scripts\', $runId, \'scripts\');',
             'flattenScriptsLayout();',
             "pmssBootstrapPhpCommand('/scripts/util/update-step2.php')",
         ]);

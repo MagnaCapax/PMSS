@@ -58,9 +58,11 @@ class UpdateSnapshotLifecycleTest extends TestCase
                 if ($state === 'empty') $this->pmssEnsureDir($root.'/'.$tree);
                 if ($state === 'populated') $this->pmssWriteFile($root.'/'.$tree.'/.hidden', 'keep');
             }
+            $outputPath = $root.'/dry-run-output';
             $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
                 'require '.var_export($bootstrap, true).'; stageSnapshot('.var_export($root, true).', true);'
-            ));
+            ).' > '.escapeshellarg($outputPath).' 2>&1');
+            $result['output'] = (string) file_get_contents($outputPath);
             $expected = '[DRY RUN] Would atomically swap /scripts from '.$root.'/scripts'."\n";
             $expected .= $state === 'populated'
                 ? '[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from '.$root.'/etc'."\n"

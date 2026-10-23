@@ -596,7 +596,7 @@ abstract class TestCase
             'pmssListManagedUsersResult(' => [
                 'scripts/cron/checkRtorrent.php',
                 'scripts/cron/userTrackerCleaner.php',
-                'scripts/lib/traffic/report.php',
+                'scripts/lib/traffic/reportModel.php',
             ],
             'pmssListManagedUsersFromResult(pmssListManagedUsersResult(' => [
                 'scripts/cron/trafficLimits.php',
