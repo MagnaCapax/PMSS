@@ -534,7 +534,34 @@ if [ "$DRY_RUN" = true ]; then
 	exit 0
 fi
 
-log_info "Installer bootstrap: leaving existing apt sources untouched"
+# Debian 11 LTS ended 2026-08-31: the live mirrors still list bullseye-security but no longer
+# serve its packages, so the bootstrap installs below would hit 404. Point only those lines at
+# archive.debian.org (as the bullseye template that update.php applies later does); other
+# sources and other releases stay untouched.
+bootstrap_bullseye_security_archive() {
+	local os_release="$1" apt_dir="$2" codename="" file backup
+	local line_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://(security|deb)\.debian\.org/debian-security/?([[:space:]]+bullseye-security([[:space:]]|$))'
+	if [ -r "$os_release" ]; then
+		codename=$(. "$os_release" 2>/dev/null; printf '%s' "${VERSION_CODENAME:-}")
+	fi
+	[ "$codename" = "bullseye" ] || return 0
+	for file in "$apt_dir/sources.list" "$apt_dir"/sources.list.d/*.list; do
+		{ [ -f "$file" ] && [ ! -L "$file" ] && grep -Eq "$line_re" "$file"; } || continue
+		backup="${file}.pmss-bootstrap.save"
+		if [ ! -e "$backup" ] && ! cp -p "$file" "$backup"; then
+			log_warn "Debian 11: could not back up ${file}; leaving it unchanged"
+			continue
+		fi
+		if sed -E -i "s#${line_re}#\1http://archive.debian.org/debian-security\5#" "$file"; then
+			log_info "Debian 11: bullseye-security in ${file} now uses archive.debian.org (backup: ${backup})"
+		else
+			log_warn "Debian 11: could not update ${file}; bootstrap packages from bullseye-security may fail with 404"
+		fi
+	done
+}
+
+log_info "Installer bootstrap: leaving existing apt sources untouched (except Debian 11 bullseye-security)"
+bootstrap_bullseye_security_archive /etc/os-release /etc/apt
 log_step "Updating package lists"
 run_cmd apt update
 if [ "$SKIP_UPGRADE" != true ]; then
