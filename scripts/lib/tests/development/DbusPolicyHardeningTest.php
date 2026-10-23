@@ -41,7 +41,7 @@ class DbusPolicyHardeningTest extends TestCase
         $snapshots = [
             '10-pmss-systemd1-restrict.conf' => [2215, '33127e72e838b6de039066dab788216a5d7792111043bea8f046a5f023eea6ab'],
             '10-pmss-login1-restrict.conf' => [1102, 'bcda38506feaf4553b1afe7bdc7a65fa070f8bc376f8524284af07f7649adc4d'],
-            'pmss-run-systemd-users.conf' => [216, '45dd3b70e3f8393a0f45c1e90dcd28e9efcbd1f53f4584595a35ab61524d5a3d'],
+            'pmss-run-systemd-users.conf' => [442, 'd1e62264790cbb59e074c1345f20cf2ae967bd31c48e761e452fa00cdfb3a16e'],
             'pmss-run-systemd-sessions.conf' => [238, 'b672da9aafb26c4391db5e57d63f4b6038a22c00817f5cb5374173d8c5c74e30'],
         ];
 
@@ -114,6 +114,20 @@ class DbusPolicyHardeningTest extends TestCase
             $this->assertStringNotContainsString('0644', $body);
             $this->assertStringNotContainsString('0755', $body);
         }
+    }
+
+    public function testUsersDirectoryStaysReadableForDbus(): void
+    {
+        $messages = [];
+        $bodies = $this->installDisclosureArtifacts($messages);
+        $lines = array_values(array_filter(explode("\n", $bodies['pmss-run-systemd-users.conf']), static function (string $line): bool {
+            return $line !== '' && $line[0] !== '#';
+        }));
+        $this->assertSame([
+            'd /run/systemd/users 0750 root root -',
+            'a+ /run/systemd/users - - - - group:messagebus:r-x',
+        ], $lines);
+        $this->assertStringNotContainsString('messagebus', $bodies['pmss-run-systemd-sessions.conf']);
     }
 
     public function testCompletePolicyInstallIsIdempotent(): void
