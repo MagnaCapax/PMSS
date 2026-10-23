@@ -39,10 +39,10 @@ class LighttpdConfigRefreshResultTest extends TestCase
         }
     }
 
-    public function testIneligibleAccountReturnsFailureWithoutRendering(): void
+    public function testIneligibleAccountSucceedsWithoutRendering(): void
     {
         $result = $this->refreshFixture('ineligible');
-        $this->assertSame(1, $result['rc']);
+        $this->assertSame(0, $result['rc']);
         $this->assertSame(null, $result['config']);
         $this->assertSame([], $result['writes']);
     }

@@ -53,7 +53,8 @@ function pmssUserConfigLighttpdConfigureUser(
 
     $homeDir = "/home/{$thisUser}";
     if (!pmssShouldConfigureLighttpdForHome($homeDir)) {
-        return false;
+        // Nothing to configure (no web stack, disabled or parked): not a failure to retry.
+        return true;
     }
 
     $portFile = "{$portsDirectory}/lighttpd-{$thisUser}";
