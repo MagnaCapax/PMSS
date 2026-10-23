@@ -9,6 +9,9 @@
  * @author PMSS Team
  */
 
+// The dir helpers below resolve through pathSafety.php; load it so a direct require can call them.
+require_once dirname(__DIR__).'/pathSafety.php';
+
 // Defaults this module reads. They live here, not in the facade, so a direct require cannot
 // call pmssLogDir() and friends before they exist (an update bootstrap fatal, 2026-10-23).
 const PMSS_LOG_DIR_DEFAULT = '/var/log/pmss';
