@@ -17,7 +17,8 @@
  *   1. Report current quota state (repquota -as)
  *   2. Disable quotas temporarily (quotaoff -av)
  *   3. Remove stale check files (/home/aquota*new)
- *   4. Recalculate quota usage from disk (quotacheck -avugmn)
+ *   4. Recalculate quota usage from disk (quotacheck -avugmn; after a failed
+ *      quotaoff only a per-type /home recount, when every declared type is off)
  *   5. Re-enable quotas (quotaon -av)
  *   6. Report final state for comparison
  *
@@ -55,24 +56,30 @@ pmssQuotaFixRunCommand('[quotaFix] Current quota state:', 'repquota -as', false,
 
 // 2. Disable quotas to allow safe recalculation
 $quotaOffResult = pmssQuotaFixRunCommand('[quotaFix] Disabling quotas for recalculation', 'quotaoff -av', true, $exitCode);
+// quotaoff cannot act on an unreadable quota file; recover only when every declared /home type is verifiably off.
+// The failed quotaoff keeps exitCode 1, so a recovered run leaves no stamp and the next update recounts normally.
+$quotaCheckCommands = pmssQuotaFixCheckCommands($quotaOffResult['ok']);
 
-if ($quotaOffResult['ok']) {
+if ($quotaCheckCommands !== []) {
+    if (!$quotaOffResult['ok']) {
+        logMessage('[quotaFix] quotaoff failed but every declared /home quota type is off; recovering with: '.implode('; ', $quotaCheckCommands));
+    }
     // 3. Remove any stale/interrupted check files from previous runs
     logMessage('[quotaFix] Cleaning stale quota check files');
     pmssRemoveStaleQuotaCheckFiles('/home');
 
-    // 4. Perform full quota recalculation
-    // Flags: -a (all filesystems), -v (verbose), -u (user quotas),
-    //        -g (group quotas), -m (don't remount ro), -n (use first found quota file)
-    $checkResult = pmssQuotaFixRunCommand(
-        '[quotaFix] Recalculating quota usage from disk (this may take time on large filesystems)',
-        'quotacheck -avugmn',
-        true,
-        $exitCode
-    );
-    if (strpos($checkResult['output'], 'Cannot') !== false) {
-        logMessage('[quotaFix] WARNING: quotacheck may have encountered issues');
-        $exitCode = 1;
+    // 4. Perform full quota recalculation (flags documented in pmssQuotaFixCheckCommands)
+    foreach ($quotaCheckCommands as $quotaCheckCommand) {
+        $checkResult = pmssQuotaFixRunCommand(
+            '[quotaFix] Recalculating quota usage from disk (this may take time on large filesystems)',
+            $quotaCheckCommand,
+            true,
+            $exitCode
+        );
+        if (strpos($checkResult['output'], 'Cannot') !== false) {
+            logMessage('[quotaFix] WARNING: quotacheck may have encountered issues');
+            $exitCode = 1;
+        }
     }
 } else {
     logMessage('[quotaFix] WARNING: skipping quotacheck because quotaoff failed');
