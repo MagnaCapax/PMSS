@@ -251,15 +251,7 @@ class SystemStatsCollectTest extends TestCase
     public function testAppendLogLineReportsIncompleteWrites(): void
     {
         // Inject only the write result; keep path checks and append bytes real.
-        $script = <<<'PHP'
-namespace SystemStatsAppendFixture;
-function file_put_contents($path, $data, $flags) {
-    $limit = $GLOBALS['limit'];
-    if ($limit === false) return false;
-    return \file_put_contents($path, $limit === null ? $data : substr($data, 0, $limit), $flags);
-}
-function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }
-PHP;
+        $script = 'namespace SystemStatsAppendFixture;'.$this->pmssInlinePhpLimitedWriteShims().$this->pmssInlinePhpFileWriteCompleteShim();
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats.php', 'SystemStatsAppendFixture');
         $script .= <<<'PHP'
 [$path, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_STATS_APPEND'), true);

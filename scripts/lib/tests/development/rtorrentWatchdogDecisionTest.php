@@ -95,16 +95,7 @@ class rtorrentWatchdogDecisionTest extends TestCase
     public function testStateWritesRequireCompletePayloads(): void
     {
         // Inject write results in a child process without touching live marker files.
-        $script = <<<'PHP'
-namespace WatchdogStateWriteFixture;
-function file_put_contents($path, $data, $flags) {
-    $GLOBALS['requests'][] = [$path, $data, $flags];
-    $limit = $GLOBALS['limit'];
-    if ($limit === false) return false;
-    return \file_put_contents($path, $limit === null ? $data : substr($data, 0, $limit), $flags);
-}
-function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }
-PHP;
+        $script = 'namespace WatchdogStateWriteFixture;'.$this->pmssInlinePhpLimitedWriteShims().$this->pmssInlinePhpFileWriteCompleteShim();
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/watchdogState.php', 'WatchdogStateWriteFixture');
         $script .= <<<'PHP'
 [$path, $payload, $GLOBALS['limit'], $escalation] = json_decode(getenv('PMSS_TEST_STATE_WRITE'), true);

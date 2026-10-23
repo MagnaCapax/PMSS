@@ -1,4 +1,4 @@
-# ADR 0153: Traffic report model and output boundaries
+# ADR 0157: Traffic report model and output boundaries
 
 Date: 2026-10-22
 Category: architecture

@@ -118,8 +118,8 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
 
     $totals = ['read' => 0, 'write' => 0];
     $matched = false;
-    foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-        if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', trim((string) $line), $m) !== 1) continue;
+    foreach (pmssConfigLines(preg_split('/\r?\n/', $raw), []) as $line) {
+        if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', $line, $m) !== 1) continue;
         $value = pmssUnsignedDecimalIntParse($m[2]);
         if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
         $direction = $m[1] === 'Read' ? 'read' : 'write';

@@ -5,7 +5,7 @@ Category: architecture
 
 ## Status
 
-Superseded by [0153](0153-traffic-report-model-and-output-boundaries.md)
+Superseded by [0157](0157-traffic-report-model-and-output-boundaries.md)
 
 ## Context
 

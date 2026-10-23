@@ -60,17 +60,7 @@ PHP;
     public function testAppendResultsRequireCompleteRecordsAndPreserveFallback(): void
     {
         // Replace only the write boundary in an isolated child; use real temp files.
-        $script = <<<'PHP'
-namespace LogAppendFixture;
-function file_put_contents($path, $data, $flags) {
-    $GLOBALS['requests'][] = [$path, $data, $flags];
-    $limit = $path === ($GLOBALS['fallback'] ?? null) ? null : $GLOBALS['limit'];
-    if ($limit === false) return false;
-    if ($limit !== null) $data = substr($data, 0, $limit);
-    return \file_put_contents($path, $data, $flags);
-}
-function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }
-PHP;
+        $script = 'namespace LogAppendFixture;'.$this->pmssInlinePhpLimitedWriteShims().$this->pmssInlinePhpFileWriteCompleteShim();
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogAppendFixture');
         $script .= <<<'PHP'
 [$path, $kind, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_LOG_APPEND'), true);

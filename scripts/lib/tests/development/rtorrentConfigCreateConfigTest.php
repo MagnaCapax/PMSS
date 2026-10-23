@@ -106,12 +106,14 @@ class rtorrentConfigCreateConfigTest extends TestCase
 
         $path = $this->pmssWriteFile(
             $this->pmssMakeTempFile('pmss-rtorrent-source-'),
-            "network.scgi.open_port = 127.0.0.1:4002\ndht.port.set = invalid\nnetwork.port_range.set = 44001-44001\n"
+            " \t\r\n # scgi_port = 4003\r\n0\n / scgi_port = 4004\n\tnetwork.scgi.open_port = 127.0.0.1:4002 \r\ndht.port.set = invalid\nnetwork.port_range.set = 44001-44001\nmalformed\nextra = ignored = value\n"
         );
         $this->assertSame(
             ['ports' => ['scgi' => [4002 => true]], 'uncertain' => []],
             \pmssRtorrentPortReservationConfigSource($path)
         );
+        $config = new \rtorrentConfig(['custom' => true], 'unused');
+        $this->assertSame(['network.scgi.open_port' => '127.0.0.1:4002', 'dht.port.set' => 'invalid', 'network.port_range.set' => '44001-44001'], $config->readConfig($path));
     }
 
     public function testCreateConfigAppliesMemoryHeadroomGuardrails(): void

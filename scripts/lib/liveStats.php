@@ -21,7 +21,7 @@ function pmssLiveStatsNodeCountersParse(string $stat, string $meminfo, string $n
     if (!preg_match('/^cpu\s+(\d+(?:\s+\d+){3,9})/m', $stat, $cpu)
         || !preg_match('/^MemTotal:\s+(\d+) kB/m', $meminfo, $mt) || !preg_match('/^MemAvailable:\s+(\d+) kB/m', $meminfo, $ma)) return null;
     // guest fields are already inside user/nice: only the first eight count.
-    $j = array_pad(array_map('intval', preg_split('/\s+/', trim($cpu[1]))), 8, 0);
+    $j = array_pad(array_map('intval', pmssConfigLineColumns($cpu[1], 0, [])), 8, 0);
     $total = array_sum(array_slice($j, 0, 8));
     if (!preg_match('/^\s*'.preg_quote($iface, '/').':\s*(\d+)(?:\s+\d+){7}\s+(\d+)/m', $netDev, $n)) return null;
     return ['busy' => $total - $j[3] - $j[4], 'total' => $total, 'mem_total' => (int) $mt[1] * 1024,

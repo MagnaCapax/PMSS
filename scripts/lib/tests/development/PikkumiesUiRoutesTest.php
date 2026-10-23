@@ -52,7 +52,7 @@ final class PikkumiesUiRoutesTest extends TestCase
     }
     public function testPortCollisionRefusesForeignListener(): void
     {
-        $foreign = 'LISTEN 0 128 0.0.0.0:844 0.0.0.0:* users:(("other",pid=7,fd=3))';
+        $foreign = " \t\r\nshort row\n\tLISTEN\t0 128 0.0.0.0:844 0.0.0.0:* users:((\"other\",pid=7,fd=3)) \r\n";
         $nginx = 'LISTEN 0 128 0.0.0.0:844 0.0.0.0:* users:(("nginx",pid=7,fd=3))';
         $this->assertFalse(\pmssPikkumiesUiPortAvailable(844, $foreign));
         $this->assertTrue(\pmssPikkumiesUiPortAvailable(844, $nginx));

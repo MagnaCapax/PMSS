@@ -350,8 +350,8 @@ function file_put_contents($path, $data, $flags = 0) {
     $index = $GLOBALS['writeIndex']++;
     return \file_put_contents($path, $index === $GLOBALS['shortIndex'] ? substr($data, 0, -1) : $data, $flags);
 }
-function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }
 PHP;
+        $script .= $this->pmssInlinePhpFileWriteCompleteShim();
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatWriteFixture');
         $script .= <<<'PHP'
 [$paths, $GLOBALS['shortIndex']] = json_decode(getenv('PMSS_TEST_IOSTAT_WRITES'), true);

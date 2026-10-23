@@ -281,7 +281,7 @@ PHP
             ['', null],
             ["Total 100\n8:0 Sync 10\n", null],
             ["8:0 Read 0\n8:0 Write 0\n", ['read' => 0, 'write' => 0]],
-            ["8:0 Read 10\r\n8:16 Read 20\r\n8:0 Write 7\r\nTotal 37\r\n", ['read' => 30, 'write' => 7]],
+            [" \t\r\n\t8:0 Read 10 \r\n8:16 Read 20\r\n8:0 Write 7\r\nTotal 37\r\n", ['read' => 30, 'write' => 7]],
             ["8:0 Read -1\n8:0 Write invalid\n8:16 Read 2\n", ['read' => 2, 'write' => 0]],
             ["8:0 Read ".PHP_INT_MAX."\n8:16 Write 3\n", ['read' => 0, 'write' => 3]],
             ["8:0 Read ".($max - 1)."\n8:16 Read 1\n", ['read' => $max, 'write' => 0]],

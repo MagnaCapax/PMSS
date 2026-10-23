@@ -92,7 +92,7 @@ function pmssPikkumiesUiPortAvailable(int $port, ?string $listeners = null): boo
         $listeners = implode("\n", $rows);
     }
     foreach (explode("\n", $listeners) as $row) {
-        $fields = preg_split('/\s+/', trim($row));
+        $fields = pmssConfigLineColumns($row, 0, []);
         $local = $fields[3] ?? '';
         if (preg_match('/(?:^|:|\])'.preg_quote((string) $port, '/').'$/', $local) === 1
             && strpos($row, '"nginx"') === false) return false;

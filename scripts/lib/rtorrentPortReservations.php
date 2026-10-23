@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/log.php';
 require_once __DIR__.'/runtime/filesystem.php';
+require_once __DIR__.'/runtime/environment.php';
 require_once __DIR__.'/runtime/locks.php';
 
 const PMSS_RTORRENT_PORT_RESERVATION_GRACE_SECONDS = 3600;
@@ -135,11 +136,7 @@ function pmssRtorrentPortReservationConfigSource(string $path): array
 
     $source = pmssRtorrentPortReservationSourceEmpty();
     $spec = pmssRtorrentPortReservationSpecs()['scgi'];
-    foreach ($lines as $line) {
-        $line = trim((string) $line);
-        if ($line === '' || $line[0] === '#') {
-            continue;
-        }
+    foreach (pmssConfigLines($lines) as $line) {
         if (preg_match($spec['pattern'], $line, $matches) === 1) {
             $port = pmssNetworkPortParseDigits($matches[1], $spec['min'], $spec['max']);
             $port === null ? $source['uncertain']['scgi'] = true : $source['ports']['scgi'][$port] = true;

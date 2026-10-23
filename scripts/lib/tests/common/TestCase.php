@@ -1103,6 +1103,25 @@ abstract class TestCase
             var_export(var_export(dirname($path), true), true).', \\file_get_contents('.var_export($path, true).')), 5));';
     }
 
+    /** Route complete-write checks through the child namespace's injected writer. */
+    protected function pmssInlinePhpFileWriteCompleteShim(): string
+    {
+        return 'function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }'."\n";
+    }
+
+    /** Inject false, byte-limited, or complete writes; record requests and let fallback writes succeed. */
+    protected function pmssInlinePhpLimitedWriteShims(): string
+    {
+        return <<<'PHP'
+function file_put_contents($path, $data, $flags = 0) {
+    $GLOBALS['requests'][] = [$path, $data, $flags];
+    $limit = $path === ($GLOBALS['fallback'] ?? null) ? null : $GLOBALS['limit'];
+    if ($limit === false) return false;
+    return \file_put_contents($path, $limit === null ? $data : substr($data, 0, $limit), $flags);
+}
+PHP;
+    }
+
     /** Return filesystem shims shared by atomic-publication fault fixtures. */
     protected function pmssInlinePhpAtomicPublicationShims(string $tempFailureMode): string
     {
@@ -1119,7 +1138,6 @@ function file_put_contents($path, $bytes, $flags = 0) {
     if ($mode === 'zero') return 0;
     return \file_put_contents($path, $mode === 'short' ? substr($bytes, 0, -1) : $bytes, $flags);
 }
-function pmssFileWriteComplete($path, $bytes, $flags = 0) { return file_put_contents($path, $bytes, $flags) === strlen($bytes); }
 // Writers that stage through an exclusive-create handle: count and fail the create, fault the writes.
 function fopen($path, $mode, ...$rest) {
     if (strpos($mode, 'x') === false) return \fopen($path, $mode, ...$rest);
@@ -1142,7 +1160,7 @@ function rename($from, $to) {
     return $GLOBALS['mode'] === 'rename' ? false : \rename($from, $to);
 }
 PHP;
-        return sprintf($shims, var_export($tempFailureMode, true));
+        return sprintf($shims, var_export($tempFailureMode, true)).$this->pmssInlinePhpFileWriteCompleteShim();
     }
 
     protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
