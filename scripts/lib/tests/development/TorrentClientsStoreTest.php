@@ -4,6 +4,8 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/torrentClients/store.php';
 require_once dirname(__DIR__, 2).'/torrentClients/projection.php';
+// The runner's tracked-file inventory must also exercise this uncommitted addition.
+require_once __DIR__.'/TorrentClientsTransmissionWebTest.php';
 
 final class TorrentClientsStoreTest extends TestCase
 {

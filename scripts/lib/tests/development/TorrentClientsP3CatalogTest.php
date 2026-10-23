@@ -29,6 +29,37 @@ final class TorrentClientsP3CatalogTest extends TestCase
         $this->assertSame([$entry], $this->load($entry));
     }
 
+    public function testOptionalWebPinLoadsOnlyForTransmission(): void
+    {
+        $entry = $this->entry();
+        $entry['web'] = ['url' => ['https://example.invalid/web.tar.gz'], 'sha256' => str_repeat('b', 64)];
+        $this->assertSame([$entry], $this->load($entry));
+        foreach (['qbittorrent', 'rtorrent', 'deluge'] as $client) {
+            $other = $entry;
+            $other['client'] = $client;
+            unset($other['rpcUnixSocket']);
+            $this->assertSame([], $this->load($other));
+        }
+    }
+
+    public function testMalformedWebMetadataRejectsTheCatalog(): void
+    {
+        $web = ['url' => ['https://example.invalid/web.tar.gz'], 'sha256' => str_repeat('b', 64)];
+        foreach ([null, [], 'archive', ['url' => $web['url']], $web + ['extra' => true],
+            array_replace($web, ['sha256' => str_repeat('B', 64)]),
+            array_replace($web, ['sha256' => str_repeat('b', 63)]),
+            array_replace($web, ['sha256' => []]),
+            array_replace($web, ['url' => ['http://example.invalid/web']]),
+            array_replace($web, ['url' => ['https://']]),
+            array_replace($web, ['url' => []]),
+            array_replace($web, ['url' => ['mirror' => 'https://example.invalid/web']]),
+            array_replace($web, ['url' => [42]])] as $bad) {
+            $entry = $this->entry();
+            $entry['web'] = $bad;
+            $this->assertSame([], $this->load($entry));
+        }
+    }
+
     public function testMissingOrFalseCapabilityDoesNotLoad(): void
     {
         $entry = $this->entry();
@@ -45,6 +76,25 @@ final class TorrentClientsP3CatalogTest extends TestCase
             $entry['kind'] = $kind;
             $this->assertSame([], $this->load($entry));
         }
+    }
+
+    public function testConfigureSwitchWarningsMatchEachClient(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/configure.php');
+        $start = strpos($source, '<input type="password" id="configure-<?= $client ?>-password"');
+        $this->assertTrue($start !== false);
+        $button = substr($source, $start, strpos($source, '</button>', $start) + 9 - $start);
+        $path = $this->pmssMakeTempDir('pmss-client-confirm-').'/button.php';
+        file_put_contents($path, '<?php $client = $argv[1]; $label = $argv[2]; ?>'.$button);
+        foreach (['transmission' => 'Transmission', 'deluge' => 'Deluge', 'rtorrent' => 'rTorrent'] as $client => $label) {
+            $result = $this->pmssExecShellCommand(implode(' ', array_map('escapeshellarg', [PHP_BINARY, $path, $client, $label])));
+            $this->assertSame(0, $result['rc']);
+            $expected = $client === 'transmission'
+                ? 'Restart Transmission with this version? Its settings are not part of the configuration backup.'
+                : 'Back up the current configuration and restart '.$label.' with this version?';
+            $this->assertStringContainsString($expected, $result['output']);
+        }
+        $this->assertStringContainsString('Back up the current configuration and restart qBittorrent with this version?', $source);
     }
 
     public function testResolverRequiresPublishedSocketCapability(): void
@@ -80,6 +130,10 @@ final class TorrentClientsP3CatalogTest extends TestCase
             'cff6d66bd7527f9eed7eaaaf931dccc061544efcada4e8b0ac3dbecb2422aab0',
             'd3dce8aaa8f5d013e0cd29a3246b46ba482217b16f74740d2a321c884a1ec45f',
         ], array_column($entries, 'sha256'));
+        $this->assertSame([
+            '5cd1d317b5ed798b92ac3d7f6fadb7187d32a76d62691e732769b8eb597ff790',
+            'cf9d0c1e1e8ef494de78a5cb5b9a0fdfd28f404bb5b0cb1d2ab693c634155200',
+        ], array_column(array_column($entries, 'web'), 'sha256'));
         foreach ($entries as $entry) {
             $this->assertSame('static', $entry['kind']);
             $this->assertSame(true, $entry['rpcUnixSocket']);
@@ -87,6 +141,8 @@ final class TorrentClientsP3CatalogTest extends TestCase
             $this->assertSame([], $entry['cve']);
             $this->assertSame(['https://pulsedmedia.com/remote/pkg/transmission-daemon-'
                 .$entry['version'].'-static-amd64-r2'], $entry['url']);
+            $this->assertSame(['https://pulsedmedia.com/remote/pkg/transmission-web-'
+                .$entry['version'].'-r1.tar.gz'], $entry['web']['url']);
         }
         $adr = (string) file_get_contents(dirname(__DIR__, 4).'/docs/adr/0108-transmission-socket-integration.md');
         $this->assertStringContainsString('4.1.3 as default and 4.0.5 as legacy', $adr);

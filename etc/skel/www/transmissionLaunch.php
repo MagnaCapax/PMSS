@@ -109,8 +109,12 @@ function pmssTransmissionLaunch(string $home, array $ops = []): bool
     if ($pids !== [] || $live) return $pids !== [] && $live;
     $lock = $dir.'/.pmss-launch.lock';
     if (is_link($lock) || (file_exists($lock) && !is_file($lock))) return false;
+    // Static store builds keep their matching web client beside the daemon.
+    $web = dirname($binary).'/public_html';
     $command = 'nohup flock -n '.escapeshellarg($lock).' env '
-        .'CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt '.escapeshellarg($binary)
+        .'CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt '
+        .(is_dir($web) && !is_link($web) ? escapeshellarg('TRANSMISSION_WEB_HOME='.$web).' ' : '')
+        .escapeshellarg($binary)
         .' -f -g '.escapeshellarg($dir).' >/dev/null 2>&1 </dev/null &';
     $run = $ops['run'] ?? static function (string $shell): void { @exec($shell); };
     $run($command);

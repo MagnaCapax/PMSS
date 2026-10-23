@@ -76,6 +76,28 @@ final class TorrentClientsP3LaunchTest extends TestCase
         $this->assertSame(0, $calls);
     }
 
+    public function testWebHomeRequiresRealAdjacentDirectory(): void
+    {
+        [$home, $store, $projection, $binary] = $this->fixture();
+        $web = dirname($binary).'/public_html';
+        foreach (['absent', 'directory', 'symlink', 'file'] as $case) {
+            if ($case === 'directory') mkdir($web);
+            if ($case === 'symlink') { rmdir($web); symlink(dirname($web), $web); }
+            if ($case === 'file') { unlink($web); file_put_contents($web, 'not a directory'); }
+            $command = '';
+            $probes = 0;
+            $this->assertTrue(\pmssTransmissionLaunch($home, [
+                'storeRoot' => $store, 'projection' => $projection,
+                'native' => static function (): array { return []; },
+                'probe' => static function () use (&$probes): bool { return ++$probes > 1; },
+                'run' => static function (string $shell) use (&$command): void { $command = $shell; },
+            ]));
+            if ($case === 'directory') {
+                $this->assertStringContainsString(escapeshellarg('TRANSMISSION_WEB_HOME='.$web).' '.escapeshellarg($binary), $command);
+            } else $this->assertStringNotContainsString('TRANSMISSION_WEB_HOME=', $command);
+        }
+    }
+
     public function testNativeIdentityUsesExecutableAndMountNamespace(): void
     {
         $root = $this->pmssMakeTempDir('pmss-p3-proc-');

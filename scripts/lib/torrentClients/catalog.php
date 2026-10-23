@@ -4,6 +4,26 @@
 require_once dirname(__DIR__).'/runtime/filesystem.php';
 require_once __DIR__.'/storePaths.php';
 
+/** Apply the same HTTPS list contract to daemon and optional web artifacts. */
+function pmssTorrentClientsCatalogUrlsValid($urls): bool
+{
+    if (!is_array($urls) || $urls === [] || array_values($urls) !== $urls) return false;
+    foreach ($urls as $url) {
+        if (!is_string($url) || strpos($url, 'https://') !== 0
+            || filter_var($url, FILTER_VALIDATE_URL) === false) return false;
+    }
+    return true;
+}
+
+/** Web metadata has exactly one URL list and a lowercase SHA-256 pin. */
+function pmssTorrentClientsCatalogWebValid($web): bool
+{
+    return is_array($web) && count($web) === 2
+        && pmssTorrentClientsCatalogUrlsValid($web['url'] ?? null)
+        && is_string($web['sha256'] ?? null)
+        && preg_match('/\A[a-f0-9]{64}\z/', $web['sha256']) === 1;
+}
+
 /** Reject the entire document if any entry is malformed or ambiguous. */
 function pmssTorrentClientsCatalogLoad(string $path): array
 {
@@ -25,6 +45,8 @@ function pmssTorrentClientsCatalogLoad(string $path): array
         // Transmission entries describe only builds with the managed socket RPC mode.
         if ($client === 'transmission' && ($kind !== 'static' || ($entry['rpcUnixSocket'] ?? null) !== true)) return [];
         if ($client !== 'transmission' && array_key_exists('rpcUnixSocket', $entry)) return [];
+        if (array_key_exists('web', $entry)
+            && ($client !== 'transmission' || !pmssTorrentClientsCatalogWebValid($entry['web']))) return [];
         $id = $client.'|'.$version;
         if (isset($seen[$id])) return [];
         $seen[$id] = true;
@@ -64,14 +86,9 @@ function pmssTorrentClientsCatalogLoad(string $path): array
             }
             continue;
         }
-        if (!is_array($entry['url'] ?? null) || $entry['url'] === []
-            || array_values($entry['url']) !== $entry['url']
+        if (!pmssTorrentClientsCatalogUrlsValid($entry['url'] ?? null)
             || !is_string($entry['sha256'] ?? null)
             || preg_match('/\A[a-fA-F0-9]{64}\z/', $entry['sha256']) !== 1) return [];
-        foreach ($entry['url'] as $url) {
-            if (!is_string($url) || strpos($url, 'https://') !== 0
-                || filter_var($url, FILTER_VALIDATE_URL) === false) return [];
-        }
     }
     return $entries;
 }

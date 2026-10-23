@@ -74,3 +74,9 @@ returns a fixed name for `AF_UNIX` peers before calling the resolver. Nothing
 else in the recipe changed. The catalog pins the `-r2` artifacts; the original
 files stay on the mirror untouched, and hosts holding a first build reinstall
 on their next update because its SHA-256 no longer matches.
+
+The static daemon builds exclude web files, so each catalog version also ships
+a SHA-256-pinned web client archive. Root-side store convergence installs its
+`public_html` directory next to the binary, including for already installed
+daemons. The shared account launcher locates it via `TRANSMISSION_WEB_HOME`;
+the root watchdog uses that same launcher.

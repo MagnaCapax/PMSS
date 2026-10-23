@@ -5,6 +5,7 @@ require_once dirname(__DIR__).'/update/apps/remoteBinary.php';
 require_once __DIR__.'/storeArchive.php';
 require_once __DIR__.'/storePaths.php';
 require_once __DIR__.'/delugeVenv.php';
+require_once __DIR__.'/transmissionWeb.php';
 
 /** Measure the existing root-owned set before reserving headroom for a new copy. */
 function pmssTorrentClientsStoreSetSize(string $root): ?int
@@ -103,6 +104,10 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
             }
             @chmod($binary, 0755);
             $results[$id] = 'installed';
+        }
+        // Existing verified daemons also need their separately pinned web client.
+        if ($client === 'transmission' && array_key_exists('web', $entry)) {
+            pmssTorrentClientsTransmissionWebConverge($entry, $root, ($ops['web'] ?? []) + ['log' => $log]);
         }
         if (!empty($entry['isDefault'])) {
             $alias = $root.'/'.$client.'/default';
