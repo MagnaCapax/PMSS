@@ -79,13 +79,7 @@ function pmssMdadmCheckarrayPlan(string $mdstatPath, string $sysBlockRoot): arra
         }
 
         $state = pmssMdadmCheckarrayEntryDegradedState($entry, $sysBlockRoot);
-        if ($state === true) {
-            $plan['degraded'][] = $array;
-        } elseif ($state === false) {
-            $plan['healthy'][] = $array;
-        } else {
-            $plan['unknown'][] = $array;
-        }
+        $plan[$state === true ? 'degraded' : ($state === false ? 'healthy' : 'unknown')][] = $array;
     }
 
     return $plan;

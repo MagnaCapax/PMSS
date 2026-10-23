@@ -614,6 +614,8 @@ iptables helpers:
 
 ## Resource Statistics
 
+- Monitoring projections retain iostat column precedence and the last Certbot marker's excerpt bounds.
+- Media-stack overall status derives from published app states: failed precedes stopped/degraded; off apps stay healthy.
 - Cgroup-v1 billing and performance collectors share `resources/v1.php` acquisition
   (ADR 0161). Their projections retain field order, integer types, zero counters,
   and missing-source omission. Billing requests only its source fields, prefers

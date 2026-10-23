@@ -42,19 +42,15 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
     foreach ($lines as $i => $line) {
         $lower = strtolower($line);
 
-        $type = null;
         if (strpos($lower, 'all renewals succeeded') !== false) {
             $type = 'ok';
         } elseif (strpos($lower, 'no renewals were attempted') !== false) {
             $type = 'noop';
-        } elseif (strpos($lower, 'all renewals failed') !== false || strpos($lower, 'some renewals have failed') !== false) {
+        } elseif (strpos($lower, 'all renewals failed') !== false || strpos($lower, 'some renewals have failed') !== false
+            || strpos($lower, 'failed to renew certificate') !== false) {
+            // Include per-cert failures from versions without a global summary.
             $type = 'fail';
-        } elseif (strpos($lower, 'failed to renew certificate') !== false) {
-            // Some certbot versions log per-cert failures without the global summary line.
-            $type = 'fail';
-        }
-
-        if ($type === null) {
+        } else {
             continue;
         }
 
@@ -75,13 +71,9 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
         ];
     }
 
-    $status = (string)$last['type'];
-    $eventTs = is_int($last['ts']) ? $last['ts'] : null;
-    $eventLine = (string)$last['line'];
-
     $excerpt = '';
-    if ($status === 'fail') {
-        $start = (int)$last['idx'];
+    if ($last['type'] === 'fail') {
+        $start = $last['idx'];
         $buf = [];
         for ($j = $start; $j < $count; $j++) {
             $l = rtrim((string)$lines[$j]);
@@ -101,9 +93,9 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
     }
 
     return [
-        'status'        => $status,
-        'event_ts'      => $eventTs,
-        'event'         => $eventLine !== '' ? $eventLine : 'Renewal summary marker found',
+        'status'        => $last['type'],
+        'event_ts'      => $last['ts'],
+        'event'         => $last['line'] !== '' ? $last['line'] : 'Renewal summary marker found',
         'error_excerpt' => $excerpt,
     ];
 }

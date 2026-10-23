@@ -29,26 +29,23 @@ function pmssDiskIostatParseSampleFields(string $iostatRaw): array
         throw new RuntimeException('No grp1 line after iostat header');
     }
 
-    $getAny = static function (array $colNames) use ($colMap, $values): string {
-        foreach ($colNames as $name) {
-            if (isset($colMap[$name])) {
-                return $values[$colMap[$name]] ?? '0';
-            }
-        }
-        return '0';
-    };
-
     // Column-name lookup keeps sysstat 12+ additions from shifting meanings;
     // legacy await/svctm names remain fallbacks for older hosts.
-    return [
-        'iopsRead'        => $getAny(['r/s']),
-        'iopsWrite'       => $getAny(['w/s']),
-        'throughputRead'  => $getAny(['rMB/s']),
-        'throughputWrite' => $getAny(['wMB/s']),
-        'diskAwait'       => $getAny(['r_await', 'await']),
-        'diskServiceTime' => $getAny(['w_await', 'svctm']),
-        'diskUtil'        => $getAny(['%util']),
-        'avgQueueSize'    => $getAny(['aqu-sz', 'avgqu-sz']),
-    ];
+    $fields = [];
+    foreach ([
+        'iopsRead' => ['r/s'], 'iopsWrite' => ['w/s'],
+        'throughputRead' => ['rMB/s'], 'throughputWrite' => ['wMB/s'],
+        'diskAwait' => ['r_await', 'await'], 'diskServiceTime' => ['w_await', 'svctm'],
+        'diskUtil' => ['%util'], 'avgQueueSize' => ['aqu-sz', 'avgqu-sz'],
+    ] as $field => $colNames) {
+        $fields[$field] = '0';
+        foreach ($colNames as $name) {
+            if (isset($colMap[$name])) {
+                $fields[$field] = $values[$colMap[$name]] ?? '0';
+                break;
+            }
+        }
+    }
+    return $fields;
 }
 
