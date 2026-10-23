@@ -11,10 +11,9 @@
  */
 
 require_once __DIR__.'/log.php';
+// environment.php owns the path and probe defaults below; load it before anything derives from them.
+require_once __DIR__.'/runtime/environment.php';
 
-const PMSS_LOG_DIR_DEFAULT = '/var/log/pmss';
-const PMSS_RUNTIME_DIR_DEFAULT = '/var/run/pmss';
-const PMSS_STATE_DIR_DEFAULT = '/var/lib/pmss';
 const PMSS_RUNTIME_FALLBACK_LOG = PMSS_LOG_DIR_DEFAULT.'/runtime.log';
 const PMSS_COMMAND_TIMEOUT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
@@ -24,10 +23,6 @@ const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
 // nothing. It only has to exceed the watchdog's poll interval under load, not be tuned.
 const PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS = 30;
 const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
-const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
-const PMSS_IOPING_PROBE_COUNT = 60;
-const PMSS_IOPING_PROBE_INTERVAL = '0.1';
-const PMSS_IOPING_PROBE_TIMEOUT = 15;
 
 /**
  * Load static helper-module require lists relative to a bootstrap file.
@@ -62,7 +57,6 @@ if (!function_exists('pmssFormatBytes')) {
     }
 }
 
-require_once __DIR__.'/runtime/environment.php';
 
 // Share structured `logMessage()` with update helpers via the standalone
 // logging bootstrap. `require_once` keeps the import idempotent. Only runtime-

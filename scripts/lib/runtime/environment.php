@@ -9,6 +9,16 @@
  * @author PMSS Team
  */
 
+// Defaults this module reads. They live here, not in the facade, so a direct require cannot
+// call pmssLogDir() and friends before they exist (an update bootstrap fatal, 2026-10-23).
+const PMSS_LOG_DIR_DEFAULT = '/var/log/pmss';
+const PMSS_RUNTIME_DIR_DEFAULT = '/var/run/pmss';
+const PMSS_STATE_DIR_DEFAULT = '/var/lib/pmss';
+const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
+const PMSS_IOPING_PROBE_COUNT = 60;
+const PMSS_IOPING_PROBE_INTERVAL = '0.1';
+const PMSS_IOPING_PROBE_TIMEOUT = 15;
+
 function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
 function pmssCommandBinaryNameIsSafe(string $binary): bool { return preg_match('/^[A-Za-z0-9._+-]+$/', $binary) === 1; }
 function pmssCommandPathCandidateIsSafe(string $path): bool { return strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false; }

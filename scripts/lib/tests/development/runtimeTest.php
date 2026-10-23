@@ -83,6 +83,20 @@ class RuntimeTest extends TestCase
         }
     }
 
+    /** A library that requires runtime/environment.php directly must not leave pmssLogDir() without its default. */
+    public function testDirectEnvironmentRequireBeforeUpdateLoggingKeepsLogDirDefault(): void
+    {
+        $lib = dirname(__DIR__, 2);
+        foreach (['rtorrentPortReservations.php', 'userTransfer/qbittorrentLegacyCategories.php',
+            'nginxConfig/userConfigsReconcile.php', 'lighttpd/dockerClientProxy.php'] as $consumer) {
+            $script = 'require_once '.var_export($lib.'/'.$consumer, true).'; '
+                .'require_once '.var_export($lib.'/update/logging.php', true).'; '
+                .'echo json_encode([PMSS_LOG_FILE, pmssRuntimeDir(), pmssStateDir()]);';
+            $this->assertSame(['/var/log/pmss/update.log', '/var/run/pmss', '/var/lib/pmss'],
+                $this->pmssRunInlinePhpJson($script, ['PMSS_LOG_DIR' => '', 'PMSS_RUNTIME_DIR' => '', 'PMSS_STATE_DIR' => '']), $consumer);
+        }
+    }
+
     public function testRuntimeRequireOnceOwnsDefinitionContract(): void
     {
         $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
