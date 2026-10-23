@@ -4,8 +4,8 @@ require_once __DIR__.'/remoteBinary.php';
 require_once __DIR__.'/../rootOwnedTree.php';
 
 // Pin both values from one published release; an empty pin disables installation.
-const PMSS_PIKKUMIES_AGENTBOARD_VERSION = 'v0.36.0-pikkumies.3';
-const PMSS_PIKKUMIES_AGENTBOARD_SHA256 = '8a60abc89966435ff37fb3b0145b062d9a301797410b160d8760e63ec3177507';
+const PMSS_PIKKUMIES_AGENTBOARD_VERSION = 'v0.36.0-pikkumies.4';
+const PMSS_PIKKUMIES_AGENTBOARD_SHA256 = '436b458643d3789d00b17e7bcbbcea831bd9ed09f4aeb4f885833dc43d6486ba';
 const PMSS_PIKKUMIES_AGENTBOARD_ROOT = '/opt/pikkumies-agentboard';
 
 /** Refuse an unpinned archive before tar or any destination write. */
