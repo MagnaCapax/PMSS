@@ -34,6 +34,31 @@ function pmssDockerSlirpArchitectureFromOutput($archOutput, ?callable $logger = 
     return $arch;
 }
 
+/** True when the helper is a regular file (not a symlink) with the pinned checksum. */
+function pmssDockerSlirpHelperMatchesPin(string $helper, string $sha256): bool
+{
+    return $sha256 !== '' && is_file($helper) && !is_link($helper) && pmssPinnedRemoteChecksum($helper) === strtolower($sha256);
+}
+
+/** Remove regular pmss-slirp4netns-XXXXXX copies left by installs that kept the tempnam() name; symlinks stay. */
+function pmssDockerRemoveStraySlirpCopies(string $dir, bool $dryRun): void
+{
+    if ($dryRun) {
+        return;
+    }
+    foreach (glob(rtrim($dir, '/').'/pmss-slirp4netns-*') ?: [] as $straySlirp) {
+        if (preg_match('/\Apmss-slirp4netns-[A-Za-z0-9]{6}\z/', basename($straySlirp)) === 1
+            && is_file($straySlirp) && !is_link($straySlirp)) {
+            pmssPinnedRemoteStaleBinaryRemove($straySlirp, 'stray slirp4netns');
+        }
+    }
+}
+
+if (pmssEnvFlagEnabled('PMSS_DOCKER_NO_ENTRYPOINT')) {
+    return;
+}
+
+$dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 logmsg('[docker] Starting Docker rootless configuration');
 // Disable Docker system service and remove stray socket
 runStep('[docker] Docker: disabling system service', pmssBuildCommand('systemctl', ['disable', '--now', 'docker.service', 'docker.socket']));
@@ -56,14 +81,13 @@ if ($version > 0 && $version < 12) {
         $slirpUrl = 'https://github.com/rootless-containers/slirp4netns/releases/download/v1.3.6/slirp4netns-'.$arch;
         pmssInstallPinnedRemoteBinary('slirp4netns v1.3.6', $slirpUrl, $slirpSha256, '/usr/local/bin/slirp4netns', true);
     }
-    runStep('[docker] Docker: creating iptables symlink', pmssBuildCommand('ln', ['-sf', '/usr/sbin/iptables', '/usr/local/bin/iptables']));
-}
-
-// Installs before this fix kept the tempnam() name (pmss-slirp4netns-XXXXXX); remove those copies on every release.
-foreach (pmssEnvFlagEnabled('PMSS_DRY_RUN') ? [] : (glob('/usr/local/bin/pmss-slirp4netns-??????') ?: []) as $straySlirp) {
-    if (is_file($straySlirp) && !is_link($straySlirp)) {
-        pmssPinnedRemoteStaleBinaryRemove($straySlirp, 'stray slirp4netns');
+    // Keep stray copies until the pinned helper is in place: a hand-made slirp4netns symlink may point at one.
+    if (pmssDockerSlirpHelperMatchesPin('/usr/local/bin/slirp4netns', $slirpSha256)) {
+        pmssDockerRemoveStraySlirpCopies('/usr/local/bin', $dryRun);
     }
+    runStep('[docker] Docker: creating iptables symlink', pmssBuildCommand('ln', ['-sf', '/usr/sbin/iptables', '/usr/local/bin/iptables']));
+} elseif ($version >= 12) {
+    pmssDockerRemoveStraySlirpCopies('/usr/local/bin', $dryRun);
 }
 
 logmsg('[docker] Docker rootless configuration complete');
