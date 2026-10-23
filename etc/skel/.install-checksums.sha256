@@ -35,8 +35,8 @@
 
 # --- install-ai-tools.sh artifacts ---
 
-# Node.js 22.22.1 (linux x64)
-9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa  node-v22.22.1-linux-x64.tar.xz
+# Node.js 22.23.4 (linux x64), nodejs.org/dist/v22.23.4/SHASUMS256.txt
+1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce  node-v22.23.4-linux-x64.tar.xz
 
 # OpenAI Codex CLI rust-v0.160.0 (linux x86_64 musl); identifier is versioned by release tag
 306865417d4ee7a927785852910a527f41e1e159add390ac5ae3accb67d44a13  codex-rust-v0.160.0-x86_64-unknown-linux-musl.tar.gz

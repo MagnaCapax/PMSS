@@ -142,7 +142,7 @@ echo ""
 # --- Portable Node.js (for Gemini CLI) ---
 install_node() {
 	# Pinned to LTS 22.x. Update this version to upgrade Node.js.
-	local NODE_VERSION="22.22.1"
+	local NODE_VERSION="22.23.4"
 	local ARCH="x64"
 
 	if [ -x "$NODE_DIR/bin/node" ]; then

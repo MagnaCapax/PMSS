@@ -46,7 +46,7 @@ $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $architecture = php_uname('m');
 $supportsPinnedArtifacts = pmssPinnedRemoteAmd64ArtifactsSupported($architecture);
 $installRoot = '/opt/pmss/ai-tools';
-$nodeDir = $installRoot.'/node-v22.22.1-linux-x64';
+$nodeDir = $installRoot.'/node-v22.23.4-linux-x64';
 
 if (!$dryRun && is_dir($installRoot)) {
     foreach (@scandir($installRoot) ?: [] as $entry) {
@@ -83,9 +83,9 @@ if ($nodeBinary === '') {
     if (!$supportsPinnedArtifacts) {
         $logger('[WARN] Skipping Gemini/Claude install: no pinned Node.js artifact for this CPU architecture');
     } else {
-        $nodeVersion  = '22.22.1';
-        $nodeArchive  = 'node-v22.22.1-linux-x64.tar.xz';
-        $nodeSha256   = '9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa';
+        $nodeVersion  = '22.23.4';
+        $nodeArchive  = 'node-v22.23.4-linux-x64.tar.xz';
+        $nodeSha256   = '1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce';
         $nodeBinary   = $nodeDir.'/bin/node';
         $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
 

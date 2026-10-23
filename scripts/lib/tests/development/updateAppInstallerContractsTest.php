@@ -23,7 +23,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'pmssAiToolsCodexInstallNeeded(',
                     'pmssAiToolsCodexAtomicWrite(',
                     'PMSS_AI_CODEX_CHAT_TAGS',
-                    'node-v22.22.1-linux-x64.tar.xz',
+                    'node-v22.23.4-linux-x64.tar.xz',
                     'codex-x86_64-unknown-linux-musl.tar.gz',
                     'PMSS_FORCE_AI_TOOLS_REFRESH',
                     "pmssAppVersionProbeMatch([escapeshellarg(\$systemNode)",

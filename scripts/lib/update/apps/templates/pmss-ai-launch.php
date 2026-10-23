@@ -334,6 +334,19 @@ function pmssAiGeminiDecision(array $args, array $env, array $state): array
     return ['argv' => $pass['argv'], 'env' => $env, 'notice' => true];
 }
 
+/** The npm CLIs start through /usr/bin/env node: run them on the runtime the updater installs (it keeps one). */
+function pmssAiNodeRuntimePath(array $env, string $root = '/opt/pmss/ai-tools'): array
+{
+    $nodes = glob($root.'/node-v*-linux-x64/bin/node') ?: [];
+    rsort($nodes, SORT_NATURAL);
+    if ($nodes === [] || !is_executable($nodes[0])) {
+        return $env;
+    }
+    $path = $env['PATH'] ?? '';
+    $env['PATH'] = dirname($nodes[0]).($path === '' ? '' : ':'.$path);
+    return $env;
+}
+
 /** Replace this process when possible; otherwise preserve all three streams. */
 function pmssAiCodexExec(array $decision)
 {
@@ -359,6 +372,9 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath($_SERVER['SCRIPT_FILENAME']) 
     $tool = $argv[1] ?? '';
     if (!in_array($tool, ['codex', 'claude', 'gemini'], true)) {
         exit(127);
+    }
+    if ($tool !== 'codex') {
+        $env = pmssAiNodeRuntimePath($env);
     }
     $binary = $tool === 'codex' ? PMSS_AI_CODEX_BINARY : ($tool === 'claude' ? PMSS_AI_CLAUDE_BINARY : PMSS_AI_GEMINI_BINARY);
     $pass = ['argv' => array_merge([$binary], $args), 'env' => $env, 'notice' => false];

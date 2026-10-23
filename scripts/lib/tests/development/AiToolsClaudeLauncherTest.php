@@ -149,4 +149,21 @@ class AiToolsClaudeLauncherTest extends TestCase
         file_put_contents($stub, 'outdated');
         $this->assertTrue(\pmssAiToolsClaudeInstallNeeded($launcher, $stub, $source));
     }
+
+    public function testNpmCliRunsOnInstalledNodeRuntime(): void
+    {
+        $env = ['HOME' => '/tmp/pmss-test-home', 'PATH' => '/usr/bin:/bin'];
+        $this->assertSame($env, \pmssAiNodeRuntimePath($env, $this->tempDir));
+        foreach (['22.9.0', '22.23.4'] as $version) {
+            $bin = $this->tempDir.'/node-v'.$version.'-linux-x64/bin';
+            mkdir($bin, 0755, true);
+            file_put_contents($bin.'/node', "#!/bin/sh\n");
+            chmod($bin.'/node', 0755);
+        }
+        $out = \pmssAiNodeRuntimePath($env, $this->tempDir);
+        $this->assertSame($this->tempDir.'/node-v22.23.4-linux-x64/bin:/usr/bin:/bin', $out['PATH']);
+        $this->assertSame('/tmp/pmss-test-home', $out['HOME']);
+        $bare = \pmssAiNodeRuntimePath(['HOME' => '/tmp/pmss-test-home'], $this->tempDir);
+        $this->assertSame($this->tempDir.'/node-v22.23.4-linux-x64/bin', $bare['PATH']);
+    }
 }

@@ -33,7 +33,7 @@ class AiDockerInstallerSafetyTest extends TestCase
     public function testAiToolsNodeTreeOwnershipAndLinkSafeRemoval(): void
     {
         $root = $this->pmssMakeTempDir('pmss-ai-node-');
-        $tree = $root.'/node-v22.22.1-linux-x64';
+        $tree = $root.'/node-v22.23.4-linux-x64';
         $outside = $root.'/outside';
         $this->assertTrue(@mkdir($tree.'/bin', 0700, true));
         $this->assertTrue(@mkdir($outside));
