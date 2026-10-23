@@ -6,6 +6,72 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Characterize the deployed CLI's output, exits, shell commands, signals and decision ordering. */
 class UserDockerLifecycleTest extends TestCase
 {
+    public function testFailedContainerRuntimeBindDiagnostics(): void
+    {
+        // Execute only the container handler with account commands and both log sinks intercepted.
+        $script = <<<'PHP'
+namespace DockerMountFixture;
+class UserConfigStore {}
+function pmssUserDockerEnabled($user, $store) { return true; }
+function pmssUserLog($user, $message) { $GLOBALS['logs'][] = $message; }
+function fwrite($stream, $message) { $GLOBALS['errors'][] = $message; return strlen($message); }
+function userDockerRunAs($user, $command, $timeout, &$rc = null) {
+    $GLOBALS['commands'][] = [$user, $command, $timeout];
+    $rc = 0;
+    if (strpos($command, ' docker start ') !== false) { $rc = $GLOBALS['startRc']; return 'started'; }
+    if (strpos($command, ' docker inspect ') !== false) { $rc = 1; return $GLOBALS['mounts']; }
+    return '';
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/docker/containers.php', 'DockerMountFixture');
+        $script .= <<<'PHP'
+$bind = static function ($source, $type = 'bind') { return ['Type' => $type, 'Source' => $source]; };
+$foreign = $bind('/run/user/2002/docker.sock');
+$cases = [
+    'foreign' => [[$foreign]],
+    'own' => [[$bind('/run/user/1001/docker.sock')]],
+    'volume' => [[$bind('/run/user/2002/docker.sock', 'volume')]],
+    'prefix' => [[$bind('/run/user/1001-extra/docker.sock')]],
+    'ordinary' => [[$bind('/srv/data')]],
+    'twice' => [[$foreign, $foreign]],
+    'two-containers' => [[$foreign], [$foreign]],
+    'runtime-root' => [[$bind('/run/user/2002')]],
+    'malformed' => [[null, ['Type' => 'bind', 'Source' => []], $bind('/run/user/no-uid/docker.sock')]],
+    'invalid-json' => [],
+    'partial-inspect' => [[$foreign]],
+    'success' => [[$foreign]],
+];
+$results = [];
+foreach ($cases as $name => $mounts) {
+    $GLOBALS['mounts'] = $name === 'invalid-json' ? "not json\nnull\n42" : implode("\n", array_map('json_encode', $mounts));
+    $GLOBALS['commands'] = $GLOBALS['logs'] = $GLOBALS['errors'] = [];
+    $GLOBALS['startRc'] = $name === 'success' ? 0 : 1;
+    ob_start();
+    $rc = userDockerStartContainers('alice', '/run/user/1001', '/run/user/1001/docker.sock', [str_repeat('a', 64), str_repeat('b', 64)]);
+    $results[$name] = [$rc, ob_get_clean(), $GLOBALS['commands'], $GLOBALS['logs'], $GLOBALS['errors']];
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script);
+        $this->assertSame(12, count($results));
+        foreach ($results as $name => [$rc, $stdout, $commands, $logs, $errors]) {
+            $success = $name === 'success';
+            $count = in_array($name, ['foreign', 'twice', 'runtime-root', 'partial-inspect'], true) ? 1 : ($name === 'two-containers' ? 2 : 0);
+            $this->assertSame($success ? 0 : 1, $rc, $name);
+            $this->assertSame("Started 1 of 2 container(s) for alice\n", $stdout, $name);
+            $this->assertSame($success ? 3 : 4, count($commands), $name);
+            if (!$success) {
+                $this->assertSame('alice', $commands[2][0], $name);
+                $this->assertSame(30, $commands[2][2], $name);
+                $this->assertTrue(strpos($commands[2][1], "inspect --type container --format '{{json .Mounts}}'") !== false, $name);
+                $this->assertTrue(strpos($commands[2][1], '2>/dev/null | head -c 1048576') !== false, $name);
+            }
+            $warning = sprintf("[WARN] %d of 2 container(s) bind a path under another account's runtime directory; this account's runtime directory is /run/user/1001", $count);
+            $this->assertSame($count > 0 ? [$warning."\n"] : [], $errors, $name);
+            $this->assertSame($count > 0 ? [$warning, 'userDocker: containers by state: '] : ['userDocker: containers by state: '], $logs, $name);
+        }
+    }
+
     public function testLifecycleBehaviorSnapshots(): void
     {
         $cases = [
@@ -65,7 +131,8 @@ class UserDockerLifecycleTest extends TestCase
             'containers-start' => '7beceada3c520642e88c15f51dadda5d8d291688586b5e9036195085227c25da',
             'containers-disabled' => 'df1e39d1693bc59a1ba21168db30b313e6c6db3acda3a9ef357604c9a61902e1',
             'containers-not-ready' => '048feb77e5be706720030eed18e3ba379ffd69d8860950e714b37de882f4e7e7',
-            'containers-partial' => 'df7686750238d25cc92d95ecab52bd873c745bf87616b2a0515db737eb6912a8',
+            // Failed starts now add the account-scoped, bounded mount inspection (Refs #1152).
+            'containers-partial' => '9b87daf60f5da646c9e6018b7cd3537598be52a7bc34d0c45c6e53a4babad556',
         ];
         foreach ($cases as $name => $case) {
             $action = $case['action'] ?? 'start';

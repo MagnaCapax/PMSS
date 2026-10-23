@@ -83,6 +83,14 @@ On cgroup v2 hosts, `userDocker.php start` also backfills the same `daemon.json`
 
 ## Troubleshooting
 
+After an account move, containers with a bind mount of the Docker socket may
+still reference the previous numeric UID in `/run/user/<uid>/docker.sock`.
+On a failed transferred-container start, PMSS reports how many requested
+containers bind another account's runtime directory and gives the current
+runtime directory. Recreate affected containers with the current socket path;
+PMSS leaves container definitions intact. Diagnostics contain counts, without
+container IDs or customer-chosen paths, as required by ADR 0072.
+
 If `docker ps` fails with a socket error like:
 
 ```
