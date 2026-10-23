@@ -2018,7 +2018,9 @@ function pmssWelcomeHomeSupportActivityEmit($home)
         if (is_array($data)) {
             $answer['state'] = preg_match('/^[a-z]{1,16}$/D', (string) ($data['state'] ?? '')) ? (string) $data['state'] : '';
             $answer['at'] = isset($data['at']) && is_int($data['at']) && $data['at'] > 0 ? $data['at'] : 0;
-            $said = preg_replace('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', ' ', (string) ($data['said'] ?? ''));
+            $said = trim((string) preg_replace('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', ' ', (string) ($data['said'] ?? '')));
+            // An answer is shown and logged as its Result sentence only; the rest of it is in the Pikkumies tab.
+            if (preg_match('/^Result:\s.*?[.!?](?=\s|$)/u', $said, $result)) $said = $result[0];
             $answer['said'] = function_exists('mb_strimwidth') ? mb_strimwidth(trim($said), 0, 200, '…', 'UTF-8') : substr(trim($said), 0, 200);
             $answer['said_at'] = $answer['said'] !== '' && isset($data['said_at']) && is_int($data['said_at']) && $data['said_at'] > 0 ? $data['said_at'] : 0;
             if (strncmp($answer['said'], 'Result:', 7) === 0 && $answer['said_at'] > pmssWelcomeHomeSupportLogLastAnswer($home)) {

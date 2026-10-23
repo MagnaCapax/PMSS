@@ -623,7 +623,8 @@ final class WelcomeHomeTest extends TestCase
         $log = $homes['answered'].'/.pmss/support-log.jsonl';
         $rows = array_map(function ($row) { return json_decode($row, true); }, file($log, FILE_IGNORE_NEW_LINES));
         $this->assertSame(1, count($rows), 'one answered row');
-        $this->assertSame(array('answered', 'pikkumies', 'Result: All fine, no ticket needed. Your disk is 41% full.', 1760000019),
+        $this->assertSame('Result: All fine, no ticket needed.', $result['answered']['said'], 'An answer reaches the page as its Result sentence only');
+        $this->assertSame(array('answered', 'pikkumies', 'Result: All fine, no ticket needed.', 1760000019),
             array($rows[0]['event'], $rows[0]['route'], $rows[0]['result'], $rows[0]['said_at']));
         $this->runWelcomeHome('function pmssWelcomePikkumiesStateRead($home, $name) { return array("visible" => true, "origin" => ""); }'
             .' ob_start(); pmssWelcomeHomeSupportActivityEmit('.var_export($homes['answered'], true).'); ob_end_clean(); echo "[]";', true);
