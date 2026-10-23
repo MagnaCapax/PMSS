@@ -6,6 +6,7 @@ require_once dirname(__DIR__, 2).'/user/credentialProcess.php';
 require_once dirname(__DIR__, 2).'/user/changePwCredential.php';
 require_once dirname(__DIR__, 2).'/user/credentialGenerate.php';
 require_once dirname(__DIR__, 2).'/user/add/cli.php';
+require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssAccountAgent.php';
 
 class CredentialProcessTransportTest extends TestCase
 {
@@ -136,12 +137,39 @@ class CredentialProcessTransportTest extends TestCase
         $this->assertSame(['shadow failure'], $output);
     }
 
-    public function testProcOpenDescriptorsDoNotUsePhp74RedirectType(): void
+    public function testAccountAgentRunCapturesStderrOnPhp73Descriptors(): void
     {
-        $descriptor = '/\[\s*[\'\"]'.'redirect'.'[\'\"]\s*,\s*\d+\s*\]/';
-        foreach ($this->pmssRepoFiles('scripts', '/\.php$/D') as $file) {
-            $source = file_get_contents($file->getPathname());
-            $this->assertFalse(is_string($source) && preg_match($descriptor, $source) === 1, $file->getPathname());
+        [$status, $output] = \pmssAgentRun(['sh', '-c', 'printf out; printf err >&2; exit 3']);
+        $this->assertSame(3, $status);
+        $this->assertSame('outerr', $output);
+    }
+
+    public function testProcOpenDescriptorsDoNotUsePhp74Types(): void
+    {
+        // PHP 7.4 added the 'redirect' and 'null' descriptor types; match both array spellings, not $map['null'].
+        $open = '(?:(?<![\\w\\])])\\[|\\barray\\s*\\()\\s*';
+        $descriptors = [
+            '/'.$open.'[\'\"]'.'redirect'.'[\'\"]\\s*,\\s*\\d+/',
+            '/'.$open.'[\'\"]'.'null'.'[\'\"]\\s*[\\])]/',
+        ];
+        $checked = 0;
+        foreach (['scripts', 'etc/skel/bin'] as $root) {
+            foreach ($this->pmssRepoFiles($root, '/\\.php$/D') as $relative => $file) {
+                $source = (string) file_get_contents($file->getPathname());
+                foreach ($descriptors as $descriptor) {
+                    $this->assertFalse(preg_match($descriptor, $source) === 1, $relative);
+                }
+                $checked++;
+            }
+        }
+        $this->assertTrue($checked > 0, 'Expected PHP files to scan');
+        $r = 'redi'.'rect';
+        $n = 'nu'.'ll';
+        foreach (["2 => ['$r', 1]", "2 => array('$r', 1)", "2 => array( \"$r\" , 1 )", "1 => ['$n']", "1 => array('$n')", "[['pipe', 'r'], ['$n']]"] as $sample) {
+            $this->assertTrue(preg_match($descriptors[0], $sample) === 1 || preg_match($descriptors[1], $sample) === 1, $sample);
+        }
+        foreach (["\$states['$n']", "\$rows[0]['$n']", "['$r', '/user-x/app', '/user-x/app/']"] as $sample) {
+            $this->assertFalse(preg_match($descriptors[0], $sample) === 1 || preg_match($descriptors[1], $sample) === 1, $sample);
         }
     }
 }
