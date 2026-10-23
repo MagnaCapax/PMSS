@@ -213,8 +213,9 @@ function pmssLogWriteMessage(string $primary, string $fallback, string $message,
 /** True when the named standard stream is open on the file at $path (same device and inode). */
 function pmssLogStreamIsFile(string $stream, string $path): bool
 {
-    if (!defined($stream)) return false;
-    $open = @fstat(constant($stream));
+    // Closed standard streams and non-stream constants cannot supply inode metadata.
+    if (!defined($stream) || !pmssStreamHandleIsOpen($handle = constant($stream))) return false;
+    $open = @fstat($handle);
     $file = @stat($path);
     return is_array($open) && is_array($file) && $file['ino'] !== 0
         && $open['dev'] === $file['dev'] && $open['ino'] === $file['ino'];

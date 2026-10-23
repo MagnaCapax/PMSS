@@ -6,6 +6,32 @@ require_once __DIR__.'/../common/TestCase.php';
 /** A cron job whose output is appended to its own log file must not get each Logger line twice. */
 class LogStdoutDuplicateTest extends TestCase
 {
+    public function testMissingAndScalarStreamConstantsReturnFalse(): void
+    {
+        $script = <<<'PHP'
+set_error_handler(static function ($severity, $message) { throw new \ErrorException($message, 0, $severity); });
+$results = [];
+foreach (['', 'PMSS_TEST_UNDEFINED_LOG_STREAM', 'PHP_INT_MAX', 'PHP_VERSION'] as $stream) {
+    $results[] = pmssLogStreamIsFile($stream, '/dev/null');
+}
+echo json_encode($results);
+PHP;
+        $this->assertSame([false, false, false, false], $this->pmssRunInlinePhpRequireJson(
+            dirname(__DIR__, 2).'/log.php', $script, [], '2>&1'));
+    }
+
+    public function testClosedStandardStreamsReturnFalse(): void
+    {
+        // Only child streams are closed; the suite's own output remains available.
+        foreach (['STDOUT' => 'STDERR', 'STDERR' => 'STDOUT'] as $stream => $reportStream) {
+            $script = 'set_error_handler(static function ($severity, $message) { throw new \\ErrorException($message, 0, $severity); });'
+                .'fclose('.$stream.'); fwrite('.$reportStream.', json_encode([pmssLogStreamIsFile('
+                .var_export($stream, true).", '/dev/null')]));";
+            $this->assertSame([false], $this->pmssRunInlinePhpRequireJson(
+                dirname(__DIR__, 2).'/log.php', $script, [], '2>&1'));
+        }
+    }
+
     public function testLineIsWrittenOnceWhenOutputIsAppendedToTheLogFile(): void
     {
         $this->assertSame(1, $this->countLines('STDOUT', true));
