@@ -122,6 +122,13 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   Missing, empty, malformed, or `0` keeps the existing quarterly hostname-staggered
   schedule unchanged. The last start is stored in
   `/var/lib/pmss/mdadm-checkarray-last` after checkarray exits successfully.
+  Checkarray command requests reject malformed array names and empty or
+  NUL-containing executable names before launching. Invalid read paths retain
+  the existing unreadable-mdstat or unset-integer result; a NUL-containing sysfs
+  root uses mdstat state without attempting an idle write. Malformed state paths
+  log the existing persistence warning without changing a successful command's
+  exit code. Valid names, sysfs precedence, command arguments and fallback policy
+  remain unchanged.
 - `trafficLog.php` – Capture recent traffic counters for aggregation.
 - `trafficStats.php` – Fold raw logs into long-term statistics.
 - `systemdServicesGuard.php` – Enforce stop/disable/mask policy for system services.

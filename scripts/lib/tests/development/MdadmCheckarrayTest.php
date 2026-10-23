@@ -28,6 +28,96 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertFalse($plan['fallback_all']);
     }
 
+    public function testArrayNamesRequireAWholeMdDeviceName(): void
+    {
+        foreach (['md0', 'md1', 'md123', 'md000'] as $array) {
+            $this->assertTrue(\pmssMdadmCheckarrayArrayNameIsSafe($array));
+        }
+        foreach (['', 'md', 'md-1', 'md/0', '--all', "md0\n", "md0\r", "md0\0", 'md0 extra'] as $array) {
+            $this->assertFalse(\pmssMdadmCheckarrayArrayNameIsSafe($array));
+        }
+    }
+
+    public function testMalformedReadPathsKeepExistingFailureResults(): void
+    {
+        $path = $this->pmssWriteRelativeFile($this->fixtureRoot, 'integer', "365\n", 0700);
+        foreach (['', "\0", $path."\0", "\0".$path, $path."\0ignored"] as $invalid) {
+            $this->pmssAssertNoPhpWarnings(function () use ($invalid): void {
+                $this->assertSame(null, \pmssMdadmCheckarrayReadInteger($invalid));
+                $plan = \pmssMdadmCheckarrayPlan($invalid, $this->fixtureRoot);
+                $this->assertSame([
+                    'fallback_all' => true, 'reason' => 'mdstat_unreadable',
+                    'healthy' => [], 'degraded' => [], 'unknown' => [],
+                ], $plan);
+            });
+        }
+        $this->assertSame(365, \pmssMdadmCheckarrayReadInteger($path));
+        $this->assertSame("365\n", file_get_contents($path));
+    }
+
+    public function testMalformedSysfsRootsRetainMdstatFallbackAndDoNotWrite(): void
+    {
+        $this->writeSysfsState('md0', '0');
+        $root = $this->fixtureRoot.'/sys/block';
+        $sync = $this->pmssWriteRelativeFile($root, 'md0/md/sync_action', "check\n", 0700);
+        foreach (["\0", $root."\0", "\0".$root, $root."\0ignored", $root."/\0/"] as $invalid) {
+            $this->pmssAssertNoPhpWarnings(function () use ($invalid): void {
+                foreach (['[2/2] [UU]' => false, '[2/1] [U_]' => true, '' => null] as $detail => $expected) {
+                    $this->assertSame($expected, \pmssMdadmCheckarrayEntryDegradedState(
+                        ['array' => 'md0', 'detail' => $detail], $invalid
+                    ));
+                }
+                $this->assertFalse(\pmssMdadmCheckarrayRequestIdle('md0', $invalid));
+            });
+            $this->assertSame("check\n", file_get_contents($sync));
+        }
+        $this->assertSame(false, \pmssMdadmCheckarrayEntryDegradedState(
+            ['array' => 'md0', 'detail' => '[2/1] [U_]'], $root
+        ));
+        $this->assertTrue(\pmssMdadmCheckarrayRequestIdle('md0', $root));
+        $this->assertSame("idle\n", file_get_contents($sync));
+    }
+
+    public function testMalformedCommandRequestsNeverLaunchTheHelper(): void
+    {
+        $stub = $this->writeCheckarrayStub();
+        $this->pmssWithEnv(['PMSS_MDADM_CHECKARRAY_STUB_LOG' => $this->fixtureRoot.'/checkarray.log'], function () use ($stub): void {
+            $requests = [['', []], ["\0", []], [$stub."\0ignored", []]];
+            foreach (['', '--all', 'md/0', "md0\n", "md0\0", 0, null, [], new \stdClass()] as $array) {
+                // A valid prefix must not launch when any later member is invalid.
+                $requests[] = [$stub, ['md0', $array]];
+            }
+            foreach ($requests as [$binary, $arrays]) {
+                $this->pmssAssertNoPhpWarnings(function () use ($binary, $arrays): void {
+                    $this->assertSame(1, \pmssMdadmCheckarrayRunCommand($binary, $arrays));
+                });
+                $this->assertFalse(file_exists($this->fixtureRoot.'/checkarray.log'));
+            }
+            foreach ([['md0', 'md12'], []] as $arrays) {
+                $this->assertSame(0, \pmssMdadmCheckarrayRunCommand($stub, $arrays));
+            }
+            $this->assertSame("--idle --quiet md0 md12\n--idle --quiet --all\n", $this->readStubLog());
+        });
+    }
+
+    public function testMalformedStatePathsKeepSuccessfulCommandStatus(): void
+    {
+        $stub = $this->writeCheckarrayStub();
+        $path = $this->fixtureRoot.'/missing/state';
+        $environment = ['PMSS_MDADM_CHECKARRAY_STUB_LOG' => $this->fixtureRoot.'/checkarray.log'];
+        foreach (['', "\0", $path."\0", "\0".$path, $path."\0ignored"] as $invalid) {
+            $this->pmssAssertNoPhpWarnings(function () use ($stub, $invalid, $environment): void {
+                [$rc, $output] = $this->pmssCaptureStdout(static function () use ($stub, $invalid): int {
+                    return \pmssMdadmCheckarrayRunAndRemember($stub, ['md0'], $invalid);
+                }, $environment);
+                $this->assertSame(0, $rc);
+                $this->assertStringContainsString('unable to write last-check state', $output);
+            });
+            $this->assertFalse(file_exists(dirname($path)), 'Invalid state paths must not create parents');
+        }
+        $this->assertSame(str_repeat("--idle --quiet md0\n", 5), $this->readStubLog());
+    }
+
     public function testPlanFallsBackToAllWhenMdstatIsUnreadable(): void
     {
         $plan = \pmssMdadmCheckarrayPlan($this->fixtureRoot.'/missing-mdstat', $this->fixtureRoot.'/sys/block');

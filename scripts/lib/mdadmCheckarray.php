@@ -24,14 +24,14 @@ function pmssMdadmCheckarrayLog(string $message): void { echo pmssLogFormatTimes
 /** Keep array names constrained before composing sysfs paths or shell args. */
 function pmssMdadmCheckarrayArrayNameIsSafe(string $array): bool
 {
-    return preg_match('/^md\d+$/', $array) === 1;
+    return preg_match('/\Amd[0-9]+\z/', $array) === 1;
 }
 
 /** Prefer valid sysfs state; missing or malformed data falls back to mdstat. */
 function pmssMdadmCheckarrayEntryDegradedState(array $entry, string $sysBlockRoot): ?bool
 {
     $array = (string) ($entry['array'] ?? '');
-    if (pmssMdadmCheckarrayArrayNameIsSafe($array)) {
+    if (pmssMdadmCheckarrayArrayNameIsSafe($array) && !pmssFilesystemPathHasNulByte($sysBlockRoot)) {
         $raw = @file_get_contents(rtrim($sysBlockRoot, '/').'/'.$array.'/md/degraded');
         if (is_string($raw) && ctype_digit(trim($raw))) {
             return (int) trim($raw) > 0;
@@ -55,7 +55,9 @@ function pmssMdadmCheckarrayEntryDegradedState(array $entry, string $sysBlockRoo
 function pmssMdadmCheckarrayPlan(string $mdstatPath, string $sysBlockRoot): array
 {
     $plan = ['fallback_all' => false, 'reason' => '', 'healthy' => [], 'degraded' => [], 'unknown' => []];
-    $mdstat = @file_get_contents($mdstatPath);
+    // Malformed paths follow the same fallback as an unreadable mdstat file.
+    $mdstat = $mdstatPath === '' || pmssFilesystemPathHasNulByte($mdstatPath)
+        ? false : @file_get_contents($mdstatPath);
     if (!is_string($mdstat)) {
         $plan['fallback_all'] = true;
         $plan['reason'] = 'mdstat_unreadable';
@@ -92,7 +94,7 @@ function pmssMdadmCheckarrayPlan(string $mdstatPath, string $sysBlockRoot): arra
 /** Best-effort cancellation for a queued/interrupted check on skipped arrays. */
 function pmssMdadmCheckarrayRequestIdle(string $array, string $sysBlockRoot): bool
 {
-    if (!pmssMdadmCheckarrayArrayNameIsSafe($array)) {
+    if (!pmssMdadmCheckarrayArrayNameIsSafe($array) || pmssFilesystemPathHasNulByte($sysBlockRoot)) {
         return false;
     }
 
@@ -103,6 +105,11 @@ function pmssMdadmCheckarrayRequestIdle(string $array, string $sysBlockRoot): bo
 /** Run Debian checkarray and preserve its stdout/stderr in the cron log. */
 function pmssMdadmCheckarrayRunCommand(string $binary, array $arrays): int
 {
+    // Validate the entire request before quoting or launching any command.
+    if ($binary === '' || pmssFilesystemPathHasNulByte($binary)) return 1;
+    foreach ($arrays as $array) {
+        if (!is_string($array) || !pmssMdadmCheckarrayArrayNameIsSafe($array)) return 1;
+    }
     // PMSS owns the cron schedule; --cron would let AUTOCHECK silently skip it.
     $args = array_merge(['--idle', '--quiet'], empty($arrays) ? ['--all'] : array_values($arrays));
     $result = pmssCommandCapture(pmssBuildCommand($binary, $args), 120);
@@ -119,6 +126,8 @@ function pmssMdadmCheckarrayRunCommand(string $binary, array $arrays): int
 /** Treat absent, malformed, or out-of-range file contents as unset. */
 function pmssMdadmCheckarrayReadInteger(string $path): ?int
 {
+    // Keep invalid filesystem strings on the existing unset-value path.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return null;
     $value = @file_get_contents($path);
     return is_string($value) ? pmssUnsignedDecimalIntParse(trim($value)) : null;
 }
@@ -134,7 +143,8 @@ function pmssMdadmCheckarrayRunAndRemember(string $binary, array $arrays, string
 {
     $startedAt = time();
     $rc = pmssMdadmCheckarrayRunCommand($binary, $arrays);
-    if ($rc === 0 && ((!is_dir(dirname($statePath)) && !@mkdir(dirname($statePath), 0755, true))
+    if ($rc === 0 && ($statePath === '' || pmssFilesystemPathHasNulByte($statePath)
+        || (!is_dir(dirname($statePath)) && !@mkdir(dirname($statePath), 0755, true))
         || !pmssFileWriteComplete($statePath, (string) $startedAt."\n"))) {
         pmssMdadmCheckarrayLog('unable to write last-check state');
     }
