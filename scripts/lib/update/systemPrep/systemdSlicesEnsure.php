@@ -8,6 +8,7 @@
 require_once __DIR__.'/../managedPath.php';
 require_once dirname(__DIR__, 2).'/cgroup/policy.php';
 require_once dirname(__DIR__).'/../runtime.php';
+require_once dirname(__DIR__, 2).'/user/userCgroupSliceDropins.php';
 
 /** Render untrusted policy/findmnt fragments safely in single-line logs. */
 function pmssSystemdLogValue($value): string
@@ -52,6 +53,13 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         $log = $logger ?: 'logMessage';
         // Avoid touching the host systemd manager in test mode so dev tests stay hermetic.
         $skipSystemctl = pmssTestModeEnabled();
+
+        // Repair orphaned as well as active UIDs before any later manager reload.
+        if (!$skipSystemctl) {
+            pmssUserCgroupSliceDropinsRepair($log, static function (): int {
+                return runStep('Reloading systemd after legacy user slice repair', 'systemctl daemon-reload');
+            });
+        }
 
         // Drop-in management must target /etc paths only; avoid vendor dirs.
         // Some legacy hosts still carry a vendor drop-in at:

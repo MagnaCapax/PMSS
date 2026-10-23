@@ -105,6 +105,11 @@ rollback, pin the target explicitly, e.g. `release:2026-01-21` or
 
 ## Phase 2 – `scripts/util/update-step2.php`
 
+Systemd preparation repairs legacy per-UID drop-in precedence, including orphaned
+UIDs, with backups and one reload after the repair batch. See
+[ADR 0160](adr/0160-per-uid-slice-dropin-precedence-and-cleanup.md) and
+[cgroup policy](cgroup.md) for file names, safety checks and termination cleanup.
+
 Phase 2 executes with the full repository mounted locally, so it may load shared
 helpers from `scripts/lib/update/…`. The orchestrator is intentionally thin and
 mostly wires together specialised modules, while keeping a few one-caller steps

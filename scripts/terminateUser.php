@@ -23,6 +23,7 @@ pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/us
 require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
 require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
 require_once __DIR__.'/lib/user/billingIds.php';
+require_once __DIR__.'/lib/user/userCgroupSliceCleanup.php';
 require_once __DIR__.'/lib/nginxUserHosts.php';
 
 pmssStdoutHeartbeatStartForStdout();
@@ -276,6 +277,17 @@ if (pmssUserAccountLookup($username) !== null) {
 // If attempts 1 and 2 failed, keep the final cleanup order explicit.
 pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand), $dryRun);
 
+// Drop-ins belong to the departed UID, including set-property's control files.
+$sliceCleanupOk = pmssUserCgroupSliceDropinsCleanup(
+    $uid, pmssUserAccountLookup($username) !== null, $dryRun,
+    static function (string $message) use ($username): void {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'remove_slice_dropins', $username, 'INFO', $message);
+    },
+    static function () use ($username): int {
+        return pmssUserLifecycleStep('terminate', $username, 'reload_slice_cleanup', 'systemctl daemon-reload', false);
+    }
+);
+
 // This root-owned marker must not be inherited by a later account with the same name.
 pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null);
 
@@ -297,6 +309,9 @@ if (pmssUserAccountLookup($username) === null) {
 
 $overallDuration = microtime(true) - $overallStart;
 $completion = pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun);
+if (!$dryRun && !$sliceCleanupOk && $completion['rc'] === 0) {
+    $completion = array('line' => '## Incomplete: remove_slice_dropins', 'rc' => 1, 'status' => 'INCOMPLETE');
+}
 pmssUserLifecycleContextLog('terminate', 'end', $username, array(
     'status'           => $completion['status'],
     'dry_run'          => $dryRun,

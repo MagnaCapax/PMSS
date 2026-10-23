@@ -159,7 +159,8 @@ Inspect and apply limits per user:
   - `php /scripts/util/userConfigCgroup.php USER --apply --defaults`
   - Policy `mounts` entries are applied as per-device IO limits/weights when their backing devices can be resolved.
 - update-step2 checks the live per-user `MemoryMax` against the stored `ramMiB` plan before marking a user refreshed; if the live cap is lower than the canonical plan, it reruns the same `userConfigCgroup.php --apply` command to restore the slice policy.
-- update-step2 also repairs stale per-user drop-ins that contain bare sub-MiB `MemoryMax=<N>` values with a matching suffixed `MemoryLimit=<N>M` sibling by appending the PMSS MiB suffix before reloading systemd, so older high-priority `90-pmss-user.conf` files cannot override the canonical slice policy on the next daemon reload.
+- update-step2 systemd preparation backs up per-UID `90-pmss-user.conf` and `99-pmss.conf` files, then renames them to `40-pmss-user-legacy.conf` and `41-pmss-legacy.conf`. Their contents remain lower-priority defaults, so canonical `50-*` property files win after reload. The scan includes orphaned UIDs and reloads once after the batch; unsafe targets or occupied destinations are logged and retained. The host-wide `user-.slice.d/99-pmss.conf` shadow is unchanged (ADR 0160).
+- Per-user maintenance also repairs bare sub-MiB `MemoryMax=<N>` values with a matching suffixed `MemoryLimit=<N>M` sibling by appending the PMSS MiB suffix before reloading systemd. This repair applies to renamed defaults too.
 - Cron refresh reapplies explicit io.latency/io.cost user knobs:
   - `/scripts/cron/cgroupPolicyRefresh.php` runs at boot and every 2 hours from `root.cron`.
 - Cgroup-v1 BFQ hosts get a direct kernel weight refresh:
@@ -179,6 +180,7 @@ Inspect and apply limits per user:
     MemoryHigh-derived CPU/systemd weight helper.
 - User termination clears slice overrides:
   - `systemctl revert user-UID.slice` before deleting OS user data.
+  - After the final deletion attempt, both the account name and UID must be absent before removing that UID's directories in `/etc/systemd/system/` and `/etc/systemd/system.control/`. Cleanup refuses symlinks, non-regular entries and non-root-owned or writable targets, then reloads once after any removals. Failed cleanup/reload reports incomplete termination; dry runs retain files (ADR 0160).
 
 ## Options Reference (systemd/cgroup v2)
 
