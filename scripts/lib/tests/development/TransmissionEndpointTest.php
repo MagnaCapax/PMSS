@@ -66,6 +66,8 @@ PHP;
         $this->assertSame(false, $result['calls'][0][1]);
         $this->assertStringContainsString(escapeshellarg($home.'/www/torrentClientsResolve.php')
             .' transmission --launch', $result['calls'][0][2]);
+        // The panel's PHP process has no account HOME; the resolver CLI needs it.
+        $this->assertStringContainsString('HOME='.escapeshellarg($home).' php ', $result['calls'][0][2]);
     }
 
     public function testRestartRefusesDisabledAccountAndOtherwiseStopsBeforeLaunch(): void

@@ -48,7 +48,8 @@ try {
     }
     if ($action === 'restart') pmssCustomerNativeStop(array($binary));
     // Use the same resolver CLI as cron; it owns settings checks and daemon flock.
-    $command = 'cd '.escapeshellarg($home).' && php '
+    // The resolver CLI reads HOME, which the panel's PHP process does not set to the account home.
+    $command = 'cd '.escapeshellarg($home).' && HOME='.escapeshellarg($home).' php '
         .escapeshellarg($home.'/www/torrentClientsResolve.php')
         .' transmission --launch >/dev/null 2>&1';
     if (trim((string) pmssFrontendShellExec($command.'; printf "%s" "$?"')) !== '0') {

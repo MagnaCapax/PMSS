@@ -80,10 +80,23 @@ class LighttpdConfigRefreshResultTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/http.php',
             "'/scripts/util/userConfigLighttpd.php --strict %s'");
-        foreach (['scripts/recreateUser.php', 'scripts/lib/lighttpd/hermesUiConverge.php', 'scripts/cron/checkLighttpdInstances.php'] as $path) {
+        foreach (['scripts/recreateUser.php', 'scripts/lib/lighttpd/hermesUiConverge.php',
+            'scripts/lib/lighttpd/transmissionProxy.php', 'scripts/cron/checkLighttpdInstances.php'] as $path) {
             $source = $this->pmssReadRepoFile($path);
             $this->assertStringContainsString('/scripts/util/userConfigLighttpd.php', $source);
             $this->pmssAssertStringNotContainsString('--strict', $source);
+        }
+    }
+
+    public function testRootRouteConvergesReadTheHomeConfigThroughTheVerifiedReader(): void
+    {
+        // ~/.lighttpd.conf sits in the account-writable home; a swapped link, hard link or FIFO must not
+        // redirect or stall the root lighttpd watchdog.
+        foreach (['scripts/lib/lighttpd/hermesUiConverge.php', 'scripts/lib/lighttpd/transmissionProxy.php'] as $path) {
+            $source = $this->pmssReadRepoFile($path);
+            $this->assertStringContainsString('pmssReadRegularFileContentsVerified(', $source);
+            $this->pmssAssertStringNotContainsString('file_get_contents($lighttpdPath', $source);
+            $this->pmssAssertStringNotContainsString('file_get_contents($path, false, null, 0, 1048576)', $source);
         }
     }
 

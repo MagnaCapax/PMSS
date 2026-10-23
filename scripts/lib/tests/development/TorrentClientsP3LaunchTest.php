@@ -198,4 +198,25 @@ final class TorrentClientsP3LaunchTest extends TestCase
         $connect = strpos($source, "stream_socket_client('unix://'.\$socketPath");
         $this->assertTrue($guard !== false && $connect !== false && $guard < $connect);
     }
+    public function testLighttpdRouteIsStaleOnlyWhenSelectionAndRenderedRouteDisagree(): void
+    {
+        require_once dirname(__DIR__, 2).'/lighttpd/transmissionProxy.php';
+        $routed = "x\n".\pmssLighttpdTransmissionProxyBlock('alice')."y\n";
+        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('alice', true, "no route here\n"));
+        $this->assertFalse(\pmssLighttpdTransmissionRouteStale('alice', true, $routed));
+        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('alice', false, $routed));
+        $this->assertFalse(\pmssLighttpdTransmissionRouteStale('alice', false, "no route here\n"));
+        // Another account's route never satisfies this account.
+        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('alice', true, \pmssLighttpdTransmissionProxyBlock('alicex')));
+    }
+
+    public function testLighttpdWatchdogReconcilesTheRouteAndLaunchCliPreparesSettings(): void
+    {
+        $watchdog = (string) file_get_contents($this->pmssRepoPath('scripts/cron/checkLighttpdInstances.php'));
+        $converge = strpos($watchdog, 'pmssLighttpdTransmissionRouteConverge($thisUser, $homeDir);');
+        $backoff = strpos($watchdog, "if (pmssUserWatchdogBackoffActive(\$thisUser, 'lighttpd')) continue;");
+        $this->assertTrue($converge !== false && $backoff !== false && $converge < $backoff);
+        $cli = (string) file_get_contents($this->pmssRepoPath('etc/skel/www/torrentClientsResolve.php'));
+        $this->assertStringContainsString('pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home)', $cli);
+    }
 }

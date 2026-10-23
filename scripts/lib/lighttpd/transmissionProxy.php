@@ -38,3 +38,22 @@ function pmssLighttpdTransmissionProxyBlock(string $user): string
         .'    proxy.server = ( "" => (( "socket" => "/home/'.$user.'/.lighttpd/transmission.sock" )) )' . "\n"
         .'}' . "\n";
 }
+
+/** True when the account's rendered lighttpd config does not match its Transmission selection. */
+function pmssLighttpdTransmissionRouteStale(string $user, bool $selected, string $config): bool
+{
+    return $selected !== (strpos($config, '"^/user-'.$user.'/transmission/"') !== false);
+}
+
+/** Re-render the account's lighttpd config when a Transmission selection gained or lost its socket route. */
+function pmssLighttpdTransmissionRouteConverge(string $user, string $home): void
+{
+    if (!pmssValidateUsername($user) || basename($home) !== $user) return;
+    $path = $home.'/.lighttpd.conf';
+    // The file sits in the account-writable home: read only the root-owned single-link regular inode, non-blocking,
+    // so a swapped link, hard link or FIFO can neither redirect nor stall this root watchdog.
+    $config = (string) pmssReadRegularFileContentsVerified($path, 0, 1048576);
+    if ($config === '' || !pmssLighttpdTransmissionRouteStale($user, pmssLighttpdTransmissionSelected($user, $home), $config)) return;
+    runStep('Reconcile Transmission lighttpd route for '.$user,
+        pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$user]));
+}

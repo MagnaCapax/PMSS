@@ -142,7 +142,9 @@ if (PHP_SAPI === 'cli' && isset($_SERVER['SCRIPT_FILENAME'])
     $home = getenv('HOME');
     if (is_string($home) && ($argv[1] ?? '') === 'transmission' && ($argv[2] ?? '') === '--launch') {
         require_once __DIR__.'/transmissionLaunch.php';
-        exit(pmssTransmissionLaunch($home) ? 0 : 1);
+        // The daemon rewrites settings.json when it stops, so re-assert the managed RPC settings first,
+        // as the Configure start path does. Unchanged settings are not rewritten.
+        exit(pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home) ? 0 : 1);
     }
     if (is_string($home) && ($argv[1] ?? '') === 'deluge' && ($argv[2] ?? '') === '--launch') {
         exit(pmssTorrentClientDelugeLaunch($home, '/var/lib/pmss/public/torrentClients.json',

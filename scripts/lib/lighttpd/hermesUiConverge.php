@@ -1,6 +1,8 @@
 <?php
 /** Reconcile generated port-C routes after an account-side install completes. */
 
+require_once __DIR__.'/../runtime/filesystem.php';
+
 function pmssHermesUiConverge(string $user, string $home): void
 {
     if (!pmssValidateUsername($user) || basename($home) !== $user) return;
@@ -10,8 +12,8 @@ function pmssHermesUiConverge(string $user, string $home): void
         && pmssReadRegularFileNetworkPort('/etc/seedbox/runtime/ports/media-stack-hermes-'.$user) !== null;
     $lighttpdPath = $home.'/.lighttpd.conf';
     $nginxPath = '/etc/nginx/conf.d/pmss-user-'.$user.'.conf';
-    $lighttpd = is_file($lighttpdPath) && !is_link($lighttpdPath)
-        ? (string) @file_get_contents($lighttpdPath, false, null, 0, 1048576) : '';
+    // Account-writable home: verified root-owned regular inode, non-blocking (no link, hard link or FIFO stall).
+    $lighttpd = (string) pmssReadRegularFileContentsVerified($lighttpdPath, 0, 1048576);
     $nginx = is_file($nginxPath) && !is_link($nginxPath)
         ? (string) @file_get_contents($nginxPath, false, null, 0, 1048576) : '';
     $lighttpdHasRoute = strpos($lighttpd, '^/__pmss-ui-c/') !== false;

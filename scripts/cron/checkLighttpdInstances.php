@@ -11,6 +11,7 @@ require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogNginxLogReader.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
 require_once __DIR__.'/../lib/lighttpd/hermesUiConverge.php';
+require_once __DIR__.'/../lib/lighttpd/transmissionProxy.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
@@ -63,6 +64,7 @@ foreach($users AS $thisUser) {
         continue;
     }
     pmssHermesUiConverge($thisUser, $homeDir);
+    pmssLighttpdTransmissionRouteConverge($thisUser, $homeDir);
     if (pmssUserWatchdogBackoffActive($thisUser, 'lighttpd')) continue;
 
     if (!file_exists($configPath) && is_dir($homeDir)) {
