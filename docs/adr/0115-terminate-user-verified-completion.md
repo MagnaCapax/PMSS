@@ -24,6 +24,11 @@ Use the existing purge-step runner's labeled return codes and add an exact purge
 - A failed purge step makes the result incomplete even if a later retry removed the path. Operators can inspect its lifecycle log; rerunning cleanup remains possible.
 - Amended 2026-10-20: the first removal of each path is excluded from that rule. It fails by design whenever immutable files remain, and PMSS itself writes `~/.trafficData*` and `~/.resourceData` immutable, so with it every account that had collected traffic stats reported `## Incomplete: remove_home_initial` after a full purge. The immutable clear and the leftover removal still count, every step must still have run, and the final path checks are unchanged.
 - The purges remain synchronous and after bounded route and port cleanup, as required by ADR 0062. No account path is selected by glob.
+- Empty-directory cleanup reports failed enumeration as an error and returns
+  `false` to the existing port-cleanup aggregator, without attempting removal.
+  Missing paths, non-empty directories, successful removals, and dry-run
+  preservation keep their existing results; the final CLI completion checks
+  and exit-code contract are unchanged.
 
 ## References
 

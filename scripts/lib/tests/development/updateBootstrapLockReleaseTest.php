@@ -42,7 +42,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
     public function testReleaseUpdateLockDoesNotDependOnRuntimeHelper(): void
     {
         $result = $this->runBootstrapInline(
-            '$path = tempnam(sys_get_temp_dir(), "pmss-lock-"); '
+            '$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
             .'$handle = fopen($path, "c+"); '
             .'$GLOBALS["PMSS_UPDATE_LOCK_HANDLE"] = $handle; '
             .'putenv("PMSS_UPDATE_LOCK_HELD=1"); '
@@ -51,8 +51,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
             .'"env" => getenv("PMSS_UPDATE_LOCK_HELD"), '
             .'"handle_defined" => isset($GLOBALS["PMSS_UPDATE_LOCK_HANDLE"]), '
             .'"handle_is_resource" => is_resource($handle)'
-            .']); '
-            .'@unlink($path);'
+            .']);'
         );
 
         $this->assertEquals(0, $result['rc'], 'pmssReleaseUpdateLock should complete without fatal shutdown errors');
@@ -65,7 +64,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
     public function testBootstrapExportsHeldLockFdClosePrefix(): void
     {
         $result = $this->runBootstrapInline(
-            '$path = tempnam(sys_get_temp_dir(), "pmss-lock-"); '
+            '$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
             .'$handle = fopen($path, "c+"); '
             .'flock($handle, LOCK_EX); '
             .'pmssUpdateLockExportChildCloseFds($handle); '
@@ -74,7 +73,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
             .'"prefix" => pmssUpdateLockChildClosePrefix(), '
             .'"command" => pmssShellCommandWithoutInheritedUpdateLock("printf ok")'
             .']); '
-            .'fclose($handle); @unlink($path);'
+            .'fclose($handle);'
         );
 
         $this->assertEquals(0, $result['rc'], 'bootstrap lock fd export should complete');
@@ -108,13 +107,13 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         $result = $this->pmssExecShellCommand(
             escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
                 'require '.var_export($runtime, true).'; '
-                .'$path = tempnam(sys_get_temp_dir(), "pmss-lock-"); '
+                .'$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
                 .'$handle = fopen($path, "c+"); '
                 .'echo json_encode(['
                 .'"empty" => pmssLockHandleFdList($handle, ""), '
                 .'"nul" => pmssLockHandleFdList($handle, "/tmp".chr(0)."fd")'
                 .']); '
-                .'fclose($handle); @unlink($path);'
+                .'fclose($handle);'
             ),
             $this->pmssTestModeEnv(),
             '2>&1'

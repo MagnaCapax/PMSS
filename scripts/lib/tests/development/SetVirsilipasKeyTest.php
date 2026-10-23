@@ -11,20 +11,7 @@ class SetVirsilipasKeyTest extends TestCase
 
     private function home(): string
     {
-        $dir = sys_get_temp_dir().'/pmss-vkey-'.bin2hex(random_bytes(6));
-        mkdir($dir, 0700);
-        return $dir;
-    }
-
-    private function removeHome(string $dir): void
-    {
-        foreach (array_merge(glob($dir.'/.*') ?: [], glob($dir.'/*') ?: []) as $entry) {
-            if (in_array(basename($entry), ['.', '..'], true)) {
-                continue;
-            }
-            is_dir($entry) && !is_link($entry) ? rmdir($entry) : unlink($entry);
-        }
-        rmdir($dir);
+        return $this->pmssMakeTempDir('pmss-vkey-', 0700);
     }
 
     public function testKeyShape(): void
@@ -45,7 +32,6 @@ class SetVirsilipasKeyTest extends TestCase
         $this->assertSame(0600, fileperms($path) & 0777);
         $this->assertSame('equal', \pmssVirsilipasKeyApply($home, self::KEY, true));
         $this->assertSame([], glob($home.'/.virsilipasKey.*') ?: [], 'no temp file left behind');
-        $this->removeHome($home);
     }
 
     public function testUpdateOnlyNeverCreatesButReplacesOurs(): void
@@ -56,7 +42,6 @@ class SetVirsilipasKeyTest extends TestCase
         \pmssVirsilipasKeyApply($home, self::KEY, true);
         $this->assertSame('written', \pmssVirsilipasKeyApply($home, self::NEW_KEY, false));
         $this->assertStringContainsString('key='.self::NEW_KEY."\n", file_get_contents($home.'/.virsilipasKey'));
-        $this->removeHome($home);
     }
 
     public function testCustomerOwnEndpointIsKept(): void
@@ -68,7 +53,6 @@ class SetVirsilipasKeyTest extends TestCase
             $this->assertSame('kept-own-endpoint', \pmssVirsilipasKeyApply($home, self::KEY, $create));
         }
         $this->assertSame($own, file_get_contents($home.'/.virsilipasKey'));
-        $this->removeHome($home);
     }
 
     public function testHandMadeFileOfOursIsReplaced(): void
@@ -78,7 +62,6 @@ class SetVirsilipasKeyTest extends TestCase
         $this->assertSame('written', \pmssVirsilipasKeyApply($home, self::NEW_KEY, false));
         file_put_contents($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1/\nkey=".self::KEY."\n");
         $this->assertSame('written', \pmssVirsilipasKeyApply($home, self::NEW_KEY, false));
-        $this->removeHome($home);
     }
 
     public function testSymlinkAndDirectoryAreLeftAlone(): void
@@ -92,7 +75,6 @@ class SetVirsilipasKeyTest extends TestCase
         unlink($home.'/.virsilipasKey');
         mkdir($home.'/.virsilipasKey');
         $this->assertSame('not-regular', \pmssVirsilipasKeyApply($home, self::KEY, true));
-        $this->removeHome($home);
     }
 
     public function testCliNeverPrintsTheKey(): void

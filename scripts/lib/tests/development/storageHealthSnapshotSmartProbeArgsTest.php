@@ -14,7 +14,7 @@ class StorageHealthSnapshotSmartProbeArgsTest extends TestCase
     public function testSmartProbeArgumentsAreValidSmartctlGrammar(): void
     {
         $device = $this->pmssMakeReadableTempPath('pmss-smart-args-', 'dev-');
-        $argFile = tempnam(sys_get_temp_dir(), 'pmss-smart-argv-');
+        $argFile = $this->pmssMakeTempFile('pmss-smart-argv-');
         $stub = $this->pmssMakeExecutableStub('smartctl', "#!/bin/sh\nprintf '%s\\n' \"\$@\" > ".escapeshellarg($argFile)."\nprintf 'SMART overall-health self-assessment test result: PASSED\\n'\n", 'pmss-smart-args-bin-');
 
         $this->pmssWithEnv(['PATH' => $stub], function () use ($device): void {
@@ -22,7 +22,6 @@ class StorageHealthSnapshotSmartProbeArgsTest extends TestCase
         });
 
         $argv = array_values(array_filter(explode("\n", (string) file_get_contents($argFile)), 'strlen'));
-        @unlink($argFile);
 
         $nIndex = array_search('-n', $argv, true);
         $this->assertTrue($nIndex !== false, 'probe must pass -n (never wake a standby drive)');

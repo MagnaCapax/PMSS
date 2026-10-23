@@ -7,22 +7,15 @@ require_once dirname(__DIR__, 2).'/update.php';
 
 class A00_JsonLogPathTest extends TestCase
 {
-    /**
-     * @var string|false
-     */
-    private $previousCorrelationId = false;
-
     public function setUp(): void
     {
-        $this->previousCorrelationId = getenv('PMSS_CORRELATION_ID');
-        $this->pmssTrackEnvKeys(['PMSS_JSON_LOG'], true);
+        $this->pmssTrackEnvKeys(['PMSS_JSON_LOG', 'PMSS_CORRELATION_ID'], true);
         $this->resetCorrelationId();
         $this->resetJsonLogPath();
     }
 
     public function tearDown(): void
     {
-        $this->pmssRestoreEnv('PMSS_CORRELATION_ID', $this->previousCorrelationId, true);
         $this->resetCorrelationIdCache();
         $this->resetJsonLogPath();
     }

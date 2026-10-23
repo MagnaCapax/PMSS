@@ -7,29 +7,14 @@ require_once dirname(__DIR__, 2).'/user/subordinateIds.php';
 /** Hermetic tests for subordinate owner ID selection. */
 class SubordinateIdsTest extends TestCase
 {
-    /** @var array<int, string> */
-    private $paths = [];
-
     public function setUp(): void
     {
         $this->pmssTrackEnvKeys(['PMSS_SUBUID_PATH', 'PMSS_SUBGID_PATH']);
     }
 
-    protected function tearDown(): void
-    {
-        foreach ($this->paths as $path) {
-            @unlink($path);
-        }
-        parent::tearDown();
-    }
-
     private function fixture(string $kind, string $contents): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-subordinate-');
-        if ($path === false) {
-            $this->fail('Could not create subordinate ID fixture');
-        }
-        $this->paths[] = $path;
+        $path = $this->pmssMakeTempFile('pmss-subordinate-');
         file_put_contents($path, $contents);
         putenv(($kind === 'uid' ? 'PMSS_SUBUID_PATH' : 'PMSS_SUBGID_PATH').'='.$path);
     }

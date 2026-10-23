@@ -573,6 +573,35 @@ SH
         $this->assertTrue(is_dir($emptyDir), 'unsafe rmdir input must not affect nearby dirs');
     }
 
+    public function testEmptyDirectoryCleanupReportsScanFailureWithoutRemoval(): void
+    {
+        $this->assertTrue(stream_wrapper_register('pmssterminatedir', TerminateDirectoryScanFailureStream::class));
+        try {
+            foreach ([false, true] as $dryRun) {
+                TerminateDirectoryScanFailureStream::$scans = 0;
+                TerminateDirectoryScanFailureStream::$removals = 0;
+                $this->assertFalse(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', 'pmssterminatedir://directory', $dryRun));
+                $this->assertSame(1, TerminateDirectoryScanFailureStream::$scans);
+                $this->assertSame(0, TerminateDirectoryScanFailureStream::$removals, 'A failed scan must never reach rmdir');
+            }
+        } finally {
+            stream_wrapper_unregister('pmssterminatedir');
+        }
+    }
+
+    public function testEmptyDirectoryCleanupKeepsMissingAndNonEmptyPathResults(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-terminate-scan-');
+        $file = $root.'/retained';
+        $this->pmssWriteFile($file, 'preserved');
+        foreach ([false, true] as $dryRun) {
+            foreach ([$root.'/absent', $file, $root] as $path) {
+                $this->assertTrue(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', $path, $dryRun));
+            }
+            $this->assertSame('preserved', file_get_contents($file));
+        }
+    }
+
     public function testTerminateUserRtorrentPortCleanupPreservesDryRunAndRemovesFiles(): void
     {
         $base = $this->pmssMakeTempDir('pmss-terminate-ports-');
@@ -635,5 +664,30 @@ SH
                 is_dir($base.'/listen')
             )
         );
+    }
+}
+
+/** Simulate an existing directory whose enumeration fails, independent of UID. */
+class TerminateDirectoryScanFailureStream
+{
+    public $context;
+    public static $scans = 0;
+    public static $removals = 0;
+
+    public function url_stat($path, $flags): array
+    {
+        return ['mode' => 0040700];
+    }
+
+    public function dir_opendir($path, $options): bool
+    {
+        self::$scans++;
+        return false;
+    }
+
+    public function rmdir($path, $options): bool
+    {
+        self::$removals++;
+        return true;
     }
 }

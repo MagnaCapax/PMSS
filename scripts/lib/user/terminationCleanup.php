@@ -153,6 +153,11 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
     }
 
     $entries = pmssDirectoryEntriesRead($path);
+    // A failed scan cannot establish that cleanup safely left a non-empty directory.
+    if ($entries === false) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Failed to read directory', array('path' => $path));
+        return false;
+    }
     if ($entries !== array()) {
         return true;
     }
