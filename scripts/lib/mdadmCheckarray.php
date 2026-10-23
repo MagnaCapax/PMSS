@@ -19,10 +19,7 @@ const PMSS_MDADM_CHECKARRAY_MIN_DAYS_DEFAULT = '/etc/seedbox/config/mdadmCheckar
 const PMSS_MDADM_CHECKARRAY_STATE_DEFAULT = '/var/lib/pmss/mdadm-checkarray-last';
 
 /** Emit one cron-friendly status line with a stable prefix. */
-function pmssMdadmCheckarrayLog(string $message): void
-{
-    echo date('c').' pmss-mdadm-checkarray: '.$message."\n";
-}
+function pmssMdadmCheckarrayLog(string $message): void { echo pmssLogFormatTimestampedLine($message, 'c', ' pmss-mdadm-checkarray: '); }
 
 /** Keep array names constrained before composing sysfs paths or shell args. */
 function pmssMdadmCheckarrayArrayNameIsSafe(string $array): bool

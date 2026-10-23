@@ -182,15 +182,20 @@ function pmssJsonEmitPayload(array $payload, string $errorMessage, int $flags = 
     return 0;
 }
 
+/** Format legacy log bytes without trimming messages or normalizing their delimiters. */
+function pmssLogFormatTimestampedLine(string $message, string $timestampFormat = 'Y-m-d H:i:s', string $prefix = ': '): string
+{
+    return date($timestampFormat).$prefix.$message.PHP_EOL;
+}
+
 /** Append one timestamped line to a log file. */
 function pmssLogAppendTimestampedLine(string $path, string $message, string $timestampFormat = '[Y-m-d H:i:s] ', string $prefix = '', ?int $mode = null): bool
 {
     if (!pmssLogWritePathIsSafe($path)) {
         return false;
     }
-    $line = date($timestampFormat).$prefix.$message.PHP_EOL;
     // Keep incomplete writes on the existing failure/fallback path.
-    $written = pmssFileWriteComplete($path, $line, FILE_APPEND | LOCK_EX);
+    $written = pmssFileWriteComplete($path, pmssLogFormatTimestampedLine($message, $timestampFormat, $prefix), FILE_APPEND | LOCK_EX);
     $written && $mode !== null && @chmod($path, $mode);
     return $written;
 }

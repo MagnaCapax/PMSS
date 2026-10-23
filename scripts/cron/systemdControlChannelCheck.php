@@ -17,7 +17,5 @@ if (!pmssSystemdRuntimeAvailable()) {
 }
 
 $lock = pmssCronLockAcquire('systemdControlChannelCheck');
-$log = static function (string $message): void {
-    echo date('c').' systemd-control-channel: '.$message.PHP_EOL;
-};
+$log = static function (string $message): void { echo pmssLogFormatTimestampedLine($message, 'c', ' systemd-control-channel: '); };
 exit(pmssSystemdControlChannelCheck('pmssCommandCapture', 'runStep', $log));

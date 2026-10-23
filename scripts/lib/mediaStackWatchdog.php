@@ -145,7 +145,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
     $previous = pmssJsonFileReadAssoc($path, true) ?? array();
     $status = pmssMediaStackWatchdogSnapshot($username, $apps, $previous, $probe, $home);
     if (!pmssMediaStackWatchdogStatusWrite($home, $path, $status)) {
-        echo date('Y-m-d H:i:s').' Media stack watchdog: unable to publish status for '.$username.PHP_EOL;
+        echo pmssLogFormatTimestampedLine('Media stack watchdog: unable to publish status for '.$username, 'Y-m-d H:i:s', ' ');
         return $status;
     }
 

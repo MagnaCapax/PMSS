@@ -188,6 +188,7 @@ PHP;
         foreach (['php://memory', 'php://temp'] as $path) {
             $handle = fopen($path, 'w+');
             try {
+                $this->assertTrue(\pmssStreamWriteAll($handle, ''));
                 foreach (['', 'payload', "binary\0bytes", "two\nlines", "already terminated\n"] as $line) {
                     $this->assertSame(null, \pmssSnapshotWriteLine($handle, $line));
                 }
@@ -214,14 +215,14 @@ function fwrite($handle, $bytes) {
     return $limit === false ? false : \fwrite($handle, substr($bytes, 0, $limit));
 }
 PHP;
-        $filesystem = var_export(dirname(__DIR__, 2).'/runtime/filesystem.php', true);
-        $script .= "require {$filesystem};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'SnapshotWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotWriteFixture');
         $script .= <<<'PHP'
-[$line, $GLOBALS['limits']] = json_decode(getenv('PMSS_TEST_SNAPSHOT_WRITE'), true);
+[$mode, $line, $GLOBALS['limits']] = json_decode(getenv('PMSS_TEST_SNAPSHOT_WRITE'), true);
 $GLOBALS['requests'] = [];
 $handle = fopen('php://memory', 'w+');
 try {
-    $result = pmssSnapshotWriteLine($handle, $line);
+    $result = $mode === 'stream' ? pmssStreamWriteAll($handle, $line."\n") : pmssSnapshotWriteLine($handle, $line);
     rewind($handle);
     echo json_encode([$result, stream_get_contents($handle), $GLOBALS['requests'], is_resource($handle)]);
 } finally {
@@ -239,9 +240,12 @@ PHP;
             ['abc', [2, 0], 'ab', ["abc\n", "c\n"]],
             ['abc', [2, false], 'ab', ["abc\n", "c\n"]],
         ] as [$line, $limits, $expected, $requests]) {
-            $this->assertSame([null, $expected, $requests, true], $this->pmssRunInlinePhpJson($script, [
-                'PMSS_TEST_SNAPSHOT_WRITE' => json_encode([$line, $limits]),
-            ]));
+            foreach (['stream', 'snapshot'] as $mode) {
+                $result = $mode === 'stream' ? $expected === $line."\n" : null;
+                $this->assertSame([$result, $expected, $requests, true], $this->pmssRunInlinePhpJson($script, [
+                    'PMSS_TEST_SNAPSHOT_WRITE' => json_encode([$mode, $line, $limits]),
+                ]));
+            }
         }
     }
 

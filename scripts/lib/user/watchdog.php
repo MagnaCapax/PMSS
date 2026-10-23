@@ -290,7 +290,7 @@ function pmssUserWatchdogHandleSuspended(string $username, array $processNames, 
 /** @param array<int,string> $processNames @param array<int,array<string,mixed>> $serviceSpecs */
 function pmssUserWatchdogRunService(string $heading, string $enableMarker, array $processNames, string $userLogMessage, array $serviceSpecs, ?callable $runningStateBuilder = null, ?string $optionalRequirePath = null, string $homeRoot = '/home', string $command = '/scripts/listUsers.php', bool $reportMissingMarker = false): void
 {
-    $heading !== '' && print date('Y-m-d H:i:s') . ': Checking '.$heading." instances\n";
+    $heading !== '' && print pmssLogFormatTimestampedLine('Checking '.$heading.' instances');
     $optionalRequirePath !== null && is_file($optionalRequirePath) && require_once $optionalRequirePath;
     if ($enableMarker === '') { return; }
     $homeRoot = rtrim($homeRoot === '/home' ? pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home') : $homeRoot, '/');

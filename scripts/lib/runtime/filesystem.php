@@ -101,6 +101,19 @@ function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path,
 function pmssFileWriteComplete(string $path, string $content, int $flags = 0, ?callable $writer = null): bool { return !pmssFilesystemPathHasNulByte($path) && ($writer ? $writer($path, $content) : @file_put_contents($path, $content, $flags)) === strlen($content); }
 /** Reject closed streams and other resource types before stream operations. */
 function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && get_resource_type($handle) === 'stream'; }
+/**
+ * Write a blocking stream buffer completely; stop on failure or no progress, without flushing or closing.
+ * @param resource $handle Caller-owned writable stream; empty payloads require no write.
+ */
+function pmssStreamWriteAll($handle, string $payload): bool
+{
+    $length = strlen($payload);
+    for ($offset = 0; $offset < $length; $offset += $written) {
+        $written = @fwrite($handle, substr($payload, $offset));
+        if (!is_int($written) || $written < 1) return false;
+    }
+    return true;
+}
 /** Treat a dangling symlink as an occupied path, unlike file_exists(). */
 function pmssPathExistsOrLink(string $path): bool { return file_exists($path) || is_link($path); }
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }

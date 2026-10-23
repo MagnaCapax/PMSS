@@ -136,13 +136,17 @@ function pmssCertbotRenewalSummaryFromFile(string $path, int $maxBytes = 262144)
                 'error_excerpt' => '',
             ];
         }
-        $offset = (int)$size - $maxBytes;
-        if ($offset < 0) {
-            $offset = 0;
+        try {
+            $offset = max(0, (int)$size - $maxBytes);
+            // A failed seek must not turn a tail read into an unbounded full read.
+            if (@fseek($fp, $offset) !== 0) {
+                return pmssCertbotRenewalSummaryFromLog('');
+            }
+            $data = stream_get_contents($fp, max(0, $maxBytes));
+        } finally {
+            // Preserve read/seek exceptions while always releasing the log stream.
+            fclose($fp);
         }
-        @fseek($fp, $offset);
-        $data = stream_get_contents($fp);
-        fclose($fp);
     } else {
         $data = @file_get_contents($path);
     }

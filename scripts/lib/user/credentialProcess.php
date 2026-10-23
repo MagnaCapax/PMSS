@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/../runtime/filesystem.php';
+
 /** Run a string command, passing one credential line on stdin when supplied. */
 function pmssCredentialProcessRun(string $command, ?string $credential, ?array &$output = null): int
 {
@@ -24,14 +26,7 @@ function pmssCredentialProcessRun(string $command, ?string $credential, ?array &
     }
 
     $payload = $credential === null ? '' : $credential."\n";
-    $written = 0;
-    while ($written < strlen($payload)) {
-        $chunk = @fwrite($pipes[0], substr($payload, $written));
-        if (!is_int($chunk) || $chunk < 1) {
-            break;
-        }
-        $written += $chunk;
-    }
+    $complete = pmssStreamWriteAll($pipes[0], $payload);
     fclose($pipes[0]);
     if ($capture) {
         $text = stream_get_contents($pipes[1]);
@@ -41,5 +36,5 @@ function pmssCredentialProcessRun(string $command, ?string $credential, ?array &
         }
     }
     $status = proc_close($process);
-    return $written === strlen($payload) ? $status : 1;
+    return $complete ? $status : 1;
 }

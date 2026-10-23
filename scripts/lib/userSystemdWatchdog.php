@@ -123,7 +123,7 @@ function pmssUserSystemdWatchdogRunUser(
         $previous
     );
     if (!pmssUserSystemdWatchdogStatusWrite($home, $path, $status)) {
-        echo date('Y-m-d H:i:s').' User systemd watchdog: unable to publish status for '.$username.PHP_EOL;
+        echo pmssLogFormatTimestampedLine('User systemd watchdog: unable to publish status for '.$username, 'Y-m-d H:i:s', ' ');
         return $status;
     }
     pmssUserSystemdWatchdogLogTransition($username, $status, $previous);

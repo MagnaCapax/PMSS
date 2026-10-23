@@ -20,9 +20,7 @@ require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/arrRootGuard.php';
 require_once __DIR__.'/../lib/runtime.php';
 
-$rootGuardFindings = pmssRootGuardAuditAndKill(static function (string $message): void {
-    echo date('Y-m-d H:i:s').': '.$message."\n";
-});
+$rootGuardFindings = pmssRootGuardAuditAndKill('pmssCronLockSkipLog');
 
 // Keep the handle alive while home filesystem probes run so overlapping ticks skip.
 $pmssMediaStackInstancesLock = pmssCronLockAcquire('mediaStackInstancesCheck', static function (string $message) use ($rootGuardFindings): int {

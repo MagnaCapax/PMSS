@@ -46,6 +46,12 @@ Complete-write interception uses `pmssInlinePhpFileWriteCompleteShim()` in each
 child namespace. `pmssInlinePhpLimitedWriteShims()` shares byte-limit failures,
 request recording, and successful fallback writes; callers still own scenarios.
 
+`CertbotRenewalLogTest` injects failed seeks and reads, exceptions and errors into
+the tail reader. Failed seeks retain an unknown summary without reading, thrown
+objects propagate unchanged after stream closure, and growing logs cannot exceed
+the requested tail byte budget. Whole-file and tail-summary fixtures preserve
+the existing successful results.
+
 Deluge compatibility-patch tests share fixture execution and symlink-refusal
 checks in `DelugeAppTestCase`. Keep patch-specific source, expected bytes,
 return-value assertions, and log expectations in each named test; the shared

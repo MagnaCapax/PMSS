@@ -108,14 +108,7 @@ function pmssRootStageFileWrite(string $path, string $content, string $group, in
         $handle = @fopen($stageFile, 'x+b');
         if (!pmssStreamHandleIsOpen($handle)) return false;
         try {
-            $length = strlen($content);
-            $written = 0;
-            while ($written < $length) {
-                $count = @fwrite($handle, substr($content, $written));
-                if (!is_int($count) || $count < 1) return false;
-                $written += $count;
-            }
-            if (!@fflush($handle)) return false;
+            if (!pmssStreamWriteAll($handle, $content) || !@fflush($handle)) return false;
         } finally {
             @fclose($handle);
         }

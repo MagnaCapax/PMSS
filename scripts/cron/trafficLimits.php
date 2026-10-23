@@ -57,7 +57,7 @@ foreach($users AS $thisUser) {
 
     $data = pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser);
     if ($data === null) {
-        echo date('Y-m-d H:i:s') . ": Skipping {$thisUser}, invalid traffic data file\n";
+        echo pmssLogFormatTimestampedLine("Skipping {$thisUser}, invalid traffic data file");
         continue;
     }
     $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
@@ -135,13 +135,13 @@ if (pmssCommandPath('fireqos') !== '') {
         if ($rendered === null) {
             $changes[] = 'users group missing or unreadable';
         }
-        echo date('Y-m-d H:i:s').': FireQOS drift: '.implode(', ', $changes)."\n";
+        echo pmssLogFormatTimestampedLine('FireQOS drift: '.implode(', ', $changes));
         $output = [];
         $rc = 1;
         exec('timeout --kill-after=30 300 /scripts/util/setupNetwork.php >> /var/log/pmss/setupNetwork.log 2>&1', $output, $rc);
-        echo date('Y-m-d H:i:s').": setupNetwork exit {$rc}\n";
+        echo pmssLogFormatTimestampedLine("setupNetwork exit {$rc}");
         $contents = @file_get_contents($fireqosPath);
         $verified = $contents === false ? null : networkFireqosRenderedUserCaps($contents);
-        echo date('Y-m-d H:i:s').': '.(networkFireqosNeedsApply($desired, $verified) ? 'verify mismatch' : 'verify ok')."\n";
+        echo pmssLogFormatTimestampedLine(networkFireqosNeedsApply($desired, $verified) ? 'verify mismatch' : 'verify ok');
     }
 }

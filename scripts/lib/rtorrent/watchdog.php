@@ -20,7 +20,7 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 function pmssCheckRtorrentLog(string $message, bool $force = false, bool $debug = false): void
 {
     if (!$force && !$debug) return;
-    echo date('c').' '.$message."\n";
+    echo pmssLogFormatTimestampedLine($message, 'c', ' ');
 }
 
 /** Mirror an intervention to cron output and the per-user PMSS log. */

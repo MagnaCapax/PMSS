@@ -85,7 +85,7 @@ function pmssRtorrentBinaryRuns(): bool
 /** Persist a queryable marker so a silent build failure becomes fleet-detectable. */
 function pmssRtorrentMarkBuildFailure(string $reason): void
 {
-    @file_put_contents('/var/log/pmss/rtorrent-build-failed', date('c').' '.$reason."\n", FILE_APPEND);
+    @file_put_contents('/var/log/pmss/rtorrent-build-failed', pmssLogFormatTimestampedLine($reason, 'c', ' '), FILE_APPEND);
 }
 
 /** Clear the build-failure marker once a verified-good binary is in place. */

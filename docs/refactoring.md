@@ -109,6 +109,11 @@ the template's default device despite selecting a different one.
 Locked PID and counter-state streams share one seek, truncate, complete-write,
 and flush sequence. Their existing entrypoints and failure results are retained.
 
+Blocking stream writers share `pmssStreamWriteAll()` for partial-write progress
+and failure handling. Callers retain validation, flushing, closing, diagnostics,
+and publication policy; empty payloads perform no I/O. Deadline-aware nonblocking
+writers and one-shot complete-write checks retain their separate semantics.
+
 Private temporary directory creation returns a path only after its 0700 mode
 has been applied. A failed chmod or replaced symlink returns `null` and attempts
 to remove the newly created directory; successful callers retain the same path

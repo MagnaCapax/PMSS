@@ -608,6 +608,13 @@ iptables helpers:
 
 ## Resource Statistics
 
+- Cgroup-v1 billing and performance collectors share `resources/v1.php` acquisition
+  (ADR 0160). Their projections retain field order, integer types, zero counters,
+  and missing-source omission. Billing requests only its source fields, prefers
+  hierarchical memory totals, and records IO bytes, ops, and source atomically.
+  Telemetry retains local memory counters and available IO bytes even when ops
+  are absent. Both choose ops from the bytes accounting family; a valid zero
+  hierarchical total takes precedence over a nonzero local value.
 - Passive I/O ceiling samples, persisted ceiling reads, and derived read-IOPS oversell settings use the shared finite, non-negative numeric parser.
 - `pmssResourceLogManagedUserUids()` revalidates list output before UID lookup
   and omits nonpositive resolver results. `pmssResourceLogLookupManagedUid()`

@@ -31,57 +31,8 @@ require_once __DIR__.'/counters.php';
  */
 function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
 {
-    $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
-    $slice = '/user.slice/user-'.$uid.'.slice/';
-    $m = [];
-
-    // --- CPU (cpuacct + cpu controllers) ---
-    $m['cpu_usage_nsec'] = pmssResourceLogReadSysfsCounter($root.'/cpuacct'.$slice.'cpuacct.usage');
-    // cpuacct.stat reports user/system in USER_HZ ticks (not ns) — recorded raw.
-    $cpuTicks = pmssResourceLogReadMemoryStatFields($root.'/cpuacct'.$slice.'cpuacct.stat', ['user', 'system']);
-    foreach (['cpu_user_ticks' => 'user', 'cpu_system_ticks' => 'system'] as $key => $field) $m[$key] = $cpuTicks[$field] ?? null;
-    // CFS throttling (only populated when a CPU quota is set on the slice).
-    $cpuStat = pmssResourceLogReadMemoryStatFields($root.'/cpu'.$slice.'cpu.stat', ['nr_periods', 'nr_throttled', 'throttled_time']);
-    foreach (['cpu_nr_periods' => 'nr_periods', 'cpu_nr_throttled' => 'nr_throttled',
-        'cpu_throttled_nsec' => 'throttled_time'] as $key => $field) $m[$key] = $cpuStat[$field] ?? null;
-
-    // --- Memory (memory controller) ---
-    foreach (['mem_current' => 'memory.usage_in_bytes', 'mem_peak' => 'memory.max_usage_in_bytes',
-        'mem_limit' => 'memory.limit_in_bytes', 'mem_failcnt' => 'memory.failcnt',
-        'memsw_current' => 'memory.memsw.usage_in_bytes'] as $key => $file) {
-        $m[$key] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.$file);
-    }
-    $m['mem_oom_kill'] = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.oom_control', 'oom_kill');
-    // Full memory.stat field set (v1 names).
-    $memoryFields = [
-        'rss', 'cache', 'rss_huge', 'mapped_file', 'swap', 'shmem', 'dirty', 'writeback',
-        'pgfault', 'pgmajfault', 'pgpgin', 'pgpgout',
-        'inactive_anon', 'active_anon', 'inactive_file', 'active_file', 'unevictable',
-    ];
-    $memoryStat = pmssResourceLogReadMemoryStatFields($root.'/memory'.$slice.'memory.stat', $memoryFields);
-    foreach ($memoryFields as $field) $m['mem_'.$field] = $memoryStat[$field] ?? null;
-
-    // --- PIDs ---
-    $m['pids_current'] = pmssResourceLogReadSysfsCounter($root.'/pids'.$slice.'pids.current');
-    $m['pids_events_max'] = pmssResourceLogReadMemoryStatField($root.'/pids'.$slice.'pids.events', 'max');
-
-    // --- Block IO (blkio controller) ---
-    // Prefer BFQ per-cgroup accounting (fleet-default scheduler on rotational/md hosts); fall
-    // back to throttle on non-BFQ hosts. Match ops to the same family the bytes came from (#707).
-    // (Raw cumulative telemetry — no delta/enforcement, so no source-reseed guard needed here.)
-    $ioBytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice);
-    pmssMetricMergeReadWrite($m, 'io_bytes', $ioBytes);
-    if ($ioBytes !== null) {
-        pmssMetricMergeReadWrite($m, 'io_ops', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.'.$ioBytes['source'].'.io_serviced'));
-    }
-    // Omit unavailable readings once, retaining zero counters and insertion order.
-    return array_filter($m, static function (?int $value): bool { return $value !== null; });
-}
-
-/** Merge a {read,write} pair into <prefix>_read / <prefix>_write when present. */
-function pmssMetricMergeReadWrite(array &$metrics, string $prefix, ?array $pair): void
-{
-    if ($pair === null) return;
-    $metrics[$prefix.'_read'] = $pair['read'];
-    $metrics[$prefix.'_write'] = $pair['write'];
+    $metrics = pmssResourceV1ReadMetrics($uid, $cgroupRoot);
+    // Telemetry records local memory fields and available IO, without billing's source marker.
+    unset($metrics['mem_total_rss'], $metrics['mem_total_cache'], $metrics['io_source']);
+    return $metrics;
 }

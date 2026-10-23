@@ -91,4 +91,53 @@ class CertbotRenewalLogTest extends TestCase
         $this->assertEquals('unknown', $summary['status']);
         $this->assertTrue($summary['event_ts'] === null);
     }
+
+    public function testTailReadFailuresCloseStreamAndPreserveExceptions(): void
+    {
+        // Intercept only the failing boundaries; open, seek and close real temp files.
+        $script = <<<'PHP'
+namespace CertbotTailFixture;
+function fseek($handle, $offset) {
+    $GLOBALS['handle'] = $handle;
+    if ($GLOBALS['mode'] === 'seek-false') return -1;
+    if (strpos($GLOBALS['mode'], 'seek-') === 0) throw $GLOBALS['failure'];
+    return \fseek($handle, $offset);
+}
+function stream_get_contents($handle, $length = -1) {
+    $GLOBALS['length'] = $length;
+    if ($GLOBALS['mode'] === 'read-false') return false;
+    if (strpos($GLOBALS['mode'], 'read-') === 0) throw $GLOBALS['failure'];
+    if ($GLOBALS['mode'] === 'growth') {
+        \file_put_contents($GLOBALS['path'], "All renewals failed.\n", FILE_APPEND);
+    }
+    return \stream_get_contents($handle, $length);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/certbotRenewal.php', 'CertbotTailFixture');
+        $script .= <<<'PHP'
+[$GLOBALS['path'], $GLOBALS['mode']] = json_decode(getenv('PMSS_TEST_CERTBOT_TAIL'), true);
+$GLOBALS['failure'] = strpos($GLOBALS['mode'], 'error') !== false
+    ? new \Error('injected failure') : new \RuntimeException('injected failure');
+$summary = null;
+$sameException = false;
+try {
+    $summary = pmssCertbotRenewalSummaryFromFile($GLOBALS['path'], 30);
+} catch (\Throwable $error) {
+    $sameException = $error === $GLOBALS['failure'];
+}
+echo json_encode([$summary, $sameException, !is_resource($GLOBALS['handle']), $GLOBALS['length'] ?? null]);
+PHP;
+        $path = $this->pmssMakeTempFile('pmss-certbot-tail-');
+        $log = str_repeat("old log line\n", 10)."No renewals were attempted.\n";
+        foreach (['normal', 'growth', 'seek-false', 'seek-exception', 'seek-error',
+            'read-false', 'read-exception', 'read-error'] as $mode) {
+            file_put_contents($path, $log);
+            $throws = strpos($mode, 'exception') !== false || strpos($mode, 'error') !== false;
+            $expected = $throws ? null : \pmssCertbotRenewalSummaryFromLog(
+                $mode === 'seek-false' || $mode === 'read-false' ? '' : substr($log, -30)
+            );
+            $this->assertSame([$expected, $throws, true, strpos($mode, 'seek-') === 0 ? null : 30],
+                $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_CERTBOT_TAIL' => json_encode([$path, $mode])]));
+        }
+    }
 }

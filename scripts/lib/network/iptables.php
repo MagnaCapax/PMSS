@@ -11,7 +11,7 @@ require_once __DIR__.'/../runtime.php';
 /** Append a best-effort iptables log entry without surfacing logging failures. */
 function networkIptablesLog(string $level, string $message): void
 {
-    @file_put_contents('/var/log/pmss/iptables.log', date('c')." {$level} {$message}\n", FILE_APPEND);
+    @file_put_contents('/var/log/pmss/iptables.log', pmssLogFormatTimestampedLine("{$level} {$message}", 'c', ' '), FILE_APPEND);
 }
 
 /**

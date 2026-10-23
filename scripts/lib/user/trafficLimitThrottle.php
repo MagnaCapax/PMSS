@@ -49,7 +49,7 @@ function pmssTrafficLimitThrottleFileRemove(string $path, ?string &$error = null
 
 function pmssTrafficLimitLog(string $user, string $message): void
 {
-    echo date('Y-m-d H:i:s') . ": {$message}\n";
+    echo pmssLogFormatTimestampedLine($message);
     if (function_exists('pmssUserLog') && ($normalizedUser = pmssTrafficLimitCliUsernameNormalize($user)) !== null) {
         pmssUserLog($normalizedUser, $message);
     }

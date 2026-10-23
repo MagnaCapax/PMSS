@@ -11,7 +11,7 @@ require_once __DIR__.'/../lib/rutorrentPlugins.php';
 
 function pmssCheckRutorrentPluginsMain(array $argv): int
 {
-    echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
+    echo pmssLogFormatTimestampedLine('Checking rTorrent instances');
 
     $accessIni = @file_get_contents('/etc/seedbox/config/template.rutorrent.access');
     if ($accessIni === false) {

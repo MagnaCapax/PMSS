@@ -6,11 +6,7 @@
 
 require_once __DIR__.'/../resources.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
-
-// UINT64_MAX casts to PHP_INT_MAX (9223372036854775807) in PHP. systemd reports it
-// for unavailable slice properties on cgroup v1 (#467). Treat any value at/above this
-// sentinel as "absent" so it never poisons the per-user resource log.
-const PMSS_RESOURCE_COUNTER_SENTINEL = PHP_INT_MAX;
+require_once __DIR__.'/v1.php';
 
 /**
  * Read per-user slice counters, selecting the source by active cgroup hierarchy.
@@ -62,117 +58,24 @@ function pmssResourceLogReadCounters(int $uid, ?string $cgroupRoot = null): ?arr
  */
 function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?array
 {
-    $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
-    $slice = '/user.slice/user-'.$uid.'.slice/';
+    $sample = pmssResourceV1ReadMetrics($uid, $cgroupRoot,
+        ['cpu_usage_nsec', 'mem_current', 'pids_current', 'mem_total_rss', 'mem_rss', 'mem_total_cache', 'mem_cache']);
     $values = [];
-
-    if (($cpu = pmssResourceLogReadSysfsCounter($root.'/cpuacct'.$slice.'cpuacct.usage')) !== null) $values['cpu_nsec'] = $cpu;
-    if (($mem = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.usage_in_bytes')) !== null) $values['memory'] = $mem;
-    if (($tasks = pmssResourceLogReadSysfsCounter($root.'/pids'.$slice.'pids.current')) !== null) $values['tasks'] = $tasks;
-
-    // Per-cgroup I/O accounting: prefer the BFQ file (real data under the fleet-default BFQ
-    // scheduler on rotational/md hosts), fall back to throttle for non-BFQ hosts. Read ops
-    // from the SAME accounting family the bytes came from, and record io_source so the delta
-    // path can reseed the baseline on a source switch, avoiding a phantom first delta (#707).
-    $blkioSlice = $root.'/blkio'.$slice;
-    $bytes = pmssResourceLogReadBlkioBytesWithSource($blkioSlice);
-    if ($bytes !== null) {
-        // ATOMIC io group: bytes, ops, AND io_source are recorded together or not at all. If the
-        // ops file is transiently unreadable, omit the WHOLE io sample rather than store a partial
-        // baseline (io_source set + io_*_ops=0). A partial baseline would let the ops cumulative
-        // flow as an unguarded phantom delta on recovery — the source is unchanged, so the §0
-        // reseed guard (keyed on io_source) would NOT fire — risking a spurious IOPS throttle.
-        // Safe: on a BFQ host both bfq.* files are exposed together (CONFIG_BFQ_CGROUP_DEBUG), so
-        // "bytes present, ops absent" is only a transient read failure, never a steady state.
-        $ops = pmssResourceLogReadBlkioReadWrite($blkioSlice.'blkio.'.$bytes['source'].'.io_serviced');
-        if ($ops !== null) {
-            $values += ['io_read' => $bytes['read'], 'io_write' => $bytes['write'],
-                'io_read_ops' => $ops['read'], 'io_write_ops' => $ops['write'], 'io_source' => $bytes['source']];
-        }
+    foreach (['cpu_nsec' => 'cpu_usage_nsec', 'memory' => 'mem_current', 'tasks' => 'pids_current'] as $key => $field) {
+        if (isset($sample[$field])) $values[$key] = $sample[$field];
     }
-
-    // The user slice owns child cgroups, so prefer hierarchical totals over its often-zero local fields.
-    $memoryValues = pmssResourceLogReadMemoryStatFields($root.'/memory'.$slice.'memory.stat', ['total_rss', 'rss', 'total_cache', 'cache']);
-    foreach (['memory_anon' => ['total_rss', 'rss'], 'memory_file' => ['total_cache', 'cache']] as $key => $fields) {
-        if (($value = $memoryValues[$fields[0]] ?? $memoryValues[$fields[1]] ?? null) !== null) $values[$key] = $value;
+    // Billing must not persist a partial IO baseline: recovered ops would become a phantom delta.
+    // The source label travels with bytes AND ops so a family switch can reseed the baseline (#707).
+    if (isset($sample['io_ops_read'], $sample['io_ops_write'])) {
+        $values += ['io_read' => $sample['io_bytes_read'], 'io_write' => $sample['io_bytes_write'],
+            'io_read_ops' => $sample['io_ops_read'], 'io_write_ops' => $sample['io_ops_write'], 'io_source' => $sample['io_source']];
     }
-
+    // User processes live in child cgroups: prefer hierarchical totals, even when they are zero.
+    foreach (['memory_anon' => ['mem_total_rss', 'mem_rss'], 'memory_file' => ['mem_total_cache', 'mem_cache']] as $key => $fields) {
+        if (($value = $sample[$fields[0]] ?? $sample[$fields[1]] ?? null) !== null) $values[$key] = $value;
+    }
     return $values === [] ? null : $values;
 }
-
-/** Read one non-negative integer cgroup counter file, rejecting the UINT64_MAX sentinel. */
-function pmssResourceLogReadSysfsCounter(string $path): ?int
-{
-    $value = pmssReadRegularFileInt($path, -1);
-    return ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $value;
-}
-
-/**
- * Sum the Read/Write rows of a v1 blkio per-device file.
- * Totals must stay below the counter sentinel; an unrepresentable sum is absent.
- */
-function pmssResourceLogReadBlkioReadWrite(string $path): ?array
-{
-    $raw = pmssReadRegularFileContents($path);
-    if ($raw === null || trim($raw) === '') return null;
-
-    $totals = ['read' => 0, 'write' => 0];
-    $matched = false;
-    foreach (pmssConfigLines(preg_split('/\r?\n/', $raw), []) as $line) {
-        if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', $line, $m) !== 1) continue;
-        $value = pmssUnsignedDecimalIntParse($m[2]);
-        if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
-        $direction = $m[1] === 'Read' ? 'read' : 'write';
-        // Check before addition: integer overflow becomes a float and can later cast negative.
-        if ($value >= PMSS_RESOURCE_COUNTER_SENTINEL - $totals[$direction]) return null;
-        $totals[$direction] += $value;
-        $matched = true;
-    }
-
-    return $matched ? $totals : null;
-}
-
-/**
- * Read v1 per-cgroup blkio Read/Write totals, preferring the BFQ accounting file.
- *
- * Under the fleet-default BFQ scheduler (rotational/md hosts) the real per-cgroup I/O lands
- * in blkio.bfq.*; blkio.throttle.* exists but stays all-zero unless an explicit throttle
- * policy is applied (#467/#707). "Whichever is non-null" is WRONG — the throttle file is
- * present-but-zero under BFQ and would win, reproducing the zero-metering bug. Prefer bfq
- * when it carries data; fall back to throttle for non-BFQ hosts (SSD/nvme) where the bfq
- * file is absent. Returns the read source label so the delta path can guard a source switch.
- *
- * @return array{read:int,write:int,source:string}|null
- */
-function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile = 'blkio.bfq.io_service_bytes', string $throttleFile = 'blkio.throttle.io_service_bytes'): ?array
-{
-    $bfq = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$bfqFile);
-    if ($bfq !== null && ($bfq['read'] > 0 || $bfq['write'] > 0)) return $bfq + ['source' => 'bfq'];
-    $throttle = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$throttleFile);
-    if ($throttle !== null && ($throttle['read'] > 0 || $throttle['write'] > 0)) return $throttle + ['source' => 'throttle'];
-    // Both absent or genuinely zero: keep a stable source label from whichever file exists so
-    // an idle user does not thrash io_source (which would force a spurious reseed each sample).
-    if ($bfq !== null) return $bfq + ['source' => 'bfq'];
-    if ($throttle !== null) return $throttle + ['source' => 'throttle'];
-    return null;
-}
-
-/** Read requested v1 key/value counters once, retaining the first valid row per field. */
-function pmssResourceLogReadMemoryStatFields(string $path, array $fields): array
-{
-    $raw = pmssReadRegularFileContents($path);
-    if ($raw === null || trim($raw) === '') return [];
-    $wanted = array_fill_keys($fields, true); $values = []; $seen = [];
-    foreach (pmssConfigRows(preg_split('/\r?\n/', trim($raw)), 2, [], 2) as [$name, $value]) {
-        if (!isset($wanted[$name]) || isset($seen[$name]) || !ctype_digit((string) $value)) continue;
-        $seen[$name] = true; $parsed = (int) $value;
-        if ($parsed >= 0 && $parsed < PMSS_RESOURCE_COUNTER_SENTINEL) $values[$name] = $parsed;
-    }
-    return $values;
-}
-
-/** Retain the single-field reader contract for existing callers. */
-function pmssResourceLogReadMemoryStatField(string $path, string $field): ?int { return pmssResourceLogReadMemoryStatFields($path, [$field])[$field] ?? null; }
 
 /**
  * Read cgroup v2 memory.stat counters for the given user slice.

@@ -122,4 +122,96 @@ class UserMetricsCollectTest extends TestCase
         $this->assertEquals(2250, $m['io_bytes_write']);
         $this->assertTrue(!array_key_exists('io_ops_read', $m));
     }
+
+    /** Lock both consumers' schemas, ordering, zeroes, and distinct memory policies. */
+    public function testV1ConsumersKeepTheirOwnProjections(): void
+    {
+        $slice = 'user.slice/user-1234.slice/';
+        $root = $this->tree([
+            'cpuacct/'.$slice.'cpuacct.usage' => "900\n",
+            'cpuacct/'.$slice.'cpuacct.stat' => "system 8\nuser 12\n",
+            'cpu/'.$slice.'cpu.stat' => "throttled_time 42\nnr_throttled 0\nnr_periods 7\n",
+            'memory/'.$slice.'memory.usage_in_bytes' => "5000\n",
+            'memory/'.$slice.'memory.max_usage_in_bytes' => "6000\n",
+            'memory/'.$slice.'memory.limit_in_bytes' => "7000\n",
+            'memory/'.$slice.'memory.failcnt' => "0\n",
+            'memory/'.$slice.'memory.memsw.usage_in_bytes' => "8000\n",
+            'memory/'.$slice.'memory.oom_control' => "oom_kill 2\n",
+            'memory/'.$slice.'memory.stat' => "total_rss 300\ntotal_cache 400\nrss 0\ncache 10\nswap 0\n",
+            'pids/'.$slice.'pids.current' => "21\n",
+            'pids/'.$slice.'pids.events' => "max 0\n",
+            'blkio/'.$slice.'blkio.bfq.io_service_bytes' => "8:0 Read 100\n8:0 Write 200\n",
+            'blkio/'.$slice.'blkio.bfq.io_serviced' => "8:0 Read 1\n8:0 Write 2\n",
+        ]);
+        $this->assertSame([
+            'cpu_nsec' => 900, 'memory' => 5000, 'tasks' => 21,
+            'io_read' => 100, 'io_write' => 200, 'io_read_ops' => 1, 'io_write_ops' => 2, 'io_source' => 'bfq',
+            'memory_anon' => 300, 'memory_file' => 400,
+        ], \pmssResourceLogReadCountersV1(1234, $root.'/'));
+        $this->assertSame([
+            'cpu_usage_nsec' => 900, 'cpu_user_ticks' => 12, 'cpu_system_ticks' => 8,
+            'cpu_nr_periods' => 7, 'cpu_nr_throttled' => 0, 'cpu_throttled_nsec' => 42,
+            'mem_current' => 5000, 'mem_peak' => 6000, 'mem_limit' => 7000, 'mem_failcnt' => 0,
+            'memsw_current' => 8000, 'mem_oom_kill' => 2, 'mem_rss' => 0, 'mem_cache' => 10, 'mem_swap' => 0,
+            'pids_current' => 21, 'pids_events_max' => 0,
+            'io_bytes_read' => 100, 'io_bytes_write' => 200, 'io_ops_read' => 1, 'io_ops_write' => 2,
+        ], \pmssUserMetricsCollect(1234, $root));
+    }
+
+    public function testV1ConsumersRetainFirstNumericRowAndSentinelOmission(): void
+    {
+        $slice = 'user.slice/user-1000.slice/';
+        $root = $this->tree([
+            'cpuacct/'.$slice.'cpuacct.usage' => "18446744073709551615\n",
+            'cpuacct/'.$slice.'cpuacct.stat' => "user invalid\nuser 12\nuser 99\nsystem 0\n",
+            'memory/'.$slice.'memory.stat' => "total_rss 0\nrss 9\ncache 9223372036854775807\ncache 5\nswap 0\n",
+        ]);
+        $this->assertSame(['memory_anon' => 0], \pmssResourceLogReadCountersV1(1000, $root));
+        $this->assertSame(['cpu_user_ticks' => 12, 'cpu_system_ticks' => 0, 'mem_rss' => 9, 'mem_swap' => 0],
+            \pmssUserMetricsCollect(1000, $root));
+    }
+
+    public function testV1ConsumersKeepDistinctPartialIoRules(): void
+    {
+        $slice = 'blkio/user.slice/user-1000.slice/';
+        $root = $this->tree([
+            $slice.'blkio.bfq.io_service_bytes' => "8:0 Read 100\n8:0 Write 0\n",
+            // A different family's ops cannot complete a BFQ billing sample.
+            $slice.'blkio.throttle.io_serviced' => "8:0 Read 99\n8:0 Write 99\n",
+        ]);
+        $this->assertSame(null, \pmssResourceLogReadCountersV1(1000, $root));
+        $this->assertSame(['io_bytes_read' => 100, 'io_bytes_write' => 0], \pmssUserMetricsCollect(1000, $root));
+    }
+
+    public function testV1ConsumersKeepZeroIoAndThrottleFallback(): void
+    {
+        $slice = 'blkio/user.slice/user-1000.slice/';
+        foreach ([0, 10] as $bytes) {
+            $root = $this->tree([
+                $slice.'blkio.bfq.io_service_bytes' => "8:0 Read 0\n8:0 Write 0\n",
+                $slice.'blkio.bfq.io_serviced' => "8:0 Read 0\n8:0 Write 0\n",
+                $slice.'blkio.throttle.io_service_bytes' => "8:0 Read {$bytes}\n8:0 Write 0\n",
+                $slice.'blkio.throttle.io_serviced' => "8:0 Read {$bytes}\n8:0 Write 0\n",
+            ]);
+            $this->assertSame([
+                'io_read' => $bytes, 'io_write' => 0, 'io_read_ops' => $bytes, 'io_write_ops' => 0,
+                'io_source' => $bytes === 0 ? 'bfq' : 'throttle',
+            ], \pmssResourceLogReadCountersV1(1000, $root));
+            $this->assertSame(['io_bytes_read' => $bytes, 'io_bytes_write' => 0, 'io_ops_read' => $bytes, 'io_ops_write' => 0],
+                \pmssUserMetricsCollect(1000, $root));
+        }
+    }
+
+    public function testV1ConsumersOmitMalformedSources(): void
+    {
+        $slice = 'user.slice/user-1000.slice/';
+        $root = $this->tree([
+            'cpuacct/'.$slice.'cpuacct.usage' => "-1\n",
+            'memory/'.$slice.'memory.usage_in_bytes' => "1 extra\n",
+            'memory/'.$slice.'memory.stat' => "rss invalid\ncache -1\n",
+            'pids/'.$slice.'pids.current' => "0\n",
+        ]);
+        $this->assertSame(['tasks' => 0], \pmssResourceLogReadCountersV1(1000, $root));
+        $this->assertSame(['pids_current' => 0], \pmssUserMetricsCollect(1000, $root));
+    }
 }

@@ -54,15 +54,7 @@ function pmssSnapshotWriteLine($handle, string $line): void
 {
     // Keep invalid or closed handles on the legacy best-effort no-op path.
     if (!pmssStreamHandleIsOpen($handle)) return;
-    $line .= PHP_EOL;
-    $length = strlen($line);
-    // A short write may still make progress; never spin on a stalled or failed stream.
-    for ($offset = 0; $offset < $length; $offset += $written) {
-        $written = @fwrite($handle, substr($line, $offset));
-        if ($written === false || $written === 0) {
-            return;
-        }
-    }
+    pmssStreamWriteAll($handle, $line.PHP_EOL);
 }
 
 /** Keep warning codes and field keys as single log tokens. */

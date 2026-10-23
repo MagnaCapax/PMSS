@@ -8,6 +8,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/runtime/filesystem.php';
+
 /** Resolve a filesystem path from an environment variable with a default. */
 function pmssResolvePathFromEnv(string $envKey, string $default): string
 {
@@ -264,13 +266,7 @@ function pmssInodeSafeRewriteRegularFile(string $root, string $path, callable $r
         if ($replacement === $original) return true;
         if (@rewind($handle) === false) return false;
         $length = strlen($replacement);
-        $written = 0;
-        while ($written < $length) {
-            $count = @fwrite($handle, substr($replacement, $written));
-            if (!is_int($count) || $count < 1) return false;
-            $written += $count;
-        }
-        return @ftruncate($handle, $length) && @fflush($handle);
+        return pmssStreamWriteAll($handle, $replacement) && @ftruncate($handle, $length) && @fflush($handle);
     } finally {
         @fclose($handle);
     }

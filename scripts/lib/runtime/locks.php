@@ -54,7 +54,7 @@ function pmssCronLockAcquire(string $name, ?callable $onBusy = null, ?callable $
 }
 
 /** Legacy watchdogs send timestamped skip notices to stdout. */
-function pmssCronLockSkipLog(string $message): void { echo date('Y-m-d H:i:s').': '.$message."\n"; }
+function pmssCronLockSkipLog(string $message): void { echo pmssLogFormatTimestampedLine($message); }
 
 /**
  * Resolve numeric fd entries that reference an acquired lock handle.

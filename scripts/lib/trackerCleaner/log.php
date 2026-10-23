@@ -5,7 +5,7 @@ require_once __DIR__.'/../user/watchdogTimeout.php';
 
 function pmssTrackerCleanerTimestamp(): string { return '['.date('Y-m-d H:i:s').']'; }
 
-function pmssTrackerCleanerLog(string $message): void { echo pmssTrackerCleanerTimestamp().' '.$message."\n"; }
+function pmssTrackerCleanerLog(string $message): void { echo pmssLogFormatTimestampedLine($message, '[Y-m-d H:i:s]', ' '); }
 function pmssTrackerCleanerLogValue($value): string { return str_replace(["\r", "\n"], ' ', (string) $value); }
 
 function pmssTrackerCleanerChangeLog(array $changes, ?string $timestamp = null): string
