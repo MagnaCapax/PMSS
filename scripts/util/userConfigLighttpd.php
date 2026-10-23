@@ -7,6 +7,8 @@
  * interface. The script keeps idempotent lighttpd configs, applies sensible
  * php-cgi limits derived from user cgroup settings, and adjusts php.ini
  * memory_limit with safe clamps.
+ * Use [--strict] [username] to report incomplete refreshes to the updater;
+ * default invocations retain the legacy success result after user selection.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -34,7 +36,14 @@ function pmssUserConfigLighttpdMain(array $argv): int
         fwrite(STDERR, "#### WARNING: DEPRECATED COMMAND (use ".basename(__FILE__).")\n");
     }
 
-    $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', (string) ($argv[1] ?? ''), array('emitEmptyMessage' => true, 'emptyToStderr' => true, 'notFoundMessage' => "Username not found\n"));
+    $arguments = array_slice($argv, 1);
+    $strict = in_array('--strict', $arguments, true);
+    $arguments = array_values(array_filter($arguments, static function ($argument): bool { return $argument !== '--strict'; }));
+    if (count($arguments) > 1) {
+        fwrite(STDERR, "Usage: userConfigLighttpd.php [--strict] [username]\n");
+        return 1;
+    }
+    $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', (string) ($arguments[0] ?? ''), array('emitEmptyMessage' => true, 'emptyToStderr' => true, 'notFoundMessage' => "Username not found\n"));
     if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];
     $users = $selection['users'];
     $portsDirectory = '/etc/seedbox/runtime/ports';
@@ -80,8 +89,8 @@ function pmssUserConfigLighttpdMain(array $argv): int
 
     $exitCode = 0;
     foreach ($users as $thisUser) {
-        // Finish the selection, but let callers retry any incomplete account.
-        if (!pmssUserConfigLighttpdConfigureUser($thisUser, $portsDirectory, $template, $deflateEnabled, $policyDefaults)) {
+        // Always finish the selection; only opt-in callers retry incomplete accounts.
+        if (!pmssUserConfigLighttpdConfigureUser($thisUser, $portsDirectory, $template, $deflateEnabled, $policyDefaults) && $strict) {
             $exitCode = 1;
         }
     }

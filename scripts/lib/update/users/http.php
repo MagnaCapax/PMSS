@@ -32,7 +32,7 @@ function pmssUserConfigureHttp(array $ctx): void
     $userEsc = $ctx['user_esc'];
     $userLog = static function (string $message) use ($user): void { pmssUserLog($user, $message); };
 
-    $rc = runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
+    $rc = runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php --strict %s', $userEsc));
     // Defer the completion marker without interrupting this user's other work.
     pmssUserLighttpdRefreshFailed($user, $rc !== 0);
     if ($rc !== 0) {

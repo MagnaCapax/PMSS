@@ -6,48 +6,88 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Exercise the CLI, real directory preparation and rendering with isolated I/O. */
 class LighttpdConfigRefreshResultTest extends TestCase
 {
-    public function testPreparationFailuresStillInstallCurrentConfigAndReturnFailure(): void
+    public function testPreparationFailuresStillInstallCurrentConfigAndFailOnlyInStrictMode(): void
     {
-        foreach (['public-link', 'dangling-public', 'lighttpd-link', 'custom-directory'] as $kind) {
-            $result = $this->refreshFixture($kind);
-            $this->assertSame(1, $result['rc'], $kind);
-            $this->assertSame(['alice', 'bob'], $result['attempted'], 'later accounts must still run');
-            $this->assertStringContainsString('Password protected area (alice)', $result['config']);
-            $this->assertStringContainsString('/user-alice/', $result['config']);
-            $this->assertSame([['root', 0644]], $result['writes']);
-            $this->assertSame([], $result['auxiliary'], 'no runtime writes after refused preparation');
-            $this->assertFalse($result['linkChanged']);
-            $this->assertSame(['.', '..'], $result['elsewhere']);
-            $this->pmssAssertStringNotContainsString('lighttpd configured', $result['output']);
+        foreach ([[], ['--strict']] as $arguments) {
+            foreach (['public-link', 'dangling-public', 'lighttpd-link', 'custom-directory'] as $kind) {
+                $result = $this->refreshFixture($kind, $arguments);
+                $this->assertSame($arguments === [] ? 0 : 1, $result['rc'], $kind);
+                $this->assertSame(['alice', 'bob'], $result['attempted'], 'later accounts must still run');
+                $this->assertStringContainsString('Password protected area (alice)', $result['config']);
+                $this->assertStringContainsString('/user-alice/', $result['config']);
+                $this->assertSame([['root', 0644]], $result['writes']);
+                $this->assertSame([], $result['auxiliary'], 'no runtime writes after refused preparation');
+                $this->assertFalse($result['linkChanged']);
+                $this->assertSame(['.', '..'], $result['elsewhere']);
+                $this->pmssAssertStringNotContainsString('lighttpd configured', $result['output']);
+            }
         }
     }
 
     public function testCompleteAccountReportsSuccess(): void
     {
-        $result = $this->refreshFixture('ready');
-        $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsString('lighttpd configured (port=31234', $result['output']);
-        $this->assertTrue(in_array('php.ini', $result['auxiliary'], true));
+        foreach ([[], ['--strict']] as $arguments) {
+            $result = $this->refreshFixture('ready', $arguments);
+            $this->assertSame(0, $result['rc']);
+            $this->assertStringContainsString('lighttpd configured (port=31234', $result['output']);
+            $this->assertTrue(in_array('php.ini', $result['auxiliary'], true));
+        }
     }
 
-    public function testConfigAndPhpIniWriteFailuresReturnFailure(): void
+    public function testConfigAndPhpIniWriteFailuresKeepLegacySuccessUnlessStrict(): void
     {
-        foreach (['config-write', 'php-write'] as $kind) {
-            $result = $this->refreshFixture($kind);
-            $this->assertSame(1, $result['rc']);
-            $this->pmssAssertStringNotContainsString('lighttpd configured', $result['output']);
+        // Before 07d20869 the CLI ignored even main-config write failures.
+        foreach ([[], ['--strict']] as $arguments) {
+            foreach (['config-write', 'php-write'] as $kind) {
+                $result = $this->refreshFixture($kind, $arguments);
+                $this->assertSame($arguments === [] ? 0 : 1, $result['rc']);
+                $this->pmssAssertStringNotContainsString('lighttpd configured', $result['output']);
+            }
         }
     }
 
     public function testIneligibleAccountSucceedsWithoutRendering(): void
     {
-        $result = $this->refreshFixture('ineligible');
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame(null, $result['config']);
-        $this->assertSame([], $result['writes']);
+        foreach ([[], ['--strict']] as $arguments) {
+            $result = $this->refreshFixture('ineligible', $arguments);
+            $this->assertSame(0, $result['rc']);
+            $this->assertSame(null, $result['config']);
+            $this->assertSame([], $result['writes']);
+        }
     }
 
-    private function refreshFixture(string $kind): array
+    public function testStrictFlagCanPrecedeOrFollowValidatedUsername(): void
+    {
+        foreach ([['alice'], ['--strict', 'alice'], ['alice', '--strict']] as $arguments) {
+            $result = $this->refreshFixture('public-link', $arguments);
+            $this->assertSame(in_array('--strict', $arguments, true) ? 1 : 0, $result['rc']);
+            $this->assertSame(['alice'], $result['attempted']);
+            $this->assertStringContainsString('Password protected area (alice)', $result['config']);
+        }
+    }
+
+    public function testInvalidArgumentsNeverConfigureAnAccount(): void
+    {
+        foreach ([['../alice'], ['--strict', '../alice'], ['--unknown'], ['--strict', '--unknown'], ['alice', 'bob']] as $arguments) {
+            $result = $this->refreshFixture('ready', $arguments);
+            $this->assertSame(1, $result['rc']);
+            $this->assertSame([], $result['attempted']);
+            $this->assertSame([], $result['writes']);
+        }
+    }
+
+    public function testOnlyUpdateHttpCallerRequestsStrictRefreshResults(): void
+    {
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/http.php',
+            "'/scripts/util/userConfigLighttpd.php --strict %s'");
+        foreach (['scripts/recreateUser.php', 'scripts/lib/lighttpd/hermesUiConverge.php', 'scripts/cron/checkLighttpdInstances.php'] as $path) {
+            $source = $this->pmssReadRepoFile($path);
+            $this->assertStringContainsString('/scripts/util/userConfigLighttpd.php', $source);
+            $this->pmssAssertStringNotContainsString('--strict', $source);
+        }
+    }
+
+    private function refreshFixture(string $kind, array $arguments = []): array
     {
         $home = $this->pmssMakeTempDir('pmss-lighttpd-refresh-');
         mkdir($home.'/www', 0755);
@@ -103,11 +143,14 @@ function file_get_contents($path) { return \file_get_contents($GLOBALS['template
 function glob($pattern) { return []; }
 function exec(...$args) { throw new \RuntimeException('Unexpected external command'); }
 function pmssDetectDistro() { return ['version' => 11]; }
-function pmssManagedUsersSelectFromCommand(...$args) { return ['exitCode' => 0, 'users' => ['alice', 'bob']]; }
+function pmssManagedUsersSelectFromCommand($command, $user, $options) {
+    return \pmssManagedUsersSelectFromList(['alice', 'bob'], $user, $options);
+}
 function pmssRunCliEntrypointWithArgv(...$args) {}
 PHP;
         $script .= '$GLOBALS["home"] = '.var_export($home, true).';';
         $script .= '$GLOBALS["kind"] = '.var_export($kind, true).';';
+        $script .= '$GLOBALS["arguments"] = '.var_export($arguments, true).';';
         $script .= '$GLOBALS["template"] = '.var_export($this->pmssRepoPath('etc/seedbox/config/template.lighttpd'), true).';';
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userConfigApply.php', 'LighttpdRefreshFixture');
         // The CLI has a shebang, unlike the libraries accepted by the shared helper.
@@ -119,7 +162,7 @@ $GLOBALS['attempted'] = $GLOBALS['writes'] = $GLOBALS['auxiliary'] = [];
 \define('PMSS_TEST_MODE', true);
 \putenv('PMSS_TEST_MODE=1');
 \ob_start();
-$rc = pmssUserConfigLighttpdMain(['userConfigLighttpd.php']);
+$rc = pmssUserConfigLighttpdMain(array_merge(['userConfigLighttpd.php'], $GLOBALS['arguments']));
 $output = \ob_get_clean();
 // Ignore the successful second account's auxiliary activity and success line.
 echo json_encode(['rc' => $rc, 'attempted' => $GLOBALS['attempted'], 'writes' => $GLOBALS['writes'],
