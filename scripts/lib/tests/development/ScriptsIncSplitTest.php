@@ -132,7 +132,7 @@ class ScriptsIncSplitTest extends TestCase
             'pmssCustomerBackupRestoreTarMemberTypesRead', 'pmssCustomerBackupRestoreMemberAllowed', 'pmssCustomerBackupRestoreMemberTypeAllowed', 'pmssCustomerBackupRestoreMemberNameFromPhar', 'pmssCustomerBackupRestoreEntriesSelect',
             'pmssCustomerBackupRestoreTouchesRtorrentLiveState', 'pmssCustomerBackupRestoreRtorrentProcRunning', 'pmssCustomerBackupRestoreRtorrentRunning', 'pmssCustomerBackupRestoreSnapshotPathBuild', 'pmssCustomerBackupRestoreSnapshotCreate',
             'pmssCustomerBackupRestore', 'pmssWelcomeMessageCustomerPathIsSafe', 'pmssWelcomeRequireLocalHelper', 'pmssCustomerManagedAppDefinitions', 'pmssWelcomeServiceAvailable',
-            'pmssCustomerNativePidsRead', 'pmssCustomerNativeSignal', 'pmssCustomerNativeStop', 'pmssCustomerDelugeSystemCommand', 'pmssCustomerTorrentClientToggleStart', 'pmssWelcomeHttpContextCreate', 'pmssCustomerAppsMediaIdsRead',
+            'pmssCustomerNativePidsRead', 'pmssCustomerNativeSignal', 'pmssCustomerNativeStop', 'pmssCustomerDelugeSystemCommand', 'pmssCustomerTorrentClientToggleStart', 'pmssCustomerTorrentClientSelectedBinary', 'pmssCustomerRtorrentBinaries', 'pmssWelcomeHttpContextCreate', 'pmssCustomerAppsMediaIdsRead',
             'pmssCustomerAppsTmuxSessionsParse', 'pmssCustomerAppsTmuxSessionsRead', 'pmssCustomerAppsStatusRead', 'pmssCustomerAppsDescriptionsRead', 'pmssCustomerAppRowStart',
             'pmssCustomerAppButton', 'pmssCustomerAppRowHtmlBuild', 'pmssCustomerAppsMediaRowsBuild', 'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsCss',
             'pmssCustomerAppsStatusJsonEmit', 'pmssCustomerAppsLogJsonEmit', 'pmssActionScriptJs', 'pmssFrontendToggleAction',
@@ -147,7 +147,7 @@ class ScriptsIncSplitTest extends TestCase
                 $functions[$name] = $body;
             }
         }
-        $this->assertSame(92, count($functions));
+        $this->assertSame(94, count($functions));
         $actual = array_keys($functions);
         sort($actual);
         sort($expected);

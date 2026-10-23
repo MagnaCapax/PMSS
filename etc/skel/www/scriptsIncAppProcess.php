@@ -28,14 +28,19 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
 }
 
 if (!function_exists('pmssCustomerTorrentClientSelectedBinary')) {
-/** Return the store binary the account selected for $client in Configure, or null for the system build. */
+/**
+ * Return the store binary the account selected for $client in Configure, or null for the system build.
+ * Only for matching this account's own processes: launches validate the selection in torrentClientsResolve.php,
+ * which the healed welcome files cannot require.
+ */
 function pmssCustomerTorrentClientSelectedBinary(string $client): ?string {
- $resolver = __DIR__.'/torrentClientsResolve.php';
- if (!function_exists('pmssTorrentClientResolve')) {
-  if (!is_file($resolver) || is_link($resolver)) return null;
-  require_once $resolver;
- }
- return function_exists('pmssTorrentClientResolve') ? pmssTorrentClientResolve(dirname(__DIR__), $client) : null;
+ $names = array('qbittorrent' => 'qbittorrent-nox', 'rtorrent' => 'rtorrent', 'deluge' => 'bin/deluged');
+ if (!isset($names[$client])) return null;
+ $target = @readlink(dirname(__DIR__).'/bin/'.$client.'/default');
+ $store = '/home/.pmss/clients/'.$client.'/';
+ if (!is_string($target) || strpos($target, $store) !== 0 || strpos($target, '/..') !== false) return null;
+ $binary = rtrim($target, '/').'/'.$names[$client];
+ return is_file($binary) && !is_link($binary) ? $binary : null;
 }
 }
 
