@@ -10,7 +10,7 @@
  * public name, or open an nginx port, so a new one fails CI instead of shipping silently.
  *
  * Rules (shipped tree only: etc/ and scripts/, tests excluded):
- *   R1  `.request-web-certs` (the per-account certificate request flag) appears only in the
+ *   R1  The per-account certificate request flag appears only in the
  *       ADR 0150 Decision 4 opt-in files and the cron that consumes them. The static test
  *       NoForcedCertificateRequestStaticTest pins the same set for the dev suite; this lint
  *       also runs before a push.
@@ -86,7 +86,7 @@ $r5Callers = [
 ];
 
 $rules = [
-    'R1' => ['re' => '/\.request-web-certs/', 'pinned' => $r1Pinned,
+    'R1' => ['re' => '/\.request\-web\-certs/', 'pinned' => $r1Pinned,
         'why' => 'requests a public certificate; ADR 0150 allows only the Configure page opt-in'],
     'R2' => ['re' => '/certbot|acme-challenge|\bnsupdate\b|acme\.sh/i', 'pinned' => $r2Pinned,
         'why' => 'certificate or DNS publishing primitive outside the pinned files'],
