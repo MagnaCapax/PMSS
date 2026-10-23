@@ -311,7 +311,7 @@ docker compose up -d
 
 All media stack applications bind to `127.0.0.1` only and are reverse-proxied through the user's lighttpd instance under `/public-<username>/<app>/`.
 Generated lighttpd proxy fragments enable HTTP upgrade forwarding so WebSocket-capable apps can keep live connections through the same per-user proxy path.
-The per-user lighttpd config blocks URL paths starting with `/jellyfin/System/Restart` or `/jellyfin/System/Shutdown` (case-insensitive) before proxying; existing installs receive this at the next PMSS update.
+The per-user lighttpd config blocks URL paths starting with `/jellyfin/System/Restart` or `/jellyfin/System/Shutdown` (case-insensitive) before proxying, including the same routes under Jellyfin's `/emby` and `/mediabrowser` aliases. The rule is part of the lighttpd template, so a PMSS update writes it into existing accounts' configs. To restart Jellyfin, the account owner runs `install-media-stack.sh --stop-app=jellyfin` and then `--start-app=jellyfin`.
 
 The `/public-<username>/` path is **intentionally unauthenticated** at the proxy level — it exists for web hosting, file sharing, and public-facing services. App-level authentication is configured by the installer for newly installed media-stack apps.
 
