@@ -137,8 +137,7 @@ if (!is_file($activeRoot.'/index.php')) {
         'Restored web root is missing index.php',
         array('active_root' => $activeRoot)
     );
-    fwrite(STDERR, "Error: restored web root is missing index.php\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Error: restored web root is missing index.php\n"));
 }
 
 // Best-effort: mirror the state in the user config store (marker is canonical).
@@ -149,6 +148,5 @@ $webStackRc = pmssUserLifecycleWebStackStartAndVerify('unsuspend', $username, fa
 pmssUserLifecycleContextLogHomeInfo('unsuspend', 'start_rtorrent', $username, $homeDir);
 pmssUserLifecycleStep('unsuspend', $username, 'start_rtorrent', '/scripts/startRtorrent '.escapeshellarg($username), false);
 if ($webStackRc !== 0) {
-    fwrite(STDERR, "Error: per-user web stack failed to start\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Error: per-user web stack failed to start\n"));
 }

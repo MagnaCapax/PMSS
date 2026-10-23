@@ -149,15 +149,13 @@ function pmssEnsureLocaleBaseline(): void
         $out = [];
         @exec('locale -a 2>/dev/null', $out);
         $has = false;
-        if (!empty($out)) {
-            $needle1 = strtolower($locale);
-            $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
-            foreach ($out as $line) {
-                $val = strtolower(trim((string) $line));
-                if ($val === $needle1 || $val === $needle2) {
-                    $has = true;
-                    break;
-                }
+        $needle1 = strtolower($locale);
+        $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
+        foreach (pmssConfigLines($out, []) as $line) {
+            $val = strtolower($line);
+            if ($val === $needle1 || $val === $needle2) {
+                $has = true;
+                break;
             }
         }
         if (!$has || !$enabled) {

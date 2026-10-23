@@ -89,7 +89,7 @@ class UpdateCodeloadFallbackTest extends TestCase
             'scripts/update.php',
             [
                 'pmssCodeloadTarballUrl',
-                'pmssFetchBranchTarball',
+                'pmssFetchSnapshotArchive',
                 'https://codeload.github.com/',
                 '/tar.gz/refs/heads/',
                 'if (pmssRunBootstrapCommand($clone) !== 0) {',
@@ -103,7 +103,7 @@ class UpdateCodeloadFallbackTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsString(
             'scripts/update.php',
-            'curl -sfL --http1.1 -A ',
+            'pmssFetchSnapshotArchive($url, $tmp, true);',
             'codeload fetch should force HTTP/1.1 (codeload has a known intermittent HTTP/2 400 in CI)'
         );
     }

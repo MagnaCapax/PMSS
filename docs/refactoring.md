@@ -351,7 +351,13 @@ Line-oriented readers use `pmssConfigLines()` for lazy trimming and empty/commen
 filtering while retaining source keys, internal spacing, inline comments, and
 literal `0` rows. Pass `[]` when every nonempty line is data, including diagnostic
 stack traces beginning with `#`. `pmssConfigRows()` uses the same line iterator
+semantics through the column parser, trimming and filtering each source row once
 before applying its existing column-count and split-limit rules.
+
+Parser compression retains source positions and result bytes. Certbot keeps only
+the last summary marker and its excerpt offset; whole-file and tail reads share
+the same summary path. Quota normalization preserves trailing empty split fields,
+and PSI fields share one unavailable-value path while keeping their existing bounds.
 
 Systemd skip reporting belongs in `pmssSystemdActionSkip()`: pass the existing
 reason and description, with `false` for legacy callers that do not record a

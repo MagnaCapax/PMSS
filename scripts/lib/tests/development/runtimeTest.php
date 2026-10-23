@@ -69,6 +69,20 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testCliDiagnosticExitPreservesBytesAndStatus(): void
+    {
+        foreach ([0, 1, 2, 7, 255] as $exitCode) {
+            foreach (['', "failure\n", "  failure  ", "first\nsecond\n", "binary\0payload"] as $message) {
+                $code = 'require '.var_export(dirname(__DIR__, 2).'/runtime/cli.php', true).'; '
+                    .'exit(pmssCliReturnWithStderr('.var_export($message, true).', '.$exitCode.')); echo "unexpected return";';
+                $capture = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+                $this->assertSame($exitCode, $capture['result']['rc']);
+                $this->assertSame('', $capture['result']['output']);
+                $this->assertSame($message, file_get_contents($capture['stderrPath']));
+            }
+        }
+    }
+
     public function testRuntimeRequireOnceOwnsDefinitionContract(): void
     {
         $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);

@@ -41,12 +41,7 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
         exec($cmd, $out, $rc);
         if ($rc === 0) {
             $checkOkLocal = true;
-            foreach ($out as $line) {
-                $parts = pmssConfigLineColumns((string) $line, 2, [], 2);
-                if ($parts === []) {
-                    continue;
-                }
-                [$pid, $cmdline] = $parts;
+            foreach (pmssConfigRows($out, 2, [], 2) as [$pid, $cmdline]) {
                 if (!ctype_digit($pid)) {
                     continue;
                 }

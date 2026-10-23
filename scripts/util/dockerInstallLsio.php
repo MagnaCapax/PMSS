@@ -48,8 +48,7 @@ function pmssDockerInstallLsioOperatorMain(array $argv): int
 {
     $account = pmssDockerInstallLsioOperatorAccount((string) getenv('HOME'));
     if ($account === null) {
-        fwrite(STDERR, "Set HOME to the account's home directory; the installer runs as that account.\n");
-        return 1;
+        return pmssCliReturnWithStderr("Set HOME to the account's home directory; the installer runs as that account.\n");
     }
     $rc = 1;
     $command = pmssDockerInstallLsioOperatorCommand($account, array_slice(array_values($argv), 1));

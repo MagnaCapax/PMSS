@@ -148,24 +148,19 @@ function pmssSystemStatsPsiFromRaw(?string $raw): string
     $values = [];
     foreach ($fields as $field) {
         list($row, $name, $decimals) = $field;
-        if (!preg_match('/^'.preg_quote($row, '/').'\s.*?'.preg_quote($name, '/').'=([0-9]+(?:\.[0-9]+)?)(?=\s|$)/m', $raw, $match)) {
-            if ($row === 'some' && $name === 'avg10') return 'na';
-            $values[] = 'na';
-            continue;
-        }
+        $value = 'na';
         // PSI averages are percentages; totals are integer microsecond counters.
-        $number = (float) $match[1];
-        if ($decimals === 0) {
-            $total = strpos($match[1], '.') === false ? pmssUnsignedDecimalIntParse($match[1]) : null;
-            $values[] = $total === null ? 'na' : number_format($number, 0, '', '');
-        } else {
-            if (!is_finite($number) || $number > 100) {
-                if ($row === 'some' && $name === 'avg10') return 'na';
-                $values[] = 'na';
-            } else {
-                $values[] = number_format($number, $decimals, '.', '');
+        if (preg_match('/^'.preg_quote($row, '/').'\s.*?'.preg_quote($name, '/').'=([0-9]+(?:\.[0-9]+)?)(?=\s|$)/m', $raw, $match)) {
+            $number = (float) $match[1];
+            if ($decimals === 0) {
+                $total = strpos($match[1], '.') === false ? pmssUnsignedDecimalIntParse($match[1]) : null;
+                $value = $total === null ? 'na' : number_format($number, 0, '', '');
+            } elseif (is_finite($number) && $number <= 100) {
+                $value = number_format($number, $decimals, '.', '');
             }
         }
+        if ($value === 'na' && $row === 'some' && $name === 'avg10') return 'na';
+        $values[] = $value;
     }
     return implode('/', $values);
 }

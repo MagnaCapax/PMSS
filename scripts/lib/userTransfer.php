@@ -226,7 +226,6 @@ function pmssUserTransferMain(array $argv): int
             echo $e->getMessage();
             return 0;
         }
-        fwrite(STDERR, $e->getMessage().PHP_EOL);
-        return is_int($code) && $code > 0 ? $code : 1;
+        return pmssCliReturnWithStderr($e->getMessage().PHP_EOL, is_int($code) && $code > 0 ? $code : 1);
     }
 }

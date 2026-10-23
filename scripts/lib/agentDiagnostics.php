@@ -255,13 +255,11 @@ function pmssAgentDiagnosticsMain(array $argv): int
         $listUsersResult = pmssAgentDiagnosticsPhpScript('listUsers.php');
         $listUsersExitCode = (int) ($listUsersResult['rc'] ?? 1);
         if ($listUsersExitCode !== 0) {
-            fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
-            return $listUsersExitCode;
+            return pmssCliReturnWithStderr("Error: listUsers.php failed; aborting.\n", $listUsersExitCode);
         }
         $listUsersLines = preg_split('/\r?\n/', trim((string) ($listUsersResult['stdout'] ?? '')));
         if (!is_array($listUsersLines) || pmssManagedUsersOutputHasDiagnostics($listUsersLines)) {
-            fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
-            return 1;
+            return pmssCliReturnWithStderr("Error: listUsers.php failed; aborting.\n");
         }
         $selection = pmssManagedUsersSelectFromList($listUsersLines, $user, ['strictInput' => true]);
         if ((int) $selection['exitCode'] !== 0) return (int) $selection['exitCode'];

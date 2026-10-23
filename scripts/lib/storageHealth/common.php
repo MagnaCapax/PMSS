@@ -16,7 +16,7 @@ require_once __DIR__.'/../runtime.php';
 function pmssStorageHealthDiskInventoryFromLsblk(string $lsblkOut): array
 {
     $disks = [];
-    foreach (pmssConfigRows(preg_split('/\r?\n/', trim($lsblkOut)), 3, []) as $parts) {
+    foreach (pmssConfigRows(preg_split('/\r?\n/', $lsblkOut), 3, []) as $parts) {
         $kname = (string) $parts[0];
         // KNAME comes from lsblk; reject shell/path syntax before composing /dev/<name>.
         if ($kname === '' || $kname === '.' || $kname === '..' || preg_match('/^[A-Za-z0-9._!+-]+$/D', $kname) !== 1) continue;

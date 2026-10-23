@@ -2,6 +2,8 @@
 /** Hermetic CLI fixture: every process, identity, filesystem and clock observation is injected. */
 namespace UserDockerLifecycleFixture;
 
+require_once dirname(__DIR__, 2).'/runtime/environment.php';
+
 $GLOBALS['case'] = json_decode($argv[1], true);
 $GLOBALS['events'] = $GLOBALS['errors'] = [];
 $GLOBALS['clock'] = 0.0;
@@ -47,10 +49,6 @@ function pmssUserDockerLingerEnsureCommands($user, $uid) { return ['enable-linge
 function runCommand($command, $verbose, $logger) { $GLOBALS['events'][] = ['linger', $command]; $GLOBALS['case']['runtime_missing'] = false; }
 function pmssBuildUserShellCommand($user, $cmd) { return 'account-shell '.$user.' '.$cmd; }
 function pmssBuildUserServiceShellCommand($user, $cmd) { return 'slice-shell '.$user.' '.$cmd; }
-function pmssConfigLineColumns($line, $minimum = 0, $comments = [], $limit = -1) {
-    $parts = preg_split('/\s+/', trim($line), $limit);
-    return count($parts) >= $minimum ? $parts : [];
-}
 function pmssUserWatchdogProcessPids($user, $pattern, $options, &$rc, &$out) {
     $rc = !empty($GLOBALS['case']['pgrep_missing']) ? 127 : (empty($GLOBALS['case']['running']) ? 1 : 0);
     $out = $rc === 0 ? ['41', '39'] : [];

@@ -48,6 +48,8 @@ class RuntimeEnvValueTest extends TestCase
         $this->assertSame(['row' => ['rss', "123\textra"]], iterator_to_array(\pmssConfigRows(['row' => "rss 123\textra"], 2, [], 2)));
         $this->assertSame([1 => ['#', 'data']], iterator_to_array(\pmssConfigRows(['#123', '# data'], 2, [])));
         $this->assertSame([2 => ['0']], iterator_to_array(\pmssConfigRows(['; comment', '# comment', '0'], 1, [';', '#'])));
+        $this->assertSame([2 => ['0'], 3 => ['42'], 4 => ['1']], iterator_to_array(\pmssConfigRows([null, false, 0, 42, true], 1, [])));
+        $this->assertSame(['kept' => ['#', 'data  # inline']], iterator_to_array(\pmssConfigRows(['skip' => ' ; comment ', 'kept' => " \t# data  # inline\r\n"], 2, [';'], 2)));
     }
 
     public function testConfigLinesPreserveKeysTextAndCommentPolicies(): void

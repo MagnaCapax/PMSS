@@ -159,8 +159,8 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
 {
     $lines = explode("\n", $iostatRaw);
     $lastHeaderIdx = -1;
-    foreach ($lines as $i => $line) {
-        if (preg_match('/^Device\s/', trim($line))) {
+    foreach (pmssConfigLines($lines, []) as $i => $line) {
+        if (preg_match('/^Device\s/', $line)) {
             $lastHeaderIdx = $i;
         }
     }

@@ -35,15 +35,11 @@ function pmssCertbotParseLogTimestamp(string $line): ?int
  */
 function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12): array
 {
-    $lines = preg_split("/\\r?\\n/", $log);
-    if (!is_array($lines)) {
-        $lines = [];
-    }
-
-    $events = [];
+    $lines = preg_split("/\\r?\\n/", $log) ?: [];
+    // Only the last summary is consumed; retain its source index for the excerpt.
+    $last = null;
     $count = count($lines);
-    for ($i = 0; $i < $count; $i++) {
-        $line = (string)$lines[$i];
+    foreach ($lines as $i => $line) {
         $lower = strtolower($line);
 
         $type = null;
@@ -62,7 +58,7 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
             continue;
         }
 
-        $events[] = [
+        $last = [
             'idx'  => $i,
             'ts'   => pmssCertbotParseLogTimestamp($line),
             'type' => $type,
@@ -70,7 +66,7 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
         ];
     }
 
-    if (empty($events)) {
+    if ($last === null) {
         return [
             'status'        => 'unknown',
             'event_ts'      => null,
@@ -79,7 +75,6 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
         ];
     }
 
-    $last = $events[count($events) - 1];
     $status = (string)$last['type'];
     $eventTs = is_int($last['ts']) ? $last['ts'] : null;
     $eventLine = (string)$last['line'];
@@ -148,16 +143,9 @@ function pmssCertbotRenewalSummaryFromFile(string $path, int $maxBytes = 262144)
         @fseek($fp, $offset);
         $data = stream_get_contents($fp);
         fclose($fp);
-        if (!is_string($data)) {
-            $data = '';
-        }
-        return pmssCertbotRenewalSummaryFromLog($data);
+    } else {
+        $data = @file_get_contents($path);
     }
-
-    $data = @file_get_contents($path);
-    if (!is_string($data)) {
-        $data = '';
-    }
-    return pmssCertbotRenewalSummaryFromLog($data);
+    return pmssCertbotRenewalSummaryFromLog(is_string($data) ? $data : '');
 }
 

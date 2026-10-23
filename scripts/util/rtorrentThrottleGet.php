@@ -15,8 +15,7 @@ require_once __DIR__.'/../lib/rtorrent/scgi.php';
 function pmssRtorrentThrottleGetCli(array $argv, ?callable $scgiCall = null): int
 {
     if (count($argv) !== 2 || !is_string($argv[1]) || !pmssUsernameIsValid($argv[1])) {
-        fwrite(STDERR, "Usage: rtorrentThrottleGet.php USERNAME\n");
-        return 1;
+        return pmssCliReturnWithStderr("Usage: rtorrentThrottleGet.php USERNAME\n");
     }
 
     $socketPath = rtorrentScgiSocketPath($argv[1]);
@@ -25,8 +24,7 @@ function pmssRtorrentThrottleGetCli(array $argv, ?callable $scgiCall = null): in
     foreach (['upload' => 'throttle.global_up.max_rate', 'download' => 'throttle.global_down.max_rate'] as $direction => $method) {
         $rate = $scgiCall($socketPath, $method);
         if (!is_int($rate) || $rate < 0) {
-            fwrite(STDERR, "n/a: rTorrent SCGI rate unavailable\n");
-            return 2;
+            return pmssCliReturnWithStderr("n/a: rTorrent SCGI rate unavailable\n", 2);
         }
         $rates[$direction] = $rate;
     }

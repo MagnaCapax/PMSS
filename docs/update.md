@@ -4,6 +4,13 @@ PMSS updates in two deliberate phases. `scripts/update.php` handles snapshot
 selection and staging while `scripts/util/update-step2.php` performs the
 heavyweight configuration work after the full repository is in place.
 
+The standalone bootstrap shares archive download/extraction and atomic directory
+publication internally (ADR 0158). Its ordered scripts/etc/var dispatcher
+validates each tree before dry-run reporting or publication. The etc phase
+retains skeleton clearing, installed seedbox-config merging and the remaining
+config overlay; permission repair follows all three trees. Characterization
+tests lock the command sequence, exit boundaries and dry-run output.
+
 ## Phase 1 – `scripts/update.php`
 
 Responsibilities:

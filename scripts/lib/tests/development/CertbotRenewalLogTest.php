@@ -65,6 +65,19 @@ class CertbotRenewalLogTest extends TestCase
 
         $summary = \pmssCertbotRenewalSummaryFromLog($log);
         $this->assertEquals('fail', $summary['status']);
+        $this->assertSame('ok', \pmssCertbotRenewalSummaryFromLog($log."\nAll renewals succeeded.\ntrailing noise")['status']);
+        $this->assertSame('noop', \pmssCertbotRenewalSummaryFromLog($log."\nNo renewals were attempted.\n")['status']);
+    }
+
+    public function testFileSummaryKeepsWholeAndTailReadResults(): void
+    {
+        $path = $this->pmssMakeTempDir('pmss-renewal-log-').'/renewal.log';
+        $log = "All renewals failed.\nold detail\nNo renewals were attempted.\n";
+        file_put_contents($path, $log);
+        foreach ([strlen($log) + 1, strlen($log), strlen($log) - 1, 30, 1] as $maxBytes) {
+            $expected = \pmssCertbotRenewalSummaryFromLog(substr($log, -$maxBytes));
+            $this->assertSame($expected, \pmssCertbotRenewalSummaryFromFile($path, $maxBytes));
+        }
     }
 
     public function testUnknownWhenNoMarkersExist(): void

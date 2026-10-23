@@ -59,8 +59,7 @@ if ($bfqActive === null) {
     }
 }
 if (!$bfqActive) {
-    fwrite(STDERR, "FATAL: BFQ is not the active elevator on the device backing /home; per-user weights would be inert\n");
-    exit(2);
+    exit(pmssCliReturnWithStderr("FATAL: BFQ is not the active elevator on the device backing /home; per-user weights would be inert\n", 2));
 }
 
 function pmssBfqUserBonusPercentRead(string $user): int

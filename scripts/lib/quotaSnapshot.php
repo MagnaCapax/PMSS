@@ -34,11 +34,8 @@ function pmssQuotaSnapshotNormalizeHumanReadableOutput(string $content): string
         return $content;
     }
 
-    $normalized = implode(PHP_EOL, array_map('pmssQuotaSnapshotNormalizeHumanReadableLine', $lines));
-
-    return ($content !== '' && substr($content, -1) === "\n" && substr($normalized, -1) !== "\n")
-        ? $normalized.PHP_EOL
-        : $normalized;
+    // The final empty split field already preserves each trailing newline.
+    return implode(PHP_EOL, array_map('pmssQuotaSnapshotNormalizeHumanReadableLine', $lines));
 }
 
 /**

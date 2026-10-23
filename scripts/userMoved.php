@@ -13,8 +13,7 @@ try {
         throw new RuntimeException('User does not exist or is not a customer account');
     }
 } catch (Exception $error) {
-    fwrite(STDERR, $error->getMessage()."\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr($error->getMessage()."\n"));
 }
 
 exit(pmssUserMovedApply($username, $until, new UserConfigStore()));

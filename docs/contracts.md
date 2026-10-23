@@ -117,6 +117,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssCliReturnWithStderr(string $message, int $exitCode = 1): int` writes the
+  message verbatim to stderr and returns the supplied code. CLI failure paths
+  return its result or pass it to `exit()`; it never adds a newline, writes to
+  stdout, or terminates execution itself.
+
 - `pmssFileWriteComplete()` returns `false` for NUL-containing paths before invoking a writer; valid paths retain complete-byte write semantics.
 - `pmssReadRegularFileContentsVerified()` returns `null` for a `PHP_INT_MAX` byte limit, whose one-byte overread would overflow the stream length; valid bounded reads retain their content and metadata contract.
 

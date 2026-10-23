@@ -6,8 +6,7 @@ require_once __DIR__.'/../lib/user/toggleApp.php';
 try {
     $catalog = pmssToggleAppCatalogRead();
 } catch (RuntimeException $error) {
-    fwrite(STDERR, $error->getMessage()."\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr($error->getMessage()."\n"));
 }
 $pmssCheckToggleAppsLock = pmssCronLockAcquire('checkToggleApps', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
 try {
@@ -23,6 +22,5 @@ try {
             });
     }
 } catch (RuntimeException $error) {
-    fwrite(STDERR, $error->getMessage()."\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr($error->getMessage()."\n"));
 }

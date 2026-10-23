@@ -643,16 +643,8 @@ function fetchSnapshot(array $spec, string $tmp): string
 {
     if ($spec['type'] === 'release') {
         $tag = $spec['pin'] !== '' ? $spec['pin'] : resolveLatestRelease();
-        $tar = $tmp.'/source.tgz';
         $url = 'https://api.github.com/repos/MagnaCapax/PMSS/tarball/'.rawurlencode($tag);
-        $cmd = sprintf(
-            'curl -sfL -A %s %s -o %s',
-            escapeshellarg(CURL_UA),
-            escapeshellarg($url),
-            escapeshellarg($tar)
-        );
-        pmssRunBootstrapCommand($cmd, EXIT_FETCH);
-        pmssRunBootstrapCommand('tar -xzf '.escapeshellarg($tar).' -C '.escapeshellarg($tmp).' --strip-components=1', EXIT_FETCH);
+        pmssFetchSnapshotArchive($url, $tmp);
         return 'release:'.$tag;
     }
 
@@ -676,7 +668,12 @@ function fetchSnapshot(array $spec, string $tmp): string
             fatal('git clone failed and a pinned spec requires git history: '.$spec['branch'].'@{'.$spec['pin'].'}', EXIT_FETCH);
         }
         logmsg('[WARN] git clone failed; falling back to codeload branch tarball');
-        pmssFetchBranchTarball($spec['repo'], $spec['branch'], $tmp);
+        $url = pmssCodeloadTarballUrl($spec['repo'], $spec['branch']);
+        if ($url === null) {
+            fatal('Cannot derive codeload tarball URL from repo: '.$spec['repo'], EXIT_FETCH);
+        }
+        // Codeload has a known intermittent HTTP/2 400 in some CI environments.
+        pmssFetchSnapshotArchive($url, $tmp, true);
         return pmssBuildVersionSpec($spec);
     }
 
@@ -705,13 +702,7 @@ function fetchSnapshot(array $spec, string $tmp): string
     return pmssBuildVersionSpec($spec);
 }
 
-/**
- * Fetch a branch tip as a tarball from GitHub's codeload CDN and extract it into
- * `$tmp`. Fallback for fetchSnapshot() when `git clone` fails (e.g. GitHub blocking
- * git-protocol from a flagged source prefix) — codeload is a separate endpoint not
- * subject to that git-upload-pack block. Derives the codeload URL from an
- * `https://github.com/<owner>/<repo>[.git]` repo URL. Fatal on failure.
- */
+/** Derive the GitHub codeload branch endpoint; non-GitHub repositories cannot fall back. */
 function pmssCodeloadTarballUrl(string $repo, string $branch): ?string
 {
     if (!preg_match('#github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#', $repo, $m)) {
@@ -720,16 +711,12 @@ function pmssCodeloadTarballUrl(string $repo, string $branch): ?string
     return 'https://codeload.github.com/'.$m[1].'/tar.gz/refs/heads/'.rawurlencode($branch);
 }
 
-function pmssFetchBranchTarball(string $repo, string $branch, string $tmp): void
+/** Download and extract either archive transport through the same fatal boundary. */
+function pmssFetchSnapshotArchive(string $url, string $tmp, bool $http11 = false): void
 {
-    $url = pmssCodeloadTarballUrl($repo, $branch);
-    if ($url === null) {
-        fatal('Cannot derive codeload tarball URL from repo: '.$repo, EXIT_FETCH);
-    }
     $tar = $tmp.'/source.tgz';
-    // --http1.1: codeload has a known intermittent HTTP/2 400 in some CI environments.
     $cmd = sprintf(
-        'curl -sfL --http1.1 -A %s %s -o %s',
+        'curl -sfL '.($http11 ? '--http1.1 ' : '').'-A %s %s -o %s',
         escapeshellarg(CURL_UA),
         escapeshellarg($url),
         escapeshellarg($tar)
@@ -1453,32 +1440,44 @@ function directoryHasContent(string $path): bool
     return false;
 }
 
-// Gate missing/dry-run staging before tree-specific work.
-function pmssStageSnapshotTreeIfPresent(string $snapshotRoot, string $source, string $tree, bool $dryRun, string $dryRunMessage, callable $stageTree): void
+/** Validate a tree before dispatch, including during dry runs; warn once when absent or empty. */
+function pmssSnapshotTreePresent(string $snapshotRoot, string $tree): bool
 {
-    if (!file_exists($source) && !is_link($source)) {
-        logmsg("[WARN] Snapshot {$tree} tree missing or empty, skipping copy");
-        logEvent('tree_skipped', ['tree' => $tree]);
-        return;
+    $source = $snapshotRoot.'/'.$tree;
+    if (file_exists($source) || is_link($source)) {
+        $error = null;
+        if (!pmssIsSafeSnapshotPath($snapshotRoot, $source, 'directory', $error)) {
+            fatal("Unsafe snapshot {$tree} tree: ".($error ?? $source), EXIT_COPY);
+        }
+        if (!pmssValidateSnapshotTreeLinks($snapshotRoot, $source, $error)) {
+            fatal("Unsafe snapshot {$tree} tree links: ".($error ?? $source), EXIT_COPY);
+        }
+        if (directoryHasContent($source)) return true;
     }
-    $error = null;
-    if (!pmssIsSafeSnapshotPath($snapshotRoot, $source, 'directory', $error)) {
-        fatal("Unsafe snapshot {$tree} tree: ".($error ?? $source), EXIT_COPY);
-    }
-    if (!pmssValidateSnapshotTreeLinks($snapshotRoot, $source, $error)) {
-        fatal("Unsafe snapshot {$tree} tree links: ".($error ?? $source), EXIT_COPY);
-    }
-    if (!directoryHasContent($source)) {
-        logmsg("[WARN] Snapshot {$tree} tree missing or empty, skipping copy");
-        logEvent('tree_skipped', ['tree' => $tree]);
-        return;
-    }
-    if ($dryRun) {
-        logmsg($dryRunMessage);
-        return;
-    }
+    logmsg("[WARN] Snapshot {$tree} tree missing or empty, skipping copy");
+    logEvent('tree_skipped', ['tree' => $tree]);
+    return false;
+}
 
-    $stageTree($source);
+/** Prepare and publish one atomic tree; config overlays retain the installed base. */
+function pmssStageSnapshotDirectory(string $source, string $target, string $runId, string $label, bool $overlay = false): void
+{
+    $staging = $target.'.pmss-staging-'.$runId;
+    $backup = $target.'.pmss-backup-'.$runId;
+    $pathLabel = basename($target);
+    pmssRemoveTreeBestEffort($staging, $pathLabel.' staging');
+    if ($overlay) {
+        if (is_dir($target)) {
+            pmssRunBootstrapCommand(sprintf('cp -a %s %s', escapeshellarg($target), escapeshellarg($staging)), EXIT_COPY);
+        } else {
+            pmssEnsureDirectory($staging);
+        }
+    }
+    if ($source !== '') {
+        pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($source), escapeshellarg($staging)), EXIT_COPY);
+    }
+    pmssAtomicSwapDirectory($target, $staging, $backup, $label);
+    pmssRemoveTreeBestEffort($backup, $pathLabel.' backup');
 }
 
 /**
@@ -1495,93 +1494,79 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 
     $runId = bin2hex(random_bytes(4));
 
-    // Stage /scripts with an atomic rename swap.
-    $scriptsSource = $tmp.'/scripts';
-    pmssStageSnapshotTreeIfPresent($tmp, $scriptsSource, 'scripts', $dryRun, "[DRY RUN] Would atomically swap /scripts from {$scriptsSource}", function (string $scriptsSource) use ($runId): void {
-        $scriptsStaging = '/scripts.pmss-staging-'.$runId;
-        $scriptsBackup  = '/scripts.pmss-backup-'.$runId;
-        pmssRemoveTreeBestEffort($scriptsStaging, 'scripts staging');
-        pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($scriptsSource), escapeshellarg($scriptsStaging)), EXIT_COPY);
-
-        pmssAtomicSwapDirectory('/scripts', $scriptsStaging, $scriptsBackup, 'scripts');
-        pmssRemoveTreeBestEffort($scriptsBackup, 'scripts backup');
-    });
-
-    // Stage /etc tree with atomic swap for /etc/seedbox and overlay for the rest.
-    $etcSource = $tmp.'/etc';
-    pmssStageSnapshotTreeIfPresent($tmp, $etcSource, 'etc', $dryRun, "[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from {$etcSource}", function (string $etcSource) use ($runId, $tmp): void {
-        $skelSource = $etcSource.'/skel';
-        if (file_exists($skelSource) || is_link($skelSource)) {
-            $error = null;
-            if (!pmssIsSafeSnapshotPath($tmp, $skelSource, 'directory', $error)) {
-                fatal("Unsafe snapshot skel tree: ".($error ?? $skelSource), EXIT_COPY);
-            }
+    // Preserve tree order and validate before either logging a dry run or publishing.
+    foreach ([
+        'scripts' => '[DRY RUN] Would atomically swap /scripts from ',
+        'etc' => '[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from ',
+        'var' => '[DRY RUN] Would copy var from ',
+    ] as $tree => $dryRunMessage) {
+        if (!pmssSnapshotTreePresent($tmp, $tree)) continue;
+        $source = $tmp.'/'.$tree;
+        if ($dryRun) {
+            logmsg($dryRunMessage.$source);
+        } elseif ($tree === 'scripts') {
+            pmssStageSnapshotDirectory($source, '/scripts', $runId, 'scripts');
+        } elseif ($tree === 'etc') {
+            pmssStageSnapshotEtc($tmp, $source, $runId);
+        } else {
+            pmssRunBootstrapCommand('cp -a '.escapeshellarg($source).' /', EXIT_COPY);
         }
-        if (is_dir($skelSource) && is_dir('/etc/skel')) {
-            $error = null;
-            if (!pmssClearDirectoryContents('/etc/skel', 'skeleton tree', $error)) {
-                fatal($error ?? 'Unable to clear skeleton tree: /etc/skel', EXIT_COPY);
-            }
-        }
-
-        // Atomic swap for /etc/seedbox
-        $seedboxSource  = $etcSource.'/seedbox';
-        $seedboxStaging = '/etc/seedbox.pmss-staging-'.$runId;
-        $seedboxBackup  = '/etc/seedbox.pmss-backup-'.$runId;
-        $haveSeedboxSnapshot = false;
-        if (file_exists($seedboxSource) || is_link($seedboxSource)) {
-            $error = null;
-            if (!pmssIsSafeSnapshotPath($tmp, $seedboxSource, 'directory', $error)) {
-                fatal("Unsafe snapshot seedbox tree: ".($error ?? $seedboxSource), EXIT_COPY);
-            }
-            $haveSeedboxSnapshot = directoryHasContent($seedboxSource);
-        }
-        if ($haveSeedboxSnapshot || is_dir('/etc/seedbox')) {
-            pmssRemoveTreeBestEffort($seedboxStaging, 'seedbox staging');
-            if (is_dir('/etc/seedbox')) {
-                pmssRunBootstrapCommand(sprintf('cp -a %s %s', escapeshellarg('/etc/seedbox'), escapeshellarg($seedboxStaging)), EXIT_COPY);
-            } else {
-                pmssEnsureDirectory($seedboxStaging);
-            }
-            if ($haveSeedboxSnapshot) {
-                pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($seedboxSource), escapeshellarg($seedboxStaging)), EXIT_COPY);
-            }
-            pmssAtomicSwapDirectory('/etc/seedbox', $seedboxStaging, $seedboxBackup, 'seedbox config');
-            pmssRemoveTreeBestEffort($seedboxBackup, 'seedbox backup');
-        }
-
-        // Overlay remaining /etc content (excluding seedbox) to preserve local edits.
-        $entries = @scandir($etcSource);
-        if (!is_array($entries)) {
-            fatal("Unable to read snapshot etc tree: {$etcSource}".pmssLastFilesystemError(), EXIT_COPY);
-        }
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..' || $entry === 'seedbox') {
-                continue;
-            }
-            $path = $etcSource.'/'.$entry;
-            $error = null;
-            if (!pmssIsSafeSnapshotPath($tmp, $path, 'entry', $error)) {
-                fatal("Unsafe snapshot etc entry: ".($error ?? $path), EXIT_COPY);
-            }
-            pmssRunBootstrapCommand('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
-        }
-    });
-
-    // Stage /var as before.
-    $varSource = $tmp.'/var';
-    pmssStageSnapshotTreeIfPresent($tmp, $varSource, 'var', $dryRun, "[DRY RUN] Would copy var from {$varSource}", function (string $varSource): void {
-        pmssRunBootstrapCommand('cp -a '.escapeshellarg($varSource).' /', EXIT_COPY);
-    });
-
-    if ($dryRun) {
-        return;
     }
 
+    if ($dryRun) return;
     pmssRunBootstrapCommand('chmod -R o-rwx /scripts /root /etc/skel /etc/seedbox', EXIT_COPY);
     pmssRunBootstrapCommand('find /scripts -type f -name "*.php" -exec chmod 0750 {} +', EXIT_COPY);
     pmssRunBootstrapCommand('chmod 0750 /scripts/update.php', EXIT_COPY);
     flattenScriptsLayout();
+}
+
+/** Clear delivered skeleton files, merge seedbox config, then overlay other etc entries. */
+function pmssStageSnapshotEtc(string $tmp, string $etcSource, string $runId): void
+{
+    $skelSource = $etcSource.'/skel';
+    if (file_exists($skelSource) || is_link($skelSource)) {
+        $error = null;
+        if (!pmssIsSafeSnapshotPath($tmp, $skelSource, 'directory', $error)) {
+            fatal("Unsafe snapshot skel tree: ".($error ?? $skelSource), EXIT_COPY);
+        }
+    }
+    if (is_dir($skelSource) && is_dir('/etc/skel')) {
+        $error = null;
+        if (!pmssClearDirectoryContents('/etc/skel', 'skeleton tree', $error)) {
+            fatal($error ?? 'Unable to clear skeleton tree: /etc/skel', EXIT_COPY);
+        }
+    }
+
+    // Atomic swap for /etc/seedbox
+    $seedboxSource  = $etcSource.'/seedbox';
+    $haveSeedboxSnapshot = false;
+    if (file_exists($seedboxSource) || is_link($seedboxSource)) {
+        $error = null;
+        if (!pmssIsSafeSnapshotPath($tmp, $seedboxSource, 'directory', $error)) {
+            fatal("Unsafe snapshot seedbox tree: ".($error ?? $seedboxSource), EXIT_COPY);
+        }
+        $haveSeedboxSnapshot = directoryHasContent($seedboxSource);
+    }
+    if ($haveSeedboxSnapshot || is_dir('/etc/seedbox')) {
+        pmssStageSnapshotDirectory($haveSeedboxSnapshot ? $seedboxSource : '', '/etc/seedbox', $runId, 'seedbox config', true);
+    }
+
+    // Overlay remaining /etc content (excluding seedbox) to preserve local edits.
+    $entries = @scandir($etcSource);
+    if (!is_array($entries)) {
+        fatal("Unable to read snapshot etc tree: {$etcSource}".pmssLastFilesystemError(), EXIT_COPY);
+    }
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..' || $entry === 'seedbox') {
+            continue;
+        }
+        $path = $etcSource.'/'.$entry;
+        $error = null;
+        if (!pmssIsSafeSnapshotPath($tmp, $path, 'entry', $error)) {
+            fatal("Unsafe snapshot etc entry: ".($error ?? $path), EXIT_COPY);
+        }
+        pmssRunBootstrapCommand('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
+    }
 }
 
 function flattenScriptsLayout(): void

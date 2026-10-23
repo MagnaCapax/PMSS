@@ -79,13 +79,11 @@ function pmssRequireSafeRecreateUserPath(string $path, string $label): void
     // Shell copy and move steps may have changed a path since its last PHP check.
     clearstatcache(true, $path);
     if (is_link($path)) {
-        fwrite(STDERR, "Refusing to operate on symlinked {$label} path: {$path}\n");
-        exit(1);
+        exit(pmssCliReturnWithStderr("Refusing to operate on symlinked {$label} path: {$path}\n"));
     }
 
     if (file_exists($path) && !is_dir($path)) {
-        fwrite(STDERR, "Refusing to operate on non-directory {$label} path: {$path}\n");
-        exit(1);
+        exit(pmssCliReturnWithStderr("Refusing to operate on non-directory {$label} path: {$path}\n"));
     }
 }
 
@@ -100,8 +98,7 @@ $homeExists = is_dir($homeDir);
 if ($homeExists) {
     $realHome = realpath($homeDir);
     if ($realHome === false || $realHome !== $homeDir) {
-        fwrite(STDERR, "Refusing to operate on unexpected home path: {$realHome}\n");
-        exit(1);
+        exit(pmssCliReturnWithStderr("Refusing to operate on unexpected home path: {$realHome}\n"));
     }
 }
 
@@ -112,15 +109,13 @@ $runtimeWriteDir = $portDir === '' ? $portDir : (is_dir($portDir) ? $portDir : d
 try {
     pmssRecreateRequireWritableDirectories(['/home', $runtimeWriteDir, '/etc']);
 } catch (RuntimeException $error) {
-    fwrite(STDERR, $error->getMessage()."\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr($error->getMessage()."\n"));
 }
 
 // A second rebuild of the same account must wait until this one has finished.
 $recreateLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-userRecreate-'.$userName.'.lock'), true);
 if ($recreateLock === false) {
-    fwrite(STDERR, "Rebuild already running or lock unavailable for {$userName}\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Rebuild already running or lock unavailable for {$userName}\n"));
 }
 
 // Handle a leftover backup-<user> from a PRIOR rebuild. Policy (2026-07-23): the backup
@@ -141,8 +136,7 @@ if (file_exists($backupDir)) {
             // flag on verified inodes before removal or it fails "Operation not permitted" (cf. terminateUser #176,
             // userTransfer #283). GH PMSS#725. Failing here is fail-safe (before rebuild — live account untouched).
             if (!pmssRecreatePurgeSupersededDirectory($supersededBackup)) {
-                fwrite(STDERR, "Unable to reclaim superseded backup before rebuild: {$supersededBackup}\n");
-                exit(1);
+                exit(pmssCliReturnWithStderr("Unable to reclaim superseded backup before rebuild: {$supersededBackup}\n"));
             }
         }
         echo "[*] Setting aside prior backup {$backupDir} -> {$supersededBackup}\n";
@@ -170,8 +164,7 @@ if ($homeExists) {
 pmssRunOrExit('cp -Rp /etc/skel ' . escapeshellarg($homeDir));
 pmssRequireSafeRecreateUserPath($homeDir, 'home');
 if (!is_dir($homeDir)) {
-    fwrite(STDERR, "Validation failed: homeDir missing after skeleton copy\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Validation failed: homeDir missing after skeleton copy\n"));
 }
 // The rebuilt home no longer has Pikkumies; let the next staged update retry it.
 if (!pmssPikkumiesPreinstallStateClear($userName)) {
@@ -197,8 +190,7 @@ try {
         echo "[i] Left in backup: {$path}\n";
     }
 } catch (RuntimeException $error) {
-    fwrite(STDERR, $error->getMessage()."\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr($error->getMessage()."\n"));
 }
 
 // Only the top-level handoff makes the restored tree reachable by the account.
@@ -224,12 +216,10 @@ pmssRun('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 clearstatcache(true, $homeDir);
 $stat = @stat($homeDir);
 if (!is_array($stat)) {
-    fwrite(STDERR, "Validation failed: unable to stat homeDir\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Validation failed: unable to stat homeDir\n"));
 }
 if ($stat['uid'] !== $uid || $stat['gid'] !== $gid) {
-    fwrite(STDERR, "Validation failed: homeDir ownership mismatch\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Validation failed: homeDir ownership mismatch\n"));
 }
 
 /* ===== 10. Password ===== */
@@ -246,8 +236,7 @@ if (!pmssRecreateCredentialPathIsSafe($credentialPath)) {
     $passwordRc = pmssCredentialProcessRun($pwCommand, $passwordInput);
 }
 if ($passwordRc !== 0) {
-    fwrite(STDERR, "Password update failed (rc={$passwordRc}) for {$userName}\n");
-    exit($passwordRc);
+    exit(pmssCliReturnWithStderr("Password update failed (rc={$passwordRc}) for {$userName}\n", $passwordRc));
 }
 
 if ($homeExists) {

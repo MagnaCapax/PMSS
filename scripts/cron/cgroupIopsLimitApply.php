@@ -94,8 +94,7 @@ function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $
 $homeDevice = pmssCgroupPolicyMountSourceResolve('/home');
 $majMin = $homeDevice !== '' ? pmssCgroupPolicyDeviceMajorMinorResolve($homeDevice) : null;
 if ($majMin === null) {
-    fwrite(STDERR, "FATAL: unable to resolve /home major:minor\n");
-    exit(2);
+    exit(pmssCliReturnWithStderr("FATAL: unable to resolve /home major:minor\n", 2));
 }
 
 openlog('pmss-iops', LOG_PID, LOG_DAEMON);

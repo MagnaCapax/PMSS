@@ -200,8 +200,8 @@ function pmssConfigLineColumns(string $line, int $minColumns = 0, array $comment
 /** Yield accepted column rows lazily, preserving source keys and caller-owned validation. */
 function pmssConfigRows(array $lines, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): \Generator
 {
-    foreach (pmssConfigLines($lines, $commentPrefixes) as $index => $line) {
-        if (($columns = pmssConfigLineColumns($line, $minColumns, [], $limit)) !== []) {
+    foreach ($lines as $index => $line) {
+        if (($columns = pmssConfigLineColumns((string) $line, $minColumns, $commentPrefixes, $limit)) !== []) {
             yield $index => $columns;
         }
     }

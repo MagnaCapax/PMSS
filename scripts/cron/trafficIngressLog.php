@@ -22,8 +22,7 @@ $stateDir = '/var/run/pmss/trafficIngress';
 $linkSpeed = is_numeric($linkSpeed ?? null) ? (float) $linkSpeed : null;
 
 if (!pmssEnsureSafeDir($logDir, 0755) || !pmssEnsureSafeDir($stateDir, 0700)) {
-    fwrite(STDERR, "Failed to prepare ingress traffic directories.\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Failed to prepare ingress traffic directories.\n"));
 }
 
 $userUids = pmssResourceLogManagedUserUids();

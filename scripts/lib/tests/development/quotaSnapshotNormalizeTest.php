@@ -52,21 +52,14 @@ class QuotaSnapshotNormalizeTest extends TestCase
 
     public function testNormalizePreservesTrailingNewline(): void
     {
-        $content = implode("\n", array(
-            'Disk quotas for user alice (uid 1000):',
-            '     Filesystem   space   quota   limit   grace   files   quota   limit   grace',
-            '       /dev/md4      1      2      3            0       0       0',
-            '',
-        ));
-
-        $this->assertEquals(
-            implode("\n", array(
-                'Disk quotas for user alice (uid 1000):',
-                '     Filesystem   space   quota   limit   grace   files   quota   limit   grace',
-                '       /dev/md4 1K 2K 3K 0 0 0',
-                '',
-            )),
-            \pmssQuotaSnapshotNormalizeHumanReadableOutput($content)
-        );
+        $header = "Disk quotas for user alice (uid 1000):\n     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n";
+        $input = $header.'       /dev/md4      1      2      3            0       0       0';
+        $expected = $header.'       /dev/md4 1K 2K 3K 0 0 0';
+        foreach (['', "\n", "\n\n", "\r\n", "\r\n\r\n"] as $ending) {
+            $this->assertSame($expected.str_replace("\r\n", PHP_EOL, $ending), \pmssQuotaSnapshotNormalizeHumanReadableOutput($input.$ending));
+        }
+        foreach (['', "\n", "\n\n", "\r\n", "\r\n\r\n"] as $blank) {
+            $this->assertSame(str_replace("\r\n", PHP_EOL, $blank), \pmssQuotaSnapshotNormalizeHumanReadableOutput($blank));
+        }
     }
 }
