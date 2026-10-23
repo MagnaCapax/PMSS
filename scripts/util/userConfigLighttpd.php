@@ -78,11 +78,15 @@ function pmssUserConfigLighttpdMain(array $argv): int
         }
     }
 
+    $exitCode = 0;
     foreach ($users as $thisUser) {
-        pmssUserConfigLighttpdConfigureUser($thisUser, $portsDirectory, $template, $deflateEnabled, $policyDefaults);
+        // Finish the selection, but let callers retry any incomplete account.
+        if (!pmssUserConfigLighttpdConfigureUser($thisUser, $portsDirectory, $template, $deflateEnabled, $policyDefaults)) {
+            $exitCode = 1;
+        }
     }
 
-    return 0;
+    return $exitCode;
 }
 
 pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserConfigLighttpdMain');

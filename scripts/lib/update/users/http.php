@@ -22,7 +22,11 @@ function pmssUserConfigureHttp(array $ctx): void
     $userEsc = $ctx['user_esc'];
     $userLog = static function (string $message) use ($user): void { pmssUserLog($user, $message); };
 
-    runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
+    $rc = runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
+    // userMaintenance catches this before marking the account refreshed.
+    if ($rc !== 0) {
+        throw new RuntimeException('lighttpd configuration refresh failed (rc='.$rc.')');
+    }
 
     // Refresh the PMSS-managed qBittorrent safety defaults on every pass.
     // This includes reverse-proxy compatibility keys such as HostHeaderValidation.

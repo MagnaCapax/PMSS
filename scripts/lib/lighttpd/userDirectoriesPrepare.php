@@ -68,8 +68,10 @@ function pmssLighttpdConfigNewerThanProcess(string $homeDir, string $configPath,
     return $configMtime !== null && $configMtime > $processStartTime;
 }
 
-function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool
+/** Prepare runtime paths; report the failed prerequisite without repairing refused links. */
+function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled, ?string &$failureReason = null): bool
 {
+    $failureReason = 'Invalid username or missing/symlinked home';
     if (!pmssValidateUsername($user) || !is_dir($homeDir) || is_link($homeDir)) {
         return false;
     }
@@ -86,24 +88,32 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
                 && pmssPathSegmentsAreSafe(dirname($path), false, false)) {
                 continue;
             }
+            $failureReason = 'Refusing unexpected symlink at www/public';
             return false;
         }
+        $failureReason = 'Unable to prepare directory '.$directory;
         if (!pmssEnsureUserHomeDir($user, $homeDir, $directory, $mode)) {
             return false;
         }
     }
 
     $customFile = $homeDir.'/.lighttpd/custom';
+    $failureReason = 'Refusing unsafe .lighttpd/custom path';
     if (!pmssLockFilePathIsSafe($customFile)) {
         return false;
     }
 
     if (!file_exists($customFile)) {
-        return pmssReplaceAccountFile($user, $homeDir, $customFile, '', 0640);
+        $failureReason = 'Unable to create .lighttpd/custom';
+        if (!pmssReplaceAccountFile($user, $homeDir, $customFile, '', 0640)) {
+            return false;
+        }
+    } else {
+        // Converge legacy file modes without rewriting customer configuration.
+        pmssAccountFileApplyMetadata($user, $homeDir, $customFile, 0640);
     }
 
-    // Converge legacy file modes without rewriting customer configuration.
-    pmssAccountFileApplyMetadata($user, $homeDir, $customFile, 0640);
+    $failureReason = null;
     return true;
 }
 

@@ -9,6 +9,13 @@ require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdateHttpTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        // These fixtures exercise HTTP maintenance after a successful CLI step.
+        // Keep the installed /scripts command out of the hermetic test path.
+        $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1']);
+    }
+
     public function testConfigureHttpRestoresQbittorrentWebUiProtections(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-qbittorrent-');

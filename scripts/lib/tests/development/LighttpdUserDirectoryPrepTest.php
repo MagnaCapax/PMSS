@@ -110,6 +110,24 @@ class LighttpdUserDirectoryPrepTest extends TestCase
         $this->assertSame('../.local/share/pmss/public', readlink($home.'/www/public'));
     }
 
+    public function testRefusedPublicLinksReportTheReasonWithoutChangingTargets(): void
+    {
+        foreach (['unexpected', 'dangling', 'expected-missing'] as $kind) {
+            $home = $this->pmssEnsureUserWebHome($this->base, $kind);
+            $this->pmssEnsureDir($home.'/.lighttpd/upload');
+            $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
+            $target = $kind === 'expected-missing' ? '../.local/share/pmss/public' : $this->base.'/'.$kind.'-target';
+            if ($kind === 'unexpected') mkdir($target, 0700);
+            symlink($target, $home.'/www/public');
+            $reason = null;
+            $this->assertFalse(\pmssPrepareLighttpdUserDirectories('testuser', $home, false, $reason));
+            $this->assertSame('Refusing unexpected symlink at www/public', $reason);
+            $this->assertSame($target, readlink($home.'/www/public'));
+            if ($kind === 'unexpected') $this->assertSame(['.', '..'], scandir($target));
+            else $this->assertFalse(file_exists($home.'/www/public'));
+        }
+    }
+
     /** The host account name may exceed PMSS's production username limit. */
     private function prepareAsCurrentAccount(string $home, bool $deflate): bool
     {

@@ -44,16 +44,16 @@ function pmssUserConfigLighttpdConfigureUser(
     $template,
     bool $deflateEnabled,
     array $policyDefaults
-): void
+): bool
 {
     if (!pmssValidateUsername($thisUser)) {
         fwrite(STDERR, "Skipping invalid username: ".substr($thisUser, 0, 20)."\n");
-        return;
+        return false;
     }
 
     $homeDir = "/home/{$thisUser}";
     if (!pmssShouldConfigureLighttpdForHome($homeDir)) {
-        return;
+        return false;
     }
 
     $portFile = "{$portsDirectory}/lighttpd-{$thisUser}";
@@ -61,15 +61,17 @@ function pmssUserConfigLighttpdConfigureUser(
         ? pmssReadRegularFileInt($portFile)
         : (int) trim((string) shell_exec('/scripts/util/portManager.php assign '.escapeshellarg($thisUser).' lighttpd'));
 
-    // Prepare directories and defaults.
-    if (!pmssPrepareLighttpdUserDirectories($thisUser, $homeDir, $deflateEnabled)) {
-        fwrite(STDERR, "[user:{$thisUser}] lighttpd directory preparation failed; skipping\n");
-        return;
+    // Runtime paths are prerequisites for auxiliary writes, not template rendering.
+    $preparationReason = null;
+    $directoriesReady = pmssPrepareLighttpdUserDirectories($thisUser, $homeDir, $deflateEnabled, $preparationReason);
+    if (!$directoriesReady) {
+        fwrite(STDERR, "[user:{$thisUser}] lighttpd directory preparation failed: {$preparationReason}; refreshing main config only\n");
+    } else {
+        pmssEnsureWebdavLockDatabase($thisUser, $homeDir);
     }
-    pmssEnsureWebdavLockDatabase($thisUser, $homeDir);
     $customDir = $homeDir.'/.lighttpd/custom.d';
 
-    foreach (pmssMediaStackPortsEnsure($thisUser, $homeDir) as $app => $mediaStackPort) {
+    foreach ($directoriesReady ? pmssMediaStackPortsEnsure($thisUser, $homeDir) : [] as $app => $mediaStackPort) {
         if ($mediaStackPort === 0) {
             fwrite(STDERR, "[user:{$thisUser}] Failed to reserve {$app} media-stack port\n");
         }
@@ -82,42 +84,44 @@ function pmssUserConfigLighttpdConfigureUser(
     $rclonePort = $proxyPorts['rclone'];
     // A running labelled Docker client owns the existing panel route until it stops.
     $qbittorrentPort = pmssLighttpdDockerClientPort($thisUser, 'qbittorrent') ?? $proxyPorts['qbittorrent'];
-
-    // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
-    foreach ([
-        'rclone' => $rclonePort,
-        'qbittorrent' => $qbittorrentPort,
-    ] as $proxyName => $proxyPort) {
-        if (!pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
-            fwrite(STDERR, "[user:{$thisUser}] Skipping {$proxyName} proxy fragment; proxy port file is unsafe\n");
-            continue;
-        }
-        pmssLighttpdWriteManagedProxyFragment($proxyName, $thisUser, $proxyPort, "{$customDir}/pmss-{$proxyName}.conf");
-    }
-
-    // Optional Invidious proxy wiring: publish both public and private URLs
-    // only when the user or installer pins a local port explicitly.
-    $invidiousPort = pmssReadRegularFileInt($homeDir.'/.invidiousPort');
-    $invidiousConfPath = $customDir.'/pmss-invidious.conf';
-    if (pmssNetworkPortInRange($invidiousPort, 1024)) {
-        pmssLighttpdWriteManagedProxyFragment('invidious', $thisUser, $invidiousPort, $invidiousConfPath);
-    } elseif (is_file($invidiousConfPath) || is_link($invidiousConfPath)) {
-        exec(pmssBuildUserShellCommand($thisUser, 'rm -f -- '.escapeshellarg($invidiousConfPath)));
-    }
-
-    // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/
-    // so nginx stays a lightweight reverse proxy.
-    $delugeWebPort = pmssLighttpdDelugeWebPortResolve($thisUser, $homeDir);
-    if ($delugeWebPort !== null) {
-        pmssLighttpdWriteManagedProxyFragment('deluge', $thisUser, $delugeWebPort, $customDir.'/pmss-deluge.conf');
-    }
-
     $dockerTransmissionPort = pmssLighttpdDockerClientPort($thisUser, 'transmission');
-    $transmissionConfPath = $customDir.'/pmss-transmission.conf';
-    if ($dockerTransmissionPort !== null) {
-        pmssLighttpdWriteManagedProxyFragment('transmission', $thisUser, $dockerTransmissionPort, $transmissionConfPath);
-    } elseif (is_file($transmissionConfPath) || is_link($transmissionConfPath)) {
-        exec(pmssBuildUserShellCommand($thisUser, 'rm -f -- '.escapeshellarg($transmissionConfPath)));
+
+    if ($directoriesReady) {
+        // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
+        foreach ([
+            'rclone' => $rclonePort,
+            'qbittorrent' => $qbittorrentPort,
+        ] as $proxyName => $proxyPort) {
+            if (!pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
+                fwrite(STDERR, "[user:{$thisUser}] Skipping {$proxyName} proxy fragment; proxy port file is unsafe\n");
+                continue;
+            }
+            pmssLighttpdWriteManagedProxyFragment($proxyName, $thisUser, $proxyPort, "{$customDir}/pmss-{$proxyName}.conf");
+        }
+
+        // Optional Invidious proxy wiring: publish both public and private URLs
+        // only when the user or installer pins a local port explicitly.
+        $invidiousPort = pmssReadRegularFileInt($homeDir.'/.invidiousPort');
+        $invidiousConfPath = $customDir.'/pmss-invidious.conf';
+        if (pmssNetworkPortInRange($invidiousPort, 1024)) {
+            pmssLighttpdWriteManagedProxyFragment('invidious', $thisUser, $invidiousPort, $invidiousConfPath);
+        } elseif (is_file($invidiousConfPath) || is_link($invidiousConfPath)) {
+            exec(pmssBuildUserShellCommand($thisUser, 'rm -f -- '.escapeshellarg($invidiousConfPath)));
+        }
+
+        // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/
+        // so nginx stays a lightweight reverse proxy.
+        $delugeWebPort = pmssLighttpdDelugeWebPortResolve($thisUser, $homeDir);
+        if ($delugeWebPort !== null) {
+            pmssLighttpdWriteManagedProxyFragment('deluge', $thisUser, $delugeWebPort, $customDir.'/pmss-deluge.conf');
+        }
+
+        $transmissionConfPath = $customDir.'/pmss-transmission.conf';
+        if ($dockerTransmissionPort !== null) {
+            pmssLighttpdWriteManagedProxyFragment('transmission', $thisUser, $dockerTransmissionPort, $transmissionConfPath);
+        } elseif (is_file($transmissionConfPath) || is_link($transmissionConfPath)) {
+            exec(pmssBuildUserShellCommand($thisUser, 'rm -f -- '.escapeshellarg($transmissionConfPath)));
+        }
     }
 
     $props = pmssReadUserSlicePropertiesByUsername(
@@ -127,7 +131,7 @@ function pmssUserConfigLighttpdConfigureUser(
     $userConfig = pmssLighttpdUserConfigLoad($thisUser);
     $resources = pmssLighttpdResourcePlan($props, $policyDefaults, $userConfig);
     $panelSessionLoginEnabled = pmssUserPanelSessionLoginEnabledFromPayload($userConfig);
-    if ($panelSessionLoginEnabled && !pmssLighttpdPanelSessionGateDeploy($thisUser, $homeDir)) {
+    if ($directoriesReady && $panelSessionLoginEnabled && !pmssLighttpdPanelSessionGateDeploy($thisUser, $homeDir)) {
         fwrite(STDERR, "[user:{$thisUser}] panelSessionLogin enabled but Lua gate deployment failed; using Basic-only config\n");
     }
     $panelSessionLogin = pmssLighttpdPanelSessionLoginOptions($thisUser, $homeDir, $panelSessionLoginEnabled);
@@ -152,7 +156,12 @@ function pmssUserConfigLighttpdConfigureUser(
     // client configs (qBittorrent.conf/deluge web.conf), never this file.
     if (!pmssWriteUserFile($homeDir.'/.lighttpd.conf', $thisUserConfig, 'root', 0644)) {
         fwrite(STDERR, "[user:{$thisUser}] Failed to write .lighttpd.conf; skipping user\n");
-        return;
+        return false;
+    }
+
+    // Leave refused paths untouched and keep this account eligible for retry.
+    if (!$directoriesReady) {
+        return false;
     }
 
     $phpIniFailure = '';
@@ -161,7 +170,7 @@ function pmssUserConfigLighttpdConfigureUser(
             ? 'Refusing to operate on unsafe php.ini path'
             : ($phpIniFailure === 'seed' ? 'Failed to seed php.ini' : 'Failed to update php.ini');
         fwrite(STDERR, "[user:{$thisUser}] {$message}; skipping user\n");
-        return;
+        return false;
     }
 
     echo sprintf(
@@ -173,4 +182,5 @@ function pmssUserConfigLighttpdConfigureUser(
         $resources['children'],
         $resources['cpuQuotaPercent']
     );
+    return true;
 }
