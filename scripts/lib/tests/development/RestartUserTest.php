@@ -112,13 +112,13 @@ SH
         $locks = \pmssRestartUserLocksAcquire($user, $reason);
         $this->assertTrue(is_array($locks));
         try {
-            $priorFds = getenv(\PMSS_UPDATE_LOCK_FDS_ENV);
+            $previous = $this->pmssCaptureEnv([\PMSS_UPDATE_LOCK_FDS_ENV]);
             \pmssRestartUserLocksPrepareChildren($locks);
             $this->assertStringContainsString('>&-', \pmssLockChildClosePrefix());
             $this->assertSame(null, \pmssRestartUserLocksAcquire($user, $reason));
             $this->assertSame('restart already running', $reason);
         } finally {
-            $priorFds === false ? putenv(\PMSS_UPDATE_LOCK_FDS_ENV) : putenv(\PMSS_UPDATE_LOCK_FDS_ENV.'='.$priorFds);
+            $this->pmssRestoreEnvMap($previous);
             fclose($locks['restart']);
             fclose($locks['recreate']);
         }

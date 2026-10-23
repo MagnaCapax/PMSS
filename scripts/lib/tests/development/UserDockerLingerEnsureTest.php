@@ -29,7 +29,7 @@ class UserDockerLingerEnsureTest extends TestCase
 
     public function testUserDockerStartPathWiresLingerEnsureBeforeDaemonStart(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/user/docker/start.php');
         $this->assertStringContainsString('if (!is_dir($runtimeDir)) {', $src);
         $this->assertOrderedStrings([
             'pmssUserDockerLingerEnsureCommands($user, $uid)',
@@ -39,9 +39,9 @@ class UserDockerLingerEnsureTest extends TestCase
 
     public function testRootDockerStartUsesSliceAwareLauncherButSameUserPathStaysDirect(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/user/docker/start.php');
+        $src .= file_get_contents(dirname(__DIR__, 2).'/user/docker/command.php');
         $this->assertStringContainsAllStrings([
-            "require_once __DIR__.'/../lib/user/serviceLaunch.php';",
             'bool $placeInUserSlice = false',
             '$wrapper = pmssBuildUserServiceShellCommand($user, $cmd);',
             'userDockerRunAs($user, $envCmd, $userDockerStartTimeoutSec, $launchRc, true);',
@@ -55,7 +55,8 @@ class UserDockerLingerEnsureTest extends TestCase
 
     public function testUserDockerStopUsesRuntimeDirFallbackAndLivenessGate(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/user/docker/stop.php');
+        $src .= file_get_contents(dirname(__DIR__, 2).'/user/docker/cli.php');
         $this->assertStringContainsString('XDG_RUNTIME_DIR=%s systemctl --user %s docker.service', $src);
         $this->assertStringContainsString('$systemdAction = !$dockerEnabled ? \'disable --now\' : \'stop\';', $src);
         $this->assertStringContainsString('step=systemctl-stop rc=%d count=1', $src);
@@ -68,14 +69,14 @@ class UserDockerLingerEnsureTest extends TestCase
 
     public function testUserDockerStopSignalsDaemonBeforeNamespaceAndUsesLongerDeadlines(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/user/docker/stop.php');
         $this->assertOrderedStrings([
             "userDockerStopSignal(\$user, \$uid, \$stopPids['dockerd'], 15, 'dockerd-term')",
             'USER_DOCKER_DAEMON_WAIT_SECONDS',
             "userDockerStopSignal(\$user, \$uid, array_merge(\$stopPids['rootlesskit'], \$stopPids['wrapper']), 15, 'namespace-term')",
             'USER_DOCKER_STOP_DEADLINE_SECONDS',
             "userDockerStopSignal(\$user, \$uid, \$remainingPids, 9, 'remaining-kill')",
-        ], substr($src, strpos($src, '// STOP')), '', 'stop order: ');
+        ], substr($src, strpos($src, 'function userDockerStop(')), '', 'stop order: ');
         $this->assertStringContainsAllStrings([
             'USER_DOCKER_DAEMON_WAIT_SECONDS = 20',
             'USER_DOCKER_STOP_DEADLINE_SECONDS = 30',

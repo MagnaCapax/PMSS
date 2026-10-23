@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../runtime/environment.php';
 
 /** Resolve one trusted reconciliation directory without allowing an empty root. */
 function pmssCreateNginxConfigContextDir(array $ctx, string $key, string $default): string
@@ -74,9 +75,8 @@ function pmssCreateNginxConfigReconcileStaleUserFiles(string $user, array $ctx, 
 function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
 {
     $expected = [];
-    foreach ($users as $user) {
-        $user = trim((string) $user);
-        if ($user === '' || !pmssValidateUsername($user)) {
+    foreach (pmssConfigLines($users, []) as $user) {
+        if (!pmssValidateUsername($user)) {
             continue;
         }
         foreach (pmssCreateNginxConfigManagedUserPaths($user, $ctx) as $label => $path) {

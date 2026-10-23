@@ -31,8 +31,7 @@ function pmssStorageHealthSnapshotRaid(string $timestamp, string $mdstatPath = '
 function pmssStorageHealthRaidEntriesParse(string $mdstat, string $timestamp): array
 {
     $entries = [];
-    foreach (preg_split('/\r?\n/', $mdstat) as $line) {
-        $trimmed = trim($line);
+    foreach (pmssConfigLines(preg_split('/\r?\n/', $mdstat), []) as $trimmed) {
         if (preg_match('/^(md\\d+)\\s*:\\s*(\\w+)\\s+(raid\\d)\\s+(.*)$/', $trimmed, $matches)) {
             $entries[] = [
                 'timestamp' => $timestamp,
@@ -49,7 +48,7 @@ function pmssStorageHealthRaidEntriesParse(string $mdstat, string $timestamp): a
             if (preg_match('/\\[(\\d+)\\/(\\d+)\\]\\s*\\[([U_]+)\\]/', $entries[$last]['detail'], $detail) && (strpos($detail[3], '_') !== false || (int) $detail[1] !== (int) $detail[2])) {
                 $entries[$last]['flags'][] = 'degraded';
             }
-        } elseif (!empty($entries) && preg_match('/\b(check|resync|recovery|reshape)\b/', $line, $operation) === 1) {
+        } elseif (!empty($entries) && preg_match('/\b(check|resync|recovery|reshape)\b/', $trimmed, $operation) === 1) {
             $last = count($entries) - 1;
             $entries[$last]['flags'][] = 'rebuild_in_progress';
             $entries[$last]['operation'] = $operation[1];

@@ -90,11 +90,8 @@ function pmssSystemStatsCpuCountersFromRaw(?string $raw): array
     $parts = pmssConfigLineColumns((string) ($lines[0] ?? ''), 6, []);
     if ($parts === [] || array_shift($parts) !== 'cpu') return [];
 
-    foreach ($parts as $value) {
-        if (!pmssSystemStatsCounterIsValid($value)) return [];
-    }
-
-    return array_map('intval', $parts);
+    $counters = array_map('pmssUnsignedDecimalIntParse', $parts);
+    return in_array(null, $counters, true) ? [] : $counters;
 }
 
 /** Format CPU iowait percentage from two /proc/stat samples. */

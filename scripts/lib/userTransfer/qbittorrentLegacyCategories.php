@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/qtVariant.php';
+require_once __DIR__.'/../runtime/environment.php';
 
 /** Extract legacy Session\Categories entries from qBittorrent.conf content. */
 function pmssUserTransferQbittorrentLegacyCategoriesFromConfig(string $contents, array $cfg): array
@@ -32,11 +33,7 @@ function pmssUserTransferQbittorrentLegacyCategoriesFromConfig(string $contents,
 function pmssUserTransferQbittorrentConfigValue(string $contents, string $targetKey): ?string
 {
     $section = '';
-    foreach (preg_split('/\r?\n/', $contents) ?: [] as $line) {
-        $trimmed = trim((string) $line);
-        if ($trimmed === '' || $trimmed[0] === '#') {
-            continue;
-        }
+    foreach (pmssConfigLines(preg_split('/\r?\n/', $contents) ?: []) as $trimmed) {
         if ($trimmed[0] === '[' && substr($trimmed, -1) === ']') {
             $section = substr($trimmed, 1, -1);
             continue;

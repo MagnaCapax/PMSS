@@ -68,3 +68,7 @@ per-user samples come from the logs that already handle the cgroup mode.
 - `www-data` is part of the managed account list and gets a ring file as well.
 - Log timestamps are local time; a DST fall-back hour can hide one slot of user
   values (the node totals are unaffected).
+- Log-tail reads return the existing unavailable result (`null`) when file size,
+  seek, or read fails, and reject NUL-containing paths before filesystem calls.
+  Opened streams close even when those operations throw; the original exception
+  propagates. Successful tail selection and partial-line handling are unchanged.

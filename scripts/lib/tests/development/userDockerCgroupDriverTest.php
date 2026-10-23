@@ -10,51 +10,32 @@ class UserDockerCgroupDriverTest extends TestCase
     {
         $this->pmssAssertRepoFileContractCases([
             'etc/skel/.config/docker/daemon.json' => ['required' => ['"exec-opts"', '"native.cgroupdriver=cgroupfs"']],
-            'scripts/util/userDocker.php' => [
-                'required' => [
-                    "require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';",
-                    'function userDockerCgroupMode(): string',
-                    "pmssCgroupModeWithDefault('v1')",
-                    'pmssUserRootlessDockerConfigConverge($user, $home, $uid, $gid',
-                    'userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info[\'gid\']);',
-                    'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
-                    'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
-                    'unsafe_config_file',
-                    'function userDockerSafeLabel(string $value): string',
-                    'function userDockerAccountInfo(string $user, ?string &$reason = null): ?array',
-                    'pmssValidateUsername($user)',
-                    'pmssPasswdEntryPositiveUid($info) === null',
-                    '$info = userDockerAccountInfo($user, $accountReason);',
-                    '$safeUser = userDockerSafeLabel($user);',
-                    '$target = userDockerAccountInfo($user);',
-                    '$rc = 127;',
-                ],
-                'ordered' => [
-                    [
-                        'needles' => [
-                            '$user = $args[1];',
-                            '$info = userDockerAccountInfo($user, $accountReason);',
-                            '$uid = (int) $info[\'uid\'];',
-                            '$runtimeDir = "/run/user/{$uid}";',
-                        ],
-                        'missingPrefix' => 'missing userDocker CLI account guard: ',
-                        'orderPrefix' => 'userDocker must validate account before runtime paths: ',
-                    ],
-                    [
-                        'needles' => [
-                            'function userDockerRunAs(',
-                            'bool $placeInUserSlice = false',
-                            '$target = userDockerAccountInfo($user);',
-                            '$wrapper = pmssBuildUserShellCommand($user, $cmd);',
-                        ],
-                        'missingPrefix' => 'missing userDockerRunAs account guard: ',
-                        'orderPrefix' => 'userDockerRunAs must validate account before shell builder: ',
-                    ],
-                ],
+            'scripts/util/userDocker.php' => ['required' => ["require_once __DIR__.'/../lib/user/docker/cli.php';", 'exit(userDockerMain($argv));']],
+            'scripts/lib/user/docker/cli.php' => [
+                'required' => ["'../rootlessDockerConfig.php'", '$safeUser = pmssLogSafeLabel($user);'],
+                'ordered' => [[
+                    'needles' => ['$user = $args[1];', '$info = userDockerAccountInfo($user, $accountReason);', '$uid = (int) $info[\'uid\'];', '$runtimeDir = "/run/user/{$uid}";'],
+                    'missingPrefix' => 'missing userDocker CLI account guard: ',
+                    'orderPrefix' => 'userDocker must validate account before runtime paths: ',
+                ]],
             ],
+            'scripts/lib/user/docker/command.php' => [
+                'required' => ['function userDockerAccountInfo(string $user, ?string &$reason = null): ?array',
+                    'pmssValidateUsername($user)', 'pmssPasswdEntryPositiveUid($info) === null', '$rc = 127;'],
+                'ordered' => [[
+                    'needles' => ['function userDockerRunAs(', 'bool $placeInUserSlice = false', '$target = userDockerAccountInfo($user);', '$wrapper = pmssBuildUserShellCommand($user, $cmd);'],
+                    'missingPrefix' => 'missing userDockerRunAs account guard: ',
+                    'orderPrefix' => 'userDockerRunAs must validate account before shell builder: ',
+                ]],
+            ],
+            'scripts/lib/user/docker/start.php' => ['required' => [
+                "pmssCgroupModeWithDefault('v1')", 'pmssUserRootlessDockerConfigConverge($user, $home, $uid, $gid',
+                'userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info[\'gid\']);',
+                'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
+                'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker', 'unsafe_config_file',
+            ]],
         ]);
     }
-
     public function testSharedRootlessDockerConfigCreatesCgroupfsOnlyConfig(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');

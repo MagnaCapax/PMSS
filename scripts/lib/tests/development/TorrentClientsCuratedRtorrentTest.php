@@ -50,9 +50,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $entry['sha256'] = hash('sha256', $bytes);
         // Exercise the mechanism, not the catalog's current offer.
         $entry['disabled'] = false;
-        $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
-        putenv('PMSS_TORRENT_CLIENTS_STORE_ROOT='.$store);
-        try {
+        $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_STORE_ROOT' => $store], function () use ($entry, $root, $store, $bytes): void {
             $projection = $root.'/public/catalog.json';
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $projection));
             $this->assertSame([], \pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent'));
@@ -77,9 +75,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             unlink($binary);
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $projection));
             $this->assertSame([], \pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent'));
-        } finally {
-            putenv($oldRoot === false ? 'PMSS_TORRENT_CLIENTS_STORE_ROOT' : 'PMSS_TORRENT_CLIENTS_STORE_ROOT='.$oldRoot);
-        }
+        });
     }
 
     public function testSystemRepointAndRestartPreflightPreserveStoppedAccounts(): void
@@ -108,13 +104,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         // Mimic pgrep matching the 0.9.8 main thread; never inspect a live PID.
         file_put_contents($probe, "#!/bin/sh\ncase \"\$*\" in *'^rtorrent'*) printf '123\\n';; *) exit 1;; esac\n");
         chmod($probe, 0755);
-        $path = getenv('PATH');
-        putenv('PATH='.$root.':'.$path);
-        try {
+        $this->pmssWithEnv(['PATH' => $root.':'.getenv('PATH')], function (): void {
             $this->assertSame([123], \pmssUserWatchdogProcessPids('testuser', '^rtorrent'));
-        } finally {
-            putenv($path === false ? 'PATH' : 'PATH='.$path);
-        }
+        });
         $source = file_get_contents(dirname(__DIR__, 3).'/cron/checkRtorrent.php');
         $this->assertStringContainsString("pmssUserWatchdogProcessPids(\$user, '^rtorrent')", $source);
     }
@@ -156,13 +148,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             $row['disabled'] = false;
             $rows[] = $row;
         }
-        $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
-        putenv('PMSS_TORRENT_CLIENTS_STORE_ROOT='.$store);
-        try {
+        $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_STORE_ROOT' => $store], function () use ($rows, $projection): void {
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($rows, $projection));
-        } finally {
-            putenv($oldRoot === false ? 'PMSS_TORRENT_CLIENTS_STORE_ROOT' : 'PMSS_TORRENT_CLIENTS_STORE_ROOT='.$oldRoot);
-        }
+        });
         $home = $root.'/t';
         mkdir($home.'/bin/rtorrent', 0755, true);
         symlink($store.'/rtorrent/0.16.25', $home.'/bin/rtorrent/default');
@@ -216,13 +204,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             $row['isDefault'] = false;
             $rows[] = $row;
         }
-        $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
-        putenv('PMSS_TORRENT_CLIENTS_STORE_ROOT='.$store);
-        try {
+        $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_STORE_ROOT' => $store], function () use ($rows, $projection): void {
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($rows, $projection));
-        } finally {
-            putenv($oldRoot === false ? 'PMSS_TORRENT_CLIENTS_STORE_ROOT' : 'PMSS_TORRENT_CLIENTS_STORE_ROOT='.$oldRoot);
-        }
+        });
         // Every installed build is on disk; only the enabled one is offered.
         $this->assertSame(['0.9.8-stickz7.2'], array_keys(\pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent')));
         $home = $root.'/t';

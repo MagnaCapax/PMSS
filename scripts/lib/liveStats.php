@@ -48,10 +48,16 @@ function pmssLiveStatsNodeSample(array $prev, array $cur, int $now): ?array
 /** Last line of a regular, non-symlink file (reads only the tail). */
 function pmssLiveStatsLastLine(string $path): ?string
 {
-    if (is_link($path) || !is_file($path) || ($h = @fopen($path, 'rb')) === false) return null;
-    fseek($h, max(0, (int) @filesize($path) - 1024));
-    $tail = (string) stream_get_contents($h);
-    fclose($h);
+    if (pmssFilesystemPathHasNulByte($path) || is_link($path) || !is_file($path) || ($h = @fopen($path, 'rb')) === false) return null;
+    try {
+        // Failed positioning must not fall back to reading the entire log.
+        $size = @filesize($path);
+        if ($size === false || fseek($h, max(0, $size - 1024)) !== 0) return null;
+        $tail = stream_get_contents($h);
+        if ($tail === false) return null;
+    } finally {
+        fclose($h);
+    }
     // A line still being appended has no newline yet: ignore it rather than parse half a number.
     if ($tail !== '' && substr($tail, -1) !== "\n") $tail = ($pos = strrpos($tail, "\n")) === false ? '' : substr($tail, 0, $pos + 1);
     $lines = pmssNonEmptyStrings(explode("\n", $tail));

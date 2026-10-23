@@ -51,9 +51,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
         $store = $root.'/pmss/clients';
         mkdir(dirname($store), 0755);
         $entries = $this->entries();
-        $oldRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT');
-        putenv('PMSS_TORRENT_CLIENTS_STORE_ROOT='.$store);
-        try {
+        $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_STORE_ROOT' => $store], function () use ($entries, $root, $store): void {
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($entries, $root.'/public/catalog.json'));
             $this->assertSame([], \pmssConfigureTorrentClientVersionsRead($root.'/public/catalog.json'));
             // The injected installer writes fixture bytes only; no network or daemon is used.
@@ -82,9 +80,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
             unlink($store.'/qbittorrent/'.$entries[0]['version'].'/qbittorrent-nox');
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($entries, $root.'/public/catalog.json'));
             $this->assertSame(13, count(\pmssConfigureTorrentClientVersionsRead($root.'/public/catalog.json')));
-        } finally {
-            putenv($oldRoot === false ? 'PMSS_TORRENT_CLIENTS_STORE_ROOT' : 'PMSS_TORRENT_CLIENTS_STORE_ROOT='.$oldRoot);
-        }
+        });
     }
 
     public function testExactSpaceReserveSkipsCuratedInstallAndPreservesOldBinary(): void

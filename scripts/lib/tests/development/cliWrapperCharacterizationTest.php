@@ -68,11 +68,11 @@ final class CliWrapperCharacterizationTest extends TestCase
         ]);
     }
 
-    public function testUserDockerKeepsSharedStopAndSocketGuardsInline(): void
+    public function testUserDockerKeepsSharedStopAndSocketGuards(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/util/userDocker.php' => ['required' => [
-                'userDockerStopPids($uid, $scanRc)',
+            'scripts/lib/user/docker/stop.php' => ['required' => ['userDockerStopScan($user, $uid)']],
+            'scripts/lib/user/docker/start.php' => ['required' => [
                 '$socketPresent = file_exists($dockerSock);',
                 'Docker socket present for {$user}, but process check failed; skipping start',
                 'Docker start requested for {$user} via dockerd-rootless.sh',

@@ -372,10 +372,9 @@ final class PikkumiesHermesUiTest extends TestCase
         fclose($pipes[0]); fclose($pipes[1]); fclose($pipes[2]);
         file_put_contents($paths['pid'], $pid."\n");
         usleep(100000);
-        $previous = getenv('PATH');
-        putenv('PATH=/does-not-exist');
-        try { $this->assertFalse(\pmssPikkumiesHermesEnsure($paths)); }
-        finally { $previous === false ? putenv('PATH') : putenv('PATH='.$previous); }
+        $this->pmssWithEnv(['PATH' => '/does-not-exist'], function () use ($paths): void {
+            $this->assertFalse(\pmssPikkumiesHermesEnsure($paths));
+        });
         usleep(100000);
         $this->assertFalse(strpos((string) @file_get_contents('/proc/'.$pid.'/cmdline'), 'dashboard') !== false);
         @posix_kill($pid, SIGKILL);

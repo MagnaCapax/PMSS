@@ -187,11 +187,7 @@ PROXY;
         $path = $dir.'/catalog.php';
         copy($this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php'), $path);
         chmod($path, 0600);
-        $oldMode = getenv('PMSS_TEST_MODE');
-        $oldPath = getenv('PMSS_TOGGLE_APP_CATALOG_PATH');
-        putenv('PMSS_TEST_MODE=1');
-        try {
-            putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$path);
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1', 'PMSS_TOGGLE_APP_CATALOG_PATH' => $path], function () use ($path, $dir): void {
             $this->assertSame(array('slskd', 'copyparty', 'qui', 'scryer'), array_keys(\pmssToggleAppCatalogRead()));
             chmod($path, 0660);
             $this->assertThrowsRuntime(static function (): void { \pmssToggleAppCatalogRead(); });
@@ -211,10 +207,7 @@ PROXY;
             symlink($dir, $directoryLink);
             putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$directoryLink.'/catalog.php');
             $this->assertThrowsRuntime(static function (): void { \pmssToggleAppCatalogRead(); });
-        } finally {
-            $oldMode === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$oldMode);
-            $oldPath === false ? putenv('PMSS_TOGGLE_APP_CATALOG_PATH') : putenv('PMSS_TOGGLE_APP_CATALOG_PATH='.$oldPath);
-        }
+        });
     }
 
     public function testSingleCronAndCatalogOnlyWiring(): void
@@ -300,17 +293,13 @@ PROXY;
     public function testCrashHistoryPersistsOutsideCustomerHome(): void
     {
         $dir = $this->pmssMakeTempDir('toggle-state-');
-        $old = getenv('PMSS_TOGGLE_APP_STATE_DIR');
-        putenv('PMSS_TOGGLE_APP_STATE_DIR='.$dir);
-        try {
+        $this->pmssWithEnv(['PMSS_TOGGLE_APP_STATE_DIR' => $dir], function () use ($dir): void {
             $state = ['failures' => 4, 'pending' => true, 'restart' => ''];
             $this->assertSame($state, \pmssUserWatchdogCrashState('alice', 'slskd', $state));
             $this->assertSame($state, \pmssUserWatchdogCrashState('alice', 'slskd'));
             $this->assertTrue(is_file($dir.'/alice-slskd.json'));
             $this->assertTrue(!empty(\pmssUserWatchdogCrashState('bad-user', 'slskd')['storageError']));
-        } finally {
-            $old === false ? putenv('PMSS_TOGGLE_APP_STATE_DIR') : putenv('PMSS_TOGGLE_APP_STATE_DIR='.$old);
-        }
+        });
     }
 
     public function testRestartSignalChangesMetadataWithoutReadingMarker(): void
@@ -325,9 +314,7 @@ PROXY;
 
     public function testBootstrapWritesPrivateLoopbackConfigsAndLogin(): void
     {
-        $old = getenv('PMSS_TEST_MODE');
-        putenv('PMSS_TEST_MODE=1');
-        try {
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function (): void {
             foreach (['slskd', 'copyparty'] as $app) {
                 $home = $this->pmssMakeTempDir('toggle-'.$app.'-');
                 $proxy = \pmssLighttpdManagedProxyFragment($app, 'alice', 23001);
@@ -355,24 +342,18 @@ PROXY;
                     $this->assertStringContainsString("[/]\n  {$home}/data\n  accs:\n    A: alice", $body);
                 }
             }
-        } finally {
-            $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
-        }
+        });
     }
 
     public function testSlskdNeedsItsOwnPeerPort(): void
     {
-        $old = getenv('PMSS_TEST_MODE');
-        putenv('PMSS_TEST_MODE=1');
-        try {
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function (): void {
             $home = $this->pmssMakeTempDir('toggle-peer-');
             $proxy = \pmssLighttpdManagedProxyFragment('slskd', 'alice', 23001);
             $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy));
             $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy, 23001));
             $this->assertFalse(is_file($home.'/.pmss/apps/slskd.secured'));
-        } finally {
-            $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
-        }
+        });
     }
 
     public function testQuiCliSecuresOnlyAfterAccountExists(): void
@@ -394,7 +375,7 @@ file_put_contents($config.'/qui.db', 'account');
 PHP
         );
         chmod($fixture, 0700);
-        $oldMode = getenv('PMSS_TEST_MODE');
+        $previous = $this->pmssCaptureEnv(['PMSS_TEST_MODE']);
         putenv('PMSS_TEST_MODE=1');
         putenv('PMSS_TEST_QUI_BINARY='.$fixture);
         putenv('PMSS_TEST_QUI_LOG='.$home.'/argv.log');
@@ -420,7 +401,7 @@ PHP
             $this->assertFalse(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
             $this->assertFalse(is_file($home.'/.pmss/apps/qui.secured'));
         } finally {
-            $oldMode === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$oldMode);
+            $this->pmssRestoreEnvMap($previous);
             foreach (array('PMSS_TEST_QUI_BINARY', 'PMSS_TEST_QUI_LOG', 'PMSS_TEST_QUI_STDIN', 'PMSS_TEST_QUI_MODE') as $key) putenv($key);
         }
     }
@@ -428,9 +409,7 @@ PHP
     public function testScryerWritesPrivateBootstrapFilesAndQuotedLaunch(): void
     {
         $home = $this->pmssMakeTempDir('toggle-scryer-');
-        $old = getenv('PMSS_TEST_MODE');
-        putenv('PMSS_TEST_MODE=1');
-        try {
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($home): void {
             $proxy = \pmssLighttpdManagedProxyFragment('scryer', 'bo', 23001);
             $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'bo', $home, 23001, $proxy));
             $env = $home.'/.config/scryer/scryer.env';
@@ -446,17 +425,13 @@ PHP
                 .' '.escapeshellarg("/home/bo/a'b/.local/share/scryer");
             // Scryer reads a relative dotenv path, so it must start in the account home, not root's cwd.
             $this->assertSame('cd '.escapeshellarg("/home/bo/a'b").' && nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell), $launch);
-        } finally {
-            $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
-        }
+        });
     }
 
     public function testRepeatedBootstrapLeavesProxyAndMarkerUntouched(): void
     {
         // The watchdog bootstraps every cycle; a rewrite would make the lighttpd watchdog restart the account.
-        $old = getenv('PMSS_TEST_MODE');
-        putenv('PMSS_TEST_MODE=1');
-        try {
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function (): void {
             foreach (['slskd', 'copyparty'] as $app) {
                 $home = $this->pmssMakeTempDir('toggle-idem-'.$app.'-');
                 $proxy = \pmssLighttpdManagedProxyFragment($app, 'alice', 23001);
@@ -471,9 +446,7 @@ PHP
                 $after = array_map(static function (string $path): array { $s = stat($path); return [$s['ino'], $s['mtime']]; }, $paths);
                 $this->assertSame($before, $after);
             }
-        } finally {
-            $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
-        }
+        });
     }
 
     public function testDetachedLaunchReturnsWhileTheAppKeepsRunning(): void
@@ -518,14 +491,10 @@ PHP
         $dir = $home.'/.lighttpd/custom.d';
         $this->pmssEnsureDir($dir);
         $this->pmssWriteFile($dir.'/custom.conf', '$HTTP["url"] =~ "^/user-alice/slskd/" {}');
-        $old = getenv('PMSS_TEST_MODE');
-        putenv('PMSS_TEST_MODE=1');
-        try {
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($home): void {
             $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001,
                 \pmssLighttpdManagedProxyFragment('slskd', 'alice', 23001)));
             $this->assertFalse(is_file($home.'/.pmss/apps/slskd.secured'));
-        } finally {
-            $old === false ? putenv('PMSS_TEST_MODE') : putenv('PMSS_TEST_MODE='.$old);
-        }
+        });
     }
 }

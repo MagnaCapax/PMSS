@@ -22,6 +22,13 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
+In-process environment fixtures use `TestCase::pmssWithEnv($values, $callback)`
+to restore unset, empty and existing values even when the callback throws.
+Use `pmssWithTrackedEnv()` when the operation also changes other environment
+keys. When restoration must occur between resource cleanup steps, use
+`pmssCaptureEnv()` and `pmssRestoreEnvMap()` at the original points instead of
+copying `getenv()`/`putenv()` restoration branches.
+
 `RuntimeEnvValueTest` covers `pmssConfigRows()` source keys, short-row filtering,
 comment policies and bounded remainders; consumers retain field validation.
 

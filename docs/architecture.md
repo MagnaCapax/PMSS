@@ -26,6 +26,12 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/util/userDocker.php** – Stable rootless-Docker CLI wrapper.
+  `user/docker/cli.php` validates requests and dispatches to daemon start, checked
+  shutdown, status, and transferred-container handlers. `command.php` preserves
+  account-shell execution; `process.php` owns process observations and UID-checked
+  signals. Shutdown scans fail at one boundary before restart may proceed
+  (ADR 0154); the existing non-systemd launch and account policies remain intact.
 - **scripts/restartUser.php** – Root-only, one-account restart entry point for
   billing. It holds the recreate/restart locks, signals only that account's
   processes as the account, and starts rTorrent, marked media-stack apps, then

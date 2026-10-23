@@ -105,9 +105,8 @@ function rtorrentProcessExecutorPids(string $user, ?int &$rc = null, ?array &$ou
     $php = [];
     $screen = [];
     $all = [];
-    foreach ($processOutput as $line) {
-        $line = trim((string) $line);
-        if ($line === '' || strpos($line, 'rtorrentExecute.php') === false) {
+    foreach (pmssConfigLines($processOutput, []) as $line) {
+        if (strpos($line, 'rtorrentExecute.php') === false) {
             continue;
         }
         if (!preg_match('/^(\\d+)\\s+(\\S+)\\s+(.+)$/', $line, $m)) {
@@ -151,14 +150,7 @@ function rtorrentProcessSnapshot(string $user): array
     if ($rc !== 0) {
         return ['[WARN] ps failed (rc='.$rc.')'];
     }
-    $lines = [];
-    foreach ($out as $line) {
-        $line = trim((string) $line);
-        if ($line !== '') {
-            $lines[] = $line;
-        }
-    }
-    return $lines;
+    return iterator_to_array(pmssConfigLines($out, []), false);
 }
 
 /**

@@ -18,18 +18,12 @@ function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPa
     }
 
     foreach (pmssConfigRows($lines, 5, []) as $columns) {
-        if (($columns[1] ?? '') !== 'LISTEN') {
+        if ($columns[1] !== 'LISTEN' || !in_array($socketPath, $columns, true)) {
             continue;
         }
 
-        $recvQ = (string) ($columns[2] ?? '');
-        $sendQ = (string) ($columns[3] ?? '');
-        if (!in_array($socketPath, $columns, true)) {
-            continue;
-        }
-
-        $recvQ = pmssUnsignedDecimalIntParse($recvQ);
-        $sendQ = pmssUnsignedDecimalIntParse($sendQ);
+        $recvQ = pmssUnsignedDecimalIntParse($columns[2]);
+        $sendQ = pmssUnsignedDecimalIntParse($columns[3]);
         if ($recvQ === null || $sendQ === null) {
             continue;
         }

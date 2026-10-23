@@ -316,14 +316,10 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->pmssWriteFile($dropinFile, $this->pmssReadRepoFile('etc/seedbox/config/template.ssh.service.pmss-starvation.conf'));
         $this->pmssResetRuntimeProfile();
 
-        $previousConfigDir = getenv('PMSS_CONFIG_DIR');
-        putenv('PMSS_CONFIG_DIR='.$this->pmssRepoPath('etc/seedbox/config'));
-        try {
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $this->pmssRepoPath('etc/seedbox/config')], function () use ($dropinDir, $dropinFile, $root): void {
             $this->assertTrue(\pmssEnsureSshdStarvationDropin($dropinDir, $dropinFile, $root));
             $this->assertEquals([], $this->pmssProfileCommands());
-        } finally {
-            putenv($previousConfigDir === false ? 'PMSS_CONFIG_DIR' : 'PMSS_CONFIG_DIR='.$previousConfigDir);
-        }
+        });
     }
 
     public function testSshdStarvationDropinRestartRequiresChangedContentAndValidSyntax(): void

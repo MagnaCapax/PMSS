@@ -178,6 +178,16 @@ function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): st
     return $trimmed;
 }
 
+/** Yield trimmed, nonempty lines with source keys and caller-owned comment policy. */
+function pmssConfigLines(array $lines, array $commentPrefixes = ['#']): \Generator
+{
+    foreach ($lines as $index => $line) {
+        if (($trimmed = pmssConfigLineTrimmed((string) $line, $commentPrefixes)) !== '') {
+            yield $index => $trimmed;
+        }
+    }
+}
+
 /** A positive split limit preserves the remaining text in the final column. */
 function pmssConfigLineColumns(string $line, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): array
 {
@@ -190,8 +200,8 @@ function pmssConfigLineColumns(string $line, int $minColumns = 0, array $comment
 /** Yield accepted column rows lazily, preserving source keys and caller-owned validation. */
 function pmssConfigRows(array $lines, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): \Generator
 {
-    foreach ($lines as $index => $line) {
-        if (($columns = pmssConfigLineColumns((string) $line, $minColumns, $commentPrefixes, $limit)) !== []) {
+    foreach (pmssConfigLines($lines, $commentPrefixes) as $index => $line) {
+        if (($columns = pmssConfigLineColumns($line, $minColumns, [], $limit)) !== []) {
             yield $index => $columns;
         }
     }

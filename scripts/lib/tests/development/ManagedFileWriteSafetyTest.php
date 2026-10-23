@@ -49,9 +49,7 @@ final class ManagedFileWriteSafetyTest extends TestCase
         $account = posix_getpwnam('nobody');
         $group = is_array($account) ? posix_getgrgid($account['gid']) : false;
         if (!is_array($account) || !is_array($group)) throw new SkipTest('Fixture account unavailable');
-        $prior = getenv('PMSS_HOME_DIR');
-        putenv('PMSS_HOME_DIR='.$this->tempDir);
-        try {
+        $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir], function () use ($account, $group): void {
             $home = $this->pmssEnsureDir($this->tempDir.'/nobody');
             chown($home, $account['uid']);
             $inside = $this->pmssEnsureDir($home.'/inside');
@@ -106,9 +104,7 @@ final class ManagedFileWriteSafetyTest extends TestCase
             $this->assertSame([$before['uid'], $before['mode'] & 07777, 'kept'],
                 [$after['uid'], $after['mode'] & 07777, file_get_contents($outside)]);
             $this->assertSame([], glob($this->tempDir.'/.pmss-root-stage-*'));
-        } finally {
-            $prior === false ? putenv('PMSS_HOME_DIR') : putenv('PMSS_HOME_DIR='.$prior);
-        }
+        });
     }
 
     public function testRootStageSweepRemovesOnlyOldEmptyPrivateDirectories(): void

@@ -100,10 +100,8 @@ class Motd
         $usesDynamic = false;
         $usesStatic = false;
         if (is_string($data)) {
-            foreach (preg_split('/\r?\n/', $data) as $line) {
-                $line = trim($line);
-                if ($line === '' || $line[0] === '#'
-                    || strpos($line, 'pam_motd.so') === false) {
+            foreach (pmssConfigLines(preg_split('/\r?\n/', $data)) as $line) {
+                if (strpos($line, 'pam_motd.so') === false) {
                     continue;
                 }
                 if (strpos($line, 'motd=/run/motd.dynamic') !== false) {

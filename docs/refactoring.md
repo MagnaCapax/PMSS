@@ -340,6 +340,11 @@ complete message and status unchanged; the helper does not exit or add a newline
 Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
 library. Pass the existing minimum column count and `[]` for command output
 whose `#` tokens are data; keep field validation and failure reporting in callers.
+Line-oriented readers use `pmssConfigLines()` for lazy trimming and empty/comment
+filtering while retaining source keys, internal spacing, inline comments, and
+literal `0` rows. Pass `[]` when every nonempty line is data, including diagnostic
+stack traces beginning with `#`. `pmssConfigRows()` uses the same line iterator
+before applying its existing column-count and split-limit rules.
 
 Systemd skip reporting belongs in `pmssSystemdActionSkip()`: pass the existing
 reason and description, with `false` for legacy callers that do not record a

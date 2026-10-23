@@ -636,11 +636,63 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals('/usr/local/bin/flexget symlink target unreadable', $checks[28]['detail']);
     }
 
+    public function testVirtualenvChecksKeepFailureRowsAndProbeOrder(): void
+    {
+        foreach (['missing', 'plain', 'unreadable', 'wrong', 'valid'] as $state) {
+            $dependencies = $this->buildSystemStatusDependencies();
+            $calls = [];
+            foreach (['isFile', 'isExecutable', 'isLink', 'readLink'] as $probe) {
+                $original = $dependencies[$probe];
+                $dependencies[$probe] = static function (string $path) use ($probe, $state, $original, &$calls) {
+                    if (!in_array($path, ['/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload', '/usr/local/bin/flexget', '/usr/local/bin/pyload'], true)) {
+                        return $original($path);
+                    }
+                    $calls[] = [$probe, $path];
+                    if ($probe === 'readLink') {
+                        return $state === 'unreadable' ? '' : ($state === 'wrong' ? '/wrong' : '/opt/'.basename($path).'/bin/'.basename($path));
+                    }
+                    return $probe === 'isLink' ? in_array($state, ['unreadable', 'wrong', 'valid'], true) : $state !== 'missing';
+                };
+            }
+
+            $checks = array_slice(pmssSystemStatusChecks($dependencies), 26, 4);
+            $expected = [];
+            $expectedCalls = [];
+            foreach (['flexget' => 'FlexGet', 'pyload' => 'pyLoad'] as $app => $label) {
+                $binary = '/opt/'.$app.'/bin/'.$app;
+                $expected[] = pmssStatus('Virtualenv: '.$label.' binary', $state === 'missing' ? 'WARN' : 'OK', $binary.($state === 'missing' ? ' missing or not executable' : ''));
+                $expectedCalls[] = ['isFile', $binary];
+                if ($state !== 'missing') $expectedCalls[] = ['isExecutable', $binary];
+            }
+            foreach (['flexget', 'pyload'] as $app) {
+                $link = '/usr/local/bin/'.$app;
+                $binary = '/opt/'.$app.'/bin/'.$app;
+                $detail = [
+                    'missing' => $link.' missing',
+                    'plain' => $link.' present but not a symlink',
+                    'unreadable' => $link.' symlink target unreadable',
+                    'wrong' => $link.' -> /wrong (expected '.$binary.')',
+                    'valid' => $link.' -> '.$binary,
+                ][$state];
+                $expected[] = pmssStatus('CLI symlink: '.($app === 'pyload' ? 'pyLoad' : $app), $state === 'valid' ? 'OK' : 'WARN', $detail);
+                $expectedCalls[] = ['isLink', $link];
+                $expectedCalls[] = [in_array($state, ['missing', 'plain'], true) ? 'isFile' : 'readLink', $link];
+            }
+            // Version lookup also tests executability of these two binary paths.
+            $this->assertSame($expected, $checks, $state);
+            $this->assertSame(array_merge([
+                ['isExecutable', '/opt/flexget/bin/flexget'],
+                ['isExecutable', '/opt/pyload/bin/pyload'],
+            ], $expectedCalls), $calls, $state);
+        }
+    }
+
     public function testCliScriptsUseSharedComponentStatusHelper(): void
     {
         $componentSource = $this->pmssReadRepoFile('scripts/util/componentStatus.php');
         $systemSource = $this->pmssReadRepoFile('scripts/util/systemTest.php');
-        $librarySource = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
+        $librarySource = $this->pmssReadRepoFile('scripts/lib/systemStatus.php')
+            .$this->pmssReadRepoFile('scripts/lib/systemStatus/render.php');
 
         $this->assertStringContainsAllStrings([
             "require_once __DIR__.'/../lib/cli/optionParser.php';",

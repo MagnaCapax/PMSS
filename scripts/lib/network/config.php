@@ -85,8 +85,7 @@ function networkLoadLocalnets(): array
     }
 
     $valid = [];
-    foreach (preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY) as $localnet) {
-        $localnet = trim((string) $localnet);
+    foreach (pmssConfigLines(preg_split('/\r?\n/', $cfg), []) as $localnet) {
         if (networkLocalnetEntryIsValid($localnet)) {
             $valid[] = $localnet;
         }

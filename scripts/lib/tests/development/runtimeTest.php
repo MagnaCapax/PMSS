@@ -773,10 +773,8 @@ class RuntimeTest extends TestCase
 
     public function testRuntimeLockDirIsPrivateToItsOwner(): void
     {
-        $saved = getenv('PMSS_RUNTIME_LOCK_DIR');
         $base = $this->pmssMakeTempDir('pmss-runtime-lockdir-');
-        try {
-            putenv('PMSS_RUNTIME_LOCK_DIR='.$base.'/fresh/locks');
+        $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => $base.'/fresh/locks'], function () use ($base): void {
             $this->assertSame($base.'/fresh/locks', \pmssRuntimeLockDir());
             clearstatcache();
             $this->assertSame(0700, fileperms($base.'/fresh/locks') & 0777, 'new lock dir must be 0700');
@@ -788,20 +786,14 @@ class RuntimeTest extends TestCase
             \pmssRuntimeLockDir();
             clearstatcache();
             $this->assertSame(0700, fileperms($base.'/loose') & 0777, 'an existing looser lock dir is tightened to 0700');
-        } finally {
-            putenv($saved === false ? 'PMSS_RUNTIME_LOCK_DIR' : 'PMSS_RUNTIME_LOCK_DIR='.$saved);
-        }
+        });
     }
 
     public function testRuntimeLockDirDefaultsToRootOwnedRunTree(): void
     {
-        $saved = getenv('PMSS_RUNTIME_LOCK_DIR');
-        putenv('PMSS_RUNTIME_LOCK_DIR');
-        try {
+        $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => null], function (): void {
             $this->assertSame('/run/pmss/locks', \pmssRuntimeLockDir());
-        } finally {
-            putenv($saved === false ? 'PMSS_RUNTIME_LOCK_DIR' : 'PMSS_RUNTIME_LOCK_DIR='.$saved);
-        }
+        });
     }
 
     public function testRuntimeLockAcquireRejectsNulBytePathFailSoft(): void

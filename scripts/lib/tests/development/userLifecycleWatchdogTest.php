@@ -253,7 +253,7 @@ class UserLifecycleWatchdogTest extends TestCase
         $lockPath = $this->pmssMakeTempDir('watchdog-lock-').'/watchdog.lock';
         $marker = $this->pmssMakeTempFile('watchdog-lock-child-');
         @unlink($marker);
-        $previousFds = getenv(PMSS_UPDATE_LOCK_FDS_ENV);
+        $previous = $this->pmssCaptureEnv([PMSS_UPDATE_LOCK_FDS_ENV]);
         $handle = false;
 
         try {
@@ -276,25 +276,16 @@ class UserLifecycleWatchdogTest extends TestCase
             $this->assertFalse(pmssLockFileAcquire($lockPath, true));
         } finally {
             pmssLockHandleRelease($handle);
-            $previousFds === false
-                ? putenv(PMSS_UPDATE_LOCK_FDS_ENV)
-                : putenv(PMSS_UPDATE_LOCK_FDS_ENV.'='.$previousFds);
+            $this->pmssRestoreEnvMap($previous);
         }
     }
 
     public function testWatchdogLockFailurePreservesExportedDescriptorList(): void
     {
-        $previousFds = getenv(PMSS_UPDATE_LOCK_FDS_ENV);
-        putenv(PMSS_UPDATE_LOCK_FDS_ENV.'=7,9');
-
-        try {
+        $this->pmssWithEnv([PMSS_UPDATE_LOCK_FDS_ENV => '7,9'], function (): void {
             $this->assertFalse(pmssUserWatchdogLockAcquire("/tmp/watchdog-lock\0invalid"));
             $this->assertSame('7,9', getenv(PMSS_UPDATE_LOCK_FDS_ENV));
-        } finally {
-            $previousFds === false
-                ? putenv(PMSS_UPDATE_LOCK_FDS_ENV)
-                : putenv(PMSS_UPDATE_LOCK_FDS_ENV.'='.$previousFds);
-        }
+        });
     }
 
     public function testEnsureServicesRefusesInvalidUsernameBeforeCommand(): void

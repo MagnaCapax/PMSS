@@ -100,8 +100,7 @@ function networkFireqosRenderedUserCaps(string $config): ?array
 {
     $inside = false;
     $caps = [];
-    foreach (preg_split('/\r?\n/', $config) as $line) {
-        $line = trim($line);
+    foreach (pmssConfigLines(preg_split('/\r?\n/', $config), []) as $line) {
         if (!$inside) {
             if (preg_match('/^class group users\b/', $line)) {
                 $inside = true;

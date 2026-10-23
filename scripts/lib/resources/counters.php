@@ -103,9 +103,7 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
 /** Read one non-negative integer cgroup counter file, rejecting the UINT64_MAX sentinel. */
 function pmssResourceLogReadSysfsCounter(string $path): ?int
 {
-    $raw = pmssReadRegularFileDigits($path);
-    if ($raw === null) return null;
-    $value = (int) $raw;
+    $value = pmssReadRegularFileInt($path, -1);
     return ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $value;
 }
 
@@ -122,8 +120,8 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
     $matched = false;
     foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
         if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', trim((string) $line), $m) !== 1) continue;
-        $value = (int) $m[2];
-        if ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
+        $value = pmssUnsignedDecimalIntParse($m[2]);
+        if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
         $direction = $m[1] === 'Read' ? 'read' : 'write';
         // Check before addition: integer overflow becomes a float and can later cast negative.
         if ($value >= PMSS_RESOURCE_COUNTER_SENTINEL - $totals[$direction]) return null;

@@ -12,8 +12,7 @@ require_once __DIR__.'/identity.php';
 function pmssManagedUsersNormalizeList(array $rawUsers): array
 {
     $users = array();
-    foreach ($rawUsers as $rawUser) {
-        $trimmed = trim((string) $rawUser);
+    foreach (pmssConfigLines($rawUsers, []) as $trimmed) {
         if (!pmssValidateUsername($trimmed)) {
             continue;
         }
@@ -25,11 +24,7 @@ function pmssManagedUsersNormalizeList(array $rawUsers): array
 /** Return true when listUsers output contains runtime diagnostics, not only data. */
 function pmssManagedUsersOutputHasDiagnostics(array $rawUsers): bool
 {
-    foreach ($rawUsers as $rawUser) {
-        $line = trim((string) $rawUser);
-        if ($line === '') {
-            continue;
-        }
+    foreach (pmssConfigLines($rawUsers, []) as $line) {
         if (preg_match('/^(?:PHP )?(?:Fatal error|Parse error|Warning|Notice|Deprecated|Recoverable fatal error):/i', $line) === 1) {
             return true;
         }

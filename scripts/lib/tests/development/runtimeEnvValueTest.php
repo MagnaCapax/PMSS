@@ -50,6 +50,20 @@ class RuntimeEnvValueTest extends TestCase
         $this->assertSame([2 => ['0']], iterator_to_array(\pmssConfigRows(['; comment', '# comment', '0'], 1, [';', '#'])));
     }
 
+    public function testConfigLinesPreserveKeysTextAndCommentPolicies(): void
+    {
+        foreach ([
+            [[], ['#'], []],
+            [['', " \t\r\n\0", ' # comment'], ['#'], []],
+            [[3 => '', 7 => " a\tb  \r\n", 12 => '0'], ['#'], [7 => "a\tb", 12 => '0']],
+            [['hash' => ' #0 stack trace ', 'row' => ' a  b # inline '], [], ['hash' => '#0 stack trace', 'row' => 'a  b # inline']],
+            [['; comment', '// comment', '# data', 'value'], [';', '//', ''], [2 => '# data', 3 => 'value']],
+            [[null, false, 0, 42, true], [], [2 => '0', 3 => '42', 4 => '1']],
+        ] as [$lines, $prefixes, $expected]) {
+            $this->assertSame($expected, iterator_to_array(\pmssConfigLines($lines, $prefixes)));
+        }
+    }
+
     public function testNormalizationCharacterizationMatrix(): void
     {
         $cases = [

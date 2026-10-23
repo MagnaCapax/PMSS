@@ -114,9 +114,7 @@ function pmssEnsureLocaleBaseline(): void
         $enabled = false;
         $gen = @file_get_contents('/etc/locale.gen');
         if (is_string($gen)) {
-            foreach (preg_split('/\r?\n/', $gen) as $line) {
-                $trim = pmssConfigLineTrimmed($line);
-                if ($trim === '') continue;
+            foreach (pmssConfigLines(preg_split('/\r?\n/', $gen)) as $trim) {
                 if (stripos($trim, $locale.' UTF-8') === 0) {
                     $enabled = true;
                     break;
@@ -174,11 +172,7 @@ function pmssEnsureLocaleBaseline(): void
     if (is_string($data)) {
         $lang = null;
         $lcTime = null;
-        foreach (preg_split('/\r?\n/', $data) as $line) {
-            $line = trim($line);
-            if ($line === '' || $line[0] === '#') {
-                continue;
-            }
+        foreach (pmssConfigLines(preg_split('/\r?\n/', $data)) as $line) {
             if (stripos($line, 'LANG=') === 0) {
                 $lang = trim(substr($line, 5));
             }

@@ -244,9 +244,7 @@ function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minF
 
 function pmssReadRegularFileInt(string $path, int $default = 0): int
 {
-    $raw = pmssReadRegularFileDigits($path);
-    if ($raw === null) return $default;
-    return pmssUnsignedDecimalIntParse($raw) ?? $default;
+    return pmssUnsignedDecimalIntParse(pmssReadRegularFileTrimmed($path) ?? '') ?? $default;
 }
 function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return !pmssFilesystemPathHasNulByte($path) && is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
 
