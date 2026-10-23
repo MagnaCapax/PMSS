@@ -268,6 +268,7 @@ PHP;
         'www/pikkumiesPanel.php',
         'www/apps.php',
         'www/configure.php',
+        'www/configureFileWrite.php',
         'www/configureSettings.php',
         'www/configureAppOwnerSettings.php',
         'www/hermesAgent.php',

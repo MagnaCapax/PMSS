@@ -1,6 +1,7 @@
 <?php
 /** Customer-owned Transmission launcher and socket checks. */
 require_once __DIR__.'/torrentClientsResolve.php';
+require_once __DIR__.'/configureFileWrite.php';
 
 /** A connection probe does not send an RPC request. */
 function pmssTransmissionSocketLive(string $socketPath): bool

@@ -1,6 +1,7 @@
 <?php
 /** Account settings for the customer-owned Configure page. */
 require_once __DIR__.'/scriptsInc.php';
+require_once __DIR__.'/configureFileWrite.php';
 require_once __DIR__.'/panelSessionAuth.php';
 if (is_file(__DIR__.'/pikkumiesPanel.php')) require_once __DIR__.'/pikkumiesPanel.php';
 if (is_file(__DIR__.'/hermesAgent.php')) require_once __DIR__.'/hermesAgent.php';
@@ -52,20 +53,6 @@ function pmssPikkumiesHermesLoginRead($home)
     $raw = @file_get_contents($path);
     return is_string($raw) && preg_match('/^HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=([a-f0-9]{64})\nHERMES_DASHBOARD_BASIC_AUTH_SECRET=[a-f0-9]{64}\n$/D', $raw, $match)
         ? $match[1] : '';
-}
-
-/** Replace one account file atomically, with private permissions. */
-function pmssConfigureFileWrite($path, $value)
-{
-    $dir = dirname($path);
-    if (is_link($path) || (file_exists($path) && !is_file($path)) || !is_dir($dir)) return false;
-    $tmp = @tempnam($dir, '.pmss-configure-');
-    if (!is_string($tmp)) return false;
-    $private = @chmod($tmp, 0600);
-    $ok = $private && @file_put_contents($tmp, $value, LOCK_EX) === strlen($value)
-        && !is_link($path) && @rename($tmp, $path);
-    if (!$ok) @unlink($tmp);
-    return $ok;
 }
 
 /** Validate and serialize editable custom frame rows, keeping comment lines. */

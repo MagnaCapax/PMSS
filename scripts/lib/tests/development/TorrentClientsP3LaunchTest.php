@@ -219,4 +219,15 @@ final class TorrentClientsP3LaunchTest extends TestCase
         $cli = (string) file_get_contents($this->pmssRepoPath('etc/skel/www/torrentClientsResolve.php'));
         $this->assertStringContainsString('pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home)', $cli);
     }
+    public function testLaunchCliPrepareRunsWithoutTheConfigurePageLoaded(): void
+    {
+        // The resolver CLI loads transmissionLaunch.php alone; Prepare must not depend on configure.php.
+        [$home] = $this->fixture();
+        $path = $home.'/.config/transmission-daemon/settings.json';
+        file_put_contents($path, '{"rpc-whitelist-enabled":false}');
+        $script = 'require '.var_export($this->pmssRepoPath('etc/skel/www/transmissionLaunch.php'), true).';'
+            .'$ok = pmssTransmissionSettingsPrepare('.var_export($home, true).');'
+            .'echo json_encode(["ok" => $ok, "ready" => pmssTransmissionSettingsReady('.var_export($home, true).')]);';
+        $this->assertSame(['ok' => true, 'ready' => true], $this->pmssRunInlinePhpJson($script));
+    }
 }
