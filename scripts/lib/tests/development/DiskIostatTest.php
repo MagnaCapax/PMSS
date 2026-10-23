@@ -183,7 +183,7 @@ PHP;
 namespace DiskIostatSlaveScanFixture;
 function glob($pattern) { return false; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatSlaveScanFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat/devices.php', 'DiskIostatSlaveScanFixture');
         $script .= <<<'PHP'
 [$class, $source, $devRoot] = json_decode(getenv('PMSS_TEST_IOSTAT_TOPOLOGY'), true);
 $runner = static function () use ($source): string { return $source; };

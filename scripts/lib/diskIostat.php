@@ -12,71 +12,13 @@
 
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/systemStats.php';   // for pmssSystemStatsIopingMs() — reused, not re-implemented (DRY)
-require_once __DIR__.'/cgroup/policy.php';
-require_once __DIR__.'/blockDeviceLeaves.php';
+require_once __DIR__.'/diskIostat/devices.php';
+require_once __DIR__.'/diskIostat/sample.php';
 
 const PMSS_DISK_IOSTAT_HISTORY_LOG = '/var/log/pmss/iostat-history.log';
 const PMSS_DISK_IOSTAT_HISTORY_RAW_LOG = '/var/log/pmss/iostat-history-raw.log';
 // Leave startup and parser time while bounding the 120-second iostat interval.
 const PMSS_DISK_IOSTAT_TIMEOUT_SECONDS = 180;
-
-/** Keep block device names argv-safe before passing them to iostat. */
-function pmssDiskIostatDeviceNameIsSafe(string $device): bool
-{
-    return $device !== '' && preg_match('/\A[A-Za-z0-9._+-]+\z/', $device) === 1;
-}
-
-/**
- * Discover data block devices from /sys/block without crossing a shell.
- *
- * @return array<int, string>
- */
-function pmssDiskIostatDiscoverDevices(string $sysBlockDir = '/sys/block'): array
-{
-    $entries = pmssDirectoryEntriesRead($sysBlockDir);
-    if (!is_array($entries)) {
-        return [];
-    }
-
-    $devices = [];
-    foreach ($entries as $entry) {
-        if (!pmssDiskIostatDeviceNameIsSafe($entry)
-            || !pmssBlockDeviceNameIsDataDevice($entry)
-            || !is_dir($sysBlockDir.'/'.$entry)) {
-            continue;
-        }
-        $devices[] = $entry;
-    }
-
-    sort($devices, SORT_NATURAL | SORT_FLAG_CASE);
-    return $devices;
-}
-
-/**
- * Build the iostat command with every shell argument escaped.
- *
- * @param array<int, string> $devices
- */
-function pmssDiskIostatBuildCommand(array $devices, string $iostatBinary = ''): string
-{
-    // Reject malformed executable paths before shell quoting can throw.
-    if (pmssFilesystemPathHasNulByte($iostatBinary)) {
-        throw new RuntimeException('Unsafe iostat binary path');
-    }
-    foreach ($devices as $device) {
-        if (!is_string($device) || !pmssDiskIostatDeviceNameIsSafe($device)) {
-            throw new RuntimeException('Unsafe block device name for iostat');
-        }
-    }
-
-    if ($iostatBinary === '') {
-        $resolved = pmssCommandPath('iostat');
-        $iostatBinary = $resolved !== '' ? $resolved : 'iostat';
-    }
-
-    $deviceArgs = $devices ? ' '.pmssCommandArgvShellQuote($devices) : '';
-    return escapeshellarg($iostatBinary).' -xm 120 2 -g grp1'.$deviceArgs.' 2>&1';
-}
 
 /**
  * Read node-level I/O pressure (PSI) full avg300 from /proc/pressure/io.
@@ -95,12 +37,8 @@ function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'):
         return null;
     }
     $raw = @file_get_contents($psiPath);
-    // A partial or malformed PSI value must not become a healthy-looking sample.
-    if (!is_string($raw) || !preg_match('/^full\s.*?avg300=([0-9]+(?:\.[0-9]+)?)(?:\s|$)/m', $raw, $matches)) {
-        return null;
-    }
-    $value = (float) $matches[1];
-    return is_finite($value) && $value <= 100.0 ? $value : null;
+    // Share validation while retaining this consumer's unrounded scalar result.
+    return is_string($raw) ? pmssSystemStatsPsiMetricFromRaw($raw, 'full', 'avg300') : null;
 }
 
 /**
@@ -124,90 +62,15 @@ function pmssDiskIostatReadIopingHomeMs(): ?float
     return is_finite($value) ? $value : null;
 }
 
-/** Resolve only sampled leaf disks behind /home; unknown topology stays unknown. */
-function pmssDiskIostatHomeDevices(array $sampled, string $sysClassBlock = '/sys/class/block', ?callable $mountRunner = null, string $devRoot = '/dev'): ?array
-{
-    $source = pmssCgroupPolicyMountSourceResolve('/home', $mountRunner);
-    $devRoot = rtrim($devRoot, '/');
-    if ($source === '' || pmssFilesystemPathHasNulByte($source) || $devRoot === ''
-        || strpos($source, $devRoot.'/') !== 0 || pmssFilesystemPathHasNulByte($sysClassBlock)) return null;
-    if (strpos($source, $devRoot.'/mapper/') === 0) {
-        $source = (string) realpath($source);
-    }
-    $topology = pmssBlockDeviceLeaves(basename($source), rtrim($sysClassBlock, '/'), static function (string $pattern) { return @glob($pattern); });
-    if (!$topology['complete'] || !$topology['leaves']) return null;
-    foreach ($topology['leaves'] as $device) {
-        if (!in_array($device, $sampled, true)) return null;
-    }
-    return $topology['leaves'];
-}
-
-/** Use /home leaves when resolvable; otherwise retain the discovered list. */
-function pmssDiskIostatSampleDevices(array $devices, string $sysClassBlock = '/sys/class/block', ?callable $mountRunner = null, string $devRoot = '/dev'): array
-{
-    return pmssDiskIostatHomeDevices($devices, $sysClassBlock, $mountRunner, $devRoot) ?: $devices;
-}
-
-/**
- * Parse the second-sample iostat group row by column name.
- * diskAwait is r_await and diskServiceTime is w_await over /home leaf disks.
- * When /home cannot be resolved, the group row covers all discovered devices.
- *
- * @return array<string, int|string|float|null>
- */
+/** Append host probes and metadata to the parsed fields in legacy serialization order. */
 function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null): array
 {
-    $lines = explode("\n", $iostatRaw);
-    $lastHeaderIdx = -1;
-    foreach (pmssConfigLines($lines, []) as $i => $line) {
-        if (preg_match('/^Device\s/', $line)) {
-            $lastHeaderIdx = $i;
-        }
-    }
-    if ($lastHeaderIdx === -1) {
-        throw new RuntimeException('No iostat Device header found');
-    }
-
-    $header = pmssConfigLineColumns($lines[$lastHeaderIdx], 1, []);
-    $colMap = array_flip($header);
-    $grp1Line = null;
-    for ($i = $lastHeaderIdx + 1; $i < count($lines); $i++) {
-        if (preg_match('/^\s*grp1\s/', $lines[$i])) {
-            $grp1Line = $lines[$i];
-            break;
-        }
-    }
-    if ($grp1Line === null) {
-        throw new RuntimeException('No grp1 line after iostat header');
-    }
-
-    $values = pmssConfigLineColumns($grp1Line, 1, []);
-    $getAny = static function (array $colNames) use ($colMap, $values): string {
-        foreach ($colNames as $name) {
-            if (isset($colMap[$name])) {
-                return $values[$colMap[$name]] ?? '0';
-            }
-        }
-        return '0';
-    };
-
-    // Column-name lookup keeps sysstat 12+ additions from shifting meanings;
-    // legacy await/svctm names remain fallbacks for older hosts.
-    return [
-        'iopsRead'        => $getAny(['r/s']),
-        'iopsWrite'       => $getAny(['w/s']),
-        'throughputRead'  => $getAny(['rMB/s']),
-        'throughputWrite' => $getAny(['wMB/s']),
-        'diskAwait'       => $getAny(['r_await', 'await']),
-        'diskServiceTime' => $getAny(['w_await', 'svctm']),
-        'diskUtil'        => $getAny(['%util']),
-        'avgQueueSize'    => $getAny(['aqu-sz', 'avgqu-sz']),
-        'psiFullAvg300'   => pmssDiskIostatReadPsiFullAvg300(),
-        'psiMemFullAvg300'=> pmssDiskIostatReadPsiFullAvg300('/proc/pressure/memory'),
-        'psiCpuFullAvg300'=> pmssDiskIostatReadPsiFullAvg300('/proc/pressure/cpu'),
-        'iopingHomeMs'    => pmssDiskIostatReadIopingHomeMs(),
-        'diskQuantity'    => $deviceCount,
-        'time'            => $timestamp ?? time(),
+    return pmssDiskIostatParseSampleFields($iostatRaw) + [
+        'psiFullAvg300' => pmssDiskIostatReadPsiFullAvg300(),
+        'psiMemFullAvg300' => pmssDiskIostatReadPsiFullAvg300('/proc/pressure/memory'),
+        'psiCpuFullAvg300' => pmssDiskIostatReadPsiFullAvg300('/proc/pressure/cpu'),
+        'iopingHomeMs' => pmssDiskIostatReadIopingHomeMs(),
+        'diskQuantity' => $deviceCount, 'time' => $timestamp ?? time(),
     ];
 }
 
