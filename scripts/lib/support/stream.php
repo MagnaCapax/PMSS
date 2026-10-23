@@ -18,12 +18,9 @@ require_once __DIR__.'/../runtime/filesystem.php';
  */
 function pmssSupportStreamWriteAll($stream, string $payload, string $context): void
 {
-    if ($payload !== '' && !is_resource($stream)) {
-        throw new RuntimeException('Unable to write '.$context.'.');
-    }
-
     if (!pmssStreamWriteAll($stream, $payload)) {
-        $meta = is_resource($stream) ? stream_get_meta_data($stream) : [];
+        // Only live streams support metadata; other resources retain the write error.
+        $meta = pmssStreamHandleIsOpen($stream) ? stream_get_meta_data($stream) : [];
         $suffix = !empty($meta['timed_out']) ? ' timed out' : '';
         throw new RuntimeException('Unable to write '.$context.$suffix.'.');
     }

@@ -109,6 +109,8 @@ function pmssStreamWriteAll($handle, string $payload): bool
 {
     $length = strlen($payload);
     for ($offset = 0; $offset < $length; $offset += $written) {
+        // A wrapper may close the stream during a partial write; recheck before retrying.
+        if (!pmssStreamHandleIsOpen($handle)) return false;
         $written = @fwrite($handle, substr($payload, $offset));
         if (!is_int($written) || $written < 1) return false;
     }

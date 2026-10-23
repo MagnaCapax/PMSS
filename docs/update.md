@@ -183,6 +183,14 @@ instead of injecting ad-hoc installs elsewhere in the run.
 
 ### Step Error Classification
 
+The Debian 12 PECL-ssh2 compatibility repairs retain the
+`opensslSsh2Compat.php` loader. Its modules separate package queries, libssl
+convergence, OpenSSH repair policy and service observation/validation. Heal and
+downgrade share one private-workspace download/install/cleanup transaction;
+their package sets, failure severity and service recovery order stay distinct.
+Pre-refactor command/log/exception trace snapshots lock both policies and their
+failure boundaries. See [ADR 0163](adr/0163-openssl-openssh-repair-transaction-boundary.md).
+
 Post-package orchestration uses explicit step classes:
 
 1. `must_succeed` — after package phase completion, logs `step_failed`

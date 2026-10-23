@@ -165,6 +165,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   Lock, snapshot, TTY, and command-pipe callers keep their existing failure results
   for closed handles and resources of other types.
 
+- `pmssStreamWriteAll($handle, string $payload): bool` checks for an open stream
+  before each write, including partial-write retries. Invalid or closed handles
+  return `false` without consuming other resource types; empty payloads retain
+  their no-I/O `true` result. The support wrapper retains its contextual
+  `RuntimeException` on failure and reads timeout metadata only from live streams.
+
 - `pmssWriteManagedPathFileWithBackup()` leaves an existing managed file intact
   when its timestamped backup cannot be created. The backup helper accepts a
   copy only when it contains the full source file; incomplete copies are removed.

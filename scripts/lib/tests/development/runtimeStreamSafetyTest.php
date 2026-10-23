@@ -8,6 +8,51 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeStreamSafetyTest extends TestCase
 {
+    public function testStreamWriterRejectsInvalidHandlesWithoutConsumingResources(): void
+    {
+        $closed = fopen('php://memory', 'w+');
+        fclose($closed);
+        $context = stream_context_create();
+        $process = proc_open('exit 7', [], $pipes);
+        $this->assertTrue(is_resource($process));
+        try {
+            foreach ([null, false, 0, '', [], new \stdClass(), $closed, $context, $process] as $handle) {
+                $this->pmssAssertNoPhpWarnings(function () use ($handle): void {
+                    $this->assertFalse(\pmssStreamWriteAll($handle, 'payload'));
+                    // Empty buffers have always succeeded without inspecting the handle.
+                    $this->assertTrue(\pmssStreamWriteAll($handle, ''));
+                });
+            }
+            $this->assertSame('stream-context', get_resource_type($context));
+            $this->assertSame('process', get_resource_type($process));
+        } finally {
+            $exitCode = proc_close($process);
+        }
+        $this->assertSame(7, $exitCode);
+    }
+
+    public function testStreamWriterStopsWhenPartialWriteClosesHandle(): void
+    {
+        // A recording writer closes its own fixture stream after accepting one byte.
+        $script = <<<'PHP'
+namespace StreamClosedWriteFixture;
+function fwrite($handle, $bytes) {
+    ++$GLOBALS['writes'];
+    \fwrite($handle, substr($bytes, 0, 1));
+    \fclose($handle);
+    return 1;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'StreamClosedWriteFixture');
+        $script .= <<<'PHP'
+$GLOBALS['writes'] = 0;
+$handle = fopen('php://memory', 'w+');
+$result = pmssStreamWriteAll($handle, 'payload');
+echo json_encode([$result, $GLOBALS['writes'], is_resource($handle)]);
+PHP;
+        $this->assertSame([false, 1, false], $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testSnapshotRestoresUmaskWhenClosingThrows(): void
     {
         // Isolate injected close failures and the process-wide umask from the runner.

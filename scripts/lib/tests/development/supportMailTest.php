@@ -80,14 +80,20 @@ class SupportMailTest extends TestCase
         fclose($stream);
     }
 
-    public function testStreamWriteAllRejectsClosedStream(): void
+    public function testStreamWriteAllRejectsInvalidHandlesWithExistingError(): void
     {
         $stream = fopen('php://temp', 'w+');
         fclose($stream);
-
-        $this->assertThrowsRuntime(static function () use ($stream): void {
-            \pmssSupportStreamWriteAll($stream, 'payload', 'closed stream');
-        }, 'Unable to write closed stream.');
+        $context = stream_context_create();
+        foreach ([null, false, 0, '', [], new \stdClass(), $stream, $context] as $handle) {
+            $this->pmssAssertNoPhpWarnings(function () use ($handle): void {
+                $this->assertThrowsRuntime(static function () use ($handle): void {
+                    \pmssSupportStreamWriteAll($handle, 'payload', 'test stream');
+                }, 'Unable to write test stream.');
+                $this->assertSame(null, \pmssSupportStreamWriteAll($handle, '', 'empty payload'));
+            });
+        }
+        $this->assertSame('stream-context', get_resource_type($context));
     }
 
     public function testSmtpExpectAcceptsMultilineReplies(): void
