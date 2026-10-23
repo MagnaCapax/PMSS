@@ -12,7 +12,9 @@ function userDockerStopScan(string $user, int $uid, bool $initial = false): arra
 {
     $lines = [];
     $rc = 0;
-    exec('ps -u '.escapeshellarg((string) $uid).' -o pid=,comm=,args= 2>/dev/null', $lines, $rc);
+    exec('ps -u '.escapeshellarg((string) $uid).' -o pid=,comm=,args= 2>&1', $lines, $rc);
+    // ps exits 1 with no output when the account runs no processes (a parked old copy); that is a clean scan.
+    if ($rc === 1 && $lines === []) $rc = 0;
     $pids = ['dockerd' => [], 'rootlesskit' => [], 'wrapper' => []];
     if ($rc === 0) foreach ($lines as $line) {
         if (!preg_match('/^\s*(\d+)\s+(\S+)\s+(.*)$/D', $line, $parts)) continue;

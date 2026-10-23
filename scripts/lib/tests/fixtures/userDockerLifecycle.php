@@ -60,6 +60,8 @@ function exec($command, &$out, &$rc) {
     if (strpos($command, 'ps -u ') === 0) {
         $GLOBALS['scans']++;
         $rc = ($GLOBALS['case']['scan_failure'] ?? 0) === $GLOBALS['scans'] ? 1 : 0;
+        // A real ps failure prints an error; exit 1 with no output only means the account runs no processes.
+        if ($rc === 1 && strpos($command, 'comm=') !== false) { $out = ['error: process listing failed']; return ''; }
         if (strpos($command, 'comm=') === false) {
             $rc = !empty($GLOBALS['case']['ps_failure']) ? 1 : 0;
             $out = !empty($GLOBALS['case']['ps_running']) ? ['39 dockerd --rootless', '77 unrelated'] : [];
