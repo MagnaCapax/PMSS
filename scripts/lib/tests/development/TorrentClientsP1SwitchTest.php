@@ -33,6 +33,15 @@ final class TorrentClientsP1SwitchTest extends TestCase
         $this->assertSame(array(), \pmssConfigureTorrentClientVersionsRead($link));
     }
 
+    public function testSelectedVersionNamesTheLinkTargetOrSystem(): void
+    {
+        $home = $this->home();
+        $this->assertSame('system', \pmssConfigureTorrentClientSelectedVersion($home, 'qbittorrent'));
+        $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/qbittorrent/5.1.4-lt2.0', $home.'/bin/qbittorrent/default');
+        $this->assertSame('5.1.4-lt2.0', \pmssConfigureTorrentClientSelectedVersion($home, 'qbittorrent'));
+        $this->assertSame('system', \pmssConfigureTorrentClientSelectedVersion($home, 'deluge'));
+    }
+
     public function testProjectionLeftAfterOptOutOffersNoVersions(): void
     {
         $root = $this->pmssMakeTempDir('pmss-p1-marker-');

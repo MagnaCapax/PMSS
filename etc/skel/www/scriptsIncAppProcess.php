@@ -17,7 +17,36 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
   foreach (require __DIR__.'/toggleAppCatalog.php' as $id => $row) {
    $definitions[$id] = array('enable' => '../'.$row['enable'], 'endpoint' => 'toggleApp.php?app='.$id, 'binaries' => $row['binaries']);
   }
+  // A version picked in Configure runs from the account's store link: status, Open and Turn off must see it too.
+  foreach (array('qBittorrent' => 'qbittorrent', 'Deluge' => 'deluge') as $name => $client) {
+   $selected = pmssCustomerTorrentClientSelectedBinary($client);
+   if ($selected === null) continue;
+   $definitions[$name]['binaries'][] = $selected;
+   if ($client === 'deluge') $definitions[$name]['binaries'][] = dirname($selected).'/deluge-web';
+  }
   return $definitions; }
+}
+
+if (!function_exists('pmssCustomerTorrentClientSelectedBinary')) {
+/** Return the store binary the account selected for $client in Configure, or null for the system build. */
+function pmssCustomerTorrentClientSelectedBinary(string $client): ?string {
+ $resolver = __DIR__.'/torrentClientsResolve.php';
+ if (!function_exists('pmssTorrentClientResolve')) {
+  if (!is_file($resolver) || is_link($resolver)) return null;
+  require_once $resolver;
+ }
+ return function_exists('pmssTorrentClientResolve') ? pmssTorrentClientResolve(dirname(__DIR__), $client) : null;
+}
+}
+
+if (!function_exists('pmssCustomerRtorrentBinaries')) {
+/** Return the rTorrent binaries this account may run: the system builds plus a Configure store selection. */
+function pmssCustomerRtorrentBinaries(): array {
+ $binaries = array('/usr/bin/rtorrent', '/usr/local/bin/rtorrent');
+ $selected = pmssCustomerTorrentClientSelectedBinary('rtorrent');
+ if ($selected !== null) $binaries[] = $selected;
+ return $binaries;
+}
 }
 
 if (!function_exists('pmssWelcomeServiceAvailable')) {
@@ -66,7 +95,12 @@ function pmssCustomerNativePidsRead(array $binaries, string $procRoot = '/proc',
   $cmdline = @file_get_contents($entry.'/cmdline', false, null, 0, 4096);
   $args = is_string($cmdline) ? explode("\0", $cmdline) : array();
   $script = isset($args[1]) ? realpath($args[1]) : false;
-  if ($script !== false && isset($scripts[$script]) && $scripts[$script] === $exe) $pids[] = (int) $pid;
+  if ($script !== false && isset($scripts[$script]) && $scripts[$script] === $exe) { $pids[] = (int) $pid; continue; }
+  // deluge-web rewrites its command line to its own name (setproctitle): only argv[0] is left, the rest is NUL.
+  if (($args[0] ?? '') === '' || implode('', array_slice($args, 1)) !== '') continue;
+  foreach ($scripts as $path => $interpreter) {
+   if ($interpreter === $exe && basename($path) === $args[0]) { $pids[] = (int) $pid; break; }
+  }
  }
  return $pids;
 }

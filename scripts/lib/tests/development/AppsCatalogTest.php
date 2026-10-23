@@ -530,6 +530,31 @@ class AppsCatalogTest extends TestCase
         $this->assertSame(array(789), \pmssCustomerNativePidsRead(array($deluged), $root.'/proc', fileowner($root.'/proc/789')));
     }
 
+    public function testNativePidsMatchDelugeWebAfterItRenamesItsCommandLine(): void
+    {
+        // deluge-web replaces its command line with "deluge-web" and NUL padding (setproctitle), so argv[1] is gone.
+        $root = $this->pmssMakeTempDir('pmss-native-proctitle-');
+        $python = $this->pmssWriteFile($root.'/usr/bin/python3', 'interpreter');
+        $otherPython = $this->pmssWriteFile($root.'/usr/bin/python3-other', 'other interpreter');
+        $web = $this->pmssWriteFile($root.'/usr/bin/deluge-web', '#!'.$python."\n");
+        $this->pmssEnsureDir($root.'/proc/self/ns');
+        @symlink('mnt:[host]', $root.'/proc/self/ns/mnt');
+        $cases = array(
+            301 => array($python, "deluge-web".str_repeat("\0", 40), 'mnt:[host]'),
+            302 => array($python, "deluge-webx".str_repeat("\0", 40), 'mnt:[host]'),
+            303 => array($python, "deluge-web\0--port\0", 'mnt:[host]'),
+            304 => array($otherPython, "deluge-web".str_repeat("\0", 40), 'mnt:[host]'),
+            305 => array($python, "deluge-web".str_repeat("\0", 40), 'mnt:[guest]'),
+        );
+        foreach ($cases as $pid => list($exe, $cmdline, $namespace)) {
+            $this->pmssEnsureDir($root.'/proc/'.$pid.'/ns');
+            @symlink($namespace, $root.'/proc/'.$pid.'/ns/mnt');
+            @symlink($exe, $root.'/proc/'.$pid.'/exe');
+            $this->pmssWriteFile($root.'/proc/'.$pid.'/cmdline', $cmdline);
+        }
+        $this->assertSame(array(301), \pmssCustomerNativePidsRead(array($web), $root.'/proc', fileowner($root.'/proc/301')));
+    }
+
     public function testEveryStateEndpointRejectsGetAndAcceptsAjaxPostGate(): void
     {
         $this->pmssWithLegacyAppsRender(function (string $home): void {

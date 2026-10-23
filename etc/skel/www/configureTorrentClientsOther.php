@@ -32,7 +32,12 @@ function pmssConfigureTorrentClientOtherRunningVersion($home, $client)
 {
     if (pmssConfigureTorrentClientOtherPids($home, $client) === array()) return 'not running';
     $target = @readlink($home.'/bin/'.$client.'/default');
-    return is_string($target) ? basename($target) : 'system';
+    if (!is_string($target)) return 'system';
+    // After three fast exits the executor runs the system build and leaves the selection alone (ADR 0146).
+    $binary = pmssTorrentClientResolve($home, $client);
+    if ($client === 'rtorrent' && $binary !== null && pmssCustomerNativePidsRead(array($binary)) === array())
+        return 'system, because '.basename($target).' kept stopping right after start';
+    return basename($target);
 }
 
 /** Recheck native identity before TERM and wait for both Deluge components. */

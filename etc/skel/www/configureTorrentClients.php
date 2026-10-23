@@ -28,6 +28,14 @@ function pmssConfigureTorrentClientNativePids($home, $procRoot = '/proc')
     }
     return $pids;
 }
+
+/** Return the version the account has selected for $client, as the version list names it. */
+function pmssConfigureTorrentClientSelectedVersion($home, $client)
+{
+    $target = @readlink($home.'/bin/'.$client.'/default');
+    return is_string($target) ? basename($target) : 'system';
+}
+
 /** Show the version of the current native process from its kernel exe path. */
 function pmssConfigureTorrentClientRunningVersion($home)
 {

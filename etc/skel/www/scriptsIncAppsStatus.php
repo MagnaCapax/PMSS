@@ -63,7 +63,7 @@ function pmssCustomerAppsStatusRead(string $home, string $username, string $host
     }
     $rtorrentOff = is_file(pmssCustomerHomePath($home, '.rtorrentDisable'));
     $apps['rtorrent'] = array('kind' => 'rtorrent', 'state' => $rtorrentOff ? 'off'
-        : (pmssCustomerNativePidsRead(array('/usr/bin/rtorrent', '/usr/local/bin/rtorrent')) !== array() ? 'running' : 'not-running'), 'url' => 'rutorrent/');
+        : (pmssCustomerNativePidsRead(pmssCustomerRtorrentBinaries()) !== array() ? 'running' : 'not-running'), 'url' => 'rutorrent/');
     $toggleCatalog = require __DIR__.'/toggleAppCatalog.php';
     foreach (pmssCustomerManagedAppDefinitions() as $name => $definition) {
         if (isset($definition['portMarker']) && !is_file(pmssCustomerHomePath($home, $definition['portMarker']))) continue;
