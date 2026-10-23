@@ -135,13 +135,13 @@ class checkRtorrentContractTest extends TestCase
         // suspended) and BEFORE the .rtorrent.rc / start logic, and it must `continue`.
         $this->pmssAssertRepoFileContract('scripts/cron/checkRtorrent.php', [
             'required' => [
-                "if (is_file(\$home.'/.rtorrentDisable')) {",
+                "if (is_link(\$home.'/.rtorrentDisable') || is_file(\$home.'/.rtorrentDisable')) {",
                 'rtorrent disabled by user (.rtorrentDisable)',
             ],
             'ordered' => [[
                 'needles' => [
                     'if (pmssUserServicesParked($user)) {',
-                    "if (is_file(\$home.'/.rtorrentDisable')) {",
+                    "if (is_link(\$home.'/.rtorrentDisable') || is_file(\$home.'/.rtorrentDisable')) {",
                     "if (!is_file(\$home.'/.rtorrent.rc')) {",
                 ],
                 'missingPrefix' => 'checkRtorrent .rtorrentDisable skip misordered: ',

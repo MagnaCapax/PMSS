@@ -73,7 +73,8 @@ foreach ($users as $user) {
     // (GH#470). A disabled user is NOT suspended (web root is fine), so this is a separate
     // check. Graceful TERM (not -9) lets rtorrent save its session; re-enable = remove the
     // marker and the watchdog restarts within PMSS_RTORRENT_MISSING_GRACE.
-    if (is_file($home.'/.rtorrentDisable')) {
+    // is_link first: root must not follow a tenant-planted link (existence oracle on root-only paths).
+    if (is_link($home.'/.rtorrentDisable') || is_file($home.'/.rtorrentDisable')) {
         $targets = rtorrentProcessKillManagedPids($user, SIGTERM);
         pmssCheckRtorrentLogBoth($user, "rtorrent disabled by user (.rtorrentDisable); cleanup signal requested (signal=TERM targets={$targets})", $debug);
         continue;

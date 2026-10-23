@@ -12,7 +12,8 @@ function pmssUserTransferRequestRtorrentRestart(string $home, string $localUser)
     // means "stop and stay stopped". checkRtorrent honours it on every cron
     // cycle, so restarting here would only be undone within a few minutes while
     // needlessly reloading the migrated session against the user's wishes. Skip.
-    if (is_file(rtrim($home, '/').'/.rtorrentDisable')) {
+    $marker = rtrim($home, '/').'/.rtorrentDisable';
+    if (is_link($marker) || is_file($marker)) {
         logMessage('[INFO] Skipping rTorrent restart: user opted out via .rtorrentDisable');
         return;
     }
