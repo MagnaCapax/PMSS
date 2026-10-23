@@ -88,7 +88,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         $runtime = dirname(__DIR__, 3).'/lib/runtime.php';
         $result = $this->pmssExecShellCommand(
             escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
-                'putenv("PMSS_UPDATE_LOCK_FDS=4,9"); '
+                'putenv("PMSS_UPDATE_LOCK_FDS=0,2,003,4,9,9,1048576,1048577,invalid,-4,+8,1.5,'.PHP_INT_MAX.'0"); '
                 .'require '.var_export($runtime, true).'; '
                 .'echo pmssCommandBashInvocation("printf ok");'
             ),
@@ -97,7 +97,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         );
 
         $this->assertEquals(0, $result['rc'], 'runtime shell invocation should complete');
-        $this->assertStringContainsString('exec 4>&- 9>&-; ', $result['output']);
+        $this->assertStringContainsString('exec 3>&- 4>&- 9>&- 1048576>&-; ', $result['output']);
         $this->assertStringContainsString('printf ok', $result['output']);
     }
 

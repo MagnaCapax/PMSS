@@ -142,7 +142,7 @@ final class ManagedFileWriteSafetyTest extends TestCase
     public function testEnsureSafeDirReportsModeFailure(): void
     {
         $root = $this->pmssMakeTempDir('pmss-safe-dir-');
-        $library = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'SafeDirModeFixture');
+        $library = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'SafeDirModeFixture', \PMSS_USER_FILE_MODULES);
         $result = $this->pmssRunInlinePhpJson(<<<'PHP'
 namespace SafeDirModeFixture;
 function chmod($path, $mode) {
@@ -215,6 +215,36 @@ PHP
         $this->assertSame('payload', (string) file_get_contents($path));
     }
 
+    public function testSerializedTargetsKeepOrderedPartialSuccessAndFailureLabels(): void
+    {
+        $first = $this->tempDir.'/first';
+        $last = $this->tempDir.'/last';
+        $linked = $this->tempDir.'/linked';
+        $outside = $this->pmssWriteFile($this->tempDir.'/outside', 'kept');
+        $this->pmssCreateSymlinkOrSkip($outside, $linked);
+        $payload = serialize(['raw' => ['month' => 0.0], 'binary' => "\0\xff"]);
+        $failures = [];
+        $ok = \pmssManagedSerializedTargetsWrite($payload, [
+            [$first, 'root', 0640, false],
+            null,
+            [$linked, 'root', 0640, false],
+            [$this->tempDir."/bad\0path", 'root', 0640, true],
+            [$this->tempDir.'/missing/state', 'root', 0600, false],
+            [$last, 'root', '384', false],
+        ], static function (string $path) use (&$failures, $first, $last, $payload): void {
+            $failures[] = [$path, file_get_contents($first) === $payload, file_exists($last)];
+        });
+
+        $this->assertFalse($ok);
+        $this->assertSame([
+            ['(invalid target)', true, false], [$linked, true, false],
+            ['(invalid target)', true, false], [$this->tempDir.'/missing/state', true, false],
+        ], $failures);
+        $this->assertSame([$payload, $payload, 'kept'], array_map('file_get_contents', [$first, $last, $outside]));
+        $this->assertSame([0640, 0600], [fileperms($first) & 0777, fileperms($last) & 0777]);
+        $this->assertTrue(\pmssManagedSerializedTargetsWrite($payload, [], static function (): void {}));
+    }
+
     public function testSerializedTargetRejectsMalformedModesBeforePublishing(): void
     {
         $path = $this->tempDir.'/mode-state.dat';
@@ -278,7 +308,7 @@ PHP
 namespace AtomicJsonWriteFixture;
 PHP;
         $script .= $this->pmssInlinePhpAtomicPublicationShims('temp');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'AtomicJsonWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'AtomicJsonWriteFixture', \PMSS_USER_FILE_MODULES);
         $script .= <<<'PHP'
 $GLOBALS['mode'] = getenv('PMSS_TEST_STATUS_MODE');
 $GLOBALS['tempCalls'] = 0;

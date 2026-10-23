@@ -44,6 +44,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   stage beside the home and one publish rename while keeping their ownership
   class. Small account-owned directory creation
   and file-mode repairs run as the account, with managed repair for older owners.
+  The shared `userFileWrite.php` facade loads separate path, handle, metadata,
+  replacement/append, account-execution, and serialized-target modules (ADR 0164).
 - **scripts/util/lighttpdSymlinkRepair.php** – Explicit root-only repair for stale
   account lighttpd upload and log symlinks. It requires a healthy live quota
   result, replaces only those links under the account identity, audits each

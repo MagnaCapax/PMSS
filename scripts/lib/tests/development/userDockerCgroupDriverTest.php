@@ -366,7 +366,7 @@ PHP;
 namespace RootlessDockerConfigWriteFixture;
 PHP;
         $script .= $this->pmssInlinePhpAtomicPublicationShims('temp');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'RootlessDockerConfigWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'RootlessDockerConfigWriteFixture', \PMSS_USER_FILE_MODULES);
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerConfigWriteFixture');
         $script .= <<<'PHP'
 $GLOBALS['mode'] = getenv('PMSS_TEST_WRITE_FAILURE');

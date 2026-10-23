@@ -84,7 +84,7 @@ final class AccountPathOperationStaticTest extends TestCase
             'pmssWriteUserFile($path, $content, $owner, $mode)',
             'pmssReplaceUserFilePreservingMetadata($path, $content, 0644)',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/userFileWrite.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/userFileReplace.php', [
             'function pmssReplaceUserFilePreservingMetadata(',
             "pmssRootStageFileWrite(\$path, \$content, \$group['name'], \$mode)",
             'pmssReplaceAccountFile($user, $home, $path, $content, $mode, true)',

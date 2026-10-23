@@ -25,14 +25,12 @@ function pmssSystemStatsKbToHuman(int $kb): string
 function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
 {
     $items = [];
-    foreach (pmssConfigRows($rows, 2, []) as $parts) {
-        $command = (string) $parts[0];
-        $rssKiB = (string) $parts[1];
-        if (preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || !pmssSystemStatsCounterIsValid($rssKiB)) {
+    foreach (pmssConfigRows($rows, 2, []) as [$command, $rssKiB]) {
+        if (preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || ($rssKiB = pmssUnsignedDecimalIntParse($rssKiB)) === null) {
             continue;
         }
 
-        $items[] = $command.':'.pmssSystemStatsKbToHuman((int) $rssKiB);
+        $items[] = $command.':'.pmssSystemStatsKbToHuman($rssKiB);
     }
 
     return empty($items) ? 'na' : implode(',', $items);
@@ -89,9 +87,8 @@ function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
 
     foreach (pmssConfigRows(preg_split('/\r?\n/', $raw) ?: [], 13, []) as $parts) {
         $name = $parts[2];
-        $ioTime = $parts[12];
-        if (pmssBlockDeviceNameIsDataDevice($name) && pmssSystemStatsCounterIsValid($ioTime)) {
-            $stats[$name] = (int) $ioTime;
+        if (pmssBlockDeviceNameIsDataDevice($name) && ($ioTime = pmssUnsignedDecimalIntParse($parts[12])) !== null) {
+            $stats[$name] = $ioTime;
         }
     }
     return $stats;

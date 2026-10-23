@@ -102,15 +102,25 @@ function pmssIopingProbeOutput(?string $target): ?string
 }
 
 function pmssIopingValueToMs(float $value, string $unit): float { return strtolower($unit) === 'us' ? $value / 1000.0 : (strtolower($unit) === 's' ? $value * 1000.0 : $value); }
-function pmssIopingAverageMsFromOutput(string $output): ?float { return preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i', $output, $m) ? pmssIopingValueToMs((float) $m[1], $m[2]) : null; }
+/** Reject malformed or overflowing averages before publishing a latency sample. */
+function pmssIopingAverageMsFromOutput(string $output): ?float
+{
+    if (!preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(us|ms|s)\s*\//i', $output, $m)) return null;
+    $value = pmssIopingValueToMs((float) $m[1], $m[2]);
+    return is_finite($value) ? $value : null;
+}
 
 /** Parse per-request ioping samples, ignoring summary lines. */
 function pmssIopingSamplesMsFromOutput(string $output): array
 {
-    preg_match_all('/\btime\s*=\s*([0-9.]+)\s*(us|ms|s)\b/i', $output, $matches, PREG_SET_ORDER);
-    return array_map(static function (array $match): float {
-        return pmssIopingValueToMs((float) $match[1], $match[2]);
-    }, $matches);
+    preg_match_all('/\btime\s*=\s*([0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(us|ms|s)\b/i', $output, $matches, PREG_SET_ORDER);
+    $values = [];
+    foreach ($matches as $match) {
+        $value = pmssIopingValueToMs((float) $match[1], $match[2]);
+        // Seconds-to-milliseconds conversion can overflow even a finite input.
+        if (is_finite($value)) $values[] = $value;
+    }
+    return $values;
 }
 
 function pmssIopingMedianMsFromSamples(array $values): ?float
@@ -119,7 +129,10 @@ function pmssIopingMedianMsFromSamples(array $values): ?float
     sort($values, SORT_NUMERIC);
     $count = count($values);
     $mid = (int) floor(($count - 1) / 2);
-    return $count % 2 === 1 ? (float) $values[$mid] : ((float) $values[$mid] + (float) $values[$mid + 1]) / 2.0;
+    if ($count % 2 === 1) return (float) $values[$mid];
+    $sum = (float) $values[$mid] + (float) $values[$mid + 1];
+    // Keep legacy rounding unless adding two finite latencies overflows.
+    return is_finite($sum) ? $sum / 2.0 : (float) $values[$mid] / 2.0 + (float) $values[$mid + 1] / 2.0;
 }
 
 function pmssIopingAverageMs(?string $target): ?float

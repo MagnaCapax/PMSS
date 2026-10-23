@@ -82,8 +82,8 @@ PHP
     public function testMemoryStatBatchPreservesFirstNumericRowAndSingleFieldContract(): void
     {
         $path = $this->makeRoot().'/memory.stat';
-        file_put_contents($path, "rss invalid\nrss 12\nrss 34\ncache 9223372036854775807\ncache 5\nswap 0\n");
-        $this->assertSame(['rss' => 12, 'swap' => 0], \pmssResourceLogReadMemoryStatFields($path, ['rss', 'cache', 'swap']));
+        file_put_contents($path, "rss invalid\nrss 00012\nrss 34\ncache 9223372036854775807\ncache 5\nswap 0\nhuge ".PHP_INT_MAX."0\nhuge 7\n");
+        $this->assertSame(['rss' => 12, 'swap' => 0], \pmssResourceLogReadMemoryStatFields($path, ['rss', 'cache', 'swap', 'huge']));
         $this->assertSame(12, \pmssResourceLogReadMemoryStatField($path, 'rss'));
         $this->assertSame(null, \pmssResourceLogReadMemoryStatField($path, 'cache'));
     }

@@ -1093,14 +1093,18 @@ abstract class TestCase
         return $result['output'];
     }
 
-    /** Load a repository PHP library into a fixture namespace for child-process fault injection. */
-    protected function pmssInlinePhpLibraryInNamespace(string $relativePath, string $namespace): string
+    /** Load a facade and optional sibling modules into one fault-injection namespace. */
+    protected function pmssInlinePhpLibraryInNamespace(string $relativePath, string $namespace, array $modules = []): string
     {
         $path = $this->pmssRepoPath($relativePath);
         // Read through the native function even when the fixture intercepts file reads.
         // Preserve library-relative includes after eval changes the source location.
-        return 'eval('.var_export('namespace '.$namespace.';', true).'.substr(str_replace("__DIR__", '.
+        $script = 'eval('.var_export('namespace '.$namespace.';', true).'.substr(str_replace("__DIR__", '.
             var_export(var_export(dirname($path), true), true).', \\file_get_contents('.var_export($path, true).')), 5));';
+        foreach ($modules as $module) {
+            $script .= $this->pmssInlinePhpLibraryInNamespace(dirname($relativePath).'/'.$module, $namespace);
+        }
+        return $script;
     }
 
     /** Route complete-write checks through the child namespace's injected writer. */

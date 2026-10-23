@@ -258,7 +258,7 @@ PHP;
 
     public function testWatchdogPidsRejectZeroAndOverflowWithoutChangingProbeOutput(): void
     {
-        $lines = ['0', '000', '0017', '17', (string) PHP_INT_MAX, (string) PHP_INT_MAX.'0', 'invalid', '-1', ' 9 '];
+        $lines = ['0', '000', '0017', '17', (string) PHP_INT_MAX, '000'.PHP_INT_MAX, PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0', 'invalid', '-1', '+1', '1.0', '1e3', ' 9 '];
         $binDir = $this->pmssMakeLineOutputStub('pgrep', $lines, 'watchdog-pids-');
 
         $this->pmssWithPathPrefix($binDir, function () use ($lines): void {

@@ -77,8 +77,9 @@ function pmssResourceLogReadMemoryStatFields(string $path, array $fields): array
     $wanted = array_fill_keys($fields, true); $values = []; $seen = [];
     foreach (pmssConfigRows(preg_split('/\r?\n/', trim($raw)), 2, [], 2) as [$name, $value]) {
         if (!isset($wanted[$name]) || isset($seen[$name]) || !ctype_digit((string) $value)) continue;
-        $seen[$name] = true; $parsed = (int) $value;
-        if ($parsed >= 0 && $parsed < PMSS_RESOURCE_COUNTER_SENTINEL) $values[$name] = $parsed;
+        // Even an overflowing first numeric row claims the field; later duplicates stay ignored.
+        $seen[$name] = true; $parsed = pmssUnsignedDecimalIntParse($value);
+        if ($parsed !== null && $parsed < PMSS_RESOURCE_COUNTER_SENTINEL) $values[$name] = $parsed;
     }
     return $values;
 }

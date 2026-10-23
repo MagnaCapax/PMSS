@@ -47,3 +47,11 @@ repository snapshot. Characterization tests freeze shared PSI results, CPU/disk
 formatting, last-header selection, truncated rows, alias precedence, missing
 samples and assembled field order. Fault-injection tests load the module that
 now owns the relevant operation. Verification runs on testing machines.
+
+The shared runtime ioping parsers accept decimal latency fields and reject
+malformed numbers or non-finite millisecond conversions. Invalid request rows
+are skipped in order, and an invalid summary average retains the nullable
+failure result. An even-sized median halves its middle values before adding
+only when their sum overflows; ordinary median arithmetic is unchanged.
+`IopingOutputSafetyTest` covers these boundaries with pure fixtures, including
+unit conversion, zero, sample ordering, and very large finite latencies.

@@ -98,10 +98,8 @@ function pmssLockChildClosePrefix(): string
 
     $closeParts = [];
     foreach (explode(',', $raw) as $fdRaw) {
-        $fdRaw = trim($fdRaw);
-        if ($fdRaw === '' || !ctype_digit($fdRaw)) continue;
-        $fd = (int) $fdRaw;
-        if ($fd < 3 || $fd > 1048576) continue;
+        $fd = pmssUnsignedDecimalIntParse(trim($fdRaw));
+        if ($fd === null || $fd < 3 || $fd > 1048576) continue;
         $closeParts[$fd] = $fd.'>&-';
     }
 

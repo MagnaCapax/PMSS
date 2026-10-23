@@ -215,7 +215,7 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testOwnershipMetadataUsesEntryAwareCalls(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/userFileWrite.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/userFileMetadata.php');
         $this->assertStringContainsString('$ownerSet = @lchown($path, $owner);', $source);
         $this->assertStringContainsString('return @lchgrp($path, $group) && $ownerSet;', $source);
         // Link-following ownership calls live only in the opened-inode branch of one helper.
@@ -547,7 +547,7 @@ function random_bytes($length) {
     return str_repeat(chr(++$GLOBALS['attempts']), $length);
 }
 PHP;
-            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'StagingCollisionFixture');
+            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'StagingCollisionFixture', \PMSS_USER_FILE_MODULES);
             $script .= '$root = '.var_export($root, true).'; $GLOBALS["collisions"] = '.var_export($collisions, true).';';
             $script .= <<<'PHP'
 $GLOBALS['attempts'] = 0;
@@ -689,7 +689,7 @@ function fwrite($handle, $bytes) {
     return \fwrite($handle, $bytes);
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'HandleWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'HandleWriteFixture', \PMSS_USER_FILE_MODULES);
         $script .= <<<'PHP'
 $results = [];
 foreach ([0, 1, 3, 7, 8] as $limit) {
