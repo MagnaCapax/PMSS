@@ -119,7 +119,7 @@ final class TorrentClientsP3CatalogTest extends TestCase
         $this->assertSame(['apps', 'qbittorrent-version', 'deluge-version', 'transmission-version', 'rtorrent-version', 'alerts'],
             $run(['system' => []], ['deluge' => ['2.2.0' => []], 'transmission' => ['4.1.3' => []], 'rtorrent' => ['0.16.25' => []]]));
         $this->assertSame(['apps', 'rtorrent-version', 'alerts'], $run([], ['deluge' => [], 'rtorrent' => ['0.16.25' => []]]));
-        $this->assertStringContainsString('<h3 id="qbittorrent-version">qBittorrent version</h3>', $source);
+        $this->assertStringContainsString('<section class="configure-card" id="qbittorrent-version"><h2>qBittorrent version</h2>', $source);
         // The version sections render right after Apps, in the order the index lists them.
         $this->assertTrue(strpos($source, 'id="<?= $client ?>-version"') < strpos($source, '<?php foreach ($ownerCards as $cardId => $card): ?>'));
     }
