@@ -14,8 +14,9 @@ used 0.87–1.0 GB PSS at idle over 15 minutes; the whole account peaked at
 tier cannot hold the idle gateway plus the account's other processes. The
 first gateway start can take a minute or two on a busy server.
 
-In **Configure → Apps**, choose **Turn on** and accept the account command-access
-and AI credit consent. The install runs in the background; allow about three
+In **Configure → Apps**, choose **Turn on**, or press **Start** on the OpenClaw tile
+on Welcome. OpenClaw runs commands as your account and uses your Pulsed Media AI
+credits by default. The install runs in the background; allow about three
 minutes and use **Show log** if needed. **Open** launches the Control UI in a
 separate browser tab with a single-use login handoff. **Restart** and **Turn off**
 use the same account installer; Turn off persists across cron checks.

@@ -306,7 +306,6 @@ function pmssAppsWait(id, desired, deadline) {
 function pmssAppsAct(button, id, action) {
     var row = $(button).closest('.row'), kind = id === 'rtorrent' ? 'rtorrent' : (id === 'lighttpd' ? 'web' : (pmssManagedAppEndpoints[id] ? 'managed' : 'media'));
     if (action === 'log') { $.getJSON(pmssAppsStatusUrl().replace('status=1', 'log=' + encodeURIComponent(id)), function(payload) { row.find('.row-log').html(payload.html || 'No log available.').prop('hidden', false); }); return; }
-    if (kind === 'managed' && action === 'start' && pmssManagedAppConsent[id] && !window.confirm(pmssManagedAppConsent[id])) return;
     if (id === 'rtorrent' && action === 'stop' && !window.confirm('Stop rTorrent? All your torrents stop seeding until you start it again.')) return;
     if (action === 'secure') { if (!window.confirm('Secure this app with its default login?')) return; pmssMediaStackSecureApp(button, id); return; }
     var endpoint = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : (kind === 'web' ? 'lighttpdRestart.php?action=confirm-restart' : pmssManagedAppEndpoints[id] + (pmssManagedAppEndpoints[id].indexOf('?') >= 0 ? '&action=' : '?action=') + action));

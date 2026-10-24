@@ -13,8 +13,7 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
        'endpoint' => 'apps.php?managed=openclaw', 'binaries' => array(dirname(__DIR__).'/.local/share/openclaw/lib/node_modules/openclaw/openclaw.mjs'),
        'installable' => true, 'portMarker' => '.media-stack-port-openclaw', 'stateFile' => '.openclaw/check.state',
        'waitSeconds' => 180, 'url' => 'apps.php?managed=openclaw&action=open', 'log' => true,
-       'statusHelperFile' => 'userOpenClaw.php', 'statusHelper' => 'pmssOpenClawStatusRead',
-       'consent' => 'OpenClaw is an AI agent that can run commands as your account. It uses your Pulsed Media AI credits by default. Continue?'),
+       'statusHelperFile' => 'userOpenClaw.php', 'statusHelper' => 'pmssOpenClawStatusRead'),
   );
   foreach (require __DIR__.'/toggleAppCatalog.php' as $id => $row) {
    $definitions[$id] = array('enable' => '../'.$row['enable'], 'endpoint' => 'toggleApp.php?app='.$id, 'binaries' => $row['binaries']);

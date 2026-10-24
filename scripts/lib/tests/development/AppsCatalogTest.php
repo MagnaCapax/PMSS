@@ -25,7 +25,10 @@ class AppsCatalogTest extends TestCase
         $this->assertSame('.openclaw/check.state', $row['stateFile']);
         $js = \pmssActionScriptJs();
         $this->assertStringContainsAllStrings(array('var pmssManagedAppEndpoints = ', '"openclaw":"apps.php?managed=openclaw"',
-            '"openclaw":180', 'pmssManagedAppConsent[id]', 'pmssManagedAppEndpoints[id]'), $js);
+            '"openclaw":180', 'pmssManagedAppEndpoints[id]'), $js);
+        // One click starts an app in our own service: no accept or confirm step before Turn on (operator 2026-10-24).
+        $this->assertFalse(isset($row['consent']));
+        $this->assertStringNotContainsString('pmssManagedAppConsent[id]', $js);
         $this->assertStringNotContainsString("id === 'qBittorrent' || id === 'Deluge'", $js);
     }
 

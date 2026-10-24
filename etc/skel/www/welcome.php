@@ -468,7 +468,8 @@ if (file_exists('openvpn-config.tgz')) {
 <?php endif; ?>
 
         /* App tiles (operator 2026-10-23: "single click installs and management"): Start and Restart call the same endpoints
-           as Configure's Apps list, through its request helper (XHR header, consent prompts, the qBittorrent password). */
+           as Configure's Apps list, through its request helper (XHR header, the qBittorrent password).
+           One click starts an app: no accept step in our own service (operator 2026-10-24). */
         function pmssAppsMoreToggle(button) {
             var open = document.getElementById('h-apps').classList.toggle('h-apps-all');
             button.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -477,7 +478,6 @@ if (file_exists('openvpn-config.tgz')) {
         $(document).on('click', '.h-app[data-app] button[data-tile-action]', function () {
             var button = this, tile = $(button).closest('.h-app'), id = tile.attr('data-app'), action = $(button).attr('data-tile-action');
             var managed = window.pmssManagedAppEndpoints && pmssManagedAppEndpoints[id], kind = id === 'rtorrent' ? 'rtorrent' : (managed ? 'managed' : 'media');
-            if (kind === 'managed' && action === 'start' && pmssManagedAppConsent[id] && !window.confirm(pmssManagedAppConsent[id])) return;
             var url = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : managed + (managed.indexOf('?') >= 0 ? '&action=' : '?action=') + action);
             var note = tile.find('.h-app-note');
             tile.find('button').prop('disabled', true); note.text(action === 'restart' ? 'Restarting…' : 'Starting…');

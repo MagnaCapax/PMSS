@@ -187,3 +187,13 @@ panel exposure remain as specified above. Hermetic checks exercise quota
 boundaries, debris selection and symlinks, supervisor exports and recovery
 attempts. A live update on a QA account on 2026-10-21 passed for the same
 version and for 2026.10.5 to a beta release, with the gateway healthy after.
+
+## Amendment: no consent step before Turn on (2026-10-24)
+
+The browser confirm that asked the customer to accept account command access and AI
+credit use before Turn on is removed from Configure and from the Welcome tile. The
+operator ruled on 2026-10-24 against "accepting terms before action in our own
+service": one click starts the app. The tile and the Apps row still describe it as
+"AI agent with shell access; uses your Pulsed Media AI credits by default". Turn off
+and the pmss-stopped marker are unchanged, and the installer already ran
+non-interactively with `install --yes` from the panel.

@@ -202,3 +202,12 @@ question answered afterwards took as long as on a larger plan. The floor
 (`pmssUserPikkumiesPreinstallMinRamMiB`) is therefore 400 MiB, for new accounts and for the update
 hook. Plans below 400 MiB keep the opt-in command. The 1000 MiB media-stack note above stays as
 the record of that measurement.
+
+## Amendment 2026-10-24: no terms question on PMSS
+
+The wrapper still passes no `--accept-terms`, and Pikkumies no longer asks on a
+PMSS server: the terms it shows are Pulsed Media's own, which the customer
+accepted at signup (operator 2026-10-24: no "accepting terms before action in our
+own service"). Pikkumies decides this itself from `/etc/seedbox` (its ADR-0032
+amendment of the same date), so existing accounts need no change. The test holds
+on every PMSS server, including PMSS hosts other operators run.
