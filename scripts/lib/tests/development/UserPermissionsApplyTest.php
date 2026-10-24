@@ -215,6 +215,25 @@ class UserPermissionsApplyTest extends TestCase
         $this->assertSame(posix_geteuid(), fileowner($file));
     }
 
+    public function testOwnerApplyWithRootPredicateLeavesAnAccountFileAlone(): void
+    {
+        if (posix_geteuid() === 0) {
+            throw new SkipTest('needs a non-root account so a chown to root would fail visibly');
+        }
+        $home = $this->home();
+        $file = $this->file($home.'/.notifyEmail', 0644, "elsewhere@example.test\n");
+
+        // A file swapped in after the lstat gate is account-owned; -uid 0 keeps chown from reaching it.
+        \pmssUserPermissionsOwnerApply($home, $file, '0:0', '-uid 0');
+        $this->assertSame(0, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
+        $this->assertSame(posix_geteuid(), fileowner($file));
+
+        // Without the predicate the same call does try to adopt it, which fails here.
+        \pmssUserPermissionsOwnerApply($home, $file, '0:0');
+        $this->assertSame(1, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
+        $this->assertSame(posix_geteuid(), fileowner($file));
+    }
+
     public function testUserPermissionsRoutesEveryRepairThroughTheCheckedObject(): void
     {
         $this->pmssAssertRepoFileContract('scripts/util/userPermissions.php', [
@@ -233,7 +252,7 @@ class UserPermissionsApplyTest extends TestCase
             ],
         ]);
         $this->assertOrderedStrings([
-            'return @lstat($path) !== false;',
+            'return @lstat($path) !== false && ($rootArtifactRepairable[$path] ?? true);',
             'pmssTrafficSetImmutable($trafficFile, false);',
             "\$findParts[] = '-execdir chown -h';",
             'pmssUserPermissionsOwnerApply($homeDir, $path, $owner',
