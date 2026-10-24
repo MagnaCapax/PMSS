@@ -49,7 +49,6 @@ function pmssStorageHealthRaidEntriesParse(string $mdstat, string $timestamp): a
                 $entries[$last]['flags'][] = 'degraded';
             }
         } elseif (!empty($entries) && preg_match('/\b(check|resync|recovery|reshape)\b/', $trimmed, $operation) === 1) {
-            $last = count($entries) - 1;
             $entries[$last]['flags'][] = 'rebuild_in_progress';
             $entries[$last]['operation'] = $operation[1];
             $entries[$last]['resync'] = $trimmed;
@@ -94,11 +93,9 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
  */
 function pmssStorageHealthRaidActivitySummaryParse(string $activityLine): array
 {
-    $summary = array_fill_keys(['operation', 'progress', 'eta', 'speed'], '');
+    $summary = [];
     foreach (['operation' => '/\b(check|resync|recovery|reshape)\b/', 'progress' => '/=\s*([0-9.]+%)/', 'eta' => '/\bfinish=([^\s]+)/', 'speed' => '/\bspeed=([^\s]+)/'] as $key => $pattern) {
-        if (preg_match($pattern, $activityLine, $matches) === 1) {
-            $summary[$key] = $matches[1];
-        }
+        $summary[$key] = preg_match($pattern, $activityLine, $matches) === 1 ? $matches[1] : '';
     }
     return $summary;
 }

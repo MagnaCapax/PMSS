@@ -41,10 +41,11 @@ function pmssUserWatchdogTerminateProcesses(string $username, array $processName
     }
 }
 
-/** @return int[] Normalized positive PIDs from a per-user pgrep probe. */
+/** @return int[] Normalized positive PIDs; malformed patterns use the invalid-request result. */
 function pmssUserWatchdogProcessPids(string $username, string $processPattern, array $options = array(), ?int &$exitCode = null, ?array &$output = null): array
 {
-    if (!pmssValidateUsername($username) || $processPattern === '') {
+    // Reject NUL before shell quoting can throw or truncate the process selector.
+    if (!pmssValidateUsername($username) || $processPattern === '' || strpos($processPattern, "\0") !== false) {
         $exitCode = 1;
         $output = array();
         return array();

@@ -104,11 +104,10 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
 function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timestamp): array
 {
     $dev = (string) $disk['path'];
-    if (!is_readable($dev)) {
-        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['device_unreadable'], 'device unreadable');
-    }
-    if (pmssCommandPath('smartctl') === '') {
-        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_missing'], 'smartctl missing');
+    $failure = !is_readable($dev) ? ['device_unreadable', 'device unreadable']
+        : (pmssCommandPath('smartctl') === '' ? ['smartctl_missing', 'smartctl missing'] : null);
+    if ($failure !== null) {
+        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), [$failure[0]], $failure[1]);
     }
 
     $cmd = 'smartctl -n standby -H -A -i '.escapeshellarg($dev);

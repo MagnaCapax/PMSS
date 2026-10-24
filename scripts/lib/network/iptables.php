@@ -85,7 +85,7 @@ function networkParseMonitoringCommands(string $raw): array
         return [];
     }
     $commands = [];
-    foreach (pmssConfigLines(explode("\n", trim($raw))) as $line) {
+    foreach (pmssConfigLines(explode("\n", $raw)) as $line) {
         $line = trim(preg_replace('/^(\/sbin\/iptables|sbin\/iptables|iptables)\s+/', '', $line));
         if ($line === '' || strncmp($line, '-F', 2) === 0 || !networkIptablesCommandSafe($line)) {
             continue;

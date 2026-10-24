@@ -34,9 +34,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
         '/num_err_log_entries\\s*:\\s*(\\d+)/i' => 'num_err_log_entries',
         '/percentage_used\\s*:\\s*(\\d+)/i' => 'percentage_used',
     ] as $pattern => $field) {
-        if (preg_match($pattern, $out, $matches)) {
-            $metrics[$field] = (int) $matches[1];
-        }
+        $metrics[$field] = preg_match($pattern, $out, $matches) ? (int) $matches[1] : null;
     }
     if (preg_match('/temperature\\s*:\\s*([0-9]+)\\s*([KC])?/i', $out, $matches)) {
         $metrics['temperature'] = (int) $matches[1] - (strtoupper($matches[2] ?? 'C') === 'K' ? 273 : 0);

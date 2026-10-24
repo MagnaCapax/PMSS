@@ -875,6 +875,50 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testMeminfoReaderPreservesRepresentableFieldsAndMiB(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-meminfo-');
+        $contents = "MemTotal:       1048576 kB\nMemFree:\t000512 kB\nHugePages_Total: 0\n"
+            .'MaxField: '.PHP_INT_MAX." kB\nPaddedMax: 000".PHP_INT_MAX."\n"
+            ."MemFree: 1024 kB\ninvalid row\nSigned: -1 kB\nBlank:\n";
+        $this->assertSame(strlen($contents), file_put_contents($path, $contents));
+        $this->assertSame([
+            'MemTotal' => 1048576, 'MemFree' => 1024, 'HugePages_Total' => 0,
+            'MaxField' => PHP_INT_MAX, 'PaddedMax' => PHP_INT_MAX,
+        ], \pmssProcMeminfoFieldsRead($path));
+        $this->assertSame(1024, \pmssProcMeminfoTotalMiBRead($path));
+    }
+
+    public function testMeminfoReaderOmitsOverflowWithoutLosingOtherFields(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-meminfo-');
+        foreach ([substr((string) PHP_INT_MAX, 0, -1).'8', (string) PHP_INT_MAX.'0',
+            '000'.PHP_INT_MAX.'0', str_repeat('9', 1000)] as $overflow) {
+            $contents = "MemFree: 512 kB\nMemTotal: ".$overflow." kB\nMemFree: ".$overflow." kB\n";
+            $this->assertSame(strlen($contents), file_put_contents($path, $contents));
+            $this->assertSame(['MemFree' => 512], \pmssProcMeminfoFieldsRead($path));
+            $this->assertSame(0, \pmssProcMeminfoTotalMiBRead($path));
+            $validTotal = "MemTotal: 2048 kB\n";
+            $this->assertSame(strlen($validTotal), file_put_contents($path, $validTotal, FILE_APPEND));
+            $this->assertSame(['MemFree' => 512, 'MemTotal' => 2048], \pmssProcMeminfoFieldsRead($path));
+            $this->assertSame(2, \pmssProcMeminfoTotalMiBRead($path));
+        }
+    }
+
+    public function testMeminfoReaderKeepsEmptyAndUnreadableFallbacks(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-meminfo-');
+        foreach (['', "invalid\nMemTotal: nope\n"] as $contents) {
+            file_put_contents($path, $contents);
+            $this->assertSame([], \pmssProcMeminfoFieldsRead($path));
+            $this->assertSame(0, \pmssProcMeminfoTotalMiBRead($path));
+        }
+        foreach ([$path.'/missing', $path."\0invalid"] as $missing) {
+            $this->assertSame([], \pmssProcMeminfoFieldsRead($missing));
+            $this->assertSame(0, \pmssProcMeminfoTotalMiBRead($missing));
+        }
+    }
+
     public function testSnapshotLogTaskKeepsLifecycleContract(): void
     {
         $logPath = $this->pmssMakeTempPath('pmss-runtime-snapshot-', '.log');

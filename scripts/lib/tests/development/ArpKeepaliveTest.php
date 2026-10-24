@@ -52,6 +52,67 @@ class ArpKeepaliveTest extends TestCase
         $this->assertFalse($sent);
     }
 
+    public function testNulMarkerBytesAreRejectedBeforeNormalizationCanAuthorizeSend(): void
+    {
+        foreach (["\0".'10.0.0.9', "10.0.0.9\0", " \0 10.0.0.9 \n", "10.0.0.9\0\n", "10.0.\0.9"] as $raw) {
+            $out = $this->runKeepalive($this->marker($raw), "10.0.0.9 dev eth0\n", self::ARP_HEADER, $sent);
+            $this->assertTrue(strpos($out, 'skip: marker does not hold a single IPv4 address') !== false);
+            $this->assertFalse($sent);
+        }
+    }
+
+    public function testSocketBoundaryValidationAndCleanupWithoutNetworkAccess(): void
+    {
+        // Replace socket creation with a memory stream; record every request and close.
+        $script = <<<'PHP'
+namespace ArpSocketFixture;
+function stream_socket_client($address, &$errno, &$errstr, $timeout) {
+    $GLOBALS['requests'][] = [$address, $timeout];
+    return $GLOBALS['openFails'] ? false : ($GLOBALS['socket'] = \fopen('php://memory', 'w+'));
+}
+function fwrite($handle, $payload) {
+    $GLOBALS['payloads'][] = $payload;
+    if ($GLOBALS['failure'] !== null) throw $GLOBALS['failure'];
+    return $GLOBALS['writeResult'];
+}
+function fclose($handle) {
+    ++$GLOBALS['closes'];
+    return \fclose($handle);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/arpKeepalive.php', 'ArpSocketFixture');
+        $script .= <<<'PHP'
+[$ip, $GLOBALS['openFails'], $GLOBALS['writeResult'], $failureType] = json_decode(getenv('PMSS_TEST_ARP_SOCKET'), true);
+$GLOBALS['requests'] = $GLOBALS['payloads'] = [];
+$GLOBALS['closes'] = 0;
+$GLOBALS['socket'] = null;
+$GLOBALS['failure'] = $failureType === '' ? null : new $failureType('write failure');
+$result = null;
+$caught = null;
+try {
+    $result = pmssArpKeepaliveSend($ip);
+} catch (\Throwable $error) {
+    $caught = $error;
+}
+echo json_encode([$result, $GLOBALS['requests'], $GLOBALS['payloads'], $GLOBALS['closes'],
+    is_resource($GLOBALS['socket']), $caught === $GLOBALS['failure']]);
+PHP;
+        foreach (['', 'localhost', '::1', '999.1.1.1', '10.0.0.9:10', "10.0.0.9\n", "\0".'10.0.0.9', "10.0.0.9\0"] as $invalid) {
+            $this->assertSame([false, [], [], 0, false, true], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_ARP_SOCKET' => json_encode([$invalid, false, 1, '']),
+            ]));
+        }
+        foreach ([[true, 1, ''], [false, false, ''], [false, 0, ''], [false, 1, ''],
+            [false, 1, 'RuntimeException'], [false, 1, 'Error']] as [$openFails, $writeResult, $failureType]) {
+            $this->assertSame([
+                $failureType !== '' ? null : (!$openFails && $writeResult === 1),
+                [['udp://10.0.0.9:9', 1]], $openFails ? [] : ['k'], $openFails ? 0 : 1, false, true,
+            ], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_ARP_SOCKET' => json_encode(['10.0.0.9', $openFails, $writeResult, $failureType]),
+            ]));
+        }
+    }
+
     public function testEmptyRouteOutputIsTreatedAsNotOnLink(): void
     {
         $this->assertFalse(\pmssArpKeepaliveIsOnLink(''));

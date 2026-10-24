@@ -50,6 +50,14 @@ An answering address is refused with a WARN line: the kernel would stop
 broadcasting for it, so the keepalive would silently stop working. Output is one
 line per run to `/var/log/pmss/arpKeepalive.log`, which logrotate bounds.
 
+Marker parsing rejects NUL bytes in the original read before whitespace
+normalization can authorize a send. The socket helper independently requires
+a literal IPv4 address before opening a socket, so malformed direct calls cannot
+trigger hostname lookup. Its socket closes even when a write throws, preserving
+the original exception. Valid markers retain their whitespace normalization,
+single `k` datagram, port, timeout and log format. `ArpKeepaliveTest` covers these
+boundaries with memory streams, without network access.
+
 ## Consequences
 
 - Default fleet behaviour is unchanged. Hosts without the marker run a no-op.

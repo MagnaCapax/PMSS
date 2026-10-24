@@ -326,4 +326,34 @@ PHP;
         $this->assertStringContainsString('WARN: unsafe changed config report path:', $output);
         $this->assertFalse(file_exists($this->tempDir.'/changedConfigs'));
     }
+
+    public function testChangedConfigReportWarnsOnIncompleteWrites(): void
+    {
+        // Reuse the marker-write fixture to inject report failures without live cron paths.
+        $script = 'namespace WatchdogReportWriteFixture;'.$this->pmssInlinePhpLimitedWriteShims().$this->pmssInlinePhpFileWriteCompleteShim();
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/watchdog.php', 'WatchdogReportWriteFixture');
+        $script .= <<<'PHP'
+[$path, $changes, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_REPORT_WRITE'), true);
+$GLOBALS['requests'] = [];
+ob_start();
+$result = pmssCheckRtorrentPublishChangedConfigReport($changes, $path, false);
+$output = ob_get_clean();
+echo json_encode([$result, file_get_contents($path),
+    strpos($output, 'WARN: failed to write changed config report: '.$path) !== false, $GLOBALS['requests']]);
+PHP;
+        $path = $this->tempDir.'/changedConfigs';
+        foreach ([[''], ['0'], ['alice -> bob'], ['alice -> bob', 'carol -> dave']] as $changes) {
+            $payload = implode("\n", $changes);
+            foreach ([false, 0, 1, max(0, strlen($payload) - 1), strlen($payload), null] as $limit) {
+                file_put_contents($path, 'prior report');
+                $bytes = $limit === false ? 'prior report' : ($limit === null ? $payload : substr($payload, 0, $limit));
+                $complete = $limit !== false && ($limit === null || $limit >= strlen($payload));
+                // Retain void return, one unflagged write, original bytes and no retry/cleanup.
+                $this->assertSame([null, $bytes, !$complete, [[$path, $payload, 0]]],
+                    $this->pmssRunInlinePhpJson($script, [
+                        'PMSS_TEST_REPORT_WRITE' => json_encode([$path, $changes, $limit]),
+                    ]));
+            }
+        }
+    }
 }

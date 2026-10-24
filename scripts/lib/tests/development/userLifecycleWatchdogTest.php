@@ -6,6 +6,58 @@ require_once dirname(__DIR__, 2).'/user/watchdog.php';
 
 class UserLifecycleWatchdogTest extends TestCase
 {
+    public function testMalformedProcessPatternsSkipProbeAndResetReferences(): void
+    {
+        $log = $this->pmssMakeTempFile('watchdog-pgrep-invalid-');
+        $binDir = $this->pmssMakeInvocationLogStub('pgrep', $log, 'watchdog-pgrep-invalid-bin-');
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            foreach (['', "\0", "\0^demo", "^de\0mo", "^demo\0", " \0 "] as $pattern) {
+                $rc = 99;
+                $output = ['stale'];
+                list($pids, $stdout) = $this->pmssCaptureStdout(function () use ($pattern, &$rc, &$output): array {
+                    return pmssUserWatchdogProcessPids('alice', $pattern, ['full' => true, 'captureStderr' => true], $rc, $output);
+                });
+                $this->assertSame([], $pids);
+                $this->assertSame(1, $rc);
+                $this->assertSame([], $output);
+                $this->assertSame('', $stdout);
+                $this->assertFalse(pmssUserWatchdogProcessRunning('alice', $pattern));
+                $this->assertSame(null, pmssUserWatchdogProcessStartTime('alice', $pattern));
+            }
+        });
+        $this->assertSame('', file_get_contents($log));
+    }
+
+    /** Record command bytes without observing or signaling the testing machine's processes. */
+    public function testValidProcessPatternsPreserveProbeCommandAndResults(): void
+    {
+        $script = <<<'PHP'
+namespace WatchdogPatternFixture;
+function exec($command, &$output, &$rc) {
+    $GLOBALS['commands'][] = $command;
+    $output = ['0017', '17', '9'];
+    $rc = 0;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'WatchdogPatternFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach ([['^demo', []], ["demo's", ['full' => true]], [' demo ', ['exact' => true]],
+    ['^demo.*worker$', ['full' => true, 'exact' => true, 'captureStderr' => true]]] as $case) {
+    $rc = 99;
+    $output = ['stale'];
+    $pids = pmssUserWatchdogProcessPids('alice', $case[0], $case[1], $rc, $output);
+    $results[] = [$pids, $rc, $output];
+}
+echo json_encode([$GLOBALS['commands'], $results]);
+PHP;
+        $this->assertSame([
+            ["pgrep -u 'alice' '^demo' 2>/dev/null", "pgrep -u 'alice' -f 'demo'\\''s' 2>/dev/null",
+                "pgrep -u 'alice' -x ' demo ' 2>/dev/null", "pgrep -u 'alice' -f -x '^demo.*worker$' 2>&1"],
+            array_fill(0, 4, [[17, 9], 0, ['0017', '17', '9']]),
+        ], $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testRegenerationTimeoutRecordsLighttpdBackoff(): void
     {
         $runtime = $this->pmssMakeTempDir('pmss-lighttpd-regen-');

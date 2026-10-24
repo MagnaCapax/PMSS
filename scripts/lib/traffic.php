@@ -80,7 +80,7 @@ function pmssTrafficParseOutputUsage(string $usage, array $localnets): array
     $traffic = $local = [];
     $unmatched = 0;
     $localnetLookup = array_fill_keys(array_filter($localnets, 'is_string'), true);
-    foreach (pmssConfigLines(preg_split('/\r?\n/', trim($usage)), []) as $trimmed) {
+    foreach (pmssConfigLines(preg_split('/\r?\n/', $usage), []) as $trimmed) {
         if (strpos($trimmed, 'Chain OUTPUT (') === 0) {
             preg_match('/,\s*([0-9]+)\s+bytes\)/', $trimmed, $matches) === 1 && $unmatched = (int) $matches[1];
             continue;

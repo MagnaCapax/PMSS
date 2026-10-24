@@ -194,7 +194,12 @@ function pmssReadRegularFileNonEmptyLines(string $path): array { $lines = preg_s
 function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
 {
     $fields = [];
-    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) if (preg_match('/^(\w+):\s+(\d+)/', $line, $matches) === 1) $fields[$matches[1]] = (int) $matches[2];
+    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) {
+        if (preg_match('/^(\w+):\s+(\d+)/', $line, $matches) !== 1) continue;
+        // An oversized sample cannot prove available memory; retain missing-field fallbacks.
+        $value = pmssUnsignedDecimalIntParse($matches[2]);
+        if ($value !== null) $fields[$matches[1]] = $value;
+    }
     return $fields;
 }
 

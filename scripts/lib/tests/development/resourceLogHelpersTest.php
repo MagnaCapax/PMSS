@@ -86,6 +86,8 @@ PHP
         $this->assertSame(['rss' => 12, 'swap' => 0], \pmssResourceLogReadMemoryStatFields($path, ['rss', 'cache', 'swap', 'huge']));
         $this->assertSame(12, \pmssResourceLogReadMemoryStatField($path, 'rss'));
         $this->assertSame(null, \pmssResourceLogReadMemoryStatField($path, 'cache'));
+        $this->assertSame(['swap' => 0], \pmssResourceLogReadMemoryStatFields($path, ['swap', 'swap', 'missing']));
+        $this->assertSame([], \pmssResourceLogReadMemoryStatFields($path, []));
     }
 
     private function makeCounters(int $ioRead, int $ioWrite, int $cpuNsec, int $memory, int $tasks, int $ioReadOps = 0, int $ioWriteOps = 0): array

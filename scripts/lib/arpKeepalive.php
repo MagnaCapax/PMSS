@@ -25,12 +25,14 @@ function pmssArpKeepaliveTarget(string $markerPath, ?string &$error = null): ?st
     if (!is_file($markerPath)) {
         return null;
     }
-    $raw = trim((string)@file_get_contents($markerPath, false, null, 0, 64));
-    if (filter_var($raw, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+    $raw = (string)@file_get_contents($markerPath, false, null, 0, 64);
+    $target = trim($raw);
+    // Do not let trim() turn malformed marker bytes into an accepted address.
+    if (strpos($raw, "\0") !== false || filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
         $error = 'marker does not hold a single IPv4 address';
         return null;
     }
-    return $raw;
+    return $target;
 }
 
 /** True when the kernel would reach $ip directly (no gateway hop). */
@@ -56,13 +58,20 @@ function pmssArpKeepaliveNeighbourState(string $procNetArp, string $ip): string
 /** Send one UDP datagram to $ip:9 (discard). Returns true when it was handed to the kernel. */
 function pmssArpKeepaliveSend(string $ip): bool
 {
+    // Validate at the socket boundary too; callers must never trigger name lookup.
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+        return false;
+    }
     $sock = @stream_socket_client('udp://'.$ip.':9', $errno, $errstr, 1);
     if ($sock === false) {
         return false;
     }
-    $ok = @fwrite($sock, 'k') === 1;
-    fclose($sock);
-    return $ok;
+    try {
+        return @fwrite($sock, 'k') === 1;
+    } finally {
+        // Release the socket even when writing throws; preserve the original error.
+        fclose($sock);
+    }
 }
 
 /** One run: returns a single log line (never throws). */

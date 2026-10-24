@@ -115,13 +115,13 @@ function pmssStorageHealthMetricIncreaseFlags(array $metrics, ?array $previous, 
  */
 function pmssStorageHealthProbeCommand(string $kind, string $kname, string $command): array
 {
-    if (pmssCommandPath('flock') === ''
+    $flock = pmssCommandPath('flock');
+    if ($flock === ''
         || preg_match('/^[A-Za-z0-9._!+-]+$/D', $kind) !== 1
         || preg_match('/^[A-Za-z0-9._!+-]+$/D', $kname) !== 1) {
         return ['command' => $command, 'lock_exit_code' => 0];
     }
 
-    $flock = pmssCommandPath('flock');
     $lockPath = pmssRuntimeLockPath('pmss-storage-'.$kind.'-'.$kname.'.lock');
     return [
         'command' => escapeshellarg($flock).' -xn -E 75 '.escapeshellarg($lockPath).' '.$command,

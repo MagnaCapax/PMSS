@@ -69,6 +69,8 @@ class CertbotRenewalLogTest extends TestCase
         $this->assertSame('noop', \pmssCertbotRenewalSummaryFromLog($log."\nNo renewals were attempted.\n")['status']);
         $this->assertSame('fail', \pmssCertbotRenewalSummaryFromLog("Failed to renew certificate example\n")['status']);
         $this->assertSame('ok', \pmssCertbotRenewalSummaryFromLog("All renewals succeeded; some renewals have failed\n")['status']);
+        $this->assertSame(['status' => 'fail', 'event_ts' => null, 'event' => 'All renewals failed.', 'error_excerpt' => '  All renewals failed.'],
+            \pmssCertbotRenewalSummaryFromLog($log."\n  All renewals failed.  \n\n2026-01-29 00:00:00 next entry\n", 0));
     }
 
     public function testFileSummaryKeepsWholeAndTailReadResults(): void

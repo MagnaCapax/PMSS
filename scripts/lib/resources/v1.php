@@ -74,11 +74,11 @@ function pmssResourceLogReadMemoryStatFields(string $path, array $fields): array
 {
     $raw = pmssReadRegularFileContents($path);
     if ($raw === null || trim($raw) === '') return [];
-    $wanted = array_fill_keys($fields, true); $values = []; $seen = [];
+    $wanted = array_fill_keys($fields, true); $values = [];
     foreach (pmssConfigRows(preg_split('/\r?\n/', trim($raw)), 2, [], 2) as [$name, $value]) {
-        if (!isset($wanted[$name]) || isset($seen[$name]) || !ctype_digit((string) $value)) continue;
+        if (!isset($wanted[$name]) || !ctype_digit((string) $value)) continue;
         // Even an overflowing first numeric row claims the field; later duplicates stay ignored.
-        $seen[$name] = true; $parsed = pmssUnsignedDecimalIntParse($value);
+        unset($wanted[$name]); $parsed = pmssUnsignedDecimalIntParse($value);
         if ($parsed !== null && $parsed < PMSS_RESOURCE_COUNTER_SENTINEL) $values[$name] = $parsed;
     }
     return $values;
@@ -116,11 +116,12 @@ function pmssResourceV1ReadMetrics(int $uid, ?string $cgroupRoot = null, ?array 
         'pids/pids.current' => 'pids_current',
         'pids/pids.events' => ['pids_events_max' => 'max'],
     ];
+    $wanted = $wanted === null ? null : array_flip($wanted);
     $metrics = [];
     foreach ($sources as $source => $fields) {
         [$controller, $file] = explode('/', $source, 2);
         $fields = is_string($fields) ? [$fields => ''] : $fields;
-        if ($wanted !== null) $fields = array_intersect_key($fields, array_flip($wanted));
+        if ($wanted !== null) $fields = array_intersect_key($fields, $wanted);
         if ($fields === []) continue;
         $path = $root.'/'.$controller.$slice.$file;
         $values = reset($fields) === '' ? ['' => pmssResourceLogReadSysfsCounter($path)]

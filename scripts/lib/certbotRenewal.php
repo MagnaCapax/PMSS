@@ -36,10 +36,10 @@ function pmssCertbotParseLogTimestamp(string $line): ?int
 function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12): array
 {
     $lines = preg_split("/\\r?\\n/", $log) ?: [];
-    // Only the last summary is consumed; retain its source index for the excerpt.
-    $last = null;
+    // Stop at the last summary; retain its source index for the excerpt.
     $count = count($lines);
-    foreach ($lines as $i => $line) {
+    for ($i = $count - 1; $i >= 0; $i--) {
+        $line = $lines[$i];
         $lower = strtolower($line);
 
         if (strpos($lower, 'all renewals succeeded') !== false) {
@@ -54,15 +54,10 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
             continue;
         }
 
-        $last = [
-            'idx'  => $i,
-            'ts'   => pmssCertbotParseLogTimestamp($line),
-            'type' => $type,
-            'line' => trim($line),
-        ];
+        break;
     }
 
-    if ($last === null) {
+    if ($i < 0) {
         return [
             'status'        => 'unknown',
             'event_ts'      => null,
@@ -72,16 +67,15 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
     }
 
     $excerpt = '';
-    if ($last['type'] === 'fail') {
-        $start = $last['idx'];
+    if ($type === 'fail') {
         $buf = [];
-        for ($j = $start; $j < $count; $j++) {
+        for ($j = $i; $j < $count; $j++) {
             $l = rtrim((string)$lines[$j]);
             if ($l === '') {
                 continue;
             }
             // Stop once we hit the next timestamped certbot entry.
-            if ($j > $start && pmssCertbotParseLogTimestamp($l) !== null) {
+            if ($j > $i && pmssCertbotParseLogTimestamp($l) !== null) {
                 break;
             }
             $buf[] = $l;
@@ -93,9 +87,9 @@ function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12):
     }
 
     return [
-        'status'        => $last['type'],
-        'event_ts'      => $last['ts'],
-        'event'         => $last['line'] !== '' ? $last['line'] : 'Renewal summary marker found',
+        'status'        => $type,
+        'event_ts'      => pmssCertbotParseLogTimestamp($line),
+        'event'         => trim($line),
         'error_excerpt' => $excerpt,
     ];
 }

@@ -99,7 +99,8 @@ function pmssCheckRtorrentPublishChangedConfigReport(array $changedConfig, strin
     }
 
     if ($changedConfig !== array()) {
-        if (@file_put_contents($path, implode("\n", $changedConfig)) === false) {
+        // A partial report must surface through the same warning as a failed write.
+        if (!pmssFileWriteComplete($path, implode("\n", $changedConfig))) {
             pmssCheckRtorrentLog("WARN: failed to write changed config report: {$path}", true, $debug);
         }
         return;

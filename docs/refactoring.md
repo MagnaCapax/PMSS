@@ -363,9 +363,10 @@ stack traces beginning with `#`. `pmssConfigRows()` uses the same line iterator
 semantics through the column parser, trimming and filtering each source row once
 before applying its existing column-count and split-limit rules.
 
-Parser compression retains source positions and result bytes. Certbot keeps only
-the last summary marker and its excerpt offset; whole-file and tail reads share
-the same summary path. Quota normalization preserves trailing empty split fields,
+Parser compression retains source positions and result bytes. Certbot scans
+backwards to the last summary marker; whole-file and tail reads share that path.
+Cgroup fields consume their wanted map at the first numeric row, even overflow.
+Quota normalization preserves trailing empty split fields,
 and PSI fields share one unavailable-value path while keeping their existing bounds.
 Both Certbot file-read branches enforce the requested byte budget, including
 when file size is unavailable or the log grows after stat. Nonpositive budgets
