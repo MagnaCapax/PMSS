@@ -57,7 +57,11 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
     $bash = $inheritTty ? $bash : pmssCommandProcessGroupWrap($bash, $timeoutSec);
 
     $pipes = [];
-    $descriptor = $inheritTty ? [0 => STDIN, 1 => STDOUT, 2 => STDERR] : pmssProcessPipeDescriptorSpec();
+    // Inherited stdio is left out of the spec so the child gets fds 0-2 as they are. Passing the
+    // STDIN/STDOUT/STDERR resources makes proc_open cast them to fds, and that cast seeks a regular
+    // file back to the stream's own write position, so a redirected log loses everything that
+    // echo or a child wrote after the caller's last fwrite.
+    $descriptor = $inheritTty ? [] : pmssProcessPipeDescriptorSpec();
     for ($attempt = 0; $attempt < ($retryLaunch ? 2 : 1); $attempt++) {
         if ($attempt > 0) usleep(500000);
         // Inherited-terminal launch warnings remain visible as before.

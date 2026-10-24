@@ -19,7 +19,7 @@ function pmssCredentialProcessRun(string $command, ?string $credential, ?array &
     }
     $descriptors = $capture
         ? [0 => ['pipe', 'r'], 1 => ['pipe', 'w']]
-        : [0 => ['pipe', 'r'], 1 => STDOUT, 2 => STDERR];
+        : [0 => ['pipe', 'r']]; // fds 1-2 inherited; passing STDOUT/STDERR would seek a redirected log back
     $process = @proc_open($capture ? $command.' 2>&1' : $command, $descriptors, $pipes);
     if (!is_resource($process)) {
         return 1;

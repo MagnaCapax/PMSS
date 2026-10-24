@@ -730,6 +730,26 @@ PHP;
         ], $result);
     }
 
+    public function testInheritedStdioKeepsEveryByteOfARedirectedStdoutFile(): void
+    {
+        // The suite runner and cron jobs write stdout to a regular file. Inherited-stdio launches
+        // must not move that file's offset: everything echoed or written by a child stays in order.
+        $out = $this->pmssMakeTempFile('pmss-inherit-stdout-');
+        $lib = dirname(__DIR__, 2);
+        $code = 'require '.var_export($lib.'/runtime.php', true).'; '
+            .'require_once '.var_export($lib.'/user/credentialProcess.php', true).'; '
+            .'fwrite(STDOUT, "A-fwrite\n"); echo "B-echo\n"; passthru("echo C-child"); '
+            .'pmssCommandInheritedTtyCapture("/bin/echo D-inherited", "inherit-order-test", 5); '
+            .'fwrite(STDOUT, "E-fwrite\n"); echo "F-echo\n"; '
+            .'pmssCredentialProcessRun("/bin/echo G-credential", null); '
+            .'fwrite(STDOUT, "H-fwrite\n");';
+        exec('timeout --kill-after=2s 10s '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code)
+            .' > '.escapeshellarg($out).' 2>/dev/null', $ignored, $rc);
+        $this->assertSame(0, $rc);
+        $this->assertSame("A-fwrite\nB-echo\nC-child\nD-inherited\nE-fwrite\nF-echo\nG-credential\nH-fwrite\n",
+            file_get_contents($out));
+    }
+
     public function testInheritedTtyCaptureKeepsResultShape(): void
     {
         foreach ([0, 5, 42, 124, 137, 255] as $rc) {

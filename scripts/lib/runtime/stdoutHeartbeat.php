@@ -20,9 +20,9 @@ function pmssStdoutHeartbeatStart(int $intervalSeconds = 5): ?int
     $parentPid = getmypid();
     $loop = 'while kill -0 '.(int) $parentPid.' 2>/dev/null; do printf "\\n"; sleep '.(int) $intervalSeconds.' 1>/dev/null; done';
     // exec makes proc_get_status() identify the loop itself, not a wrapper shell.
+    // fd 1 is inherited by leaving it out: passing STDOUT would seek a redirected log file back.
     $process = @proc_open('exec /bin/sh -c '.escapeshellarg($loop), array(
         0 => array('file', '/dev/null', 'r'),
-        1 => STDOUT,
         2 => array('file', '/dev/null', 'w'),
     ), $pipes);
     if (!is_resource($process)) {

@@ -359,7 +359,8 @@ function pmssAiCodexExec(array $decision)
     foreach ($argv as $arg) {
         $command .= ' '.escapeshellarg($arg);
     }
-    $process = @proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $decision['env']);
+    // Empty spec: the child inherits fds 0-2 as they are (passing STDOUT would seek a redirected file back).
+    $process = @proc_open($command, [], $pipes, null, $decision['env']);
     if (!is_resource($process)) {
         throw new RuntimeException('Unable to start Codex');
     }
