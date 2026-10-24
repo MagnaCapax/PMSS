@@ -58,7 +58,8 @@ function pmssConfigureTorrentClientStop($home)
         if (!in_array($pid, pmssConfigureTorrentClientNativePids($home), true)
             || !@posix_kill($pid, 15)) return false;
     }
-    for ($attempt = 0; $attempt < 30; $attempt++) {
+    // Saving resume data for many torrents takes far longer than a few seconds; starting early hands off to the exiting daemon.
+    for ($attempt = 0; $attempt < 600; $attempt++) {
         if (pmssConfigureTorrentClientNativePids($home) === array()) return true;
         usleep(100000);
     }
@@ -88,7 +89,17 @@ function pmssConfigureTorrentClientStart($home, $version)
     if (!is_string($binary) || ($version !== 'system' && !is_file($binary))) return false;
     $rc = 1;
     @exec('cd '.escapeshellarg($home).' && '.escapeshellarg($binary).' -d >/dev/null 2>&1', $unused, $rc);
-    return $rc === 0;
+    if ($rc !== 0) return false;
+    // qbittorrent-nox -d exits 0 even when it handed off to another instance; started means the asked build runs.
+    $expected = $version === 'custom' ? 'custom build' : (string) $version;
+    for ($attempt = 0; $attempt < 200; $attempt++) {
+        if (pmssConfigureTorrentClientRunningVersion($home) === $expected) {
+            sleep(3);
+            return pmssConfigureTorrentClientRunningVersion($home) === $expected;
+        }
+        usleep(100000);
+    }
+    return false;
 }
 /** Snapshot, stop, select and start under one account-owned client lock. */
 function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())

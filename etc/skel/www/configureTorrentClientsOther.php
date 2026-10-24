@@ -51,7 +51,8 @@ function pmssConfigureTorrentClientOtherStop($home, $client)
         if (!in_array($pid, pmssConfigureTorrentClientOtherPids($home, $client), true)
             || !@posix_kill($pid, 15)) return false;
     }
-    for ($attempt = 0; $attempt < 30; $attempt++) {
+    // Saving resume data for many torrents takes far longer than a few seconds.
+    for ($attempt = 0; $attempt < 600; $attempt++) {
         if (pmssConfigureTorrentClientOtherPids($home, $client) === array()) return true;
         usleep(100000);
     }
