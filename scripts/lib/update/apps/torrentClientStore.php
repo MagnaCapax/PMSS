@@ -1,12 +1,8 @@
 <?php
-/** Optional host store hook. Loading it without the marker is strictly inert. */
+/** Converge the host's torrent-client store during each normal update. */
 
 /** Never let optional client setup abort update-step2's uncaught include. */
-function pmssTorrentClientStoreRun(
-    string $marker = '/etc/seedbox/config/torrentClients.enabled',
-    array $ops = []
-): void {
-    if (!is_file($marker)) return;
+function pmssTorrentClientStoreRun(array $ops = []): void {
     try {
         require_once dirname(__DIR__, 2).'/torrentClients/catalog.php';
         require_once dirname(__DIR__, 2).'/torrentClients/store.php';

@@ -17,11 +17,19 @@ function pmssConfigureTorrentClientVersionsRead($path = '/var/lib/pmss/public/to
     return $versions;
 }
 
-/** Offer versions only while the host marker is set; a projection left after opt-out offers none. */
-function pmssConfigureTorrentClientVersionsOffered($client = 'qbittorrent', $marker = '/etc/seedbox/config/torrentClients.enabled',
+/** Offer installed client versions from the root-published projection. */
+function pmssConfigureTorrentClientVersionsOffered($client = 'qbittorrent',
     $path = '/var/lib/pmss/public/torrentClients.json')
 {
-    return is_file($marker) ? pmssConfigureTorrentClientVersionsRead($path, $client) : array();
+    return pmssConfigureTorrentClientVersionsRead($path, $client);
+}
+
+/** Name the libtorrent generation of a curated qBittorrent build in words. */
+function pmssConfigureTorrentClientVersionLabel($version): string
+{
+    $version = (string) $version;
+    return preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)-lt(1\.2|2\.0)\z/', $version, $m) === 1
+        ? $m[1].' (libtorrent '.$m[2].')' : $version;
 }
 
 /** Numeric releases, including curated libtorrent suffixes, prove major downgrades. */

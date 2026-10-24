@@ -97,6 +97,32 @@ final class TorrentClientsP3CatalogTest extends TestCase
         $this->assertStringContainsString('Back up the current configuration and restart qBittorrent with this version?', $source);
     }
 
+    public function testConfigureNamesLibtorrentBuildsAndIndexesVersionSections(): void
+    {
+        require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsVersion.php';
+        $this->assertSame('5.2.4 (libtorrent 1.2)', \pmssConfigureTorrentClientVersionLabel('5.2.4-lt1.2'));
+        $this->assertSame('4.3.9 (libtorrent 2.0)', \pmssConfigureTorrentClientVersionLabel('4.3.9-lt2.0'));
+        foreach (['system', '0.16.25', '0.9.8-stickz7.2', 'not running', '5.2.4-lt3.0'] as $plain)
+            $this->assertSame($plain, \pmssConfigureTorrentClientVersionLabel($plain));
+        $source = $this->pmssReadRepoFile('etc/skel/www/configure.php');
+        $start = strpos($source, '$versionSections = array();');
+        $endMark = '$versionSections, array_slice($sections, 1, null, true));';
+        $this->assertTrue($start !== false && strpos($source, $endMark, $start) !== false);
+        $block = substr($source, $start, strpos($source, $endMark, $start) + strlen($endMark) - $start);
+        $run = function (array $qbit, array $other) use ($block): array {
+            $sections = ['apps' => 'Apps', 'alerts' => 'Usage alert email'];
+            $torrentVersions = $qbit;
+            $otherTorrentVersions = $other;
+            eval($block);
+            return array_keys($sections);
+        };
+        $this->assertSame(['apps', 'qbittorrent-version', 'deluge-version', 'transmission-version', 'rtorrent-version', 'alerts'],
+            $run(['system' => []], ['deluge' => ['2.2.0' => []], 'transmission' => ['4.1.3' => []], 'rtorrent' => ['0.16.25' => []]]));
+        $this->assertSame(['apps', 'rtorrent-version', 'alerts'], $run([], ['deluge' => [], 'rtorrent' => ['0.16.25' => []]]));
+        $this->assertStringContainsString('<h3 id="qbittorrent-version">qBittorrent version</h3>', $source);
+        // The version sections render right after Apps, in the order the index lists them.
+        $this->assertTrue(strpos($source, 'id="<?= $client ?>-version"') < strpos($source, '<?php foreach ($ownerCards as $cardId => $card): ?>'));
+    }
     public function testResolverRequiresPublishedSocketCapability(): void
     {
         $root = $this->pmssMakeTempDir('pmss-p3-resolve-');

@@ -19,16 +19,11 @@ final class TorrentClientsP6VenvTest extends TestCase
         return [$root, $entry];
     }
 
-    public function testMarkerOffAndNoDelugeVersionNeverInvokeInstaller(): void
+    public function testSystemDelugeNeverInvokesStoreInstaller(): void
     {
         [$root, $entry] = $this->fixture();
         $calls = 0;
         $install = static function () use (&$calls): void { $calls++; };
-        $marker = $root.'/missing-marker';
-        $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_TEST_MARKER' => $marker], function () use ($root, $entry, $install): void {
-            $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', ['install' => $install]));
-        });
-        $this->assertSame(0, $calls);
         $results = \pmssTorrentClientsStoreConverge([['client' => 'deluge', 'version' => 'system',
             'kind' => 'system', 'disabled' => false]], ['root' => $root, 'install' => $install]);
         $this->assertSame([], $results);

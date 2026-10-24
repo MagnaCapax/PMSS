@@ -46,3 +46,5 @@ root-owned public directory. Logs contain client/version status, no account
 credentials. A compromised tenant may alter only its own links and cannot
 change the store or another tenant's default. The marker should remain absent
 until curated remote entries and live-host validation are ready.
+
+Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).

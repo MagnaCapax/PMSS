@@ -22,16 +22,6 @@ function pmssTorrentClientsVersionValid($version): bool
     return is_string($version) && preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/', $version) === 1;
 }
 
-/** The development suite exercises writers only inside its temporary tree. */
-function pmssTorrentClientsMarkerEnabled(): bool
-{
-    if (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE) {
-        $fixture = getenv('PMSS_TORRENT_CLIENTS_TEST_MARKER');
-        return $fixture === false ? true : is_file($fixture);
-    }
-    return is_file('/etc/seedbox/config/torrentClients.enabled');
-}
-
 /** Missing components may be created later; existing ones must be trusted. */
 function pmssTorrentClientsStorePathChainSafe(string $root, string $client = '', string $version = ''): bool
 {

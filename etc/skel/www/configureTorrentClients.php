@@ -134,6 +134,8 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
     $repointed = $stopped && $repoint($home, $version);
     $ok = $repointed && pmssConfigureFileWrite($dir.'/qbittorrent.lastRun', $version."\n")
         && $start($home, $version) && pmssConfigureFileWrite($dir.'/qbittorrent.lastgood', $version."\n");
+    // The switch starts the chosen build, so Apps shows qBittorrent on and the watchdog keeps it running.
+    if ($ok) @touch($home.'/.qbittorrentEnable');
     $restored = true;
     if (!$ok && $stopped) {
         $lastgood = trim(pmssConfigureFileRead($dir.'/qbittorrent.lastgood', 64));
@@ -143,11 +145,11 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
         if ($restored) pmssConfigureFileWrite($dir.'/qbittorrent.lastRun', $restore."\n");
     }
     pmssConfigureFileWrite($dir.'/qbittorrent.notice', $ok
-        ? 'qBittorrent selected: '.$version."\n" : ($restored ? 'qBittorrent switch failed; previous version restored.'
+        ? 'qBittorrent selected: '.pmssConfigureTorrentClientVersionLabel($version)."\n" : ($restored ? 'qBittorrent switch failed; previous version restored.'
             : 'qBittorrent switch failed; manual recovery is needed.')."\n");
     flock($lock, LOCK_UN);
     fclose($lock);
     return array('ok' => $ok, 'status' => $ok ? 200 : 503,
-        'message' => $ok ? 'qBittorrent switched to '.$version.'.' : ($restored
+        'message' => $ok ? 'qBittorrent switched to '.pmssConfigureTorrentClientVersionLabel($version).'.' : ($restored
             ? 'The switch failed; the previous version was restored.' : 'The switch failed; manual recovery is needed.'));
 }

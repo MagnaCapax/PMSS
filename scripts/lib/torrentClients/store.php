@@ -1,5 +1,5 @@
 <?php
-/** Marker-gated callers may converge only root-owned versioned artifacts. */
+/** Converge only root-owned versioned artifacts. */
 
 require_once dirname(__DIR__).'/update/apps/remoteBinary.php';
 require_once __DIR__.'/storeArchive.php';
@@ -32,7 +32,6 @@ function pmssTorrentClientsStoreDirectory(string $path): bool
 /** Converge non-system entries; never prune a previously installed version. */
 function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
 {
-    if (!pmssTorrentClientsMarkerEnabled()) return [];
     $root = $ops['root'] ?? '/home/.pmss/clients';
     $free = $ops['free'] ?? static function (): ?int {
         $bytes = @disk_free_space('/home');

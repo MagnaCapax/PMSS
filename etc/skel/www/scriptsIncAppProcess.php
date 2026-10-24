@@ -146,7 +146,7 @@ function pmssCustomerDelugeSystemCommand(): string {
 if (!function_exists('pmssCustomerTorrentClientToggleStart')) {
 /** Hold the account switch lock while choosing the selected or unchanged system start. */
 function pmssCustomerTorrentClientToggleStart(string $client, callable $systemStart, ?string $home = null,
-    string $marker = '/etc/seedbox/config/torrentClients.enabled', ?callable $selectedStart = null): void {
+    ?callable $selectedStart = null): void {
  if (!in_array($client, array('qbittorrent', 'deluge'), true)) return;
  $home = $home ?? dirname(__DIR__);
  $link = $home.'/bin/'.$client.'/default';
@@ -162,7 +162,7 @@ function pmssCustomerTorrentClientToggleStart(string $client, callable $systemSt
  }
  try {
   // Recheck under the lock so a completed Configure switch determines this launch.
-  if (is_link($link) && is_file($marker)) {
+  if (is_link($link)) {
    $command = 'cd ~; php ~/www/torrentClientsResolve.php '.$client.' --launch'
        .($client === 'qbittorrent' ? ' --held' : ' both').' >/dev/null 2>&1';
    if ($selectedStart !== null) $selectedStart($command);

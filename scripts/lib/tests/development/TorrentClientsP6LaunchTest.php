@@ -17,7 +17,8 @@ final class TorrentClientsP6LaunchTest extends TestCase
             $this->assertSame($expected, substr($tail, 0, strpos($tail, ')')));
             $this->assertStringContainsString('php ~/www/torrentClientsResolve.php deluge --launch '.$daemon, $source);
         }
-        $this->assertStringContainsString('[ -f /etc/seedbox/config/torrentClients.enabled ]', $source);
+        $this->assertStringContainsString('[ -L ~/bin/deluge/default ] && (cd ~; php', $source);
+        $this->assertStringContainsString('flock -n 9 || exit 0;', $source);
     }
 
     public function testSelectedVenvLaunchesBothScriptsWithExistingLogOptions(): void

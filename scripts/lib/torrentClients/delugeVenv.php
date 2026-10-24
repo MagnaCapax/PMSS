@@ -21,10 +21,10 @@ function pmssTorrentClientsDelugeVenvCompatible(array $entry): bool
         : '/\APython 3\.(?:7|8|9|10)(?:\.|\s|\z)/', $version) === 1;
 }
 
-/** Return false before invoking pip if the marker, manifest, or mirror is incomplete. */
+/** Return false before invoking pip if the manifest or mirror is incomplete. */
 function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, array $ops = []): bool
 {
-    if (!pmssTorrentClientsMarkerEnabled() || ($entry['client'] ?? '') !== 'deluge'
+    if (($entry['client'] ?? '') !== 'deluge'
         || ($entry['kind'] ?? '') !== 'venv' || !pmssTorrentClientsDelugeVenvCompatible($entry)
         || !is_array($entry['wheels'] ?? null) || $entry['wheels'] === []) return false;
     $version = $entry['version'] ?? null;

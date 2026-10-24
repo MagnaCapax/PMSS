@@ -70,6 +70,8 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     $ok = $repointed && pmssConfigureFileWrite($dir.'/'.$client.'.lastRun', $version."\n")
         && $start($home, $client, $version)
         && pmssConfigureFileWrite($dir.'/'.$client.'.lastgood', $version."\n");
+    // The switch starts the chosen build, so Apps shows Deluge on and the watchdog keeps it running.
+    if ($ok && $client === 'deluge') @touch($home.'/.delugeEnable');
     $restored = true;
     if (!$ok && $stopped) {
         $lastgood = trim(pmssConfigureFileRead($dir.'/'.$client.'.lastgood', 64));

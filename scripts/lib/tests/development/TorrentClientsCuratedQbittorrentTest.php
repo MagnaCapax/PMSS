@@ -102,8 +102,6 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
 
     public function testOptionalIncludeContainsExceptionsAndErrorsAtEveryStage(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-qbit-throwable-');
-        file_put_contents($root.'/marker', '');
         foreach (['load', 'store', 'project'] as $stage) {
             foreach ([\RuntimeException::class, \Error::class] as $type) {
                 $events = [];
@@ -113,7 +111,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
                     $events[] = $stage;
                     throw new $type('curated fixture failure');
                 };
-                \pmssTorrentClientStoreRun($root.'/marker', $ops);
+                \pmssTorrentClientStoreRun($ops);
                 $this->assertSame([$stage], $events);
             }
         }

@@ -130,3 +130,5 @@ verification remain separate.
 - `scripts/lib/update/users/rutorrentRpcCompatibility.php`
 - `etc/skel/www/torrentClientsResolve.php`
 - `etc/skel/.rtorrentExecute.php`
+
+Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).

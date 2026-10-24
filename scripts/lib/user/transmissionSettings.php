@@ -73,7 +73,8 @@ function pmssTransmissionSettingsApply(string $user, string $home, array $ops = 
             'mkdir -m 700 -p '.escapeshellarg($configDir));
     };
     if (!$prepare($user, $home, $dir) || is_link($dir) || !is_dir($dir)) return false;
-    $raw = pmssReadRegularFileContents($path);
+    // Root reads an account-owned file here: bound it like the other account config reads.
+    $raw = pmssReadRegularFileContentsVerified($path, null, 1048576);
     if ($raw === null && (file_exists($path) || is_link($path))) return false;
     $updated = pmssTransmissionSettingsContent($raw ?? '{}', $socketPath,
         '/user-'.$user.'/transmission/', $ops['snakeCase'] ?? null);

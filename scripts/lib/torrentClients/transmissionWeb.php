@@ -22,7 +22,7 @@ function pmssTorrentClientsTransmissionWebConverge(array $entry, string $root, a
 function pmssTorrentClientsTransmissionWebInstall(array $entry, string $root, array $ops): bool
 {
     $version = $entry['version'] ?? null;
-    if (!pmssTorrentClientsMarkerEnabled() || ($entry['client'] ?? '') !== 'transmission'
+    if (($entry['client'] ?? '') !== 'transmission'
         || ($entry['kind'] ?? '') !== 'static' || !pmssTorrentClientsVersionValid($version)
         || !pmssTorrentClientsCatalogWebValid($entry['web'] ?? null)
         || !pmssPathTargetIsSafe($root, true, true, false)

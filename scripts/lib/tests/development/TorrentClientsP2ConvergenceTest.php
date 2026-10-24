@@ -12,7 +12,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->pmssTrackEnvKeys(['PMSS_TORRENT_CLIENTS_TEST_MARKER', 'PMSS_DRY_RUN']);
+        $this->pmssTrackEnvKeys(['PMSS_DRY_RUN']);
     }
 
     private function fixture(string $name): array
@@ -57,11 +57,9 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame([], \pmssTorrentClientsProjectionVersionsRead($path));
     }
 
-    public function testTargetFlagConvergesLinksAndPreservesSelection(): void
+    public function testConvergesLinksAndPreservesSelectionWithoutHostSetup(): void
     {
-        [$root, $home, $ops, $events] = $this->fixture('enabled');
-        $this->pmssWriteFile($root.'/enabled', '1');
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/enabled');
+        [$root, $home, $ops, $events] = $this->fixture('selection');
         $this->pmssWriteFile($root.'/store/qbittorrent/5.1.0/qbittorrent-nox', 'binary');
         $this->pmssWriteFile($root.'/projection.json', '{"versions":[{"client":"qbittorrent","version":"5.1.0","kind":"static"}]}');
         $target = $root.'/store/qbittorrent/5.1.0';
@@ -72,23 +70,9 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame([], $events->logs);
     }
 
-    public function testFlagOffLeavesMigratedStoreDefaultAndLogsOneWarn(): void
+    public function testCustomDefaultSurvivesConvergenceWithoutWarning(): void
     {
-        [$root, $home, $ops, $events] = $this->fixture('disabled');
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/absent');
-        $target = $root.'/store/qbittorrent/5.1.0';
-        symlink($target, $home.'/bin/qbittorrent/default');
-        \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
-        $this->assertSame($target, readlink($home.'/bin/qbittorrent/default'));
-        $this->assertFalse(is_link($home.'/bin/qbittorrent/5.1.0'));
-        $this->assertSame(1, count($events->logs));
-        $this->assertStringContainsString('[WARN]', $events->logs[0][1]);
-    }
-
-    public function testFlagOffCustomDefaultDoesNotWarnOrWrite(): void
-    {
-        [$root, $home, $ops, $events] = $this->fixture('custom-disabled');
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/absent');
+        [$root, $home, $ops, $events] = $this->fixture('custom');
         $this->pmssWriteFile($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'custom');
         symlink('custom', $home.'/bin/qbittorrent/default');
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
@@ -99,8 +83,6 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     public function testUnavailableSelectionFallsBackWithNoticeAndCustomBuildSurvives(): void
     {
         [$root, $home, $ops, $events] = $this->fixture('fallback');
-        $this->pmssWriteFile($root.'/enabled', '1');
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/enabled');
         $this->pmssWriteFile($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'custom');
         symlink($root.'/store/qbittorrent/old', $home.'/bin/qbittorrent/default');
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
@@ -111,15 +93,14 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'qbittorrent'));
         $launcher = (string) file_get_contents(dirname(__DIR__, 3).'/cron/checkQbittorrentInstances.php');
         $this->assertStringContainsString('[ ! -L ~/bin/qbittorrent/default ]', $launcher);
-        $this->assertStringContainsString('[ -f /etc/seedbox/config/torrentClients.enabled ]', $launcher);
+        $this->assertStringContainsString('[ -L ~/bin/qbittorrent/default ] && (cd ~; php', $launcher);
+        $this->assertStringContainsString('flock -n 9 || exit 0;', $launcher);
     }
 
     public function testInstalledDelugeVenvSelectionSurvivesTheUpdatePass(): void
     {
         // A Deluge store version is a virtualenv whose daemon lives in bin/ (ADR 0110), not at the top level.
         [$root, $home, $ops, $events] = $this->fixture('deluge-venv');
-        $this->pmssWriteFile($root.'/enabled', '1');
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/enabled');
         $this->pmssEnsureDir($home.'/bin/deluge');
         $target = $root.'/store/deluge/2.2.0';
         $this->pmssWriteFile($target.'/bin/deluged', '#!/usr/bin/python3');
@@ -135,8 +116,6 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     public function testUnavailableSelectionUsesInstalledNonSystemDefault(): void
     {
         [$root, $home, $ops, $events] = $this->fixture('static-default');
-        $this->pmssWriteFile($root.'/enabled', '1');
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/enabled');
         $catalog = json_decode((string) file_get_contents($root.'/catalog.json'), true);
         $catalog[0]['isDefault'] = false;
         $catalog[] = [
@@ -172,7 +151,6 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
             (string) file_get_contents(dirname(__DIR__, 3).'/recreateUser.php'));
         $this->assertStringContainsString('pmssTorrentClientsPostSetupConverge($user',
             (string) file_get_contents(dirname(__DIR__, 2).'/update/users.php'));
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/absent');
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertSame([], $events->logs);
     }

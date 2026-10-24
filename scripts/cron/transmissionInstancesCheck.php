@@ -8,7 +8,6 @@ require_once __DIR__.'/../lib/lighttpd/transmissionProxy.php';
 
 $pmssCheckTransmissionLock = pmssCronLockAcquire('checkTransmissionInstances',
     'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
-if (!pmssTorrentClientsMarkerEnabled()) exit(0);
 $users = pmssListManagedUsersFromResult(pmssListManagedUsersResult());
 if ($users === null) exit(1);
 foreach ($users as $user) {

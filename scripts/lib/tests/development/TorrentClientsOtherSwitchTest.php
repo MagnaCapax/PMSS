@@ -84,6 +84,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
             $this->assertSame(array('stop', array('repoint', $version, null), array('start', $version),
                 'stop', array('repoint', 'old', $old), array('start', 'old')), $events);
             $this->assertSame("old\n", file_get_contents($home.'/.config/pmss/torrentClients/'.$client.'.lastRun'));
+            $this->assertFalse(is_file($home.'/.delugeEnable'), 'a failed switch does not turn Deluge on');
         }
     }
 

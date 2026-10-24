@@ -17,7 +17,6 @@ function pmssTorrentClientsUserLinksRun(string $user, string $home, array $paths
 /** Publish store versions and seed the rTorrent store default for accounts that never switched. */
 function pmssTorrentClientsUserLinksConverge(string $user, string $home, array $ops = []): bool
 {
-    if (!pmssTorrentClientsMarkerEnabled()) return true;
     $homeRoot = $ops['homeRoot'] ?? '/home';
     if (!pmssValidateUsername($user) || $home !== rtrim($homeRoot, '/').'/'.$user) return false;
     $root = $ops['root'] ?? '/home/.pmss/clients';

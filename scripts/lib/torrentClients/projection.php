@@ -15,7 +15,6 @@ function pmssTorrentClientsProjectionWrite(
     array $catalog,
     string $publicPath = '/var/lib/pmss/public/torrentClients.json'
 ): bool {
-    if (!pmssTorrentClientsMarkerEnabled()) return false;
     $root = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT') ?: '/home/.pmss/clients';
     $versions = [];
     foreach ($catalog as $entry) {

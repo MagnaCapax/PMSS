@@ -627,6 +627,39 @@ class AppsCatalogTest extends TestCase
         });
     }
 
+    public function testRtorrentRestartRunsTheConsumerWithoutAUserCronLine(): void
+    {
+        $this->pmssWithLegacyAppsRender(function (string $home): void {
+            // Stand-in consumer: proves the panel ran it from the account home and saw the marker.
+            file_put_contents($home.'/.rtorrentRestart.php', '<?php if (is_file("www/.rtorrentRestart")) { unlink("www/.rtorrentRestart"); file_put_contents("restart-ran", "ok"); }');
+            foreach (array('restart', 'start') as $action) {
+                @unlink($home.'/restart-ran');
+                $post = $this->pmssAppsEndpointProbe($home, 'rtorrentRestart.php', $action, 'POST', true);
+                $this->assertStringContainsString('HTTP=200', $post, $action);
+                for ($i = 0; $i < 50 && !is_file($home.'/restart-ran'); $i++) usleep(100000);
+                $this->assertTrue(is_file($home.'/restart-ran'), $action.' did not run the restart consumer');
+                $this->assertFalse(is_file($home.'/www/.rtorrentRestart'), $action.' left the marker unconsumed');
+            }
+        });
+    }
+
+    public function testEveryPanelPhpFileReachesExistingAccountsOnUpdate(): void
+    {
+        // Existing accounts only receive skeleton files on this list; an endpoint left off keeps its creation-time copy forever.
+        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        $start = strpos($source, 'function pmssUserApplySkeletonFiles(');
+        $this->assertTrue($start !== false);
+        $listStart = strpos($source, '$files = [', $start);
+        $list = substr($source, $listStart, strpos($source, '];', $listStart) - $listStart);
+        $root = dirname(__DIR__, 4).'/etc/skel/';
+        $missing = array();
+        foreach (glob($root.'www/*.php') as $path) {
+            $relative = substr($path, strlen($root));
+            if (strpos($list, "'".$relative."'") === false) $missing[] = $relative;
+        }
+        $this->assertSame(array(), $missing);
+    }
+
     public function testWelcomeStillRendersControlsUsingPostRequests(): void
     {
         $html = $this->pmssRenderLegacyAppsPage('welcome.php', array(), array('minBytes' => 10000));

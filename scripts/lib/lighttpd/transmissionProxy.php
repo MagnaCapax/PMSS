@@ -12,7 +12,7 @@ function pmssLighttpdTransmissionSelected(
     string $projection = '/var/lib/pmss/public/torrentClients.json',
     string $storeRoot = '/home/.pmss/clients'
 ): bool {
-    if (!pmssTorrentClientsMarkerEnabled() || !pmssValidateUsername($user)
+    if (!pmssValidateUsername($user)
         || basename($home) !== $user) return false;
     $target = @readlink($home.'/bin/transmission/default');
     $prefix = rtrim($storeRoot, '/').'/transmission/';

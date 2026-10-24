@@ -45,3 +45,5 @@ The flag is controlled on the target and cannot be forged by home content.
 No root process writes into a tenant's `bin`. A missing catalog or unavailable
 non-system default leaves the selection for operator review; the post-setup
 step stays advisory so a transfer or recreate does not fail after data handoff.
+
+Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).

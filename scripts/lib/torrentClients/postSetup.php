@@ -19,16 +19,6 @@ function pmssTorrentClientsPostSetupAvailable(string $path): array
     return $available;
 }
 
-/** Detect a source-store default without inspecting tenant paths as root. */
-function pmssTorrentClientsPostSetupHasStoreLink(string $user, string $home, array $ops): bool
-{
-    $root = rtrim($ops['root'] ?? '/home/.pmss/clients', '/');
-    $command = 'for client in '.implode(' ', array_keys(pmssTorrentClientsBinaryNames())).'; do '
-        .'target=$(readlink '.escapeshellarg($home).'/bin/$client/default 2>/dev/null) || continue; '
-        .'case "$target" in '.escapeshellarg($root.'/').'*) exit 0;; esac; done; exit 1';
-    return pmssTorrentClientsUserLinksRun($user, $home, [$home.'/bin'], $command, $ops);
-}
-
 /** Replace only an unavailable store selection; custom builds remain untouched. */
 function pmssTorrentClientsPostSetupFallback(string $user, string $home, string $client, array $available, string $default, array $ops): bool
 {
@@ -73,12 +63,6 @@ function pmssTorrentClientsPostSetupConverge(string $user, string $home, array $
     if (!pmssValidateUsername($user) || $home !== $homeRoot.'/'.$user
         || (function_exists('pmssEnvFlagEnabled') && pmssEnvFlagEnabled('PMSS_DRY_RUN'))) return;
     $log = $ops['log'] ?? 'pmssUserLog';
-    if (!pmssTorrentClientsMarkerEnabled()) {
-        if (pmssTorrentClientsPostSetupHasStoreLink($user, $home, $ops)) {
-            $log($user, '[WARN] Migrated torrent-client store selection left unchanged: this host has torrent clients disabled.');
-        }
-        return;
-    }
     if (!pmssTorrentClientsUserLinksConverge($user, $home, $ops)) {
         $log($user, '[WARN] Torrent-client version links could not be converged.');
         return;

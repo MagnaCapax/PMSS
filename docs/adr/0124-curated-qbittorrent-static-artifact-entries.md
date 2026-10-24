@@ -74,3 +74,5 @@ account permissions or customer/operator include boundaries change here.
 - [userdocs releases](https://github.com/userdocs/qbittorrent-nox-static/releases)
 - [Issue #1068](https://github.com/MagnaCapax/PMSS/issues/1068)
 - ADRs 0073, 0105, 0106 and 0120
+
+Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).

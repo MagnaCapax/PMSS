@@ -50,7 +50,6 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
             $this->assertSame([], $entry['url']);
             $this->assertSame('', $entry['sha256']);
         }
-        $this->assertFalse(file_exists(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.enabled'));
     }
 
     /** Exercise real command discovery using only isolated shell and os-release fixtures. */
@@ -83,23 +82,19 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
     {
         $this->host('Python 3.9.2', 'bullseye', function (): void {
             $root = $this->pmssMakeTempDir('pmss-deluge-skip-');
-            $marker = $root.'/enabled';
-            file_put_contents($marker, '');
-            $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_TEST_MARKER' => $marker], function () use ($root): void {
-                $calls = 0;
-                foreach ($this->entries() as $entry) {
-                    $this->assertFalse(\pmssTorrentClientsDelugeVenvCompatible($entry));
-                    $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry,
-                        $root.'/clients/deluge/'.$entry['version'], ['install' => static function () use (&$calls): void { $calls++; }]));
-                }
-                $this->assertSame(0, $calls);
-                $results = \pmssTorrentClientsStoreConverge($this->entries(), ['root' => $root.'/clients',
-                    'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
-                    'size' => static function (): int { return 0; }, 'log' => static function (): void {}]);
-                $this->assertSame(array_fill_keys(['deluge/2.0.5', 'deluge/2.1.1', 'deluge/2.2.0'], 'failed'), $results);
-                // Uninstalled versions have no customer selection; launchers retain the system command.
-                $this->assertSame(null, \pmssTorrentClientResolve($root.'/customer', 'deluge', $root.'/missing.json', $root.'/clients'));
-            });
+            $calls = 0;
+            foreach ($this->entries() as $entry) {
+                $this->assertFalse(\pmssTorrentClientsDelugeVenvCompatible($entry));
+                $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry,
+                    $root.'/clients/deluge/'.$entry['version'], ['install' => static function () use (&$calls): void { $calls++; }]));
+            }
+            $this->assertSame(0, $calls);
+            $results = \pmssTorrentClientsStoreConverge($this->entries(), ['root' => $root.'/clients',
+                'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
+                'size' => static function (): int { return 0; }, 'log' => static function (): void {}]);
+            $this->assertSame(array_fill_keys(['deluge/2.0.5', 'deluge/2.1.1', 'deluge/2.2.0'], 'failed'), $results);
+            // Uninstalled versions have no customer selection; launchers retain the system command.
+            $this->assertSame(null, \pmssTorrentClientResolve($root.'/customer', 'deluge', $root.'/missing.json', $root.'/clients'));
         });
     }
 

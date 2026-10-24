@@ -42,32 +42,19 @@ final class TorrentClientsP1SwitchTest extends TestCase
         $this->assertSame('system', \pmssConfigureTorrentClientSelectedVersion($home, 'deluge'));
     }
 
-    public function testProjectionLeftAfterOptOutOffersNoVersions(): void
+    public function testProjectionOffersAllFourClientsWithoutHostSetup(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-p1-marker-');
+        $root = $this->pmssMakeTempDir('pmss-p1-offers-');
         $path = $root.'/projection.json';
         $this->pmssWriteFile($path, json_encode(array('versions' => array(
             array('client' => 'qbittorrent', 'version' => '5.1.0', 'kind' => 'static'),
             array('client' => 'rtorrent', 'version' => '0.9.8-r16', 'kind' => 'static'),
+            array('client' => 'deluge', 'version' => '2.2.0', 'kind' => 'venv'),
+            array('client' => 'transmission', 'version' => '4.1.3', 'kind' => 'static', 'rpcUnixSocket' => true),
         ))));
-        $this->assertSame(array(), \pmssConfigureTorrentClientVersionsOffered('qbittorrent', $root.'/absent', $path));
-        $this->assertSame(array(), \pmssConfigureTorrentClientVersionsOffered('rtorrent', $root.'/absent', $path));
-        $this->pmssWriteFile($root.'/marker', '');
-        $this->assertSame(array('5.1.0'), array_keys(\pmssConfigureTorrentClientVersionsOffered('qbittorrent', $root.'/marker', $path)));
-        $this->assertSame(array('0.9.8-r16'), array_keys(\pmssConfigureTorrentClientVersionsOffered('rtorrent', $root.'/marker', $path)));
-    }
-
-    public function testSwitchWithoutHostMarkerDoesNoWork(): void
-    {
-        if (is_file('/etc/seedbox/config/torrentClients.enabled')) $this->markTestSkipped('Host marker is set on this runner.');
-        foreach (array('qbittorrent', 'deluge', 'transmission', 'rtorrent') as $client) {
-            $home = $this->home();
-            $events = array();
-            $ops = array('backup' => static function () use (&$events): array { $events[] = 'backup'; return array('ok' => true); });
-            $result = \pmssConfigureActionApply($home, 'torrentClientSwitch',
-                array('client' => $client, 'version' => '5.1.0', 'password' => 'secret'), $ops);
-            $this->assertSame(400, $result['status'], $client);
-            $this->assertSame(array(), $events, $client);
+        foreach (array('qbittorrent' => '5.1.0', 'rtorrent' => '0.9.8-r16',
+            'deluge' => '2.2.0', 'transmission' => '4.1.3') as $client => $version) {
+            $this->assertSame(array($version), array_keys(\pmssConfigureTorrentClientVersionsOffered($client, $path)));
         }
     }
 
@@ -117,6 +104,7 @@ final class TorrentClientsP1SwitchTest extends TestCase
         $this->assertSame(array('backup', 'stop', 'repoint', 'start'), $events);
         $this->assertSame("5.1.0\n", file_get_contents($home.'/.config/pmss/torrentClients/qbittorrent.lastRun'));
         $this->assertSame("5.1.0\n", file_get_contents($home.'/.config/pmss/torrentClients/qbittorrent.lastgood'));
+        $this->assertTrue(is_file($home.'/.qbittorrentEnable'), 'a started build is on in Apps');
     }
 
     public function testFailedStartRestoresSystemSelection(): void

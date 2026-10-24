@@ -107,3 +107,5 @@ and the CORS anti-CSRF nonce leak fixed in
 [4.1.3](https://github.com/transmission/transmission/releases/tag/4.1.3).
 Compromise of the panel's account access already permits actions as that UID;
 the controls retain UID, executable and mount-namespace process scoping.
+
+Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).

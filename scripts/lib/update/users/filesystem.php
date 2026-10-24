@@ -305,6 +305,8 @@ PHP;
         'www/toggleApp.php',
         'www/toggleAppRuntime.php',
         'www/rclone.php',
+        'www/rtorrentRestart.php',
+        'www/lighttpdRestart.php',
         'www/rutorrent/js/content.js',
         'www/screen.css',
         'www/stats.php',

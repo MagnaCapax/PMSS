@@ -271,10 +271,8 @@ Failed CLI link publication emits a warning; a later update can retry the link.
 6. Apply repository templates, refresh apt indexes, migrate legacy files.
 7. Run system-level application installers under `scripts/lib/update/apps/*.php`,
    excluding helper modules and account-scoped media-stack maintenance.
-   The torrent-client store hook is dormant until
-   `/etc/seedbox/config/torrentClients.enabled` exists. Without that marker it
-   loads no store code and changes no downloads, links, or public projection.
-   With the marker, account version links and the public projection are prepared.
+   The torrent-client store hook runs on every normal update, preparing installed
+   builds, account version links and the public projection (ADR 0163).
    The installed rTorrent store default also gets an account default link when
    neither a selection nor a prior-switch `lastRun` record exists, its custom rc
    is absent or matches the readable current skeleton, and all three ruTorrent
@@ -287,13 +285,13 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    The catalog curates fourteen SHA-256-pinned userdocs x86_64 qBittorrent
    static builds, covering 4.3.9 through 5.2.4 with both libtorrent families
    (ADR 0124). Installed builds appear in the Configure picker through the
-   public projection; absent binaries are omitted. The marker remains an
-   operator-controlled staged rollout, with more than 3 GiB plus the existing
+   public projection; absent binaries are omitted. Each host downloads about
+   1 GB of builds on its next update, with more than 3 GiB plus the existing
    store size required free on `/home` before each new installation.
-   Deluge catalog venv rows, when later supplied, use pinned wheels from the
+   Deluge catalog venv rows use pinned wheels from the
    root-owned store mirror and publish both daemon scripts (ADR 0110). The
-   shipped catalog has no Deluge store version, so its existing launch path
-   remains active.
+   shipped catalog offers 2.0.5, 2.1.1 and 2.2.0 on compatible Bookworm hosts
+   (ADR 0129); the system launch remains the default.
 8. Configure the web stack, regenerate per-user nginx configs from staged
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).

@@ -79,4 +79,15 @@ final class TorrentClientsP3SettingsTest extends TestCase
         $this->assertSame(0, $writes->count);
         $this->assertSame('{}', file_get_contents($home.'/outside.json'));
     }
+
+    public function testOversizedSettingsAreRefusedWithoutBeingRead(): void
+    {
+        // Root runs this for every account; an account-sized file must not be read into memory.
+        [$home, $path, $ops, $writes] = $this->fixture('{"pad":"'.str_repeat('x', 1048576).'"}');
+        $this->assertFalse(\pmssTransmissionSettingsApply('t', $home, $ops));
+        $this->assertSame(0, $writes->count);
+        file_put_contents($path, '{}');
+        $this->assertTrue(\pmssTransmissionSettingsApply('t', $home, $ops));
+        $this->assertSame(1, $writes->count);
+    }
 }

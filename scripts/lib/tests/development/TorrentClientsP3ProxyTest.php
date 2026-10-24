@@ -6,12 +6,6 @@ require_once dirname(__DIR__, 2).'/lighttpd/configRender.php';
 
 final class TorrentClientsP3ProxyTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssTrackEnvKeys(['PMSS_TORRENT_CLIENTS_TEST_MARKER']);
-    }
-
     private function render(bool $selected): string
     {
         $template = (string) file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd');
@@ -36,7 +30,7 @@ final class TorrentClientsP3ProxyTest extends TestCase
         $this->assertStringContainsString('"/user-t/" =>', $config);
     }
 
-    public function testSelectionNeedsPublishedCapabilityAndMarker(): void
+    public function testSelectionNeedsPublishedCapabilityWithoutHostSetup(): void
     {
         $root = $this->pmssMakeTempDir('pmss-p3-proxy-');
         $home = $root.'/t';
@@ -48,9 +42,6 @@ final class TorrentClientsP3ProxyTest extends TestCase
         $projection = $root.'/projection.json';
         $version = ['client' => 'transmission', 'version' => '4.1.3', 'kind' => 'static'];
         file_put_contents($projection, json_encode(['versions' => [$version]]));
-        putenv('PMSS_TORRENT_CLIENTS_TEST_MARKER='.$root.'/enabled');
-        $this->assertFalse(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
-        file_put_contents($root.'/enabled', '1');
         $this->assertFalse(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
         $version['rpcUnixSocket'] = true;
         file_put_contents($projection, json_encode(['versions' => [$version]]));

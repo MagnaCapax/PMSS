@@ -178,3 +178,5 @@ never reaches pip and is retried on the next update.
 This supersedes the "operator hosting" and "provisioning the local mirror"
 follow-ups above. The Bullseye closure, the bootstrap pinning and the live canary
 remain open.
+
+Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).
