@@ -38,9 +38,8 @@ function pmssDockerInstallLsioOperatorAccount(string $homeDir, ?callable $passwd
 function pmssDockerInstallLsioOperatorCommand(array $account, array $args): string
 {
     $home = (string) $account['dir'];
-    $command = array_merge(['env', 'HOME='.$home, 'DOCKER_HOST=unix:///run/user/'.(int) $account['uid'].'/docker.sock',
-        '/usr/bin/php', $home.'/bin/docker-install-lsio'], array_map('strval', $args));
-    return implode(' ', array_map('escapeshellarg', $command));
+    return pmssCommandArgvShellQuote(array_merge(['env', 'HOME='.$home, 'DOCKER_HOST=unix:///run/user/'.(int) $account['uid'].'/docker.sock',
+        '/usr/bin/php', $home.'/bin/docker-install-lsio'], array_map('strval', $args)));
 }
 
 /** Resolve the account from HOME and hand the install to it. */

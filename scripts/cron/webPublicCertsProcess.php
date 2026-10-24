@@ -134,7 +134,7 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
         $args[] = '-d';
         $args[] = $n;
     }
-    $cmd = 'certbot '.implode(' ', array_map('escapeshellarg', $args)).' 2>&1';
+    $cmd = 'certbot '.pmssCommandArgvShellQuote($args).' 2>&1';
     exec($cmd, $out, $rc);
 
     if ($rc === 0) {

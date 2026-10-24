@@ -17,11 +17,7 @@ require_once __DIR__.'/log.php';
 const PMSS_SCHEDULED_CONFIG_BACKUP_KEY = 'scheduledConfigBackup';
 const PMSS_SCHEDULED_CONFIG_BACKUP_RETENTION_DEFAULT = 7;
 
-function pmssScheduledConfigBackupMessageSafe(string $message): string
-{
-    $message = trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $message));
-    return strlen($message) > 300 ? substr($message, 0, 300).'...' : $message;
-}
+function pmssScheduledConfigBackupMessageSafe(string $message): string { return pmssLogExcerpt(pmssLogLineCompact($message), 300); }
 
 function pmssScheduledConfigBackupOutcome(string $status, string $message, array $extra = []): array
 {

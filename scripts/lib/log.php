@@ -19,6 +19,12 @@ function pmssLogWhitespaceCollapse(string $text): string { return (string) preg_
 /** Replace control-character runs while retaining printable column spacing. */
 function pmssLogControlCharactersReplace(string $text): string { return (string) preg_replace('/[[:cntrl:]]+/', ' ', $text); }
 
+/** Compact line separators and horizontal spacing; retain other embedded control bytes. */
+function pmssLogLineCompact(string $text): string { return trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $text)); }
+
+/** Bound diagnostic bytes, adding the caller's suffix only when text exceeds the cutoff. */
+function pmssLogExcerpt(string $text, int $limit, string $suffix = '...'): string { return strlen($text) > $limit ? substr($text, 0, $limit).$suffix : $text; }
+
 /** Keep account labels on one line while preserving printable characters. */
 function pmssLogSafeLabel(string $value): string { $label = preg_replace('/[\r\n\0]+/', '?', $value); return is_string($label) && $label !== '' ? $label : '(empty)'; }
 
@@ -38,7 +44,6 @@ function pmssLogScalarText($value, string $default = ''): string
         $text = gettype($value);
     }
 
-    $text = str_replace(array("\r", "\n", "\t", "\0"), ' ', $text);
     $text = pmssLogWhitespaceCollapse(trim(pmssLogControlCharactersReplace($text)));
     return $text !== '' ? $text : $default;
 }

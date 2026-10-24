@@ -66,7 +66,7 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
     $install = $ops['install'] ?? 'pmssPythonVenvInstallCli';
     $log = $ops['log'] ?? 'logmsg';
     $install($versionDir, 'Deluge '.$version,
-        [['Installing pinned Deluge wheels', '--no-index --no-deps '.implode(' ', array_map('escapeshellarg', $paths))]],
+        [['Installing pinned Deluge wheels', '--no-index --no-deps '.pmssCommandArgvShellQuote($paths)]],
         $versionDir.'/bin/deluged', $link,
         '[WARN] Skipping Deluge venv: python3 missing', '[WARN] Deluge venv missing deluged', $log);
     $linked = is_link($link) && readlink($link) === $versionDir.'/bin/deluged';

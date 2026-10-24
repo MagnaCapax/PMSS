@@ -162,7 +162,7 @@ function pmssUserTransferBuildDockerStartScript(array $cfg, array $ids): string
     }
     if (!pmssUserDockerContainerIdsValid($ids)) throw new RuntimeException('Invalid Docker container ID');
     $remote = 'DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock docker start '
-        .implode(' ', array_map('escapeshellarg', $ids)).' >/dev/null 2>&1';
+        .pmssCommandArgvShellQuote($ids).' >/dev/null 2>&1';
     return "#!/bin/bash\nset -e\numask 077\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
 }
 

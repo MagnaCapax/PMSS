@@ -44,7 +44,7 @@ class CronInlineCharacterizationTest extends TestCase
             '$names = pmssWebPublicCertNames(',
             "exec('/scripts/util/createNginxConfig.php --user '.escapeshellarg(\$user).' 2>&1', \$configOut, \$configRc);",
             "exec('systemctl reload nginx 2>&1 || /etc/init.d/nginx reload 2>&1', \$reloadOut, \$reloadRc);",
-            "\$cmd = 'certbot '.implode(",
+            "\$cmd = 'certbot '.pmssCommandArgvShellQuote(\$args)",
         ], $source, 'ACME must use the activated current vhost: ');
         $this->assertStringContainsString('if ($configRc !== 0)', $source);
         $this->assertStringContainsString('if ($reloadRc !== 0)', $source);

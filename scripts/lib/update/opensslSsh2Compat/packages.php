@@ -11,10 +11,7 @@ function pmssOpenSslSsh2CompatVersionCompare(string $left, string $operator, str
 {
     $rc = 1;
     @exec(
-        'dpkg --compare-versions '
-        .escapeshellarg($left).' '
-        .escapeshellarg($operator).' '
-        .escapeshellarg($right),
+        'dpkg --compare-versions '.pmssCommandArgvShellQuote([$left, $operator, $right]),
         $unused,
         $rc
     );

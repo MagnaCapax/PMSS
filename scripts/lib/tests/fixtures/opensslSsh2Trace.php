@@ -1,6 +1,7 @@
 <?php
 /** In-memory compatibility-repair boundaries: never execute package or service commands. */
 namespace OpenSslSsh2Trace;
+require_once dirname(__DIR__, 2).'/runtime.php';
 
 $case = json_decode(getenv('PMSS_OPENSSL_TRACE_CASE'), true);
 $trace = [];

@@ -51,11 +51,7 @@ function pmssStorageBenchmarkPostInstallCommand(): string
 }
 
 /** Sanitize one benchmark output line before mirroring it into the update log. */
-function pmssStorageBenchmarkPostInstallLogLine(string $line): string
-{
-    $line = trim(pmssLogControlCharactersReplace($line));
-    return strlen($line) > 1000 ? substr($line, 0, 1000).' ...' : $line;
-}
+function pmssStorageBenchmarkPostInstallLogLine(string $line): string { return pmssLogExcerpt(trim(pmssLogControlCharactersReplace($line)), 1000, ' ...'); }
 
 /** Mirror captured benchmark stdout into the update log so WARN lines persist. */
 function pmssStorageBenchmarkPostInstallLogCapturedOutput(callable $logger, int $maxLines = 250): void

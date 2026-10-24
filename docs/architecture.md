@@ -108,6 +108,10 @@ Development tests must avoid network/system changes; production tests and the CL
 - `etc/skel/www` first-party files are editable normally. Bundled vendor/third-party trees remain read-only unless explicitly approved.
 
 ## Logs & Profile
+- Diagnostic line compaction and suffixed byte excerpts share `log.php` helpers.
+  Callers retain their control-byte policy, cutoff and truncation suffix: snapshot
+  fields truncate silently, scheduled backups use `...`, and storage benchmark
+  output uses ` ...`. Scalar logging retains its broader control-byte cleanup.
 - Plain log: `/var/log/pmss-update.log`
 - JSON events: `/var/log/pmss-update.jsonl`
 - Optional profile: `PMSS_PROFILE_OUTPUT` or `<json>.profile.json`

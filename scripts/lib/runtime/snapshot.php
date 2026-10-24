@@ -81,7 +81,7 @@ function pmssSnapshotWriteWarn($handle, string $timestamp, string $code, array $
 
     $line = $timestamp.' WARN '.pmssSnapshotWarnToken($code, 'warn');
     foreach ($fields as $key => $value) {
-        $value = substr(trim((string) preg_replace('/ {2,}/', ' ', (string) preg_replace('/[\r\n\0\t]+/', ' ', (string) $value))), 0, 300);
+        $value = substr(pmssLogLineCompact((string) $value), 0, 300);
         if ($value === '') {
             continue;
         }

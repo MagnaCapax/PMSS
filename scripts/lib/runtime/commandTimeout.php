@@ -4,11 +4,10 @@
 function pmssTimeoutFireLog(string $command, int $intendedSeconds, float $actualSeconds, string $signal, int $exitStatus): void
 {
     $logPath = pmssEnvTrimmed('PMSS_TIMEOUT_FIRE_LOG', PMSS_TIMEOUT_FIRE_LOG_DEFAULT);
-    $command = trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $command));
     $payload = [
         'timestamp'        => date('c'),
         'event'            => 'timeout_fired',
-        'command'          => strlen($command) > 500 ? substr($command, 0, 500).'...' : $command,
+        'command'          => pmssLogExcerpt(pmssLogLineCompact($command), 500),
         'intended_seconds' => $intendedSeconds,
         'actual_seconds'   => (float) sprintf('%.3f', max(0.0, $actualSeconds)),
         'signal'           => $signal,
