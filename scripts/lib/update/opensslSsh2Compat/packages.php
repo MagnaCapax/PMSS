@@ -56,6 +56,6 @@ function pmssOpenSslSsh2CompatDebsByPrefix(array $debs, string $prefix): array
 
 function pmssOpenSslSsh2CompatDpkgInstallCommand(array $debs): string
 {
-    return dpkgCmd('--force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $debs)));
+    return dpkgCmd('--force-confdef --force-confold -i '.pmssCommandArgvShellQuote($debs));
 }
 

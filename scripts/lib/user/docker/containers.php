@@ -4,6 +4,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../../runtime/environment.php';
+
 /** Wait for the daemon, then start only the already-validated transferred set. */
 function userDockerStartContainers(string $user, string $runtimeDir, string $dockerSock, array $containerIds): int
 {
@@ -31,12 +33,12 @@ function userDockerStartContainers(string $user, string $runtimeDir, string $doc
     } while (true);
 
     $startRc = 0;
-    $output = userDockerRunAs($user, $dockerEnv.'start '.implode(' ', array_map('escapeshellarg', $containerIds)).' 2>/dev/null', 120, $startRc);
+    $output = userDockerRunAs($user, $dockerEnv.'start '.pmssCommandArgvShellQuote($containerIds).' 2>/dev/null', 120, $startRc);
     $started = $output === '' ? 0 : min(count($containerIds), count(explode("\n", $output)));
     if ($startRc !== 0) {
         // Inspect as the account; never read its Docker store as root or expose raw errors/IDs.
         $mountOutput = userDockerRunAs($user, $dockerEnv.'inspect --type container --format '
-            .escapeshellarg('{{json .Mounts}}').' '.implode(' ', array_map('escapeshellarg', $containerIds))
+            .escapeshellarg('{{json .Mounts}}').' '.pmssCommandArgvShellQuote($containerIds)
             .' 2>/dev/null | head -c 1048576', 30);
         $foreign = 0;
         // Inspect can return useful rows even when another requested container is missing.

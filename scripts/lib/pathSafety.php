@@ -187,7 +187,9 @@ function pmssPathShellTargetPaths(string $path): array
 function pmssPathShellTarget(string $path): ?string
 {
     $targets = pmssPathShellTargetPaths($path);
-    return $targets === [] ? null : implode(' ', array_map('escapeshellarg', $targets));
+    if ($targets === []) return null;
+    require_once __DIR__.'/runtime/environment.php';
+    return pmssCommandArgvShellQuote($targets);
 }
 
 /**

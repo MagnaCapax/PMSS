@@ -27,7 +27,7 @@ function pmssChromiumRuntimePackages(int $debianMajor): array
 /** One apt call; recommends stay off so chromium-sandbox (a setuid-root helper) never comes along. */
 function pmssChromiumInstallCommand(array $packages): string
 {
-    return aptCmd('install -y --no-install-recommends '.implode(' ', array_map('escapeshellarg', $packages)));
+    return aptCmd('install -y --no-install-recommends '.pmssCommandArgvShellQuote($packages));
 }
 
 /** Install whatever part of the runtime is missing; every skip is one log line, every failure soft. */

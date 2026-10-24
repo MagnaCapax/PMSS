@@ -48,9 +48,7 @@ function pmssUserTransferBuildRsyncCommand(
     array $rsyncOptions = []
 ): string
 {
-    $options = implode(' ', array_map(static function (string $option): string {
-        return escapeshellarg($option);
-    }, $rsyncOptions));
+    $options = pmssCommandArgvShellQuote(array_map(static function (string $option): string { return $option; }, $rsyncOptions));
     $arguments = array_map(static function (string $item): string {
         return '--exclude='.escapeshellarg($item);
     }, $excludes);
