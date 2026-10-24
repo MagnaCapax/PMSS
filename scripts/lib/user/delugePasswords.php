@@ -58,8 +58,7 @@ function pmssDelugeAuthWriteLocalclientPassword(string $authPath, string $passwo
         return false;
     }
     $existing = @lstat($authPath);
-    if ($owner !== null && is_array($existing)
-        && (($existing['mode'] & 0170000) !== 0100000 || $existing['nlink'] !== 1)) {
+    if ($owner !== null && is_array($existing) && !pmssUserFileStatIsSingleRegular($existing)) {
         return false;
     }
 

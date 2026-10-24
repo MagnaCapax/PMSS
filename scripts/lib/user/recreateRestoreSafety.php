@@ -120,7 +120,7 @@ function pmssRecreateMoveDirectory(string $source, string $destination): bool
     clearstatcache(true, $destination);
     $movedStat = @lstat($destination);
     if (!is_array($movedStat) || ($movedStat['mode'] & 0170000) !== 0040000
-        || $movedStat['dev'] !== $sourceStat['dev'] || $movedStat['ino'] !== $sourceStat['ino']) {
+        || !pmssFilesystemStatSameInode($movedStat, $sourceStat)) {
         throw new RuntimeException('Restore move identity mismatch: '.$destination);
     }
     return true;

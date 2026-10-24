@@ -29,7 +29,7 @@ function pmssRestartUserLogWrite(array $record, string $path = '/var/log/pmss/re
         $opened = fstat($handle);
         $linked = @lstat($path);
         if (!is_array($opened) || !is_array($linked) || ($linked['mode'] & 0170000) !== 0100000
-            || $opened['ino'] !== $linked['ino'] || $opened['dev'] !== $linked['dev']) return false;
+            || !pmssFilesystemStatSameInode($opened, $linked)) return false;
         if ($created && (!@chmod($path, 0640) || !@chgrp($path, 'adm'))) return false;
         return flock($handle, LOCK_EX)
             && fwrite($handle, $json."\n") === strlen($json) + 1 && fflush($handle);

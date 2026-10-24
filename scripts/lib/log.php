@@ -222,6 +222,5 @@ function pmssLogStreamIsFile(string $stream, string $path): bool
     if (!defined($stream) || !pmssStreamHandleIsOpen($handle = constant($stream))) return false;
     $open = @fstat($handle);
     $file = @stat($path);
-    return is_array($open) && is_array($file) && $file['ino'] !== 0
-        && $open['dev'] === $file['dev'] && $open['ino'] === $file['ino'];
+    return is_array($open) && is_array($file) && $file['ino'] !== 0 && pmssFilesystemStatSameInode($open, $file);
 }

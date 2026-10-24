@@ -18,9 +18,8 @@ function pmssReplaceAccountFile(
         && (int) $existing['uid'] === 0 && @fileowner(dirname($path)) === $account['uid'];
     if (!is_array($account) || !isset($account['uid']) || $mode < 0 || $mode > 0777
         || !pmssUserFilePathIsSafe($path)
-        || (is_array($existing) && ((($existing['mode'] & 0170000) !== 0100000)
-            || ($existing['uid'] !== $account['uid'] && !$legacyOwner)
-            || $existing['nlink'] !== 1))) {
+        || (is_array($existing) && (!pmssUserFileStatIsSingleRegular($existing)
+            || ($existing['uid'] !== $account['uid'] && !$legacyOwner)))) {
         error_log("Unable to replace account file for {$username}: {$path}");
         return false;
     }

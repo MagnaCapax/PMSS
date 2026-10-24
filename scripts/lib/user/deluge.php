@@ -79,8 +79,7 @@ function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $upload
 function pmssDelugeConfigFileWrite(string $path, string $content, string $label, ?string $owner = null, ?int $modeOverride = null): bool
 {
     $existing = @lstat($path);
-    if ($owner !== null && is_array($existing)
-        && (($existing['mode'] & 0170000) !== 0100000 || $existing['nlink'] !== 1)) {
+    if ($owner !== null && is_array($existing) && !pmssUserFileStatIsSingleRegular($existing)) {
         pmssLogStatus('WARN', sprintf('Refusing Deluge %s config path: %s', $label, $path), 1);
         return false;
     }

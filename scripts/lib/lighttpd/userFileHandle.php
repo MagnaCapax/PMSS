@@ -4,12 +4,6 @@
 /** A /proc/self/fd/N path names an inode this process already holds open. */
 function pmssUserFileOpenedPathIs(string $path): bool { return preg_match('#\A/proc/self/fd/[0-9]+\z#', $path) === 1; }
 
-/** True for lstat/fstat data describing a regular file with exactly one name. */
-function pmssUserFileStatIsSingleRegular($stat): bool
-{
-    return is_array($stat) && (($stat['mode'] ?? 0) & 0170000) === 0100000 && ($stat['nlink'] ?? 0) === 1;
-}
-
 /** Confirm a directory entry is the single-link regular file behind an open handle. */
 function pmssUserFileHandleMatchesEntry($handle, string $path): bool
 {
@@ -60,7 +54,7 @@ function pmssUserFileHandleProcPath($handle): ?string
         $candidate = '/proc/self/fd/'.$entry;
         clearstatcache(true, $candidate);
         $stat = ctype_digit((string) $entry) ? @stat($candidate) : false;
-        if (is_array($stat) && $stat['dev'] === $opened['dev'] && $stat['ino'] === $opened['ino']) {
+        if (is_array($stat) && pmssFilesystemStatSameInode($stat, $opened)) {
             return $candidate;
         }
     }

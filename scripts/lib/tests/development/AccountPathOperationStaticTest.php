@@ -119,7 +119,12 @@ final class AccountPathOperationStaticTest extends TestCase
             "@fopen(\$path, 'r+b')",
             '@fstat($handle)',
             '@lstat($path)',
-            "\$opened['ino'] !== \$named['ino']",
+            '!pmssFilesystemStatSameInode($opened, $named)',
+        ]);
+        // The shared helper must keep the strict device and inode comparison the rewrite depends on.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/runtime/filesystem.php', [
+            "(\$left['dev'] ?? null) === (\$right['dev'] ?? null)",
+            "(\$left['ino'] ?? null) === (\$right['ino'] ?? null)",
         ]);
     }
 

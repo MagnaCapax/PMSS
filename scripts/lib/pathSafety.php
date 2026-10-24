@@ -252,11 +252,9 @@ function pmssInodeSafeRewriteRegularFile(string $root, string $path, callable $r
         clearstatcache(true, $path);
         $opened = @fstat($handle);
         $named = @lstat($path);
-        if (!is_array($opened) || !is_array($named)
-            || ($opened['mode'] & 0170000) !== 0100000
+        if (!pmssUserFileStatIsSingleRegular($opened) || !is_array($named)
             || ($named['mode'] & 0170000) !== 0100000
-            || $opened['nlink'] !== 1
-            || $opened['dev'] !== $named['dev'] || $opened['ino'] !== $named['ino']
+            || !pmssFilesystemStatSameInode($opened, $named)
             || !pmssPathTargetIsSafe($path, false, true)
             || !pmssPathWithinResolvedRoot($path, $root)) {
             return false;

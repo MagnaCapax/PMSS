@@ -48,8 +48,7 @@ function pmssUserNotificationEmailRead(string $home, int $expectedGroup): ?strin
     $permissions = is_array($handleStat) ? ($handleStat['mode'] ?? 0) & 0777 : -1;
     if (!$openedPathMatches
         || !is_array($pathAfterOpen)
-        || ($pathAfterOpen['dev'] ?? null) !== ($handleStat['dev'] ?? null)
-        || ($pathAfterOpen['ino'] ?? null) !== ($handleStat['ino'] ?? null)
+        || !pmssFilesystemStatSameInode($pathAfterOpen, $handleStat)
         || ($handleStat['uid'] ?? -1) !== 0
         || ($handleStat['gid'] ?? -1) !== $expectedGroup
         || !in_array($permissions, [0600, 0640], true)

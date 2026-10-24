@@ -106,7 +106,7 @@ function pmssIntegerSettingPathModeConverge(string $path, int $mode): bool
         $context = pmssRootStageContext($path);
         if ($context === null || $mode < 0 || $mode > 0777) return false;
         $entry = @lstat($path);
-        if (!is_array($entry) || ($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1) return false;
+        if (!pmssUserFileStatIsSingleRegular($entry)) return false;
         if ($entry['uid'] === 0) {
             $group = @posix_getgrgid($entry['gid']);
             $content = pmssReadRegularFileContents($path);

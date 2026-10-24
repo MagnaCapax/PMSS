@@ -24,7 +24,7 @@ function pmssRecreateMoveTopDirectory(string $source, string $destination): void
     }
     clearstatcache(true, $destination);
     $after = @lstat($destination);
-    if (!is_array($after) || $before['dev'] !== $after['dev'] || $before['ino'] !== $after['ino']) {
+    if (!is_array($after) || !pmssFilesystemStatSameInode($before, $after)) {
         throw new RuntimeException('Recreate move identity mismatch: '.$destination);
     }
 }

@@ -34,6 +34,15 @@ function pmssRegularFilePathIsReadable(string $path): bool { return $path !== ''
 /** Lock and other write targets must be plain files; refuse symlinks and device paths. */
 function pmssLockFilePathIsSafe(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && !is_link($path) && (!file_exists($path) || is_file($path)); }
 
+/** Compare inode snapshots strictly; callers retain metadata validation and all I/O. */
+function pmssFilesystemStatSameInode(array $left, array $right): bool { return ($left['dev'] ?? null) === ($right['dev'] ?? null) && ($left['ino'] ?? null) === ($right['ino'] ?? null); }
+
+/** True for lstat/fstat data describing a regular file with exactly one name. */
+function pmssUserFileStatIsSingleRegular($stat): bool
+{
+    return is_array($stat) && (($stat['mode'] ?? 0) & 0170000) === 0100000 && ($stat['nlink'] ?? 0) === 1;
+}
+
 /** Confirm an opened stream still points at a path or supplied path snapshot. */
 function pmssLockFileHandleMatchesPath($handle, string $path, ?array $pathStat = null, ?array &$handleStat = null): bool
 {
@@ -42,8 +51,7 @@ function pmssLockFileHandleMatchesPath($handle, string $path, ?array $pathStat =
     $observedHandleStat = @fstat($handle); $pathStat = $validateLockPath ? @stat($path) : $pathStat;
     $handleStat = is_array($observedHandleStat) ? $observedHandleStat : null;
     if ($handleStat === null || !is_array($pathStat)) return false;
-    if (!$validateLockPath) return ($handleStat['dev'] ?? null) === ($pathStat['dev'] ?? null)
-        && ($handleStat['ino'] ?? null) === ($pathStat['ino'] ?? null);
+    if (!$validateLockPath) return pmssFilesystemStatSameInode($handleStat, $pathStat);
     return isset($handleStat['dev'], $handleStat['ino'], $pathStat['dev'], $pathStat['ino'])
         && (int) $handleStat['dev'] === (int) $pathStat['dev'] && (int) $handleStat['ino'] === (int) $pathStat['ino'];
 }

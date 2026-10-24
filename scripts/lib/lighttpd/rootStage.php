@@ -115,8 +115,7 @@ function pmssRootStageFileWrite(string $path, string $content, string $group, in
         if (!@chown($stageFile, 'root') || !@chgrp($stageFile, $group)
             || !@chmod($stageFile, $mode)) return false;
         $published = @lstat($stageFile);
-        if (!is_array($published) || ($published['mode'] & 0170000) !== 0100000
-            || $published['nlink'] !== 1 || $published['dev'] !== $parentStat['dev']) return false;
+        if (!pmssUserFileStatIsSingleRegular($published) || $published['dev'] !== $parentStat['dev']) return false;
         $old = @lstat($path);
         $oldCleared = $immutable && is_array($old);
         if ($oldCleared && !pmssRootStageImmutableSet($path, $old, false)) return false;

@@ -75,8 +75,7 @@ function pmssPikkumiesUiIdentityPublish(string $user, ?string $serviceId, string
     if (!$enabled || $serviceId === null) {
         if (!file_exists($path) && !is_link($path)) return true;
         $entry = @lstat($path);
-        return is_array($entry) && ($entry['mode'] & 0170000) === 0100000
-            && $entry['uid'] === 0 && $entry['nlink'] === 1 && @unlink($path);
+        return pmssUserFileStatIsSingleRegular($entry) && $entry['uid'] === 0 && @unlink($path);
     }
     if (pmssUnsignedDecimalIntParse($serviceId) === null || (int) $serviceId < 1) return false;
     return pmssPikkumiesUiIdentityWrite($path, $serviceId, $user);

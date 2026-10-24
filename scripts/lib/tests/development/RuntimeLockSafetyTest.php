@@ -7,6 +7,27 @@ require_once __DIR__.'/../common/LockLifecycleStream.php';
 
 class RuntimeLockSafetyTest extends TestCase
 {
+    public function testInodeSnapshotsPreserveStrictComparisonAndIgnoreUnrelatedFields(): void
+    {
+        $identity = ['dev' => 7, 'ino' => 19];
+        foreach ([
+            [$identity, true],
+            [['dev' => 8, 'ino' => 19], false],
+            [['dev' => 7, 'ino' => 20], false],
+            [['dev' => '7', 'ino' => 19], false],
+            [['dev' => 7, 'ino' => '19'], false],
+            [['dev' => 7], false],
+            [['ino' => 19], false],
+            [$identity + ['uid' => 123, 'mode' => 0100600, 'size' => 0], true],
+        ] as [$snapshot, $expected]) {
+            $this->assertSame($expected, \pmssFilesystemStatSameInode($identity, $snapshot));
+            $this->assertSame($expected, \pmssFilesystemStatSameInode($snapshot, $identity));
+        }
+        // Supplied stream snapshots historically compare absent fields as null.
+        $this->assertTrue(\pmssFilesystemStatSameInode([], ['dev' => null, 'ino' => null]));
+        $this->assertTrue(\pmssFilesystemStatSameInode(['dev' => 0, 'ino' => 0], ['dev' => 0, 'ino' => 0]));
+    }
+
     public function testLockLifecycleClosesStreamsWhenBoundariesThrow(): void
     {
         $this->assertTrue(stream_wrapper_register('pmsslocklifecycle', LockLifecycleStream::class));

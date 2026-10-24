@@ -74,7 +74,7 @@ function pmssReplaceUserFilePreservingMetadata(string $path, string $content, in
         if ($identity === null) return false;
         list($home, $user) = $identity;
         $entry = @lstat($path);
-        if (is_array($entry) && (($entry['mode'] & 0170000) !== 0100000 || $entry['nlink'] !== 1)) return false;
+        if (is_array($entry) && !pmssUserFileStatIsSingleRegular($entry)) return false;
         $mode = is_array($entry) ? $entry['mode'] & 0777 : $fallbackMode;
         $account = @posix_getpwnam($user);
         if (!is_array($account)) return false;

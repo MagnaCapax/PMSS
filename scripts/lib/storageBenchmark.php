@@ -131,8 +131,7 @@ function storageBenchmarkFileCleanup(string $path, array $identity): bool
 {
     clearstatcache(true, $path);
     $current = @lstat($path);
-    return is_array($current) && $current['dev'] === $identity['dev']
-        && $current['ino'] === $identity['ino'] && @unlink($path);
+    return is_array($current) && pmssFilesystemStatSameInode($current, $identity) && @unlink($path);
 }
 
 function storageBenchmarkRegisterFileCleanup(string $path, array $identity): void

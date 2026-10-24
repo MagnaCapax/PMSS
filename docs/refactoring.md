@@ -116,6 +116,15 @@ the template's default device despite selecting a different one.
 Locked PID and counter-state streams share one seek, truncate, complete-write,
 and flush sequence. Their existing entrypoints and failure results are retained.
 
+Strict device/inode snapshot comparisons share `pmssFilesystemStatSameInode()`
+in the existing runtime filesystem facade. Callers retain metadata validation,
+stat/open ordering, ownership, permissions, and mutation policy. Supplied stream
+snapshots keep their null-field comparison; numeric lock comparisons retain
+their explicit integer casts. The standalone updater remains self-contained.
+The existing `pmssUserFileStatIsSingleRegular()` predicate also lives in that
+facade, shared by readers, writers, staging, config guards, and identity cleanup;
+its public name and single-link regular-file policy remain unchanged.
+
 Blocking stream writers share `pmssStreamWriteAll()` for partial-write progress
 and failure handling. Callers retain validation, flushing, closing, diagnostics,
 and publication policy; empty payloads perform no I/O. Deadline-aware nonblocking

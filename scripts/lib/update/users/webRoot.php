@@ -126,13 +126,12 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
             && pmssPathTargetIsSafe($source, true, true)
             && pmssPathTargetIsSafe($target, true, true)
             && is_array($current = @lstat($source))
-            && $current['dev'] === $before['dev'] && $current['ino'] === $before['ino']
+            && pmssFilesystemStatSameInode($current, $before)
             && @rename($source, $target);
     }
     clearstatcache(true, $target);
     $after = $moved ? @lstat($target) : false;
-    return is_array($after) && !is_link($target)
-        && $after['dev'] === $before['dev'] && $after['ino'] === $before['ino'];
+    return is_array($after) && !is_link($target) && pmssFilesystemStatSameInode($after, $before);
 }
 
 /** Copy and remove migration staging only with the account's authority. */
