@@ -17,6 +17,13 @@ class UpdateRuntimeProcessesTest extends TestCase
         $this->pmssWriteExecutableFiles($this->tempDir.'/bin', [
             'pgrep' => <<<'BASH'
 #!/bin/bash
+printf '%s\n' "$*" >> "${PMSS_TEST_PROBE_LOG:?}"
+if [ -n "${PMSS_TEST_PROCESS_TABLE:-}" ]; then
+  uid=
+  [ "${3:-}" = -u ] && uid=$4
+  awk -v name="$2" -v uid="$uid" '$2 == name && (uid == "" || $1 == uid) { print $3; found=1 } END { exit !found }' "$PMSS_TEST_PROCESS_TABLE"
+  exit $?
+fi
 state_file=${PMSS_TEST_PGREP_STATE:?}
 state=$(cat "$state_file" 2>/dev/null || echo stopped)
 [ "$state" = "error" ] && exit 2
@@ -26,6 +33,13 @@ BASH,
 #!/bin/bash
 printf '%s
 ' "$*" >> "${PMSS_TEST_COMMAND_LOG:?}"
+if [ -n "${PMSS_TEST_PROCESS_TABLE:-}" ]; then
+  uid=
+  [ "${4:-}" = -u ] && uid=$5
+  awk -v name="$3" -v uid="$uid" '$2 != name || (uid != "" && $1 != uid)' "$PMSS_TEST_PROCESS_TABLE" > "$PMSS_TEST_PROCESS_TABLE.next"
+  mv "$PMSS_TEST_PROCESS_TABLE.next" "$PMSS_TEST_PROCESS_TABLE"
+  exit 0
+fi
 state_file=${PMSS_TEST_PGREP_STATE:?}
 mode=$(cat "${PMSS_TEST_KILL_MODE:?}" 2>/dev/null || echo term)
 case "${1:-}" in
@@ -45,6 +59,8 @@ BASH
             'HOME' => $this->tempDir,
             'PMSS_TEST_PGREP_STATE' => $this->tempDir.'/state',
             'PMSS_TEST_COMMAND_LOG' => $this->tempDir.'/commands.log',
+            'PMSS_TEST_PROBE_LOG' => $this->tempDir.'/probes.log',
+            'PMSS_TEST_PROCESS_TABLE' => '',
             'PMSS_TEST_KILL_MODE' => $this->tempDir.'/kill-mode',
         ]);
         $this->pmssResetRuntimeProfile();
@@ -181,6 +197,61 @@ BASH
         $this->assertEquals([
             "pkill -TERM -x 'demo'",
         ], $this->pmssProfileCommands());
+    }
+
+    public function testKillProcessScopesEveryProbeAndSignalIncludingEscalation(): void
+    {
+        foreach ([0, 33] as $uid) {
+            foreach (['term', 'kill', 'error'] as $mode) {
+                file_put_contents($this->tempDir.'/state', "running\n");
+                file_put_contents($this->tempDir.'/kill-mode', $mode."\n");
+                file_put_contents($this->tempDir.'/probes.log', '');
+                $this->pmssResetRuntimeProfile();
+                \killProcess('demo', 'Stopping system process', null, 0, $uid);
+
+                $expected = ["pkill -TERM -x 'demo' -u '$uid'"];
+                if ($mode === 'kill') {
+                    $expected[] = "pkill -KILL -x 'demo' -u '$uid'";
+                }
+                $this->assertSame($expected, $this->pmssProfileCommands());
+                $probes = array_unique(explode("\n", trim(file_get_contents($this->tempDir.'/probes.log'))));
+                $this->assertSame(['-x demo -u '.$uid], array_values($probes));
+            }
+        }
+    }
+
+    public function testKillProcessRejectsNegativeUidWithoutProbingOrSignalling(): void
+    {
+        \killProcess('demo', 'Stopping system process', null, 0, -1);
+
+        $this->assertSame([], $this->pmssProfileCommands());
+        $this->assertFalse(file_exists($this->tempDir.'/probes.log'));
+        $this->assertSame('', file_get_contents($this->tempDir.'/commands.log'));
+    }
+
+    public function testSystemWebCleanupPreservesTenantProcessIdsAndUnrelatedBinaries(): void
+    {
+        // The process-table shims model simultaneous system and tenant daemons.
+        $table = $this->tempDir.'/processes';
+        $survivors = "1001 lighttpd 501\n1001 php-cgi 502\n1002 lighttpd 503\n1002 php-cgi 504\n0 other 505\n33 other 506\n";
+        file_put_contents($table, "0 lighttpd 401\n0 php-cgi 402\n33 lighttpd 403\n33 php-cgi 404\n".$survivors);
+        $this->pmssTrackEnvOverrides(['PMSS_TEST_PROCESS_TABLE' => $table]);
+
+        foreach ([0, 33] as $uid) {
+            foreach (['lighttpd', 'php-cgi'] as $name) {
+                \killProcess($name, 'Stopping system web process', null, 0, $uid);
+            }
+        }
+        $this->assertSame($survivors, file_get_contents($table));
+        $this->assertSame(4, count($this->pmssProfileCommands()));
+
+        // Only tenant matches remain: repeating cleanup must not signal anything.
+        $this->pmssResetRuntimeProfile();
+        foreach (['lighttpd', 'php-cgi'] as $name) {
+            \killProcess($name, 'Stopping absent system web process', null, 0, 33);
+        }
+        $this->assertSame([], $this->pmssProfileCommands());
+        $this->assertSame($survivors, file_get_contents($table));
     }
 
 }

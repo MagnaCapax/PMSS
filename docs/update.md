@@ -47,12 +47,16 @@ only the root reserve lets `/home` pass.
 Phase 2 repeats the same 3 GiB preflight before package work, using the same
 root-usable `/home` decision and conservative fallback. Its disk readings and
 reserve warning are logged independently after handoff.
-When an account home has under 64 MiB available to its user, phase 2 leaves
-running lighttpd/php-cgi instances in place instead of performing the global
-web-stack stop. The lighttpd watchdog likewise defers an automatic restart of a
-running instance and logs a per-account warning. Disabled and suspended account
-stops still run. Normal-space restart behavior is unchanged; a stopped service
-may still receive a start attempt.
+The phase-2 web-stack cleanup stops/disables the system lighttpd service and
+limits lingering lighttpd/php-cgi probes and signals to the effective UIDs of
+`root` and Debian's `www-data` service account. Tenant processes stay running;
+their configuration and health remain with per-account maintenance. A missing
+system account skips its cleanup rather than broadening the process match.
+The existing guard still defers the system stop when a running account has
+under 64 MiB available. The lighttpd watchdog likewise defers an automatic
+restart of a running instance and logs a per-account warning. Disabled and
+suspended account stops still run. Normal-space restart behavior is unchanged;
+a stopped service may still receive a start attempt.
 
 Common flags:
 
@@ -189,7 +193,7 @@ convergence, OpenSSH repair policy and service observation/validation. Heal and
 downgrade share one private-workspace download/install/cleanup transaction;
 their package sets, failure severity and service recovery order stay distinct.
 Pre-refactor command/log/exception trace snapshots lock both policies and their
-failure boundaries. See [ADR 0163](adr/0163-openssl-openssh-repair-transaction-boundary.md).
+failure boundaries. See [ADR 0166](adr/0166-openssl-openssh-repair-transaction-boundary.md).
 
 Post-package orchestration uses explicit step classes:
 

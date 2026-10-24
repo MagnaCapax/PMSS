@@ -73,15 +73,20 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
 }
 
 /**
- * Gracefully stop all processes matching the binary name.
+ * Gracefully stop processes matching the binary name and optional effective UID.
  *
  * @param string      $name            Exact binary name (for pgrep -x)
  * @param string      $description     Human-readable description for logging
  * @param string|null $systemdUnit     Optional systemd unit to stop first
  * @param int         $timeoutSeconds  Seconds to wait after SIGTERM before SIGKILL
+ * @param int|null    $uid             Optional effective UID for probes and signals
  */
-function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
+function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10, ?int $uid = null): void
 {
+    if ($uid !== null && $uid < 0) {
+        logmsg("[WARN] {$description} (invalid effective UID)");
+        return;
+    }
     // Validate raw bytes before trim() can erase a malformed process name.
     if (pmssFilesystemPathHasNulByte($name)) {
         logmsg("[WARN] {$description} (invalid process name)");
@@ -97,7 +102,9 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
         return;
     }
 
-    $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
+    // Reuse the same selector for every probe and signal, including escalation.
+    $selector = '-x '.escapeshellarg($name).($uid === null ? '' : ' -u '.escapeshellarg((string) $uid));
+    $probeCommand = 'pgrep '.$selector.' >/dev/null 2>&1';
     exec($probeCommand, $_, $probeStatus);
     if ($probeStatus === 1) {
         logmsg("[SKIP] {$description} (no {$name} processes)");
@@ -119,7 +126,7 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
     }
 
     foreach (['TERM' => max(0, $timeoutSeconds), 'KILL' => 5] as $signal => $waitSeconds) {
-        runStep($description.' (SIG'.$signal.')', 'pkill -'.$signal.' -x '.escapeshellarg($name));
+        runStep($description.' (SIG'.$signal.')', 'pkill -'.$signal.' '.$selector);
 
         $deadline = microtime(true) + $waitSeconds;
         while (true) {

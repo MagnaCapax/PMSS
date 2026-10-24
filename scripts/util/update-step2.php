@@ -122,8 +122,8 @@ function pmssConfigureWebStack(): void
 {
     $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = true;
 
-    // The legacy global kill also targets healthy per-account daemons; defer it
-    // when any running account cannot create files needed by a fresh start.
+    // Retain the low-space stop guard. Lingering-process cleanup below is scoped
+    // to system accounts; tenant daemons belong to per-user maintenance.
     $lowSpaceUsers = [];
     foreach (users::listHomeUsers() as $user) {
         $home = '/home/'.$user;
@@ -134,8 +134,16 @@ function pmssConfigureWebStack(): void
     }
     if ($lowSpaceUsers === []) {
         runStep('Stopping lighttpd (systemd)', '/etc/init.d/lighttpd stop');
-        killProcess('lighttpd', 'Terminating lingering lighttpd processes');
-        killProcess('php-cgi', 'Terminating lingering php-cgi processes');
+        foreach (['root', 'www-data'] as $serviceUser) {
+            $serviceAccount = posix_getpwnam($serviceUser);
+            if ($serviceAccount === false) {
+                logmsg('[SKIP] Web-stack process cleanup (system account '.$serviceUser.' missing)');
+                continue;
+            }
+            foreach (['lighttpd', 'php-cgi'] as $processName) {
+                killProcess($processName, 'Terminating lingering system '.$processName.' processes ('.$serviceUser.')', null, 10, (int) $serviceAccount['uid']);
+            }
+        }
     }
     pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');
     pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');

@@ -1,4 +1,4 @@
-# ADR 0163: OpenSSL and OpenSSH repair transaction boundary
+# ADR 0166: OpenSSL and OpenSSH repair transaction boundary
 
 Date: 2026-10-23
 Category: architecture

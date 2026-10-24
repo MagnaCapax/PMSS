@@ -20,6 +20,10 @@ class WebStackSystemdHelperWiringTest extends TestCase
                 'function pmssConfigureWebStack(): void',
                 "pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');",
                 "pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');",
+                "foreach (['root', 'www-data'] as \$serviceUser)",
+                'posix_getpwnam($serviceUser)',
+                "if (\$serviceAccount === false)",
+                "null, 10, (int) \$serviceAccount['uid']);",
             ],
             ['update-rc.d lighttpd', 'Disabling {$legacySvc} in sysvinit']
         );

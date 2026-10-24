@@ -139,7 +139,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - `killProcess()` rejects NUL bytes in the original process name before trimming,
   so malformed names cannot select a process for `pkill -x`. Ordinary surrounding
-  whitespace still normalizes to the same exact binary name.
+  whitespace still normalizes to the same exact binary name. An optional effective
+  UID scopes every probe and signal, including SIGKILL escalation; negative UIDs
+  skip without running commands. Omitted UIDs preserve the all-owner behavior.
 
 - `pmssCheckDirectoriesEnsureDirectory()` requires the managed path itself to
   be a real directory before changing ownership or mode. A symlink or other
@@ -532,9 +534,9 @@ Sub-handlers:
 ## Web Stack & System Prep
 
 - pmssConfigureWebStack(): void
-  - Stops nginx; disables/stops lighttpd through the supported systemd path; kills lingering `lighttpd` and `php-cgi`.
+  - Disables/stops system lighttpd; limits lingering `lighttpd` and `php-cgi` cleanup to the effective UIDs of `root` and `www-data`, preserving tenant processes and the existing low-space stop guard. Missing service accounts skip their cleanup.
   - Enables nginx, regenerates all per-user nginx configs from the freshly staged templates without restarting nginx, and hardens `/home` perms.
-  - A final nginx config refresh and restart still runs later in `scripts/util/update-step2.php` after app installers finish.
+  - A final nginx config refresh and validated reload runs later in `scripts/util/update-step2.php` after app installers finish.
 
 - pmssApplyRuntimeTemplates(): void
   - Installs `rc.local`, systemd `system.conf`, `sshd_config`, and the
