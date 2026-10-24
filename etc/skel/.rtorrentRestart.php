@@ -137,12 +137,18 @@ if (file_exists('.rtorrentExecuteRun')) $lastRun = file_get_contents('.rtorrentE
 
 writeLog('Last rTorrent Execution read: ' . $lastRun);
 
-// An executor that found its file replaced by an update exits right after rTorrent does, while its run stamp is
-// still fresh; nothing would start rTorrent until the watchdog's next pass. A free executor lock means none runs.
-$executorLock = @fopen('.rtorrentExecute.lock', 'c');
-$executorIdle = is_resource($executorLock) && @flock($executorLock, LOCK_EX | LOCK_NB);
-if ($executorIdle) flock($executorLock, LOCK_UN);
-if (is_resource($executorLock)) fclose($executorLock);
+// An executor that found its file replaced by an update exits up to 5 s after rTorrent does, while its run stamp is
+// still fresh; nothing would start rTorrent until the watchdog's next pass. While no rTorrent runs, wait for either
+// the executor to start one or its lock to come free, which means no executor runs.
+$executorIdle = false;
+for ($wait = 0; $wait < 12 && empty(pmssRtorrentRestartUserPids($uid)); $wait++) {
+  $executorLock = @fopen('.rtorrentExecute.lock', 'c');
+  $executorIdle = is_resource($executorLock) && @flock($executorLock, LOCK_EX | LOCK_NB);
+  if ($executorIdle) flock($executorLock, LOCK_UN);
+  if (is_resource($executorLock)) fclose($executorLock);
+  if ($executorIdle) break;
+  sleep(1);
+}
 if ($executorIdle) writeLog('no rtorrent executor holds the lock; starting one');
 
 if ($lastRun == 0 or $executorIdle or

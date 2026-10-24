@@ -30,5 +30,5 @@ function pmssRtorrentRestartRequest(string $home): void
     if (!@touch($home.'/www/.rtorrentRestart')) { http_response_code(500); exit; }
     if (!is_file($home.'/.rtorrentRestart.php') || !pmssFrontendFunctionAvailable('exec')) return;
     // The consumer takes about 20 s and removes the marker first, so a cron line that also runs it finds nothing to do.
-    @exec('cd '.escapeshellarg($home).' && nohup php ./.rtorrentRestart.php >/dev/null 2>&1 &');
+    @exec('cd '.escapeshellarg($home).' && setsid php ./.rtorrentRestart.php >/dev/null 2>&1 &');
 }

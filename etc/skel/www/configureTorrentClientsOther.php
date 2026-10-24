@@ -92,9 +92,10 @@ function pmssConfigureTorrentClientOtherStart($home, $client, $version)
             $binary = '/usr/local/bin/rtorrent';
         if ($binary === null || !is_file($home.'/.rtorrentRestart.php')
             || is_file($home.'/.rtorrentDisable') || !@touch($home.'/www/.rtorrentRestart')) return false;
-        // Reuse Apps' restart consumer; it preserves the supervising executor.
+        // Reuse Apps' restart consumer; it preserves the supervising executor. Its own session keeps it running
+        // when the account web server restarts during the switch (a new proxy route, for one).
         $rc = 1;
-        @exec('cd '.escapeshellarg($home).' && php ./.rtorrentRestart.php >/dev/null 2>&1', $unused, $rc);
+        @exec('cd '.escapeshellarg($home).' && setsid -w php ./.rtorrentRestart.php >/dev/null 2>&1', $unused, $rc);
         if ($rc !== 0) return false;
         // The executor sleeps 5 s after rTorrent exits before it starts the selected build.
         for ($attempt = 0; $attempt < 150; $attempt++) {
