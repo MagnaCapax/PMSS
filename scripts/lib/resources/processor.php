@@ -49,7 +49,29 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         $this->ensureRuntime();
     }
 
-    /** Hold the cron spawn lock while detached workers start. */
+    /** Aggregate in the cron process so the run lock covers every account. */
+    public function runCli(array $argv, string $scriptPath): int
+    {
+        if (isset($argv[1])) {
+            return parent::runCli($argv, $scriptPath);
+        }
+        $this->beforeRunCli();
+        if (!$this->beforeSpawn()) {
+            return 0;
+        }
+        $users = array_filter($this->discoverUsers(), [$this, 'validateUser']);
+        if (empty($users)) {
+            echo "No users in this system!\n";
+            return 0;
+        }
+        $compareTimes = pmssStatsCompareTimesBuild();
+        foreach ($users as $user) {
+            $this->processUser($user, $compareTimes);
+        }
+        return 0;
+    }
+
+    /** Take the run lock; the handle stays open until the cron process exits. */
     public function beforeSpawn(): bool
     {
         $lockFile = $this->runtimeDir.'/resourceStats.lock';
@@ -65,7 +87,7 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         if (!pmssLockHandleWritePid($this->lockHandle)) {
             pmssLockHandleRelease($this->lockHandle);
             $this->lockHandle = false;
-            $this->log(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without spawn lock");
+            $this->log(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without run lock");
         }
         return true;
     }
