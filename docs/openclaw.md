@@ -98,22 +98,27 @@ other provider settings remain untouched.
 ## Pulsed Media skills
 
 Install and update also install the optional Apache-2.0
-[mcxKokko v0.2.0 pack](https://github.com/MagnaCapax/mcxKokko/tree/v0.2.0).
-Its AgentSkills teach OpenClaw to use Pulsed Media services with your own
-account keys. PMSS verifies a pinned SHA256 before extraction, stages privately
-under your home, and selects the completed version through
-`~/.openclaw/pmss-kokko`. A new pack release requires a PMSS update to the pin.
-Download or verification failures leave OpenClaw working and retain any older
-pack. Tests use an offline copy of that exact release archive, including its
-license and notice.
+[mcxKokko pack](https://github.com/MagnaCapax/mcxKokko/tree/main) from
+MagnaCapax's own `main` branch, refreshed on `install-openclaw update`.
+The account, AI-credit, docs, ticket and order skills come from this pack and
+teach OpenClaw to use Pulsed Media services with your own account keys.
+The credits, docs and ticket skills hand over to Pikkumies when it is installed.
+PMSS validates archive members, stages privately under your home, and names the
+completed directory `~/.openclaw/pmss-kokko-<12hex>` using the first 12 characters
+of the archive's SHA256. The full hash is stored in its private marker, and
+`~/.openclaw/pmss-kokko` selects the directory atomically. An identical archive
+leaves the selection unchanged. Download or validation failures leave OpenClaw
+working and retain any older pack. Tests use an offline archive with the same
+`mcxKokko-main/` root, including the upstream license and notice.
 
 The installer appends `~/.openclaw/pmss-kokko/skills` to
 `skills.load.extraDirs` once, preserving your existing entries. To disable the
 pack, create `~/.openclaw/pmss-kokko-disabled` and run
 `install-openclaw install --yes` or `install-openclaw update`; this removes only
 PMSS's load entry and skips installation. Remove the file and rerun either
-command to enable it again. `status` and `check` report the pack version or
-disabled/absent state. `uninstall` removes the managed pack and its load entry
+command to enable it again. `status` and `check` report `main <12hex>` for the
+selected pack or `disabled`/`absent`. Existing release selections report their
+tag until updated. `uninstall` removes the managed pack and its load entry
 even when keeping the rest of your OpenClaw state.
 
 ## Updating

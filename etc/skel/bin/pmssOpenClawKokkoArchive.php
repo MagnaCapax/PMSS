@@ -1,7 +1,7 @@
 <?php
-/** Validate tar's effective member names and types before extracting a verified Kokko archive. */
+/** Validate tar's effective member names and types before extracting a Kokko archive. */
 
-/** Reject links, special files, escaped names and every path outside the pinned archive root. */
+/** Reject links, special files, escaped names and every path outside the main archive root. */
 function ocKokkoArchiveValidate(string $archive): void
 {
     $env = getenv();
@@ -9,7 +9,7 @@ function ocKokkoArchiveValidate(string $archive): void
     unset($env['TAR_OPTIONS']);
     list($rc, $listing) = ocRun(array('tar', '-tzvf', $archive, '--numeric-owner', '--quoting-style=escape'), $env);
     if ($rc !== 0 || trim($listing) === '') throw new RuntimeException('Invalid skill archive');
-    $root = 'mcxKokko-'.ltrim(OC_KOKKO_VERSION, 'v').'/';
+    $root = 'mcxKokko-main/';
     foreach (explode("\n", rtrim($listing, "\n")) as $line) {
         $fields = preg_split('/\s+/', $line, 6);
         $name = $fields[5] ?? '';
@@ -35,7 +35,7 @@ function ocKokkoManaged(string $dir): bool
     $marker = $dir.'/.pmss-kokko';
     return !is_link($dir) && is_dir($dir) && fileowner($dir) === posix_geteuid()
         && !is_link($marker) && is_file($marker) && fileowner($marker) === posix_geteuid()
-        && preg_match('/^v[0-9]+\.[0-9]+\.[0-9]+\n[a-f0-9]{64}\n$/D', (string) @file_get_contents($marker)) === 1;
+        && preg_match('/^(?:main|v[0-9]+\.[0-9]+\.[0-9]+)\n[a-f0-9]{64}\n$/D', (string) @file_get_contents($marker)) === 1;
 }
 
 /** Remove marked older versions, leaving unrecognized paths and redirected directories alone. */
@@ -43,7 +43,7 @@ function ocKokkoCleanup(array $paths, ?string $keep): void
 {
     foreach (new DirectoryIterator($paths['state']) as $entry) {
         $dir = $entry->getPathname();
-        if (preg_match('/^pmss-kokko-v[0-9]+\.[0-9]+\.[0-9]+$/D', $entry->getFilename())
+        if (preg_match('/^pmss-kokko-(?:v[0-9]+\.[0-9]+\.[0-9]+|[a-f0-9]{12})$/D', $entry->getFilename())
             && $dir !== $keep && ocKokkoManaged($dir)) ocRemoveTree($dir);
     }
 }

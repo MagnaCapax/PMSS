@@ -102,3 +102,32 @@ preserved extraDirs and idempotent updates.
 - [ADR 0087](0087-separate-per-user-openclaw-installer.md)
 - [OpenClaw custom providers](https://docs.openclaw.ai/gateway/config-tools/custom-providers)
 - [mcxKokko v0.2.0](https://github.com/MagnaCapax/mcxKokko/tree/v0.2.0)
+
+## Amendment — 2026-10-24: Follow mcxKokko main
+
+The operator's 2026-10-24 direction, "we probably should not pin versions",
+supersedes the skill-pack release pin above. mcxKokko is MagnaCapax's own
+repository. PMSS already installs the more powerful Pikkumies from `main`
+through `etc/skel/bin/install-pikkumies.sh` and lets it update daily; OpenClaw
+itself installs the latest npm version. Pinning this pack adds release upkeep
+without a meaningful protection over that existing trust boundary. The
+third-party Node binary keeps its version and SHA256 pin.
+
+Install/update downloads
+`https://github.com/MagnaCapax/mcxKokko/archive/refs/heads/main.tar.gz`.
+The archive's SHA256 identifies its content rather than authenticating it
+against a preselected release: the first 12 hex characters name
+`~/.openclaw/pmss-kokko-<12hex>`, and the private `.pmss-kokko` marker contains
+`main\n<64hex>\n`. Identical archives reuse the completed directory and leave
+the selection unchanged. A reused directory must match the full hash before
+selection, including when two hashes share the same 12-character prefix.
+
+Archive validation now requires the `mcxKokko-main/` root and retains all member
+and type checks. Private home staging, ownership and marker checks, atomic
+publication/selection, additive extraDirs handling, the off switch, secret-safe
+errors and fail-soft optional-pack behavior remain in effect. Legacy
+`pmss-kokko-vX.Y.Z` directories with `vX.Y.Z\n<64hex>\n` markers remain managed
+for upgrades, cleanup and uninstall. Status shows `main <12hex>` for the new
+selection, or `disabled`/`absent`; legacy selections retain their tag until an
+update succeeds. Offline fixtures use the main root, preserving upstream
+content, license, notice and executable helpers.
