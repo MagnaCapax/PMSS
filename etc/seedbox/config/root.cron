@@ -26,19 +26,23 @@ MAILTO=""
 # filter the uid column rather than combining -C with -U (GH#1100: matching by
 # process name alone let any account reach ionice class 1 with a look-alike binary).
 * * * * *   root ps -o pid=,uid= -C bash | awk '$2==0{print $1}' |xargs -I'{1}' ionice -c1 -n2 -p{1}
-* * * * *   root ps -o pid= -C php|xargs -I'{1}' ionice -c2 -n6 -p{1}
-* * * * *   root ps -o pid= -C rar|xargs -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C unrar|xargs -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C tar|xargs -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C mktorrent|xargs -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C sftp-server|xargs -I'{1}' ionice -c2 -n7 -p{1}
-* * * * *   root ps -o pid= -C cp|xargs -I'{1}' ionice -c3 -p{1}
+# Demotions below target account workloads only (uid >= 1000, the PMSS account
+# floor). Root's own tar/cp/php (backups, transfers, update.php, every PHP cron)
+# keep their default class. proftpd stays unfiltered: sessions inherit the class
+# from the root-owned master. xmrig stays unfiltered whoever owns it.
+* * * * *   root ps -o pid=,uid= -C php | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c2 -n6 -p{1}
+* * * * *   root ps -o pid=,uid= -C rar | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid=,uid= -C unrar | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid=,uid= -C tar | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid=,uid= -C mktorrent | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid=,uid= -C sftp-server | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c2 -n7 -p{1}
+* * * * *   root ps -o pid=,uid= -C cp | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c3 -p{1}
 * * * * *   root ps -o pid= -C proftpd|xargs -I'{1}' ionice -c2 -n7 -p{1}
-* * * * *   root ps -o pid= -C mono|xargs -I'{1}' renice -n 17 -p {1}
-* * * * *   root ps -o pid= -C ffmpeg|xargs -I'{1}' renice -n 18 -p {1}
-* * * * *   root ps -o pid= -C ffmpeg|xargs -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C rclone|xargs -I'{1}' renice -n 17 -p {1}
-* * * * *   root ps -o pid= -C rclone|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid=,uid= -C mono | awk '$2>=1000{print $1}' |xargs -I'{1}' renice -n 17 -p {1}
+* * * * *   root ps -o pid=,uid= -C ffmpeg | awk '$2>=1000{print $1}' |xargs -I'{1}' renice -n 18 -p {1}
+* * * * *   root ps -o pid=,uid= -C ffmpeg | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid=,uid= -C rclone | awk '$2>=1000{print $1}' |xargs -I'{1}' renice -n 17 -p {1}
+* * * * *   root ps -o pid=,uid= -C rclone | awk '$2>=1000{print $1}' |xargs -I'{1}' ionice -c3 -p{1}
 * * * * *   root ps -o pid= -C xmrig|xargs -I'{1}' renice -n 19 -p {1}
 
 
