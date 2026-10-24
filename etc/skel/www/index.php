@@ -958,8 +958,14 @@ document.getElementById('pikkumiesFrame').addEventListener('load', function () {
  if (this.src === 'about:blank') return;
  clearTimeout(pmssPikkumiesHintTimer);
  document.getElementById('pmss-pikkumies-hint').hidden = true;
- pmssPikkumiesHintTimer = setTimeout(function () {
-  if (!pmssPikkumiesReady) document.getElementById('pmss-pikkumies-hint').hidden = false;
+ // The panel's own launcher page (setup, starting, not running) is this origin and never reports ready; only a frame
+ // that went on to Pikkumies, or failed to, can be blocked by the network. A frame loaded behind another tab cannot
+ // report ready either (the browser runs no animation frames in it), so the hint shows only while the tab is open;
+ // opening the tab while not ready reloads the frame, which starts this timer again.
+ var launcher = false;
+ try { launcher = this.contentWindow.location.origin === location.origin; } catch (e) {}
+ if (!launcher) pmssPikkumiesHintTimer = setTimeout(function () {
+  if (!pmssPikkumiesReady && document.getElementById('pikkumies').offsetParent !== null) document.getElementById('pmss-pikkumies-hint').hidden = false;
  }, 12000);
  if (window.matchMedia('(pointer:fine)').matches && document.getElementById('pikkumies').offsetParent !== null) this.focus();
 });

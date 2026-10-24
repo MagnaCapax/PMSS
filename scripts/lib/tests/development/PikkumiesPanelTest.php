@@ -110,6 +110,11 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertStringContainsString('.pmss-pikkumies-bar iframe{border:0;background:transparent}', $welcome);
         $this->assertFalse(strpos($welcome, 'height:84px') !== false);
         $this->assertStringContainsString('}, 12000)', $index);
+        // The network hint waits for the Pikkumies tab to be open (a frame loaded behind another tab cannot report ready)
+        // and is never armed for the panel's own launcher page, which is this origin.
+        $this->assertStringContainsString("try { launcher = this.contentWindow.location.origin === location.origin; } catch (e) {}", $index);
+        $this->assertStringContainsString("if (!launcher) pmssPikkumiesHintTimer = setTimeout(function () {", $index);
+        $this->assertStringContainsString("if (!pmssPikkumiesReady && document.getElementById('pikkumies').offsetParent !== null) document.getElementById('pmss-pikkumies-hint').hidden = false;", $index);
         $this->assertStringContainsString('}, 30000)', $index);
         $this->assertStringContainsString('if (!state.visible) location.reload()', $index);
         $this->assertStringContainsString('pikkumies:switch', $welcome);
