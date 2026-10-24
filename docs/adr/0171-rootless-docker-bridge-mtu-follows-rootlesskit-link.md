@@ -1,4 +1,4 @@
-# ADR 0169: Rootless Docker bridge MTU follows the RootlessKit link
+# ADR 0171: Rootless Docker bridge MTU follows the RootlessKit link
 
 Date: 2026-10-23
 Category: architecture
