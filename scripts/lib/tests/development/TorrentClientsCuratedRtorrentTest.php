@@ -123,6 +123,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $restart = file_get_contents($root.'/etc/skel/.rtorrentRestart.php');
         $this->assertStringContainsString("'rtorrent([ -]main)?'", $restart);
         $this->assertStringContainsString('screen -fa -d -m ./.rtorrentExecute.php', $restart);
+        // A stale executor exits with a fresh run stamp; the consumer must look at the executor lock as well.
+        $this->assertStringContainsString("flock(\$executorLock, LOCK_EX | LOCK_NB)", $restart);
+        $this->assertStringContainsString('$lastRun == 0 or $executorIdle or', $restart);
     }
     public function testRtorrent016EntryIsPinnedDefaultAndLaunchesWithDeprecatedRedirects(): void
     {
