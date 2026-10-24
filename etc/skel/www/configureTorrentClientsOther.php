@@ -36,7 +36,9 @@ function pmssConfigureTorrentClientOtherRunningVersion($home, $client)
     // After three fast exits the executor runs the system build and leaves the selection alone (ADR 0146).
     $binary = pmssTorrentClientResolve($home, $client);
     if ($client === 'rtorrent' && $binary !== null && pmssCustomerNativePidsRead(array($binary)) === array())
-        return 'system, because '.basename($target).' kept stopping right after start';
+        return pmssRtorrentExecutorFallbackVersion($home) === basename($target)
+            ? 'system, because '.basename($target).' kept stopping right after start'
+            : 'system; '.basename($target).' starts at the next rTorrent restart';
     return basename($target);
 }
 

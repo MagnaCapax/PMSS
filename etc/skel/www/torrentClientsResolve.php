@@ -104,6 +104,28 @@ function pmssRtorrentExecutorFastExits(string $command, string $lastFailedComman
     return $command === $lastFailedCommand ? $fastExits + 1 : 1;
 }
 
+/** Record the store build the executor gave up on, or forget it (null), so the panel can tell a fallback from a pending restart. */
+function pmssRtorrentExecutorFallbackMark(string $home, ?string $failedCommand): void
+{
+    $path = rtrim($home, '/').'/.config/pmss/torrentClients/rtorrent.fallback';
+    if ($failedCommand === null) {
+        if (is_file($path) && !is_link($path)) @unlink($path);
+        return;
+    }
+    if (preg_match('#/rtorrent/([A-Za-z0-9][A-Za-z0-9._-]{0,63})/rtorrent\b#', $failedCommand, $m) !== 1) return;
+    $dir = dirname($path);
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    if (is_dir($dir) && !is_link($dir) && !is_link($path)) @file_put_contents($path, $m[1]."\n");
+}
+
+/** The store build the executor last fell back from, or '' when none is recorded. */
+function pmssRtorrentExecutorFallbackVersion(string $home): string
+{
+    $path = rtrim($home, '/').'/.config/pmss/torrentClients/rtorrent.fallback';
+    if (!is_file($path) || is_link($path) || @filesize($path) > 128) return '';
+    return trim((string) @file_get_contents($path));
+}
+
 /** rTorrent 0.16 renamed rc and RPC commands; -D keeps the old names the template and ruTorrent use. */
 function pmssRtorrentDeprecatedRedirects(string $version, string $projectionPath): bool
 {

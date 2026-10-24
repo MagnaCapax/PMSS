@@ -53,4 +53,30 @@ final class TorrentClientsExecutorFallbackTest extends TestCase
             $this->assertSame(0, \pmssRtorrentExecutorFastExits(self::SYSTEM, self::STORE, $count, 0.0));
         }
     }
+
+    public function testFallbackRecordNamesOnlyTheBuildThatFailedAndClears(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rt-fallback-');
+        $this->assertSame('', \pmssRtorrentExecutorFallbackVersion($home), 'no record before any fallback');
+        \pmssRtorrentExecutorFallbackMark($home, self::SYSTEM);
+        $this->assertSame('', \pmssRtorrentExecutorFallbackVersion($home), 'the system build is never recorded');
+        \pmssRtorrentExecutorFallbackMark($home, self::STORE);
+        $this->assertSame('0.16.25', \pmssRtorrentExecutorFallbackVersion($home));
+        \pmssRtorrentExecutorFallbackMark($home, null);
+        $this->assertSame('', \pmssRtorrentExecutorFallbackVersion($home));
+        // A record path the account replaced with a link is neither written through nor read.
+        symlink('/etc/hostname', $home.'/.config/pmss/torrentClients/rtorrent.fallback');
+        \pmssRtorrentExecutorFallbackMark($home, self::STORE);
+        $this->assertSame('', \pmssRtorrentExecutorFallbackVersion($home));
+        $this->assertTrue(is_link($home.'/.config/pmss/torrentClients/rtorrent.fallback'));
+    }
+
+    public function testPanelSaysPendingRestartUnlessTheExecutorFellBack(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsOther.php');
+        $this->assertStringContainsString("pmssRtorrentExecutorFallbackVersion(\$home) === basename(\$target)", $source);
+        $this->assertStringContainsString("' starts at the next rTorrent restart'", $source);
+        $executor = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
+        $this->assertStringContainsString('pmssRtorrentExecutorFallbackMark(__DIR__', $executor);
+    }
 }

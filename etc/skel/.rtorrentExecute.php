@@ -69,6 +69,9 @@ while (true) {
       $rtorrentFastExits, microtime(true) - $rtorrentStartedAt);
     $rtorrentFailedCommand = $rtorrentCommand;
     if ($rtorrentFastExits === 3) writeLog('rTorrent store build exited in under 20 seconds three times; using /usr/local/bin/rtorrent until selection changes');
+    // The panel names a fallback only when one happened; a build that ran long clears the record.
+    if (function_exists('pmssRtorrentExecutorFallbackMark') && ($rtorrentFastExits === 3 || $rtorrentFastExits === 0))
+      pmssRtorrentExecutorFallbackMark(__DIR__, $rtorrentFastExits === 3 ? $rtorrentCommand : null);
   }
   writeLog('rtorrent exited (rc='.$rtorrentRc.'); sleeping 5 seconds then restarting');
   sleep(5); // avoid overloading the server
