@@ -1,11 +1,5 @@
 {
     "exec-opts": [
         "native.cgroupdriver=cgroupfs"
-    ],
-    "mtu": 65520,
-    "default-network-opts": {
-        "bridge": {
-            "com.docker.network.driver.mtu": "65520"
-        }
-    }
+    ]
 }

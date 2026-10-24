@@ -63,6 +63,21 @@ On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast a
 
 `fuse-overlayfs` is in the PMSS dpkg baseline (Debian 11/12/13), so every regular update reinstalls it if it is ever removed — notably by the recurring fuse2/fuse3 apt cascade (`apt-get install fuse …` pulls bare `fuse` v2, which conflicts with and evicts `fuse3` + `fuse-overlayfs`; see GH #464/#643). This makes rootless Docker's storage driver self-heal without manual intervention. Dist-upgrades also install it best-effort. Debian 10 (buster, EOL) is not baselined for it because availability in the archived buster repos is not guaranteed.
 
+## Bridge MTU
+
+Rootless Docker reaches the network through a user-space stack (normally slirp4netns) whose link inside your account's network namespace has MTU 65520. PMSS adds two keys to an existing `~/.config/docker/daemon.json` so Docker's bridges match it, which makes container transfers several times faster (ADR 0169):
+
+- `"mtu": 65520` for the default bridge (`docker run` without `--network`);
+- `"default-network-opts": {"bridge": {"com.docker.network.driver.mtu": "65520"}}` for networks created afterwards, such as compose networks.
+
+The keys apply at the next Docker start. Networks that already exist keep their MTU until you recreate them (`docker compose down && docker compose up -d`). The larger MTU stays inside your account; traffic leaves the server at the normal size.
+
+To keep 1500, set both keys yourself: `"mtu": 1500` and `"com.docker.network.driver.mtu": "1500"`. PMSS keeps values you set. Deleting the keys does not work, because the next maintenance run adds them again.
+
+WireGuard containers size their tunnel from the container's interface, so on a 65520 bridge large tunnel packets leave as IP fragments. `docker-install-wireguard.sh` runs the server on its own `wireguard` network at 1500. A container created by an older copy of the script on the default bridge should be recreated with the current one (`docker rm -f wireguard`, then run the script again with the same port).
+
+If PMSS finds an empty object such as `"log-opts": {}` in your `daemon.json`, it leaves the file unchanged and logs a warning, since rewriting it would turn `{}` into `[]` and Docker would refuse to start. Remove the empty entry to let PMSS update the file.
+
 If you ever need to change the driver, edit `~/.config/docker/daemon.json` and restart Docker. On PMSS the daemon is normally managed for you; reach out to support if you believe a driver change is required so they can coordinate it with platform tooling.
 
 ## Additional tools

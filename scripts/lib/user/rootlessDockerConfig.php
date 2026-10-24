@@ -104,6 +104,16 @@ function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int
 }
 
 /**
+ * Return true when the decoded array re-encodes to the same JSON value. json_decode(..., true)
+ * cannot tell {} from [], and Docker refuses a map written back as a list ("log-opts": []).
+ */
+function pmssUserRootlessDockerConfigRoundTrips(string $raw, array $decoded): bool
+{
+    $reencoded = json_encode($decoded);
+    return is_string($reencoded) && json_encode(json_decode($raw)) === json_encode(json_decode($reencoded));
+}
+
+/**
  * Fill the bridge MTU keys of a daemon.json payload: "mtu" covers the default
  * bridge, default-network-opts every network created afterwards (existing networks
  * keep their MTU until recreated). Keys the account already set, valid or not, are
@@ -167,6 +177,7 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
         return $result;
     }
     $data = [];
+    $decoded = null;
     if ($current !== false && trim((string) $current) !== '') {
         $decoded = pmssJsonDecodeAssoc((string) $current);
         if ($decoded === null && empty($policy['invalid_json_as_empty'])) {
@@ -207,12 +218,14 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
         }
     }
 
-    if (array_key_exists('bridge_mtu', $policy) && pmssUserRootlessDockerBridgeMtuApply($data, $policy['bridge_mtu'])) {
+    $createWhenMissing = !empty($policy['create_when_missing']);
+    // The MTU fills a file that exists or is written anyway; it never creates one on its own.
+    if (array_key_exists('bridge_mtu', $policy) && ($hasConfigFile || $createWhenMissing || $changed)
+        && pmssUserRootlessDockerBridgeMtuApply($data, $policy['bridge_mtu'])) {
         $changed = true;
         $result['configured_bridge_mtu'] = true;
     }
 
-    $createWhenMissing = !empty($policy['create_when_missing']);
     if ($hasConfigFile || $createWhenMissing || $changed) {
         $execOpts = is_array($data['exec-opts'] ?? null) ? $data['exec-opts'] : [];
         if (!in_array('native.cgroupdriver=cgroupfs', $execOpts, true)) {
@@ -223,6 +236,14 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
     }
     if (!$changed) {
         $result['ok'] = true;
+        return $result;
+    }
+    if ($decoded !== null && !pmssUserRootlessDockerConfigRoundTrips((string) $current, $decoded)) {
+        // Leave the account's file as it is rather than write one Docker would refuse to load.
+        foreach (['removed_storage_driver', 'configured_storage_driver', 'disabled_containerd_snapshotter', 'configured_bridge_mtu'] as $key) {
+            $result[$key] = false;
+        }
+        $result['reason'] = 'lossy_json';
         return $result;
     }
 

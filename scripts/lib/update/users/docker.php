@@ -312,7 +312,7 @@ function pmssEnsureDockerDependencies(string $user): void
         'bridge_mtu' => PMSS_ROOTLESS_DOCKER_BRIDGE_MTU,
     ]);
     if (!$result['ok']) {
-        $messages = ['ensure_dir_failed' => '[WARN] Failed to ensure ~/.config/docker', 'encode_failed' => '[WARN] Failed to encode daemon.json', 'write_failed' => '[WARN] Failed to write daemon.json'];
+        $messages = ['ensure_dir_failed' => '[WARN] Failed to ensure ~/.config/docker', 'encode_failed' => '[WARN] Failed to encode daemon.json', 'write_failed' => '[WARN] Failed to write daemon.json', 'lossy_json' => '[WARN] daemon.json has an empty or numeric-key object PMSS cannot rewrite safely; left unchanged'];
         pmssUserLog($user, $messages[$result['reason']] ?? '[WARN] Failed to converge daemon.json');
         return;
     }
