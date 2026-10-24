@@ -26,7 +26,8 @@ function pmssDpkgStatusIndicatesPresent(string $status): bool
 /** Read the legacy MediaArea package state without emitting missing-package errors. */
 function pmssRepoMediaareaDpkgStatus(): string
 {
-    return (string) @shell_exec(pmssLockChildClosePrefix().'dpkg-query -W -f=${Status} repo-mediaarea 2>/dev/null');
+    // Quote the format: unquoted, sh expands ${Status} to empty and dpkg-query prints nothing.
+    return (string) @shell_exec(pmssLockChildClosePrefix().'dpkg-query -W -f='.escapeshellarg('${Status}').' repo-mediaarea 2>/dev/null');
 }
 
 /**
