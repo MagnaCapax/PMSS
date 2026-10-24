@@ -247,6 +247,7 @@ function pmssCreateNginxConfigSetup(): array
         'nginxUsersDir' => '/etc/nginx/users',
         'homeBase' => '/home',
         'runtimePortDir' => '/etc/seedbox/runtime/ports',
+        'billingPublicDir' => '/var/lib/pmss/public/billing',
         'nginxSslBlock' => $nginxSslBlock,
         'publicSubdomainTemplate' => $templates['public'],
         'publicSuspendedTemplate' => $templates['publicSuspended'],

@@ -108,6 +108,24 @@ class NginxConfigWriteGuardTest extends TestCase
         foreach (\pmssCreateNginxConfigManagedUserPaths('bob', $ctx) as $path) $this->assertFalse(file_exists($path));
     }
 
+    public function testOrphanPruneRemovesARemovedAccountsPublishedBillingIdentity(): void
+    {
+        $ctx = ['nginxUsersDir' => $this->tempDir.'/users', 'subdomainConfigDir' => $this->tempDir.'/conf.d', 'subdomainEnabled' => true,
+            'billingPublicDir' => $this->tempDir.'/billing'];
+        $current = $this->pmssWriteFile($ctx['billingPublicDir'].'/alice', "123\n");
+        $removed = $this->pmssWriteFile($ctx['billingPublicDir'].'/bob', "456\n");
+        $kept = [$this->pmssWriteFile($ctx['billingPublicDir'].'/README', "keep\n"), $this->pmssWriteFile($ctx['billingPublicDir'].'/ALICE', "keep\n")];
+
+        $this->assertTrue(\pmssCreateNginxConfigPruneOrphans(['alice'], $ctx));
+        $this->assertSame("123\n", file_get_contents($current));
+        $this->assertFalse(file_exists($removed));
+        foreach ($kept as $path) $this->assertSame("keep\n", file_get_contents($path));
+
+        unset($ctx['billingPublicDir']);
+        $this->assertTrue(\pmssCreateNginxConfigPruneOrphans([], $ctx));
+        $this->assertSame("123\n", file_get_contents($current));
+    }
+
     public function testOrphanPruneKeepsFilesOutsideGeneratedNameShapes(): void
     {
         $ctx = ['nginxUsersDir' => $this->tempDir.'/users', 'subdomainConfigDir' => $this->tempDir.'/conf.d', 'subdomainEnabled' => true];

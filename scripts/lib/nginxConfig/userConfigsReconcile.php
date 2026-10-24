@@ -74,6 +74,8 @@ function pmssCreateNginxConfigReconcileStaleUserFiles(string $user, array $ctx, 
 /** Remove managed paths not owned by the already-selected current user set. */
 function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
 {
+    // A removed account's published billing identity (pmssPikkumiesUiIdentityPublish) goes with its routes.
+    $billingDir = rtrim((string) ($ctx['billingPublicDir'] ?? ''), '/');
     $expected = [];
     foreach (pmssConfigLines($users, []) as $user) {
         if (!pmssValidateUsername($user)) {
@@ -83,6 +85,7 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
             if ($label === 'private') continue;
             $expected[$path] = true;
         }
+        if ($billingDir !== '') $expected[$billingDir.'/'.$user] = true;
     }
 
     $patterns = ['user' => pmssCreateNginxConfigContextDir($ctx, 'nginxUsersDir', '/etc/nginx/users').'/*'];
@@ -91,6 +94,7 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
     } else {
         $patterns['private'] = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d').'/pmss-user-*-hash.conf';
     }
+    if ($billingDir !== '' && is_dir($billingDir)) $patterns['billing'] = $billingDir.'/*';
 
     $success = true;
     foreach ($patterns as $kind => $pattern) {
@@ -103,7 +107,7 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
         foreach ($matches as $path) {
             $name = basename($path);
             // Only generated route names may be removed from a shared config directory.
-            if ($kind === 'user' && !pmssValidateUsername($name)) {
+            if (($kind === 'user' || $kind === 'billing') && !pmssValidateUsername($name)) {
                 continue;
             }
             if ($kind === 'public' &&
