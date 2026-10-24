@@ -269,8 +269,10 @@ foreach ($chownItems as $item) {
     }
     $owner = $item[1];
     if (array_key_exists($path, $rootArtifactRepairable)) {
-        // Match only a root-owned inode, so a file swapped in after the check is not adopted.
-        pmssUserPermissionsOwnerApply($homeDir, $path, $owner, '-uid 0');
+        // The file is already root-owned, so only its group can need repair. Set it
+        // through the opened inode, which must still be root-owned: a file swapped in
+        // after the check is never adopted, and no path is resolved twice.
+        pmssUserPermissionsOpenedGroupSet($thisUser, $homeDir, $path, substr($owner, strpos($owner, ':') + 1), 0);
         continue;
     }
     $recursive = isset($item[2]) ? (bool)$item[2] : false;

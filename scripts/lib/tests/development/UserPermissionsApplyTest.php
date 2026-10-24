@@ -215,23 +215,32 @@ class UserPermissionsApplyTest extends TestCase
         $this->assertSame(posix_geteuid(), fileowner($file));
     }
 
-    public function testOwnerApplyWithRootPredicateLeavesAnAccountFileAlone(): void
+    public function testOpenedGroupSetNeverAdoptsAFileOwnedBySomeoneElse(): void
     {
-        if (posix_geteuid() === 0) {
-            throw new SkipTest('needs a non-root account so a chown to root would fail visibly');
-        }
         $home = $this->home();
-        $file = $this->file($home.'/.notifyEmail', 0644, "elsewhere@example.test\n");
+        $uid = posix_geteuid();
+        $owner = $this->pmssCurrentOwner();
+        $group = posix_getgrgid(posix_getegid());
+        if (!is_array($group)) {
+            throw new SkipTest('current group has no name');
+        }
+        $file = $this->file($home.'/.notifyEmail', 0640, "elsewhere@example.test\n");
+        $outside = $this->file($this->tempDir.'/outside/.quota', 0600);
+        $this->pmssCreateSymlinkOrSkip($outside, $home.'/.quota');
 
-        // A file swapped in after the lstat gate is account-owned; -uid 0 keeps chown from reaching it.
-        \pmssUserPermissionsOwnerApply($home, $file, '0:0', '-uid 0');
+        // A file swapped in after the lstat gate has the wrong owner; nothing changes on it.
+        $this->assertFalse(\pmssUserPermissionsOpenedGroupSet($owner, $home, $file, $group['name'], $uid + 1));
+        $this->assertSame($uid, fileowner($file));
         $this->assertSame(0, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
-        $this->assertSame(posix_geteuid(), fileowner($file));
+        foreach (['/.quota', '/missing'] as $name) {
+            $this->assertFalse(\pmssUserPermissionsOpenedGroupSet($owner, $home, $home.$name, $group['name'], $uid), $name);
+        }
 
-        // Without the predicate the same call does try to adopt it, which fails here.
-        \pmssUserPermissionsOwnerApply($home, $file, '0:0');
-        $this->assertSame(1, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
-        $this->assertSame(posix_geteuid(), fileowner($file));
+        // The expected owner gets its group set through the opened inode; content and owner stay.
+        $this->assertTrue(\pmssUserPermissionsOpenedGroupSet($owner, $home, $file, $group['name'], $uid));
+        $this->assertSame($uid, fileowner($file));
+        $this->assertSame(posix_getegid(), filegroup($file));
+        $this->assertSame("elsewhere@example.test\n", file_get_contents($file));
     }
 
     public function testUserPermissionsRoutesEveryRepairThroughTheCheckedObject(): void

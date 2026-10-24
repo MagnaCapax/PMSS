@@ -85,7 +85,7 @@ class UserRootArtifactPermissionsTest extends TestCase
             "\$trafficPaths['local'] => ",
             "\$trafficPaths['ingress'] => ",
             "\$trafficPaths['ingressLocal'] => ",
-            "pmssUserPermissionsOwnerApply(\$homeDir, \$path, \$owner, '-uid 0');",
+            "pmssUserPermissionsOpenedGroupSet(\$thisUser, \$homeDir, \$path, substr(\$owner, strpos(\$owner, ':') + 1), 0);",
             "&& (\$rootArtifactRepairable[\$path] ?? true);",
         ], $source);
         $this->assertSame(2, substr_count($source, 'array_key_exists($path, $rootArtifactRepairable) && !$rootArtifactRepairable[$path]'));
