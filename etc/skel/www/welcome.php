@@ -1564,6 +1564,8 @@ function pmssWelcomeHomeAppsBuild(array $appsStatus, $agentFirst)
         $desc = (string) ($descriptions[$name] ?? '');
         return array('id' => (string) $id, 'name' => $name, 'desc' => $desc !== '' ? $desc : ($ideas[$id] ?? ''), 'state' => $state, 'url' => $url,
             'open' => $action === 'open', 'action' => $action, 'restart' => $state === 'running',
+            // ruTorrent opens while rTorrent is down; the tile also offers the start that brings it back.
+            'start' => $action === 'open' && $state !== 'running',
             'hero' => $agentFirst && $id === 'openclaw' && $state !== 'off' && $state !== 'absent', 'more' => false);
     };
     $active = $inactive = array();
@@ -1607,6 +1609,7 @@ function pmssWelcomeHomeAppTileHtml(array $app)
     elseif ($app['action'] === 'setup') $button = '<a class="h-btn h-btn-quiet" '.$configure.'>Set up'.$sr.'</a>';
     elseif ($app['action'] === 'manage') $button = '<a class="h-btn h-btn-quiet" '.$configure.'>Manage'.$sr.'</a>';
     else $button = '';
+    if (!empty($app['start'])) $button .= '<button type="button" class="h-btn h-btn-quiet" data-tile-action="start">Start'.$sr.'</button>';
     if (!empty($app['restart'])) $button .= '<button type="button" class="h-btn h-btn-quiet" data-tile-action="restart">Restart'.$sr.'</button>';
     if ($app['state'] === 'absent') list($word, $class) = array('Not set up', '');
     elseif ($app['state'] === 'off') list($word, $class) = array('Off', '');

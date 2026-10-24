@@ -326,6 +326,12 @@ final class WelcomeHomeTest extends TestCase
         $this->assertSame(true, $byId['rtorrent']['open'], 'ruTorrent still loads while rTorrent restarts');
         $this->assertSame(false, $byId['sonarr']['open']);
         $this->assertSame(false, $byId['radarr']['open'], 'An app without a URL has nothing to open');
+        $this->assertSame(true, $byId['rtorrent']['start'], 'a stopped rTorrent can be started from its tile');
+        $this->assertSame(false, $byId['radarr']['start']);
+
+        $html = $this->runWelcomeHome('echo json_encode(array("html" => pmssWelcomeHomeAppTileHtml('.var_export($byId['rtorrent'], true).')));')['html'];
+        $this->assertStringContainsAllStrings(array('>Open<span class="h-sr"> ruTorrent</span></a>', 'data-tile-action="start">Start'), $html);
+        $this->pmssAssertStringNotContainsString('data-tile-action="restart"', $html);
     }
 
     public function testSupportRedactRemovesPasswordsAndKeysButKeepsOrdinaryText(): void
