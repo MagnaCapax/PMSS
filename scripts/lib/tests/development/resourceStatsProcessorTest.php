@@ -304,13 +304,71 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertEquals([], $processor->spawnCalls);
     }
 
-    public function testRunCliSpawnsWorkersForDiscoveredUsers(): void
+    public function testRunCliAggregatesValidAccountsUnderRunLockWithoutSpawning(): void
     {
-        $processor = new SpyResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
-        $processor->usersToDiscover = ['alice', 'bob'];
+        $stats = new StubResourceStatsProcessorStatistics();
+        $processor = new class($stats, $this->paths) extends \ResourceStatsProcessor {
+            /** @var string */
+            public $lockPath = '';
+            /** @var array<string, bool> */
+            public $lockBusyDuring = [];
+
+            protected function runSpawnCommand(string $command): int
+            {
+                throw new \RuntimeException('Resource aggregation must not spawn workers');
+            }
+
+            public function processUser(string $user, array $compareTimes): void
+            {
+                $busy = false;
+                $probe = \pmssLockFileAcquire($this->lockPath, true, 'c+', false, true, $busy);
+                is_resource($probe) && \pmssLockHandleRelease($probe);
+                $this->lockBusyDuring[$user] = $busy;
+                parent::processUser($user, $compareTimes);
+            }
+        };
+        $processor->lockPath = $this->paths['runtime_dir'].'/resourceStats.lock';
+        $now = time();
+        foreach (['alice', 'bob'] as $user) {
+            $this->seedManagedUser($user);
+            $this->setResourceData($stats, $user, [
+                $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
+                $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
+            ]);
+        }
+        file_put_contents($this->paths['passwd_file'], "bob:x:1001:1001::{$this->paths['home_dir']}/bob:/bin/bash\n", FILE_APPEND);
+        // Ghost series: data without a home, and data plus home without a passwd record.
+        file_put_contents($this->paths['resource_dir'].'/ghost', 'seed');
+        $this->seedManagedUser('no-passwd');
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'));
-        $this->assertEquals([['/scripts/cron/resourceStats.php', ['alice', 'bob']]], $processor->spawnCalls);
+
+        $this->assertEquals(['alice' => true, 'bob' => true], $processor->lockBusyDuring);
+        $this->assertTrue($this->readSavedResourceStats('alice') !== null);
+        $this->assertTrue($this->readSavedResourceStats('bob') !== null);
+        $this->assertTrue(!is_file($this->paths['home_dir'].'/no-passwd/.resourceData'));
+        $busy = false;
+        $this->assertEquals(false, \pmssLockFileAcquire($this->paths['runtime_dir'].'/resourceStats.lock', true, 'c+', false, true, $busy));
+        $this->assertTrue($busy, 'Expected the run lock to stay held after the account loop');
+    }
+
+    public function testRunCliSkipsAggregationWhenRunLockIsBusy(): void
+    {
+        $stats = new StubResourceStatsProcessorStatistics();
+        $user = $this->seedManagedUser();
+        $this->setResourceData($stats, $user, [
+            $this->resourceLine(time() - 120, '1024 2048 10 20 3600 1048576 4'),
+            $this->resourceLine(time() - 60, '2048 4096 30 40 7200 2097152 6'),
+        ]);
+        $handle = \pmssLockFileAcquire($this->paths['runtime_dir'].'/resourceStats.lock', true);
+        $this->assertTrue(is_resource($handle));
+
+        try {
+            $this->assertEquals(0, $this->makeProcessor($stats)->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'));
+            $this->assertTrue($this->readSavedResourceStats($user) === null);
+        } finally {
+            \pmssLockHandleRelease($handle);
+        }
     }
 
     public function testBeforeSpawnSkipsWhenResourceStatsLockIsBusy(): void

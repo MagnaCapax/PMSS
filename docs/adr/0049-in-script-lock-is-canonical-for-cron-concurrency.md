@@ -78,7 +78,11 @@ script's idempotency and updating the existing flock-asserting tests) is tracked
   skip aggregation. Both ingress and egress use `TrafficStatsProcessor`, which
   filters discovered entries through its existing validator, including base-user
   mapping for localnet series. Explicit single-account invocations retain their
-  validation and processing path; resource-stat worker dispatch is unchanged.
+  validation and processing path.
+- Resource aggregation follows the same model. `ResourceStatsProcessor` keeps its
+  `resourceStats.lock` for the whole no-argument run and processes validated
+  accounts in the cron process. Detached per-account workers outlived the lock,
+  so overlapping runs were not excluded.
 - Positive: one lock mechanism, protecting every invocation path (cron, manual, test), not
   only the cron path.
 - Positive: the #850 double-lock collision class is eliminated structurally (guard test) and
