@@ -96,9 +96,9 @@ function pmssAgentCronMerge(string $current, string $tag, array $managed): strin
 /** Run a fixed argument vector; callers never place secrets in it. */
 function pmssAgentRun(array $args, ?array $env = null): array
 {
-    $command = implode(' ', array_map('escapeshellarg', $args));
-    $process = proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'),
-        2 => array('redirect', 1)), $pipes, null, $env);
+    // The shell merges stderr; the 'redirect' descriptor needs PHP 7.4.
+    $command = implode(' ', array_map('escapeshellarg', $args)).' 2>&1';
+    $process = proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w')), $pipes, null, $env);
     if (!is_resource($process)) return array(1, 'Could not launch command');
     fclose($pipes[0]);
     $output = stream_get_contents($pipes[1]);
