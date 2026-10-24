@@ -89,6 +89,10 @@ Workflow (Do This Now):
   behind config, name the choice in the commit message, and let review adjust the number.
   A design knob is neither "external access" nor an "operator decision" — five build
   sessions on one issue posted BLOCKED on knobs its thread had already resolved.
+  Also NOT a skip reason: the code half of an issue whose measurement, canary or rollout
+  runs on a host. Build the code default-off (an opt-in marker or config, so nothing changes
+  on any host until it is enabled) with hermetic tests; the host-side measurement is tracked
+  on its own issue and is not part of this build.
   Note why you skipped it.
 - BLOCKED ISSUE FEEDBACK (important — enables autonomous cycle health):
   When you skip an issue, FIRST check its existing comments — if a previous

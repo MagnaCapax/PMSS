@@ -43,6 +43,11 @@ Workflow (Do This Now):
 - Verify: follow "Commit Verification (one rule)" in AGENTS.md. The failing CI jobs above are the target;
   the test suite runs only on a testing machine, and a test that also fails on clean origin/main is the
   baseline, not a failure of your fix.
+- A test that asserts source text (a source-contract or characterization test) of code a later
+  commit deliberately moved, renamed or reworded, as that commit, an ADR or docs/ records, is stale:
+  point it at the new location or wording, keeping everything it checked, and name the moving commit
+  in yours. That is not an architecture decision and not a reason to stop. It never applies to a test
+  asserting a security or validation constraint (see Absolutes): fix the code instead.
 - From the CI logs, locate the latest LOC snapshot emitted by development/loc.sh (look for "PMSS lines of code (excluding third-party trees)" and the advisory complexity sections) and use that to understand category growth and hotspots; do not re-run loc.sh unless explicitly requested.
 - If the operator asks you to commit (no branches, no push):
   * `git add <specific_files>` (never `git add -A`) then `git commit -m "ci: <scope> — <short reason>"`
