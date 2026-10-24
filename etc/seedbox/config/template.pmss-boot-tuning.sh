@@ -74,7 +74,8 @@ write_hardware_summary() {
     "nvme_scheduler": "none",
     "nvme_read_ahead_kb": 128,
     "bcache_scheduler": "bfq",
-    "bcache_read_ahead_kb": 4096
+    "bcache_read_ahead_kb": 4096,
+    "ext4_group_prealloc": ${ext4_prealloc_audit:-[]}
   }
 }
 EOF
@@ -195,6 +196,17 @@ fi
 # Stage 2: reload the sock_diag BPF-LSM filter (BPF state does not survive a reboot).
 # The loader self-gates on the marker and fails open, so this is safe to call unconditionally.
 [ -x /bin/sh ] && sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh 2>/dev/null || true
+
+# Opt-in only: no ext4 discovery or helper execution without the host marker.
+if [ -f /etc/seedbox/config/ext4-group-prealloc.enabled ]; then
+	# shellcheck source=scripts/lib/update/systemPrep/ext4Prealloc.sh
+	if [ -r /scripts/lib/update/systemPrep/ext4Prealloc.sh ]; then
+		. /scripts/lib/update/systemPrep/ext4Prealloc.sh
+		ext4_prealloc_audit=$(pmss_ext4_prealloc_apply /proc/fs/ext4 /sys/fs/ext4 "$(uname -r)")
+	else
+		ext4_prealloc_audit='[{"result":"skip:missing-helper"}]'
+	fi
+fi
 
 # Record the detected host profile and the boot-time tuning targets for audits.
 write_hardware_summary
