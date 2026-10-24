@@ -670,7 +670,7 @@ html, body {
 #tabs .tabs-nav a {
     display: flex;
     align-items: center;
-    position: static;
+    position: initial;
     box-sizing: border-box;
     width: auto;
     height: 100%;
