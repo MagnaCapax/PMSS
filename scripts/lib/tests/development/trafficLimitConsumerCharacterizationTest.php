@@ -54,11 +54,29 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     {
         $source = file_get_contents(dirname(__DIR__, 4).'/scripts/cron/trafficLimits.php');
         $clear = strpos($source, 'pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile)');
-        $usage = strpos($source, 'if (!file_exists($trafficDataFile)) continue;');
+        $usage = strpos($source, 'if (!file_exists($trafficDataFile)) {');
 
         $this->assertTrue($clear !== false);
         $this->assertTrue($usage !== false);
         $this->assertTrue($clear < $usage);
+    }
+
+    public function testTrafficLimitCronReconcilesThrottleWhenUsageDataUnavailable(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 4).'/scripts/cron/trafficLimits.php');
+        $reconcile = strpos($source, 'pmssTrafficLimitThrottleReconcileWithoutUsage($thisUser, $userTrafficLimitEnabledFile, $trafficLimitPeriod)');
+        $usage = strpos($source, '$trafficLimit = (float) $trafficLimitState[\'effectiveLimitGiB\'];');
+
+        $this->assertTrue($reconcile !== false);
+        $this->assertTrue($usage !== false);
+        $this->assertTrue($reconcile < $usage);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/trafficLimitThrottle.php' => ['required' => [
+                'function pmssTrafficLimitThrottleReconcileWithoutUsage(',
+                'pmssTrafficLimitThrottleOrphanReconcile($user, 0, $enabledMarkerPath, $homeRoot)',
+                'traffic throttle removed after cooldown',
+            ]],
+        ]);
     }
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void

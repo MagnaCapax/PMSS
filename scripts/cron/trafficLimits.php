@@ -53,11 +53,17 @@ foreach($users AS $thisUser) {
         pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile);
         continue;
     }
-    if (!file_exists($trafficDataFile)) continue;
+    if (!file_exists($trafficDataFile)) {
+        // Usage is unknown, not under limit: lift only a throttle that
+        // nothing has reasserted for a full cooldown.
+        pmssTrafficLimitThrottleReconcileWithoutUsage($thisUser, $userTrafficLimitEnabledFile, $trafficLimitPeriod);
+        continue;
+    }
 
     $data = pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser);
     if ($data === null) {
         echo pmssLogFormatTimestampedLine("Skipping {$thisUser}, invalid traffic data file");
+        pmssTrafficLimitThrottleReconcileWithoutUsage($thisUser, $userTrafficLimitEnabledFile, $trafficLimitPeriod);
         continue;
     }
     $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
