@@ -9,13 +9,12 @@ require_once dirname(__DIR__).'/cli/optionParser.php';
 
 function pmssShowTrafficMain(array $argv): int
 {
-    $parsed = pmssParseCliTokens($argv);
     $usage = pmssCliHelpUsageOptions('showTraffic.php [--json] [--show-missing] [--extended] [--sort=<mode>]', [
         ['--json', 'Emit JSON instead of human text output.'], ['--show-missing', 'Print missing stats usernames (text mode only).'],
         ['--extended', 'Show limit, percent, and rate units in text output.'], ['--sort=<mode>', 'Sort output by name, month, pct, or rate (default: name).'],
         ['--color', 'Force ANSI colors in extended text output.'], ['--no-color', 'Disable ANSI colors in extended text output.'],
     ]);
-    if (pmssCliOptionPresent($parsed, 'help')) { echo $usage; return 0; }
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, [], null)) === null) return 0;
     $sortOption = pmssCliOption($parsed, 'sort', null, null);
     if ($sortOption !== null && (!is_string($sortOption) || trim($sortOption) === '')) {
         return pmssCliReturnWithStderr("Error: --sort expects a value.\n", 2);

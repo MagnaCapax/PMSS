@@ -12,15 +12,22 @@ final class UserCliHelpContractsTest extends TestCase
             ['scripts/util/userConfig.php', ['ghostuser', '--help'], ['Usage', '--welcome-message=HTML', '--iops-limit=OPS', '--io-latency-ms=MS', '--io-cost-qos=SETTING', '--io-cost-model=SETTING', 'MemoryHigh', 'Examples', '250 MiB']],
             ['scripts/util/userConfigCgroup.php', ['--help'], ['Resource Options', '--defaults', '--io-profile=hdd|nvme|bulk', '--io-latency-ms=MS', '--io-cost-qos=SETTING', '--io-cost-model=SETTING', '1-10000', '250 MiB', 'Examples']],
             ['scripts/util/userResourcesList.php', ['--help'], ['--brief', '--full', '--json', '--jsonl', '--help works without root'], ['must be run as root']],
+            ['scripts/showTraffic.php', ['--help'], ['Usage: showTraffic.php', '--sort=<mode>', '--no-color']],
+            ['scripts/util/storageBenchmark.php', ['--help'], ['Storage benchmark (non-destructive)', '--home-device', '--show-last']],
+            ['scripts/util/storageHealthSnapshot.php', ['--help'], ['Usage: storageHealthSnapshot.php', '--json <path>', '--quiet']],
+            ['scripts/util/safeRootCleanup.php', ['--help'], ['Usage: safeRootCleanup.php', '--apply', 'DEFAULT is dry-run']],
+            ['scripts/productConfig.php', ['--help'], ['Usage: productConfig.php PRODUCT --welcome-message=<html>'], ['must run as root']],
         ] as $case) {
             $result = $this->pmssAssertRepoPhpScriptOutputContains($case[0], $case[1], $case[2]);
             $this->assertStringContainsAndOmitsStrings(array(), $case[3] ?? array(), $result['output']);
         }
     }
 
-    public function testAddUserShortHelpMatchesLongHelp(): void
+    public function testShortAndValueBearingHelpMatchesLongHelp(): void
     {
-        $this->assertSame($this->pmssRunRepoPhpScript('scripts/addUser.php', ['--help']), $this->pmssRunRepoPhpScript('scripts/addUser.php', ['-h']));
+        foreach (['scripts/addUser.php', 'scripts/productConfig.php', 'scripts/util/storageBenchmark.php', 'scripts/util/storageHealthSnapshot.php', 'scripts/util/safeRootCleanup.php', 'scripts/showTraffic.php'] as $script) {
+            $this->assertSame($this->pmssRunRepoPhpScript($script, ['--help']), $this->pmssRunRepoPhpScript($script, [$script === 'scripts/showTraffic.php' ? '--help=1' : '-h']));
+        }
     }
 
     public function testOperatorDocsStayAlignedWithStructuredHelp(): void

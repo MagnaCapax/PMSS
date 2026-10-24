@@ -14,9 +14,7 @@ require_once __DIR__.'/../lib/cli/optionParser.php';
 function pmssStorageHealthSnapshotMain(array $argv): int
 {
     $logPath = '/var/log/pmss/storage-health.jsonl';
-    $parsed = pmssParseCliTokens($argv);
-
-    if (pmssCliHelpTextEmitIfRequested($parsed, "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\nUsage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n  --quiet         Suppress the success message (cron-friendly)\n\n")) return 0;
+    if (($parsed = pmssParseCliTokensOrHelp($argv, "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\nUsage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n  --quiet         Suppress the success message (cron-friendly)\n\n")) === null) return 0;
 
     $quiet = pmssCliOptionPresent($parsed, 'quiet');
     $logPath = pmssCliOptionString($parsed, 'json', null, $logPath) ?? $logPath;

@@ -243,8 +243,7 @@ function pmssSafeRootCleanupMain(array $argv): int
         . "NEVER touches /home, /var/www, customer data, /etc, /root, /boot, or live logs.\n"
         . "Not a live-log-storm tool — a filling live syslog/kern.log is fixed by killing the source.\n\n";
 
-    $parsed = pmssParseCliTokens($argv, ['min-pct', 'log-days', 'journal-mb', 'json']);
-    if (pmssCliHelpTextEmitIfRequested($parsed, $help)) {
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $help, ['min-pct', 'log-days', 'journal-mb', 'json'])) === null) {
         return 0;
     }
 
