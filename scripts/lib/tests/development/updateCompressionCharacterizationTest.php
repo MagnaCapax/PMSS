@@ -50,7 +50,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
                     "runStep(\$description.' (SIG'.\$signal.')'",
                     'graceful stop',
                     'processes linger after SIGKILL',
-                    "\$probeCommand = 'pgrep -x '.escapeshellarg(\$name).' >/dev/null 2>&1';",
+                    "\$selector = '-x '.escapeshellarg(\$name).",
+                    "\$probeCommand = 'pgrep '.\$selector.' >/dev/null 2>&1';",
                     'exec($probeCommand, $_, $probeStatus);',
                     '[SKIP] {$description} (no {$name} processes)',
                     '$deadline = microtime(true) + $waitSeconds;',
@@ -261,7 +262,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/storageHealthSnapshot.php', [
             "require_once __DIR__.'/../lib/cli/optionParser.php';",
-            '$parsed = pmssParseCliTokens($argv);',
+            '$parsed = pmssParseCliTokensOrHelp($argv, ',
             "pmssCliOptionPresent(\$parsed, 'quiet')",
             "pmssCliOptionString(\$parsed, 'json', null, \$logPath)",
         ], [

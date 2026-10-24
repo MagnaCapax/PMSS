@@ -11,7 +11,7 @@ class ProductConfigCliContractTest extends TestCase
             'scripts/productConfig.php',
             [
                 "require_once __DIR__.'/lib/cli/optionParser.php';",
-                "pmssParseCliTokens(pmssCliArgv(\$argv ?? null), ['welcome-message'])",
+                "pmssParseCliTokensOrHelp(pmssCliArgv(\$argv ?? null), \$usage, ['welcome-message'])",
                 "pmssCliOption(\$parsed, 'welcome-message')",
             ]
         );
