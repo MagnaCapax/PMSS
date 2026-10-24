@@ -106,6 +106,67 @@ class installBootstrapSafetyTest extends TestCase
         }
     }
 
+    public function testBullseyeSecurityMovesToArchiveBeforeBootstrapPackages(): void
+    {
+        $this->assertOrderedStrings([
+            'bootstrap_bullseye_security_archive /etc/os-release /etc/apt',
+            'run_cmd apt update',
+            'ensure_packages git rsync curl wget ca-certificates unzip php php-cli',
+        ], $this->script);
+    }
+
+    public function testBullseyeSecurityRewriteTouchesOnlyBullseyeSecurityLines(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-install-bullseye-');
+        mkdir($root.'/apt/sources.list.d', 0755, true);
+        $original = implode("\n", [
+            'deb http://deb.debian.org/debian bullseye main',
+            'deb http://security.debian.org/debian-security bullseye-security main',
+            'deb-src http://security.debian.org/debian-security/ bullseye-security main contrib',
+            'deb [arch=amd64] https://deb.debian.org/debian-security bullseye-security main',
+            '# deb http://security.debian.org/debian-security bullseye-security main',
+            'deb http://deb.debian.org/debian bullseye-updates main',
+        ])."\n";
+        file_put_contents($root.'/apt/sources.list', $original);
+        file_put_contents($root.'/apt/sources.list.d/extra.list', "deb http://security.debian.org/debian-security bullseye-security main\n");
+        file_put_contents($root.'/target.list', "deb http://security.debian.org/debian-security bullseye-security main\n");
+        symlink($root.'/target.list', $root.'/apt/sources.list.d/link.list');
+        file_put_contents($root.'/bookworm', "VERSION_CODENAME=bookworm\n");
+        file_put_contents($root.'/bullseye', "VERSION_CODENAME=bullseye\n");
+
+        $script = $root.'/run.sh';
+        file_put_contents($script, "log_info() { echo \"INFO \$*\"; }\nlog_warn() { echo \"WARN \$*\"; }\n"
+            .$this->pmssExtractShellFunction($this->script, 'bootstrap_bullseye_security_archive')."\n"
+            .'bootstrap_bullseye_security_archive "$1" "$2"'."\n");
+
+        $run = function (string $release) use ($script, $root): array {
+            return $this->pmssExecShellCommand('bash '.escapeshellarg($script).' '.escapeshellarg($root.'/'.$release).' '.escapeshellarg($root.'/apt'));
+        };
+
+        $result = $run('bookworm');
+        $this->assertSame(0, $result['rc']);
+        $this->assertSame($original, file_get_contents($root.'/apt/sources.list'), 'Other releases stay untouched');
+
+        $result = $run('bullseye');
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertSame(implode("\n", [
+            'deb http://deb.debian.org/debian bullseye main',
+            'deb http://archive.debian.org/debian-security bullseye-security main',
+            'deb-src http://archive.debian.org/debian-security bullseye-security main contrib',
+            'deb [arch=amd64] http://archive.debian.org/debian-security bullseye-security main',
+            '# deb http://security.debian.org/debian-security bullseye-security main',
+            'deb http://deb.debian.org/debian bullseye-updates main',
+        ])."\n", file_get_contents($root.'/apt/sources.list'));
+        $this->assertSame($original, file_get_contents($root.'/apt/sources.list.pmss-bootstrap.save'), 'Backup keeps the original');
+        $this->assertSame("deb http://archive.debian.org/debian-security bullseye-security main\n", file_get_contents($root.'/apt/sources.list.d/extra.list'));
+        $this->assertStringContainsString('security.debian.org', (string) file_get_contents($root.'/target.list'), 'Symlinked lists are not followed');
+
+        $second = $run('bullseye');
+        $this->assertSame(0, $second['rc']);
+        $this->assertSame('', $second['output'], 'A second run changes nothing');
+        $this->assertSame($original, file_get_contents($root.'/apt/sources.list.pmss-bootstrap.save'), 'Backup is not overwritten');
+    }
+
     public function testSharedConvergenceRemainsInUpdateStep2(): void
     {
         $path = $this->pmssRepoPath('scripts/util/update-step2.php');

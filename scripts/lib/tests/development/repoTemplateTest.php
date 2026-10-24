@@ -54,6 +54,10 @@ class RepoTemplateTest extends TestCase
             'Expected bullseye template to take the security pocket from archive.debian.org'
         );
         $this->assertTrue(
+            strpos($data, 'deb-src http://archive.debian.org/debian-security bullseye-security ') !== false,
+            'Expected bullseye template to take the security sources from archive.debian.org'
+        );
+        $this->assertTrue(
             strpos($data, 'security.debian.org/debian-security bullseye-security') === false,
             'Expected bullseye template not to reference the live security mirror'
         );
