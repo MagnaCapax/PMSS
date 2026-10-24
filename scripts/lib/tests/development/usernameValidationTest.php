@@ -138,4 +138,28 @@ class UsernameValidationTest extends TestCase
             $this->assertTrue(!\pmssValidateUsername($name), 'Expected invalid username: '.$name);
         }
     }
+
+    public function testTestAccountPrefixIsReservedForCreateUnlessMarked(): void
+    {
+        $saved = getenv('PMSS_TEST_ACCOUNT');
+        putenv('PMSS_TEST_ACCOUNT');
+        try {
+            foreach (['qatst1a2', 'qatst', 'QATST9'] as $name) {
+                $error = \pmssUsernameCreateValidationError($name);
+                $this->assertTrue(is_array($error) && $error['code'] === 'reserved', 'Expected the test-account prefix to be refused: '.$name);
+                $this->assertTrue(!\pmssUsernameIsValidForCreate($name), 'Expected create to refuse: '.$name);
+            }
+            $this->assertEquals(null, \pmssUsernameCreateValidationError('qatbob'));
+            // The exact-name list is untouched: other readers of it (per-user log gating) see no change.
+            $this->assertTrue(!\pmssUsernameIsReserved('qatst1a2'), 'The prefix is not an exact reserved name');
+            putenv('PMSS_TEST_ACCOUNT=0');
+            $this->assertTrue(is_array(\pmssUsernameCreateValidationError('qatst1a2')), 'Only the value 1 marks a test account');
+            putenv('PMSS_TEST_ACCOUNT=1');
+            $this->assertEquals(null, \pmssUsernameCreateValidationError('qatst1a2'));
+            $this->assertTrue(\pmssUsernameIsValidForCreate('qatst1a2'), 'A marked create may use the prefix');
+            $this->assertEquals('reserved', \pmssUsernameCreateValidationError('seedbox')['code'] ?? null);
+        } finally {
+            putenv($saved === false ? 'PMSS_TEST_ACCOUNT' : 'PMSS_TEST_ACCOUNT=' . $saved);
+        }
+    }
 }

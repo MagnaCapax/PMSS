@@ -97,6 +97,10 @@ function pmssUsernameCreateValidationError(string $username): ?array
     if (pmssUsernameIsReserved($normalized)) {
         return array('code' => 'reserved', 'detail' => 'is reserved for system use');
     }
+    // Names starting with qatst belong to throwaway test accounts (ADR 0171); only a create marked as one may use them.
+    if (strncmp($normalized, 'qatst', 5) === 0 && getenv('PMSS_TEST_ACCOUNT') !== '1') {
+        return array('code' => 'reserved', 'detail' => 'is reserved for test accounts');
+    }
 
     return null;
 }
