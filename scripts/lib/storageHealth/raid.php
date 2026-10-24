@@ -8,6 +8,19 @@
 
 require_once __DIR__.'/common.php';
 
+// Load only the shipped root-owned skeleton, never an account's writable copy.
+$pmssStorageRaidDisplay = dirname(__DIR__, 3).'/etc/skel/www/storageHealthRaidDisplay.php';
+if (!is_file($pmssStorageRaidDisplay) || is_link($pmssStorageRaidDisplay)) {
+    throw new RuntimeException('Storage RAID display helper unavailable');
+}
+if (function_exists('posix_geteuid') && posix_geteuid() === 0
+    && (fileowner($pmssStorageRaidDisplay) !== 0 || (fileperms($pmssStorageRaidDisplay) & 0022) !== 0
+        || fileowner(dirname($pmssStorageRaidDisplay)) !== 0 || (fileperms(dirname($pmssStorageRaidDisplay)) & 0022) !== 0)) {
+    throw new RuntimeException('Unsafe storage RAID display helper ownership');
+}
+require_once $pmssStorageRaidDisplay;
+unset($pmssStorageRaidDisplay);
+
 /**
  * Read mdadm array status from `/proc/mdstat`.
  *
@@ -87,20 +100,6 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
 }
 
 /**
- * Parse mdadm activity details from /proc/mdstat.
- *
- * @return array<string,string>
- */
-function pmssStorageHealthRaidActivitySummaryParse(string $activityLine): array
-{
-    $summary = [];
-    foreach (['operation' => '/\b(check|resync|recovery|reshape)\b/', 'progress' => '/=\s*([0-9.]+%)/', 'eta' => '/\bfinish=([^\s]+)/', 'speed' => '/\bspeed=([^\s]+)/'] as $key => $pattern) {
-        $summary[$key] = preg_match($pattern, $activityLine, $matches) === 1 ? $matches[1] : '';
-    }
-    return $summary;
-}
-
-/**
  * Read current activity for the md array backing /home.
  *
  * @param array<int, array<string,mixed>>|null $raidEntries
@@ -127,45 +126,6 @@ function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $r
         }
     }
     return $degradedNotice;
-}
-
-/** Build the shared GUI notice for /home RAID maintenance. */
-function pmssStorageHealthHomeRaidNoticeHtmlBuild($activity): string
-{
-    if (!is_array($activity) || empty($activity['array'])) {
-        return '';
-    }
-    $flags = (array) ($activity['flags'] ?? []);
-    if (in_array('degraded', $flags, true) && empty($activity['operation'])) {
-        return <<<HTML
-<div class="pmss-raid-notice pmss-raid-notice-error" role="alert" aria-live="assertive">
-    <strong><span class="pmss-raid-icon" aria-hidden="true">&#9940;</span> Storage array degraded</strong>
-    <p>A drive in your server's storage array has failed. Your data is still accessible but the array is running without full redundancy. Please contact support if you experience issues.</p>
-</div>
-HTML;
-    }
-    if (empty($activity['operation'])) {
-        return '';
-    }
-
-    $parts = [];
-    foreach (['progress' => 'Progress', 'eta' => 'ETA', 'speed' => 'Speed'] as $key => $label) {
-        if (!empty($activity[$key])) {
-            $parts[] = $label.': '.htmlspecialchars((string) $activity[$key], ENT_QUOTES, 'UTF-8');
-        }
-    }
-    $detailHtml = empty($parts) ? '' : '<div class="pmss-raid-meta">'.implode(' <span aria-hidden="true">&bull;</span> ', $parts).'</div>';
-    $operation = htmlspecialchars((string) $activity['operation'], ENT_QUOTES, 'UTF-8');
-    $arrayName = htmlspecialchars((string) $activity['array'], ENT_QUOTES, 'UTF-8');
-
-    return <<<HTML
-<div class="pmss-raid-notice" role="status" aria-live="polite">
-    <strong><span class="pmss-raid-icon" aria-hidden="true">&#10071;</span> Home storage maintenance in progress</strong>
-    <p>The <code>/home</code> RAID array {$arrayName} is running a {$operation}. Disk performance is temporarily lower.</p>
-    {$detailHtml}
-    <p>If possible, avoid heavy disk activity until the array work completes. Lighter use helps the maintenance finish sooner.</p>
-</div>
-HTML;
 }
 
 /**
