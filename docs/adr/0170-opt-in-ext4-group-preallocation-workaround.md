@@ -1,4 +1,4 @@
-# ADR 0169: Opt-in ext4 group preallocation workaround
+# ADR 0170: Opt-in ext4 group preallocation workaround
 
 Date: 2026-10-24
 Category: architecture

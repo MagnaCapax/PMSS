@@ -1,5 +1,5 @@
 #!/bin/sh
-# Opt-in ext4 group preallocation workaround; see ADR 0169.
+# Opt-in ext4 group preallocation workaround; see ADR 0170.
 # Decision is pure; the applier accepts proc/sys roots for hermetic fixtures.
 
 pmss_ext4_prealloc_decide() {
