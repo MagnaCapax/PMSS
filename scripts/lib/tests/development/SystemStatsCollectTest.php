@@ -267,6 +267,61 @@ PHP;
         }
     }
 
+    public function testAppendLogLineRejectsRedirectedPathsBeforeCreatingParents(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-stats-path-');
+        $target = $root.'/target';
+        $this->pmssEnsureDir($target, 0755);
+        $victim = $this->pmssWriteFile($target.'/stats.log', "prior\n");
+        $this->assertTrue(symlink($target, $root.'/redirect'));
+        $this->assertTrue(symlink($victim, $root.'/leaf'));
+        $this->assertTrue(symlink($root.'/missing', $root.'/dangling'));
+        foreach ([$root.'/redirect/stats.log', $root.'/redirect/new/stats.log',
+            $root.'/leaf', $root.'/dangling', $root.'/new/../stats.log',
+            $root.'/new/./stats.log', $victim.'/new/stats.log', $target] as $path) {
+            $this->pmssAssertNoPhpWarnings(function () use ($path): void {
+                $this->assertFalse(\pmssSystemStatsAppendLogLine($path, 'blocked'));
+            });
+        }
+        $this->assertSame("prior\n", file_get_contents($victim));
+        $this->assertFalse(file_exists($target.'/new'));
+        $this->assertFalse(file_exists($root.'/new'));
+        $this->assertFalse(file_exists($root.'/missing'));
+    }
+
+    public function testAppendLogLineCreatesParentsAndPreservesRecordBytes(): void
+    {
+        $path = $this->pmssMakeTempDir('pmss-stats-nested-').'/new/nested/stats.log';
+        foreach (["first\r\n", '', "third\n\n", "internal\nline"] as $line) {
+            $this->assertTrue(\pmssSystemStatsAppendLogLine($path, $line));
+        }
+        $this->assertSame("first\n\nthird\ninternal\nline\n", file_get_contents($path));
+    }
+
+    public function testAppendLogLineRechecksParentsAfterDirectoryCreation(): void
+    {
+        // Substitute an ancestor at the mkdir boundary; the append must never follow it.
+        $script = <<<'PHP'
+namespace SystemStatsParentSwapFixture;
+function pmssDirEnsureExists($path, $mode) {
+    return rename($path, $path.'-old') && symlink($GLOBALS['redirect'], $path);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats.php', 'SystemStatsParentSwapFixture');
+        $script .= <<<'PHP'
+[$path, $GLOBALS['redirect']] = json_decode(getenv('PMSS_TEST_STATS_PARENT_SWAP'), true);
+echo json_encode([pmssSystemStatsAppendLogLine($path, 'blocked'), file_get_contents($GLOBALS['redirect'].'/stats.log')]);
+PHP;
+        $root = $this->pmssMakeTempDir('pmss-stats-parent-swap-');
+        $this->pmssEnsureDir($root.'/parent', 0755);
+        $this->pmssEnsureDir($root.'/redirect', 0755);
+        $this->pmssWriteFile($root.'/redirect/stats.log', "prior\n");
+        $this->assertSame([false, "prior\n"], $this->pmssRunInlinePhpJson($script, [
+            'PMSS_TEST_STATS_PARENT_SWAP' => json_encode([$root.'/parent/stats.log', $root.'/redirect']),
+        ]));
+        $this->assertFalse(file_exists($root.'/parent-old/stats.log'));
+    }
+
     public function testHostPressurePayloadKeepsOnlyCustomerSafeMetrics(): void
     {
         $payload = \pmssSystemStatsHostPressurePayloadBuild([

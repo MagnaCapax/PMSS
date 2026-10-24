@@ -1,23 +1,12 @@
 <?php
 /** Daily quota snapshot parsing and declared-mount checks. */
 
-require_once __DIR__.'/update/fstab.php';
+require_once __DIR__.'/quota/state.php';
 
 /** Return true only when the target fstab entry declares journaled quotas. */
 function pmssQuotaSnapshotMountDeclaresJournaledQuota(string $mountPath, string $fstabPath = '/etc/fstab'): bool
 {
-    $lines = pmssFstabLinesRead($fstabPath, static function (string $warning): void {}, 'quota snapshot');
-    $entry = $lines === null ? null : pmssFstabMountEntryRead($lines, $mountPath);
-    if ($entry === null) {
-        return false;
-    }
-
-    foreach (explode(',', $entry['columns'][3]) as $option) {
-        if (strpos($option, 'usrjquota=') === 0 || strpos($option, 'grpjquota=') === 0) {
-            return true;
-        }
-    }
-    return false;
+    return (pmssQuotaMountDeclaredTypes($mountPath, static function (string $warning): void {}, $fstabPath, 'quota snapshot', true) ?? []) !== [];
 }
 
 /**

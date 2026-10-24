@@ -46,12 +46,14 @@ function pmssSystemStatsLogLine(array $stats, ?string $timestamp = null): string
     return $line;
 }
 
-/** Append one system-stats log line after checking the target path shape. */
+/** Append one system-stats record only through a plain file and safe ancestors. */
 function pmssSystemStatsAppendLogLine(string $path, string $line): bool
 {
     if ($path === '' || pmssFilesystemPathHasNulByte($path) || $path[0] !== '/') return false;
+    // Validate before mkdir too, so redirected ancestors cannot create directories elsewhere.
+    if (!pmssPathTargetIsSafe($path, false)) return false;
     if (!pmssDirEnsureExists(dirname($path), 0755)) return false;
-    if (!pmssLockFilePathIsSafe($path)) return false;
+    if (!pmssPathTargetIsSafe($path, false)) return false;
 
     $record = rtrim($line, "\r\n")."\n";
     // A partial record must reach the cron caller's existing failure warning.
