@@ -93,6 +93,16 @@ $homeMemoryState = function_exists('pmssWelcomeMemoryStateBuild') ? pmssWelcomeM
 $homeAgentFirst = pmssWelcomeHomeAgentFirst($appsStatus);
 $homeAlertsHtml = $storageHealthNoticeHtml
     .pmssWelcomeHomeAlertsHtmlBuild($homeQuotaState, $homeTrafficState, $homeMemoryState, $trafficBandwidthState, $billingServiceId);
+// The panel's Welcome tab marks an alert that needs the customer, named by its title; the missing-quota notice is not one.
+$homeAttention = '';
+if (preg_match_all('#<strong>(.*?)</strong>#s', $homeAlertsHtml, $homeAlertTitles)) {
+    foreach ($homeAlertTitles[1] as $homeAlertTitle) {
+        $homeAlertTitle = trim(html_entity_decode(strip_tags($homeAlertTitle), ENT_QUOTES, 'UTF-8'));
+        if ($homeAlertTitle !== '' && $homeAlertTitle !== 'Quota info is missing') { $homeAttention = $homeAlertTitle; break; }
+    }
+}
+$homeAppStates = array();
+foreach ($appsStatus['apps'] as $homeAppId => $homeApp) $homeAppStates[$homeAppId] = array('state' => (string) ($homeApp['state'] ?? ''));
 $homeStatusChipsHtml = pmssWelcomeHomeStatusChipsHtmlBuild($bonusDisplayState, $billingServiceId);
 $homeMetricsHtml = pmssWelcomeHomeQuotaMetricHtmlBuild($homeQuotaState, $billingServiceId)
     .pmssWelcomeHomeTrafficMetricHtmlBuild($homeTrafficState, $billingServiceId)
@@ -344,10 +354,11 @@ if (file_exists('openvpn-config.tgz')) {
                 newsMark();
             }
 
-            var words = {'running': ['Running', 'h-state-run'], 'installing': ['Setting up', 'h-state-warn'], 'not-running': ['Not running', 'h-state-warn'],
-                'stopped': ['Stopped', 'h-state-warn'], 'not secured': ['Needs a login', 'h-state-warn'], 'gave up': ['Gave up', 'h-state-bad'], 'failed': ['Failed', 'h-state-bad']};
-            function appsRefresh() {
-                if (!visible() || !window.fetch || !document.querySelector('.h-app')) return;
+            var words = {};
+            for (var state in (window.pmssAppStateWords || {})) words[state] = [pmssAppStateWords[state][0], pmssAppStateWords[state][1] ? 'h-state-' + pmssAppStateWords[state][1] : ''];
+            // The panel asks for fresh app state when the customer switches tabs, also while this page is hidden.
+            function appsRefresh(asked) {
+                if ((asked !== true && !visible()) || !window.fetch || (asked !== true && !document.querySelector('.h-app'))) return;
                 fetch('welcome.php?status=1', {credentials: 'same-origin', cache: 'no-store'})
                     .then(function (response) { return response.json(); })
                     .then(function (status) {
@@ -357,9 +368,13 @@ if (file_exists('openvpn-config.tgz')) {
                             var word = app && words[app.state], label = tiles[i].querySelector('[data-state-word]');
                             if (word && label) { label.textContent = word[0]; label.className = 'h-state ' + word[1]; }
                         }
+                        if (window.pmssAppsStatePost) pmssAppsStatePost(status.apps);
                     }).catch(function () {});
             }
             setInterval(appsRefresh, 30000);
+            window.addEventListener('message', function (event) {
+                if (event.origin === location.origin && event.source === window.parent && event.data === 'pmss:apps-state') appsRefresh(true);
+            });
 
             // Reload for fresh figures only when the customer comes back after a long absence, never while typing.
             var hiddenSince = 0;
@@ -546,6 +561,7 @@ if (file_exists('openvpn-config.tgz')) {
             }, 4000);
         }
     </script>
+<script type="text/javascript">if (window.pmssAppsStatePost) pmssAppsStatePost(<?= json_encode($homeAppStates, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode($homeAttention, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>);</script>
 </body>
 </html>
 <?php

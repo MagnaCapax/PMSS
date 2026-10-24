@@ -8,6 +8,18 @@ function pmssActionScriptJs(): string {
 /* Shared customer-panel action helpers. Loaded after jQuery. */
 var pmssActionNoticeTimer = null;
 var pmssMediaStackPollTimer = null;
+/* App state words, shared by the Welcome tiles and the panel tab bar: state => [word, tone], tone run / warn / bad, or none for an app the customer switched off. */
+var pmssAppStateWords = {'running': ['Running', 'run'], 'installing': ['Setting up', 'warn'], 'not-running': ['Not running', 'warn'],
+    'stopped': ['Stopped', 'warn'], 'not secured': ['Needs a login', 'warn'], 'gave up': ['Gave up', 'bad'], 'failed': ['Failed', 'bad'], 'off': ['Off', '']};
+/* Tell the panel around this page what state the apps are in; the tab bar marks the ones that need attention. */
+function pmssAppsStatePost(apps, attention) {
+    if (window.parent === window || !apps || typeof apps !== 'object') return;
+    var out = {};
+    for (var id in apps) if (Object.prototype.hasOwnProperty.call(apps, id) && apps[id] && pmssAppStateWords[apps[id].state]) out[id] = pmssAppStateWords[apps[id].state];
+    var message = {type: 'pmss:apps-state', apps: out};
+    if (typeof attention === 'string') message.attention = attention;
+    try { window.parent.postMessage(message, location.origin); } catch (e) {}
+}
 
 function pmssShowActionNotice(message, isError) {
     var notice = $('#pmss-action-notice');
@@ -247,6 +259,7 @@ function pmssAppsUpdatingResponse(xhr) {
 function pmssAppsRefresh(callback) {
     window.clearTimeout(pmssAppsRefreshTimer);
     $.getJSON(pmssAppsStatusUrl(), function(payload) {
+        pmssAppsStatePost(payload.apps);
         var media = $('#pmss-media-apps'), wasInstalling = media.attr('data-installing') === '1';
         if (payload.poll || wasInstalling || !payload.installed) media.html(payload.mediaHtml);
         media.attr('data-installing', payload.poll ? '1' : '0');

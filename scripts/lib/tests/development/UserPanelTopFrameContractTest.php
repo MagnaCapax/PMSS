@@ -48,6 +48,29 @@ class UserPanelTopFrameContractTest extends TestCase
         $this->assertStringNotContainsString('href="#custom1"', $html);
     }
 
+    /** ADR 0169 — the tab bar is one tablist: Welcome selected, an icon and a plain-text label per tab, Configure at the end. */
+    public function testTabBarIsATablistWithIconsAndPlainLabels(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-tab-bar-');
+        foreach (array('configure.php', 'configureSettings.php') as $name) {
+            $this->assertTrue(copy($this->pmssRepoPath('etc/skel/www/'.$name), $home.'/www/'.$name));
+        }
+        $this->pmssWriteFile($home.'/.customFrames', "custom0|My guide|<b>Guide</b>|https://example.com\n");
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $this->assertStringContainsString('<ul class="tabs-nav" role="tablist" aria-label="Panel sections">', $html);
+        $this->assertStringContainsString('<li><a href="#welcome" title="Welcome to your seedbox. Basic information" id="pmss-tab-welcome" role="tab" aria-controls="welcome" aria-selected="true" tabindex="0" data-tab="welcome"', $html);
+        $this->assertSame(1, substr_count($html, 'aria-selected="true" tabindex="0"'));
+        $this->assertSame(substr_count($html, 'role="tab" aria-controls='), substr_count($html, 'aria-selected="false" tabindex="-1"') + 1);
+        $this->assertStringContainsString('<use href="#pmss-i-house" xlink:href="#pmss-i-house"></use></svg><span class="pt-lbl">Welcome</span>', $html);
+        $this->assertStringContainsString('<span class="pt-lbl">Wiki</span>', $html);
+        $this->assertStringContainsString('<li class="pt-end"><a href="#pmssconfigure"', $html);
+        $this->assertStringContainsString('#pmss-i-settings"></use></svg><span class="pt-lbl">Configure</span>', $html);
+        $this->assertStringNotContainsString('⚙', $html);
+        $this->assertStringContainsString('#pmss-i-app-window"></use></svg><span class="pt-lbl">&lt;b&gt;Guide&lt;/b&gt;</span>', $html);
+        $this->assertSame(1, substr_count($html, '<symbol id="pmss-i-house"'));
+        $this->assertStringContainsString("data.type !== 'pmss:apps-state'", $html);
+    }
+
     /** Return the id of the first in-page tab anchor (the default tab), or '' if none. */
     private function firstTabId(string $html): string
     {

@@ -139,7 +139,7 @@ class SkeletonWebLocalAssetTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsString(
             'etc/skel/www/index.php',
-            '<ul class="tabs-nav">',
+            '<ul class="tabs-nav" role="tablist"',
             'index.php must emit styled tab navigation even when JavaScript fails to load.'
         );
 
@@ -156,10 +156,12 @@ class SkeletonWebLocalAssetTest extends TestCase
             'etc/skel/www/index.php',
             [
                 'top: 34px;',
-                'font-size: 14px;',
-                'padding: 6px 14px;',
+                '#tabs .tabs-nav a {',
+                'font-size: 13px;',
+                'height: 34px;',
+                'box-sizing: border-box;',
+                'float: none;',
                 'width: auto;',
-                'height: auto;',
                 'min-width: 0;',
                 'min-height: 0;',
                 'background-image: none;',
