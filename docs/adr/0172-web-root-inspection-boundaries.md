@@ -1,4 +1,4 @@
-# ADR 0171: Shared web-root inspection boundaries
+# ADR 0172: Shared web-root inspection boundaries
 
 Date: 2026-10-24
 Category: architecture
