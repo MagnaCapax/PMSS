@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer-owned web-root migration helpers.
+ * Customer-state migration and account mutation boundary for web-root recovery.
  *
  * Move mutable web content below the durable home paths before linking it back
  * into www. The move is deliberately conservative: conflicts and symlinks are
@@ -13,6 +13,8 @@ require_once dirname(__DIR__, 2).'/pathSafety.php';
 require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
 require_once dirname(__DIR__, 2).'/user/directories.php';
 require_once dirname(__DIR__, 2).'/lighttpd/accountPath.php';
+require_once __DIR__.'/webRootInspection.php';
+require_once __DIR__.'/webRootPaths.php';
 
 /** Emit one migration message through the normal updater logger or a test logger. */
 function pmssUserWebRootMigrationLog(string $user, ?callable $logger, string $message): void
@@ -24,145 +26,6 @@ function pmssUserWebRootMigrationLog(string $user, ?callable $logger, string $me
     }
 
     logMessage($message);
-}
-
-/** Validate an existing or future migration parent without following symlinks. */
-function pmssUserWebRootMigrationParentSafe(string $home, string $path): bool
-{
-    $home = rtrim($home, '/');
-    $path = rtrim($path, '/');
-    return pmssPathAbsoluteStringIsSafe($home, ['allowRoot' => false])
-        && pmssPathAbsoluteStringIsSafe($path, ['allowRoot' => false])
-        && ($path === $home || strpos($path, $home.'/') === 0)
-        && pmssPathSegmentsAreSafe($path, false, false);
-}
-
-/**
- * Collect file metadata with content or inode identity without traversing symlinks.
- *
- * A symlink anywhere in a moved tree is refused because relocating it could
- * change the meaning of a relative target even though rename() itself is safe.
- */
-function pmssUserWebRootMigrationSnapshotWalk(
-    string $path,
-    string $relative,
-    array &$snapshot,
-    bool $identity
-): bool
-{
-    if (is_link($path) || !is_array($stat = @lstat($path))) {
-        return false;
-    }
-
-    $entry = [
-        'type' => is_dir($path) ? 'dir' : (is_file($path) ? 'file' : 'other'),
-        'mode' => $stat['mode'] & 07777,
-        'uid'  => (int) ($stat['uid'] ?? -1),
-        'gid'  => (int) ($stat['gid'] ?? -1),
-    ];
-    if ($entry['type'] === 'other') {
-        return false;
-    }
-    if ($identity) {
-        if (!isset($stat['dev'], $stat['ino'])) {
-            return false;
-        }
-        $entry['dev'] = (int) $stat['dev'];
-        $entry['ino'] = (int) $stat['ino'];
-        if ($entry['type'] === 'file') {
-            if (!isset($stat['size'], $stat['mtime'])) {
-                return false;
-            }
-            $entry['size'] = (int) $stat['size'];
-            $entry['mtime'] = (int) $stat['mtime'];
-        }
-    } elseif ($entry['type'] === 'file') {
-        $entry['sha256'] = @hash_file('sha256', $path);
-        if (!is_string($entry['sha256'])) {
-            return false;
-        }
-    }
-    $snapshot[$relative] = $entry;
-
-    if ($entry['type'] !== 'dir') {
-        return true;
-    }
-
-    $children = pmssDirectoryEntriesRead($path);
-    if (!is_array($children)) {
-        return false;
-    }
-    foreach ($children as $child) {
-        $childRelative = $relative === '' ? $child : $relative.'/'.$child;
-        if (!pmssUserWebRootMigrationSnapshotWalk($path.'/'.$child, $childRelative, $snapshot, $identity)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/** Return a content snapshot by default, or an inode-identity snapshot for rename verification. */
-function pmssUserWebRootMigrationSnapshot(string $path, bool $identity = false): ?array
-{
-    if (!is_dir($path) || is_link($path)) {
-        return null;
-    }
-
-    $snapshot = [];
-    if (!pmssUserWebRootMigrationSnapshotWalk($path, '', $snapshot, $identity)) {
-        return null;
-    }
-    ksort($snapshot);
-    return $snapshot;
-}
-
-/** Compute the relative symlink target from an in-www path to its home path. */
-function pmssUserWebRootMigrationRelativeTarget(string $home, string $source, string $target): ?string
-{
-    $home = rtrim($home, '/').'/';
-    if (strpos($source, $home) !== 0 || strpos($target, $home) !== 0) {
-        return null;
-    }
-
-    $sourceParent = trim(substr(dirname($source), strlen($home)), '/');
-    $targetRelative = trim(substr($target, strlen($home)), '/');
-    if ($targetRelative === '') {
-        return null;
-    }
-
-    $up = $sourceParent === '' ? '' : str_repeat('../', count(explode('/', $sourceParent)));
-    return $up.$targetRelative;
-}
-
-/** Create missing parents while preserving existing parent metadata. */
-function pmssUserWebRootMigrationPrepareParent(string $user, string $home, string $path, callable $logger): bool
-{
-    if (!pmssUserWebRootMigrationParentSafe($home, $path)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe web-root migration parent: '.$path);
-        return false;
-    }
-    if (is_dir($path) && !is_link($path)) {
-        return true;
-    }
-    if (pmssPathExistsOrLink($path)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Refusing conflicting web-root migration parent: '.$path);
-        return false;
-    }
-
-    if (!pmssAccountDirectoryEnsure($user, $home, $path, 0755, 0755, $logger)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Unable to create web-root migration parent: '.$path);
-        return false;
-    }
-
-    return is_dir($path) && !is_link($path);
-}
-
-/** Return true only for an existing, readable directory with no children. */
-function pmssUserWebRootMigrationDirectoryIsEmpty(string $path): bool
-{
-    $entries = pmssDirectoryEntriesRead($path);
-    return is_array($entries) && empty($entries);
 }
 
 /** Root may act as its own fixture account only beneath unwritable root parents. */
@@ -280,6 +143,7 @@ function pmssUserWebRootMigrationCopyTree(string $user, string $home, string $so
             'cp -aT -- '.escapeshellarg($source).' '.escapeshellarg($target));
 }
 
+/** Remove migration staging only with the account's authority. */
 function pmssUserWebRootMigrationRemoveCopy(string $user, string $home, string $path): void
 {
     $command = 'rm -rf -- '.escapeshellarg($path);
@@ -320,16 +184,8 @@ function pmssUserMigrateWebRootBasenameCollapsePath(
         return;
     }
 
-    if (is_link($target)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Preserving symlink destination conflict at '.$targetRelative);
-        return;
-    }
-    if (file_exists($target) && !is_dir($target)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Preserving non-directory destination conflict at '.$targetRelative);
-        return;
-    }
-    if (is_dir($target) && !pmssUserWebRootMigrationDirectoryIsEmpty($target)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
+    if (($conflict = pmssUserWebRootMigrationDestinationConflict($target, $targetRelative, $sourceRelative, true)) !== null) {
+        pmssUserWebRootMigrationLog($user, $logger, $conflict);
         return;
     }
 
@@ -355,23 +211,17 @@ function pmssUserMigrateWebRootBasenameCollapsePath(
         pmssUserWebRootMigrationLog($user, $logger, 'Verification failed; removed incomplete copy for '.$misfileRelative);
         return;
     }
-    if (is_link($target)) {
+    if (($conflict = pmssUserWebRootMigrationDestinationConflict($target, $targetRelative, $sourceRelative, false)) !== null) {
         pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-        pmssUserWebRootMigrationLog($user, $logger, 'Preserving symlink destination conflict at '.$targetRelative);
+        pmssUserWebRootMigrationLog($user, $logger, $conflict);
         return;
     }
-    if (file_exists($target)) {
-        if (!is_dir($target)) {
-            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-            pmssUserWebRootMigrationLog($user, $logger, 'Preserving non-directory destination conflict at '.$targetRelative);
-            return;
-        }
-        if (!pmssUserWebRootMigrationDirectoryIsEmpty($target)
-            || !pmssUserWebRootMigrationRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target))) {
-            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-            pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
-            return;
-        }
+    if (file_exists($target)
+        && (!pmssUserWebRootMigrationDirectoryIsEmpty($target)
+            || !pmssUserWebRootMigrationRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target)))) {
+        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
+        pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
+        return;
     }
 
     if (!pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)) {
@@ -417,15 +267,11 @@ function pmssUserMigrateWebRootPath(
         pmssUserWebRootMigrationLog($user, $logger, 'Refusing non-directory source at '.$sourceRelative);
         return;
     }
-    if (is_link($target)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Preserving symlink destination conflict at '.$targetRelative);
+    if (($conflict = pmssUserWebRootMigrationDestinationConflict($target, $targetRelative, $sourceRelative, false)) !== null) {
+        pmssUserWebRootMigrationLog($user, $logger, $conflict);
         return;
     }
     $targetExists = file_exists($target);
-    if ($targetExists && !is_dir($target)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Preserving non-directory destination conflict at '.$targetRelative);
-        return;
-    }
     if (!$sourceExists && !$targetExists) {
         return;
     }
