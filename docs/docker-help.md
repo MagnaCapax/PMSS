@@ -77,6 +77,7 @@ Rootless Docker reaches the network through a user-space stack (normally slirp4n
 - Networks that already exist keep their MTU until you recreate them (`docker compose down && docker compose up -d`).
 - The default bridge (`docker run` without `--network`) stays at 1500, so containers you already run there keep their MTU. To raise it as well, add `"mtu": 65520` yourself.
 - Ordinary traffic leaves the server at the normal packet size.
+- The key is only added when the server runs Docker 24 or later, the first version that uses it.
 
 To keep 1500 for every new network, set the value yourself: `"com.docker.network.driver.mtu": "1500"`. PMSS keeps values you set. Deleting the key does not work, because the next maintenance run adds it again.
 

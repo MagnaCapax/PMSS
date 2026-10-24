@@ -60,9 +60,10 @@ driver PMSS hosts use today.
 Engine floor: `default-network-opts` takes effect from Docker Engine 24. Older daemons start with the
 key and ignore it (measured: 19.03.15, 20.10.24 and 23.0.6 start and create new networks at the
 default; 24.0 creates them at 65520). PMSS installs `docker-ce` unpinned from download.docker.com,
-whose newest builds are 26.1.4 for Debian 10 and 29.x for Debian 11/12, so every host on current
-packages applies it, and a host held at an older package keeps 1500 without failing. No version gate
-is needed.
+whose newest builds are 26.1.4 for Debian 10 and 29.x for Debian 11/12. The key is still only
+written when the installed `docker-ce` is 24 or later (`pmssPackageVersion()`), so a pre-24 build
+that did refuse it could not stop every account's daemon on the host. A host held at an older
+package keeps 1500, and the key is added at the first maintenance run after an upgrade to 24.
 
 `etc/skel` is unchanged; converge fills new accounts' files on their first maintenance run.
 `docker-install-wireguard.sh` puts its container on a network created at MTU 1500 (see below).

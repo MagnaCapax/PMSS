@@ -113,6 +113,25 @@ function pmssUserRootlessDockerConfigRoundTrips(string $raw, array $decoded): bo
     return is_string($reencoded) && json_encode(json_decode($raw)) === json_encode(json_decode($reencoded));
 }
 
+/** Return true for a decoded JSON object; a non-empty list is not one ([] may be either). */
+function pmssUserRootlessDockerIsJsonObject($value): bool
+{
+    return is_array($value) && ($value === [] || array_values($value) !== $value);
+}
+
+/**
+ * Return true when the installed docker-ce applies default-network-opts (Engine 24 and later).
+ * An empty or unparsable version (package missing) returns false, so the key is not written.
+ */
+function pmssUserRootlessDockerBridgeMtuSupported(string $dockerCeVersion): bool
+{
+    // Debian versions look like 5:24.0.7-1~debian.12~bookworm: drop the epoch, keep the upstream part.
+    if (!preg_match('/^(?:\d+:)?(\d+(?:\.\d+)*)/', $dockerCeVersion, $match)) {
+        return false;
+    }
+    return version_compare($match[1], '24', '>=');
+}
+
 /**
  * Fill the bridge MTU network option of a daemon.json payload: default-network-opts
  * covers networks created afterwards (existing networks keep their MTU until
@@ -126,9 +145,9 @@ function pmssUserRootlessDockerBridgeMtuApply(array &$data, $mtu): bool
         return false;
     }
     $opts = array_key_exists('default-network-opts', $data) ? $data['default-network-opts'] : [];
-    $bridge = is_array($opts) ? (array_key_exists('bridge', $opts) ? $opts['bridge'] : []) : null;
-    // A non-object value belongs to the account; Docker reports it, PMSS does not repair it.
-    if (is_array($bridge) && !array_key_exists('com.docker.network.driver.mtu', $bridge)) {
+    $bridge = pmssUserRootlessDockerIsJsonObject($opts) ? (array_key_exists('bridge', $opts) ? $opts['bridge'] : []) : null;
+    // A non-object value (lists included) belongs to the account; Docker reports it, PMSS does not repair it.
+    if (pmssUserRootlessDockerIsJsonObject($bridge) && !array_key_exists('com.docker.network.driver.mtu', $bridge)) {
         $bridge['com.docker.network.driver.mtu'] = (string) $mtu;
         $opts['bridge'] = $bridge;
         $data['default-network-opts'] = $opts;
