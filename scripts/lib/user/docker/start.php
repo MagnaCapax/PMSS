@@ -21,6 +21,7 @@ function userDockerEnsureCgroupfsDaemonConfig(string $user, string $home, int $u
             'ensure_dir_failed' => '[WARN] userDocker: failed to ensure ~/.config/docker for cgroup v2 rootless Docker',
             'unsafe_config_file' => '[WARN] userDocker: refusing unsafe ~/.config/docker/daemon.json target',
             'invalid_json' => '[WARN] userDocker: existing daemon.json is invalid JSON; leaving it unchanged',
+            'lossy_json' => '[WARN] userDocker: daemon.json has an empty or numeric-key object PMSS cannot rewrite safely; leaving it unchanged',
             'encode_failed' => '[WARN] userDocker: failed to encode daemon.json for cgroup v2 rootless Docker',
             'temp_failed' => '[WARN] userDocker: failed to create temporary daemon.json for cgroup v2 rootless Docker',
             'write_failed' => '[WARN] userDocker: failed to write ~/.config/docker/daemon.json for cgroup v2 rootless Docker',

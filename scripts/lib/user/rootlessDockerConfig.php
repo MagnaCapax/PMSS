@@ -9,7 +9,7 @@ pmssRequireRelativeFiles(__DIR__, ['directories.php', 'log.php', '../lighttpd/us
  * tap link (slirp4netns) a 65520 MTU; bridges at Docker's 1500 default make every
  * container cut TCP into 1460-byte segments that slirp4netns then handles one by one.
  * The value only exists inside the account's network namespace: slirp4netns opens
- * normal host sockets, so traffic leaves the host at the real path MTU.
+ * normal host sockets, so ordinary traffic leaves the host at the real path MTU.
  */
 const PMSS_ROOTLESS_DOCKER_BRIDGE_MTU = 65520;
 
@@ -114,20 +114,16 @@ function pmssUserRootlessDockerConfigRoundTrips(string $raw, array $decoded): bo
 }
 
 /**
- * Fill the bridge MTU keys of a daemon.json payload: "mtu" covers the default
- * bridge, default-network-opts every network created afterwards (existing networks
- * keep their MTU until recreated). Keys the account already set, valid or not, are
- * kept as they are. Returns true when the payload changed.
+ * Fill the bridge MTU network option of a daemon.json payload: default-network-opts
+ * covers networks created afterwards (existing networks keep their MTU until
+ * recreated). The default bridge ("mtu") is left alone, so containers that already
+ * exist keep 1500 across daemon restarts. A value the account already set, valid
+ * or not, is kept as it is. Returns true when the payload changed.
  */
 function pmssUserRootlessDockerBridgeMtuApply(array &$data, $mtu): bool
 {
     if (!is_int($mtu) || $mtu < 1280 || $mtu > 65535) {
         return false;
-    }
-    $changed = false;
-    if (!array_key_exists('mtu', $data)) {
-        $data['mtu'] = $mtu;
-        $changed = true;
     }
     $opts = array_key_exists('default-network-opts', $data) ? $data['default-network-opts'] : [];
     $bridge = is_array($opts) ? (array_key_exists('bridge', $opts) ? $opts['bridge'] : []) : null;
@@ -136,9 +132,9 @@ function pmssUserRootlessDockerBridgeMtuApply(array &$data, $mtu): bool
         $bridge['com.docker.network.driver.mtu'] = (string) $mtu;
         $opts['bridge'] = $bridge;
         $data['default-network-opts'] = $opts;
-        $changed = true;
+        return true;
     }
-    return $changed;
+    return false;
 }
 
 /**
@@ -238,7 +234,8 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
         $result['ok'] = true;
         return $result;
     }
-    if ($decoded !== null && !pmssUserRootlessDockerConfigRoundTrips((string) $current, $decoded)) {
+    // An empty top-level decode ({}) is safe: the written file always gains keys.
+    if ($decoded !== null && $decoded !== [] && !pmssUserRootlessDockerConfigRoundTrips((string) $current, $decoded)) {
         // Leave the account's file as it is rather than write one Docker would refuse to load.
         foreach (['removed_storage_driver', 'configured_storage_driver', 'disabled_containerd_snapshotter', 'configured_bridge_mtu'] as $key) {
             $result[$key] = false;
