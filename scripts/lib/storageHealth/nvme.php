@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/common.php';
+require_once __DIR__.'/deviceParse.php';
 
 /**
  * @param array<string, mixed> $disk
@@ -27,33 +28,6 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
         return null;
     }
 
-    $metrics = array_fill_keys(['critical_warnings', 'temperature', 'media_errors', 'num_err_log_entries', 'percentage_used'], null);
-    foreach ([
-        '/critical_warning\\s*:\\s*(\\d+)/i' => 'critical_warnings',
-        '/media_errors\\s*:\\s*(\\d+)/i' => 'media_errors',
-        '/num_err_log_entries\\s*:\\s*(\\d+)/i' => 'num_err_log_entries',
-        '/percentage_used\\s*:\\s*(\\d+)/i' => 'percentage_used',
-    ] as $pattern => $field) {
-        $metrics[$field] = preg_match($pattern, $out, $matches) ? (int) $matches[1] : null;
-    }
-    if (preg_match('/temperature\\s*:\\s*([0-9]+)\\s*([KC])?/i', $out, $matches)) {
-        $metrics['temperature'] = (int) $matches[1] - (strtoupper($matches[2] ?? 'C') === 'K' ? 273 : 0);
-    }
-
-    $entry = pmssStorageHealthDeviceEntryBuild('nvme', $disk, $timestamp, 0);
-    $entry['metrics'] = $metrics;
-    $flags = [];
-    if (($metrics['critical_warnings'] ?? 0) > 0) {
-        $flags[] = 'nvme_critical_warning';
-    }
-    if (($metrics['temperature'] ?? 0) >= 70) {
-        $flags[] = 'hot_nvme';
-    }
-    if (($percentageUsed = (int) ($metrics['percentage_used'] ?? 0)) >= 80) {
-        $flags[] = $percentageUsed >= 95 ? 'wearout_critical' : 'wearout_high';
-    }
-
     $previous = $last['nvme::'.$dev]['metrics'] ?? null;
-    $flags = array_merge($flags, pmssStorageHealthMetricIncreaseFlags($metrics, is_array($previous) ? $previous : null, ['media_errors' => 'media_errors_increase', 'num_err_log_entries' => 'err_log_increase']));
-    return pmssStorageHealthEntryFinalize($entry, $flags);
+    return pmssStorageHealthParseNvmeOutput($out, $disk, is_array($previous) ? $previous : null, $timestamp);
 }

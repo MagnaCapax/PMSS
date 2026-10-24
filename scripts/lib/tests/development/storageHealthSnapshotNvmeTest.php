@@ -6,6 +6,49 @@ require_once dirname(__DIR__, 2).'/storageHealth.php';
 
 final class StorageHealthSnapshotNvmeTest extends TestCase
 {
+    public function testLegacyProbePayloadsBeforeParserSeparation(): void
+    {
+        $device = $this->pmssMakeReadableTempPath('pmss-nvme-characterization-', 'dev-');
+        $disk = ['path' => $device, 'kname' => 'nvme0n1', 'model' => 'Fixture', 'serial' => 'NVME', 'size' => '1T'];
+        $timestamp = '2025-01-01T00:00:00+00:00';
+        $unknown = array_fill_keys(['critical_warnings', 'temperature', 'media_errors', 'num_err_log_entries', 'percentage_used'], null);
+        // Explicit expectations freeze first-match parsing, units, thresholds and flag order.
+        $cases = [
+            ['unrecognized output', [], [], [], 'ok'],
+            ['temperature : 342 K', [], ['temperature' => 69], [], 'ok'],
+            ['temperature : 343 K', [], ['temperature' => 70], ['hot_nvme'], 'warn'],
+            ['temperature : 69 C', [], ['temperature' => 69], [], 'ok'],
+            ['temperature : 70', [], ['temperature' => 70], ['hot_nvme'], 'warn'],
+            ['temperature : 0 K', [], ['temperature' => -273], [], 'ok'],
+            ['percentage_used : 79', [], ['percentage_used' => 79], [], 'ok'],
+            ['percentage_used : 80', [], ['percentage_used' => 80], ['wearout_high'], 'warn'],
+            ['percentage_used : 94', [], ['percentage_used' => 94], ['wearout_high'], 'warn'],
+            ['percentage_used : 95', [], ['percentage_used' => 95], ['wearout_critical'], 'warn'],
+            ["temperature : 40 C\ntemperature : 99 C\npercentage_used : 80\npercentage_used : 99", [],
+                ['temperature' => 40, 'percentage_used' => 80], ['wearout_high'], 'warn'],
+            ["CRITICAL_WARNING : 1\r\ntemperature : 343 k\nmedia_errors : 5\nnum_err_log_entries : 7\npercentage_used : 95",
+                ['media_errors' => 4, 'num_err_log_entries' => 6],
+                ['critical_warnings' => 1, 'temperature' => 70, 'media_errors' => 5, 'num_err_log_entries' => 7, 'percentage_used' => 95],
+                ['nvme_critical_warning', 'hot_nvme', 'wearout_critical', 'media_errors_increase', 'err_log_increase'], 'fail'],
+            ["media_errors : 5\nnum_err_log_entries : 7", ['media_errors' => '4', 'num_err_log_entries' => '6'],
+                ['media_errors' => 5, 'num_err_log_entries' => 7], [], 'ok'],
+            ["media_errors : 0\nnum_err_log_entries : 0", ['media_errors' => 4, 'num_err_log_entries' => 6],
+                ['media_errors' => 0, 'num_err_log_entries' => 0], [], 'ok'],
+        ];
+        foreach ($cases as [$output, $previous, $metrics, $flags, $severity]) {
+            $stubDir = $this->pmssMakeLineOutputStub('nvme', explode("\n", $output), 'pmss-nvme-characterization-bin-');
+            $entry = null;
+            $this->pmssWithPathPrefix($stubDir, static function () use ($disk, $previous, $timestamp, &$entry): void {
+                $entry = \pmssStorageHealthSnapshotNvme($disk, ['nvme::'.$disk['path'] => ['metrics' => $previous]], $timestamp);
+            });
+            $this->assertSame([
+                'timestamp' => $timestamp, 'kind' => 'nvme', 'device' => $device, 'kname' => 'nvme0n1',
+                'model' => 'Fixture', 'serial' => 'NVME', 'rota' => 0, 'size' => '1T',
+                'metrics' => array_replace($unknown, $metrics), 'flags' => $flags, 'severity' => $severity, 'ok' => $severity === 'ok',
+            ], $entry, $output);
+        }
+    }
+
     public function testSnapshotNvmeReturnsNullWhenBinaryMissing(): void
     {
         $device = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');

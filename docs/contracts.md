@@ -265,6 +265,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Logging & JSON Events
 
+- Storage-health device parsers share ordered metric matching and threshold
+  evaluation. SMART processes each line in order, including overlapping matches;
+  NVMe searches the complete output once per field. Thresholds select one flag
+  per metric, highest applicable wear tier first. Snapshot commands, eligibility,
+  timeout/lock results, history typing, field order and flag order remain stable.
+  Pure parsing and finding helpers load independently of the runtime facade.
+
 - `pmssMediaStackWatchdogStatusWrite()` encodes before allocating a temporary
   file and publishes only a complete write. Encoding, write, mode, or rename
   failures leave the previous status untouched; unpublished files are removed
