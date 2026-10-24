@@ -8,8 +8,24 @@ echo "Using port: $PORT"
 
 mkdir -p "$CONFIG_DIR"
 
+# WireGuard sizes wg0 from eth0 (MTU - 80). PMSS raises rootless bridges to 65520
+# (ADR 0173), which would let tunnel packets leave the host as IP fragments, so the
+# server gets its own network at the usual 1500.
+NETWORK=wireguard
+if docker network inspect "$NETWORK" >/dev/null 2>&1; then
+	NETWORK_MTU=$(docker network inspect -f '{{index .Options "com.docker.network.driver.mtu"}}' "$NETWORK")
+	if [ "$NETWORK_MTU" != "1500" ]; then
+		echo "Network $NETWORK exists with MTU ${NETWORK_MTU:-default}, not 1500." >&2
+		echo "Remove it (docker network rm $NETWORK) or pick another name, then run this again." >&2
+		exit 1
+	fi
+else
+	docker network create --opt com.docker.network.driver.mtu=1500 "$NETWORK" >/dev/null
+fi
+
 docker run -d \
 	--name wireguard \
+	--network "$NETWORK" \
 	--cap-add NET_ADMIN \
 	--cap-add SYS_MODULE \
 	-e PUID=0 \

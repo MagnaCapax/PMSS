@@ -309,9 +309,10 @@ function pmssEnsureDockerDependencies(string $user): void
         'invalid_json_as_empty' => true,
         'preserve_custom_storage_driver' => true,
         'disable_containerd_snapshotter' => !$storeExists && $fuse['available'] && $distroVersion <= 11,
+        'bridge_mtu' => PMSS_ROOTLESS_DOCKER_BRIDGE_MTU,
     ]);
     if (!$result['ok']) {
-        $messages = ['ensure_dir_failed' => '[WARN] Failed to ensure ~/.config/docker', 'encode_failed' => '[WARN] Failed to encode daemon.json', 'write_failed' => '[WARN] Failed to write daemon.json'];
+        $messages = ['ensure_dir_failed' => '[WARN] Failed to ensure ~/.config/docker', 'encode_failed' => '[WARN] Failed to encode daemon.json', 'write_failed' => '[WARN] Failed to write daemon.json', 'lossy_json' => '[WARN] daemon.json has an empty or numeric-key object PMSS cannot rewrite safely; left unchanged'];
         pmssUserLog($user, $messages[$result['reason']] ?? '[WARN] Failed to converge daemon.json');
         return;
     }
@@ -326,5 +327,9 @@ function pmssEnsureDockerDependencies(string $user): void
     }
     if ($result['disabled_containerd_snapshotter']) {
         pmssUserLog($user, '[INFO] Disabled Docker containerd image store for rootless fuse-overlayfs');
+    }
+    if ($result['configured_bridge_mtu']) {
+        // Applies at the next daemon start; a running daemon is not restarted for it.
+        pmssUserLog($user, '[INFO] Configured Docker MTU '.PMSS_ROOTLESS_DOCKER_BRIDGE_MTU.' for new networks (next daemon start; existing networks and the default bridge keep theirs)');
     }
 }
