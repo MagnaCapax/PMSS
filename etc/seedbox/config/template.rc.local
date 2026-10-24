@@ -61,7 +61,25 @@ fi
 # If an update run removed `/etc/cron.d/pmss` mid-flight, restore the template
 # without restarting cron (restarting cron can re-trigger @reboot jobs).
 if [ -f /etc/seedbox/config/root.cron ]; then
+    ROOT_CRON_WAS_MISSING=0
+    [ -f /etc/cron.d/pmss ] || ROOT_CRON_WAS_MISSING=1
     install -m 0644 /etc/seedbox/config/root.cron /etc/cron.d/pmss >/dev/null 2>&1 || true
+    # cron reads @reboot entries once, when it starts. If it is already up while
+    # the system is still booting, it started without this file and will not run
+    # PMSS's @reboot jobs on this boot (setupNetwork among them: no firewall or
+    # shaping until the next reboot). Run only those here; a cron restart would
+    # also re-run every other @reboot job, tenants' crontabs included.
+    # update-step2 runs this script too, after boot, and must not start them.
+    if [ "$ROOT_CRON_WAS_MISSING" = 1 ] && [ -f /etc/cron.d/pmss ] && systemctl is-active --quiet cron.service; then
+        case "$(systemctl is-system-running 2>/dev/null)" in
+            initializing|starting)
+                ROOT_CRON_PATH=$(sed -n 's/^PATH=//p' /etc/cron.d/pmss | head -n 1)
+                sed -n 's/^@reboot[[:space:]]\{1,\}root[[:space:]]\{1,\}//p' /etc/cron.d/pmss | while IFS= read -r JOB; do
+                    PATH="${ROOT_CRON_PATH:-$PATH}" nohup /bin/bash -c "$JOB" </dev/null >/dev/null 2>&1 &
+                done
+                ;;
+        esac
+    fi
 fi
 
 # Refresh MOTD at boot so service/network status reflects current runtime state.
