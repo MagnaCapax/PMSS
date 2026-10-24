@@ -170,4 +170,22 @@ PHP;
         $this->assertSame(0, $run['rc'], $run['output']);
         $this->assertStringContainsString('[agentic-issues] done', $run['output']);
     }
+
+    /** A failed check shows its one-line ERROR reason in the run log; other output and successes add nothing. */
+    public function testFailedIntentCheckShowsItsErrorLine(): void
+    {
+        $long = str_repeat('x', 400);
+        $this->fixture([1001, 1002, 1003], [], [
+            1001 => ['rc' => 2, 'out' => "noise before\nERROR budget cap reached\x07 for the check\nERROR second line\n"],
+            1002 => ['rc' => 2, 'out' => "ERROR $long\n"],
+            1003 => ['rc' => 1, 'out' => "no error line here\n"],
+        ]);
+        $run = $this->select();
+        $this->assertSame(0, $run['rc'], $run['output']);
+        $this->assertStringContainsString('#1001 intent-check not clear (exit=2): ERROR budget cap reached for the check', $run['output']);
+        $this->assertFalse(strpos($run['output'], 'ERROR second line') !== false, $run['output']);
+        $this->assertFalse(strpos($run['output'], 'noise before') !== false, $run['output']);
+        $this->assertStringContainsString('#1002 intent-check not clear (exit=2): ERROR '.str_repeat('x', 194)."\n", $run['output']);
+        $this->assertStringContainsString("#1003 intent-check not clear (exit=1)\n", $run['output']);
+    }
 }

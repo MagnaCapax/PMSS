@@ -236,7 +236,7 @@ if [[ -z "$target_issue" ]]; then
 					intent_check_cap_logged=1
 				fi
 			else
-				local output rc line timestamp
+				local output rc line timestamp reason=""
 				intent_check_calls=$((intent_check_calls + 1))
 				rc=0
 				output=$(timeout 300 "$PMSS_INTENT_CHECK_CMD" "$num") || rc=$?
@@ -250,7 +250,12 @@ if [[ -z "$target_issue" ]]; then
 						fi
 					done <<<"$output"
 				fi
-				echo "[agentic-issues] GATE: #$num intent-check not clear (exit=$rc)" >&1
+				# A failed check prints one "ERROR <reason>" line; show it so a check outage is visible in the
+				# run log instead of an exit code alone (bounded, printable characters only).
+				if [[ "$rc" != "0" ]]; then
+					reason=$(printf '%s\n' "$output" | grep -m1 '^ERROR ' | tr -cd '[:print:]' | cut -c1-200) || reason=""
+				fi
+				echo "[agentic-issues] GATE: #$num intent-check not clear (exit=$rc)${reason:+: $reason}" >&1
 			fi
 		fi
 		echo "[agentic-issues] GATE: #$num not build-ready (adversarial review incl. malicious-intent gate not passed)" >&1
