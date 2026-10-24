@@ -10,13 +10,24 @@ require_once __DIR__.'/transmissionWeb.php';
 /** Measure the existing root-owned set before reserving headroom for a new copy. */
 function pmssTorrentClientsStoreSetSize(string $root): ?int
 {
+    if ($root === '' || pmssFilesystemPathHasNulByte($root)) return null;
     if (!is_dir($root)) return 0;
     if (is_link($root)) return null;
     $output = [];
     $rc = 1;
     @exec('du -sb -- '.escapeshellarg($root).' 2>/dev/null', $output, $rc);
     if ($rc !== 0 || !isset($output[0]) || !preg_match('/\A([0-9]+)\s/', $output[0], $match)) return null;
-    return (int) $match[1];
+    return pmssUnsignedDecimalIntParse($match[1]);
+}
+
+/** Reject failed or unrepresentable filesystem measurements before integer conversion. */
+function pmssTorrentClientsStoreFreeSpace(): ?int
+{
+    $bytes = @disk_free_space('/home');
+    if (is_int($bytes)) return $bytes >= 0 ? $bytes : null;
+    // The float at PHP_INT_MAX may already round up beyond the integer range.
+    return is_float($bytes) && is_finite($bytes) && $bytes >= 0 && $bytes < PHP_INT_MAX
+        ? (int) $bytes : null;
 }
 
 /** Ensure a root-owned real directory with public traverse permission. */
@@ -33,10 +44,7 @@ function pmssTorrentClientsStoreDirectory(string $path): bool
 function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
 {
     $root = $ops['root'] ?? '/home/.pmss/clients';
-    $free = $ops['free'] ?? static function (): ?int {
-        $bytes = @disk_free_space('/home');
-        return is_float($bytes) || is_int($bytes) ? (int) $bytes : null;
-    };
+    $free = $ops['free'] ?? 'pmssTorrentClientsStoreFreeSpace';
     $size = $ops['size'] ?? 'pmssTorrentClientsStoreSetSize';
     $log = $ops['log'] ?? 'logmsg';
     $install = $ops['install'] ?? static function (array $entry, string $binary): bool {
@@ -86,8 +94,10 @@ function pmssTorrentClientsStoreConverge(array $catalog, array $ops = []): array
         } else {
             $freeBytes = $free();
             $setBytes = $size($root);
+            // Subtract the reserve so a large store cannot promote the sum to float.
             if (!is_int($freeBytes) || !is_int($setBytes)
-                || $freeBytes <= 3 * 1024 * 1024 * 1024 + $setBytes) {
+                || $freeBytes < 0 || $setBytes < 0
+                || $freeBytes - 3 * 1024 * 1024 * 1024 <= $setBytes) {
                 $log('[SKIP] torrent client '.$id.' insufficient /home free space or unreadable set size');
                 $results[$id] = 'skipped-space';
                 continue;

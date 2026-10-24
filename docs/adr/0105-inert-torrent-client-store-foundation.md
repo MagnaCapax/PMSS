@@ -28,6 +28,11 @@ must have a SHA-256 pin and are installed under `/home/.pmss/clients/` only
 while `torrentClients.enabled` exists. The app include catches all throwables.
 The store requires more than 3 GiB plus its measured existing set size free on
 `/home`; a shortfall skips installation without pruning prior versions.
+Size probes reject empty or NUL-containing roots. Failed, negative or
+unrepresentable measurements use the existing space-skip path. The reserve
+comparison subtracts 3 GiB from free bytes to avoid overflowing the required-size
+sum; equality still skips and one byte above the requirement permits installation.
+`TorrentClientsStoreTest` covers measurement failures and these boundaries.
 
 Account version links are created only through `pmssAccountPathRun()`; P1 stopped
 automatic default-link creation so selection requires a customer switch (ADR 0106).

@@ -35,6 +35,77 @@ final class TorrentClientsStoreTest extends TestCase
         $this->assertFalse(file_exists($root));
     }
 
+    public function testStoreSizeRequiresRepresentableUnsignedCommandOutput(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-clients-size-');
+        foreach ([
+            ['0', 0, 0], ['00042', 0, 42], [(string) PHP_INT_MAX, 0, PHP_INT_MAX],
+            [PHP_INT_MAX.'0', 0, null], ['000'.PHP_INT_MAX.'0', 0, null],
+            ['-1', 0, null], ['1.5', 0, null], ['invalid', 0, null], ['', 0, null],
+            ['42', 1, null],
+        ] as [$digits, $rc, $expected]) {
+            $bin = $this->pmssMakeExecutableStub('du', "#!/bin/sh\nprintf '%s\\n' "
+                .escapeshellarg($digits."\t".$root)."\nexit ".$rc."\n", 'pmss-clients-du-');
+            $this->pmssWithPathPrefix($bin, function () use ($root, $expected): void {
+                $this->assertSame($expected, \pmssTorrentClientsStoreSetSize($root));
+            });
+        }
+    }
+
+    public function testStoreSizeRejectsMalformedPathsWithoutRunningDu(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-clients-size-path-');
+        symlink($root, $root.'/linked');
+        $log = $root.'/calls';
+        $bin = $this->pmssMakeInvocationLogStub('du', $log, 'pmss-clients-du-path-');
+        $this->pmssWithPathPrefix($bin, function () use ($root): void {
+            foreach (['', "\0".$root, $root."\0", $root.'/linked'] as $path) {
+                $this->assertSame(null, \pmssTorrentClientsStoreSetSize($path));
+            }
+            $this->assertSame(0, \pmssTorrentClientsStoreSetSize($root.'/missing'));
+        });
+        $this->assertFalse(file_exists($log));
+    }
+
+    public function testFreeSpaceMeasurementRejectsInvalidNumbersBeforeCasting(): void
+    {
+        // Only the namespaced filesystem probe is replaced; conversion uses the real library.
+        $script = 'namespace StoreSpaceFixture; function disk_free_space($path) { return $GLOBALS["bytes"]; }';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/torrentClients/store.php', 'StoreSpaceFixture');
+        $script .= '$results = []; foreach ([false, null, "42", [], -1, -0.5, INF, NAN, '
+            .'(float) PHP_INT_MAX, PHP_INT_MAX * 2.0, 0, 0.0, 42.75, PHP_INT_MAX] as $bytes) {'
+            .'$GLOBALS["bytes"] = $bytes; $results[] = pmssTorrentClientsStoreFreeSpace(); } echo json_encode($results);';
+        $this->assertSame(array_merge(array_fill(0, 10, null), [0, 0, 42, PHP_INT_MAX]),
+            $this->pmssRunInlinePhpJson($script));
+    }
+
+    public function testSpaceReserveUsesExactIntegerBoundariesBeforeInstallation(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-clients-reserve-');
+        $reserve = 3 * 1024 * 1024 * 1024;
+        foreach ([
+            [-1, 0, false], [PHP_INT_MAX, -1, false], [PHP_INT_MAX, PHP_INT_MAX, false],
+            [null, 0, false], [PHP_INT_MAX, null, false], ['9999999999', 0, false],
+            [$reserve, 0, false], [$reserve + 10, 10, false], [$reserve + 11, 10, true],
+            [PHP_INT_MAX, PHP_INT_MAX - $reserve, false],
+            [PHP_INT_MAX, PHP_INT_MAX - $reserve - 1, true],
+        ] as $index => [$free, $size, $attempt]) {
+            $root = $base.'/case-'.$index.'/store';
+            $calls = 0;
+            $result = \pmssTorrentClientsStoreConverge([$this->entry()], [
+                'root' => $root,
+                'free' => static function () use ($free) { return $free; },
+                'size' => static function () use ($size) { return $size; },
+                // Stop at the install boundary; no download or daemon is needed.
+                'install' => static function () use (&$calls): bool { $calls++; return false; },
+                'log' => static function (): void {},
+            ]);
+            $this->assertSame(['rtorrent/0.9.9' => $attempt ? 'failed' : 'skipped-space'], $result);
+            $this->assertSame($attempt ? 1 : 0, $calls);
+            $this->assertSame($attempt, is_dir($root));
+        }
+    }
+
     public function testProjectionIsAtomicPublicAndHostOnly(): void
     {
         $root = $this->pmssMakeTempDir('pmss-clients-projection-');
