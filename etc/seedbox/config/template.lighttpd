@@ -104,8 +104,17 @@ $HTTP["url"] =~ "^/webdav-##username($|/)" {
     dir-listing.activate = "disable"
 
     # Defense-in-depth: do not expose dotfiles via WebDAV (prevents users from
-    # breaking runtimes by editing internal config/state).
-    url.access-deny = ( "/." )
+    # breaking runtimes by editing internal config/state). url.access-deny only
+    # matches the end of the path, so the dot segment is matched by condition.
+    # COPY and MOVE name their target in the Destination header, which the URL
+    # condition never sees; that header is not decoded, so encoded "." "/" and
+    # "w" (no client needs to encode them) are refused as well.
+    $HTTP["url"] =~ "/\." {
+        url.access-deny = ( "" )
+    }
+    $REQUEST_HEADER["Destination"] =~ "/\.|%(2[eEfF]|77)" {
+        url.access-deny = ( "" )
+    }
 }
 
 # Allow read access, but make www read-only to prevent common footguns.
