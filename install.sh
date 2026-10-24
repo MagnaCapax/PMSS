@@ -542,11 +542,15 @@ bootstrap_bullseye_security_archive() {
 	local os_release="$1" apt_dir="$2" codename="" file backup
 	local line_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://(security|deb)\.debian\.org/debian-security/?([[:space:]]+bullseye-security([[:space:]]|$))'
 	if [ -r "$os_release" ]; then
-		codename=$(. "$os_release" 2>/dev/null; printf '%s' "${VERSION_CODENAME:-}")
+		codename=$(sed -nE "s/^VERSION_CODENAME=[\"']?([^\"']*)[\"']?[[:space:]]*\$/\1/p" "$os_release" | head -n 1)
 	fi
 	[ "$codename" = "bullseye" ] || return 0
 	for file in "$apt_dir/sources.list" "$apt_dir"/sources.list.d/*.list; do
-		{ [ -f "$file" ] && [ ! -L "$file" ] && grep -Eq "$line_re" "$file"; } || continue
+		{ [ -f "$file" ] && grep -Eq "$line_re" "$file"; } || continue
+		if [ -L "$file" ]; then
+			log_warn "Debian 11: ${file} is a symlink; not rewriting it, so bootstrap packages from bullseye-security may fail with 404"
+			continue
+		fi
 		backup="${file}.pmss-bootstrap.save"
 		if [ ! -e "$backup" ] && ! cp -p "$file" "$backup"; then
 			log_warn "Debian 11: could not back up ${file}; leaving it unchanged"
