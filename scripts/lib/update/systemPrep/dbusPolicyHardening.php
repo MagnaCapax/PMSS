@@ -93,8 +93,11 @@ function pmssSystemdDbusDisclosureArtifacts(): array
             'runtime_path' => '/run/systemd/users',
             'description' => 'Restricting /run/systemd/users directory mode',
             'content' => "# PMSS-managed: restrict the /run/systemd/users directory (UID->username map) to root.\n"
+                ."# dbus-daemon (group messagebus) reads it to authenticate connections; systemd 241 keeps the\n"
+                ."# 0750 mode, so without the ACL dbus, logind and SSH logins stall after a reboot.\n"
                 ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
-                ."d /run/systemd/users 0750 root root -\n",
+                ."d /run/systemd/users 0750 root root -\n"
+                ."a+ /run/systemd/users - - - - group:messagebus:r-x\n",
         ],
         [
             'kind' => 'tmpfiles',
