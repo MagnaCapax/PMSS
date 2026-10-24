@@ -54,6 +54,11 @@ objects propagate unchanged after stream closure, and growing logs cannot exceed
 the requested tail byte budget. Whole-file and tail-summary fixtures preserve
 the existing successful results.
 
+`QuotaFstabOptionsTest` verifies that stale quota-file cleanup rejects raw NUL,
+CR and LF bytes before trimming the mount path, leaves stale files intact on
+rejection, and escapes the rejected path in its warning. Ordinary surrounding
+spaces, tabs and trailing slashes retain the existing cleanup count and logs.
+
 Deluge compatibility-patch tests share fixture execution and symlink-refusal
 checks in `DelugeAppTestCase`. Keep patch-specific source, expected bytes,
 return-value assertions, and log expectations in each named test; the shared

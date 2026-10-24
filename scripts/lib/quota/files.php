@@ -43,16 +43,21 @@ function pmssQuotaEscapePathForLog(string $path): string
  *
  * quotacheck may leave temporary `aquota*new` files behind after an interrupted
  * run. Only regular files directly under the mount point are eligible here.
+ * Reject control bytes before normalization can hide a malformed target.
  */
 function pmssRemoveStaleQuotaCheckFiles(string $mountPoint = '/home', ?callable $logger = null): int
 {
     $log = $logger ?: 'logMessage';
+    if (preg_match('/[\r\n\0]/', $mountPoint) === 1) {
+        $log('[quotaFix] WARNING: refusing unsafe quota cleanup path: '.pmssQuotaEscapePathForLog($mountPoint));
+        return 0;
+    }
     $mountPoint = rtrim(trim($mountPoint), '/');
     if ($mountPoint === '') {
         $mountPoint = '/';
     }
 
-    if ($mountPoint[0] !== '/' || preg_match('/[\r\n\0]/', $mountPoint) === 1) {
+    if ($mountPoint[0] !== '/') {
         $log('[quotaFix] WARNING: refusing unsafe quota cleanup path: '.pmssQuotaEscapePathForLog($mountPoint));
         return 0;
     }

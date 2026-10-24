@@ -186,6 +186,37 @@ class QuotaFstabOptionsTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'skipped unsafe stale quota path'), 'expected unsafe-path log');
     }
 
+    public function testRemoveStaleQuotaCheckFilesRejectsRawControlBytes(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
+        $stale = $dir.'/aquota.user.new';
+        file_put_contents($stale, 'stale');
+
+        // Prefix/suffix controls used to disappear during trim(), authorizing deletion.
+        foreach (["\0", "\r", "\n", "\r\n"] as $control) {
+            foreach ([$control.$dir, $dir.$control, $dir.'/'.$control, $dir.$control.'/child'] as $path) {
+                [$removed, $messages] = $this->removeStaleQuotaCheckFiles($path);
+                $this->assertSame(0, $removed);
+                $this->assertSame('stale', file_get_contents($stale));
+                $this->assertSame(['[quotaFix] WARNING: refusing unsafe quota cleanup path: '
+                    .\pmssQuotaEscapePathForLog($path)], $messages);
+            }
+        }
+    }
+
+    public function testRemoveStaleQuotaCheckFilesKeepsOrdinaryPathNormalization(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
+        $stale = $dir.'/aquota.user.new';
+        foreach ([$dir, $dir.'/', '  '.$dir.'//  ', "\t".$dir."\t"] as $path) {
+            file_put_contents($stale, 'stale');
+            [$removed, $messages] = $this->removeStaleQuotaCheckFiles($path);
+            $this->assertSame(1, $removed);
+            $this->assertFalse(file_exists($stale));
+            $this->assertSame(['[quotaFix] Removed stale file: '.\pmssQuotaEscapePathForLog($stale)], $messages);
+        }
+    }
+
     public function testRemoveStaleQuotaCheckFilesRejectsRelativeMountPoint(): void
     {
         [$removed, $messages] = $this->removeStaleQuotaCheckFiles('relative/home');
