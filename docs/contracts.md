@@ -444,6 +444,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     `userPermissions.php` normalization step fixes final ownership.
   - Cross-username transfers hard-fail after normalization unless the `data`
     payload is target-owned and readable/traversable by the local account.
+  - After permissions and client selections converge, enabled native qBittorrent
+    receives SIGTERM so its watchdog reloads the copied sessions on the next pass.
+    Missing, linked or non-file `.qbittorrentEnable` markers skip the request;
+    dry runs never signal. The shared native identity gate excludes Docker
+    mount namespaces and other accounts and rechecks each PID before signaling.
   - Errors: fail-soft; invalid/missing category metadata logs a warning or info
     line and does not abort the transfer.
 

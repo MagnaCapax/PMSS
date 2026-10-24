@@ -13,6 +13,7 @@ require_once __DIR__.'/sessionRewrite.php';
 require_once dirname(__DIR__).'/torrentClients/postSetup.php';
 require_once dirname(__DIR__).'/user/trafficLimit.php';
 require_once __DIR__.'/rtorrentRestart.php';
+require_once __DIR__.'/qbittorrentRestart.php';
 
 function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths): void
 {
@@ -45,6 +46,7 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
         pmssUserTransferVerifyPayloadOwnership($localUser, $home);
     }
     pmssUserTransferRequestRtorrentRestart($home, $localUser);
+    pmssUserTransferRequestQbittorrentRestart($home, $localUser);
 
     // Advisory only: keep exit-code semantics while surfacing suspiciously incomplete copies.
     pmssUserTransferVerifyCompleteness($cfg, $home, $scratchPaths['expect'], $scratchPaths['remoteSizeScript']);

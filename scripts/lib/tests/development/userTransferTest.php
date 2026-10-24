@@ -283,6 +283,7 @@ class UserTransferTest extends TestCase
                 "'Normalising user permissions'",
                 'pmssUserTransferVerifyPayloadOwnership($localUser, $home);',
                 'pmssUserTransferRequestRtorrentRestart',
+                'pmssUserTransferRequestQbittorrentRestart',
             ],
             'Cross-username payload gate order is unsafe: '
         );
@@ -903,6 +904,74 @@ SNAP;
         // Control: without the marker the restart is requested as before.
         $this->assertStringContainsString('Requesting rTorrent restart marker', $output);
         $this->assertStringNotContainsString('user opted out via .rtorrentDisable', $output);
+    }
+
+    public function testRequestQbittorrentRestartHonoursEnableMarkerAndDryRun(): void
+    {
+        foreach (['missing', 'directory', 'symlink', 'dangling', 'dry-run'] as $case) {
+            $home = $this->pmssMakeTempDir('pmss-transfer-qbittorrent-');
+            $marker = $home.'/.qbittorrentEnable';
+            if ($case === 'directory') mkdir($marker);
+            if ($case === 'symlink' || $case === 'dry-run') file_put_contents($home.'/enabled', '');
+            if ($case === 'symlink' || $case === 'dangling') symlink($home.'/enabled', $marker);
+            if ($case === 'dry-run') file_put_contents($marker, '');
+            $ops = [
+                'account' => static function (): array { return ['uid' => 1000]; },
+                'pids' => static function (): array { throw new \RuntimeException('Unexpected process probe'); },
+            ];
+            [, $output] = $this->pmssCaptureStdout(static function () use ($home, $ops): void {
+                \pmssUserTransferRequestQbittorrentRestart($home, 'newuser', $ops);
+            }, ['PMSS_DRY_RUN' => $case === 'dry-run' ? '1' : '0', 'PMSS_LOG_DIR' => $home]);
+            if ($case === 'dry-run') $this->assertStringContainsString('qBittorrent restart (dry run)', $output);
+            else $this->assertSame('', $output);
+        }
+    }
+
+    public function testRequestQbittorrentRestartSignalsOnlyNativeAccountProcesses(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-transfer-qbittorrent-native-');
+        file_put_contents($home.'/.qbittorrentEnable', '');
+        $signals = [];
+        $ops = [
+            'account' => static function (string $user): array {
+                if ($user !== 'newuser') throw new \RuntimeException('Wrong target account');
+                return ['uid' => 1000];
+            },
+            'pids' => static function (string $user, string $name): array {
+                if ($name !== 'qbittorrent-nox') throw new \RuntimeException('Wrong client');
+                return [101, 102, 103, 104, 105, 106, 107];
+            },
+            'namespace' => static function (int $pid): string { return $pid === 102 ? 'mnt:[2]' : 'mnt:[1]'; },
+            'read' => static function (string $path): string {
+                if (substr($path, -5) === '/comm') return strpos($path, '/105/') !== false ? 'other' : 'qbittorrent-nox';
+                return strpos($path, '/103/') !== false ? "Uid:\t2000 2000 2000 2000\n" : "Uid:\t1000 1000 1000 1000\n";
+            },
+            'exe' => static function (int $pid): string {
+                if ($pid === 104) return '/tmp/qbittorrent-nox';
+                if ($pid === 106) return '/home/.pmss/clients/qbittorrent/5.1.0/qbittorrent-nox';
+                if ($pid === 107) return '/home/newuser/bin/qbittorrent/custom/qbittorrent-nox';
+                return '/usr/bin/qbittorrent-nox';
+            },
+            // Recording delivery keeps this regression test entirely hermetic.
+            'signal' => static function (int $pid, int $signal) use (&$signals): bool {
+                $signals[] = [$pid, $signal];
+                return true;
+            },
+        ];
+        [, $output] = $this->pmssCaptureStdout(static function () use ($home, $ops): void {
+            \pmssUserTransferRequestQbittorrentRestart($home, 'newuser', $ops);
+        }, ['PMSS_DRY_RUN' => '0', 'PMSS_LOG_DIR' => $home]);
+        $this->assertSame([[101, 15], [106, 15], [107, 15]], $signals);
+        $this->assertStringContainsString('watchdog will reload migrated sessions', $output);
+
+        // A stopped client is left for the watchdog without claiming a restart.
+        $signals = [];
+        $ops['pids'] = static function (): array { return []; };
+        [, $output] = $this->pmssCaptureStdout(static function () use ($home, $ops): void {
+            \pmssUserTransferRequestQbittorrentRestart($home, 'newuser', $ops);
+        }, ['PMSS_DRY_RUN' => '0', 'PMSS_LOG_DIR' => $home]);
+        $this->assertSame([], $signals);
+        $this->assertStringContainsString('No native qBittorrent process stopped', $output);
     }
 
     public function testRutorrentShareRenameMovesExactDirectoryAsAccount(): void
