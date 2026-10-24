@@ -62,6 +62,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   trimming binary names or raw lookup output; ioping probes reject NUL targets before shell quoting.
   These boundaries retain their empty-string/null failure results and preserve
   ordinary whitespace normalization and valid probe arguments.
+- **scripts/lib/runtime/filesystem.php** – Stable include for path/inode primitives,
+  temporary workspaces, stream writes, file reads, and host values. Its sibling
+  modules keep those responsibilities separate. Bounded and unbounded readers
+  share one checked-open lifetime and the existing inode matcher (ADR 0167).
 - **scripts/lib/update/environment.php** – dpkg/apt guards plus helper to apply release-specific package selections.
 - **scripts/lib/update/filesystem.php** – warning-only filesystem preflights, including `/home` inode density detection for media-stack-heavy hosts.
 - **scripts/lib/update/arrRootExecutionBlock.php** – occupies `/root/.config/<App>` with a regular file so a root launch cannot create its data directory and aborts before binding; leftover config directories are moved aside, never deleted. Root has no legitimate Servarr instance, and `/opt` stays fully usable by customers (ADR 0034). Backstopped by **scripts/lib/arrRootGuard.php**, which the every-2-minute media-stack cron uses to kill root-owned `/opt/<App>/` processes and any known ARR process holding its default listener.

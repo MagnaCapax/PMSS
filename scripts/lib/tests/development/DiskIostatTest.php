@@ -244,6 +244,59 @@ PHP;
         ]);
     }
 
+    public function testFailedCapturesCannotPublishParseablePartialSamples(): void
+    {
+        $script = <<<'PHP'
+namespace DiskIostatCaptureFixture;
+class RuntimeException extends \RuntimeException {}
+function pmssDiskIostatDiscoverDevices() { return ['sda']; }
+function pmssDiskIostatSampleDevices($devices) { return $devices; }
+function pmssDiskIostatBuildCommand($devices) { return 'fixture-iostat'; }
+function pmssCommandCapture($command, $timeout) {
+    $GLOBALS['captures'][] = [$command, $timeout];
+    return $GLOBALS['captureResult'];
+}
+function pmssDiskIostatParseSampleFields($raw) {
+    $GLOBALS['parsed'][] = $raw;
+    return ['diskAwait' => '1'];
+}
+function is_readable($path) { return false; }
+function pmssSystemStatsIopingMs($path) { return 'na'; }
+function pmssPathTargetIsSafe($path, $directory, $missing) { return true; }
+function pmssFileWriteComplete($path, $content, $flags = 0) {
+    $GLOBALS['writes'][] = [$path, $flags];
+    return true;
+}
+function copy($source, $destination) { $GLOBALS['copies']++; return true; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatCaptureFixture');
+        $script .= <<<'PHP'
+$GLOBALS['captureResult'] = json_decode(getenv('PMSS_TEST_IOSTAT_CAPTURE'), true);
+$GLOBALS['captures'] = $GLOBALS['parsed'] = $GLOBALS['writes'] = [];
+$GLOBALS['copies'] = 0;
+ob_start();
+$rc = pmssDiskIostatMain();
+$output = ob_get_clean();
+echo json_encode([$rc, $output, $GLOBALS['captures'], $GLOBALS['parsed'], $GLOBALS['writes'], $GLOBALS['copies']]);
+PHP;
+        $raw = "Device r_await w_await\ngrp1 1 2\n";
+        foreach ([1, 124, 127, 137, -1, null, 0] as $rc) {
+            $result = ['stdout' => $raw, 'stderr' => 'fixture diagnostic'];
+            if ($rc !== null) $result['rc'] = $rc;
+            $success = $rc === 0;
+            $this->assertSame([
+                0, $success ? '' : 'Unable to collect iostat sample (rc='.($rc ?? 1).")\n",
+                [['fixture-iostat', 180]], $success ? [$raw] : [],
+                $success ? [
+                    ['/var/run/pmss/iostat', 0],
+                    [PMSS_DISK_IOSTAT_HISTORY_LOG, FILE_APPEND],
+                    [PMSS_DISK_IOSTAT_HISTORY_RAW_LOG, FILE_APPEND],
+                ] : [],
+                $success ? 1 : 0,
+            ], $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IOSTAT_CAPTURE' => json_encode($result)]));
+        }
+    }
+
     public function testParseLatestSampleUsesHeaderNames(): void
     {
         $raw = "Device r/s rMB/s rrqm/s %rrqm r_await rareq-sz w/s wMB/s wrqm/s %wrqm w_await wareq-sz d/s dMB/s drqm/s %drqm d_await dareq-sz f/s f_await aqu-sz %util\n"

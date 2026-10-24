@@ -43,7 +43,7 @@ function fwrite($handle, $bytes) {
     return 1;
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'StreamClosedWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystemStream.php', 'StreamClosedWriteFixture');
         $script .= <<<'PHP'
 $GLOBALS['writes'] = 0;
 $handle = fopen('php://memory', 'w+');
@@ -260,7 +260,7 @@ function fwrite($handle, $bytes) {
     return $limit === false ? false : \fwrite($handle, substr($bytes, 0, $limit));
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'SnapshotWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystemStream.php', 'SnapshotWriteFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotWriteFixture');
         $script .= <<<'PHP'
 [$mode, $line, $GLOBALS['limits']] = json_decode(getenv('PMSS_TEST_SNAPSHOT_WRITE'), true);

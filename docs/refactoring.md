@@ -28,6 +28,13 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+The iostat collector checks the command exit status before parsing or publishing
+captured output. Failed and timed-out probes may contain an initial sample;
+they leave the current snapshot and histories untouched and use the existing
+stdout diagnostic/zero-exit failure path. Successful captures and the legacy
+string-returning runner callback retain their behavior. `DiskIostatTest` checks
+failure statuses, missing status, and successful publication with isolated stubs.
+
 Legacy per-user installer cleanup preserves the old installer when its crontab
 entry is non-regular or cannot be read. A missing crontab, or one read
 successfully without the old installer reference, retains cleanup behavior.

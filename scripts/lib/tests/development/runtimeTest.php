@@ -8,6 +8,147 @@ require_once dirname(__DIR__, 2).'/log.php';
 
 class RuntimeTest extends TestCase
 {
+    public function testRegularReadPayloadAndMetadataCharacterization(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-read-contract-');
+        foreach (['', '0', " a\r\nb\n", "binary\0bytes", str_repeat('x', 4097)] as $bytes) {
+            file_put_contents($path, $bytes);
+            clearstatcache(true, $path);
+            $before = lstat($path);
+            $this->assertSame($bytes, \pmssReadRegularFileContents($path));
+            foreach ([1, max(1, strlen($bytes)), max(1, strlen($bytes) + 1)] as $limit) {
+                $metadata = ['stale' => true];
+                $accepted = strlen($bytes) <= $limit;
+                $this->assertSame($accepted ? $bytes : null,
+                    \pmssReadRegularFileContentsVerified($path, $before['uid'], $limit, $metadata));
+                $this->assertSame($accepted ? $before : null, $metadata);
+            }
+            $metadata = ['stale' => true];
+            $this->assertSame(null, \pmssReadRegularFileContentsVerified($path, $before['uid'] + 1, 8192, $metadata));
+            $this->assertSame(null, $metadata);
+        }
+    }
+
+    public function testRegularReadPathAndLimitCharacterization(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-read-path-contract-');
+        $path = $root.'/record';
+        file_put_contents($path, 'kept');
+        symlink($path, $root.'/symlink');
+        link($path, $root.'/hardlink');
+        foreach (['', "bad\0path", $root, $root.'/missing', $root.'/symlink', $root.'/hardlink', $path] as $invalid) {
+            $metadata = ['stale' => true];
+            $this->assertSame(null, \pmssReadRegularFileContents($invalid));
+            $this->assertSame(null, \pmssReadRegularFileContentsVerified($invalid, null, 4096, $metadata));
+            $this->assertSame(null, $metadata);
+        }
+        // Removing the extra link restores the valid single-link file contract.
+        unlink($root.'/hardlink');
+        foreach ([PHP_INT_MIN, -1, 0, PHP_INT_MAX] as $invalidLimit) {
+            $metadata = ['stale' => true];
+            $this->assertSame(null, \pmssReadRegularFileContentsVerified($path, null, $invalidLimit, $metadata));
+            $this->assertSame(null, $metadata);
+        }
+        $previous = getcwd();
+        try {
+            chdir($root);
+            $this->assertSame('kept', \pmssReadRegularFileContents('record'));
+            $this->assertSame(null, \pmssReadRegularFileContentsVerified('record'));
+        } finally {
+            chdir($previous);
+        }
+    }
+
+    public function testFilesystemFacadeAloneExportsAllResponsibilityGroups(): void
+    {
+        $script = 'require_once '.var_export(dirname(__DIR__, 2).'/runtime/filesystem.php', true).';';
+        $symbols = ['pmssDirectoryEntriesRead', 'pmssCreatePrivateTempFile', 'pmssStreamWriteAll',
+            'pmssReadRegularFileContentsVerified', 'pmssReadSerializedArrayFile', 'pmssColonRecordFieldsLookup',
+            'pmssProcMeminfoFieldsRead', 'pmssHostnameIsValid', 'pmssNetworkPortParseDigits'];
+        $script .= 'echo json_encode(array_map("function_exists", '.var_export($symbols, true).'));';
+        $this->assertSame(array_fill(0, count($symbols), true), $this->pmssRunInlinePhpJson($script));
+    }
+
+    public function testRegularReadOpenedInodeAndCleanupCharacterization(): void
+    {
+        // Only the child's filesystem calls are injected; the fixture stream is real.
+        $script = <<<'PHP'
+namespace RegularReadFixture;
+function fopen($path, $mode) { return $GLOBALS['mode'] === 'open' ? false : \fopen($path, $mode); }
+function fstat($handle) {
+    if ($GLOBALS['mode'] === 'stat') return false;
+    $stat = \fstat($handle);
+    foreach (['dev', 'ino', 'uid', 'size'] as $field) {
+        if ($GLOBALS['mode'] === $field) ++$stat[$field];
+    }
+    if ($GLOBALS['mode'] === 'type') $stat['mode'] = 0010600;
+    if ($GLOBALS['mode'] === 'links') $stat['nlink'] = 2;
+    return $stat;
+}
+function stream_get_contents($handle, $length = -1) {
+    ++$GLOBALS['reads'];
+    if ($GLOBALS['mode'] === 'throw') throw $GLOBALS['failure'];
+    return ['read' => false, 'short' => 'ke', 'long' => 'keptmore'][$GLOBALS['mode']]
+        ?? \stream_get_contents($handle, $length);
+}
+function fclose($handle) { ++$GLOBALS['closes']; return \fclose($handle); }
+PHP;
+        // The same behavior matrix runs before and after module decomposition.
+        $modules = [];
+        foreach (['filesystemStream.php', 'filesystemRead.php'] as $module) {
+            if (is_file(dirname(__DIR__, 2).'/runtime/'.$module)) $modules[] = $module;
+        }
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'RegularReadFixture', $modules);
+        $script .= <<<'PHP'
+[$GLOBALS['mode'], $bounded] = json_decode(getenv('PMSS_TEST_REGULAR_READ'), true);
+$GLOBALS['reads'] = $GLOBALS['closes'] = 0;
+$GLOBALS['failure'] = new \RuntimeException('read failure');
+$path = getenv('PMSS_TEST_REGULAR_PATH');
+$metadata = ['stale' => true];
+$caught = false;
+$value = null;
+try {
+    $value = $bounded ? pmssReadRegularFileContentsVerified($path, \fileowner($path), 4, $metadata)
+        : pmssReadRegularFileContents($path);
+} catch (\Throwable $error) { $caught = $error === $GLOBALS['failure']; }
+echo json_encode([$value, $GLOBALS['reads'], $GLOBALS['closes'], $caught,
+    $bounded ? ($metadata === null ? null : $metadata === \stat($path)) : 'unused']);
+PHP;
+        $path = $this->pmssMakeTempFile('pmss-opened-read-contract-');
+        file_put_contents($path, 'kept');
+        foreach (['normal', 'open', 'stat', 'dev', 'ino', 'type', 'links', 'uid', 'size', 'read', 'short', 'long', 'throw'] as $mode) {
+            foreach ([false, true] as $bounded) {
+                $blocked = in_array($mode, ['open', 'stat', 'dev', 'ino', 'type', 'links'], true)
+                    || ($bounded && in_array($mode, ['uid', 'size'], true));
+                $value = $blocked || in_array($mode, ['read', 'throw'], true) ? null
+                    : (['short' => 'ke', 'long' => 'keptmore'][$mode] ?? 'kept');
+                if ($bounded && $mode !== 'normal') $value = null;
+                $this->assertSame([$value, $blocked ? 0 : 1, $mode === 'open' ? 0 : 1, $mode === 'throw',
+                    $bounded ? ($value === null ? null : true) : 'unused'], $this->pmssRunInlinePhpJson($script, [
+                        'PMSS_TEST_REGULAR_READ' => json_encode([$mode, $bounded]), 'PMSS_TEST_REGULAR_PATH' => $path,
+                    ]), $mode.($bounded ? ' bounded' : ' unbounded'));
+            }
+        }
+    }
+
+    public function testRegularReadDerivedFormatsCharacterization(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-read-format-contract-');
+        foreach ([['', '', [], null, 99], [" 0012\r\n", '0012', [' 0012'], '0012', 12],
+            ["one\n\n  two \r\n", "one\n\n  two", ['one', '  two '], null, 99],
+            ['-1', '-1', ['-1'], null, 99], ['0', '0', ['0'], '0', 0]] as $case) {
+            file_put_contents($path, $case[0]);
+            $this->assertSame($case[1], \pmssReadRegularFileTrimmed($path));
+            $this->assertSame($case[2], \pmssReadRegularFileNonEmptyLines($path));
+            $this->assertSame($case[3], \pmssReadRegularFileDigits($path));
+            $this->assertSame($case[4], \pmssReadRegularFileInt($path, 99));
+        }
+        foreach ([[], ['zero' => 0, 'false' => false], 'text', 0, null] as $value) {
+            file_put_contents($path, serialize($value));
+            $this->assertSame(is_array($value) ? $value : null, \pmssReadSerializedArrayFile($path));
+        }
+    }
+
     public function testCompleteWriteRejectsNulPathBeforeWriter(): void
     {
         $calls = 0;

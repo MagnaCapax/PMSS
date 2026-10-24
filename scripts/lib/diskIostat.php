@@ -124,6 +124,11 @@ function pmssDiskIostatMain(?callable $runner = null): int
         $command = pmssDiskIostatBuildCommand($devices);
         if ($runner === null) {
             $result = pmssCommandCapture($command, PMSS_DISK_IOSTAT_TIMEOUT_SECONDS);
+            // Failed probes can leave a parseable first sample; never publish it as fresh.
+            $rc = (int) ($result['rc'] ?? 1);
+            if ($rc !== 0) {
+                throw new RuntimeException('Unable to collect iostat sample (rc='.$rc.')');
+            }
             $iostatRaw = (string) ($result['stdout'] ?? '');
         } else {
             $iostatRaw = (string) $runner($command);
