@@ -15,20 +15,23 @@ class RootlessDockerBridgeMtuTest extends TestCase
                 "if (\$result['configured_bridge_mtu'])",
                 "'lossy_json' => '[WARN] daemon.json has an empty or numeric-key object",
             ]],
+            'scripts/lib/user/docker/start.php' => ['required' => [
+                "'lossy_json' => '[WARN] userDocker: daemon.json has an empty or numeric-key object",
+            ]],
             'etc/skel/bin/docker-install-wireguard.sh' => ['required' => [
                 'docker network create --opt com.docker.network.driver.mtu=1500 "$NETWORK"',
                 '--network "$NETWORK"',
+                'if [ "$NETWORK_MTU" != "1500" ]; then',
             ]],
         ]);
         $this->assertSame(65520, PMSS_ROOTLESS_DOCKER_BRIDGE_MTU);
     }
 
-    public function testApplyFillsBothKeysOnEmptyPayload(): void
+    public function testApplyFillsNetworkOptionButNotDefaultBridge(): void
     {
         $data = [];
         $this->assertTrue(\pmssUserRootlessDockerBridgeMtuApply($data, 65520));
-        $this->assertSame(65520, $data['mtu']);
-        $this->assertSame('65520', $data['default-network-opts']['bridge']['com.docker.network.driver.mtu']);
+        $this->assertSame(['default-network-opts' => ['bridge' => ['com.docker.network.driver.mtu' => '65520']]], $data);
     }
 
     public function testApplyIsIdempotent(): void
@@ -51,7 +54,7 @@ class RootlessDockerBridgeMtuTest extends TestCase
         $this->assertSame($before, $data);
     }
 
-    public function testApplyFillsOnlyTheMissingHalf(): void
+    public function testApplyKeepsSiblingOptions(): void
     {
         $data = ['mtu' => 9000];
         $this->assertTrue(\pmssUserRootlessDockerBridgeMtuApply($data, 65520));
@@ -59,9 +62,8 @@ class RootlessDockerBridgeMtuTest extends TestCase
         $this->assertSame('65520', $data['default-network-opts']['bridge']['com.docker.network.driver.mtu']);
 
         $data = ['default-network-opts' => ['bridge' => ['com.docker.network.driver.mtu' => '1500']]];
-        $this->assertTrue(\pmssUserRootlessDockerBridgeMtuApply($data, 65520));
-        $this->assertSame(65520, $data['mtu']);
-        $this->assertSame('1500', $data['default-network-opts']['bridge']['com.docker.network.driver.mtu']);
+        $this->assertFalse(\pmssUserRootlessDockerBridgeMtuApply($data, 65520));
+        $this->assertTrue(!array_key_exists('mtu', $data));
 
         $data = ['default-network-opts' => ['macvlan' => ['k' => 'v']]];
         $this->assertTrue(\pmssUserRootlessDockerBridgeMtuApply($data, 65520));
@@ -101,7 +103,7 @@ class RootlessDockerBridgeMtuTest extends TestCase
         $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, $policy);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'created' => true, 'configured_bridge_mtu' => true], $result);
         $payload = $this->readDaemonConfig($home);
-        $this->assertSame(65520, $payload['mtu']);
+        $this->assertTrue(!array_key_exists('mtu', $payload), 'The default bridge stays at 1500');
         $this->assertSame('65520', $payload['default-network-opts']['bridge']['com.docker.network.driver.mtu']);
         $this->assertSame(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
 
@@ -125,9 +127,10 @@ class RootlessDockerBridgeMtuTest extends TestCase
         $this->writeDaemonConfig($home, ['exec-opts' => ['native.cgroupdriver=cgroupfs']]);
         $refilled = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'configured_bridge_mtu' => true], $refilled);
-        $this->assertSame(65520, $this->readDaemonConfig($home)['mtu'], 'Deleted keys are filled again');
+        $this->assertSame('65520', $this->readDaemonConfig($home)['default-network-opts']['bridge']['com.docker.network.driver.mtu'],
+            'A deleted key is filled again');
 
-        $optOut = ['exec-opts' => ['native.cgroupdriver=cgroupfs'], 'mtu' => 1500,
+        $optOut = ['exec-opts' => ['native.cgroupdriver=cgroupfs'],
             'default-network-opts' => ['bridge' => ['com.docker.network.driver.mtu' => '1500']]];
         $this->writeDaemonConfig($home, $optOut);
         $kept = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
@@ -149,7 +152,7 @@ class RootlessDockerBridgeMtuTest extends TestCase
             $this->assertSame($raw, file_get_contents($path), $raw);
         }
 
-        $complete = '{"exec-opts": ["native.cgroupdriver=cgroupfs"], "log-opts": {}, "mtu": 65520,'
+        $complete = '{"exec-opts": ["native.cgroupdriver=cgroupfs"], "log-opts": {},'
             .' "default-network-opts": {"bridge": {"com.docker.network.driver.mtu": "65520"}}}';
         file_put_contents($path, $complete);
         $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
@@ -157,6 +160,20 @@ class RootlessDockerBridgeMtuTest extends TestCase
         $this->assertSame($complete, file_get_contents($path), 'Nothing to write, so no warning either');
 
         $this->assertTrue(\pmssUserRootlessDockerConfigRoundTrips('{"a": [], "b": {"c": 1.5}, "d": "\u00e9"}', ['a' => [], 'b' => ['c' => 1.5], 'd' => "\u{e9}"]));
+    }
+
+    public function testConvergeFillsTopLevelEmptyObject(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-mtu-');
+        @mkdir($home.'/.config/docker', 0755, true);
+        foreach ([['create_when_missing' => true], ['bridge_mtu' => 65520]] as $policy) {
+            file_put_contents($home.'/.config/docker/daemon.json', "{}\n");
+            $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, $policy);
+            $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true], $result);
+            $payload = $this->readDaemonConfig($home);
+            $this->assertSame(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
+            $this->assertSame(isset($policy['bridge_mtu']), isset($payload['default-network-opts']));
+        }
     }
 
     public function testConvergeKeepsTenantSettingsAndStorageDriver(): void

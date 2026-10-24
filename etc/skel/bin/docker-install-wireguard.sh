@@ -12,8 +12,16 @@ mkdir -p "$CONFIG_DIR"
 # (ADR 0169), which would let tunnel packets leave the host as IP fragments, so the
 # server gets its own network at the usual 1500.
 NETWORK=wireguard
-docker network inspect "$NETWORK" >/dev/null 2>&1 \
-	|| docker network create --opt com.docker.network.driver.mtu=1500 "$NETWORK" >/dev/null
+if docker network inspect "$NETWORK" >/dev/null 2>&1; then
+	NETWORK_MTU=$(docker network inspect -f '{{index .Options "com.docker.network.driver.mtu"}}' "$NETWORK")
+	if [ "$NETWORK_MTU" != "1500" ]; then
+		echo "Network $NETWORK exists with MTU ${NETWORK_MTU:-default}, not 1500." >&2
+		echo "Remove it (docker network rm $NETWORK) or pick another name, then run this again." >&2
+		exit 1
+	fi
+else
+	docker network create --opt com.docker.network.driver.mtu=1500 "$NETWORK" >/dev/null
+fi
 
 docker run -d \
 	--name wireguard \

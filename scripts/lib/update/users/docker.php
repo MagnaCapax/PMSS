@@ -330,6 +330,6 @@ function pmssEnsureDockerDependencies(string $user): void
     }
     if ($result['configured_bridge_mtu']) {
         // Applies at the next daemon start; a running daemon is not restarted for it.
-        pmssUserLog($user, '[INFO] Configured Docker bridge MTU '.PMSS_ROOTLESS_DOCKER_BRIDGE_MTU.' (next daemon start; existing networks keep theirs until recreated)');
+        pmssUserLog($user, '[INFO] Configured Docker MTU '.PMSS_ROOTLESS_DOCKER_BRIDGE_MTU.' for new networks (next daemon start; existing networks and the default bridge keep theirs)');
     }
 }
