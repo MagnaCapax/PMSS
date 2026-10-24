@@ -118,6 +118,13 @@ class NetworkHelpersTest extends TestCase
         $this->assertFalse(\networkApplyIptablesAtomically(['-A OUTPUT -j ACCEPT'], [['not' => 'a rule']]));
     }
 
+    public function testOutputReplacementRejectsUnsafeRulesBeforeRestore(): void
+    {
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(["-A OUTPUT\0 -j ACCEPT"]));
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(['-A OUTPUT -j ACCEPT', ['not' => 'a rule']]));
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(['-A OUTPUT -j ACCEPT; iptables -F INPUT']));
+    }
+
     public function testFallbackRenderValidatesRulesBeforeFlush(): void
     {
         $rendered = \networkIptablesRenderCommandSets(
@@ -157,6 +164,12 @@ class NetworkHelpersTest extends TestCase
     public function testTrafficLogParsesMonitoringRulesBeforeApplying(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLog.php', ['networkParseMonitoringCommands(', "networkRunIptables('-F OUTPUT');"]);
+        // The sequential flush is only the fallback when the single restore commit fails.
+        $source = $this->pmssReadRepoFile('scripts/cron/trafficLog.php');
+        $atomic = strpos($source, '!networkReplaceOutputRulesAtomically($monitoringCommands)');
+        $this->assertTrue($atomic !== false);
+        $this->assertTrue($atomic < strpos($source, "networkRunIptables('-F OUTPUT');"));
+        $this->assertSame(1, substr_count($source, "networkRunIptables('-F OUTPUT');"));
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', 'passthru($'.'monitoringRules)');
     }
 }

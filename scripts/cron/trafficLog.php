@@ -36,7 +36,8 @@ $localnets = networkLoadLocalnets();
 	$usage = pmssTrafficCollectOutputUsage(null, [$logger, 'msg']);
 	if ($usage === null || trim($usage) === '') die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
 
-// Debian 11 iptables -Z output doesn't work anymore .... we might miss a tiny fraction this way, but atleast not exponential growth
+// Rebuilding OUTPUT every run is also the counter reset: iptables-nft 1.8.7
+// (Debian 11) returns 0 from -Z but leaves rule counters as they were.
 $monitoringCommands = networkLoadMonitoringCommands(
     null,
     static function (string $message) use ($logger): void {
@@ -44,8 +45,11 @@ $monitoringCommands = networkLoadMonitoringCommands(
     }
 );
 // networkLoadMonitoringCommands() checks helper status before networkParseMonitoringCommands().
-if ($monitoringCommands !== []) {
-    networkRunIptables('-F OUTPUT'); // let's first clear old rules
+// One restore commit leaves no window in which OUTPUT is empty or half built,
+// so no egress goes uncounted or unmarked for FireQOS during the rebuild.
+if ($monitoringCommands !== [] && !networkReplaceOutputRulesAtomically($monitoringCommands)) {
+    $logger->msg('trafficLog: iptables-restore failed, rebuilding OUTPUT one rule at a time');
+    networkRunIptables('-F OUTPUT');
     foreach ($monitoringCommands as $monitoringCommand) {
         networkRunIptables($monitoringCommand);
     }

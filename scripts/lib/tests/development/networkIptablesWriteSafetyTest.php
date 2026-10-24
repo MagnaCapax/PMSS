@@ -47,7 +47,26 @@ class NetworkIptablesWriteSafetyTest extends TestCase
         }
     }
 
-    private function applyFixture(string $mode): array
+    public function testOutputReplacementFlushesAndRebuildsInOneNoflushCommit(): void
+    {
+        foreach (['success', 'commandFail'] as $mode) {
+            $result = $this->applyFixture($mode, 'output');
+            $this->assertSame($mode === 'success', $result['result']);
+            $this->assertSame(false, $result['exists']);
+            $this->assertSame([], $result['logs']);
+            // No chain declarations: they would reset other chains' policies and counters.
+            $this->assertSame("*filter\n-F OUTPUT\n-A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n".
+                "-A OUTPUT ! -d 10.0.0.0/8 -m owner --uid-owner 1001 -j MARK --set-mark 1001\nCOMMIT\n", $result['bytes']);
+            $this->assertSame([[sprintf('sh -c %s', escapeshellarg('iptables-restore --noflush < '.escapeshellarg($result['path']))),
+                false, 'logMessage']], $result['commands']);
+        }
+        $result = $this->applyFixture('false', 'output');
+        $this->assertSame(false, $result['result']);
+        $this->assertSame([], $result['commands']);
+        $this->assertSame(false, $result['exists']);
+    }
+
+    private function applyFixture(string $mode, string $target = 'all'): array
     {
         // Namespace stubs isolate the system boundary; temporary files and cleanup are real.
         $script = <<<'PHP'
@@ -89,7 +108,10 @@ $GLOBALS['bytes'] = $GLOBALS['permissions'] = null;
 $result = $exception = null;
 $sameThrowable = false;
 try {
-    $result = networkApplyIptablesAtomically(['-A OUTPUT -j ACCEPT'], ['-A POSTROUTING -j MASQUERADE']);
+    $result = getenv('PMSS_TEST_IPTABLES_TARGET') === 'output'
+        ? networkReplaceOutputRulesAtomically(['-A OUTPUT -d 127.0.0.0/8 -j ACCEPT',
+            '-A OUTPUT ! -d 10.0.0.0/8 -m owner --uid-owner 1001 -j MARK --set-mark 1001'])
+        : networkApplyIptablesAtomically(['-A OUTPUT -j ACCEPT'], ['-A POSTROUTING -j MASQUERADE']);
 } catch (\Throwable $caught) {
     $exception = $caught->getMessage();
     $sameThrowable = $caught === $GLOBALS['throwable'];
@@ -101,6 +123,6 @@ echo json_encode(['result' => $result, 'exception' => $exception, 'sameThrowable
 // Keep the fixture hermetic even if a regression leaks its temporary file.
 @unlink($GLOBALS['path']);
 PHP;
-        return $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IPTABLES_WRITE' => $mode]);
+        return $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IPTABLES_WRITE' => $mode, 'PMSS_TEST_IPTABLES_TARGET' => $target]);
     }
 }
