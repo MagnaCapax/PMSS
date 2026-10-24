@@ -6,8 +6,8 @@ require_once __DIR__.'/storePaths.php';
 
 /** Read the published versions through one bounded regular-file check. */
 function pmssTorrentClientsProjectionVersionsRead(string $path): array {
-    $raw = pmssReadRegularFileContentsVerified($path, null, 65536); $data = is_string($raw) ? json_decode($raw, true) : null;
-    return is_array($data) && is_array($data['versions'] ?? null) ? $data['versions'] : [];
+    $raw = pmssReadRegularFileContentsVerified($path, null, 65536); $data = is_string($raw) ? pmssJsonDecodeAssoc($raw) : null;
+    return is_array($data['versions'] ?? null) ? $data['versions'] : [];
 }
 
 /** Atomically write root-owned 0644 JSON without tenant names or paths. */

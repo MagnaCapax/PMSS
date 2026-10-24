@@ -252,6 +252,9 @@ empty files and a final line without a newline. Already delivered entries remain
 available to handlers and the read/last convenience helpers. `LogWriteSafetyTest`
 verifies these results and cleanup on read failures and handler exceptions.
 
+Operator-side JSON readers share `pmssJsonDecodeAssoc()` for array-only decoding;
+callers retain file guards, schema checks, and missing/malformed-data fallbacks.
+
 ## Helper Extraction Rules
 
 Pikkumies preinstall markers and detached-job cleanup validate the entire state

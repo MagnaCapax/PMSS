@@ -3,6 +3,7 @@
 namespace UserDockerLifecycleFixture;
 
 require_once dirname(__DIR__, 2).'/runtime/environment.php';
+require_once dirname(__DIR__, 2).'/log.php';
 
 $GLOBALS['case'] = json_decode($argv[1], true);
 $GLOBALS['events'] = $GLOBALS['errors'] = [];

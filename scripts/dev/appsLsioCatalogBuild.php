@@ -1,5 +1,6 @@
 <?php
 /** Build the delivered, documentation-only LinuxServer.io app catalog. */
+require_once dirname(__DIR__).'/lib/log.php';
 const PMSS_LSIO_SOURCE = 'https://api.linuxserver.io/api/v1/images?include_config=false';
 const PMSS_LSIO_EXCLUDED = array(
     // PMSS already provides these applications: media stack (jellyfin, sonarr, radarr, prowlarr, sabnzbd),
@@ -66,8 +67,8 @@ function pmssLsioCatalogWrite(string $target, string $output): bool
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     $source = $argv[1] ?? PMSS_LSIO_SOURCE;
     $json = @file_get_contents($source);
-    $data = is_string($json) ? json_decode($json, true) : null;
-    if (!is_array($data) || !isset($data['data']['repositories']['linuxserver'])
+    $data = is_string($json) ? pmssJsonDecodeAssoc($json) : null;
+    if ($data === null || !isset($data['data']['repositories']['linuxserver'])
         || !is_array($data['data']['repositories']['linuxserver'])) {
         fwrite(STDERR, "Could not read LinuxServer.io image catalog: {$source}\n");
         exit(1);

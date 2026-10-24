@@ -20,8 +20,8 @@ function pmssTransmissionSocketPathIsSymlink(string $socketPath): bool
 /** Preserve unrelated keys while keeping one spelling for each managed setting. */
 function pmssTransmissionSettingsContent(string $raw, string $socketPath, string $rpcPath, ?bool $snakeCase = null): ?string
 {
-    $settings = json_decode($raw, true);
-    if (!is_array($settings) || ($settings !== [] && array_values($settings) === $settings)) return null;
+    if (($settings = pmssJsonDecodeAssoc($raw)) === null
+        || ($settings !== [] && array_values($settings) === $settings)) return null;
     if ($snakeCase === null) {
         $snakeCase = array_key_exists('rpc_bind_address', $settings);
     }
@@ -43,8 +43,7 @@ function pmssTransmissionSettingsContent(string $raw, string $socketPath, string
     foreach (['rpc-username', 'rpc-password'] as $unused) {
         unset($settings[$unused], $settings[str_replace('-', '_', $unused)]);
     }
-    $encoded = json_encode((object) $settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    return is_string($encoded) ? $encoded."\n" : null;
+    return pmssJsonEncodePrettyLine((object) $settings);
 }
 
 /** Apply only when no same-account Transmission process is present. */

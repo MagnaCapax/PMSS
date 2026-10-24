@@ -29,11 +29,10 @@ function pmssUserBillingIdentityRead(
     if (!pmssValidateUsername($user) || !in_array($key, ['billingServiceId', 'billingClientId'], true)
         || is_link($configDir) || is_link($configDir.'/users')) return null;
     $raw = pmssReadRegularFileContentsVerified($configDir.'/users/'.$user.'.json', $requiredUid, 65536);
-    $payload = is_string($raw) ? json_decode($raw, true) : null;
-    if (!is_array($payload)) {
+    if (($payload = is_string($raw) ? pmssJsonDecodeAssoc($raw) : null) === null) {
         $legacy = pmssReadRegularFileContentsVerified(dirname($configDir).'/runtime/users.json', $requiredUid, 1048576);
-        $users = is_string($legacy) ? json_decode($legacy, true) : null;
-        $records = is_array($users) && is_array($users['users'] ?? null) ? $users['users'] : $users;
+        $users = is_string($legacy) ? pmssJsonDecodeAssoc($legacy) : null;
+        $records = is_array($users['users'] ?? null) ? $users['users'] : $users;
         $payload = is_array($records) ? ($records[$user] ?? null) : null;
     }
     if (!is_array($payload)) return null;

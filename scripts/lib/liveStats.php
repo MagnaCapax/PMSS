@@ -90,8 +90,8 @@ function pmssLiveStatsUserSample(string $user, int $now, string $logRoot = '/var
 /** Samples of a ring file; unreadable or malformed input yields []. */
 function pmssLiveStatsRingRead(string $path): array
 {
-    $d = is_link($path) || !is_file($path) ? null : json_decode((string) @file_get_contents($path), true);
-    return is_array($d) && is_array($d['samples'] ?? null) ? $d['samples'] : [];
+    $d = is_link($path) || !is_file($path) ? null : pmssJsonDecodeAssoc((string) @file_get_contents($path));
+    return is_array($d['samples'] ?? null) ? $d['samples'] : [];
 }
 
 /** Append a sample, drop equal/future slots (clock stepped back), keep the newest slots; returns the JSON document. */

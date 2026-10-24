@@ -2,7 +2,7 @@
 /** Resolve an account's running, labelled rootless Docker WebUI port. */
 
 require_once __DIR__.'/../runtime/environment.php';
-require_once __DIR__.'/../runtime/filesystem.php';
+require_once __DIR__.'/../log.php';
 require_once __DIR__.'/../user/identity.php';
 
 /**
@@ -54,6 +54,6 @@ function pmssLighttpdDockerClientPort(string $user, string $app, ?callable $insp
         };
     }
     $raw = $inspect();
-    $container = is_string($raw) ? json_decode($raw, true) : null;
-    return is_array($container) ? pmssLighttpdDockerClientPortFromInspect($container, $app) : null;
+    $container = is_string($raw) ? pmssJsonDecodeAssoc($raw) : null;
+    return $container !== null ? pmssLighttpdDockerClientPortFromInspect($container, $app) : null;
 }

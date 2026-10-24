@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__.'/../../runtime/environment.php';
+require_once __DIR__.'/../../log.php';
 
 /** Wait for the daemon, then start only the already-validated transferred set. */
 function userDockerStartContainers(string $user, string $runtimeDir, string $dockerSock, array $containerIds): int
@@ -43,8 +44,7 @@ function userDockerStartContainers(string $user, string $runtimeDir, string $doc
         $foreign = 0;
         // Inspect can return useful rows even when another requested container is missing.
         foreach (array_slice(explode("\n", $mountOutput), 0, count($containerIds)) as $line) {
-            $mounts = json_decode($line, true);
-            if (!is_array($mounts)) continue;
+            if (($mounts = pmssJsonDecodeAssoc($line)) === null) continue;
             foreach ($mounts as $mount) {
                 if (!is_array($mount) || ($mount['Type'] ?? '') !== 'bind'
                     || !is_string($mount['Source'] ?? null)) continue;

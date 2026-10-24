@@ -1,7 +1,7 @@
 <?php
 /** Pure validation of the operator-owned torrent client catalog. */
 
-require_once dirname(__DIR__).'/runtime/filesystem.php';
+require_once dirname(__DIR__).'/log.php';
 require_once __DIR__.'/storePaths.php';
 
 /** Apply the same HTTPS list contract to daemon and optional web artifacts. */
@@ -29,8 +29,7 @@ function pmssTorrentClientsCatalogLoad(string $path): array
 {
     $raw = pmssReadRegularFileContents($path);
     if (!is_string($raw)) return [];
-    $entries = json_decode($raw, true);
-    if (!is_array($entries) || $entries === []) return [];
+    if (($entries = pmssJsonDecodeAssoc($raw)) === null || $entries === []) return [];
     $seen = [];
     $defaults = [];
     $binaryNames = pmssTorrentClientsBinaryNames();

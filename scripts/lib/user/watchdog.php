@@ -159,8 +159,7 @@ function pmssUserWatchdogCrashState(string $username, string $app, ?array $next 
     }
     $old = is_file($path) ? @file_get_contents($path) : null;
     if ($old === false) return ['storageError' => true];
-    $value = is_string($old) ? json_decode($old, true) : null;
-    if (!is_array($value)) return $empty;
+    if (($value = is_string($old) ? pmssJsonDecodeAssoc($old) : null) === null) return $empty;
     return ['failures' => is_int($value['failures'] ?? null) ? max(0, min(5, $value['failures'])) : 0,
         'pending' => ($value['pending'] ?? false) === true,
         'restart' => is_string($value['restart'] ?? null) ? $value['restart'] : ''];
