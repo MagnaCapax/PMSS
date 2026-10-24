@@ -863,7 +863,7 @@ These scripts are primarily imperative; treat them as idempotent installers guar
   - Client profiles and artifact names use the hostname as given when it contains a dot; bare hostnames gain `.pulsedmedia.com`. The system status artifact probe uses the same rule.
 
 - rclone.php
-  - Logic: Picks the pinned version by default, optionally fetches the latest release when requested, replaces `/usr/bin/rclone` when version mismatch, installs from the official zip.
+  - Logic: Picks the pinned version and SHA-256 by default, optionally fetches the latest release when requested (its checksum comes from that release's `SHA256SUMS` over HTTPS; without one it stays on the pin), replaces `/usr/bin/rclone` when version mismatch, installs from the official amd64 zip only after the checksum matches. Skips on other architectures.
   - Env: `PMSS_RCLONE_FETCH_LATEST=1` to request latest.
 
 - wireguard.php
