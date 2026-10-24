@@ -38,6 +38,11 @@ while (true) {
     writeLog('executor stale; exiting for watchdog restart');
     break;
   }
+  // Stop in Apps leaves .rtorrentDisable: stay stopped instead of relaunching until the watchdog's cleanup pass.
+  if (file_exists('.rtorrentDisable')) {
+    writeLog('rtorrent stopped in Apps (.rtorrentDisable); executor exiting');
+    break;
+  }
 
   file_put_contents('.rtorrentExecuteRun', (string) time());
 

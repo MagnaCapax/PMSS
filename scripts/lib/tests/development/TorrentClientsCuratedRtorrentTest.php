@@ -126,6 +126,10 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         // A stale executor exits with a fresh run stamp; the consumer must look at the executor lock as well.
         $this->assertStringContainsString("flock(\$executorLock, LOCK_EX | LOCK_NB)", $restart);
         $this->assertStringContainsString('$lastRun == 0 or $executorIdle or', $restart);
+        // Stop in Apps must hold: the executor leaves instead of relaunching while the stop marker exists.
+        $executor = file_get_contents($root.'/etc/skel/.rtorrentExecute.php');
+        $stopCheck = strpos($executor, "if (file_exists('.rtorrentDisable'))");
+        $this->assertTrue($stopCheck !== false && $stopCheck < strpos($executor, 'passthru($rtorrentCommand'));
     }
     public function testRtorrent016EntryIsPinnedDefaultAndLaunchesWithDeprecatedRedirects(): void
     {
