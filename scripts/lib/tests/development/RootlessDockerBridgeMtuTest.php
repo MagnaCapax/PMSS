@@ -13,15 +13,14 @@ class RootlessDockerBridgeMtuTest extends TestCase
             'scripts/lib/update/users/docker.php' => ['required' => [
                 "'bridge_mtu' => PMSS_ROOTLESS_DOCKER_BRIDGE_MTU,",
                 "if (\$result['configured_bridge_mtu'])",
+                "'lossy_json' => '[WARN] daemon.json has an empty or numeric-key object",
             ]],
-            'etc/skel/.config/docker/daemon.json' => ['required' => [
-                '"mtu": 65520',
-                '"com.docker.network.driver.mtu": "65520"',
+            'etc/skel/bin/docker-install-wireguard.sh' => ['required' => [
+                'docker network create --opt com.docker.network.driver.mtu=1500 "$NETWORK"',
+                '--network "$NETWORK"',
             ]],
         ]);
         $this->assertSame(65520, PMSS_ROOTLESS_DOCKER_BRIDGE_MTU);
-        $skel = json_decode((string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.config/docker/daemon.json'), true);
-        $this->assertSame(['native.cgroupdriver=cgroupfs'], $skel['exec-opts']);
     }
 
     public function testApplyFillsBothKeysOnEmptyPayload(): void
@@ -98,15 +97,66 @@ class RootlessDockerBridgeMtuTest extends TestCase
     public function testConvergeWritesMtuWithCgroupfsAndReportsIt(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-mtu-');
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
+        $policy = ['bridge_mtu' => 65520, 'create_when_missing' => true];
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, $policy);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'created' => true, 'configured_bridge_mtu' => true], $result);
         $payload = $this->readDaemonConfig($home);
         $this->assertSame(65520, $payload['mtu']);
         $this->assertSame('65520', $payload['default-network-opts']['bridge']['com.docker.network.driver.mtu']);
         $this->assertSame(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
 
-        $again = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
+        $again = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, $policy);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => false, 'configured_bridge_mtu' => false], $again);
+    }
+
+    public function testConvergeDoesNotCreateFileForMtuAlone(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-mtu-');
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520, 'create_when_missing' => false]);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => false, 'created' => false, 'configured_bridge_mtu' => false], $result);
+        $this->assertFalse(file_exists($home.'/.config/docker/daemon.json'));
+    }
+
+    public function testConvergeRefillsDeletedKeysButKeepsExplicitOptOut(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-mtu-');
+        $this->writeDaemonConfig($home, ['exec-opts' => ['native.cgroupdriver=cgroupfs']]);
+        \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
+        $this->writeDaemonConfig($home, ['exec-opts' => ['native.cgroupdriver=cgroupfs']]);
+        $refilled = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'configured_bridge_mtu' => true], $refilled);
+        $this->assertSame(65520, $this->readDaemonConfig($home)['mtu'], 'Deleted keys are filled again');
+
+        $optOut = ['exec-opts' => ['native.cgroupdriver=cgroupfs'], 'mtu' => 1500,
+            'default-network-opts' => ['bridge' => ['com.docker.network.driver.mtu' => '1500']]];
+        $this->writeDaemonConfig($home, $optOut);
+        $kept = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => false, 'configured_bridge_mtu' => false], $kept);
+        $this->assertSame($optOut, $this->readDaemonConfig($home));
+    }
+
+    public function testConvergeLeavesFileWithEmptyObjectUntouched(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-mtu-');
+        @mkdir($home.'/.config/docker', 0755, true);
+        $path = $home.'/.config/docker/daemon.json';
+        foreach (['{"exec-opts": ["native.cgroupdriver=cgroupfs"], "log-opts": {}}',
+            '{"exec-opts": ["native.cgroupdriver=cgroupfs"], "default-network-opts": {"overlay": {}}}',
+            '{"exec-opts": ["native.cgroupdriver=cgroupfs"], "default-ulimits": {"0": {"Name": "x"}}}'] as $raw) {
+            file_put_contents($path, $raw);
+            $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
+            $this->pmssAssertArraySubsetSame(['ok' => false, 'changed' => false, 'reason' => 'lossy_json', 'configured_bridge_mtu' => false], $result);
+            $this->assertSame($raw, file_get_contents($path), $raw);
+        }
+
+        $complete = '{"exec-opts": ["native.cgroupdriver=cgroupfs"], "log-opts": {}, "mtu": 65520,'
+            .' "default-network-opts": {"bridge": {"com.docker.network.driver.mtu": "65520"}}}';
+        file_put_contents($path, $complete);
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, ['bridge_mtu' => 65520]);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => false], $result);
+        $this->assertSame($complete, file_get_contents($path), 'Nothing to write, so no warning either');
+
+        $this->assertTrue(\pmssUserRootlessDockerConfigRoundTrips('{"a": [], "b": {"c": 1.5}, "d": "\u00e9"}', ['a' => [], 'b' => ['c' => 1.5], 'd' => "\u{e9}"]));
     }
 
     public function testConvergeKeepsTenantSettingsAndStorageDriver(): void
