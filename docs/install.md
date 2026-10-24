@@ -10,6 +10,7 @@ Responsibilities are intentionally limited to:
    - `/proc` mounted with `hidepid=2`.
    - `systemd.unified_cgroup_hierarchy=0` present in `/etc/default/grub` (reboot required) so rootless Docker remains compatible with `hidepid=2`.
 5. Pull the repository into `/scripts`, `/etc`, and `/var`, then hand off to `/scripts/update.php`.
+6. On Debian 11 only, point `bullseye-security` lines in `/etc/apt/sources.list` and `sources.list.d/*.list` at `http://archive.debian.org/debian-security` before the first `apt update`, so the core tooling can install before `update.php` applies the bullseye template. Each changed file is backed up once as `<file>.pmss-bootstrap.save`; symlinked lists are skipped with a warning. Other sources and releases stay untouched. Remove this step when Debian 11 support ends.
 
 Interactivity contract:
 - The documented pipe installer (`wget -qO- .../install.sh | bash -s -- ...`) must still be able to prompt in SSH/console sessions by using the controlling TTY (`/dev/tty`) when present.

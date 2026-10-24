@@ -132,7 +132,7 @@ class installBootstrapSafetyTest extends TestCase
         file_put_contents($root.'/target.list', "deb http://security.debian.org/debian-security bullseye-security main\n");
         symlink($root.'/target.list', $root.'/apt/sources.list.d/link.list');
         file_put_contents($root.'/bookworm', "VERSION_CODENAME=bookworm\n");
-        file_put_contents($root.'/bullseye', "VERSION_CODENAME=bullseye\n");
+        file_put_contents($root.'/bullseye', "PRETTY_NAME=\"Debian GNU/Linux 11 (bullseye)\"\nVERSION_CODENAME=\"bullseye\"\n");
 
         $script = $root.'/run.sh';
         file_put_contents($script, "log_info() { echo \"INFO \$*\"; }\nlog_warn() { echo \"WARN \$*\"; }\n"
@@ -160,10 +160,11 @@ class installBootstrapSafetyTest extends TestCase
         $this->assertSame($original, file_get_contents($root.'/apt/sources.list.pmss-bootstrap.save'), 'Backup keeps the original');
         $this->assertSame("deb http://archive.debian.org/debian-security bullseye-security main\n", file_get_contents($root.'/apt/sources.list.d/extra.list'));
         $this->assertStringContainsString('security.debian.org', (string) file_get_contents($root.'/target.list'), 'Symlinked lists are not followed');
+        $this->assertStringContainsString('WARN Debian 11: '.$root.'/apt/sources.list.d/link.list is a symlink', $result['output']);
 
         $second = $run('bullseye');
         $this->assertSame(0, $second['rc']);
-        $this->assertSame('', $second['output'], 'A second run changes nothing');
+        $this->assertStringNotContainsString('INFO', $second['output'], 'A second run changes nothing');
         $this->assertSame($original, file_get_contents($root.'/apt/sources.list.pmss-bootstrap.save'), 'Backup is not overwritten');
     }
 
