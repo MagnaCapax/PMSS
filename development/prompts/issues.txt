@@ -61,7 +61,8 @@ Absolutes:
   flow below and skip the implementation. Do not implement the removal.
 - Keep diffs small, idempotent, backward-compatible; reuse existing helpers.
 
-Autocommit: When Autocommit Mode is appended below, "do not commit or push" is VOID.
+Autocommit: When Autocommit Mode is appended below, "do not commit" is VOID. Publishing (push, GitHub
+comments and labels) stays with the lane: see Autocommit Mode.
 
 Workflow (Do This Now):
 - Fix direction: when an issue contains a ## Suggested Fix section, that section is the
@@ -94,27 +95,22 @@ Workflow (Do This Now):
   cycle already posted a blocking explanation and nothing has changed (no new
   comments, no new information since the last skip comment), do NOT post again.
   Instead investigate whether the situation has changed that might unblock it.
-  If it IS the first skip, or you have NEW information about what's blocking:
-    gh issue comment $ISSUE_NUMBER --body "BLOCKED: <one-sentence reason>.
+  If it IS the first skip, or you have NEW information about what's blocking, write the note to the
+  file .git/lane-notes/issue-<N>.txt (create the directory; <N> is the issue number), in this shape:
+    BLOCKED: <one-sentence reason>.
     Missing: <what specific info/access/change is needed to unblock>.
-    Attempted: <what you tried before skipping>."
+    Attempted: <what you tried before skipping>.
+  Do not post it yourself: the lane posts the note on the issue, once.
   Keep it factual and short. Do not repeat yourself across cycles.
   Then move to the next issue.
 - For tractable issues: implement the smallest coherent fix/feature.
-- Verify locally:
-  * php -l <each changed PHP file>
-  * php scripts/lib/tests/development/Runner.php
-  * scripts/testing/test-php.sh
-  * scripts/testing/test-bash.sh
-  * scripts/testing/php73-compat-scan.sh
-  * scripts/testing/php-lint-compat.sh
-  * scripts/testing/docblock-lint.sh
-  * scripts/testing/doctrine-lint.sh
+- Verify: follow "Commit Verification (one rule)" in AGENTS.md (static checks here; the test suite only on a
+  testing machine; a test that already fails on clean origin/main is not your failure).
 - One commit per issue. Include "Refs #N" in the commit message.
 - Partial progress IS acceptable: if the issue is too large for one session, commit what compiles and passes tests with a wip: prefix. Do NOT throw away working code because the issue is not 100% complete.
 - For complex issues, multiple commits are allowed. Each must pass verification and include Refs #N.
 - Commit prefix: fix: for bugs, feat: for features, security: for security issues, wip: for partial progress on complex issues.
-- After commit: gh issue edit N --add-label complete-verify (best-effort).
+- After commit: stop there. The lane publishes the commit and labels the issue complete-verify.
 
 Context to open (paths in this workspace):
  - AGENTS.md

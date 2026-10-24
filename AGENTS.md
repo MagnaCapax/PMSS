@@ -156,7 +156,7 @@ A GitHub issue requesting removal does not override the commit that created the 
 - Never overwrite a file without reading it first and understanding its current behaviour; always inspect contents and context before editing.
 - Avoid sweeping changes or bulk deletions of code; keep removals targeted to clearly dead or superseded paths with explicit justification.
 - Make small, focused changes; keep diffs coherent and easy to review.
-- Validate locally before pushing: run `php -l` on changed PHP files, `php scripts/lib/tests/development/Runner.php`, and the testing scripts under `scripts/testing/` as applicable.
+- Validate before committing as "Commit Verification (one rule)" below says.
 - Keep generated or ephemeral files out of commits; honor `.gitignore` and repository conventions.
 - When behavior or contracts change, ship code + tests + docs and, when appropriate, an ADR in the same PR.                      
                                                                                                                                  
@@ -177,7 +177,7 @@ A GitHub issue requesting removal does not override the commit that created the 
 - **NO branches. NO stash. NO worktrees. NO pull requests.** Commit directly to `main`. These are DISABLED, not discouraged. A `reference-transaction` git hook aborts branch/stash ref creation for every process (this agent included) — do not attempt to work around it; if a step seems to need a branch/stash/worktree/PR, it does not.
 - Commit messages: describe what changed, why, and notable side effects. Reference ADRs or docs when relevant.
 - Linear history on `main` only; never force-push.
-- Before commit: CI must pass (lint, tests, basic bash checks). Production-impacting changes should include a dry-run validation note.
+- Before commit: follow "Commit Verification (one rule)"; CI runs the full set after every push. Production-impacting changes should include a dry-run validation note.
 - Commit cadence: frequent, small commits with meaningful messages — a logical checkpoint roughly every 10–120 minutes or at completion of a self‑contained micro‑feature/refactor; avoid giant monolithic commits. EVERY commit lands on `main`.
 - The agent must NEVER `git branch` / `git checkout -b` / `git switch -c` / `git worktree add` / `git stash` / open a PR. If the operator wants any of these, the operator removes the git hook themselves.
 
@@ -236,6 +236,7 @@ A GitHub issue requesting removal does not override the commit that created the 
   2. **Add `complete-verify` label** to signal work is done and ready for operator verification: `gh issue edit <number> --add-label complete-verify`.
   3. **Review existing labels** and adjust if needed (e.g., remove `in-progress` if present, ensure category labels are accurate).
   4. **Push commits** to remote before marking `complete-verify`.
+  - In an automated lane run (Autocommit Mode), the lane does steps 1, 2 and 4 itself: commit locally and stop.
 - **Never Close Issues**: Agents must NEVER close GitHub issues. Only the operator closes issues after verification. Use `complete-verify` label to signal completion.
 
 
@@ -324,9 +325,17 @@ A GitHub issue requesting removal does not override the commit that created the 
 - Architecture docs and these guardrails are mandatory reading—don’t start coding until you understand both.
 - #TODO Consolidate package management around the dpkg baselines (no per-app queues) so every host installs the exact same package set and the update flow stays idempotent.
 
+## Commit Verification (one rule)
+This is the single test rule for every commit in every mode. Any other section or prompt that says "must pass" means this.
+1. **Static checks** run where you work and must pass: `php -l` on each changed PHP file, `scripts/testing/test-bash.sh`, `scripts/testing/php73-compat-scan.sh`, `scripts/testing/php-lint-compat.sh`, `scripts/testing/docblock-lint.sh`, `scripts/testing/doctrine-lint.sh`, and the deleted-symbol grep.
+2. **The test suite** (`php scripts/lib/tests/development/Runner.php`, `scripts/testing/test-php.sh`) runs only on a testing machine, never on a production host. If no testing machine is available to you, commit after the static checks.
+3. **Baseline failures are not yours.** A test failure counts against your change only when the same test passes on clean `origin/main`. A test that already fails there is the baseline: it does not block your commit, it is not a verification failure, and it does not count toward any stop condition.
+4. **Fix the code, not the test.** Never edit, skip or delete a test to get past this rule. A change to the test harness (`scripts/lib/tests/development/Runner.php`, `scripts/lib/tests/common/`, `scripts/testing/`) is reviewed before it is published.
+5. **Before an automated lane publishes a commit** it runs the development suite on a testing machine against clean `origin/main` and against the commit, and holds the commit back when a test that passed or ran on `origin/main` fails or is missing.
+
 ## Operational Verification
 - **Baseline Checks**: Until a formal test suite exists, run lightweight confirmations before committing—`bash -n`, `shellcheck`, and `php -l` as applicable—to ensure syntax correctness.
-- **Dev Tests**: Execute `php scripts/lib/tests/development/Runner.php` after code changes; this suite must pass before PRs or deployments.
+- **Dev Tests**: `php scripts/lib/tests/development/Runner.php` is judged by "Commit Verification (one rule)": no test that passes on `origin/main` may fail with your change.
 - **Safe Execution Proof**: When possible, exercise non-destructive entry points such as `--help`, `--dry-run`, or environment-detection routines and note the observed output. If the change affects destructive steps, document reasoning or out-of-band validation that supports the update.
 - **Manual Traceability**: Record the commands or scenarios reviewed (including dry runs or log captures) so reviewers can follow the verification story.
 - **Coverage Expectations**: When adding features or models, ship matching unit tests—target at least five distinct cases per function (ideally ten, including unusual or boundary scenarios).
