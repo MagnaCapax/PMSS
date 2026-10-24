@@ -33,6 +33,25 @@ class DpkgBaselineApplySafetyTest extends TestCase
         );
     }
 
+    public function testLegacyMediaAreaStatusQueryReachesDpkgWithItsFormat(): void
+    {
+        // The real command runs through sh; a stub dpkg-query answers only when it receives the literal ${Status} format.
+        $root = $this->pmssMakeTempDir('pmss-mediaarea-dpkg-');
+        file_put_contents($root.'/dpkg-query', "#!/bin/sh\n"
+            ."[ \"\$1 \$2 \$3\" = '-W -f=\${Status} repo-mediaarea' ] && printf 'install ok installed' && exit 0\n"
+            ."echo 'dpkg-query: error in show format: may not be empty string' >&2\nexit 2\n");
+        chmod($root.'/dpkg-query', 0755);
+        $path = (string) getenv('PATH');
+        putenv('PATH='.$root.':'.$path);
+        try {
+            $status = \pmssRepoMediaareaDpkgStatus();
+        } finally {
+            putenv('PATH='.$path);
+        }
+        $this->assertSame('install ok installed', $status);
+        $this->assertTrue(\pmssDpkgStatusIndicatesPresent($status), 'an installed repo-mediaarea must reach the purge and hold');
+    }
+
     public function testDpkgSelectionSanitizerKeepsBaselinePolicySnapshot(): void
     {
         $available = static function (string $package): bool { return in_array($package, ['alpha', 'held'], true); };
