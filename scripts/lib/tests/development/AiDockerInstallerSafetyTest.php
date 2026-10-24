@@ -94,10 +94,10 @@ class AiDockerInstallerSafetyTest extends TestCase
             'no pinned slirp4netns build for',
             "'https://github.com/rootless-containers/slirp4netns/releases/download/v1.3.6/slirp4netns-'.\$arch",
             "pmssInstallPinnedRemoteBinary('slirp4netns v1.3.6', \$slirpUrl, \$slirpSha256, '/usr/local/bin/slirp4netns', true);",
+            "pmssDockerSlirpHelperMatchesPin('/usr/local/bin/slirp4netns', \$slirpSha256)",
+            "pmssDockerRemoveStraySlirpCopies('/usr/local/bin', \$dryRun);",
             "runStep('[docker] Docker: creating iptables symlink'",
-            "pmssEnvFlagEnabled('PMSS_DRY_RUN') ? [] : (glob('/usr/local/bin/pmss-slirp4netns-??????') ?: [])",
-            'is_file($straySlirp) && !is_link($straySlirp)',
-            "pmssPinnedRemoteStaleBinaryRemove(\$straySlirp, 'stray slirp4netns');",
+            "} elseif (\$version >= 12) {\n    pmssDockerRemoveStraySlirpCopies('/usr/local/bin', \$dryRun);",
         ]);
         $source = $this->pmssReadRepoFile('scripts/lib/update/apps/docker.php');
         foreach (["'/usr/local/bin/']", '@tempnam(', 'download/v1.3.2/', '--version'] as $forbidden) {
