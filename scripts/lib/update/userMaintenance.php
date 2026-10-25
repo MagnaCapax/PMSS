@@ -17,10 +17,13 @@ require_once __DIR__.'/users/docker.php';
 /**
  * Signature a user is refreshed against for same-version resume skips.
  */
-function pmssUserRefreshSignature(string $rutorrentIndexSha): string
+function pmssUserRefreshSignature(string $rutorrentIndexSha, string $projectionPath = '/var/lib/pmss/public/torrentClients.json'): string
 {
     $version = trim((string) @file_get_contents('/etc/seedbox/config/version'));
-    return sha1($version.'|'.$rutorrentIndexSha);
+    // A same-version run that installs or removes torrent client builds must still publish each account's links.
+    $projection = is_file($projectionPath) && !is_link($projectionPath) && (int) @filesize($projectionPath) <= 65536
+        ? sha1((string) @file_get_contents($projectionPath)) : '';
+    return sha1($version.'|'.$rutorrentIndexSha.'|'.$projection);
 }
 
 /** Marker path for a username when the boundary inputs are safe. */

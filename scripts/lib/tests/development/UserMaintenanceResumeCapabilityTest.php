@@ -27,6 +27,24 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         });
     }
 
+    public function testTorrentClientProjectionChangeInvalidatesTheMarker(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-urefresh-proj-', 0700);
+        $projection = $dir.'/torrentClients.json';
+        file_put_contents($projection, '{"versions":[{"client":"rtorrent","version":"system"}]}');
+        $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $dir], function () use ($projection): void {
+            $sig = pmssUserRefreshSignature('skel-sha-A', $projection);
+            pmssUserRefreshMarkDone('alice', $sig);
+            $this->assertTrue(pmssUserRefreshAlreadyDone('alice', pmssUserRefreshSignature('skel-sha-A', $projection)),
+                'unchanged projection keeps the same-version skip');
+            file_put_contents($projection, '{"versions":[{"client":"rtorrent","version":"system"},{"client":"rtorrent","version":"0.16.25"}]}');
+            $this->assertTrue(!pmssUserRefreshAlreadyDone('alice', pmssUserRefreshSignature('skel-sha-A', $projection)),
+                'newly installed client builds must refresh every account once');
+            $this->assertTrue(pmssUserRefreshSignature('skel-sha-A', $projection.'.missing') !== $sig,
+                'a missing projection is a distinct state');
+        });
+    }
+
     public function testMarkerRejectsInvalidUsernameBeforeFilesystemWrite(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-urefresh-safe-', 0700);
