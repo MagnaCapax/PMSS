@@ -22,7 +22,7 @@ function pmssCustomerPanelRenderExpectations(): array
         'welcome.php' => ['minBytes' => $minBytes ?? 10000, 'query' => 'quota='.$quota],
         'info.php' => ['minBytes' => $minBytes ?? 5000, 'query' => ''],
         'stats.php' => ['minBytes' => $minBytes ?? 5000, 'query' => ''],
-        'configure.php' => ['minBytes' => $minBytes ?? 4000, 'query' => ''],
+        'configure.php' => ['minBytes' => $minBytes ?? 4000, 'query' => '', 'maxGzipBytes' => 60000],
     ];
 }
 
@@ -76,6 +76,10 @@ function pmssCustomerPanelRenderPage(string $www, string $bootstrap, string $hom
     }
     if ($stdoutBytes < (int) $expectation['minBytes']) {
         $errors[] = 'stdout below minimum: '.$stdoutBytes.' < '.(int) $expectation['minBytes'];
+    }
+    // lighttpd keeps a response up to 64 KB in memory; above that it needs disk, which a full account does not have.
+    if (isset($expectation['maxGzipBytes']) && strlen((string) gzencode($process['stdout'])) > (int) $expectation['maxGzipBytes']) {
+        $errors[] = 'compressed page above maximum: '.strlen((string) gzencode($process['stdout'])).' > '.(int) $expectation['maxGzipBytes'];
     }
 
     return [
