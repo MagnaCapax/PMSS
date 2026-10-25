@@ -23,9 +23,19 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
    $selected = pmssCustomerTorrentClientSelectedBinary($client);
    // Transmission has no system fallback and is visible only after an explicit store selection.
    if ($client === 'transmission' && $selected === null) unset($definitions[$name]);
-   if ($selected === null) continue;
-   $definitions[$name]['binaries'][] = $selected;
-   if ($client === 'deluge') $definitions[$name]['binaries'][] = dirname($selected).'/deluge-web';
+   if ($selected !== null) $definitions[$name]['binaries'][] = $selected;
+   // An own ~/bin build, or a build still running after the selection changed, must stay visible and stoppable.
+   // Only an account that uses version selection (it has ~/bin/<client>) can run these builds through PMSS.
+   if (isset($definitions[$name]) && is_dir(dirname(__DIR__).'/bin/'.$client)) {
+    $leaf = array('qbittorrent' => 'qbittorrent-nox', 'deluge' => 'bin/deluged', 'transmission' => 'transmission-daemon')[$client];
+    foreach (array('/home/.pmss/clients/'.$client, dirname(__DIR__).'/bin/'.$client) as $root) {
+     $found = glob($root.'/*/'.$leaf);
+     foreach (is_array($found) ? $found : array() as $binary) if (is_file($binary) && !is_link($binary)) $definitions[$name]['binaries'][] = $binary;
+    }
+   }
+   if ($client !== 'deluge') continue;
+   foreach ($definitions[$name]['binaries'] as $binary)
+    if (basename($binary) === 'deluged' && strpos($binary, '/usr/') !== 0) $definitions[$name]['binaries'][] = dirname($binary).'/deluge-web';
   }
   return $definitions; }
 }

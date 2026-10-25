@@ -169,6 +169,25 @@ class AppsCatalogTest extends TestCase
         });
     }
 
+    public function testStatusAndTurnOffSeeOwnAndUnselectedClientBuilds(): void
+    {
+        $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
+            $path = $home.'/www/scriptsIncAppProcess.php';
+            file_put_contents($path, str_replace('/home/.pmss/clients/', $home.'/store/', file_get_contents($path)));
+            $this->pmssWriteFile($home.'/www/qaBinaries.php', "<?php require __DIR__.'/scriptsInc.php';"
+                ." \$d = pmssCustomerManagedAppDefinitions(); echo json_encode([\$d['qBittorrent']['binaries'], \$d['Deluge']['binaries']]);");
+            $store = $this->pmssWriteFile($home.'/store/qbittorrent/5.2.4-lt2.0/qbittorrent-nox', 'fixture');
+            $own = $this->pmssWriteFile($home.'/bin/qbittorrent/mybuild/qbittorrent-nox', 'fixture');
+            $deluged = $this->pmssWriteFile($home.'/store/deluge/2.1.1/bin/deluged', 'fixture');
+            $this->pmssEnsureDir($home.'/bin/deluge');
+            // The selection points at the own build; the store build may still be running from before.
+            $this->pmssCreateSymlinkOrSkip('mybuild', $home.'/bin/qbittorrent/default');
+            [$qbittorrent, $deluge] = json_decode($render('qaBinaries.php', ['minBytes' => 10])['stdout'], true);
+            foreach (['/usr/bin/qbittorrent-nox', $store, $own] as $binary) $this->assertTrue(in_array($binary, $qbittorrent, true), $binary);
+            foreach (['/usr/bin/deluged', $deluged, dirname($deluged).'/deluge-web'] as $binary) $this->assertTrue(in_array($binary, $deluge, true), $binary);
+        });
+    }
+
     public function testTransmissionRowNeedsSelectionAndHonoursDisableMarker(): void
     {
         $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
