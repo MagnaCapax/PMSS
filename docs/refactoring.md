@@ -394,6 +394,10 @@ share the array parsers' trimming, source indices, internal spacing, inline
 comments, literal `0` rows, minimum columns and split limits. Pass `[]` when
 every nonempty line is data, including diagnostic stack traces beginning with
 `#`. Readers using other newline rules retain their explicit splitting.
+The rTorrent config, monitoring rules, default routes, disk inventory and
+WireGuard public-key registry use these text helpers directly. Public-key
+deduplication uses one insertion-ordered map; invalid-key diagnostics retain
+their original source line numbers.
 
 Parser compression retains source positions and result bytes. Certbot scans
 backwards to the last summary marker; whole-file and tail reads share that path.

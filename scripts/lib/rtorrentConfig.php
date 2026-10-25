@@ -142,7 +142,7 @@ class rtorrentConfig
             return false;
         }
         $config = array();
-        foreach (pmssConfigLines(explode("\n", $configRaw), ['#', '/']) as $thisLine) {
+        foreach (pmssConfigTextLines($configRaw, ['#', '/']) as $thisLine) {
             $elements = explode('=', $thisLine);
             if (count($elements) != 2) {
                 continue;

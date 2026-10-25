@@ -23,7 +23,7 @@ require_once __DIR__.'/../runtime/environment.php';
 /** Select the first safe, non-tunnel device on a default route. */
 function pmssNetworkDefaultRouteInterface(string $routes): string
 {
-    foreach (pmssConfigLines(explode("\n", $routes), []) as $route) {
+    foreach (pmssConfigTextLines($routes, []) as $route) {
         if (preg_match('/^default\s+.*\bdev\s+(\S+)/', $route, $matches) !== 1) {
             continue;
         }

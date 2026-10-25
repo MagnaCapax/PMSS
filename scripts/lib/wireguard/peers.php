@@ -71,19 +71,15 @@ function wgReadUserPublicKeysResult(string $user): array
     }
 
     $result = [];
-    $seen = [];
-    foreach (pmssConfigLines(explode("\n", $contents), ['#', ';']) as $index => $line) {
+    foreach (pmssConfigTextLines($contents, ['#', ';']) as $index => $line) {
         if (!wgValidatePublicKey($line)) {
             wgLog(sprintf('Ignoring invalid WireGuard public key for user %s at %s line %d', $user, $path, $index + 1));
             continue;
         }
-        if (!isset($seen[$line])) {
-            $seen[$line] = true;
-            $result[] = $line;
-        }
+        $result[$line] = true;
     }
 
-    return ['status' => 'ok', 'keys' => $result];
+    return ['status' => 'ok', 'keys' => array_keys($result)];
 }
 
 /** Retain the original key-only reader contract for existing callers. */
