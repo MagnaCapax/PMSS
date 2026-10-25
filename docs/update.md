@@ -88,6 +88,13 @@ Version specs normalise user input so `main`, `git main`, and `git/main` produce
 identical results. If no spec is supplied the previously recorded one is reused,
 falling back to `git/main`.
 
+Source-request decoding stays inside the standalone bootstrap: one option table
+classifies flag and value spellings, and Git/release parsing fills one source
+record. Version-label serialization shares the pin suffix; ordering decisions
+and marker content dates each have one result path. Legacy spellings, precedence,
+URL splitting and literal-zero behavior are locked by
+`UpdateSourceRequestCharacterizationTest` (ADR 0181).
+
 Dated git pins resolve against commit history, not the clone's local reflog.
 They fetch the missing history and detach at the commit selected at or before
 the cutoff; an incomplete history or a date preceding every commit fails before

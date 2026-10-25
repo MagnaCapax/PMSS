@@ -21,6 +21,8 @@ Keep the canonical installer/update details under `docs/install.md` and
    checklist.
 2. **update.php** – Snapshot fetch + staging. Logging, argument parsing, and
    hand-off behaviour live in [`docs/update.md`](./update.md#phase-1--scriptsupdatephp).
+   Its source-request decoder shares option dispatch, source records and version
+   label projection internally, preserving standalone recovery (ADR 0181).
 3. **update-step2.php** – Orchestrator that consumes the staged tree and runs
    modules under `scripts/lib/update/`. Responsibilities and ordering are
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).

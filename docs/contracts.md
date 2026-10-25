@@ -23,9 +23,13 @@ Signature: refer to file for full source; highlights below.
 - parseArguments(array $argv): array
   - Inputs: CLI args; supports `<spec>`, `--dry-run`, `--dist-upgrade=<max>`, `--scripts-only`,
     `--repo=<url>`, `--branch=<name>`, and internal `--skip-self-update`.
-  - Output: array keys: `dry_run` (bool), `dist_upgrade` (bool), `scripts_only` (bool),
+  - Output: array keys: `dry_run` (bool), `dist_upgrade` (bool|string), `scripts_only` (bool),
     `skip_self_update` (bool), `spec` (string), `repo` (?string), `branch` (?string).
   - Side-effects: `--help|-h` prints usage and `exit(0)`.
+  - One spelling table distinguishes exact flags from `=` values. Repeated options
+    use the last value; the first non-option becomes the spec. Repo/branch values
+    are trimmed, while the dist-upgrade value retains its original bytes. Unknown
+    options retain positional handling, and `--scriptonly` remains accepted.
 
 - storedSpec(): string
   - Reads `/etc/seedbox/config/version`, strips `@<timestamp>`, trims. Empty when missing.
@@ -37,6 +41,9 @@ Signature: refer to file for full source; highlights below.
 - parseSpec(string $spec): array
   - Parses normalized spec into: `type` (`git|release`), `repo`, `branch`, `pin` (date).
   - On mismatch: `fatal(..., EXIT_PARSE)`.
+  - Git and release decoding fill the same ordered record. URL sources retain
+    last-colon splitting and treat branch `0` as `main`; non-URL sources split at
+    the first colon and retain branch `0`. Date-pin syntax is not calendar validation.
 
 - createWorkdir(): string
   - Creates 0700 temp dir; `fatal(EXIT_FETCH)` if mkdir fails.

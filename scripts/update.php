@@ -438,8 +438,13 @@ function parseArguments(array $argv): array
         'branch'          => null,
     ];
 
-    $flagOptions = ['--dry-run' => 'dry_run', '--dist-upgrade' => 'dist_upgrade', SELF_UPDATE_SKIP_FLAG => 'skip_self_update', SCRIPTS_ONLY_FLAG => 'scripts_only', '--scriptonly' => 'scripts_only'];
-    $valueOptions = ['--dist-upgrade=' => ['dist_upgrade', false], '--repo=' => ['repo', true], '--branch=' => ['branch', true]];
+    // An equals suffix declares a value-taking spelling; bare flags remain exact matches.
+    $optionNames = [
+        '--dry-run' => 'dry_run', '--dist-upgrade' => 'dist_upgrade',
+        SELF_UPDATE_SKIP_FLAG => 'skip_self_update', SCRIPTS_ONLY_FLAG => 'scripts_only',
+        '--scriptonly' => 'scripts_only', '--dist-upgrade=' => 'dist_upgrade',
+        '--repo=' => 'repo', '--branch=' => 'branch',
+    ];
 
     foreach (array_slice($argv, 1) as $arg) {
         if ($arg === '--help' || $arg === '-h') {
@@ -454,19 +459,13 @@ function parseArguments(array $argv): array
                 ."  {$script} --scripts-only            # refresh scripts/skel only; never runs apt/apt-get\n";
             exit(0);
         }
-        if (isset($flagOptions[$arg])) {
-            $options[$flagOptions[$arg]] = true;
-            continue;
-        }
-        foreach ($valueOptions as $prefix => [$optionName, $trimValue]) {
-            if (strncmp($arg, $prefix, strlen($prefix)) !== 0) {
-                continue;
-            }
-            $value = substr($arg, strlen($prefix));
-            $options[$optionName] = $trimValue ? trim($value) : $value;
-            continue 2;
-        }
-        if ($options['spec'] === '') {
+        $equals = strpos($arg, '=');
+        $name = $equals === false ? $arg : substr($arg, 0, $equals + 1);
+        if (isset($optionNames[$name])) {
+            $value = $equals === false ? true : substr($arg, $equals + 1);
+            // The upgrade cap historically retains whitespace; repo and branch do not.
+            $options[$optionNames[$name]] = $equals === false || $name === '--dist-upgrade=' ? $value : trim($value);
+        } elseif ($options['spec'] === '') {
             $options['spec'] = $arg;
         }
     }
@@ -542,68 +541,44 @@ function normaliseSpec(string $spec): string
 function parseSpec(string $spec): array
 {
     $spec = trim($spec);
-    if (strcasecmp($spec, 'release') === 0 || preg_match('/^release[\/:]$/i', $spec) === 1) {
-        return [
-            'type'   => 'release',
-            'repo'   => DEFAULT_REPO,
-            'branch' => '',
-            'pin'    => '',
-        ];
-    }
-
-    if (!preg_match('/^(git|release)([\/:])(.*)$/i', $spec, $m)) {
+    // Bare release is the sole delimiter-free form accepted by this decoder.
+    if (!preg_match('/^(git|release)[\/:](.*)$/i', strcasecmp($spec, 'release') === 0 ? 'release:' : $spec, $m)) {
         fatal("Unable to parse source spec '{$spec}'", EXIT_PARSE);
     }
 
-    $type = strtolower($m[1]);
-    $rest = $m[3];
-
-    if ($type === 'release') {
-        return [
-            'type'   => 'release',
-            'repo'   => DEFAULT_REPO,
-            'branch' => '',
-            'pin'    => ltrim($rest, ':'),
-        ];
+    $rest = $m[2];
+    $source = ['type' => strtolower($m[1]), 'repo' => DEFAULT_REPO, 'branch' => '', 'pin' => ltrim($rest, ':')];
+    if ($source['type'] === 'release') {
+        return $source;
     }
 
-    $repo   = DEFAULT_REPO;
-    $branch = 'main';
-    $pin    = '';
-
+    $source['branch'] = 'main';
+    $source['pin'] = '';
     if (preg_match('/:(\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?)$/', $rest, $match)) {
-        $pin  = $match[1];
+        $source['pin'] = $match[1];
         $rest = substr($rest, 0, -strlen($match[0]));
     }
 
-    if ($rest === '') {
-        // nothing more to do
-    } elseif (preg_match('#^(https?|ssh)://#', $rest)) {
+    // URL parsing deliberately retains its last-colon and truthy-branch rules.
+    if (preg_match('#^(https?|ssh)://#', $rest)) {
         $pos = strrpos($rest, ':');
         if ($pos !== false && $pos > 8) {
-            $repo   = substr($rest, 0, $pos);
-            $branch = substr($rest, $pos + 1) ?: 'main';
+            $source['repo'] = substr($rest, 0, $pos);
+            $source['branch'] = substr($rest, $pos + 1) ?: 'main';
         } else {
-            $repo = rtrim($rest, '/');
+            $source['repo'] = rtrim($rest, '/');
         }
     } elseif (strpos($rest, ':') !== false) {
         [$maybeRepo, $maybeBranch] = explode(':', $rest, 2);
         if (preg_match('#://|/#', $maybeRepo)) {
-            $repo   = $maybeRepo;
-            $branch = $maybeBranch !== '' ? $maybeBranch : 'main';
-        } else {
-            $branch = $maybeBranch !== '' ? $maybeBranch : 'main';
+            $source['repo'] = $maybeRepo;
         }
-    } else {
-        $branch = $rest;
+        $source['branch'] = $maybeBranch !== '' ? $maybeBranch : 'main';
+    } elseif ($rest !== '') {
+        $source['branch'] = $rest;
     }
 
-    return [
-        'type'   => 'git',
-        'repo'   => $repo,
-        'branch' => $branch,
-        'pin'    => $pin,
-    ];
+    return $source;
 }
 
 function createWorkdir(): string
@@ -1605,16 +1580,14 @@ function collectCommitTimestamp(string $tmp): string
 
 function pmssBuildVersionSpec(array $spec): string
 {
-    if (($spec['type'] ?? '') === 'release') {
-        $pin = (string) ($spec['pin'] ?? '');
-        return 'release'.($pin !== '' ? ':'.$pin : '');
-    }
-
-    $repo = (string) ($spec['repo'] ?? DEFAULT_REPO);
-    $branch = (string) ($spec['branch'] ?? 'main');
     $pin = (string) ($spec['pin'] ?? '');
-    $version = $repo === DEFAULT_REPO ? 'git/'.$branch : 'git/'.$repo.':'.$branch;
-
+    if (($spec['type'] ?? '') === 'release') {
+        $version = 'release';
+    } else {
+        $repo = (string) ($spec['repo'] ?? DEFAULT_REPO);
+        $branch = (string) ($spec['branch'] ?? 'main');
+        $version = $repo === DEFAULT_REPO ? 'git/'.$branch : 'git/'.$repo.':'.$branch;
+    }
     return $version.($pin !== '' ? ':'.$pin : '');
 }
 
@@ -1671,12 +1644,11 @@ function pmssVersionMoveDecision(
 {
     $installedDate = pmssVersionFacts($installedVersion)['order_date'];
     $fetchedDate = pmssVersionFacts($fetchedVersion)['order_date'];
-    if ($installedDate === '' || $fetchedDate === '') {
-        return ['allowed' => true, 'ordering' => 'indeterminate', 'installed_order' => $installedDate, 'fetched_order' => $fetchedDate];
+    $ordering = 'indeterminate';
+    if ($installedDate !== '' && $fetchedDate !== '') {
+        $comparison = strcmp($fetchedDate, $installedDate);
+        $ordering = $comparison < 0 ? 'backward' : ($comparison > 0 ? 'forward' : 'same');
     }
-
-    $comparison = strcmp($fetchedDate, $installedDate);
-    $ordering = $comparison < 0 ? 'backward' : ($comparison > 0 ? 'forward' : 'same');
 
     return [
         'allowed' => $ordering !== 'backward' || $explicitTarget,
@@ -1784,11 +1756,8 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
 function pmssRecordedVersionLine(string $spec, string $fetchedVersion): string
 {
     $facts = pmssVersionFacts($fetchedVersion);
-    $contentDate = $facts['recorded_timestamp'];
-
-    if ($contentDate === '') {
-        $contentDate = $facts['order_date'] !== '' ? $facts['order_date'].' 00:00' : '';
-    } elseif (strlen($contentDate) === 10) {
+    $contentDate = $facts['recorded_timestamp'] !== '' ? $facts['recorded_timestamp'] : $facts['order_date'];
+    if (strlen($contentDate) === 10) {
         $contentDate .= ' 00:00';
     }
 
