@@ -76,6 +76,46 @@ function pmssAppsAllowedUrlsRead(): array
     return $urls;
 }
 
+/** Render the common catalog row once, retaining optional tags and search names. */
+function pmssAppsCatalogRowHtmlBuild(string $name, string $description, string $guide, string $category, string $tag = '', ?string $search = null): string
+{
+    return '<div class="mrow" data-category="'.pmssCustomerHtmlAttr($category).'"'
+        .($search === null ? '' : ' data-search="'.pmssCustomerHtmlAttr($search).'"').'><span class="name">'
+        .pmssCustomerHtmlAttr($name).($tag === '' ? '' : '<span class="tag">'.pmssCustomerHtmlAttr($tag).'</span>')
+        .'</span><span class="desc">'.pmssCustomerHtmlAttr($description).'</span><a href="'
+        .pmssCustomerHtmlAttr($guide).'" target="_blank" rel="noopener">Setup guide &#8599;</a></div>';
+}
+
+/** Project the closed wiki catalog to the same rows on both customer pages. */
+function pmssAppsCatalogWikiHtmlBuild(array $catalog, array $urls): string
+{
+    $html = '';
+    foreach ($catalog as $category => $apps) {
+        foreach ($apps as $app) {
+            $html .= pmssAppsCatalogRowHtmlBuild($app[0], $app[2], $urls[$category], $category, $app[3]);
+        }
+    }
+    return $html;
+}
+
+/** Group consecutive LinuxServer entries without changing their source order. */
+function pmssAppsCatalogLsioHtmlBuild(array $catalog): string
+{
+    $html = '';
+    $lastCategory = null;
+    foreach ($catalog as $app) {
+        if ($app['category'] !== $lastCategory) {
+            if ($lastCategory !== null) $html .= '</div></div>';
+            $lastCategory = $app['category'];
+            $html .= '<div class="lsio-group"><div class="group">'
+                .pmssCustomerHtmlAttr(str_replace(',', ', ', $lastCategory)).'</div><div class="list">';
+        }
+        $html .= pmssAppsCatalogRowHtmlBuild($app['title'], $app['description'], $app['guide'],
+            str_replace(',', ', ', $app['category']), '', $app['name'])."\n";
+    }
+    return $html.($lastCategory === null ? '' : '</div></div>');
+}
+
 /** Shared catalog layout used by the legacy Apps page and Configure. */
 function pmssAppsCatalogCss(): string
 {

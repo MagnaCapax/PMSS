@@ -32,7 +32,8 @@ if (is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php
     return;
 }
 
-if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()) {
+if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()
+    || !function_exists('pmssAppsCatalogWikiHtmlBuild') || !function_exists('pmssAppsCatalogLsioHtmlBuild')) {
     http_response_code(200);
     header('Content-Type: text/html; charset=utf-8');
     echo '<!doctype html><html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8"><title>Apps</title></head><body><p>The Apps page is being updated on this server. Reload it in a few minutes.</p></body></html>';
@@ -58,11 +59,9 @@ if (!is_array($lsioCatalog)) $lsioCatalog = array();
 <h2>Find more apps</h2><p class="note">You can set up more apps yourself with rootless Docker. LinuxServer.io examples publish ports on every address (for example 8080:8080). On this server that puts the app on the internet: publish it as 127.0.0.1:8080:8080 instead, and turn on the app's own login — other accounts on this server can reach a port on 127.0.0.1.</p>
 <input id="pmss-apps-search" class="search" type="search" aria-label="Search apps" placeholder="Search apps, e.g. comics, photos, IRC">
 <h2>Guides on the Pulsed Media wiki</h2><div class="list" id="pmss-more-apps">
-<?php foreach (pmssAppsCatalogRead() as $category => $apps): foreach ($apps as $app): ?><div class="mrow" data-category="<?= pmssCustomerHtmlAttr($category) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app[0]) ?><?php if ($app[3] !== ''): ?><span class="tag"><?= pmssCustomerHtmlAttr($app[3]) ?></span><?php endif; ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app[2]) ?></span><a href="<?= pmssCustomerHtmlAttr($urls[$category]) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div><?php endforeach; endforeach; ?></div>
+<?= pmssAppsCatalogWikiHtmlBuild(pmssAppsCatalogRead(), $urls) ?></div>
 <?php if ($lsioCatalog): ?><h2>More from LinuxServer.io (<?= count($lsioCatalog) ?>)</h2><div id="pmss-lsio-apps">
-<?php $lastCategory = null; foreach ($lsioCatalog as $app): if ($app['category'] !== $lastCategory): if ($lastCategory !== null): ?></div></div><?php endif; $lastCategory = $app['category']; ?><div class="lsio-group"><div class="group"><?= pmssCustomerHtmlAttr(str_replace(',', ', ', $lastCategory)) ?></div><div class="list"><?php endif; ?>
-<div class="mrow" data-category="<?= pmssCustomerHtmlAttr(str_replace(',', ', ', $app['category'])) ?>" data-search="<?= pmssCustomerHtmlAttr($app['name']) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app['title']) ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app['description']) ?></span><a href="<?= pmssCustomerHtmlAttr($app['guide']) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div>
-<?php endforeach; ?></div></div></div><?php endif; ?>
+<?= pmssAppsCatalogLsioHtmlBuild($lsioCatalog) ?></div><?php endif; ?>
 </div></div><div class="full_bottom"></div></div></div>
 <script>
 <?= pmssAppsCatalogSearchJs() ?>

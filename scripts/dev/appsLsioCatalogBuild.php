@@ -47,6 +47,25 @@ function pmssLsioCatalogBuild(array $images): array
     return $entries;
 }
 
+/** Store source fields only; the standalone snapshot expands name-derived links. */
+function pmssLsioCatalogExport(array $entries, string $snapshotDate): string
+{
+    foreach ($entries as &$entry) {
+        unset($entry['image'], $entry['guide']);
+    }
+    unset($entry);
+    $array = preg_replace('/[ \t]+$/m', '', var_export($entries, true));
+    $projection = <<<'PHP'
+return array_map(static function (array $app): array {
+    $app['image'] = 'lscr.io/linuxserver/'.$app['name'];
+    $app['guide'] = 'https://docs.linuxserver.io/images/docker-'.$app['name'].'/';
+    return $app;
+},
+PHP;
+    return "<?php\n/** Source: ".PMSS_LSIO_SOURCE."; snapshot: ".$snapshotDate.". */\n"
+        .$projection.$array.");\n";
+}
+
 /** Publish a complete catalog from the target directory, retaining its public read mode. */
 function pmssLsioCatalogWrite(string $target, string $output): bool
 {
@@ -74,8 +93,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
         exit(1);
     }
     $entries = pmssLsioCatalogBuild($data['data']['repositories']['linuxserver']);
-    $array = preg_replace('/[ \t]+$/m', '', var_export($entries, true));
-    $output = "<?php\n/** Source: ".PMSS_LSIO_SOURCE."; snapshot: ".date('Y-m-d').". */\nreturn ".$array.";\n";
+    $output = pmssLsioCatalogExport($entries, date('Y-m-d'));
     $target = dirname(__DIR__, 2).'/etc/skel/www/appsLsioCatalog.php';
     if (!pmssLsioCatalogWrite($target, $output)) {
         fwrite(STDERR, "Could not write {$target}\n");

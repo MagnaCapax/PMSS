@@ -27,6 +27,7 @@ if (isset($_GET['hermesStatus'])) {
     return;
 }
 if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()
+    || !function_exists('pmssAppsCatalogWikiHtmlBuild') || !function_exists('pmssAppsCatalogLsioHtmlBuild')
     || !function_exists('pmssFrontendPostActionRequired')) {
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         http_response_code(503);
@@ -185,11 +186,9 @@ $sections = array_merge(array_slice($sections, 0, 1, true), $versionSections, ar
 <section class="configure-card" id="more"><h2>Find more apps</h2><p class="note">You can set up more apps yourself with rootless Docker. LinuxServer.io examples publish ports on every address (for example 8080:8080). On this server that puts the app on the internet: publish it as 127.0.0.1:8080:8080 instead, and turn on the app's own login — other accounts on this server can reach a port on 127.0.0.1.</p>
 <input id="pmss-apps-search" class="search" type="search" aria-label="Search apps" placeholder="Search apps, e.g. comics, photos, IRC">
 <details class="catalog" id="pmss-more-apps-box"><summary>Guides on the Pulsed Media wiki</summary><div class="list" id="pmss-more-apps">
-<?php foreach (pmssAppsCatalogRead() as $category => $apps): foreach ($apps as $app): ?><div class="mrow" data-category="<?= pmssCustomerHtmlAttr($category) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app[0]) ?><?php if ($app[3] !== ''): ?><span class="tag"><?= pmssCustomerHtmlAttr($app[3]) ?></span><?php endif; ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app[2]) ?></span><a href="<?= pmssCustomerHtmlAttr($urls[$category]) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div><?php endforeach; endforeach; ?><div class="mrow" data-category="AI agents"><span class="name">AI coding tools<span class="tag">over SSH</span></span><span class="desc">Command-line AI coding assistants; personal copies with <code style="display:inline">bash ~/install-ai-tools.sh</code></span><a href="https://wiki.pulsedmedia.com/index.php/AI_Coding_Tools_on_PMSS" target="_blank" rel="noopener">Setup guide &#8599;</a></div></div></details>
+<?= pmssAppsCatalogWikiHtmlBuild(pmssAppsCatalogRead(), $urls) ?><div class="mrow" data-category="AI agents"><span class="name">AI coding tools<span class="tag">over SSH</span></span><span class="desc">Command-line AI coding assistants; personal copies with <code style="display:inline">bash ~/install-ai-tools.sh</code></span><a href="https://wiki.pulsedmedia.com/index.php/AI_Coding_Tools_on_PMSS" target="_blank" rel="noopener">Setup guide &#8599;</a></div></div></details>
 <?php if ($lsioCatalog): ?><details class="catalog" id="pmss-lsio-box"><summary>More from LinuxServer.io (<?= count($lsioCatalog) ?>)</summary><div id="pmss-lsio-apps">
-<?php $lastCategory = null; foreach ($lsioCatalog as $app): if ($app['category'] !== $lastCategory): if ($lastCategory !== null): ?></div></div><?php endif; $lastCategory = $app['category']; ?><div class="lsio-group"><div class="group"><?= pmssCustomerHtmlAttr(str_replace(',', ', ', $lastCategory)) ?></div><div class="list"><?php endif; ?>
-<div class="mrow" data-category="<?= pmssCustomerHtmlAttr(str_replace(',', ', ', $app['category'])) ?>" data-search="<?= pmssCustomerHtmlAttr($app['name']) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app['title']) ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app['description']) ?></span><a href="<?= pmssCustomerHtmlAttr($app['guide']) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div>
-<?php endforeach; ?></div></div></div></details><?php endif; ?>
+<?= pmssAppsCatalogLsioHtmlBuild($lsioCatalog) ?></div></details><?php endif; ?>
 </section></main></div></div></div><div class="full_bottom"></div></div></div>
 <script>
 function pmssConfigureNotice(message, error) { var node = document.getElementById('pmss-action-notice'); node.textContent = message; node.style.display = 'block'; node.className = error ? 'pmss-error' : ''; }
