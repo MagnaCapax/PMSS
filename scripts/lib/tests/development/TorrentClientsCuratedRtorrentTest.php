@@ -134,16 +134,21 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $stopCheck = strpos($executor, "if (file_exists('.rtorrentDisable'))");
         $this->assertTrue($stopCheck !== false && $stopCheck < strpos($executor, 'passthru($rtorrentCommand'));
     }
-    public function testRtorrent016EntryIsPinnedDefaultAndLaunchesWithDeprecatedRedirects(): void
+    public function testRtorrent016EntriesArePinnedAndLaunchWithDeprecatedRedirects(): void
     {
-        $entry = $this->entries()[2];
-        $this->assertSame('0.16.25', $entry['version']);
-        $this->assertSame('static', $entry['kind']);
-        $this->assertSame('0.16', $entry['compatFamily']);
-        $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-0.16.25-static-amd64-r1'], $entry['url']);
-        $this->assertSame('84f2b40561f353249fa463d1f79a8d3f6c5ce886cbd974372d4e5553201e2f49', $entry['sha256']);
-        $this->assertTrue($entry['isDefault']);
-        $this->assertFalse($entry['disabled']);
+        $this->assertSame(['system', '0.9.8-r16', '0.16.25', '0.16.26', '0.9.8-stickz7.2'],
+            array_column($this->entries(), 'version'));
+        foreach (['0.16.25' => '84f2b40561f353249fa463d1f79a8d3f6c5ce886cbd974372d4e5553201e2f49',
+            '0.16.26' => '27a5150d55e6eeec7db95d4808cb51a32025e6171a23897b3a5ce173834cd3be'] as $version => $sha256) {
+            $entry = $this->entries()[$version === '0.16.25' ? 2 : 3];
+            $this->assertSame('static', $entry['kind']);
+            $this->assertSame('0.16', $entry['compatFamily']);
+            $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-'.$version.'-static-amd64-r1'], $entry['url']);
+            $this->assertSame($sha256, $entry['sha256']);
+            $this->assertSame($version === '0.16.25', $entry['isDefault']);
+            $this->assertFalse($entry['disabled']);
+            $this->assertSame([], $entry['cve']);
+        }
         $root = $this->pmssMakeTempDir('pmss-rtorrent-016-');
         $store = $root.'/clients';
         $projection = $root.'/catalog.json';
@@ -162,11 +167,13 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         });
         $home = $root.'/t';
         mkdir($home.'/bin/rtorrent', 0755, true);
-        symlink($store.'/rtorrent/0.16.25', $home.'/bin/rtorrent/default');
-        $output = [];
-        exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
-        $this->assertSame([0, ['-D|']], [$rc, $output]);
-        unlink($home.'/bin/rtorrent/default');
+        foreach (['0.16.25', '0.16.26'] as $version) {
+            symlink($store.'/rtorrent/'.$version, $home.'/bin/rtorrent/default');
+            $output = [];
+            exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
+            $this->assertSame([0, ['-D|']], [$rc, $output]);
+            unlink($home.'/bin/rtorrent/default');
+        }
         symlink($store.'/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
         // 0.9.8-family selections launch with no arguments, exactly as before.
         $this->assertSame(escapeshellarg($store.'/rtorrent/0.9.8-r16/rtorrent'),
@@ -188,7 +195,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     }
     public function testStickzForkEntryIsPinnedOptInZeroNineEightFamily(): void
     {
-        $entry = $this->entries()[3];
+        $entry = $this->entries()[4];
         $this->assertSame('0.9.8-stickz7.2', $entry['version']);
         $this->assertSame('static', $entry['kind']);
         // Same rc and process-name family as 0.9.8, so it launches without -D.

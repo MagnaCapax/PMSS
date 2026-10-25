@@ -96,9 +96,15 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
             preg_match('/^\s*log\.add_output\s*=\s*"tracker_debug"/m', $content) !== 1,
             'Skeleton custom config should not enable tracker_debug logging by default'
         );
-        $this->assertStringContainsString('log.add_output = "storage_critical", "rtorrent.log"', $content);
+    }
+
+    /** Removed cascading groups must never prevent a 0.16.26 startup. */
+    public function testSkeletonRtorrentCustomConfigGuardsEveryCriticalLogGroup(): void
+    {
+        $content = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom');
+        $this->assertStringContainsString('catch = {"log.add_output=storage_critical,rtorrent.log"}', $content);
         $this->assertStringContainsString('catch = {"log.add_output=socket_critical,rtorrent.log"}', $content);
-        $this->assertSame(0, preg_match('/^\s*log\.add_output\s*=\s*"socket_critical"/m', $content));
+        $this->assertSame(0, preg_match('/^\s*log\.add_output\s*=\s*["\']?[a-z0-9_]+_critical\b/im', $content));
     }
 
     /**

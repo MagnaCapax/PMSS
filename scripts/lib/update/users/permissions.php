@@ -58,6 +58,7 @@ function pmssUserRefreshPermissions(array $ctx): void
             'dcf21704d49910d1670b3fdd04b37e640b755889',
             'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a',
             '434fb08e9ca2c9dbcd7abdbf89d5b95b7c898022',
+            'a0d0394d457baeeb1f8b5a341180e111febad8d4',
         ], true))) {
         $skelRcCustomPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.rtorrent.rc.custom';
         if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {

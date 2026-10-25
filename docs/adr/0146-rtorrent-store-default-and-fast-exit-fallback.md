@@ -132,3 +132,12 @@ verification remain separate.
 - `etc/skel/.rtorrentExecute.php`
 
 Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).
+
+## Amendment 2026-10-24: 0.16.26 offered as opt-in
+
+The catalog also offers static rTorrent `0.16.26` (`compatFamily: 0.16`,
+`disabled: false`, `isDefault: false`) at
+`https://pulsedmedia.com/remote/pkg/rtorrent-0.16.26-static-amd64-r1`, pinned by
+SHA-256 `27a5150d55e6eeec7db95d4808cb51a32025e6171a23897b3a5ce173834cd3be`.
+It requires an explicit customer selection; `0.16.25` remains the catalog
+default. ADR 0141 records the custom rc guard for the removed storage log group.

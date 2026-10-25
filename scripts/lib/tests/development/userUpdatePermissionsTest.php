@@ -62,15 +62,23 @@ RC;
 # rTorrent 0.16 has no socket_critical log group; catch keeps the line from stopping it.
 catch = {"log.add_output=socket_critical,rtorrent.log"}
 RC;
-        // The skeleton before the 0.16 catch line, and the one before the throttle hook.
-        $previous = str_replace($catchBlock, 'log.add_output = "socket_critical", "rtorrent.log"', $skeleton, $catches);
+        $storageBlock = <<<'RC'
+catch = {"log.add_output=storage_critical,rtorrent.log"}
+# rTorrent 0.16 has no socket_critical log group, and 0.16.26 has no storage_critical either; catch keeps each line from stopping it.
+RC;
+        // Reconstruct each stock generation, including the file shipped before 0.16.26.
+        $stock = str_replace($storageBlock, 'log.add_output = "storage_critical", "rtorrent.log"'."\n"
+            .'# rTorrent 0.16 has no socket_critical log group; catch keeps the line from stopping it.', $skeleton, $storageCatches);
+        $previous = str_replace($catchBlock, 'log.add_output = "socket_critical", "rtorrent.log"', $stock, $catches);
         $legacy = str_replace($hookBlock, '', $previous, $replacements);
 
+        $this->assertSame(1, $storageCatches, 'Expected one storage_critical catch in the skeleton');
+        $this->assertSame('a0d0394d457baeeb1f8b5a341180e111febad8d4', sha1($stock));
         $this->assertSame(1, $catches, 'Expected one socket_critical catch in the skeleton');
         $this->assertSame(1, $replacements, 'Expected one throttle startup hook in the skeleton');
         $this->assertSame('434fb08e9ca2c9dbcd7abdbf89d5b95b7c898022', sha1($previous));
         $this->assertSame('81d37b0b09345e3bfa5c2e79e66a3ef055f65905', sha1($legacy));
-        foreach ([$previous, $legacy] as $old) {
+        foreach ([$stock, $previous, $legacy] as $old) {
             $result = $this->runRefreshPermissionsWithStepRc(0, $old);
             $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
             $this->assertSame($skeleton, $result['content']);
@@ -80,10 +88,11 @@ RC;
 
     public function testRefreshPermissionsPreservesCustomizedRtorrentConfig(): void
     {
-        $result = $this->runRefreshPermissionsWithStepRc(0, "# customer override\n");
-
-        $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
-        $this->assertSame("# customer override\n", $result['content']);
+        foreach (["# customer override\n", $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom')."# customer override\n"] as $custom) {
+            $result = $this->runRefreshPermissionsWithStepRc(0, $custom);
+            $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
+            $this->assertSame($custom, $result['content']);
+        }
     }
 
     public function testRefreshPermissionsSeedsAbsentConfigOnceWithCustomerMetadata(): void

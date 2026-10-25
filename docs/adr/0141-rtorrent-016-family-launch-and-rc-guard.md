@@ -86,3 +86,19 @@ resolves to the system build again. The builds, the `-D` launch rule and the rc
 guard stay in place for when ruTorrent support for these builds lands.
 
 ADR 0146 re-enables both offers with ruTorrent 3.10 compatibility patches and guarded 0.16.25 default seeding.
+
+## Amendment 2026-10-24: 0.16.26 log-group guard
+
+Upstream [0.16.26](https://github.com/rakshasa/rtorrent/releases/tag/v0.16.26)
+(2026-10-22) removes the remaining cascading log groups, including
+`storage_critical`. An unknown group in `log.add_output` is an option-file error
+and stops startup. The shipped `.rtorrent.rc.custom` now wraps that output in
+`catch`, like the existing `socket_critical` line: older builds still enable
+the group, while builds without it continue loading the configuration.
+
+The stock-file refresh recognizes the previous skeleton's SHA-1
+`a0d0394d457baeeb1f8b5a341180e111febad8d4`. Only untouched stock files migrate;
+customer edits survive, with ADR 0146's fast-exit fallback still available.
+The rc template, skeleton `.rtorrent.rc`, token renderer and appended localnet
+guard contain no critical log-group outputs and need no further changes.
+The existing 0.16 `-D` launch and encoding/IPv4 guards remain applicable.
