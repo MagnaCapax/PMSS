@@ -16,20 +16,13 @@ require_once __DIR__.'/../distro.php';
 // 0.13 GiB of downloaded archives; 3 GiB before the install leaves more than 2 GiB afterwards.
 const PMSS_CHROMIUM_MIN_FREE_BYTES = 3 * 1073741824;
 
-/** Packages the runtime needs on a Debian major; empty when the release is not supported. */
-function pmssChromiumRuntimePackages(int $debianMajor): array
-{
-    if ($debianMajor === 12) return ['chromium']; // the Debian 12 baseline already has slirp4netns
-    if ($debianMajor === 13) return ['chromium', 'slirp4netns'];
-    return [];
-}
-
 /** Install whatever part of the runtime is missing; every skip is one log line, every failure soft. */
 function pmssChromiumRuntimeEnsure(array $ops = []): void
 {
     $log = $ops['log'] ?? 'logmsg';
     try {
-        $packages = pmssChromiumRuntimePackages((int) ($ops['major'] ?? pmssDistroVersionFromEnv()));
+        // Debian 12 already carries slirp4netns in its baseline; other releases stay unsupported.
+        $packages = [12 => ['chromium'], 13 => ['chromium', 'slirp4netns']][(int) ($ops['major'] ?? pmssDistroVersionFromEnv())] ?? [];
         if ($packages === []) return;
         if (!($ops['packagesReady'] ?? !empty($GLOBALS['PMSS_PACKAGES_READY']))) {
             $log('[SKIP] chromium runtime: package phase not complete');

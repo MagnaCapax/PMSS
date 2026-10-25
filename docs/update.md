@@ -136,6 +136,11 @@ scripts/lib/update/runtime/*           # shared runStep/logging/profile helpers
 The lighttpd/nginx lifecycle step stays inline in `scripts/util/update-step2.php`
 because phase 2 is its only caller.
 
+Fixed updater policy stays with its consumer: Chromium selects its Debian package
+list in the installer, the post-install benchmark checks skip conditions and builds
+its command in the trigger, and locale preparation handles the single shared
+LANG/LC_TIME baseline directly. Command bytes, log messages and skip order are preserved.
+
 Environment hints captured by `install.sh` are passed via `PMSS_HOSTNAME`,
 `PMSS_SKIP_HOSTNAME`, `PMSS_QUOTA_MOUNT`, and `PMSS_SKIP_QUOTA`; phase 2 honors
 those flags when reapplying legacy hostname/quota defaults. Optional hardening

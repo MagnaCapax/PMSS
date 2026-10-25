@@ -18,38 +18,6 @@ function pmssStorageBenchmarkPostInstallMarkerPath(): string
     return pmssResolvePathFromEnv('PMSS_STORAGE_BENCHMARK_INSTALL_MARKER', '/var/lib/pmss/storage-benchmark-post-install.json');
 }
 
-/** Return true only when a prior successful post-install benchmark is marked. */
-function pmssStorageBenchmarkPostInstallMarkerExists(): bool
-{
-    $path = pmssStorageBenchmarkPostInstallMarkerPath();
-    return pmssPathAbsoluteStringIsSafe($path, ['allowRoot' => false, 'allowTrailingSlash' => false])
-        && is_file($path)
-        && !is_link($path);
-}
-
-/** Decide whether the post-install benchmark should run. */
-function pmssStorageBenchmarkPostInstallDecision(array $managedUsers, bool $markerExists): string
-{
-    if ($managedUsers !== array()) {
-        return 'users_present';
-    }
-    if ($markerExists) {
-        return 'already_completed';
-    }
-    return 'run';
-}
-
-/** Build the storage benchmark CLI command with the required idle/device gates. */
-function pmssStorageBenchmarkPostInstallCommand(): string
-{
-    return pmssBuildCommand('php', [
-        '/scripts/util/storageBenchmark.php',
-        '--require-idle',
-        '--devices',
-        '--label=post-install',
-    ]);
-}
-
 /** Mirror captured benchmark stdout into the update log so WARN lines persist. */
 function pmssStorageBenchmarkPostInstallLogCapturedOutput(callable $logger, int $maxLines = 250): void
 {
@@ -113,18 +81,24 @@ function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable 
     }
 
     $managedUsers = pmssManagedUsersNormalizeList($rawUsers);
-    $decision = pmssStorageBenchmarkPostInstallDecision($managedUsers, pmssStorageBenchmarkPostInstallMarkerExists());
-    if ($decision === 'users_present') {
+    // Observe the marker before either skip, retaining managed-user precedence.
+    $path = pmssStorageBenchmarkPostInstallMarkerPath();
+    $markerExists = pmssPathAbsoluteStringIsSafe($path, ['allowRoot' => false, 'allowTrailingSlash' => false])
+        && is_file($path)
+        && !is_link($path);
+    if ($managedUsers !== array()) {
         $log('[SKIP] Managed users already exist; skipping post-install storage benchmark');
         return 0;
     }
-    if ($decision === 'already_completed') {
+    if ($markerExists) {
         $log('[SKIP] Post-install storage benchmark already completed');
         return 0;
     }
 
     $run = $runner ?: 'runStep';
-    $rc = (int) $run('Running post-install idle storage benchmark', pmssStorageBenchmarkPostInstallCommand());
+    $rc = (int) $run('Running post-install idle storage benchmark', pmssBuildCommand('php', [
+        '/scripts/util/storageBenchmark.php', '--require-idle', '--devices', '--label=post-install',
+    ]));
     pmssStorageBenchmarkPostInstallLogCapturedOutput($log);
     if ($rc !== 0) {
         $log('[WARN] Post-install storage benchmark did not complete (rc='.$rc.'); leaving marker unset');

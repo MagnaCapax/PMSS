@@ -106,63 +106,57 @@ function pmssLocaleGenWriteComplete(string $path, string $content, ?callable $wr
  */
 function pmssEnsureLocaleBaseline(): void
 {
-    $langLocale = 'en_US.UTF-8';
-    $timeLocale = 'en_US.UTF-8';
-
-    // Deduplicate locales to avoid redundant file reads and locale-gen calls.
-    foreach (array_unique([$langLocale, $timeLocale]) as $locale) {
-        $enabled = false;
-        $gen = @file_get_contents('/etc/locale.gen');
-        if (is_string($gen)) {
-            foreach (pmssConfigTextLines($gen) as $trim) {
-                if (stripos($trim, $locale.' UTF-8') === 0) {
-                    $enabled = true;
-                    break;
-                }
-            }
-        }
-        if (!$enabled) {
-            $line = $locale.' UTF-8';
-            if ($gen === false) {
-                // Best effort: create file with the required locale line
-                if (pmssLocaleGenWriteComplete('/etc/locale.gen', $line."\n")) {
-                    logMessage('[WARN] /etc/locale.gen missing; created with '.$line);
-                } else {
-                    logMessage('[WARN] Unable to create /etc/locale.gen with '.$line);
-                }
-            } else {
-                if (strpos($gen, $line) === false) {
-                    // Append the desired locale line if not present at all
-                    if (!pmssLocaleGenWriteComplete('/etc/locale.gen', rtrim($gen, "\r\n")."\n".$line."\n")) {
-                        logMessage('[WARN] Unable to append '.$line.' to /etc/locale.gen');
-                    } else {
-                        logMessage('Appended '.$line.' to /etc/locale.gen');
-                    }
-                } else {
-                    // Un-comment the existing line if commented out
-                    runStep('Enabling '.$locale.' in /etc/locale.gen',
-                        "sed -i 's/^# *".$locale." UTF-8/".$locale." UTF-8/' /etc/locale.gen");
-                }
-            }
-        }
-
-        $out = [];
-        @exec('locale -a 2>/dev/null', $out);
-        $has = false;
-        $needle1 = strtolower($locale);
-        $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
-        foreach (pmssConfigLines($out, []) as $line) {
-            $val = strtolower($line);
-            if ($val === $needle1 || $val === $needle2) {
-                $has = true;
+    // LANG and LC_TIME share one fixed baseline locale.
+    $locale = 'en_US.UTF-8';
+    $enabled = false;
+    $gen = @file_get_contents('/etc/locale.gen');
+    if (is_string($gen)) {
+        foreach (pmssConfigTextLines($gen) as $trim) {
+            if (stripos($trim, $locale.' UTF-8') === 0) {
+                $enabled = true;
                 break;
             }
         }
-        if (!$has || !$enabled) {
-            runStep('Generating '.$locale.' locale', 'locale-gen '.$locale);
+    }
+    if (!$enabled) {
+        $line = $locale.' UTF-8';
+        if ($gen === false) {
+            // Best effort: create file with the required locale line
+            if (pmssLocaleGenWriteComplete('/etc/locale.gen', $line."\n")) {
+                logMessage('[WARN] /etc/locale.gen missing; created with '.$line);
+            } else {
+                logMessage('[WARN] Unable to create /etc/locale.gen with '.$line);
+            }
+        } elseif (strpos($gen, $line) === false) {
+            // Append the desired locale line if not present at all
+            if (!pmssLocaleGenWriteComplete('/etc/locale.gen', rtrim($gen, "\r\n")."\n".$line."\n")) {
+                logMessage('[WARN] Unable to append '.$line.' to /etc/locale.gen');
+            } else {
+                logMessage('Appended '.$line.' to /etc/locale.gen');
+            }
         } else {
-            logMessage('[SKIP] '.$locale.' already generated');
+            // Un-comment the existing line if commented out
+            runStep('Enabling '.$locale.' in /etc/locale.gen',
+                "sed -i 's/^# *".$locale." UTF-8/".$locale." UTF-8/' /etc/locale.gen");
         }
+    }
+
+    $out = [];
+    @exec('locale -a 2>/dev/null', $out);
+    $has = false;
+    $needle1 = strtolower($locale);
+    $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
+    foreach (pmssConfigLines($out, []) as $line) {
+        $val = strtolower($line);
+        if ($val === $needle1 || $val === $needle2) {
+            $has = true;
+            break;
+        }
+    }
+    if (!$has || !$enabled) {
+        runStep('Generating '.$locale.' locale', 'locale-gen '.$locale);
+    } else {
+        logMessage('[SKIP] '.$locale.' already generated');
     }
 
     $defaultMatches = false;
@@ -178,15 +172,15 @@ function pmssEnsureLocaleBaseline(): void
                 $lcTime = trim(substr($line, 8));
             }
         }
-        $defaultMatches = ($lang === $langLocale && $lcTime === $timeLocale);
+        $defaultMatches = ($lang === $locale && $lcTime === $locale);
     }
     if (!$defaultMatches) {
         runStep(
             'Setting default system locale',
-            'update-locale LANG='.$langLocale.' LC_TIME='.$timeLocale
+            'update-locale LANG='.$locale.' LC_TIME='.$locale
         );
     } else {
-        logMessage('[SKIP] Default system locale already set to '.$langLocale.' (LC_TIME='.$timeLocale.')');
+        logMessage('[SKIP] Default system locale already set to '.$locale.' (LC_TIME='.$locale.')');
     }
 
     // Ensure system timezone matches the Finland/Helsinki baseline.
