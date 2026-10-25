@@ -1012,6 +1012,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userConfigCgroup.php USERNAME [options]
   - Behavior: Plans and optionally applies systemd/cgroup slice properties for one existing user.
+  - Internal handoff: input parsing, IO profiles and display share one plan;
+    `cgroup/plan.php` finalizes it without changing CLI output or sizing APIs
+    (ADR 0173). Live properties are filtered before display, and all apply
+    commands are constructed after root checking and before the first runs.
   - Apply errors: when `--apply` runs a planned `systemctl` or `io.cost`
     write and any step returns non-zero, the script attempts the remaining
     planned writes for visibility, then exits non-zero.

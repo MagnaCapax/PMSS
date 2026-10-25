@@ -68,7 +68,7 @@ function pmssCgroupCliParseFlagInputs(SystemInterface $sys, array $flags, ?strin
         }
     }
 
-    return ['options' => $options, 'io' => $ioPairs];
+    return ['options' => $options, 'ioProperties' => $ioPairs];
 }
 
 /**

@@ -32,7 +32,7 @@ function pmssCgroupCliExpandProfiles(array &$opt): void
 }
 
 /** Apply one IO profile directly; no translated defaults/limits catalog is retained. */
-function pmssCgroupCliApplyIoProfile(string $profile, string $dev, array &$opt, array &$pairs): void
+function pmssCgroupCliApplyIoProfile(string $profile, string $dev, array &$plan): void
 {
     $builtIns = [
         'hdd' => ['ioWeight' => '200', 'readBw' => '5M', 'writeBw' => '10M', 'readIops' => 100, 'writeIops' => 100],
@@ -51,9 +51,9 @@ function pmssCgroupCliApplyIoProfile(string $profile, string $dev, array &$opt, 
         }
     }
     foreach ($defaults as $key => $option) {
-        if (isset($entry[$key]) && !isset($opt[$option])) $opt[$option] = $entry[$key];
+        if (isset($entry[$key]) && !isset($plan['options'][$option])) $plan['options'][$option] = $entry[$key];
     }
-    $pairs = array_merge($pairs, \pmssCgroupPolicyIoPairs($entry, $dev, false));
+    $plan['ioProperties'] = array_merge($plan['ioProperties'], \pmssCgroupPolicyIoPairs($entry, $dev, false));
 }
 
 /** Apply numeric and mount defaults while retaining device validation and deduplication. */

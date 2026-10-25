@@ -90,6 +90,54 @@ class UserCgroupUtilTest extends TestCase
             $this->assertSame('2043e5da85f94201d8ee42562f1d08dc7d293f9fd42b6715663bc499b00c7abc', hash('sha256', serialize($snapshot)));
         });
     }
+    /** Freeze plan output and ordered apply calls before restructuring the handoff. */
+    public function testPlanExecutionCharacterization(): void
+    {
+        $banner = "user=testuser uid=1000 slice=user-1000.slice mode=v1\n";
+        $properties = "\n[Planned properties]\nCPUWeight=50\n";
+        $io = "[Planned IO properties]\nIOReadIOPSMax=/dev/sdb 2\n";
+        $apply = ['Applying cgroup properties', "systemctl 'set-property' 'user-1000.slice' 'CPUWeight=50' 'IOReadIOPSMax=/dev/sdb 2'"];
+        $wipe = [
+            ['Reverting user slice', "systemctl 'revert' 'user-1000.slice'"],
+            ['Unlimiting core properties', "systemctl 'set-property' 'user-1000.slice' 'MemoryHigh=infinity' 'MemoryMax=infinity' 'TasksMax=infinity' 'CPUWeight=100' 'IOWeight=100'"],
+        ];
+        $cases = [
+            [['--apply', '--cpu-weight=50', '--io-read-iops=/dev/sdb:2'], 0, 0, $banner.$properties.$io, [$apply]],
+            [['--apply', '--dry-run', '--cpu-weight=50', '--io-read-iops=/dev/sdb:2'], 0, 0, $banner.$properties.$io."(dry-run or no --apply; not changing system)\n", []],
+            [['--cpu-weight=50', '--io-read-iops=/dev/sdb:2'], 0, 0, $banner.$properties.$io."(dry-run or no --apply; not changing system)\n", []],
+            [['--apply', '--wipe'], 0, 0, $banner, $wipe],
+            [['--apply', '--wipe'], 7, 1, $banner, $wipe],
+            [['--apply', '--device=/dev/sdb'], 0, 0, $banner, []],
+            [['--apply', '--io-cost-qos=enable=1', '--cpu-weight=50'], 0, 0, $banner."[SKIP] io.cost requires cgroup v2\n".$properties, [
+                ['Applying cgroup properties', "systemctl 'set-property' 'user-1000.slice' 'CPUWeight=50'"],
+            ]],
+        ];
+        foreach ($cases as [$flags, $stepRc, $expectedRc, $expectedOutput, $expectedSteps]) {
+            $system = new class implements SystemInterface {
+                public $rootChecks = 0;
+                public function getCgroupMode(): string { return 'v1'; }
+                public function getUid(string $user): int { return 1000; }
+                public function execute(string $command): ?string { throw new \RuntimeException('Unexpected command: '.$command); }
+                public function readFile(string $path): ?string { return null; }
+                public function getTotalMemoryMiB(): int { return 0; }
+                public function resolveDevice(string $device): string { return '/dev/sdb'; }
+                public function requireRoot(): void { $this->rootChecks++; }
+            };
+            $steps = [];
+            $manager = new Manager($system, static function (string $label, string $command) use (&$steps, $stepRc): int {
+                $steps[] = [$label, $command];
+                return $stepRc;
+            });
+            [$rc, $output] = $this->pmssCaptureStdout(static function () use ($manager, $flags): int {
+                return $manager->run(array_merge(['userConfigCgroup.php', 'testuser'], $flags));
+            });
+            $this->assertSame($expectedRc, $rc, json_encode($flags));
+            $this->assertSame($expectedOutput, $output, json_encode($flags));
+            $this->assertSame($expectedSteps, $steps, json_encode($flags));
+            $this->assertSame($expectedSteps === [] ? 0 : 1, $system->rootChecks);
+        }
+    }
+
     /**
      * Create a manager instance backed by a no-op system implementation.
      *

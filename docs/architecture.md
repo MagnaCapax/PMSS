@@ -88,6 +88,9 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/portManager.php** – Stable service-port and CLI facade. `portManager/state.php` owns assignment files and shared reservation reads; `portManager/selection.php` owns bind checks and allocation. Legacy rTorrent markers remain part of the used-port set. Allocation stops if either reservation namespace cannot be scanned completely; an absent legacy namespace remains valid.
 - **scripts/lib/blockDeviceLeaves.php** – One bounded sysfs topology walk supplies backing leaf disks to BFQ policy and `/home` iostat selection, and visits backing nodes for cgroup storage-class detection. Callers retain their own response to incomplete topology.
 - **scripts/lib/cgroup/readIopsPolicy.php** – Derived read-IOPS policy loads the runtime value helpers directly; passive ceiling computation remains in `cgroup/ioCeiling.php`.
+- **scripts/lib/cgroup/plan.php** – Finalizes the CLI's single plan after input
+  and profile expansion: retain live properties, display, guard, build and apply
+  ordered steps. Manager keeps orchestration and public sizing helpers (ADR 0173).
 - **scripts/lib/nginxConfig/** – Generates the public user subdomain route and reconciles obsolete private hash routes. The template catalog contains only active and suspended public variants.
 - **scripts/lib/resources/log.php** – Resource-log entrypoint. `resources/counters.php` selects the hierarchy and projects billing counters; `resources/v1.php` owns the source traversal and parsers shared with performance telemetry (ADR 0161). `resources/counterState.php` owns locked delta persistence shared with traffic ingress (ADR 0078).
 - **scripts/lib/traffic/report.php** – Stable traffic CLI facade. `reportModel.php` reads accepted rows and derives totals and summary counts before sorting; `reportDisplay.php` projects that model to JSON and terminal output without filesystem reads (ADR 0157).

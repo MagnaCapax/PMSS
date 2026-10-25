@@ -9,19 +9,19 @@
 namespace PMSS\Cgroup;
 
 /** Keep legacy headings and property order for operators and automation. */
-function pmssCgroupCliPrintPlan(array $props, array $ioPairs, array $ioCostWrites): void
+function pmssCgroupCliPrintPlan(array $plan): void
 {
-    if (!empty($props)) {
+    if (!empty($plan['properties'])) {
         echo "\n[Planned properties]\n";
-        foreach ($props as $key => $value) echo $key.'='.$value."\n";
+        foreach ($plan['properties'] as $key => $value) echo $key.'='.$value."\n";
     }
-    if (!empty($ioPairs)) {
+    if (!empty($plan['ioProperties'])) {
         echo "[Planned IO properties]\n";
-        foreach ($ioPairs as $pair) echo $pair."\n";
+        foreach ($plan['ioProperties'] as $pair) echo $pair."\n";
     }
-    if (!empty($ioCostWrites)) {
+    if (!empty($plan['ioCostWrites'])) {
         echo "[Planned io.cost writes]\n";
-        foreach ($ioCostWrites as $write) echo $write['path'].' <= '.$write['value']."\n";
+        foreach ($plan['ioCostWrites'] as $write) echo $write['path'].' <= '.$write['value']."\n";
     }
 }
 
