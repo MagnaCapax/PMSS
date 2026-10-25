@@ -173,9 +173,21 @@ function runProvisionStep(string $description, string $command, ?string $logComm
     }
 
     $startedAt = microtime(true);
+    $excerpt = '';
     if ($stdin !== null) {
         $logger('[CMD start] '.$logCommand);
-        $result = pmssCredentialProcessRun($command, $stdin);
+        // changePw prints passwords on stdout; only stderr may enter persistent diagnostics.
+        $output = [];
+        $result = pmssCredentialProcessRun($command, $stdin, $output, true);
+        if ($output !== []) {
+            fwrite(STDERR, implode(PHP_EOL, $output).PHP_EOL);
+        }
+        if ($result !== 0) {
+            $diagnostic = implode("\n", $output);
+            $diagnostic = $stdin !== '' ? str_replace($stdin, '[REDACTED]', $diagnostic) : $diagnostic;
+            $diagnostic = trim(pmssLogWhitespaceCollapse(pmssLogControlCharactersReplace($diagnostic)));
+            $excerpt = $diagnostic !== '' ? ' :: '.pmssLogExcerpt($diagnostic, 300) : '';
+        }
     } else {
         $result = runCommand($command, false, $logger);
     }
@@ -184,7 +196,7 @@ function runProvisionStep(string $description, string $command, ?string $logComm
     if ($result !== 0) {
         $provisionStats['err']++;
         $provisionStats['last_error'] = $description . ' rc=' . $result;
-        logProvisionMessage($description . ' failed (rc=' . $result . ', duration=' . $duration . 's)');
+        $logger($description . ' failed (rc=' . $result . ', duration=' . $duration . 's)' . $excerpt);
     } else {
         $provisionStats['ok']++;
         logProvisionMessage($description . ' completed (duration=' . $duration . 's)');

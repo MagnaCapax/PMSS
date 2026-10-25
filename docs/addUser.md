@@ -51,6 +51,7 @@ Usage
 - If `RAM_MiB` is below `245`, PMSS persists `dockerEnabled=false` for safety.
 - Invalid CLI input exits non-zero. `--bonus-quota-gib` accepts only a non-negative integer and writes only positive values. Username validation failures also emit an `ERROR:` line and `###ADDUSER_JSON` with `success=false` for automation.
 - Before initial credential sync, provisioning converges the required `~/.lighttpd/` directory and retains the existing rollback path if safe directory creation fails.
+- A failed initial password step appends up to 300 bytes of compacted stderr to its provisioning-log entry (with `...` on truncation). Supplied credentials are redacted before truncation; stdout, including generated passwords, remains console-only. Exit status and rollback behavior are unchanged.
 
 ## Examples
 

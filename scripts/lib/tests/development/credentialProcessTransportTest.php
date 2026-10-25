@@ -122,6 +122,81 @@ class CredentialProcessTransportTest extends TestCase
         $this->assertSame(['diagnostic'], $output);
     }
 
+    public function testProvisionStepLogsFailureStderrAndPreservesExitStatus(): void
+    {
+        $result = $this->provisionStepHarness('fwrite(STDERR, "PHP Fatal error: fixture failed\n"); exit(255);', 'provided-value');
+        $this->assertSame(255, $result['rc']);
+        $this->assertStringContainsString(' :: PHP Fatal error: fixture failed', $result['log']);
+        $this->assertStringContainsString('PHP Fatal error: fixture failed', $result['stderr']);
+        $this->assertSame(['steps' => 1, 'err' => 1, 'ok' => 0, 'last_error' => 'Set initial password rc=255'], $result['stats']);
+        $this->assertStringContainsString('fixture failed', json_encode($result['events']));
+    }
+
+    public function testProvisionStepKeepsGeneratedPasswordOnStdoutOnly(): void
+    {
+        $result = $this->provisionStepHarness('echo "new password: generated-value\n"; fwrite(STDERR, "sync failed\n"); exit(7);', '');
+        $this->assertSame(7, $result['rc']);
+        $this->assertStringContainsString('new password: generated-value', $result['output']);
+        $this->assertStringContainsString(' :: sync failed', $result['log']);
+        $this->assertFalse(strpos($result['log'].json_encode($result['events']), 'generated-value') !== false);
+    }
+
+    public function testProvisionStepRedactsBeforeCompactingAndBoundingDiagnostics(): void
+    {
+        $secret = str_repeat('sample-secret-', 30);
+        $result = $this->provisionStepHarness('$password = rtrim(fgets(STDIN), "\n"); fwrite(STDERR, "Rejected ".$password."\r\n\t\033".str_repeat("x", 350)); exit(1);', $secret);
+        $this->assertStringContainsString(' :: Rejected [REDACTED] ', $result['log']);
+        $excerpt = explode(' :: ', trim($result['log']), 2)[1];
+        $this->assertSame(303, strlen($excerpt));
+        $this->assertSame('...', substr($excerpt, -3));
+        $this->assertFalse(strpos($result['log'].json_encode($result['events']), 'sample-secret-') !== false);
+        $this->assertFalse(strpos($result['log'], "\033") !== false);
+    }
+
+    public function testProvisionStepWithoutDiagnosticRetainsFailureLine(): void
+    {
+        foreach (['exit(9);', 'fwrite(STDERR, " \n\t "); exit(9);'] as $child) {
+            $result = $this->provisionStepHarness($child, 'provided-value');
+            $this->assertSame(9, $result['rc']);
+            $this->assertStringContainsString('Set initial password failed (rc=9, duration=', $result['log']);
+            $this->assertFalse(strpos($result['log'], ' :: ') !== false);
+        }
+    }
+
+    public function testProvisionStepSuccessPreservesConsoleWithoutPersistingChildOutput(): void
+    {
+        $result = $this->provisionStepHarness('echo "new password: provided-value\n"; fwrite(STDERR, "advisory\n");', 'provided-value');
+        $this->assertSame(0, $result['rc']);
+        $this->assertStringContainsString('new password: provided-value', $result['output']);
+        $this->assertStringContainsString('advisory', $result['stderr']);
+        $this->assertStringContainsString('Set initial password completed (duration=', $result['log']);
+        $this->assertSame(['steps' => 1, 'err' => 0, 'ok' => 1], $result['stats']);
+        $this->assertStringContainsAndOmitsStrings([], ['provided-value', 'advisory'], $result['log'].json_encode($result['events']));
+    }
+
+    /** Exercise the real process and provisioning wrappers with isolated log sinks. */
+    private function provisionStepHarness(string $childSource, string $stdin): array
+    {
+        $dir = $this->pmssMakeTempDir('pmss-provision-step-');
+        file_put_contents($dir.'/child.php', '<?php '.$childSource);
+        $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($dir.'/child.php');
+        $library = $this->pmssRepoPath('scripts/lib/user/add/provisioningRuntime.php');
+        file_put_contents($dir.'/harness.php', '<?php require '.var_export($library, true).'; '
+            .'function pmssUserBaseContext($action, $phase, $user, $extra) { return $extra; } '
+            .'function pmssUserWriteLogs($event) { $GLOBALS["events"][] = $event; } '
+            .'$user = ["name" => "alice"]; $events = []; $provisionStats = ["steps" => 0, "err" => 0, "ok" => 0]; '
+            .'$rc = runProvisionStep("Set initial password", '.var_export($command, true).', null, '.var_export($stdin, true).'); '
+            .'file_put_contents('.var_export($dir.'/result.json', true).', json_encode(["rc" => $rc, "stats" => $provisionStats, "events" => $events]));');
+        $run = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' '.escapeshellarg($dir.'/harness.php'), [
+            'PMSS_ADDUSER_LOG_PATH' => $dir.'/provision.log',
+        ]);
+        $this->assertSame(0, $run['result']['rc'], $run['result']['output'].file_get_contents($run['stderrPath']));
+        return json_decode(file_get_contents($dir.'/result.json'), true) + [
+            'output' => $run['result']['output'], 'stderr' => file_get_contents($run['stderrPath']),
+            'log' => file_get_contents($dir.'/provision.log'),
+        ];
+    }
+
     public function testShadowUpdateCapturesStderrOnPhp73Descriptors(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-shadow-stderr-');
