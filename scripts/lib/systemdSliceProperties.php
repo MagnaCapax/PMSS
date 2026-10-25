@@ -12,7 +12,7 @@ require_once __DIR__.'/user/identity.php';
 function pmssParseSystemdPropertyOutput(array $propertyNames, string $output): array
 {
     $properties = array_fill_keys($propertyNames, '');
-    foreach (preg_split('/\r?\n/', trim($output)) as $line) {
+    foreach (pmssTextLines(trim($output)) as $line) {
         $separatorPos = is_string($line) ? strpos($line, '=') : false;
         if ($separatorPos === false) {
             continue;

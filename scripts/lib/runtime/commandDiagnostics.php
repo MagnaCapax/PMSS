@@ -68,7 +68,7 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
     $limitsRaw = $readTrim('/proc/self/limits', 16384);
     if ($limitsRaw !== null) {
         $limits = ['Max processes' => null, 'Max open files' => null];
-        foreach (preg_split('/\r?\n/', $limitsRaw) ?: [] as $limitLine) {
+        foreach (pmssTextLines($limitsRaw) as $limitLine) {
             foreach ($limits as $label => $value) {
                 if ($value === null && strpos($limitLine, $label) === 0) {
                     $limits[$label] = pmssLogWhitespaceCollapse(trim($limitLine));

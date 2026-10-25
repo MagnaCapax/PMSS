@@ -2,6 +2,7 @@
 /** Pure SMART/NVMe text parsing and device findings. @license GPL-3.0-only */
 
 require_once __DIR__.'/deviceMetrics.php';
+require_once dirname(__DIR__).'/runtime/environment.php';
 
 /**
  * Parse smartctl output into a stable metric set.
@@ -46,7 +47,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         '/\\bPower_On_Hours\\b.*?\\s(\\d+)\\s*$/' => ['power_on_hours'],
         '/Accumulated\\s+power\\s+on\\s+time.*?([0-9]+):([0-9]+):([0-9]+)/i' => ['power_on_hours'],
     ];
-    $metrics = pmssStorageHealthMetricsParse(preg_split('/\r?\n/', $out), $lineParsers, $metrics);
+    $metrics = pmssStorageHealthMetricsParse(pmssTextLines($out), $lineParsers, $metrics);
 
     $entry['metrics'] = $metrics;
     // Null distinguishes an absent health line from an explicit, unsuccessful result.

@@ -137,12 +137,7 @@ function pmssUserTransferParseDuBytes(string $output): ?int
         return pmssUnsignedDecimalIntParse($matches[1]);
     }
 
-    $lines = preg_split('/\r?\n/', trim($output));
-    if (!is_array($lines)) {
-        return null;
-    }
-
-    foreach ($lines as $line) {
+    foreach (pmssTextLines(trim($output)) as $line) {
         if (preg_match('/^\s*([0-9]+)\b/', $line, $matches) === 1) {
             return pmssUnsignedDecimalIntParse($matches[1]);
         }

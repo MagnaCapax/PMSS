@@ -57,10 +57,10 @@ function pmssStatsReadCgroupStats(string $cgroupDir): array
     $stats['memory_limit'] = ($memoryMax === 'max') ? 'max' : (ctype_digit($memoryMax) ? (int) $memoryMax : null);
     $stats['pids_current'] = $pidsCurrent !== null ? (int) $pidsCurrent : null;
 
-    foreach (preg_split('/\r?\n/', trim(pmssReadRegularFileContents($cgroupDir.'/cpu.stat') ?? '')) ?: [] as $line) {
+    foreach (pmssTextLines(trim(pmssReadRegularFileContents($cgroupDir.'/cpu.stat') ?? '')) as $line) {
         if (preg_match('/^usage_usec\s+(\d+)$/', (string) $line, $matches) === 1) $stats['cpu_usage_usec'] = (int) $matches[1];
     }
-    foreach (preg_split('/\r?\n/', trim(pmssReadRegularFileContents($cgroupDir.'/io.stat') ?? '')) ?: [] as $line) {
+    foreach (pmssTextLines(trim(pmssReadRegularFileContents($cgroupDir.'/io.stat') ?? '')) as $line) {
         if (preg_match('/\brbytes=(\d+)/', (string) $line, $readMatches) === 1) $stats['io_read_bytes'] += (int) $readMatches[1];
         if (preg_match('/\bwbytes=(\d+)/', (string) $line, $writeMatches) === 1) $stats['io_write_bytes'] += (int) $writeMatches[1];
     }

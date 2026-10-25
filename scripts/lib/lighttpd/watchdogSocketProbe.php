@@ -127,7 +127,7 @@ function pmssLighttpdWatchdogListeningSocketSnapshot(string $homeDir, array $opt
             $stdout = trim((string) ($result['stdout'] ?? ''));
 
             return array(
-                'lines' => $stdout === '' ? array() : preg_split('/\r?\n/', $stdout),
+                'lines' => $stdout === '' ? array() : pmssTextLines($stdout),
                 'rc' => (int) ($result['rc'] ?? 1),
             );
         };

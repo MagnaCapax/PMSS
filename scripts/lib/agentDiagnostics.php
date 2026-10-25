@@ -185,8 +185,7 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
     $format = (string) ($spec['format'] ?? 'text');
 
     if ($format === 'lines') {
-        $lines = (int) ($result['rc'] ?? 1) === 0 ? preg_split('/\r?\n/', $stdout) : [];
-        return pmssNonEmptyStrings(is_array($lines) ? $lines : []);
+        return pmssNonEmptyStrings((int) ($result['rc'] ?? 1) === 0 ? pmssTextLines($stdout) : []);
     }
     if ($format === 'json') {
         if ((int) ($result['rc'] ?? 1) !== 0) {
@@ -257,7 +256,7 @@ function pmssAgentDiagnosticsMain(array $argv): int
         if ($listUsersExitCode !== 0) {
             return pmssCliReturnWithStderr("Error: listUsers.php failed; aborting.\n", $listUsersExitCode);
         }
-        $listUsersLines = preg_split('/\r?\n/', trim((string) ($listUsersResult['stdout'] ?? '')));
+        $listUsersLines = pmssTextLines(trim((string) ($listUsersResult['stdout'] ?? '')));
         if (!is_array($listUsersLines) || pmssManagedUsersOutputHasDiagnostics($listUsersLines)) {
             return pmssCliReturnWithStderr("Error: listUsers.php failed; aborting.\n");
         }

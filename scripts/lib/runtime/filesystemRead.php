@@ -35,7 +35,7 @@ function pmssRegularFileRead(string $path, ?int $requiredUid = null, ?int $maxBy
 }
 
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
-function pmssReadRegularFileNonEmptyLines(string $path): array { $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? ''); return pmssNonEmptyStrings(is_array($lines) ? $lines : []); }
+function pmssReadRegularFileNonEmptyLines(string $path): array { return pmssNonEmptyStrings(pmssTextLines(pmssReadRegularFileContents($path) ?? '')); }
 
 function pmssReadSerializedArrayFile(string $path): ?array
 {

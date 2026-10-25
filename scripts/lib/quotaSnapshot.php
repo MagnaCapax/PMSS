@@ -30,12 +30,8 @@ function pmssQuotaSnapshotDataRows(string $content, string $pathPrefix = '/'): a
  */
 function pmssQuotaSnapshotNormalizeHumanReadableOutput(string $content): string
 {
-    if (!is_array($lines = preg_split('/\r?\n/', $content))) {
-        return $content;
-    }
-
     // The final empty split field already preserves each trailing newline.
-    return implode(PHP_EOL, array_map('pmssQuotaSnapshotNormalizeHumanReadableLine', $lines));
+    return implode(PHP_EOL, array_map('pmssQuotaSnapshotNormalizeHumanReadableLine', pmssTextLines($content)));
 }
 
 /**

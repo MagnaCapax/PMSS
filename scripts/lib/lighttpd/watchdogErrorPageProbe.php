@@ -14,7 +14,7 @@ require_once __DIR__.'/../user/watchdogTimeout.php';
 /** Parse the reported root inode-use percentage from `df -i` output. */
 function pmssLighttpdWatchdogParseDfInodeUsePercent(string $output): ?int
 {
-    foreach (preg_split('/\r?\n/', trim($output)) as $line) {
+    foreach (pmssTextLines(trim($output)) as $line) {
         if (stripos($line, 'iused') !== false || stripos($line, 'filesystem') !== false) {
             continue;
         }

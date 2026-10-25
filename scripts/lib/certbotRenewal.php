@@ -11,6 +11,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/runtime/environment.php';
+
 /**
  * Parse a certbot log line timestamp (best-effort).
  *
@@ -35,7 +37,7 @@ function pmssCertbotParseLogTimestamp(string $line): ?int
  */
 function pmssCertbotRenewalSummaryFromLog(string $log, int $maxErrorLines = 12): array
 {
-    $lines = preg_split("/\\r?\\n/", $log) ?: [];
+    $lines = pmssTextLines($log);
     // Stop at the last summary; retain its source index for the excerpt.
     $count = count($lines);
     for ($i = $count - 1; $i >= 0; $i--) {

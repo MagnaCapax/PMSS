@@ -6,6 +6,11 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeEnvValueTest extends TestCase
 {
+    public function testTextLinesPreserveRawFieldsAndBoundedRemainder(): void
+    {
+        foreach ([['', [''], -1], ["a\r\nb\nc", ['a', 'b', 'c'], -1], ["a\n\n", ['a', '', ''], -1], [" \t#0\n0\na\rb\0", [" \t#0", '0', "a\rb\0"], -1], ["cpu 1\r\ncpu0 2\r\ncpu1 3\n", ['cpu 1', "cpu0 2\r\ncpu1 3\n"], 2]] as [$raw, $expected, $limit]) { $this->assertSame($expected, \pmssTextLines($raw, $limit)); }
+    }
+
     public function testUnsignedDecimalIntParserKeepsExactBoundaries(): void
     {
         foreach (['0' => 0, '000' => 0, '0012' => 12, (string) PHP_INT_MAX => PHP_INT_MAX, '000'.PHP_INT_MAX => PHP_INT_MAX] as $raw => $expected) {

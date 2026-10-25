@@ -58,8 +58,7 @@ function pmssSystemStatsCpuCountersFromRaw(?string $raw): array
 {
     if ($raw === null) return [];
 
-    $lines = preg_split('/\r?\n/', $raw, 2);
-    $parts = pmssConfigLineColumns((string) ($lines[0] ?? ''), 6, []);
+    $parts = pmssConfigLineColumns(pmssTextLines($raw, 2)[0], 6, []);
     if ($parts === [] || array_shift($parts) !== 'cpu') return [];
 
     $counters = array_map('pmssUnsignedDecimalIntParse', $parts);

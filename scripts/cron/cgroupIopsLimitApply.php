@@ -78,7 +78,7 @@ function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $
     $desired = $majMin.' '.$iops;
     // Current may contain other-device entries; check whether OUR device line matches.
     $hasMatch = false;
-    foreach (preg_split('/\r?\n/', $cur) ?: [] as $line) {
+    foreach (pmssTextLines($cur) as $line) {
         if (trim($line) === $desired) { $hasMatch = true; break; }
     }
     if ($hasMatch) {
