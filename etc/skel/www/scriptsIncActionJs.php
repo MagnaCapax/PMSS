@@ -29,10 +29,7 @@ function pmssShowActionNotice(message, isError) {
     }
 
     notice.stop(true, true);
-    notice.removeClass('pmss-error');
-    if (isError) {
-        notice.addClass('pmss-error');
-    }
+    notice.toggleClass('pmss-error', !!isError);
 
     notice.text(message).fadeIn('fast');
 
@@ -48,9 +45,9 @@ function pmssShowActionNotice(message, isError) {
 function pmssSetActionLoading(button, isLoading) {
     var actionButton = $(button);
     var indicator = actionButton.next('.pmss-action-loading');
+    actionButton.prop('disabled', !!isLoading);
 
     if (isLoading) {
-        actionButton.attr('disabled', 'disabled');
         if (indicator.length === 0) {
             indicator = $('<span class="pmss-action-loading" aria-live="polite">&#8987; Working...</span>');
             actionButton.after(indicator);
@@ -59,10 +56,7 @@ function pmssSetActionLoading(button, isLoading) {
         return;
     }
 
-    actionButton.removeAttr('disabled');
-    if (indicator.length > 0) {
-        indicator.hide();
-    }
+    indicator.hide();
 }
 
 function pmssActionRequest(action, passwordValue) {
@@ -143,19 +137,11 @@ function pmssMediaStackApply(payload) {
     }
 
     if (button.length > 0 && payload) {
-        if (payload.canStart) {
-            button.removeAttr('disabled');
-        } else {
-            button.attr('disabled', 'disabled');
-        }
+        button.prop('disabled', !payload.canStart);
     }
 
     if (recoveryButton.length > 0 && payload) {
-        if (payload.canRestart) {
-            recoveryButton.removeAttr('disabled').show();
-        } else {
-            recoveryButton.attr('disabled', 'disabled').hide();
-        }
+        recoveryButton.prop('disabled', !payload.canRestart).toggle(!!payload.canRestart);
     }
 
     pmssMediaStackPollSchedule(payload && payload.poll ? 4000 : 0);
@@ -207,10 +193,6 @@ function pmssMediaStackAction(button, action, pendingMessage, failureMessage) {
 
 function pmssMediaStackStart(button) {
     pmssMediaStackAction(button, 'start', 'Starting media stack install...', 'Media stack install could not be started from the panel.');
-}
-
-function pmssMediaStackStartStopped(button) {
-    pmssMediaStackAction(button, 'start-stopped', 'Starting stopped media-stack apps...', 'Stopped media-stack apps could not be started from the panel.');
 }
 
 function pmssMediaStackSecureApp(button, app) {
@@ -322,9 +304,9 @@ function pmssAppsAct(button, id, action) {
     });
 }
 $(document).on('click', '.row[data-app] button[data-action]', function() { pmssAppsAct(this, $(this).closest('.row').attr('data-app'), $(this).attr('data-action')); });
-$(document).on('click', '#pmss-start-all[data-bulk-action]', function() { pmssAppsBulk(this, $(this).attr('data-bulk-action')); });
-function pmssAppsBulk(button, action) { pmssMediaStackAction(button, action, 'Starting stopped apps…', 'Could not start stopped apps.'); }
-function pmssAppsInstall(button) { pmssMediaStackStart(button); }
+$(document).on('click', '#pmss-start-all[data-bulk-action]', function() {
+    pmssMediaStackAction(this, $(this).attr('data-bulk-action'), 'Starting stopped apps…', 'Could not start stopped apps.');
+});
 function pmssAppsRestartAll(button) {
     $(button).prop('disabled', true);
     $.getJSON(pmssAppsStatusUrl(), function(status) {

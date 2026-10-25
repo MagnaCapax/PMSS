@@ -1173,6 +1173,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   Requiring `appsLsioCatalog.php` remains standalone and returns the same ordered
   `name`, `title`, `description`, `category`, `image`, and `guide` fields; its source
   stores the first four fields and derives both links from `name`.
+- Install and bulk-start controls call the shared media-stack actions directly. Loading, error, and recovery controls apply boolean UI state; absent controls and payloads retain their existing no-op behavior.
 - Both `welcome.php?status=1` and `apps.php?status=1` emit the same live tmux, native-process, marker, and media-stack auth state; both are read-only. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
 - A media app's tmux state is running only when its sole pane was launched from that app's installer directory. The root watchdog uses the same check; a same-named shell session is not an app.
 - If the guiv-delivered Apps status part is absent, that Apps feed returns HTTP 503 JSON with `updating: true` and a reload message. The shared status poll shows the message in app rows and stops retrying; other transient failures still retry.

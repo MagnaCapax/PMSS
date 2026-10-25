@@ -96,7 +96,7 @@ function pmssCustomerAppsMediaRowsBuild(array $status): string
             ? array_column(pmssMediaStackPanelAppDefinitionsRead(), 'label') : array(), array('Cloudplow')));
         return pmssCustomerAppRowStart('Media Stack is not installed', $names)
             .'<div class="desc" id="pmss-install-progress">'.pmssCustomerHtmlAttr($status['message']).'</div>'
-            .'<div class="acts"><button type="button" class="b b-pri" onclick="pmssAppsInstall(this)"'
+            .'<div class="acts"><button type="button" class="b b-pri" onclick="pmssMediaStackStart(this)"'
             .(!empty($status['canStart']) && is_file(__DIR__.'/mediaStack.php') ? '' : ' disabled').'>Install Media Stack</button></div></div>';
     }
     $html = '';
