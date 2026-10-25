@@ -24,7 +24,7 @@ function pmssPinnedRemoteAmd64OrSkip(string $label, string $action = 'bootstrap'
 function pmssPinnedRemoteVersionMatches(string $binary, string $marker, string $version): bool { return is_file($binary) && !is_link($marker) && trim((string) @file_get_contents($marker)) === $version; }
 
 /** Publish a version only through a safe regular marker path after installation. */
-function pmssPinnedRemoteVersionMarkerWrite(string $marker, string $version): bool { return pmssPathTargetIsSafe($marker, false, true) && @file_put_contents($marker, $version."\n") === strlen($version) + 1; }
+function pmssPinnedRemoteVersionMarkerWrite(string $marker, string $version): bool { return pmssPathTargetIsSafe($marker, false, true) && pmssFileWriteComplete($marker, $version."\n"); }
 
 /** Install a portable tar binary and write its marker only after a successful install. */
 function pmssPinnedRemotePortableTarInstall(string $label, string $url, string $sha256, string $root, string $binary, string $version): void

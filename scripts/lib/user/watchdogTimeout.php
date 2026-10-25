@@ -47,7 +47,7 @@ function pmssUserWatchdogBackoffRecord(string $username, string $service, ?int $
     if ($path === null || !pmssPathTargetIsSafe($path, false, true)) return;
     $fresh = pmssUserWatchdogBackoffActive($username, $service, $now);
     $bytes = (string) $now;
-    if (@file_put_contents($path, $bytes, LOCK_EX) !== strlen($bytes)) return;
+    if (!pmssFileWriteComplete($path, $bytes, LOCK_EX)) return;
     @chmod($path, 0600);
     if (!$fresh) error_log('Watchdog '.$service.' for '.$username.' timed out; skipping starts and probes for 15 minutes');
 }

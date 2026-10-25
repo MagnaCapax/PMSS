@@ -1,5 +1,6 @@
 <?php
 /** Pinned Codex layout and atomic publication helpers for aiToolsInstall.php. */
+require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
 
 const PMSS_AI_CODEX_TAG = 'rust-v0.93.0';
 // A pin bump requires a live Virsilipas check before adding another chat-capable tag.
@@ -49,7 +50,7 @@ function pmssAiToolsCodexAtomicWrite(string $path, string $content, int $mode, i
     }
     try {
         if (dirname($temporary) !== dirname($path)
-            || @file_put_contents($temporary, $content) !== strlen($content)
+            || !pmssFileWriteComplete($temporary, $content)
             || !@chmod($temporary, $mode)
             || !@chown($temporary, $owner)
             || !@chgrp($temporary, $group)) {

@@ -1,6 +1,7 @@
 <?php
 /** Build the delivered, documentation-only LinuxServer.io app catalog. */
 require_once dirname(__DIR__).'/lib/log.php';
+require_once __DIR__.'/../lib/runtime/filesystem.php';
 const PMSS_LSIO_SOURCE = 'https://api.linuxserver.io/api/v1/images?include_config=false';
 const PMSS_LSIO_EXCLUDED = array(
     // PMSS already provides these applications: media stack (jellyfin, sonarr, radarr, prowlarr, sabnzbd),
@@ -55,8 +56,7 @@ function pmssLsioCatalogWrite(string $target, string $output): bool
     }
 
     // A short write or failed mode change must leave the previous snapshot intact.
-    $ready = @file_put_contents($temporary, $output) === strlen($output)
-        && @chmod($temporary, 0644);
+    $ready = pmssFileWriteComplete($temporary, $output) && @chmod($temporary, 0644);
     if (!$ready || !@rename($temporary, $target)) {
         @unlink($temporary);
         return false;

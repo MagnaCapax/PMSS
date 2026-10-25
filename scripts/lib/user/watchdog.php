@@ -154,8 +154,7 @@ function pmssUserWatchdogCrashState(string $username, string $app, ?array $next 
     if (!pmssPathTargetIsSafe($path, false, true)) return ['storageError' => true];
     if ($next !== null) {
         $bytes = json_encode($next);
-        return is_string($bytes) && @file_put_contents($path, $bytes, LOCK_EX) === strlen($bytes)
-            ? $next : ['storageError' => true];
+        return is_string($bytes) && pmssFileWriteComplete($path, $bytes, LOCK_EX) ? $next : ['storageError' => true];
     }
     $old = is_file($path) ? @file_get_contents($path) : null;
     if ($old === false) return ['storageError' => true];
