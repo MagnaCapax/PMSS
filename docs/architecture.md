@@ -98,6 +98,11 @@ Keep the canonical installer/update details under `docs/install.md` and
   bounded probes; `deviceParse.php` interprets text without I/O. `deviceMetrics.php`
   shares ordered matching, threshold selection, counter growth and entry status.
   SMART retains last-line precedence; NVMe retains first-match precedence (ADR 0173).
+- **scripts/lib/storageBenchmark.php** – Stable CLI and guarded probe facade.
+  `storageBenchmark/jobs.php` owns the ordered catalogs and shared fio/dd job
+  execution; `homeDeviceInspection.php` inspects the mounted device without
+  running jobs. The mounted-device controller retains its fio-unavailable
+  fallback, and `report.php` owns live and saved summaries (ADR 0178).
 
 ## Package Strategy
 - Per-release bootstrap baselines live under `scripts/lib/update/dpkg/`; the installer only ensures core tools. System-level apps are built via update-step2 modules, while per-account media-stack apps stay in the skeleton/user maintenance tooling.

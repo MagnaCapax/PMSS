@@ -116,3 +116,14 @@ function storageBenchmarkShowLast(string $jsonLog): int
     }
     return 0;
 }
+
+/** Live summaries retain the same formatting as the CLI's historical output. */
+function storageBenchmarkPrintFileSummary(string $targetDir, string $jsonLog, string $label, array $summary): void { echo "\n== Storage benchmark summary ".($label !== '' ? '(' . $label . ' on '.$targetDir.')' : "(on {$targetDir})")." ==\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95_ms\twrite_p95_ms\n"; foreach ($summary as $row) printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", ...$row); echo "\nJSON log: {$jsonLog}\n"; }
+function storageBenchmarkMedian(array $values): float { sort($values); $n = count($values); if ($n === 0) return 0.0; $m = (int) floor(($n - 1) / 2); return $n % 2 ? (float) $values[$m] : (($values[$m] + $values[$m + 1]) / 2); }
+function storageBenchmarkPeerMedian(array $peer, string $key): float { return storageBenchmarkMedian(array_filter(array_column($peer, $key), static function ($value): bool { return $value !== null; })); }
+
+function storageBenchmarkPrintPeerWarnings(array $peer): void
+{
+    $medDd = storageBenchmarkPeerMedian($peer, 'dd_mb'); $medIop = storageBenchmarkPeerMedian($peer, 'iop_ms'); $med4k = storageBenchmarkPeerMedian($peer, 'fio4k_mb');
+    foreach ($peer as $p => $r) { if ($medDd > 0 && isset($r['dd_mb']) && $r['dd_mb'] < 0.6 * $medDd) echo "WARN: {$p} seqread < 60% median\n"; if ($medIop > 0 && isset($r['iop_ms']) && $r['iop_ms'] > max(50, 2 * $medIop)) echo "WARN: {$p} ioping > 2x median\n"; if ($med4k > 0 && isset($r['fio4k_mb']) && $r['fio4k_mb'] < 0.5 * $med4k) echo "WARN: {$p} 4k randread < 50% median\n"; }
+}
