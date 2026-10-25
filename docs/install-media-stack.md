@@ -65,8 +65,9 @@ Note: Jellyfin requires FFmpeg 4.4+ for startup. The script uses distro ffmpeg w
 - Jellyfin: `https://repo.jellyfin.org/files/server/linux/latest-stable/<arch>/` (scraped for latest tarball), or explicit override
 - SABnzbd: latest GitHub release `-src` asset
 - Autobrr: latest GitHub release Linux tarball for the detected architecture
+- ASP.NET: `https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json`; selects the latest 8.0 release's Linux runtime URL and SHA512 for x64, arm64, or arm. Missing or invalid metadata aborts installation; the runtime must match the published SHA512 before extraction.
 
-Every URL may be overridden via CLI flags (below). The script verifies each URL in dry‑run/verify‑only mode.
+App URLs may be overridden via CLI flags (below). The script verifies each URL in dry‑run/verify‑only mode. These modes resolve runtime metadata but do not download or hash the runtime archive.
 
 ## Installing the Installer
 

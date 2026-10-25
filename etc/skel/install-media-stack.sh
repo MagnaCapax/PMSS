@@ -577,6 +577,7 @@ fetch() {
 
 fetch_verified_archive() {
 	local url="$1" archive="$2" label="$3" checksum_id="${4:-}"
+	local sha512="${5:-}"
 	[[ -n "$checksum_id" ]] || checksum_id=$(basename "${url%%\?*}")
 
 	if ! fetch "$url" "$archive"; then
@@ -587,6 +588,49 @@ fetch_verified_archive() {
 		log_err "${label} download failed integrity check — aborting"
 		exit 1
 	fi
+	# Upstream release metadata supplies a mandatory second check for the runtime.
+	if [[ $DRY_RUN -eq 0 && -n "$sha512" ]]; then
+		if ! printf '%s  %s\n' "$sha512" "$archive" | sha512sum --check --status; then
+			log_err "${label} download failed SHA512 integrity check — aborting"
+			exit 1
+		fi
+	fi
+}
+
+aspnetcore_resolve_download_url() {
+	local artifact
+	# Parse structured metadata with the PHP already used for app configuration.
+	# shellcheck disable=SC2016
+	if ! artifact=$(fetch_text "https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json" | php -r '
+		$data = json_decode(stream_get_contents(STDIN), true);
+		$arch = $argv[1];
+		$version = $data["latest-release"] ?? null;
+		if (!is_array($data) || !is_string($version) || !preg_match("/^8\\.0\\.[0-9]+$/D", $version)
+			|| !in_array($arch, ["x64", "arm64", "arm"], true) || !is_array($data["releases"] ?? null)) { exit(1); }
+		foreach ($data["releases"] as $release) {
+			if (!is_array($release) || ($release["release-version"] ?? null) !== $version) { continue; }
+			$runtime = $release["aspnetcore-runtime"] ?? null;
+			if (!is_array($runtime) || ($runtime["version"] ?? null) !== $version
+				|| !is_array($runtime["files"] ?? null)) { exit(1); }
+			foreach ($runtime["files"] as $file) {
+				if (!is_array($file) || ($file["name"] ?? null) !== "aspnetcore-runtime-linux-".$arch.".tar.gz"
+					|| ($file["rid"] ?? null) !== "linux-".$arch) { continue; }
+				$url = "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/".$version
+					."/aspnetcore-runtime-".$version."-linux-".$arch.".tar.gz";
+				$hash = $file["hash"] ?? null;
+				// Keep metadata from selecting another origin, release, or artifact.
+				if (($file["url"] ?? null) !== $url || !is_string($hash)
+					|| !preg_match("/^[a-fA-F0-9]{128}$/D", $hash)) { exit(1); }
+				echo $url, "\t", strtolower($hash), "\n";
+				exit(0);
+			}
+		}
+		exit(1);
+	' -- "$DOTNET_ARCH"); then
+		log_err "Could not resolve ASP.NET runtime URL and SHA512 from Microsoft release metadata"
+		return 1
+	fi
+	IFS=$'\t' read -r ASPDOTNET_URL ASPDOTNET_SHA512 <<<"$artifact"
 }
 
 autobrr_resolve_download_url() {
@@ -1370,7 +1414,7 @@ if [[ -z "$SECURE_APP" ]]; then
 	log_step "Checking dependencies..."
 	MISSING_CMDS=()
 
-	for cmd in ss tmux git python3 tar dpkg getconf; do
+	for cmd in ss tmux git python3 tar dpkg getconf php sha512sum; do
 		if ! command -v "$cmd" >/dev/null 2>&1; then
 			MISSING_CMDS+=("$cmd")
 		fi
@@ -1495,9 +1539,8 @@ if [[ -z "$SECURE_APP" ]]; then
 		JELLYFIN_URL="${JF_REPO_BASE}${JF_FILENAME}"
 	fi
 
-	# ASP.NET Core Runtime (Microsoft aka.ms Links)
-	# These redirect to the latest patch version of .NET 8 (LTS)
-	ASPDOTNET_URL="https://aka.ms/dotnet/8.0/aspnetcore-runtime-linux-${DOTNET_ARCH}.tar.gz"
+	# Resolve the current .NET 8 patch and its published hash without aka.ms aliases.
+	aspnetcore_resolve_download_url
 
 	log_info "SABnzbd: ${SABNZBD_VERSION:-unknown}"
 	log_info "Autobrr: ${AUTOBRR_VERSION:-unknown}"
@@ -2663,7 +2706,7 @@ installdir="$HOME/.bin/dotnet"
 managed_install_path_reset "$installdir"
 mkdir -p "$installdir"
 cd "$installdir"
-fetch_verified_archive "$ASPDOTNET_URL" "aspnetcore.tar.gz" "ASP.NET runtime"
+fetch_verified_archive "$ASPDOTNET_URL" "aspnetcore.tar.gz" "ASP.NET runtime" "" "$ASPDOTNET_SHA512"
 if [[ $DRY_RUN -eq 0 && ! -f "aspnetcore.tar.gz" ]]; then
 	log_err "Failed to find downloaded ASP.NET archive"
 	exit 1

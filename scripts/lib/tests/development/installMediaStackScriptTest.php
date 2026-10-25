@@ -213,6 +213,101 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringNotContainsString($oldRemoveCommand, $this->script);
     }
 
+    public function testAspnetcoreMetadataSelectsLatestReleaseForEachArchitecture(): void
+    {
+        foreach (['x64', 'arm64', 'arm'] as $arch) {
+            $metadata = $this->aspnetcoreMetadataFixture($arch);
+            // A previous release and a different runtime asset must never win selection.
+            array_unshift($metadata['releases'], ['release-version' => '8.0.1']);
+            array_unshift($metadata['releases'][1]['aspnetcore-runtime']['files'], ['name' => 'dotnet-runtime-linux-'.$arch.'.tar.gz']);
+            $output = $this->aspnetcoreResolverHarness(json_encode($metadata), $arch);
+            $file = $metadata['releases'][1]['aspnetcore-runtime']['files'][1];
+            $this->assertStringContainsString('resolved:'.$file['url'].'|'.strtolower($file['hash']), $output);
+            $this->assertStringContainsString('releases.json', $output);
+        }
+        $this->assertStringContainsString('fetch_verified_archive "$ASPDOTNET_URL" "aspnetcore.tar.gz" "ASP.NET runtime" "" "$ASPDOTNET_SHA512"', $this->script);
+    }
+
+    public function testAspnetcoreMetadataRejectsMissingMalformedAndMismatchedFields(): void
+    {
+        $valid = $this->aspnetcoreMetadataFixture('x64');
+        $invalid = ['{', 'null', '[]', '"text"'];
+        foreach (['latest-release' => '9.0.1', 'releases' => null] as $key => $value) {
+            $metadata = $valid;
+            $metadata[$key] = $value;
+            $invalid[] = json_encode($metadata);
+        }
+        foreach (['name' => 'aspnetcore-runtime-linux-arm.tar.gz', 'rid' => 'linux-arm',
+            'url' => 'https://example.invalid/runtime.tar.gz', 'hash' => null,
+            'hash-short' => str_repeat('a', 127), 'hash-nonhex' => str_repeat('z', 128)] as $key => $value) {
+            $metadata = $valid;
+            $metadata['releases'][0]['aspnetcore-runtime']['files'][0][strpos($key, 'hash') === 0 ? 'hash' : $key] = $value;
+            $invalid[] = json_encode($metadata);
+        }
+        foreach (['version' => '8.0.1', 'files' => null] as $key => $value) {
+            $metadata = $valid;
+            $metadata['releases'][0]['aspnetcore-runtime'][$key] = $value;
+            $invalid[] = json_encode($metadata);
+        }
+        foreach ($invalid as $json) {
+            $output = $this->aspnetcoreResolverHarness($json, 'x64');
+            $this->assertStringContainsString('rejected', $output);
+            $this->assertStringNotContainsString('resolved:', $output);
+        }
+        // A transfer error must reject even a complete-looking response body.
+        $this->assertStringContainsString('rejected', $this->aspnetcoreResolverHarness(json_encode($valid), 'x64', 1));
+        $this->assertStringContainsString('rejected', $this->aspnetcoreResolverHarness(json_encode($valid), 'riscv64'));
+    }
+
+    private function aspnetcoreMetadataFixture(string $arch): array
+    {
+        return ['latest-release' => '8.0.33', 'releases' => [['release-version' => '8.0.33',
+            'aspnetcore-runtime' => ['version' => '8.0.33', 'files' => [[
+                'name' => 'aspnetcore-runtime-linux-'.$arch.'.tar.gz', 'rid' => 'linux-'.$arch,
+                'url' => 'https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.33/aspnetcore-runtime-8.0.33-linux-'.$arch.'.tar.gz',
+                'hash' => str_repeat('A', 128),
+            ]]],
+        ]]];
+    }
+
+    private function aspnetcoreResolverHarness(string $json, string $arch, int $fetchRc = 0): string
+    {
+        return $this->pmssRunShellHarness("#!/usr/bin/env bash\nset -euo pipefail\n"
+            .'DOTNET_ARCH='.escapeshellarg($arch)."\n"
+            .'fetch_text() { echo "$1" >&2; printf "%s" '.escapeshellarg($json).'; return '.$fetchRc."; }\n"
+            ."log_err() { echo \"\$*\" >&2; }\n"
+            .$this->pmssExtractShellFunction($this->script, 'aspnetcore_resolve_download_url')."\n"
+            .'if aspnetcore_resolve_download_url; then printf "resolved:%s|%s\\n" "$ASPDOTNET_URL" "$ASPDOTNET_SHA512"; else echo rejected; fi'."\n");
+    }
+
+    public function testArchiveSha512StopsFailuresAndPreservesExistingVerification(): void
+    {
+        $fixture = $this->pmssMakeTempFile('pmss-aspnetcore-archive-');
+        $this->pmssWriteFile($fixture, 'runtime fixture');
+        $functions = $this->pmssExtractShellFunction($this->script, 'fetch_verified_archive');
+        $hash = hash('sha512', 'runtime fixture');
+        foreach (['valid', 'mismatch', 'missing', 'fetch-failed', 'checksum-failed', 'dry-run', 'legacy'] as $scenario) {
+            $archive = $scenario === 'missing' ? $fixture.'.missing' : $fixture;
+            $expectedHash = $scenario === 'mismatch' ? str_repeat('0', 128) : ($scenario === 'legacy' ? '' : $hash);
+            $output = $this->pmssRunShellHarness("#!/usr/bin/env bash\nset -euo pipefail\n"
+                .'DRY_RUN='.($scenario === 'dry-run' ? '1' : '0')."\n"
+                .'fetch() { echo fetched; return '.($scenario === 'fetch-failed' ? '1' : '0')."; }\n"
+                .'verify_checksum() { echo existing-check; return '.($scenario === 'checksum-failed' ? '1' : '0')."; }\n"
+                ."log_err() { echo \"\$*\" >&2; }\n"
+                // Dry-run must not hash even when an old archive already exists.
+                .($scenario === 'dry-run' ? "sha512sum() { echo unexpected-hash; return 1; }\n" : '')
+                .$functions."\n(fetch_verified_archive https://example.invalid/runtime.tar.gz "
+                .escapeshellarg($archive).' runtime "" '.escapeshellarg($expectedHash)
+                .') && echo accepted || echo rejected'."\n");
+            $accept = in_array($scenario, ['valid', 'dry-run', 'legacy'], true);
+            $this->assertStringContainsString($accept ? 'accepted' : 'rejected', $output);
+            $this->assertStringNotContainsString('unexpected-hash', $output);
+            if ($scenario !== 'fetch-failed') {
+                $this->assertStringContainsString('existing-check', $output);
+            }
+        }
+    }
+
     public function testSabnzbdConfiguresAuthAndKeepsProxiedWebUiAccess(): void
     {
         $this->assertStringContainsAllStrings([
