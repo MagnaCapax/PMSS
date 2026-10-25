@@ -447,7 +447,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     `.billingClientId`; target provisioning records service identity in the
     target's root store (ADR 0152); the client ID is present once recorded there.
   - Main rsync excludes server-specific torrent client configs such as
-    `~/.config/qBittorrent/qBittorrent.conf`.
+    `~/.config/qBittorrent/qBittorrent.conf`. These and other home-level state
+    exclusions are anchored to the transfer root, so nested customer files and
+    directories with the same names still copy. Only `*.pmss-tmp-*` matches at
+    every depth.
   - Final rsync copies session data but excludes the source host's
     `session/rtorrent.lock`; the target keeps its own runtime lock.
   - Both rsync passes use one `--one-file-system`: recursion leaves separate

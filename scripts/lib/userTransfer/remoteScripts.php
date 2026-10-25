@@ -72,12 +72,13 @@ function pmssUserTransferBuildRsyncCommand(
 
 function pmssUserTransferBuildRsyncMain(array $cfg): string
 {
+    // Home-level state must not hide customer data with the same names deeper in the tree.
     $excludes = [
-        '.rtorrent.rc', '.config/qBittorrent/qBittorrent.conf', '.qbittorrentPort', '.config/pmss-user.json', '.config/deluge/core.conf',
-        '.config/deluge/web.conf', '.cache', 'www', 'session', 'www/rutorrent/share',
-        '.lighttpd', '.logs', '.local', '.lighttpd.conf', '.quota', '.rtorrentExecuteRun', '.trafficData',
-        '.trafficDataLocal', '.trafficDataIngress', '.trafficDataIngressLocal', 'rTorrentLog', '.bonusQuota',
-        '.bonusTraffic', '.trafficLimit', '.resourceData', '*.pmss-tmp-*',
+        '/.rtorrent.rc', '/.config/qBittorrent/qBittorrent.conf', '/.qbittorrentPort', '/.config/pmss-user.json', '/.config/deluge/core.conf',
+        '/.config/deluge/web.conf', '/.cache', '/www', '/session', '/www/rutorrent/share',
+        '/.lighttpd', '/.logs', '/.local', '/.lighttpd.conf', '/.quota', '/.rtorrentExecuteRun', '/.trafficData',
+        '/.trafficDataLocal', '/.trafficDataIngress', '/.trafficDataIngressLocal', '/rTorrentLog', '/.bonusQuota',
+        '/.bonusTraffic', '/.trafficLimit', '/.resourceData', '*.pmss-tmp-*',
         '/.billingId', '/.billingServiceId', '/.billingClientId',
         '/.mcxPikkumies/pikkumies/local',
         '/.hermes',
