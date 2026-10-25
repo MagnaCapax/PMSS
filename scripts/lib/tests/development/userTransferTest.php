@@ -209,7 +209,10 @@ class UserTransferTest extends TestCase
                     if (is_file($bin.'/'.$binary)) unlink($bin.'/'.$binary);
                     continue;
                 }
-                $this->pmssWriteExecutableFile($bin.'/'.$binary, "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)
+                // The last stage drains its input before exiting: the real wc upstream would otherwise race a closed
+                // pipe and print "write error" to stderr, which is fixture noise rather than a pipeline failure.
+                $drain = $binary === 'tr' ? "cat >/dev/null\n" : '';
+                $this->pmssWriteExecutableFile($bin.'/'.$binary, "#!/bin/sh\n".$drain."printf '%s' ".escapeshellarg($output)
                     ."\nexit ".($binary === $failed ? '9' : '0')."\n");
             }
             $this->pmssWithPathPrefixedEnv($bin, [], function () use ($home, $failed): void {
