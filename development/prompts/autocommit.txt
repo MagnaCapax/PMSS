@@ -102,7 +102,7 @@ Substantial means substantial REAL simplification, not substantial line count.
 After committing the arc: STOP. Do not start a second arc in the same session. A second commit is
 permitted ONLY in CI-mode or to fix a verification regression introduced by the first commit.
 
-STOP CONDITIONS (any of these halts before commit):
+STOP CONDITIONS FOR REFACTOR MODES ONLY (other modes use the STOP CONDITIONS list above):
   - Cumulative LOC delta > 0 AND PREFIX is not refactor(safety)
   - Two consecutive verification failures (a baseline failure per AGENTS.md is not one)
   - Context genuinely exhausted (>80 files read or working memory unable to track diff state)
