@@ -29,12 +29,17 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     if ($client === 'transmission' && is_file($home.'/.transmissionDisable'))
         return array('ok' => false, 'status' => 409, 'message' => 'Start Transmission in Apps before switching versions.');
     $dir = $home.'/.config/pmss/torrentClients';
-    if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
-        return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
-    $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
-    if (!is_resource($lock) || !@flock($lock, LOCK_EX | LOCK_NB)) {
-        if (is_resource($lock)) fclose($lock);
-        return array('ok' => false, 'status' => 409, 'message' => 'A '.$client.' switch is already running.');
+    if (function_exists('pmssConfigureTorrentClientLockOpen')) {
+        list($lock, $refused) = pmssConfigureTorrentClientLockOpen($dir, $client, $client);
+        if ($refused !== null) return $refused;
+    } else {
+        if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
+            return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
+        $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
+        if (!is_resource($lock) || !@flock($lock, LOCK_EX | LOCK_NB)) {
+            if (is_resource($lock)) fclose($lock);
+            return array('ok' => false, 'status' => 409, 'message' => 'A '.$client.' switch is already running.');
+        }
     }
     $link = $home.'/bin/'.$client.'/default';
     if (file_exists($link) && !is_link($link)) {

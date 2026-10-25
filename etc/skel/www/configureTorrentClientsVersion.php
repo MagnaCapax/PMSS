@@ -73,3 +73,23 @@ function pmssConfigureTorrentClientMajorDowngrade($previous, $requested): bool
     return strlen($newMajor) < strlen($oldMajor)
         || strlen($newMajor) === strlen($oldMajor) && strcmp($newMajor, $oldMajor) < 0;
 }
+
+/** Open one client's switch lock; a full account is told so instead of "unavailable" or "already running". */
+function pmssConfigureTorrentClientLockOpen($dir, $client, $label)
+{
+    $full = array('ok' => false, 'status' => 507,
+        'message' => 'Your account is out of disk space, so the switch could not start. Nothing was changed. Free some space and try again.');
+    $failed = static function () use ($full) {
+        $error = error_get_last();
+        return is_array($error) && preg_match('/quota exceeded|no space left/i', (string) $error['message']) === 1
+            ? $full : array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
+    };
+    error_clear_last();
+    if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir)) return array(null, $failed());
+    error_clear_last();
+    $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
+    if (!is_resource($lock)) return array(null, $failed());
+    if (@flock($lock, LOCK_EX | LOCK_NB)) return array($lock, null);
+    fclose($lock);
+    return array(null, array('ok' => false, 'status' => 409, 'message' => 'A '.$label.' switch is already running.'));
+}

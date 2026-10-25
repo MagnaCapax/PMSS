@@ -119,12 +119,17 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
     if (!is_dir($home.'/bin/qbittorrent') || is_link($home.'/bin/qbittorrent'))
         return array('ok' => false, 'status' => 503, 'message' => 'The client link directory is unavailable.');
     $dir = $home.'/.config/pmss/torrentClients';
-    if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
-        return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
-    $lock = @fopen($dir.'/qbittorrent.lock', 'ce');
-    if (!is_resource($lock) || !@flock($lock, LOCK_EX | LOCK_NB)) {
-        if (is_resource($lock)) fclose($lock);
-        return array('ok' => false, 'status' => 409, 'message' => 'A qBittorrent switch is already running.');
+    if (function_exists('pmssConfigureTorrentClientLockOpen')) {
+        list($lock, $refused) = pmssConfigureTorrentClientLockOpen($dir, 'qbittorrent', 'qBittorrent');
+        if ($refused !== null) return $refused;
+    } else {
+        if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir))
+            return array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
+        $lock = @fopen($dir.'/qbittorrent.lock', 'ce');
+        if (!is_resource($lock) || !@flock($lock, LOCK_EX | LOCK_NB)) {
+            if (is_resource($lock)) fclose($lock);
+            return array('ok' => false, 'status' => 409, 'message' => 'A qBittorrent switch is already running.');
+        }
     }
     $link = $home.'/bin/qbittorrent/default';
     $old = @readlink($link);
