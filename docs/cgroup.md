@@ -4,7 +4,7 @@ This document explains how PMSS configures Linux cgroups (via systemd) for per�
 
 ## Overview
 
-- Debian 11/12 use cgroup v2 (unified). Debian 10 uses cgroup v1.
+- Production pins cgroup v1 on every Debian version (ADR 0019); v2 detection remains for portability.
 - PMSS detects the kernel cgroup mode and renders a systemd user slice drop‑in accordingly:
   - v2: `etc/seedbox/config/template.cgroup.user-slice.v2.conf`
   - v1: `etc/seedbox/config/template.cgroup.user-slice.v1.conf`
@@ -152,6 +152,53 @@ Inspect and apply limits per user:
 
 - Root slice (user‑0.slice) is never limited. PMSS installs an override and a repair job to enforce this:
   - At boot (after 20 seconds) and every 2 hours: `/scripts/cron/cgroupRootCheck.php` fixes limits if misconfigured.
+
+## Opt-in aggregate I/O placement (v1)
+
+On v1, blk-throttle does not propagate slice limits to child blkio groups.
+The shipped `DefaultIOAccounting=yes` creates those groups for account scopes
+and services, so populated slice throttle files alone do not prove enforcement.
+BFQ weights remain hierarchical. ADR 0176 records the placement fix.
+
+Before enabling it, run `/scripts/cron/cgroupIopsLimitApply.php --census` as root.
+This read-only TSV report lists each configured account's computed read cap,
+explicit write cap, recent read-IOPS P95, valid interval count and immediate
+blkio child-directory count. `none` means no cap; `n/a` means unavailable data.
+The existing direct-writer policy computes the caps, including explicit
+overrides, storage-class floors and the md derivation exclusion.
+
+P95 uses nearest rank over counter-delta rates in the last 24 hours from
+`/var/log/pmss/metrics/<account>` and its uncompressed `.1` rotation. Each file
+is limited to 16 MiB; larger/unreadable files are skipped. Timestamps use the
+collector's local timezone. Duplicate timestamps are deduplicated; resets,
+invalid counters and intervals over 15 minutes are omitted. These are
+**slice-local** counters: child I/O can be missing before placement is fixed.
+A low or zero P95 is not evidence that a cap is safe. Child-directory counts
+include empty remnants and do not prove where processes run. Check actual
+process membership and obtain representative uncapped measurements on testing
+machines before planning rollout; the census does not authorize activation.
+
+Set `cgroup.ioSlicePlacement` to boolean `true` in `cgroup.policy.php` to opt in.
+The default is `false`. During runtime-template convergence on v1, PMSS installs
+`/etc/systemd/system.conf.d/90-pmss-io-placement.conf` with
+`DefaultIOAccounting=no` before its existing systemd reexec. Account slices keep
+their explicit accounting and weights, while new scopes use the slice's blkio
+group and share one aggregate cap. This also makes existing slice bandwidth
+limits effective; inspect those values before activation. System services lose
+default per-unit I/O accounting unless explicitly requested.
+
+Already-running delegated user managers can retain their child blkio groups,
+including rootless Docker and containers. Plan a user-manager restart or reboot
+and verify membership before calling rollout complete. PMSS does not restart
+accounts or move their processes automatically. Explicit I/O properties in
+local unit drop-ins can still create child groups and require inspection.
+Buffered-write limitations and the separate monthly-clamp persistence defect
+are unchanged.
+
+Setting the switch back to `false` and running runtime-template convergence
+removes only the PMSS placement drop-in before reexec, restoring the shipped
+manager default. Unknown/v2 mode also removes that drop-in. Dry runs do not
+create or remove it. No sysfs path guard or throttle validator is widened.
 
 ## Integration Hooks
 

@@ -5,6 +5,10 @@
 // Guardrails still apply in code: MemoryHigh >= 250MiB; MemoryMax <= 95% of system RAM.
 return [
     'cgroup' => [
+        // Opt in only after the IOPS census and a planned user-manager restart/reboot.
+        // false preserves per-unit accounting and today's effective cap placement.
+        'ioSlicePlacement' => false,
+
         // Per-user derived read-IOPS caps may oversell the measured host ceiling.
         // 2.0 means PMSS assigns up to 200% of the passive host read-IOPS estimate.
         'assignMax' => ['iops' => 2.0],

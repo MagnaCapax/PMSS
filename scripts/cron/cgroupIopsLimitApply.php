@@ -31,10 +31,12 @@ declare(strict_types=1);
 require_once __DIR__.'/../lib/cgroup/directApply.php';
 require_once __DIR__.'/../lib/cgroup/policy.php';
 require_once __DIR__.'/../lib/cgroup/ioCeilingHistory.php';
+require_once __DIR__.'/../lib/cgroup/iopsCensus.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
 $DRY_RUN = in_array('--dry-run', $argv ?? [], true);
+$CENSUS = in_array('--census', $argv ?? [], true);
 
 pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here');
 
@@ -119,6 +121,10 @@ $derivationAllowed = !$homeMdBacked && pmssCgroupPolicyReadIopsDerivationAllowed
     static function (string $message): void { syslog(LOG_WARNING, $message); }
 );
 
+if ($CENSUS) {
+    fwrite(STDERR, "Census uses slice-local telemetry: child I/O may be missing; low P95 values do not prove rollout safety.\n");
+    echo "user\tuid\tread_cap\twrite_cap\tread_p95_24h\tintervals\tblkio_children\n";
+}
 foreach ($userConfigs as $user => $json) {
     $readIops  = pmssIopsParseSpec($json['IOReadIOPS']  ?? null);
     $writeIops = pmssIopsParseSpec($json['IOWriteIOPS'] ?? null);
@@ -133,7 +139,7 @@ foreach ($userConfigs as $user => $json) {
             $derivationAllowed
         );
     }
-    if ($readIops === null && $writeIops === null) {
+    if ($readIops === null && $writeIops === null && !$CENSUS) {
         continue; // no caps configured or derived for this user
     }
     $total++;
@@ -143,6 +149,10 @@ foreach ($userConfigs as $user => $json) {
     $limits = [$readIops, $writeIops];
 
     $sliceDir = pmssCgroupDirectUserSliceDir($uid);
+    if ($CENSUS) {
+        pmssCgroupIopsCensusPrint($user, $uid, $readIops, $writeIops, $sliceDir);
+        continue; // Census never reaches the throttle writer, even with --dry-run.
+    }
     if (!is_dir($sliceDir)) {
         $skippedNoSlice++;
         continue;
@@ -171,4 +181,5 @@ foreach ($userConfigs as $user => $json) {
     }
 }
 
+if ($CENSUS) { closelog(); exit($errors > 0 ? 1 : 0); }
 exit(pmssCgroupDirectFinishCycle($DRY_RUN, $total, $written, $skippedNoSlice, $errors));

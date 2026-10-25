@@ -9,6 +9,7 @@
 foreach (['../logging.php', '../managedPath.php', '../runtime/commands.php', 'quota.php', '../../configBackups.php', '../../runtime.php'] as $relativePath) {
     require_once __DIR__.'/'.$relativePath;
 }
+require_once __DIR__.'/ioPlacement.php';
 
 /**
  * Apply hostname overrides provided by the installer.
@@ -266,8 +267,10 @@ function pmssApplyRuntimeTemplates(): void
         ['Executing rc.local to apply runtime tweaks', 'nohup /etc/rc.local >> /dev/null 2>&1'],
         ['Installing systemd system.conf template', 'cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf'],
         ['Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf'],
-        ['Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec'],
     ] as $action) { runStep(...$action); }
+
+    pmssCgroupIoPlacementConfigure(pmssCgroupPolicyLoad(), pmssCgroupMode());
+    runStep('Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec');
 
     pmssEnsureSshdStarvationDropin();
     pmssResetInheritedOomImmunity();
