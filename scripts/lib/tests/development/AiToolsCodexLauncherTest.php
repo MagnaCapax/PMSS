@@ -1,37 +1,21 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../../update/apps/templates/pmss-ai-launch.php';
-require_once __DIR__.'/../../update/apps/aiToolsCodex.php';
+require_once __DIR__.'/../common/AiToolsLauncherTestCase.php';
 
-class AiToolsCodexLauncherTest extends TestCase
+class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
 {
-    protected function pmssTempDirFixtureArguments(): array
-    {
-        return ['tempDir', 'pmss-ai-codex-'];
-    }
+    protected const TOOL = 'codex';
 
     public function testPrecedenceTable(): void
     {
         $env = ['HOME' => '/tmp/pmss-test-home'];
-        $state = ['uid' => 1000, 'keyFileValid' => true, 'key' => 'private-test-key',
-            'endpoint' => 'https://virsilipas.mcx.fi/v1', 'authExists' => false, 'configChoice' => false];
-        $cases = [
-            'opt off' => [['PMSS_VIRSILIPAS' => 'off'], [], []],
-            'opt zero' => [['PMSS_VIRSILIPAS' => '0'], [], []],
-            'opt no' => [['PMSS_VIRSILIPAS' => 'no'], [], []],
-            'root' => [[], ['uid' => 0], []],
-            'home absent' => [['HOME' => ''], [], []],
-            'key missing' => [[], ['keyFileValid' => false], []],
+        $state = $this->launcherState(['authExists' => false]);
+        $cases = array_merge($this->launcherPassthroughCases(), [
             'key symlink' => [[], ['keyFileValid' => false], []],
             'key nonregular' => [[], ['keyFileValid' => false], []],
             'key other owner' => [[], ['keyFileValid' => false], []],
-            'key empty' => [[], ['key' => ''], []],
             'key whitespace' => [[], ['key' => 'with space'], []],
-            'key Unicode whitespace' => [[], ['key' => "bad\xC2\xA0key"], []],
-            'key control' => [[], ['key' => "bad\nkey"], []],
-            'key invalid encoding' => [[], ['key' => "bad\xFFkey"], []],
             'endpoint http' => [[], ['endpoint' => 'http://virsilipas.mcx.fi/v1'], []],
             'endpoint query' => [[], ['endpoint' => 'https://virsilipas.mcx.fi/v1?key=x'], []],
             'endpoint quote' => [[], ['endpoint' => 'https://bad".example/v1'], []],
@@ -39,7 +23,6 @@ class AiToolsCodexLauncherTest extends TestCase
             'own key' => [['OPENAI_API_KEY' => 'own'], [], []],
             'own key zero' => [['OPENAI_API_KEY' => '0'], [], []],
             'own base' => [['OPENAI_BASE_URL' => 'https://own.example'], [], []],
-            'config choice' => [[], ['configChoice' => true], []],
             'cli provider' => [[], [], ['-c', 'model_provider="own"']],
             'cli provider table' => [[], [], ['--config', 'model_providers.own={}']],
             'cli model' => [[], [], ['--config=model = "own"']],
@@ -52,15 +35,8 @@ class AiToolsCodexLauncherTest extends TestCase
             'logout' => [[], [], ['logout']],
             'completion' => [[], [], ['completion']],
             'help' => [[], [], ['help']],
-        ];
-        foreach ($cases as $label => [$envChange, $stateChange, $args]) {
-            $inputEnv = array_merge($env, $envChange);
-            $result = \pmssAiCodexDecision($args, $inputEnv, array_merge($state, $stateChange));
-            $this->assertSame(array_merge([\PMSS_AI_CODEX_BINARY], $args), $result['argv'], $label);
-            $this->assertSame($inputEnv, $result['env'], $label.' env');
-            $this->assertFalse($result['notice'], $label.' notice');
-        }
-        $this->assertFalse(\pmssAiCodexDecision([], [], $state)['notice'], 'unset HOME');
+        ]);
+        $this->assertLauncherPassthroughCases($cases, $state, $env);
         $result = \pmssAiCodexDecision(['exec', 'hello'], $env, $state);
         $this->assertTrue($result['notice']);
         $this->assertSame('private-test-key', $result['env']['VIRSILIPAS_API_KEY']);

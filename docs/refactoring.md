@@ -291,6 +291,11 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+AI launcher tests share their temporary-directory setup, valid account state,
+passthrough cases, explicit-environment matrix and result assertions through
+`AiToolsLauncherTestCase`. Provider-specific arguments and refusal variants stay
+in each test; runtime launcher code and its credential handling are unchanged.
+
 Pikkumies preinstall markers and detached-job cleanup validate the entire state
 directory path with the shared path guard before creating directories or touching
 account files. Empty, relative, NUL-containing, dot-segment and redirected paths

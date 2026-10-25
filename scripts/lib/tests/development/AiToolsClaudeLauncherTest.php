@@ -1,38 +1,18 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../../update/apps/templates/pmss-ai-launch.php';
-require_once __DIR__.'/../../update/apps/aiToolsCodex.php';
+require_once __DIR__.'/../common/AiToolsLauncherTestCase.php';
 require_once __DIR__.'/../../update/apps/aiToolsClaude.php';
 
-class AiToolsClaudeLauncherTest extends TestCase
+class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
 {
-    protected function pmssTempDirFixtureArguments(): array
-    {
-        return ['tempDir', 'pmss-ai-claude-'];
-    }
+    protected const TOOL = 'claude';
 
     public function testPassthroughPrecedence(): void
     {
         $env = ['HOME' => '/tmp/pmss-test-home'];
-        $state = ['uid' => 1000, 'keyFileValid' => true, 'key' => 'private-test-key',
-            'endpoint' => 'https://virsilipas.mcx.fi/v1', 'configChoice' => false];
-        $cases = [
-            'off' => [['PMSS_VIRSILIPAS' => 'off'], [], []],
-            'zero' => [['PMSS_VIRSILIPAS' => '0'], [], []],
-            'no' => [['PMSS_VIRSILIPAS' => 'no'], [], []],
-            'root' => [[], ['uid' => 0], []],
-            'empty home' => [['HOME' => ''], [], []],
-            'missing key' => [[], ['keyFileValid' => false], []],
-            'empty key' => [[], ['key' => ''], []],
-            'space key' => [[], ['key' => 'bad key'], []],
-            'control key' => [[], ['key' => "bad\nkey"], []],
-            'unicode space' => [[], ['key' => "bad\xC2\xA0key"], []],
-            'invalid key encoding' => [[], ['key' => "bad\xFFkey"], []],
-            'http endpoint' => [[], ['endpoint' => 'http://example.com/v1'], []],
-            'endpoint query' => [[], ['endpoint' => 'https://example.com/v1?x=1'], []],
-            'config choice' => [[], ['configChoice' => true], []],
+        $state = $this->launcherState();
+        $cases = array_merge($this->launcherPassthroughCases(), [
             'model' => [[], [], ['--model', 'opus']],
             'model joined' => [[], [], ['--model=opus']],
             'fallback model' => [[], [], ['--fallback-model', 'sonnet']],
@@ -40,28 +20,17 @@ class AiToolsClaudeLauncherTest extends TestCase
             'settings' => [[], [], ['--settings', '/tmp/own.json']],
             'settings joined' => [[], [], ['--settings=/tmp/own.json']],
             'setup token' => [[], [], ['setup-token']],
-        ];
-        foreach (['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL',
-            'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_OAUTH_TOKEN'] as $name) {
-            $cases[$name] = [[$name => 'own'], [], []];
-            $cases[$name.' zero'] = [[$name => '0'], [], []];
-        }
-        foreach ($cases as $label => [$envChange, $stateChange, $args]) {
-            $input = array_merge($env, $envChange);
-            $decision = \pmssAiClaudeDecision($args, $input, array_merge($state, $stateChange));
-            $this->assertSame(array_merge([\PMSS_AI_CLAUDE_BINARY], $args), $decision['argv'], $label);
-            $this->assertSame($input, $decision['env'], $label.' environment');
-            $this->assertFalse($decision['notice'], $label.' notice');
-        }
-        $this->assertFalse(\pmssAiClaudeDecision([], [], $state)['notice'], 'unset HOME');
+        ]);
+        $cases += $this->launcherEnvironmentCases(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL',
+            'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_OAUTH_TOKEN']);
+        $this->assertLauncherPassthroughCases($cases, $state, $env);
     }
 
     public function testInjectedEnvironmentDoesNotPutKeyInArguments(): void
     {
         $env = ['HOME' => '/tmp/pmss-test-home', 'ANTHROPIC_MODEL' => 'own',
             'ANTHROPIC_DEFAULT_HAIKU_MODEL' => ''];
-        $state = ['uid' => 1000, 'keyFileValid' => true, 'key' => 'private-test-key',
-            'endpoint' => 'https://virsilipas.mcx.fi/v1/', 'configChoice' => false];
+        $state = $this->launcherState(['endpoint' => 'https://virsilipas.mcx.fi/v1/']);
         $decision = \pmssAiClaudeDecision(['-p', 'hello'], $env, $state);
         $this->assertSame([\PMSS_AI_CLAUDE_BINARY, '-p', 'hello'], $decision['argv']);
         $this->assertStringNotContainsString('private-test-key', implode(' ', $decision['argv']));

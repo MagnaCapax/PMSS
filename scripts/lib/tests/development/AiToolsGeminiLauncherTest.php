@@ -1,63 +1,32 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../../update/apps/templates/pmss-ai-launch.php';
-require_once __DIR__.'/../../update/apps/aiToolsCodex.php';
+require_once __DIR__.'/../common/AiToolsLauncherTestCase.php';
 require_once __DIR__.'/../../update/apps/aiToolsGemini.php';
 
-class AiToolsGeminiLauncherTest extends TestCase
+class AiToolsGeminiLauncherTest extends AiToolsLauncherTestCase
 {
-    protected function pmssTempDirFixtureArguments(): array
-    {
-        return ['tempDir', 'pmss-ai-gemini-'];
-    }
+    protected const TOOL = 'gemini';
 
     public function testPassthroughPrecedence(): void
     {
         $env = ['HOME' => '/tmp/pmss-test-home'];
-        $state = ['uid' => 1000, 'keyFileValid' => true, 'key' => 'private-test-key',
-            'endpoint' => 'https://virsilipas.mcx.fi/v1', 'configChoice' => false];
-        $cases = [
-            'off' => [['PMSS_VIRSILIPAS' => 'off'], [], []],
-            'zero' => [['PMSS_VIRSILIPAS' => '0'], [], []],
-            'no' => [['PMSS_VIRSILIPAS' => 'no'], [], []],
-            'root' => [[], ['uid' => 0], []],
-            'empty home' => [['HOME' => ''], [], []],
-            'missing key' => [[], ['keyFileValid' => false], []],
-            'empty key' => [[], ['key' => ''], []],
-            'space key' => [[], ['key' => 'bad key'], []],
-            'control key' => [[], ['key' => "bad\nkey"], []],
-            'unicode space' => [[], ['key' => "bad\xC2\xA0key"], []],
-            'invalid encoding' => [[], ['key' => "bad\xFFkey"], []],
-            'http endpoint' => [[], ['endpoint' => 'http://example.com/v1'], []],
-            'query endpoint' => [[], ['endpoint' => 'https://example.com/v1?x=1'], []],
-            'config choice' => [[], ['configChoice' => true], []],
+        $state = $this->launcherState();
+        $cases = array_merge($this->launcherPassthroughCases(), [
             'short model' => [[], [], ['-m', 'own']],
             'long model' => [[], [], ['--model', 'own']],
             'joined model' => [[], [], ['--model=own']],
-        ];
-        foreach (['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GEMINI_BASE_URL',
+        ]);
+        $cases += $this->launcherEnvironmentCases(['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GEMINI_BASE_URL',
             'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_GENAI_USE_GCA', 'GOOGLE_CLOUD_PROJECT',
             'GEMINI_CLI_AUTH_OVERRIDE', 'GEMINI_DEFAULT_AUTH_TYPE',
-            'GEMINI_CLI_SYSTEM_DEFAULTS_PATH', 'GEMINI_CLI_SYSTEM_SETTINGS_PATH'] as $name) {
-            $cases[$name] = [[$name => 'own'], [], []];
-            $cases[$name.' zero'] = [[$name => '0'], [], []];
-        }
-        foreach ($cases as $label => [$envChange, $stateChange, $args]) {
-            $input = array_merge($env, $envChange);
-            $decision = \pmssAiGeminiDecision($args, $input, array_merge($state, $stateChange));
-            $this->assertSame(array_merge([\PMSS_AI_GEMINI_BINARY], $args), $decision['argv'], $label);
-            $this->assertSame($input, $decision['env'], $label.' environment');
-            $this->assertFalse($decision['notice'], $label.' notice');
-        }
-        $this->assertFalse(\pmssAiGeminiDecision([], [], $state)['notice'], 'unset HOME');
+            'GEMINI_CLI_SYSTEM_DEFAULTS_PATH', 'GEMINI_CLI_SYSTEM_SETTINGS_PATH']);
+        $this->assertLauncherPassthroughCases($cases, $state, $env);
     }
 
     public function testInjectedEnvironmentAndArguments(): void
     {
-        $state = ['uid' => 1000, 'keyFileValid' => true, 'key' => 'private-test-key',
-            'endpoint' => 'https://virsilipas.mcx.fi/v1/', 'configChoice' => false];
+        $state = $this->launcherState(['endpoint' => 'https://virsilipas.mcx.fi/v1/']);
         $decision = \pmssAiGeminiDecision(['-p', 'hello'], ['HOME' => '/tmp/test-home'], $state);
         $this->assertSame([\PMSS_AI_GEMINI_BINARY, '-p', 'hello'], $decision['argv']);
         $this->assertStringNotContainsString('private-test-key', implode(' ', $decision['argv']));
@@ -117,8 +86,7 @@ class AiToolsGeminiLauncherTest extends TestCase
         mkdir($workspace.'/'.$configName);
         file_put_contents($home.'/.env', 'GEMINI_API_KEY=home');
         $this->assertTrue(\pmssAiGeminiEnvChoice($workspace, $home));
-        $state = ['uid' => 1000, 'keyFileValid' => true, 'key' => 'private-test-key',
-            'endpoint' => 'https://virsilipas.mcx.fi/v1', 'configChoice' => \pmssAiGeminiEnvChoice($workspace, $home)];
+        $state = $this->launcherState(['configChoice' => \pmssAiGeminiEnvChoice($workspace, $home)]);
         $this->assertFalse(\pmssAiGeminiDecision([], ['HOME' => $home], $state)['notice']);
         unlink($home.'/.env');
         file_put_contents($workspace.'/.env', 'GOOGLE_CLOUD_PROJECT=project');
