@@ -12,12 +12,14 @@ require_once __DIR__.'/../runtime.php';
  */
 function pmssCreateNginxConfigCommandFromEnv(string $envKey, string $default): string
 {
-    $command = pmssEnvTrimmed($envKey);
-    if ($command === '' || strpos($command, "\0") !== false || strpos($command, "\n") !== false || strpos($command, "\r") !== false) {
+    $command = (string) getenv($envKey);
+    // Validate original bytes before trim can hide a malformed command boundary.
+    if (strpos($command, "\0") !== false || strpos($command, "\n") !== false || strpos($command, "\r") !== false) {
         return $default;
     }
 
-    return $command;
+    $command = trim($command);
+    return $command === '' ? $default : $command;
 }
 
 function pmssCreateNginxConfigAppendLog(string $message): void

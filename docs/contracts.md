@@ -948,6 +948,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
+  - Command overrides: Config-test, restart and reload commands reject NUL, CR and LF bytes before trimming and use their existing default commands. Missing or blank values also use the defaults; valid commands retain whitespace normalization, shell syntax and execution order.
   - Default self-signed TLS site: Inherits TLSv1.2 and TLSv1.3 from the global template and lists only its existing AEAD cipher suites. A complete Let's Encrypt set uses its separate include.
   - Global template copy, default-site write, directory preparation, and guarded obsolete account UI default removal failures emit stderr warnings; setup still reaches the existing nginx config test and restart decision. Directory modes and stale-default path guards are unchanged.
   - Reconciliation: Replaces current per-user routes atomically without deleting them first. A full run prunes genuine orphan routes only after every selected user completes without a write failure; single-user runs never prune other accounts. Orphan pruning accepts only validated generated filenames and reports incomplete scans through the existing warning path.

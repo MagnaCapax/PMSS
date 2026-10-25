@@ -150,6 +150,43 @@ class NginxConfigTestTest extends TestCase
         $this->assertCommandEnvFallsBack('PMSS_NGINX_RESTART_COMMAND', "systemctl restart nginx\nprintf 'surprise'\n", 'systemctl restart nginx || /etc/init.d/nginx restart');
     }
 
+    public function testCommandOverridesRejectLineBreaksBeforeTrimming(): void
+    {
+        foreach (['PMSS_NGINX_CONFIG_TEST_COMMAND', 'PMSS_NGINX_RESTART_COMMAND', 'PMSS_NGINX_RELOAD_COMMAND'] as $envKey) {
+            foreach (["\n", "\r", "\r\n"] as $lineBreak) {
+                // Edge line breaks must follow the same refusal path as embedded ones.
+                foreach ([$lineBreak.'custom-command', 'custom-command'.$lineBreak, 'custom'.$lineBreak.'command', " \t".$lineBreak."custom-command \t"] as $value) {
+                    $this->assertCommandEnvFallsBack($envKey, $value, 'fallback-command');
+                }
+            }
+        }
+    }
+
+    public function testCommandOverridesPreserveValidShellBytesAndWhitespaceNormalization(): void
+    {
+        $cases = [
+            ['custom-command', 'custom-command'],
+            [" \tcustom-command\t ", 'custom-command'],
+            ['first || second', 'first || second'],
+            ['first && second', 'first && second'],
+            ["printf 'two words'", "printf 'two words'"],
+            ['0', '0'],
+        ];
+        foreach (['PMSS_NGINX_CONFIG_TEST_COMMAND', 'PMSS_NGINX_RESTART_COMMAND', 'PMSS_NGINX_RELOAD_COMMAND'] as $envKey) {
+            foreach ($cases as [$value, $expected]) {
+                $this->pmssWithEnv([$envKey => $value], function () use ($envKey, $expected): void {
+                    $this->assertEquals($expected, \pmssCreateNginxConfigCommandFromEnv($envKey, 'fallback-command'));
+                });
+            }
+            foreach (['', " \t "] as $value) {
+                $this->assertCommandEnvFallsBack($envKey, $value, 'fallback-command');
+            }
+            $this->pmssWithEnv([$envKey => null], function () use ($envKey): void {
+                $this->assertEquals('fallback-command', \pmssCreateNginxConfigCommandFromEnv($envKey, 'fallback-command'));
+            });
+        }
+    }
+
     /** @return array{0:int,1:string} */
     private function runConfigTestWithCommands(string $testCommand, ?string $restartCommand, bool $restart, ?string $reloadCommand = null, bool $reload = false): array
     {
