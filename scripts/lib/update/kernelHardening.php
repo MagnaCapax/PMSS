@@ -106,7 +106,7 @@ function pmssKernelHardeningLoadedModules(array $modules): ?array
 
     $loaded = [];
     $moduleSet = array_fill_keys($modules, true);
-    foreach (pmssConfigRows(preg_split('/\r?\n/', $snapshot) ?: [], 3, []) as $columns) {
+    foreach (pmssConfigTextRows($snapshot, 3, []) as $columns) {
         if ($columns[0] === 'Module' || !isset($moduleSet[$columns[0]])) continue;
         $loaded[$columns[0]] = ctype_digit($columns[2]) ? (int) $columns[2] : 0;
     }

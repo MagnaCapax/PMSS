@@ -100,7 +100,7 @@ class Motd
         $usesDynamic = false;
         $usesStatic = false;
         if (is_string($data)) {
-            foreach (pmssConfigLines(preg_split('/\r?\n/', $data)) as $line) {
+            foreach (pmssConfigTextLines($data) as $line) {
                 if (strpos($line, 'pam_motd.so') === false) {
                     continue;
                 }

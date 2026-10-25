@@ -33,7 +33,7 @@ function pmssUserTransferQbittorrentLegacyCategoriesFromConfig(string $contents,
 function pmssUserTransferQbittorrentConfigValue(string $contents, string $targetKey): ?string
 {
     $section = '';
-    foreach (pmssConfigLines(preg_split('/\r?\n/', $contents) ?: []) as $trimmed) {
+    foreach (pmssConfigTextLines($contents) as $trimmed) {
         if ($trimmed[0] === '[' && substr($trimmed, -1) === ']') {
             $section = substr($trimmed, 1, -1);
             continue;

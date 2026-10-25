@@ -95,7 +95,7 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
         }
 
         $breakdown = [];
-        foreach (pmssConfigRows(preg_split('/\r?\n/', $raw), 2, [], 2) as [$field, $value]) {
+        foreach (pmssConfigTextRows($raw, 2, [], 2) as [$field, $value]) {
             if (!isset($memoryFields[$field]) || !ctype_digit((string) $value)) {
                 continue;
             }

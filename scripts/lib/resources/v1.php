@@ -25,12 +25,9 @@ function pmssResourceLogReadSysfsCounter(string $path): ?int
  */
 function pmssResourceLogReadBlkioReadWrite(string $path): ?array
 {
-    $raw = pmssReadRegularFileContents($path);
-    if ($raw === null || trim($raw) === '') return null;
-
     $totals = ['read' => 0, 'write' => 0];
     $matched = false;
-    foreach (pmssConfigLines(preg_split('/\r?\n/', $raw), []) as $line) {
+    foreach (pmssConfigTextLines(pmssReadRegularFileContents($path) ?? '', []) as $line) {
         if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', $line, $m) !== 1) continue;
         $value = pmssUnsignedDecimalIntParse($m[2]);
         if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
@@ -72,10 +69,8 @@ function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $
 /** Read requested v1 key/value counters once, retaining the first valid row per field. */
 function pmssResourceLogReadMemoryStatFields(string $path, array $fields): array
 {
-    $raw = pmssReadRegularFileContents($path);
-    if ($raw === null || trim($raw) === '') return [];
     $wanted = array_fill_keys($fields, true); $values = [];
-    foreach (pmssConfigRows(preg_split('/\r?\n/', trim($raw)), 2, [], 2) as [$name, $value]) {
+    foreach (pmssConfigTextRows(pmssReadRegularFileContents($path) ?? '', 2, [], 2) as [$name, $value]) {
         if (!isset($wanted[$name]) || !ctype_digit((string) $value)) continue;
         // Even an overflowing first numeric row claims the field; later duplicates stay ignored.
         unset($wanted[$name]); $parsed = pmssUnsignedDecimalIntParse($value);

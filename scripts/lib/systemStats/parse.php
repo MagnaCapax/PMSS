@@ -85,7 +85,7 @@ function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
     $stats = [];
     if ($raw === null) return $stats;
 
-    foreach (pmssConfigRows(preg_split('/\r?\n/', $raw) ?: [], 13, []) as $parts) {
+    foreach (pmssConfigTextRows($raw, 13, []) as $parts) {
         $name = $parts[2];
         if (pmssBlockDeviceNameIsDataDevice($name) && ($ioTime = pmssUnsignedDecimalIntParse($parts[12])) !== null) {
             $stats[$name] = $ioTime;

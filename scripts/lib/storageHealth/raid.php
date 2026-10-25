@@ -44,7 +44,7 @@ function pmssStorageHealthSnapshotRaid(string $timestamp, string $mdstatPath = '
 function pmssStorageHealthRaidEntriesParse(string $mdstat, string $timestamp): array
 {
     $entries = [];
-    foreach (pmssConfigLines(preg_split('/\r?\n/', $mdstat), []) as $trimmed) {
+    foreach (pmssConfigTextLines($mdstat, []) as $trimmed) {
         if (preg_match('/^(md\\d+)\\s*:\\s*(\\w+)\\s+(raid\\d)\\s+(.*)$/', $trimmed, $matches)) {
             $entries[] = [
                 'timestamp' => $timestamp,

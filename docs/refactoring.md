@@ -388,12 +388,12 @@ ARP and module tables use `pmssConfigRows()`. WireGuard peer blocks keep `# user
 markers with `[]`; account public-key lists filter `['#', ';']` while retaining
 source indices for diagnostics. Monitoring rules and legacy port cleanup use the
 default `#` policy. Default-route and running-peer readers keep every nonempty row.
-Line-oriented readers use `pmssConfigLines()` for lazy trimming and empty/comment
-filtering while retaining source keys, internal spacing, inline comments, and
-literal `0` rows. Pass `[]` when every nonempty line is data, including diagnostic
-stack traces beginning with `#`. `pmssConfigRows()` uses the same line iterator
-semantics through the column parser, trimming and filtering each source row once
-before applying its existing column-count and split-limit rules.
+LF/CRLF text readers use `pmssConfigTextLines()` and `pmssConfigTextRows()`;
+array readers retain `pmssConfigLines()` and `pmssConfigRows()`. The text helpers
+share the array parsers' trimming, source indices, internal spacing, inline
+comments, literal `0` rows, minimum columns and split limits. Pass `[]` when
+every nonempty line is data, including diagnostic stack traces beginning with
+`#`. Readers using other newline rules retain their explicit splitting.
 
 Parser compression retains source positions and result bytes. Certbot scans
 backwards to the last summary marker; whole-file and tail reads share that path.

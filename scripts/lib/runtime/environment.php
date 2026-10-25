@@ -214,6 +214,11 @@ function pmssConfigLines(array $lines, array $commentPrefixes = ['#']): \Generat
     }
 }
 
+/** Split LF/CRLF text into filtered lines without losing source indices. */
+function pmssConfigTextLines(string $text, array $commentPrefixes = ['#']): \Generator { return pmssConfigLines(preg_split('/\r?\n/', $text) ?: [], $commentPrefixes); }
+/** Parse LF/CRLF text through the same column and comment rules as array rows. */
+function pmssConfigTextRows(string $text, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): \Generator { return pmssConfigRows(preg_split('/\r?\n/', $text) ?: [], $minColumns, $commentPrefixes, $limit); }
+
 /** A positive split limit preserves the remaining text in the final column. */
 function pmssConfigLineColumns(string $line, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): array
 {

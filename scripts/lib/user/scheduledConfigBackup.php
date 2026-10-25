@@ -91,9 +91,8 @@ function pmssScheduledConfigBackupCommandRun(string $command): array
 function pmssScheduledConfigBackupCustomerResult(array $process): array
 {
     $rc = is_numeric($process['rc'] ?? null) ? (int) $process['rc'] : 1;
-    $stdout = trim((string) ($process['stdout'] ?? ''));
     $jsonLine = '';
-    foreach (pmssConfigLines(preg_split('/\r?\n/', $stdout) ?: [], []) as $line) {
+    foreach (pmssConfigTextLines((string) ($process['stdout'] ?? ''), []) as $line) {
         $jsonLine = $line;
     }
 
