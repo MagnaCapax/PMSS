@@ -77,3 +77,13 @@ is fucked if it does", and "It is not to run externally but locally".
 ## References
 
 ADRs 0039, 0040, 0090 and 0128.
+
+## Amendment 2026-10-24: Welcome shows the account its own service permalink
+
+A customer asked to see their permanent address in the panel instead of looking it up in the client area.
+The Welcome page's Connect card now shows the service permalink (ADR 0040) with a Copy button and a link to the
+wiki page "Permalinks on PMSS". The page is served only to the logged-in account. It derives the name from the
+home marker ADR 0152 keeps for display, writes nothing and publishes nothing; the DNS record already exists.
+`welcome.php` is added to the R4 pin list in `scripts/testing/public-exposure-lint.php` as a display-only
+caller. The open decision on whether the `mcx.fi` records stay on by default (Consequences, above) is
+unchanged: if they become opt-in, this row must show only for accounts that turned the record on.

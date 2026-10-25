@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 3).'/lib/nginxUserHosts.php';
 
 /** Welcome home view helpers (ADR 0147, 0148): news selection, status chips and the app tiles. */
 final class WelcomeHomeTest extends TestCase
@@ -640,5 +641,21 @@ final class WelcomeHomeTest extends TestCase
         }
         $this->assertFalse(file_exists($homes['oldBuild'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), 'A build without the activity command is never run');
         $this->assertFalse(file_exists($homes['notVisible'].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), 'Pikkumies is never run where its windows do not run');
+    }
+    public function testConnectShowsThePermanentAddressOnlyWithAServiceId(): void
+    {
+        $html = $this->runWelcomeHome('$_SERVER["HTTP_HOST"] = "host.example.test"; $apps = array("apps" => array());'
+            .'echo json_encode(array("with" => pmssWelcomeHomeConnectHtmlBuild("alice", $apps, false, 12345),'
+            .' "none" => pmssWelcomeHomeConnectHtmlBuild("alice", $apps, false, 0),'
+            .' "omitted" => pmssWelcomeHomeConnectHtmlBuild("alice", $apps, false)));');
+        // The same name nginx serves and createWebPublicCerts prints (ADR 0040).
+        $name = \pmssMcxLabel('service', '12345').'.mcx.fi';
+        $this->assertStringContainsAllStrings(['<dt>Permanent address</dt><dd>'.$name.'</dd>', 'data-copy="'.$name.'"',
+            'index.php/Permalinks_on_PMSS', '<dt>Host</dt><dd>host.example.test</dd>'], $html['with']);
+        foreach (['none', 'omitted'] as $case) {
+            $this->pmssAssertStringNotContainsString('Permanent address', $html[$case], $case);
+            $this->pmssAssertStringNotContainsString('mcx.fi', $html[$case], $case);
+            $this->assertStringContainsString('<dt>Username</dt><dd>alice</dd>', $html[$case], $case);
+        }
     }
 }

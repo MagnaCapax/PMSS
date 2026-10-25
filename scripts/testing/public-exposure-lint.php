@@ -74,6 +74,8 @@ $r4Pinned = [
     'etc/skel/bin/pmssHermesRuntime.php',
     'etc/skel/www/pikkumiesPanel.php',
     'etc/skel/www/pikkumiesOpen.php',
+    // Display only: Welcome shows the account its own service permalink and publishes nothing (ADR 0150 amendment 2026-10-24).
+    'etc/skel/www/welcome.php',
 ];
 // R5: callers of the derivation functions (existing ADR 0039/0040 users). ADR 0150 gives the mcx.fi
 // records their own decision; this list only stops new callers.

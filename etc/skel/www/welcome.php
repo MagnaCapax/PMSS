@@ -113,7 +113,7 @@ if ($homeCreditsKey) $homeMetricsHtml .= pmssWelcomeHomeCreditsMetricHtmlBuild()
 $homeApps = pmssWelcomeHomeAppsBuild($appsStatus, $homeAgentFirst);
 $homeAppsHtml = pmssWelcomeHomeAppsHtmlBuild($homeApps);
 
-$homeConnectHtml = pmssWelcomeHomeConnectHtmlBuild($username, $appsStatus, $homeAgentFirst);
+$homeConnectHtml = pmssWelcomeHomeConnectHtmlBuild($username, $appsStatus, $homeAgentFirst, $billingServiceId);
 $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
 
 ?>
@@ -1657,17 +1657,24 @@ function pmssWelcomeHomeAppsHtmlBuild(array $apps)
     return $html.'<a class="h-head-link" href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)">All apps and settings in Configure</a></div>';
 }
 /** Connection details with copy buttons; client download links only to sites checked live. */
-function pmssWelcomeHomeConnectHtmlBuild($username, array $appsStatus, $agentFirst)
+function pmssWelcomeHomeConnectHtmlBuild($username, array $appsStatus, $agentFirst, $billingServiceId = 0)
 {
     $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
     $host = preg_match('/^[a-z0-9.-]{1,253}$/', $host) ? $host : strtolower((string) (function_exists('gethostname') ? gethostname() : ''));
     $rows = array(array('Host', $host), array('Username', (string) $username), array('SFTP / SSH port', '22'));
+    // The service permalink (ADR 0040), shown only to this account; it reads the home marker ADR 0152 keeps for display.
+    $permalink = (int) $billingServiceId > 0 ? substr(hash('sha256', 'mcx.fi:service:'.(int) $billingServiceId), 0, 16).'.mcx.fi' : '';
+    if ($permalink !== '') $rows[] = array('Permanent address', $permalink);
     $html = '<section class="h-card" aria-labelledby="h-connect-title"><div class="h-head"><h2 id="h-connect-title" class="h-label">Connect</h2>'
         .'<a class="h-head-link" href="data/">Browse files over HTTP</a></div><dl class="h-kv">';
     foreach ($rows as $row) {
         $html .= '<dt>'.$row[0].'</dt><dd>'.pmssWelcomeHtmlAttr($row[1]).'</dd><button type="button" class="h-copy" data-copy="'.pmssWelcomeHtmlAttr($row[1]).'" aria-label="Copy '.strtolower($row[0]).'">Copy</button>';
     }
     $html .= '</dl>';
+    if ($permalink !== '') {
+        $html .= '<p class="h-foot">The permanent address stays the same if your service moves to another server. '
+            .'<a href="https://wiki.pulsedmedia.com/index.php/Permalinks_on_PMSS" target="_blank" rel="noopener">Permalinks</a></p>';
+    }
     $apps = is_array($appsStatus['apps'] ?? null) ? $appsStatus['apps'] : array();
     if (!$agentFirst && isset($apps['rtorrent']) && ($apps['rtorrent']['state'] ?? 'off') !== 'off') {
         $html .= '<p class="h-foot">Drop .torrent files into the <code>watch</code> folder and rTorrent starts them automatically.</p>';
