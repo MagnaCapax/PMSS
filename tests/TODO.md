@@ -10,6 +10,11 @@ Update Flow Smoke
 - Add a dev-safe smoke script that runs `scripts/update.php --dry-run` with hermetic env and temp paths; assert JSON events and step ordering.
 - Validate that no filesystem mutation occurs in `--dry-run` mode; capture logs under `/tmp/pmss-tests-root/`.
 
+rTorrent HTTPS Announce Acceptance (Refs #1188)
+- On a testing machine, announce a private fixture torrent to a controlled HTTPS tracker with the generated config under 0.16.25, 0.9.8-r16 and 0.9.8-stickz7.2; require a successful tracker reply using Debian's CA bundle.
+- Repeat with an untrusted certificate and a hostname mismatch; both must fail certificate verification. Keep certificate verification enabled and redact tracker credentials from logs.
+- Add this matrix to the store-build acceptance gate before rollout; template assertions alone do not establish successful announces. This live acceptance remains unverified.
+
 Docblocks (Tighten Coverage)
 - Make `docblock-lint.sh` required for `scripts/lib/update/**` as the first gating step (keep advisory elsewhere initially).
 - Track coverage (classes/public methods) and expand to `scripts/lib/**` once violations are resolved.

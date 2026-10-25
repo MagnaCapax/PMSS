@@ -48,6 +48,23 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     }
 
     /**
+     * Static and system builds must use Debian's CA bundle without disabling TLS checks.
+     */
+    public function testPmssRtorrentTemplateUsesDebianCaBundle(): void
+    {
+        $content = $this->pmssReadRepoFile('etc/seedbox/config/template.rtorrent.rc');
+        $this->assertSame(
+            1,
+            preg_match_all('/^network\.http\.cacert\.set = \/etc\/ssl\/certs\/ca-certificates\.crt$/m', $content)
+        );
+        $this->assertSame(
+            0,
+            preg_match('/^\s*network\.http\.ssl_verify_(?:host|peer)\.set\s*=\s*(?:0|no|false)\b/mi', $content),
+            'The managed template must retain certificate and hostname verification'
+        );
+    }
+
+    /**
      * rTorrent listen ranges must not overlap the managed-service namespace.
      */
     public function testPmssRtorrentListenRangesExcludeManagedServicePorts(): void
