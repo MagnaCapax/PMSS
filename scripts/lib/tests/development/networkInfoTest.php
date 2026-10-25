@@ -31,6 +31,39 @@ class NetworkInfoTest extends TestCase
         $this->assertSame('', \networkInterfaceNameNormalized('eth0; touch /tmp/pwned'));
     }
 
+    public function testNetworkInterfaceNamesRejectNullBytesBeforeTrimming(): void
+    {
+        foreach (["\0eth0", "eth0\0", "eth\0".'0', " \0eth0\t", "eth0\0\n"] as $name) {
+            $this->assertSame('', \networkInterfaceNameNormalized($name));
+            $this->assertSame('', \pmssNetworkInterfaceNameNormalize($name, 15));
+            $this->assertFalse(\pmssNetworkInterfaceNameIsSafe($name));
+            $this->assertSame(0, \pmssNetworkProbeSysfsLinkSpeed($name));
+            $this->assertSame(0, \pmssNetworkProbeEthtoolLinkSpeed($name));
+        }
+        foreach (['eth0', 'bond0.100', 'veth_test-1', 'eth0:1', 'lo'] as $name) {
+            $this->assertSame($name, \networkInterfaceNameNormalized(" \t".$name."\r\n"));
+        }
+        $this->assertSame('', \pmssNetworkInterfaceNameNormalize('bond0.100', 8));
+        $this->assertSame('bond0.100', \pmssNetworkInterfaceNameNormalize('bond0.100', 9));
+    }
+
+    public function testSysfsSpeedRejectsOverflowAndPreservesRepresentableValues(): void
+    {
+        foreach (['', '-1', '0', 'unknown', '1.5', (string) PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0'] as $raw) {
+            $root = $this->networkSpeedFixture('probe0', $raw);
+            $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function (): void {
+                $this->assertSame(0, \pmssNetworkProbeSysfsLinkSpeed('probe0'));
+                $this->assertSame(0, \getDetectedLinkSpeed('probe0'));
+            });
+        }
+        foreach (['1' => 1, '001000' => 1000, " 10000\n" => 10000, (string) PHP_INT_MAX => PHP_INT_MAX] as $raw => $expected) {
+            $root = $this->networkSpeedFixture('probe0', (string) $raw);
+            $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function () use ($expected): void {
+                $this->assertSame($expected, \pmssNetworkProbeSysfsLinkSpeed('probe0'));
+            });
+        }
+    }
+
     public function testDetectPrimaryInterfaceReturnsString(): void
     {
         $iface = \detectPrimaryInterface();

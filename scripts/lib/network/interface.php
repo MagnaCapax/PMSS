@@ -12,6 +12,8 @@
 /** Normalize a Linux network interface name from trusted or probed inputs. */
 function pmssNetworkInterfaceNameNormalize(string $interface, int $maxLength = 0): string
 {
+    // Reject malformed bytes before trim can turn them into a valid device name.
+    if (strpos($interface, "\0") !== false) return '';
     $interface = trim($interface);
     if ($interface === '' || preg_match('/^[A-Za-z0-9_.:-]+$/', $interface) !== 1) {
         return '';

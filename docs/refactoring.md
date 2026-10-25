@@ -41,6 +41,13 @@ field order and output bytes retain their existing contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Network interface normalization rejects NUL bytes before trimming, including
+raw default-route output. Sysfs and ethtool speed probes accept only decimal
+values that fit a PHP integer; overflow retains their unknown-speed result.
+Valid interface whitespace, speed values, command arguments, configured shaping
+caps and detection fallbacks retain their contracts. `NetworkInfoTest` and
+`NetworkInfoCharacterizationTest` cover malformed inputs and valid boundaries.
+
 Stdout heartbeat startup rejects a failed or nonpositive parent PID before
 building its liveness loop. A failed child-status read, invalid child PID, or
 already-exited child returns `null` after stopping and reaping the child.

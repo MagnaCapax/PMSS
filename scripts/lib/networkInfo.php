@@ -34,7 +34,7 @@ function detectPrimaryInterface(): string
         }
     }
 
-    $iface = networkInterfaceNameNormalized(trim((string) shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'")));
+    $iface = networkInterfaceNameNormalized((string) shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'"));
     return $iface !== '' ? $iface : 'eth0';
 }
 
@@ -53,12 +53,9 @@ function pmssNetworkProbeSysfsLinkSpeed(string $iface): int
 
     $raw = @file_get_contents(rtrim($baseDir, '/').'/'.$iface.'/speed');
     $speed = is_string($raw) ? trim($raw) : '';
-    if ($speed === '' || ctype_digit($speed) === false) {
-        return 0;
-    }
-
-    $speedMbit = (int) $speed;
-    return $speedMbit > 0 ? $speedMbit : 0;
+    // Oversized probe values are unknown, never saturated link speeds.
+    $speedMbit = pmssUnsignedDecimalIntParse($speed);
+    return $speedMbit !== null && $speedMbit > 0 ? $speedMbit : 0;
 }
 
 /** Probe the physical interface speed with ethtool, returning 0 when unknown. */
@@ -70,7 +67,8 @@ function pmssNetworkProbeEthtoolLinkSpeed(string $iface): int
     }
 
     $raw = shell_exec('/sbin/ethtool '.escapeshellarg($iface).' 2>/dev/null');
-    return $raw && preg_match('/Speed:\s*(\d+)Mb/', $raw, $m) ? (int) $m[1] : 0;
+    if (!$raw || !preg_match('/Speed:\s*(\d+)Mb/', $raw, $m)) return 0;
+    return pmssUnsignedDecimalIntParse($m[1]) ?? 0;
 }
 
 /** Detect physical interface speed in Mbps without applying config overrides. */
