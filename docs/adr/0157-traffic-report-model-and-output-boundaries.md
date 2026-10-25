@@ -26,8 +26,11 @@ Output helpers translated those fields into another totals and summary schema.
 Keep `traffic/report.php` as the legacy include path and CLI facade.
 `traffic/reportModel.php` owns user discovery, guarded payload reads, row
 acceptance, summaries, and sorting. `traffic/reportDisplay.php` owns JSON and
-terminal projections and performs no filesystem reads. Existing function names
-and entrypoints remain available through the facade; no alternate flow remains.
+terminal projections and performs no filesystem reads. Existing entrypoints
+remain available through the facade; no alternate flow remains. Extended row
+columns are built in their sole consumer, without an internal positional-tuple
+helper. Automatic text color uses the shared CLI terminal policy, while explicit
+color flags retain precedence.
 
 The internal report contains `rows`, `missingStats`, `totals`, and `summary`.
 Derive totals and summary once, before sorting, preserving floating-point

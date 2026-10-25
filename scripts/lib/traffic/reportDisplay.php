@@ -26,9 +26,17 @@ function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): vo
     $inboundText = $row['inboundMonthMiB'] !== null ? pmssTrafficFormatAmount((float) $row['inboundMonthMiB']) : '-';
     $ratioText = $row['inboundRatio'] !== null ? sprintf('%.2f', (float) $row['inboundRatio']) : 'n/a';
     if ($extended) {
-        [$limitDisplay, $pctDisplay, $statusDisplay, $barDisplay] = pmssShowTrafficLimitDisplays($row, $useColor);
+        // Build the extended columns here instead of packing and unpacking a tuple.
+        $limitDisplay = ($row['limitMiB'] !== null) ? pmssTrafficFormatAmount($row['limitMiB']) : '-';
+        $pctDisplay = $row['pctUsed'] !== null ? sprintf('%3d%%', min(999, (int) round($row['pctUsed']))) : 'n/a';
+        $statusLabel = $row['pctUsed'] !== null && $row['pctUsed'] >= 80 ? ($row['pctUsed'] >= 100 ? '[OVER]' : '[WARN]') : '';
+        $statusDisplay = pmssCliAnsiStyle(str_pad($statusLabel, 6, ' ', STR_PAD_RIGHT), $statusLabel === '[OVER]' ? '1;31' : '33', $useColor && $statusLabel !== '');
+        $filled = ($row['limitMiB'] !== null && $row['pctUsed'] !== null)
+            ? (int) floor((max(0.0, min(100.0, (float) $row['pctUsed'])) / 100) * 10)
+            : null;
+        $barDisplay = $filled === null ? str_repeat(' ', 12) : '['.str_repeat('#', $filled).str_repeat('-', 10 - $filled).']';
         $format = "%-14s %9s / %9s %4s %s %s IN: %9s R: %5s  Datarates: %10s / %10s / %10s / %10s\n";
-        $values = [$label, (string) $display['month'], $limitDisplay, $pctDisplay, $statusDisplay, $barDisplay];
+        $values = [$label, (string) $display['month'], $limitDisplay, sprintf('%4s', $pctDisplay), $statusDisplay, $barDisplay];
     } else {
         $format = "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n";
         $values = [$label, (string) $display['month'], (string) $display['week'], (string) $display['day']];
@@ -46,20 +54,6 @@ function pmssShowTrafficRateColumns(array $rates, bool $withUnits): array
         // Extended columns auto-scale from MiB/s to GiB/s at the legacy threshold.
         return sprintf('%.2f%s', $rate >= 1000 ? $rate / 1024 : $rate, $rate >= 1000 ? 'GiB/s' : 'MiB/s');
     }, ['week', 'day', 'hour', '15min']);
-}
-
-function pmssShowTrafficLimitDisplays(array $row, bool $useColor): array
-{
-    $limitDisplay = ($row['limitMiB'] !== null) ? pmssTrafficFormatAmount($row['limitMiB']) : '-';
-    $pctDisplayRaw = $row['pctUsed'] !== null ? sprintf('%3d%%', min(999, (int) round($row['pctUsed']))) : 'n/a';
-    $statusLabel = $row['pctUsed'] !== null && $row['pctUsed'] >= 80 ? ($row['pctUsed'] >= 100 ? '[OVER]' : '[WARN]') : '';
-    $statusDisplay = str_pad($statusLabel, 6, ' ', STR_PAD_RIGHT);
-    $statusDisplay = pmssCliAnsiStyle($statusDisplay, $statusLabel === '[OVER]' ? '1;31' : '33', $useColor && $statusLabel !== '');
-    $filled = ($row['limitMiB'] !== null && $row['pctUsed'] !== null)
-        ? (int) floor((max(0.0, min(100.0, (float) $row['pctUsed'])) / 100) * 10)
-        : null;
-    $barDisplay = $filled === null ? str_repeat(' ', 12) : '['.str_repeat('#', $filled).str_repeat('-', 10 - $filled).']';
-    return [$limitDisplay, sprintf('%4s', $pctDisplayRaw), $statusDisplay, $barDisplay];
 }
 
 function pmssShowTrafficPrintSummary(array $report, bool $extended, bool $showMissing): void

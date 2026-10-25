@@ -50,9 +50,8 @@ function pmssShowTrafficMain(array $argv): int
         return pmssJsonEmitPayload(pmssShowTrafficJsonPayload($report), 'Failed to encode traffic report JSON.');
     }
     // Color selection belongs to text output, after the JSON return.
-    $term = getenv('TERM'); $noColorEnv = getenv('NO_COLOR');
     $useColor = $extended && (pmssCliOptionPresent($parsed, 'color') || (!pmssCliOptionPresent($parsed, 'no-color')
-        && pmssStreamIsTty(STDOUT) && !in_array($term, [false, '', 'dumb'], true) && ($noColorEnv === false || $noColorEnv === '')));
+        && pmssCliHelpSupportsColor()));
     foreach ($report['rows'] as $row) { pmssShowTrafficPrintRow($row, $extended, $useColor); }
     pmssShowTrafficPrintSummary($report, $extended, pmssCliOptionPresent($parsed, 'show-missing'));
     return 0;

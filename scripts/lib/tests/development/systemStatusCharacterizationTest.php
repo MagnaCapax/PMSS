@@ -360,14 +360,15 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testStatusSummaryCountsOkWarnAndErr(): void
     {
-        $summary = pmssStatusSummary([
+        $checks = [
             pmssStatus('one', 'OK'),
             pmssStatus('two', 'WARN'),
             pmssStatus('three', 'ERR'),
             pmssStatus('four', 'OK'),
-        ]);
-
-        $this->assertEquals(['ok' => 2, 'warn' => 1, 'err' => 1], $summary);
+        ];
+        $this->assertSame(['ok' => 2, 'warn' => 1, 'err' => 1], pmssStatusSummary($checks));
+        $this->assertSame(['ok' => 0, 'warn' => 0, 'err' => 0], pmssStatusSummary([]));
+        $this->assertSame(['ok' => 6, 'warn' => 1, 'err' => 1], pmssStatusSummary(array_merge($checks, [null, [], ['status' => 'warn'], ['status' => 0]])));
     }
 
     public function testStatusEmitJsonSubstitutesInvalidUtf8(): void

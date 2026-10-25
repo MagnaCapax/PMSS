@@ -52,6 +52,7 @@ class CliHelperTest extends TestCase
             $this->assertSame([$debug, $remaining], \pmssCliArgvDebugSplit($argv));
         }
         $this->assertSame('', \pmssCliHelpSectionText([], false));
+        $this->assertSame("\n\n0\n0\n\ntail\n", \pmssCliHelpSectionText(['' => [], 0 => [9 => '0'], 'tail' => ['']], false));
         $this->assertSame("\033[1mFirst\033[0m\nline\n\n\033[1mEmpty\033[0m", \pmssCliHelpSectionText(['First' => ['line'], 'Empty' => []], true));
     }
 

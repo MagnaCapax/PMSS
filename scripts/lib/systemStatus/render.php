@@ -16,9 +16,13 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
 /** Count OK/WARN/ERR entries for summary banners and JSON payloads. */
 function pmssStatusSummary(array $checks): array
 {
-    $statuses = array_count_values(array_map(static function ($check) { return is_array($check) ? (string) ($check['status'] ?? '') : ''; }, $checks));
-    $errors = (int) ($statuses['ERR'] ?? 0); $warnings = (int) ($statuses['WARN'] ?? 0);
-    return ['ok' => count($checks) - $warnings - $errors, 'warn' => $warnings, 'err' => $errors];
+    $summary = ['ok' => 0, 'warn' => 0, 'err' => 0];
+    foreach ($checks as $check) {
+        $status = is_array($check) ? (string) ($check['status'] ?? '') : '';
+        // The legacy summary counts every status other than exact WARN/ERR as OK.
+        $summary[$status === 'ERR' ? 'err' : ($status === 'WARN' ? 'warn' : 'ok')]++;
+    }
+    return $summary;
 }
 /** Emit either JSON or text output for a PMSS status report. */
 function pmssStatusEmit(
