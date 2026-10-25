@@ -11,9 +11,9 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
         $loopbackRule = '$rules = "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\\n";';
         $userLoop = 'foreach ($userUids as $thisUid) {';
 
-        $this->pmssAssertRepoFileSubstringCount('scripts/lib/network/iptables.php', $loopbackRule, 1, 'Loopback exemption should be declared exactly once');
+        $this->pmssAssertRepoFileSubstringCount('scripts/lib/network/rules.php', $loopbackRule, 1, 'Loopback exemption should be declared exactly once');
         $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/lib/network/iptables.php',
+            'scripts/lib/network/rules.php',
             [$loopbackRule, $userLoop],
             'Expected monitoring rule fragment: ',
             'Loopback exemption must run before per-user accounting rules: '

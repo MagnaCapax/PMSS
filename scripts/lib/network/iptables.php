@@ -7,49 +7,13 @@
  */
 
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/rules.php';
+require_once __DIR__.'/monitoring.php';
 
 /** Append a best-effort iptables log entry without surfacing logging failures. */
 function networkIptablesLog(string $level, string $message): void
 {
     @file_put_contents('/var/log/pmss/iptables.log', pmssLogFormatTimestampedLine("{$level} {$message}", 'c', ' '), FILE_APPEND);
-}
-
-/**
- * Verify that the iptables owner match is available (xt_owner/ipt_owner).
- *
- * @return bool True when owner match can be used.
- */
-function networkIptablesOwnerMatchAvailable(): bool
-{
-    static $cached = null;
-    if ($cached !== null) {
-        return $cached;
-    }
-
-    $moduleStatus = 1;
-    exec('lsmod | grep -q "^xt_owner\\b"', $null, $moduleStatus);
-    if ($moduleStatus !== 0) {
-        exec('modprobe xt_owner', $null, $rc);
-        if ($rc !== 0) {
-            exec('modprobe ipt_owner', $null, $rc);
-        }
-    }
-
-    $output = [];
-    $rc = 0;
-    exec('/sbin/iptables -m owner -h 2>&1', $output, $rc);
-    if ($rc !== 0) {
-        $message = trim(implode("\n", $output));
-        if ($message === '') {
-            $message = 'no output';
-        }
-        networkIptablesLog('WARN', "owner match unavailable (rc={$rc}): {$message}");
-        $cached = false;
-        return $cached;
-    }
-
-    $cached = true;
-    return $cached;
 }
 
 function networkRunIptables(string $rule): void
@@ -68,81 +32,6 @@ function networkRunIptables(string $rule): void
     }
 }
 
-/**
- * Keep shell-executed iptables arguments to a single argv-like rule.
- */
-function networkIptablesCommandSafe(string $rule): bool
-{
-    return $rule !== ''
-        && $rule[0] === '-'
-        && strpos($rule, "\0") === false
-        && preg_match('/[;&|`$<>\\\\\r\n]/', $rule) !== 1;
-}
-
-function networkParseMonitoringCommands(string $raw): array
-{
-    $commands = [];
-    foreach (pmssConfigTextLines($raw) as $line) {
-        $line = trim(preg_replace('/^(\/sbin\/iptables|sbin\/iptables|iptables)\s+/', '', $line));
-        if ($line === '' || strncmp($line, '-F', 2) === 0 || !networkIptablesCommandSafe($line)) {
-            continue;
-        }
-        $commands[] = $line;
-    }
-    return $commands;
-}
-
-/** Render per-UID egress accounting commands for the monitoring chain. */
-function networkMonitoringRulesRender(array $userUids, array $localnets): string
-{
-    $lastLocalNet = $localnets ? end($localnets) : '';
-    $rules = "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";
-    foreach ($userUids as $thisUid) {
-        foreach ($localnets as $thisLocalNet) {
-            $rules .= "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";
-        }
-        if ($lastLocalNet !== '') {
-            $rules .= "/sbin/iptables -A OUTPUT ! -d {$lastLocalNet} -m owner --uid-owner {$thisUid} -j MARK --set-mark {$thisUid}\n";
-        }
-        $rules .= "/sbin/iptables -A OUTPUT -m owner --uid-owner {$thisUid} -j ACCEPT\n";
-    }
-    foreach ($localnets as $thisLocalNet) {
-        $rules .= "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -j ACCEPT\n";
-    }
-    return $rules;
-}
-
-/**
- * Run the monitoring-rule helper and reject output from failed executions.
- */
-function networkLoadMonitoringCommands(?callable $runner = null, ?callable $logger = null): array
-{
-    $runner = $runner ?? static function (array &$output, int &$rc): void {
-        exec('/scripts/util/makeMonitoringRules.php', $output, $rc);
-    };
-    $logger = $logger ?? 'logMessage';
-    $output = [];
-    $rc = 1;
-
-    try {
-        $runner($output, $rc);
-    } catch (Throwable $exception) {
-        if (is_callable($logger)) {
-            $logger('setupNetwork: failed to run monitoring rules helper: '.$exception->getMessage());
-        }
-        return [];
-    }
-
-    if ($rc !== 0) {
-        if (is_callable($logger)) {
-            $logger("setupNetwork: monitoring rules helper failed (rc={$rc}); skipping per-user monitoring rules");
-        }
-        return [];
-    }
-
-    return networkParseMonitoringCommands(implode("\n", array_map('strval', array_filter($output, 'is_scalar'))));
-}
-
 function networkApplyIptablesAtomically(array $filterCommands, array $natCommands): bool
 {
     foreach (array_merge($filterCommands, $natCommands) as $command) {
@@ -153,7 +42,7 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
         }
     }
 
-    $sections = [];
+    $data = '';
     foreach ([
         [$filterCommands, ['*filter', ':INPUT ACCEPT [0:0]', ':FORWARD ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]']],
         [$natCommands, ['*nat', ':PREROUTING ACCEPT [0:0]', ':INPUT ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]', ':POSTROUTING ACCEPT [0:0]']],
@@ -161,14 +50,13 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
         if (!$commands) {
             continue;
         }
-        $sections[] = implode("\n", array_merge($section, array_values($commands), ['COMMIT']));
+        $data .= implode("\n", array_merge($section, array_values($commands), ['COMMIT']))."\n";
     }
 
-    if (!$sections) {
+    if ($data === '') {
         return true;
     }
 
-    $data = implode("\n", $sections)."\n";
     $tmp = pmssCreatePrivateTempFile('pmss-iptables-');
     if ($tmp === null) {
         networkIptablesLog('ERROR', 'unable to allocate iptables-restore temp file');
@@ -199,51 +87,10 @@ function networkApplyIptablesFallback(array $filterCommands, array $natCommands,
         networkRunIptables($flushCommand);
     }
 
-    foreach ($renderedSets['filter'] as $cmd) {
-        networkRunIptables($cmd);
-    }
-    foreach ($renderedSets['nat'] as $cmd) {
-        if (strpos($cmd, '-t nat') !== 0) {
-            $cmd = '-t nat '.$cmd;
-        }
-        networkRunIptables($cmd);
-    }
-}
-
-/**
- * Render and validate iptables rules before any apply path sees them.
- *
- * @param array<int, mixed> $filterCommands
- * @param array<int, mixed> $natCommands
- * @param array<string, mixed> $replacements
- * @return ?array{filter:array<int,string>,nat:array<int,string>}
- */
-function networkIptablesRenderCommandSets(array $filterCommands, array $natCommands, array $replacements): ?array
-{
-    foreach ($replacements as $search => $replace) {
-        if (!is_string($search) || !is_string($replace)) {
-            networkIptablesLog('ERROR', 'rejected non-string iptables replacement');
-            return null;
-        }
-    }
-
-    $renderedSets = ['filter' => [], 'nat' => []];
-    $search = array_keys($replacements);
-    $replace = array_values($replacements);
-    foreach (['filter' => $filterCommands, 'nat' => $natCommands] as $section => $commands) {
+    // The shared pair preserves filter-before-NAT order and explicit NAT prefixes.
+    foreach ($renderedSets as $table => $commands) {
         foreach ($commands as $cmd) {
-            if (!is_string($cmd)) {
-                networkIptablesLog('ERROR', 'rejected non-string iptables rule: '.gettype($cmd));
-                return null;
-            }
-            $rendered = str_replace($search, $replace, $cmd);
-            if (!networkIptablesCommandSafe($rendered)) {
-                networkIptablesLog('ERROR', "rejected unsafe rendered iptables rule: {$rendered}");
-                return null;
-            }
-            $renderedSets[$section][] = $rendered;
+            networkRunIptables($table === 'nat' && strpos($cmd, '-t nat') !== 0 ? '-t nat '.$cmd : $cmd);
         }
     }
-
-    return $renderedSets;
 }

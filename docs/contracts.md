@@ -620,6 +620,14 @@ Bootstrap helpers from install-time env (Phase 2):
 
 ## Networking
 
+`setupNetwork.php` keeps the load → uplink → monitoring → forwarding → firewall →
+FireQOS sequence. `network/setup.php` resolves one uplink and builds the ordered
+filter/NAT pair directly, without separate chain staging lists. The stable
+`network/iptables.php` include loads rule parsing/validation from `rules.php` and
+owner-match/helper discovery from `monitoring.php`; command execution, logging,
+restore-file lifetime, and fallback remain in the facade (ADR 0179). Default
+rule bytes, diagnostics, stdout, exit status, and validation are preserved.
+
 - pmssEnsureNetworkTemplate(?callable $logger=null, ?callable $routeReader=null): void → writes default PHP array config to `/etc/seedbox/config/network` when missing (first safe non-tunnel default-route interface, falling back to eth0; speed=1000 and throttle defaults). Existing config is not rewritten. A template missing `##INTERFACE##` warns and is not installed.
 - pmssApplyNetworkConfig(): void → runs `/scripts/util/setupNetwork.php` to render/apply FireQOS config.
 

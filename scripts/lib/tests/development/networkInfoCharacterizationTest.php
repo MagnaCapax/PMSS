@@ -72,11 +72,16 @@ PHP;
     public function testSetupNetworkKeepsConfiguredCapAndWarnsOnPhysicalSpeedDrift(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/lib/network/setup.php',
+            [
+                '$detectedLinkSpeed = getDetectedLinkSpeed($interface);',
+                'detected %s link speed %dMbit exceeds configured FireQOS speed %dMbit; keeping configured cap',
+            ]
+        );
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/util/setupNetwork.php',
             [
-                '$detectedLinkSpeed = getDetectedLinkSpeed($link);',
-                '$renderedIptables = networkIptablesRenderCommandSets($filterCommands, $natCommands, $replacements);',
-                'detected %s link speed %dMbit exceeds configured FireQOS speed %dMbit; keeping configured cap',
+                '$renderedIptables = networkIptablesRenderCommandSets($commands[\'filter\'], $commands[\'nat\'], $replacements);',
                 '$fireqosNetworkConfig[\'interface\'] = $interface;',
                 '$fireqosNetworkConfig[\'speed\'] = $linkSpeed;',
             ],
