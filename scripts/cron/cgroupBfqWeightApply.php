@@ -101,7 +101,18 @@ $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
 // root.slice unmanaged. cgroupRootCheck.php enforces root's memory/tasks
 // policy separately.
 
-foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json): int {
+$shadowPolicy = [];
+if (!$DRY_RUN) {
+    try {
+        $shadowPolicy = pmssCgroupPolicyLoad();
+    } catch (Throwable $error) {
+        syslog(LOG_WARNING, 'dynamic-iops shadow policy load failed');
+    }
+}
+$shadowEnabled = ($shadowPolicy['cgroup']['dynamicIops']['mode'] ?? null) === 'shadow' && !pmssEnvFlagEnabled('PMSS_DRY_RUN');
+$shadowConfigs = []; $shadowUsers = [];
+foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json) use ($shadowEnabled, &$shadowConfigs): int {
+    if ($shadowEnabled) $shadowConfigs[$user] = $json;
     // Prefer explicit JSON IOWeight; fall back to ramMiB-derived formula.
     if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) return (int) $json['IOWeight'];
     $ramMiB = isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0;
@@ -112,6 +123,7 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
     // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
     $bonusPct = pmssBfqUserBonusPercentRead($user);
     $w        = pmssBfqApplyBonusWeight($wRaw, $bonusPct);
+    if ($shadowEnabled) $shadowUsers[$user] = ['source' => $shadowConfigs[$user], 'weight' => $w];
 
     $cgPath = pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.bfq.weight');
     if (!pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.bfq.weight'])) {
@@ -156,4 +168,13 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
     syslog(LOG_INFO, "bfq $user uid=$uid: $cur -> $w");
 }
 
+// Shadow output is diagnostic only: failures cannot interrupt existing enforcement.
+if ($shadowEnabled) {
+    try {
+        require_once __DIR__.'/../lib/cgroup/dynamicIopsShadow.php';
+        if (!pmssDynamicIopsShadowCycle($shadowUsers, $shadowPolicy)) syslog(LOG_WARNING, 'dynamic-iops shadow log failed');
+    } catch (Throwable $error) {
+        syslog(LOG_WARNING, 'dynamic-iops shadow cycle failed');
+    }
+}
 exit(pmssCgroupDirectFinishCycle($DRY_RUN, $total, $written, $skippedNoSlice, $errors));

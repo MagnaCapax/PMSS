@@ -170,6 +170,18 @@
     create 0600 root root
 }
 
+# Shadow allocations contain per-account resource figures; keep them root-only.
+/var/log/pmss/dynamic-iops.jsonl {
+    daily
+    rotate 14
+    maxsize 16M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0600 root root
+}
+
 # Cron job output that root.cron appends here (">> ... 2>&1"). Without a stanza these grew
 # forever on every host. Same retention as the check*.log watchdog history above.
 /var/log/pmss/backupEtc.log

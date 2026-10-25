@@ -1033,6 +1033,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Reads the last 16 MiB of the active iostat history and `.1`; older compressed
     rotations are excluded. See ADR 0063 for the publication and retention contract.
 
+- scripts/cron/cgroupBfqWeightApply.php
+  - Optional `cgroup.dynamicIops.mode=shadow` computes pressure/quota read-IOPS
+    proposals using the cycle's bonus-adjusted weights. Default `off` and dry
+    runs create no shadow output. Proposals never change applied limits.
+  - `/var/log/pmss/dynamic-iops.jsonl` is root-only (0600); it records both quota
+    exponents, legacy caps, pressure windows and separate capacity sources.
+    See ADR 0177 for defaults, missing-input behavior and measurement scope.
+
 - scripts/productConfig.php <product> --welcome-message=<HTML>
   - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.
 
