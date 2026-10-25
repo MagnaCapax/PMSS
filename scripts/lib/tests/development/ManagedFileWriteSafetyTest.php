@@ -20,8 +20,8 @@ final class ManagedFileWriteSafetyTest extends TestCase
         $device = (int) stat($stage)['dev'];
         foreach ([[$outside, $device], [$inside, $device + 1]] as $scenario) {
             $command = \pmssRootStagePublishCommand($scenario[0], $home, $stage, 'target', $scenario[1]);
-            exec($command.' 2>/dev/null', $output, $rc);
-            $this->assertTrue($rc !== 0);
+            $result = $this->pmssExecShellCommand($command, [], '2>/dev/null');
+            $this->assertTrue($result['rc'] !== 0);
             $this->assertSame('new', file_get_contents($stage));
         }
         $this->assertSame('kept', file_get_contents($outside.'/target'));
@@ -35,8 +35,8 @@ final class ManagedFileWriteSafetyTest extends TestCase
         $stage = $this->pmssWriteFile($this->tempDir.'/stage', 'new');
         $device = (int) stat($stage)['dev'];
         $command = \pmssRootStagePublishCommand($inside, $home, $stage, 'target', $device);
-        exec($command.' 2>/dev/null', $output, $rc);
-        $this->assertSame(0, $rc);
+        $result = $this->pmssExecShellCommand($command, [], '2>/dev/null');
+        $this->assertSame(0, $result['rc']);
         $this->assertSame('new', file_get_contents($inside.'/target'));
         $this->assertFalse(file_exists($stage));
     }

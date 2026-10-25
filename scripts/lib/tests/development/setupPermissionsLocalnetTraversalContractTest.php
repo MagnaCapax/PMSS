@@ -37,9 +37,9 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
         chmod($catalog, 0660);
         chmod($other, 0660);
         $command = str_replace(['\\\\', '/etc/skel/www'], ['\\', escapeshellarg($dir)], $match[1]);
-        exec($command.' 2>&1', $output, $rc);
+        $result = $this->pmssExecShellCommand($command);
         clearstatcache();
-        $this->assertSame(0, $rc, implode("\n", $output));
+        $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame(0750, fileperms($dir) & 0777);
         $this->assertSame(0640, fileperms($catalog) & 0777);
         $this->assertSame(0660, fileperms($other) & 0777);

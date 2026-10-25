@@ -47,8 +47,8 @@ class NginxDefaultTlsTemplateTest extends TestCase
         $makeCert = escapeshellarg($openssl).' req -x509 -nodes -newkey rsa:2048 -days 1'
             .' -subj '.escapeshellarg('/CN=localhost').' -keyout '.escapeshellarg($key)
             .' -out '.escapeshellarg($cert).' >/dev/null 2>&1';
-        exec($makeCert, $output, $status);
-        $this->assertSame(0, $status);
+        $result = $this->pmssExecShellCommand($makeCert, [], '');
+        $this->assertSame(0, $result['rc']);
 
         $site = str_replace(
             ['/etc/nginx/ssl/nginx.crt', '/etc/nginx/ssl/nginx.key'],
@@ -65,8 +65,7 @@ class NginxDefaultTlsTemplateTest extends TestCase
         file_put_contents($path, $config);
         $command = escapeshellarg($nginx).' -t -p '.escapeshellarg($dir.'/')
             .' -c '.escapeshellarg($path).' 2>&1';
-        $output = [];
-        exec($command, $output, $status);
-        $this->assertSame(0, $status, implode("\n", $output));
+        $result = $this->pmssExecShellCommand($command, [], '');
+        $this->assertSame(0, $result['rc'], $result['output']);
     }
 }

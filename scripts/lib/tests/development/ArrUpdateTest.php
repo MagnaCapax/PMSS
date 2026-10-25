@@ -320,19 +320,7 @@ class ArrUpdateTest extends TestCase
         }
 
         $archivePath = $baseDir.'/'.$archiveName;
-        $output = [];
-        $rc = 0;
-        exec(
-            sprintf(
-                'tar -czf %s -C %s %s 2>&1',
-                escapeshellarg($archivePath),
-                escapeshellarg($archiveRoot),
-                escapeshellarg($extractDir)
-            ),
-            $output,
-            $rc
-        );
-        $this->assertEquals(0, $rc, implode("\n", $output));
+        $this->pmssCreateTarGzArchive($archivePath, $archiveRoot, [$extractDir], '', '2>&1');
         return $archivePath;
     }
 

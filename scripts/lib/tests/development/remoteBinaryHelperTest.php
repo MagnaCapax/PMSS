@@ -193,14 +193,7 @@ SH
         @file_put_contents($sourceDir.'/payload.txt', 'archive-ok');
 
         $archivePath = $root.'/archive.tar.gz';
-        $output = [];
-        $rc = 0;
-        exec(
-            sprintf('tar -czf %s -C %s source 2>&1', escapeshellarg($archivePath), escapeshellarg($archiveRoot)),
-            $output,
-            $rc
-        );
-        $this->assertEquals(0, $rc, implode("\n", $output));
+        $this->pmssCreateTarGzArchive($archivePath, $archiveRoot, ['source'], '', '2>&1');
         return $archivePath;
     }
 

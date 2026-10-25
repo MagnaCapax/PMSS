@@ -291,6 +291,13 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Development fixtures use `TestCase::pmssExecShellCommand()` for captured shell
+results, with explicit redirection overrides when stderr must remain inherited
+or go to a file. The shared account-path callback adapter and gzip tar fixture
+builder use that same execution path. Fixture-specific arguments, archive
+members, malformed-member transforms, exit checks and content assertions stay
+with their tests; these fixtures run only on testing machines.
+
 AI launcher tests share their temporary-directory setup, valid account state,
 passthrough cases, explicit-environment matrix and result assertions through
 `AiToolsLauncherTestCase`. Provider-specific arguments and refusal variants stay

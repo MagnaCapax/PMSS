@@ -17,12 +17,10 @@ class AddUserProvisioningGuardTest extends TestCase
         file_put_contents($cwd.'/lib/user/add/cli.php', '<?php file_put_contents('.var_export($marker, true).', "yes");');
         $command = 'cd '.escapeshellarg($cwd).' && '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($this->pmssRepoPath('scripts/addUser.php')).' --help 2>&1';
-        $output = [];
-        $status = 1;
-        exec($command, $output, $status);
-        $this->assertSame(0, $status);
+        $result = $this->pmssExecShellCommand($command, [], '');
+        $this->assertSame(0, $result['rc']);
         $this->assertFalse(file_exists($marker));
-        $this->assertTrue(strpos(implode("\n", $output), 'Usage') !== false);
+        $this->assertTrue(strpos($result['output'], 'Usage') !== false);
     }
 
     public function testAddUserSourceContractsStayWired(): void

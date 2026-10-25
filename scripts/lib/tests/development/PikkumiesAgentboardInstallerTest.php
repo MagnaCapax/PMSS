@@ -19,9 +19,7 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         if ($extra === 'hardlink') link($source.'/dist/client/app.js', $source.'/dist/client/extra.js');
         $archive = $temp.'/'.$name.'.tar.gz';
         $transform = $extra === 'traversal' ? " --transform='s|^dist/client/app.js$|../escape|'" : '';
-        exec('tar -czf '.escapeshellarg($archive).$transform.' -C '.escapeshellarg($source)
-            .' agentboard dist/client', $output, $rc);
-        $this->assertSame(0, $rc);
+        $this->pmssCreateTarGzArchive($archive, $source, ['agentboard', 'dist/client'], $transform);
         return $archive;
     }
 

@@ -117,13 +117,10 @@ BASH;
         $runner = $entry === 'legacy' ? $this->bashBin : $this->phpBin;
         $command = 'env '.\pmssCommandArgvShellQuote(array_merge($envPairs, [$runner, $entryScript], $args)).' 2>&1';
 
-        $output = [];
-        $rc = 0;
-        exec($command, $output, $rc);
-
+        $result = $this->pmssExecShellCommand($command, [], '');
         return [
-            'rc' => $rc,
-            'output' => implode("\n", $output),
+            'rc' => $result['rc'],
+            'output' => $result['output'],
             'dockerLog' => $this->pmssReadFileOrEmpty($this->dockerLog),
         ];
     }

@@ -233,8 +233,8 @@ SH
     {
         file_put_contents($root.'/ping-calls', '0');
         $command = 'PATH='.escapeshellarg($root.'/bin:/usr/bin:/bin').' sh '.escapeshellarg($root.'/check.sh').' 2>&1';
-        exec($command, $output, $status);
-        $this->assertSame($expectedExit, $status, implode("\n", $output));
+        $result = $this->pmssExecShellCommand($command, [], '');
+        $this->assertSame($expectedExit, $result['rc'], $result['output']);
         $this->assertSame($expectedPings, (int) file_get_contents($root.'/ping-calls'));
     }
 

@@ -128,17 +128,16 @@ class LighttpdSocketCleanupTest extends TestCase
         $this->assertSame('', (string) @file_get_contents($fixture['launchLog']));
         $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => $fixture['locks']], function () use ($fixture): void {
             $path = \pmssRuntimeLockPath('pmss-lighttpdStart-'.$fixture['user'].'.lock');
-            exec('sudo -n flock -n '.escapeshellarg($path).' true 2>&1', $output, $rc);
-            $this->assertSame(0, $rc, 'failed starter must release its lock');
+            $result = $this->pmssExecShellCommand('sudo -n flock -n '.escapeshellarg($path).' true');
+            $this->assertSame(0, $result['rc'], 'failed starter must release its lock');
         });
     }
 
     /** PATH stubs keep process detection and launch away from live services and /proc. */
     private function startFixture(bool $running): array
     {
-        $sudoStatus = 1;
-        exec('sudo -n true 2>/dev/null', $unused, $sudoStatus);
-        if ($sudoStatus !== 0 || !is_array(posix_getpwnam('nobody'))) {
+        $result = $this->pmssExecShellCommand('sudo -n true', [], '2>/dev/null');
+        if ($result['rc'] !== 0 || !is_array(posix_getpwnam('nobody'))) {
             throw new SkipTest('Root account fixture unavailable');
         }
         $root = $this->pmssMakeTempDir('pmss-lighttpd-start-home-');
@@ -153,8 +152,8 @@ class LighttpdSocketCleanupTest extends TestCase
         chmod($home, 0777);
         chmod($home.'/.lighttpd', 0777);
         chmod($root, 0711);
-        exec('sudo -n chown nobody '.escapeshellarg($home), $unused, $ownerRc);
-        $this->assertSame(0, $ownerRc);
+        $result = $this->pmssExecShellCommand('sudo -n chown nobody '.escapeshellarg($home), [], '');
+        $this->assertSame(0, $result['rc']);
         $marker = $root.'/running';
         if ($running) $this->pmssWriteFile($marker, '1');
         $bin = $this->pmssMakeTempDir('pmss-lighttpd-start-bin-');
@@ -179,8 +178,8 @@ class LighttpdSocketCleanupTest extends TestCase
             .' PMSS_RUNTIME_LOCK_DIR='.escapeshellarg($fixture['locks'])
             .' '.escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 3).'/startLighttpd')
             .' '.escapeshellarg($fixture['user']).' 2>&1';
-        exec($command, $output, $rc);
-        return ['rc' => $rc, 'output' => implode("\n", $output)];
+        $result = $this->pmssExecShellCommand($command, [], '');
+        return ['rc' => $result['rc'], 'output' => $result['output']];
     }
 
     private function readStartScript(): string

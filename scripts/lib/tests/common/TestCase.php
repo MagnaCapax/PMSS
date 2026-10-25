@@ -1048,7 +1048,7 @@ abstract class TestCase
     protected function pmssExecShellCommand(string $command, array $environment = [], string $stderrRedirect = '2>&1'): array
     {
         $output = [];
-        $rc = 0;
+        $rc = 1;
         @exec(
             $this->pmssBuildCommandEnvironmentPrefix($environment).$command.($stderrRedirect !== '' ? ' '.$stderrRedirect : ''),
             $output,
@@ -1059,6 +1059,22 @@ abstract class TestCase
             'output' => implode("\n", $output),
             'lines' => $output,
         ];
+    }
+
+    /** Adapt fixture shell execution to the account-path runner callback contract. */
+    protected function pmssAccountPathCommandRunner(): callable
+    {
+        return function (string $user, string $path, array $paths, string $command): bool {
+            return $this->pmssExecShellCommand($command, [], '')['rc'] === 0;
+        };
+    }
+
+    /** Build and verify a real gzip tar fixture, retaining caller-owned tar options. */
+    protected function pmssCreateTarGzArchive(string $archive, string $root, array $members, string $options = '', string $stderrRedirect = ''): void
+    {
+        $result = $this->pmssExecShellCommand('tar -czf '.escapeshellarg($archive).$options
+            .' -C '.escapeshellarg($root).' '.implode(' ', array_map('escapeshellarg', $members)), [], $stderrRedirect);
+        $this->assertSame(0, $result['rc'], $result['output']);
     }
 
     /** Extract one shell function body from a source fixture for focused harness tests. */

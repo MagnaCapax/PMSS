@@ -34,11 +34,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
         }
         $ops = ['root' => $store, 'homeRoot' => $root, 'catalog' => $catalog,
             'rtorrentCustomSkeleton' => $skeleton,
-            'run' => static function (string $user, string $path, array $paths, string $command): bool {
-                $output = []; $rc = 1;
-                exec($command, $output, $rc);
-                return $rc === 0;
-            }];
+            'run' => $this->pmssAccountPathCommandRunner()];
         return [$home, $store, $ops];
     }
 

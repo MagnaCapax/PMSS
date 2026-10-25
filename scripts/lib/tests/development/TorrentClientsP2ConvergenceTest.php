@@ -27,11 +27,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $ops = [
             'homeRoot' => $root, 'root' => $root.'/store',
             'catalog' => $root.'/catalog.json', 'projection' => $root.'/projection.json',
-            'run' => static function (string $user, string $path, array $paths, string $command): bool {
-                $output = []; $rc = 1;
-                exec($command, $output, $rc);
-                return $rc === 0;
-            },
+            'run' => $this->pmssAccountPathCommandRunner(),
             'log' => static function (string $user, string $message) use ($events): void {
                 $events->logs[] = [$user, $message];
             },

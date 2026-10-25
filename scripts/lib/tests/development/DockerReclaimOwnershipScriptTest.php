@@ -63,13 +63,10 @@ BASH;
 
         $command = 'env '.\pmssCommandArgvShellQuote(array_merge($envPairs, [$this->bashBin, $this->scriptPath], $args)).' 2>&1';
 
-        $output = [];
-        $rc = 0;
-        exec($command, $output, $rc);
-
+        $result = $this->pmssExecShellCommand($command, [], '');
         return [
-            'rc' => $rc,
-            'output' => implode("\n", $output),
+            'rc' => $result['rc'],
+            'output' => $result['output'],
             'dockerLog' => $this->pmssReadFileOrEmpty($this->dockerLog),
         ];
     }

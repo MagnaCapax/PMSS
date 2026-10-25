@@ -16,13 +16,7 @@ final class TorrentClientsUserLinksTest extends TestCase
         mkdir($store.'/5.1.0', 0755, true);
         file_put_contents($store.'/5.1.0/qbittorrent-nox', 'binary');
         symlink('5.1.0', $store.'/default');
-        $run = static function (string $user, string $path, array $paths, string $command): bool {
-            $output = [];
-            $rc = 1;
-            exec($command, $output, $rc);
-            return $rc === 0;
-        };
-        $ops = ['root' => $root.'/store', 'homeRoot' => $root, 'run' => $run,
+        $ops = ['root' => $root.'/store', 'homeRoot' => $root, 'run' => $this->pmssAccountPathCommandRunner(),
             'catalog' => dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json'];
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
         $versionLink = $home.'/bin/qbittorrent/5.1.0';

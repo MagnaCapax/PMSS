@@ -135,15 +135,11 @@ final class TorrentClientsStoreTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-clients-archive-');
         file_put_contents($root.'/rtorrent', 'binary');
         $safe = $root.'/safe.tar.gz';
-        $output = [];
-        $rc = 1;
-        exec('tar -czf '.escapeshellarg($safe).' -C '.escapeshellarg($root).' rtorrent', $output, $rc);
-        $this->assertSame(0, $rc);
+        $this->pmssCreateTarGzArchive($safe, $root, ['rtorrent']);
         $this->assertTrue(\pmssTorrentClientsStoreArchiveIsSafe($safe));
         symlink('rtorrent', $root.'/linked');
         $linked = $root.'/linked.tar.gz';
-        exec('tar -czf '.escapeshellarg($linked).' -C '.escapeshellarg($root).' linked', $output, $rc);
-        $this->assertSame(0, $rc);
+        $this->pmssCreateTarGzArchive($linked, $root, ['linked']);
         $this->assertFalse(\pmssTorrentClientsStoreArchiveIsSafe($linked));
     }
 

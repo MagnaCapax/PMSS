@@ -62,13 +62,11 @@ final class DockerInstallLsioOperatorTest extends TestCase
         if (!is_executable('/usr/bin/php')) {
             throw new SkipTest('/usr/bin/php unavailable');
         }
-        $output = [];
-        $rc = 1;
-        exec('cd '.escapeshellarg($home).' && '.$command.' 2>&1', $output, $rc);
-        $this->assertSame(0, $rc, implode("\n", $output));
+        $result = $this->pmssExecShellCommand('cd '.escapeshellarg($home).' && '.$command);
+        $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame(
             ['argv' => $args, 'home' => $home, 'docker' => 'unix:///run/user/4321/docker.sock'],
-            json_decode(implode("\n", $output), true)
+            json_decode($result['output'], true)
         );
         $this->assertFalse(file_exists($home.'/pmss-injected'));
     }
@@ -80,11 +78,9 @@ final class DockerInstallLsioOperatorTest extends TestCase
             $command = 'env '.implode(' ', array_map('escapeshellarg', [
                 'HOME='.$candidate, 'PATH=/usr/bin:/bin', PHP_BINARY, self::ENTRYPOINT, 'mariadb',
             ])).' 2>&1';
-            $output = [];
-            $rc = 0;
-            exec($command, $output, $rc);
-            $this->assertSame(1, $rc, implode("\n", $output));
-            $this->assertStringContainsString("Set HOME to the account's home directory", implode("\n", $output));
+            $result = $this->pmssExecShellCommand($command, [], '');
+            $this->assertSame(1, $result['rc'], $result['output']);
+            $this->assertStringContainsString("Set HOME to the account's home directory", $result['output']);
         }
         $this->assertSame(['.', '..'], scandir($home));
     }

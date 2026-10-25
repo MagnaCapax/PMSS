@@ -57,11 +57,9 @@ class ScheduledConfigBackupTest extends TestCase
         $this->assertSame(0700, fileperms($this->home.'/.pmss-backups') & 0777);
         $this->assertSame(0600, fileperms($result['path']) & 0777);
 
-        $members = array();
-        $returnCode = 1;
-        exec('/bin/tar -tzf '.escapeshellarg($result['path']).' 2>&1', $members, $returnCode);
-        $manifest = implode("\n", $members);
-        $this->assertSame(0, $returnCode, $manifest);
+        $listing = $this->pmssExecShellCommand('/bin/tar -tzf '.escapeshellarg($result['path']));
+        $manifest = $listing['output'];
+        $this->assertSame(0, $listing['rc'], $manifest);
         $this->assertStringContainsAllStrings(['.rtorrent.rc', 'session/state.torrent', '.config/deluge/auth'], $manifest);
         $this->assertStringNotContainsString('data/media.bin', $manifest);
     }

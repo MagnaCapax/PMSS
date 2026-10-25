@@ -161,15 +161,12 @@ class CustomerBackupTest extends TestCase
         $command = \pmssCustomerBackupTarCommandBuild($this->home, \pmssCustomerBackupEntriesRead($this->home));
         $archive = $this->homeRoot.'/backup.tar.gz';
         $errors = $this->homeRoot.'/tar-errors.log';
-        $output = array();
-        $returnCode = 1;
-        exec($command.' > '.escapeshellarg($archive).' 2> '.escapeshellarg($errors), $output, $returnCode);
-        $this->assertSame(0, $returnCode, (string) @file_get_contents($errors));
+        $result = $this->pmssExecShellCommand($command.' > '.escapeshellarg($archive), [], '2> '.escapeshellarg($errors));
+        $this->assertSame(0, $result['rc'], (string) @file_get_contents($errors));
 
-        $members = array();
-        exec('/bin/tar -tzf '.escapeshellarg($archive).' 2>&1', $members, $returnCode);
-        $manifest = implode("\n", $members);
-        $this->assertSame(0, $returnCode, $manifest);
+        $result = $this->pmssExecShellCommand('/bin/tar -tzf '.escapeshellarg($archive));
+        $manifest = $result['output'];
+        $this->assertSame(0, $result['rc'], $manifest);
         $this->assertStringContainsAllStrings(array('.rtorrent.rc', 'session/state.torrent', '.config/deluge/auth'), $manifest);
         $this->assertStringNotContainsString('data/media.bin', $manifest);
     }
