@@ -274,9 +274,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - Storage-health device parsers share ordered metric matching and threshold
   evaluation. SMART processes each line in order, including overlapping matches;
   NVMe searches the complete output once per field. Thresholds select one flag
-  per metric, highest applicable wear tier first. Snapshot commands, eligibility,
-  timeout/lock results, history typing, field order and flag order remain stable.
+  per metric, highest applicable wear tier first. Successful snapshot commands,
+  eligibility, history typing, field order and flag order remain stable.
   Pure parsing and finding helpers load independently of the runtime facade.
+  NVMe snapshots parse stdout only after a zero command exit status. Failed,
+  locked, and timed-out probes return the existing `null` unavailable result,
+  including when they captured partial metrics; empty successful output also
+  retains that result. `StorageHealthSnapshotNvmeTest` covers these boundaries
+  and the successful payloads.
 
 - `pmssMediaStackWatchdogStatusWrite()` encodes before allocating a temporary
   file and publishes only a complete write. Encoding, write, mode, or rename

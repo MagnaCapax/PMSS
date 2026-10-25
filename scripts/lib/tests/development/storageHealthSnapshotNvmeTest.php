@@ -58,6 +58,32 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
         });
     }
 
+    public function testFailedProbesDiscardCapturedMetrics(): void
+    {
+        $device = $this->pmssMakeReadableTempPath('pmss-nvme-failed-', 'dev-');
+        $disk = ['path' => $device, 'kname' => 'nvme0n1'];
+        $previous = ['nvme::'.$device => ['metrics' => ['media_errors' => 0]]];
+        // Include lock refusal, timeout, launch failures and ordinary command failures.
+        foreach ([1, 2, 75, 124, 126, 127, 255] as $rc) {
+            $stubDir = $this->pmssMakeExecutableStub('nvme',
+                "#!/bin/sh\nprintf '%s\\n' 'critical_warning : 0' 'temperature : 42 C' 'media_errors : 5'\nexit ".$rc."\n",
+                'pmss-nvme-failed-bin-');
+            // No flock binary: the stub status reaches the capture boundary directly.
+            $this->pmssWithEnv(['PATH' => $stubDir], function () use ($disk, $previous, $rc): void {
+                $this->assertSame(null, \pmssStorageHealthSnapshotNvme($disk, $previous, '2025-01-01T00:00:00+00:00'), 'rc='.$rc);
+            });
+        }
+    }
+
+    public function testSuccessfulEmptyProbeRemainsUnavailable(): void
+    {
+        $device = $this->pmssMakeReadableTempPath('pmss-nvme-empty-', 'dev-');
+        $stubDir = $this->pmssMakeExecutableStub('nvme', "#!/bin/sh\nexit 0\n", 'pmss-nvme-empty-bin-');
+        $this->pmssWithEnv(['PATH' => $stubDir], function () use ($device): void {
+            $this->assertSame(null, \pmssStorageHealthSnapshotNvme(['path' => $device], [], '2025-01-01T00:00:00+00:00'));
+        });
+    }
+
     public function testSnapshotNvmeParsesMetricsAndFlags(): void
     {
         $device = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');

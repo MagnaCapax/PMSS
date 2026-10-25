@@ -23,8 +23,10 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
 
     $cmd = 'nvme smart-log '.escapeshellarg($dev).' 2>/dev/null';
     $probe = pmssStorageHealthProbeCommand('nvme', (string) ($disk['kname'] ?? ''), $cmd);
-    $out = pmssCommandCapture($probe['command'], 20)['stdout'];
-    if ($out === '') {
+    $result = pmssCommandCapture($probe['command'], 20);
+    $out = $result['stdout'];
+    // Failed or timed-out probes can leave partial metrics in captured stdout.
+    if ($result['rc'] !== 0 || $out === '') {
         return null;
     }
 
