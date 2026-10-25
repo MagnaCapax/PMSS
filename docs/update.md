@@ -327,6 +327,12 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    A failed `userPermissions.php` repair reports the failed-command count and
    first command to stderr and returns 1. The updater warns and continues;
    only its timeout (rc 124) stops the user refresh.
+   Account-identity repairs start in `/` through `pmssAccountPathRun()` so an
+   unreadable caller directory cannot make GNU `find` fail while restoring its
+   initial working directory (#1153). Traffic immutable flags are toggled only
+   for files present at the start of the repair; optional traffic files are not
+   created by this pass. A file that disappears before flags are restored still
+   produces a diagnostic.
 10. Reapply network templates, apply security hardening, summarise profiling, and
    log completion markers. Tenant-empty fresh installs also run the existing
    storage benchmark once with `--require-idle --devices` before root cron is
