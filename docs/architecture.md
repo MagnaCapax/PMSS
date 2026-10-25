@@ -90,7 +90,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/cgroup/readIopsPolicy.php** – Derived read-IOPS policy loads the runtime value helpers directly; passive ceiling computation remains in `cgroup/ioCeiling.php`.
 - **scripts/lib/cgroup/plan.php** – Finalizes the CLI's single plan after input
   and profile expansion: retain live properties, display, guard, build and apply
-  ordered steps. Manager keeps orchestration and public sizing helpers (ADR 0173).
+  ordered steps. Manager keeps orchestration and public sizing helpers (ADR 0175).
 - **scripts/lib/nginxConfig/** – Generates the public user subdomain route and reconciles obsolete private hash routes. The template catalog contains only active and suspended public variants.
 - **scripts/lib/resources/log.php** – Resource-log entrypoint. `resources/counters.php` selects the hierarchy and projects billing counters; `resources/v1.php` owns the source traversal and parsers shared with performance telemetry (ADR 0161). `resources/counterState.php` owns locked delta persistence shared with traffic ingress (ADR 0078).
 - **scripts/lib/traffic/report.php** – Stable traffic CLI facade. `reportModel.php` reads accepted rows and derives totals and summary counts before sorting; `reportDisplay.php` projects that model to JSON and terminal output without filesystem reads (ADR 0157).

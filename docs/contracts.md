@@ -1014,7 +1014,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Plans and optionally applies systemd/cgroup slice properties for one existing user.
   - Internal handoff: input parsing, IO profiles and display share one plan;
     `cgroup/plan.php` finalizes it without changing CLI output or sizing APIs
-    (ADR 0173). Live properties are filtered before display, and all apply
+    (ADR 0175). Live properties are filtered before display, and all apply
     commands are constructed after root checking and before the first runs.
   - Apply errors: when `--apply` runs a planned `systemctl` or `io.cost`
     write and any step returns non-zero, the script attempts the remaining
@@ -1172,7 +1172,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## Customer Apps Controls – `etc/skel/www/scriptsIncAppsStatus.php` and related parts
 
 - Apps and Configure share wiki rows and consecutive-category LinuxServer groups
-  through `appsRuntime.php` (ADR 0173). Their surrounding layouts and search modes
+  through `appsRuntime.php` (ADR 0174). Their surrounding layouts and search modes
   remain page-specific. Missing new renderers use the existing updating response.
   Requiring `appsLsioCatalog.php` remains standalone and returns the same ordered
   `name`, `title`, `description`, `category`, `image`, and `guide` fields; its source

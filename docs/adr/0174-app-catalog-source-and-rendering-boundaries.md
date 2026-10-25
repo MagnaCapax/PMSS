@@ -1,4 +1,4 @@
-# ADR 0173: App catalog source and rendering boundaries
+# ADR 0174: App catalog source and rendering boundaries
 
 Date: 2026-10-24
 Category: architecture

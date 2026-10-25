@@ -1,4 +1,4 @@
-# ADR 0173: One cgroup CLI plan handoff
+# ADR 0175: One cgroup CLI plan handoff
 
 Date: 2026-10-24
 Category: architecture
