@@ -2135,12 +2135,13 @@ jellyfin_auth_seed() {
 		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
-	# Use an owner-only curl config for the returned token; never put it in argv.
+	# Use MediaBrowser auth even when legacy headers are disabled; keep the token out of argv.
+	code="000"
 	# shellcheck disable=SC2016
-	if ! php -r '$data = json_decode(file_get_contents($argv[1]), true); $token = $data["AccessToken"] ?? null; if (!is_string($token) || !preg_match("/^[a-zA-Z0-9]+$/", $token)) { exit(1); } echo "header = \"X-Emby-Token: ".$token."\"\n";' "$payload_json" >"$curl_config" ||
-		! curl -fsS --max-time 10 --config "$curl_config" "${base_url}/Users" -o "$payload_json" ||
+	if ! php -r '$data = json_decode(file_get_contents($argv[1]), true); $token = $data["AccessToken"] ?? null; if (!is_string($token) || !preg_match("/^[a-zA-Z0-9]+$/", $token)) { exit(1); } echo "header = ".json_encode("Authorization: MediaBrowser Client=\"PMSS\", Device=\"media-stack-installer\", DeviceId=\"pmss-media-stack\", Version=\"1\", Token=\"".$token."\"")."\n";' "$payload_json" >"$curl_config" ||
+		! code=$(curl -fsS --max-time 10 --config "$curl_config" "${base_url}/Users" -o "$payload_json" -w '%{http_code}') || [[ "$code" != "200" ]] ||
 		! MEDIA_STACK_AUTH_USERNAME="$MEDIA_STACK_AUTH_USERNAME" php -r '$users = json_decode(file_get_contents($argv[1]), true); exit(is_array($users) && count($users) === 1 && ($users[0]["Name"] ?? null) === getenv("MEDIA_STACK_AUTH_USERNAME") ? 0 : 1);' "$payload_json"; then
-		log_err "Jellyfin must have exactly one expected user; stop and reinstall. No users or config were deleted."
+		log_err "Jellyfin must have exactly one expected user (HTTP ${code:-000}); stop and reinstall. No users or config were deleted."
 		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi

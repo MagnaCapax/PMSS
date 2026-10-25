@@ -43,8 +43,11 @@ the count after successful create-user must be exactly one. Unknown counts or
 multiple users stop setup without changing or deleting the database.
 
 Jellyfin authenticates the new administrator, keeps the returned token in a
-0600 curl config, and reads the authenticated `/Users` list. Exactly one entry
-with the expected name is required. A private pending marker is created before
+0600 curl config using `Authorization: MediaBrowser` with the login's client
+identity and token, and reads the authenticated `/Users` list. This works when
+Jellyfin disables legacy token headers. HTTP 200 and exactly one entry with the
+expected name are required; failures report the HTTP status (000 when no response
+was received). A private pending marker is created before
 startup completion and removed only after verification, preventing failed
 verification from being skipped as already configured on rerun. Failure asks
 the customer to reinstall and retains config and user records. Successful
