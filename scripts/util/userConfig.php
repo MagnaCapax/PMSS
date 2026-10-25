@@ -12,7 +12,7 @@
  * @author PMSS Team
  */
 
-foreach (['traffic', 'iopsLimit', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
+foreach (['traffic', 'iopsLimit', 'deluge', 'qbittorrent', 'qbittorrentWebUiAuth', 'userConfigStore'] as $module) {
     require_once __DIR__.'/../lib/user/'.$module.'.php';
 }
 require_once __DIR__.'/../lib/cli/optionParser.php';
@@ -210,6 +210,9 @@ if (!file_exists($qbittorrentConfigFile)) {
             ],
             $qbittorrentTemplate
         );
+        // A new config always carries a WebUI password line (ADR 0102 sentinel) so no build falls back to its default;
+        // the account password synced right after addUser replaces it, and the panel asks for one otherwise.
+        $qbittorrentConfig = pmssQbittorrentWebUiAuthForce($qbittorrentConfig);
         if (!pmssReplaceUserFileWithMetadata($qbittorrentConfigFile, $qbittorrentConfig, 0644, 'root', 'root')) {
             fwrite(STDERR, "Warning: failed to write qBittorrent config for {$user['name']}\n");
         }
