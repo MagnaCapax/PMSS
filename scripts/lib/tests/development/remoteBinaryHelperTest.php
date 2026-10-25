@@ -287,6 +287,37 @@ SH
         }, ['PMSS_DRY_RUN' => '1']);
     }
 
+    public function testArtifactCustomDownloadPolicyRetainsLabelsPrefixesAndCleanup(): void
+    {
+        foreach (['pmss-ai-node-' => 'Downloading pinned Node.js runtime for AI CLI tools',
+            'pmss-ai-codex-' => 'Downloading pinned Codex CLI archive',
+            'pmss-remote-deb-' => 'Downloading demo package'] as $prefix => $description) {
+            $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $sha) use ($prefix, $description): void {
+                [$path, $output] = $this->pmssCaptureStdout(static function () use ($sha, $prefix, $description) {
+                    return \pmssPinnedRemoteArtifactTempFileUse('demo', 'https://example.invalid/archive', $sha,
+                        static function (string $path): string { return $path; }, true,
+                        ['tempPrefix' => $prefix, 'downloadDescription' => $description]);
+                });
+                $this->assertSame(0, strpos(basename($path), $prefix));
+                $this->assertFalse(file_exists($path));
+                $this->assertStringContainsString($description, $output);
+            }, ['PMSS_DRY_RUN' => '1']);
+        }
+    }
+
+    public function testArtifactCustomMismatchLabelRetainsPackageDiagnostic(): void
+    {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $sha): void {
+            [$result, $output] = $this->pmssCaptureStdout(static function () {
+                return \pmssPinnedRemoteArtifactTempFileUse('demo', 'https://example.invalid/archive', str_repeat('a', 64),
+                    static function () { throw new \RuntimeException('Unverified package reached callback'); }, true,
+                    ['tempPrefix' => 'pmss-remote-deb-', 'downloadDescription' => 'Downloading demo package', 'artifactLabel' => ' package']);
+            });
+            $this->assertSame(null, $result);
+            $this->assertStringContainsString('[WARN] demo package checksum mismatch; refusing install (expected '.str_repeat('a', 64).', got '.$sha.')', $output);
+        });
+    }
+
     public function testRunPinnedRemoteArchiveStepRejectsUnsafeExtractionInputsBeforeDownload(): void
     {
         $cases = [

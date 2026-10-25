@@ -153,20 +153,25 @@ class UpdateAppInstallerContractsTest extends TestCase
             ],
             'remoteBinary.php' => [
                 'required' => [
-                    'function pmssRunPinnedRemoteArchiveStep(',
-                    'function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = \'/root/compile\'): bool',
-                    "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
-                    "'tar '.\$tarMode",
                     'function pmssInstallPinnedRemoteDebPackage',
                     "dpkgCmd('-i '",
                     "'pmss-remote-deb-'",
                     "require_once __DIR__.'/remoteBinary/versionProbe.php';",
                     "require_once __DIR__.'/remoteBinary/artifact.php';",
+                    "require_once __DIR__.'/remoteBinary/archive.php';",
+                ],
+            ],
+            'remoteBinary/archive.php' => [
+                'required' => [
+                    'function pmssPinnedRemotePortableInstall(',
+                    'function pmssRunPinnedRemoteArchiveStep(',
+                    'function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = \'/root/compile\'): bool',
+                    "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
+                    "'tar '.\$tarMode",
                 ],
             ],
             'remoteBinary/artifact.php' => [
                 'required' => [
-                    'function pmssPinnedRemoteTempFileUse(',
                     'function pmssPinnedRemoteArtifactTempFileUse(',
                     'checksum mismatch; refusing install',
                     "'pmss-remote-bin-'",

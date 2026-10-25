@@ -32,9 +32,8 @@ function pmssTorrentClientsStoreVenvInstall(array $entry, string $binary): bool
     $installed = false;
     try {
         foreach ($entry['url'] as $url) {
-            $installed = pmssPinnedRemoteTempFileUse(
+            $installed = pmssPinnedRemoteArtifactTempFileUse(
                 $entry['client'].' '.$entry['version'], $url, $entry['sha256'],
-                'pmss-client-venv-', 'Downloading torrent client venv',
                 static function (string $archive) use ($stage, $binary, $versionDir): bool {
                     if (!pmssTorrentClientsStoreArchiveIsSafe($archive)) return false;
                     if (runStep('Extracting torrent client venv', 'tar --no-same-owner --no-same-permissions -xzf '
@@ -45,7 +44,7 @@ function pmssTorrentClientsStoreVenvInstall(array $entry, string $binary): bool
                         .' -type d -exec chmod 0755 {} + && find '.escapeshellarg($stage)
                         .' -type f -exec chmod 0755 {} +') !== 0) return false;
                     return @rename($stage, $versionDir);
-                }, '', false
+                }, false, ['tempPrefix' => 'pmss-client-venv-', 'downloadDescription' => 'Downloading torrent client venv']
             ) === true;
             if ($installed) break;
         }

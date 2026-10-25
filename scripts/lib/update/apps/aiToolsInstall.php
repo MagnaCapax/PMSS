@@ -101,12 +101,10 @@ if ($nodeBinary === '') {
             $nodeBinary = '';
         } elseif (!is_executable($nodeBinary)) {
             runStep('Ensuring AI tools install root exists', pmssBuildCommand('mkdir', ['-p', $installRoot]));
-            $resolvedNodeBinary = pmssPinnedRemoteTempFileUse(
+            $resolvedNodeBinary = pmssPinnedRemoteArtifactTempFileUse(
                 'Node.js runtime for AI CLI tools',
                 $downloadUrl,
                 $nodeSha256,
-                'pmss-ai-node-',
-                'Downloading pinned Node.js runtime for AI CLI tools',
                 static function (string $downloadPath) use ($dryRun, $installRoot, $nodeBinary): string {
                     // Dry-run keeps the historical path: later npm checks
                     // still report what would be missing without extracting.
@@ -117,7 +115,9 @@ if ($nodeBinary === '') {
                     // Keep shared binaries readable under a restrictive updater umask.
                     runStep('Extracting pinned Node.js runtime for AI CLI tools', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions', '-xJf', $downloadPath, '-C', $installRoot]));
                     return is_executable($nodeBinary) ? $nodeBinary : '';
-                }
+                },
+                true,
+                ['tempPrefix' => 'pmss-ai-node-', 'downloadDescription' => 'Downloading pinned Node.js runtime for AI CLI tools']
             );
 
             $nodeBinary = is_string($resolvedNodeBinary) ? $resolvedNodeBinary : '';
@@ -213,9 +213,8 @@ if (pmssAiToolsCodexInstallNeeded($destination, $launcher, $stub, $launcherSourc
             $downloadDir = $dryRun ? '' : pmssCreatePrivateTempDir('pmss-ai-codex-');
             if ($dryRun || $downloadDir !== null) {
                 try {
-                    $binaryReady = pmssPinnedRemoteTempFileUse(
-                        'Codex CLI archive', $url, $sha256, 'pmss-ai-codex-',
-                        'Downloading pinned Codex CLI archive',
+                    $binaryReady = pmssPinnedRemoteArtifactTempFileUse(
+                        'Codex CLI archive', $url, $sha256,
                         static function (string $archivePath) use ($downloadDir, $destination, $codexRoot, $dryRun): bool {
                             if (runStep('Extracting Codex CLI archive', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions', '-xzf', $archivePath, '-C', $downloadDir ?: '/tmp'])) !== 0) {
                                 return false;
@@ -238,7 +237,9 @@ if (pmssAiToolsCodexInstallNeeded($destination, $launcher, $stub, $launcherSourc
                                     @unlink($temporary);
                                 }
                             }
-                        }
+                        },
+                        true,
+                        ['tempPrefix' => 'pmss-ai-codex-', 'downloadDescription' => 'Downloading pinned Codex CLI archive']
                     ) === true;
                 } finally {
                     if ($downloadDir !== '') {

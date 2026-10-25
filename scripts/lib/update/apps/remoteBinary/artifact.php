@@ -7,8 +7,8 @@ function pmssPinnedRemoteChecksum(string $path): string
     return is_string($checksum) ? strtolower($checksum) : '';
 }
 
-/** Download, verify, and consume one private artifact; every exit removes the temp file. */
-function pmssPinnedRemoteTempFileUse(string $label, string $url, string $expectedSha256, string $tempPrefix, string $downloadDescription, callable $callback, string $artifactLabel = '', bool $runCallbackInDryRun = true)
+/** Download, verify, and consume one private artifact; options retain caller-specific diagnostics. */
+function pmssPinnedRemoteArtifactTempFileUse(string $label, string $url, string $expectedSha256, callable $callback, bool $runCallbackInDryRun = false, array $options = [])
 {
     $expectedSha256 = strtolower($expectedSha256);
     if (preg_match('/\A[a-f0-9]{64}\z/', $expectedSha256) !== 1) {
@@ -26,7 +26,7 @@ function pmssPinnedRemoteTempFileUse(string $label, string $url, string $expecte
         return null;
     }
 
-    $tmp = pmssCreatePrivateTempFile($tempPrefix);
+    $tmp = pmssCreatePrivateTempFile($options['tempPrefix'] ?? 'pmss-remote-bin-');
     if ($tmp === null) {
         logmsg("[WARN] Unable to create temp file for {$label} download");
         return null;
@@ -34,12 +34,13 @@ function pmssPinnedRemoteTempFileUse(string $label, string $url, string $expecte
 
     // One owner covers failed downloads, rejected pins, dry runs, and callback exceptions.
     try {
-        if (runStep($downloadDescription, pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
+        if (runStep($options['downloadDescription'] ?? 'Downloading '.$label, pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
             return null;
         }
         if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
             $actualSha = pmssPinnedRemoteChecksum($tmp);
             if ($actualSha !== $expectedSha256) {
+                $artifactLabel = $options['artifactLabel'] ?? '';
                 logmsg("[WARN] {$label}{$artifactLabel} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
                 return null;
             }
@@ -49,10 +50,4 @@ function pmssPinnedRemoteTempFileUse(string $label, string $url, string $expecte
     } finally {
         @unlink($tmp);
     }
-}
-
-/** Run a callback with the default verified remote artifact temp-file policy. */
-function pmssPinnedRemoteArtifactTempFileUse(string $label, string $url, string $expectedSha256, callable $callback, bool $runCallbackInDryRun = false)
-{
-    return pmssPinnedRemoteTempFileUse($label, $url, $expectedSha256, 'pmss-remote-bin-', "Downloading {$label}", $callback, '', $runCallbackInDryRun);
 }
