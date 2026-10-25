@@ -88,8 +88,10 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertFalse(is_link($home.'/bin/qbittorrent/default'));
         $this->assertSame('custom', file_get_contents($home.'/bin/qbittorrent/custom/qbittorrent-nox'));
-        $this->assertStringContainsString('using the host default', (string) file_get_contents($home.'/.config/pmss/torrentClients/qbittorrent.notice'));
+        $message = 'The qBittorrent version selected for this account is not installed on this server; the server\'s build is used.';
+        $this->assertSame($message."\n", (string) file_get_contents($home.'/.config/pmss/torrentClients/qbittorrent.notice'));
         $this->assertSame(1, count($events->logs));
+        $this->assertSame(['t', '[WARN] '.$message], $events->logs[0]);
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'qbittorrent'));
         $launcher = (string) file_get_contents(dirname(__DIR__, 3).'/cron/checkQbittorrentInstances.php');
         $this->assertStringContainsString('[ ! -L ~/bin/qbittorrent/default ]', $launcher);
@@ -111,6 +113,19 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame($target, readlink($home.'/bin/deluge/default'));
         $this->assertFalse(is_file($home.'/.config/pmss/torrentClients/deluge.notice'));
         $this->assertSame([], $events->logs);
+    }
+
+    public function testFallbackNoticeNamesEachClientAndTheServerBuild(): void
+    {
+        foreach (['qbittorrent' => 'qBittorrent', 'rtorrent' => 'rTorrent',
+            'deluge' => 'Deluge', 'transmission' => 'Transmission'] as $client => $label) {
+            [$root, $home, $ops] = $this->fixture('notice-'.$client);
+            $this->pmssEnsureDir($home.'/bin/'.$client);
+            $this->pmssCreateSymlinkOrSkip($root.'/store/'.$client.'/missing', $home.'/bin/'.$client.'/default');
+            $this->assertTrue(\pmssTorrentClientsPostSetupFallback('t', $home, $client, [], 'system', $ops));
+            $message = 'The '.$label.' version selected for this account is not installed on this server; the server\'s build is used.';
+            $this->assertSame($message."\n", file_get_contents($home.'/.config/pmss/torrentClients/'.$client.'.notice'));
+        }
     }
 
     public function testUnavailableSelectionUsesInstalledNonSystemDefault(): void

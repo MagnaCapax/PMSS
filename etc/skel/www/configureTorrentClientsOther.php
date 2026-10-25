@@ -28,13 +28,17 @@ function pmssConfigureTorrentClientOtherPids($home, $client, $component = 'both'
 }
 
 /** Report the selected version only when a native client process is present. */
-function pmssConfigureTorrentClientOtherRunningVersion($home, $client)
+function pmssConfigureTorrentClientOtherRunningVersion($home, $client, $ops = array())
 {
-    if (pmssConfigureTorrentClientOtherPids($home, $client) === array()) return 'not running';
+    $nativePids = $ops['pids'] ?? 'pmssConfigureTorrentClientOtherPids';
+    $resolve = $ops['resolve'] ?? 'pmssTorrentClientResolve';
+    if ($nativePids($home, $client) === array()) return 'not running';
     $target = @readlink($home.'/bin/'.$client.'/default');
     if (!is_string($target)) return 'system';
     // After three fast exits the executor runs the system build and leaves the selection alone (ADR 0146).
-    $binary = pmssTorrentClientResolve($home, $client);
+    $binary = $resolve($home, $client);
+    if (strpos($target, '/home/.pmss/clients/'.$client.'/') === 0 && $binary === null)
+        return 'system; '.basename($target).' is not installed on this server';
     if ($client === 'rtorrent' && $binary !== null && pmssCustomerNativePidsRead(array($binary)) === array())
         return pmssRtorrentExecutorFallbackVersion($home) === basename($target)
             ? 'system, because '.basename($target).' kept stopping right after start'
@@ -71,10 +75,12 @@ function pmssConfigureTorrentClientOtherRepoint($home, $client, $version, $resto
     $check = $target[0] === '/' ? $target : dirname($path).'/'.$target;
     $binary = $client === 'deluge' ? '/bin/deluged'
         : ($client === 'rtorrent' ? '/rtorrent' : '/transmission-daemon');
-    if (!is_dir($check) || is_link($check) || !is_file($check.$binary)
-        || is_link($check.$binary)) return false;
-    if ($client === 'deluge' && (!is_file($check.'/bin/deluge-web')
-        || is_link($check.'/bin/deluge-web'))) return false;
+    // Restore an invalid selection exactly after a failed recovery switch to system.
+    if ($version !== 'invalid' || $restoreTarget === null) {
+        if (!is_dir($check) || is_link($check) || !is_file($check.$binary) || is_link($check.$binary)) return false;
+        if ($client === 'deluge' && (!is_file($check.'/bin/deluge-web')
+            || is_link($check.'/bin/deluge-web'))) return false;
+    }
     $temp = $path.'.tmp-'.getmypid();
     if (file_exists($temp) || is_link($temp) || !@symlink($target, $temp)) return false;
     if (@rename($temp, $path)) return true;

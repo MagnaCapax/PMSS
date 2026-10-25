@@ -114,11 +114,14 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     {
         $root = dirname(__DIR__, 4);
         $configure = file_get_contents($root.'/etc/skel/www/configure.php');
-        $this->assertStringContainsString("'rtorrent' => 'rTorrent'", $configure);
-        $this->assertStringContainsString("pmssConfigureTorrentClientVersionsOffered(\$client)", $configure);
+        $this->assertStringContainsString('pmssConfigureTorrentClientCardsBuild($home)', $configure);
+        $cards = file_get_contents($root.'/etc/skel/www/configureTorrentClientsCard.php');
+        $this->assertStringContainsString("'rtorrent' => 'rTorrent'", $cards);
+        $this->assertStringContainsString('pmssConfigureTorrentClientVersionsOffered($client, $path)', $cards);
         $delivery = file_get_contents($root.'/scripts/lib/update/users/filesystem.php');
         foreach (['configureTorrentClientsOther.php', 'configureTorrentClientsSwitch.php',
-            'configureTorrentClientsVersion.php', 'torrentClientsResolve.php', '.rtorrentRestart.php'] as $file)
+            'configureTorrentClientsVersion.php', 'configureTorrentClientsCard.php',
+            'torrentClientsResolve.php', '.rtorrentRestart.php'] as $file)
             $this->assertStringContainsString("'".($file[0] === '.' ? '' : 'www/').$file."'", $delivery);
         $restart = file_get_contents($root.'/etc/skel/.rtorrentRestart.php');
         $this->assertStringContainsString("'rtorrent([ -]main)?'", $restart);

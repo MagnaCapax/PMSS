@@ -6,6 +6,13 @@ require_once __DIR__.'/projection.php';
 require_once __DIR__.'/userLinks.php';
 require_once dirname(__DIR__).'/user/log.php';
 
+/** Keep the customer notice and operator log aligned on the server fallback. */
+function pmssTorrentClientsPostSetupFallbackMessage(string $client): string
+{
+    $labels = ['qbittorrent' => 'qBittorrent', 'rtorrent' => 'rTorrent', 'deluge' => 'Deluge', 'transmission' => 'Transmission'];
+    return 'The '.$labels[$client].' version selected for this account is not installed on this server; the server\'s build is used.';
+}
+
 /** Read the host-published view, never a selection supplied by the tenant. */
 function pmssTorrentClientsPostSetupAvailable(string $path): array
 {
@@ -49,7 +56,7 @@ function pmssTorrentClientsPostSetupFallback(string $user, string $home, string 
             .'ln -s '.escapeshellarg($target).' "$temp" && mv -Tf -- "$temp" '.escapeshellarg($link)
             .' || { rm -f -- "$temp"; exit 1; }; ';
     }
-    $message = $client.' selection unavailable on this host; using the host default.';
+    $message = pmssTorrentClientsPostSetupFallbackMessage($client);
     $command .= 'mkdir -m 700 -p '.escapeshellarg($noticeDir).' || exit 1; '
         .'[ ! -L '.escapeshellarg($noticeDir).' ] && [ ! -L '.escapeshellarg($notice).' ] || exit 1; '
         .'printf '.escapeshellarg('%s\n').' '.escapeshellarg($message).' > '.escapeshellarg($notice);
@@ -78,7 +85,7 @@ function pmssTorrentClientsPostSetupConverge(string $user, string $home, array $
         $client = $entry['client'];
         if ($entry['version'] !== 'system' && !isset($available[$client][$entry['version']])) continue;
         if (pmssTorrentClientsPostSetupFallback($user, $home, $client, $available, $entry['version'], $ops)) {
-            $log($user, '[WARN] '.$client.' selection unavailable on this host; using the host default.');
+            $log($user, '[WARN] '.pmssTorrentClientsPostSetupFallbackMessage($client));
         }
     }
 }

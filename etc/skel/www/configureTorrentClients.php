@@ -37,9 +37,16 @@ function pmssConfigureTorrentClientSelectedVersion($home, $client)
 }
 
 /** Show the version of the current native process from its kernel exe path. */
-function pmssConfigureTorrentClientRunningVersion($home)
+function pmssConfigureTorrentClientRunningVersion($home, $ops = array())
 {
-    foreach (pmssConfigureTorrentClientNativePids($home) as $pid) {
+    $nativePids = $ops['pids'] ?? 'pmssConfigureTorrentClientNativePids';
+    $resolve = $ops['resolve'] ?? 'pmssTorrentClientResolve';
+    $pids = $nativePids($home);
+    $target = @readlink($home.'/bin/qbittorrent/default');
+    if ($pids !== array() && is_string($target) && strpos($target, '/home/.pmss/clients/qbittorrent/') === 0
+        && $resolve($home, 'qbittorrent') === null)
+        return 'system; '.basename($target).' is not installed on this server';
+    foreach ($pids as $pid) {
         $exe = @readlink('/proc/'.$pid.'/exe');
         if (!is_string($exe)) continue;
         if (strpos($exe, '/home/.pmss/clients/qbittorrent/') === 0) {
@@ -73,8 +80,9 @@ function pmssConfigureTorrentClientRepoint($home, $version, $restoreTarget = nul
     if ($version === 'system') return !is_link($path) || @unlink($path);
     $target = $restoreTarget === null ? '/home/.pmss/clients/qbittorrent/'.$version : $restoreTarget;
     $check = $target[0] === '/' ? $target : dirname($path).'/'.$target;
-    if (!is_dir($check) || is_link($check) || !is_file($check.'/qbittorrent-nox')
-        || is_link($check.'/qbittorrent-nox')) return false;
+    // Recovery may need to restore an already-invalid link verbatim.
+    if (($version !== 'invalid' || $restoreTarget === null) && (!is_dir($check) || is_link($check)
+        || !is_file($check.'/qbittorrent-nox') || is_link($check.'/qbittorrent-nox'))) return false;
     $temp = $path.'.tmp-'.getmypid();
     if (file_exists($temp) || is_link($temp) || !@symlink($target, $temp)) return false;
     if (@rename($temp, $path)) return true;
@@ -120,13 +128,24 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
     }
     $link = $home.'/bin/qbittorrent/default';
     $old = @readlink($link);
-    if (is_string($old) && pmssTorrentClientResolve($home, 'qbittorrent') === null) {
+    $resolve = $ops['resolve'] ?? 'pmssTorrentClientResolve';
+    $invalid = is_string($old) && $resolve($home, 'qbittorrent') === null;
+    if ($invalid && $version !== 'system') {
         flock($lock, LOCK_UN);
         fclose($lock);
         return array('ok' => false, 'status' => 409, 'message' => 'The current selection is invalid.');
     }
     $oldVersion = is_string($old) && strpos($old, '/home/.pmss/clients/qbittorrent/') === 0
         ? basename($old) : (is_string($old) ? 'custom' : 'system');
+    if ($invalid) $oldVersion = 'invalid';
+    // A selection alone is not proof: stopped or different native builds still need the restart.
+    $runningVersion = $ops['runningVersion'] ?? 'pmssConfigureTorrentClientRunningVersion';
+    if ($version === $oldVersion && $runningVersion($home) === $version) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => true, 'status' => 200, 'message' => 'qBittorrent is already running '
+            .pmssConfigureTorrentClientVersionLabel($version).'; nothing changed.');
+    }
     $lastRun = trim(pmssConfigureFileRead($dir.'/qbittorrent.lastRun', 64));
     if (pmssConfigureTorrentClientMajorDowngrade($lastRun, $version)) {
         $message = 'Downgrading qBittorrent from '.$lastRun.' to '.$version
@@ -141,7 +160,15 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
     $start = $ops['start'] ?? 'pmssConfigureTorrentClientStart';
     $repoint = $ops['repoint'] ?? 'pmssConfigureTorrentClientRepoint';
     $snapshot = $backup($home);
-    $stopped = is_array($snapshot) && !empty($snapshot['ok']) && $stop($home);
+    if (!is_array($snapshot) || empty($snapshot['ok'])) {
+        $detail = is_string($snapshot['message'] ?? null) ? $snapshot['message'] : 'Backup failed';
+        $message = 'Could not back up the current configuration: '.rtrim($detail, ". \r\n").'. Nothing was changed.';
+        pmssConfigureFileWrite($dir.'/qbittorrent.notice', $message."\n");
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'status' => 503, 'message' => $message);
+    }
+    $stopped = $stop($home);
     $repointed = $stopped && $repoint($home, $version);
     $ok = $repointed && pmssConfigureFileWrite($dir.'/qbittorrent.lastRun', $version."\n")
         && $start($home, $version) && pmssConfigureFileWrite($dir.'/qbittorrent.lastgood', $version."\n");

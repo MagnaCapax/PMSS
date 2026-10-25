@@ -22,14 +22,41 @@ Deluge and no Transmission build; absent projection rows must stay inert.
 
 ## Decision
 
-Configure filters the bounded public projection for each client and renders a
-card only when that client's version list is nonempty. Its existing account
-password check guards all three clients. Deluge and Transmission use their own
+Configure filters the bounded public projection for each client. A shared
+customer-side renderer supplies all four clients' cards and matching index
+entries. Multiple offered versions retain the existing controls. One offered
+version equal to the current selection shows Running and the notice without
+switch controls; a different selection retains controls. The projection's
+`notInstalled` map counts enabled catalog entries skipped because their binary,
+Deluge web entrypoint or Transmission socket capability is unavailable; disabled
+entries are excluded and `versions` is unchanged. Cards explain that other
+versions are not installed only when that client's count is positive, independent
+of the account. Older projections default the counts to zero. Clients with no
+entries are named once at the end of the first card. When no client has controls,
+one general card lists installed clients and their running builds, notices and
+availability sentences, with one matching index entry. An absent, unreadable,
+symlinked, oversized or invalid projection instead shows one general version-choice
+unavailable card. The existing account password check guards version switches
+for every client. Deluge and Transmission use their own
 account lock, private lastRun/lastgood/notice files, configuration snapshot,
 native stop, checked atomic default-link replacement, and restart. A failed
 start selects and restarts the prior version. Both watchdogs skip launch while
-the corresponding switch lock is held. qBittorrent's switch code and rTorrent
-behavior remain as they were.
+the corresponding switch lock is held. qBittorrent and rTorrent retain their
+existing launch and recovery paths.
+
+All four clients now share ADR 0106's same-version no-op contract: both the
+selection and native running build must match exactly under the lock. rTorrent's
+descriptive system fallback/pending-restart states do not match a requested
+version, so those requests still restart through the existing path. Real switches
+retain all validation, backup, downgrade refusal and recovery checks.
+
+An invalid selection link may switch to an offered `system` build; other
+requests still receive the existing invalid-selection refusal. Failed recovery
+recreates the original link verbatim, including a dangling target. An unresolved
+store selection with a native process reports that the server build is running
+because the selected version is not installed. Backup failure stops before any
+daemon or selection change and records the backup's reason without claiming a
+restore. Post-setup notices and logs name the client and explain server fallback.
 
 Deluge restarts a selected virtualenv through `pmssTorrentClientDelugeLaunch()`;
 the legacy toggle and system-version restore share the same system launch

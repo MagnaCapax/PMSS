@@ -31,6 +31,17 @@ including the first switch from the legacy version. A busy lock exits quietly; t
 watchdog pass can recover. Failed starts restore the preceding selection and
 record a private notice.
 
+Selecting the current version is a successful no-op only when the native
+running-version reader also reports that exact version under the switch lock.
+It returns an already-running message without a backup, restart, link change,
+enable marker, or state/notice write. A stopped or different build still uses
+the existing switch and recovery path, including ADR 0120's downgrade refusal.
+An unresolved selection may recover to an offered `system` build; other
+requests retain the invalid-selection refusal. Recovery failure restores the
+original link target verbatim. Backup failure reports its reason and that
+nothing changed, without claiming a restore. ADR 0119 documents the shared
+availability counts and combined read-only version card.
+
 The root watchdog uses the P0 launcher-liveness predicate (name, UID and mount
 namespace). Operator stop sites use the P0 native predicate (those checks plus
 an allowed executable path), rechecking immediately before each PID signal.

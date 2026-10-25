@@ -44,13 +44,23 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     }
     $old = @readlink($link);
     $resolve = $ops['resolve'] ?? 'pmssTorrentClientResolve';
-    if (is_string($old) && $resolve($home, $client) === null) {
+    $invalid = is_string($old) && $resolve($home, $client) === null;
+    if ($invalid && $version !== 'system') {
         flock($lock, LOCK_UN);
         fclose($lock);
         return array('ok' => false, 'status' => 409, 'message' => 'The current selection is invalid.');
     }
     $oldVersion = is_string($old) && strpos($old, '/home/.pmss/clients/'.$client.'/') === 0
         ? basename($old) : (is_string($old) ? 'custom' : 'system');
+    if ($invalid) $oldVersion = 'invalid';
+    // Exact equality excludes stopped clients and rTorrent's descriptive system fallback states.
+    $runningVersion = $ops['runningVersion'] ?? 'pmssConfigureTorrentClientOtherRunningVersion';
+    if ($version === $oldVersion && $runningVersion($home, $client) === $version) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => true, 'status' => 200, 'message' => $label.' is already running '
+            .pmssConfigureTorrentClientVersionLabel($version).'; nothing changed.');
+    }
     $lastRun = trim(pmssConfigureFileRead($dir.'/'.$client.'.lastRun', 64));
     if (pmssConfigureTorrentClientMajorDowngrade($lastRun, $version)) {
         $message = 'Downgrading '.$label.' from '.$lastRun.' to '.$version
@@ -65,7 +75,15 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     $start = $ops['start'] ?? 'pmssConfigureTorrentClientOtherStart';
     $repoint = $ops['repoint'] ?? 'pmssConfigureTorrentClientOtherRepoint';
     $snapshot = $backup($home);
-    $stopped = is_array($snapshot) && !empty($snapshot['ok']) && $stop($home, $client);
+    if (!is_array($snapshot) || empty($snapshot['ok'])) {
+        $detail = is_string($snapshot['message'] ?? null) ? $snapshot['message'] : 'Backup failed';
+        $message = 'Could not back up the current configuration: '.rtrim($detail, ". \r\n").'. Nothing was changed.';
+        pmssConfigureFileWrite($dir.'/'.$client.'.notice', $message."\n");
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'status' => 503, 'message' => $message);
+    }
+    $stopped = $stop($home, $client);
     $repointed = $stopped && $repoint($home, $client, $version);
     $ok = $repointed && pmssConfigureFileWrite($dir.'/'.$client.'.lastRun', $version."\n")
         && $start($home, $client, $version)

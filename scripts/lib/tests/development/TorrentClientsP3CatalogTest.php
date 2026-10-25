@@ -2,11 +2,14 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/TorrentClientsCardsRenderTrait.php';
 require_once dirname(__DIR__, 2).'/torrentClients/catalog.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/torrentClientsResolve.php';
 
 final class TorrentClientsP3CatalogTest extends TestCase
 {
+    use TorrentClientsCardsRenderTrait;
+
     private function entry(string $version = '4.1.3'): array
     {
         return ['client' => 'transmission', 'version' => $version,
@@ -80,48 +83,31 @@ final class TorrentClientsP3CatalogTest extends TestCase
 
     public function testConfigureSwitchWarningsMatchEachClient(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/configure.php');
-        $start = strpos($source, '<input type="password" id="configure-<?= $client ?>-password"');
-        $this->assertTrue($start !== false);
-        $button = substr($source, $start, strpos($source, '</button>', $start) + 9 - $start);
-        $path = $this->pmssMakeTempDir('pmss-client-confirm-').'/button.php';
-        file_put_contents($path, '<?php $client = $argv[1]; $label = $argv[2]; ?>'.$button);
-        foreach (['transmission' => 'Transmission', 'deluge' => 'Deluge', 'rtorrent' => 'rTorrent'] as $client => $label) {
-            $result = $this->pmssExecShellCommand(implode(' ', array_map('escapeshellarg', [PHP_BINARY, $path, $client, $label])));
-            $this->assertSame(0, $result['rc']);
-            $expected = $client === 'transmission'
-                ? 'Restart Transmission with this version? Its settings are not part of the configuration backup.'
-                : 'Back up the current configuration and restart '.$label.' with this version?';
-            $this->assertStringContainsString($expected, $result['output']);
-        }
-        $this->assertStringContainsString('Back up the current configuration and restart qBittorrent with this version?', $source);
+        $versions = array_fill_keys(['qbittorrent', 'transmission', 'deluge', 'rtorrent'], ['4.1.3', '4.0.5']);
+        $this->withProjection($this->entries($versions), function ($page): void {
+            $cards = $page();
+            foreach (['qbittorrent' => 'qBittorrent', 'transmission' => 'Transmission',
+                'deluge' => 'Deluge', 'rtorrent' => 'rTorrent'] as $client => $label) {
+                $expected = $client === 'transmission'
+                    ? 'Restart Transmission with this version? Its settings are not part of the configuration backup.'
+                    : 'Back up the current configuration and restart '.$label.' with this version?';
+                $this->assertStringContainsString($expected, $cards[$client.'-version']);
+            }
+        });
     }
 
-    public function testConfigureNamesLibtorrentBuildsAndIndexesVersionSections(): void
+    public function testConfigureNamesLibtorrentBuildsThroughTheRenderer(): void
     {
         require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsVersion.php';
         $this->assertSame('5.2.4 (libtorrent 1.2)', \pmssConfigureTorrentClientVersionLabel('5.2.4-lt1.2'));
         $this->assertSame('4.3.9 (libtorrent 2.0)', \pmssConfigureTorrentClientVersionLabel('4.3.9-lt2.0'));
         foreach (['system', '0.16.25', '0.9.8-stickz7.2', 'not running', '5.2.4-lt3.0'] as $plain)
             $this->assertSame($plain, \pmssConfigureTorrentClientVersionLabel($plain));
-        $source = $this->pmssReadRepoFile('etc/skel/www/configure.php');
-        $start = strpos($source, '$versionSections = array();');
-        $endMark = '$versionSections, array_slice($sections, 1, null, true));';
-        $this->assertTrue($start !== false && strpos($source, $endMark, $start) !== false);
-        $block = substr($source, $start, strpos($source, $endMark, $start) + strlen($endMark) - $start);
-        $run = function (array $qbit, array $other) use ($block): array {
-            $sections = ['apps' => 'Apps', 'alerts' => 'Usage alert email'];
-            $torrentVersions = $qbit;
-            $otherTorrentVersions = $other;
-            eval($block);
-            return array_keys($sections);
-        };
-        $this->assertSame(['apps', 'qbittorrent-version', 'deluge-version', 'transmission-version', 'rtorrent-version', 'alerts'],
-            $run(['system' => []], ['deluge' => ['2.2.0' => []], 'transmission' => ['4.1.3' => []], 'rtorrent' => ['0.16.25' => []]]));
-        $this->assertSame(['apps', 'rtorrent-version', 'alerts'], $run([], ['deluge' => [], 'rtorrent' => ['0.16.25' => []]]));
-        $this->assertStringContainsString('<section class="configure-card" id="qbittorrent-version"><h2>qBittorrent version</h2>', $source);
-        // The version sections render right after Apps, in the order the index lists them.
-        $this->assertTrue(strpos($source, 'id="<?= $client ?>-version"') < strpos($source, '<?php foreach ($ownerCards as $cardId => $card): ?>'));
+        $this->withProjection($this->entries(['qbittorrent' => ['5.2.4-lt1.2', '4.3.9-lt2.0']]), function ($page): void {
+            $this->assertStringContainsAllStrings(['<option value="5.2.4-lt1.2">5.2.4 (libtorrent 1.2)</option>',
+                '<option value="4.3.9-lt2.0">4.3.9 (libtorrent 2.0)</option>'], $page()['qbittorrent-version']);
+        });
+        // TorrentClientsCardsRenderTest checks actual Configure index order for every card layout.
     }
     public function testResolverRequiresPublishedSocketCapability(): void
     {

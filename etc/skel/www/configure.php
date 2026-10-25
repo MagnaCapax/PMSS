@@ -89,27 +89,15 @@ $reloadActions = array_merge(array('delugeRotate', 'torrentClientSwitch'), funct
 $urls = pmssAppsAllowedUrlsRead();
 $lsioCatalog = is_file(__DIR__.'/appsLsioCatalog.php') ? require __DIR__.'/appsLsioCatalog.php' : array();
 if (!is_array($lsioCatalog)) $lsioCatalog = array();
-$torrentVersions = array();
-$torrentRunning = '';
-$torrentNotice = '';
-$otherTorrentVersions = array();
-if (is_file(__DIR__.'/configureTorrentClients.php') && is_file(__DIR__.'/torrentClientsResolve.php')) {
-    require_once __DIR__.'/configureTorrentClients.php';
-    $torrentVersions = pmssConfigureTorrentClientVersionsOffered();
-    $torrentRunning = pmssConfigureTorrentClientRunningVersion($home);
-    $torrentNotice = trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/qbittorrent.notice', 256));
-    if (is_file(__DIR__.'/configureTorrentClientsOther.php') && is_file(__DIR__.'/configureTorrentClientsSwitch.php')
-        && is_file(__DIR__.'/transmissionLaunch.php')) {
-        require_once __DIR__.'/configureTorrentClientsOther.php';
-        foreach (array('deluge', 'transmission', 'rtorrent') as $client)
-            $otherTorrentVersions[$client] = pmssConfigureTorrentClientVersionsOffered($client);
-    }
+$torrentClientCards = array('sections' => array(), 'html' => '');
+if (is_file(__DIR__.'/configureTorrentClientsCard.php') && is_file(__DIR__.'/configureTorrentClients.php')
+    && is_file(__DIR__.'/torrentClientsResolve.php') && is_file(__DIR__.'/configureTorrentClientsOther.php')
+    && is_file(__DIR__.'/configureTorrentClientsSwitch.php') && is_file(__DIR__.'/transmissionLaunch.php')) {
+    require_once __DIR__.'/configureTorrentClientsCard.php';
+    $torrentClientCards = pmssConfigureTorrentClientCardsBuild($home);
 }
 // List the version controls in the section index right after Apps.
-$versionSections = array();
-if ($torrentVersions) $versionSections['qbittorrent-version'] = 'qBittorrent version';
-foreach (array('deluge' => 'Deluge', 'transmission' => 'Transmission', 'rtorrent' => 'rTorrent') as $client => $label)
-    if (!empty($otherTorrentVersions[$client])) $versionSections[$client.'-version'] = $label.' version';
+$versionSections = $torrentClientCards['sections'];
 $sections = array_merge(array_slice($sections, 0, 1, true), $versionSections, array_slice($sections, 1, null, true));
 ?>
 <!doctype html>
@@ -128,13 +116,7 @@ $sections = array_merge(array_slice($sections, 0, 1, true), $versionSections, ar
 <h1>Configure</h1><p class="note">Apps and settings for your account.</p>
 <div class="configure-layout"><nav class="configure-index" aria-label="Configure sections"><?php foreach ($sections as $id => $label): ?><a href="#<?= pmssCustomerHtmlAttr($id) ?>"><?= pmssCustomerHtmlAttr($label) ?></a><?php endforeach; ?></nav><main>
 <section class="configure-card" id="apps"><h2>Apps</h2><?= pmssCustomerAppsSectionHtmlBuild($status, 'configure.php?status=1') ?></section>
-<?php if ($torrentVersions): ?><section class="configure-card" id="qbittorrent-version"><h2>qBittorrent version</h2><p>Running: <?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientVersionLabel($torrentRunning)) ?></p><?php if ($torrentNotice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($torrentNotice) ?></p><?php endif; ?>
-<div class="configure-actions"><select id="configure-qbittorrent-version" aria-label="qBittorrent version"><?php $selectedVersion = pmssConfigureTorrentClientSelectedVersion($home, 'qbittorrent'); foreach ($torrentVersions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"<?= (string) $version === $selectedVersion ? ' selected' : '' ?>><?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientVersionLabel($version)) ?></option><?php endforeach; ?></select>
-<input type="password" id="configure-qbittorrent-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'qbittorrent',version:document.getElementById('configure-qbittorrent-version').value,password:document.getElementById('configure-qbittorrent-password').value},'Back up the current configuration and restart qBittorrent with this version?')">Switch version</button></div></section><?php endif; ?>
-<?php foreach (array('deluge' => 'Deluge', 'transmission' => 'Transmission', 'rtorrent' => 'rTorrent') as $client => $label): $versions = $otherTorrentVersions[$client] ?? array(); if ($versions): ?>
-<section class="configure-card" id="<?= $client ?>-version"><h2><?= $label ?> version</h2><p>Running: <?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientOtherRunningVersion($home, $client)) ?></p><?php $notice = trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/'.$client.'.notice', 256)); if ($notice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($notice) ?></p><?php endif; ?>
-<div class="configure-actions"><select id="configure-<?= $client ?>-version" aria-label="<?= $label ?> version"><?php $selectedVersion = pmssConfigureTorrentClientSelectedVersion($home, $client); foreach ($versions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"<?= (string) $version === $selectedVersion ? ' selected' : '' ?>><?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientVersionLabel($version)) ?></option><?php endforeach; ?></select>
-<input type="password" id="configure-<?= $client ?>-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'<?= $client ?>',version:document.getElementById('configure-<?= $client ?>-version').value,password:document.getElementById('configure-<?= $client ?>-password').value},'<?= $client === 'transmission' ? 'Restart Transmission with this version? Its settings are not part of the configuration backup.' : 'Back up the current configuration and restart '.$label.' with this version?' ?>')">Switch version</button></div></section><?php endif; endforeach; ?>
+<?= $torrentClientCards['html'] ?>
 <?php foreach ($ownerCards as $cardId => $card): ?>
 <section class="configure-card" id="<?= pmssCustomerHtmlAttr($cardId) ?>"><h2><?= pmssCustomerHtmlAttr($card['label']) ?></h2>
 <?= $card['html'] ?></section>

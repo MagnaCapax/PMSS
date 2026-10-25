@@ -1,6 +1,35 @@
 <?php
 /** Customer-side projection reader and conservative version-family comparison. */
 
+/** Read a bounded projection, retaining null for unavailable or malformed files. */
+function pmssConfigureTorrentClientProjectionRead($path)
+{
+    if (!is_file($path) || is_link($path) || !is_readable($path) || @filesize($path) > 65536) return null;
+    $raw = @file_get_contents($path, false, null, 0, 65537);
+    if (!is_string($raw) || strlen($raw) > 65536) return null;
+    $data = json_decode($raw, true);
+    return is_array($data) && is_array($data['versions'] ?? null) ? $data : null;
+}
+
+/** Distinguish an unavailable projection from a valid projection with no installed entries. */
+function pmssConfigureTorrentClientVersionsAvailable($path = '/var/lib/pmss/public/torrentClients.json')
+{
+    return pmssConfigureTorrentClientProjectionRead($path) !== null;
+}
+
+/** Older projections and malformed counts default to zero for each known client. */
+function pmssConfigureTorrentClientNotInstalledRead($path = '/var/lib/pmss/public/torrentClients.json')
+{
+    $counts = array('qbittorrent' => 0, 'rtorrent' => 0, 'deluge' => 0, 'transmission' => 0);
+    $data = pmssConfigureTorrentClientProjectionRead($path);
+    $published = $data['notInstalled'] ?? null;
+    if (is_array($published)) foreach ($counts as $client => $zero) {
+        $count = $published[$client] ?? null;
+        if (is_int($count) && $count >= 0) $counts[$client] = $count;
+    }
+    return $counts;
+}
+
 /** Read only installed versions from the root-published projection. */
 function pmssConfigureTorrentClientVersionsRead($path = '/var/lib/pmss/public/torrentClients.json', $client = 'qbittorrent')
 {

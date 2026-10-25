@@ -273,6 +273,7 @@ PHP;
         'www/configureAppOwnerSettings.php',
         'www/hermesAgent.php',
         'www/configureTorrentClients.php',
+        'www/configureTorrentClientsCard.php',
         'www/configureTorrentClientsOther.php',
         'www/configureTorrentClientsSwitch.php',
         'www/configureTorrentClientsVersion.php',
