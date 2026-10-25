@@ -134,4 +134,72 @@ class QbittorrentManagedConfigTest extends TestCase
         );
     }
 
+    public function testMigratedThrottleComparisonDoesNotWriteBeforeShutdown(): void
+    {
+        $before = "[Meta]\nMigrationVersion=2\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=10\n[Preferences]\nLocale=en\n";
+        $path = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', $before);
+        $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.torrentThrottle', "512\n");
+        $this->assertTrue(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
+        $this->assertSame($before, file_get_contents($path));
+
+        // Simulate the daemon saving its old settings on SIGTERM before PMSS writes.
+        file_put_contents($path, $before."WebUI\\Port=23456\n");
+        $this->assertTrue(pmssQbittorrentApplyUploadThrottle('alice'));
+        $updated = file_get_contents($path);
+        $this->assertStringContainsString("Session\\GlobalUPSpeedLimit=512\n", $updated);
+        $this->assertStringContainsString("WebUI\\Port=23456\n", $updated);
+        $this->assertStringNotContainsString('Connection\\GlobalUPLimit', $updated);
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice'));
+    }
+
+    public function testMigratedThrottleIgnoresObsoleteKeyAndSurvivesDaemonSave(): void
+    {
+        foreach ([2, 9, 12] as $migration) {
+            $config = "[Meta]\nMigrationVersion=".$migration."\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=512\n";
+            $this->assertSame($config, pmssQbittorrentUploadThrottleConfig($config, 512));
+            $obsolete = $config."[Preferences]\nConnection\\GlobalUPLimit=10\n";
+            $this->assertSame($obsolete, pmssQbittorrentUploadThrottleConfig($obsolete, 512));
+        }
+    }
+
+    public function testUninitializedAndLegacyConfigsSeedBothThrottleSchemas(): void
+    {
+        foreach (["[Preferences]\nLocale=en\n", "[Meta]\nMigrationVersion=1\n[Preferences]\n"] as $config) {
+            $updated = pmssQbittorrentUploadThrottleConfig($config, 500);
+            $parsed = parse_ini_string($updated, true, INI_SCANNER_RAW);
+            $this->assertSame('500', $parsed['BitTorrent']['Session\\GlobalUPSpeedLimit']);
+            $this->assertSame('500', $parsed['Preferences']['Connection\\GlobalUPLimit']);
+            $this->assertSame($updated, pmssQbittorrentUploadThrottleConfig($updated, 500));
+        }
+    }
+
+    public function testThrottleReleaseLeavesSavedUnlimitedValuesAlone(): void
+    {
+        $config = "[Meta]\nMigrationVersion=9\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=512\n";
+        $unlimited = str_replace('=512', '=0', $config);
+        $this->assertSame($unlimited, pmssQbittorrentUploadThrottleConfig($config, 0));
+        foreach ([null, 0] as $throttle) {
+            $this->assertSame($unlimited, pmssQbittorrentUploadThrottleConfig($unlimited, $throttle));
+            $legacy = $unlimited."[Preferences]\nConnection\\GlobalUPLimit=0\n";
+            $this->assertSame($legacy, pmssQbittorrentUploadThrottleConfig($legacy, $throttle));
+            $this->assertSame("[Preferences]\n", pmssQbittorrentUploadThrottleConfig("[Preferences]\n", $throttle));
+        }
+    }
+
+    public function testThrottleComparisonSkipsMissingMalformedAndLinkedConfigs(): void
+    {
+        $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.torrentThrottle', "500\n");
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
+        $path = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[invalid\n");
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice'));
+        unlink($path);
+        $target = $this->pmssWriteRelativeFile($this->homeRoot, 'target.conf', "[Preferences]\n");
+        symlink($target, $path);
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice'));
+        $this->assertSame("[Preferences]\n", file_get_contents($target));
+    }
+
 }

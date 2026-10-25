@@ -5,6 +5,27 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class QbittorrentWatchdogPortReconcileTest extends TestCase
 {
+    public function testThrottleRestartComparesThenRechecksExitBeforeWriting(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkQbittorrentInstances.php', [
+            'pmssUserWatchdogRestartProcessesIf(',
+            'return pmssQbittorrentUploadThrottleNeedsUpdate($thisUser);',
+            "pmssTorrentClientNativeStop(\$thisUser, 'qbittorrent', 15);",
+            "\$qbittorrentRunning = pmssTorrentClientLauncherLivenessPids(\$thisUser, 'qbittorrent') !== [];",
+            "pmssUserWatchdogApplyManagedConfigWhenStopped(\$thisUser, \$qbittorrentRunning, 'pmssQbittorrentApplyUploadThrottle');",
+            "return ['qbittorrent-nox' => \$qbittorrentRunning];",
+        ]);
+    }
+
+    public function testUserConfigLeavesLiveThrottleDriftForWatchdog(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/userConfig.php', [
+            "require_once __DIR__.'/../lib/torrentClients/identity.php';",
+            "if (pmssTorrentClientLauncherLivenessPids(\$user['name'], 'qbittorrent') === []) {",
+            "pmssQbittorrentApplyUploadThrottle(\$user['name'], \$throttle);",
+        ]);
+    }
+
     public function testWatchdogLoadsAndRunsWebUiPortReconcilerBeforeRestartDecisions(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkQbittorrentInstances.php', [

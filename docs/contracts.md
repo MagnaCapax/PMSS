@@ -487,6 +487,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     Password-sync prerequisite and failure branches write reason-only PHP error-log entries.
   - The qBittorrent watchdog reports a count of accounts skipped for a missing
     enable marker on each run; other service watchdogs retain their prior output.
+  - Upload-throttle drift is compared without writing. After native SIGTERM, the
+    watchdog rechecks liveness and writes only while stopped; a slow shutdown
+    defers the write and start to a later pass. Migrated configs (Meta migration
+    version >= 2) use `BitTorrent/Session/GlobalUPSpeedLimit` in KiB/s; older or
+    uninitialized configs seed that key and `Preferences/Connection/GlobalUPLimit`.
+    Explicit unlimited zero values remain a no-op after the daemon saves them.
+    `userConfig.php` leaves a live client's settings untouched so the watchdog
+    can still detect drift from the persisted `.torrentThrottle` marker.
 - pmssUserSystemdWatchdogRunUser(string $username, string $homeRoot='/home', string $lingerRoot='/var/lib/systemd/linger', ?callable $probe=null, ?callable $accountLookup=null): ?array
   - Runs from the existing two-minute all-users cron and observes only accounts with
     linger, an account-authored `~/.config/systemd/user/*.service`, and cgroup v1.

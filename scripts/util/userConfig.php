@@ -26,6 +26,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/welcomeMessage.php';
 require_once __DIR__.'/../lib/portManager.php';
 require_once __DIR__.'/../lib/user/directories.php';
+require_once __DIR__.'/../lib/torrentClients/identity.php';
 
 /**
  * Main entry point for user configuration changes.
@@ -217,7 +218,10 @@ if (!file_exists($qbittorrentConfigFile)) {
         }
     }
 }
-pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
+// Let the watchdog stop a live client before writing its daemon-owned settings.
+if (pmssTorrentClientLauncherLivenessPids($user['name'], 'qbittorrent') === []) {
+    pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
+}
 if (pmssUserConfigDiskQuotaShouldApply($configMode)) {
     userApplyDiskQuota($user);
 }

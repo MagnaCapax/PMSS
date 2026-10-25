@@ -215,19 +215,46 @@ function pmssQbittorrentApplyUploadThrottle(string $username, ?int $throttle = n
     return pmssQbittorrentConfigMutate(
         $username,
         static function (string $config) use ($throttle): ?string {
-            if ($throttle !== null && $throttle > 0) {
-                return pmssQbittorrentConfigUpsert(
-                    $config,
-                    'Preferences',
-                    'Connection\\GlobalUPLimit',
-                    (string) (int) $throttle
-                );
-            }
-
-            $updated = preg_replace('/^Connection\\\\GlobalUPLimit=.*\r?\n?/m', '', $config, 1);
-            return is_string($updated) ? $updated : null;
+            return pmssQbittorrentUploadThrottleConfig($config, $throttle);
         }
     );
+}
+
+/** Render the throttle in the daemon's persisted settings schema (KiB/s). */
+function pmssQbittorrentUploadThrottleConfig(string $config, ?int $throttle): ?string
+{
+    $settings = @parse_ini_string($config, true, INI_SCANNER_RAW);
+    if (!is_array($settings)) return null;
+    $key = 'Session\\GlobalUPSpeedLimit';
+    // Migration 2 introduced the session key; migration 9 removes the old key.
+    $migrated = (int) ($settings['Meta']['MigrationVersion'] ?? 0) >= 2;
+    if ($throttle !== null && $throttle > 0) {
+        $updated = pmssQbittorrentConfigUpsert($config, 'BitTorrent', $key, (string) $throttle);
+        if (!is_string($updated) || $migrated) return $updated;
+        // Seed both keys before the first start, including legacy system builds.
+        return pmssQbittorrentConfigUpsert($updated, 'Preferences', 'Connection\\GlobalUPLimit', (string) $throttle);
+    }
+
+    // A daemon may save an explicit unlimited value: leave it alone on reruns.
+    if (isset($settings['BitTorrent'][$key]) && (string) $settings['BitTorrent'][$key] !== '0') {
+        $config = pmssQbittorrentConfigUpsert($config, 'BitTorrent', $key, '0');
+        if (!is_string($config)) return null;
+    }
+    if (!isset($settings['Preferences']['Connection\\GlobalUPLimit'])
+        || (string) $settings['Preferences']['Connection\\GlobalUPLimit'] === '0') return $config;
+    $updated = preg_replace('/^Connection\\\\GlobalUPLimit=.*\r?\n?/m', '', $config, 1);
+    return is_string($updated) ? $updated : null;
+}
+
+/** Compare without writing while the daemon still owns its in-memory config. */
+function pmssQbittorrentUploadThrottleNeedsUpdate(string $username): bool
+{
+    $path = pmssQbittorrentConfigPath($username);
+    if (!pmssUserFilePathIsSafe($path)) return false;
+    $config = pmssReadRegularFileContents($path);
+    if ($config === null) return false;
+    $updated = pmssQbittorrentUploadThrottleConfig($config, pmssReadTorrentThrottle($username));
+    return is_string($updated) && $updated !== $config;
 }
 
 /**
