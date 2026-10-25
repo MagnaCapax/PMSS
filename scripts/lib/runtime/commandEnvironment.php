@@ -1,11 +1,6 @@
 <?php
 /** Shell invocation and unattended package-command environment. */
 
-function pmssCommandIsAptDpkg(string $cmd): bool
-{
-    return preg_match('/\b(apt-get|apt|dpkg)\b/i', $cmd) === 1;
-}
-
 /**
  * Return the environment every apt/dpkg command must inherit.
  *
@@ -56,16 +51,10 @@ function pmssAptDpkgEnvPrefix(array $overrides = []): string
     return implode(' ', $parts);
 }
 
-function pmssAptDpkgEnvExportPrefix(?string $pathOverride = null, array $overrides = []): string
-{
-    $pathPrefix = $pathOverride !== null && $pathOverride !== '' ? 'PATH='.escapeshellarg($pathOverride).' ' : '';
-    return 'export '.$pathPrefix.pmssAptDpkgEnvPrefix($overrides).'; ';
-}
-
 function pmssCommandBashInvocation(string $cmd): string
 {
     $cmdForShell = $cmd;
-    $isAptDpkg = pmssCommandIsAptDpkg($cmd);
+    $isAptDpkg = preg_match('/\b(apt-get|apt|dpkg)\b/i', $cmd) === 1;
     if ($isAptDpkg && preg_match('/[|;]|&&|\|\|/', $cmd) !== 1) {
         $cmdForShell = preg_match('/^(\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)+)(.+)$/', $cmd, $match) === 1
             ? rtrim($match[1]).' exec '.ltrim($match[2])
@@ -74,13 +63,10 @@ function pmssCommandBashInvocation(string $cmd): string
 
     $pathOverride = getenv('PATH');
     $pathShouldApply = $pathOverride !== false && $pathOverride !== '' && preg_match('/(^|\s)PATH=/', $cmdForShell) !== 1;
-    if ($isAptDpkg) {
-        $cmdForShell = pmssAptDpkgEnvExportPrefix($pathShouldApply ? $pathOverride : null).$cmdForShell;
-    } elseif ($pathShouldApply) {
-        // A statement, not an assignment prefix: "PATH=x if ...; then" is a syntax error, and a prefix
-        // reaches only the first command of a list or pipeline.
-        $cmdForShell = 'export PATH='.escapeshellarg($pathOverride).'; '.$cmdForShell;
-    }
+    $exports = $pathShouldApply ? 'PATH='.escapeshellarg($pathOverride) : '';
+    if ($isAptDpkg) $exports .= ($exports === '' ? '' : ' ').pmssAptDpkgEnvPrefix();
+    // A statement reaches the whole list/pipeline and remains valid before shell conditionals.
+    if ($exports !== '') $cmdForShell = 'export '.$exports.'; '.$cmdForShell;
 
     $cmdForShell = pmssLockChildClosePrefix().$cmdForShell;
 

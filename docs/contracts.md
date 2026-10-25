@@ -117,6 +117,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- Command launch builds one export statement for inherited PATH and unattended
+  package variables, retaining their order, quoting and existing shell bytes.
+  Single-caller command/log adapters are folded into Chromium installation,
+  post-install benchmark logging and the local transfer statistics probe;
+  shared quoting, sanitization and aggregate-probe helpers remain authoritative.
+
 - `pmssCliReturnWithStderr(string $message, int $exitCode = 1): int` writes the
   message verbatim to stderr and returns the supplied code. CLI failure paths
   return its result or pass it to `exit()`; it never adds a newline, writes to

@@ -162,14 +162,6 @@ function pmssUserTransferParseHomeStats(string $output): ?array
 }
 
 /**
- * Build the local target-side aggregate home statistics command.
- */
-function pmssUserTransferBuildLocalHomeStatsCommand(string $home): string
-{
-    return pmssBuildCommand('bash', ['-c', pmssUserTransferBuildHomeStatsShell($home)]);
-}
-
-/**
  * Run an aggregate home statistics probe.
  */
 function pmssUserTransferMeasureHomeStats(string $description, string $command): ?array
@@ -228,7 +220,7 @@ function pmssUserTransferVerifyCompleteness(array $cfg, string $home, string $ex
     );
     $localStats = pmssUserTransferMeasureHomeStats(
         'Measuring local home size',
-        pmssUserTransferBuildLocalHomeStatsCommand($home)
+        pmssBuildCommand('bash', ['-c', pmssUserTransferBuildHomeStatsShell($home)])
     );
 
     if ($remoteStats === null || $localStats === null) {

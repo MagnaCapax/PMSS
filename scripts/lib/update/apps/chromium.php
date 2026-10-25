@@ -24,12 +24,6 @@ function pmssChromiumRuntimePackages(int $debianMajor): array
     return [];
 }
 
-/** One apt call; recommends stay off so chromium-sandbox (a setuid-root helper) never comes along. */
-function pmssChromiumInstallCommand(array $packages): string
-{
-    return aptCmd('install -y --no-install-recommends '.pmssCommandArgvShellQuote($packages));
-}
-
 /** Install whatever part of the runtime is missing; every skip is one log line, every failure soft. */
 function pmssChromiumRuntimeEnsure(array $ops = []): void
 {
@@ -68,7 +62,9 @@ function pmssChromiumRuntimeEnsure(array $ops = []): void
             return;
         }
         $run = $ops['run'] ?? 'runStep';
-        $rc = (int) $run('[chromium] Installing browser runtime ('.implode(', ', $missing).')', pmssChromiumInstallCommand($missing));
+        // Recommends stay off so the setuid chromium-sandbox helper never comes along.
+        $rc = (int) $run('[chromium] Installing browser runtime ('.implode(', ', $missing).')',
+            aptCmd('install -y --no-install-recommends '.pmssCommandArgvShellQuote($missing)));
         if ($rc !== 0) $log("[WARN] chromium runtime install failed (rc={$rc}); a later update retries");
     } catch (Throwable $error) {
         $log('[WARN] chromium runtime skipped: '.$error->getMessage());
