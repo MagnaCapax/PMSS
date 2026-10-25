@@ -197,6 +197,38 @@ class UserTransferTest extends TestCase
         }
     }
 
+    public function testHomeStatsRejectsEveryFailedPipelineStage(): void
+    {
+        $bin = $this->pmssMakeTempDir('pmss-transfer-stats-bin-');
+        $home = $this->pmssMakeTempDir('pmss-transfer-stats-home-');
+        // Every failure emits plausible partial output; no fixture scans the real home.
+        $outputs = ['du' => "12345\tprivate-home\n", 'awk' => "12345\n", 'find' => '.', 'wc' => "1\n", 'tr' => '1'];
+        foreach ([null, 'du', 'awk', 'find', 'wc', 'tr'] as $failed) {
+            foreach ($outputs as $binary => $output) {
+                if ($binary !== 'du' && $binary !== 'find' && $binary !== $failed) {
+                    if (is_file($bin.'/'.$binary)) unlink($bin.'/'.$binary);
+                    continue;
+                }
+                $this->pmssWriteExecutableFile($bin.'/'.$binary, "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)
+                    ."\nexit ".($binary === $failed ? '9' : '0')."\n");
+            }
+            $this->pmssWithPathPrefixedEnv($bin, [], function () use ($home, $failed): void {
+                // Both local bash -c and callers with errexit must reject partial scans.
+                foreach (['-c', '-ec'] as $flags) {
+                    $result = \pmssCommandCapture(\pmssBuildCommand('bash', [$flags, \pmssUserTransferBuildHomeStatsShell($home)]));
+                    $this->assertSame($failed === null ? 0 : 1, $result['rc'], (string) $failed.' '.$flags);
+                    $this->assertSame('', $result['stderr']);
+                    $this->assertStringNotContainsString('private-home', $result['stdout']);
+                    if ($failed === null) {
+                        $this->assertSame(['bytes' => 12345, 'files' => 1], \pmssUserTransferParseHomeStats($result['stdout']));
+                    } else {
+                        $this->assertSame('', $result['stdout'], 'partial counters must never reach the caller');
+                    }
+                }
+            });
+        }
+    }
+
     public function testMountSummaryPersistsWithLocalAndExpectLineEndings(): void
     {
         $logDir = $this->pmssMakeTempDir('pmss-transfer-mount-log-');
@@ -361,6 +393,23 @@ class UserTransferTest extends TestCase
             "bytes=abc files=67\n" => null,
         ] as $output => $expected) {
             $this->assertSame($expected, \pmssUserTransferParseHomeStats($output), $output);
+        }
+    }
+
+    public function testTransferStatsRejectOverflowWithoutChangingRepresentableCounters(): void
+    {
+        $max = (string) PHP_INT_MAX;
+        foreach ([
+            ['0', 0], ['000', 0], ['00123', 123], [$max, PHP_INT_MAX], ['000'.$max, PHP_INT_MAX],
+            [$max.'0', null], ['000'.$max.'0', null], [str_repeat('9', 100), null],
+        ] as [$digits, $expected]) {
+            foreach ([$digits."\tprivate-home\n", 'bytes='.$digits." files=1\r\n"] as $output) {
+                $this->assertSame($expected, \pmssUserTransferParseDuBytes($output), $digits);
+            }
+            $this->assertSame($expected === null ? null : ['bytes' => $expected, 'files' => 1],
+                \pmssUserTransferParseHomeStats('bytes='.$digits.' files=1'), $digits);
+            $this->assertSame($expected === null ? null : ['bytes' => 1, 'files' => $expected],
+                \pmssUserTransferParseHomeStats('bytes=1 files='.$digits), $digits);
         }
     }
 

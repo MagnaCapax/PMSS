@@ -82,8 +82,10 @@ function pmssUserTransferBuildHomeStatsShell(string $home): string
 {
     $home = rtrim($home, '/').'/';
     $lines = [
-        'bytes=$(du -sbx -- "$home" 2>/dev/null | awk "NR == 1 {print \$1}")',
-        'files=$(find "$home" -xdev -type f -printf . 2>/dev/null | wc -c | tr -d "[:space:]")',
+        // Partial scans must fail even when a later pipeline stage succeeds.
+        'set -o pipefail',
+        'bytes=$(du -sbx -- "$home" 2>/dev/null | awk "NR == 1 {print \$1}") || exit 1',
+        'files=$(find "$home" -xdev -type f -printf . 2>/dev/null | wc -c | tr -d "[:space:]") || exit 1',
         'case "$bytes" in ""|*[!0-9]*) exit 1 ;; esac',
         'case "$files" in ""|*[!0-9]*) exit 1 ;; esac',
         'printf "bytes=%s files=%s\n" "$bytes" "$files"',
@@ -132,7 +134,7 @@ function pmssUserTransferBuildRemoteSizeProbe(array $cfg): string
 function pmssUserTransferParseDuBytes(string $output): ?int
 {
     if (preg_match('/\bbytes=([0-9]+)\b/', $output, $matches) === 1) {
-        return (int) $matches[1];
+        return pmssUnsignedDecimalIntParse($matches[1]);
     }
 
     $lines = preg_split('/\r?\n/', trim($output));
@@ -142,7 +144,7 @@ function pmssUserTransferParseDuBytes(string $output): ?int
 
     foreach ($lines as $line) {
         if (preg_match('/^\s*([0-9]+)\b/', $line, $matches) === 1) {
-            return (int) $matches[1];
+            return pmssUnsignedDecimalIntParse($matches[1]);
         }
     }
 
@@ -158,7 +160,10 @@ function pmssUserTransferParseHomeStats(string $output): ?array
         return null;
     }
 
-    return ['bytes' => (int) $matches[1], 'files' => (int) $matches[2]];
+    // Reject unrepresentable command counters before PHP can saturate the cast.
+    $bytes = pmssUnsignedDecimalIntParse($matches[1]);
+    $files = pmssUnsignedDecimalIntParse($matches[2]);
+    return $bytes === null || $files === null ? null : ['bytes' => $bytes, 'files' => $files];
 }
 
 /**

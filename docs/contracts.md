@@ -1207,6 +1207,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## User Management (CLI)
 
+- Transfer completeness statistics reject failed `du`/`find` pipelines, including
+  failures in their formatting stages, before emitting aggregate counters.
+  Byte and file counters above `PHP_INT_MAX` use the existing unavailable-statistics
+  path. Valid aggregate bytes, legacy `du` parsing, mount-summary fallback and
+  advisory thresholds remain unchanged.
+
 - Shared traffic and IOPS integer setting parsing accepts non-negative values
   only when PHP can represent them as an integer. Oversized decimal strings and
   floating values take the existing parse-failure path before persistence.
