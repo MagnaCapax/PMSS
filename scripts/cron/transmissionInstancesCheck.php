@@ -25,7 +25,8 @@ foreach ($users as $user) {
     $command = 'cd '.escapeshellarg($home)
         .' && { [ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/transmission.lock; flock -n 9 || exit 0; }; php '
         .escapeshellarg($home.'/www/torrentClientsResolve.php')
-        .' transmission --launch >/dev/null 2>&1; }';
+        // The foreground daemon must not inherit fd 9, or it holds the switch lock for its lifetime.
+        .' transmission --launch >/dev/null 2>&1 9>&-; }';
     $result = pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $command),
         90, $user, 'transmission');
     $rc = $result['rc'];
