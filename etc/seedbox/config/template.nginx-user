@@ -2,6 +2,8 @@
 # expose it via public subdomain routing.
 location /user-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/user-##username/;
+        # A page here may not widen a service worker's scope over other paths on this host.
+        proxy_hide_header Service-Worker-Allowed;
         # Deluge map-urlpath can double cookie paths; normalize to canonical base.
         proxy_cookie_path ~^/user-##username/deluge/user-##username/deluge/.* /user-##username/deluge/;
         proxy_set_header Upgrade $http_upgrade;
@@ -21,6 +23,8 @@ location ^~ /~##username/__pmss-ui- { return 404; }
 
 location /public-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/;
+        # A page here may not widen a service worker's scope over other paths on this host.
+        proxy_hide_header Service-Worker-Allowed;
         # lighttpd map-urlpath restores Location headers, but it does not
         # rewrite Set-Cookie Path values for proxied responses. Keep login
         # cookies scoped to the external /public-##username/<app> paths here.
@@ -55,6 +59,8 @@ location /public-##username/ {
 # to lighttpd and 403 every request.
 location /~##username/ {
         proxy_pass http://127.0.0.1:##serverPort/;
+        # A page here may not widen a service worker's scope over other paths on this host.
+        proxy_hide_header Service-Worker-Allowed;
         proxy_cookie_path /sabnzbd /~##username/sabnzbd;
         proxy_cookie_path /lidarr /~##username/lidarr;
         proxy_cookie_path /radarr /~##username/radarr;
@@ -79,7 +85,13 @@ location /webdav-##username/ {
         if ($scheme = http) {
                 return 301 https://$host$request_uri;
         }
+        # WebDAV serves WebDAV clients (no Sec-Fetch-Dest), browser tabs and embedded media; not scripts or frames on a web page.
+        if ($http_sec_fetch_dest !~ ^(|document|image|audio|video|track)$) {
+                return 403;
+        }
         proxy_pass http://127.0.0.1:##serverPort/webdav-##username/;
+        # A page here may not widen a service worker's scope over other paths on this host.
+        proxy_hide_header Service-Worker-Allowed;
         include /etc/nginx/webdav_proxy_params;
         proxy_http_version 1.1;
 
@@ -101,6 +113,8 @@ location = /deluge-##username {
 location /deluge-##username/ {
     # Legacy Deluge URL path: proxy to lighttpd so POST clients don't trip on redirects.
     proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;
+    # A page here may not widen a service worker's scope over other paths on this host.
+    proxy_hide_header Service-Worker-Allowed;
     proxy_cookie_path /deluge-##username/ /deluge-##username/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
