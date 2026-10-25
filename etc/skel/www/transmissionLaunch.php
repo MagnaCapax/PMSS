@@ -115,7 +115,8 @@ function pmssTransmissionLaunch(string $home, array $ops = []): bool
     if (is_link($lock) || (file_exists($lock) && !is_file($lock))) return false;
     // Static store builds keep their matching web client beside the daemon.
     $web = dirname($binary).'/public_html';
-    $command = 'nohup flock -n '.escapeshellarg($lock).' env '
+    // A panel start runs under php-cgi; its own session keeps a lighttpd restart from terminating the daemon.
+    $command = 'nohup /usr/bin/setsid flock -n '.escapeshellarg($lock).' env '
         .'CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt '
         .(is_dir($web) && !is_link($web) ? escapeshellarg('TRANSMISSION_WEB_HOME='.$web).' ' : '')
         .escapeshellarg($binary)

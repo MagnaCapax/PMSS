@@ -97,7 +97,7 @@ final class TorrentClientsP3LaunchTest extends TestCase
             'probe' => static function () use (&$probes): bool { return ++$probes > 1; },
             'run' => static function (string $shell) use (&$command): void { $command = $shell; }];
         $this->assertTrue(\pmssTransmissionLaunch($home, $ops));
-        $this->assertStringContainsString('flock -n', $command);
+        $this->assertStringContainsString('nohup /usr/bin/setsid flock -n', $command);
         $this->assertStringContainsString('.pmss-launch.lock', $command);
         $this->assertStringContainsString('CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt', $command);
         $this->assertStringContainsString(' -f -g ', $command);
