@@ -157,12 +157,34 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
         }
         // Check each job even after the command itself reported success.
         if (($jobj['error'] ?? 0) !== 0) return ['ok' => false, 'error' => 'fio failed'];
-        $rbw += (int) ($jobj['read']['bw_bytes'] ?? 0); $wbw += (int) ($jobj['write']['bw_bytes'] ?? 0);
-        $ri += (float) ($jobj['read']['iops'] ?? 0); $wi += (float) ($jobj['write']['iops'] ?? 0);
+        // Do not turn malformed scalars or oversized counters into successful metrics.
+        $bandwidth = $iops = [];
+        foreach (['read', 'write'] as $direction) {
+            $raw = $jobj[$direction]['bw_bytes'] ?? 0;
+            $bandwidth[$direction] = is_int($raw) || is_string($raw) ? pmssUnsignedDecimalIntParse((string) $raw) : null;
+            $iops[$direction] = pmssFiniteNonNegativeFloat($jobj[$direction]['iops'] ?? 0);
+            if ($bandwidth[$direction] === null || $iops[$direction] === null) {
+                return ['ok' => false, 'error' => 'invalid fio JSON'];
+            }
+        }
+        if ($rbw > PHP_INT_MAX - $bandwidth['read'] || $wbw > PHP_INT_MAX - $bandwidth['write']) {
+            return ['ok' => false, 'error' => 'invalid fio JSON'];
+        }
+        $rbw += $bandwidth['read']; $wbw += $bandwidth['write'];
+        $ri += $iops['read']; $wi += $iops['write'];
         $p95r = $jobj['read']['clat_ns']['percentile']['95.000000'] ?? null;
         $p95w = $jobj['write']['clat_ns']['percentile']['95.000000'] ?? null;
+        foreach ([$p95r, $p95w] as $percentile) {
+            if ($percentile !== null && pmssFiniteNonNegativeFloat($percentile) === null) {
+                return ['ok' => false, 'error' => 'invalid fio JSON'];
+            }
+        }
         if ($p95r !== null) $rp[] = (float) $p95r;
         if ($p95w !== null) $wp[] = (float) $p95w;
+    }
+    // Individually finite samples can still overflow during aggregation.
+    if (!is_finite($ri) || !is_finite($wi) || !is_finite((float) array_sum($rp)) || !is_finite((float) array_sum($wp))) {
+        return ['ok' => false, 'error' => 'invalid fio JSON'];
     }
     $avg = static function ($a) { return count($a) ? array_sum($a) / count($a) : 0; };
     return ['ok' => true, 'result' => ['read_bw_MBps' => round($rbw / (1024 * 1024), 2), 'write_bw_MBps' => round($wbw / (1024 * 1024), 2), 'read_iops' => round($ri, 1), 'write_iops' => round($wi, 1), 'read_p95_ms' => round($avg($rp) / 1000000, 2), 'write_p95_ms' => round($avg($wp) / 1000000, 2), 'raw' => $j]];
@@ -191,7 +213,23 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
 }
 
 function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $deviceEntry, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, $deviceEntry + ['test' => 'device-preflight', 'ok' => false, 'error' => $error]); printf("%s\tskipped: %s\n", $deviceEntry['device'], $error); }
-function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array { $dd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip); [$rc, $so, $se] = [runCommand($dd, true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? '']; $line = trim($se !== '' ? $se : $so); $mbps = null; $secs = null; if (preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $m)) { $secs = (float) $m[1]; $mbps = (float) $m[2]; } return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs]; }
+function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array
+{
+    $dd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip);
+    [$rc, $so, $se] = [runCommand($dd, true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? ''];
+    $line = trim($se !== '' ? $se : $so);
+    $mbps = $secs = null;
+    // A failed read can leave a partial transfer summary; it is not a measurement.
+    if ($rc === 0 && preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $match)) {
+        $elapsed = pmssFiniteNonNegativeFloat($match[1]);
+        $rate = pmssFiniteNonNegativeFloat($match[2]);
+        if ($elapsed !== null && $rate !== null) {
+            $secs = $elapsed;
+            $mbps = $rate;
+        }
+    }
+    return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs];
+}
 /** Preserve the JSON shape for dd results in both read-only device modes. */
 function storageBenchmarkDdResultEntry(array $deviceEntry, string $test, int $count, int $skip, array $dd): array
 {

@@ -88,6 +88,16 @@ after a successful job. Successful metrics, optional-field defaults, raw JSON
 and temporary-output cleanup retain their contracts. `StorageBenchSecurityTest`
 covers these cases with command and output shims, without running fio.
 
+Fio bandwidth counters must be unsigned integers within the PHP integer range;
+IOPS and supplied latency percentiles must be finite, non-negative numbers.
+Counter sums and floating-point aggregates are checked before reporting success.
+Malformed metrics use the existing invalid-JSON result, while absent optional
+metrics retain their zero defaults. Read-only dd probes publish measurements only
+after a successful command with finite numeric elapsed time and throughput.
+Failed commands and malformed summaries retain the unavailable measurement shape.
+`StorageBenchSecurityTest` covers these boundaries with isolated command shims;
+valid probe metrics, JSONL field order and temporary-file cleanup are preserved.
+
 Boot-default convergence logs nonzero `/proc` remount and `update-grub` results
 through the caller logger after managed configuration is persisted. Both steps
 retain their fail-soft flow and successful command sequence.

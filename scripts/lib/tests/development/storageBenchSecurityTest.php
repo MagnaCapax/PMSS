@@ -139,7 +139,38 @@ PHP;
                 'clat_ns' => ['percentile' => ['95.000000' => 4000000]]]]]];
         $multiSuccess = ['ok' => true, 'result' => ['read_bw_MBps' => 1, 'write_bw_MBps' => 2,
             'read_iops' => 2, 'write_iops' => 3, 'read_p95_ms' => 0, 'write_p95_ms' => 4, 'raw' => $multi]];
+        $metricCases = [];
+        // Valid decimal counters and numeric float strings keep their legacy metrics.
         foreach ([
+            ['bw_bytes', '0001048576'], ['bw_bytes', '1048576'],
+            ['iops', '2.0'], ['iops', '2e0'], ['iops', 2.0],
+        ] as [$field, $value]) {
+            $payload = $raw;
+            $payload['jobs'][0]['read'][$field] = $value;
+            $expected = $success;
+            $expected['result']['raw'] = json_decode(json_encode($payload), true);
+            $metricCases[] = ['normal', 'exception', json_encode($payload), $expected, true];
+        }
+        foreach (['read', 'write'] as $direction) {
+            foreach (['bw_bytes', 'iops', 'percentile'] as $field) {
+                foreach (['', 'invalid', -1, true, [], [1], '1e309', "1\0"] as $value) {
+                    $payload = $raw;
+                    if ($field === 'percentile') $payload['jobs'][0][$direction]['clat_ns']['percentile']['95.000000'] = $value;
+                    else $payload['jobs'][0][$direction][$field] = $value;
+                    $metricCases[] = ['normal', 'exception', json_encode($payload), $invalid, true];
+                }
+            }
+            foreach ([1.5, (string) PHP_INT_MAX.'0'] as $value) {
+                $metricCases[] = ['normal', 'exception', json_encode(['jobs' => [[$direction => ['bw_bytes' => $value]]]]), $invalid, true];
+            }
+            // Reject overflow across jobs as well as within a single metric.
+            foreach (['bw_bytes' => PHP_INT_MAX, 'iops' => 1.0e308, 'percentile' => 1.0e308] as $field => $value) {
+                $section = $field === 'percentile' ? ['clat_ns' => ['percentile' => ['95.000000' => $value]]] : [$field => $value];
+                $job = [$direction => $section];
+                $metricCases[] = ['normal', 'exception', json_encode(['jobs' => [$job, $job]]), $invalid, true];
+            }
+        }
+        foreach (array_merge([
             ['allocate', 'exception', '', ['ok' => false, 'error' => 'unable to allocate fio JSON temp file'], false],
             ['quote', 'exception', '', ['sameThrowable' => true], false],
             ['execute', 'exception', '', ['sameThrowable' => true], true],
@@ -163,11 +194,46 @@ PHP;
             ['normal', 'exception', '{"jobs":[{"error":"unknown"}]}', $failed, true],
             ['normal', 'exception', json_encode($multi), $multiSuccess, true],
             ['normal', 'exception', json_encode($raw), $success, true],
-        ] as [$case, $kind, $payload, $expected, $ran]) {
+        ], $metricCases) as [$case, $kind, $payload, $expected, $ran]) {
             $this->assertSame([$expected, false, $ran], $this->pmssRunInlinePhpJson($script, [
                 'PMSS_TEST_FIO_CASE' => json_encode([$case, $kind, $payload]),
                 'PMSS_TEST_FIO_PATH' => $this->pmssMakeTempPath('pmss-fio-cleanup-'),
             ]), $case.'/'.$kind);
+        }
+    }
+
+    public function testDdProbeRequiresSuccessfulFiniteMeasurements(): void
+    {
+        $script = <<<'PHP'
+namespace DdResultFixture;
+function runCommand($command, $verbose) {
+    [$rc, $stdout, $stderr] = json_decode(getenv('PMSS_TEST_DD_RESULT'), true);
+    $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => $stdout, 'stderr' => $stderr];
+    return $rc;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'DdResultFixture');
+        $script .= "echo json_encode(storageBenchmarkDdSeqread('/unused', 1, 0));";
+        $summary = "1048576 bytes copied, 0.5 s, 2.1 MB/s\n";
+        $missing = ['mbps' => null, 'secs' => null];
+        $measured = ['mbps' => 2.1, 'secs' => 0.5];
+        foreach ([
+            [0, $summary, '', $measured],
+            [0, '', $summary, $measured],
+            [0, 'copied, 0 s, 0 MB/s', '', ['mbps' => 0, 'secs' => 0]],
+            [1, $summary, '', $missing],
+            [124, '', $summary, $missing],
+            [0, '', '', $missing],
+            [0, 'copied, 1..2 s, 2.1 MB/s', '', $missing],
+            [0, 'copied, 0.5 s, 2..1 MB/s', '', $missing],
+            [0, 'copied, '.str_repeat('9', 400).' s, 2.1 MB/s', '', $missing],
+            [0, 'copied, 0.5 s, '.str_repeat('9', 400).' MB/s', '', $missing],
+            [0, $summary, 'diagnostic wins over stdout', $missing],
+        ] as [$rc, $stdout, $stderr, $expected]) {
+            // Command interception keeps every case away from real block devices.
+            $this->assertSame(['rc' => $rc] + $expected, $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_DD_RESULT' => json_encode([$rc, $stdout, $stderr]),
+            ]));
         }
     }
 
