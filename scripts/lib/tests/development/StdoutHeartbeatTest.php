@@ -24,6 +24,73 @@ final class StdoutHeartbeatTest extends TestCase
         }
     }
 
+    /** Failed observations must not publish a child PID or leave its handle behind. */
+    public function testStartChecksParentPidAndChildStatus(): void
+    {
+        $script = <<<'PHP'
+namespace HeartbeatStatusFixture;
+function getmypid() { return $GLOBALS['parent']; }
+function proc_open($command, $descriptor, &$pipes) {
+    ++$GLOBALS['opened'];
+    return \proc_open('exit 0', [], $pipes);
+}
+function proc_get_status($process) { return $GLOBALS['status']; }
+function register_shutdown_function($callback) {}
+function proc_terminate($process) { ++$GLOBALS['stopped']; return true; }
+function proc_close($process) { ++$GLOBALS['closed']; return \proc_close($process); }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/stdoutHeartbeat.php', 'HeartbeatStatusFixture');
+        $script .= <<<'PHP'
+[$GLOBALS['parent'], $GLOBALS['status']] = json_decode(getenv('PMSS_TEST_HEARTBEAT_STATUS'), true);
+$GLOBALS['opened'] = $GLOBALS['stopped'] = $GLOBALS['closed'] = 0;
+$pid = pmssStdoutHeartbeatStart();
+$published = isset($GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS']);
+pmssStdoutHeartbeatStop();
+pmssStdoutHeartbeatStop();
+echo json_encode([$pid, $published, $GLOBALS['opened'], $GLOBALS['stopped'], $GLOBALS['closed']]);
+PHP;
+        $running = ['pid' => 42, 'running' => true];
+        foreach ([null, false, 0, -1, '1234', 1.5] as $parent) {
+            $this->assertSame([null, false, 0, 0, 0], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_HEARTBEAT_STATUS' => json_encode([$parent, $running]),
+            ]));
+        }
+        foreach ([false, [], ['pid' => 0, 'running' => true], ['pid' => -1, 'running' => true],
+            ['pid' => '42', 'running' => true], ['pid' => 42], ['pid' => 42, 'running' => false], $running] as $status) {
+            $success = $status === $running;
+            $this->assertSame([$success ? 42 : null, $success, 1, 1, 1], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_HEARTBEAT_STATUS' => json_encode([1234, $status]),
+            ]));
+        }
+        $this->assertSame([42, true, 1, 1, 1], $this->pmssRunInlinePhpJson($script, [
+            'PMSS_TEST_HEARTBEAT_STATUS' => json_encode([1, $running]),
+        ]));
+    }
+
+    /** A corrupted global must not close or signal an unrelated resource. */
+    public function testStopIgnoresInvalidAndNonProcessHandles(): void
+    {
+        $stream = fopen('php://memory', 'w+');
+        $closed = fopen('php://memory', 'w+');
+        fclose($closed);
+        $context = stream_context_create();
+        try {
+            foreach ([null, false, 0, '', [], new \stdClass(), $closed, $context, $stream] as $handle) {
+                $GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS'] = $handle;
+                $this->pmssAssertNoPhpWarnings(static function (): void {
+                    \pmssStdoutHeartbeatStop();
+                    \pmssStdoutHeartbeatStop();
+                });
+                $this->assertFalse(isset($GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS']));
+            }
+            $this->assertSame('stream', get_resource_type($stream));
+            $this->assertSame('stream-context', get_resource_type($context));
+        } finally {
+            unset($GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS']);
+            fclose($stream);
+        }
+    }
+
     /** A shell child must keep writing while PHP is blocked in passthru(). */
     public function testBlockingCallKeepsStdoutAliveAndPreservesLastLine(): void
     {

@@ -28,6 +28,13 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Stdout heartbeat startup rejects a failed or nonpositive parent PID before
+building its liveness loop. A failed child-status read, invalid child PID, or
+already-exited child returns `null` after stopping and reaping the child.
+Shutdown ignores non-process resources without closing them. Valid starts keep
+the inherited stdout, blank-line cadence, PID result, and shutdown behavior;
+`StdoutHeartbeatTest` covers these boundaries with isolated process stubs.
+
 The iostat collector checks the command exit status before parsing or publishing
 captured output. Failed and timed-out probes may contain an initial sample;
 they leave the current snapshot and histories untouched and use the existing

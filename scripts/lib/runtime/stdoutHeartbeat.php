@@ -18,6 +18,10 @@ function pmssStdoutHeartbeatStart(int $intervalSeconds = 5): ?int
     }
 
     $parentPid = getmypid();
+    // A failed PID lookup must not turn kill -0 into a process-group probe.
+    if (!is_int($parentPid) || $parentPid < 1) {
+        return null;
+    }
     $loop = 'while kill -0 '.(int) $parentPid.' 2>/dev/null; do printf "\\n"; sleep '.(int) $intervalSeconds.' 1>/dev/null; done';
     // exec makes proc_get_status() identify the loop itself, not a wrapper shell.
     // fd 1 is inherited by leaving it out: passing STDOUT would seek a redirected log file back.
@@ -32,6 +36,11 @@ function pmssStdoutHeartbeatStart(int $intervalSeconds = 5): ?int
     $GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS'] = $process;
     register_shutdown_function('pmssStdoutHeartbeatStop');
     $status = proc_get_status($process);
+    // Reap an unobservable or already-exited child rather than reporting a PID.
+    if (!is_array($status) || !is_int($status['pid'] ?? null) || $status['pid'] < 1 || empty($status['running'])) {
+        pmssStdoutHeartbeatStop();
+        return null;
+    }
     return $status['pid'];
 }
 
@@ -40,7 +49,7 @@ function pmssStdoutHeartbeatStop(): void
 {
     $process = $GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS'] ?? null;
     unset($GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS']);
-    if (!is_resource($process)) {
+    if (!is_resource($process) || get_resource_type($process) !== 'process') {
         return;
     }
     @proc_terminate($process);
