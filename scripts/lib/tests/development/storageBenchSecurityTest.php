@@ -132,6 +132,13 @@ PHP;
         $raw = ['jobs' => [['read' => ['bw_bytes' => 1048576, 'iops' => 2]]]];
         $success = ['ok' => true, 'result' => ['read_bw_MBps' => 1, 'write_bw_MBps' => 0,
             'read_iops' => 2, 'write_iops' => 0, 'read_p95_ms' => 0, 'write_p95_ms' => 0, 'raw' => $raw]];
+        $invalid = ['ok' => false, 'error' => 'invalid fio JSON'];
+        $failed = ['ok' => false, 'error' => 'fio failed'];
+        $multi = ['jobs' => [$raw['jobs'][0] + ['error' => 0],
+            ['error' => 0, 'write' => ['bw_bytes' => 2097152, 'iops' => 3,
+                'clat_ns' => ['percentile' => ['95.000000' => 4000000]]]]]];
+        $multiSuccess = ['ok' => true, 'result' => ['read_bw_MBps' => 1, 'write_bw_MBps' => 2,
+            'read_iops' => 2, 'write_iops' => 3, 'read_p95_ms' => 0, 'write_p95_ms' => 4, 'raw' => $multi]];
         foreach ([
             ['allocate', 'exception', '', ['ok' => false, 'error' => 'unable to allocate fio JSON temp file'], false],
             ['quote', 'exception', '', ['sameThrowable' => true], false],
@@ -143,6 +150,18 @@ PHP;
             ['normal', 'exception', false, ['ok' => false, 'error' => 'fio failed'], true],
             ['normal', 'exception', '', ['ok' => false, 'error' => 'fio failed'], true],
             ['normal', 'exception', '{', ['ok' => false, 'error' => 'invalid fio JSON'], true],
+            ['normal', 'exception', '{}', $invalid, true],
+            ['normal', 'exception', '{"jobs":"unexpected"}', $invalid, true],
+            ['normal', 'exception', '{"jobs":true}', $invalid, true],
+            ['normal', 'exception', '{"jobs":[]}', $invalid, true],
+            ['normal', 'exception', '{"jobs":["unexpected"]}', $invalid, true],
+            ['normal', 'exception', json_encode(['jobs' => [$raw['jobs'][0], false]]), $invalid, true],
+            ['normal', 'exception', '{"jobs":[{"read":"unexpected"}]}', $invalid, true],
+            ['normal', 'exception', '{"jobs":[{"write":true}]}', $invalid, true],
+            ['normal', 'exception', '{"jobs":[{"error":5}]}', $failed, true],
+            ['normal', 'exception', json_encode(['jobs' => [$raw['jobs'][0], ['error' => 5]]]), $failed, true],
+            ['normal', 'exception', '{"jobs":[{"error":"unknown"}]}', $failed, true],
+            ['normal', 'exception', json_encode($multi), $multiSuccess, true],
             ['normal', 'exception', json_encode($raw), $success, true],
         ] as [$case, $kind, $payload, $expected, $ran]) {
             $this->assertSame([$expected, false, $ran], $this->pmssRunInlinePhpJson($script, [

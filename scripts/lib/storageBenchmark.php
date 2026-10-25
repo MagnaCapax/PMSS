@@ -142,7 +142,31 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
         // Release the private output even when quoting, execution, or reading throws.
         @unlink($json);
     }
-    if ($rc !== 0 || $payload === false || trim($payload) === '') return ['ok' => false, 'error' => 'fio failed']; $j = pmssJsonDecodeAssoc($payload); if ($j === null || empty($j['jobs'][0])) return ['ok' => false, 'error' => 'invalid fio JSON']; $rbw = 0; $wbw = 0; $ri = 0.0; $wi = 0.0; $rp = []; $wp = []; foreach ($j['jobs'] as $jobj) { $rbw += (int) ($jobj['read']['bw_bytes'] ?? 0); $wbw += (int) ($jobj['write']['bw_bytes'] ?? 0); $ri += (float) ($jobj['read']['iops'] ?? 0); $wi += (float) ($jobj['write']['iops'] ?? 0); $p95r = $jobj['read']['clat_ns']['percentile']['95.000000'] ?? null; $p95w = $jobj['write']['clat_ns']['percentile']['95.000000'] ?? null; if ($p95r !== null) $rp[] = (float) $p95r; if ($p95w !== null) $wp[] = (float) $p95w; } $avg = static function ($a) { return count($a) ? array_sum($a) / count($a) : 0; }; return ['ok' => true, 'result' => ['read_bw_MBps' => round($rbw / (1024 * 1024), 2), 'write_bw_MBps' => round($wbw / (1024 * 1024), 2), 'read_iops' => round($ri, 1), 'write_iops' => round($wi, 1), 'read_p95_ms' => round($avg($rp) / 1000000, 2), 'write_p95_ms' => round($avg($wp) / 1000000, 2), 'raw' => $j]]; }
+    if ($rc !== 0 || $payload === false || trim($payload) === '') return ['ok' => false, 'error' => 'fio failed'];
+    $j = pmssJsonDecodeAssoc($payload);
+    if ($j === null || !is_array($j['jobs'] ?? null) || empty($j['jobs'][0])) {
+        return ['ok' => false, 'error' => 'invalid fio JSON'];
+    }
+    $rbw = 0; $wbw = 0; $ri = 0.0; $wi = 0.0; $rp = []; $wp = [];
+    foreach ($j['jobs'] as $jobj) {
+        // A partial or malformed job cannot supply a successful measurement.
+        if (!is_array($jobj)
+            || (isset($jobj['read']) && !is_array($jobj['read']))
+            || (isset($jobj['write']) && !is_array($jobj['write']))) {
+            return ['ok' => false, 'error' => 'invalid fio JSON'];
+        }
+        // Check each job even after the command itself reported success.
+        if (($jobj['error'] ?? 0) !== 0) return ['ok' => false, 'error' => 'fio failed'];
+        $rbw += (int) ($jobj['read']['bw_bytes'] ?? 0); $wbw += (int) ($jobj['write']['bw_bytes'] ?? 0);
+        $ri += (float) ($jobj['read']['iops'] ?? 0); $wi += (float) ($jobj['write']['iops'] ?? 0);
+        $p95r = $jobj['read']['clat_ns']['percentile']['95.000000'] ?? null;
+        $p95w = $jobj['write']['clat_ns']['percentile']['95.000000'] ?? null;
+        if ($p95r !== null) $rp[] = (float) $p95r;
+        if ($p95w !== null) $wp[] = (float) $p95w;
+    }
+    $avg = static function ($a) { return count($a) ? array_sum($a) / count($a) : 0; };
+    return ['ok' => true, 'result' => ['read_bw_MBps' => round($rbw / (1024 * 1024), 2), 'write_bw_MBps' => round($wbw / (1024 * 1024), 2), 'read_iops' => round($ri, 1), 'write_iops' => round($wi, 1), 'read_p95_ms' => round($avg($rp) / 1000000, 2), 'write_p95_ms' => round($avg($wp) / 1000000, 2), 'raw' => $j]];
+}
 
 function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string $runTs, string $label, string $runId, string $mntDev, string $fs, int $requested, int $runtime): array
 {

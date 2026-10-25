@@ -81,6 +81,13 @@ The read-only home-device probe parses md degraded counts as representable
 unsigned integers. Malformed or overflowed sysfs values retain its existing
 preflight failure result; valid counts keep the same report shape.
 
+Fio results require an array of job objects and array-valued read/write sections
+when present. Malformed job containers use the existing invalid-JSON result;
+any reported job error uses the existing fio-failure result, including errors
+after a successful job. Successful metrics, optional-field defaults, raw JSON
+and temporary-output cleanup retain their contracts. `StorageBenchSecurityTest`
+covers these cases with command and output shims, without running fio.
+
 Boot-default convergence logs nonzero `/proc` remount and `update-grub` results
 through the caller logger after managed configuration is persisted. Both steps
 retain their fail-soft flow and successful command sequence.
