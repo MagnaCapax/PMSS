@@ -48,7 +48,7 @@ function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null
     $failLaunch = static function () use ($cmd, $log): int {
         $message = '[WARN] Failed to launch command: '.$cmd.'; possible process limit exhaustion (check pids.max / ulimit -u)';
         $log($message);
-        $banner = pmssStreamIsTty(STDERR) ? "\033[1;31m[FORK]\033[0m " : '[FORK] ';
+        $banner = pmssCliAnsiStyle('[FORK]', '1;31', pmssStreamIsTty(STDERR)).' ';
         fwrite(STDERR, $banner.$message.PHP_EOL);
         pmssDumpForkDiagnostics('proc_open failed: '.$cmd, $log);
         $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
@@ -57,7 +57,7 @@ function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null
     $isInteractive = pmssStreamIsTty(STDOUT);
     $timeoutSec = pmssCommandTimeoutSeconds($cmd);
     if ($isInteractive || $verbose) {
-        echo ($isInteractive ? "\033[36m[EXEC]\033[0m " : '[CMD] ').$cmd.PHP_EOL;
+        echo pmssCliAnsiStyle($isInteractive ? '[EXEC]' : '[CMD]', '36', $isInteractive).' '.$cmd.PHP_EOL;
     }
     $debugRun = getenv('PMSS_RUNCOMMAND_DEBUG');
     $logMemoryUsage = $verbose || ($debugRun !== false && $debugRun !== '');
@@ -90,8 +90,8 @@ function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null
         $excerpt = trim($stderr);
         $excerpt = $excerpt !== '' ? ' :: '.pmssLogWhitespaceCollapse(substr($excerpt, 0, 300)) : '';
         if ($timedOut) {
-            $msg = ($isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ')
-                .'Command timed out after '.$timeoutSec.'s: '.$cmd;
+            $msg = pmssCliAnsiStyle('[TIMEOUT]', '1;31', $isInteractive)
+                .' Command timed out after '.$timeoutSec.'s: '.$cmd;
             fwrite(STDERR, $msg.PHP_EOL);
             echo $msg.PHP_EOL;
             $log($msg);

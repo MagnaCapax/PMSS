@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/log.php';
+require_once __DIR__.'/cli/helpText.php';
 // environment.php owns the path and probe defaults below; load it before anything derives from them.
 require_once __DIR__.'/runtime/environment.php';
 

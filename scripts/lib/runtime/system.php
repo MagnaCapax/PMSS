@@ -114,7 +114,7 @@ function requireRoot(): void
 
 function pmssError(string $message): void
 {
-    $prefix = pmssStreamIsTty(STDERR) ? "\033[31m[ERROR]\033[0m " : "[ERROR] ";
+    $prefix = pmssCliAnsiStyle('[ERROR]', '31', pmssStreamIsTty(STDERR)).' ';
     fwrite(STDERR, $prefix . $message . PHP_EOL);
     logMessage('[ERROR] ' . $message);
 }

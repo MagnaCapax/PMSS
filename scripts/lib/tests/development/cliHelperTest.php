@@ -6,6 +6,15 @@ require_once dirname(__DIR__, 2).'/cli/optionParser.php';
 
 class CliHelperTest extends TestCase
 {
+    public function testAnsiStylePreservesBytesAndCallerColorPolicy(): void
+    {
+        foreach (['', '0', ' padded ', "first\nsecond", "\0\033[32minner\033[0m"] as $text) {
+            $this->assertSame("\033[1;31m".$text."\033[0m", \pmssCliAnsiStyle($text, '1;31'));
+            $this->assertSame($text, \pmssCliAnsiStyle($text, '1;31', false));
+            $this->assertSame($text === '' ? '' : "\033[1;31m".$text."\033[0m", \pmssCliHelpStyle($text, '1;31', true));
+        }
+    }
+
     public function testParsesLongOptionsWithValues(): void
     {
         $parsed = \pmssParseCliTokens(['script.php', '--user=alice', '--limit=42', 'extra']);

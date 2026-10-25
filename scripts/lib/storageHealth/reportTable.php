@@ -8,14 +8,13 @@
 
 const PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY = ['ok' => ['color' => '32', 'mark' => 'OK', 'rank' => 2], 'warn' => ['color' => '33', 'mark' => '!!', 'rank' => 1], 'fail' => ['color' => '31', 'mark' => 'XX', 'rank' => 0]];
 
+require_once dirname(__DIR__).'/cli/helpText.php';
+
 /** Apply severity coloring only for interactive terminals. */
 function pmssStorageHealthColor(string $severity, string $text): string
 {
-    if (!pmssStreamIsTty(STDOUT)) {
-        return $text;
-    }
     $code = PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$severity]['color'] ?? '0';
-    return "\033[".$code."m".$text."\033[0m";
+    return pmssCliAnsiStyle($text, $code, pmssStreamIsTty(STDOUT));
 }
 
 /** Format nullable integer SMART/NVMe metrics for fixed-width report columns. */

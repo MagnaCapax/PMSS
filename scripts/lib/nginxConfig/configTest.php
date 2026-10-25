@@ -36,27 +36,23 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx, bool $relo
     $configTestResult = implode("\n", $configTestOutput);
 
     $isTty = pmssStreamIsTty(STDOUT);
-    $cReset  = $isTty ? "\033[0m"  : '';
-    $cRed    = $isTty ? "\033[31m" : '';
-    $cGreen  = $isTty ? "\033[32m" : '';
-    $cYellow = $isTty ? "\033[33m" : '';
 
     if ($configTestRc === 0) {
-        echo "{$cGreen}[OK]{$cReset} nginx configuration test passed\n";
+        echo pmssCliAnsiStyle('[OK]', '32', $isTty)." nginx configuration test passed\n";
         pmssCreateNginxConfigAppendLog('nginx -t passed (rc=0)');
     } else {
-        echo "{$cRed}[CRITICAL]{$cReset} nginx configuration test {$cRed}FAILED{$cReset} (rc={$configTestRc})\n";
-        echo "{$cRed}{$configTestResult}{$cReset}\n";
+        echo pmssCliAnsiStyle('[CRITICAL]', '31', $isTty).' nginx configuration test '.pmssCliAnsiStyle('FAILED', '31', $isTty)." (rc={$configTestRc})\n";
+        echo pmssCliAnsiStyle($configTestResult, '31', $isTty)."\n";
         pmssCreateNginxConfigAppendLog("CRITICAL: nginx -t failed (rc={$configTestRc}): {$configTestResult}");
 
         if ($restartNginx) {
-            echo "{$cRed}## Restart aborted: refusing to restart nginx with broken configuration{$cReset}\n## Fix the errors above, then manually restart:\n   systemctl restart nginx\n";
+            echo pmssCliAnsiStyle('## Restart aborted: refusing to restart nginx with broken configuration', '31', $isTty)."\n## Fix the errors above, then manually restart:\n   systemctl restart nginx\n";
             pmssCreateNginxConfigAppendLog('restart aborted due to config test failure');
         } elseif ($reloadNginx) {
-            echo "{$cRed}## Reload aborted: refusing to reload nginx with broken configuration{$cReset}\n";
+            echo pmssCliAnsiStyle('## Reload aborted: refusing to reload nginx with broken configuration', '31', $isTty)."\n";
             pmssCreateNginxConfigAppendLog('reload aborted due to config test failure');
         } else {
-            echo "{$cYellow}## Fix the configuration errors above before restarting nginx{$cReset}\n";
+            echo pmssCliAnsiStyle('## Fix the configuration errors above before restarting nginx', '33', $isTty)."\n";
         }
 
         return 1;
@@ -75,7 +71,7 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx, bool $relo
     $actionRc = 0;
     passthru($command, $actionRc);
     if ($actionRc !== 0) {
-        echo "{$cRed}[CRITICAL]{$cReset} nginx {$operation} {$cRed}FAILED{$cReset} (rc={$actionRc})\n";
+        echo pmssCliAnsiStyle('[CRITICAL]', '31', $isTty)." nginx {$operation} ".pmssCliAnsiStyle('FAILED', '31', $isTty)." (rc={$actionRc})\n";
         pmssCreateNginxConfigAppendLog("CRITICAL: nginx {$operation} failed (rc={$actionRc})");
         return 1;
     }

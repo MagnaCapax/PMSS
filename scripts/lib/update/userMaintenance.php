@@ -153,9 +153,9 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
         }
 
         if ($isTty) {
-            echo PHP_EOL."\033[35mUpdating user {$userTrim}\033[0m".PHP_EOL;
+            echo PHP_EOL.pmssCliAnsiStyle('Updating user '.$userTrim, '35').PHP_EOL;
             foreach ($phases as $phase) {
-                echo "  \033[33m* {$phase}\033[0m".PHP_EOL;
+                echo '  '.pmssCliAnsiStyle('* '.$phase, '33').PHP_EOL;
             }
         } else {
             logMessage(sprintf('Updating user %s phases: %s', $userTrim, implode(', ', $phases)));

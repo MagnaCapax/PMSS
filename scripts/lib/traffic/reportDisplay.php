@@ -54,7 +54,7 @@ function pmssShowTrafficLimitDisplays(array $row, bool $useColor): array
     $pctDisplayRaw = $row['pctUsed'] !== null ? sprintf('%3d%%', min(999, (int) round($row['pctUsed']))) : 'n/a';
     $statusLabel = $row['pctUsed'] !== null && $row['pctUsed'] >= 80 ? ($row['pctUsed'] >= 100 ? '[OVER]' : '[WARN]') : '';
     $statusDisplay = str_pad($statusLabel, 6, ' ', STR_PAD_RIGHT);
-    if ($useColor && $statusLabel !== '') $statusDisplay = ($statusLabel === '[OVER]' ? "\033[1;31m" : "\033[33m").$statusDisplay."\033[0m";
+    $statusDisplay = pmssCliAnsiStyle($statusDisplay, $statusLabel === '[OVER]' ? '1;31' : '33', $useColor && $statusLabel !== '');
     $filled = ($row['limitMiB'] !== null && $row['pctUsed'] !== null)
         ? (int) floor((max(0.0, min(100.0, (float) $row['pctUsed'])) / 100) * 10)
         : null;

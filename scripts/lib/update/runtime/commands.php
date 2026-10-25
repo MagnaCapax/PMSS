@@ -36,11 +36,9 @@ function runStep(string $description, string $command, array $skipExitCodes = []
     $dryRun  = pmssEnvFlagEnabled('PMSS_DRY_RUN');
     $started = microtime(true);
     $isTty   = pmssStreamIsTty(STDOUT);
-    $cReset  = "\033[0m";
     // Emit a start banner for interactive operators so hangs show which step is running.
     if ($isTty) {
-        $cBlue = "\033[34m";
-        echo $cBlue.'[START] '.$description.$cReset.PHP_EOL;
+        echo pmssCliAnsiStyle('[START] '.$description, '34').PHP_EOL;
     } else {
         // Persist start markers to the log for non-interactive runs.
         logMessage('[START] '.$description.' :: '.$command);
@@ -63,18 +61,15 @@ function runStep(string $description, string $command, array $skipExitCodes = []
         pmssDumpForkDiagnostics('runStep: '.$description.' :: '.$command, 'logMessage');
     }
 
-    $statusColor = $status === 'ERR' ? "\033[31m" : ($status === 'SKIP' ? "\033[33m" : "\033[32m");
-
     // Colorize the status block: [STATUS ... rc=N]
-    $statusBlock = sprintf('[%s%s%s %.3fs rc=%s%d%s]',
-        $statusColor, $status, $cReset,
-        $duration,
-        $rc === 0 ? "\033[32m" : "\033[31m", $rc, $cReset
+    $statusBlock = sprintf('[%s %.3fs rc=%s]',
+        pmssCliAnsiStyle($status, $status === 'ERR' ? '31' : ($status === 'SKIP' ? '33' : '32')),
+        $duration, pmssCliAnsiStyle((string) $rc, $rc === 0 ? '32' : '31')
     );
 
     $message = sprintf('%s %s :: %s', $statusBlock, $description, $command);
     if ($status === 'ERR' && $stderrShort !== '') {
-        $message .= ' :: ' . "\033[31m" . $stderrShort . $cReset;
+        $message .= ' :: '.pmssCliAnsiStyle($stderrShort, '31');
     }
     // Use structured logger from logging.php to avoid missing logmsg() when
     // this runtime is invoked outside update.php/bootstrap paths.

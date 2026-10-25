@@ -66,7 +66,7 @@ class Motd
         $repl = [];
         foreach (self::MOTD_FIELDS as $placeholder => $field) {
             $value = (string) ($model[$field[0]] ?? '');
-            $repl[$placeholder] = $colorEnabled && ($field[1] ?? null) !== null ? self::c($value, $field[1]) : $value;
+            $repl[$placeholder] = pmssCliAnsiStyle($value, $field[1] ?? '', $colorEnabled && ($field[1] ?? null) !== null);
         }
 
         if ($colorEnabled) {
@@ -75,8 +75,8 @@ class Motd
             // 'unknown' and 'n/a' only, so ethtool's literal "Unknown!" on a virtio NIC
             // slipped through and was rendered green, as if it were a detected speed.
             $repl['%NETWORK_SPEED%'] = pmssMotdNetworkSpeedIsResolved($netSpeed)
-                ? self::c($netSpeed, '32') // green when detected or provisioned
-                : self::c('Unknown', '33'); // yellow when neither probe nor config answers
+                ? pmssCliAnsiStyle($netSpeed, '32') // green when detected or provisioned
+                : pmssCliAnsiStyle('Unknown', '33'); // yellow when neither probe nor config answers
         }
 
         $rendered = strtr($template, $repl);
@@ -85,7 +85,7 @@ class Motd
 
         $storageWarn = (string) ($model['storageWarn'] ?? '');
         if ($storageWarn !== '') {
-            $rendered .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
+            $rendered .= "\n".pmssCliAnsiStyle('Storage WARN:', '33').' '.$storageWarn."\n";
         }
 
         return $rendered;
@@ -114,10 +114,5 @@ class Motd
         if ($usesDynamic) {
             pmssWriteManagedFile('/run/motd.dynamic', $usesStatic ? '' : $rendered, 'root', 'root', 0644);
         }
-    }
-
-    private static function c(string $text, string $code): string
-    {
-        return "\e[{$code}m{$text}\e[0m";
     }
 }

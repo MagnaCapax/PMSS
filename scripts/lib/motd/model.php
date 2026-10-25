@@ -37,13 +37,11 @@ function pmssMotdModelCollect(): array
     $name = ucfirst(strtolower($name));
     $model['distro'] = $name.($ver > 0 ? ' '.$ver : '').($code !== '' ? ' ('.$code.')' : '');
     $svc = static function (string $service, ?string $configPath): string {
-        if ($configPath !== null && !file_exists($configPath)) {
-            return "\e[33mnot configured\e[0m";
-        }
+        if ($configPath !== null && !file_exists($configPath)) return pmssCliAnsiStyle('not configured', '33');
         $active = \pmssSystemdUnitIsActive($service);
-        if ($active === null) return "\e[33munknown\e[0m";
-        if ($active) return "\e[32mactive\e[0m";
-        return \pmssSystemdUnitIsEnabled($service) === false ? "\e[33mdisabled\e[0m" : "\e[31minactive\e[0m";
+        if ($active === null) return pmssCliAnsiStyle('unknown', '33');
+        if ($active) return pmssCliAnsiStyle('active', '32');
+        return \pmssSystemdUnitIsEnabled($service) === false ? pmssCliAnsiStyle('disabled', '33') : pmssCliAnsiStyle('inactive', '31');
     };
     $model['wgStatus'] = $svc('wg-quick@wg0', '/etc/wireguard/wg0.conf');
     $model['ovpnStatus'] = $svc('openvpn@openvpn', '/etc/openvpn/openvpn.conf');

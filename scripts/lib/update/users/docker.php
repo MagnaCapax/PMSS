@@ -121,7 +121,7 @@ function pmssEnsureLingerAndDocker(string $user): void
 
     pmssUserLog($user, sprintf('== Linger/Docker kick for %s (uid=%s) on host %s ==', $user, $uid, gethostname()));
     if (pmssStreamIsTty(STDOUT)) {
-        echo "\033[36m[LINGER/DOCKER] {$user}\033[0m".PHP_EOL;
+        echo pmssCliAnsiStyle('[LINGER/DOCKER] '.$user, '36').PHP_EOL;
     } else {
         logMessage('[LINGER/DOCKER] '.$user);
     }

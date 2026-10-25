@@ -5,6 +5,8 @@
  */
 declare(strict_types=1);
 
+require_once dirname(__DIR__).'/cli/helpText.php';
+
 /** Build a normalized status entry for text and JSON outputs. */
 function pmssStatus(string $name, string $status, string $detail = ''): array
 {
@@ -48,9 +50,8 @@ function pmssStatusEmit(
         $label = str_pad('['.$status.']', $labelWidth);
         $name = $textValue($result['name'] ?? '');
         $detail = $textValue($result['detail'] ?? '');
-        $colour = $isTty ? (['OK' => "\033[32m", 'WARN' => "\033[33m", 'ERR' => "\033[31m"][$status] ?? '') : '';
-        $reset = $colour === '' ? '' : "\033[0m";
-        echo $colour.$label.$reset.$name.($detail !== '' ? ' - '.$detail : '').PHP_EOL;
+        $code = ['OK' => '32', 'WARN' => '33', 'ERR' => '31'][$status] ?? '';
+        echo pmssCliAnsiStyle($label, $code, $isTty && $code !== '').$name.($detail !== '' ? ' - '.$detail : '').PHP_EOL;
     }
 
     echo str_repeat('-', 60)."\n";

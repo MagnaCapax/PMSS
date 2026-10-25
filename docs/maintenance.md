@@ -53,6 +53,12 @@ This executes the logging pipeline without mutating the system. The summary is
 still printed, and the profiler records each step with `status=SKIP`.
 
 ## 3. Capture Structured Logs
+
+Operator-side ANSI wrapping shares `pmssCliAnsiStyle()` in `scripts/lib/cli/helpText.php`
+(also loaded by the runtime facade). Callers retain TTY policy, codes and spacing,
+including colored updater log fields. Empty text is wrapped when enabled; help
+text retains its empty-string exception.
+
 ```
 /scripts/update.php --jsonlog --profile-output=/var/log/pmss-update.profile.json
 ```

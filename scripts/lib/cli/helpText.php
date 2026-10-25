@@ -1,6 +1,6 @@
 <?php
 /**
- * Shared CLI help-formatting helpers.
+ * Shared CLI help and ANSI text formatting helpers.
  *
  * Small presentation helpers keep operator-facing usage text consistent across
  * scripts without pulling in heavier runtime dependencies.
@@ -31,14 +31,13 @@ function pmssCliHelpSupportsColor(): bool
     return false;
 }
 
+/** Wrap text verbatim, including empty text; callers retain their color policy. */
+function pmssCliAnsiStyle(string $text, string $code, bool $useColor = true): string { return $useColor ? "\033[{$code}m{$text}\033[0m" : $text; }
+
 /** Apply a basic ANSI style when the current terminal supports it. */
 function pmssCliHelpStyle(string $text, string $code, bool $useColor): string
 {
-    if (!$useColor || $text === '') {
-        return $text;
-    }
-
-    return "\033[{$code}m{$text}\033[0m";
+    return pmssCliAnsiStyle($text, $code, $useColor && $text !== '');
 }
 
 /** Render lower-priority default or hint text. */
