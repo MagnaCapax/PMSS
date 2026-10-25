@@ -22,8 +22,10 @@
  *   R5  the name derivation functions in nginxUserHosts.php are called only by the pinned
  *       callers below.
  *
- * Adding a file to a pin list is a decision to publish something new. It needs the
- * operator's ruling, recorded in an ADR the operator accepted, not an agent's.
+ * A new certificate, ACME/DNS or port pin (R1-R3), or a name pin outside the panel, would
+ * publish or serve something new: the push gate refuses it without the operator's ruling.
+ * A panel page (etc/skel/www/) that only shows an account its own existing name is pinned
+ * after the agent's review; the operator never asked to rule on those (2026-10-25).
  *
  * Usage: php scripts/testing/public-exposure-lint.php [--root PATH]
  * Exit:  0 clean, 1 violations, 2 usage error.

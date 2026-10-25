@@ -59,7 +59,10 @@ is fucked if it does", and "It is not to run externally but locally".
   own decision: the per-service and cluster `mcx.fi` records (ADR 0040).
 - A test fails the build when any file outside the allowed paths in Decision 4 writes a certificate request.
 - `scripts/testing/public-exposure-lint.php` fails the build on a new certificate, ACME or DNS path, a new public
-  name derivation or a new nginx port. Adding to its pin lists needs the operator's ruling.
+  name derivation or a new nginx port. A new certificate, ACME/DNS or port pin, or a name pin outside the panel,
+  needs the operator's ruling. A panel page that only shows an account its own existing name is pinned after
+  review, without a ruling. (Corrected 2026-10-25: an agent had written that every pin needs the operator's
+  ruling; the operator never asked for that.)
 - In review, "it is only a hash" is not enough. A label derived from a sequential or guessable id can be
   reversed by enumeration.
 
