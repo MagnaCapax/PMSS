@@ -127,6 +127,49 @@ class PmssStatsCollectTest extends TestCase
         $this->assertEquals(25.0, \pmssStatsPercent(2.0, 8.0));
     }
 
+    public function testPercentHelperRejectsNonFiniteInputsAndArithmeticOverflow(): void
+    {
+        foreach ([
+            [INF, 1.0], [-INF, 1.0], [NAN, 1.0],
+            [1.0, INF], [1.0, -INF], [1.0, NAN],
+            [PHP_FLOAT_MAX, 0.5], [PHP_FLOAT_MAX, 1.0], [-PHP_FLOAT_MAX, 1.0],
+        ] as [$used, $limit]) {
+            $percent = \pmssStatsPercent($used, $limit);
+            $this->assertSame(null, $percent);
+            $this->assertSame('{"percent":null}', json_encode(['percent' => $percent]));
+        }
+
+        foreach ([
+            [0.0, 1.0, 0.0], [2.0, 8.0, 25.0], [3.0, 2.0, 150.0],
+            [-1.0, 2.0, -50.0], [PHP_FLOAT_MAX, PHP_FLOAT_MAX, 100.0],
+        ] as [$used, $limit, $expected]) {
+            // Preserve uncapped values and the historical sign of finite percentages.
+            $this->assertSame($expected, \pmssStatsPercent($used, $limit));
+        }
+    }
+
+    public function testRtorrentRatioOverflowKeepsCountersAndViewsAvailable(): void
+    {
+        foreach ([
+            [PHP_FLOAT_MAX, 0.5, null], [1.0e200, 1.0e-200, null],
+            [PHP_FLOAT_MAX, PHP_FLOAT_MAX, 1.0], [0.0, 0.5, 0.0],
+            [1.0, 0.0, null], [1.0, 2.0, 0.5], [1.0e-300, 1.0e300, 0.0],
+        ] as [$uploaded, $downloaded, $expected]) {
+            $caller = static function (string $socketPath, string $method) use ($uploaded, $downloaded) {
+                if ($method === 'get_up_total') return $uploaded;
+                if ($method === 'get_down_total') return $downloaded;
+                return $method === 'd.multicall2' ? [['hash']] : 0;
+            };
+            $stats = \pmssStatsReadRtorrentStats($caller, '/unused');
+            $this->assertTrue($stats['ok']);
+            $this->assertSame($uploaded, $stats['upload_total']);
+            $this->assertSame($downloaded, $stats['download_total']);
+            $this->assertSame($expected, $stats['ratio']);
+            $this->assertSame(1, $stats['torrent_total']);
+            $this->assertTrue(is_string(json_encode($stats)), 'Ratio arithmetic must not prevent JSON encoding');
+        }
+    }
+
     /**
      * Collect stats with the shared fixture paths used by this test case.
      *

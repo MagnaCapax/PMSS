@@ -32,6 +32,12 @@ including when command construction, execution, or output reading throws. The
 original throwable propagates; normal metrics and failure results are unchanged.
 `StorageBenchSecurityTest` injects these failures without executing storage probes.
 
+Shared account-statistics helpers return `null` for non-finite percentage inputs,
+percentage overflow, and overflowing rTorrent ratios. Finite calculations retain
+their values, including uncapped percentages; ratio overflow leaves accepted RPC
+counters and torrent-view collection available. `PmssStatsCollectTest` covers
+these arithmetic boundaries and JSON encoding of the resulting metrics.
+
 Storage benchmark preflight fields and block-device sizes reject NUL bytes in
 raw command output before whitespace normalization. Invalid fields retain the
 existing stderr message and exit code; invalid device sizes return `null` so

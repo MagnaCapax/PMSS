@@ -32,9 +32,12 @@ function pmssStatsReadQuotaSnapshot(string $home): array
     return $result;
 }
 
+/** Keep unavailable or overflowing percentages on the nullable metric path. */
 function pmssStatsPercent(?float $used, ?float $limit): ?float
 {
-    return ($used !== null && $limit !== null && $limit > 0.0) ? ($used / $limit) * 100.0 : null;
+    if ($used === null || $limit === null || !is_finite($used) || !is_finite($limit) || $limit <= 0.0) return null;
+    $percent = ($used / $limit) * 100.0;
+    return is_finite($percent) ? $percent : null;
 }
 
 /**
@@ -90,7 +93,9 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
             $stats[$key] = $number;
         }
         $stats['ok'] = true;
-        $stats['ratio'] = ($stats['download_total'] > 0.0) ? ($stats['upload_total'] / $stats['download_total']) : null;
+        // Finite counters can still overflow during division; retain other RPC fields.
+        $stats['ratio'] = ($stats['download_total'] > 0.0)
+            ? pmssFiniteNonNegativeFloat($stats['upload_total'] / $stats['download_total']) : null;
 
         foreach (['torrent_total' => 'main', 'torrent_active' => 'started', 'torrent_seeding' => 'seeding'] as $key => $view) {
             $result = $caller($socketPath, 'd.multicall2', [$view, 'd.get_hash='], 2);
