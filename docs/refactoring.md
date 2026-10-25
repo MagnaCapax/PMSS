@@ -32,6 +32,13 @@ repository-wide reference checks. Callers already use the shared status reader,
 bulk action handler, version facts, and renewal plan directly; uptime remains a
 numeric field in the terminal stats payload.
 
+Read-only projections avoid redundant intermediate state: host load/PSI parsers
+format their validated fields directly, resource counters merge the nullable
+memory breakdown, and FireQOS returns its rendered template. Torrent-client
+publication reuses its initialized per-client counters for membership checks;
+cgroup status initializes its path map once. Validation, unavailable values,
+field order and output bytes retain their existing contracts.
+
 ## Minimal Contract Rules (Joukahainen)
 
 Stdout heartbeat startup rejects a failed or nonpositive parent PID before

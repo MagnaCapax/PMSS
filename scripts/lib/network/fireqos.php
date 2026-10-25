@@ -81,7 +81,7 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
         $fireqosConfigUsers .= "      match rawmark {$user['uid']}\n";
     }
 
-    $rendered = str_replace(
+    return str_replace(
         ['##INTERFACE', '##SPEED', '##LOCALNETWORK', '##USERMATCHES'],
         [
             $networkConfig['interface'] ?? 'eth0',
@@ -91,8 +91,6 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
         ],
         $template
     );
-
-    return $rendered;
 }
 
 /** Read the user leaf caps from one rendered users group; null means no group. */

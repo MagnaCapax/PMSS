@@ -94,9 +94,9 @@ function pmssCgroupCliShowStatus(SystemInterface $sys, string $slice, int $uid):
 {
     $mode = $sys->getCgroupMode();
     echo "\n[Status] $slice (mode=$mode)\n";
+    $pairs = [];
     if ($mode === 'v2') {
         $base = "/sys/fs/cgroup/user.slice/user-".$uid.".slice";
-        $pairs = [];
         foreach (['pids.current', 'memory.current', 'memory.high', 'memory.max', 'io.stat', 'io.latency', 'io.cost.weight', 'io.cost.qos', 'io.cost.model', 'cpu.weight'] as $field) {
             $pairs[$field] = $base.'/'.$field;
         }
@@ -104,7 +104,6 @@ function pmssCgroupCliShowStatus(SystemInterface $sys, string $slice, int $uid):
             if ($sys->readFile($pairs[$field]) === null) $pairs[$field] = '/sys/fs/cgroup/'.$field;
         }
     } else {
-        $pairs = [];
         foreach (['pids.current' => 'pids', 'memory.limit_in_bytes' => 'memory', 'memory.usage_in_bytes' => 'memory'] as $field => $controller) {
             $pairs[$field] = '/sys/fs/cgroup/'.$controller.'/user.slice/user-'.$uid.'.slice/'.$field;
         }

@@ -44,8 +44,7 @@ function pmssResourceLogReadCounters(int $uid, ?string $cgroupRoot = null): ?arr
     );
     if (!is_array($values)) return null;
 
-    $memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid, $cgroupRoot);
-    return is_array($memoryBreakdown) ? $values + $memoryBreakdown : $values;
+    return $values + (pmssResourceLogReadMemoryBreakdown($uid, $cgroupRoot) ?? []);
 }
 
 /**

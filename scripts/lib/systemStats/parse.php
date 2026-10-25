@@ -41,9 +41,8 @@ function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
  */
 function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
 {
-    if (($parts = pmssConfigLineColumns($raw ?? '', 3, [])) === []) return 'na,na,na';
-
-    $load = array_slice($parts, 0, 3);
+    $load = array_slice(pmssConfigLineColumns($raw ?? '', 3, []), 0, 3);
+    if ($load === []) return 'na,na,na';
     foreach ($load as $value) {
         $value = (string) $value;
         if (strlen($value) > 16 || preg_match('/^\d+(?:\.\d+)?$/', $value) !== 1) {
@@ -127,12 +126,10 @@ function pmssSystemStatsPsiFromRaw(?string $raw): string
         ['some', 'total', 0], ['full', 'total', 0],
     ];
     $values = [];
-    foreach ($fields as $field) {
-        list($row, $name, $decimals) = $field;
+    foreach ($fields as [$row, $name, $decimals]) {
         $number = pmssSystemStatsPsiMetricFromRaw($raw, $row, $name);
-        $value = $number === null ? 'na' : number_format($number, $decimals, '.', '');
-        if ($value === 'na' && $row === 'some' && $name === 'avg10') return 'na';
-        $values[] = $value;
+        if ($number === null && $row === 'some' && $name === 'avg10') return 'na';
+        $values[] = $number === null ? 'na' : number_format($number, $decimals, '.', '');
     }
     return implode('/', $values);
 }

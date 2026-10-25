@@ -19,7 +19,7 @@ function pmssTorrentClientsProjectionWrite(
     $versions = [];
     $notInstalled = array_fill_keys(array_keys(pmssTorrentClientsBinaryNames()), 0);
     foreach ($catalog as $entry) {
-        if (!is_array($entry) || !isset(pmssTorrentClientsBinaryNames()[$entry['client'] ?? ''], $entry['version'], $entry['kind'])) continue;
+        if (!is_array($entry) || !isset($notInstalled[$entry['client'] ?? ''], $entry['version'], $entry['kind'])) continue;
         // A disabled entry is not offered even when an earlier run installed it.
         if (!empty($entry['disabled'])) continue;
         $client = $entry['client'];
