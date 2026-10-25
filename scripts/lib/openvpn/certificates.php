@@ -81,16 +81,6 @@ function pmssOpenvpnServerCertificateRenewalPlan(
     ];
 }
 
-/** Boolean wrapper for the common fast-path gate. */
-function pmssOpenvpnServerCertificateRenewalNeeded(
-    string $certificatePath,
-    ?int $now = null,
-    int $renewalWindowSeconds = PMSS_OPENVPN_SERVER_CERT_RENEWAL_WINDOW_SECONDS
-): bool {
-    $plan = pmssOpenvpnServerCertificateRenewalPlan($certificatePath, $now, $renewalWindowSeconds);
-    return (bool) $plan['renew'];
-}
-
 /** Build a bounded tar backup command for the PKI before EasyRSA mutates it. */
 function pmssOpenvpnPkiBackupCommand(
     string $easyRsaDir,

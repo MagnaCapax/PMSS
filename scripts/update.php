@@ -1663,11 +1663,6 @@ function pmssVersionFacts(string $version): array
     return ['spec' => $spec, 'recorded_timestamp' => $recordedTimestamp, 'order_date' => $orderDate];
 }
 
-function pmssVersionOrderingDate(string $version): string
-{
-    return pmssVersionFacts($version)['order_date'];
-}
-
 function pmssVersionMoveDecision(
     string $installedVersion,
     string $fetchedVersion,

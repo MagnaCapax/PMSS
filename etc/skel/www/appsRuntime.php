@@ -149,12 +149,6 @@ function pmssAppsRuntimeReady(): bool
     return true;
 }
 
-/** Compatibility entry point for existing Apps callers. */
-function pmssAppsLiveStatusRead(string $home, string $username, string $hostname): array
-{
-    return pmssCustomerAppsStatusRead($home, $username, $hostname);
-}
-
 /** Read only a fixed app log, cap work to 16 KiB and output to twenty short lines. */
 function pmssAppsLogTailRead(string $home, string $app): string
 {

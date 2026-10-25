@@ -26,6 +26,12 @@ These rules complement the “Linux kernel style” note already present in the
 repository documentation and should be referenced before undertaking larger
 clean-ups.
 
+Orphaned Apps status/action wrappers, the terminal uptime formatter, and the
+bootstrap date and OpenVPN renewal boolean wrappers have been removed after
+repository-wide reference checks. Callers already use the shared status reader,
+bulk action handler, version facts, and renewal plan directly; uptime remains a
+numeric field in the terminal stats payload.
+
 ## Minimal Contract Rules (Joukahainen)
 
 Stdout heartbeat startup rejects a failed or nonpositive parent PID before

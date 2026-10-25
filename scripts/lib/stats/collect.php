@@ -37,15 +37,6 @@ function pmssStatsPercent(?float $used, ?float $limit): ?float
     return ($used !== null && $limit !== null && $limit > 0.0) ? ($used / $limit) * 100.0 : null;
 }
 
-function pmssStatsFormatUptime(int $seconds): string
-{
-    $days = intdiv($seconds, 86400);
-    $hours = intdiv($seconds % 86400, 3600);
-    $minutes = intdiv($seconds % 3600, 60);
-    if ($days > 0) return sprintf('%dd %dh %dm', $days, $hours, $minutes);
-    return $hours > 0 ? sprintf('%dh %dm', $hours, $minutes) : sprintf('%dm', $minutes);
-}
-
 /**
  * Read a few cgroup v2 counters for the current account slice when present.
  *
