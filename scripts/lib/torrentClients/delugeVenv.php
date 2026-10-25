@@ -2,6 +2,7 @@
 /** Build a catalog Deluge version from a root-owned mirror of pinned wheels. */
 
 require_once dirname(__DIR__).'/update/apps/pythonVenv.php';
+require_once dirname(__DIR__).'/update/apps/delugeWebBasePatch.php';
 require_once dirname(__DIR__).'/update/distro.php';
 require_once __DIR__.'/storePaths.php';
 require_once __DIR__.'/store.php';
@@ -75,5 +76,6 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
     if (is_link($link) && !$unlink($link)) return false;
     // InstallCli calls pmssPythonVenvEnsure; both daemon scripts must exist.
     return $linked && is_file($versionDir.'/bin/deluged') && !is_link($versionDir.'/bin/deluged')
-        && is_file($versionDir.'/bin/deluge-web') && !is_link($versionDir.'/bin/deluge-web');
+        && is_file($versionDir.'/bin/deluge-web') && !is_link($versionDir.'/bin/deluge-web')
+        && pmssDelugeWebBasePathPatchVenv($versionDir, $log, $ops['patch'] ?? 'pmssPatchDelugeWebBasePathBytes');
 }

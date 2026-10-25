@@ -9,44 +9,7 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
-
-/** Read a candidate patch target while refusing symlinked or unreadable paths. */
-function pmssDelugeReadPatchLines(string $path, callable $log, string $readWarning): ?array
-{
-    if (!pmssRegularFilePathIsReadable($path) || !is_readable($path)) return null;
-    $lines = @file($path, FILE_IGNORE_NEW_LINES);
-    if (!is_array($lines)) { $log($readWarning.$path); return null; }
-    return $lines;
-}
-
-/** Search a bounded line window without open-coding patch-specific loops. */
-function pmssDelugeLineSearch(array $lines, string $needle, int $start = 0, ?int $end = null, int $step = 1, bool $regex = false): ?int
-{
-    if ($lines === [] || $step === 0) return null;
-    $lastIndex = count($lines) - 1;
-    $start = max(0, min($start, $lastIndex));
-    $end = $end === null ? ($step > 0 ? $lastIndex : 0) : max(0, min($end, $lastIndex));
-
-    for ($i = $start; $step > 0 ? $i <= $end : $i >= $end; $i += $step) {
-        $matched = $regex ? preg_match($needle, $lines[$i]) === 1 : strpos($lines[$i], $needle) !== false;
-        if ($matched) return $i;
-    }
-    return null;
-}
-
-/** Persist patched lines with the same newline and dry-run contract. */
-function pmssDelugeWritePatchedLines(string $path, array $lines, bool $dryRun, callable $log, string $dryRunMessage, string $writeWarning, ?callable $writer = null): bool
-{
-    $newContent = implode("\n", $lines);
-    if ($newContent !== '' && substr($newContent, -1) !== "\n") $newContent .= "\n";
-    if ($dryRun) { $log($dryRunMessage.$path); return true; }
-    // Recheck after the earlier read so a replaced target is rejected before writing.
-    clearstatcache(true, $path);
-    if (!pmssRegularFilePathIsReadable($path)) { $log($writeWarning.$path); return false; }
-    if (!pmssFileWriteComplete($path, $newContent, 0, $writer)) { $log($writeWarning.$path); return false; }
-    return true;
-}
+require_once __DIR__.'/delugeWebBasePatch.php';
 
 /** Patch Deluge cache hit ratio handling for libtorrent 2.0+ stats removal. */
 function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log): bool
@@ -160,6 +123,7 @@ function pmssDelugePatchEnsure(array $patterns, callable $patch, bool $dryRun, c
 /** Run every known Deluge compatibility patch and emit legacy status lines. */
 function pmssDelugePatchAll(bool $dryRun, callable $log): void
 {
+    $storeRoot = getenv('PMSS_TORRENT_CLIENTS_STORE_ROOT') ?: '/home/.pmss/clients';
     $specs = [
         [
             'patterns' => ['/usr/lib/python3/dist-packages/deluge/core/core.py', '/usr/lib/python3*/dist-packages/deluge/core/core.py', '/usr/local/lib/python3*/dist-packages/deluge/core/core.py'],
@@ -175,6 +139,11 @@ function pmssDelugePatchAll(bool $dryRun, callable $log): void
             'patterns' => ['/usr/lib/python3/dist-packages/deluge/i18n/util.py', '/usr/lib/python3*/dist-packages/deluge/i18n/util.py', '/usr/local/lib/python3*/dist-packages/deluge/i18n/util.py'],
             'patch' => 'pmssPatchDelugeBindTextdomainCodeset',
             'message' => "\t*** Deluge gettext Python 3.11 compatibility ensured\n",
+        ],
+        [
+            'patterns' => ['/usr/lib/python3/dist-packages/deluge/ui/web/server.py', '/usr/lib/python3*/dist-packages/deluge/ui/web/server.py', '/usr/local/lib/python3*/dist-packages/deluge/ui/web/server.py', $storeRoot.'/deluge/*/lib/python3*/site-packages/deluge/ui/web/server.py'],
+            'patch' => 'pmssPatchDelugeWebBasePathBytes',
+            'message' => "\t*** Deluge WebUI base path bytes compatibility ensured\n",
         ],
     ];
     foreach ($specs as $spec) {

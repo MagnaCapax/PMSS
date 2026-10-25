@@ -180,3 +180,14 @@ follow-ups above. The Bullseye closure, the bootstrap pinning and the live canar
 remain open.
 
 Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).
+
+## WebUI base-path compatibility (2026-10-24)
+
+Deluge 2.0.5 and 2.1.1 pass a string base-path segment to Twisted's `putChild()`;
+the pinned Twisted 25.5.0 requires bytes. With the account's
+`/user-<name>/deluge` base path, `deluge-web` exits at startup and the panel
+returns 503. These versions carry a one-line compatibility patch adding
+`.encode()` to `self.base.strip('/')` at that call. The updater repairs system
+and existing store copies; new venv installs apply it before publication and
+return failure if a required patch fails. Deluge 2.2.0 lacks the call and is
+left untouched. Wheel pins and the dependency closure remain unchanged.
