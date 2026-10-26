@@ -32,7 +32,9 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
     }
 
     $prevMetrics = $last['smart::'.$dev]['metrics'] ?? null;
-    if (is_array($prevMetrics) && isset($prevMetrics['udma_crc']) && !isset($prevMetrics['link_errors'])) {
+    // Invalid persisted metrics mean no history, as in the NVMe backend.
+    $prevMetrics = is_array($prevMetrics) ? $prevMetrics : null;
+    if (isset($prevMetrics['udma_crc']) && !isset($prevMetrics['link_errors'])) {
         $prevMetrics['link_errors'] = $prevMetrics['udma_crc'];
     }
 

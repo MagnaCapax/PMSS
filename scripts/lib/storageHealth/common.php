@@ -51,7 +51,11 @@ function pmssStorageHealthReadLastEntries(string $path): array
 {
     $last = [];
     pmssJsonLineFileEach($path, static function (array $entry) use (&$last): void {
-        $last[(string) ($entry['kind'] ?? '').'::'.(string) ($entry['device'] ?? ($entry['array'] ?? 'global'))] = $entry;
+        $kind = $entry['kind'] ?? '';
+        $device = $entry['device'] ?? ($entry['array'] ?? 'global');
+        // Malformed JSON containers cannot name a history key; retain scalar coercion.
+        if (!is_scalar($kind) || !is_scalar($device)) return;
+        $last[(string) $kind.'::'.(string) $device] = $entry;
     });
     return $last;
 }

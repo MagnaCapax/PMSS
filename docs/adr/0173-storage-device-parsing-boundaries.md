@@ -34,6 +34,13 @@ CRC history, probe locks and timeout handling retain their existing behavior.
 The existing SMART/RAID payload hash and NVMe probe characterization cases lock
 the contracts; all execution verification runs on a testing machine.
 
+History ingestion skips records whose selected kind or device/array key is a
+JSON container, before string conversion. Scalar keys, missing/null defaults,
+encounter order and last-entry precedence remain unchanged. SMART treats
+non-array persisted metrics as absent history, matching NVMe; valid counters
+and legacy CRC migration retain their existing results. The SMART failure
+tests cover malformed history without probing real devices.
+
 ## References
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)
 - [Function contracts](../contracts.md)
