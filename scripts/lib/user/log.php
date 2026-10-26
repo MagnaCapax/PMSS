@@ -70,8 +70,8 @@ function pmssUserLog(string $user, string $message): void
     // Mirror per-user events into the shared users.log/users.jsonl stream
     // when the lifecycle helpers are available. Kept optional so this
     // helper remains usable in minimal bootstrap environments.
-    if (function_exists('pmssUserWriteLogs') && function_exists('pmssUserBaseContext')) {
-        $payload = pmssUserBaseContext(
+    if (function_exists('pmssUserLifecycleContextLog')) {
+        pmssUserLifecycleContextLog(
             'runtime',
             'user_log',
             $user,
@@ -81,7 +81,6 @@ function pmssUserLog(string $user, string $message): void
                 'message' => $message,
             ]
         );
-        pmssUserWriteLogs($payload);
     }
 }
 

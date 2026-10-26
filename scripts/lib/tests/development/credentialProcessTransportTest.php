@@ -203,6 +203,7 @@ class CredentialProcessTransportTest extends TestCase
         file_put_contents($dir.'/harness.php', '<?php require '.var_export($library, true).'; '
             .'function pmssUserBaseContext($action, $phase, $user, $extra) { return $extra; } '
             .'function pmssUserWriteLogs($event) { $GLOBALS["events"][] = $event; } '
+            .'function pmssUserLifecycleContextLog($action, $phase, $user, $extra) { pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $user, $extra)); } '
             .'$user = ["name" => "alice"]; $events = []; $provisionStats = ["steps" => 0, "err" => 0, "ok" => 0]; '
             .'$rc = runProvisionStep("Set initial password", '.var_export($command, true).', null, '.var_export($stdin, true).'); '
             .'file_put_contents('.var_export($dir.'/result.json', true).', json_encode(["rc" => $rc, "stats" => $provisionStats, "events" => $events]));');

@@ -1255,6 +1255,13 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## User Management (CLI)
 
+- `scripts/lib/userLifecycle.php` remains the shared lifecycle load point.
+  Its audit, web-root, and service modules retain the existing function API
+  (ADR 0187). Audit callers share one context-and-write entrypoint, preserving
+  extra-field precedence, JSON field order, text bytes, and root-only output.
+  Web-stack verification logs the same observed state that determines its
+  return code; dry runs retain their launcher result and skip process checks.
+
 - Transfer completeness statistics reject failed `du`/`find` pipelines, including
   failures in their formatting stages, before emitting aggregate counters.
   Byte and file counters above `PHP_INT_MAX` use the existing unavailable-statistics

@@ -91,15 +91,13 @@ function logProvisionMessage(string $message): void
     if (function_exists('pmssUserLog')) {
         pmssUserLog($user['name'], $message);
     }
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'add',
-            'log',
-            $user['name'],
-            array(
-                'status'  => 'INFO',
-                'message' => $message,
-            )
+    pmssUserLifecycleContextLog(
+        'add',
+        'log',
+        $user['name'],
+        array(
+            'status'  => 'INFO',
+            'message' => $message,
         )
     );
 }
@@ -201,18 +199,16 @@ function runProvisionStep(string $description, string $command, ?string $logComm
         $provisionStats['ok']++;
         logProvisionMessage($description . ' completed (duration=' . $duration . 's)');
     }
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'add',
-            'step',
-            $user['name'],
-            array(
-                'status'   => $result === 0 ? 'OK' : 'ERR',
-                'step'     => $description,
-                'command'  => $logCommand,
-                'rc'       => $result,
-                'duration' => $duration,
-            )
+    pmssUserLifecycleContextLog(
+        'add',
+        'step',
+        $user['name'],
+        array(
+            'status'   => $result === 0 ? 'OK' : 'ERR',
+            'step'     => $description,
+            'command'  => $logCommand,
+            'rc'       => $result,
+            'duration' => $duration,
         )
     );
     return $result;
@@ -267,21 +263,19 @@ function finalizeProvision(string $status, string $message, int $exitCode, array
         logProvisionMessage('###ADDUSER_JSON:'.$jsonEncoded);
     }
 
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'add',
-            'summary',
-            $user['name'],
-            array(
-                'status'      => $status === 'SUCCESS' ? 'OK' : 'ERR',
-                'result'      => $status,
-                'message'     => $message,
-                'duration'    => $duration,
-                'exit_code'   => $exitCode,
-                'steps_ok'    => $provisionStats['ok'],
-                'steps_err'   => $provisionStats['err'],
-                'last_error'  => $provisionStats['last_error'],
-            )
+    pmssUserLifecycleContextLog(
+        'add',
+        'summary',
+        $user['name'],
+        array(
+            'status'      => $status === 'SUCCESS' ? 'OK' : 'ERR',
+            'result'      => $status,
+            'message'     => $message,
+            'duration'    => $duration,
+            'exit_code'   => $exitCode,
+            'steps_ok'    => $provisionStats['ok'],
+            'steps_err'   => $provisionStats['err'],
+            'last_error'  => $provisionStats['last_error'],
         )
     );
 }

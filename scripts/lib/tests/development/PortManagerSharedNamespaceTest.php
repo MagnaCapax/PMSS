@@ -65,6 +65,7 @@ function pmssLockFileAcquire($path) {
 }
 function pmssUserBaseContext() { return []; }
 function pmssUserWriteLogs() { return true; }
+function pmssUserLifecycleContextLog() {}
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/portManager.php', 'PortManagerLockRaceFixture',
             ['portManager/selection.php', 'portManager/assignment.php', 'portManager/cli.php']);

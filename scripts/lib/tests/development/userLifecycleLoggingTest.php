@@ -73,7 +73,7 @@ PHP;
 
     public function testUserLifecycleSourceContractsUseSharedHelpers(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
+        $this->pmssAssertRepoFileContract('scripts/lib/user/lifecycleLog.php', ['required' => [
                 "pmssLogScalarText(\$payload['status'] ?? 'INFO')",
                 "pmssLogScalarText(\$payload['action'] ?? 'unknown')",
                 "pmssLogScalarText(\$payload['phase'] ?? 'unknown')",

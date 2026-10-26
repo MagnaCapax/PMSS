@@ -65,16 +65,14 @@ $provisionFinalized = false;
 $usernameValidationError = pmssUsernameCreateValidationError($user['name']);
 if ($usernameValidationError !== null) {
     $errorMessage = sprintf('Invalid username "%s": %s', $user['name'], $usernameValidationError['detail']);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'add',
-            'validate',
-            $user['name'],
-            array(
-                'status'  => 'ERR',
-                'code'    => $usernameValidationError['code'],
-                'message' => $errorMessage,
-            )
+    pmssUserLifecycleContextLog(
+        'add',
+        'validate',
+        $user['name'],
+        array(
+            'status'  => 'ERR',
+            'code'    => $usernameValidationError['code'],
+            'message' => $errorMessage,
         )
     );
     pmssAddUserFatalExit(

@@ -65,4 +65,5 @@ function pmssPortManagerWriteAssignedPort($dir, $file, $port) {
 }
 function pmssUserBaseContext($domain, $action, $user, $details) { return [$domain, $action, $user, $details]; }
 function pmssUserWriteLogs($context) { $GLOBALS['events'][] = $context; }
+function pmssUserLifecycleContextLog($domain, $action, $user, $details) { pmssUserWriteLogs(pmssUserBaseContext($domain, $action, $user, $details)); }
 function fwrite($stream, $text) { $GLOBALS['stderr'] .= $text; return strlen($text); }

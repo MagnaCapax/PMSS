@@ -18,7 +18,7 @@ const PMSS_PORT_MANAGER_MAX_PORT = 38000;
 /** Write a port assignment event to the shared user logs when available. */
 function pmssPortManagerLog(string $user, string $action, string $service, ?int $port, string $status, string $message): void
 {
-    pmssUserWriteLogs(pmssUserBaseContext('port', $action, $user, array('status' => $status, 'service' => $service, 'port' => $port, 'message' => $message)));
+    pmssUserLifecycleContextLog('port', $action, $user, array('status' => $status, 'service' => $service, 'port' => $port, 'message' => $message));
 }
 
 /** Read a persisted port assignment and reject malformed or out-of-range data. */
