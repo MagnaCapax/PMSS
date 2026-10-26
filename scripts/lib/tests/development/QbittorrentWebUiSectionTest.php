@@ -68,8 +68,8 @@ final class QbittorrentWebUiSectionTest extends TestCase
             'Password_PBKDF2="'.\pmssQbittorrentWebUiAuthSentinel().'"' => true] as $line => $required) {
             $this->pmssWriteFile($path, $modern.$line."\n");
             $this->assertSame($required, \pmssQbittorrentFrontendPasswordRequired($path, $safe, '5.3.0'));
-            // The same file's legacy build still reads its own Preferences password.
-            $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, $safe, '4.3.9'));
+            // A legacy build gets what the restore copies from [WebUI]; with nothing there it keeps its own password.
+            $this->assertSame($line !== '' && $required, \pmssQbittorrentFrontendPasswordRequired($path, $safe, '4.3.9'));
         }
         $forced = \pmssQbittorrentWebUiAuthForce($modern.'Password_PBKDF2=owner');
         $values = \pmssQbittorrentConfigValues($forced);
@@ -89,5 +89,17 @@ final class QbittorrentWebUiSectionTest extends TestCase
         $values = \pmssQbittorrentConfigValues(file_get_contents($path));
         $this->assertSame($values['Preferences']['WebUI\\Password_PBKDF2'], $values['WebUI']['Password_PBKDF2']);
         $this->assertStringNotContainsString('separate-webui-password', file_get_contents($path));
+    }
+
+    public function testServerBuildStartAfterA53RunNeedsNoNewPassword(): void
+    {
+        // 5.3 moved the password out of [Preferences]; Start on a pre-5.3 build must not ask for one again.
+        $path = $this->pmssMakeTempPath('pmss-qbt-moved-', '.conf');
+        $safe = static function (): bool { return true; };
+        $this->pmssWriteFile($path, "[Meta]\nMigrationVersion=12\n[Preferences]\nGeneral\\Locale=en\n[WebUI]\nPort=32162\nPassword_PBKDF2=owner\n");
+        foreach (['4.3.9', '4.5.2', '5.2.4', '5.3.0'] as $build)
+            $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, $safe, $build), $build);
+        $this->pmssWriteFile($path, "[Meta]\nMigrationVersion=12\n[Preferences]\nGeneral\\Locale=en\n[WebUI]\nPort=32162\n");
+        $this->assertTrue(\pmssQbittorrentFrontendPasswordRequired($path, $safe, '4.5.2'));
     }
 }
