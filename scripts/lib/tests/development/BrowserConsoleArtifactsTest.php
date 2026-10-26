@@ -183,4 +183,133 @@ class BrowserConsoleArtifactsTest extends TestCase
         $src = $this->repoFile('scripts/lib/update/users/filesystem.php');
         $this->assertStringContainsString("'www/console.php'", $src);
     }
+
+    private function loadLifecycleHelpers(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        foreach (array('pmssConsoleTtydProcesses', 'pmssConsoleSpawnAllowed') as $function) {
+            $this->assertTrue(preg_match('/^function '.$function.'\(.*?^\}$/ms', $src, $match) === 1);
+            if (!function_exists($function)) eval($match[0]);
+        }
+    }
+
+    public function testConsoleProcessIdentityAndIdleState(): void
+    {
+        $this->loadLifecycleHelpers();
+        $root = $this->pmssMakeTempDir('pmss-console-proc-');
+        $sock = '/fixture/console.sock';
+        $command = "/usr/bin/ttyd\0-W\0--once\0-i\0".$sock."\0bash\0";
+        // All process observations are fixture files; no host process is read or signalled.
+        $cases = array(
+            101 => array(12345, 12345, 'ttyd', '/usr/bin/ttyd', $command, '', true),
+            102 => array(12345, 12345, 'ttyd', '/usr/bin/ttyd', $command, '999 ', false),
+            103 => array(12345, 12345, 'ttyd', '/usr/bin/ttyd', $command, null, false),
+            104 => array(12345, 12345, 'ttyd', '/usr/bin/ttyd (deleted)', $command, '', true),
+            105 => array(12345, 12345, 'ttyd', '/other/ttyd', $command, '', null),
+            106 => array(12345, 12345, 'ttyd', '/usr/bin/ttyd', str_replace($sock, $sock.'.other', $command), '', null),
+            107 => array(12345, 12345, 'ttyd', '/usr/bin/ttyd', str_replace("--once\0", '', $command), '', null),
+            108 => array(54321, 54321, 'ttyd', '/usr/bin/ttyd', $command, '', 'absent'),
+            109 => array(12345, 0, 'ttyd', '/usr/bin/ttyd', $command, '', 'absent'),
+            110 => array(12345, 12345, 'sh', '/bin/sh', $command, '', 'absent'),
+            111 => array(12345, 12345, 'ttyd', null, $command, '', false),
+            112 => array(12345, 12345, 'ttyd', '/usr/bin/ttyd', null, '', false),
+        );
+        $expected = array();
+        foreach ($cases as $pid => $case) {
+            list($real, $effective, $comm, $exe, $cmdline, $children, $state) = $case;
+            $dir = $root.'/'.$pid;
+            mkdir($dir.'/task/'.$pid, 0700, true);
+            file_put_contents($dir.'/status', "Uid:\t$real\t$effective\t$effective\t$effective\n");
+            file_put_contents($dir.'/comm', $comm."\n");
+            if ($exe !== null) symlink($exe, $dir.'/exe');
+            if ($cmdline !== null) file_put_contents($dir.'/cmdline', $cmdline);
+            if ($children !== null) file_put_contents($dir.'/task/'.$pid.'/children', $children);
+            if ($state !== 'absent') $expected[$pid] = $state;
+        }
+        $this->assertSame($expected, \pmssConsoleTtydProcesses(12345, '/usr/bin/ttyd', $sock, $root));
+        $this->assertSame(array(101 => true), \pmssConsoleTtydProcesses(12345, '/usr/bin/ttyd', $sock, $root, 101));
+        foreach (array(null, 0, -1, '12345') as $uid) {
+            $this->assertSame(null, \pmssConsoleTtydProcesses($uid, '/usr/bin/ttyd', $sock, $root));
+        }
+    }
+
+    public function testConsoleCleanupWaitsForExitBeforeAllowingSpawn(): void
+    {
+        $this->loadLifecycleHelpers();
+        $state = array(101 => true, 102 => null);
+        $signals = array();
+        $pauses = 0;
+        $allowed = \pmssConsoleSpawnAllowed(12345, '/usr/bin/ttyd', '/fixture/console.sock', array(
+            'processes' => static function () use (&$state) { return $state; },
+            'signal' => static function ($pid) use (&$signals) { $signals[] = $pid; return true; },
+            'pause' => static function () use (&$state, &$pauses) { unset($state[101]); $pauses++; },
+        ));
+        $this->assertTrue($allowed);
+        $this->assertSame(array(101), $signals);
+        $this->assertSame(1, $pauses, 'successful TERM alone is not proof that ttyd has exited');
+    }
+
+    public function testConsoleSpawnLimitAndCleanupFailures(): void
+    {
+        $this->loadLifecycleHelpers();
+        $cases = array(
+            array(array(), true, true, 0),
+            array(array(101 => null, 102 => null), true, true, 0),
+            array(array(101 => null, 102 => null, 103 => null), true, false, 0),
+            array(array(101 => false), true, false, 0),
+            array(array(101 => true), false, false, 1),
+            array(array(101 => true), true, false, 1), // TERM accepted, process still present.
+            array(null, true, false, 0),
+        );
+        foreach ($cases as $case) {
+            list($state, $signalResult, $expected, $signalCount) = $case;
+            $signals = array();
+            $actual = \pmssConsoleSpawnAllowed(12345, '/usr/bin/ttyd', '/fixture/console.sock', array(
+                'processes' => static function () use ($state) { return $state; },
+                'signal' => static function ($pid) use (&$signals, $signalResult) {
+                    $signals[] = $pid;
+                    return $signalResult;
+                },
+                'pause' => static function () {},
+            ));
+            $this->assertSame($expected, $actual);
+            $this->assertSame($signalCount, count($signals));
+        }
+    }
+
+    public function testConsoleRechecksIdleStateBeforeSignalling(): void
+    {
+        $this->loadLifecycleHelpers();
+        foreach (array(array(101 => false), array(), null) as $changed) {
+            $reads = 0;
+            $signals = array();
+            $allowed = \pmssConsoleSpawnAllowed(12345, '/usr/bin/ttyd', '/fixture/console.sock', array(
+                'processes' => static function () use (&$reads, $changed) {
+                    return ++$reads === 1 ? array(101 => true) : $changed;
+                },
+                'signal' => static function ($pid) use (&$signals) { $signals[] = $pid; return true; },
+                'pause' => static function () {},
+            ));
+            $this->assertSame($changed === array(), $allowed);
+            $this->assertSame(array(), $signals);
+        }
+    }
+
+    public function testConsoleSerializesProbeCleanupAndSpawn(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        $lock = strpos($src, 'LOCK_EX | LOCK_NB');
+        $probe = strpos($src, '$running = pmssConsoleSocketLive($sock)');
+        $cleanup = strpos($src, 'if (!pmssConsoleSpawnAllowed(');
+        $unlink = strpos($src, '@unlink($sock)');
+        $spawn = strpos($src, "@exec('setsid");
+        $unlock = strpos($src, 'fclose($consoleLock)');
+        foreach (array($lock, $probe, $cleanup, $unlink, $spawn, $unlock) as $offset) {
+            $this->assertTrue($offset !== false);
+        }
+        $this->assertTrue($lock < $probe && $probe < $cleanup && $cleanup < $unlink
+            && $unlink < $spawn && $spawn < $unlock);
+        $this->assertStringContainsString("console.lock', 'ce'", $src);
+        $this->assertStringContainsString("'exec '.\$cmd", $src);
+    }
 }

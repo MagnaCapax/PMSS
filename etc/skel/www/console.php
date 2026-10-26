@@ -42,6 +42,63 @@ function pmssConsoleSocketLive($sock)
     return true;
 }
 
+/** List account ttyd PIDs: true = idle console, false = busy, null = other ttyd. */
+function pmssConsoleTtydProcesses($uid, $ttyd, $sock, $procRoot = '/proc', $pid = null)
+{
+    if (!is_int($uid) || $uid < 1) return null;
+    $dirs = glob($procRoot.'/'.($pid === null ? '[0-9]*' : (int) $pid), GLOB_ONLYDIR);
+    if ($dirs === false || !is_readable($procRoot)) return null;
+    $processes = array();
+    foreach ($dirs as $dir) {
+        $status = @file_get_contents($dir.'/status');
+        if (!is_string($status) || preg_match('/^Uid:\s+(\d+)\s+(\d+)/m', $status, $match) !== 1
+            || (int) $match[1] !== $uid || (int) $match[2] !== $uid
+            || trim((string) @file_get_contents($dir.'/comm')) !== 'ttyd') continue;
+        $pid = (int) basename($dir);
+        if ($pid < 1) continue;
+        $processes[$pid] = null;
+        $exe = @readlink($dir.'/exe');
+        $cmdline = @file_get_contents($dir.'/cmdline');
+        // An unreadable identity might be our console: block replacement safely.
+        if (!is_string($exe) || !is_string($cmdline)) { $processes[$pid] = false; continue; }
+        if (($exe !== $ttyd && $exe !== $ttyd.' (deleted)')
+            || strpos($cmdline, "\0--once\0") === false
+            || strpos($cmdline, "\0-i\0".$sock."\0") === false) continue;
+        // ttyd starts its shell only after a WebSocket connects. Unknown children
+        // or an existing shell must never be treated as an abandoned helper.
+        $children = @file_get_contents($dir.'/task/'.$pid.'/children');
+        $processes[$pid] = is_string($children) && trim($children) === '';
+    }
+    return $processes;
+}
+
+/** Reap abandoned console helpers and allow a spawn only after they have exited. */
+function pmssConsoleSpawnAllowed($uid, $ttyd, $sock, $ops = array())
+{
+    $read = $ops['processes'] ?? 'pmssConsoleTtydProcesses';
+    $signal = $ops['signal'] ?? static function ($pid) {
+        return function_exists('posix_kill') && @posix_kill($pid, 15);
+    };
+    $pause = $ops['pause'] ?? static function () { usleep(25000); };
+    $processes = $read($uid, $ttyd, $sock);
+    if ($processes === null) return false;
+    foreach ($processes as $pid => $idle) {
+        if ($idle !== true) continue;
+        // Recheck identity and children immediately before signalling.
+        $current = $read($uid, $ttyd, $sock, '/proc', $pid);
+        if ($current === null) return false;
+        if (($current[$pid] ?? false) === true && !$signal($pid)) return false;
+    }
+    for ($attempt = 0; $attempt < 20; $attempt++) {
+        $processes = $read($uid, $ttyd, $sock);
+        if ($processes === null) return false;
+        // Never unlink beneath a remaining console, even if its probe timed out.
+        if (count($processes) < 3 && array_filter($processes, 'is_bool') === array()) return true;
+        $pause();
+    }
+    return false;
+}
+
 // Resolve the running customer from the process identity — never from request data.
 $uid  = function_exists('posix_getuid') ? posix_getuid() : null;
 $pw   = ($uid !== null && function_exists('posix_getpwuid')) ? posix_getpwuid($uid) : false;
@@ -80,9 +137,26 @@ $basePath = '/user-'.$name.'/console/';
 // Reuse a live console only if its socket accepts a connection; otherwise the
 // spawn block clears the stale socket, respawns ttyd and refreshes the
 // console-error.log diagnostic (GH #789, #807; ADR-0031).
+// Serialize probe/unlink/spawn. Close-on-exec keeps detached ttyd from holding
+// this request's lock forever; failed locks must never reach the spawn path.
+$consoleLock = @fopen($home.'/.lighttpd/console.lock', 'ce');
+if ($consoleLock === false || !@flock($consoleLock, LOCK_EX | LOCK_NB)) {
+    http_response_code(503);
+    header('Retry-After: 2');
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Console is starting. Please try again.';
+    return;
+}
 $running = pmssConsoleSocketLive($sock);
 
 if (!$running) {
+    if (!pmssConsoleSpawnAllowed($uid, $ttyd, $sock)) {
+        error_log('[console] ttyd cleanup or process limit prevented a new console.');
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'Console temporarily unavailable. Please try again.';
+        return;
+    }
     @unlink($sock); // clear a stale socket left by a previously exited ttyd
 
     // -W writable, --once exit-on-disconnect (no lingering daemon),
@@ -104,7 +178,7 @@ if (!$running) {
     $spawn = 'cd '.escapeshellarg($home).' 2>/dev/null || exit 1; '
         .'export HOME='.escapeshellarg($home).'; '
         .': > '.escapeshellarg($spawnLog).' 2>/dev/null || exit 1; '
-        .$cmd.' </dev/null >/dev/null 2>>'.escapeshellarg($spawnLog);
+        .'exec '.$cmd.' </dev/null >/dev/null 2>>'.escapeshellarg($spawnLog);
     // Fully detach so ttyd outlives this php-cgi request. Capture outer-shell
     // failures too: bare setsid does not propagate the child's exit status.
     @exec('setsid sh -c '.escapeshellarg($spawn)
@@ -133,6 +207,7 @@ if (!$running) {
         return;
     }
 }
+fclose($consoleLock);
 
 // Load the terminal via the reverse-proxy path (relative -> /user-<user>/console/).
 $label = $persist ? 'persistent tmux session (reattaches on reconnect)'

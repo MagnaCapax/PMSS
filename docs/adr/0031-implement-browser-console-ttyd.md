@@ -93,3 +93,17 @@ Implement GH #326 as an **additive** browser console:
 
 ## Update 2026-10-03 (GH #1001)
 - **Ended sessions.** The launcher disables ttyd's automatic reconnect and watches the pinned client's ended-session overlay in its same-origin iframe. When the overlay appears, the outer `console.php` page reloads, allowing the existing socket probe and spawn path to start a fresh ttyd. Reload preserves `?mode=persist`, so a tmux session reattaches. ttyd's own Enter-key retry cannot restart an exited `--once` process.
+
+## Update 2026-10-26 (GH #1195)
+- **Bounded launches.** An account-local, nonblocking lock serializes the socket
+  probe, cleanup and spawn. The lock closes on exec so detached ttyd cannot retain it.
+  A failed probe no longer authorizes unlinking underneath a remaining console.
+- **Idle cleanup.** Before replacement, the launcher checks native ttyd identity,
+  real/effective UID, exact console socket arguments and absence of a shell child.
+  Only matching idle helpers receive TERM; cleanup waits up to 500 ms for exit.
+  Busy or uninspectable matching consoles prevent replacement. New launches also
+  stop when three account ttyd processes remain. Live sockets retain normal reuse.
+  The detached shell uses exec so future launches leave no waiting shell wrapper.
+- **Security boundary.** Cleanup remains inside customer PHP and the account UID;
+  panel authentication, origin checks, credentials and socket exposure are unchanged.
+  No session output is captured by cleanup or its diagnostics.
