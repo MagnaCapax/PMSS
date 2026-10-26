@@ -57,6 +57,12 @@ uses the shared unsigned-decimal parser; customer PHP retains its local parser
 and includes. Cap ownership, stricter customer limits, overflow rejection,
 notice path guards and stopped-write ordering retain their existing contracts.
 
+Resource statistics keep bounded tail execution and payload persistence with
+their sole consumers. Samples reuse the current memory/task readings; report
+projections update their existing fields and accumulate into the returned model.
+Serialized field order, missing-data defaults, write ordering and diagnostics
+retain their contracts and existing snapshot coverage.
+
 ## Minimal Contract Rules (Joukahainen)
 
 Lighttpd watchdog inode diagnosis requires a successful `df -i` exit and a

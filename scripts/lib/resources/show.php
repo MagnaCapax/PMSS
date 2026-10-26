@@ -16,8 +16,7 @@ require_once dirname(__DIR__).'/userLifecycle.php';
  */
 function pmssResourceBuildReport(string $statsDir, array $users): array
 {
-    $missingStats = $rows = [];
-    $totals = pmssResourceReportTemplate();
+    $report = ['rows' => [], 'missing' => [], 'totals' => pmssResourceReportTemplate()];
 
     foreach ($users as $thisUser) {
         if (!pmssResourceUserIsValid((string) $thisUser)) {
@@ -25,20 +24,20 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         }
 
         if (($data = pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")) === null || ($row = pmssResourceStoredPayloadReportRow($data)) === null) {
-            $missingStats[] = $thisUser;
+            $report['missing'][] = $thisUser;
             continue;
         }
 
         foreach ($row as $metric => $fields) {
             foreach ($fields as $label => $value) {
-                $totals[$metric][$label] += $value;
+                $report['totals'][$metric][$label] += $value;
             }
         }
 
-        $rows[$thisUser] = $row;
+        $report['rows'][$thisUser] = $row;
     }
 
-    return ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals];
+    return $report;
 }
 
 function pmssShowResourcesMain(array $argv): int

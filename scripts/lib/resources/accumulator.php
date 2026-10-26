@@ -29,8 +29,7 @@ class ResourceStatsAccumulator
     public function addSample(array $sample): void
     {
         $timestamp = (int) $sample['timestamp'];
-        $sampleAverages = ['memory' => (float) $sample['memory'], 'tasks' => (float) $sample['tasks']];
-        foreach ($sampleAverages as $metric => $value) $this->currentValues[$metric]['current'] = $value;
+        foreach (self::AVERAGE_METRICS as $metric) $this->currentValues[$metric]['current'] = (float) $sample[$metric];
         foreach (['anon', 'file'] as $field) if (isset($sample['memory_'.$field]) && is_numeric($sample['memory_'.$field])) $this->currentValues['memory'][$field] = (float) $sample['memory_'.$field];
 
         $delta = ($this->prevTimestamp === null) ? 300 : ($timestamp - $this->prevTimestamp);
@@ -42,8 +41,10 @@ class ResourceStatsAccumulator
             'io_read_ops' => (float) ($sample['io_read_ops'] ?? 0.0),
             'io_write_ops' => (float) ($sample['io_write_ops'] ?? 0.0),
             'cpu' => (float) $sample['cpu'],
-            'ram_hours' => ($sampleAverages['memory'] / 1024 / 1024 / 1024) * $intervalHours,
-        ] + $sampleAverages;
+            'ram_hours' => ($this->currentValues['memory']['current'] / 1024 / 1024 / 1024) * $intervalHours,
+            'memory' => $this->currentValues['memory']['current'],
+            'tasks' => $this->currentValues['tasks']['current'],
+        ];
 
         foreach ($this->compareTimes as $label => $threshold) {
             if ($timestamp < $threshold) {

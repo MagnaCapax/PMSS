@@ -37,7 +37,8 @@ function pmssResourceStoredPayloadReportRow(array $data): ?array
         }
     }
 
-    $row['memory'] = ['current' => (float) ($data['memory']['current'] ?? 0.0), 'avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0)];
-    $row['tasks'] = ['current' => (float) ($data['tasks']['current'] ?? 0.0)];
+    $row['memory']['current'] = (float) ($data['memory']['current'] ?? 0.0);
+    $row['memory']['avg_month'] = (float) ($data['memory']['raw']['month'] ?? 0.0);
+    $row['tasks']['current'] = (float) ($data['tasks']['current'] ?? 0.0);
     return $row;
 }

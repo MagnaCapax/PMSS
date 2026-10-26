@@ -89,20 +89,14 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         }
 
         $this->ensureRuntime();
-        if (!$this->save($user, $data, $logPrefix)) {
+        // Persist the same payload to the user home and runtime cache before reporting success.
+        $serialized = serialize($data);
+        $homePath = $this->homeDir.'/'.$user;
+        $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
+        is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
+        if (!pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($logPrefix, $user): void { $this->log($logPrefix."Failed to write resource stats for {$user} at {$path}"); })) {
             return;
         }
         $this->log($logPrefix."Resource stats for {$user} saved, month read bytes: {$data['io_read']['raw']['month']}");
-    }
-
-    /** Persist user resource data to home directory and runtime cache. */
-    private function save(string $user, array $data, string $logPrefix): bool
-    {
-        $serialized = serialize($data);
-        $homePath = $this->homeDir.'/'.$user;
-
-        $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
-        is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
-        return pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($logPrefix, $user): void { $this->log($logPrefix."Failed to write resource stats for {$user} at {$path}"); });
     }
 }

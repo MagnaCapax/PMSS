@@ -39,15 +39,6 @@ function pmssResourceLogFilePath(string $resourceDir, string $user): ?string
 /** Keep resource tail calls bounded before they reach the shell. */
 function pmssResourceTailLineCount($timePeriod): int { return max(1, min((int) $timePeriod, PMSS_RESOURCE_LOG_TAIL_LINES_MAX)); }
 
-/** Read recent resource log records through the bounded runtime command helper. */
-function pmssResourceTailLogContents(string $path, int $lines): string
-{
-    $tail = pmssCommandPath('tail');
-    if ($tail === '') return '';
-    $result = pmssCommandCapture(pmssCommandArgvShellQuote([$tail, '-n', (string) $lines, $path]), PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS);
-    return $result['rc'] === 0 ? trim($result['stdout']) : '';
-}
-
 /** Compose the stable resource cron text-record payload after the timestamp. */
 function pmssResourceLogLineParts(array $delta, array $state): array
 {
@@ -112,7 +103,11 @@ class resourceStatistics
             return '';
         }
 
-        return pmssResourceTailLogContents($path, pmssResourceTailLineCount($timePeriod));
+        $lines = pmssResourceTailLineCount($timePeriod);
+        $tail = pmssCommandPath('tail');
+        if ($tail === '') return '';
+        $result = pmssCommandCapture(pmssCommandArgvShellQuote([$tail, '-n', (string) $lines, $path]), PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS);
+        return $result['rc'] === 0 ? trim($result['stdout']) : '';
     }
 
     /**
