@@ -53,6 +53,8 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
             "\$action = pmssFrontendActionRequest();",
             'pmssQbittorrentFrontendPasswordSync($action);',
             'pmssFrontendToggleAction(',
+        ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/qbittorrent.php', [
             "isset(\$_POST['qbittorrentPassword'])",
             "http_response_code(428);",
             "'WebUI\\\\Password_PBKDF2'",

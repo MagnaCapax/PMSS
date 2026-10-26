@@ -125,6 +125,9 @@ final class TorrentClientsStoreTest extends TestCase
         $this->assertSame(0644, fileperms($path) & 0777);
         $raw = file_get_contents($path);
         $this->assertStringContainsString('CVE-2025-1234', $raw);
+        $published = json_decode($raw, true)['versions'][0];
+        $this->assertSame($entry['cve'], $published['cve']);
+        $this->assertFalse(array_key_exists('badges', $published));
         $this->assertStringNotContainsString('t@localhost', $raw);
         $this->assertStringNotContainsString($root, $raw);
         $this->assertSame(1, count(glob($root.'/public/*')));

@@ -2,6 +2,7 @@
 /** Reconcile qBittorrent WebUI settings before a running daemon can retain old values. */
 
 require_once __DIR__.'/torrentPort.php';
+require_once __DIR__.'/qbittorrentBuild.php';
 require_once __DIR__.'/watchdog.php';
 require_once __DIR__.'/../arrRootGuard.php';
 require_once __DIR__.'/qbittorrentWebUiAuthState.php';
@@ -12,58 +13,7 @@ function pmssQbittorrentWebUiAuthSentinel(): string
     return '@ByteArray('.base64_encode(str_repeat("\0", 16)).':'.base64_encode(str_repeat("\0", 64)).')';
 }
 
-/** Update every copy of both managed keys in every Preferences section. */
-function pmssQbittorrentWebUiAuthForce(string $config): string
-{
-    list($lines, $trailing, $lineEnding) = pmssQbittorrentConfigSplitLines($config);
-    // A line in another section does not supply Preferences with a password.
-    $passwordPresent = false;
-    $passwordSection = false;
-    foreach ($lines as $line) {
-        if (preg_match('/^\[[^\]]+\]$/', $line) === 1) $passwordSection = $line === '[Preferences]';
-        if ($passwordSection && strpos($line, 'WebUI\\Password_PBKDF2=') === 0) {
-            $passwordPresent = true;
-            break;
-        }
-    }
-    $managed = [
-        'WebUI\\LocalHostAuth' => 'true',
-        'WebUI\\AuthSubnetWhitelistEnabled' => 'false',
-    ];
-    // The sentinel is stable across passes and is never added over an existing value.
-    if (!$passwordPresent) $managed['WebUI\\Password_PBKDF2'] = pmssQbittorrentWebUiAuthSentinel();
-    $result = [];
-    $inPreferences = false;
-    $hasPreferences = false;
-    $seen = [];
-    foreach ($lines as $line) {
-        // Finish each section independently, including repeated Preferences sections.
-        if (preg_match('/^\[[^\]]+\]$/', $line) === 1) {
-            if ($inPreferences) foreach ($managed as $key => $value) if (!isset($seen[$key])) $result[] = $key.'='.$value;
-            $inPreferences = $line === '[Preferences]';
-            $hasPreferences = $hasPreferences || $inPreferences;
-            $seen = [];
-        }
-        if ($inPreferences) {
-            // Replace every copy so a later duplicate cannot restore an old value.
-            foreach ($managed as $key => $value) {
-                if (strpos($line, $key.'=') !== 0) continue;
-                $line = $key.'='.$value;
-                $seen[$key] = true;
-                break;
-            }
-        }
-        $result[] = $line;
-    }
-    if ($inPreferences) foreach ($managed as $key => $value) if (!isset($seen[$key])) $result[] = $key.'='.$value;
-    if (!$hasPreferences) {
-        // The template may be incomplete on older accounts.
-        if ($result !== [] && end($result) !== '') $result[] = '';
-        $result[] = '[Preferences]';
-        foreach ($managed as $key => $value) $result[] = $key.'='.$value;
-    }
-    return pmssQbittorrentConfigJoinLines($result, $trailing, $lineEnding);
-}
+require_once __DIR__.'/qbittorrentWebUiAuthConfig.php';
 
 /** Confirm the executable and mount context still identify a native daemon. */
 function pmssQbittorrentWebUiAuthPidIsNative(int $pid, array $ops = []): bool
@@ -111,12 +61,15 @@ function pmssQbittorrentWebUiAuthEnsure(string $user, string $home, array $ops =
     $read = $ops['read'] ?? 'pmssReadRegularFileContents';
     $config = $read($configPath);
     if (!is_string($config)) return false;
-    $forced = pmssQbittorrentWebUiAuthForce($config);
+    $build = $ops['build'] ?? pmssQbittorrentBuildVersion($home);
+    $forced = pmssQbittorrentWebUiAuthForce($config, $build);
     $changed = $forced !== $config;
     if (!$changed && !pmssQbittorrentWebUiAuthStateActive($user, $ops)) return false;
-    $write = static function () use ($user, $configPath, $ops): bool {
-        $writer = $ops['write'] ?? static function (string $name, string $path): bool {
-            return pmssQbittorrentConfigMutate($name, 'pmssQbittorrentWebUiAuthForce', $path);
+    $write = static function () use ($user, $configPath, $ops, $build): bool {
+        $writer = $ops['write'] ?? static function (string $name, string $path) use ($build): bool {
+            return pmssQbittorrentConfigMutate($name, static function (string $config) use ($build): string {
+                return pmssQbittorrentWebUiAuthForce($config, $build);
+            }, $path);
         };
         return $writer($user, $configPath);
     };

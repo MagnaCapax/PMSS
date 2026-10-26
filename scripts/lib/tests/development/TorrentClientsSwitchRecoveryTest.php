@@ -35,6 +35,7 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                         return $client === 'qbittorrent' ? \pmssConfigureTorrentClientRepoint($home, ...$args)
                             : \pmssConfigureTorrentClientOtherRepoint($home, $client, ...$args);
                     },
+                    'restore' => static function (): bool { return true; },
                     'start' => static function ($home, ...$args) use (&$events, $starts): bool {
                         $events[] = 'start-'.end($args); return $starts;
                     }];

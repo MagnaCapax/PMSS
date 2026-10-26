@@ -10,7 +10,7 @@ require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssAccountAgent.php';
 
 class CredentialProcessTransportTest extends TestCase
 {
-    private function assertStdinTransport(array $arguments): void
+    private function assertStdinTransport(array $arguments, ?float $timeout = null): void
     {
         $dir = $this->pmssMakeTempDir('pmss-credential-process-');
         $script = $dir.'/record.php';
@@ -21,8 +21,8 @@ class CredentialProcessTransportTest extends TestCase
         $output = [];
         $this->pmssWithEnv([
             'PMSS_TEST_ARGS' => $dir.'/args', 'PMSS_TEST_INPUT' => $dir.'/input',
-        ], function () use ($command, $secret, &$output): void {
-            $this->assertSame(0, \pmssCredentialProcessRun($command, $secret, $output));
+        ], function () use ($command, $secret, $timeout, &$output): void {
+            $this->assertSame(0, \pmssCredentialProcessRun($command, $secret, $output, false, $timeout));
         });
         $this->assertSame($arguments, json_decode((string) file_get_contents($dir.'/args'), true));
         $this->assertSame($secret."\n", file_get_contents($dir.'/input'));
@@ -49,9 +49,9 @@ class CredentialProcessTransportTest extends TestCase
     public function testQbittorrentHandoffUsesStdin(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/qbittorrent.php');
-        $this->assertTrue(strpos($source, 'pmssCredentialProcessRun($command, $password, $output)') !== false);
+        $this->assertTrue(strpos($source, 'pmssCredentialProcessRun($command, $password, $output, false, 45)') !== false);
         $this->assertFalse(strpos($source, '$username, $password])') !== false);
-        $this->assertStdinTransport(['-r', 'account']);
+        $this->assertStdinTransport(['-r', 'account'], 45);
     }
 
     public function testHtpasswdHandoffUsesStdin(): void
@@ -118,8 +118,27 @@ class CredentialProcessTransportTest extends TestCase
     {
         $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('fwrite(STDERR, "diagnostic\n"); exit(7);');
         $output = [];
-        $this->assertSame(7, \pmssCredentialProcessRun($command, 'provided-value', $output));
-        $this->assertSame(['diagnostic'], $output);
+        foreach ([null, 2.0] as $timeout) {
+            $this->assertSame(7, \pmssCredentialProcessRun($command, 'provided-value', $output, false, $timeout));
+            $this->assertSame(['diagnostic'], $output);
+        }
+    }
+
+    public function testBoundedStderrCaptureKeepsCredentialStdoutOnTheInheritedConsole(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-credential-timed-stderr-');
+        $library = $this->pmssRepoPath('scripts/lib/user/credentialProcess.php');
+        $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('echo "generated-value\n"; fwrite(STDERR, "diagnostic\n"); exit(7);');
+        foreach ([false, true] as $capture) {
+            file_put_contents($dir.'/harness.php', '<?php require '.var_export($library, true).'; '
+                .'echo "before\n"; $output = '.($capture ? '[]' : 'null').'; '
+                .'$rc = pmssCredentialProcessRun('.var_export($command, true).', null, $output, true, 2); '
+                .'echo "after\n"; file_put_contents('.var_export($dir.'/result.json', true).', json_encode([$rc, $output]));');
+            $run = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' '.escapeshellarg($dir.'/harness.php'));
+            $this->assertSame([7, $capture ? ['diagnostic'] : null], json_decode(file_get_contents($dir.'/result.json'), true));
+            $this->assertSame("before\ngenerated-value\nafter", $run['result']['output']);
+            $this->assertSame($capture ? '' : "diagnostic\n", file_get_contents($run['stderrPath']));
+        }
     }
 
     public function testProvisionStepLogsFailureStderrAndPreservesExitStatus(): void

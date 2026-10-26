@@ -136,50 +136,10 @@ function pmssCustomerNativeSignal(array $binaries, int $signal, string $procRoot
 }
 }
 
-if (!function_exists('pmssCustomerNativeStop')) {
-/** Give native frontends a brief graceful exit before a scoped force stop. */
-function pmssCustomerNativeStop(array $binaries): void {
- if (pmssCustomerNativeSignal($binaries, 15) === 0) return;
- usleep(3000000);
- pmssCustomerNativeSignal($binaries, 9);
-}
-}
-
 if (!function_exists('pmssCustomerDelugeSystemCommand')) {
 /** Keep the legacy Deluge start command shared by the toggle and Configure. */
 function pmssCustomerDelugeSystemCommand(): string {
  return 'nohup deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &';
-}
-}
-
-if (!function_exists('pmssCustomerTorrentClientToggleStart')) {
-/** Hold the account switch lock while choosing the selected or unchanged system start. */
-function pmssCustomerTorrentClientToggleStart(string $client, callable $systemStart, ?string $home = null,
-    ?callable $selectedStart = null): void {
- if (!in_array($client, array('qbittorrent', 'deluge'), true)) return;
- $home = $home ?? dirname(__DIR__);
- $link = $home.'/bin/'.$client.'/default';
- $dir = $home.'/.config/pmss/torrentClients';
- // Match the watchdog: prepare the lock directory for a selection, and lock it whenever present.
- if (is_link($link) && !is_dir($dir) && !@mkdir($dir, 0700, true)) return;
- if (is_link($dir)) return;
- $lock = null;
- if (is_dir($dir)) {
-  $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
-  if (!is_resource($lock)) return;
-  if (!@flock($lock, LOCK_EX | LOCK_NB)) { fclose($lock); return; }
- }
- try {
-  // Recheck under the lock so a completed Configure switch determines this launch.
-  if (is_link($link)) {
-   $command = 'cd ~; php ~/www/torrentClientsResolve.php '.$client.' --launch'
-       .($client === 'qbittorrent' ? ' --held' : ' both').' >/dev/null 2>&1';
-   if ($selectedStart !== null) $selectedStart($command);
-   else pmssFrontendShellExec($command);
-  } else $systemStart();
- } finally {
-  if (is_resource($lock)) { flock($lock, LOCK_UN); fclose($lock); }
- }
 }
 }
 
@@ -189,5 +149,86 @@ function pmssCustomerAppsMediaIdsRead(): array
 {
     return function_exists('pmssMediaStackPanelAppDefinitionsRead')
         ? array_merge(array_keys(pmssMediaStackPanelAppDefinitionsRead()), array('cloudplow')) : array();
+}
+}
+if (!function_exists('pmssCustomerNativeStop')) {
+/** Give native frontends a brief graceful exit before a scoped force stop. */
+function pmssCustomerNativeStop(array $binaries, array $ops = array()): void {
+ $signal = $ops['signal'] ?? 'pmssCustomerNativeSignal';
+ $pids = $ops['pids'] ?? 'pmssCustomerNativePidsRead';
+ $pause = $ops['pause'] ?? static function (): void { usleep(100000); };
+ if ($signal($binaries, 15) === 0) return;
+ for ($attempt = 0; $attempt < 30; $attempt++) {
+  if ($pids($binaries) === array()) return;
+  $pause();
+ }
+ $signal($binaries, 9);
+ // Do not hand the next start an exiting daemon's still-open config.
+ for ($attempt = 0; $attempt < 50; $attempt++) {
+  if ($pids($binaries) === array()) return;
+  $pause();
+ }
+}
+}
+if (!function_exists('pmssCustomerTorrentClientToggleStart')) {
+/** Hold the account switch lock while choosing the selected or unchanged system start. */
+function pmssCustomerTorrentClientToggleStart(string $client, callable $systemStart, ?string $home = null,
+    ?callable $selectedStart = null, array $ops = array()): bool {
+ if (!in_array($client, array('qbittorrent', 'deluge'), true)) return false;
+ $home = $home ?? dirname(__DIR__);
+ // Billing heals this file ahead of nightly helpers: keep these functions here despite its size.
+ if ($client === 'qbittorrent') {
+  if (is_file(__DIR__.'/configureTorrentClients.php')) require_once __DIR__.'/configureTorrentClients.php';
+ }
+ // Mixed deliveries retain the previous toggle path until the complete start helper arrives.
+ $protected = $client === 'qbittorrent' && function_exists('pmssQbittorrentFrontendStart')
+  && function_exists('pmssQbittorrentFrontendStartRefused') && function_exists('pmssQbittorrentFrontendNotice')
+  && function_exists('pmssQbittorrentFrontendRefusalClear') && function_exists('pmssConfigureFileWrite');
+ $link = $home.'/bin/'.$client.'/default';
+ $dir = $home.'/.config/pmss/torrentClients';
+ // Match the watchdog: prepare the lock directory for a selection, and lock it whenever present.
+ if (($protected || is_link($link)) && !is_dir($dir) && !@mkdir($dir, 0700, true))
+  return $protected ? pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the operation directory is unavailable.') : false;
+ if (is_link($dir)) return $protected
+  ? pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the operation directory is a link.') : false;
+ $lock = null;
+ if (is_dir($dir)) {
+  $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
+  if (!is_resource($lock)) return $protected
+   ? pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the operation lock could not be opened.') : false;
+  if (!@flock($lock, LOCK_EX | LOCK_NB)) {
+   fclose($lock);
+   if ($protected) pmssQbittorrentFrontendNotice($home, 'qBittorrent is busy with another operation; try again shortly.');
+   return false;
+  }
+ }
+ try {
+  if ($protected && !pmssQbittorrentFrontendRefusalClear($home))
+   return pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the refusal marker could not be cleared.');
+  // Recheck under the lock so a completed Configure switch determines this launch.
+  if (is_link($link)) {
+   if ($protected) pmssConfigureFileWrite($dir.'/qbittorrent.notice', '');
+   $command = 'cd ~; php ~/www/torrentClientsResolve.php '.$client.' --launch'
+       .($client === 'qbittorrent' ? ' --held' : ' both').' >/dev/null 2>&1';
+   if ($selectedStart !== null) {
+    $ok = $selectedStart($command) !== false;
+    if (!$ok && $protected) pmssQbittorrentFrontendNotice($home, 'qBittorrent start refused: the selected launcher failed.');
+    return $ok;
+   }
+   if ($protected) {
+    $rc = 1;
+    if (pmssFrontendFunctionAvailable('exec')) exec($command, $output, $rc);
+    if ($rc !== 0 && trim((string) @file_get_contents($dir.'/qbittorrent.notice')) === '')
+     pmssQbittorrentFrontendNotice($home, 'qBittorrent start refused: the selected launcher failed.');
+    return $rc === 0;
+   }
+   pmssFrontendShellExec($command);
+   return true;
+ } elseif ($protected) {
+   return pmssQbittorrentFrontendStart($home, $systemStart, $ops);
+ } else { $systemStart(); return true; }
+ } finally {
+  if (is_resource($lock)) { flock($lock, LOCK_UN); fclose($lock); }
+ }
 }
 }

@@ -213,8 +213,10 @@ if (!file_exists($qbittorrentConfigFile)) {
         // A new config always carries a WebUI password line (ADR 0102 sentinel) so no build falls back to its default;
         // the account password synced right after addUser replaces it, and the panel asks for one otherwise.
         $qbittorrentConfig = pmssQbittorrentWebUiAuthForce($qbittorrentConfig);
-        if (!pmssReplaceUserFileWithMetadata($qbittorrentConfigFile, $qbittorrentConfig, 0644, 'root', 'root')) {
+        if (!pmssWriteUserFile($qbittorrentConfigFile, $qbittorrentConfig, $user['name'], 0600)) {
             fwrite(STDERR, "Warning: failed to write qBittorrent config for {$user['name']}\n");
+        } elseif (!pmssQbittorrentThrottleSeedRecord($user['name'], $expectedHome, $throttle ?? 0)) {
+            fwrite(STDERR, "Warning: failed to record qBittorrent upload throttle for {$user['name']}\n");
         }
         if (!pmssNetworkPortFileWrite(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort, 1024, 65500, 0644)) {
             fwrite(STDERR, "Warning: failed to write qBittorrent port for {$user['name']}\n");
@@ -223,6 +225,7 @@ if (!file_exists($qbittorrentConfigFile)) {
 }
 // Let the watchdog stop a live client before writing its daemon-owned settings.
 if (pmssTorrentClientLauncherLivenessPids($user['name'], 'qbittorrent') === []) {
+    // Keep the template's legacy seed; the stopped writer also sets the selected build's key.
     pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
 }
 if (pmssUserConfigDiskQuotaShouldApply($configMode)) {

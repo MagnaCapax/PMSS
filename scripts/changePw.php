@@ -155,6 +155,9 @@ if ($jsonlOutput) {
     pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentUpdated);
 }
 
+// The account password has changed: an optional client sync must not abort recreate/addUser.
+pmssQbittorrentPasswordSyncWarning($qbittorrentUpdated, is_file(pmssQbittorrentConfigPath($username)));
+
 function generatePassword(): string
 {
     return pmssAccountPasswordGenerate();

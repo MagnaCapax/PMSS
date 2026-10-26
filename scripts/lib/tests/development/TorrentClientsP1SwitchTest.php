@@ -94,6 +94,7 @@ final class TorrentClientsP1SwitchTest extends TestCase
             'repoint' => static function () use (&$events, $locked): bool {
                 $events[] = 'repoint'; return $locked();
             },
+            'restore' => static function (): bool { return true; },
             'start' => static function () use (&$events, $locked): bool {
                 $events[] = 'start'; return $locked();
             },
@@ -107,22 +108,6 @@ final class TorrentClientsP1SwitchTest extends TestCase
         $this->assertTrue(is_file($home.'/.qbittorrentEnable'), 'a started build is on in Apps');
     }
 
-    public function testStartThatHandsOffToAnotherInstanceIsNotStarted(): void
-    {
-        // qbittorrent-nox -d exits 0 when it only passes its arguments to an instance that is still exiting.
-        $home = $this->home();
-        $bin = $this->pmssMakeTempDir('pmss-qbit-handoff-');
-        file_put_contents($bin.'/qbittorrent-nox', "#!/bin/sh\nexit 0\n");
-        chmod($bin.'/qbittorrent-nox', 0755);
-        $path = getenv('PATH');
-        putenv('PATH='.$bin.':'.$path);
-        try {
-            $this->assertFalse(\pmssConfigureTorrentClientStart($home, 'system'));
-        } finally {
-            putenv('PATH='.$path);
-        }
-    }
-
     public function testFailedStartRestoresSystemSelection(): void
     {
         $home = $this->home();
@@ -134,6 +119,7 @@ final class TorrentClientsP1SwitchTest extends TestCase
             'repoint' => static function ($path, $version) use (&$events): bool {
                 $events[] = 'repoint-'.$version; return true;
             },
+            'restore' => static function (): bool { return true; },
             'start' => static function ($path, $version) use (&$events): bool {
                 $events[] = 'start-'.$version; return $version === 'system';
             },
@@ -154,6 +140,7 @@ final class TorrentClientsP1SwitchTest extends TestCase
             'backup' => static function (): array { return array('ok' => true); },
             'stop' => static function () use (&$stops): bool { $stops++; return $stops === 1; },
             'repoint' => static function (): bool { return true; },
+            'restore' => static function (): bool { return true; },
             'start' => static function (): bool { return false; },
         );
         $result = \pmssConfigureTorrentClientSwitch($home,

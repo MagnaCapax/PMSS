@@ -60,6 +60,7 @@ final class TorrentClientsDowngradeTest extends TestCase
             },
             'stop' => static function () use ($record): bool { return $record('stop'); },
             'repoint' => static function () use ($record): bool { return $record('repoint'); },
+            'restore' => static function (): bool { return true; },
             'start' => static function () use ($record): bool { return $record('start'); });
         $result = \pmssConfigureTorrentClientSwitch($home,
             array('client' => 'qbittorrent', 'version' => '5.1.0'), $ops);
@@ -90,6 +91,7 @@ final class TorrentClientsDowngradeTest extends TestCase
             'backup' => static function () use (&$events): array { $events[] = 'backup'; return array('ok' => true); },
             'stop' => static function () use (&$events): bool { $events[] = 'stop'; return true; },
             'repoint' => static function () use (&$events): bool { $events[] = 'repoint'; return true; },
+            'restore' => static function (): bool { return true; },
             'start' => static function () use (&$events): bool { $events[] = 'start'; return true; });
         $request = array('client' => $client, 'version' => $new);
         $result = $client === 'qbittorrent'

@@ -9,18 +9,40 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClients.php';
 /** Preserve the default launch command and exclude a switched PID. */
 final class TorrentClientsP1LaunchTest extends TestCase
 {
-    public function testNoSelectionRetainsExactLegacyCommand(): void
+    public function testCronShellRoutesBothStartsUnderTheAccountLock(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/cron/checkQbittorrentInstances.php');
-        $legacy = 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &';
-        $this->assertSame(1, preg_match('/\|\| \((cd ~; nohup qbittorrent-nox -d >> \/dev\/null 2>&1 &)\)/', $source, $match));
-        $this->assertSame($legacy, $match[1]);
-        $this->assertStringContainsString('[ -L ~/bin/qbittorrent/default ] &&', $source);
+        // The cron entry point has no ops seam; keep only this shell-routing structural check.
+        $source = $this->pmssReadRepoFile('scripts/cron/checkQbittorrentInstances.php');
+        $this->assertStringContainsString('torrentClientsResolve.php qbittorrent --launch --held', $source);
         $this->assertStringContainsString('mkdir -m 700 -p ~/.config/pmss/torrentClients', $source);
         $this->assertStringContainsString('flock -n 9 || exit 0', $source);
-        $this->assertStringContainsString('pmssTorrentClientLauncherLivenessPids', $source);
+        $this->assertOrderedStrings(['--launch --held --system 9>&-;',
+            'else qbittorrent-nox -d 9>&-; fi;', 'pmssQbtStartRc=$?;'], $source);
+        $this->assertStringContainsString('pmssQbittorrentWatchdogRunning($thisUser, $home)', $source);
+        $this->assertStringContainsString("return pmssTorrentClientLauncherLivenessPids(\$user, 'qbittorrent') !== [];",
+            $this->pmssReadRepoFile('scripts/lib/user/qbittorrentWatchdog.php'));
+        $this->assertStringNotContainsString('nohup qbittorrent-nox', $source);
     }
 
+    public function testSystemAndSelectedResolverLaunchesRestoreBeforeLaunchAndCheck(): void
+    {
+        foreach ([false, true] as $selected) {
+            $home = $this->pmssMakeTempDir('pmss-qbt-resolver-behaviour-');
+            if ($selected) {
+                $this->pmssEnsureDir($home.'/bin/qbittorrent');
+                $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/qbittorrent/default');
+            }
+            $events = [];
+            $this->assertTrue(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, [
+                'system' => !$selected, 'accountPids' => static function (): array { return []; },
+                'resolve' => static function (): string { return '/fixture/custom/qbittorrent-nox'; },
+                'restore' => static function () use (&$events): bool { $events[] = 'restore'; return true; },
+                'launch' => static function () use (&$events): bool { $events[] = 'launch'; return true; },
+                'check' => static function () use (&$events): bool { $events[] = 'check'; return true; },
+            ]));
+            $this->assertSame(['restore', 'launch', 'check'], $events);
+        }
+    }
     public function testSelectedLauncherExitsQuietlyOnBusySwitchLock(): void
     {
         $home = $this->pmssMakeTempDir('pmss-p1-launch-');
@@ -36,6 +58,13 @@ final class TorrentClientsP1LaunchTest extends TestCase
         $this->assertTrue(\pmssTorrentClientResolverLaunch($home, 'qbittorrent'));
         flock($handle, LOCK_UN);
         fclose($handle);
+    }
+
+    public function testLegacyResolverWithoutSelectionStillRefusesSystemLaunch(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-p1-unselected-');
+        $this->assertFalse(\pmssTorrentClientResolverLaunch($home, 'qbittorrent'));
+        $this->assertFalse(is_dir($home.'/.config'));
     }
 
     public function testReusedPidIsNotSignalled(): void

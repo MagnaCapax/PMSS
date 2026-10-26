@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 4).'/etc/skel/www/scriptsIncAppProcess.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/scriptsInc.php';
 
 /** Exercise the shared customer toggle decision without starting host daemons. */
 final class TorrentClientsToggleLaunchTest extends TestCase
@@ -26,7 +26,10 @@ final class TorrentClientsToggleLaunchTest extends TestCase
         \pmssCustomerTorrentClientToggleStart($client,
             static function () use (&$calls, $legacy): void { $calls[] = array('system', $legacy); },
             $home,
-            static function (string $command) use (&$calls): void { $calls[] = array('selected', $command); });
+            static function (string $command) use (&$calls): void { $calls[] = array('selected', $command); }, array(
+                'accountPids' => static function (): array { return []; },
+                'restore' => static function (): bool { return true; },
+                'check' => static function (): bool { return true; }));
         return $calls;
     }
 
@@ -77,7 +80,10 @@ final class TorrentClientsToggleLaunchTest extends TestCase
                     $this->assertFalse(flock($other, LOCK_EX | LOCK_NB));
                     fclose($other);
                 };
-                \pmssCustomerTorrentClientToggleStart($client, $check, $home, $check);
+                \pmssCustomerTorrentClientToggleStart($client, $check, $home, $check, array(
+                    'accountPids' => static function (): array { return []; },
+                    'restore' => static function (): bool { return true; },
+                    'check' => static function (): bool { return true; }));
             }
         }
     }

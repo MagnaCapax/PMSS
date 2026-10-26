@@ -37,8 +37,9 @@ function pmssTorrentClientsProjectionWrite(
             'kind' => $entry['kind'],
             'isDefault' => (bool) ($entry['isDefault'] ?? false),
             'compatFamily' => $entry['compatFamily'] ?? '',
-            'badges' => $entry['cve'] ?? [],
+            'cve' => $entry['cve'] ?? [],
         ];
+        if (isset($entry['note'])) $published['note'] = $entry['note'];
         if ($client === 'transmission') {
             if (($entry['rpcUnixSocket'] ?? null) !== true || $entry['kind'] !== 'static') {
                 ++$notInstalled[$client]; continue;

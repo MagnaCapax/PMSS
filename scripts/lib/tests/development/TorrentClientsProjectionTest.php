@@ -8,6 +8,23 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsVersion.p
 /** Publish isolated store fixtures; no installed host binaries or tenant data are used. */
 final class TorrentClientsProjectionTest extends TestCase
 {
+    public function testOptionalNotesSurviveProjectionWithCveMetadataAndWithoutBadges(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-projection-notes-');
+        $binary = $this->pmssWriteFile($root.'/binary', 'fixture');
+        $entry = ['client' => 'qbittorrent', 'version' => 'system', 'kind' => 'system',
+            'binary' => $binary, 'cve' => ['CVE-2024-51774']];
+        $path = $root.'/public/clients.json';
+        foreach ([$entry, $entry + ['note' => 'A factual build note']] as $input) {
+            $this->assertTrue(\pmssTorrentClientsProjectionWrite([$input], $path));
+            $published = \pmssTorrentClientsProjectionVersionsRead($path)[0];
+            $this->assertSame(isset($input['note']), array_key_exists('note', $published));
+            if (isset($input['note'])) $this->assertSame($input['note'], $published['note']);
+            $this->assertFalse(array_key_exists('badges', $published));
+            $this->assertSame($input['cve'], $published['cve']);
+        }
+    }
+
     public function testProjectionCountsEachEnabledUnavailableEntryOnce(): void
     {
         $root = $this->pmssMakeTempDir('pmss-projection-counts-');
@@ -22,7 +39,7 @@ final class TorrentClientsProjectionTest extends TestCase
             if ($client === 'deluge') $this->pmssWriteFile(dirname($binary).'/deluge-web', 'web');
             $catalog[] = $entry;
             $expected[] = ['client' => $client, 'version' => '1.0.0', 'kind' => $kind,
-                'isDefault' => true, 'compatFamily' => '1', 'badges' => []]
+                'isDefault' => true, 'compatFamily' => '1', 'cve' => []]
                 + ($client === 'transmission' ? ['rpcUnixSocket' => true] : []);
             $catalog[] = array_replace($entry, ['version' => 'missing']);
             $linked = \pmssTorrentClientsStoreBinaryPath($store, $client, 'linked', $kind);

@@ -68,6 +68,8 @@ function pmssTorrentClientNativeStopPids(string $user, string $client, array $op
     // Lexical account prefixes: root must not realpath or stat tenant-owned bin.
     $accountRoots = $ops['accountRoots'] ??
         ['/home/.pmss/clients/'.$client.'/', '/home/'.$user.'/bin/'.$client.'/'];
+    // Customers also launch qBittorrent directly from ~/bin before choosing a managed version.
+    if ($client === 'qbittorrent' && !isset($ops['accountRoots'])) $accountRoots[] = '/home/'.$user.'/bin/qbittorrent-nox';
     if ($client === 'deluge' && !empty($ops['storeOnly'])) {
         $accountRoots = array_values(array_filter($accountRoots, static function (string $root): bool {
             return strpos($root, '/.pmss/clients/deluge/') !== false;

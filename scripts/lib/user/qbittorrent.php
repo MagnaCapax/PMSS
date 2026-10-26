@@ -7,9 +7,12 @@
  */
 
 require_once __DIR__.'/traffic.php';
+require_once __DIR__.'/qbittorrentConfig.php';
+require_once __DIR__.'/qbittorrentBuild.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/qbittorrentVersion.php';
 require_once __DIR__.'/credentialProcess.php';
+require_once __DIR__.'/qbittorrentThrottle.php';
 
 /**
  * Resolve the canonical qBittorrent config path for a user.
@@ -56,92 +59,6 @@ function pmssQbittorrentManagedConfigEntries(string $compatFamily = ''): array
         $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\AuthSubnetWhitelistEnabled', 'value' => 'false'];
     }
     return $entries;
-}
-
-/** Split config lines while retaining their original newline convention. */
-function pmssQbittorrentConfigSplitLines(string $config): array
-{
-    $lineEnding = strpos($config, "\r\n") !== false ? "\r\n" : "\n";
-    $normalized = str_replace(["\r\n", "\r"], "\n", $config);
-    $lines = $normalized === '' ? [] : explode("\n", $normalized);
-    $trailing = substr($normalized, -1) === "\n";
-    if ($trailing) array_pop($lines);
-    return [$lines, $trailing, $lineEnding];
-}
-
-/** Render normalized qBittorrent config lines with the original newline style. */
-function pmssQbittorrentConfigJoinLines(array $lines, bool $hadTrailingNewline, string $lineEnding): string
-{
-    $updated = implode("\n", $lines);
-    if ($updated !== '' && $hadTrailingNewline) {
-        $updated .= "\n";
-    }
-
-    return str_replace("\n", $lineEnding, $updated);
-}
-
-/**
- * Replace or restore one managed qBittorrent key inside the target section.
- */
-function pmssQbittorrentConfigUpsert(string $config, string $section, string $key, string $value): ?string
-{
-    list($lines, $hadTrailingNewline, $lineEnding) = pmssQbittorrentConfigSplitLines($config);
-
-    $sectionHeader = '['.$section.']';
-    $managedLine = $key.'='.$value;
-    $sectionStart = null;
-    $sectionEnd = count($lines);
-    $found = false;
-
-    foreach ($lines as $index => $line) {
-        if ($line === $sectionHeader) {
-            $sectionStart = $index;
-            continue;
-        }
-        if ($sectionStart !== null && preg_match('/^\[[^\]]+\]$/', $line) === 1) {
-            $sectionEnd = $index;
-            break;
-        }
-    }
-
-    if ($sectionStart !== null) {
-        for ($index = $sectionStart + 1; $index < $sectionEnd; $index++) {
-            if (strpos($lines[$index], $key.'=') !== 0) {
-                continue;
-            }
-
-            $lines[$index] = $managedLine;
-            $found = true;
-            break;
-        }
-    }
-
-    if ($found) {
-        return pmssQbittorrentConfigJoinLines($lines, $hadTrailingNewline, $lineEnding);
-    }
-
-    if ($sectionStart === null) {
-        if (!empty($lines) && end($lines) !== '') {
-            $lines[] = '';
-        }
-        $lines[] = $sectionHeader;
-        $lines[] = $managedLine;
-    } else {
-        for ($index = $sectionStart + 1; $index < $sectionEnd; $index++) {
-            if ($lines[$index] === $managedLine) {
-                return pmssQbittorrentConfigJoinLines($lines, $hadTrailingNewline, $lineEnding);
-            }
-        }
-
-        while ($sectionEnd > ($sectionStart + 1) && $lines[$sectionEnd - 1] === '') {
-            $sectionEnd--;
-        }
-
-        // Insert before the next section header so user-owned settings keep their section.
-        array_splice($lines, $sectionEnd, 0, [$managedLine]);
-    }
-
-    return pmssQbittorrentConfigJoinLines($lines, $hadTrailingNewline, $lineEnding);
 }
 
 /**
@@ -207,57 +124,6 @@ function pmssQbittorrentApplyManagedConfig(string $username, ?string $configFile
 }
 
 /**
- * Apply the upload throttle setting to an existing qBittorrent config.
- */
-function pmssQbittorrentApplyUploadThrottle(string $username, ?int $throttle = null): bool
-{
-    $throttle = $throttle ?? pmssReadTorrentThrottle($username);
-    return pmssQbittorrentConfigMutate(
-        $username,
-        static function (string $config) use ($throttle): ?string {
-            return pmssQbittorrentUploadThrottleConfig($config, $throttle);
-        }
-    );
-}
-
-/** Render the throttle in the daemon's persisted settings schema (KiB/s). */
-function pmssQbittorrentUploadThrottleConfig(string $config, ?int $throttle): ?string
-{
-    $settings = @parse_ini_string($config, true, INI_SCANNER_RAW);
-    if (!is_array($settings)) return null;
-    $key = 'Session\\GlobalUPSpeedLimit';
-    // Migration 2 introduced the session key; migration 9 removes the old key.
-    $migrated = (int) ($settings['Meta']['MigrationVersion'] ?? 0) >= 2;
-    if ($throttle !== null && $throttle > 0) {
-        $updated = pmssQbittorrentConfigUpsert($config, 'BitTorrent', $key, (string) $throttle);
-        if (!is_string($updated) || $migrated) return $updated;
-        // Seed both keys before the first start, including legacy system builds.
-        return pmssQbittorrentConfigUpsert($updated, 'Preferences', 'Connection\\GlobalUPLimit', (string) $throttle);
-    }
-
-    // A daemon may save an explicit unlimited value: leave it alone on reruns.
-    if (isset($settings['BitTorrent'][$key]) && (string) $settings['BitTorrent'][$key] !== '0') {
-        $config = pmssQbittorrentConfigUpsert($config, 'BitTorrent', $key, '0');
-        if (!is_string($config)) return null;
-    }
-    if (!isset($settings['Preferences']['Connection\\GlobalUPLimit'])
-        || (string) $settings['Preferences']['Connection\\GlobalUPLimit'] === '0') return $config;
-    $updated = preg_replace('/^Connection\\\\GlobalUPLimit=.*\r?\n?/m', '', $config, 1);
-    return is_string($updated) ? $updated : null;
-}
-
-/** Compare without writing while the daemon still owns its in-memory config. */
-function pmssQbittorrentUploadThrottleNeedsUpdate(string $username): bool
-{
-    $path = pmssQbittorrentConfigPath($username);
-    if (!pmssUserFilePathIsSafe($path)) return false;
-    $config = pmssReadRegularFileContents($path);
-    if ($config === null) return false;
-    $updated = pmssQbittorrentUploadThrottleConfig($config, pmssReadTorrentThrottle($username));
-    return is_string($updated) && $updated !== $config;
-}
-
-/**
  * Update the qBittorrent WebUI password hash inside the config file.
  */
 function pmssQbittorrentApplyPassword(string $username, string $password, ?string $configFile = null): bool
@@ -287,19 +153,21 @@ function pmssUpdateQbittorrentPassword(string $username, string $password): bool
 /** Write the user-owned config with the account's privileges. */
 function pmssUpdateQbittorrentPasswordAsUser(string $username, string $password): bool
 {
+    require_once __DIR__.'/qbittorrentStoppedConfig.php';
     $identity = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
     if (!is_array($identity) || !function_exists('posix_geteuid')) {
         return false;
     }
+    $home = dirname(dirname(dirname(pmssQbittorrentConfigPath($username))));
     if (posix_geteuid() === (int) $identity['uid']) {
-        return pmssUpdateQbittorrentPassword($username, $password);
+        return pmssQbittorrentPasswordApplyStopped($username, $home, $password);
     }
     if (posix_geteuid() !== 0) {
         return false;
     }
 
     // Load the operator library before the child switches to the account identity.
-    $code = 'require_once '.var_export(__FILE__, true).";\n".<<<'PHP'
+    $code = 'require_once '.var_export(__DIR__.'/qbittorrentStoppedConfig.php', true).";\n".<<<'PHP'
 $account = posix_getpwnam($argv[1]);
 if (!is_array($account)
     || !posix_initgroups($argv[1], (int) $account['gid'])
@@ -308,10 +176,12 @@ if (!is_array($account)
 $password = fgets(STDIN);
 if (!is_string($password)) exit(1);
 $password = preg_replace('/\r?\n$/', '', $password);
-exit(is_string($password) && $password !== '' && pmssUpdateQbittorrentPassword($argv[1], $password) ? 0 : 1);
+exit(is_string($password) && $password !== ''
+    && pmssQbittorrentPasswordApplyStopped($argv[1], $argv[2], $password) ? 0 : 1);
 PHP;
     $output = [];
-    $command = pmssBuildCommand(PHP_BINARY, ['-r', $code, $username]);
-    $status = pmssCredentialProcessRun($command, $password, $output);
+    $command = pmssBuildCommand(PHP_BINARY, ['-r', $code, $username, $home]);
+    $status = pmssCredentialProcessRun($command, $password, $output, false, 45);
+    if ($status !== 0) error_log('PMSS qBittorrent: password synchronization failed; see the account notice.');
     return $status === 0;
 }

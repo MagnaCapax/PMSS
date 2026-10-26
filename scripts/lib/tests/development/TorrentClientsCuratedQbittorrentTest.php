@@ -13,6 +13,19 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/torrentClientsResolve.php';
 /** Exercise the shipped catalog through installation, publication and customer reads. */
 final class TorrentClientsCuratedQbittorrentTest extends TestCase
 {
+    public function testOnlyEightPre501BuildsCarryTheCertificateNote(): void
+    {
+        $notes = 0;
+        foreach ($this->entries() as $entry) {
+            $old = version_compare(explode('-lt', $entry['version'])[0], '5.0.1', '<');
+            $this->assertSame($old, isset($entry['note']));
+            if (!$old) continue;
+            $notes++;
+            $this->assertSame('HTTPS certificate checks are not enforced in this build; fixed in 5.0.1 (CVE-2024-51774).', $entry['note']);
+        }
+        $this->assertSame(8, $notes);
+    }
+
     private function entries(): array
     {
         $catalog = \pmssTorrentClientsCatalogLoad(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json');

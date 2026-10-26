@@ -28,6 +28,7 @@ final class TorrentClientsSameVersionTest extends TestCase
             'backup' => static function () use ($record): array { return array('ok' => $record('backup')); },
             'stop' => static function () use ($record): bool { return $record('stop'); },
             'repoint' => static function () use ($record): bool { return $record('repoint'); },
+            'restore' => static function (): bool { return true; },
             'start' => static function () use ($record): bool { return $record('start'); });
         return array($home, array('client' => $client, 'version' => $selected), $ops);
     }
@@ -138,7 +139,12 @@ final class TorrentClientsSameVersionTest extends TestCase
             $ops['resolve'] = static function () { return null; };
             $this->assertSame(409, $this->apply($home, $request, $ops)['status']);
             $this->assertSame(array(), $events);
-            $this->assertSame(array('.', '..', $client.'.lock'), scandir($dir));
+            $expected = array('.', '..', $client.'.lock');
+            if ($client === 'qbittorrent') {
+                $expected[] = $client.'.notice';
+                $this->assertStringContainsString('current selection is invalid', file_get_contents($dir.'/'.$client.'.notice'));
+            }
+            $this->assertSame($expected, scandir($dir));
         }
     }
 }

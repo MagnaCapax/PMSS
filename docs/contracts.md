@@ -510,12 +510,25 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     enable marker on each run; other service watchdogs retain their prior output.
   - Upload-throttle drift is compared without writing. After native SIGTERM, the
     watchdog rechecks liveness and writes only while stopped; a slow shutdown
-    defers the write and start to a later pass. Migrated configs (Meta migration
-    version >= 2) use `BitTorrent/Session/GlobalUPSpeedLimit` in KiB/s; older or
-    uninitialized configs seed that key and `Preferences/Connection/GlobalUPLimit`.
-    Explicit unlimited zero values remain a no-op after the daemon saves them.
+    defers the write and start to a later pass. The selected build chooses the
+    upload-limit key (ADR 0182); unknown builds fall back to Meta migration 2.
+    The historical `pmssQbittorrentUploadThrottleConfig`,
+    `pmssQbittorrentUploadThrottleNeedsUpdate` and `pmssQbittorrentApplyUploadThrottle`
+    APIs retain exact-value updates, dual-schema seeding for unknown legacy or
+    uninitialized builds, and explicit unlimited zero preservation. They use the
+    same transformer and stopped account writer as the watchdog's cap policy.
+    Watchdog/launch convergence preserves stricter customer limits and removes
+    only a recorded PMSS cap; saved unlimited zero never causes a restart loop.
     `userConfig.php` leaves a live client's settings untouched so the watchdog
     can still detect drift from the persisted `.torrentThrottle` marker.
+- pmssCredentialProcessRun(string $command, ?string $credential, ?array &$output=null, bool $stderrOnly=false, ?float $timeout=null, array $ops=[]): int
+  - Passes credentials only on stdin. Capture merges stdout/stderr by default;
+    stderr-only capture leaves stdout inherited so generated credentials never
+    enter provisioning diagnostics. Uncaptured console descriptors are inherited
+    without PHP stream casts or seeks, including with a deadline.
+  - An optional timeout bounds execution and captured pipe draining, kills the
+    child process group on expiry and returns 124. Clock/pause operations remain
+    injectable. The fourth argument remains the historical stderr-only boolean.
 - pmssUserSystemdWatchdogRunUser(string $username, string $homeRoot='/home', string $lingerRoot='/var/lib/systemd/linger', ?callable $probe=null, ?callable $accountLookup=null): ?array
   - Runs from the existing two-minute all-users cron and observes only accounts with
     linger, an account-authored `~/.config/systemd/user/*.service`, and cgroup v1.

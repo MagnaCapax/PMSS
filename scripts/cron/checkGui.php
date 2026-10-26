@@ -253,7 +253,8 @@ function pmssCheckGuiMain(array $argv): int
         foreach (['index.php', 'scriptsInc.php', 'scriptsIncFormat.php', 'scriptsIncFiles.php',
             'scriptsIncFrontend.php', 'scriptsIncBonus.php', 'scriptsIncCgroup.php',
             'scriptsIncBackup.php', 'scriptsIncRestoreTar.php', 'scriptsIncRestore.php',
-            'scriptsIncAppProcess.php', 'scriptsIncAppsHtml.php', 'scriptsIncAppsStatus.php',
+            'scriptsIncAppProcess.php',
+            'scriptsIncAppsHtml.php', 'scriptsIncAppsStatus.php',
             'scriptsIncActionJs.php'] as $guiFile) {
             pmssCheckGuiRestoreUserFile(
                 $wwwDir.'/'.$guiFile,

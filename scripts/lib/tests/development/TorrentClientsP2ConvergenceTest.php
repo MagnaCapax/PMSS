@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/TorrentClientsP2Fixture.php';
 require_once dirname(__DIR__, 2).'/torrentClients/postSetup.php';
 require_once dirname(__DIR__, 2).'/user/recreateRestore.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/torrentClientsResolve.php';
@@ -12,28 +13,10 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->pmssTrackEnvKeys(['PMSS_DRY_RUN']);
+        $this->pmssTrackEnvKeys(['PMSS_DRY_RUN', 'PMSS_HOME_DIR']);
     }
 
-    private function fixture(string $name): array
-    {
-        $root = $this->pmssMakeTempDir('pmss-p2-'.$name.'-');
-        $home = $root.'/t';
-        $this->pmssEnsureDir($home.'/bin/qbittorrent');
-        $this->pmssEnsureDir($root.'/store/qbittorrent');
-        $this->pmssWriteFile($root.'/catalog.json', (string) file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json'));
-        $this->pmssWriteFile($root.'/projection.json', '{"versions":[]}');
-        $events = (object) ['logs' => []];
-        $ops = [
-            'homeRoot' => $root, 'root' => $root.'/store',
-            'catalog' => $root.'/catalog.json', 'projection' => $root.'/projection.json',
-            'run' => $this->pmssAccountPathCommandRunner(),
-            'log' => static function (string $user, string $message) use ($events): void {
-                $events->logs[] = [$user, $message];
-            },
-        ];
-        return [$root, $home, $ops, $events];
-    }
+    use TorrentClientsP2Fixture;
 
     public function testProjectionReaderRejectsUnsafeAndMalformedFiles(): void
     {
@@ -90,8 +73,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame(['t', '[WARN] '.$message], $events->logs[0]);
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'qbittorrent'));
         $launcher = (string) file_get_contents(dirname(__DIR__, 3).'/cron/checkQbittorrentInstances.php');
-        $this->assertStringContainsString('[ ! -L ~/bin/qbittorrent/default ]', $launcher);
-        $this->assertStringContainsString('[ -L ~/bin/qbittorrent/default ] && (cd ~; php', $launcher);
+        $this->assertStringContainsString('torrentClientsResolve.php qbittorrent --launch --held', $launcher);
         $this->assertStringContainsString('flock -n 9 || exit 0;', $launcher);
     }
 

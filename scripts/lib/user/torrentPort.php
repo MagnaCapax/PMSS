@@ -111,9 +111,7 @@ function pmssQbittorrentPortEnsure(string $user, string $home): bool
         return false;
     }
     $config = pmssReadRegularFileContents($configPath);
-    $parsed = is_string($config) ? @parse_ini_string($config, true, INI_SCANNER_RAW) : false;
-    $key = 'WebUI\\Port';
-    $currentPort = is_array($parsed) ? (string) ($parsed['Preferences'][$key] ?? '') : '';
+    $currentPort = is_string($config) ? trim((string) pmssQbittorrentWebUiValue($config, 'Port', pmssQbittorrentBuildVersion($home)), " \t\"") : '';
     if ($expectedPort === null || !is_string($config) || $currentPort === '') {
         return false;
     }

@@ -108,11 +108,17 @@ class QbittorrentManagedConfigTest extends TestCase
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
             'alice/.config/qBittorrent/qBittorrent.conf',
-            "[Preferences]\nConnection\\GlobalUPLimit=10\n"
+            "[Preferences]\nConnection\\GlobalUPLimit=900\n"
         );
         chmod($configPath, 0640);
 
-        $this->assertTrue(pmssQbittorrentApplyUploadThrottle('alice', 512));
+        require_once dirname(__DIR__, 2).'/user/qbittorrentThrottleAccount.php';
+        $this->assertTrue(pmssQbittorrentThrottleAccount($this->homeRoot.'/alice', 512, true, [
+            'build' => '4.3.9',
+            'recordWrite' => static function ($path, $value): bool { return file_put_contents($path, $value) === strlen($value); },
+            'accountPids' => static function (): array { return []; },
+            'restore' => static function (): bool { return true; },
+        ]));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsString("Connection\\GlobalUPLimit=512\n", $updated);

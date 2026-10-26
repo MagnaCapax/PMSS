@@ -2,76 +2,9 @@
 /** Customer-owned qBittorrent switch mechanics and shared version reader. */
 require_once __DIR__.'/torrentClientsResolve.php';
 require_once __DIR__.'/configureTorrentClientsVersion.php';
-/** Check current UID, process name, mount namespace and executable location. */
-function pmssConfigureTorrentClientNativePids($home, $procRoot = '/proc')
-{
-    $ownNs = @readlink('/proc/self/ns/mnt');
-    if (!is_string($ownNs) || $ownNs === '') return array();
-    $uid = posix_geteuid();
-    $roots = array('/home/.pmss/clients/qbittorrent/', $home.'/bin/qbittorrent/', '/opt/qBittorrent/');
-    $pids = array();
-    foreach ((array) glob(rtrim($procRoot, '/').'/[0-9]*', GLOB_ONLYDIR) as $dir) {
-        $pid = (int) basename($dir);
-        if ($pid < 1 || @readlink($dir.'/ns/mnt') !== $ownNs
-            || trim((string) @file_get_contents($dir.'/comm')) !== 'qbittorrent-nox') continue;
-        $status = @file_get_contents($dir.'/status');
-        if (!is_string($status) || preg_match('/^Uid:\s+(\d+)/m', $status, $match) !== 1
-            || (int) $match[1] !== $uid) continue;
-        $exe = @readlink($dir.'/exe');
-        if (!is_string($exe)) continue;
-        if (substr($exe, -10) === ' (deleted)') $exe = substr($exe, 0, -10);
-        if ($exe === '/usr/bin/qbittorrent-nox' || $exe === '/usr/local/bin/qbittorrent-nox') {
-            $pids[] = $pid;
-            continue;
-        }
-        foreach ($roots as $root) if (strpos($exe, $root) === 0) { $pids[] = $pid; break; }
-    }
-    return $pids;
-}
-
-/** Return the version the account has selected for $client, as the version list names it. */
-function pmssConfigureTorrentClientSelectedVersion($home, $client)
-{
-    $target = @readlink($home.'/bin/'.$client.'/default');
-    return is_string($target) ? basename($target) : 'system';
-}
-
-/** Show the version of the current native process from its kernel exe path. */
-function pmssConfigureTorrentClientRunningVersion($home, $ops = array())
-{
-    $nativePids = $ops['pids'] ?? 'pmssConfigureTorrentClientNativePids';
-    $resolve = $ops['resolve'] ?? 'pmssTorrentClientResolve';
-    $pids = $nativePids($home);
-    $target = @readlink($home.'/bin/qbittorrent/default');
-    if ($pids !== array() && is_string($target) && strpos($target, '/home/.pmss/clients/qbittorrent/') === 0
-        && $resolve($home, 'qbittorrent') === null)
-        return 'system; '.basename($target).' is not installed on this server';
-    foreach ($pids as $pid) {
-        $exe = @readlink('/proc/'.$pid.'/exe');
-        if (!is_string($exe)) continue;
-        if (strpos($exe, '/home/.pmss/clients/qbittorrent/') === 0) {
-            $rest = substr($exe, strlen('/home/.pmss/clients/qbittorrent/'));
-            return explode('/', $rest, 2)[0];
-        }
-        if (strpos($exe, $home.'/bin/qbittorrent/') === 0) return 'custom build';
-        return 'system';
-    }
-    return 'not running';
-}
-/** Re-enumerate before each TERM, then wait for the native daemon to leave. */
-function pmssConfigureTorrentClientStop($home)
-{
-    foreach (pmssConfigureTorrentClientNativePids($home) as $pid) {
-        if (!in_array($pid, pmssConfigureTorrentClientNativePids($home), true)
-            || !@posix_kill($pid, 15)) return false;
-    }
-    // Saving resume data for many torrents takes far longer than a few seconds; starting early hands off to the exiting daemon.
-    for ($attempt = 0; $attempt < 600; $attempt++) {
-        if (pmssConfigureTorrentClientNativePids($home) === array()) return true;
-        usleep(100000);
-    }
-    return false;
-}
+require_once __DIR__.'/qbittorrentStart.php';
+require_once __DIR__.'/configureTorrentClientsProcess.php';
+require_once __DIR__.'/configureTorrentClientsStart.php';
 /** Rename a same-directory symlink so readers see one complete selection. */
 function pmssConfigureTorrentClientRepoint($home, $version, $restoreTarget = null)
 {
@@ -89,28 +22,8 @@ function pmssConfigureTorrentClientRepoint($home, $version, $restoreTarget = nul
     @unlink($temp);
     return false;
 }
-/** Start under the held switch lock; the watchdog uses its nonblocking peer. */
-function pmssConfigureTorrentClientStart($home, $version)
-{
-    $binary = $version === 'system' ? 'qbittorrent-nox'
-        : pmssTorrentClientResolve($home, 'qbittorrent');
-    if (!is_string($binary) || ($version !== 'system' && !is_file($binary))) return false;
-    $rc = 1;
-    @exec('cd '.escapeshellarg($home).' && '.escapeshellarg($binary).' -d >/dev/null 2>&1', $unused, $rc);
-    if ($rc !== 0) return false;
-    // qbittorrent-nox -d exits 0 even when it handed off to another instance; started means the asked build runs.
-    $expected = $version === 'custom' ? 'custom build' : (string) $version;
-    for ($attempt = 0; $attempt < 200; $attempt++) {
-        if (pmssConfigureTorrentClientRunningVersion($home) === $expected) {
-            sleep(3);
-            return pmssConfigureTorrentClientRunningVersion($home) === $expected;
-        }
-        usleep(100000);
-    }
-    return false;
-}
 /** Snapshot, stop, select and start under one account-owned client lock. */
-function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
+function pmssConfigureTorrentClientSwitchApply($home, $request, $ops = array())
 {
     $versions = isset($ops['versions']) ? $ops['versions'] : pmssConfigureTorrentClientVersionsOffered();
     $version = $request['version'] ?? null;
@@ -130,6 +43,11 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
             if (is_resource($lock)) fclose($lock);
             return array('ok' => false, 'status' => 409, 'message' => 'A qBittorrent switch is already running.');
         }
+    }
+    if (!pmssQbittorrentFrontendRefusalClear($home)) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'status' => 409, 'message' => 'The qBittorrent refusal marker could not be cleared.');
     }
     $link = $home.'/bin/qbittorrent/default';
     $old = @readlink($link);
@@ -161,8 +79,9 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
         return array('ok' => false, 'status' => 409, 'message' => $message);
     }
     $backup = $ops['backup'] ?? 'pmssCustomerBackupFileCreate';
-    $stop = $ops['stop'] ?? 'pmssConfigureTorrentClientStop';
-    $start = $ops['start'] ?? 'pmssConfigureTorrentClientStart';
+    $stop = $ops['stop'] ?? static function ($home) use ($ops): bool { return pmssConfigureTorrentClientStop($home, $ops); };
+    $start = $ops['start'] ?? static function ($home, $version) use ($ops): bool { return pmssConfigureTorrentClientStart($home, $version, $ops); };
+    $restoreConfig = $ops['restore'] ?? static function ($home) use ($ops): bool { return pmssQbittorrentFrontendRestore($home, $ops); };
     $repoint = $ops['repoint'] ?? 'pmssConfigureTorrentClientRepoint';
     $snapshot = $backup($home);
     if (!is_array($snapshot) || empty($snapshot['ok'])) {
@@ -175,24 +94,35 @@ function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
     }
     $stopped = $stop($home);
     $repointed = $stopped && $repoint($home, $version);
-    $ok = $repointed && pmssConfigureFileWrite($dir.'/qbittorrent.lastRun', $version."\n")
-        && $start($home, $version) && pmssConfigureFileWrite($dir.'/qbittorrent.lastgood', $version."\n");
+    $ok = $repointed && $restoreConfig($home) && $start($home, $version)
+        && pmssConfigureFileWrite($dir.'/qbittorrent.lastRun', $version."\n")
+        && pmssConfigureFileWrite($dir.'/qbittorrent.lastgood', $version."\n");
     // The switch starts the chosen build, so Apps shows qBittorrent on and the watchdog keeps it running.
     if ($ok) @touch($home.'/.qbittorrentEnable');
     $restored = true;
     if (!$ok && $stopped) {
         $lastgood = trim(pmssConfigureFileRead($dir.'/qbittorrent.lastgood', 64));
         $restore = $lastgood === $oldVersion ? $lastgood : $oldVersion;
-        $restored = $repointed ? ($stop($home) && $repoint($home, $restore, $old) && $start($home, $restore))
-            : $start($home, $restore);
+        $restored = $repointed ? ($stop($home) && $repoint($home, $restore, $old)
+            && $restoreConfig($home) && $start($home, $restore))
+            : ($restoreConfig($home) && $start($home, $restore));
         if ($restored) pmssConfigureFileWrite($dir.'/qbittorrent.lastRun', $restore."\n");
     }
+    $linkRefused = is_link($home.'/.config/qBittorrent/qBittorrent.conf');
     pmssConfigureFileWrite($dir.'/qbittorrent.notice', $ok
         ? 'qBittorrent selected: '.pmssConfigureTorrentClientVersionLabel($version)."\n" : ($restored ? 'qBittorrent switch failed; previous version restored.'
             : 'qBittorrent switch failed; manual recovery is needed.')."\n");
     flock($lock, LOCK_UN);
     fclose($lock);
     return array('ok' => $ok, 'status' => $ok ? 200 : 503,
-        'message' => $ok ? 'qBittorrent switched to '.pmssConfigureTorrentClientVersionLabel($version).'.' : ($restored
-            ? 'The switch failed; the previous version was restored.' : 'The switch failed; manual recovery is needed.'));
+        'message' => $linkRefused && !$ok ? 'qBittorrent.conf is a link; PMSS will not write through it' : ($ok ? 'qBittorrent switched to '.pmssConfigureTorrentClientVersionLabel($version).'.' : ($restored
+            ? 'The switch failed; the previous version was restored.' : 'The switch failed; manual recovery is needed.')));
+}
+
+/** Publish each refusal returned before the start path can write its own notice. */
+function pmssConfigureTorrentClientSwitch($home, $request, $ops = array())
+{
+    $result = pmssConfigureTorrentClientSwitchApply($home, $request, $ops);
+    if (!$result['ok']) pmssQbittorrentFrontendNotice($home, $result['message']);
+    return $result;
 }

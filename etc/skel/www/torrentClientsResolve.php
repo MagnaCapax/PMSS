@@ -139,29 +139,19 @@ function pmssRtorrentDeprecatedRedirects(string $version, string $projectionPath
     return false;
 }
 
-/** Start a selected client as the account while excluding a concurrent switch. */
-function pmssTorrentClientResolverLaunch(string $home, string $client, bool $lockHeld = false): bool
-{
-    if ($client !== 'qbittorrent' || !is_link($home.'/bin/'.$client.'/default')) return false;
-    $lock = null;
-    if (!$lockHeld) {
-        $dir = $home.'/.config/pmss/torrentClients';
-        if (!is_dir($dir) && !@mkdir($dir, 0700, true)) return false;
-        if (is_link($dir)) return false;
-        $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
-        if (!is_resource($lock)) return false;
-        if (!@flock($lock, LOCK_EX | LOCK_NB)) { fclose($lock); return true; }
-    }
-    $binary = pmssTorrentClientResolve($home, $client);
-    $rc = 1;
-    if ($binary !== null) @exec(escapeshellarg($binary).' -d >/dev/null 2>&1', $unused, $rc);
-    if (is_resource($lock)) { flock($lock, LOCK_UN); fclose($lock); }
-    return $rc === 0;
-}
+require_once __DIR__.'/qbittorrentResolverLaunch.php';
 
 if (PHP_SAPI === 'cli' && isset($_SERVER['SCRIPT_FILENAME'])
     && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
     $home = getenv('HOME');
+    if (is_string($home) && ($argv[1] ?? '') === 'qbittorrent' && ($argv[2] ?? '') === '--restore') {
+        require_once __DIR__.'/configureTorrentClients.php';
+        // Post-setup supplies the validated home explicitly rather than relying on an inherited HOME.
+        $home = $argv[3] ?? $home;
+        // Link repair must proceed while a daemon runs; the next actual start restores while stopped.
+        $ok = pmssQbittorrentFrontendRestoreForRepair($home);
+        exit($ok ? 0 : 1);
+    }
     if (is_string($home) && ($argv[1] ?? '') === 'transmission' && ($argv[2] ?? '') === '--launch') {
         require_once __DIR__.'/transmissionLaunch.php';
         // The daemon rewrites settings.json when it stops, so re-assert the managed RPC settings first,
@@ -173,5 +163,6 @@ if (PHP_SAPI === 'cli' && isset($_SERVER['SCRIPT_FILENAME'])
             '/home/.pmss/clients', null, $argv[3] ?? 'both') ? 0 : 1);
     }
     exit(is_string($home) && ($argv[1] ?? '') === 'qbittorrent' && ($argv[2] ?? '') === '--launch'
-        && pmssTorrentClientResolverLaunch($home, 'qbittorrent', ($argv[3] ?? '') === '--held') ? 0 : 1);
+        && pmssTorrentClientResolverLaunch($home, 'qbittorrent', ($argv[3] ?? '') === '--held',
+            ['system' => ($argv[4] ?? '') === '--system']) ? 0 : 1);
 }

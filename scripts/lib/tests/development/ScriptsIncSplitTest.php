@@ -166,6 +166,8 @@ class ScriptsIncSplitTest extends TestCase
         foreach (self::PARTS as $part) {
             $this->assertStringContainsString("'".$part."'", $loader);
             $this->assertStringContainsString("'www/scriptsInc".$part.".php'", $manifest);
+            $this->assertStringContainsString("'scriptsInc".$part.".php'",
+                $this->pmssReadRepoFile('scripts/cron/checkGui.php'));
         }
     }
 

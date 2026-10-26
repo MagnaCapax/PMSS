@@ -6,6 +6,23 @@ require_once dirname(__DIR__, 2).'/torrentClients/identity.php';
 
 final class TorrentClientsIdentityTest extends TestCase
 {
+    public function testDirectAccountBinBuildRetainsUidNamespaceAndExecutableChecks(): void
+    {
+        $ops = [
+            'account' => static function (): array { return ['uid' => 1000]; },
+            'pids' => static function (): array { return [101, 102, 103, 104]; },
+            'namespace' => static function ($pid): string { return $pid === 102 ? 'mnt:[foreign]' : 'mnt:[own]'; },
+            'read' => static function ($path): string {
+                return substr($path, -5) === '/comm' ? 'qbittorrent-nox'
+                    : 'Uid: '.(strpos($path, '/103/') !== false ? '1001' : '1000');
+            },
+            'exe' => static function ($pid): string {
+                return $pid === 104 ? '/home/other/bin/qbittorrent-nox' : '/home/qafix081/bin/qbittorrent-nox';
+            },
+        ];
+        $this->assertSame([101], \pmssTorrentClientNativeStopPids('qafix081', 'qbittorrent', $ops));
+    }
+
     /** Fake proc content; no real tenant path is read by the predicate. */
     public function testLivenessAndNativeStopHaveDifferentExeRules(): void
     {
@@ -17,7 +34,7 @@ final class TorrentClientsIdentityTest extends TestCase
         }
         $exe = [
             101 => '/home/.pmss/clients/qbittorrent/5.1.0/qbittorrent-nox',
-            102 => '/home/t/bin/qbittorrent/custom/qbittorrent-nox',
+            102 => '/home/qafix081/bin/qbittorrent/custom/qbittorrent-nox',
             103 => '/home/.pmss/clients/qbittorrent/5.1.0/qbittorrent-nox',
             104 => '/usr/bin/qbittorrent-nox',
         ];
@@ -30,8 +47,8 @@ final class TorrentClientsIdentityTest extends TestCase
             'namespace' => static function (int $pid): string { return $pid === 103 ? 'mnt:[2]' : 'mnt:[1]'; },
             'exe' => static function (int $pid) use ($exe): string { return $exe[$pid]; },
         ];
-        $this->assertSame([101, 102, 104], \pmssTorrentClientLauncherLivenessPids('t', 'qbittorrent', $ops));
-        $this->assertSame([101, 102, 104], \pmssTorrentClientNativeStopPids('t', 'qbittorrent', $ops));
+        $this->assertSame([101, 102, 104], \pmssTorrentClientLauncherLivenessPids('qafix081', 'qbittorrent', $ops));
+        $this->assertSame([101, 102, 104], \pmssTorrentClientNativeStopPids('qafix081', 'qbittorrent', $ops));
     }
 
     /** Resolve system install links while leaving an account-owned bin link lexical. */
@@ -42,8 +59,8 @@ final class TorrentClientsIdentityTest extends TestCase
         $versioned = $this->pmssWriteFile($installBin.'/qbittorrent-nox-4.6.7', 'binary');
         $this->pmssCreateSymlinkOrSkip('qbittorrent-nox-4.6.7', $installBin.'/qbittorrent-nox');
         $tenantTarget = $this->pmssEnsureDir($root.'/tenant-target');
-        $this->pmssEnsureDir($root.'/home/t/bin');
-        $this->pmssCreateSymlinkOrSkip($tenantTarget, $root.'/home/t/bin/qbittorrent');
+        $this->pmssEnsureDir($root.'/home/qafix081/bin');
+        $this->pmssCreateSymlinkOrSkip($tenantTarget, $root.'/home/qafix081/bin/qbittorrent');
         $tenantExe = $this->pmssWriteFile($tenantTarget.'/qbittorrent-nox', 'binary');
         foreach ([201, 202] as $pid) {
             $this->pmssEnsureDir($root.'/proc/'.$pid);
@@ -60,9 +77,9 @@ final class TorrentClientsIdentityTest extends TestCase
             'namespace' => static function (): string { return 'mnt:[1]'; },
             'exe' => static function (int $pid) use ($exe): string { return $exe[$pid]; },
             'installRoots' => [$installBin.'/qbittorrent-nox'],
-            'accountRoots' => [$root.'/home/t/bin/qbittorrent/'],
+            'accountRoots' => [$root.'/home/qafix081/bin/qbittorrent/'],
         ];
-        $this->assertSame([201], \pmssTorrentClientNativeStopPids('t', 'qbittorrent', $ops));
+        $this->assertSame([201], \pmssTorrentClientNativeStopPids('qafix081', 'qbittorrent', $ops));
     }
 
     public function testUidAndNameMismatchAreExcluded(): void
@@ -76,13 +93,13 @@ final class TorrentClientsIdentityTest extends TestCase
                 return "Uid:\t2000 2000 2000 2000\n";
             },
         ];
-        $this->assertSame([], \pmssTorrentClientLauncherLivenessPids('t', 'rtorrent', $ops));
-        $this->assertSame([], \pmssTorrentClientNativeStopPids('t', 'rtorrent', $ops));
+        $this->assertSame([], \pmssTorrentClientLauncherLivenessPids('qafix081', 'rtorrent', $ops));
+        $this->assertSame([], \pmssTorrentClientNativeStopPids('qafix081', 'rtorrent', $ops));
     }
 
     public function testUnknownClientAndUnsafeUserReject(): void
     {
-        $this->assertSame([], \pmssTorrentClientLauncherLivenessPids('t', 'unknown'));
+        $this->assertSame([], \pmssTorrentClientLauncherLivenessPids('qafix081', 'unknown'));
         $this->assertSame([], \pmssTorrentClientNativeStopPids('../t', 'rtorrent'));
     }
 }

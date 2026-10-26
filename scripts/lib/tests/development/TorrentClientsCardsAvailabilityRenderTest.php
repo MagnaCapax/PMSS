@@ -9,6 +9,27 @@ final class TorrentClientsCardsAvailabilityRenderTest extends TestCase
 {
     use TorrentClientsCardsRenderTrait;
 
+    public function testDeliveredConfigureTreeRendersWithOneUnmodifiedVersionReader(): void
+    {
+        $this->pmssWithCustomerPanelRender(function ($home, $render, $root): void {
+            $source = '';
+            $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+            foreach (['configureTorrentClients.php', 'configureTorrentClientsProcess.php', 'configureTorrentClientsStart.php'] as $file) {
+                $this->assertStringContainsString("'www/".$file."'", $manifest);
+                $expected = $this->pmssReadRepoFile('etc/skel/www/'.$file);
+                $this->assertSame($expected, file_get_contents($home.'/www/'.$file));
+                $source .= $expected;
+            }
+            $this->assertSame(1, substr_count($source, 'function pmssConfigureTorrentClientRunningVersion('));
+            // Isolate only availability; keep every delivered function definition intact.
+            $card = $home.'/www/configureTorrentClientsCard.php';
+            $this->pmssWriteFile($card, str_replace('/var/lib/pmss/public/torrentClients.json',
+                $root.'/missing-projection.json', file_get_contents($card)));
+            $html = $render('configure.php', ['minBytes' => 4000])['stdout'];
+            $this->assertStringContainsString('Version choice is not available on this server.', $html);
+        });
+    }
+
     public function testMissingBuildSentenceUsesCountsForBothSingleAndMultipleOptions(): void
     {
         $this->withProjection($this->entries(array('qbittorrent' => array('system', '5.2.4-lt2.0'),

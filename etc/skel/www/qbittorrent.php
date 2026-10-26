@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/scriptsInc.php';
-require_once __DIR__.'/qbittorrentPasswordRequired.php';
+if (is_file(__DIR__.'/qbittorrentPassword.php')) require_once __DIR__.'/qbittorrentPassword.php';
+if (is_file(__DIR__.'/qbittorrentPasswordRequired.php')) require_once __DIR__.'/qbittorrentPasswordRequired.php';
 // Port enforcement is operator-side work; this customer endpoint only toggles daemons.
 /** Lightweight frontend toggle for qBittorrent. */
 
@@ -9,14 +10,21 @@ pmssFrontendPostActionRequired();
 pmssQbittorrentFrontendPasswordSync($action);
 
 pmssFrontendToggleAction('../.qbittorrentEnable', static function () {
-    pmssCustomerTorrentClientToggleStart('qbittorrent', static function () { passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &'); });
+    $ok = pmssCustomerTorrentClientToggleStart('qbittorrent', static function () { passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &'); });
+    if ($ok === false) {
+        http_response_code(409);
+        header('Content-Type: text/plain; charset=utf-8');
+        $notice = @file_get_contents(dirname(__DIR__).'/.config/pmss/torrentClients/qbittorrent.notice');
+        echo is_string($notice) && trim($notice) !== '' ? $notice : 'qBittorrent start refused; configuration is busy or unavailable.';
+    }
+    return $ok;
 }, static function () {
     pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['qBittorrent']['binaries']);
 });
 function pmssQbittorrentFrontendPasswordSync($action) {
     if ($action !== 'start' && $action !== 'restart') return;
     $configPath = __DIR__.'/../.config/qBittorrent/qBittorrent.conf';
-    if (!pmssQbittorrentFrontendPasswordRequired($configPath)) return;
+    if (!function_exists('pmssQbittorrentFrontendPasswordRequired') || !pmssQbittorrentFrontendPasswordRequired($configPath)) return;
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !isset($_POST['qbittorrentPassword'])) {
         error_log('PMSS qBittorrent toggle: WebUI password required before '.$action);
         http_response_code(428);
@@ -30,6 +38,9 @@ function pmssQbittorrentFrontendPasswordSync($action) {
 }
 function pmssQbittorrentFrontendPasswordApply($configPath, $password) {
     if ($password === '' || strpos($password, "\0") !== false || !pmssCustomerPathIsSafe($configPath) || !is_file($configPath) || is_link($configPath)) return false;
+    // Billing heals this endpoint first; preserve its legacy helpers until nightly delivery completes.
+    if (function_exists('pmssQbittorrentFrontendPasswordApplyStopped'))
+        return pmssQbittorrentFrontendPasswordApplyStopped($configPath, $password);
     $config = @file_get_contents($configPath);
     if (!is_string($config)) return false;
     $updated = pmssQbittorrentFrontendPreferenceSet($config, 'WebUI\\Password_PBKDF2', pmssQbittorrentFrontendPasswordHash($password));
@@ -53,6 +64,10 @@ function pmssQbittorrentFrontendPasswordHash($password) {
     return '@ByteArray(' . base64_encode($salt) . ':' . base64_encode($hash) . ')';
 }
 function pmssQbittorrentFrontendPreferenceSet($config, $key, $value) {
+    if (function_exists('pmssQbittorrentFrontendWebUiSection') && function_exists('pmssQbittorrentFrontendConfigSet')
+        && strpos($key, 'WebUI\\') === 0 && pmssQbittorrentFrontendWebUiSection($config)[0] === 'WebUI') {
+        $config = pmssQbittorrentFrontendConfigSet($config, 'WebUI', substr($key, 6), $value);
+    }
     $lines = preg_split('/\n/', str_replace(array("\r\n", "\r"), "\n", (string) $config));
     if (!is_array($lines)) return (string) $config;
     $section = null;

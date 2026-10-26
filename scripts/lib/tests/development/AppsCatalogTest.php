@@ -115,8 +115,16 @@ class AppsCatalogTest extends TestCase
             'scriptsIncFrontend', 'scriptsIncBonus', 'scriptsIncCgroup', 'scriptsIncBackup',
             'scriptsIncRestoreTar', 'scriptsIncRestore', 'scriptsIncAppProcess', 'scriptsIncAppsHtml',
             'scriptsIncAppsStatus', 'scriptsIncActionJs', 'userMediaStackPanel', 'qbittorrent', 'qbittorrentPasswordRequired',
+            'qbittorrentAccountProcess', 'qbittorrentBuild', 'qbittorrentBuildProbe', 'qbittorrentConfig',
+            'qbittorrentLegacyKeys', 'qbittorrentPassword', 'qbittorrentRefusal', 'qbittorrentResolverLaunch',
+            'qbittorrentRestore', 'qbittorrentSocket', 'qbittorrentStart', 'qbittorrentStoppedConfig',
+            'qbittorrentThrottle', 'qbittorrentThrottleStart', 'qbittorrentThrottleStopped', 'qbittorrentWebUi',
+            'fileReadVerified', 'configureFileWrite', 'configureTorrentClients', 'configureTorrentClientsProcess',
+            'configureTorrentClientsStart', 'configureTorrentClientsVersion', 'torrentClientsResolve', 'transmissionLaunch',
             'deluge', 'transmission', 'rclone', 'slskd', 'copyparty', 'toggleApp', 'toggleAppCatalog', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
+        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
         foreach ($guiv as $name) {
+            $this->assertStringContainsString("'www/".$name.".php'", $manifest, $name.' must reach existing homes');
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
             $tokens = token_get_all($source);
             foreach ($tokens as $index => $token) {
@@ -132,7 +140,8 @@ class AppsCatalogTest extends TestCase
                 if ($name === 'scriptsInc' && trim($expression) === '$p') {
                     $this->assertStringContainsString("\$p = __DIR__.'/scriptsInc'.\$part.'.php'", $source);
                     $this->assertStringContainsString('is_file($p) && !is_link($p)', $source);
-                    foreach (array_slice($guiv, 3, 12) as $part) {
+                    foreach ($guiv as $part) {
+                        if ($part === 'scriptsInc' || strpos($part, 'scriptsInc') !== 0) continue;
                         $this->assertStringContainsString("'".substr($part, strlen('scriptsInc'))."'", $source);
                     }
                     continue;

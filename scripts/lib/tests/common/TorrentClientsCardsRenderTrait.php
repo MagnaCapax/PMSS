@@ -12,9 +12,11 @@ trait TorrentClientsCardsRenderTrait
             $card = $home.'/www/configureTorrentClientsCard.php';
             $this->pmssWriteFile($card, str_replace('/var/lib/pmss/public/torrentClients.json', $path, file_get_contents($card)));
             // Never rely on or inspect the testing account's actual torrent processes.
-            foreach (array('configureTorrentClients.php' => 'pmssConfigureTorrentClientRunningVersion',
+            foreach (array('configureTorrentClientsProcess.php' => 'pmssConfigureTorrentClientRunningVersion',
                 'configureTorrentClientsOther.php' => 'pmssConfigureTorrentClientOtherRunningVersion') as $file => $function) {
                 $target = $home.'/www/'.$file;
+                $this->assertSame(1, substr_count(file_get_contents($target), 'function '.$function.'('),
+                    'Stub the delivered definition, never append a duplicate after a helper moves.');
                 $this->pmssWriteFile($target, str_replace('function '.$function.'(', 'function '.$function.'Real(',
                     file_get_contents($target))."\nfunction ".$function."() { return 'system'; }\n");
             }

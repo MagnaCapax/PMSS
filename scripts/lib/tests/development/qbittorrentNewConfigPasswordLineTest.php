@@ -20,7 +20,7 @@ class qbittorrentNewConfigPasswordLineTest extends TestCase
             "'qbittorrentWebUiAuth'",
             '$qbittorrentTemplate',
             '$qbittorrentConfig = pmssQbittorrentWebUiAuthForce($qbittorrentConfig);',
-            'pmssReplaceUserFileWithMetadata($qbittorrentConfigFile, $qbittorrentConfig,',
+            'pmssWriteUserFile($qbittorrentConfigFile, $qbittorrentConfig,',
         ]);
     }
 

@@ -10,9 +10,14 @@ require_once __DIR__.'/../runtime/filesystem.php';
 /**
  * Run a command with a credential line on stdin; requested capture normally merges both streams.
  * Stderr-only capture keeps credential-bearing stdout on the inherited console.
+ * An optional deadline bounds the child and descendants, with injectable clock/pause operations.
  */
-function pmssCredentialProcessRun(string $command, ?string $credential, ?array &$output = null, bool $stderrOnly = false): int
+function pmssCredentialProcessRun(string $command, ?string $credential, ?array &$output = null, bool $stderrOnly = false, ?float $timeout = null, array $ops = []): int
 {
+    if ($timeout !== null) {
+        require_once __DIR__.'/credentialProcessTimed.php';
+        return pmssCredentialProcessRunTimed($command, $credential, $output, $stderrOnly, $timeout, $ops);
+    }
     $capture = $output !== null;
     if ($capture) {
         $output = [];

@@ -38,6 +38,8 @@ function pmssTorrentClientsPostSetupFallback(string $user, string $home, string 
     if (!isset($binaries[$client])) return false;
     $command = 'selected=$(readlink '.escapeshellarg($link).' 2>/dev/null) || exit 1; '
         .'case "$selected" in '.escapeshellarg($prefix).'*) ;; *) exit 1;; esac; ';
+    if ($client === 'qbittorrent') $command = 'mkdir -m 700 -p '.escapeshellarg($noticeDir).' || exit 1; '
+        .'exec 9>>'.escapeshellarg($noticeDir.'/qbittorrent.lock').'; flock -w 120 9 || exit 1; '.$command;
     foreach (array_keys($available[$client] ?? []) as $version) {
         if ($version === 'system') continue;
         $path = $prefix.$version;
@@ -48,6 +50,11 @@ function pmssTorrentClientsPostSetupFallback(string $user, string $home, string 
             .' && [ -f '.escapeshellarg($binary).' ]'
             .' && [ ! -L '.escapeshellarg($binary).' ]; then exit 1; fi; ';
     }
+    // Best-effort stopped restore must never prevent repair of a dangling selection.
+    if ($client === 'qbittorrent') $command .= 'if [ -f '.escapeshellarg($home.'/www/qbittorrentStart.php')
+        .' ]; then cd '.escapeshellarg($home)
+        .' && php '.escapeshellarg($home.'/www/torrentClientsResolve.php').' qbittorrent --restore '
+        .escapeshellarg($home).'; fi; ';
     if ($default === 'system') {
         $command .= 'rm -f -- '.escapeshellarg($link).' || exit 1; ';
     } else {

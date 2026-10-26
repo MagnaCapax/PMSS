@@ -33,6 +33,7 @@ function pmssConfigureTorrentClientCardsBuild($home, $path = '/var/lib/pmss/publ
         foreach ($offered as $client => $versions) {
             $status = pmssConfigureTorrentClientCardStatusRead($home, $client);
             $html .= '<p>'.pmssCustomerHtmlAttr($labels[$client].': '.$status['running']).'</p>';
+            $html .= pmssConfigureTorrentClientNotesHtml($versions, $status['running']);
             if ($status['notice'] !== '') $html .= '<p role="status">'.pmssCustomerHtmlAttr($status['notice']).'</p>';
             if ($notInstalled[$client] > 0) $sentences[] = pmssConfigureTorrentClientOtherVersionsMessage();
         }
@@ -75,6 +76,18 @@ function pmssConfigureTorrentClientCardStatusRead($home, $client)
         'notice' => trim(pmssConfigureFileRead($home.'/.config/pmss/torrentClients/'.$client.'.notice', 256)));
 }
 
+/** Controls list every offered note; read-only cards describe only the exact running build. */
+function pmssConfigureTorrentClientNotesHtml($versions, $running = null)
+{
+    $html = '';
+    foreach ($versions as $version => $entry) {
+        $label = pmssConfigureTorrentClientVersionLabel($version);
+        if (!is_string($entry['note'] ?? null) || ($running !== null && $running !== $label)) continue;
+        $html .= '<p>'.pmssCustomerHtmlAttr($label.': '.$entry['note']).'</p>';
+    }
+    return $html;
+}
+
 /** Keep the existing controls when a real selection change is possible. */
 function pmssConfigureTorrentClientCardHtmlBuild($home, $client, $label, $versions, $message = '', $notInstalled = 0)
 {
@@ -91,7 +104,7 @@ function pmssConfigureTorrentClientCardHtmlBuild($home, $client, $label, $versio
 <section class="configure-card" id="<?= pmssCustomerHtmlAttr($client) ?>-version"><h2><?= pmssCustomerHtmlAttr($label) ?> version</h2><p>Running: <?= pmssCustomerHtmlAttr($running) ?></p><?php if ($notice !== ''): ?><p role="status"><?= pmssCustomerHtmlAttr($notice) ?></p><?php endif; ?>
 <?php if ($controls): ?>
 <div class="configure-actions"><select id="configure-<?= pmssCustomerHtmlAttr($client) ?>-version" aria-label="<?= pmssCustomerHtmlAttr($label) ?> version"><?php foreach ($versions as $version => $entry): ?><option value="<?= pmssCustomerHtmlAttr($version) ?>"<?= (string) $version === $selectedVersion ? ' selected' : '' ?>><?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientVersionLabel($version)) ?></option><?php endforeach; ?></select>
-<input type="password" id="configure-<?= pmssCustomerHtmlAttr($client) ?>-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'<?= pmssCustomerHtmlAttr($client) ?>',version:document.getElementById('configure-<?= pmssCustomerHtmlAttr($client) ?>-version').value,password:document.getElementById('configure-<?= pmssCustomerHtmlAttr($client) ?>-password').value},'<?= pmssCustomerHtmlAttr($confirm) ?>')">Switch version</button></div><?php endif; ?><?php if ($notInstalled > 0): ?>
+<input type="password" id="configure-<?= pmssCustomerHtmlAttr($client) ?>-password" autocomplete="current-password" placeholder="Account password" aria-label="Account password"><button type="button" onclick="pmssConfigureSend('torrentClientSwitch',{client:'<?= pmssCustomerHtmlAttr($client) ?>',version:document.getElementById('configure-<?= pmssCustomerHtmlAttr($client) ?>-version').value,password:document.getElementById('configure-<?= pmssCustomerHtmlAttr($client) ?>-password').value},'<?= pmssCustomerHtmlAttr($confirm) ?>')">Switch version</button></div><?= pmssConfigureTorrentClientNotesHtml($versions) ?><?php else: ?><?= pmssConfigureTorrentClientNotesHtml($versions, $running) ?><?php endif; ?><?php if ($notInstalled > 0): ?>
 <p><?= pmssCustomerHtmlAttr(pmssConfigureTorrentClientOtherVersionsMessage()) ?></p><?php endif; ?><?php if ($message !== ''): ?>
 <p><?= pmssCustomerHtmlAttr($message) ?></p><?php endif; ?></section>
 <?php

@@ -49,6 +49,21 @@ public directory (ADR 0073). The customer-local picker and resolver already
 consume this view; catalog entries alone do not advertise missing binaries.
 All system defaults remain unchanged and every curated entry is non-default.
 
+Entries may carry a plain optional `note` of 1–100 Unicode characters, without
+control or Unicode format characters, and with at least one non-space character.
+The installed-version projection carries
+it only when set and no longer publishes the unused `badges` field. Catalog
+`cve` lists remain separate from notes and are published as `cve` metadata;
+removing the unused `badges` alias does not discard the CVE identifiers.
+Configure renders escaped paragraphs
+for each offered version under its picker; read-only cards show a note only for
+the listed running build. This needs no JavaScript or customer-specific metadata.
+The eight 4.3.9, 4.4.5, 4.5.5 and 4.6.7 variants carry the certificate-check note
+for CVE-2024-51774, fixed in 5.0.1. NVD describes continuing HTTPS requests after
+certificate-validation errors; upstream's 5.0.1 release notes confirm the SSL-error
+fix. Later curated builds receive no note for this issue. These notes do not
+certify the general security of any build.
+
 Installation and publication still require `torrentClients.enabled`; this
 change does not create that marker or select a version for any customer.
 The strict reserve of more than 3 GiB plus the measured existing store size
@@ -73,6 +88,9 @@ account permissions or customer/operator include boundaries change here.
 
 - [userdocs releases](https://github.com/userdocs/qbittorrent-nox-static/releases)
 - [Issue #1068](https://github.com/MagnaCapax/PMSS/issues/1068)
+- [NVD CVE-2024-51774](https://nvd.nist.gov/vuln/detail/CVE-2024-51774)
+- [qBittorrent 5.0.1 release notes](https://www.qbittorrent.org/news.html)
+- ADR 0182: qBittorrent WebUI settings follow the config's MigrationVersion.
 - ADRs 0073, 0105, 0106 and 0120
 
 Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).

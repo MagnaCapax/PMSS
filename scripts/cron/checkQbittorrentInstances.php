@@ -9,6 +9,7 @@
 require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/user/torrentPort.php';
 require_once __DIR__.'/../lib/user/qbittorrentWebUiAuth.php';
+require_once __DIR__.'/../lib/user/qbittorrentWatchdog.php';
 require_once __DIR__.'/../lib/torrentClients/identity.php';
 require_once __DIR__.'/../lib/lighttpd/dockerClientProxy.php';
 
@@ -16,23 +17,11 @@ $pmssCheckQbittorrentLock = pmssCronLockAcquire('checkQbittorrentInstances', 'pm
 
 pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox'], 'qbittorrent-nox stopped: suspended or moved', [
     pmssUserWatchdogServiceSpec('qbittorrent-nox', static function (string $thisUser): string {
-        return pmssBuildUserServiceShellCommand($thisUser, '[ ! -L ~/bin/qbittorrent/default ] || mkdir -m 700 -p ~/.config/pmss/torrentClients || exit 0; [ ! -d ~/.config/pmss/torrentClients ] || { exec 9>>~/.config/pmss/torrentClients/qbittorrent.lock; flock -n 9 || exit 0; }; [ -L ~/bin/qbittorrent/default ] && (cd ~; php ~/www/torrentClientsResolve.php qbittorrent --launch --held >/dev/null 2>&1; :) 9>&- || (cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &) 9>&-');
+        return pmssBuildUserServiceShellCommand($thisUser, 'mkdir -m 700 -p ~/.config/pmss/torrentClients || exit 1; exec 9>>~/.config/pmss/torrentClients/qbittorrent.lock; flock -n 9 || exit 0; cd ~; [ ! -e ~/.config/pmss/torrentClients/qbittorrent.refused ] || exit 1; if [ -f ~/www/qbittorrentStart.php ]; then php ~/www/torrentClientsResolve.php qbittorrent --launch --held --system 9>&-; else qbittorrent-nox -d 9>&-; fi; pmssQbtStartRc=$?; exit "$pmssQbtStartRc"');
     }, 'qbittorrent-nox start requested', 'qBittorrent'),
 ], function (string $thisUser): array {
     // A running, labelled Docker qBittorrent is this account's client; never start a native one beside it.
     if (pmssLighttpdDockerClientPort($thisUser, 'qbittorrent') !== null) return ['qbittorrent-nox' => true];
-    $running = pmssTorrentClientLauncherLivenessPids($thisUser, 'qbittorrent') !== [];
     $home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$thisUser;
-    if (pmssQbittorrentPortEnsure($thisUser, $home)) {
-        $running = pmssTorrentClientLauncherLivenessPids($thisUser, 'qbittorrent') !== [];
-    }
-    if (pmssQbittorrentWebUiAuthEnsure($thisUser, $home)) {
-        $running = false;
-    }
-    pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $running, 'pmssQbittorrentApplyManagedConfig');
-    pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['qbittorrent-nox'], static function () use ($thisUser): bool { return pmssQbittorrentUploadThrottleNeedsUpdate($thisUser); }, 'qbittorrent-nox restarted to apply upload throttle', 15, static function () use ($thisUser): void { pmssTorrentClientNativeStop($thisUser, 'qbittorrent', 15); });
-    // SIGTERM is asynchronous: defer the write and start until shutdown has finished.
-    $qbittorrentRunning = pmssTorrentClientLauncherLivenessPids($thisUser, 'qbittorrent') !== [];
-    pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $qbittorrentRunning, 'pmssQbittorrentApplyUploadThrottle');
-    return ['qbittorrent-nox' => $qbittorrentRunning];
+    return ['qbittorrent-nox' => pmssQbittorrentWatchdogRunning($thisUser, $home)];
 }, __DIR__.'/../lib/user/qbittorrent.php', '/home', '/scripts/listUsers.php', true);

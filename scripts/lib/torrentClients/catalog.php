@@ -4,6 +4,13 @@
 require_once dirname(__DIR__).'/log.php';
 require_once __DIR__.'/storePaths.php';
 
+/** Plain optional notes contain 1–100 Unicode characters, without controls or formatting. */
+function pmssTorrentClientsCatalogNoteValid($note): bool
+{
+    return is_string($note) && preg_match('/\A[^\p{Cc}\p{Cf}]{1,100}\z/u', $note) === 1
+        && preg_match('/[^\s\p{Z}]/u', $note) === 1;
+}
+
 /** Apply the same HTTPS list contract to daemon and optional web artifacts. */
 function pmssTorrentClientsCatalogUrlsValid($urls): bool
 {
@@ -35,6 +42,7 @@ function pmssTorrentClientsCatalogLoad(string $path): array
     $binaryNames = pmssTorrentClientsBinaryNames();
     foreach ($entries as $index => $entry) {
         if (!is_int($index) || $index < 0 || !is_array($entry)) return [];
+        if (array_key_exists('note', $entry) && !pmssTorrentClientsCatalogNoteValid($entry['note'])) return [];
         $client = $entry['client'] ?? null;
         $version = $entry['version'] ?? null;
         $kind = $entry['kind'] ?? null;
