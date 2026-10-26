@@ -77,6 +77,57 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
         );
     }
 
+    public function testReadSystemdPropertiesRequiresSuccessfulQuery(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-systemd-show-');
+        $this->pmssWriteExecutableFiles($binDir, [
+            'systemctl' => '#!/bin/sh'."\n".'printf \'%s\' "$PMSS_TEST_SYSTEMD_OUTPUT"'."\n"
+                .'exit "$PMSS_TEST_SYSTEMD_RC"'."\n",
+        ]);
+        $empty = ['MemoryCurrent' => '', 'TasksCurrent' => ''];
+        $complete = ['MemoryCurrent' => '12', 'TasksCurrent' => '3'];
+        $cases = [
+            [0, "MemoryCurrent=12\nTasksCurrent=3\n", $complete],
+            [0, "Ignored=99\nMemoryCurrent=12\nTasksCurrent=3", $complete],
+            [0, "MemoryCurrent= 12 \nTasksCurrent= 3 \n", $complete],
+            [0, 'MemoryCurrent=12', ['MemoryCurrent' => '12', 'TasksCurrent' => '']],
+            [0, "MemoryCurrent=99\nMemoryCurrent=12\nTasksCurrent=3\n", $complete],
+            [0, '', $empty],
+        ];
+        foreach ([1, 3, 124, 126, 127, 137, 255] as $exitCode) {
+            // Even complete-looking output must not conceal a failed command.
+            $cases[] = [$exitCode, "MemoryCurrent=12\nTasksCurrent=3\n", $empty];
+            $cases[] = [$exitCode, 'MemoryCurrent=12', $empty];
+            $cases[] = [$exitCode, '', $empty];
+        }
+        foreach ($cases as [$exitCode, $output, $expected]) {
+            $this->pmssWithPathPrefixedEnv($binDir, [
+                'PMSS_TEST_SYSTEMD_OUTPUT' => $output,
+                'PMSS_TEST_SYSTEMD_RC' => (string) $exitCode,
+            ], function () use ($expected, $complete): void {
+                $this->assertSame($expected,
+                    \pmssReadSystemdProperties('user-1000.slice', ['MemoryCurrent', 'TasksCurrent']));
+                $this->assertSame($expected === $complete ? ['memory' => 12, 'tasks' => 3] : null,
+                    \pmssReadSystemdIntProperties('user-1000.slice', ['MemoryCurrent' => 'memory', 'TasksCurrent' => 'tasks']));
+            });
+        }
+    }
+
+    public function testReadSystemdPropertiesRejectsFailedExecutionWithPartialOutput(): void
+    {
+        $script = <<<'PHP'
+namespace SystemdReadFailureFixture;
+function exec($command, &$lines, &$exitCode) {
+    $lines = ['MemoryCurrent=12'];
+    $exitCode = 0;
+    return false;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemdSliceProperties.php', 'SystemdReadFailureFixture');
+        $script .= 'echo json_encode(pmssReadSystemdProperties("user-1000.slice", ["MemoryCurrent", "TasksCurrent"]));';
+        $this->assertSame(['MemoryCurrent' => '', 'TasksCurrent' => ''], $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testTrailingIntParsesPlainNumericValues(): void
     {
         $this->assertEquals(4096, \pmssSystemdPropertyTrailingInt('4096'));

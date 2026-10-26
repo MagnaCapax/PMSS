@@ -58,8 +58,12 @@ function pmssBuildSystemdShowCommand(string $unit, array $propertyNames): string
 /** @param array<int, string> $propertyNames @return array<string, string> */
 function pmssReadSystemdProperties(string $unit, array $propertyNames): array
 {
-    $output = @shell_exec(pmssBuildSystemdShowCommand($unit, $propertyNames));
-    return pmssParseSystemdPropertyOutput($propertyNames, is_string($output) ? $output : '');
+    $lines = [];
+    $exitCode = 1;
+    $result = @exec(pmssBuildSystemdShowCommand($unit, $propertyNames), $lines, $exitCode);
+    // A failed query may emit partial properties; none establish a usable snapshot.
+    return pmssParseSystemdPropertyOutput($propertyNames,
+        $result !== false && $exitCode === 0 ? implode("\n", $lines) : '');
 }
 
 /** @param array<string, string> $properties @param array<string, string> $fieldMap @param array<string, int> $defaults @return array<string, int>|null */

@@ -684,6 +684,11 @@ iptables helpers:
 
 ## Resource Statistics
 
+- `pmssReadSystemdProperties()` accepts properties only after a successful
+  `systemctl show` exit. Failed execution or a nonzero exit discards any partial
+  stdout and returns the requested keys with empty values. Successful queries
+  retain requested-key filtering, last-value precedence and whitespace handling;
+  integer-property readers retain their existing missing-value result.
 - Monitoring projections retain iostat column precedence and the last Certbot marker's excerpt bounds.
 - Media-stack overall status derives from published app states: failed precedes stopped/degraded; off apps stay healthy.
 - Cgroup-v1 billing and performance collectors share `resources/v1.php` acquisition
