@@ -95,6 +95,44 @@ class ShowTrafficFormatTest extends TestCase
         }
     }
 
+    public function testRawCountersRejectNonFiniteValuesInEveryWindow(): void
+    {
+        $raw = ['month' => 10, 'week' => 7, 'day' => 1, 'hour' => 1, '15min' => 1];
+        foreach (array_keys($raw) as $key) {
+            foreach ([INF, -INF, NAN, '1e309', '-1e309'] as $value) {
+                $this->assertSame(null, \pmssShowTrafficRawCounters(['raw' => array_replace($raw, [$key => $value])]));
+            }
+            // Keep finite signed values and numeric spellings; this is not a new range policy.
+            foreach ([PHP_FLOAT_MAX, -PHP_FLOAT_MAX, '-2.5', '1e3', ' 12'] as $value) {
+                $expected = array_map('floatval', array_replace($raw, [$key => $value]));
+                $this->assertSame($expected, \pmssShowTrafficRawCounters(['raw' => array_replace($raw, [$key => $value])]));
+            }
+        }
+    }
+
+    public function testReportSkipsNonFiniteCachedRowsAndKeepsValidRawPayload(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-traffic-finite-');
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root]);
+        $raw = ['week' => '700', 'month' => '900.125', 'day' => 144, 'hour' => '36', '15min' => 15, 'extra' => 'kept'];
+        file_put_contents($root.'/valid', serialize(['raw' => $raw]));
+        $users = ['valid', 'absent'];
+        foreach (['month' => INF, 'week' => -INF, 'day' => NAN, 'hour' => '1e309', '15min' => '-1e309'] as $key => $value) {
+            $user = 'bad'.count($users);
+            $users[] = $user;
+            file_put_contents($root.'/'.$user, serialize(['raw' => array_replace($raw, [$key => $value])]));
+        }
+
+        $report = \pmssShowTrafficReportBuild($users, $root);
+        $payload = \pmssShowTrafficJsonPayload($report);
+        $this->assertSame(['valid'], array_column($report['rows'], 'user'));
+        $this->assertSame($raw, $payload['users'][0]['rawMiB']);
+        $this->assertSame(900.125, $report['totals']['monthMiB']);
+        $this->assertSame(['absent'], $payload['missingStatsUsers']);
+        $this->assertSame(['totalUsers' => 7, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 0, 'missingStats' => 1], $report['summary']);
+        $this->assertTrue(is_string(json_encode($payload)));
+    }
+
     public function testFormatRateDisplay(): void
     {
         foreach ([

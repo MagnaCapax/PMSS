@@ -754,6 +754,13 @@ iptables helpers:
   Terminal stats retain their help exit status and text layouts, including raw
   percentages beside clamped bars. Traffic columns retain unitless default rates
   and the extended display's 1000 MiB/s scaling threshold.
+- `pmssShowTrafficRawCounters()` rejects non-finite values after numeric
+  conversion in every required window. Infinity, NaN, and overflowing numeric
+  strings use the existing invalid-payload result; their cached rows are omitted
+  without entering the missing-file list. Finite signed values, raw numeric
+  types and field order, zero-month omission, report totals and output layouts
+  retain their contracts. `ShowTrafficFormatTest` covers the parser boundary
+  and mixed valid/malformed serialized caches.
 - Terminal rTorrent stats accept finite, non-negative numeric counter responses.
   Malformed counters retain the existing unavailable-probe result rather than
   reporting a successful zero; valid numeric strings and zero retain their values.
