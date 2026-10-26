@@ -85,6 +85,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   orchestration (ADR 0172).
 - **scripts/lib/user/qbittorrentWebUiAuth.php** – Opt-in qBittorrent WebUI config reconciliation. It checks the same path predicate as the writer, updates every managed key copy, and stops a matching native daemon at most once per account per day until a stopped pass applies the file. The customer panel's password-required helper lives under `etc/skel/www/`.
 - **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
+- **scripts/lib/update/apps/arr.php** – Shared ARR installer facade and app dispatch.
+  `arr/config.php` retains input guards, `arr/release.php` owns metadata-only
+  version reading and asset selection, and `arr/activation.php` runs explicit
+  download/extract/replace steps inside one workspace lifetime (ADR 0190).
 - **scripts/lib/update/apps/remoteBinary.php** – Pinned executable refresh facade.
   `remoteBinary/artifact.php` owns one verified-download callback lifetime;
   specialized callers retain explicit dry-run and diagnostic options.

@@ -20,6 +20,11 @@ class UpdateAppsBootstrapTest extends TestCase
                 $this->assertTrue(@copy($sourcePath, $sandboxDir.'/'.$file), 'Unable to copy '.$file.' into sandbox');
             }
         }
+        // Keep the isolated installer tree complete while deliberately omitting runtime.php.
+        $this->pmssEnsureDir($sandboxDir.'/arr');
+        foreach (glob($sourceDir.'/arr/*.php') ?: [] as $module) {
+            $this->assertTrue(@copy($module, $sandboxDir.'/arr/'.basename($module)), 'Unable to copy ARR helper');
+        }
         $helperPath = $sourceDir.'/../rootOwnedTree.php';
         $this->assertTrue(@copy($helperPath, $this->tempDir.'/rootOwnedTree.php'), 'Unable to copy shared tree helper');
 

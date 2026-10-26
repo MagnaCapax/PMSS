@@ -25,7 +25,7 @@ class AiDockerInstallerSafetyTest extends TestCase
             "preg_match('/\\Anode-v[0-9]+(?:\\.[0-9]+)*-linux-x64\\z/', \$entry)",
             'pmssRootOwnedTreeRemove($oldDir)',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/arr.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/arr/activation.php', [
             'umask 022 && tar --no-same-owner --no-same-permissions -xzf %s -C %s',
         ]);
     }

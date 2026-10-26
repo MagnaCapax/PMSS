@@ -47,6 +47,9 @@ class ArrInstallerNoExecPolicyTest extends TestCase
     public function testInstallerSourceContainsNoBinaryTrustOrProbePrimitives(): void
     {
         $source = (string) @file_get_contents(dirname(__DIR__, 2).'/update/apps/arr.php');
+        foreach (glob(dirname(__DIR__, 2).'/update/apps/arr/*.php') ?: [] as $module) {
+            $source .= (string) file_get_contents($module);
+        }
 
         $this->assertStringContainsString('pmssArrInstalledVersionRead', $source, 'sanity: installer source loaded');
         foreach (['is_executable', 'pmssAppVersionProbe', 'proc_open'] as $primitive) {
