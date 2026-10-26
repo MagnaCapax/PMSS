@@ -33,10 +33,25 @@ function pmssQbittorrentPasswordApplyStopped(string $user, string $home, string 
     $notice = $ops['notice'] ?? 'pmssQbittorrentNotice';
     return pmssQbittorrentConfigLocked($home, static function () use ($user, $home, $password, $prepare, $write, $notice, $ops): bool {
         if (!$prepare($user, $home, $ops)) return false;
-        if ($write($user, $password)) return true;
+        if ($write($user, $password)) {
+            $clear = $ops['noticeClear'] ?? 'pmssQbittorrentPasswordNoticeClear';
+            $clear($home);
+            return true;
+        }
         $notice($home, 'qBittorrent password synchronization failed: the configuration could not be written.');
         return false;
     }, $ops + ['attempts' => 301, 'passwordSync' => true]);
+}
+
+/** A successful sync supersedes an older password-sync failure notice; any other notice stays. */
+function pmssQbittorrentPasswordNoticeClear(string $home): void
+{
+    $path = $home.'/.config/pmss/torrentClients/qbittorrent.notice';
+    if (!is_file($path) || !pmssQbittorrentFileSafe($path)) return;
+    $text = pmssReadRegularFileContentsVerified($path, null, 4096);
+    if (is_string($text) && strpos($text, 'qBittorrent password synchronization failed') === 0) {
+        pmssReplaceUserFilePreservingMetadata(realpath($path), '', 0600);
+    }
 }
 
 /** Optional client sync cannot change the account-password command's exit status. */
