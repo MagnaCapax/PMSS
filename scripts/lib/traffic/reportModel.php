@@ -10,8 +10,7 @@ require_once dirname(__DIR__).'/user/trafficLimit.php';
 /** @return array<int,string>|null */
 function pmssShowTrafficUsersLoad(string $listUsersScript, string $statsDir): ?array
 {
-    $listUsersResult = pmssListManagedUsersResult($listUsersScript);
-    if (($users = pmssListManagedUsersFromResult($listUsersResult)) === null) return null;
+    if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult($listUsersScript))) === null) return null;
 
     $expanded = [];
     foreach ($users as $user) {
@@ -45,9 +44,6 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
         $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
         $inboundMonth = $ingressData !== null ? pmssTrafficRawMonthMiB($ingressData) : null;
 
-        $inboundRatio = ($inboundMonth !== null && $rawCounters['month'] > 0) ? round($inboundMonth / $rawCounters['month'], 2) : null;
-        $dataRates = ['week' => round(($rawCounters['week'] / (7 * 24 * 60 * 60)), 2), 'day' => round(($rawCounters['day'] / (24 * 60 * 60)), 2), 'hour' => round(($rawCounters['hour'] / (60 * 60)), 2), '15min' => round(($rawCounters['15min'] / (15 * 60)), 2)];
-
         if (!array_key_exists($baseUser, $limitCache)) {
             $parsedLimit = pmssTrafficLimitReadGiBFile(pmssTrafficLimitPath($baseUser));
             $limitCache[$baseUser] = $parsedLimit > 0 ? $parsedLimit : null;
@@ -55,7 +51,10 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
 
         $limitMiB = ($limitCache[$baseUser] !== null) ? ($limitCache[$baseUser] * 1024) : null;
         $pctUsed = $limitMiB !== null ? ($rawCounters['month'] / $limitMiB) * 100 : null;
-        $report['rows'][] = ['user' => $thisUser, 'rates' => $dataRates, 'inboundMonthMiB' => $inboundMonth, 'inboundRatio' => $inboundRatio, 'limitMiB' => $limitMiB, 'pctUsed' => $pctUsed, 'overLimit' => $pctUsed !== null && $pctUsed >= 100, 'nearLimit' => $pctUsed !== null && $pctUsed >= 80 && $pctUsed < 100, 'rawMiB' => $data['raw']];
+        $report['rows'][] = ['user' => $thisUser,
+            'rates' => ['week' => round(($rawCounters['week'] / (7 * 24 * 60 * 60)), 2), 'day' => round(($rawCounters['day'] / (24 * 60 * 60)), 2), 'hour' => round(($rawCounters['hour'] / (60 * 60)), 2), '15min' => round(($rawCounters['15min'] / (15 * 60)), 2)],
+            'inboundMonthMiB' => $inboundMonth, 'inboundRatio' => ($inboundMonth !== null && $rawCounters['month'] > 0) ? round($inboundMonth / $rawCounters['month'], 2) : null,
+            'limitMiB' => $limitMiB, 'pctUsed' => $pctUsed, 'overLimit' => $pctUsed !== null && $pctUsed >= 100, 'nearLimit' => $pctUsed !== null && $pctUsed >= 80 && $pctUsed < 100, 'rawMiB' => $data['raw']];
     }
 
     sort($report['missingStats'], SORT_NATURAL | SORT_FLAG_CASE);

@@ -39,9 +39,9 @@ function pmssUserResourcesListMain(array $argv): int
         return pmssCliReturnWithStderr("Error: This script must be run as root to query systemd slices.\n", 1);
     }
     $outputMode = pmssCliOption($parsed, 'jsonl') ? 'jsonl' : (pmssCliOption($parsed, 'json') ? 'json' : 'text');
-    $fullMode = (bool) pmssCliOption($parsed, 'full');
+    $displayMode = pmssCliOption($parsed, 'full') ? 'full' : 'brief';
     if (pmssCliRejectMutuallyExclusiveOptions($parsed, ['brief', 'full'], "Error: choose either --brief or --full (not both).\n", 'truthy')) return 1;
-    $columns = pmssUserResourcesListColumns([], $fullMode ? 'full' : 'brief');
+    $columns = pmssUserResourcesListColumns([], $displayMode);
     $format = implode(' ', array_map(static function (array $column): string { return '%-'.$column[1].'s'; }, $columns))."\n";
     $users = pmssListManagedUsers('/scripts/listUsers.php');
     if ($users === []) {
@@ -50,7 +50,7 @@ function pmssUserResourcesListMain(array $argv): int
     }
     if ($outputMode === 'text') {
         printf($format, ...array_column($columns, 0));
-        echo str_repeat('-', $fullMode ? 180 : 120)."\n";
+        echo str_repeat('-', $displayMode === 'full' ? 180 : 120)."\n";
     }
     $allData = [];
     $sliceKeys = ['MemoryHigh', 'MemoryMax', 'CPUWeight', 'IOWeight', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota', 'IOReadBandwidthMax', 'IOWriteBandwidthMax', 'IOReadIOPSMax', 'IOWriteIOPSMax', 'TasksMax'];
@@ -65,7 +65,7 @@ function pmssUserResourcesListMain(array $argv): int
         } elseif ($outputMode === 'json') {
             $allData[] = $resourceData;
         } else {
-            printf($format, ...pmssUserResourcesListRowBuild($resourceData, $fullMode ? 'full' : 'brief'));
+            printf($format, ...pmssUserResourcesListRowBuild($resourceData, $displayMode));
         }
     }
     return $outputMode === 'json' ? pmssJsonEmitPayload($allData, 'Failed to encode user resources JSON.', JSON_PRETTY_PRINT) : 0;

@@ -2,6 +2,13 @@
 /** Pure configured-resource column catalog and text formatting.
  * @license GPL-3.0-only
  */
+/** Share the legacy one-decimal rounding and integer display rule across units. */
+function pmssUserResourcesListNumberFormat(float $value): string
+{
+    $rounded = round($value, 1);
+    return (string) ((abs($rounded - (int) $rounded) < 0.05) ? (int) $rounded : $rounded);
+}
+
 /** Format a byte value in a compact binary unit. */
 function pmssUserResourcesListBinaryFormat(?int $bytes): string
 {
@@ -10,18 +17,13 @@ function pmssUserResourcesListBinaryFormat(?int $bytes): string
     }
     $units = ['B', 'K', 'M', 'G', 'T'];
     $pow = min((int) floor(log($bytes) / log(1024)), count($units) - 1);
-    $rounded = round($bytes / (1 << (10 * $pow)), 1);
-    return ((abs($rounded - (int) $rounded) < 0.05) ? (int) $rounded : $rounded).$units[$pow];
+    return pmssUserResourcesListNumberFormat($bytes / (1 << (10 * $pow))).$units[$pow];
 }
 
 /** Format GiB values compactly for text output. */
 function pmssUserResourcesListGiBFormat($value): string
 {
-    if ($value === null) {
-        return '-';
-    }
-    $rounded = round((float) $value, 1);
-    return ((abs($rounded - (int) $rounded) < 0.05) ? (int) $rounded : $rounded).'G';
+    return $value === null ? '-' : pmssUserResourcesListNumberFormat((float) $value).'G';
 }
 
 /** One ordered catalog supplies headers, widths and formatted values together. */

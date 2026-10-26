@@ -19,9 +19,8 @@ function pmssShowTrafficJsonPayload(array $report): array
 
 function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): void
 {
-    $isLocalnet = pmssTrafficUserKeyIsLocalnet((string) $row['user']);
-    $baseUser = pmssTrafficUserKeyBaseUser((string) $row['user']);
-    $label = ($isLocalnet ? "{$baseUser} (L)" : $baseUser).':';
+    $label = pmssTrafficUserKeyBaseUser((string) $row['user'])
+        .(pmssTrafficUserKeyIsLocalnet((string) $row['user']) ? ' (L)' : '').':';
     $display = pmssShowTrafficDisplayAmounts($row['rawMiB']);
     $inboundText = $row['inboundMonthMiB'] !== null ? pmssTrafficFormatAmount((float) $row['inboundMonthMiB']) : '-';
     $ratioText = $row['inboundRatio'] !== null ? sprintf('%.2f', (float) $row['inboundRatio']) : 'n/a';

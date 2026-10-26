@@ -13,13 +13,12 @@ pmssRequireRelativeFiles(__DIR__, ['../systemdSliceProperties.php', 'selection.p
 function pmssUserResourcesListQuotaState(?array $userConfig, bool $suspended): array
 {
     $diskQuotaGiB = is_numeric($userConfig['quota'] ?? null) ? (int) $userConfig['quota'] : null;
-    // Explicit zero bursts survive; only missing/invalid values derive from the quota.
-    $diskBurstGiB = is_numeric($userConfig['quotaBurst'] ?? null) ? (int) $userConfig['quotaBurst']
-        : ($diskQuotaGiB === null ? null : (int) round($diskQuotaGiB * 1.25));
     $inodeQuota = $diskQuotaGiB !== null && $diskQuotaGiB > 0 ? max($diskQuotaGiB * 500, 15000) : null;
     return [
         'disk_quota_gib' => $diskQuotaGiB,
-        'disk_burst_gib' => $diskBurstGiB,
+        // Explicit zero bursts survive; only missing/invalid values derive from the quota.
+        'disk_burst_gib' => is_numeric($userConfig['quotaBurst'] ?? null) ? (int) $userConfig['quotaBurst']
+            : ($diskQuotaGiB === null ? null : (int) round($diskQuotaGiB * 1.25)),
         'inode_quota' => $inodeQuota,
         'inode_burst' => $inodeQuota === null ? null : (int) floor($inodeQuota * 1.25),
         'suspended' => $suspended || (bool) ($userConfig['suspended'] ?? false),
