@@ -197,3 +197,20 @@ service": one click starts the app. The tile and the Apps row still describe it 
 "AI agent with shell access; uses your Pulsed Media AI credits by default". Turn off
 and the pmss-stopped marker are unchanged, and the installer already ran
 non-interactively with `install --yes` from the panel.
+
+## Amendment: update refreshes the pinned Node (2026-10-26)
+
+`install-openclaw update` now runs the same pinned Node step as a fresh
+install, after stopping the gateway and before npm. Before this, only a fresh
+install downloaded Node: a repeat `install` skips onboarding, and `update`
+reused whatever runtime was present, so a pin bump never reached existing
+accounts. The step is a no-op when the private runtime already reports the
+pinned version. Otherwise the archive is downloaded and its SHA256 checked
+before the old runtime is moved aside. A failed download, check or extraction
+removes its staging directory, keeps the old runtime, and goes through the
+update's existing restart-then-report path. The swap holds both Node trees for
+a moment (about 5,900 extra entries for 24.22.1), well inside the 60,000-file
+preflight.
+
+The pin moves to 24.22.1, the 24.x security release that fixes
+CVE-2026-111497, an out-of-bounds write in the bundled Brotli decoder.

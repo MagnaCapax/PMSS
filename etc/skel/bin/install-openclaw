@@ -2,8 +2,8 @@
 <?php
 /** Per-account OpenClaw installer and cron watchdog. Run only as the account owner. */
 
-const OC_NODE_VERSION = '24.21.0';
-const OC_NODE_SHA256 = 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6';
+const OC_NODE_VERSION = '24.22.1';
+const OC_NODE_SHA256 = '6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6';
 const OC_CRON_TAG = '# pmss-openclaw';
 const OC_REQUIRED_FILES = 60000;
 const OC_UPDATE_REQUIRED_FILES = 60000;
@@ -330,12 +330,14 @@ function ocInstallNode(array $paths): void
     $name = 'node-v'.OC_NODE_VERSION.'-linux-x64.tar.xz';
     list($rc, $out) = ocRun(array('curl', '-fsSL', '--connect-timeout', '15', '--max-time', '300', 'https://nodejs.org/dist/v'.OC_NODE_VERSION.'/'.$name, '-o', $archive));
     if ($rc !== 0 || !is_file($archive) || !hash_equals(OC_NODE_SHA256, hash_file('sha256', $archive))) {
+        ocRemoveTree($work);
         throw new RuntimeException('Node download or SHA256 verification failed: '.$out);
     }
     $stage = $work.'/node';
     mkdir($stage, 0700);
     list($rc, $out) = ocRun(array('tar', '-xJf', $archive, '--strip-components=1', '-C', $stage));
     if ($rc !== 0) {
+        ocRemoveTree($work);
         throw new RuntimeException('Node extraction failed: '.$out);
     }
     $target = dirname($paths['node'], 2);
@@ -817,6 +819,8 @@ function ocUpdate(array $paths): void
     ocWriteCliWrapper($paths);
     ocStop($paths);
     try {
+        // A Node pin bump reaches existing installs only here; a current runtime is kept as it is.
+        ocInstallNode($paths);
         foreach (ocUpdateRuntimeDirs($paths) as $dir) {
             ocRemoveTree($dir);
         }

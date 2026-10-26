@@ -109,8 +109,7 @@ final class OpenClawInstallerTest extends TestCase
         if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');
         $home = $this->pmssMakeTempDir('pmss-oc-update-');
         $paths = \ocPaths($home);
-        mkdir(dirname($paths['node']), 0700, true);
-        symlink(PHP_BINARY, $paths['node']);
+        $this->openClawNodeShim($paths);
         mkdir(dirname($paths['entry']), 0700, true);
         mkdir(dirname($paths['npm']), 0700, true);
         mkdir($paths['state'], 0700);
@@ -661,6 +660,7 @@ $file = $argv[1]; array_shift($argv); require $file;');
             'apiKey' => array('source' => 'env', 'provider' => 'default', 'id' => 'CUSTOM_API_KEY'),
             'models' => array(array('id' => 'default', 'name' => 'default')));
         $paths = $this->openClawConfigFixture(array('models' => array('providers' => array('virsilipas' => $provider))));
+        $paths['node'] = $this->openClawNodeShim($paths);
         $paths['npm'] = $paths['home'].'/npm.php';
         file_put_contents($paths['npm'], '<?php // No network.');
         \ocPrivateMarkerWrite($paths['state'].'/pmss-virsilipas', "virsilipas\n");
@@ -682,6 +682,60 @@ $file = $argv[1]; array_shift($argv); require $file;');
             explode("\n", trim(file_get_contents($paths['home'].'/calls'))));
         $this->assertSame(array('--version', 'doctor', 'config', 'config', 'gateway'), array_column($calls, 0));
         $this->assertSame('models.providers.virsilipas.models', $calls[2][2]);
+    }
+
+    public function testUpdateReplacesAnOutdatedNodeOnlyFromTheVerifiedPinnedArchive(): void
+    {
+        $paths = $this->openClawConfigFixture();
+        $home = $paths['home'];
+        $paths['node'] = $this->openClawNodeShim($paths, '24.21.0');
+        $paths['npm'] = $home.'/npm.php';
+        file_put_contents($paths['npm'], '<?php touch(getenv("OC_TEST_NPM_MARK"));');
+        touch($paths['state'].'/pmss-kokko-disabled');
+        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        mkdir($home.'/stubs', 0700);
+        file_put_contents($home.'/stubs/quota', "#!/bin/sh\nexit 0\n");
+        // The fake download is never the pinned archive, so its SHA256 check must fail.
+        file_put_contents($home.'/stubs/curl', "#!/bin/sh\necho \"\$@\" >>".escapeshellarg($home.'/curl-args')
+            ."\nwhile [ \$# -gt 0 ]; do [ \"\$1\" = -o ] && printf 'not node' >\"\$2\"; shift; done\n");
+        chmod($home.'/stubs/quota', 0700);
+        chmod($home.'/stubs/curl', 0700);
+        $prior = getenv('PATH');
+        putenv('PATH='.$home.'/stubs:'.$prior);
+        putenv('OC_TEST_NPM_MARK='.$home.'/npm-ran');
+        try {
+            $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Node download or SHA256 verification failed');
+            $url = 'https://nodejs.org/dist/v'.OC_NODE_VERSION.'/node-v'.OC_NODE_VERSION.'-linux-x64.tar.xz';
+            $this->assertStringContainsString($url, file_get_contents($home.'/curl-args'));
+            $this->assertSame(array(0, 'v24.21.0'), \ocRun(array($paths['node'], '--version')));
+            $this->assertFalse(file_exists($home.'/npm-ran'));
+            $this->assertSame(array(), glob($home.'/.local/share/.node-openclaw-*'));
+            // The failure still went through the gateway restart attempt.
+            $calls = array_map(static function (string $line): array { return json_decode($line, true); },
+                explode("\n", trim(file_get_contents($home.'/calls'))));
+            $this->assertSame(array('--version', 'config', 'gateway'), array_column($calls, 0));
+            // With the pinned runtime in place, update downloads nothing and goes on to npm.
+            $this->openClawNodeShim($paths);
+            unlink($home.'/curl-args');
+            $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Gateway did not stay running');
+            $this->assertFalse(file_exists($home.'/curl-args'));
+            $this->assertTrue(file_exists($home.'/npm-ran'));
+        } finally {
+            $prior === false ? putenv('PATH') : putenv('PATH='.$prior);
+            putenv('OC_TEST_NPM_MARK');
+        }
+    }
+
+    /** A node shim at the private runtime path reports a version and runs PHP entry scripts in place of Node. */
+    private function openClawNodeShim(array $paths, string $version = OC_NODE_VERSION): string
+    {
+        $node = \ocPaths($paths['home'])['node'];
+        if (!is_dir(dirname($node))) mkdir(dirname($node), 0700, true);
+        file_put_contents($node, '#!'.PHP_BINARY."\n".'<?php
+if (($argv[1] ?? "") === "--version") { echo "v'.$version.'"; exit; }
+$file = $argv[1]; array_shift($argv); require $file;');
+        chmod($node, 0700);
+        return $node;
     }
 
     /** Minimal tar headers let tests express unsafe names and links without extracting them. */
