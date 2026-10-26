@@ -360,6 +360,8 @@ function pmssUserWatchdogCommandRun($command, $seconds, $user, $service): array 
 }
 function pmssUserLog($user, $message): void {}
 PHP;
+        // Catalog callbacks name global renderers even when bootstrap is namespaced.
+        $script .= 'require_once '.var_export($this->pmssRepoPath('etc/skel/www/toggleAppRuntime.php'), true).';';
         $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/www/toggleAppRuntime.php', 'ToggleRegenerationFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'ToggleRegenerationFixture');
         $script .= '$root = '.var_export($root, true).';';
@@ -368,29 +370,29 @@ putenv('PMSS_TEST_MODE=1');
 putenv('PMSS_HOME_DIR='.$root.'/home');
 putenv('PMSS_RUNTIME_DIR='.$root.'/runtime');
 putenv('PMSS_TOGGLE_APP_STATE_DIR='.$root.'/state');
-$home = $root.'/home/fixtureuser';
+$home = $root.'/home/fixture';
 $proxy = 'proxy';
 $GLOBALS['starts'] = 0;
 $GLOBALS['stops'] = [];
 $GLOBALS['running'] = true;
 $bootstrap = static function (bool $restart = false) use ($home, $proxy): bool {
-    return pmssToggleAppBootstrap('copyparty', 'fixtureuser', $home, 23001, $proxy, 0, $restart);
+    return pmssToggleAppBootstrap('copyparty', 'fixture', $home, 23001, $proxy, 0, $restart);
 };
 $initial = $bootstrap();
 $login = $home.'/.pmss/apps/copyparty.login';
 $oldLogin = file_get_contents($login);
 $GLOBALS['config'] = $home.'/.config/copyparty/copyparty.conf';
 file_put_contents($GLOBALS['config'], 'mismatch');
-pmssUserWatchdogCrashState('fixtureuser', 'copyparty', ['failures' => 4, 'pending' => true, 'restart' => '']);
+pmssUserWatchdogCrashState('fixture', 'copyparty', ['failures' => 4, 'pending' => true, 'restart' => '']);
 $spec = pmssUserWatchdogServiceSpec('copyparty', static function () use ($bootstrap): string {
     return $bootstrap(true) ? 'start-app' : '';
 }, 'start', '', ['securedMarker' => '.pmss/apps/copyparty.secured', 'crashLoop' => 'copyparty']);
 $cycles = [];
 for ($cycle = 0; $cycle < 3; $cycle++) {
     ob_start();
-    pmssUserWatchdogEnsureServices('fixtureuser', [$spec], ['copyparty' => $GLOBALS['running']]);
+    pmssUserWatchdogEnsureServices('fixture', [$spec], ['copyparty' => $GLOBALS['running']]);
     ob_end_clean();
-    $cycles[] = [count($GLOBALS['stops']), $GLOBALS['starts'], pmssUserWatchdogCrashState('fixtureuser', 'copyparty')];
+    $cycles[] = [count($GLOBALS['stops']), $GLOBALS['starts'], pmssUserWatchdogCrashState('fixture', 'copyparty')];
 }
 echo json_encode([$initial, $GLOBALS['stops'], $cycles, $oldLogin !== file_get_contents($login),
     pmssUserWatchdogRestartToken($home, 'copyparty'), $bootstrap(true), file_get_contents($login),
@@ -417,13 +419,14 @@ namespace ToggleRegenerationGuardFixture;
 function pmssCustomerNativeStop(array $binaries): void { $GLOBALS['stops']++; }
 PHP;
         $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/user/watchdog.php'), true).';';
+        $script .= 'require_once '.var_export($this->pmssRepoPath('etc/skel/www/toggleAppRuntime.php'), true).';';
         $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/www/toggleAppRuntime.php', 'ToggleRegenerationGuardFixture');
         $script .= '$home = '.var_export($root, true).';';
         $script .= <<<'PHP'
 putenv('PMSS_TEST_MODE=1');
 $GLOBALS['stops'] = 0;
 $bootstrap = static function ($port = 23001, $restart = true) use ($home): bool {
-    return pmssToggleAppBootstrap('copyparty', 'fixtureuser', $home, $port, 'proxy', 0, $restart);
+    return pmssToggleAppBootstrap('copyparty', 'fixture', $home, $port, 'proxy', 0, $restart);
 };
 $invalid = $bootstrap(1);
 $first = $bootstrap();
