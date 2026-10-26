@@ -4,10 +4,10 @@ require_once __DIR__.'/qbittorrentAccountProcess.php';
 require_once __DIR__.'/../runtime/filesystem.php';
 require_once __DIR__.'/qbittorrentBuildProbe.php';
 
-/** Accept only a numeric release, optionally carrying the curated libtorrent label. */
+/** Accept only a numeric release with the curated labels; an Enhanced Edition build reads as its upstream release. */
 function pmssQbittorrentBuildNumber(?string $value): ?string
 {
-    return is_string($value) && preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:-lt(?:1\.2|2\.[01]))?\z/', trim($value), $m) === 1
+    return is_string($value) && preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:\.[0-9]+-ee)?(?:-lt(?:1\.2|2\.[01]))?(?:-not-for-private-trackers)?\z/', trim($value), $m) === 1
         ? $m[1] : null;
 }
 

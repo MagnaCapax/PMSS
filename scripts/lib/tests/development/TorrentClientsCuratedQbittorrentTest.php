@@ -29,8 +29,9 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
     private function entries(): array
     {
         $catalog = \pmssTorrentClientsCatalogLoad(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json');
+        // The userdocs families only; the Enhanced Edition entry has its own test.
         return array_values(array_filter($catalog, static function ($entry) {
-            return $entry['client'] === 'qbittorrent' && $entry['kind'] === 'static';
+            return $entry['client'] === 'qbittorrent' && $entry['kind'] === 'static' && strpos($entry['version'], '-ee-') === false;
         }));
     }
 

@@ -113,3 +113,10 @@ first time it starts on a config. ADR 0182 keeps every PMSS reader and writer on
 the section the config actually uses and restores the settings to `[Preferences]`
 before an older build starts, so moving between 5.3.0 and the earlier builds keeps
 the account port, password and access settings.
+
+## Amendment 2026-10-25: qBittorrent Enhanced Edition 5.2.4.10
+
+One non-userdocs entry is added, `5.2.4.10-ee-lt1.2-not-for-private-trackers`,
+re-hosted on pulsedmedia.com and pinned by sha256. Its label, release parsing and
+downgrade handling are in [ADR 0183](0183-qbittorrent-enhanced-edition-entry.md).
+The userdocs rules above do not apply to it.

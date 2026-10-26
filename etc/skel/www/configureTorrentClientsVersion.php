@@ -53,20 +53,22 @@ function pmssConfigureTorrentClientVersionsOffered($client = 'qbittorrent',
     return pmssConfigureTorrentClientVersionsRead($path, $client);
 }
 
-/** Name the libtorrent generation of a curated qBittorrent build in words. */
+/** Name the libtorrent generation of a curated qBittorrent build in words; Enhanced Edition keeps its warning. */
 function pmssConfigureTorrentClientVersionLabel($version): string
 {
     $version = (string) $version;
+    if (preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+){0,2})-ee-lt(1\.2|2\.[01])(?:-not-for-private-trackers)?\z/', $version, $m) === 1)
+        return $m[1].' Enhanced Edition (libtorrent '.$m[2].'), not for private trackers';
     return preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)-lt(1\.2|2\.[01])\z/', $version, $m) === 1
         ? $m[1].' (libtorrent '.$m[2].')' : $version;
 }
 
-/** Numeric releases, including curated libtorrent suffixes, prove major downgrades. */
+/** Numeric releases, including curated libtorrent and Enhanced Edition suffixes, prove major downgrades. */
 function pmssConfigureTorrentClientMajorDowngrade($previous, $requested): bool
 {
     if (!is_string($previous) || !is_string($requested)
-        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.[01]))?\z/', $previous, $old) !== 1
-        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.[01]))?\z/', $requested, $new) !== 1) return false;
+        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+){0,2}(?:-ee)?(?:-lt(?:1\.2|2\.[01]))?(?:-not-for-private-trackers)?\z/', $previous, $old) !== 1
+        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+){0,2}(?:-ee)?(?:-lt(?:1\.2|2\.[01]))?(?:-not-for-private-trackers)?\z/', $requested, $new) !== 1) return false;
     // Compare decimal strings without integer overflow from long catalog values.
     $oldMajor = ltrim($old[1], '0');
     $newMajor = ltrim($new[1], '0');
