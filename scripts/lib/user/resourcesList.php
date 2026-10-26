@@ -9,110 +9,8 @@
  */
 
 require_once __DIR__.'/../cli/optionParser.php';
-require_once __DIR__.'/../systemdSliceProperties.php';
-require_once __DIR__.'/../userLifecycle.php';
-require_once __DIR__.'/traffic.php';
-require_once __DIR__.'/trafficLimit.php';
-require_once __DIR__.'/userConfigStore.php';
-
-/** Format a byte value in a compact binary unit. */
-function pmssUserResourcesListBinaryFormat(?int $bytes): string
-{
-    if ($bytes === null || $bytes <= 0) {
-        return '-';
-    }
-    $units = ['B', 'K', 'M', 'G', 'T'];
-    $pow = min((int) floor(log($bytes) / log(1024)), count($units) - 1);
-    $rounded = round($bytes / (1 << (10 * $pow)), 1);
-    return ((abs($rounded - (int) $rounded) < 0.05) ? (int) $rounded : $rounded).$units[$pow];
-}
-
-/** Format GiB values compactly for text output. */
-function pmssUserResourcesListGiBFormat($value): string
-{
-    if ($value === null) {
-        return '-';
-    }
-    $rounded = round((float) $value, 1);
-    return ((abs($rounded - (int) $rounded) < 0.05) ? (int) $rounded : $rounded).'G';
-}
-
-/**
- * Compute quota- and suspension-derived fields from stored user config.
- *
- * @return array{disk_quota_gib:?int,disk_burst_gib:?int,inode_quota:?int,inode_burst:?int,suspended:bool}
- */
-function pmssUserResourcesListQuotaState(?array $userConfig, bool $suspended): array
-{
-    $diskQuotaGiB = is_numeric($userConfig['quota'] ?? null) ? (int) $userConfig['quota'] : null;
-    $diskBurstGiB = is_numeric($userConfig['quotaBurst'] ?? null) ? (int) $userConfig['quotaBurst'] : null;
-    // Explicit zero bursts survive; only missing/invalid values derive from the quota.
-    if ($diskBurstGiB === null && $diskQuotaGiB !== null) {
-        $diskBurstGiB = (int) round($diskQuotaGiB * 1.25);
-    }
-    $inodeQuota = $diskQuotaGiB !== null && $diskQuotaGiB > 0 ? max($diskQuotaGiB * 500, 15000) : null;
-    return [
-        'disk_quota_gib' => $diskQuotaGiB,
-        'disk_burst_gib' => $diskBurstGiB,
-        'inode_quota' => $inodeQuota,
-        'inode_burst' => $inodeQuota === null ? null : (int) floor($inodeQuota * 1.25),
-        'suspended' => $suspended || (bool) ($userConfig['suspended'] ?? false),
-    ];
-}
-
-/** Build one resource entry from systemd properties and local PMSS state. */
-function pmssUserResourcesListEntryBuild(string $user, array $info, array $props, ?array $userConfig): array
-{
-    $quotaState = pmssUserResourcesListQuotaState($userConfig, is_dir("/home/{$user}/www-disabled"));
-    return [
-        'user' => $user,
-        'uid' => $info['uid'],
-        'memory_high' => pmssSystemdPropertyTrailingInt($props['MemoryHigh']),
-        'memory_max' => pmssSystemdPropertyTrailingInt($props['MemoryMax']),
-        'cpu_weight' => is_numeric($props['CPUWeight']) ? (int) $props['CPUWeight'] : null,
-        'cpu_quota_percent' => pmssSystemdCpuQuotaPercent($props),
-        'io_weight' => is_numeric($props['IOWeight']) ? (int) $props['IOWeight'] : null,
-        'io_read_bandwidth' => pmssSystemdPropertyTrailingInt($props['IOReadBandwidthMax']),
-        'io_write_bandwidth' => pmssSystemdPropertyTrailingInt($props['IOWriteBandwidthMax']),
-        'io_read_iops' => pmssSystemdPropertyTrailingInt($props['IOReadIOPSMax']),
-        'io_write_iops' => pmssSystemdPropertyTrailingInt($props['IOWriteIOPSMax']),
-        'disk_quota_gib' => $quotaState['disk_quota_gib'],
-        'disk_burst_gib' => $quotaState['disk_burst_gib'],
-        'inode_quota' => $quotaState['inode_quota'],
-        'inode_burst' => $quotaState['inode_burst'],
-        'network_limit_gib' => (($trafficLimitGiB = pmssTrafficLimitReadGiBFile("/home/{$user}/.trafficLimit")) > 0) ? $trafficLimitGiB : null,
-        'network_used_gib' => round(pmssReadUserTrafficMonth("/home/{$user}/.trafficData") / 1024, 1),
-        'process_max' => pmssSystemdPropertyTrailingInt($props['TasksMax']),
-        'suspended' => $quotaState['suspended'],
-    ];
-}
-
-/** Render a text row for the chosen mode. */
-function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode): array
-{
-    return array_merge([
-        substr($resourceData['user'], 0, 10),
-        (string) $resourceData['uid'],
-        pmssUserResourcesListBinaryFormat($resourceData['memory_high']),
-        pmssUserResourcesListBinaryFormat($resourceData['memory_max']),
-        (string) ($resourceData['cpu_weight'] ?? '-'),
-        $resourceData['cpu_quota_percent'] === null ? '-' : $resourceData['cpu_quota_percent'].'%',
-        (string) ($resourceData['io_weight'] ?? '-'),
-        pmssUserResourcesListBinaryFormat($resourceData['io_read_bandwidth']),
-        pmssUserResourcesListBinaryFormat($resourceData['io_write_bandwidth']),
-        (string) ($resourceData['io_read_iops'] ?? '-'),
-        (string) ($resourceData['io_write_iops'] ?? '-'),
-    ], $displayMode !== 'full' ? [] : [
-        pmssUserResourcesListGiBFormat($resourceData['disk_quota_gib']),
-        pmssUserResourcesListGiBFormat($resourceData['disk_burst_gib']),
-        (string) ($resourceData['inode_quota'] ?? '-'),
-        (string) ($resourceData['inode_burst'] ?? '-'),
-        $resourceData['network_limit_gib'] === null ? 'inf' : pmssUserResourcesListGiBFormat($resourceData['network_limit_gib']),
-        pmssUserResourcesListGiBFormat($resourceData['network_used_gib']),
-        (string) ($resourceData['process_max'] ?? 'inf'),
-        $resourceData['suspended'] ? 'yes' : 'no',
-    ]);
-}
+require_once __DIR__.'/resourcesListModel.php';
+require_once __DIR__.'/resourcesListDisplay.php';
 
 /** Main CLI entrypoint for resource listing. */
 function pmssUserResourcesListMain(array $argv): int
@@ -140,25 +38,18 @@ function pmssUserResourcesListMain(array $argv): int
     if (posix_getuid() !== 0) {
         return pmssCliReturnWithStderr("Error: This script must be run as root to query systemd slices.\n", 1);
     }
-    $outputJsonl = (bool) pmssCliOption($parsed, 'jsonl');
-    $outputJson = !$outputJsonl && (bool) pmssCliOption($parsed, 'json');
+    $outputMode = pmssCliOption($parsed, 'jsonl') ? 'jsonl' : (pmssCliOption($parsed, 'json') ? 'json' : 'text');
     $fullMode = (bool) pmssCliOption($parsed, 'full');
     if (pmssCliRejectMutuallyExclusiveOptions($parsed, ['brief', 'full'], "Error: choose either --brief or --full (not both).\n", 'truthy')) return 1;
-    // Full mode extends the same eleven-column prefix used by brief rows.
-    $format = "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s";
-    $headers = ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS"];
-    if ($fullMode) {
-        $format .= " %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s";
-        array_push($headers, "DskQ", "DskB", "InoQ", "InoB", "NetLim", "NetUsed", "ProcMax", "Suspended");
-    }
-    $format .= "\n";
+    $columns = pmssUserResourcesListColumns([], $fullMode ? 'full' : 'brief');
+    $format = implode(' ', array_map(static function (array $column): string { return '%-'.$column[1].'s'; }, $columns))."\n";
     $users = pmssListManagedUsers('/scripts/listUsers.php');
     if ($users === []) {
-        echo $outputJson ? "[]\n" : ($outputJsonl ? '' : "No users found.\n");
+        echo ['json' => "[]\n", 'jsonl' => '', 'text' => "No users found.\n"][$outputMode];
         return 0;
     }
-    if (!$outputJson && !$outputJsonl) {
-        printf($format, ...$headers);
+    if ($outputMode === 'text') {
+        printf($format, ...array_column($columns, 0));
         echo str_repeat('-', $fullMode ? 180 : 120)."\n";
     }
     $allData = [];
@@ -169,16 +60,13 @@ function pmssUserResourcesListMain(array $argv): int
             continue;
         }
         $resourceData = pmssUserResourcesListEntryBuild($user, $info, pmssReadSystemdProperties('user-'.$info['uid'].'.slice', $sliceKeys), $store->get($user));
-        if ($outputJsonl) {
+        if ($outputMode === 'jsonl') {
             if (pmssJsonEmitPayload($resourceData, 'Failed to encode user resources JSON line.') !== 0) return 1;
-        } elseif ($outputJson) {
+        } elseif ($outputMode === 'json') {
             $allData[] = $resourceData;
         } else {
             printf($format, ...pmssUserResourcesListRowBuild($resourceData, $fullMode ? 'full' : 'brief'));
         }
     }
-    if ($outputJson) {
-        return pmssJsonEmitPayload($allData, 'Failed to encode user resources JSON.', JSON_PRETTY_PRINT);
-    }
-    return 0;
+    return $outputMode === 'json' ? pmssJsonEmitPayload($allData, 'Failed to encode user resources JSON.', JSON_PRETTY_PRINT) : 0;
 }

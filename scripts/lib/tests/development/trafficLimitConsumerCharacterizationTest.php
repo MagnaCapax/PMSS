@@ -75,11 +75,11 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testUserResourcesTrafficStateReadingDelegatesToSharedHelpers(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/resourcesList.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/resourcesListModel.php', [
             '"/home/{$user}/.trafficLimit"',
             '"/home/{$user}/.trafficData"',
-            "require_once __DIR__.'/traffic.php';",
-            "require_once __DIR__.'/trafficLimit.php';",
+            "'traffic.php'",
+            "'trafficLimit.php'",
             'pmssTrafficLimitReadGiBFile("/home/{$user}/.trafficLimit")',
             'pmssReadUserTrafficMonth("/home/{$user}/.trafficData")',
             'max($diskQuotaGiB * 500, 15000)',
