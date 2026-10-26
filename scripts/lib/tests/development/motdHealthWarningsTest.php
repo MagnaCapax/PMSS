@@ -6,6 +6,69 @@ require_once dirname(__DIR__, 3).'/motd/Generator.php';
 
 class MotdHealthWarningsTest extends TestCase
 {
+    public function testMalformedNestedHealthRecordsDoNotInterruptAcceptedWarnings(): void
+    {
+        $log = $this->pmssMakeJsonLogPath('pmss-motd-health-shape-', 'health.jsonl');
+        $malformed = [
+            ['kind' => 'smart', 'device' => []],
+            ['kind' => 'smart', 'device' => ['name' => '/dev/sda']],
+            ['kind' => 'nvme', 'device' => [], 'metrics' => ['critical_warnings' => 1]],
+            ['kind' => 'nvme', 'device' => ['name' => '/dev/nvme0n1'], 'metrics' => ['critical_warnings' => 1]],
+            ['kind' => 'nvme', 'metrics' => 'invalid'],
+            ['kind' => 'nvme', 'metrics' => true],
+            ['kind' => 'nvme', 'metrics' => ['critical_warnings' => [1]]],
+            ['kind' => 'nvme', 'metrics' => ['critical_warnings' => ['value' => 1]]],
+            ['kind' => 'raid', 'severity' => 'fail', 'array' => []],
+            ['kind' => 'raid', 'severity' => 'fail', 'state' => []],
+            ['kind' => 'raid', 'severity' => []],
+            ['kind' => 'raid', 'severity' => 'fail', 'flags' => [['degraded']]],
+            ['kind' => 'raid', 'severity' => 'fail', 'flags' => ['value' => ['degraded']]],
+        ];
+        foreach ($malformed as $entry) {
+            file_put_contents($log, '');
+            $this->pmssAppendFixtureLines($log, [
+                ['kind' => 'raid', 'array' => 'md0', 'severity' => 'fail', 'flags' => ['degraded']],
+                ['kind' => 'nvme', 'device' => '/dev/nvme0n1', 'metrics' => ['critical_warnings' => 1]],
+                $entry,
+                ['kind' => 'smart', 'device' => '/dev/sda', 'flags' => ['udma_crc_increase']],
+            ]);
+            // Also fail on warnings: malformed labels must never leak "Array" into the MOTD.
+            set_error_handler(static function ($severity, $message, $file, $line): void {
+                throw new \ErrorException($message, 0, $severity, $file, $line);
+            });
+            try {
+                $this->pmssWithEnv(['PMSS_HEALTH_LOG_PATH' => $log], function (): void {
+                    $this->assertSame('RAID md0: degraded | NVMe critical warning: /dev/nvme0n1 | SATA UDMA CRC increased: /dev/sda',
+                        \pmssMotdStorageWarnings());
+                });
+            } finally {
+                restore_error_handler();
+            }
+        }
+    }
+
+    public function testHealthProjectionRetainsOrderingDefaultsAndLatestSmartState(): void
+    {
+        $log = $this->pmssMakeJsonLogPath('pmss-motd-health-policy-', 'health.jsonl');
+        $this->pmssAppendFixtureLines($log, [
+            ['kind' => 'raid', 'array' => 'md0', 'severity' => 'fail', 'flags' => ['degraded']],
+            ['kind' => 'raid', 'array' => 'md1', 'flags' => ['rebuild_in_progress']],
+            ['kind' => 'raid', 'array' => 'md2', 'severity' => 'warn', 'state' => 'recovering'],
+            ['kind' => 'nvme', 'device' => '/dev/nvme0n1', 'metrics' => ['critical_warnings' => '1']],
+            ['kind' => 'nvme', 'device' => '/dev/nvme0n1', 'metrics' => ['critical_warnings' => 1]],
+            ['kind' => 'nvme', 'metrics' => ['critical_warnings' => 1]],
+            ['kind' => 'nvme', 'metrics' => null],
+            ['kind' => 'nvme', 'metrics' => ['critical_warnings' => null]],
+            ['kind' => 'smart', 'device' => '/dev/sda', 'flags' => ['udma_crc_increase']],
+            ['kind' => 'smart', 'device' => '/dev/sdb', 'flags' => 'udma_crc_increase'],
+            ['kind' => 'smart', 'device' => '/dev/sda', 'flags' => []],
+        ]);
+        $this->pmssWithEnv(['PMSS_HEALTH_LOG_PATH' => $log], function (): void {
+            $this->assertSame('RAID md2: recovering | Performance limited: RAID md1 resync in progress | NVMe critical warning: /dev/nvme0n1, nvme | SATA UDMA CRC increased: /dev/sdb',
+                \pmssMotdStorageWarnings());
+        });
+    }
+
     public function testMotdShowsStorageWarningsFromHealthLog(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-health-', 0700);

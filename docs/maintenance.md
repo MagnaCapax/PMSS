@@ -59,6 +59,12 @@ still printed, and the profiler records each step with `status=SKIP`.
 
 ## 3. Capture Structured Logs
 
+MOTD storage warnings ignore health-log records whose device labels, RAID fields
+or flags, or NVMe metrics contain malformed nested containers. Other accepted
+records remain available, including later lines. Valid warning text, encounter
+order, NVMe deduplication and latest-per-device SMART selection are preserved;
+`MotdHealthWarningsTest` covers these boundaries without storage probes.
+
 Operator-side ANSI wrapping shares `pmssCliAnsiStyle()` in `scripts/lib/cli/helpText.php`
 (also loaded by the runtime facade). Callers retain TTY policy, codes and spacing,
 including colored updater log fields. Empty text is wrapped when enabled; help

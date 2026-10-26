@@ -11,8 +11,17 @@ function pmssMotdStorageWarnings(): string
     $raidWarnLine = ''; $raidPerfLine = ''; $nvmeCrit = []; $lastSmart = [];
     pmssJsonLineFileEach($path, static function (array $j) use (&$raidWarnLine, &$raidPerfLine, &$nvmeCrit, &$lastSmart): void {
         $k = $j['kind'] ?? '';
+        // Decoded JSON may contain containers where a device key or label is expected.
+        if (($k === 'smart' || $k === 'nvme') && !is_scalar($j['device'] ?? '')) return;
         if ($k==='smart') { $lastSmart[$j['device'] ?? '']=$j; }
         elseif ($k==='raid') {
+            foreach (['array', 'state', 'severity'] as $field) {
+                if (!is_scalar($j[$field] ?? '')) return;
+            }
+            // Keep scalar flag compatibility, but never pass nested arrays to implode.
+            foreach ((array) ($j['flags'] ?? []) as $flag) {
+                if ($flag !== null && !is_scalar($flag)) return;
+            }
             if (($j['severity'] ?? 'ok')!=='ok') {
                 $flags = implode(',', (array) ($j['flags'] ?? []));
                 $raidWarnLine = 'RAID '.($j['array'] ?? 'md').': '.($flags !== '' ? $flags : ($j['state'] ?? 'warn'));
@@ -21,7 +30,12 @@ function pmssMotdStorageWarnings(): string
                 $raidPerfLine = 'Performance limited: RAID '.($j['array'] ?? 'md').' resync in progress';
             }
         }
-        elseif ($k==='nvme') { if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme'; }
+        elseif ($k==='nvme') {
+            // A malformed counter must not become a positive warning by array coercion.
+            if (isset($j['metrics']) && !is_array($j['metrics'])) return;
+            if (!is_scalar($j['metrics']['critical_warnings'] ?? 0)) return;
+            if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme';
+        }
     });
     $lines = pmssNonEmptyStrings([$raidWarnLine, $raidPerfLine, empty($nvmeCrit) ? '' : 'NVMe critical warning: '.implode(', ', array_unique($nvmeCrit))]);
     foreach ($lastSmart as $dev=>$s) {
