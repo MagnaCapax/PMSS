@@ -20,7 +20,7 @@ function pmssQbittorrentFrontendStart(string $home, callable $launch, array $ops
     $build = $ops['build'] ?? pmssQbittorrentFrontendBuildVersion($home, $ops['binary'] ?? null, $ops);
     if (!$restore($home, $ops + ['build' => $build])) {
         // Restore owns its detailed refusal text, including link and busy notices.
-        if (isset($ops['restore'])) $notice($home, 'qBittorrent start refused: the stopped configuration could not be restored.');
+        if (isset($ops['restore'])) $notice($home, 'qBittorrent did not start: its settings file could not be updated. Check that ~/.config/qBittorrent is writable, then start it again.');
         return false;
     }
     $throttle = $ops['throttle'] ?? 'pmssQbittorrentFrontendThrottleStart';

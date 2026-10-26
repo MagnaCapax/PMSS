@@ -87,7 +87,7 @@ function pmssQbittorrentFrontendRestore(string $home, array $ops = []): bool
     if ($updated === $config) return true;
     $write = $ops['write'] ?? 'pmssConfigureFileWrite';
     if ($write($path, $updated)) return true;
-    $notice($home, 'qBittorrent start refused: the stopped configuration could not be restored.');
+    $notice($home, 'qBittorrent did not start: its settings file could not be updated. Check that ~/.config/qBittorrent is writable, then start it again.');
     return false;
 }
 

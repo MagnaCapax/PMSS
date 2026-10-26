@@ -13,9 +13,11 @@ pmssFrontendToggleAction('../.qbittorrentEnable', static function () {
     $ok = pmssCustomerTorrentClientToggleStart('qbittorrent', static function () { passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &'); });
     if ($ok === false) {
         http_response_code(409);
-        header('Content-Type: text/plain; charset=utf-8');
+        // The Apps row shows message from a JSON body, like the OpenClaw endpoint.
+        header('Content-Type: application/json; charset=utf-8');
         $notice = @file_get_contents(dirname(__DIR__).'/.config/pmss/torrentClients/qbittorrent.notice');
-        echo is_string($notice) && trim($notice) !== '' ? $notice : 'qBittorrent start refused; configuration is busy or unavailable.';
+        echo json_encode(array('message' => is_string($notice) && trim($notice) !== '' ? trim($notice)
+            : 'qBittorrent start refused; configuration is busy or unavailable.'));
     }
     return $ok;
 }, static function () {

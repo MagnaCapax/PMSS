@@ -66,7 +66,7 @@ function pmssQbittorrentRestore(string $home, array $ops = []): bool
         return pmssReplaceUserFilePreservingMetadata(realpath($path), $content, (int) @fileperms($path) & 0777);
     };
     if ($write($path, $updated)) return true;
-    $notice($home, 'qBittorrent start refused: the stopped configuration could not be restored.');
+    $notice($home, 'qBittorrent did not start: its settings file could not be updated. Check that ~/.config/qBittorrent is writable, then start it again.');
     return false;
 }
 
