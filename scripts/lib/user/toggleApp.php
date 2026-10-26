@@ -45,7 +45,7 @@ function pmssToggleAppPrepare(string $user, string $app): bool
     if ($peerPort === null) return false;
     $helper = '/home/'.$user.'/www/toggleAppRuntime.php';
     $inner = 'php '.escapeshellarg($helper).' bootstrap '.escapeshellarg($app).' '.escapeshellarg((string) $port).' '.escapeshellarg(base64_encode($fragment))
-        .' '.escapeshellarg((string) $peerPort);
+        .' '.escapeshellarg((string) $peerPort).' --restart-on-change';
     $command = pmssBuildUserServiceShellCommand($user, $inner);
     return pmssToggleAppBootstrapRun($command, $user, $app);
 }

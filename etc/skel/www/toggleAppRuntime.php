@@ -92,8 +92,8 @@ function pmssToggleAppConfigs(string $app, string $user, string $home, int $port
     return function_exists($renderer) ? $renderer($user, $home, $port, $password, $peerPort) : array();
 }
 
-/** Bootstrap runs as the account; the secured marker is the final write. */
-function pmssToggleAppBootstrap(string $app, string $user, string $home, int $port, string $proxy, int $peerPort = 0): bool
+/** Bootstrap runs as the account; watchdog repairs also stop stale app processes. */
+function pmssToggleAppBootstrap(string $app, string $user, string $home, int $port, string $proxy, int $peerPort = 0, bool $restartOnChange = false): bool
 {
     $catalog = pmssToggleAppCustomerCatalog();
     if (!isset($catalog[$app]) || preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1
@@ -119,9 +119,15 @@ function pmssToggleAppBootstrap(string $app, string $user, string $home, int $po
         $configValid = $configValid && !is_link($path) && is_file($path)
             && (@fileperms($path) & 0777) === 0600 && @file_get_contents($path) === $contents;
     }
-    if (!is_file($secured) || !$configValid) {
+    $regenerated = !is_file($secured) || !$configValid;
+    if ($regenerated) {
         // A previous marker must not authorize a start after a failed repair.
         if (is_file($secured) || is_link($secured)) @unlink($secured);
+        if ($restartOnChange) {
+            // Stop as the account, matching the native binary/script rather than its interpreter name.
+            require_once __DIR__.'/scriptsInc.php';
+            pmssCustomerNativeStop($row['binaries']);
+        }
         $password = bin2hex(random_bytes(24));
         foreach (pmssToggleAppConfigs($app, $user, $home, $port, $password, $peerPort) as $relative => $contents) {
             if (!pmssToggleAppPrivateWrite($home.'/'.$relative, $contents)) return false;
@@ -151,6 +157,8 @@ function pmssToggleAppBootstrap(string $app, string $user, string $home, int $po
         }
     }
     if (!pmssToggleAppPrivateWriteIfChanged($proxyPath, $proxy)) return false;
+    // Reset crash history only after successful regeneration; unchanged passes never request a restart.
+    if ($restartOnChange && $regenerated && !pmssToggleAppRestartSignal($app, $home)) return false;
     return pmssToggleAppPrivateWriteIfChanged($secured, "secured\n");
 }
 
@@ -179,7 +187,7 @@ if (PHP_SAPI === 'cli' && realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? ''))
     if ($action === 'state') $ok = pmssToggleAppStateWrite((string) ($argv[2] ?? ''), (string) ($argv[3] ?? ''), $home);
     elseif ($action === 'bootstrap') {
         $proxy = base64_decode((string) ($argv[4] ?? ''), true);
-        $ok = is_string($proxy) && strlen($proxy) < 8192 && pmssToggleAppBootstrap((string) ($argv[2] ?? ''), $user, $home, (int) ($argv[3] ?? 0), $proxy, (int) ($argv[5] ?? 0));
+        $ok = is_string($proxy) && strlen($proxy) < 8192 && pmssToggleAppBootstrap((string) ($argv[2] ?? ''), $user, $home, (int) ($argv[3] ?? 0), $proxy, (int) ($argv[5] ?? 0), ($argv[6] ?? '') === '--restart-on-change');
     } else $ok = false;
     exit($ok ? 0 : 1);
 }

@@ -131,3 +131,28 @@ PMSS login. Managed web authentication and loopback bind, the allocated peer
 port, and disabled remote configuration/script execution defaults are unchanged.
 The existing POST/XHR guard and account-password check protect this new writer;
 audit logging records only action and success/failure.
+
+## Reload regenerated credentials (2026-10-26, Refs #1151)
+
+The watchdog opts into `bootstrap ... --restart-on-change`. When the existing
+exact-byte, mode or secured-marker checks require regeneration, account-UID PHP
+uses the same native stop helper as Apps before replacing config or credentials.
+The helper matches the installed binary or interpreter plus script, account UID
+and mount namespace; stopping Copyparty therefore does not stop unrelated Python
+processes. After writing the regenerated files it atomically replaces the restart
+marker before the final secured marker, so failed signalling remains retryable
+and the existing crash-loop gate allows a new start. A process observed running
+before bootstrap is started again on the next watchdog pass; failed repairs
+retain the missing secured marker and cannot authorize a start. Unchanged passes
+neither stop the app nor replace its restart marker. Existing bootstrap calls
+without the opt-in retain their boolean result, CLI exit status and behavior.
+
+Credentials remain separate random service secrets in mode-0600 account files,
+outside the web root. Root receives no secret, and argv and logs contain no
+credential. Web binds and proxy exposure are unchanged. Security review rechecked
+Copyparty's published [browser-session advisory](https://github.com/9001/copyparty/security/advisories/GHSA-rcp6-88mm-9vgf)
+and [file/dirkey advisory](https://github.com/9001/copyparty/security/advisories/GHSA-x5pq-m9p8-f4vx):
+the documented attack surfaces are authenticated browser actions and shared-file
+access. A leaked service login exposes the account's app data and actions, not
+its primary PMSS password. Reusing the account-side stop avoids a new root
+process-signalling path. Rollback removes the watchdog's opt-in flag.
