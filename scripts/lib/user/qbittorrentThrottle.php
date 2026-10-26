@@ -2,6 +2,7 @@
 /** Build-aware upload throttling; daemon-owned settings are written only while stopped. */
 require_once __DIR__.'/qbittorrentConfig.php';
 require_once __DIR__.'/qbittorrentBuild.php';
+require_once dirname(__DIR__).'/runtime/environment.php';
 
 /** Use the discovered build, falling back to upstream migration 2 only when unknown. */
 function pmssQbittorrentThrottleKey(string $config, ?string $build): array
@@ -13,30 +14,19 @@ function pmssQbittorrentThrottleKey(string $config, ?string $build): array
     return $modern ? ['BitTorrent', 'Session\\GlobalUPSpeedLimit'] : ['Preferences', 'Connection\\GlobalUPLimit'];
 }
 
-/** Read only the selected build's limit; invalid/unlimited values need an active cap. */
-function pmssQbittorrentThrottleValue(string $config, ?string $build): ?int
-{
-    list($section, $key) = pmssQbittorrentThrottleKey($config, $build);
-    $value = trim(pmssQbittorrentConfigValues($config)[$section][$key] ?? '0', " \t\"");
-    return pmssQbittorrentThrottleNumber($value);
-}
-
 /** Decimal caps and applied records must fit a PHP integer without saturation. */
 function pmssQbittorrentThrottleNumber(string $value): ?int
 {
-    $value = trim($value);
-    if (preg_match('/\A[0-9]+\z/', $value) !== 1) return null;
-    $digits = ltrim($value, '0') ?: '0';
-    if (strlen($digits) > strlen((string) PHP_INT_MAX)
-        || (strlen($digits) === strlen((string) PHP_INT_MAX) && strcmp($digits, (string) PHP_INT_MAX) > 0)) return null;
-    return (int) $digits;
+    return pmssUnsignedDecimalIntParse(trim($value));
 }
 
 /** #1165: customer limits survive absent PMSS caps and stricter choices stay compliant. */
 function pmssQbittorrentThrottleDiffers(string $config, ?int $throttle, ?string $build, ?int $applied = null): bool
 {
     if (($throttle ?? 0) <= 0 && $applied === null) return false;
-    $value = pmssQbittorrentThrottleValue($config, $build);
+    // Read only the selected build's limit; invalid/unlimited values need an active cap.
+    list($section, $key) = pmssQbittorrentThrottleKey($config, $build);
+    $value = pmssQbittorrentThrottleNumber(trim(pmssQbittorrentConfigValues($config)[$section][$key] ?? '0', " \t\""));
     return ($throttle ?? 0) > 0 ? ($value === null || $value === 0 || $value > $throttle)
         : $value === $applied;
 }

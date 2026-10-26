@@ -13,14 +13,6 @@ function pmssQbittorrentFrontendThrottleKey(string $config, ?string $build): arr
     return $modern ? ['BitTorrent', 'Session\\GlobalUPSpeedLimit'] : ['Preferences', 'Connection\\GlobalUPLimit'];
 }
 
-/** Read only the selected build's limit; invalid/unlimited values need an active cap. */
-function pmssQbittorrentFrontendThrottleValue(string $config, ?string $build): ?int
-{
-    list($section, $key) = pmssQbittorrentFrontendThrottleKey($config, $build);
-    $value = trim(pmssQbittorrentFrontendConfigValues($config)[$section][$key] ?? '0', " \t\"");
-    return pmssQbittorrentFrontendThrottleNumber($value);
-}
-
 /** Decimal caps and applied records must fit a PHP integer without saturation. */
 function pmssQbittorrentFrontendThrottleNumber(string $value): ?int
 {
@@ -36,7 +28,9 @@ function pmssQbittorrentFrontendThrottleNumber(string $value): ?int
 function pmssQbittorrentFrontendThrottleDiffers(string $config, ?int $throttle, ?string $build, ?int $applied = null): bool
 {
     if (($throttle ?? 0) <= 0 && $applied === null) return false;
-    $value = pmssQbittorrentFrontendThrottleValue($config, $build);
+    // Read only the selected build's limit; invalid/unlimited values need an active cap.
+    list($section, $key) = pmssQbittorrentFrontendThrottleKey($config, $build);
+    $value = pmssQbittorrentFrontendThrottleNumber(trim(pmssQbittorrentFrontendConfigValues($config)[$section][$key] ?? '0', " \t\""));
     return ($throttle ?? 0) > 0 ? ($value === null || $value === 0 || $value > $throttle)
         : $value === $applied;
 }

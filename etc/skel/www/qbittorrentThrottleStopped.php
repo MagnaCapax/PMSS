@@ -4,15 +4,6 @@ require_once __DIR__.'/qbittorrentStoppedConfig.php';
 require_once __DIR__.'/qbittorrentThrottle.php';
 require_once __DIR__.'/configureFileWrite.php';
 
-/** Remove only a throttle-deferred notice after successful convergence. */
-function pmssQbittorrentFrontendThrottleNoticeClear(string $home): void
-{
-    $path = $home.'/.config/pmss/torrentClients/qbittorrent.notice';
-    $text = \PMSS\Customer\pmssReadRegularFileContentsVerified($path, null, 4096);
-    if (is_string($text) && strpos($text, 'qBittorrent upload throttle ') === 0
-        && pmssQbittorrentFrontendFileSafe($path)) @unlink($path);
-}
-
 /** Apply positive caps only; removal belongs to the root watchdog's account writer. */
 function pmssQbittorrentFrontendThrottleAccount(string $home, ?int $throttle, bool $apply, array $ops = []): ?bool
 {
@@ -59,7 +50,11 @@ function pmssQbittorrentFrontendThrottleAccount(string $home, ?int $throttle, bo
             }
             if (!$write($path, $updated)) return $refuse('qBittorrent upload throttle failed: the stopped configuration could not be written.');
         }
-        pmssQbittorrentFrontendThrottleNoticeClear($home);
+        // Remove only a throttle-deferred notice after successful convergence.
+        $noticePath = $home.'/.config/pmss/torrentClients/qbittorrent.notice';
+        $noticeText = \PMSS\Customer\pmssReadRegularFileContentsVerified($noticePath, null, 4096);
+        if (is_string($noticeText) && strpos($noticeText, 'qBittorrent upload throttle ') === 0
+            && pmssQbittorrentFrontendFileSafe($noticePath)) @unlink($noticePath);
         $result = $updated !== $config;
         return true;
     };

@@ -45,6 +45,13 @@ order; probe commands still pass through the same guarded lock builder.
 Severity/device ordering, model truncation, metric defaults and JSON bytes remain
 unchanged, covered by the storage-health characterization tests.
 
+qBittorrent throttle predicates read the selected build's value directly, and
+successful stopped convergence clears its own deferred notice. These operations
+have no separate single-caller adapters. The operator's trimmed integer reader
+uses the shared unsigned-decimal parser; customer PHP retains its local parser
+and includes. Cap ownership, stricter customer limits, overflow rejection,
+notice path guards and stopped-write ordering retain their existing contracts.
+
 ## Minimal Contract Rules (Joukahainen)
 
 Lighttpd watchdog inode diagnosis requires a successful `df -i` exit and a

@@ -3,15 +3,6 @@
 require_once __DIR__.'/qbittorrentStoppedConfig.php';
 require_once __DIR__.'/qbittorrentThrottle.php';
 
-/** Remove only a throttle-deferred notice after successful convergence. */
-function pmssQbittorrentThrottleNoticeClear(string $home): void
-{
-    $path = $home.'/.config/pmss/torrentClients/qbittorrent.notice';
-    $text = pmssReadRegularFileContentsVerified($path, null, 4096);
-    if (is_string($text) && strpos($text, 'qBittorrent upload throttle ') === 0
-        && pmssQbittorrentFileSafe($path)) @unlink($path);
-}
-
 /** Return changed/unchanged, or null on refusal; no cap/record never reads daemon settings. */
 function pmssQbittorrentThrottleAccount(string $home, ?int $throttle, bool $apply, array $ops = []): ?bool
 {
@@ -73,7 +64,11 @@ function pmssQbittorrentThrottleAccount(string $home, ?int $throttle, bool $appl
             if (!pmssQbittorrentFileSafe($state) || !@unlink($state))
                 return $refuse('qBittorrent upload throttle failed: the applied-cap record could not be cleared.');
         }
-        pmssQbittorrentThrottleNoticeClear($home);
+        // Remove only a throttle-deferred notice after successful convergence.
+        $noticePath = $home.'/.config/pmss/torrentClients/qbittorrent.notice';
+        $noticeText = pmssReadRegularFileContentsVerified($noticePath, null, 4096);
+        if (is_string($noticeText) && strpos($noticeText, 'qBittorrent upload throttle ') === 0
+            && pmssQbittorrentFileSafe($noticePath)) @unlink($noticePath);
         $result = $updated !== $config;
         return true;
     };
