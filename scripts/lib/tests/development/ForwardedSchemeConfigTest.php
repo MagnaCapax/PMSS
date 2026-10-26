@@ -3,6 +3,8 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/nginxConfig/templates.php';
+require_once dirname(__DIR__, 2).'/nginxUserHosts.php';
+require_once dirname(__DIR__, 2).'/nginxConfig/pikkumiesUi.php';
 require_once dirname(__DIR__, 2).'/lighttpd/pikkumiesUi.php';
 
 /** ADR 0153: proxied apps receive the scheme the visitor used; lighttpd keeps 127.0.0.1 as the client. */
@@ -63,11 +65,13 @@ final class ForwardedSchemeConfigTest extends TestCase
 
     public function testAccountUiMountsSendTheHop(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/nginxConfig/pikkumiesUi.php');
+        // Inspect every emitted location after shared fragments have been expanded.
+        $source = \pmssPikkumiesHermesNginxBlock('uitester', 'node.example', 'service.example', 24000)
+            .\pmssHermesUiNginxBlock('uitester', 'node.example', 'service.example', 24000);
         $scheme = preg_match_all('/^( +)proxy_set_header X-Forwarded-Proto https;\n\1proxy_set_header X-PMSS-Proxy-Hop 127\.0\.0\.1;\n\1proxy_bind 127\.0\.0\.2;$/m', $source);
         $this->assertSame(substr_count($source, 'proxy_set_header X-Forwarded-Proto https;'), $scheme);
-        $this->assertTrue($scheme >= 8, 'every account UI location that sets the scheme also sends the hop');
-        $this->assertSame($scheme, substr_count($source, 'proxy_set_header Forwarded "for=\\\\"\\$remote_addr\\\\";proto=https";'));
+        $this->assertSame(9, $scheme, 'all four B and five C relay locations send the hop');
+        $this->assertSame($scheme, substr_count($source, 'proxy_set_header Forwarded "for=\\"$remote_addr\\";proto=https";'));
         foreach ([\pmssLighttpdPikkumiesHermesBlock('uitester', 24000), \pmssLighttpdHermesUiBlock('uitester', 24000),
             \pmssLighttpdHermesUiBlock('uitester', 24000, 'vanilla-agentboard')] as $block) {
             $this->assertStringNotContainsString('X-Forwarded-Proto', $block);
