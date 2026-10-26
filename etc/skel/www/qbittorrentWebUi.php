@@ -21,7 +21,7 @@ function pmssQbittorrentFrontendConfigValues(string $config): array
 /** A 5.3+ build reads WebUI only after migration 11 has actually moved its settings. */
 function pmssQbittorrentFrontendWebUiSection(string $config, ?string $build = null): array
 {
-    if (is_string($build) && preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:-lt(?:1\.2|2\.0))?\z/', $build, $match) === 1)
+    if (is_string($build) && preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:-lt(?:1\.2|2\.[01]))?\z/', $build, $match) === 1)
         if (version_compare($match[1], '5.3', '<')) return ['Preferences', 'WebUI\\'];
     $version = trim(pmssQbittorrentFrontendConfigValues($config)['Meta']['MigrationVersion'] ?? '');
     if (preg_match('/\A"([0-9]+)"\z/', $version, $quoted) === 1) $version = $quoted[1];

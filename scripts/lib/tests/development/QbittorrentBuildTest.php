@@ -68,4 +68,13 @@ final class QbittorrentBuildTest extends TestCase
         \pmssQbittorrentFrontendBuildRecord($home, null);
         $this->assertSame('5.3.0', \pmssQbittorrentFrontendLastBuild($home));
     }
+
+    public function testLibtorrent21StoreLabelReadsAsItsReleaseOnBothSides(): void
+    {
+        foreach (['pmssQbittorrentBuildNumber', 'pmssQbittorrentFrontendBuildNumber'] as $number) {
+            $this->assertSame('5.3.0', $number('5.3.0-lt2.1'));
+            $this->assertSame('5.3.0', $number('5.3.0-lt1.2'));
+            $this->assertSame(null, $number('5.3.0-lt2.2'));
+        }
+    }
 }

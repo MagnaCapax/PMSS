@@ -57,7 +57,7 @@ function pmssConfigureTorrentClientVersionsOffered($client = 'qbittorrent',
 function pmssConfigureTorrentClientVersionLabel($version): string
 {
     $version = (string) $version;
-    return preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)-lt(1\.2|2\.0)\z/', $version, $m) === 1
+    return preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)-lt(1\.2|2\.[01])\z/', $version, $m) === 1
         ? $m[1].' (libtorrent '.$m[2].')' : $version;
 }
 
@@ -65,8 +65,8 @@ function pmssConfigureTorrentClientVersionLabel($version): string
 function pmssConfigureTorrentClientMajorDowngrade($previous, $requested): bool
 {
     if (!is_string($previous) || !is_string($requested)
-        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.0))?\z/', $previous, $old) !== 1
-        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.0))?\z/', $requested, $new) !== 1) return false;
+        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.[01]))?\z/', $previous, $old) !== 1
+        || preg_match('/\A([0-9]+)\.[0-9]+(?:\.[0-9]+)?(?:-lt(?:1\.2|2\.[01]))?\z/', $requested, $new) !== 1) return false;
     // Compare decimal strings without integer overflow from long catalog values.
     $oldMajor = ltrim($old[1], '0');
     $newMajor = ltrim($new[1], '0');

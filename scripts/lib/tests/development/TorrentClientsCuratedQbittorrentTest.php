@@ -34,13 +34,14 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
         }));
     }
 
-    public function testAllSevenSeriesHaveBothPinnedStaticFamilies(): void
+    public function testAllEightSeriesHaveBothPinnedStaticFamilies(): void
     {
         $entries = $this->entries();
-        $this->assertSame(14, count($entries));
+        $this->assertSame(16, count($entries));
         $expected = [];
-        foreach (['4.3.9', '4.4.5', '4.5.5', '4.6.7', '5.0.5', '5.1.4', '5.2.4'] as $version) {
-            foreach (['1.2', '2.0'] as $family) $expected[] = $version.'-lt'.$family;
+        foreach (['4.3.9', '4.4.5', '4.5.5', '4.6.7', '5.0.5', '5.1.4', '5.2.4', '5.3.0'] as $version) {
+            // From 5.3.0 the newer family is libtorrent 2.1.
+            foreach (['1.2', $version === '5.3.0' ? '2.1' : '2.0'] as $family) $expected[] = $version.'-lt'.$family;
         }
         $this->assertSame($expected, array_column($entries, 'version'));
         foreach ($entries as $entry) {
@@ -75,7 +76,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
                     return basename($binary) === 'qbittorrent-nox' && file_put_contents($binary, 'fixture') === 7;
                 }, 'log' => static function (): void {},
             ]);
-            $this->assertSame(array_fill(0, 14, 'installed'), array_values($result));
+            $this->assertSame(array_fill(0, 16, 'installed'), array_values($result));
             $this->assertFalse(file_exists($store.'/qbittorrent/default'));
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($entries, $root.'/public/catalog.json'));
             $picker = \pmssConfigureTorrentClientVersionsRead($root.'/public/catalog.json');
@@ -92,7 +93,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
             // A catalog entry alone must never advertise an unavailable binary.
             unlink($store.'/qbittorrent/'.$entries[0]['version'].'/qbittorrent-nox');
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($entries, $root.'/public/catalog.json'));
-            $this->assertSame(13, count(\pmssConfigureTorrentClientVersionsRead($root.'/public/catalog.json')));
+            $this->assertSame(15, count(\pmssConfigureTorrentClientVersionsRead($root.'/public/catalog.json')));
         });
     }
 
@@ -108,7 +109,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
                 'install' => static function (): bool { throw new \RuntimeException('must not install'); },
                 'log' => static function (): void {},
             ]);
-            $this->assertSame(array_fill(0, 14, 'skipped-space'), array_values($result));
+            $this->assertSame(array_fill(0, 16, 'skipped-space'), array_values($result));
             $this->assertSame('old', file_get_contents($root.'/qbittorrent/old/qbittorrent-nox'));
         }
     }

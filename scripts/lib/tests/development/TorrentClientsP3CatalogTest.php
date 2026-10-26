@@ -101,6 +101,7 @@ final class TorrentClientsP3CatalogTest extends TestCase
         require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsVersion.php';
         $this->assertSame('5.2.4 (libtorrent 1.2)', \pmssConfigureTorrentClientVersionLabel('5.2.4-lt1.2'));
         $this->assertSame('4.3.9 (libtorrent 2.0)', \pmssConfigureTorrentClientVersionLabel('4.3.9-lt2.0'));
+        $this->assertSame('5.3.0 (libtorrent 2.1)', \pmssConfigureTorrentClientVersionLabel('5.3.0-lt2.1'));
         foreach (['system', '0.16.25', '0.9.8-stickz7.2', 'not running', '5.2.4-lt3.0'] as $plain)
             $this->assertSame($plain, \pmssConfigureTorrentClientVersionLabel($plain));
         $this->withProjection($this->entries(['qbittorrent' => ['5.2.4-lt1.2', '4.3.9-lt2.0']]), function ($page): void {

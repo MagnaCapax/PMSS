@@ -94,3 +94,22 @@ account permissions or customer/operator include boundaries change here.
 - ADRs 0073, 0105, 0106 and 0120
 
 Host-marker opt-in clauses superseded by [ADR 0163](0163-torrent-client-store-on-by-default.md).
+
+## Amendment 2026-10-24: qBittorrent 5.3.0 with libtorrent 1.2 and 2.1
+
+Two entries are added: `5.3.0-lt1.2` (userdocs `release-5.3.0_v1.2.20`) and
+`5.3.0-lt2.1` (userdocs `release-5.3.0_v2.1.2`). Both x86_64 assets were
+downloaded and hashed on 2026-10-24 and are pinned by sha256 like the others.
+The newer family of the 5.3.0 series is libtorrent 2.1, so the label suffix
+`lt2.1` joins `lt1.2` and `lt2.0`. The Configure label ("5.3.0 (libtorrent 2.1)"),
+the ADR 0120 major-downgrade comparison and the build-number parsers on both the
+operator and the customer side accept it; any other suffix stays an unrecognised
+label. `compatFamily` is `lt1.2` and `5.3.0`; the disk-I/O rule above is unchanged.
+Both entries are non-default, carry no note, and install only under the existing
+space reserve.
+
+qBittorrent 5.3 moves its WebUI settings from `[Preferences]` to `[WebUI]` the
+first time it starts on a config. ADR 0182 keeps every PMSS reader and writer on
+the section the config actually uses and restores the settings to `[Preferences]`
+before an older build starts, so moving between 5.3.0 and the earlier builds keeps
+the account port, password and access settings.

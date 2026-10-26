@@ -7,7 +7,7 @@ require_once __DIR__.'/qbittorrentBuildProbe.php';
 /** Accept only a numeric release, optionally carrying the curated libtorrent label. */
 function pmssQbittorrentFrontendBuildNumber(?string $value): ?string
 {
-    return is_string($value) && preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:-lt(?:1\.2|2\.0))?\z/', trim($value), $m) === 1
+    return is_string($value) && preg_match('/\A([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:-lt(?:1\.2|2\.[01]))?\z/', trim($value), $m) === 1
         ? $m[1] : null;
 }
 
