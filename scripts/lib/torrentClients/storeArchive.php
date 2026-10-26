@@ -4,17 +4,13 @@
 /** Accept only regular files and directories with lexical relative member paths. */
 function pmssTorrentClientsStoreArchiveIsSafe(string $archive): bool
 {
-    $paths = [];
-    $listing = [];
-    $rc = 1;
-    @exec('tar -tzf '.escapeshellarg($archive).' 2>/dev/null', $paths, $rc);
-    if ($rc !== 0 || $paths === []) return false;
-    @exec('tar -tvzf '.escapeshellarg($archive).' 2>/dev/null', $listing, $rc);
-    if ($rc !== 0 || count($listing) !== count($paths)) return false;
-    foreach ($paths as $index => $path) {
+    $members = @pmssPinnedRemoteArchiveMembersRead('tar -tzf '.escapeshellarg($archive).' 2>/dev/null', 'tar -tvzf '.escapeshellarg($archive).' 2>/dev/null');
+    if ($members === []) return false;
+    foreach ($members as $member) {
+        $path = $member['path'];
         if ($path === '' || $path[0] === '/'
             || preg_match('/\A[A-Za-z0-9._\/-]+\z/', $path) !== 1
-            || !in_array($listing[$index][0] ?? '', ['-', 'd'], true)) return false;
+            || !in_array($member['type'], ['-', 'd'], true)) return false;
         foreach (explode('/', rtrim($path, '/')) as $part) {
             if ($part === '' || $part === '.' || $part === '..') return false;
         }

@@ -17,16 +17,12 @@ function pmssPikkumiesAgentboardVersionOwned(string $versionDir, int $ownerUid):
 /** Accept only the two release members and paths beneath the frontend bundle. */
 function pmssPikkumiesAgentboardArchiveMembersSafe(string $archive): bool
 {
-    $rows = [];
-    $listing = [];
-    exec('tar -tzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null', $rows, $rc);
-    if ($rc !== 0 || $rows === []) return false;
-    exec('tar -tvzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null', $listing, $rc);
-    if ($rc !== 0 || count($listing) !== count($rows)) return false;
-    foreach ($rows as $index => $path) {
+    $members = pmssPinnedRemoteArchiveMembersRead('tar -tzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null', 'tar -tvzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null');
+    if ($members === []) return false;
+    foreach ($members as $member) {
         // Match the listing row to its name and accept only files or directories.
-        if (!in_array($listing[$index][0] ?? '', ['-', 'd'], true)) return false;
-        $path = rtrim($path, '/');
+        if (!in_array($member['type'], ['-', 'd'], true)) return false;
+        $path = rtrim($member['path'], '/');
         if ($path !== 'agentboard' && $path !== 'dist' && $path !== 'dist/client'
             && strpos($path, 'dist/client/') !== 0) return false;
         if (preg_match('/[\x00-\x1f\x7f\\\\]/', $path) === 1

@@ -895,6 +895,10 @@ Service hostnames in guides require a root-owned billing ID entry.
 
 ## Application Installers (Contracts)
 
+Tar member discovery shares `pmssPinnedRemoteArchiveMembersRead()`: failed, empty
+or count-mismatched listings return `[]`. Callers retain command bytes, warning
+suppression and their own path/type validation before extraction.
+
 These scripts are primarily imperative; treat them as idempotent installers guarded by presence/version checks.
 
 Single-caller installer checks stay at their decision sites: pinned-binary version

@@ -2,19 +2,7 @@
 /** Inspect web archives before extraction and verify their filesystem result. */
 
 /** List names and types separately; escaped unusual names fail the lexical check. */
-function pmssTorrentClientsTransmissionWebArchiveList(string $archive): array
-{
-    $paths = $details = [];
-    $rc = 1;
-    $arg = escapeshellarg($archive);
-    @exec('LC_ALL=C tar --quoting-style=escape -tzf '.$arg.' 2>/dev/null', $paths, $rc);
-    if ($rc !== 0 || $paths === []) return [];
-    @exec('LC_ALL=C tar --quoting-style=escape -tvzf '.$arg.' 2>/dev/null', $details, $rc);
-    if ($rc !== 0 || count($paths) !== count($details)) return [];
-    $members = [];
-    foreach ($paths as $index => $path) $members[] = ['path' => $path, 'type' => $details[$index][0] ?? ''];
-    return $members;
-}
+function pmssTorrentClientsTransmissionWebArchiveList(string $archive): array { $arg = escapeshellarg($archive); return @pmssPinnedRemoteArchiveMembersRead('LC_ALL=C tar --quoting-style=escape -tzf '.$arg.' 2>/dev/null', 'LC_ALL=C tar --quoting-style=escape -tvzf '.$arg.' 2>/dev/null'); }
 
 /** Accept only unique regular files/directories strictly below public_html. */
 function pmssTorrentClientsTransmissionWebArchiveSafe(array $members): bool

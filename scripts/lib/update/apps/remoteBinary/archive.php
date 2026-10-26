@@ -1,6 +1,20 @@
 <?php
 /** Archive installation policy; verified download lifetime belongs to artifact.php. */
 
+/** Pair tar names and types only after both caller-supplied listing commands succeed. */
+function pmssPinnedRemoteArchiveMembersRead(string $pathsCommand, string $detailsCommand): array
+{
+    $paths = $details = [];
+    $rc = 1;
+    exec($pathsCommand, $paths, $rc);
+    if ($rc !== 0 || $paths === []) return [];
+    exec($detailsCommand, $details, $rc);
+    if ($rc !== 0 || count($paths) !== count($details)) return [];
+    $members = [];
+    foreach ($paths as $index => $path) $members[] = ['path' => $path, 'type' => $details[$index][0] ?? ''];
+    return $members;
+}
+
 /** Install a marked portable release; tar and zip retain their original extraction policy. */
 function pmssPinnedRemotePortableInstall(string $label, string $url, string $sha256, string $root, string $binary, string $version, bool $zipArchive = false): void
 {
