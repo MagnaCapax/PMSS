@@ -51,6 +51,18 @@ final class TorrentClientsNotesTest extends TestCase
         });
     }
 
+    public function testSharedNoteIsShownOnceNamingEachReleaseOnce(): void
+    {
+        $entries = $this->entries(['qbittorrent' => ['4.5.5-lt1.2', '4.6.7-lt1.2', '4.6.7-lt2.0', '5.2.4-lt2.0', 'system']]);
+        foreach ([0, 1, 2] as $i) $entries[$i]['note'] = 'Same note';
+        $entries[3]['note'] = 'Own note';
+        $this->withProjection($entries, function ($page): void {
+            $card = $page()['qbittorrent-version'];
+            $this->assertStringContainsAllStrings(['<p>4.5.5 and 4.6.7: Same note</p>', '<p>5.2.4 (libtorrent 2.0): Own note</p>'], $card);
+            $this->assertSame(1, substr_count($card, 'Same note'));
+        });
+    }
+
     public function testCombinedReadOnlyCardShowsOnlyTheRunningBuildsNote(): void
     {
         $entries = $this->entries(['qbittorrent' => ['system'], 'rtorrent' => ['system']]);

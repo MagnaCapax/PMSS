@@ -79,11 +79,19 @@ function pmssConfigureTorrentClientCardStatusRead($home, $client)
 /** Controls list every offered note; read-only cards describe only the exact running build. */
 function pmssConfigureTorrentClientNotesHtml($versions, $running = null)
 {
-    $html = '';
+    $groups = array();
     foreach ($versions as $version => $entry) {
         $label = pmssConfigureTorrentClientVersionLabel($version);
         if (!is_string($entry['note'] ?? null) || ($running !== null && $running !== $label)) continue;
-        $html .= '<p>'.pmssCustomerHtmlAttr($label.': '.$entry['note']).'</p>';
+        // One line per note text; a release is named once when its libtorrent builds share the note.
+        $groups[$entry['note']][(string) preg_replace('/ \(libtorrent [0-9.]+\)\z/', '', $label)][] = $label;
+    }
+    $html = '';
+    foreach ($groups as $note => $releases) {
+        $first = reset($releases);
+        $names = count($releases) === 1 && count($first) === 1 ? $first : array_map('strval', array_keys($releases));
+        $last = array_pop($names);
+        $html .= '<p>'.pmssCustomerHtmlAttr(($names === array() ? $last : implode(', ', $names).' and '.$last).': '.$note).'</p>';
     }
     return $html;
 }
