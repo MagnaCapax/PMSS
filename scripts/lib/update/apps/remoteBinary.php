@@ -46,7 +46,7 @@ function pmssPinnedRemoteStaleBinaryRemove(string $path, string $label): bool
 /** Prepare a pinned binary only when its installed version does not match. */
 function pmssPinnedRemoteBinaryPrepareInstall(string $path, array $commands, string $pattern, string $label): bool
 {
-    return !pmssAppVersionInstalledMatches($path, $commands, $pattern)
+    return (!file_exists($path) || pmssAppVersionProbeMatch($commands, $pattern) === null)
         && pmssPinnedRemoteStaleBinaryRemove($path, $label);
 }
 

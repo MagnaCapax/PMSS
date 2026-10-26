@@ -72,28 +72,10 @@ function pmssRtorrentBuildPrereqsPresent(): bool
     return $rc === 0;
 }
 
-/** Verify the freshly built rtorrent binary actually loads its libraries and runs. */
-function pmssRtorrentBinaryRuns(): bool
-{
-    if (!is_file('/usr/local/bin/rtorrent')) {
-        return false;
-    }
-
-    return pmssAppVersionProbeSucceeded('/usr/local/bin/rtorrent -h >/dev/null 2>&1');
-}
-
 /** Persist a queryable marker so a silent build failure becomes fleet-detectable. */
 function pmssRtorrentMarkBuildFailure(string $reason): void
 {
     @file_put_contents('/var/log/pmss/rtorrent-build-failed', pmssLogFormatTimestampedLine($reason, 'c', ' '), FILE_APPEND);
-}
-
-/** Clear the build-failure marker once a verified-good binary is in place. */
-function pmssRtorrentClearBuildFailure(): void
-{
-    if (is_file('/var/log/pmss/rtorrent-build-failed')) {
-        @unlink('/var/log/pmss/rtorrent-build-failed');
-    }
 }
 
 $rtorrentVersion = pmssAppVersionProbeOutput('rtorrent -h');
@@ -237,12 +219,16 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     // Post-build verification. A failed build previously completed update.php "successfully"
     // (runStep does not abort the run) and left rtorrent crash-looping fleet-wide (GH #662).
     // Confirm the freshly built binary loads its libraries and runs; surface failure loudly.
-    if (!pmssRtorrentBinaryRuns()) {
+    if (!is_file('/usr/local/bin/rtorrent')
+        || !pmssAppVersionProbeSucceeded('/usr/local/bin/rtorrent -h >/dev/null 2>&1')) {
         $log('[ERR] rtorrent rebuild FAILED verification: /usr/local/bin/rtorrent does not load/run after build '
             .'(check `ldd /usr/local/bin/rtorrent` for missing libtorrent.so/libcppunit). rTorrent is DOWN on this host. See GH #662.');
         pmssRtorrentMarkBuildFailure('post-build-verify-failed');
     } else {
-        pmssRtorrentClearBuildFailure();
+        // Clear the build-failure marker only after verifying the binary.
+        if (is_file('/var/log/pmss/rtorrent-build-failed')) {
+            @unlink('/var/log/pmss/rtorrent-build-failed');
+        }
         echo "*** Update done - rtorrent instances will restart within minute\n";
     }
 }

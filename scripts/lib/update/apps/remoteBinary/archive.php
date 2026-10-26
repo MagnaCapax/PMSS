@@ -35,17 +35,6 @@ function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
         && preg_match('/[\x00-\x1F\x7F]/', $component) !== 1;
 }
 
-/** Reject post-extract shell fragments that would break the generated command chain. */
-function pmssPinnedRemoteArchivePostCommandIsSafe(string $command): bool
-{
-    return trim($command) !== ''
-        && strpos($command, "\0") === false
-        && preg_match('/[\r\n]/', $command) !== 1
-        && strpos($command, ';') === false
-        && strpos($command, '&&') === false
-        && strpos($command, '||') === false;
-}
-
 /** Download a verified archive, unpack it in the compile workspace, then run caller steps. */
 function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): bool
 {
@@ -62,7 +51,13 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
         return false;
     }
     foreach ($postExtractCommands as $command) {
-        if (!is_string($command) || !pmssPinnedRemoteArchivePostCommandIsSafe($command)) {
+        // Reject shell fragments that would break the generated command chain.
+        if (!is_string($command) || trim($command) === ''
+            || strpos($command, "\0") !== false
+            || preg_match('/[\r\n]/', $command) === 1
+            || strpos($command, ';') !== false
+            || strpos($command, '&&') !== false
+            || strpos($command, '||') !== false) {
             logmsg("[WARN] Refusing unsafe archive post-extract command for {$label}");
             return false;
         }

@@ -8,13 +8,6 @@ const PMSS_PIKKUMIES_AGENTBOARD_VERSION = 'v0.36.0-pikkumies.5';
 const PMSS_PIKKUMIES_AGENTBOARD_SHA256 = 'a737049d1b3b5cd31c8652f7c710cf6ff4e8c0791e903d8b318e7183a472f30c';
 const PMSS_PIKKUMIES_AGENTBOARD_ROOT = '/opt/pikkumies-agentboard';
 
-/** Refuse an unpinned archive before tar or any destination write. */
-function pmssPikkumiesAgentboardArchiveVerified(string $archive, string $sha256): bool
-{
-    return preg_match('/\A[a-f0-9]{64}\z/i', $sha256) === 1
-        && hash_equals(strtolower($sha256), pmssPinnedRemoteChecksum($archive));
-}
-
 /** An existing version is inspected only when its directory has the expected owner. */
 function pmssPikkumiesAgentboardVersionOwned(string $versionDir, int $ownerUid): bool
 {
@@ -82,8 +75,10 @@ function pmssPikkumiesAgentboardTreeManifest(string $dir, int $ownerUid, bool $n
 /** Install one verified archive and switch the stable link by atomic rename. */
 function pmssPikkumiesAgentboardArchiveInstall(string $archive, string $version, string $sha256, string $root = PMSS_PIKKUMIES_AGENTBOARD_ROOT, int $ownerUid = 0): bool
 {
+    // Refuse an unpinned archive before tar or any destination write.
     if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\z/D', $version) !== 1
-        || !pmssPikkumiesAgentboardArchiveVerified($archive, $sha256)
+        || preg_match('/\A[a-f0-9]{64}\z/i', $sha256) !== 1
+        || !hash_equals(strtolower($sha256), pmssPinnedRemoteChecksum($archive))
         || !pmssPathTargetIsSafe($root, true, false, false)
         || (file_exists($root) && (!is_dir($root) || is_link($root)))) return false;
     if (!is_dir($root) && !@mkdir($root, 0755, true)) return false;

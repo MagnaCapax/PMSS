@@ -879,6 +879,11 @@ Service hostnames in guides require a root-owned billing ID entry.
 
 These scripts are primarily imperative; treat them as idempotent installers guarded by presence/version checks.
 
+Single-caller installer checks stay at their decision sites: pinned-binary version
+matching, source archive command validation, Agentboard archive pin verification,
+and rTorrent post-build verification and marker cleanup. Their short-circuit order,
+trust checks, commands, diagnostics and failure behavior are preserved.
+
 - btsync.php
   - Ensures BTSync 1.4/2.2 binaries in `/usr/bin/`; symlinks `/usr/bin/btsync`→2.2; installs/updates Resilio Sync to pinned version.
 
