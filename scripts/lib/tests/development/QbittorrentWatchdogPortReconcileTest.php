@@ -62,11 +62,8 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
         $this->assertFalse(\pmssQbittorrentWatchdogRunning('t', '/fixture/t', [
             'running' => static function (): bool { return false; },
             'account' => static function (): bool { return true; },
-            'port' => static function () use (&$events): bool { $events[] = 'port'; return false; },
-            'auth' => static function () use (&$events): bool { $events[] = 'auth'; return false; },
-            'managed' => static function () use (&$events): void { $events[] = 'managed'; },
             'throttle' => static function ($user, $running) use (&$events): bool { $events[] = 'throttle'; return $running; },
-        ]));
+        ] + $this->pmssMakeEventCallbacks($events, ['port' => false, 'auth' => false, 'managed' => null])));
         $this->assertSame(['port', 'auth', 'managed', 'throttle'], $events);
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkQbittorrentInstances.php', [
             "require_once __DIR__.'/../lib/user/watchdog.php';",
@@ -98,11 +95,8 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
             'account' => static function ($user, $home, $observe = false, $release = false) use (&$events): bool {
                 $events[] = $release ? 'release' : 'restore'; return !$release;
             },
-            'port' => static function () use (&$events): bool { $events[] = 'port'; return true; },
-            'auth' => static function () use (&$events): bool { $events[] = 'auth'; return false; },
-            'managed' => static function () use (&$events): void { $events[] = 'managed'; },
             'throttle' => static function (): void { throw new \RuntimeException('Refused account reached restart decisions'); },
-        ]));
+        ] + $this->pmssMakeEventCallbacks($events, ['port' => true, 'auth' => false, 'managed' => null])));
         $this->assertSame(['restore', 'port', 'auth', 'managed', 'release'], $events);
         // The cron file is top-level with no injectable entry point; retain only its delegation check.
         $this->pmssAssertRepoFileContainsString('scripts/cron/checkQbittorrentInstances.php', 'pmssQbittorrentWatchdogRunning($thisUser, $home)');

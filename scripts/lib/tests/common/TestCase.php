@@ -68,6 +68,19 @@ abstract class TestCase
     {
     }
 
+    /** Build fixed-result operation stubs that append their names to a shared event log. */
+    protected function pmssMakeEventCallbacks(array &$events, array $results): array
+    {
+        $callbacks = [];
+        foreach ($results as $event => $result) {
+            $callbacks[$event] = static function () use (&$events, $event, $result) {
+                $events[] = $event;
+                return $result;
+            };
+        }
+        return $callbacks;
+    }
+
     /** Reset the shared runtime profile globals between dry-run assertions. */
     protected function pmssResetRuntimeProfile(): void
     {

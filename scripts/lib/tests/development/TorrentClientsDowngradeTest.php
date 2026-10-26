@@ -51,18 +51,9 @@ final class TorrentClientsDowngradeTest extends TestCase
         $state = $home.'/.config/pmss/torrentClients/qbittorrent.lastRun';
         $this->pmssWriteFile($state, "4.3.9\n");
         $events = array();
-        $record = static function (string $step) use (&$events): bool {
-            $events[] = $step;
-            return true;
-        };
         $ops = array('versions' => array('5.1.0' => array('kind' => 'static')),
-            'backup' => static function () use ($record): array {
-                return array('ok' => $record('backup'));
-            },
-            'stop' => static function () use ($record): bool { return $record('stop'); },
-            'repoint' => static function () use ($record): bool { return $record('repoint'); },
-            'restore' => static function (): bool { return true; },
-            'start' => static function () use ($record): bool { return $record('start'); });
+            'restore' => static function (): bool { return true; })
+            + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true]);
         $result = \pmssConfigureTorrentClientSwitch($home,
             array('client' => 'qbittorrent', 'version' => '5.1.0'), $ops);
         $this->assertSame(200, $result['status']);
@@ -89,11 +80,8 @@ final class TorrentClientsDowngradeTest extends TestCase
         $entry = array('kind' => $client === 'deluge' ? 'venv' : 'static');
         if ($client === 'transmission') $entry['rpcUnixSocket'] = true;
         $ops = array('versions' => array($new => $entry),
-            'backup' => static function () use (&$events): array { $events[] = 'backup'; return array('ok' => true); },
-            'stop' => static function () use (&$events): bool { $events[] = 'stop'; return true; },
-            'repoint' => static function () use (&$events): bool { $events[] = 'repoint'; return true; },
-            'restore' => static function (): bool { return true; },
-            'start' => static function () use (&$events): bool { $events[] = 'start'; return true; });
+            'restore' => static function (): bool { return true; })
+            + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true]);
         $request = array('client' => $client, 'version' => $new);
         $result = $client === 'qbittorrent'
             ? \pmssConfigureTorrentClientSwitch($home, $request, $ops)

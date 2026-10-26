@@ -36,10 +36,7 @@ final class TorrentClientsP1LaunchTest extends TestCase
             $this->assertTrue(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, [
                 'system' => !$selected, 'accountPids' => static function (): array { return []; },
                 'resolve' => static function (): string { return '/fixture/custom/qbittorrent-nox'; },
-                'restore' => static function () use (&$events): bool { $events[] = 'restore'; return true; },
-                'launch' => static function () use (&$events): bool { $events[] = 'launch'; return true; },
-                'check' => static function () use (&$events): bool { $events[] = 'check'; return true; },
-            ]));
+            ] + $this->pmssMakeEventCallbacks($events, ['restore' => true, 'launch' => true, 'check' => true])));
             $this->assertSame(['restore', 'launch', 'check'], $events);
         }
     }

@@ -27,8 +27,6 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                 $ops = ['versions' => ['system' => ['kind' => 'system'], '4.2.0' => ['kind' => $client === 'deluge' ? 'venv' : 'static']],
                     'resolve' => static function () { return null; },
                     'runningVersion' => static function () { return 'system'; },
-                    'backup' => static function () use (&$events): array { $events[] = 'backup'; return ['ok' => true]; },
-                    'stop' => static function () use (&$events): bool { $events[] = 'stop'; return true; },
                     'repoint' => static function ($home, ...$args) use ($client, &$events): bool {
                         if ($client !== 'qbittorrent') array_shift($args);
                         $events[] = 'repoint-'.$args[0];
@@ -38,7 +36,7 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                     'restore' => static function (): bool { return true; },
                     'start' => static function ($home, ...$args) use (&$events, $starts): bool {
                         $events[] = 'start-'.end($args); return $starts;
-                    }];
+                    }] + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true]);
                 $this->assertSame(409, $this->apply($home, $client, '4.2.0', $ops)['status']);
                 $this->assertSame([], $events);
                 $result = $this->apply($home, $client, 'system', $ops);

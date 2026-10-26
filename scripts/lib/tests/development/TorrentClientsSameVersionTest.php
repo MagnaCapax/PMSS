@@ -16,7 +16,6 @@ final class TorrentClientsSameVersionTest extends TestCase
             '/home/.pmss/clients/'.$client.'/'.$selected, $home.'/bin/'.$client.'/default');
         $entry = array('kind' => $selected === 'system' ? 'system' : ($client === 'deluge' ? 'venv' : 'static'),
             'rpcUnixSocket' => true);
-        $record = static function ($event) use (&$events): bool { $events[] = $event; return true; };
         $ops = array('versions' => array($selected => $entry),
             'resolve' => static function () { return '/fixture/binary'; },
             'runningVersion' => function () use ($home, $client, $running) {
@@ -25,11 +24,8 @@ final class TorrentClientsSameVersionTest extends TestCase
                 fclose($other);
                 return $running;
             },
-            'backup' => static function () use ($record): array { return array('ok' => $record('backup')); },
-            'stop' => static function () use ($record): bool { return $record('stop'); },
-            'repoint' => static function () use ($record): bool { return $record('repoint'); },
-            'restore' => static function (): bool { return true; },
-            'start' => static function () use ($record): bool { return $record('start'); });
+            'restore' => static function (): bool { return true; })
+            + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true]);
         return array($home, array('client' => $client, 'version' => $selected), $ops);
     }
 

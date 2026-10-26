@@ -46,11 +46,8 @@ final class QbittorrentSocketTest extends TestCase
                 'read' => static function ($path): string { return substr($path, -16) === '.qbittorrentPort' ? '23456' : ''; },
                 'pids' => static function (): array { return [101]; },
                 'listeners' => static function () use ($address, $port): array { return [['address' => $address, 'port' => $port]]; },
-                'stop' => static function () use (&$events): bool { $events[] = 'stop'; return true; },
-                'notice' => static function ($home, $message) use (&$events): void { $events[] = 'notice'; },
-                'refuse' => static function () use (&$events): bool { $events[] = 'refuse'; return true; },
                 'pause' => static function (): void { throw new \RuntimeException('Immediate decision slept'); },
-            ]);
+            ] + $this->pmssMakeEventCallbacks($events, ['stop' => true, 'notice' => null, 'refuse' => true]));
             $this->assertSame($ok, $result);
             $this->assertSame($ok ? [] : ['stop', 'refuse', 'notice'], $events);
         }
@@ -64,11 +61,8 @@ final class QbittorrentSocketTest extends TestCase
                 'read' => static function (): string { return '23456'; },
                 'pids' => static function (): array { return [101]; },
                 'listeners' => static function () use ($sockets) { return $sockets; },
-                'stop' => static function () use (&$events): bool { $events[] = 'stop'; return true; },
-                'notice' => static function () use (&$events): void { $events[] = 'notice'; },
-                'refuse' => static function () use (&$events): bool { $events[] = 'refuse'; return true; },
                 'pause' => static function (): void {}, 'attempts' => 2,
-            ]));
+            ] + $this->pmssMakeEventCallbacks($events, ['stop' => true, 'notice' => null, 'refuse' => true])));
             $this->assertSame([], $events);
         }
     }
@@ -94,10 +88,8 @@ final class QbittorrentSocketTest extends TestCase
         $ops = ['attempts' => 1, 'read' => static function (): string { return '23456'; },
             'pids' => static function (): array { return [101]; },
             'listeners' => static function () use (&$sockets): array { return $sockets; },
-            'pause' => static function (): void {},
-            'stop' => static function () use (&$events): bool { $events[] = 'stop'; return true; },
-            'notice' => static function () use (&$events): void { $events[] = 'notice'; },
-            'refuse' => static function () use (&$events): bool { $events[] = 'refuse'; return true; }];
+            'pause' => static function (): void {}]
+            + $this->pmssMakeEventCallbacks($events, ['stop' => true, 'notice' => null, 'refuse' => true]);
         $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/t', $ops));
         $sockets = [['address' => '00000000', 'port' => 8080]];
         $this->assertFalse(\pmssQbittorrentFrontendSocketWait('/fixture/t', $ops));

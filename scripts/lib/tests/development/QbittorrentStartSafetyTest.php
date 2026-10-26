@@ -14,9 +14,8 @@ final class QbittorrentStartSafetyTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-qbt-start-');
         $events = [];
         $ops = ['system' => true, 'accountPids' => static function (): array { return []; },
-            'restore' => static function () use (&$events): bool { $events[] = 'restore'; return false; },
-            'notice' => static function () use (&$events): void { $events[] = 'notice'; },
-            'check' => static function (): bool { throw new \RuntimeException('Unstarted socket checked'); }];
+            'check' => static function (): bool { throw new \RuntimeException('Unstarted socket checked'); }]
+            + $this->pmssMakeEventCallbacks($events, ['restore' => false, 'notice' => null]);
         $launch = static function (): void { throw new \RuntimeException('Failed restore started a daemon'); };
         $this->assertFalse(\pmssQbittorrentFrontendStart($home, $launch, $ops));
         $this->assertFalse(\pmssConfigureTorrentClientStart($home, 'system', $ops));
@@ -43,12 +42,11 @@ final class QbittorrentStartSafetyTest extends TestCase
     public function testCommonStartRestoresLaunchesThenChecksSocket(): void
     {
         $events = [];
+        $launch = $this->pmssMakeEventCallbacks($events, ['launch' => null])['launch'];
         $this->assertTrue(\pmssQbittorrentFrontendStart('/fixture/t',
-            static function () use (&$events): void { $events[] = 'launch'; }, [
+            $launch, [
                 'accountPids' => static function (): array { return []; },
-                'restore' => static function () use (&$events): bool { $events[] = 'restore'; return true; },
-                'check' => static function () use (&$events): bool { $events[] = 'check'; return true; },
-            ]));
+            ] + $this->pmssMakeEventCallbacks($events, ['restore' => true, 'check' => true])));
         $this->assertSame(['restore', 'launch', 'check'], $events);
     }
 
@@ -79,9 +77,8 @@ final class QbittorrentStartSafetyTest extends TestCase
             'backup' => static function (): array { return ['ok' => true]; },
             'stop' => static function (): bool { return true; },
             'repoint' => static function (): bool { return true; },
-            'restore' => static function () use (&$events): bool { $events[] = 'restore'; return true; },
             'start' => static function ($home, $version) use (&$events): bool { $events[] = $version; return $version === 'system'; },
-        ]);
+        ] + $this->pmssMakeEventCallbacks($events, ['restore' => true]));
         $this->assertFalse($result['ok']);
         $this->assertSame(['restore', '5.2.4', 'restore', 'system'], $events);
     }

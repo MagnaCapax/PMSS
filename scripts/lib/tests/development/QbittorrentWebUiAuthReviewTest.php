@@ -16,16 +16,14 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
             'contextSafe' => static function (): bool { return true; },
             'pathSafe' => static function (): bool { return true; },
             'read' => static function (): string { return "[Preferences]\nWebUI\\LocalHostAuth=false\n"; },
-            'write' => static function () use (&$events): bool { $events[] = 'write'; return true; },
             'pids' => static function (): array { return [123]; },
             'roots' => [$native],
             'exe' => static function () use ($native): string { return $native; },
             'mntNs' => static function (): string { return 'mnt:[1]'; },
-            'signal' => static function () use (&$events): bool { $events[] = 'signal'; return true; },
             'log' => static function ($user, $message) use (&$events): void { $events[] = 'log:'.$message; },
             'stateDir' => $root.'/run',
             'now' => 100000,
-        ];
+        ] + $this->pmssMakeEventCallbacks($events, ['write' => true, 'signal' => true]);
     }
 
     /** A replaced on-disk binary keeps its native proc link name. */
@@ -66,7 +64,7 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
     {
         $events = [];
         $ops = $this->fixture($events);
-        $ops['signal'] = static function () use (&$events): bool { $events[] = 'signal'; return false; };
+        $ops = $this->pmssMakeEventCallbacks($events, ['signal' => false]) + $ops;
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
         $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('alice', $ops));
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));

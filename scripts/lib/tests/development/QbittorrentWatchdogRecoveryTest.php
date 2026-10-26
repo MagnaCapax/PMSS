@@ -22,11 +22,8 @@ final class QbittorrentWatchdogRecoveryTest extends TestCase
             'account' => static function ($user, $home, $observe = false, $release = false) use (&$events): bool {
                 $events[] = $release ? 'release' : 'restore'; return true;
             },
-            'port' => static function () use (&$events): bool { $events[] = 'port'; return true; },
-            'auth' => static function () use (&$events): bool { $events[] = 'auth'; return false; },
-            'managed' => static function () use (&$events): void { $events[] = 'managed'; },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ]));
+        ] + $this->pmssMakeEventCallbacks($events, ['port' => true, 'auth' => false, 'managed' => null])));
         $this->assertSame(['restore', 'port', 'auth', 'managed', 'release'], $events);
     }
 

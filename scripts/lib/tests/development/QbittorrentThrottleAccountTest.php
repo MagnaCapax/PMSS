@@ -55,8 +55,7 @@ final class QbittorrentThrottleAccountTest extends TestCase
                 $events[] = 'exit-save';
                 file_put_contents($this->path, "[BitTorrent]\nSession\\GlobalUPSpeedLimit=900\nOther=preserved\n");
                 $live = false;
-            },
-            'restore' => static function () use (&$events): bool { $events[] = 'restore'; return true; }]);
+            }] + $this->pmssMakeEventCallbacks($events, ['restore' => true]));
         $this->assertTrue(\pmssQbittorrentThrottleAccount($this->home, 512, true, $ops));
         $this->assertSame(['exit-save', 'restore'], $events);
         $this->assertStringContainsAllStrings(['GlobalUPSpeedLimit=512', 'Other=preserved'], file_get_contents($this->path));

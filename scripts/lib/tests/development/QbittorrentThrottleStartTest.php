@@ -23,7 +23,6 @@ final class QbittorrentThrottleStartTest extends TestCase
             };
             $ops = ['build' => '5.2.4', 'system' => true,
                 'accountPids' => static function (): array { return []; },
-                'restore' => static function () use (&$events): bool { $events[] = 'restore'; return true; },
                 'throttleRead' => static function (): int { return 500; },
                 'write' => static function ($path, $value) use (&$events): bool {
                     $events[] = 'write'; return file_put_contents($path, $value) === strlen($value);
@@ -34,7 +33,7 @@ final class QbittorrentThrottleStartTest extends TestCase
                 'attempts' => 1,
                 'runningVersion' => static function (): string { return 'system'; },
                 'launch' => $launch,
-            ];
+            ] + $this->pmssMakeEventCallbacks($events, ['restore' => true]);
             if ($entry === 'apps') $ok = \pmssCustomerTorrentClientToggleStart('qbittorrent', $launch, $home, null, $ops);
             elseif ($entry === 'configure') $ok = \pmssConfigureTorrentClientStart($home, 'system', $ops);
             else $ok = \pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, $ops);

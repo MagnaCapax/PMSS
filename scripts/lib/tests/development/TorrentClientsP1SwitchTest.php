@@ -62,8 +62,8 @@ final class TorrentClientsP1SwitchTest extends TestCase
     {
         $home = $this->home();
         $events = array();
-        $ops = array('versions' => array('5.1.0' => array('kind' => 'static')),
-            'backup' => static function () use (&$events): array { $events[] = 'backup'; return array('ok' => true); });
+        $ops = array('versions' => array('5.1.0' => array('kind' => 'static')))
+            + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true]]);
         $request = array('client' => 'qbittorrent', 'version' => '5.1.0');
         $this->assertSame(403, \pmssConfigureActionApply($home, 'torrentClientSwitch', $request, $ops)['status']);
         $this->assertSame(403, \pmssConfigureActionApply($home, 'torrentClientSwitch', $request + array('password' => 'wrong'), $ops)['status']);
@@ -115,7 +115,6 @@ final class TorrentClientsP1SwitchTest extends TestCase
         $ops = array(
             'versions' => array('5.1.0' => array('kind' => 'static')),
             'backup' => static function (): array { return array('ok' => true); },
-            'stop' => static function () use (&$events): bool { $events[] = 'stop'; return true; },
             'repoint' => static function ($path, $version) use (&$events): bool {
                 $events[] = 'repoint-'.$version; return true;
             },
@@ -123,7 +122,7 @@ final class TorrentClientsP1SwitchTest extends TestCase
             'start' => static function ($path, $version) use (&$events): bool {
                 $events[] = 'start-'.$version; return $version === 'system';
             },
-        );
+        ) + $this->pmssMakeEventCallbacks($events, ['stop' => true]);
         $result = \pmssConfigureTorrentClientSwitch($home,
             array('client' => 'qbittorrent', 'version' => '5.1.0'), $ops);
         $this->assertFalse($result['ok']);
