@@ -20,6 +20,8 @@ function pmssQbittorrentPasswordPrepare(string $user, string $home, array $ops =
 /** Serialize credential writes against every PMSS start and version switch. */
 function pmssQbittorrentPasswordApplyStopped(string $user, string $home, string $password, array $ops = []): bool
 {
+    // Account creation sets the password before qBittorrent has a profile: nothing to sync, so no stop or notice.
+    if (@lstat($home.'/.config/qBittorrent') === false) return false;
     $prepare = $ops['prepare'] ?? 'pmssQbittorrentPasswordPrepare';
     $write = $ops['password'] ?? static function (string $user, string $password) use ($home): bool {
         // A relocated config directory is followed only while it resolves inside this account's home (ADR 0182).

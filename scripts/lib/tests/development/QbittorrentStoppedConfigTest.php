@@ -60,9 +60,23 @@ final class QbittorrentStoppedConfigTest extends TestCase
         $this->assertFalse(\pmssQbittorrentFrontendFileSafe($path));
     }
 
+    public function testPasswordSyncBeforeQbittorrentHasAProfileDoesNothing(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-qbt-noprofile-');
+        $calls = [];
+        $this->assertFalse(\pmssQbittorrentPasswordApplyStopped('t', $home, 'secret', [
+            'prepare' => static function () use (&$calls): bool { $calls[] = 'prepare'; return true; },
+            'password' => static function () use (&$calls): bool { $calls[] = 'password'; return true; },
+            'notice' => static function () use (&$calls): void { $calls[] = 'notice'; },
+        ]));
+        $this->assertSame([], $calls);
+        $this->assertFalse(file_exists($home.'/.config/pmss/torrentClients/qbittorrent.notice'));
+    }
+
     public function testPasswordSyncRetriesBusyLockThenRunsTheWriteOnce(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-lock-');
+        mkdir($home.'/.config/qBittorrent', 0700, true);
         $path = $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.lock', '');
         $lock = fopen($path, 'c');
         flock($lock, LOCK_EX);
@@ -84,6 +98,7 @@ final class QbittorrentStoppedConfigTest extends TestCase
     public function testPasswordLockTimeoutIsVisibleAndNeverWritesThePassword(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-lock-timeout-');
+        mkdir($home.'/.config/qBittorrent', 0700, true);
         $path = $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.lock', '');
         $lock = fopen($path, 'c');
         flock($lock, LOCK_EX);
