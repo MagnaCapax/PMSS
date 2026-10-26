@@ -77,8 +77,7 @@ function storageBenchmarkShowLast(string $jsonLog): int
     unset($runs); // Release other runs before rendering, as the former reader did.
     $first = $run[0];
     $label = storageBenchmarkScalarDisplay($first['label'] ?? '');
-    $labelStr = $label !== '' ? ('  Label: '.$label) : '';
-    echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".storageBenchmarkScalarDisplay($first['run_ts'] ?? '').$labelStr."\n\n";
+    echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".storageBenchmarkScalarDisplay($first['run_ts'] ?? '').($label !== '' ? '  Label: '.$label : '')."\n\n";
 
     // Print only the first preflight recorded in the selected run.
     foreach ($run as $entry) {

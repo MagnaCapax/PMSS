@@ -22,12 +22,8 @@ function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): vo
     $label = pmssTrafficUserKeyBaseUser((string) $row['user'])
         .(pmssTrafficUserKeyIsLocalnet((string) $row['user']) ? ' (L)' : '').':';
     $display = pmssShowTrafficDisplayAmounts($row['rawMiB']);
-    $inboundText = $row['inboundMonthMiB'] !== null ? pmssTrafficFormatAmount((float) $row['inboundMonthMiB']) : '-';
-    $ratioText = $row['inboundRatio'] !== null ? sprintf('%.2f', (float) $row['inboundRatio']) : 'n/a';
     if ($extended) {
         // Build the extended columns here instead of packing and unpacking a tuple.
-        $limitDisplay = ($row['limitMiB'] !== null) ? pmssTrafficFormatAmount($row['limitMiB']) : '-';
-        $pctDisplay = $row['pctUsed'] !== null ? sprintf('%3d%%', min(999, (int) round($row['pctUsed']))) : 'n/a';
         $statusLabel = $row['pctUsed'] !== null && $row['pctUsed'] >= 80 ? ($row['pctUsed'] >= 100 ? '[OVER]' : '[WARN]') : '';
         $statusDisplay = pmssCliAnsiStyle(str_pad($statusLabel, 6, ' ', STR_PAD_RIGHT), $statusLabel === '[OVER]' ? '1;31' : '33', $useColor && $statusLabel !== '');
         $filled = ($row['limitMiB'] !== null && $row['pctUsed'] !== null)
@@ -35,12 +31,17 @@ function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): vo
             : null;
         $barDisplay = $filled === null ? str_repeat(' ', 12) : '['.str_repeat('#', $filled).str_repeat('-', 10 - $filled).']';
         $format = "%-14s %9s / %9s %4s %s %s IN: %9s R: %5s  Datarates: %10s / %10s / %10s / %10s\n";
-        $values = [$label, (string) $display['month'], $limitDisplay, $pctDisplay, $statusDisplay, $barDisplay];
+        $values = [$label, (string) $display['month'],
+            $row['limitMiB'] !== null ? pmssTrafficFormatAmount($row['limitMiB']) : '-',
+            $row['pctUsed'] !== null ? sprintf('%3d%%', min(999, (int) round($row['pctUsed']))) : 'n/a',
+            $statusDisplay, $barDisplay];
     } else {
         $format = "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n";
         $values = [$label, (string) $display['month'], (string) $display['week'], (string) $display['day']];
     }
-    printf($format, ...array_merge($values, [$inboundText, $ratioText], pmssShowTrafficRateColumns($row['rates'], $extended)));
+    $values[] = $row['inboundMonthMiB'] !== null ? pmssTrafficFormatAmount((float) $row['inboundMonthMiB']) : '-';
+    $values[] = $row['inboundRatio'] !== null ? sprintf('%.2f', (float) $row['inboundRatio']) : 'n/a';
+    printf($format, ...array_merge($values, pmssShowTrafficRateColumns($row['rates'], $extended)));
 }
 
 function pmssShowTrafficDisplayAmounts(array $rawMiB): array { return array_map('pmssTrafficFormatAmount', array_intersect_key($rawMiB, ['month' => true, 'week' => true, 'day' => true])); }

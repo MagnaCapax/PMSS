@@ -33,8 +33,8 @@ class TrafficStatsProcessor extends PmssUserStatsProcessor
         if ($loadedData === null) {
             return;
         }
-        $rawTotals = array_fill_keys(array_keys($compareTimes), 0.0);
-        $dailyTotals = [];
+        // Accumulate in the persisted schema, retaining raw/daily key and sample order.
+        $data = ['raw' => array_fill_keys(array_keys($compareTimes), 0.0), 'daily' => []];
 
         foreach (array_filter(explode("\n", $loadedData)) as $line) {
             $parsed = $this->stats->parseLine($line);
@@ -45,20 +45,17 @@ class TrafficStatsProcessor extends PmssUserStatsProcessor
 
             foreach ($compareTimes as $label => $threshold) {
                 if ($parsed['timestamp'] >= $threshold) {
-                    $rawTotals[$label] += $parsed['data'];
+                    $data['raw'][$label] += $parsed['data'];
                 }
             }
 
             if ($parsed['timestamp'] >= $compareTimes['month']) {
                 $currentDay = date('Y/m/d', $parsed['timestamp']);
-                $dailyTotals[$currentDay] = ($dailyTotals[$currentDay] ?? 0) + $parsed['data'];
+                $data['daily'][$currentDay] = ($data['daily'][$currentDay] ?? 0) + $parsed['data'];
             }
         }
 
-        $this->stats->saveUserTraffic($user, [
-            'raw'     => $rawTotals,
-            'daily'   => $dailyTotals,
-        ]);
-        logMessage($logPrefix."Traffic stats for {$user} saved, month data consumption: {$rawTotals['month']}");
+        $this->stats->saveUserTraffic($user, $data);
+        logMessage($logPrefix."Traffic stats for {$user} saved, month data consumption: {$data['raw']['month']}");
     }
 }

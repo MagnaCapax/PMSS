@@ -69,20 +69,20 @@ function pmssShowResourcesMain(array $argv): int
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
     }
 
-    ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
+    $report = pmssResourceBuildReport($statsDir, $users);
 
     if (pmssCliOptionPresent($parsed, 'json')) {
-        return pmssJsonEmitPayload(['users' => $rows, 'totals' => $totals, 'missing' => $missingStats], 'Failed to encode resource report JSON.');
+        return pmssJsonEmitPayload(['users' => $report['rows'], 'totals' => $report['totals'], 'missing' => $report['missing']], 'Failed to encode resource report JSON.');
     }
 
     $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-10s %-8s\n";
     printf($rowFormat, 'Username', 'IO Read/mo', 'IO Write/mo', 'CPU hrs/mo', 'RAM GB-hrs/mo', 'Mem Now', 'Procs', 'IO Ops/mo', 'IOPS/s');
-    foreach ($rows as $username => $row) { pmssShowResourcesPrintUsageRow($username, $row, $rowFormat); }
+    foreach ($report['rows'] as $username => $row) { pmssShowResourcesPrintUsageRow($username, $row, $rowFormat); }
     printf($rowFormat, '---', '---', '---', '---', '---', '---', '---', '---', '---');
-    pmssShowResourcesPrintUsageRow('Total', $totals, $rowFormat);
-    if (!empty($missingStats)) {
-        echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";
-        if (pmssCliOptionPresent($parsed, 'show-missing')) { echo "* Missing: ".implode(' ', $missingStats)."\n"; }
+    pmssShowResourcesPrintUsageRow('Total', $report['totals'], $rowFormat);
+    if (!empty($report['missing'])) {
+        echo "* Missing resource stats for ".count($report['missing'])." users (run resourceStats to rebuild).\n";
+        if (pmssCliOptionPresent($parsed, 'show-missing')) { echo "* Missing: ".implode(' ', $report['missing'])."\n"; }
     }
 
     return 0;
@@ -90,7 +90,6 @@ function pmssShowResourcesMain(array $argv): int
 
 function pmssShowResourcesPrintUsageRow(string $label, array $data, string $rowFormat): void
 {
-    $hourOps = (float) (($data['io_read_ops']['hour'] ?? 0) + ($data['io_write_ops']['hour'] ?? 0));
     $monthOps = (float) (($data['io_read_ops']['month'] ?? 0) + ($data['io_write_ops']['month'] ?? 0));
     $monthOpsText = number_format($monthOps, 0).' ops';
     foreach ([1000000000.0 => 'B ops', 1000000.0 => 'M ops', 1000.0 => 'K ops'] as $divisor => $unit) {
@@ -111,6 +110,6 @@ function pmssShowResourcesPrintUsageRow(string $label, array $data, string $rowF
         pmssFormatBytes((float) $data['memory']['current'], 2, 1),
         (string) round($data['tasks']['current']),
         $monthOpsText,
-        number_format($hourOps / 3600, 2)
+        number_format((float) (($data['io_read_ops']['hour'] ?? 0) + ($data['io_write_ops']['hour'] ?? 0)) / 3600, 2)
     );
 }
