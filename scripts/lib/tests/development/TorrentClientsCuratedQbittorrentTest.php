@@ -21,7 +21,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
             $this->assertSame($old, isset($entry['note']));
             if (!$old) continue;
             $notes++;
-            $this->assertSame('HTTPS certificate checks are not enforced in this build; fixed in 5.0.1 (CVE-2024-51774).', $entry['note']);
+            $this->assertSame('HTTPS certificate checks are not enforced; fixed in 5.0.1 (CVE-2024-51774).', $entry['note']);
         }
         $this->assertSame(8, $notes);
     }
