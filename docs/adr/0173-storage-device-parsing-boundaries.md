@@ -53,6 +53,10 @@ SMART last-line precedence, NVMe first-match precedence, payload ordering and
 thresholds remain unchanged. Parser tests cover ATA/SCSI counters and both
 temperature units at the integer boundary without running storage probes.
 
+SMART passes its ordered patterns directly to the shared parser; NVMe consumes
+captured stdout directly, retaining failed/empty-probe handling.
+
 ## References
+
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)
 - [Function contracts](../contracts.md)

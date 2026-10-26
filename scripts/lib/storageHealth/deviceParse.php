@@ -35,7 +35,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
     }
 
     // The first capture is always the counter; keep parser order for overlapping lines.
-    $lineParsers = [
+    $metrics = pmssStorageHealthMetricsParse(pmssTextLines($out), [
         '/\\bReallocated_Sector_Ct\\b.*?\\s(\\d+)\\s*$/' => ['reallocated'],
         '/\\bCurrent_Pending_Sector\\b.*?\\s(\\d+)\\s*$/' => ['pending'],
         '/\\bUDMA_CRC_Error_Count\\b.*?\\s(\\d+)\\s*$/' => ['udma_crc', 'link_errors'],
@@ -45,8 +45,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         '/Non-medium\\s+error\\s+count:\\s*([0-9]+)/i' => ['link_errors'],
         '/\\bPower_On_Hours\\b.*?\\s(\\d+)\\s*$/' => ['power_on_hours'],
         '/Accumulated\\s+power\\s+on\\s+time.*?([0-9]+):([0-9]+):([0-9]+)/i' => ['power_on_hours'],
-    ];
-    $metrics = pmssStorageHealthMetricsParse(pmssTextLines($out), $lineParsers, $metrics);
+    ], $metrics);
 
     $entry['metrics'] = $metrics;
     // Null distinguishes an absent health line from an explicit, unsuccessful result.

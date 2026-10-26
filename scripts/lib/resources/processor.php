@@ -28,17 +28,10 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         $this->logger = $paths['logger'] ?? 'logMessage';
     }
 
-    /** Emit processor diagnostics through the configured logger. */
-    private function log(string $message): void
-    {
-        $logger = $this->logger;
-        $logger($message);
-    }
-
     /** Ensure runtime directories exist before writing. */
     public function ensureRuntime(): void
     {
-        pmssManagedDirsEnsure([$this->runtimeDir => 0755, $this->statsDir => 0600], function (string $dir): void { $this->log(date('c').": Unable to prepare resource runtime directory {$dir}"); });
+        pmssManagedDirsEnsure([$this->runtimeDir => 0755, $this->statsDir => 0600], function (string $dir): void { ($this->logger)(date('c').": Unable to prepare resource runtime directory {$dir}"); });
     }
 
     /** Ensure resource runtime paths are ready before any CLI mode runs. */
@@ -57,13 +50,13 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
             if ($lockBusy) {
                 return false;
             }
-            $this->log(date('c').": Unable to open lock file {$lockFile} for resourceStats");
+            ($this->logger)(date('c').": Unable to open lock file {$lockFile} for resourceStats");
             return true;
         }
         if (!pmssLockHandleWritePid($this->lockHandle)) {
             pmssLockHandleRelease($this->lockHandle);
             $this->lockHandle = false;
-            $this->log(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without spawn lock");
+            ($this->logger)(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without spawn lock");
         }
         return true;
     }
@@ -80,11 +73,11 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
             $loadedData,
             $compareTimes,
             function (string $line) use ($logPrefix, $user): void {
-                $this->log($logPrefix."Parsing line failed for {$user}, line: {$line}");
+                ($this->logger)($logPrefix."Parsing line failed for {$user}, line: {$line}");
             }
         );
         if ($data === null) {
-            $this->log($logPrefix."No valid samples for {$user}");
+            ($this->logger)($logPrefix."No valid samples for {$user}");
             return;
         }
 
@@ -94,9 +87,9 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         $homePath = $this->homeDir.'/'.$user;
         $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
         is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
-        if (!pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($logPrefix, $user): void { $this->log($logPrefix."Failed to write resource stats for {$user} at {$path}"); })) {
+        if (!pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($logPrefix, $user): void { ($this->logger)($logPrefix."Failed to write resource stats for {$user} at {$path}"); })) {
             return;
         }
-        $this->log($logPrefix."Resource stats for {$user} saved, month read bytes: {$data['io_read']['raw']['month']}");
+        ($this->logger)($logPrefix."Resource stats for {$user} saved, month read bytes: {$data['io_read']['raw']['month']}");
     }
 }

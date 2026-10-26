@@ -52,12 +52,12 @@ function pmssResourceLogLineParts(array $delta, array $state): array
 /** Return the payload fields accepted by each historical resource-log line shape. */
 function pmssResourceLogPayloadFields(int $payloadCount): ?array
 {
-    static $layouts = [
-        ['io_read', 'io_write', 'cpu', 'memory', 'tasks'],
-        ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'],
-        ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks', 'memory_anon', 'memory_file'],
-    ];
-    return ($payloadCount < 5 || $payloadCount === 8) ? null : ($payloadCount >= 9 ? $layouts[2] : ($payloadCount >= 7 ? $layouts[1] : $layouts[0]));
+    if ($payloadCount < 5 || $payloadCount === 8) return null;
+    // Historical extensions retain the same shared prefix and metric order.
+    return array_merge(['io_read', 'io_write'],
+        $payloadCount >= 7 ? ['io_read_ops', 'io_write_ops'] : [],
+        ['cpu', 'memory', 'tasks'],
+        $payloadCount >= 9 ? ['memory_anon', 'memory_file'] : []);
 }
 
 /** Parse one resource cron text record into the accumulator sample schema. */

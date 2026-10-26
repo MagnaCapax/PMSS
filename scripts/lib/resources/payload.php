@@ -5,8 +5,8 @@ require_once __DIR__.'/accumulator.php';
 /** Return the shared schema used by resource rows and totals. */
 function pmssResourceReportTemplate(): array
 {
-    $windows = array_fill_keys(['month', 'week', 'day', 'hour'], 0.0);
-    return array_fill_keys(ResourceStatsAccumulator::RAW_METRICS, $windows) + ['memory' => ['current' => 0.0, 'avg_month' => 0.0], 'tasks' => ['current' => 0.0]];
+    return array_fill_keys(ResourceStatsAccumulator::RAW_METRICS, array_fill_keys(['month', 'week', 'day', 'hour'], 0.0))
+        + ['memory' => ['current' => 0.0, 'avg_month' => 0.0], 'tasks' => ['current' => 0.0]];
 }
 
 /** Normalize a stored metric window, rejecting malformed values and defaulting missing ops to zero. */

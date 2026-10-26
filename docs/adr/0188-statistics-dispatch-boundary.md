@@ -58,6 +58,10 @@ its localnet-to-base-account mapping.
   machine. No provisioning or production dry run is needed for this internal
   dispatch change.
 
+Resource layouts compose shared field groups, defaults are built directly, and
+diagnostics invoke the configured logger without a private pass-through method.
+Record lengths, field order, messages and persistence ordering stay unchanged.
+
 ## References
 
 - [Cron lock policy](0049-in-script-lock-is-canonical-for-cron-concurrency.md)
