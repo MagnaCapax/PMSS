@@ -29,7 +29,9 @@ function storageBenchmarkFioJobsRun(string $jsonLog, string $path, int $size, in
 function storageBenchmarkDdTestRun(string $jsonLog, string $path, array $row, string $test, int $size, int $ddSizeBytes, string $format, ?callable $runner = null): array
 {
     $count = (int) floor($ddSizeBytes / (1024 * 1024));
-    $skip = storageBenchmarkDdSkipBlocks($size, $count);
+    // Choose an in-bounds MiB offset with the existing four-MiB tail margin.
+    $skip = $size > ($count * 1024 * 1024 + 4 * 1024 * 1024)
+        ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0;
     $dd = ($runner ?: 'storageBenchmarkDdSeqread')($path, $count, $skip);
     storageBenchmarkAppendJsonLine($jsonLog, storageBenchmarkDdResultEntry($row, $test, $count, $skip, $dd));
     printf($format, $path, $dd['mbps'] !== null ? number_format($dd['mbps'], 2) : 'n/a');

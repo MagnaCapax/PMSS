@@ -37,6 +37,12 @@ values, including numeric JSON tokens and strings that overflow PHP floats.
 Finite values retain their formatting and conversions. `StorageBenchmarkShowLastTest`
 covers file-backed and device report rows; reading a saved report runs no probes.
 
+Storage benchmark report selection and peer medians stay with their renderers;
+the shared dd runner owns its read offset. Post-install output mirroring and
+success-marker publication stay in the trigger. These single-caller steps have
+no separate adapters; report bytes, offset bounds, log limits and marker policy
+retain their existing behavior.
+
 Shared account-statistics helpers return `null` for non-finite percentage inputs,
 percentage overflow, and overflowing rTorrent ratios. Finite calculations retain
 their values, including uncapped percentages; ratio overflow leaves accepted RPC

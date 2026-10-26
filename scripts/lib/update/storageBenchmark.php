@@ -18,52 +18,6 @@ function pmssStorageBenchmarkPostInstallMarkerPath(): string
     return pmssResolvePathFromEnv('PMSS_STORAGE_BENCHMARK_INSTALL_MARKER', '/var/lib/pmss/storage-benchmark-post-install.json');
 }
 
-/** Mirror captured benchmark stdout into the update log so WARN lines persist. */
-function pmssStorageBenchmarkPostInstallLogCapturedOutput(callable $logger, int $maxLines = 250): void
-{
-    $stdout = (string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '');
-    $lines = preg_split('/\R/', trim($stdout));
-    if (!is_array($lines) || $lines === array()) {
-        return;
-    }
-
-    $logged = 0;
-    foreach ($lines as $line) {
-        $line = pmssLogExcerpt(trim(pmssLogControlCharactersReplace((string) $line)), 1000, ' ...');
-        if ($line === '') {
-            continue;
-        }
-        if ($logged >= $maxLines) {
-            $logger('[storage-benchmark] output truncated after '.$maxLines.' lines');
-            return;
-        }
-        $logger('[storage-benchmark] '.$line);
-        $logged++;
-    }
-}
-
-/** Record that the post-install storage benchmark completed successfully. */
-function pmssStorageBenchmarkPostInstallWriteMarker(callable $logger): bool
-{
-    $path = pmssStorageBenchmarkPostInstallMarkerPath();
-    $payload = pmssJsonEncodePrettyLine([
-        'timestamp' => date('c'),
-        'event'     => 'storage_benchmark_post_install',
-        'rc'        => 0,
-    ]);
-    if (!is_string($payload)) {
-        $logger('[WARN] Unable to encode post-install storage benchmark marker payload');
-        return false;
-    }
-
-    return pmssRefreshManagedPathFile($path, $payload, 'post-install storage benchmark marker', $logger, [
-        'directoryMode'       => 0755,
-        'mode'                => 0644,
-        'successMessage'      => 'Recorded post-install storage benchmark marker at '.$path,
-        'writeFailureMessage' => '[WARN] Unable to record post-install storage benchmark marker at '.$path,
-    ]);
-}
-
 /**
  * Run the post-install storage benchmark when the host is still tenant-empty.
  *
@@ -99,11 +53,41 @@ function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable 
     $rc = (int) $run('Running post-install idle storage benchmark', pmssBuildCommand('php', [
         '/scripts/util/storageBenchmark.php', '--require-idle', '--devices', '--label=post-install',
     ]));
-    pmssStorageBenchmarkPostInstallLogCapturedOutput($log);
+    // Mirror captured stdout into the update log so WARN lines persist.
+    $stdout = (string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '');
+    $lines = preg_split('/\R/', trim($stdout));
+    $logged = 0;
+    foreach (is_array($lines) ? $lines : [] as $line) {
+        $line = pmssLogExcerpt(trim(pmssLogControlCharactersReplace((string) $line)), 1000, ' ...');
+        if ($line === '') continue;
+        if ($logged >= 250) {
+            $log('[storage-benchmark] output truncated after 250 lines');
+            break;
+        }
+        $log('[storage-benchmark] '.$line);
+        $logged++;
+    }
     if ($rc !== 0) {
         $log('[WARN] Post-install storage benchmark did not complete (rc='.$rc.'); leaving marker unset');
         return $rc;
     }
 
-    return pmssStorageBenchmarkPostInstallWriteMarker($log) ? 0 : 1;
+    // Resolve the marker again after the runner and logger have completed.
+    $path = pmssStorageBenchmarkPostInstallMarkerPath();
+    $payload = pmssJsonEncodePrettyLine([
+        'timestamp' => date('c'),
+        'event'     => 'storage_benchmark_post_install',
+        'rc'        => 0,
+    ]);
+    if (!is_string($payload)) {
+        $log('[WARN] Unable to encode post-install storage benchmark marker payload');
+        return 1;
+    }
+
+    return pmssRefreshManagedPathFile($path, $payload, 'post-install storage benchmark marker', $log, [
+        'directoryMode'       => 0755,
+        'mode'                => 0644,
+        'successMessage'      => 'Recorded post-install storage benchmark marker at '.$path,
+        'writeFailureMessage' => '[WARN] Unable to record post-install storage benchmark marker at '.$path,
+    ]) ? 0 : 1;
 }

@@ -236,8 +236,6 @@ function storageBenchmarkDdResultEntry(array $deviceEntry, string $test, int $co
     return array_replace($deviceEntry + ['test' => $test, 'params' => ['bs' => '1M', 'count' => $count, 'skip_blocks' => $skip], 'ok' => ($dd['rc'] === 0 && $dd['mbps'] !== null)],
         $dd['mbps'] !== null ? ['metrics' => ['seqread_MBps' => $dd['mbps'], 'elapsed_s' => $dd['secs']]] : ['error' => 'dd parse failed']);
 }
-/** Choose an in-bounds MiB offset with the existing four-MiB tail margin. */
-function storageBenchmarkDdSkipBlocks(int $size, int $count): int { return $size > ($count * 1024 * 1024 + 4 * 1024 * 1024) ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0; }
 function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $label, string $runId, int $ddSizeBytes, int $devRuntime): void
 {
     echo "\n== Per-device read-only benchmarks ==\n";

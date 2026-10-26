@@ -46,9 +46,14 @@ function storageBenchmarkEntryDeviceName(array $entry): ?string
     return ($device !== '' && $device !== '0') ? $device : null;
 }
 
-/** @return array{0:string,1:array<int,array<string,mixed>>} */
-function storageBenchmarkLastRunRead(string $jsonLog): array
+/** Render the selected run in encounter order without executing benchmarks. */
+function storageBenchmarkShowLast(string $jsonLog): int
 {
+    if (!is_file($jsonLog)) {
+        return pmssCliReturnWithStderr("No log at {$jsonLog}\n", 1);
+    }
+
+    // Select the latest timestamp while retaining every row of that run.
     $runs = [];
     $lastId = '';
     $lastTs = '';
@@ -63,22 +68,13 @@ function storageBenchmarkLastRunRead(string $jsonLog): array
         }
     }
 
-    return [$lastId, $lastId !== '' ? $runs[$lastId] : []];
-}
-
-/** Render the selected run in encounter order without executing benchmarks. */
-function storageBenchmarkShowLast(string $jsonLog): int
-{
-    if (!is_file($jsonLog)) {
-        return pmssCliReturnWithStderr("No log at {$jsonLog}\n", 1);
-    }
-
-    [$lastId, $run] = storageBenchmarkLastRunRead($jsonLog);
     if ($lastId === '') {
         echo "No runs found.\n";
         return 0;
     }
 
+    $run = $runs[$lastId];
+    unset($runs); // Release other runs before rendering, as the former reader did.
     $first = $run[0];
     $label = storageBenchmarkScalarDisplay($first['label'] ?? '');
     $labelStr = $label !== '' ? ('  Label: '.$label) : '';
@@ -122,8 +118,16 @@ function storageBenchmarkShowLast(string $jsonLog): int
 
 /** Live summaries retain the same formatting as the CLI's historical output. */
 function storageBenchmarkPrintFileSummary(string $targetDir, string $jsonLog, string $label, array $summary): void { echo "\n== Storage benchmark summary ".($label !== '' ? '(' . $label . ' on '.$targetDir.')' : "(on {$targetDir})")." ==\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95_ms\twrite_p95_ms\n"; foreach ($summary as $row) printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", ...$row); echo "\nJSON log: {$jsonLog}\n"; }
-function storageBenchmarkMedian(array $values): float { sort($values); $n = count($values); if ($n === 0) return 0.0; $m = (int) floor(($n - 1) / 2); return $n % 2 ? (float) $values[$m] : (($values[$m] + $values[$m + 1]) / 2); }
-function storageBenchmarkPeerMedian(array $peer, string $key): float { return storageBenchmarkMedian(array_filter(array_column($peer, $key), static function ($value): bool { return $value !== null; })); }
+/** Compare available peer measurements; missing samples do not enter the median. */
+function storageBenchmarkPeerMedian(array $peer, string $key): float
+{
+    $values = array_filter(array_column($peer, $key), static function ($value): bool { return $value !== null; });
+    sort($values);
+    $n = count($values);
+    if ($n === 0) return 0.0;
+    $m = (int) floor(($n - 1) / 2);
+    return $n % 2 ? (float) $values[$m] : (($values[$m] + $values[$m + 1]) / 2);
+}
 
 function storageBenchmarkPrintPeerWarnings(array $peer): void
 {
