@@ -54,6 +54,9 @@ final class QbittorrentStartSafetyTest extends TestCase
 
     public function testSuccessfulStartClearsAnOlderFailureNotice(): void
     {
+        // The notice writer only touches files under the customer home root: put the temp home inside it.
+        $this->pmssTrackEnvKeys(['PMSS_HOME_DIR']);
+        putenv('PMSS_HOME_DIR='.(getenv('PMSS_TEST_TEMP_ROOT') ?: sys_get_temp_dir()));
         $home = $this->pmssMakeTempDir('pmss-qbt-notice-');
         $notice = $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.notice', "qBittorrent start failed: old.\n");
         $ops = ['build' => '4.5.2', 'accountPids' => static function (): array { return []; },
