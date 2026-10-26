@@ -1,8 +1,10 @@
 <?php
 /** Verified artifact lifetime; loaded by the remoteBinary.php installer facade. */
 
+/** Return an empty checksum for malformed paths before invoking the filesystem. */
 function pmssPinnedRemoteChecksum(string $path): string
 {
+    if ($path === '' || strpos($path, "\0") !== false) return '';
     $checksum = @hash_file('sha256', $path);
     return is_string($checksum) ? strtolower($checksum) : '';
 }

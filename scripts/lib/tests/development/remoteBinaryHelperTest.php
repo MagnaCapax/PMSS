@@ -6,6 +6,40 @@ require_once dirname(__DIR__, 2).'/update/apps/remoteBinary.php';
 
 class RemoteBinaryHelperTest extends TestCase
 {
+    public function testChecksumRejectsMalformedPathsAndPreservesValidReads(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-checksum-path-');
+        $path = $root.'/artifact with spaces';
+        file_put_contents($path, 'payload');
+        // Existing prefixes must not be hashed after dropping malformed bytes.
+        foreach (['', "\0", "\0".$path, $path."\0", $path."\0suffix", $root."\0/other"] as $invalid) {
+            $this->assertSame('', \pmssPinnedRemoteChecksum($invalid));
+        }
+        $this->assertSame('', \pmssPinnedRemoteChecksum($root.'/missing'));
+        $this->assertSame('', \pmssPinnedRemoteChecksum($root));
+        $this->assertSame(hash('sha256', 'payload'), \pmssPinnedRemoteChecksum($path));
+        symlink($path, $root.'/link');
+        $this->assertSame(hash('sha256', 'payload'), \pmssPinnedRemoteChecksum($root.'/link'));
+        file_put_contents($path, '');
+        $this->assertSame(hash('sha256', ''), \pmssPinnedRemoteChecksum($path));
+    }
+
+    public function testPinnedVersionMatchRejectsMalformedPathsBeforeReadingMarker(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-version-path-');
+        $binary = $root.'/app with spaces';
+        $marker = $root.'/version with spaces';
+        file_put_contents($binary, 'binary');
+        file_put_contents($marker, " 1.2.3\n");
+        foreach (['', "\0", "\0".$marker, $marker."\0", $marker."\0suffix", $root."\0/other"] as $invalid) {
+            $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $invalid, '1.2.3'));
+            $this->assertFalse(\pmssPinnedRemoteVersionMatches($invalid, $marker, '1.2.3'));
+        }
+        $this->assertTrue(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
+        $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.4'));
+        $this->assertSame(" 1.2.3\n", file_get_contents($marker));
+    }
+
     public function testPinnedVersionMatchRequiresBinaryAndUnlinkedMatchingMarker(): void
     {
         $root = $this->pmssMakeTempDir('pmss-pinned-version-');

@@ -22,7 +22,13 @@ function pmssPinnedRemoteAmd64OrSkip(string $label, string $action = 'bootstrap'
 }
 
 /** Read a pinned install marker only for a regular binary and a non-symlink marker. */
-function pmssPinnedRemoteVersionMatches(string $binary, string $marker, string $version): bool { return is_file($binary) && !is_link($marker) && trim((string) @file_get_contents($marker)) === $version; }
+function pmssPinnedRemoteVersionMatches(string $binary, string $marker, string $version): bool
+{
+    // Warning suppression cannot turn invalid path arguments into a failed read.
+    if ($binary === '' || $marker === ''
+        || strpos($binary, "\0") !== false || strpos($marker, "\0") !== false) return false;
+    return is_file($binary) && !is_link($marker) && trim((string) @file_get_contents($marker)) === $version;
+}
 
 /** Publish a version only through a safe regular marker path after installation. */
 function pmssPinnedRemoteVersionMarkerWrite(string $marker, string $version): bool { return pmssPathTargetIsSafe($marker, false, true) && pmssFileWriteComplete($marker, $version."\n"); }

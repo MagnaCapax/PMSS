@@ -895,6 +895,11 @@ Service hostnames in guides require a root-owned billing ID entry.
 
 ## Application Installers (Contracts)
 
+Pinned artifact checksum and installed-version readers reject empty or
+NUL-containing paths before filesystem calls, returning their existing empty
+checksum or non-matching-version result. Valid paths retain checksum bytes,
+marker whitespace trimming, and their existing symlink policies.
+
 Tar member discovery shares `pmssPinnedRemoteArchiveMembersRead()`: failed, empty
 or count-mismatched listings return `[]`. Callers retain command bytes, warning
 suppression and their own path/type validation before extraction.
