@@ -41,6 +41,12 @@ field order and output bytes retain their existing contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Lighttpd watchdog inode diagnosis requires a successful `df -i` exit and a
+percentage from 0 through 100. Failed probes with partial rows and malformed
+percentages retain the unavailable-result fallback instead of selecting the
+inode error page. Successful probes retain their arguments and 95% threshold;
+`LighttpdWatchdogErrorPageTest` covers both mounts with isolated command stubs.
+
 Network interface normalization rejects NUL bytes before trimming, including
 raw default-route output. Sysfs and ethtool speed probes accept only decimal
 values that fit a PHP integer; overflow retains their unknown-speed result.

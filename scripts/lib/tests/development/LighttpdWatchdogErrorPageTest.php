@@ -204,6 +204,38 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $this->assertSame(96, pmssLighttpdWatchdogParseDfInodeUsePercent($output));
     }
 
+    public function testParseDfInodeUsePercentChecksPercentageBounds(): void
+    {
+        foreach (['0' => 0, '001' => 1, '94' => 94, '95' => 95, '100' => 100,
+            '101' => null, '999' => null, '1000' => null, '-1' => null, '95.5' => null] as $raw => $expected) {
+            $this->assertSame($expected, pmssLighttpdWatchdogParseDfInodeUsePercent(
+                "/dev/root 100 95 5 {$raw}% /\n"
+            ));
+        }
+    }
+
+    public function testRootInodeProbeRequiresSuccessfulValidMeasurement(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-watchdog-inodes-');
+        $header = "Filesystem Inodes IUsed IFree IUse% Mounted on\n";
+        $full = $header."/dev/root 100 100 0 100% /\n";
+        // Failed probes must not turn their partial high-usage row into a diagnosis.
+        foreach ([[$full, 1, false], [$full, 2, false], [$full, 124, false], [$full, 127, false],
+            [$full, 0, true], [$header."/dev/root 100 95 5 95% /\n", 0, true],
+            [$header."/dev/root 100 94 6 94% /\n", 0, false],
+            [$header."/dev/root 100 101 0 101% /\n", 0, false],
+            [$header."/dev/root 100 999 0 999% /\n", 0, false],
+            ['', 0, false], [$header, 0, false], ['unavailable', 1, false]] as [$output, $rc, $expected]) {
+            $this->pmssWriteExecutableFiles($binDir, [
+                'df' => "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)."\nexit {$rc}\n",
+            ]);
+            $this->pmssWithPathPrefix($binDir, function () use ($expected): void {
+                $this->assertSame($expected, pmssLighttpdWatchdogRootInodesExhausted('/'));
+                $this->assertSame($expected, pmssLighttpdWatchdogRootInodesExhausted('/home'));
+            });
+        }
+    }
+
     public function testParseDfInodeUsePercentHandlesFullUsage(): void
     {
         $output = "Filesystem Inodes IUsed IFree IUse% Mounted on\n/dev/sda1 100 100 0 100% /\n";

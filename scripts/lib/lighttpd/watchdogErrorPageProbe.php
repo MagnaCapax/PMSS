@@ -20,7 +20,8 @@ function pmssLighttpdWatchdogParseDfInodeUsePercent(string $output): ?int
         }
 
         if (preg_match('/\s([0-9]{1,3})%\s+\S+\s*$/', $line, $matches) === 1) {
-            return (int) $matches[1];
+            $percent = (int) $matches[1];
+            return $percent <= 100 ? $percent : null;
         }
     }
 
@@ -55,7 +56,9 @@ function pmssLighttpdWatchdogRootInodesExhausted(string $mountPath = '/'): bool
         return false;
     }
     $dfResult = pmssLighttpdWatchdogCommandCapture('df', '-i '.escapeshellarg($mountPath).' 2>/dev/null');
+    // A failed probe may leave partial output; it cannot establish inode exhaustion.
     return $dfResult !== null
+        && $dfResult['exitCode'] === 0
         && ($usagePercent = pmssLighttpdWatchdogParseDfInodeUsePercent($dfResult['output'])) !== null
         && $usagePercent >= 95;
 }
