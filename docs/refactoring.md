@@ -63,6 +63,11 @@ projections update their existing fields and accumulate into the returned model.
 Serialized field order, missing-data defaults, write ordering and diagnostics
 retain their contracts and existing snapshot coverage.
 
+Storage benchmark dispatch keeps single-use options, commands and callbacks at
+their consumers. dd measurements return only after both fields validate; fio
+peer reporting shares one success guard. Command bytes, JSONL field order,
+fallbacks and cleanup retain the existing benchmark characterization contracts.
+
 ## Minimal Contract Rules (Joukahainen)
 
 Lighttpd watchdog inode diagnosis requires a successful `df -i` exit and a

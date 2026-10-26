@@ -13,12 +13,11 @@ const PMSS_STORAGE_BENCHMARK_HOME_DEVICE_JOBS = [
 /** Yield each result only after its ordered JSONL entry is persisted; exceptions stop the sequence. */
 function storageBenchmarkFioJobsRun(string $jsonLog, string $path, int $size, int $runtime, array $jobs, array $base, array $params, string $fallbackError = 'unknown', ?callable $runner = null): \Generator
 {
-    $run = $runner ?: 'fioRun';
     foreach ($jobs as $job) {
         $job += ['numjobs' => 1, 'direct' => 1];
         // The projection preserves each mode's parameter keys, nulls, and insertion order.
         $entry = $base + ['test' => $job['name'], 'params' => array_replace($params, array_intersect_key($job, $params), ['runtime' => (int) ($job['runtime'] ?? $runtime)])];
-        $result = $run($path, $size, $runtime, $job);
+        $result = ($runner ?: 'fioRun')($path, $size, $runtime, $job);
         $entry['ok'] = $result['ok'];
         storageBenchmarkAppendJsonLine($jsonLog, storageBenchmarkApplyRunResult($entry, $result, $fallbackError));
         yield $job['name'] => $result;

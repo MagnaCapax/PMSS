@@ -24,20 +24,15 @@ function storageBenchmarkDeviceSizeBytesRead(string $path): ?int
 function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $deviceEntry, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, $deviceEntry + ['test' => 'device-preflight', 'ok' => false, 'error' => $error]); printf("%s\tskipped: %s\n", $deviceEntry['device'], $error); }
 function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array
 {
-    $dd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip);
-    [$rc, $so, $se] = [runCommand($dd, true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? ''];
+    [$rc, $so, $se] = [runCommand(sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip), true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? ''];
     $line = trim($se !== '' ? $se : $so);
-    $mbps = $secs = null;
     // A failed read can leave a partial transfer summary; it is not a measurement.
     if ($rc === 0 && preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $match)) {
-        $elapsed = pmssFiniteNonNegativeFloat($match[1]);
-        $rate = pmssFiniteNonNegativeFloat($match[2]);
-        if ($elapsed !== null && $rate !== null) {
-            $secs = $elapsed;
-            $mbps = $rate;
-        }
+        $secs = pmssFiniteNonNegativeFloat($match[1]);
+        $mbps = pmssFiniteNonNegativeFloat($match[2]);
+        if ($secs !== null && $mbps !== null) return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs];
     }
-    return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs];
+    return ['rc' => $rc, 'mbps' => null, 'secs' => null];
 }
 /** Preserve the JSON shape for dd results in both read-only device modes. */
 function storageBenchmarkDdResultEntry(array $deviceEntry, string $test, int $count, int $skip, array $dd): array
@@ -62,8 +57,9 @@ function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $
         if ($iop !== null) printf("%s\tioping_avg_ms=%.2f\n", $path, $iop);
         $params = array_fill_keys(['rw', 'bs', 'iodepth', 'numjobs', 'runtime'], null);
         foreach (storageBenchmarkFioJobsRun($jsonLog, $path, $size, $devRuntime, storageBenchmarkDeviceJobs(), $deviceEntry, $params, 'fio failed') as $name => $res) {
-            if ($res['ok']) printf("%s\t%s\tread_MB/s=%.2f\tread_IOPS=%.1f\tread_p95_ms=%.2f\n", $path, $name, $res['result']['read_bw_MBps'], $res['result']['read_iops'], $res['result']['read_p95_ms']);
-            if ($res['ok'] && $name === 'dev-randread-4k') $peer[$path]['fio4k_mb'] = $res['result']['read_bw_MBps'];
+            if (!$res['ok']) continue;
+            printf("%s\t%s\tread_MB/s=%.2f\tread_IOPS=%.1f\tread_p95_ms=%.2f\n", $path, $name, $res['result']['read_bw_MBps'], $res['result']['read_iops'], $res['result']['read_p95_ms']);
+            if ($name === 'dev-randread-4k') $peer[$path]['fio4k_mb'] = $res['result']['read_bw_MBps'];
         }
         $peer[$path]['dd_mb'] = $dd['mbps']; $peer[$path]['iop_ms'] = $iop;
     }

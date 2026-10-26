@@ -17,7 +17,6 @@ function storageBenchmarkRequireTargetDir(string $targetDir, bool $writable = tr
 
 function storageBenchmarkMain(array $argv): int
 {
-    $valueOptionNames = ['--target', '--size', '--json', '--label', '--dd-size', '--runtime', '--device-runtime', '--idle-latency-ms', '--idle-util'];
     $usage = "\nStorage benchmark (non-destructive)\n".pmssCliHelpUsageOptions('storageBenchmark.php [options]', [
         ['--target <dir>', 'Directory for file-backed tests (default /home).'], ['--size <bytes|MiB|GiB>', 'Target file size (default 500G, capped to 80% free).'],
         ['--runtime <seconds>', 'Per-test runtime for volume fio tests (default 60).'], ['--label <name>', 'Tag results (e.g., hostname/site/array).'],
@@ -27,12 +26,12 @@ function storageBenchmarkMain(array $argv): int
         ['--require-idle', 'Abort if busy (ioping/iostat exceed thresholds).'], ['--idle-latency-ms <ms>', 'ioping avg latency threshold (default 100).'],
         ['--idle-util <percent>', 'iostat util threshold (default 85).'], ['--show-last', 'Print the last run human summary and exit.'],
     ], 28, ['Also accepts --key=value form for all value options.']);
-    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, $valueOptionNames)) === null) return 0;
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, ['--target', '--size', '--json', '--label', '--dd-size', '--runtime', '--device-runtime', '--idle-latency-ms', '--idle-util'])) === null) return 0;
 
-    $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true); $homeDevice = pmssCliOptionPresent($parsed, 'home-device', null, true); $requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true); $showLast = pmssCliOptionPresent($parsed, 'show-last', null, true);
+    $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true); $homeDevice = pmssCliOptionPresent($parsed, 'home-device', null, true); $requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true);
     $targetDir = (string) pmssCliOptionString($parsed, 'target', null, '/home', true); $fileSize = (string) pmssCliOptionString($parsed, 'size', null, '500G', true); $jsonLog = (string) pmssCliOptionString($parsed, 'json', null, '/var/log/pmss/benchmark-storage.jsonl', true);
     $label = (string) pmssCliOptionString($parsed, 'label', null, '', true); $ddSize = (string) pmssCliOptionString($parsed, 'dd-size', null, '1G', true);
-    if ($showLast) return storageBenchmarkShowLast($jsonLog);
+    if (pmssCliOptionPresent($parsed, 'show-last', null, true)) return storageBenchmarkShowLast($jsonLog);
 
     if ($homeDevice) return storageBenchmarkHomeDeviceMain($parsed, $targetDir, $jsonLog, $label, $ddSize, $requireIdle);
 

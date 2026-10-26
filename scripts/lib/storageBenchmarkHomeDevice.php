@@ -51,7 +51,7 @@ function storageBenchmarkHomeDeviceMain(array $parsed, string $targetDir, string
     if ($requireIdle && !$idle) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
 
     $fioPresent = pmssCommandPath('fio') !== '';
-    $ddSizeBytes = $fioPresent ? 0 : storageBenchmarkRequireSizeBytes('--dd-size', $ddSize, 1024 * 1024, '1 MiB');
-    storageBenchmarkHomeDeviceRunTests($jsonLog, $base, $device, $ddSizeBytes, $runtime, $fioPresent);
+    storageBenchmarkHomeDeviceRunTests($jsonLog, $base, $device,
+        $fioPresent ? 0 : storageBenchmarkRequireSizeBytes('--dd-size', $ddSize, 1024 * 1024, '1 MiB'), $runtime, $fioPresent);
     return 0;
 }
