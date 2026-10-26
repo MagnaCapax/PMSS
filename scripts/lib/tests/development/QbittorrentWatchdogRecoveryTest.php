@@ -1,19 +1,12 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/TemporaryHomeRootTestCase.php';
 require_once __DIR__.'/../../user/qbittorrentWatchdog.php';
 
 /** Observe once per cron pass, and allow managed stopped repairs behind a refusal. */
-final class QbittorrentWatchdogRecoveryTest extends TestCase
+final class QbittorrentWatchdogRecoveryTest extends TemporaryHomeRootTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssTrackEnvKeys(['PMSS_HOME_DIR']);
-        putenv('PMSS_HOME_DIR='.(getenv('PMSS_TEST_TEMP_ROOT') ?: sys_get_temp_dir()));
-    }
-
     public function testStoppedRefusalStillRunsPortAndAuthRepairBeforeRelease(): void
     {
         $events = [];

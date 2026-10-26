@@ -121,8 +121,7 @@ final class TorrentClientsSameVersionTest extends TestCase
     public function testNoOpStillRequiresPasswordOfferedVersionFreeLockAndValidSelection(): void
     {
         // The qBittorrent notice writer only writes under the customer home root: put the temp homes inside it.
-        $this->pmssTrackEnvKeys(['PMSS_HOME_DIR']);
-        putenv('PMSS_HOME_DIR='.(getenv('PMSS_TEST_TEMP_ROOT') ?: sys_get_temp_dir()));
+        $this->pmssTrackTempRootAsHomeRoot();
         foreach (array('qbittorrent', 'deluge', 'transmission', 'rtorrent') as $client) {
             $events = array();
             list($home, $request, $ops) = $this->fixture($client, '4.1.3', '4.1.3', $events);

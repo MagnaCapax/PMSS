@@ -1,22 +1,15 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/TemporaryHomeRootTestCase.php';
 require_once __DIR__.'/../../user/qbittorrentRestore.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/qbittorrentRestore.php';
 require_once __DIR__.'/../../user/qbittorrentStoppedConfig.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/qbittorrentStoppedConfig.php';
 
 /** Regression fixtures for old names removed at migration 9 and the unstamped 4.3.9 build. */
-final class QbittorrentLegacyRestoreTest extends TestCase
+final class QbittorrentLegacyRestoreTest extends TemporaryHomeRootTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssTrackEnvKeys(['PMSS_HOME_DIR']);
-        putenv('PMSS_HOME_DIR='.(getenv('PMSS_TEST_TEMP_ROOT') ?: sys_get_temp_dir()));
-    }
-
     public function testMigrationNineMappingsCoverEveryUpstreamEntryAndBothCopiesAgree(): void
     {
         $keys = \pmssQbittorrentLegacyKeys();

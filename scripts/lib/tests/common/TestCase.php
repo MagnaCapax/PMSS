@@ -392,6 +392,12 @@ abstract class TestCase
         return $homeRoot;
     }
 
+    /** Allow fixture homes beneath the temp root, preserving even an empty prior override. */
+    protected function pmssTrackTempRootAsHomeRoot(): void
+    {
+        $this->pmssTrackHomeRoot(getenv('PMSS_TEST_TEMP_ROOT') ?: sys_get_temp_dir(), false);
+    }
+
     /** Create a fresh fixture home root and register it as PMSS_HOME_DIR for the current test. */
     protected function pmssMakeTrackedHomeRoot(string $prefix, int $mode = 0755): string
     {

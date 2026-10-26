@@ -331,6 +331,11 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Temporary account fixtures share their home-root setup through
+`TemporaryHomeRootTestCase`; individual cases opt in with
+`TestCase::pmssTrackTempRootAsHomeRoot()`. Both retain the existing temporary-root
+fallback and restore absent, empty, or populated prior overrides after each test.
+
 Development fixtures use `TestCase::pmssExecShellCommand()` for captured shell
 results, with explicit redirection overrides when stderr must remain inherited
 or go to a file. The shared account-path callback adapter and gzip tar fixture

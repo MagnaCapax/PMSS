@@ -1,20 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/TemporaryHomeRootTestCase.php';
 require_once __DIR__.'/../../user/qbittorrentRestoreAccount.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/scriptsInc.php';
 
 /** Explicit retries, watchdog refusals and HTTP responses use isolated account fixtures. */
-final class QbittorrentRefusalTest extends TestCase
+final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssTrackEnvKeys(['PMSS_HOME_DIR']);
-        putenv('PMSS_HOME_DIR='.(getenv('PMSS_TEST_TEMP_ROOT') ?: sys_get_temp_dir()));
-    }
-
     public function testRefusalAllowsStoppedRepairButBlocksResolverUntilPortAndHashAreSafe(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-refusal-');
