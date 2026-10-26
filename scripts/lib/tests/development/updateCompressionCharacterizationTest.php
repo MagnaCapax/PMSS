@@ -233,7 +233,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             "preg_split('/\\r?\\n/', trim((string) \$lsblkOut))" => 'snapshot should not keep a local lsblk parser',
             $symbol.'((string) shell_exec' => 'snapshot should check lsblk exit status before parsing inventory output',
         ]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/storageBenchmark.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/storageBenchmark/device.php', [
             'foreach (pmssStorageHealthDiskInventoryRead() as $meta)',
         ], [
             $symbol.'((string) shell_exec' => 'storageBenchmark.php should check lsblk exit status before parsing inventory output',
@@ -277,7 +277,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'scripts/util/storageBenchmark.php' => [
                 'required' => ['exit(storageBenchmarkMain($argv ?? []));'],
             ],
-            'scripts/lib/storageBenchmark.php' => [
+            'scripts/lib/storageBenchmark/cli.php' => [
                 'required' => [
                     'function storageBenchmarkMain(array $argv): int',
                     "'--device-runtime'",

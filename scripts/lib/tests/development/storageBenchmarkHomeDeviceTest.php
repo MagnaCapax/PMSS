@@ -185,7 +185,7 @@ function pmssCreatePrivateTempFile($prefix) { return getenv('PMSS_TEST_FIO_PATH'
 function runCommand($command, $verbose) { $GLOBALS['command'] = $command; return 0; }
 function file_get_contents($path) { return '{"jobs":[{"read":{"bw_bytes":1048576,"iops":10}}]}'; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'HomeFioFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'HomeFioFixture', ['storageBenchmark/fio.php']);
         $script .= <<<'PHP'
 $job = ['name' => 'test', 'rw' => 'read', 'bs' => '1M', 'iodepth' => 1, 'numjobs' => 1, 'direct' => 1];
 fioRun('/dev/example', 1048576, 1, $job);

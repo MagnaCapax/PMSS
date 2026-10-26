@@ -52,7 +52,7 @@ function pmssCommandCapture($command, $timeout) {
     return json_decode(getenv('PMSS_TEST_BENCH_CAPTURE'), true);
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'BenchmarkOutputFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'BenchmarkOutputFixture', ['storageBenchmark/cli.php', 'storageBenchmark/device.php']);
         $script .= <<<'PHP'
 $kind = getenv('PMSS_TEST_BENCH_KIND');
 $result = $kind === 'device' ? storageBenchmarkDeviceSizeBytesRead('/dev/pmss-test')
@@ -110,7 +110,7 @@ function file_get_contents($path) {
     return $GLOBALS['payload'];
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'FioCleanupFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'FioCleanupFixture', ['storageBenchmark/fio.php']);
         $script .= <<<'PHP'
 [$GLOBALS['case'], $kind, $GLOBALS['payload']] = json_decode(getenv('PMSS_TEST_FIO_CASE'), true);
 $GLOBALS['path'] = getenv('PMSS_TEST_FIO_PATH');
@@ -140,6 +140,26 @@ PHP;
         $multiSuccess = ['ok' => true, 'result' => ['read_bw_MBps' => 1, 'write_bw_MBps' => 2,
             'read_iops' => 2, 'write_iops' => 3, 'read_p95_ms' => 0, 'write_p95_ms' => 4, 'raw' => $multi]];
         $metricCases = [];
+        // Freeze asymmetric multi-job aggregation, missing samples and raw field order.
+        $asymmetric = ['jobs' => [
+            ['read' => ['bw_bytes' => 1048576, 'iops' => 2, 'clat_ns' => ['percentile' => ['95.000000' => 1000000]]],
+                'write' => ['bw_bytes' => 2097152, 'iops' => 3, 'clat_ns' => ['percentile' => ['95.000000' => 5000000]]]],
+            ['read' => ['bw_bytes' => 3145728, 'iops' => 4, 'clat_ns' => ['percentile' => ['95.000000' => 3000000]]]],
+            ['write' => ['bw_bytes' => 4194304, 'iops' => 5, 'clat_ns' => ['percentile' => ['95.000000' => 9000000]]]],
+        ]];
+        foreach ([
+            [$asymmetric, [4, 6, 6, 8, 2, 7]],
+            [['jobs' => [['read' => null, 'write' => null]]], [0, 0, 0, 0, 0, 0]],
+            [['jobs' => [['error' => 0], ['write' => ['clat_ns' => ['percentile' => ['95.000000' => 0]]]],
+                ['write' => ['clat_ns' => ['percentile' => ['95.000000' => 6000000]]]]]], [0, 0, 0, 0, 0, 3]],
+        ] as [$payload, $values]) {
+            $metrics = array_combine(['read_bw_MBps', 'write_bw_MBps', 'read_iops', 'write_iops', 'read_p95_ms', 'write_p95_ms'], $values);
+            $metricCases[] = ['normal', 'exception', json_encode($payload), ['ok' => true, 'result' => $metrics + ['raw' => $payload]], true];
+        }
+        foreach ([['jobs' => [['error' => '0']]], ['jobs' => [$raw['jobs'][0], ['read' => [], 'error' => 1]]]] as $payload) {
+            $metricCases[] = ['normal', 'exception', json_encode($payload), $failed, true];
+        }
+        $metricCases[] = ['normal', 'exception', json_encode(['jobs' => ['other' => $raw['jobs'][0]]]), $invalid, true];
         // Valid decimal counters and numeric float strings keep their legacy metrics.
         foreach ([
             ['bw_bytes', '0001048576'], ['bw_bytes', '1048576'],
@@ -212,7 +232,7 @@ function runCommand($command, $verbose) {
     return $rc;
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'DdResultFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'DdResultFixture', ['storageBenchmark/device.php']);
         $script .= "echo json_encode(storageBenchmarkDdSeqread('/unused', 1, 0));";
         $summary = "1048576 bytes copied, 0.5 s, 2.1 MB/s\n";
         $missing = ['mbps' => null, 'secs' => null];
@@ -450,7 +470,10 @@ PHP;
 
     public function testStorageBenchmarkSourceKeepsSafetyHelpers(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
+        $source = '';
+        foreach (['storageBenchmark.php', 'storageBenchmark/cli.php', 'storageBenchmark/file.php', 'storageBenchmark/device.php'] as $module) {
+            $source .= $this->pmssReadRepoFile('scripts/lib/'.$module);
+        }
 
         foreach ([
             'iostat serialized array reader' => [['storageBenchmarkIostatUtilPctRead', 'pmssReadSerializedArrayFile($path)'], ['unserialize(']],
