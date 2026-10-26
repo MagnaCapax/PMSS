@@ -142,6 +142,11 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testMigratedThrottleComparisonDoesNotWriteBeforeShutdown(): void
     {
+        // ADR 0182 keys the throttle on the discovered build; pin a 4.4+ build so the host's system build cannot decide.
+        $bin = $this->pmssMakeTempDir('pmss-qbt-bin-');
+        $this->pmssWriteFile($bin.'/qbittorrent-nox', "#!/bin/sh\necho 'qBittorrent v4.6.7'\n");
+        chmod($bin.'/qbittorrent-nox', 0755);
+        $this->pmssTrackEnvOverrides(['PATH' => $bin.':'.(string) getenv('PATH')]);
         $before = "[Meta]\nMigrationVersion=2\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=10\n[Preferences]\nLocale=en\n";
         $path = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', $before);
         $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.torrentThrottle', "512\n");

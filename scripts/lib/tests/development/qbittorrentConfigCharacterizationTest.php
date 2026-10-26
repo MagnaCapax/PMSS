@@ -94,7 +94,9 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
         $configPath = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nConnection\\GlobalUPLimit=512\nLocale=en\n");
 
         require_once dirname(__DIR__, 2).'/user/qbittorrentThrottleAccount.php';
+        // Exact mode is the historical pmssQbittorrentApplyUploadThrottle removal contract.
         $this->assertTrue(\pmssQbittorrentThrottleAccount($this->homeRoot.'/alice', 0, true, [
+            'exact' => true,
             'build' => '4.3.9',
             'accountPids' => static function (): array { return []; },
             'restore' => static function (): bool { return true; },

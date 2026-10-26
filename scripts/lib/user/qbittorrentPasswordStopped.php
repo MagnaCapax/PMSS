@@ -21,9 +21,12 @@ function pmssQbittorrentPasswordPrepare(string $user, string $home, array $ops =
 function pmssQbittorrentPasswordApplyStopped(string $user, string $home, string $password, array $ops = []): bool
 {
     $prepare = $ops['prepare'] ?? 'pmssQbittorrentPasswordPrepare';
-    $write = $ops['password'] ?? static function (string $user, string $password): bool {
+    $write = $ops['password'] ?? static function (string $user, string $password) use ($home): bool {
+        // A relocated config directory is followed only while it resolves inside this account's home (ADR 0182).
         $path = realpath(pmssQbittorrentConfigPath($user));
-        return is_string($path) && pmssQbittorrentApplyPassword($user, $password, $path);
+        $root = realpath($home);
+        return is_string($path) && is_string($root) && strpos($path, rtrim($root, '/').'/') === 0
+            && pmssQbittorrentApplyPassword($user, $password, $path);
     };
     $notice = $ops['notice'] ?? 'pmssQbittorrentNotice';
     return pmssQbittorrentConfigLocked($home, static function () use ($user, $home, $password, $prepare, $write, $notice, $ops): bool {
