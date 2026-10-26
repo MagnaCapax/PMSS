@@ -74,9 +74,8 @@ function pmssStorageHealthProbeCommand(string $kind, string $kname, string $comm
         return ['command' => $command, 'lock_exit_code' => 0];
     }
 
-    $lockPath = pmssRuntimeLockPath('pmss-storage-'.$kind.'-'.$kname.'.lock');
     return [
-        'command' => escapeshellarg($flock).' -xn -E 75 '.escapeshellarg($lockPath).' '.$command,
+        'command' => escapeshellarg($flock).' -xn -E 75 '.escapeshellarg(pmssRuntimeLockPath('pmss-storage-'.$kind.'-'.$kname.'.lock')).' '.$command,
         'lock_exit_code' => 75,
     ];
 }

@@ -39,33 +39,30 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
 
     if (!empty($disks)) {
         echo "Disks\n-----\n";
-        $rows = array_map(static function (array $entry): array {
-            $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
-            $kind = (string) ($entry['kind'] ?? 'smart');
-
-            return [
-                'sev' => (string) ($entry['severity'] ?? 'warn'), 'dev' => (string) ($entry['kname'] ?? ($entry['device'] ?? '')),
-                'size' => (string) ($entry['size'] ?? ''), 'model' => (string) ($entry['model'] ?? ''),
-                'flags' => is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '',
-                'health' => $kind === 'nvme' ? 'NVME' : (string) ($metrics['health'] ?? 'UNKNOWN'),
-                'temp' => pmssStorageHealthReportInt($kind === 'nvme' ? ($metrics['temperature'] ?? null) : ($metrics['temp_c'] ?? null), 'C'), 'realloc' => $kind === 'nvme' ? '-' : pmssStorageHealthReportInt($metrics['reallocated'] ?? null),
-                'pend' => pmssStorageHealthReportInt($kind === 'nvme' ? ($metrics['media_errors'] ?? null) : ($metrics['pending'] ?? null)), 'link' => pmssStorageHealthReportInt($kind === 'nvme' ? ($metrics['percentage_used'] ?? null) : ($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null))),
-            ];
-        }, $disks);
-        usort($rows, static function (array $a, array $b): int {
-            return ((PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$a['sev']]['rank'] ?? 1)
-                - (PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$b['sev']]['rank'] ?? 1)) ?: strcmp($a['dev'], $b['dev']);
+        // Sort the supplied entries directly; a second display-row schema is unnecessary.
+        usort($disks, static function (array $a, array $b): int {
+            return ((PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[(string) ($a['severity'] ?? 'warn')]['rank'] ?? 1)
+                - (PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[(string) ($b['severity'] ?? 'warn')]['rank'] ?? 1))
+                ?: strcmp((string) ($a['kname'] ?? ($a['device'] ?? '')), (string) ($b['kname'] ?? ($b['device'] ?? '')));
         });
         $modelWidth = 12;
-        foreach ($rows as $r) {
-            $modelWidth = max($modelWidth, min(34, strlen($r['model'])));
+        foreach ($disks as $entry) {
+            $modelWidth = max($modelWidth, min(34, strlen((string) ($entry['model'] ?? ''))));
         }
         $format = "%-4s %-4s %-5s %-5s %-".$modelWidth."s %-10s %-5s %-7s %-6s %-6s %s\n";
         $fmtHeader = sprintf($format, 'MARK', 'SEV', 'DEV', 'SIZE', 'MODEL', 'HEALTH', 'TEMP', 'REALLOC', 'PEND', 'LINK', 'FLAGS');
         echo $fmtHeader;
         echo str_repeat('-', max(20, strlen(rtrim($fmtHeader)))).PHP_EOL;
-        foreach ($rows as $r) {
-            printf($format, pmssStorageHealthColor($r['sev'], PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$r['sev']]['mark'] ?? '?'), strtoupper($r['sev']), $r['dev'], $r['size'], substr($r['model'], 0, $modelWidth), substr($r['health'], 0, 10), $r['temp'], $r['realloc'], $r['pend'], $r['link'], $r['flags']);
+        foreach ($disks as $entry) {
+            $sev = (string) ($entry['severity'] ?? 'warn');
+            $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
+            $nvme = (string) ($entry['kind'] ?? 'smart') === 'nvme';
+            printf($format, pmssStorageHealthColor($sev, PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$sev]['mark'] ?? '?'), strtoupper($sev),
+                (string) ($entry['kname'] ?? ($entry['device'] ?? '')), (string) ($entry['size'] ?? ''), substr((string) ($entry['model'] ?? ''), 0, $modelWidth),
+                substr($nvme ? 'NVME' : (string) ($metrics['health'] ?? 'UNKNOWN'), 0, 10),
+                pmssStorageHealthReportInt($metrics[$nvme ? 'temperature' : 'temp_c'] ?? null, 'C'), $nvme ? '-' : pmssStorageHealthReportInt($metrics['reallocated'] ?? null),
+                pmssStorageHealthReportInt($metrics[$nvme ? 'media_errors' : 'pending'] ?? null), pmssStorageHealthReportInt($nvme ? ($metrics['percentage_used'] ?? null) : ($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null))),
+                is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '');
         }
         echo PHP_EOL;
     }

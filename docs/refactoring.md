@@ -39,6 +39,12 @@ publication reuses its initialized per-client counters for membership checks;
 cgroup status initializes its path map once. Validation, unavailable values,
 field order and output bytes retain their existing contracts.
 
+Storage-health tables sort and render the snapshot entries directly, without a
+second display-row schema. SMART/NVMe findings merge once in their existing
+order; probe commands still pass through the same guarded lock builder.
+Severity/device ordering, model truncation, metric defaults and JSON bytes remain
+unchanged, covered by the storage-health characterization tests.
+
 ## Minimal Contract Rules (Joukahainen)
 
 Lighttpd watchdog inode diagnosis requires a successful `df -i` exit and a
