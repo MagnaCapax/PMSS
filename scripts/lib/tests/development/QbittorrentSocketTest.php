@@ -115,6 +115,22 @@ final class QbittorrentSocketTest extends TestCase
         ]));
     }
 
+    public function testAsynchronousLaunchMayAppearAfterTheFirstPollsButNeverAfterTheGrace(): void
+    {
+        // The panel launch is backgrounded; the process can be absent on the first checks.
+        $polls = 0;
+        $ops = ['read' => static function (): string { return '23456'; },
+            'pids' => static function () use (&$polls): array { return ++$polls > 3 ? [101] : []; },
+            'listeners' => static function (): array { return [['address' => '0100007F', 'port' => 23456]]; },
+            'pause' => static function (): void {}];
+        $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/t', $ops));
+        $pauses = 0;
+        $this->assertFalse(\pmssQbittorrentFrontendSocketWait('/fixture/t', ['appearAttempts' => 5,
+            'pids' => static function (): array { return []; },
+            'pause' => static function () use (&$pauses): void { $pauses++; }] + $ops));
+        $this->assertSame(4, $pauses);
+    }
+
     public function testConfiguredWebUiAndPeer8080AreAllowedForBothSectionLayouts(): void
     {
         foreach (['4.2.5', '5.3.0'] as $build) foreach (['web', 'peer'] as $role) {

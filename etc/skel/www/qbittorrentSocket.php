@@ -82,9 +82,16 @@ function pmssQbittorrentFrontendSocketWait(string $home, array $ops = []): bool
         : ($values['BitTorrent']['Session\\Port'] ?? $values['Preferences']['Connection\\PortRangeMin'] ?? '')), " \t\"");
     $status = 'waiting';
     $seen = false;
+    $appeared = false;
     for ($attempt = 0; $attempt < ($ops['attempts'] ?? 200); $attempt++) {
         $native = $pids($home);
-        if ($native === []) return false;
+        if ($native === []) {
+            // The launch is asynchronous: allow the process to appear; once seen, a vanished process has exited.
+            if ($appeared || $attempt + 1 >= ($ops['appearAttempts'] ?? 50)) return false;
+            $pause();
+            continue;
+        }
+        $appeared = true;
         $seen = $observed($home) || $seen;
         $sockets = $listeners($native);
         $status = is_array($sockets) ? pmssQbittorrentFrontendSocketStatus($sockets, $port, $configured, $peer) : 'waiting';
