@@ -1,6 +1,8 @@
 <?php
 /** Pure device metrics and finding policies shared by SMART and NVMe. @license GPL-3.0-only */
 
+require_once dirname(__DIR__).'/runtime/environment.php';
+
 /** @param array<string, mixed> $disk @return array<string, mixed> */
 function pmssStorageHealthDeviceEntryBuild(string $kind, array $disk, string $timestamp, int $defaultRota): array
 {
@@ -56,7 +58,9 @@ function pmssStorageHealthMetricsParse(array $chunks, array $patterns, array $me
     foreach ($chunks as $chunk) {
         foreach ($patterns as $pattern => $targets) {
             if (preg_match($pattern, $chunk, $matches) !== 1) continue;
-            foreach ($targets as $target) $metrics[$target] = (int) $matches[1];
+            // Oversized probe counters are unavailable, never saturated measurements.
+            $value = pmssUnsignedDecimalIntParse($matches[1]);
+            foreach ($targets as $target) $metrics[$target] = $value;
         }
     }
     return $metrics;

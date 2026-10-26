@@ -45,6 +45,14 @@ Parsers pass findings directly to finalization; NVMe adds metrics to the base
 entry without a mutable copy. Reports likewise avoid redundant color state,
 integer casts and empty-timestamp branches, retaining field order and bytes.
 
+SMART/NVMe probe counters use the shared bounded unsigned-decimal parser before
+integer conversion. Overflowed counters retain the existing unavailable (`null`)
+metric shape instead of reporting a saturated integer. NVMe temperature validates
+the raw sample before Kelvin conversion. Representable values, leading zeroes,
+SMART last-line precedence, NVMe first-match precedence, payload ordering and
+thresholds remain unchanged. Parser tests cover ATA/SCSI counters and both
+temperature units at the integer boundary without running storage probes.
+
 ## References
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)
 - [Function contracts](../contracts.md)

@@ -2,7 +2,6 @@
 /** Pure SMART/NVMe text parsing and device findings. @license GPL-3.0-only */
 
 require_once __DIR__.'/deviceMetrics.php';
-require_once dirname(__DIR__).'/runtime/environment.php';
 
 /**
  * Parse smartctl output into a stable metric set.
@@ -71,7 +70,10 @@ function pmssStorageHealthParseNvmeOutput(string $out, array $disk, ?array $prev
         '/percentage_used\\s*:\\s*(\\d+)/i' => ['percentage_used'],
     ], array_fill_keys(['critical_warnings', 'temperature', 'media_errors', 'num_err_log_entries', 'percentage_used'], null));
     if (preg_match('/temperature\\s*:\\s*([0-9]+)\\s*([KC])?/i', $out, $matches)) {
-        $metrics['temperature'] = (int) $matches[1] - (strtoupper($matches[2] ?? 'C') === 'K' ? 273 : 0);
+        // Validate the raw sample before Kelvin conversion can hide a saturated cast.
+        $temperature = pmssUnsignedDecimalIntParse($matches[1]);
+        $metrics['temperature'] = $temperature === null ? null
+            : $temperature - (strtoupper($matches[2] ?? 'C') === 'K' ? 273 : 0);
     }
 
     return pmssStorageHealthEntryFinalize(

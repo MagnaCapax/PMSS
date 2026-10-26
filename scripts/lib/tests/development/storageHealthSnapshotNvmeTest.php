@@ -6,6 +6,37 @@ require_once dirname(__DIR__, 2).'/storageHealth.php';
 
 final class StorageHealthSnapshotNvmeTest extends TestCase
 {
+    public function testParsedProbeCountersMustFitBeforeTemperatureConversion(): void
+    {
+        $cases = [
+            ['0', 0], ['00042', 42], [(string) PHP_INT_MAX, PHP_INT_MAX],
+            ['000'.PHP_INT_MAX, PHP_INT_MAX], [PHP_INT_MAX.'0', null],
+            [substr((string) PHP_INT_MAX, 0, -1).'8', null], // One above the integer limit.
+            ['000'.PHP_INT_MAX.'0', null], [str_repeat('9', 100), null],
+        ];
+        foreach ($cases as [$raw, $expected]) {
+            foreach (['C', 'K', ''] as $unit) {
+                $entry = \pmssStorageHealthParseNvmeOutput(implode("\n", [
+                    'critical_warning : '.$raw, 'media_errors : '.$raw,
+                    'num_err_log_entries : '.$raw, 'percentage_used : '.$raw,
+                    'temperature : '.$raw.' '.$unit,
+                ]), [], null, 'fixture');
+                foreach (['critical_warnings', 'media_errors', 'num_err_log_entries', 'percentage_used'] as $metric) {
+                    $this->assertSame($expected, $entry['metrics'][$metric], $metric.': '.$raw);
+                }
+                $temperature = $expected === null ? null : $expected - ($unit === 'K' ? 273 : 0);
+                $this->assertSame($temperature, $entry['metrics']['temperature'], $raw.' '.$unit);
+            }
+        }
+        // NVMe retains the first match; a later valid row cannot mask overflow.
+        $entry = \pmssStorageHealthParseNvmeOutput(
+            'media_errors : '.PHP_INT_MAX."0\nmedia_errors : 7\ntemperature : ".PHP_INT_MAX."0 K\ntemperature : 343 K",
+            [], ['media_errors' => 2], 'fixture');
+        $this->assertSame(null, $entry['metrics']['media_errors']);
+        $this->assertSame(null, $entry['metrics']['temperature']);
+        $this->assertSame([], $entry['flags']);
+    }
+
     public function testLegacyProbePayloadsBeforeParserSeparation(): void
     {
         $device = $this->pmssMakeReadableTempPath('pmss-nvme-characterization-', 'dev-');

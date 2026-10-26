@@ -5,6 +5,42 @@ require_once dirname(__DIR__, 2).'/storageHealth.php';
 
 class StorageHealthSmartctlParsingTest extends TestCase
 {
+    public function testProbeCountersMustFitAnInteger(): void
+    {
+        $cases = [
+            ['0', 0], ['00042', 42], [(string) PHP_INT_MAX, PHP_INT_MAX],
+            ['000'.PHP_INT_MAX, PHP_INT_MAX], [PHP_INT_MAX.'0', null],
+            [substr((string) PHP_INT_MAX, 0, -1).'8', null], // One above the integer limit.
+            ['000'.PHP_INT_MAX.'0', null], [str_repeat('9', 100), null],
+        ];
+        foreach ($cases as [$raw, $expected]) {
+            $entry = \pmssStorageHealthParseSmartctlOutput(implode("\n", [
+                'SMART Health Status: OK',
+                'Reallocated_Sector_Ct '.$raw, 'Current_Pending_Sector '.$raw,
+                'UDMA_CRC_Error_Count '.$raw, 'Temperature_Celsius '.$raw,
+                'Power_On_Hours '.$raw,
+            ]), [], null, 'fixture');
+            foreach (['reallocated', 'pending', 'udma_crc', 'link_errors', 'temp_c', 'power_on_hours'] as $metric) {
+                $this->assertSame($expected, $entry['metrics'][$metric], $metric.': '.$raw);
+            }
+            $scsi = \pmssStorageHealthParseSmartctlOutput(implode("\n", [
+                'SMART Health Status: OK', 'Current Drive Temperature: '.$raw.' C',
+                'Elements in grown defect list: '.$raw, 'Non-medium error count: '.$raw,
+                'Accumulated power on time '.$raw.':00:00',
+            ]), [], null, 'fixture');
+            foreach (['reallocated', 'link_errors', 'temp_c', 'power_on_hours'] as $metric) {
+                $this->assertSame($expected, $scsi['metrics'][$metric], $metric.': '.$raw);
+            }
+        }
+        // SMART keeps the last matching line, including an unavailable final sample.
+        $entry = \pmssStorageHealthParseSmartctlOutput(
+            "SMART Health Status: OK\nUDMA_CRC_Error_Count 7\nUDMA_CRC_Error_Count ".PHP_INT_MAX.'0',
+            [], ['link_errors' => 2], 'fixture');
+        $this->assertSame(null, $entry['metrics']['udma_crc']);
+        $this->assertSame(null, $entry['metrics']['link_errors']);
+        $this->assertSame([], $entry['flags']);
+    }
+
     public function testSmartctlMetricsAndFindings(): void
     {
         // Keep ATA/SCSI parsing cases beside their complete ordered findings.
