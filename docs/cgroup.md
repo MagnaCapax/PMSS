@@ -110,6 +110,11 @@ as unavailable (`null`). Both direct percentages and time-derived percentages
 must round to a positive PHP integer before conversion. Finite time spans,
 ordinary quota rounding, and direct-percentage precedence retain their existing
 behavior; `SystemdSlicePropertiesCharacterizationTest` covers these boundaries.
+NUL-containing captures return the requested keys with empty values before any
+whitespace normalization. Standalone trailing-integer, time-span and CPU-quota
+parsers likewise return `null` for NUL-containing selected values; a malformed
+direct quota does not select the fallback time-derived quota. Valid whitespace,
+device-qualified integers and direct-quota precedence keep their existing results.
 
 Inspect and apply limits per user:
 

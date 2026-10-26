@@ -36,6 +36,20 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
         );
     }
 
+    public function testParseOutputRejectsNulBeforeNormalization(): void
+    {
+        $names = ['MemoryCurrent', 'TasksCurrent'];
+        $empty = ['MemoryCurrent' => '', 'TasksCurrent' => ''];
+        foreach (["\x00MemoryCurrent=12", "MemoryCurrent=12\x00", "MemoryCurrent=1\x002",
+            "MemoryCurrent=\x0012", "MemoryCurrent=12\nTasksCurrent=3\x00\n",
+            "MemoryCurrent=12\nIgnored=\x00\nTasksCurrent=3", "\x00", "\x00\x00"] as $output) {
+            $this->assertSame($empty, \pmssParseSystemdPropertyOutput($names, $output));
+        }
+        // Ordinary whitespace, CRLF and duplicate precedence keep their result.
+        $this->assertSame(['MemoryCurrent' => '12', 'TasksCurrent' => '3'],
+            \pmssParseSystemdPropertyOutput($names, " \tMemoryCurrent=99\r\nMemoryCurrent= 12 \r\nTasksCurrent=3\r\n "));
+    }
+
     public function testBuildSystemdShowCommandReturnsEmptyPrintfForEmptyProperties(): void
     {
         $this->assertEquals('printf %s ""', \pmssBuildSystemdShowCommand('user-1000.slice', []));
@@ -145,6 +159,39 @@ PHP;
         $this->assertEquals(null, \pmssSystemdPropertyTrailingInt('infinity'));
         $this->assertEquals(null, \pmssSystemdPropertyTrailingInt('[not set]'));
         $this->assertEquals(null, \pmssSystemdPropertyTrailingInt('0'));
+    }
+
+    public function testTrailingIntRejectsNulInPlainAndDeviceQualifiedValues(): void
+    {
+        foreach (["\x00", "\x00\x00", "\x004096", "40\x0096", "4096\x00", "8:0\x00 4096",
+            "8:0 4096\x00", "/dev/md0\x00 4096", " \x004096 "] as $value) {
+            $this->assertSame(null, \pmssSystemdPropertyTrailingInt($value));
+        }
+        foreach (['4096', ' 4096 ', "\t4096\r\n", '8:0 4096', '/dev/md0 4096'] as $value) {
+            $this->assertSame(4096, \pmssSystemdPropertyTrailingInt($value));
+        }
+    }
+
+    public function testTimeSpanRejectsNulBeforeNormalization(): void
+    {
+        foreach (["\x00", "\x00\x00", "\x0012", "12\x00", "1\x002", "\x001.5ms", "1.5ms\x00",
+            "1min\x00 30s", "1min 30s\x00", " \x0012 "] as $value) {
+            $this->assertSame(null, \pmssSystemdTimeSpanUsec($value));
+            $this->assertSame(null, \pmssSystemdCpuQuotaPercent(['CPUQuotaPerSecUSec' => $value]));
+        }
+    }
+
+    public function testCpuQuotaPercentRejectsNulWithoutUsingFallback(): void
+    {
+        foreach (["\x00", "\x00\x00", "\x00250%", "250%\x00", "25\x000%", "250\x00%",
+            "infinity\x00", " \x00250% "] as $value) {
+            $this->assertSame(null, \pmssSystemdCpuQuotaPercent([
+                'CPUQuota' => $value, 'CPUQuotaPerSecUSec' => '1000000',
+            ]));
+        }
+        $this->assertSame(250, \pmssSystemdCpuQuotaPercent([
+            'CPUQuota' => '250%', 'CPUQuotaPerSecUSec' => "1000000\x00",
+        ]));
     }
 
     public function testCpuQuotaPercentPrefersDirectPercent(): void

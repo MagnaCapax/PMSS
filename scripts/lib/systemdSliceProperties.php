@@ -12,6 +12,10 @@ require_once __DIR__.'/user/identity.php';
 function pmssParseSystemdPropertyOutput(array $propertyNames, string $output): array
 {
     $properties = array_fill_keys($propertyNames, '');
+    // Reject a corrupt capture before trim can turn it into usable properties.
+    if (strpos($output, "\0") !== false) {
+        return $properties;
+    }
     foreach (pmssTextLines(trim($output)) as $line) {
         $separatorPos = is_string($line) ? strpos($line, '=') : false;
         if ($separatorPos === false) {
@@ -106,7 +110,7 @@ function pmssReadUserSlicePropertiesByUsername(string $username, array $property
  */
 function pmssSystemdPropertyTrailingInt($value): ?int
 {
-    if (!is_string($value)) {
+    if (!is_string($value) || strpos($value, "\0") !== false) {
         return null;
     }
     $value = trim($value);
@@ -123,6 +127,8 @@ function pmssSystemdPropertyTrailingInt($value): ?int
 /** Parse a systemd time span into microseconds; unset or malformed values have no duration. */
 function pmssSystemdTimeSpanUsec(string $value): ?float
 {
+    // Raw NUL bytes must not disappear during whitespace normalization.
+    if (strpos($value, "\0") !== false) return null;
     $value = trim($value);
     if ($value === '' || $value === '[not set]' || strcasecmp($value, 'infinity') === 0) {
         return null;
@@ -146,7 +152,10 @@ function pmssSystemdTimeSpanUsec(string $value): ?float
 /** Extract CPU quota percentage from `systemctl show` properties. */
 function pmssSystemdCpuQuotaPercent(array $properties): ?int
 {
-    $rawQuota = trim((string) ($properties['CPUQuota'] ?? ''));
+    $rawQuota = (string) ($properties['CPUQuota'] ?? '');
+    // A malformed direct value cannot authorize a numeric-prefix or fallback quota.
+    if (strpos($rawQuota, "\0") !== false) return null;
+    $rawQuota = trim($rawQuota);
     if ($rawQuota !== '' && stripos($rawQuota, 'infinity') === false && strpos($rawQuota, '%') !== false) {
         $quota = (float) $rawQuota;
     } else {
