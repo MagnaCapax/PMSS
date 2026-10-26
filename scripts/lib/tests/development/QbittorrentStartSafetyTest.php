@@ -52,6 +52,20 @@ final class QbittorrentStartSafetyTest extends TestCase
         $this->assertSame(['restore', 'launch', 'check'], $events);
     }
 
+    public function testSuccessfulStartClearsAnOlderFailureNotice(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-qbt-notice-');
+        $notice = $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.notice', "qBittorrent start failed: old.\n");
+        $ops = ['build' => '4.5.2', 'accountPids' => static function (): array { return []; },
+            'restore' => static function (): bool { return true; }, 'throttle' => static function (): bool { return true; }];
+        $this->assertFalse(\pmssQbittorrentFrontendStart($home, static function (): void {},
+            $ops + ['check' => static function (): bool { return false; }]));
+        $this->assertStringContainsString('start failed', file_get_contents($notice));
+        $this->assertTrue(\pmssQbittorrentFrontendStart($home, static function (): void {},
+            $ops + ['check' => static function (): bool { return true; }]));
+        $this->assertSame('', file_get_contents($notice));
+    }
+
     public function testSwitchAndFailureRestorePrepareBeforeEachStart(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-switch-');

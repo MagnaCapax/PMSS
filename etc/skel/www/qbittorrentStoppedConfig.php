@@ -24,6 +24,13 @@ function pmssQbittorrentFrontendNotice(string $home, string $message): void
     pmssConfigureFileWrite($dir.'/qbittorrent.notice', $message."\n");
 }
 
+/** A successful start supersedes an older operation's failure notice. */
+function pmssQbittorrentFrontendNoticeClear(string $home): void
+{
+    $path = $home.'/.config/pmss/torrentClients/qbittorrent.notice';
+    if (is_file($path) && pmssQbittorrentFrontendFileSafe($path)) pmssConfigureFileWrite($path, '');
+}
+
 /** Refusals always replace any older operation's notice. */
 function pmssQbittorrentFrontendStartRefused(string $home, string $message): bool
 {

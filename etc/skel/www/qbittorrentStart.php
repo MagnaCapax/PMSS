@@ -35,5 +35,7 @@ function pmssQbittorrentFrontendStart(string $home, callable $launch, array $ops
         return false;
     }
     pmssQbittorrentFrontendBuildRecord($home, $build);
+    $clear = $ops['noticeClear'] ?? 'pmssQbittorrentFrontendNoticeClear';
+    if (is_callable($clear)) $clear($home);
     return true;
 }
