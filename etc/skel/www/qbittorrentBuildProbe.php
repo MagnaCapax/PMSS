@@ -4,9 +4,14 @@
 /** Start a separate process group and kill the whole probe on deadline or excess output. */
 function pmssQbittorrentFrontendBuildProbe(string $binary, array $ops = []): ?string
 {
+    // --version still loads and saves the profile's qBittorrent.conf, so the probe gets an empty private profile.
+    $profile = rtrim(sys_get_temp_dir(), '/').'/pmss-qbt-probe-'.bin2hex(random_bytes(8));
+    if (!@mkdir($profile, 0700)) return null;
+    $env = ['PATH' => getenv('PATH') ?: '/usr/bin:/bin', 'HOME' => $profile, 'XDG_CONFIG_HOME' => $profile.'/.config',
+        'XDG_DATA_HOME' => $profile.'/.local/share', 'XDG_CACHE_HOME' => $profile.'/.cache'];
     $process = @proc_open('exec setsid '.escapeshellarg($binary).' --version',
-        [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
-    if (!is_resource($process)) return null;
+        [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, $profile, $env);
+    if (!is_resource($process)) { pmssQbittorrentFrontendBuildProbeClean($profile); return null; }
     stream_set_blocking($pipes[1], false);
     $clock = $ops['clock'] ?? static function (): float { return microtime(true); };
     $pause = $ops['pause'] ?? static function (): void { usleep(10000); };
@@ -34,7 +39,24 @@ function pmssQbittorrentFrontendBuildProbe(string $binary, array $ops = []): ?st
         }
         fclose($pipes[1]);
         $closed = proc_close($process);
+        pmssQbittorrentFrontendBuildProbeClean($profile);
     }
     $rc = $exitCode ?? $closed;
     return $complete && $rc === 0 && strlen($output) <= 4096 ? $output : null;
+}
+
+/** Remove the probe's private profile without following links it may contain. */
+function pmssQbittorrentFrontendBuildProbeClean(string $profile): void
+{
+    try {
+        $items = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($profile, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($items as $item) {
+            $path = $item->getPathname();
+            if (!is_link($path) && is_dir($path)) @rmdir($path); else @unlink($path);
+        }
+    } catch (UnexpectedValueException $e) {
+        // An unreadable leftover stays private (0700) to this account.
+    }
+    @rmdir($profile);
 }

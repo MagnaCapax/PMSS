@@ -8,6 +8,9 @@ function pmssQbittorrentAccountPids(string $proc = '/proc', ?int $uid = null): a
     $pids = [];
     foreach (glob(rtrim($proc, '/').'/[0-9]*', GLOB_ONLYDIR) ?: [] as $dir) {
         if (trim((string) @file_get_contents($dir.'/comm')) !== 'qbittorrent-nox') continue;
+        // A build probe (qbittorrent-nox --version) runs in its own private profile; it is not this account's daemon.
+        $argv = explode("\0", rtrim((string) @file_get_contents($dir.'/cmdline'), "\0"));
+        if (array_slice($argv, 1) === ['--version']) continue;
         $status = @file_get_contents($dir.'/status');
         if (is_string($status) && preg_match('/^Uid:\s+(\d+)/m', $status, $match) === 1
             && (int) $match[1] === $uid) $pids[] = (int) basename($dir);
