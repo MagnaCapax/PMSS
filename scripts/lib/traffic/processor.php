@@ -11,31 +11,12 @@ require_once __DIR__.'/../stats/userStatsProcessor.php';
 
 class TrafficStatsProcessor extends PmssUserStatsProcessor
 {
-    /** @var trafficStatistics */
-    private $stats;
+    protected $detachedWorkers = false;
 
     public function __construct(trafficStatistics $stats, array $paths = [])
     {
         parent::__construct($paths, 'traffic_dir', 'PMSS_TRAFFIC_DIR', '/var/log/pmss/traffic', '/var/log/pmss/trafficStats.log');
         $this->stats = $stats;
-    }
-
-    /** Aggregate in the cron's locked process so detached workers cannot contend with it. */
-    public function runCli(array $argv, string $scriptPath): int
-    {
-        if (isset($argv[1])) {
-            return parent::runCli($argv, $scriptPath);
-        }
-        $users = array_filter($this->discoverUsers(), [$this, 'validateUser']);
-        if (empty($users)) {
-            echo "No users in this system!\n";
-            return 0;
-        }
-        $compareTimes = pmssStatsCompareTimesBuild();
-        foreach ($users as $user) {
-            $this->processUser($user, $compareTimes);
-        }
-        return 0;
     }
 
     /** Validate that a user has traffic data, a home directory, and a passwd record. */
@@ -55,7 +36,7 @@ class TrafficStatsProcessor extends PmssUserStatsProcessor
         $rawTotals = array_fill_keys(array_keys($compareTimes), 0.0);
         $dailyTotals = [];
 
-        foreach ($loadedData['records'] as $line) {
+        foreach (array_filter(explode("\n", $loadedData)) as $line) {
             $parsed = $this->stats->parseLine($line);
             if ($parsed === false) {
                 logMessage($logPrefix."Parsing line failed for {$user}, line: {$line}");

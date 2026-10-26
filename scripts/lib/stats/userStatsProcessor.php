@@ -10,6 +10,9 @@ require_once dirname(__DIR__).'/runtime.php';
 
 abstract class PmssUserStatsProcessor
 {
+    protected $stats;
+    // Resource workers detach; traffic stays inside the cron's aggregation lock.
+    protected $detachedWorkers = true;
     protected $statsDataDir;
     protected $homeDir;
     protected $passwdFile;
@@ -57,11 +60,20 @@ abstract class PmssUserStatsProcessor
 
     public function runCli(array $argv, string $scriptPath): int
     {
-        $this->beforeRunCli();
+        if ($this->detachedWorkers || isset($argv[1])) $this->beforeRunCli();
         if (isset($argv[1])) { $user = (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $argv[1]); if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $this->processUser($user, pmssStatsCompareTimesBuild()); return 0; }
-        if (!$this->beforeSpawn()) return 0;
-        if (empty($users = $this->discoverUsers())) { echo "No users in this system!\n"; return 0; }
-        $this->spawnWorkers($scriptPath, $users); return 0;
+        if ($this->detachedWorkers && !$this->beforeSpawn()) return 0;
+        $users = $this->discoverUsers();
+        if (!$this->detachedWorkers) $users = array_filter($users, [$this, 'validateUser']);
+        if (empty($users)) { echo "No users in this system!\n"; return 0; }
+        if ($this->detachedWorkers) {
+            $this->spawnWorkers($scriptPath, $users);
+        } else {
+            // All inline accounts share the same window boundaries for this cycle.
+            $compareTimes = pmssStatsCompareTimesBuild();
+            foreach ($users as $user) $this->processUser($user, $compareTimes);
+        }
+        return 0;
     }
 
     protected function beforeRunCli(): void {}
@@ -75,10 +87,13 @@ abstract class PmssUserStatsProcessor
             && pmssColonRecordFieldsLookup($this->passwdFile, $homeUser, 2, false) !== null;
     }
 
-    /** @return array{data_lines:string,records:array<int,string>}|null */
-    protected function loadStatsDataLines(string $user, callable $loadData, string $logPrefix, bool $trimData = false): ?array { if (!$this->validateUser($user)) { logMessage($logPrefix."Invalid user {$user}"); return null; } $dataLines = (string) $loadData($user, (int) ((35 * 24 * 60) / 5)); $trimData && $dataLines = trim($dataLines); if ($dataLines === '') { logMessage($logPrefix."No data for user {$user}"); return null; } if (count($records = array_filter(explode("\n", $dataLines))) < 2) { logMessage($logPrefix."Too little data for {$user}"); return null; } return ['data_lines' => $dataLines, 'records' => $records]; }
+    /** Return the checked log text; each statistics parser owns its record traversal. */
+    protected function loadStatsDataLines(string $user, callable $loadData, string $logPrefix, bool $trimData = false): ?string { if (!$this->validateUser($user)) { logMessage($logPrefix."Invalid user {$user}"); return null; } $dataLines = (string) $loadData($user, (int) ((35 * 24 * 60) / 5)); $trimData && $dataLines = trim($dataLines); if ($dataLines === '') { logMessage($logPrefix."No data for user {$user}"); return null; } if (count(array_filter(explode("\n", $dataLines))) < 2) { logMessage($logPrefix."Too little data for {$user}"); return null; } return $dataLines; }
 
-    abstract public function validateUser(string $user): bool;
+    public function validateUser(string $user): bool
+    {
+        return $this->statsUserHasDataHomeAndPasswd($user, $user);
+    }
 
     abstract public function processUser(string $user, array $compareTimes): void;
 }

@@ -10,8 +10,6 @@ require_once __DIR__.'/../stats/userStatsProcessor.php';
 
 class ResourceStatsProcessor extends PmssUserStatsProcessor
 {
-    /** @var resourceStatistics */
-    private $stats;
     /** @var string */
     private $runtimeDir;
     /** @var string */
@@ -70,11 +68,6 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         return true;
     }
 
-    public function validateUser(string $user): bool
-    {
-        return $this->statsUserHasDataHomeAndPasswd($user, $user);
-    }
-
     /** Process and persist resource statistics for a single user. */
     public function processUser(string $user, array $compareTimes): void
     {
@@ -84,7 +77,7 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
             return;
         }
         $data = $this->stats->collectWindowResultsFromData(
-            $loadedData['data_lines'],
+            $loadedData,
             $compareTimes,
             function (string $line) use ($logPrefix, $user): void {
                 $this->log($logPrefix."Parsing line failed for {$user}, line: {$line}");
