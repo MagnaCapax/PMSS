@@ -83,30 +83,28 @@ function pmssPortManagerReservationRootIsSafe(string $root): bool
     return $root !== '' && strpos($root, "\0") === false && is_dir($root) && !is_link($root);
 }
 
+/** Scan, recheck the root, then decode reservations; missing legacy roots are valid. */
+function pmssPortManagerReservationPorts(string $root, string $pattern, bool $allowMissing, callable $readPort, ?bool &$scanComplete): array
+{
+    $scanComplete = false;
+    if (!pmssPortManagerReservationRootIsSafe($root)) {
+        $scanComplete = $allowMissing && !pmssPathExistsOrLink($root);
+        return [];
+    }
+    $paths = @glob($root.$pattern);
+    $scanComplete = $paths !== false && pmssPortManagerReservationRootIsSafe($root);
+    $used = array();
+    foreach ($scanComplete ? $paths : [] as $path) {
+        if (($port = $readPort($path)) !== null) $used[$port] = true;
+    }
+    return $used;
+}
+
 /** @return array<int, bool> */
 function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports', ?bool &$scanComplete = null): array
 {
-    $scanComplete = true;
-    $portsBase = rtrim($portsBase, '/');
-    if (!pmssPortManagerReservationRootIsSafe($portsBase)) {
-        // An absent legacy namespace is normal; an existing unsafe one is not.
-        $scanComplete = !pmssPathExistsOrLink($portsBase);
-        return [];
-    }
-
-    $used = array();
-    $paths = @glob($portsBase.'/*/*');
-    if ($paths === false || !pmssPortManagerReservationRootIsSafe($portsBase)) {
-        $scanComplete = false;
-        return [];
-    }
-    foreach ($paths as $path) {
-        $port = pmssNetworkPortParseDigits(basename($path));
-        if ($port !== null) {
-            $used[$port] = true;
-        }
-    }
-    return $used;
+    return pmssPortManagerReservationPorts(rtrim($portsBase, '/'), '/*/*', true,
+        static function (string $path): ?int { return pmssNetworkPortParseDigits(basename($path)); }, $scanComplete);
 }
 
 /**
@@ -117,23 +115,8 @@ function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports
 function pmssPortManagerUsedPorts(string $portDir, string $legacyPortsBase = '/var/lib/pmss/ports', ?bool &$scanComplete = null): array
 {
     $used = pmssPortManagerLegacyUsedPorts($legacyPortsBase, $legacyComplete);
-    $scanComplete = $legacyComplete;
-    $portDir = rtrim($portDir, '/');
-    if (!pmssPortManagerReservationRootIsSafe($portDir)) {
-        $scanComplete = false;
-        return $used;
-    }
-
-    $paths = @glob($portDir.'/*');
-    if ($paths === false || !pmssPortManagerReservationRootIsSafe($portDir)) {
-        $scanComplete = false;
-        return $used;
-    }
-    foreach ($paths as $path) {
-        $assignedPort = pmssPortManagerReadAssignedPort($path);
-        if ($assignedPort !== null) {
-            $used[$assignedPort] = true;
-        }
-    }
-    return $used;
+    $managed = pmssPortManagerReservationPorts(rtrim($portDir, '/'), '/*', false,
+        static function (string $path): ?int { return pmssPortManagerReadAssignedPort($path); }, $managedComplete);
+    $scanComplete = $legacyComplete && $managedComplete;
+    return $used + $managed;
 }

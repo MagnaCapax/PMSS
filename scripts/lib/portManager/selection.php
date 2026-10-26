@@ -60,19 +60,7 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
         return null;
     }
 
-    $context = pmssPortManagerAssignmentContext($user, $service, $status);
-    if ($context === null) {
-        return null;
-    }
-
-    $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager.lock'));
-    if ($lockHandle === false) {
-        $status = 'lock_failed';
-        return null;
-    }
-    try {
-        // The assignment may have changed while waiting for the shared lock.
-        $context = pmssPortManagerAssignmentContext($user, $service, $status);
+    return pmssPortManagerAssignmentWithLock($user, $service, static function (?array $context, &$status) use ($preferredPort): ?int {
         if ($context === null) return null;
         if ($context['present']) {
             $port = pmssPortManagerReadAssignedPort($context['file']);
@@ -95,7 +83,5 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
 
         $status = 'assigned';
         return $port;
-    } finally {
-        pmssLockHandleRelease($lockHandle);
-    }
+    }, $status);
 }

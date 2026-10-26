@@ -66,8 +66,8 @@ function pmssLockFileAcquire($path) {
 function pmssUserBaseContext() { return []; }
 function pmssUserWriteLogs() { return true; }
 PHP;
-        $source = $action === 'assign' ? 'scripts/lib/portManager/selection.php' : 'scripts/lib/portManager.php';
-        $script .= $this->pmssInlinePhpLibraryInNamespace($source, 'PortManagerLockRaceFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/portManager.php', 'PortManagerLockRaceFixture',
+            ['portManager/selection.php', 'portManager/assignment.php', 'portManager/cli.php']);
         if ($action === 'assign') {
             $script .= '$status = null; $port = pmssPortManagerAssignServicePort("alice", "rclone", 26000, $status);';
             $script .= 'echo json_encode(["port" => $port, "status" => $status, "file" => \file_get_contents($GLOBALS["assignment"])]);';
