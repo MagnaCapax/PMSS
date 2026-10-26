@@ -4,6 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/resources/metrics.php';
 require_once dirname(__DIR__, 2).'/resources/oomStatus.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/webCgroupMemoryStatus.php';
 
 class UserMetricsCollectTest extends TestCase
 {
@@ -17,7 +18,63 @@ class UserMetricsCollectTest extends TestCase
         $this->assertSame(300, $increase['last_increase']);
         $this->assertSame(300, \pmssOomStatusStateNext($increase, 5, 400)['last_increase']);
         $this->assertSame(null, \pmssOomStatusStateNext($increase, 0, 500)['last_increase']);
-        $this->assertSame(600, \pmssOomStatusStateNext($increase, 2, 600)['last_increase']);
+        $reset = \pmssOomStatusStateNext($increase, 2, 600);
+        $this->assertSame(['count' => 2, 'last_increase' => null, 'sampled_at' => 600], $reset);
+        $this->assertSame(null, \pmssOomStatusStateNext($reset, 2, 700)['last_increase']);
+        $resumed = \pmssOomStatusStateNext($reset, 3, 800);
+        $this->assertSame(800, $resumed['last_increase']);
+        $this->assertSame(false, \pmssWebCgroupMemoryStatusOomRecent(2, $reset, 600));
+        $this->assertSame(true, \pmssWebCgroupMemoryStatusOomRecent(3, $resumed, 800));
+    }
+
+    /** Both read-only boundaries must include disjoint session/run counters at every depth. */
+    public function testOomReadersSumAccountDescendants(): void
+    {
+        $cases = [
+            [[
+                'memory.oom_control' => "oom_kill 2\n",
+                'user@1000.service/memory.oom_control' => "oom_kill 3\n",
+                'user@1000.service/app.slice/run-nested.scope/memory.oom_control' => "oom_kill 5\n",
+                'session-1.scope/memory.oom_control' => "oom_kill 7\n",
+                'run-1.scope/memory.oom_control' => "oom_kill 11\n",
+            ], 28, 28],
+            [['session-1.scope/memory.oom_control' => "oom_kill 4\n"], 4, 4],
+            [[
+                'memory.oom_control' => "oom_kill invalid\n",
+                'session-1.scope/memory.oom_control' => "oom_kill -2\n",
+                'session-1.scope/nested/memory.oom_control' => "oom_kill 4\n",
+            ], 4, 4],
+            [[], null, 0],
+            [['memory.oom_control' => "oom_kill 0\n"], 0, 0],
+            [[
+                'memory.oom_control' => 'oom_kill '.(PHP_INT_MAX - 1)."\n",
+                'session-1.scope/memory.oom_control' => "oom_kill 2\n",
+            ], null, PHP_INT_MAX],
+        ];
+        foreach ($cases as [$files, $rootCount, $panelCount]) {
+            $slice = $this->tree($files);
+            $this->assertSame($rootCount, \pmssOomStatusV1CountRead($slice));
+            $this->assertSame($panelCount, \pmssWebCgroupMemoryStatusV1OomKillRead($slice, 1000));
+        }
+        $this->assertSame(null, \pmssOomStatusV1CountRead($slice.'/missing'));
+        $this->assertSame(0, \pmssWebCgroupMemoryStatusV1OomKillRead('', 1000));
+        // Preserve the existing UID gate: invalid identities permit only the parent read.
+        $slice = $this->tree(['memory.oom_control' => "oom_kill 2\n", 'session-1.scope/memory.oom_control' => "oom_kill 3\n"]);
+        foreach ([null, -1, '1000'] as $uid) {
+            $this->assertSame(2, \pmssWebCgroupMemoryStatusV1OomKillRead($slice, $uid));
+        }
+    }
+
+    /** A sibling account or symlink cycle must never become part of the account total. */
+    public function testOomReadersSkipSymlinkedScopesAndCounters(): void
+    {
+        $slice = $this->tree(['session-1.scope/memory.oom_control' => "oom_kill 3\n"]);
+        $outside = $this->tree(['memory.oom_control' => "oom_kill 99\n"]);
+        $this->assertTrue(symlink($outside, $slice.'/other.scope'));
+        $this->assertTrue(symlink($slice, $slice.'/session-1.scope/loop'));
+        $this->assertTrue(symlink($outside.'/memory.oom_control', $slice.'/memory.oom_control'));
+        $this->assertSame(3, \pmssOomStatusV1CountRead($slice));
+        $this->assertSame(3, \pmssWebCgroupMemoryStatusV1OomKillRead($slice, 1000));
     }
 
     /** A forged home projection cannot become the collector's previous sample. */

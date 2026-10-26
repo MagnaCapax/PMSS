@@ -54,10 +54,9 @@ foreach ($userUids as $user => $uid) {
         @chmod($path, 0600);
     }
     // This private projection is the only collector data exposed to the owning account.
-    $parent = $metrics['mem_oom_kill'] ?? null;
-    $child = pmssResourceLogReadMemoryStatField('/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice/user@'.$uid.'.service/memory.oom_control', 'oom_kill');
-    if (($parent !== null || $child !== null) && is_dir(userFilesystem::homePath($user))) {
-        if (!pmssOomStatusProject($user, max($parent ?? 0, $child ?? 0), time())) {
+    $count = pmssOomStatusV1CountRead('/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice');
+    if ($count !== null && is_dir(userFilesystem::homePath($user))) {
+        if (!pmssOomStatusProject($user, $count, time())) {
             fwrite(STDERR, "Failed to project OOM status for {$user}.\n");
         }
     }

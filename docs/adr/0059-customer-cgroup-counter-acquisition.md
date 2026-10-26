@@ -57,3 +57,13 @@ first sample of a nonzero count has no known event time and does not qualify.
 The runtime directory is transient: after reboot, the first collection seeds a
 new baseline. A tenant can alter only their own panel projection; root never
 uses that file as input. Existing live memory-pressure thresholds are unchanged.
+
+The v1 reader and private OOM projection sum local `oom_kill` counters over the
+account slice and all descendants, including session and run scopes (Refs #1198).
+V1 events do not propagate to parents, so these counters are disjoint. The two
+read-only readers stay within their respective trees (ADR 0016), skip symlinked
+entries, and tolerate scopes disappearing during traversal. Any count decrease
+clears the recency latch and seeds a new baseline; only a later sampled increase
+dates another kill. A scope that exits between samples can lose an unobserved
+kill, so this remains a sampled view rather than a durable event log. The local
+`mem_oom_kill` telemetry field retains its existing meaning.

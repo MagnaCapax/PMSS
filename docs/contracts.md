@@ -710,12 +710,17 @@ iptables helpers:
   `scriptsInc.php` (ADRs 0059 and 0099). Page-specific
   directory precedence and missing-data behavior stay unchanged; live pressure
   thresholds remain separate from the OOM recency signal.
-- The five-minute metrics collector projects the maximum parent/child cgroup-v1
+- The five-minute metrics collector projects the sum of local cgroup-v1
+  `oom_kill` counters in the account slice and all descendants, including SSH
+  session and run scopes. The telemetry `mem_oom_kill` field retains its local
+  slice meaning; only the private projection and panel use the account total.
+  Symlinked directories/counters are skipped. The collector projects the
   `oom_kill` count into the owning account's private `.oomKillStatus` file (root:user
   0640). Its baseline and last-increase state are locked in root-owned
   `/var/run/pmss/oomStatus`; the collector never reads the home projection.
   Its first sample is an undated baseline; subsequent increases record the
-  observation time, while a zero reset clears it. The welcome panel treats an
+  observation time, while any decrease clears it and seeds a new baseline.
+  Scopes that exit between samples can lose unobserved kills. The welcome panel treats an
   observed increase as current for 24 hours when the sample is at most 15 minutes
   old. A higher live counter is immediately current; missing or stale projection
   data cannot turn a lifetime count into a permanent HIGH warning.

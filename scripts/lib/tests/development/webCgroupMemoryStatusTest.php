@@ -241,7 +241,7 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testReadReadsChildServiceSliceOomKillWhenParentSliceIsZero(): void
     {
         // systemd can record the memcg OOM kills on the child user@<uid>.service slice while the
-        // parent user-<uid>.slice reads 0 — the reader must check both and take the max.
+        // parent user-<uid>.slice reads 0 — the reader must include the child counter.
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-oomchild-');
         $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "104857600\n");
         $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "327155712\n");
@@ -254,6 +254,20 @@ class WebCgroupMemoryStatusTest extends TestCase
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
 
         $this->assertSame(3, $status['oom_kill_events']);
+        $this->assertSame('HIGH', $status['status']);
+    }
+
+    public function testReadSurfacesNestedSessionOomKills(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-scopes-');
+        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "100\n");
+        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "400\n");
+        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill 0\n");
+        $this->pmssWriteFile($dir.'/session-1.scope/run-1.scope/memory.oom_control', "oom_kill 2\n");
+        $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 0, 'last_increase' => null, 'sampled_at' => 100]));
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
+        $this->assertSame(2, $status['oom_kill_events']);
+        $this->assertSame(true, $status['oom_kill_recent']);
         $this->assertSame('HIGH', $status['status']);
     }
 

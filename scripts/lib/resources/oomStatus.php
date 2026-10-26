@@ -8,6 +8,27 @@
 
 require_once __DIR__.'/log.php';
 
+/** Sum local v1 OOM kills across an account slice, omitting absent/invalid counters. */
+function pmssOomStatusV1CountRead(string $slice): ?int
+{
+    $directories = [$slice];
+    $total = null;
+    while ($directories !== []) {
+        $directory = array_pop($directories);
+        if (is_link($directory) || !is_dir($directory)) continue;
+        $value = pmssResourceLogReadMemoryStatField($directory.'/memory.oom_control', 'oom_kill');
+        if ($value !== null) {
+            // Retain the resource counter sentinel and integer-overflow rejection.
+            if ($value >= PMSS_RESOURCE_COUNTER_SENTINEL - ($total ?? 0)) return null;
+            $total = ($total ?? 0) + $value;
+        }
+        foreach (pmssDirectoryEntriesRead($directory) ?: [] as $entry) {
+            if (is_dir($directory.'/'.$entry)) $directories[] = $directory.'/'.$entry;
+        }
+    }
+    return $total;
+}
+
 /** Return a bounded-recency state after one valid collector sample. */
 function pmssOomStatusStateNext(array $previous, int $count, int $now): array
 {
@@ -18,10 +39,11 @@ function pmssOomStatusStateNext(array $previous, int $count, int $now): array
         $oldCount = null;
         $lastIncrease = null;
     }
-    if ($oldCount !== null && ($count > $oldCount || ($count < $oldCount && $count > 0))) {
+    if ($oldCount !== null && $count > $oldCount) {
         $lastIncrease = $now;
     }
-    if ($count === 0) {
+    // Removed scopes take their counters with them: a decrease seeds a new baseline.
+    if ($count === 0 || ($oldCount !== null && $count < $oldCount)) {
         $lastIncrease = null;
     }
     return ['count' => $count, 'last_increase' => $lastIncrease, 'sampled_at' => $now];

@@ -100,10 +100,9 @@ function pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw)
 
 /**
  * cgroup-v1 fallback: read the real OOM-kill count from memory.oom_control on the account's
- * own slice AND its child user@<uid>.service slice. systemd can place the memcg limit (and
- * therefore the kills) on the child, so the parent slice can read oom_kill 0 while the child
- * recorded the kills — read both, take the max. Both files are world-readable (root:root 0644),
- * so this customer-tree helper reads them directly, no /scripts traversal (ADR-0016/0017).
+ * slice and every descendant, including session/run scopes. V1 counters are local to each
+ * memcg, so sum them without double-counting. Read directly from the customer tree without
+ * /scripts traversal (ADR-0016/0017); disappearing scopes are skipped without warnings.
  * memory.events (the v2 oom_kill source used in the reader above) does not exist on the
  * v1-pinned fleet; a REAL OOM kill is the ONLY sound per-account memory-pressure signal there
  * (failcnt false-HIGHs on page-cache reclaim and is deliberately NOT read). Returns 0 on v2.
@@ -113,19 +112,25 @@ function pmssWebCgroupMemoryStatusV1OomKillRead($cgroupDir, $uid)
     if (!is_string($cgroupDir) || $cgroupDir === '') {
         return 0;
     }
-    $cgroupDir = rtrim($cgroupDir, '/');
-    $paths = array($cgroupDir.'/memory.oom_control');
-    if (is_int($uid) && $uid >= 0) {
-        $paths[] = $cgroupDir.'/user@'.$uid.'.service/memory.oom_control';
-    }
-    $max = 0;
-    foreach ($paths as $path) {
-        $value = pmssCustomerUnsignedIntegerValue((pmssCustomerKeyValueFileRead($path))['oom_kill'] ?? null);
-        if ($value !== null && $value > $max) {
-            $max = $value;
+    $directories = [rtrim($cgroupDir, '/')];
+    $total = 0;
+    while ($directories !== []) {
+        $directory = array_pop($directories);
+        if (is_link($directory) || !is_dir($directory)) continue;
+        $path = $directory.'/memory.oom_control';
+        $value = is_link($path) ? null
+            : pmssCustomerUnsignedIntegerValue((pmssCustomerKeyValueFileRead($path))['oom_kill'] ?? null);
+        // Preserve integer output even if an aggregate exceeds the representable range.
+        if ($value !== null) $total += min($value, PHP_INT_MAX - $total);
+        if (is_int($uid) && $uid >= 0) {
+            foreach (@scandir($directory) ?: [] as $entry) {
+                if ($entry !== '.' && $entry !== '..' && is_dir($directory.'/'.$entry)) {
+                    $directories[] = $directory.'/'.$entry;
+                }
+            }
         }
     }
-    return $max;
+    return $total;
 }
 
 /** Only a sampled increase within 24 hours can make a lifetime v1 counter live. */
