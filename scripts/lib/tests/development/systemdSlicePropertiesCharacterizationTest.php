@@ -133,6 +133,58 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
         $this->assertEquals(null, $quota);
     }
 
+    public function testTimeSpanKeepsFiniteValuesAndWhitespaceNormalization(): void
+    {
+        foreach ([['0', 0.0], ['00012', 12.0], [' 12 ', 12.0], ['1.5ms', 1500.0],
+            ['1min 30s', 90000000.0], ['1h 2min 3s 4ms 5us', 3723004005.0]] as $case) {
+            $this->assertSame($case[1], \pmssSystemdTimeSpanUsec($case[0]));
+        }
+    }
+
+    public function testTimeSpanRejectsOverflowDuringConversionMultiplicationAndAddition(): void
+    {
+        $huge = str_repeat('9', 400);
+        $finite = str_repeat('9', 308);
+        foreach ([$huge, '000'.$huge, $huge.'us', $huge.'ms', $finite.'h',
+            $finite.'us '.$finite.'us', 'infinity', '1e309'] as $span) {
+            $this->assertSame(null, \pmssSystemdTimeSpanUsec($span));
+        }
+    }
+
+    public function testCpuQuotaPercentRejectsNonFiniteAndUnrepresentableValues(): void
+    {
+        // The next integer is representable as a float on both 32-bit and 64-bit PHP.
+        $boundary = sprintf('%.0f', (float) PHP_INT_MAX + 1.0);
+        foreach ([str_repeat('9', 400), '1e309', '-1e309', '1e100', $boundary, $boundary.'0'] as $raw) {
+            $this->assertSame(null, \pmssSystemdCpuQuotaPercent([
+                'CPUQuota' => $raw.'%', 'CPUQuotaPerSecUSec' => '1000000',
+            ]));
+        }
+        foreach ([str_repeat('9', 400), str_repeat('9', 308), $boundary.'0000',
+            $boundary.'0000us', $boundary.'s'] as $span) {
+            $this->assertSame(null, \pmssSystemdCpuQuotaPercent(['CPUQuotaPerSecUSec' => $span]));
+        }
+    }
+
+    public function testCpuQuotaPercentKeepsRoundingAndDirectValuePrecedence(): void
+    {
+        foreach (['250.4%' => 250, '250.5%' => 251, '0.49%' => null, '0.5%' => 1,
+            ' 0250% ' => 250, '2.5e2%' => 250, 'garbage%' => null] as $raw => $expected) {
+            $this->assertSame($expected, \pmssSystemdCpuQuotaPercent([
+                'CPUQuota' => $raw, 'CPUQuotaPerSecUSec' => '1000000',
+            ]));
+        }
+        foreach (['4999' => null, '5000' => 1, '14999' => 1, '15000' => 2, '2500000' => 250] as $span => $expected) {
+            $this->assertSame($expected, \pmssSystemdCpuQuotaPercent(['CPUQuotaPerSecUSec' => (string) $span]));
+        }
+    }
+
+    public function testCpuQuotaPercentKeepsLargeRepresentableIntegers(): void
+    {
+        $nearLimit = PHP_INT_SIZE >= 8 ? '9223372036854774784' : '2147483646';
+        $this->assertSame((int) $nearLimit, \pmssSystemdCpuQuotaPercent(['CPUQuota' => $nearLimit.'%']));
+    }
+
     public function testMapSystemdIntPropertiesAppliesDefaultsForOptionalCounters(): void
     {
         $mapped = \pmssMapSystemdIntProperties(

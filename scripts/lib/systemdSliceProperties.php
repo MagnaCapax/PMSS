@@ -124,7 +124,7 @@ function pmssSystemdTimeSpanUsec(string $value): ?float
         return null;
     }
     if (ctype_digit($value)) {
-        return (float) $value;
+        return pmssFiniteNonNegativeFloat($value);
     }
     if (preg_match('/\A\d+(?:\.\d+)?(?:us|ms|min|s|h)(?:\s+\d+(?:\.\d+)?(?:us|ms|min|s|h))*\z/i', $value) !== 1) {
         return null;
@@ -144,14 +144,16 @@ function pmssSystemdCpuQuotaPercent(array $properties): ?int
 {
     $rawQuota = trim((string) ($properties['CPUQuota'] ?? ''));
     if ($rawQuota !== '' && stripos($rawQuota, 'infinity') === false && strpos($rawQuota, '%') !== false) {
-        $quota = (int) round((float) $rawQuota);
-        return $quota > 0 ? $quota : null;
+        $quota = (float) $rawQuota;
+    } else {
+        $perSecUsec = pmssSystemdTimeSpanUsec((string) ($properties['CPUQuotaPerSecUSec'] ?? ''));
+        if ($perSecUsec === null) return null;
+        // PerSecUSec is allowed CPU time per wall-clock second; the scheduling period is unrelated.
+        $quota = $perSecUsec / 10000;
+        if ($quota > PHP_INT_MAX) return null;
     }
-    $perSecUsec = pmssSystemdTimeSpanUsec((string) ($properties['CPUQuotaPerSecUSec'] ?? ''));
-    if ($perSecUsec === null || $perSecUsec <= 0 || $perSecUsec / 10000 > PHP_INT_MAX) {
-        return null;
-    }
-    // PerSecUSec is allowed CPU time per wall-clock second; the scheduling period is unrelated.
-    $quota = (int) round($perSecUsec / 10000);
-    return $quota > 0 ? $quota : null;
+    if (!is_finite($quota) || $quota <= 0) return null;
+    // Compare rounded decimal digits: a float comparison rounds PHP_INT_MAX up on 64-bit PHP.
+    $quota = pmssUnsignedDecimalIntParse(sprintf('%.0f', round($quota)));
+    return $quota !== null && $quota > 0 ? $quota : null;
 }

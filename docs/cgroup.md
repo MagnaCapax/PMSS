@@ -105,6 +105,12 @@ There is no translated profile catalog or diagnostic-result envelope between
 these modules. The CLI output, return codes, validation, and production v1 pin
 (ADR 0019) remain unchanged; `UserCgroupUtilTest` locks profile/option output.
 
+Shared systemd property readers treat overflowed time spans and CPU percentages
+as unavailable (`null`). Both direct percentages and time-derived percentages
+must round to a positive PHP integer before conversion. Finite time spans,
+ordinary quota rounding, and direct-percentage precedence retain their existing
+behavior; `SystemdSlicePropertiesCharacterizationTest` covers these boundaries.
+
 Inspect and apply limits per user:
 
 ```
