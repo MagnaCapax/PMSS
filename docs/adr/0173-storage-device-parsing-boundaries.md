@@ -41,6 +41,10 @@ non-array persisted metrics as absent history, matching NVMe; valid counters
 and legacy CRC migration retain their existing results. The SMART failure
 tests cover malformed history without probing real devices.
 
+Parsers pass findings directly to finalization; NVMe adds metrics to the base
+entry without a mutable copy. Reports likewise avoid redundant color state,
+integer casts and empty-timestamp branches, retaining field order and bytes.
+
 ## References
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)
 - [Function contracts](../contracts.md)

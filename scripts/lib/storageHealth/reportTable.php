@@ -13,14 +13,13 @@ require_once dirname(__DIR__).'/cli/helpText.php';
 /** Apply severity coloring only for interactive terminals. */
 function pmssStorageHealthColor(string $severity, string $text): string
 {
-    $code = PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$severity]['color'] ?? '0';
-    return pmssCliAnsiStyle($text, $code, pmssStreamIsTty(STDOUT));
+    return pmssCliAnsiStyle($text, PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$severity]['color'] ?? '0', pmssStreamIsTty(STDOUT));
 }
 
 /** Format nullable integer SMART/NVMe metrics for fixed-width report columns. */
 function pmssStorageHealthReportInt($value, string $suffix = ''): string
 {
-    return is_int($value) ? (string) $value.$suffix : '-';
+    return is_int($value) ? $value.$suffix : '-';
 }
 
 /** @param array<int, array<string, mixed>> $disks @param array<int, array<string, mixed>> $raid */

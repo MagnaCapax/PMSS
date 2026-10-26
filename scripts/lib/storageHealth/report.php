@@ -93,7 +93,7 @@ function pmssStorageHealthReportMain(array $argv): int
     foreach (pmssStorageHealthReadLastEntries($jsonPath) as $entry) {
         $ts = (string) ($entry['timestamp'] ?? '');
         $kind = (string) ($entry['kind'] ?? '');
-        if ($ts !== '' && ($latestTs === '' || strcmp($ts, $latestTs) > 0)) {
+        if (strcmp($ts, $latestTs) > 0) {
             $latestTs = $ts;
         }
         if ($kind === 'raid') {
