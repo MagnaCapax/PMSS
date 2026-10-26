@@ -9,11 +9,45 @@
 # Keep newly-created files private before any early shell return.
 umask 077
 
+# Normalize PATH before the interactive guard so SSH commands find user bins.
+pmss_normalize_path() {
+    local sys_paths="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    local new_path=""
+    local entry
+    local path_value="${PATH:-}"
+    local -a parts=()
+
+    IFS=':' read -r -a parts <<< "$path_value"
+    for entry in "${parts[@]}"; do
+        case "$entry" in
+            ""|"$HOME/.bin"|"$HOME/bin"|"$HOME/.local/bin") continue ;;
+        esac
+        case ":$new_path:" in
+            *":$entry:"*) ;;
+            *) new_path="${new_path:+$new_path:}$entry" ;;
+        esac
+    done
+
+    new_path="${sys_paths}${new_path:+:$new_path}"
+    for entry in "$HOME/.bin" "$HOME/bin" "$HOME/.local/bin"; do
+        if [ -d "$entry" ]; then
+            case ":$new_path:" in
+                *":$entry:"*) ;;
+                *) new_path="${new_path}:$entry" ;;
+            esac
+        fi
+    done
+
+    export PATH="$new_path"
+}
+pmss_normalize_path
+unset -f pmss_normalize_path
+
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
-# If not running interactively, don't do anything
+# Keep the remaining shell setup interactive-only.
 [ -z "$PS1" ] && return
 
 # don't put duplicate lines in the history. See bash(1) for more options
@@ -236,40 +270,6 @@ specify one. After launch, fetch client configs with
 EOF
 }
 
-
-# Normalize PATH so system paths lead, then existing entries, then user bins.
-pmss_normalize_path() {
-    local sys_paths="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    local new_path=""
-    local entry
-    local path_value="${PATH:-}"
-    local -a parts=()
-
-    IFS=':' read -r -a parts <<< "$path_value"
-    for entry in "${parts[@]}"; do
-        case "$entry" in
-            ""|"$HOME/.bin"|"$HOME/bin"|"$HOME/.local/bin") continue ;;
-        esac
-        case ":$new_path:" in
-            *":$entry:"*) ;;
-            *) new_path="${new_path:+$new_path:}$entry" ;;
-        esac
-    done
-
-    new_path="${sys_paths}${new_path:+:$new_path}"
-    for entry in "$HOME/.bin" "$HOME/bin" "$HOME/.local/bin"; do
-        if [ -d "$entry" ]; then
-            case ":$new_path:" in
-                *":$entry:"*) ;;
-                *) new_path="${new_path}:$entry" ;;
-            esac
-        fi
-    done
-
-    export PATH="$new_path"
-}
-pmss_normalize_path
-unset -f pmss_normalize_path
 
 # Prefer the per-user systemd runtime directory when available so rootless
 # daemons and other user services can attach to the correct socket.

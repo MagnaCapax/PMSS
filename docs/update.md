@@ -363,6 +363,11 @@ writes emit the existing write warning instead of silently reporting success.
 
 ### User dotfile hooks (`.bashrc.custom` / `.bashrc.user`)
 
+The managed `.bashrc` applies `umask 077` and silently normalizes `PATH` before
+its non-interactive return, including for remote SSH commands. System paths
+lead, followed by inherited entries, then existing `~/.bin`, `~/bin` and
+`~/.local/bin` directories. The remaining setup and custom hooks stay interactive-only.
+
 Step 9's per-user refresh force-syncs a fixed set of skeleton files into each home
 (`pmssUserApplySkeletonFiles()` in `scripts/lib/update/users/filesystem.php`), `.bashrc`
 among them. `updateUserFile()` (`scripts/lib/update.php`) SHA1-compares the tenant copy
