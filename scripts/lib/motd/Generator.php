@@ -74,14 +74,12 @@ class Motd
             // Resolved means "starts with a digit". The old allow-list compared against
             // 'unknown' and 'n/a' only, so ethtool's literal "Unknown!" on a virtio NIC
             // slipped through and was rendered green, as if it were a detected speed.
-            $repl['%NETWORK_SPEED%'] = pmssMotdNetworkSpeedIsResolved($netSpeed)
-                ? pmssCliAnsiStyle($netSpeed, '32') // green when detected or provisioned
-                : pmssCliAnsiStyle('Unknown', '33'); // yellow when neither probe nor config answers
+            $resolved = pmssMotdNetworkSpeedIsResolved($netSpeed);
+            $repl['%NETWORK_SPEED%'] = pmssCliAnsiStyle($resolved ? $netSpeed : 'Unknown', $resolved ? '32' : '33');
         }
 
         $rendered = strtr($template, $repl);
-        $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
-        $rendered = is_string($patched) ? $patched : $rendered;
+        $rendered = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered) ?? $rendered;
 
         $storageWarn = (string) ($model['storageWarn'] ?? '');
         if ($storageWarn !== '') {

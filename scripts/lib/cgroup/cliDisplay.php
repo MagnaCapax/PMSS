@@ -29,8 +29,7 @@ function pmssCgroupCliPrintPlan(array $plan): void
 function pmssCgroupCliShowConfig(SystemInterface $sys, string $slice): void
 {
     echo "\n[Config] $slice\n";
-    $props = ['CPUWeight','IOWeight','IODeviceLatencyTargetSec','MemoryAccounting','CPUAccounting','IOAccounting','MemoryHigh','MemoryMax','TasksMax','CPUQuotaPerSecUSec','CPUQuotaPeriodUSec'];
-    $out = $sys->execute(\pmssBuildSystemdShowCommand($slice, $props));
+    $out = $sys->execute(\pmssBuildSystemdShowCommand($slice, ['CPUWeight','IOWeight','IODeviceLatencyTargetSec','MemoryAccounting','CPUAccounting','IOAccounting','MemoryHigh','MemoryMax','TasksMax','CPUQuotaPerSecUSec','CPUQuotaPeriodUSec']));
     echo $out !== null ? trim($out)."\n" : "(no data)\n";
 }
 

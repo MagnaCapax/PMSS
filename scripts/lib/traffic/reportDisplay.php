@@ -36,7 +36,7 @@ function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): vo
             : null;
         $barDisplay = $filled === null ? str_repeat(' ', 12) : '['.str_repeat('#', $filled).str_repeat('-', 10 - $filled).']';
         $format = "%-14s %9s / %9s %4s %s %s IN: %9s R: %5s  Datarates: %10s / %10s / %10s / %10s\n";
-        $values = [$label, (string) $display['month'], $limitDisplay, sprintf('%4s', $pctDisplay), $statusDisplay, $barDisplay];
+        $values = [$label, (string) $display['month'], $limitDisplay, $pctDisplay, $statusDisplay, $barDisplay];
     } else {
         $format = "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n";
         $values = [$label, (string) $display['month'], (string) $display['week'], (string) $display['day']];
@@ -52,7 +52,7 @@ function pmssShowTrafficRateColumns(array $rates, bool $withUnits): array
         $rate = (float) $rates[$key];
         if (!$withUnits) return sprintf('%.2f', $rate);
         // Extended columns auto-scale from MiB/s to GiB/s at the legacy threshold.
-        return sprintf('%.2f%s', $rate >= 1000 ? $rate / 1024 : $rate, $rate >= 1000 ? 'GiB/s' : 'MiB/s');
+        return $rate >= 1000 ? sprintf('%.2fGiB/s', $rate / 1024) : sprintf('%.2fMiB/s', $rate);
     }, ['week', 'day', 'hour', '15min']);
 }
 

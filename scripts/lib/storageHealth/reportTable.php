@@ -53,9 +53,8 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
             ];
         }, $disks);
         usort($rows, static function (array $a, array $b): int {
-            $ra = PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$a['sev']]['rank'] ?? 1;
-            $rb = PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$b['sev']]['rank'] ?? 1;
-            return $ra !== $rb ? $ra - $rb : strcmp($a['dev'], $b['dev']);
+            return ((PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$a['sev']]['rank'] ?? 1)
+                - (PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$b['sev']]['rank'] ?? 1)) ?: strcmp($a['dev'], $b['dev']);
         });
         $modelWidth = 12;
         foreach ($rows as $r) {

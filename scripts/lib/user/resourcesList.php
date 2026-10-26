@@ -90,7 +90,7 @@ function pmssUserResourcesListEntryBuild(string $user, array $info, array $props
 /** Render a text row for the chosen mode. */
 function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode): array
 {
-    $row = [
+    return array_merge([
         substr($resourceData['user'], 0, 10),
         (string) $resourceData['uid'],
         pmssUserResourcesListBinaryFormat($resourceData['memory_high']),
@@ -102,8 +102,7 @@ function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode)
         pmssUserResourcesListBinaryFormat($resourceData['io_write_bandwidth']),
         (string) ($resourceData['io_read_iops'] ?? '-'),
         (string) ($resourceData['io_write_iops'] ?? '-'),
-    ];
-    return array_merge($row, $displayMode !== 'full' ? [] : [
+    ], $displayMode !== 'full' ? [] : [
         pmssUserResourcesListGiBFormat($resourceData['disk_quota_gib']),
         pmssUserResourcesListGiBFormat($resourceData['disk_burst_gib']),
         (string) ($resourceData['inode_quota'] ?? '-'),
