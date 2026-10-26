@@ -7,7 +7,7 @@ require_once dirname(__DIR__, 2).'/user/qbittorrentStoppedConfig.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/qbittorrentStoppedConfig.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsVersion.php';
 
-/** The Enhanced Edition entry carries its warning in the version and reads as its upstream release (ADR 0183). */
+/** The Enhanced Edition entry carries its warning in the version and reads as its upstream release (ADR 0184). */
 final class TorrentClientsEnhancedEditionTest extends TestCase
 {
     private const VERSION = '5.2.4.10-ee-lt1.2-not-for-private-trackers';

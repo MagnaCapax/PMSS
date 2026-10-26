@@ -118,5 +118,5 @@ the account port, password and access settings.
 
 One non-userdocs entry is added, `5.2.4.10-ee-lt1.2-not-for-private-trackers`,
 re-hosted on pulsedmedia.com and pinned by sha256. Its label, release parsing and
-downgrade handling are in [ADR 0183](0183-qbittorrent-enhanced-edition-entry.md).
+downgrade handling are in [ADR 0184](0184-qbittorrent-enhanced-edition-entry.md).
 The userdocs rules above do not apply to it.

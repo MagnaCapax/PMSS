@@ -1,7 +1,7 @@
-# ADR 0183: qBittorrent Enhanced Edition entry with its warning in the version
+# ADR 0184: qBittorrent Enhanced Edition entry with its warning in the version
 
 Date: 2026-10-25
-Category: product
+Category: domain
 
 ## Status
 
