@@ -32,6 +32,11 @@ including when command construction, execution, or output reading throws. The
 original throwable propagates; normal metrics and failure results are unchanged.
 `StorageBenchSecurityTest` injects these failures without executing storage probes.
 
+Saved benchmark metric columns use the existing zero fallback for non-finite
+values, including numeric JSON tokens and strings that overflow PHP floats.
+Finite values retain their formatting and conversions. `StorageBenchmarkShowLastTest`
+covers file-backed and device report rows; reading a saved report runs no probes.
+
 Shared account-statistics helpers return `null` for non-finite percentage inputs,
 percentage overflow, and overflowing rTorrent ratios. Finite calculations retain
 their values, including uncapped percentages; ratio overflow leaves accepted RPC

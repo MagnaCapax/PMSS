@@ -5,6 +5,54 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class StorageBenchmarkShowLastTest extends TestCase
 {
+    public function testMetricFloatRejectsNonFiniteAndMalformedSavedValues(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/storageBenchmark/report.php');
+        foreach ([INF, -INF, NAN, '1e999', '-1e999', ' 1e999 ', 'INF', 'NAN', '', 'invalid', [], new \stdClass(), true, null] as $value) {
+            $this->assertSame(0.0, \storageBenchmarkMetricFloat(['metric' => $value], 'metric'));
+        }
+        $this->assertSame(0.0, \storageBenchmarkMetricFloat([], 'missing'));
+    }
+
+    public function testMetricFloatPreservesFiniteSavedValues(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/storageBenchmark/report.php');
+        foreach ([
+            [0, 0.0], [42, 42.0], [12.5, 12.5], [' 12.5 ', 12.5], ["\0 12.5 \0", 12.5],
+            ['1e3', 1000.0], [-2, -2.0], ['-2.5', -2.5],
+            [PHP_INT_MAX, (float) PHP_INT_MAX], [PHP_FLOAT_MAX, PHP_FLOAT_MAX], ['1e-999', 0.0],
+        ] as $case) {
+            $this->assertSame($case[1], \storageBenchmarkMetricFloat(['metric' => $case[0]], 'metric'));
+        }
+    }
+
+    public function testShowLastUsesZeroFallbackForOverflowedJsonMetrics(): void
+    {
+        $runId = 'overflow';
+        $runTs = '2025-01-08T08:08:08Z';
+        $log = $this->pmssWriteStorageBenchmarkLog([
+            $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'randread-small', [
+                'read_bw_MBps' => '1e999', 'write_bw_MBps' => '-1e999',
+                'read_iops' => ' 1e999 ', 'write_iops' => 42, 'read_p95_ms' => 2.5,
+            ]),
+            // Raw numeric tokens can overflow while JSON is decoded, before the cast.
+            '{"run_id":"overflow","run_ts":"'.$runTs.'","test":"device-seqread-dd",'
+                .'"device":"/dev/sda","metrics":{"seqread_MBps":1e999,"elapsed_s":-1e999}}',
+            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'dev-randread-4k', [
+                'device' => '/dev/sda', 'metrics' => ['read_bw_MBps' => '1e999', 'read_iops' => '-1e999', 'read_p95_ms' => '1e999'],
+            ]),
+            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'device-ioping', [
+                'device' => '/dev/sda', 'metrics' => ['ioping_avg_ms' => '1e999'],
+            ]),
+        ]);
+
+        $out = $this->pmssRunStorageBenchmarkShowLast($log);
+        $this->assertStringContainsString(sprintf("randread-small\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", 0, 0, 0, 42, 2.5, 0), $out);
+        $this->assertStringContainsString(sprintf("  %-18s seq_MB/s=%.2f t=%.2fs\n", 'device-seqread-dd', 0, 0), $out);
+        $this->assertStringContainsString(sprintf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", 'dev-randread-4k', 0, 0, 0), $out);
+        $this->assertStringContainsString(sprintf("  %-18s avg_ms=%.2f\n", 'device-ioping', 0), $out);
+    }
+
     public function testShowLastParsesAndPrintsSummary(): void
     {
         $runId  = '20250101010101-aaa';

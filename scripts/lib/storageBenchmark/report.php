@@ -22,8 +22,11 @@ function storageBenchmarkScalarDisplay($value): string
 function storageBenchmarkMetricFloat(array $metrics, string $key): float
 {
     $value = $metrics[$key] ?? 0;
-    if (is_int($value) || is_float($value)) return (float) $value;
-    return (is_string($value) && is_numeric(trim($value))) ? (float) trim($value) : 0.0;
+    if (!is_int($value) && !is_float($value)
+        && !(is_string($value) && is_numeric(trim($value)))) return 0.0;
+    $number = (float) (is_string($value) ? trim($value) : $value);
+    // Numeric JSON tokens and strings can overflow during decoding or casting.
+    return is_finite($number) ? $number : 0.0;
 }
 
 /** Return the metrics object only when the decoded JSONL shape is valid. */
