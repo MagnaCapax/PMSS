@@ -240,10 +240,7 @@ class UserWebRootMigrationTest extends TestCase
         $before = lstat($outside);
 
         $this->assertFalse(\pmssUserWebRootMigrationCopyTree($this->user, $this->home, $source, $target));
-        clearstatcache(true, $outside);
-        $after = lstat($outside);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $outside);
         $this->assertTrue(is_link($target));
     }
 
@@ -256,10 +253,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertFalse(\pmssUserWebRootMigrationCopyTree(
             $this->user, $this->home, $this->home.'/www/public', $this->home.'/www/linked/copy'
         ));
-        clearstatcache(true, $outside);
-        $after = lstat($outside);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $outside);
         $this->assertFalse(file_exists($outside.'/copy'));
     }
 
@@ -273,10 +267,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertFalse(\pmssUserWebRootMigrationCopyTree(
             $this->user, $this->home, $this->home.'/linked-source', $target
         ));
-        clearstatcache(true, $outside);
-        $after = lstat($outside);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $outside);
         $this->assertFalse(file_exists($target));
     }
 

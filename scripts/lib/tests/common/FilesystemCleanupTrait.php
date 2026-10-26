@@ -3,6 +3,16 @@ namespace PMSS\Tests;
 
 trait FilesystemCleanupTrait
 {
+    /** Assert that a fixture path retains its owner and permission bits. */
+    protected function pmssAssertPathOwnerAndModeSame(array $expected, string $path): void
+    {
+        clearstatcache(true, $path);
+        $actual = lstat($path);
+        $this->assertTrue(is_array($actual), 'Expected fixture path to exist: '.$path);
+        $this->assertSame($expected['uid'], $actual['uid']);
+        $this->assertSame($expected['mode'] & 07777, $actual['mode'] & 07777);
+    }
+
     /** Build a named temporary directory, optionally under a stable base path. */
     protected function pmssMakeNamedTempDir(string $prefix, int $mode = 0755, ?string $baseDir = null): string
     {

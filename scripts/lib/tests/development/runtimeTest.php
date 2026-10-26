@@ -192,9 +192,7 @@ PHP;
         exec('timeout --kill-after=2s 5s '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code), $output, $rc);
         $this->assertSame(0, $rc);
         $this->assertSame('[null,null,null]', implode("\n", $output));
-        $after = lstat($target);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $target);
         $this->assertSame('kept', file_get_contents($target));
     }
 

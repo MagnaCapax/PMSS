@@ -296,10 +296,7 @@ PHP;
             $homeDir
         ));
         $this->assertTrue(is_link($homeDir.'/www'));
-        clearstatcache(true, $outsideDir);
-        $after = lstat($outsideDir);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $outsideDir);
         $this->pmssAssertMessagesContain($messages, 'unsafe www directory target');
     }
 
@@ -308,8 +305,7 @@ PHP;
         $target = $this->pmssWriteFile($this->tempDir.'/outside.txt', 'outside');
         $link = $this->tempDir.'/linked.txt';
         symlink($target, $link);
-        $owner = fileowner($target);
-        $mode = fileperms($target) & 07777;
+        $before = lstat($target);
         $messages = [];
 
         $this->assertFalse(\pmssCheckGuiApplyOwnership(
@@ -317,9 +313,7 @@ PHP;
             $this->pmssCurrentOwner(),
             $this->pmssMakeArrayLogger($messages)
         ));
-        clearstatcache(true, $target);
-        $this->assertSame($owner, fileowner($target));
-        $this->assertSame($mode, fileperms($target) & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $target);
         $this->pmssAssertMessagesContain($messages, 'refusing to apply ownership to symlinked');
     }
 

@@ -206,10 +206,7 @@ class UserWebRootReconcileTest extends TestCase
         $before = lstat($outside);
 
         $this->assertTrue(pmssUserWebRootReconcileApplyOwnership($link, $this->user));
-        clearstatcache(true, $outside);
-        $after = lstat($outside);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $outside);
     }
     public function testUnreadableSkeletonDirectoryRefusesRestoreAndMerge(): void
     {

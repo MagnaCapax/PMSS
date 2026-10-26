@@ -100,9 +100,8 @@ final class ManagedFileWriteSafetyTest extends TestCase
             $this->assertFalse(\pmssRootStageImmutableSet($inside.'/managed',
                 ['dev' => $managed['dev'], 'ino' => $managed['ino'] + 1], true));
             $this->assertSame('payload', file_get_contents($inside.'/managed'));
-            $after = lstat($outside);
-            $this->assertSame([$before['uid'], $before['mode'] & 07777, 'kept'],
-                [$after['uid'], $after['mode'] & 07777, file_get_contents($outside)]);
+            $this->pmssAssertPathOwnerAndModeSame($before, $outside);
+            $this->assertSame('kept', file_get_contents($outside));
             $this->assertSame([], glob($this->tempDir.'/.pmss-root-stage-*'));
         });
     }

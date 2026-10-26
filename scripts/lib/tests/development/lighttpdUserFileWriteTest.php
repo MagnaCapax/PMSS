@@ -98,10 +98,7 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertFalse(\pmssReplaceAccountFile(
             $this->pmssCurrentOwner(), $home, $home.'/linked', 'new', 0644, true
         ));
-        clearstatcache(true, $target);
-        $after = lstat($target);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $target);
         $this->assertSame('kept', file_get_contents($target));
     }
 

@@ -139,10 +139,7 @@ class UserDirectoriesEnsureTest extends TestCase
 
         $this->assertFalse(\pmssEnsureUserHomeDir($this->user, $home, 'linked', 0755));
         $this->assertFalse(\pmssEnsureUserHomeDir($this->user, $home, 'linked/child', 0755));
-        clearstatcache(true, $outside);
-        $after = lstat($outside);
-        $this->assertSame($before['uid'], $after['uid']);
-        $this->assertSame($before['mode'] & 07777, $after['mode'] & 07777);
+        $this->pmssAssertPathOwnerAndModeSame($before, $outside);
         $this->assertFalse(file_exists($outside.'/child'));
     }
 
