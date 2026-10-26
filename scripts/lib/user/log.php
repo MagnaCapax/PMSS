@@ -64,8 +64,7 @@ function pmssUserLog(string $user, string $message): void
         return;
     }
 
-    $path = pmssUserLogFile($user);
-    pmssLogAppendTimestampedLine($path, $message);
+    pmssLogAppendTimestampedLine(pmssUserLogFile($user), $message);
 
     // Mirror per-user events into the shared users.log/users.jsonl stream
     // when the lifecycle helpers are available. Kept optional so this

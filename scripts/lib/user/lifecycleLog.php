@@ -25,7 +25,7 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
         }
     }
 
-    $base = array(
+    return array_merge(array(
         'event'              => 'user_'.$action,
         'action'             => $action,
         'phase'              => $phase,
@@ -38,9 +38,7 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
         'sudo_user'          => getenv('SUDO_USER') ?: null,
         'pmss_correlation_id'=> getenv('PMSS_CORRELATION_ID') ?: null,
         'argv'               => $GLOBALS['argv'] ?? array(),
-    );
-
-    return array_merge($base, $extra);
+    ), $extra);
 }
 
 /**
@@ -56,8 +54,8 @@ function pmssUserLifecycleContextLog(string $action, string $phase, string $user
  */
 function pmssUserLifecycleContextLogStatusMessage(string $action, string $phase, string $username, string $status, string $message, array $extra = array()): void
 {
-    $payload = array_merge(array('status' => $status, 'message' => $message), $extra);
-    pmssUserLifecycleContextLog($action, $phase, $username, $payload);
+    pmssUserLifecycleContextLog($action, $phase, $username,
+        array_merge(array('status' => $status, 'message' => $message), $extra));
 }
 
 /**

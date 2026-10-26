@@ -11,11 +11,9 @@ function pmssUserLifecycleStep(string $action, string $username, string $step, s
     $started = microtime(true);
     $rc = 0;
     $duration = 0.0;
-    $status = $dryRun ? 'SKIP' : 'OK';
     if (!$dryRun) {
         @passthru($command, $rc);
         $duration = microtime(true) - $started;
-        $status = $rc === 0 ? 'OK' : 'ERR';
     }
 
     pmssUserLifecycleContextLog($action, $step, $username, array(
@@ -24,7 +22,7 @@ function pmssUserLifecycleStep(string $action, string $username, string $step, s
         'rc'       => $rc,
         'duration' => round($duration, 4),
         'dry_run'  => $dryRun,
-        'status'   => $status,
+        'status'   => $dryRun ? 'SKIP' : ($rc === 0 ? 'OK' : 'ERR'),
     ));
 
     if ($dryRun) {
@@ -64,11 +62,7 @@ function pmssUserLifecycleRefreshNginxConfig(string $action, string $username, b
     }
 
     $restartRc = (int) $runner($action, $username, $systemctlStep, $systemctlCommand, $dryRun);
-    if ($restartRc === 0) {
-        return 0;
-    }
-
-    return (int) $runner($action, $username, $initStep, $initCommand, $dryRun);
+    return $restartRc === 0 ? 0 : (int) $runner($action, $username, $initStep, $initCommand, $dryRun);
 }
 
 /**

@@ -32,6 +32,11 @@ repository-wide reference checks. Callers already use the shared status reader,
 bulk action handler, version facts, and renewal plan directly; uptime remains a
 numeric field in the terminal stats payload.
 
+Lifecycle audit helpers merge payloads at their consumer and derive step status
+from the dry-run flag and command result. Per-user log path selection and nginx
+fallback returns likewise avoid intermediate state. Audit field order, override
+precedence, command order, output bytes and return codes retain their contracts.
+
 Read-only projections avoid redundant intermediate state: host load/PSI parsers
 format their validated fields directly, resource counters merge the nullable
 memory breakdown, and FireQOS returns its rendered template. Torrent-client
