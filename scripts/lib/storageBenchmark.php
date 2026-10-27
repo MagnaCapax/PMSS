@@ -14,7 +14,17 @@ require_once __DIR__.'/storageBenchmarkHomeDevice.php';
 function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { if (!pmssJsonLineAppend($jsonLog, $entry)) storageBenchmarkFail("Error: failed to append JSON log entry: {$jsonLog}\n"); }
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
 function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
-function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); $util = $payload['diskUtil'] ?? null; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
+/** Keep non-finite cached samples out of idle decisions and JSONL evidence. */
+function storageBenchmarkIostatUtilPctRead(string $path): ?float
+{
+    $payload = pmssReadSerializedArrayFile($path);
+    $util = $payload['diskUtil'] ?? null;
+    if ((!is_int($util) && !is_float($util) && !(is_string($util) && is_numeric(trim($util))))
+        || (is_float($util) && !is_finite($util))) return null;
+    // Retain legacy scalar normalization, then check numeric-string overflow too.
+    $number = (float) trim((string) $util);
+    return is_finite($number) ? $number : null;
+}
 /** Persist the shared idle evidence before either benchmark mode decides whether to abort. */
 function storageBenchmarkIdlePreflight(string $jsonLog, array $base, string $targetDir, int $latencyLimit, int $utilLimit): bool
 {

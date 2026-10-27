@@ -6,6 +6,64 @@ require_once dirname(__DIR__, 2).'/storageBenchmark.php';
 
 class StorageBenchSecurityTest extends TestCase
 {
+    public function testIostatUtilRejectsNonFiniteSerializedSamples(): void
+    {
+        $path = $this->pmssMakeTempPath('pmss-bench-iostat-');
+        foreach ([
+            [NAN, null], [INF, null], [-INF, null], ['1e309', null], ['-1e309', null],
+            [str_repeat('9', 400), null], ['', null], ['invalid', null],
+            [null, null], [true, null], [false, null], [[], null], [[85], null],
+            [0, 0.0], [85, 85.0], [85.5, 85.5], [' 85.5 ', 85.5],
+            ["\t85\r\n", 85.0], ['8.5e1', 85.0], ['1e308', 1.0e308],
+            [-1, -1.0], ['-1.5', -1.5], [101, 101.0],
+        ] as $index => [$value, $expected]) {
+            // Serialize directly: JSON cannot carry native NaN or infinity fixtures.
+            file_put_contents($path, serialize(['diskUtil' => $value]));
+            $this->assertSame($expected, \storageBenchmarkIostatUtilPctRead($path), 'sample '.$index);
+        }
+        foreach (['', 'invalid', serialize([]), serialize(null)] as $payload) {
+            file_put_contents($path, $payload);
+            $this->assertSame(null, \storageBenchmarkIostatUtilPctRead($path));
+        }
+        $this->assertSame(null, \storageBenchmarkIostatUtilPctRead($path.'-missing'));
+    }
+
+    public function testIdlePreflightOmitsNonFiniteUtilWithoutChangingThresholds(): void
+    {
+        // Intercept telemetry and JSONL publication; never probe a real disk or log.
+        $script = <<<'PHP'
+namespace BenchmarkIdleFixture;
+function pmssReadSerializedArrayFile($path) { return ['diskUtil' => $GLOBALS['util']]; }
+function pmssIopingAverageMs($path) { return $GLOBALS['latency']; }
+function pmssJsonLineAppend($path, $entry) {
+    $GLOBALS['entry'] = $entry;
+    return json_encode($entry) !== false;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'BenchmarkIdleFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach ([[NAN, null], [INF, null], [-INF, null], ['1e309', null], ['-1e309', null],
+    [null, null], ['85', null], ['85.5', null], [0, 100], [NAN, 101]] as [$util, $latency]) {
+    $GLOBALS['util'] = $util;
+    $GLOBALS['latency'] = $latency;
+    $ok = storageBenchmarkIdlePreflight('unused', ['run_id' => 'fixture'], '/unused', 100, 85);
+    $results[] = [$ok, $GLOBALS['entry']];
+}
+echo json_encode($results);
+PHP;
+        $idle = ['run_id' => 'fixture', 'test' => 'preflight-idle', 'ok' => true, 'ioping_avg_ms' => null];
+        $expected = array_fill(0, 6, [true, $idle]);
+        $expected[] = [true, $idle + ['iostat_util_pct' => 85]];
+        $expected[] = [false, array_replace($idle, ['ok' => false])
+            + ['iostat_util_pct' => 85.5, 'warn_util' => 'iostat util high']];
+        $expected[] = [true, array_replace($idle, ['ioping_avg_ms' => 100, 'iostat_util_pct' => 0])];
+        // Missing utilization must not erase a busy latency result.
+        $expected[] = [false, array_replace($idle, ['ok' => false, 'ioping_avg_ms' => 101])
+            + ['warn' => 'ioping above threshold']];
+        $this->assertSame($expected, $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testBenchmarkFileReservationAndCleanupPreserveForeignEntries(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-bench-file-');
