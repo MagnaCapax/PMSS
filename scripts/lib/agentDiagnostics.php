@@ -22,8 +22,7 @@ function pmssAgentDiagnosticsRenderText(array $payload): string
     }
     $output .= 'user: '.(($payload['user'] ?? null) === null ? '-' : $payload['user'])."\n";
     foreach (($payload['sections'] ?? []) as $name => $section) {
-        $output .= "\n== {$name} ==\n";
-        $output .= (is_string($section) ? rtrim($section) : (pmssJsonEncodePretty($section) ?? ''))."\n";
+        $output .= "\n== {$name} ==\n".(is_string($section) ? rtrim($section) : (pmssJsonEncodePretty($section) ?? ''))."\n";
     }
     return $output;
 }
@@ -60,9 +59,8 @@ function pmssAgentDiagnosticsMain(array $argv): int
 
     $payload = pmssAgentDiagnosticsCollect($user);
     if (pmssCliOptionPresent($parsed, 'json', 'j')) {
-        $flags = JSON_UNESCAPED_SLASHES;
-        if (pmssCliOptionPresent($parsed, 'pretty', 'p')) $flags |= JSON_PRETTY_PRINT;
-        return pmssJsonEmitPayload($payload, 'Failed to encode agent diagnostics JSON.', $flags);
+        return pmssJsonEmitPayload($payload, 'Failed to encode agent diagnostics JSON.',
+            JSON_UNESCAPED_SLASHES | (pmssCliOptionPresent($parsed, 'pretty', 'p') ? JSON_PRETTY_PRINT : 0));
     }
 
     echo pmssAgentDiagnosticsRenderText($payload);

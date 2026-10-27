@@ -8,7 +8,7 @@ function pmssAgentDiagnosticsSpecLabel(array $spec): string
     $path = trim((string) ($spec['path'] ?? ''));
     if ($path === '') return trim((string) ($spec['command'] ?? 'diagnostics command'));
     $args = pmssNonEmptyStrings(array_map('strval', (array) ($spec['args'] ?? [])));
-    return $args === [] ? basename($path) : basename($path).' '.implode(' ', $args);
+    return basename($path).($args === [] ? '' : ' '.implode(' ', $args));
 }
 
 /** Resolve the bounded timeout for a diagnostics command spec. */
@@ -33,30 +33,28 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
     if ((string) ($spec['type'] ?? '') === 'file') {
         $value = @file_get_contents(pmssResolvePathFromEnv((string) $spec['env'], (string) $spec['path']));
         $value = is_string($value) ? $value : '';
-        return isset($spec['wrap']) ? [(string) $spec['wrap'] => $value] : $value;
-    }
+    } else {
+        $timeoutSec = pmssAgentDiagnosticsSpecTimeout($spec);
+        $result = ((string) ($spec['type'] ?? '') === 'php')
+            ? pmssAgentDiagnosticsPhpScript((string) $spec['path'], (array) ($spec['args'] ?? []), $timeoutSec)
+            : pmssCommandCapture((string) $spec['command'], $timeoutSec, false, 'Failed to launch command');
+        $stdout = trim((string) ($result['stdout'] ?? ''));
+        $format = (string) ($spec['format'] ?? 'text');
 
-    $timeoutSec = pmssAgentDiagnosticsSpecTimeout($spec);
-    $result = ((string) ($spec['type'] ?? '') === 'php')
-        ? pmssAgentDiagnosticsPhpScript((string) $spec['path'], (array) ($spec['args'] ?? []), $timeoutSec)
-        : pmssCommandCapture((string) $spec['command'], $timeoutSec, false, 'Failed to launch command');
-    $stdout = trim((string) ($result['stdout'] ?? ''));
-    $format = (string) ($spec['format'] ?? 'text');
-
-    if ($format === 'lines') {
-        return pmssNonEmptyStrings((int) ($result['rc'] ?? 1) === 0 ? pmssTextLines($stdout) : []);
-    }
-    if ($format === 'json') {
-        if ((int) ($result['rc'] ?? 1) !== 0) {
-            return ['error' => pmssAgentDiagnosticsSpecLabel($spec).' failed', 'rc' => (int) $result['rc'], 'stderr' => trim((string) ($result['stderr'] ?? ''))];
+        if ($format === 'lines') {
+            return pmssNonEmptyStrings((int) ($result['rc'] ?? 1) === 0 ? pmssTextLines($stdout) : []);
         }
-        $decoded = pmssJsonDecodeAssoc((string) ($result['stdout'] ?? ''));
-        return $decoded !== null
-            ? $decoded
-            : ['error' => pmssAgentDiagnosticsSpecLabel($spec).' returned invalid JSON', 'rc' => (int) $result['rc'], 'stdout' => $stdout];
+        if ($format === 'json') {
+            if ((int) ($result['rc'] ?? 1) !== 0) {
+                return ['error' => pmssAgentDiagnosticsSpecLabel($spec).' failed', 'rc' => (int) $result['rc'], 'stderr' => trim((string) ($result['stderr'] ?? ''))];
+            }
+            return pmssJsonDecodeAssoc((string) ($result['stdout'] ?? ''))
+                ?? ['error' => pmssAgentDiagnosticsSpecLabel($spec).' returned invalid JSON', 'rc' => (int) $result['rc'], 'stdout' => $stdout];
+        }
+        $value = $stdout !== '' ? $stdout : (string) ($spec['fallback'] ?? '');
+        if ($format === 'int') return (int) $value;
     }
-    $value = $stdout !== '' ? $stdout : (string) ($spec['fallback'] ?? '');
-    if ($format === 'int') return (int) $value;
+    // Files retain their raw bytes; only text command results use fallback normalization.
     return isset($spec['wrap']) ? [(string) $spec['wrap'] => $value] : $value;
 }
 

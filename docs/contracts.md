@@ -341,6 +341,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Side-effects: none intended; collects read-only command and file snapshots.
   - Validation: requires root outside `PMSS_TEST_MODE=1`; `--user` is validated through managed-user selection before per-user sections run.
   - Per-user metrics: `user_metrics_latest` reads the current JSONL tail; `user_metrics_24h_ago` reads the 289th line from the end of the newest uncompressed rotation plus the live log. With less history it returns the oldest available line; callers use its `ts` to determine the actual interval.
+  - Scalar wrapping shares one projection: file reads preserve raw whitespace and ignore command formats/fallbacks; text commands trim stdout and use their fallback only when empty. Integer, line and JSON command formats return before wrapping.
 
 ---
 

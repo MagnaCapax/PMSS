@@ -29,6 +29,5 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
     }
     if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$reportedPath];
     // Use 'php' from $PATH instead of PHP_BINARY — consistent with update.php (GH#589).
-    $command = pmssCommandArgvShellQuote(array_merge(['php', $scriptPath], $arguments));
-    return pmssCommandCapture($command, max(1, $timeoutSec), false, 'Failed to launch command');
+    return pmssCommandCapture(pmssCommandArgvShellQuote(array_merge(['php', $scriptPath], $arguments)), max(1, $timeoutSec), false, 'Failed to launch command');
 }
