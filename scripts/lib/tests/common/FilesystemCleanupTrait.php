@@ -121,6 +121,15 @@ trait FilesystemCleanupTrait
         return $this->pmssWriteFile(rtrim($baseDir, '/').'/'.ltrim($relativePath, '/'), $content, $dirMode);
     }
 
+    /** Write an ordered fixture tree without changing payload bytes or existing directory modes. */
+    protected function pmssWriteFiles(string $baseDir, array $files, int $dirMode = 0755): string
+    {
+        foreach ($files as $relativePath => $content) {
+            $this->pmssWriteRelativeFile($baseDir, (string) $relativePath, $content, $dirMode);
+        }
+        return $baseDir;
+    }
+
     /**
      * Create paired fstab/mounts files for hermetic mount-hardening tests.
      *

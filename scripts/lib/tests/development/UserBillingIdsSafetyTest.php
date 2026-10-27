@@ -15,9 +15,7 @@ class UserBillingIdsSafetyTest extends TestCase
         if ($record !== null) {
             file_put_contents($base.'/config/users/alice.json', json_encode($record));
         }
-        foreach ($homeFiles as $name => $value) {
-            file_put_contents($base.'/home/'.$name, $value);
-        }
+        $this->pmssWriteFiles($base.'/home', $homeFiles);
         return $base;
     }
 

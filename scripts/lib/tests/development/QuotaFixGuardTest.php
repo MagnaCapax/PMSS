@@ -217,9 +217,7 @@ class QuotaFixGuardTest extends TestCase
     private function quotaFixCheckCommandsRun(bool $quotaOffOk, string $options, array $state, array $files = []): array
     {
         ['dir' => $dir, 'fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-check-', "UUID=abc /srv ext4 usrquota 0 0\nUUID=def /home ext4 {$options} 0 0\n");
-        foreach ($files as $name => $content) {
-            file_put_contents($dir.'/'.$name, $content);
-        }
+        $this->pmssWriteFiles($dir, $files);
         $commands = [];
         $logs = [];
         $checks = \pmssQuotaFixCheckCommands($quotaOffOk, static function (string $command) use ($state, &$commands): array {

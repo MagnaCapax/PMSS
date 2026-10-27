@@ -167,11 +167,7 @@ PHP
 
     private function pmssCustomerContextFixtureRoot(array $files): string
     {
-        $root = $this->pmssMakeTempDir('pmss-customer-context-scan-', 0700);
-        foreach ($files as $relativePath => $contents) {
-            $this->pmssWriteFile($root.'/'.$relativePath, $contents);
-        }
-        return $root;
+        return $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-customer-context-scan-', 0700), $files);
     }
 
     private function pmssCustomerContextRunScan(string $root): array

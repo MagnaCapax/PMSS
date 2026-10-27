@@ -30,7 +30,7 @@ class UserCgroupSliceDropinsTest extends TestCase
         $contents = ['90-pmss-user.conf' => "[Slice]\nCPUWeight=500\nMemoryHigh=4000M\nCPUAccounting=yes\n",
             '99-pmss.conf' => "[Slice]\nIOWeight=500\nTasksAccounting=yes\n"];
         foreach ([1234, 2345] as $uid) {
-            foreach ($contents as $name => $body) $this->pmssWriteFile($base.'/user-'.$uid.'.slice.d/'.$name, $body);
+            $this->pmssWriteFiles($base.'/user-'.$uid.'.slice.d', $contents);
         }
         $canonical = $this->pmssWriteFile($root.'/system.control/user-1234.slice.d/50-CPUWeight.conf', "[Slice]\nCPUWeight=200\n");
         chmod($base.'/user-1234.slice.d/90-pmss-user.conf', 0600);

@@ -135,13 +135,7 @@ PHP
     /** Build a fake cgroup v1 sysfs tree for one UID under a temp root. */
     private function makeV1CgroupTree(int $uid, array $files): string
     {
-        $root = $this->makeRoot();
-        foreach ($files as $relative => $contents) {
-            $path = $root.'/'.$relative;
-            @mkdir(dirname($path), 0755, true);
-            file_put_contents($path, $contents);
-        }
-        return $root;
+        return $this->pmssWriteFiles($this->makeRoot(), $files);
     }
 
     public function testReadCountersV1ReadsRealCountersFromSysfs(): void

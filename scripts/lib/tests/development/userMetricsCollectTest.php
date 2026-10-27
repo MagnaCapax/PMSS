@@ -112,13 +112,7 @@ class UserMetricsCollectTest extends TestCase
 
     private function tree(array $files): string
     {
-        $root = $this->pmssMakeTempDir('pmss-metrics-', 0700);
-        foreach ($files as $relative => $contents) {
-            $path = $root.'/'.$relative;
-            @mkdir(dirname($path), 0755, true);
-            file_put_contents($path, $contents);
-        }
-        return $root;
+        return $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), $files);
     }
 
     public function testCollectsFullV1MetricSet(): void

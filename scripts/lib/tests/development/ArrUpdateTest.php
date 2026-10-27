@@ -315,9 +315,7 @@ class ArrUpdateTest extends TestCase
     {
         $archiveRoot = $baseDir.'/archive';
         $payloadDir = $this->pmssEnsureDir($archiveRoot.'/'.$extractDir);
-        foreach ($files as $name => $contents) {
-            @file_put_contents($payloadDir.'/'.$name, $contents);
-        }
+        $this->pmssWriteFiles($payloadDir, $files);
 
         $archivePath = $baseDir.'/'.$archiveName;
         $this->pmssCreateTarGzArchive($archivePath, $archiveRoot, [$extractDir], '', '2>&1');
