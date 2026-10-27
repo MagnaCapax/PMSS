@@ -300,6 +300,22 @@ LIGHTTPD;
         $this->pmssAssertStringNotContainsString('"bin-args"', $rendered);
     }
 
+    public function testFastcgiSpawnLoadMatchesWorkerPoolAcrossResourcePlans(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
+        foreach ([[1, 1], [2, 2], [3, 6], [8, 6], [4, 12]] as $plan) {
+            $resources = ['maxProcs' => $plan[0], 'children' => $plan[1]];
+            $rendered = \pmssLighttpdRenderUserConfig($template, 'fixtureacct', 31234, 0, 0, $resources);
+            // The spawn heuristic follows worker capacity without changing process limits.
+            foreach (['max-procs' => $plan[0], 'min-procs' => 1, 'max-load-per-proc' => $plan[1],
+                'PHP_FCGI_CHILDREN' => $plan[1], 'PHP_FCGI_MAX_REQUESTS' => 5000] as $key => $value) {
+                $this->assertSame(1, preg_match('/"'.$key.'"\s*=>\s*"?([0-9]+)"?/', $rendered, $matches));
+                $this->assertSame((string) $value, $matches[1]);
+            }
+            $this->assertSame($rendered, \pmssLighttpdRenderUserConfig($rendered, 'fixtureacct', 31234, 0, 0, $resources));
+        }
+    }
+
     public function testPhpIniContentRendererAppendsMissingDirectives(): void
     {
         $updated = \pmssLighttpdApplyPhpIniContent("engine = On\n", 'fixtureuser', 256);

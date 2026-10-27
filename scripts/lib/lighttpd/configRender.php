@@ -81,8 +81,10 @@ function pmssLighttpdRenderUserConfig(
         (string) $template
     );
     $config = preg_replace(
-        ['/("max-procs"\\s*=>\\s*)[0-9]+/', '/("PHP_FCGI_CHILDREN"\\s*=>\\s*")[0-9]+(")/'],
-        ['${1}'.(int) $resources['maxProcs'], '${1}'.(int) $resources['children'].'${2}'],
+        ['/("max-procs"\\s*=>\\s*)[0-9]+/', '/("max-load-per-proc"\\s*=>\\s*)[0-9]+/',
+            '/("PHP_FCGI_CHILDREN"\\s*=>\\s*")[0-9]+(")/'],
+        ['${1}'.(int) $resources['maxProcs'], '${1}'.(int) $resources['children'],
+            '${1}'.(int) $resources['children'].'${2}'],
         $config,
         1
     );

@@ -981,6 +981,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/configureLighttpd.php [<user>]
 - Behavior: Renders per-user lighttpd vhost/fastcgi config from templates. With a username, targets only that user; otherwise (no args) refreshes all.
+  - FastCGI adaptive spawning: `max-load-per-proc` follows the rendered `PHP_FCGI_CHILDREN` worker count (shipped default 6). Lighttpd spawns another backend only when every backend has more in-flight requests than that count; `min-procs`, resource-derived `max-procs`, and idle retirement remain unchanged. Before fleet rollout, canary repeated dashboard opens and compare process counts and lighttpd error logs (Refs #1197).
   - Logging: the managed template pipes access and daemon errors to their existing files in `~/.lighttpd/`. The logger appends as the account, so both files remain quota-bound and the hourly access-log trimmer remains active.
   - Process tracking: the managed config writes no PID file in the quota-bound home; the starter and watchdog detect account processes directly.
   - 503 pages: rendered lighttpd configs use the customer-tree `~/www/error-503.html` static page so app proxies that are enabled but still starting return a styled retry page instead of lighttpd's raw default.

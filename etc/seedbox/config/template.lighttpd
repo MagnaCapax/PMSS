@@ -146,6 +146,8 @@ fastcgi.server += ( ".php" =>
                 "socket"                => "/home/##username/.lighttpd/php.socket",
                 "max-procs"             => 6,
                 "min-procs"             => 1,
+                # Match the PHP worker pool before spawning another backend.
+                "max-load-per-proc"     => 6,
                 "bin-environment" => (
                     "PHP_FCGI_CHILDREN" => "6",
                     "PHP_FCGI_MAX_REQUESTS" => "5000"
