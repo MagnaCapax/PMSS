@@ -6,6 +6,29 @@ require_once dirname(__DIR__, 2).'/user/trafficThrottlePolicy.php';
 
 class TrafficThrottlePolicyNormalizationTest extends TestCase
 {
+    /** Lock result order, integer types, and message bytes before restructuring policy. */
+    public function testPlanBoundarySnapshots(): void
+    {
+        $stages = [['overagePercent' => 50, 'capMbit' => 25]];
+        foreach ([
+            'plan bypasses malformed tiers' => [[100.0, 400.0, 1000, [null], true, 2.5, 0.0, true], 1000,
+                'traffic throttle enabled (limit=100.00 GiB usage=400.00 GiB plan cap=1000 Mbit)'],
+            'disabled negative cap stays literal' => [[100.0, 150.0, -5, [], false, 2.5, 0.0], -5,
+                'traffic throttle enabled (limit=100.00 GiB usage=150.00 GiB)'],
+            'unmatched negative cap stays literal' => [[100.0, 150.0, -5, $stages, false, 2.5, 0.0], -5,
+                'traffic throttle enabled (limit=100.00 GiB usage=150.00 GiB)'],
+            'progressive zero cap' => [[0.0, 20.0, 0, $stages, true, 2.5, 0.0], 0,
+                'traffic throttle enabled (limit=0.00 GiB usage=20.00 GiB overage=0.0% adjusted=0.0% cap=0 Mbit effective=0 Mbit floor=0 Mbit)'],
+            'stage wins over progressive' => [[100.0, 150.0, 100, $stages, true, 2.5, 0.0], 25,
+                'traffic throttle staged (limit=100.00 GiB usage=150.00 GiB overage=50.0% overageGiB=50.00 cap=100 Mbit stageCap=25 Mbit stageOverage=50.0% stageMinOverageGiB=0.00 effective=25 Mbit)'],
+            'grace before progressive reduction' => [[100.0, 150.0, 100, [], true, 2.5, 75.0], 100,
+                'traffic throttle enabled (limit=100.00 GiB usage=150.00 GiB overage=50.0% adjusted=0.0% cap=100 Mbit effective=100 Mbit floor=3 Mbit)'],
+        ] as $label => $case) {
+            $this->assertSame(serialize(['effectiveCapMbit' => $case[1], 'logMessage' => $case[2]]),
+                serialize(\pmssTrafficLimitThrottlePlan(...$case[0])), $label);
+        }
+    }
+
     public function testNormalizeStagesDropsInvalidRowsAndOrdersForEnforcement(): void
     {
         $this->assertEquals([

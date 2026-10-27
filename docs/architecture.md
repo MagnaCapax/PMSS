@@ -122,6 +122,9 @@ Keep the canonical installer/update details under `docs/install.md` and
   offline locations and protocol fragments; policy stays explicit (ADR 0185).
 - **scripts/lib/resources/log.php** – Resource-log entrypoint. `resources/counters.php` selects the hierarchy and projects billing counters; `resources/v1.php` owns the source traversal and parsers shared with performance telemetry (ADR 0161). `resources/counterState.php` owns locked delta persistence shared with traffic ingress (ADR 0078).
 - **scripts/lib/traffic/report.php** – Stable traffic CLI facade. `reportModel.php` reads accepted rows and derives totals and summary counts before sorting; `reportDisplay.php` projects that model to JSON and terminal output without filesystem reads (ADR 0157).
+- **scripts/lib/user/trafficThrottlePolicy.php** – Configuration normalization and
+  the stable throttle-policy include. `trafficThrottle/tiers.php` owns tier rules;
+  `plan.php` owns progressive arithmetic and one ordered plan/result path (ADR 0195).
 - **scripts/lib/storageHealth/** – SMART/NVMe backends own device eligibility and
   bounded probes; `deviceParse.php` interprets text without I/O. `deviceMetrics.php`
   shares ordered matching, threshold selection, counter growth and entry status.
