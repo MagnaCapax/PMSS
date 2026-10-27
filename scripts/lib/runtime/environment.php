@@ -27,12 +27,19 @@ function pmssCommandBinaryNameIsSafe(string $binary): bool { return preg_match('
 function pmssCommandPathCandidateIsSafe(string $path): bool { return strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false; }
 function pmssBlockDeviceNameIsDataDevice(string $device): bool { return preg_match(PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN, $device) === 1; }
 
-/** Accept finite, non-negative numeric scalars from telemetry and policy data. */
-function pmssFiniteNonNegativeFloat($value): ?float
+/** Parse numeric scalars without trimming strings or accepting non-finite conversions. */
+function pmssFiniteFloat($value): ?float
 {
     if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) return null;
     $number = (float) $value;
-    return is_finite($number) && $number >= 0 ? $number : null;
+    return is_finite($number) ? $number : null;
+}
+
+/** Accept finite, non-negative numeric scalars from telemetry and policy data. */
+function pmssFiniteNonNegativeFloat($value): ?float
+{
+    $number = pmssFiniteFloat($value);
+    return $number !== null && $number >= 0 ? $number : null;
 }
 
 function pmssCommandPath(string $binary): string
@@ -106,8 +113,7 @@ function pmssIopingValueToMs(float $value, string $unit): float { return strtolo
 function pmssIopingAverageMsFromOutput(string $output): ?float
 {
     if (!preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(us|ms|s)\s*\//i', $output, $m)) return null;
-    $value = pmssIopingValueToMs((float) $m[1], $m[2]);
-    return is_finite($value) ? $value : null;
+    return pmssFiniteFloat(pmssIopingValueToMs((float) $m[1], $m[2]));
 }
 
 /** Parse per-request ioping samples, ignoring summary lines. */

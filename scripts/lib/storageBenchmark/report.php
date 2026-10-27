@@ -11,6 +11,7 @@
 
 require_once dirname(__DIR__).'/log.php';
 require_once dirname(__DIR__).'/runtime/cli.php';
+require_once dirname(__DIR__).'/runtime/environment.php';
 
 /** Convert untrusted JSONL display values to printable scalar text. */
 function storageBenchmarkScalarDisplay($value): string
@@ -22,11 +23,8 @@ function storageBenchmarkScalarDisplay($value): string
 function storageBenchmarkMetricFloat(array $metrics, string $key): float
 {
     $value = $metrics[$key] ?? 0;
-    if (!is_int($value) && !is_float($value)
-        && !(is_string($value) && is_numeric(trim($value)))) return 0.0;
-    $number = (float) (is_string($value) ? trim($value) : $value);
     // Numeric JSON tokens and strings can overflow during decoding or casting.
-    return is_finite($number) ? $number : 0.0;
+    return pmssFiniteFloat(is_string($value) ? trim($value) : $value) ?? 0.0;
 }
 
 /** Return the metrics object only when the decoded JSONL shape is valid. */

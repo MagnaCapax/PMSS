@@ -19,11 +19,9 @@ function storageBenchmarkIostatUtilPctRead(string $path): ?float
 {
     $payload = pmssReadSerializedArrayFile($path);
     $util = $payload['diskUtil'] ?? null;
-    if ((!is_int($util) && !is_float($util) && !(is_string($util) && is_numeric(trim($util))))
-        || (is_float($util) && !is_finite($util))) return null;
+    if (!is_int($util) && !is_float($util) && !is_string($util)) return null;
     // Retain legacy scalar normalization, then check numeric-string overflow too.
-    $number = (float) trim((string) $util);
-    return is_finite($number) ? $number : null;
+    return pmssFiniteFloat(trim((string) $util));
 }
 /** Persist the shared idle evidence before either benchmark mode decides whether to abort. */
 function storageBenchmarkIdlePreflight(string $jsonLog, array $base, string $targetDir, int $latencyLimit, int $utilLimit): bool

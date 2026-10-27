@@ -530,6 +530,13 @@ The sysctl profile's sysfs NIC speed read uses this bounded parser; malformed or
 oversized samples retain its 1000 Mbps fallback, while explicit environment
 overrides keep their existing `pmssEnvReadDigits()` behavior.
 
+Finite numeric scalars use `pmssFiniteFloat()` from the runtime value module;
+`pmssFiniteNonNegativeFloat()` adds the existing non-negative range policy.
+Resource and traffic reports, saved benchmark metrics, idle evidence and ioping
+readers share the numeric conversion and overflow check. Callers retain their
+own regexes, missing-value defaults and whitespace rules. Benchmark idle evidence
+also retains its historical float-to-string normalization before conversion.
+
 The sysctl swap-device probe rejects NUL bytes and dot path components before
 reading sysfs. Valid device names retain their rotational checks; malformed
 names return the existing slow-device result.

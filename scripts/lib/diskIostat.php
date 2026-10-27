@@ -58,8 +58,7 @@ function pmssDiskIostatReadIopingHomeMs(): ?float
     if (!is_string($raw) || !preg_match('/\A([0-9]+(?:\.[0-9]+)?)ms\z/', $raw, $matches)) {
         return null;
     }
-    $value = (float) $matches[1];
-    return is_finite($value) ? $value : null;
+    return pmssFiniteFloat($matches[1]);
 }
 
 /** Append host probes and metadata to the parsed fields in legacy serialization order. */

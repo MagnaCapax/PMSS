@@ -286,6 +286,28 @@ PHP;
         ], $this->pmssRunInlinePhpJson($script));
     }
 
+    public function testFiniteFloatRejectsMalformedAndOverflowedValues(): void
+    {
+        foreach ([null, false, true, [], new \stdClass(), '', 'invalid', "\0 12.5 \0", 'INF', 'NAN', INF, -INF, NAN, '1e999', '-1e999'] as $value) {
+            $this->assertSame(null, \pmssFiniteFloat($value));
+            $this->assertSame(null, \pmssFiniteNonNegativeFloat($value));
+        }
+    }
+
+    public function testFiniteFloatPreservesNumericValuesAndCallerRangePolicy(): void
+    {
+        foreach ([[0, 0.0], [-0.0, -0.0], [42, 42.0], [12.5, 12.5], ['12.5', 12.5],
+            ['1e3', 1000.0], ['1e-999', 0.0], [-2, -2.0], ['-2.5', -2.5],
+            [PHP_INT_MAX, (float) PHP_INT_MAX], [PHP_FLOAT_MAX, PHP_FLOAT_MAX]] as [$value, $expected]) {
+            $this->assertSame($expected, \pmssFiniteFloat($value));
+            $this->assertSame($expected >= 0 ? $expected : null, \pmssFiniteNonNegativeFloat($value));
+        }
+        // Keep the running PHP version's numeric-string whitespace rules, including PHP 7.3.
+        foreach ([' 12.5', '12.5 ', "12.5\n"] as $value) {
+            $this->assertSame(is_numeric($value) ? (float) $value : null, \pmssFiniteFloat($value));
+        }
+    }
+
     public function testCreatePrivateTempDirKeepsPrivateScopeAndMode(): void
     {
         $path = \pmssCreatePrivateTempDir('pmss-runtime-private-');

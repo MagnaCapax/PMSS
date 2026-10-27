@@ -91,10 +91,8 @@ function pmssShowTrafficRawCounters(array $payload): ?array
 
     $counters = [];
     foreach (['month', 'week', 'day', 'hour', '15min'] as $key) {
-        if (!array_key_exists($key, $payload['raw']) || !is_numeric($payload['raw'][$key])) return null;
-        $counters[$key] = (float) $payload['raw'][$key];
         // Serialized numeric values can be non-finite, including after string conversion.
-        if (!is_finite($counters[$key])) return null;
+        if (($counters[$key] = pmssFiniteFloat($payload['raw'][$key] ?? null)) === null) return null;
     }
 
     return $counters;

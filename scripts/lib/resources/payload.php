@@ -1,6 +1,7 @@
 <?php
 /** Resource payload projections shared by persisted reports and raw-log fallbacks. */
 require_once __DIR__.'/accumulator.php';
+require_once dirname(__DIR__).'/runtime/environment.php';
 
 /** Return the shared schema used by resource rows and totals. */
 function pmssResourceReportTemplate(): array
@@ -12,9 +13,8 @@ function pmssResourceReportTemplate(): array
 /** Normalize a stored metric window, rejecting malformed values and defaulting missing ops to zero. */
 function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
 {
-    $value = $data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null);
     // Numeric strings can overflow on conversion; serialized floats can be INF/NAN.
-    return $value !== null && is_numeric($value) && is_finite((float) $value) ? (float) $value : null;
+    return pmssFiniteFloat($data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null));
 }
 
 /** Read all metrics for a stored payload window. */
