@@ -497,6 +497,12 @@ Systemd skip reporting belongs in `pmssSystemdActionSkip()`: pass the existing
 reason and description, with `false` for legacy callers that do not record a
 profile entry. Keep reason evaluation at its original point in each flow.
 
+Shared slice setup projects numeric overrides into its template token map and
+publishes manager artifacts through one ordered managed-write loop. Sizing,
+I/O policy, related drop-ins and live refresh have separate owners behind the
+original setup include (ADR 0192). The 19-scenario characterization lock retains
+rendered bytes, writer metadata, diagnostics, failure boundaries and command order.
+
 Systemd unit discovery matches the complete first column of `list-unit-files`
 output. A unit whose name only begins with the requested service name does not
 prove that the requested unit exists; on-disk and `systemctl cat` fallbacks

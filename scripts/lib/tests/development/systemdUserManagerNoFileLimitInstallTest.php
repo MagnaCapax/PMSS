@@ -75,7 +75,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir($dirPrefix);
         $this->pmssWithEnv(['PMSS_SYSTEMD_USER_AT_SERVICE_DIR' => $dir], function () use ($policy): void {
-            \pmssSystemdUserManagerNoFileLimitInstall($policy, function (): void {
+            \pmssSystemdUserManagerDropinsInstall($policy, function (): void {
             });
         });
 

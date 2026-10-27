@@ -121,6 +121,12 @@ UIDs, with backups and one reload after the repair batch. See
 [ADR 0160](adr/0160-per-uid-slice-dropin-precedence-and-cleanup.md) and
 [cgroup policy](cgroup.md) for file names, safety checks and termination cleanup.
 
+Shared slice setup keeps host sizing, I/O directives, related drop-ins and live
+limit refresh in separate modules behind `systemdSlicesEnsure.php` (ADR 0192).
+The manager's descriptor and log-namespace files share one ordered publication
+loop through the existing managed writer. Template failures, root protection,
+legacy TasksMax repair, diagnostic bytes and reload order retain their contracts.
+
 Phase 2 executes with the full repository mounted locally, so it may load shared
 helpers from `scripts/lib/update/…`. The orchestrator is intentionally thin and
 mostly wires together specialised modules, while keeping a few one-caller steps

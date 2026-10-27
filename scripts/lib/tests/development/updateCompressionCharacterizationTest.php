@@ -71,8 +71,16 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'scripts/lib/update/systemPrep/systemdSlicesEnsure.php' => [
                 'required' => [
                     "pmssRefreshManagedPathFile(\$target, \$raw, 'systemd drop-in'",
-                    "pmssRefreshManagedPathFile(\$userAtTarget, \$userAtBody, 'systemd drop-in'",
                 ],
+                'forbidden' => [
+                    'function pmssSystemdDropin'.'Install(' => 'systemd drop-in writes should use the shared managed-file writer directly',
+                    'pmssWriteManagedPathFile(' => 'systemd drop-ins should have one convergence path through the managed-file refresher',
+                    '$write'.'FailurePrefix' => 'systemd drop-in writes should not keep a dead temp-write prefix concept',
+                    'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
+                ],
+            ],
+            'scripts/lib/update/systemPrep/systemdSliceDropins.php' => [
+                'required' => ["pmssRefreshManagedPathFile(\$target, \$body, 'systemd drop-in'"],
                 'forbidden' => [
                     'function pmssSystemdDropin'.'Install(' => 'systemd drop-in writes should use the shared managed-file writer directly',
                     'pmssWriteManagedPathFile(' => 'systemd drop-ins should have one convergence path through the managed-file refresher',
