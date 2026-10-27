@@ -16,11 +16,8 @@ final class TorrentClientsDefaultLinksTest extends TestCase
 
     private function fixture(): array
     {
-        $root = $this->pmssMakeTempDir('pmss-clients-default-');
-        $home = $root.'/t';
-        $store = $root.'/store';
-        mkdir($home.'/bin/rtorrent', 0755, true);
-        mkdir($store.'/rtorrent/0.16.25', 0755, true);
+        [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-clients-default-',
+            'rtorrent', '0.16.25', []);
         $catalog = $root.'/catalog.json';
         copy(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json', $catalog);
         $skeleton = $root.'/rc.custom';

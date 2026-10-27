@@ -7,6 +7,11 @@
   run manually as root).
 - `common/` – shared utilities such as `TestCase`.
 
+Torrent-client resolver, catalog, proxy, and launch fixtures stage their account
+and build files through `TestCase::pmssTorrentClientStoreFixture()`. Callers keep
+selection links, projection contents, executable modes, and service settings
+explicit so missing capabilities and unavailable selections remain observable.
+
 Keep development tests free of network/system side-effects; production tests may
 rely on real services but should remain read-only. Integration tests are
 destructive — see `integration/README.md` for safety and requirements.

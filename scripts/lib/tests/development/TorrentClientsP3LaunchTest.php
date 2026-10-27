@@ -28,15 +28,11 @@ final class TorrentClientsP3LaunchTest extends TestCase
 
     private function fixture(): array
     {
-        $root = $this->pmssMakeTempDir('pmss-p3-launch-');
-        $home = $root.'/t';
-        $store = $root.'/store';
-        mkdir($home.'/bin/transmission', 0700, true);
+        [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-p3-launch-',
+            'transmission', '4.1.3', ['transmission-daemon' => "#!/bin/sh\nexit 0\n"], 't', 0700);
         mkdir($home.'/.config/transmission-daemon', 0700, true);
         mkdir($home.'/.lighttpd', 0700, true);
-        mkdir($store.'/transmission/4.1.3', 0755, true);
         $binary = $store.'/transmission/4.1.3/transmission-daemon';
-        file_put_contents($binary, "#!/bin/sh\nexit 0\n");
         chmod($binary, 0755);
         symlink($store.'/transmission/4.1.3', $home.'/bin/transmission/default');
         $projection = $root.'/projection.json';

@@ -23,11 +23,8 @@ final class TorrentClientsP6LaunchTest extends TestCase
 
     public function testSelectedVenvLaunchesBothScriptsWithExistingLogOptions(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-p6-launch-');
-        $home = $root.'/t@localhost'; $store = $root.'/store';
-        mkdir($home.'/bin/deluge', 0755, true);
-        mkdir($store.'/deluge/2.1.1/bin', 0755, true);
-        foreach (['deluged', 'deluge-web'] as $name) file_put_contents($store.'/deluge/2.1.1/bin/'.$name, 'fixture');
+        [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-p6-launch-',
+            'deluge', '2.1.1', ['bin/deluged' => 'fixture', 'bin/deluge-web' => 'fixture'], 't@localhost');
         symlink($store.'/deluge/2.1.1', $home.'/bin/deluge/default');
         $projection = $root.'/projection.json';
         file_put_contents($projection, json_encode(['versions' => [

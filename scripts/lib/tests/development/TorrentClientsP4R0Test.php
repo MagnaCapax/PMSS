@@ -9,13 +9,9 @@ final class TorrentClientsP4R0Test extends TestCase
 {
     private function fixture(): array
     {
-        $root = $this->pmssMakeTempDir('pmss-p4-r0-');
-        $home = $root.'/t@localhost';
-        $store = $root.'/store';
+        [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-p4-r0-',
+            'rtorrent', '0.9.8-r16', ['rtorrent' => 'fixture'], 't@localhost');
         $projection = $root.'/torrentClients.json';
-        mkdir($home.'/bin/rtorrent', 0755, true);
-        mkdir($store.'/rtorrent/0.9.8-r16', 0755, true);
-        file_put_contents($store.'/rtorrent/0.9.8-r16/rtorrent', 'fixture');
         return [$home, $store, $projection];
     }
 

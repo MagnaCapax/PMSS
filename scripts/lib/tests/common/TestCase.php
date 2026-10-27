@@ -458,6 +458,24 @@ abstract class TestCase
         return $relative === '' ? $home : $home.'/'.ltrim($relative, '/');
     }
 
+    /**
+     * Stage unselected torrent-client store files; callers own links and projections.
+     * @param array<string,string> $files Build-relative paths and literal fixture bytes.
+     * @return array{string,string,string} Temporary root, account home, and store root.
+     */
+    protected function pmssTorrentClientStoreFixture(string $prefix, string $client, string $version, array $files, string $user = 't', int $homeMode = 0755): array
+    {
+        $root = $this->pmssMakeTempDir($prefix);
+        $home = $root.'/'.$user;
+        $store = $root.'/store';
+        $this->pmssEnsureDir($home.'/bin/'.$client, $homeMode);
+        $build = $this->pmssEnsureDir($store.'/'.$client.'/'.$version);
+        foreach ($files as $path => $content) {
+            $this->pmssWriteFile($build.'/'.$path, $content);
+        }
+        return [$root, $home, $store];
+    }
+
     /** Build the standard user/home context array consumed by fixture helpers. */
     protected function pmssUserHomeContext(string $homeRoot, string $user): array
     {
