@@ -26,10 +26,8 @@ final class TorrentClientsToggleLaunchTest extends TestCase
         \pmssCustomerTorrentClientToggleStart($client,
             static function () use (&$calls, $legacy): void { $calls[] = array('system', $legacy); },
             $home,
-            static function (string $command) use (&$calls): void { $calls[] = array('selected', $command); }, array(
-                'accountPids' => static function (): array { return []; },
-                'restore' => static function (): bool { return true; },
-                'check' => static function (): bool { return true; }));
+            static function (string $command) use (&$calls): void { $calls[] = array('selected', $command); },
+            self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'check' => true]));
         return $calls;
     }
 
@@ -80,10 +78,8 @@ final class TorrentClientsToggleLaunchTest extends TestCase
                     $this->assertFalse(flock($other, LOCK_EX | LOCK_NB));
                     fclose($other);
                 };
-                \pmssCustomerTorrentClientToggleStart($client, $check, $home, $check, array(
-                    'accountPids' => static function (): array { return []; },
-                    'restore' => static function (): bool { return true; },
-                    'check' => static function (): bool { return true; }));
+                \pmssCustomerTorrentClientToggleStart($client, $check, $home, $check,
+                    self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'check' => true]));
             }
         }
     }

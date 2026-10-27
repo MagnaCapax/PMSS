@@ -20,3 +20,9 @@ Fixture trees use `TestCase::pmssWriteFiles($baseDir, $files, $dirMode)` for
 ordered relative-path/content maps. It reuses the checked single-file writer,
 preserves payload bytes and existing directory modes, and leaves empty maps
 untouched. Each caller retains its temporary-root and data-generation policy.
+
+Torrent-client store, launch, stopped-settings and throttle fixtures use
+`TestCase::pmssMakeCallbacks()` for fixed operation results, including empty
+arrays and null. Pass an event array only when calls must be recorded. Keep
+stateful, argument-dependent and throwing callbacks explicit; scalar options
+such as build versions and attempt budgets remain ordinary values.

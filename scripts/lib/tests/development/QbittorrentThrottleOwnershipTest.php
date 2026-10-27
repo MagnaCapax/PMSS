@@ -23,22 +23,20 @@ final class QbittorrentThrottleOwnershipTest extends TestCase
             if ($applied !== null) $this->pmssWriteFile($state, $applied."\n");
             $running = true;
             $events = [];
-            $ops = ['read' => static function () use ($cap): ?int { return $cap; },
+            $ops = [
                 'running' => static function () use (&$running): bool { return $running; },
                 'account' => static function ($user, $home, $cap, $apply) use (&$running, &$events): ?bool {
                     return \pmssQbittorrentThrottleAccount($home, $cap, $apply, [
                         'build' => '5.2.4', 'accountPids' => static function () use (&$running): array { return $running ? [101] : []; },
-                        'restore' => static function (): bool { return true; },
                         'recordWrite' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); },
                         'write' => static function ($path, $value) use (&$running, &$events): bool {
                             if ($running) throw new \RuntimeException('Daemon-owned settings written while running');
                             $events[] = 'write'; return file_put_contents($path, $value) === strlen($value);
                         },
-                    ]);
+                    ] + self::pmssMakeCallbacks(['restore' => true]));
                 },
                 'stop' => static function () use (&$running, &$events): void { $events[] = 'stop'; $running = false; },
-                'log' => static function (): void {},
-            ];
+            ] + self::pmssMakeCallbacks(['read' => $cap, 'log' => null]);
             if (!\pmssQbittorrentThrottleWatchdog('alice', $home, true, $ops)) {
                 $events[] = 'start'; $running = true;
             }
@@ -70,9 +68,8 @@ final class QbittorrentThrottleOwnershipTest extends TestCase
                 $home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-cap-parity-').'/alice';
                 $config = "[BitTorrent]\nSession\\GlobalUPSpeedLimit=".($current ?? 0)."\n";
                 $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', $config);
-                $ops = ['build' => '5.3.0', 'accountPids' => static function (): array { return []; },
-                    'restore' => static function (): bool { return true; },
-                    'write' => 'pmssConfigureFileWrite', 'recordWrite' => 'pmssConfigureFileWrite'];
+                $ops = ['build' => '5.3.0', 'write' => 'pmssConfigureFileWrite', 'recordWrite' => 'pmssConfigureFileWrite']
+                    + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true]);
                 $changed = $current === null || $current > 500;
                 $this->assertSame($changed, $account($home, 500, true, $ops));
                 $this->assertSame($changed ? '500' : (string) $current,
@@ -100,8 +97,8 @@ final class QbittorrentThrottleOwnershipTest extends TestCase
         $calls = 0;
         $this->assertTrue(\pmssQbittorrentThrottleAccount($home, 500, true, ['build' => '5.2.4',
             'accountPids' => static function () use (&$calls): array { return ++$calls < 60 ? [101] : []; },
-            'pause' => static function (): void {}, 'restore' => static function (): bool { return true; },
-            'write' => 'pmssConfigureFileWrite', 'recordWrite' => 'pmssConfigureFileWrite']));
+            'write' => 'pmssConfigureFileWrite', 'recordWrite' => 'pmssConfigureFileWrite']
+            + self::pmssMakeCallbacks(['pause' => null, 'restore' => true])));
         $this->assertFalse(file_exists($notice));
     }
 }

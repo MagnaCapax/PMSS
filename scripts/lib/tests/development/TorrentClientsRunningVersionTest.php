@@ -21,10 +21,9 @@ final class TorrentClientsRunningVersionTest extends TestCase
                 $home = $this->pmssMakeTempDir('pmss-running-unavailable-');
                 $this->pmssEnsureDir($home.'/bin/'.$client);
                 $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/'.$client.'/'.$version, $home.'/bin/'.$client.'/default');
-                $ops = ['pids' => static function (): array { return [1]; },
-                    'resolve' => static function () { return null; }];
+                $ops = self::pmssMakeCallbacks(['pids' => [1], 'resolve' => null]);
                 $this->assertSame('system; '.$version.' is not installed on this server', $this->running($home, $client, $ops));
-                $ops['pids'] = static function (): array { return []; };
+                $ops = self::pmssMakeCallbacks(['pids' => [], 'resolve' => null]);
                 $this->assertSame('not running', $this->running($home, $client, $ops));
             }
         }
@@ -35,8 +34,7 @@ final class TorrentClientsRunningVersionTest extends TestCase
         foreach (['rtorrent', 'deluge', 'transmission'] as $client) {
             $home = $this->pmssMakeTempDir('pmss-running-system-');
             $this->pmssEnsureDir($home.'/bin/'.$client);
-            $ops = ['pids' => static function (): array { return [1]; },
-                'resolve' => static function () { return null; }];
+            $ops = self::pmssMakeCallbacks(['pids' => [1], 'resolve' => null]);
             $this->assertSame('system', $this->running($home, $client, $ops));
             $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/'.$client.'/default');
             $this->assertSame('custom', $this->running($home, $client, $ops));

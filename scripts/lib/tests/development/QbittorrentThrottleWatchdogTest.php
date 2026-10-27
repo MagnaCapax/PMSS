@@ -38,14 +38,13 @@ final class QbittorrentThrottleWatchdogTest extends TestCase
                 return \pmssQbittorrentThrottleAccount($home, $throttle, $apply, [
                     'build' => $this->build,
                     'accountPids' => function (): array { return $this->running ? [101] : []; },
-                    'restore' => static function (): bool { return true; },
                     'recordWrite' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); },
                     'write' => function ($path, $content): bool {
                         $this->assertFalse($this->running, 'A live daemon owned the config at write time');
                         $this->events[] = 'write';
                         return file_put_contents($path, $content) === strlen($content);
                     },
-                ]);
+                ] + self::pmssMakeCallbacks(['restore' => true]));
             },
             'stop' => function (): void {
                 $this->events[] = 'stop';
@@ -55,8 +54,7 @@ final class QbittorrentThrottleWatchdogTest extends TestCase
                 file_put_contents($this->path, "[Meta]\nMigrationVersion=8\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=".$value."\n");
                 $this->running = false;
             },
-            'log' => static function (): void {},
-        ]);
+        ] + self::pmssMakeCallbacks(['log' => null]));
         // The service watchdog starts only when its convergence callback returned false.
         if (!$running) { $this->events[] = 'start'; $this->running = true; }
         return $running;
@@ -130,10 +128,8 @@ final class QbittorrentThrottleWatchdogTest extends TestCase
     {
         foreach ([false, true] as $running) {
             $this->assertTrue(\pmssQbittorrentThrottleWatchdog('alice', $this->home, $running, [
-                'read' => static function (): int { return 256; },
-                'account' => static function (): ?bool { return null; },
                 'stop' => static function (): void { throw new \RuntimeException('Failed comparison stopped a daemon'); },
-            ]));
+            ] + self::pmssMakeCallbacks(['read' => 256, 'account' => null])));
         }
     }
 }

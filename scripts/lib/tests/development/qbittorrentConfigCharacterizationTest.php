@@ -98,9 +98,7 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
         $this->assertTrue(\pmssQbittorrentThrottleAccount($this->homeRoot.'/alice', 0, true, [
             'exact' => true,
             'build' => '4.3.9',
-            'accountPids' => static function (): array { return []; },
-            'restore' => static function (): bool { return true; },
-        ]));
+        ] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true])));
         $this->assertSame("[Preferences]\nLocale=en\n", (string) file_get_contents($configPath));
     }
 

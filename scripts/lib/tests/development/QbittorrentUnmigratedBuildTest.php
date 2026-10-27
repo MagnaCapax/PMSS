@@ -25,7 +25,7 @@ final class QbittorrentUnmigratedBuildTest extends TestCase
         $config = "[Meta]\nMigrationVersion=8\n[Preferences]\nWebUI\\Port=23456\n"
             ."WebUI\\Password_PBKDF2=@ByteArray(owner)\nWebUI\\LocalHostAuth=true\nWebUI\\AuthSubnetWhitelistEnabled=false\n";
         $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', $config);
-        $safe = static function (): bool { return true; };
+        $safe = self::pmssMakeCallbacks(['safe' => true])['safe'];
         $this->assertSame($config, \pmssQbittorrentWebUiAuthForce($config, '5.3.0'));
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', $home, ['build' => '5.3.0',
             'enabled' => $safe, 'contextSafe' => $safe, 'pathSafe' => $safe,
@@ -46,8 +46,7 @@ final class QbittorrentUnmigratedBuildTest extends TestCase
         $config = "[Meta]\nMigrationVersion=8\n[Preferences]\nWebUI\\Port=8080\n[WebUI]\nPort=34567\n";
         $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/alice', ['build' => '5.3.0', 'attempts' => 1,
             'read' => static function ($path) use ($config): string { return basename($path) === '.qbittorrentPort' ? '23456' : $config; },
-            'pids' => static function (): array { return [101]; },
-            'listeners' => static function (): array { return [['address' => '00000000', 'port' => 8080]]; },
-            'stop' => static function (): void { throw new \RuntimeException('Configured port was mistaken for fallback'); }]));
+            'stop' => static function (): void { throw new \RuntimeException('Configured port was mistaken for fallback'); }]
+            + self::pmssMakeCallbacks(['pids' => [101], 'listeners' => [['address' => '00000000', 'port' => 8080]]])));
     }
 }

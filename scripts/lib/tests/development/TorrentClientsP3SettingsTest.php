@@ -15,13 +15,11 @@ final class TorrentClientsP3SettingsTest extends TestCase
         file_put_contents($dir.'/settings.json', $raw);
         $writes = (object) ['count' => 0];
         $ops = [
-            'running' => static function (): bool { return false; },
-            'prepare' => static function (): bool { return true; },
             'write' => static function (string $path, string $content) use ($writes): bool {
                 $writes->count++;
                 return file_put_contents($path, $content) === strlen($content);
             },
-        ];
+        ] + self::pmssMakeCallbacks(['running' => false, 'prepare' => true]);
         return [$home, $dir.'/settings.json', $ops, $writes];
     }
 
@@ -62,7 +60,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
     public function testRunningDaemonLeavesSettingsUnchanged(): void
     {
         [$home, $path, $ops, $writes] = $this->fixture('{"rpc-bind-address":"old"}');
-        $ops['running'] = static function (): bool { return true; };
+        $ops = self::pmssMakeCallbacks(['running' => true]) + $ops;
         $this->assertFalse(\pmssTransmissionSettingsApply('t', $home, $ops));
         $this->assertSame(0, $writes->count);
         $this->assertSame('{"rpc-bind-address":"old"}', file_get_contents($path));

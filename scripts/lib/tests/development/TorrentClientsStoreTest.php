@@ -24,11 +24,9 @@ final class TorrentClientsStoreTest extends TestCase
         $events = [];
         $results = \pmssTorrentClientsStoreConverge([$this->entry()], [
             'root' => $root,
-            'free' => static function (): int { return 3 * 1024 * 1024 * 1024 + 9; },
-            'size' => static function (): int { return 10; },
             'install' => static function () use (&$events): bool { $events[] = 'download'; return true; },
             'log' => static function (string $line) use (&$events): void { $events[] = $line; },
-        ]);
+        ] + self::pmssMakeCallbacks(['free' => 3 * 1024 * 1024 * 1024 + 9, 'size' => 10]));
         $this->assertSame(['rtorrent/0.9.9' => 'skipped-space'], $results);
         $this->assertSame(1, count($events));
         $this->assertStringContainsString('insufficient /home free space', $events[0]);
@@ -94,12 +92,9 @@ final class TorrentClientsStoreTest extends TestCase
             $calls = 0;
             $result = \pmssTorrentClientsStoreConverge([$this->entry()], [
                 'root' => $root,
-                'free' => static function () use ($free) { return $free; },
-                'size' => static function () use ($size) { return $size; },
                 // Stop at the install boundary; no download or daemon is needed.
                 'install' => static function () use (&$calls): bool { $calls++; return false; },
-                'log' => static function (): void {},
-            ]);
+            ] + self::pmssMakeCallbacks(['free' => $free, 'size' => $size, 'log' => null]));
             $this->assertSame(['rtorrent/0.9.9' => $attempt ? 'failed' : 'skipped-space'], $result);
             $this->assertSame($attempt ? 1 : 0, $calls);
             $this->assertSame($attempt, is_dir($root));
@@ -154,11 +149,8 @@ final class TorrentClientsStoreTest extends TestCase
         $calls = 0;
         $results = \pmssTorrentClientsStoreConverge([$this->entry()], [
             'root' => $root.'/store',
-            'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
-            'size' => static function (): int { return 0; },
             'install' => static function () use (&$calls): bool { $calls++; return true; },
-            'log' => static function (): void {},
-        ]);
+        ] + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
         $this->assertSame(['rtorrent/0.9.9' => 'failed'], $results);
         $this->assertSame(0, $calls);
     }
@@ -176,11 +168,8 @@ final class TorrentClientsStoreTest extends TestCase
             chmod($path, $mode);
             $results = \pmssTorrentClientsStoreConverge([$this->entry()], [
                 'root' => $store,
-                'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
-                'size' => static function (): int { return 0; },
                 'install' => static function () use (&$calls): bool { $calls++; return true; },
-                'log' => static function (): void {},
-            ]);
+            ] + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
             $this->assertSame(['rtorrent/0.9.9' => 'failed'], $results);
             chmod($path, 0755);
         }
@@ -197,13 +186,10 @@ final class TorrentClientsStoreTest extends TestCase
         $entry = $this->entry();
         $result = \pmssTorrentClientsStoreConverge([$entry], [
             'root' => $store,
-            'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
-            'size' => static function (): int { return 10; },
             'install' => static function (array $item, string $binary): bool {
                 return file_put_contents($binary, 'newer') === 5;
             },
-            'log' => static function (): void {},
-        ]);
+        ] + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 10, 'log' => null]));
         $this->assertSame(['rtorrent/0.9.9' => 'installed'], $result);
         $this->assertTrue(is_file($store.'/rtorrent/old/rtorrent'));
         $this->assertSame('0.9.9', readlink($store.'/rtorrent/default'));
@@ -219,13 +205,10 @@ final class TorrentClientsStoreTest extends TestCase
         $entry['sha256'] = hash('sha256', 'newer');
         $ops = [
             'root' => $store,
-            'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
-            'size' => static function (): int { return 10; },
             'install' => static function (array $item, string $binary): bool {
                 return file_put_contents($binary, 'newer') === 5;
             },
-            'log' => static function (): void {},
-        ];
+        ] + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 10, 'log' => null]);
         $this->assertSame(['rtorrent/0.9.9' => 'installed'], \pmssTorrentClientsStoreConverge([$entry], $ops));
         // update-step2 hardens every depth-1 /home directory to 0700, dot-dirs included.
         chmod($root.'/pmss', 0700);

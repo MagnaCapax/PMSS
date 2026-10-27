@@ -12,10 +12,9 @@ final class QbittorrentWaitTest extends TestCase
     {
         $pauses = 0; $signals = [];
         $this->assertFalse(\pmssConfigureTorrentClientStop('/fixture/t', [
-            'pids' => static function (): array { return [101]; },
             'signal' => static function ($pid, $signal) use (&$signals): bool { $signals[] = [$pid, $signal]; return true; },
             'pause' => static function () use (&$pauses): void { $pauses++; },
-        ]));
+        ] + self::pmssMakeCallbacks(['pids' => [101]])));
         $this->assertSame([[101, 15]], $signals);
         $this->assertSame(600, $pauses);
     }
@@ -39,17 +38,12 @@ final class QbittorrentWaitTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-qbt-virtual-start-');
         $now = 0.0; $pauses = 0;
         $this->assertTrue(\pmssConfigureTorrentClientStart($home, 'system', [
-            'build' => '5.2.4', 'accountPids' => static function (): array { return []; },
-            'restore' => static function (): bool { return true; },
-            'throttle' => static function (): bool { return true; },
-            'launch' => static function (): bool { return true; },
-            'pids' => static function (): array { return [101]; },
-            'listeners' => static function (): array { return [['address' => '0100007F', 'port' => 23456]]; },
-            'runningVersion' => static function (): string { return 'system'; },
-            'read' => static function (): string { return '23456'; },
+            'build' => '5.2.4',
             'clock' => static function () use (&$now): float { return $now; },
             'pause' => static function () use (&$now, &$pauses): void { $now += 0.5; $pauses++; },
-        ]));
+        ] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'throttle' => true, 'launch' => true,
+            'pids' => [101], 'listeners' => [['address' => '0100007F', 'port' => 23456]],
+            'runningVersion' => 'system', 'read' => '23456'])));
         $this->assertSame(6, $pauses);
         $this->assertSame(3.0, $now);
     }
@@ -58,13 +52,11 @@ final class QbittorrentWaitTest extends TestCase
     {
         $pauses = 0;
         $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/t', [
-            'build' => '5.2.4', 'read' => static function (): string { return '23456'; },
-            'pids' => static function (): array { return [101]; },
-            'listeners' => static function (): array { return []; },
+            'build' => '5.2.4',
             'pause' => static function () use (&$pauses): void { $pauses++; },
             'stop' => static function (): void { throw new \RuntimeException('Healthy slow start stopped'); },
             'notice' => static function (): void { throw new \RuntimeException('Inconclusive observation reported'); },
-        ]));
+        ] + self::pmssMakeCallbacks(['read' => '23456', 'pids' => [101], 'listeners' => []])));
         $this->assertSame(199, $pauses);
     }
 
@@ -74,11 +66,10 @@ final class QbittorrentWaitTest extends TestCase
             $home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-virtual-throttle-').'/alice';
             $pauses = 0; $notice = '';
             $this->assertSame(null, $apply($home, 500, true, [
-                'accountPids' => static function (): array { return [101]; },
                 'pause' => static function () use (&$pauses): void { $pauses++; },
                 'notice' => static function ($home, $text) use (&$notice): void { $notice = $text; },
                 'restore' => static function (): void { throw new \RuntimeException('Still-running config restored'); },
-            ]));
+            ] + self::pmssMakeCallbacks(['accountPids' => [101]])));
             $this->assertSame(600, $pauses);
             $this->assertStringContainsString('still running', $notice);
         }

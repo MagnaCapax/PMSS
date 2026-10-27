@@ -12,28 +12,19 @@ final class QbittorrentSwitchStartTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-start-running-');
         $this->assertFalse(\pmssConfigureTorrentClientStart($home, 'system', [
-            'accountPids' => static function (): array { return [101]; },
-            'notice' => static function (): void {},
             'restore' => static function (): void { throw new \RuntimeException('Running config touched'); },
-        ]));
+        ] + self::pmssMakeCallbacks(['accountPids' => [101], 'notice' => null])));
     }
 
     public function testSlowConfigureStartWithoutAListenerIsLeftRunning(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-slow-configure-');
         $this->assertTrue(\pmssConfigureTorrentClientStart($home, 'system', [
-            'build' => '5.2.4', 'accountPids' => static function (): array { return []; },
-            'restore' => static function (): bool { return true; },
-            'pids' => static function (): array { return [101]; },
-            'listeners' => static function (): array { return []; },
-            'read' => static function (): string { return '23456'; },
-            'pause' => static function (): void {}, 'attempts' => 2,
-            'ready' => static function (): bool { return false; },
-            'runningVersion' => static function (): string { return 'system'; },
-            'launch' => static function (): bool { return true; },
+            'build' => '5.2.4', 'attempts' => 2,
             'stop' => static function (): void { throw new \RuntimeException('Slow daemon stopped'); },
             'notice' => static function (): void { throw new \RuntimeException('Slow daemon refusal notice'); },
-        ]));
+        ] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'pids' => [101], 'listeners' => [],
+            'read' => '23456', 'pause' => null, 'ready' => false, 'runningVersion' => 'system', 'launch' => true])));
     }
 
     public function testImmediateExitFailsTheSwitchAndRestartsThePreviousBuild(): void
@@ -43,24 +34,15 @@ final class QbittorrentSwitchStartTest extends TestCase
         $binary = $this->pmssWriteFile($home.'/qbittorrent-nox', 'fixture');
         $starts = [];
         $ops = ['versions' => ['5.2.4' => ['kind' => 'static']],
-            'backup' => static function (): array { return ['ok' => true]; },
-            'stop' => static function (): bool { return true; },
-            'repoint' => static function (): bool { return true; },
-            'restore' => static function (): bool { return true; },
             'start' => static function ($home, $version) use (&$starts, $binary): bool {
                 $starts[] = $version;
                 return \pmssConfigureTorrentClientStart($home, $version, [
-                    'resolve' => static function () use ($binary): string { return $binary; },
-                    'accountPids' => static function (): array { return []; },
-                    'restore' => static function (): bool { return true; },
                     'build' => $version === 'system' ? '4.6.7' : '5.2.4',
-                    'launch' => static function (): bool { return true; },
-                    'pids' => static function () use ($version): array { return $version === 'system' ? [101] : []; },
-                    'runningVersion' => static function () use ($version): string { return $version; },
-                    'listeners' => static function (): array { return []; },
-                    'read' => static function (): string { return '23456'; }, 'attempts' => 1,
-                ]);
-            }];
+                    'attempts' => 1,
+                ] + self::pmssMakeCallbacks(['resolve' => $binary, 'accountPids' => [], 'restore' => true,
+                    'launch' => true, 'pids' => $version === 'system' ? [101] : [], 'runningVersion' => $version,
+                    'listeners' => [], 'read' => '23456']));
+            }] + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'restore' => true]);
         $result = \pmssConfigureTorrentClientSwitch($home, ['client' => 'qbittorrent', 'version' => '5.2.4'], $ops);
         $this->assertFalse($result['ok']);
         $this->assertSame(['5.2.4', 'system'], $starts);
@@ -73,15 +55,9 @@ final class QbittorrentSwitchStartTest extends TestCase
     public function testLiveWrongBuildCannotBecomeLastgoodEvenWithoutAListener(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-switch-wrong-build-');
-        $this->assertFalse(\pmssConfigureTorrentClientStart($home, 'system', [
-            'accountPids' => static function (): array { return []; },
-            'restore' => static function (): bool { return true; },
-            'launch' => static function (): bool { return true; },
-            'pids' => static function (): array { return [101]; },
-            'runningVersion' => static function (): string { return '4.3.9-lt1.2'; },
-            'listeners' => static function (): array { return []; },
-            'read' => static function (): string { return '23456'; }, 'attempts' => 1,
-        ]));
+        $this->assertFalse(\pmssConfigureTorrentClientStart($home, 'system', ['attempts' => 1]
+            + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'launch' => true, 'pids' => [101],
+                'runningVersion' => '4.3.9-lt1.2', 'listeners' => [], 'read' => '23456'])));
         $this->assertFalse(file_exists($home.'/.config/pmss/torrentClients/qbittorrent.lastBuild'));
     }
 }

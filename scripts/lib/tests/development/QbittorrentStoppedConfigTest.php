@@ -57,11 +57,8 @@ final class QbittorrentStoppedConfigTest extends TemporaryHomeRootTestCase
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-noprofile-');
         $calls = [];
-        $this->assertFalse(\pmssQbittorrentPasswordApplyStopped('t', $home, 'secret', [
-            'prepare' => static function () use (&$calls): bool { $calls[] = 'prepare'; return true; },
-            'password' => static function () use (&$calls): bool { $calls[] = 'password'; return true; },
-            'notice' => static function () use (&$calls): void { $calls[] = 'notice'; },
-        ]));
+        $this->assertFalse(\pmssQbittorrentPasswordApplyStopped('t', $home, 'secret',
+            self::pmssMakeCallbacks(['prepare' => true, 'password' => true, 'notice' => null], $calls)));
         $this->assertSame([], $calls);
         $this->assertFalse(file_exists($home.'/.config/pmss/torrentClients/qbittorrent.notice'));
     }
@@ -72,7 +69,7 @@ final class QbittorrentStoppedConfigTest extends TemporaryHomeRootTestCase
         mkdir($home.'/.config/qBittorrent', 0700, true);
         $notice = $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.notice',
             "qBittorrent password synchronization failed: another qbittorrent-nox process of this account is running (not started by PMSS).\n");
-        $ops = ['prepare' => static function (): bool { return true; }, 'password' => static function (): bool { return true; }];
+        $ops = self::pmssMakeCallbacks(['prepare' => true, 'password' => true]);
         $this->assertTrue(\pmssQbittorrentPasswordApplyStopped('t', $home, 'secret', $ops));
         $this->assertSame('', file_get_contents($notice));
         file_put_contents($notice, "Downgrading qBittorrent can corrupt existing data; switch refused.\n");
@@ -94,9 +91,8 @@ final class QbittorrentStoppedConfigTest extends TemporaryHomeRootTestCase
                 'pause' => static function () use ($lock, &$pauses): void {
                     if (++$pauses === 3) flock($lock, LOCK_UN);
                 },
-                'prepare' => static function (): bool { return true; },
                 'password' => static function () use (&$writes): bool { $writes++; return true; },
-            ]));
+            ] + self::pmssMakeCallbacks(['prepare' => true])));
             $this->assertSame(3, $pauses);
             $this->assertSame(1, $writes);
         } finally { flock($lock, LOCK_UN); fclose($lock); }
