@@ -46,8 +46,7 @@ function storageBenchmarkMain(array $argv): int
     $idle = storageBenchmarkIdlePreflight($jsonLog, storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir], $targetDir, $idleLatencyMs, $idleUtilPct);
     if ($requireIdle && !$idle) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
 
-    $summary = storageBenchmarkRunFileTests($targetDir, $jsonLog, $runTs, $label, $runId, $mntDev, $fs, $requested, $runtime);
-    storageBenchmarkPrintFileSummary($targetDir, $jsonLog, $label, $summary);
+    storageBenchmarkPrintFileSummary($targetDir, $jsonLog, $label, storageBenchmarkRunFileTests($targetDir, $jsonLog, $runTs, $label, $runId, $mntDev, $fs, $requested, $runtime));
     if ($testDevices) storageBenchmarkRunDeviceTests($jsonLog, $runTs, $label, $runId, $ddSizeBytes, $devRuntime);
     return 0;
 }

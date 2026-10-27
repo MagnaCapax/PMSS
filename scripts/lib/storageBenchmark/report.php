@@ -59,12 +59,11 @@ function storageBenchmarkShowLast(string $jsonLog): int
     $lastTs = '';
     foreach (pmssJsonLineFileRead($jsonLog) as $entry) {
         if (!is_string($entry['run_id'] ?? null) || $entry['run_id'] === '') continue;
-        $runId = $entry['run_id'];
-        $runs[$runId][] = $entry;
+        $runs[$entry['run_id']][] = $entry;
         $runTs = is_string($entry['run_ts'] ?? null) ? $entry['run_ts'] : '';
         if ($runTs > $lastTs) {
             $lastTs = $runTs;
-            $lastId = $runId;
+            $lastId = $entry['run_id'];
         }
     }
 
@@ -75,9 +74,8 @@ function storageBenchmarkShowLast(string $jsonLog): int
 
     $run = $runs[$lastId];
     unset($runs); // Release other runs before rendering, as the former reader did.
-    $first = $run[0];
-    $label = storageBenchmarkScalarDisplay($first['label'] ?? '');
-    echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".storageBenchmarkScalarDisplay($first['run_ts'] ?? '').($label !== '' ? '  Label: '.$label : '')."\n\n";
+    $label = storageBenchmarkScalarDisplay($run[0]['label'] ?? '');
+    echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".storageBenchmarkScalarDisplay($run[0]['run_ts'] ?? '').($label !== '' ? '  Label: '.$label : '')."\n\n";
 
     // Print only the first preflight recorded in the selected run.
     foreach ($run as $entry) {

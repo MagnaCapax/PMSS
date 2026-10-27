@@ -32,9 +32,9 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
     });
     if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) storageBenchmarkFail("Error: failed to preallocate benchmark file.\n");
     $summary = [];
-    $base = storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir, 'device' => $mntDev, 'filesystem' => $fs];
-    $params = array_fill_keys(['rw', 'rwmixread', 'bs', 'bssplit', 'iodepth', 'numjobs', 'direct', 'runtime'], null) + ['size_bytes' => $use];
-    foreach (storageBenchmarkFioJobsRun($jsonLog, $testFile, $use, $runtime, storageBenchmarkFileJobs($runtime), $base, $params) as $name => $res) {
+    foreach (storageBenchmarkFioJobsRun($jsonLog, $testFile, $use, $runtime, storageBenchmarkFileJobs($runtime),
+        storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir, 'device' => $mntDev, 'filesystem' => $fs],
+        array_fill_keys(['rw', 'rwmixread', 'bs', 'bssplit', 'iodepth', 'numjobs', 'direct', 'runtime'], null) + ['size_bytes' => $use]) as $name => $res) {
         if ($res['ok']) $summary[] = [$name, $res['result']['read_bw_MBps'], $res['result']['write_bw_MBps'], $res['result']['read_iops'], $res['result']['write_iops'], $res['result']['read_p95_ms'], $res['result']['write_p95_ms']];
     }
     storageBenchmarkFileCleanup($testFile, $testFileIdentity);

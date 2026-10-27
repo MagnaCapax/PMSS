@@ -15,8 +15,8 @@ function storageBenchmarkHomeDeviceRunTests(
     $row = array_diff_key($base + $device, ['ok' => true]);
     $path = $device['device'];
     if ($fioPresent) {
-        $params = array_fill_keys(['rw', 'bs', 'iodepth', 'numjobs', 'direct', 'readonly', 'runtime'], null);
-        foreach (storageBenchmarkFioJobsRun($jsonLog, $path, $device['size'], $runtime, PMSS_STORAGE_BENCHMARK_HOME_DEVICE_JOBS, $row, $params, 'fio failed', $fioRunner) as $name => $result) {
+        foreach (storageBenchmarkFioJobsRun($jsonLog, $path, $device['size'], $runtime, PMSS_STORAGE_BENCHMARK_HOME_DEVICE_JOBS, $row,
+            array_fill_keys(['rw', 'bs', 'iodepth', 'numjobs', 'direct', 'readonly', 'runtime'], null), 'fio failed', $fioRunner) as $name => $result) {
             printf("%s\t%s\tread_MB/s=%s\tread_IOPS=%s\n", $path, $name,
                 $result['ok'] ? number_format($result['result']['read_bw_MBps'], 2) : 'n/a',
                 $result['ok'] ? number_format($result['result']['read_iops'], 1) : 'n/a');

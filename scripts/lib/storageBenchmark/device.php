@@ -55,8 +55,8 @@ function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $
         $iop = pmssIopingAverageMs($path);
         storageBenchmarkAppendJsonLine($jsonLog, $deviceEntry + ['test' => 'device-ioping', 'ok' => ($iop !== null), 'metrics' => ['ioping_avg_ms' => round($iop ?? 0, 2)]]);
         if ($iop !== null) printf("%s\tioping_avg_ms=%.2f\n", $path, $iop);
-        $params = array_fill_keys(['rw', 'bs', 'iodepth', 'numjobs', 'runtime'], null);
-        foreach (storageBenchmarkFioJobsRun($jsonLog, $path, $size, $devRuntime, storageBenchmarkDeviceJobs(), $deviceEntry, $params, 'fio failed') as $name => $res) {
+        foreach (storageBenchmarkFioJobsRun($jsonLog, $path, $size, $devRuntime, storageBenchmarkDeviceJobs(), $deviceEntry,
+            array_fill_keys(['rw', 'bs', 'iodepth', 'numjobs', 'runtime'], null), 'fio failed') as $name => $res) {
             if (!$res['ok']) continue;
             printf("%s\t%s\tread_MB/s=%.2f\tread_IOPS=%.1f\tread_p95_ms=%.2f\n", $path, $name, $res['result']['read_bw_MBps'], $res['result']['read_iops'], $res['result']['read_p95_ms']);
             if ($name === 'dev-randread-4k') $peer[$path]['fio4k_mb'] = $res['result']['read_bw_MBps'];
