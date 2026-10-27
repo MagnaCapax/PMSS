@@ -30,16 +30,16 @@ exchange from `pikkumiesUiHermes.php`, and the interface chooser route from
 `pikkumiesUiChoice.php`.
 
 `pikkumiesUiFragments.php` owns origin/API maps, trusted relay headers, upgrade
-settings and default-server bytes. Route templates retain their authorization
-headers, auth requests, cookie handling, path guards, redirects and locations.
-The three historical default-server functions delegate to the shared renderer.
-No previous implementation or alternative dispatch flow remains.
+settings, server framing, response headers, origin guards, proxy bodies and
+offline locations. Routes choose literal listen lines, frame and Authorization
+policies, auth requests, cookies, path guards, redirects and location ordering.
+The historical default-server functions keep their existing shared renderer.
 
-Independent fragment implementations fall from 18 to 4: origin maps 3 to 1,
-relay headers 8 to 1, upgrade settings 4 to 1, and default servers 3 to 1.
-This removes fourteen separately maintained variants. The port-A GET prefix
-and the anchored Hermes GET expression remain distinct explicit arguments;
-this refactor does not change their matching behavior.
+The original extraction reduced eighteen fragment implementations to four.
+Server framing, paired CSP/frame headers, origin guards, proxy bodies and offline
+locations now also share five implementations instead of twenty-one (3/6/3/6/3).
+Port-A GET prefixes, anchored Hermes GET expressions, login CSP hashes and all
+route-specific policy remain explicit and retain their matching behavior.
 
 ## Consequences
 

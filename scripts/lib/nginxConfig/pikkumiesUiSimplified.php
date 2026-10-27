@@ -9,17 +9,11 @@ function pmssPikkumiesUiNginxBlock(string $user, string $host, string $serviceHo
     $ssl = pmssNginxUserSslBlock($user.'.'.$host, '', $live);
     $maps = pmssPikkumiesUiOriginMaps($variable, $origin, '');
     $upgrade = pmssPikkumiesUiUpgradeSettings();
-    return <<<NGINX
-# Account UI A: the backend handles bearer authentication on every non-static request.
-{$maps}server {
-    listen 844 ssl;
-    server_name {$serviceHost};
-{$ssl}    add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
-    add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
-    add_header Cache-Control "no-store" always;
-    if (\${$variable}_origin_ok = 0) { return 403; }
-    if (\${$variable}_api_ok = 0) { return 403; }
-
+    $checks = pmssPikkumiesUiOriginChecks($variable);
+    $offline = pmssPikkumiesUiOfflineLocation('pikkumies_offline');
+    return "# Account UI A: the backend handles bearer authentication on every non-static request.\n".$maps
+        .pmssPikkumiesUiServer("    listen 844 ssl;\n", $serviceHost, $ssl, 'https://'.$host, 'ALLOW-FROM https://'.$host, <<<NGINX
+{$checks}
     location = /bar {
         alias /var/www/pikkumies/bar.html;
         default_type text/html;
@@ -29,10 +23,7 @@ function pmssPikkumiesUiNginxBlock(string $user, string $host, string $serviceHo
         proxy_set_header Host \$host;
 {$upgrade}        error_page 502 503 = @pikkumies_offline;
     }
-    location @pikkumies_offline {
-        root /var/www;
-        try_files /pikkumies/not-running.html =503;
-    }
-}
-NGINX;
+{$offline}
+NGINX
+    );
 }

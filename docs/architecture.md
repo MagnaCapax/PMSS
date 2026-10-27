@@ -113,8 +113,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   ordered steps. Manager keeps orchestration and public sizing helpers (ADR 0175).
 - **scripts/lib/nginxConfig/** – Generates the public user subdomain route and reconciles obsolete private hash routes. The template catalog contains only active and suspended public variants.
   The account UI facade retains publication and preflight; simplified, Hermes
-  and chooser route modules share one fragment renderer for origin maps, trusted
-  relay headers, upgrade settings and default servers (ADR 0185).
+  and chooser routes share server framing, headers, origin checks, proxy bodies,
+  offline locations and protocol fragments; policy stays explicit (ADR 0185).
 - **scripts/lib/resources/log.php** – Resource-log entrypoint. `resources/counters.php` selects the hierarchy and projects billing counters; `resources/v1.php` owns the source traversal and parsers shared with performance telemetry (ADR 0161). `resources/counterState.php` owns locked delta persistence shared with traffic ingress (ADR 0078).
 - **scripts/lib/traffic/report.php** – Stable traffic CLI facade. `reportModel.php` reads accepted rows and derives totals and summary counts before sorting; `reportDisplay.php` projects that model to JSON and terminal output without filesystem reads (ADR 0157).
 - **scripts/lib/storageHealth/** – SMART/NVMe backends own device eligibility and

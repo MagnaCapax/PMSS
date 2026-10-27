@@ -53,3 +53,38 @@ function pmssPikkumiesUiDefaultServer(string $listenLine, string $sslBlock): str
     return "server {\n".$listenLine."    server_name _;\n"
         .$sslBlock."    return 444;\n}\n";
 }
+
+/** Emit the paired frame policies at server or location indentation. */
+function pmssPikkumiesUiFrameHeaders(string $policy, string $options, string $indent = '    '): string
+{
+    return $indent.'add_header Content-Security-Policy "'.$policy.'" always;'."\n"
+        .$indent.'add_header X-Frame-Options "'.$options.'" always;'."\n";
+}
+
+/** Wrap a route body; callers keep literal listen lines and explicit frame policy. */
+function pmssPikkumiesUiServer(string $listenLine, string $serviceHost, string $sslBlock, string $ancestors, string $options, string $body): string
+{
+    return "server {\n".$listenLine.'    server_name '.$serviceHost.";\n".$sslBlock
+        .pmssPikkumiesUiFrameHeaders('frame-ancestors '.$ancestors, $options)."    add_header Cache-Control \"no-store\" always;\n"
+        .$body."\n}";
+}
+
+/** Both origin maps must pass before any route's locations can be reached. */
+function pmssPikkumiesUiOriginChecks(string $variable): string
+{
+    return "    if (\${$variable}_origin_ok = 0) { return 403; }\n"
+        ."    if (\${$variable}_api_ok = 0) { return 403; }\n";
+}
+
+/** Preserve each route's explicit target and Authorization expression before the trusted hop. */
+function pmssPikkumiesUiProxyBody(int $lighttpdPort, string $target, string $authorization): string
+{
+    return '        proxy_pass http://127.0.0.1:'.$lighttpdPort.$target.";\n"
+        .'        proxy_set_header Authorization '.$authorization.";\n".pmssPikkumiesUiRelayHeaders();
+}
+
+/** The offline page is identical; its named location remains route-specific. */
+function pmssPikkumiesUiOfflineLocation(string $name): string
+{
+    return '    location @'.$name." {\n        root /var/www;\n        try_files /pikkumies/not-running.html =503;\n    }";
+}

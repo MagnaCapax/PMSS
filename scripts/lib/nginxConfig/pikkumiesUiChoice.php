@@ -12,9 +12,12 @@ function pmssHermesUiNginxBlock(string $user, string $host, string $serviceHost,
     $relay = pmssPikkumiesUiRelayHeaders();
     $maps = pmssPikkumiesUiOriginMaps($variable, $origin, '$');
     $upgrade = pmssPikkumiesUiUpgradeSettings();
-    return <<<NGINX
-# Account UI C: Hermes enforces its login behind the private relay.
-{$maps}# The Agentboard client sends its API calls without cookies: its token exchange and bearer calls pick it directly.
+    $checks = pmssPikkumiesUiOriginChecks($variable);
+    $proxy = pmssPikkumiesUiProxyBody($lighttpdPort, '$'.$variable.'_prefix$request_uri', '$'.$variable.'_authorization');
+    $offline = pmssPikkumiesUiOfflineLocation('pikkumies_offline');
+    $frame = pmssPikkumiesUiFrameHeaders('frame-ancestors https://'.$host, 'ALLOW-FROM https://'.$host, '        ');
+    $maps .= <<<NGINX
+# The Agentboard client sends its API calls without cookies: its token exchange and bearer calls pick it directly.
 map "\$request_method:\$request_uri:\$http_authorization:\$http_cookie" \${$variable}_choice {
     default "";
     "~^POST:/api/auth(?:\\?[^:]*)?::" agentboard;
@@ -29,33 +32,25 @@ map \${$variable}_choice \${$variable}_authorization {
     default "";
     agentboard \$http_authorization;
 }
-server {
-    listen 846 ssl;
-    server_name {$serviceHost};
-{$ssl}    add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
-    add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
-    add_header Cache-Control "no-store" always;
+
+NGINX;
+    return "# Account UI C: Hermes enforces its login behind the private relay.\n".$maps
+        .pmssPikkumiesUiServer("    listen 846 ssl;\n", $serviceHost, $ssl, 'https://'.$host, 'ALLOW-FROM https://'.$host, <<<NGINX
     access_log /var/log/nginx/access.log pmss_ui_noargs;
     proxy_cookie_domain ~.+ "";
     # Hermes answers with its relay prefix in login redirects and cookie paths; the browser only knows /.
     proxy_redirect /__pmss-ui-c/ /;
     proxy_cookie_path /__pmss-ui-c/ /;
     if (\$request_uri ~* "^[^?]*(%2e|%2f|\\.\\.|//)") { return 400; }
-    if (\${$variable}_origin_ok = 0) { return 403; }
-    if (\${$variable}_api_ok = 0) { return 403; }
-    location = /api/cron/fire { return 404; }
+{$checks}    location = /api/cron/fire { return 404; }
     location = /__pmss-select-web {
         add_header Set-Cookie "__Host-pmss_ui_c=web; Path=/; Secure; HttpOnly; SameSite=Lax" always;
-        add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
-        add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
-        # The browser keeps the launcher's #token fragment across this redirect.
+{$frame}        # The browser keeps the launcher's #token fragment across this redirect.
         return 302 /__pmss-login;
     }
     location = /__pmss-select-agentboard {
         add_header Set-Cookie "__Host-pmss_ui_c=agentboard; Path=/; Secure; HttpOnly; SameSite=Lax" always;
-        add_header Content-Security-Policy "frame-ancestors https://{$host}" always;
-        add_header X-Frame-Options "ALLOW-FROM https://{$host}" always;
-        return 302 /;
+{$frame}        return 302 /;
     }
 {$login}    location = /__pmss-auth {
         internal;
@@ -66,24 +61,15 @@ server {
         proxy_set_header Authorization "";
 {$relay}    }
     location ~ ^/(?:login(?:/|\$)|auth/password-login(?:/|\$)|api/auth/providers(?:/|\$)|assets/|ds-assets/|fonts/|fonts-terminal/|favicon\.ico\$) {
-        proxy_pass http://127.0.0.1:{$lighttpdPort}\${$variable}_prefix\$request_uri;
-        proxy_set_header Authorization \${$variable}_authorization;
-{$relay}    }
+{$proxy}    }
     location /api/ {
         auth_request /__pmss-auth;
-        proxy_pass http://127.0.0.1:{$lighttpdPort}\${$variable}_prefix\$request_uri;
-        proxy_set_header Authorization \${$variable}_authorization;
-{$relay}{$upgrade}        error_page 502 503 = @pikkumies_offline;
+{$proxy}{$upgrade}        error_page 502 503 = @pikkumies_offline;
     }
     location / {
-        proxy_pass http://127.0.0.1:{$lighttpdPort}\${$variable}_prefix\$request_uri;
-        proxy_set_header Authorization \${$variable}_authorization;
-{$relay}{$upgrade}        error_page 502 503 = @pikkumies_offline;
+{$proxy}{$upgrade}        error_page 502 503 = @pikkumies_offline;
     }
-    location @pikkumies_offline {
-        root /var/www;
-        try_files /pikkumies/not-running.html =503;
-    }
-}
-NGINX;
+{$offline}
+NGINX
+    );
 }

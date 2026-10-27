@@ -15,23 +15,19 @@ function pmssPikkumiesHermesLoginCsp(string $frameAncestors): string
  */
 function pmssPikkumiesHermesLoginLocations(string $prefix, int $lighttpdPort, string $frameAncestors, string $frameOptions): string
 {
-    $csp = pmssPikkumiesHermesLoginCsp($frameAncestors);
-    $relay = pmssPikkumiesUiRelayHeaders();
+    $frame = pmssPikkumiesUiFrameHeaders(pmssPikkumiesHermesLoginCsp($frameAncestors), $frameOptions, '        ');
+    $proxy = pmssPikkumiesUiProxyBody($lighttpdPort, $prefix.'/__pmss-session', '""');
     return <<<NGINX
     location = /__pmss-login {
         alias /var/www/pikkumies/hermes-login.html;
         default_type text/html;
-        add_header Content-Security-Policy "{$csp}" always;
-        add_header X-Frame-Options "{$frameOptions}" always;
-        add_header Cache-Control "no-store" always;
+{$frame}        add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
     }
     location = /__pmss-session {
         limit_except POST { deny all; }
         client_max_body_size 1k;
-        proxy_pass http://127.0.0.1:{$lighttpdPort}{$prefix}/__pmss-session;
-        proxy_set_header Authorization "";
-{$relay}    }
+{$proxy}    }
 
 NGINX;
 }
@@ -46,22 +42,17 @@ function pmssPikkumiesHermesNginxBlock(string $user, string $host, string $servi
     $relay = pmssPikkumiesUiRelayHeaders();
     $maps = pmssPikkumiesUiOriginMaps($variable, $origin, '$');
     $upgrade = pmssPikkumiesUiUpgradeSettings();
-    return <<<NGINX
-# Account UI B: Hermes login is required at the private relay.
-{$maps}server {
-    listen 845 ssl;
-    server_name {$serviceHost};
-{$ssl}    add_header Content-Security-Policy "frame-ancestors 'none'" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header Cache-Control "no-store" always;
+    $checks = pmssPikkumiesUiOriginChecks($variable);
+    $proxy = pmssPikkumiesUiProxyBody($lighttpdPort, '/__pmss-ui-b$request_uri', '""');
+    $offline = pmssPikkumiesUiOfflineLocation('pikkumies_b_offline');
+    return "# Account UI B: Hermes login is required at the private relay.\n".$maps
+        .pmssPikkumiesUiServer("    listen 845 ssl;\n", $serviceHost, $ssl, "'none'", 'DENY', <<<NGINX
     access_log /var/log/nginx/access.log pmss_ui_b_noargs;
     # Hermes answers with its relay prefix in login redirects and cookie paths; the browser only knows /.
     proxy_redirect /__pmss-ui-b/ /;
     proxy_cookie_path /__pmss-ui-b/ /;
     if (\$request_uri ~* "^[^?]*(%2e|%2f|\\.\\.|//)") { return 400; }
-    if (\${$variable}_origin_ok = 0) { return 403; }
-    if (\${$variable}_api_ok = 0) { return 403; }
-    location = /api/cron/fire { return 404; }
+{$checks}    location = /api/cron/fire { return 404; }
 {$login}    location = /__pmss-b-auth {
         internal;
         proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b/api/auth/me;
@@ -70,14 +61,10 @@ function pmssPikkumiesHermesNginxBlock(string $user, string $host, string $servi
         proxy_set_header Authorization "";
 {$relay}    }
     location ~ ^/(?:login(?:/|\$)|auth/password-login(?:/|\$)|api/auth/providers(?:/|\$)|assets/|ds-assets/|fonts/|fonts-terminal/|favicon\.ico\$) {
-        proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b\$request_uri;
-        proxy_set_header Authorization "";
-{$relay}    }
+{$proxy}    }
     location / {
         auth_request /__pmss-b-auth;
-        proxy_pass http://127.0.0.1:{$lighttpdPort}/__pmss-ui-b\$request_uri;
-        proxy_set_header Authorization "";
-{$relay}{$upgrade}        error_page 401 = @pikkumies_b_login;
+{$proxy}{$upgrade}        error_page 401 = @pikkumies_b_login;
         error_page 502 503 = @pikkumies_b_offline;
     }
     # Not logged in: pages go to the Hermes login form; API calls and WebSocket upgrades keep their 401.
@@ -86,10 +73,7 @@ function pmssPikkumiesHermesNginxBlock(string $user, string $host, string $servi
         if (\$http_upgrade != "") { return 401; }
         return 302 /login;
     }
-    location @pikkumies_b_offline {
-        root /var/www;
-        try_files /pikkumies/not-running.html =503;
-    }
-}
-NGINX;
+{$offline}
+NGINX
+    );
 }
