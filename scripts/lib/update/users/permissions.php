@@ -38,14 +38,16 @@ function pmssUserRefreshPermissions(array $ctx): void
         pmssUserLog($user, sprintf('[WARN] userPermissions returned rc=%d', $rc));
     }
 
-    // Accounts created before 2026-10-21 end their config with the unwrapped localnet line.
+    // Bounded repairs converge old managed directives without regenerating account settings.
     if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
-        try {
-            $migrated = (new rtorrentConfig())->migrateLegacyLocalnetLine($user);
-            if ($migrated === true) pmssUserLog($user, 'Updated .rtorrent.rc localnet line');
-            elseif ($migrated === false) pmssUserLog($user, '[WARN] .rtorrent.rc localnet line update failed');
-        } catch (\Throwable $error) {
-            pmssUserLog($user, '[WARN] .rtorrent.rc localnet line update failed: '.$error->getMessage());
+        foreach (['localnet' => 'migrateLegacyLocalnetLine', 'encoding' => 'migrateLegacyEncodingLine'] as $line => $method) {
+            try {
+                $migrated = (new rtorrentConfig())->$method($user);
+                if ($migrated === true) pmssUserLog($user, 'Updated .rtorrent.rc '.$line.' line');
+                elseif ($migrated === false) pmssUserLog($user, '[WARN] .rtorrent.rc '.$line.' line update failed');
+            } catch (\Throwable $error) {
+                pmssUserLog($user, '[WARN] .rtorrent.rc '.$line.' line update failed: '.$error->getMessage());
+            }
         }
     }
 

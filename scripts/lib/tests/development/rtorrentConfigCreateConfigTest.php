@@ -309,6 +309,66 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertSame(null, $cfg->migrateLegacyLocalnetLine('dummy'));
     }
 
+    public function testMigrateLegacyEncodingLinePreservesConfigAndMetadata(): void
+    {
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-encoding-');
+        $home = $this->pmssEnsureDir($this->pmssUserHomePath($homeRoot, 'dummy'));
+        $path = $home.'/.rtorrent.rc';
+        $custom = $this->pmssWriteFile($home.'/.rtorrent.rc.custom', "# customer overrides\n");
+        $cfg = $this->rtorrentConfigFixture();
+        $guard = 'branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
+            .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))';
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.rtorrent.rc');
+        $this->assertStringContainsString("\n".$guard."\n", $template);
+
+        // Cover first/last lines, duplicate directives, CRLF, and a full legacy template.
+        foreach ([
+            'encoding.add = utf8',
+            "encoding.add = utf8\n",
+            "network.scgi.open_port = 127.0.0.1:4100\nencoding.add = utf8\ntry_import = .rtorrent.rc.custom\n",
+            "# retain\r\nencoding.add = utf8\r\ntry_import = .rtorrent.rc.custom\r\n",
+            "encoding.add = utf8\nencoding.add = utf8\n",
+            str_replace($guard, 'encoding.add = utf8', $template),
+        ] as $legacy) {
+            $this->pmssWriteFile($path, $legacy);
+            chmod($path, 0640);
+            $before = stat($path);
+            $this->assertTrue($cfg->migrateLegacyEncodingLine('dummy'));
+            $this->assertSame(str_replace('encoding.add = utf8', $guard, $legacy), file_get_contents($path));
+            clearstatcache(true, $path);
+            $after = stat($path);
+            foreach (['mode', 'uid', 'gid'] as $field) $this->assertSame($before[$field], $after[$field]);
+            $this->assertSame(null, $cfg->migrateLegacyEncodingLine('dummy'));
+            $this->assertSame($after['ino'], stat($path)['ino'], 'A converged config must not be rewritten');
+        }
+        $this->assertSame("# customer overrides\n", file_get_contents($custom));
+
+        foreach (['', $template, "# encoding.add = utf8\n", "encoding.add = utf8-extra\n",
+            " encoding.add = utf8\n", "encoding.add = utf8 # edited\n", 'catch = {"encoding.add=utf8"}'] as $current) {
+            $this->pmssWriteFile($path, $current);
+            $this->assertSame(null, $cfg->migrateLegacyEncodingLine('dummy'));
+            $this->assertSame($current, file_get_contents($path));
+        }
+    }
+
+    public function testMigrateLegacyEncodingLineRefusesMissingAndLinkedTargets(): void
+    {
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-encoding-path-');
+        $home = $this->pmssEnsureDir($this->pmssUserHomePath($homeRoot, 'dummy'));
+        $path = $home.'/.rtorrent.rc';
+        $cfg = $this->rtorrentConfigFixture();
+        $this->assertSame(null, $cfg->migrateLegacyEncodingLine('dummy'));
+        $this->assertFalse(file_exists($path));
+        $outside = $this->pmssWriteFile($homeRoot.'/outside', "encoding.add = utf8\n");
+        $this->pmssCreateSymlinkOrSkip($outside, $path);
+        $this->assertSame(null, $cfg->migrateLegacyEncodingLine('dummy'));
+        $this->assertSame("encoding.add = utf8\n", file_get_contents($outside));
+        $this->assertTrue(is_link($path));
+        $this->assertThrows(\InvalidArgumentException::class, static function () use ($cfg): void {
+            $cfg->migrateLegacyEncodingLine('../outside');
+        }, 'valid PMSS username');
+    }
+
     public function testPortReservationRejectsUnsafeTypeBeforeFilesystemTouch(): void
     {
         $portRoot = $this->pmssMakeTempPath('pmss-rtorrent-ports-');

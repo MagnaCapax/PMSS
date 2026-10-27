@@ -884,6 +884,9 @@ Class `rtorrentConfig`
 - idempotentConfig(string $user, string $config): ?bool
   - Reads current file and compares; writes only when content differs; returns write result or null when identical.
 
+- migrateLegacyEncodingLine(string $user): ?bool
+  - During non-dry-run user maintenance, replaces only complete, exact `encoding.add = utf8` lines with the ADR 0141 template branch (legacy UTF-8 on 0.9.8, IPv4 bind on newer builds). Preserves all other bytes, newline style, ownership and mode through the existing guarded writer; absent/non-regular files and already converged configs are left alone. Returns the write result or null when no repair applies. Does not edit `.rtorrent.rc.custom`, restart rTorrent or clear its fallback marker.
+
 - readUserConfig(string $user): array|false → wrapper for readConfig on `/home/<user>/.rtorrent.rc`.
 - readConfig(string $file): array|false → parses key=value pairs from `~/.rtorrent.rc` file (skipping comments and blanks).
 - _configPortPrivate(string $type, int $rangeStart=2000, int $rangeEnd=65000): int

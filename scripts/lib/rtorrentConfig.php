@@ -29,6 +29,9 @@ class rtorrentConfig
     // catch: builds without ipv4_filter.load (curated store builds) start instead of exiting at parse.
     private const LOCALNET_LINE = "catch = {\"ipv4_filter.load=/etc/seedbox/config/localnet,preferred\"}";
     private const LEGACY_LOCALNET_LINE = "ipv4_filter.load = /etc/seedbox/config/localnet, preferred";
+    // ADR 0141: retain legacy UTF-8 handling on 0.9.8 and force IPv4 on 0.16.
+    private const ENCODING_LINE = 'branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
+        .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))';
     protected $_resourceConfig;
     protected $_template;
     /**
@@ -84,6 +87,19 @@ class rtorrentConfig
         if ($body === '' || substr($body, -strlen($legacy)) !== $legacy) return null;
         return $this->writeConfig($user, substr($body, 0, -strlen($legacy))."\n".self::LOCALNET_LINE
             .substr($data, strlen($body)));
+    }
+    /**
+     * Repair only the exact legacy encoding directive in an existing managed config.
+     * @param string $user Target username.
+     * @return bool|null Write result, or null when no legacy directive is present.
+     */
+    public function migrateLegacyEncodingLine($user)
+    {
+        $data = pmssReadRegularFileContents($this->userConfigFilePath($user));
+        if (!is_string($data)) return null;
+        // Match complete physical lines only; preserve comments, overrides and newline bytes.
+        $updated = preg_replace('/^encoding\.add = utf8(?=\r?$)/m', self::ENCODING_LINE, $data);
+        return $updated !== $data ? $this->writeConfig($user, $updated) : null;
     }
     /**
      * Persist rendered configuration text to the user's `.rtorrent.rc` file.
