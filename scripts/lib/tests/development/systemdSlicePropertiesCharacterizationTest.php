@@ -348,4 +348,46 @@ PHP;
             $this->assertSame(null, \pmssMapSystemdIntProperties(['IPIngressBytes' => $raw], $map, ['IPIngressBytes' => 0]));
         }
     }
+
+    public function testPropertyProjectionsRejectMalformedValuesBeforeConversion(): void
+    {
+        $stringable = new class {
+            public function __toString(): string
+            {
+                throw new \RuntimeException('Malformed properties must not be converted');
+            }
+        };
+        $resource = fopen('php://memory', 'r+');
+        try {
+            foreach ([[], ['12'], ['value' => '12'], [['12']], new \stdClass(), $stringable, $resource] as $value) {
+                // Even optional counters cannot turn a corrupt observation into a usable snapshot.
+                foreach ([[], ['IPIngressBytes' => 0]] as $defaults) {
+                    $this->assertSame(null, \pmssMapSystemdIntProperties(
+                        ['IPIngressBytes' => $value], ['IPIngressBytes' => 'ingress'], $defaults));
+                }
+                $this->assertSame(null, \pmssSystemdCpuQuotaPercent([
+                    'CPUQuota' => $value, 'CPUQuotaPerSecUSec' => '1000000',
+                ]));
+                $this->assertSame(null, \pmssSystemdCpuQuotaPercent(['CPUQuotaPerSecUSec' => $value]));
+                // A valid direct quota still takes precedence over an unused fallback.
+                $this->assertSame(250, \pmssSystemdCpuQuotaPercent([
+                    'CPUQuota' => '250%', 'CPUQuotaPerSecUSec' => $value,
+                ]));
+            }
+        } finally {
+            fclose($resource);
+        }
+    }
+
+    public function testPropertyProjectionsKeepScalarConversionsAndMissingDefaults(): void
+    {
+        foreach ([['12', 12], [12, 12], [12.0, 12], [true, 1], [false, 7], [null, 7], ['', 7]] as [$value, $expected]) {
+            $this->assertSame(['ingress' => $expected], \pmssMapSystemdIntProperties(
+                ['IPIngressBytes' => $value], ['IPIngressBytes' => 'ingress'], ['IPIngressBytes' => 7]));
+        }
+        $this->assertSame(['ingress' => 7], \pmssMapSystemdIntProperties([], ['IPIngressBytes' => 'ingress'], ['IPIngressBytes' => 7]));
+        foreach ([1000000, 1000000.0, '1000000'] as $value) {
+            $this->assertSame(100, \pmssSystemdCpuQuotaPercent(['CPUQuota' => null, 'CPUQuotaPerSecUSec' => $value]));
+        }
+    }
 }

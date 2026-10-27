@@ -75,7 +75,10 @@ function pmssMapSystemdIntProperties(array $properties, array $fieldMap, array $
 {
     $values = [];
     foreach ($fieldMap as $propertyName => $outputField) {
-        $raw = (string) ($properties[$propertyName] ?? '');
+        $raw = $properties[$propertyName] ?? '';
+        // A malformed value must not invoke object conversion or become a defaulted counter.
+        if (!is_scalar($raw)) return null;
+        $raw = (string) $raw;
         if (!ctype_digit($raw)) {
             if (!array_key_exists($propertyName, $defaults)) {
                 return null;
@@ -152,14 +155,19 @@ function pmssSystemdTimeSpanUsec(string $value): ?float
 /** Extract CPU quota percentage from `systemctl show` properties. */
 function pmssSystemdCpuQuotaPercent(array $properties): ?int
 {
-    $rawQuota = (string) ($properties['CPUQuota'] ?? '');
+    $rawQuota = $properties['CPUQuota'] ?? '';
+    // Check shape before casting: objects can throw or execute conversion code.
+    if (!is_scalar($rawQuota)) return null;
+    $rawQuota = (string) $rawQuota;
     // A malformed direct value cannot authorize a numeric-prefix or fallback quota.
     if (strpos($rawQuota, "\0") !== false) return null;
     $rawQuota = trim($rawQuota);
     if ($rawQuota !== '' && stripos($rawQuota, 'infinity') === false && strpos($rawQuota, '%') !== false) {
         $quota = (float) $rawQuota;
     } else {
-        $perSecUsec = pmssSystemdTimeSpanUsec((string) ($properties['CPUQuotaPerSecUSec'] ?? ''));
+        $rawPerSec = $properties['CPUQuotaPerSecUSec'] ?? '';
+        if (!is_scalar($rawPerSec)) return null;
+        $perSecUsec = pmssSystemdTimeSpanUsec((string) $rawPerSec);
         if ($perSecUsec === null) return null;
         // PerSecUSec is allowed CPU time per wall-clock second; the scheduling period is unrelated.
         $quota = $perSecUsec / 10000;

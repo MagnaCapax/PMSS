@@ -693,6 +693,11 @@ iptables helpers:
   stdout and returns the requested keys with empty values. Successful queries
   retain requested-key filtering, last-value precedence and whitespace handling;
   integer-property readers retain their existing missing-value result.
+- Systemd integer and CPU-quota projections reject array, object and resource
+  property values before string conversion, returning their existing `null`
+  unavailable result. Malformed optional counters cannot use a default, and a
+  malformed direct quota cannot select its fallback. Scalar conversions,
+  missing/null defaults and valid direct-quota precedence remain unchanged.
 - Monitoring projections retain iostat column precedence and the last Certbot marker's excerpt bounds.
 - Media-stack overall status derives from published app states: failed precedes stopped/degraded; off apps stay healthy.
 - Cgroup-v1 billing and performance collectors share `resources/v1.php` acquisition
