@@ -277,6 +277,7 @@ PHP;
         'www/configureTorrentClients.php',
         'www/configureTorrentClientsCard.php',
         'www/configureTorrentClientsOther.php',
+        'www/configureTorrentClientsRc.php',
         'www/configureTorrentClientsSwitch.php',
         'www/configureTorrentClientsVersion.php',
         'www/appsLsioCatalog.php',

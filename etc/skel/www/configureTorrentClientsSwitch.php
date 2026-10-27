@@ -2,6 +2,7 @@
 /** Password-guarded Configure switch for the additional native clients. */
 require_once __DIR__.'/configureTorrentClients.php';
 require_once __DIR__.'/configureTorrentClientsOther.php';
+require_once __DIR__.'/configureTorrentClientsRc.php';
 
 /** Snapshot, stop, select and start with the same account-owned state contract. */
 function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
@@ -74,6 +75,13 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
         flock($lock, LOCK_UN);
         fclose($lock);
         return array('ok' => false, 'status' => 409, 'message' => $message);
+    }
+    $rcError = $client === 'rtorrent' ? pmssConfigureTorrentClientRtorrentRcCheck($home, $version) : null;
+    if ($rcError !== null) {
+        pmssConfigureFileWrite($dir.'/'.$client.'.notice', $rcError."\n");
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'status' => 409, 'message' => $rcError);
     }
     $backup = $ops['backup'] ?? 'pmssCustomerBackupFileCreate';
     $stop = $ops['stop'] ?? 'pmssConfigureTorrentClientOtherStop';

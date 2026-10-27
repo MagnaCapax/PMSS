@@ -102,3 +102,18 @@ customer edits survive, with ADR 0146's fast-exit fallback still available.
 The rc template, skeleton `.rtorrent.rc`, token renderer and appended localnet
 guard contain no critical log-group outputs and need no further changes.
 The existing 0.16 `-D` launch and encoding/IPv4 guards remain applicable.
+
+## Amendment 2026-10-27: Diagnose edited custom rc files before switching
+
+Configure performs a bounded, read-only check before a switch to 0.16.25 or
+0.16.26 mutates the selection or stops the client (Refs #1202). A bare
+`log.add_output` for `socket_critical` is refused on both versions; one for
+`storage_critical` is refused on 0.16.26 only. The response and existing notice
+name the group and physical line and ask the customer to wrap it in `catch`.
+Comments and already wrapped commands pass. Customer edits remain untouched.
+
+The account-side check reads at most 256 KiB through the existing regular-file
+reader; missing, symlinked, unreadable or oversized files retain the existing
+startup/rollback path. It does not interpret nested commands or imports and
+does not claim full rc validation. Other startup failures keep the existing
+rollback message; asynchronous executor output is not exposed by the panel.

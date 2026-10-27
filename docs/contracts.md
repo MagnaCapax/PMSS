@@ -830,6 +830,15 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ## rTorrent Configuration – `scripts/lib/rtorrentConfig.php`
 
+- Configure switches to rTorrent 0.16.25/0.16.26 check regular, non-symlink
+  `.rtorrent.rc.custom` files up to 256 KiB for bare `log.add_output` commands.
+  `socket_critical` is refused for both releases and `storage_critical` for
+  0.16.26, with HTTP 409, the physical line number and a `catch` hint before
+  backup, stop or selection changes. Customer settings and version history
+  remain untouched; the refusal is saved in the existing switch notice.
+  Comments and wrapped commands pass. This is a best-effort check of known
+  incompatibilities, not an rc interpreter; unavailable/oversized files and
+  other startup failures retain the existing switch and rollback behavior.
 - `scripts/util/rtorrentThrottleGet.php USERNAME` reads the live global upload
   and download limits from the account's rTorrent SCGI socket. It prints two
   `*_bytes_per_second` lines (zero means unlimited). Invalid usernames fail
