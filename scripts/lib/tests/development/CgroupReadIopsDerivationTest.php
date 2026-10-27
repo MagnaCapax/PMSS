@@ -32,6 +32,35 @@ class CgroupReadIopsDerivationTest extends TestCase
         $this->assertSame(150, \pmssCgroupPolicyReadIopsClamp(50, 200, 150), 'absolute tier ceiling wins over the floor');
     }
 
+    /** Characterize the legacy coercions and precedence; refactoring must not tighten them. */
+    public function testAccountPolicyResolutionCharacterization(): void
+    {
+        foreach ([
+            [[], [], 100], [['IOWeight' => '007'], ['ioWeight' => 500], 7],
+            // PHP 8 broadened is_numeric() to accept trailing whitespace.
+            [['IOWeight' => ' 007 '], ['ioWeight' => 500], PHP_VERSION_ID >= 80000 ? 7 : 500],
+            [['IOWeight' => '3.9'], [], 3], [['IOWeight' => 0], ['ioWeight' => '250'], 250],
+            [['IOWeight' => []], ['ioWeight' => false], 100],
+            [['IOWeight' => -1], ['ioWeight' => null], 100],
+        ] as [$source, $policy, $expected]) {
+            $this->assertSame($expected, \pmssCgroupPolicyUserIoWeight($source, $policy));
+        }
+        $policy = ['serviceTypes' => ['plan' => ['resourceIOPSReadMax' => '900'], 'bad' => 'invalid']];
+        foreach ([
+            [[], null], [['resourceIOPSReadMax' => '50', 'serviceType' => 'plan'], 50],
+            [['resourceIOPSReadMax' => 0, 'serviceType' => ' plan '], 900],
+            [['serviceType' => ['resourceIOPSReadMax' => '75.9']], 75],
+            [['serviceType' => ['resourceIOPSReadMax' => -1]], null],
+            [['serviceType' => []], null], [['serviceType' => 'bad'], null],
+            [['serviceType' => 'missing'], null], [['serviceType' => null], null],
+        ] as [$source, $expected]) {
+            $this->assertSame($expected, \pmssCgroupPolicyReadIopsTierCeiling($source, $policy));
+        }
+        $this->assertSame(['default' => 200, 'storage' => 200, 'hdd' => 200, 'ssd' => 900, 'nvme' => 900],
+            \pmssCgroupPolicyReadIopsClassFloors(['cgroup' => ['readIopsClassFloors' =>
+                ['SSD' => 900, 'nvme' => 400, 'hdd' => 0, '' => 5, 0 => 5]]]));
+    }
+
     public function testExplicitReadIopsIsNeverOverwrittenByDerivation(): void
     {
         $payload = ['IOReadIOPS' => '/home:777', 'IOWeight' => 300, 'resourceIOPSReadMax' => 2000];

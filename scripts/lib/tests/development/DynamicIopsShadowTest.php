@@ -18,6 +18,46 @@ class DynamicIopsShadowTest extends TestCase
         return \pmssDynamicIopsAllocate($users, $policy, ['blend' => $blend], $passive, null, 'hdd', true);
     }
 
+    /** Freeze complete payload bytes, including types and field order, before restructuring. */
+    public function testAllocationPayloadCharacterization(): void
+    {
+        $source = ['quota' => 1000, 'IOWeight' => 100, 'resourceIOPSReadMax' => 100000];
+        $row = ['quota' => 1000.0, 'weight' => 100, 'share' => 1.0, 'floor' => 15,
+            'ceiling' => 100000, 'explicit' => false, 'legacy' => 2000, 'proposed' => 2000];
+        // Expected variant facts are literals, independent of the allocation implementation.
+        foreach ([
+            'ordinary' => [],
+            'explicit-zero' => ['source' => ['IOReadIOPS' => 0],
+                'row' => ['explicit' => true, 'legacy' => null, 'proposed' => null]],
+            'missing-pressure' => ['pressure' => null, 'fallback' => 'missing-pressure'],
+            'invalid-quota' => ['source' => ['quota' => null], 'row' => ['quota' => null],
+                'fallback' => 'missing-quota-or-weight'],
+            'invalid-weight' => ['weight' => 0, 'row' => ['quota' => null, 'weight' => 0, 'share' => 0.0],
+                'fallback' => 'missing-quota-or-weight', 'lift' => 15.0, 'charged' => 1996.25],
+            'missing-capacity' => ['passive' => null, 'fallback' => 'missing-ceiling',
+                'row' => ['legacy' => 200, 'proposed' => 200], 'lift' => 15.0, 'charged' => 0.0],
+            'stale-capacity' => ['passive' => null, 'legacyPassive' => 5000.0, 'fallback' => 'missing-ceiling',
+                'row' => ['legacy' => 10000, 'proposed' => 10000], 'lift' => 15.0, 'charged' => 0.0],
+            'disabled-legacy' => ['allowed' => false, 'row' => ['legacy' => null]],
+        ] as $label => $case) {
+            $pressure = ['blend' => array_key_exists('pressure', $case) ? $case['pressure'] : 15.0];
+            $passive = array_key_exists('passive', $case) ? $case['passive'] : 1000.0;
+            $pool = $passive === null ? 0.0 : 2000.0;
+            $expected = ['pressure' => $pressure, 'passive_read_iops' => $passive,
+                'benchmark_read_iops' => null, 'host_read_iops' => $passive ?? 0.0,
+                'multiplier' => 2.0, 'pool' => $pool, 'fallback' => $case['fallback'] ?? null, 'variants' => []];
+            foreach (['1.0' => 1.0, '0.5' => 0.5] as $variant => $alpha) {
+                $expected['variants'][$variant] = ['alpha' => $alpha, 'floor_lift' => $case['lift'] ?? 0.0,
+                    'charged_pool' => $case['charged'] ?? $pool, 'users' => ['account' => array_replace($row, $case['row'] ?? [])]];
+            }
+            $actual = \pmssDynamicIopsAllocate(['account' => [
+                'source' => array_replace($source, $case['source'] ?? []), 'weight' => $case['weight'] ?? 100,
+            ]], [], $pressure, $passive, null, 'hdd', $case['allowed'] ?? true, $case['legacyPassive'] ?? null);
+            $this->assertSame(json_encode($expected, JSON_PRESERVE_ZERO_FRACTION),
+                json_encode($actual, JSON_PRESERVE_ZERO_FRACTION), $label);
+        }
+    }
+
     public function testSettingsRejectUnsafeTypesRangesAndEnforcementMode(): void
     {
         $this->assertSame('off', \pmssDynamicIopsSettings([])['mode']);
