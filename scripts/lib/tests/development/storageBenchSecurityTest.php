@@ -230,6 +230,20 @@ PHP;
             $metricCases[] = ['normal', 'exception', json_encode($payload), $expected, true];
         }
         foreach (['read', 'write'] as $direction) {
+            // Validate both nested containers, including corruption after a valid job.
+            foreach (['clat_ns', 'percentile'] as $container) {
+                foreach (['unexpected', '', true, false, 0, 1, 1.5, null, []] as $value) {
+                    $section = $container === 'clat_ns' ? ['clat_ns' => $value]
+                        : ['clat_ns' => ['percentile' => $value]];
+                    $payload = ['jobs' => [$raw['jobs'][0], [$direction => $section]]];
+                    $expected = $invalid;
+                    if ($value === null || $value === []) {
+                        $expected = $success;
+                        $expected['result']['raw'] = $payload;
+                    }
+                    $metricCases[] = ['normal', 'exception', json_encode($payload), $expected, true];
+                }
+            }
             foreach (['bw_bytes', 'iops', 'percentile'] as $field) {
                 foreach (['', 'invalid', -1, true, [], [1], '1e309', "1\0"] as $value) {
                     $payload = $raw;

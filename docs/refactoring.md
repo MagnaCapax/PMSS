@@ -122,6 +122,9 @@ any reported job error uses the existing fio-failure result, including errors
 after a successful job. Successful metrics, optional-field defaults, raw JSON
 and temporary-output cleanup retain their contracts. `StorageBenchSecurityTest`
 covers these cases with command and output shims, without running fio.
+Nested `clat_ns` and `percentile` containers also require arrays when non-null;
+malformed scalars use the same invalid-JSON result instead of a zero latency.
+Absent, null and empty optional containers retain their existing zero defaults.
 
 Fio bandwidth counters must be unsigned integers within the PHP integer range;
 IOPS and supplied latency percentiles must be finite, non-negative numbers.

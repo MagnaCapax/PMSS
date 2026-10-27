@@ -21,10 +21,15 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
             || (isset($job['write']) && !is_array($job['write']))) return $invalid;
         if (($job['error'] ?? 0) !== 0) return ['ok' => false, 'error' => 'fio failed'];
         foreach ($totals as $direction => &$total) {
+            // Malformed latency containers must not masquerade as absent samples.
+            $latency = $job[$direction]['clat_ns'] ?? null;
+            if ($latency !== null && !is_array($latency)) return $invalid;
+            $percentiles = $latency['percentile'] ?? null;
+            if ($percentiles !== null && !is_array($percentiles)) return $invalid;
             $raw = $job[$direction]['bw_bytes'] ?? 0;
             $bandwidth = is_int($raw) || is_string($raw) ? pmssUnsignedDecimalIntParse((string) $raw) : null;
             $iops = pmssFiniteNonNegativeFloat($job[$direction]['iops'] ?? 0);
-            $percentile = $job[$direction]['clat_ns']['percentile']['95.000000'] ?? null;
+            $percentile = $percentiles['95.000000'] ?? null;
             // Preserve unsigned counters, finite non-negative floats and overflow rejection.
             if ($bandwidth === null || $iops === null || $total['bw'] > PHP_INT_MAX - $bandwidth
                 || ($percentile !== null && pmssFiniteNonNegativeFloat($percentile) === null)) return $invalid;
