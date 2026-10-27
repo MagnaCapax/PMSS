@@ -5,13 +5,17 @@ require_once __DIR__.'/../blockDeviceLeaves.php';
 /** Extract a safe block device name from a /dev path. */
 function pmssCgroupPolicyBlockDeviceName(string $devicePath): ?string
 {
+    // Inspect the original bytes before trim/basename can hide a malformed path.
+    if (strpos($devicePath, "\0") !== false) return null;
     $device = basename(trim($devicePath));
-    return preg_match('/^[A-Za-z0-9._!+-]+\z/', $device) === 1 ? $device : null;
+    return $device !== '.' && $device !== '..'
+        && preg_match('/^[A-Za-z0-9._!+-]+\z/', $device) === 1 ? $device : null;
 }
 
 /** Return true when the /home source is an md device; derived caps wait for #623. */
 function pmssCgroupPolicyHomeDeviceIsMdBacked(string $devicePath, string $sysClassBlock = '/sys/class/block'): bool
 {
+    if (strpos($sysClassBlock, "\0") !== false) return false;
     $device = pmssCgroupPolicyBlockDeviceName($devicePath);
     return $device !== null && (preg_match('/^md\d+\z/', $device) === 1
         || is_dir(rtrim($sysClassBlock, '/').'/'.$device.'/md'));
@@ -20,6 +24,8 @@ function pmssCgroupPolicyHomeDeviceIsMdBacked(string $devicePath, string $sysCla
 /** Detect the class of the single-device /home backing block device. */
 function pmssCgroupPolicyHomeStorageClassResolve(string $devicePath, string $sysClassBlock = '/sys/class/block'): ?string
 {
+    // Invalid sysfs roots use the existing unknown result before filesystem I/O.
+    if (strpos($sysClassBlock, "\0") !== false) return null;
     $device = pmssCgroupPolicyBlockDeviceName($devicePath);
     if ($device === null) return null;
     if (preg_match('/^nvme\d+n\d+(?:p\d+)?\z/', $device) === 1) return 'nvme';

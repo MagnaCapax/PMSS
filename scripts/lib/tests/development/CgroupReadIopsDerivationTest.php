@@ -173,6 +173,43 @@ class CgroupReadIopsDerivationTest extends TestCase
         $this->assertSame(null, \pmssCgroupPolicyHomeStorageClassResolve('/dev/bad name', $root));
     }
 
+    /** Malformed source bytes cannot be normalized into a device observation. */
+    public function testStorageObservationRejectsMalformedDevicePaths(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-read-iops-paths-', 0700);
+        // A root queue would otherwise let dot components masquerade as a disk.
+        @mkdir($root.'/queue', 0700, true);
+        @mkdir($root.'/md', 0700, true);
+        file_put_contents($root.'/queue/rotational', "1\n");
+        foreach (["\0/dev/sda", "/dev/sda\0", "/bad\0/dev/sda", "/dev/md0\0",
+            "/dev/nvme0n1\0", '/dev/.', '/dev/..', '', '/dev/bad name'] as $path) {
+            $this->assertSame(null, \pmssCgroupPolicyBlockDeviceName($path));
+            $this->assertFalse(\pmssCgroupPolicyHomeDeviceIsMdBacked($path, $root));
+            $this->assertSame(null, \pmssCgroupPolicyHomeStorageClassResolve($path, $root));
+        }
+    }
+
+    /** Reject corrupted sysfs roots even when a device name alone implies its class. */
+    public function testStorageObservationRejectsNulSysfsRoots(): void
+    {
+        foreach (["\0", "/sys/class/block\0", "\0/sys/class/block", "/sys/\0/class/block"] as $root) {
+            foreach (['/dev/sda', '/dev/md0', '/dev/nvme0n1', '/dev/dm-0', '/dev/missing'] as $path) {
+                $this->assertFalse(\pmssCgroupPolicyHomeDeviceIsMdBacked($path, $root));
+                $this->assertSame(null, \pmssCgroupPolicyHomeStorageClassResolve($path, $root));
+            }
+        }
+    }
+
+    /** Preserve valid basename extraction, surrounding whitespace and device punctuation. */
+    public function testStorageObservationPreservesValidDeviceNames(): void
+    {
+        foreach (['/dev/sda' => 'sda', " \t/dev/md0\n" => 'md0', '/dev/nvme0n1p2' => 'nvme0n1p2',
+            'sda' => 'sda', '/dev/dm-0' => 'dm-0', '/dev/disk.name' => 'disk.name',
+            '/dev/cciss!c0d0' => 'cciss!c0d0', '/dev/device+1' => 'device+1'] as $path => $name) {
+            $this->assertSame($name, \pmssCgroupPolicyBlockDeviceName($path));
+        }
+    }
+
     public function testUnknownClassUsesProfileDefaultFloor(): void
     {
         $this->assertSame(200, \pmssCgroupPolicyDerivedReadIopsCap(

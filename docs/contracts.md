@@ -708,6 +708,11 @@ iptables helpers:
   are absent. Both choose ops from the bytes accounting family; a valid zero
   hierarchical total takes precedence over a nonzero local value.
 - Passive I/O ceiling samples, persisted ceiling reads, and derived read-IOPS oversell settings use the shared finite, non-negative numeric parser.
+- Read-IOPS storage observations reject NUL bytes in the original device path
+  before trimming or basename extraction, and reject `.` and `..` device names.
+  NUL-containing sysfs roots return `false` for md detection and `null` for
+  storage class before filesystem access. Valid name normalization, md detection,
+  storage-class precedence and policy fallbacks retain their existing behavior.
 - `pmssResourceLogManagedUserUids()` revalidates list output before UID lookup
   and omits nonpositive resolver results. `pmssResourceLogLookupManagedUid()`
   accepts only representable, positive decimal output from its `id -u` fallback.
