@@ -25,16 +25,15 @@ function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): vo
     if ($extended) {
         // Build the extended columns here instead of packing and unpacking a tuple.
         $statusLabel = $row['pctUsed'] !== null && $row['pctUsed'] >= 80 ? ($row['pctUsed'] >= 100 ? '[OVER]' : '[WARN]') : '';
-        $statusDisplay = pmssCliAnsiStyle(str_pad($statusLabel, 6, ' ', STR_PAD_RIGHT), $statusLabel === '[OVER]' ? '1;31' : '33', $useColor && $statusLabel !== '');
         $filled = ($row['limitMiB'] !== null && $row['pctUsed'] !== null)
             ? (int) floor((max(0.0, min(100.0, (float) $row['pctUsed'])) / 100) * 10)
             : null;
-        $barDisplay = $filled === null ? str_repeat(' ', 12) : '['.str_repeat('#', $filled).str_repeat('-', 10 - $filled).']';
         $format = "%-14s %9s / %9s %4s %s %s IN: %9s R: %5s  Datarates: %10s / %10s / %10s / %10s\n";
         $values = [$label, (string) $display['month'],
             $row['limitMiB'] !== null ? pmssTrafficFormatAmount($row['limitMiB']) : '-',
             $row['pctUsed'] !== null ? sprintf('%3d%%', min(999, (int) round($row['pctUsed']))) : 'n/a',
-            $statusDisplay, $barDisplay];
+            pmssCliAnsiStyle(str_pad($statusLabel, 6, ' ', STR_PAD_RIGHT), $statusLabel === '[OVER]' ? '1;31' : '33', $useColor && $statusLabel !== ''),
+            $filled === null ? str_repeat(' ', 12) : '['.str_repeat('#', $filled).str_repeat('-', 10 - $filled).']'];
     } else {
         $format = "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n";
         $values = [$label, (string) $display['month'], (string) $display['week'], (string) $display['day']];

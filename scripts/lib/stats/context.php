@@ -64,27 +64,25 @@ function pmssStatsResolveContext(array $overrides = []): array
     }
 
     $home = pmssStatsContextPathResolve($homeCandidate, $defaultHome, true);
-    $configDir = pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'config_dir', 'PMSS_STATS_CONFIG_DIR', '/etc/seedbox/config'), '/etc/seedbox/config', true);
-    $socketPath = pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'socket_path', 'PMSS_STATS_SOCKET_PATH', $home.'/.rtorrent.socket'), $home.'/.rtorrent.socket');
-    $versionFile = pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'version_file', 'PMSS_STATS_VERSION_FILE', '/etc/seedbox/config/version'), '/etc/seedbox/config/version');
-    $cgroupDir = pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'cgroup_dir', 'PMSS_STATS_CGROUP_DIR', ''), '', true);
-    if ($cgroupDir === '') {
+    // Build the returned record in contract order; discovery fills only its missing cgroup path.
+    $context = [
+        'user' => $user,
+        'home' => $home,
+        'config_dir' => pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'config_dir', 'PMSS_STATS_CONFIG_DIR', '/etc/seedbox/config'), '/etc/seedbox/config', true),
+        'socket_path' => pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'socket_path', 'PMSS_STATS_SOCKET_PATH', $home.'/.rtorrent.socket'), $home.'/.rtorrent.socket'),
+        'version_file' => pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'version_file', 'PMSS_STATS_VERSION_FILE', '/etc/seedbox/config/version'), '/etc/seedbox/config/version'),
+        'cgroup_dir' => pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'cgroup_dir', 'PMSS_STATS_CGROUP_DIR', ''), '', true),
+    ];
+    if ($context['cgroup_dir'] === '') {
         foreach (pmssCgroupSelfEntries() as $entry) {
             foreach (['/sys/fs/cgroup'.$entry['path'], '/sys/fs/cgroup/unified'.$entry['path']] as $candidate) {
                 if (is_dir($candidate)) {
-                    $cgroupDir = $candidate;
+                    $context['cgroup_dir'] = $candidate;
                     break 2;
                 }
             }
         }
     }
 
-    return [
-        'user' => $user,
-        'home' => $home,
-        'config_dir' => $configDir,
-        'socket_path' => $socketPath,
-        'version_file' => $versionFile,
-        'cgroup_dir' => $cgroupDir,
-    ];
+    return $context;
 }

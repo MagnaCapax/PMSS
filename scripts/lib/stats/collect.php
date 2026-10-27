@@ -16,9 +16,8 @@ require_once __DIR__.'/../traffic/storage.php';
  */
 function pmssStatsReadQuotaSnapshot(string $home): array
 {
-    $path = rtrim($home, '/').'/.quota';
-    $result = ['path' => $path, 'raw' => '', 'used_text' => 'n/a', 'soft_text' => 'n/a', 'hard_text' => 'n/a', 'used_bytes' => null, 'soft_bytes' => null, 'hard_bytes' => null];
-    $raw = pmssReadRegularFileContents($path);
+    $result = ['path' => rtrim($home, '/').'/.quota', 'raw' => '', 'used_text' => 'n/a', 'soft_text' => 'n/a', 'hard_text' => 'n/a', 'used_bytes' => null, 'soft_bytes' => null, 'hard_bytes' => null];
+    $raw = pmssReadRegularFileContents($result['path']);
     if ($raw === null || trim($raw) === '') return $result;
     $result['raw'] = $raw;
 
@@ -86,9 +85,8 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
 
     try {
         foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
-            $value = $caller($socketPath, $method, [], 2);
             // A malformed RPC value must not turn into a successful zero reading.
-            $number = pmssFiniteNonNegativeFloat($value);
+            $number = pmssFiniteNonNegativeFloat($caller($socketPath, $method, [], 2));
             if ($number === null) return $stats;
             $stats[$key] = $number;
         }
@@ -121,8 +119,8 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $context = pmssStatsResolveContext($overrides);
     $home = $context['home'];
     $store = new UserConfigStore($context['config_dir']);
-    $configPayload = $store->get($context['user']);
-    $config = is_array($configPayload) ? $configPayload : [];
+    $config = $store->get($context['user']);
+    $config = is_array($config) ? $config : [];
     $quota = pmssStatsReadQuotaSnapshot($home);
     $traffic = pmssReadSerializedArrayFile($home.'/.trafficData') ?: [];
     $trafficIngress = pmssReadSerializedArrayFile($home.'/.trafficDataIngress') ?: [];
