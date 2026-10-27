@@ -5,6 +5,14 @@ require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserRutorrentCompatPatchTest extends TestCase
 {
+    public function testRpcCatalogBytesAndOrder(): void
+    {
+        $patches = \pmssUserRutorrentRpcCompatibilityPatches();
+        // Captured from the original catalog on a testing machine; includes whitespace and order.
+        $this->assertSame('955ad78521f90482daa7d964facd91db356b0aea6b2adfbf69fbc55afc672441', hash('sha256', serialize($patches)));
+        $this->assertSame(18, count($patches));
+    }
+
     public function testCompatibilityPatchesLegacyTargets(): void
     {
         foreach ($this->compatPatchCases() as $case) {
