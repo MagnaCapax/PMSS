@@ -246,7 +246,7 @@ class UserPermissionsApplyTest extends TestCase
             "pmssUserFileOpenVerified(\$path, 'rbn')",
             '@readlink($procPath)',
             "\$action = '-execdir chown -h '",
-            'pmssAccountPathRun($user, $home, $paths, $command)',
+            'pmssAccountPathRun($user, $home, $paths, $command, null, 0, $timedOut, $failure)',
         ]);
     }
 }

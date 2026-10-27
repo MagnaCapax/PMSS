@@ -33,8 +33,8 @@ function pmssReplaceAccountFile(
         .' && test ! -L '.escapeshellarg($path)
         .' && { test ! -e '.escapeshellarg($path).' || test -f '.escapeshellarg($path).'; }'
         .' && mv -T -- "$tmp" '.escapeshellarg($path);
-    $replaced = pmssAccountPathRun($username, $home, [$path], $command, $content);
-    if (!$replaced) error_log("Unable to replace account file for {$username}: {$path}");
+    $replaced = pmssAccountPathRun($username, $home, [$path], $command, $content, 0, $timedOut, $failure);
+    if (!$replaced) error_log("Unable to replace account file for {$username}: {$path} ({$failure})");
     // The shell replaces the inode outside PHP; invalidate metadata cached for the old path.
     clearstatcache(true, $path);
     return $replaced;

@@ -24,8 +24,8 @@ require_once __DIR__.'/permissionsCommands.php';
 /** Run one repair command as the account, keeping a failure for the final summary. */
 function pmssUserPermissionsAccountRun(string $user, string $home, array $paths, string $command): void
 {
-    if (!pmssAccountPathRun($user, $home, $paths, $command)) {
-        pmssUserPermissionsFailed($command.' (as '.$user.')');
+    if (!pmssAccountPathRun($user, $home, $paths, $command, null, 0, $timedOut, $failure)) {
+        pmssUserPermissionsFailed($command.' (as '.$user.') '.$failure);
     }
 }
 

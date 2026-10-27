@@ -124,6 +124,17 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssAccountPathRun()` preserves its boolean result and optional timeout flag.
+  Its optional eighth argument receives failure text with a stage, child exit
+  status (or `not-started`), and at most the first 300 bytes of stderr with
+  control characters replaced. Success clears the text. Treat it as log text,
+  never as machine input. Validation, stderr setup and launch failures remain
+  distinct from child, stdin and timeout failures.
+  Stderr uses a private, unlinked temporary-file descriptor so a noisy child
+  cannot deadlock stdin streaming; stdout and input content are never captured.
+  Account-file replacement and permission-repair failure logs include the text.
+  Existing path/identity guards, process isolation and timeout behavior remain.
+
 - Command launch builds one export statement for inherited PATH and unattended
   package variables, retaining their order, quoting and existing shell bytes.
   Single-caller command/log adapters are folded into Chromium installation,
