@@ -48,7 +48,7 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
     public function testDiagnosticsHelperUsesPathResolvedPhp(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'scripts/lib/agentDiagnostics.php',
+            'scripts/lib/agentDiagnostics/command.php',
             ["array_merge(['php', \$scriptPath]"],
             ['escapeshellarg(PHP_BINARY)' => "agentDiagnostics must not use PHP_BINARY for child invocation (GH#589)"]
         );

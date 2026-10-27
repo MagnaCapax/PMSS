@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/agentDiagnostics.php** – Stable diagnostic CLI and text renderer.
+  `agentDiagnostics/catalog.php` defines ordered probes, `command.php` owns checked
+  PHP-script execution, and `collect.php` acquires and projects recursive results.
+  Root/user guards and existing payload/error shapes remain at their original
+  boundaries (ADR 0193).
 - **scripts/util/userDocker.php** – Stable rootless-Docker CLI wrapper.
   `user/docker/cli.php` validates requests and dispatches to daemon start, checked
   shutdown, status, and transferred-container handlers. `command.php` preserves
