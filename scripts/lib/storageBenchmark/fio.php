@@ -15,7 +15,7 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
     $invalid = ['ok' => false, 'error' => 'invalid fio JSON'];
     if ($payload === null || !is_array($payload['jobs'] ?? null) || empty($payload['jobs'][0])) return $invalid;
     // One direction record replaces independent read/write bandwidth, IOPS and latency state.
-    $totals = array_fill_keys(['read', 'write'], ['bw' => 0, 'iops' => 0.0, 'p95' => []]);
+    $totals = array_fill_keys(['read', 'write'], ['bw' => 0, 'iops' => 0.0, 'p95' => 0.0, 'samples' => 0]);
     foreach ($payload['jobs'] as $job) {
         if (!is_array($job) || (isset($job['read']) && !is_array($job['read']))
             || (isset($job['write']) && !is_array($job['write']))) return $invalid;
@@ -35,18 +35,17 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
                 || ($percentile !== null && pmssFiniteNonNegativeFloat($percentile) === null)) return $invalid;
             $total['bw'] += $bandwidth;
             $total['iops'] += $iops;
-            if ($percentile !== null) $total['p95'][] = (float) $percentile;
+            if ($percentile !== null) { $total['p95'] += (float) $percentile; ++$total['samples']; }
         }
         unset($total);
     }
     // Fix field order independently of the direction traversal for JSONL consumers.
     $metrics = array_fill_keys(['read_bw_MBps', 'write_bw_MBps', 'read_iops', 'write_iops', 'read_p95_ms', 'write_p95_ms'], 0.0);
     foreach ($totals as $direction => $total) {
-        $sum = array_sum($total['p95']);
-        if (!is_finite($total['iops']) || !is_finite((float) $sum)) return $invalid;
+        if (!is_finite($total['iops']) || !is_finite($total['p95'])) return $invalid;
         $metrics[$direction.'_bw_MBps'] = round($total['bw'] / (1024 * 1024), 2);
         $metrics[$direction.'_iops'] = round($total['iops'], 1);
-        $metrics[$direction.'_p95_ms'] = round((count($total['p95']) ? $sum / count($total['p95']) : 0) / 1000000, 2);
+        $metrics[$direction.'_p95_ms'] = round(($total['samples'] ? $total['p95'] / $total['samples'] : 0) / 1000000, 2);
     }
     return ['ok' => true, 'result' => $metrics + ['raw' => $payload]];
 }

@@ -24,7 +24,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         $weight = pmssFiniteNonNegativeFloat($entry['weight'] ?? null);
         if ($quota !== null && $quota > 0 && $weight !== null && $weight > 0 && $weight <= PMSS_BFQ_KERNEL_MAX) $quotas[$user] = $quota;
         // Account facts and legacy caps do not depend on the quota exponent.
-        // Reserve share's payload position before each variant fills its value.
+        // Reserve share's payload position for weight calculation and normalization.
         $cohort[$user] = ['quota' => $quotas[$user] ?? null, 'weight' => $entry['weight'] ?? null,
             'share' => 0.0, 'floor' => pmssCgroupPolicyPositiveIntSetting($source['resourceIOPSReadMin'] ?? null) ?? (int) $settings['floor'],
             'ceiling' => pmssCgroupPolicyReadIopsTierCeiling($source, $policy),
@@ -43,14 +43,14 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $result = ['pressure' => $pressure, 'passive_read_iops' => $passive, 'benchmark_read_iops' => $benchmark,
         'host_read_iops' => $host, 'multiplier' => $multiplier, 'pool' => $pool, 'fallback' => $fallback, 'variants' => []];
     foreach (['1.0' => 1.0, '0.5' => 0.5] as $label => $alpha) {
-        $weights = []; $rows = $cohort; $lift = 0.0;
+        $rows = $cohort; $lift = 0.0;
         foreach ($users as $user => $entry) {
-            $weights[$user] = (pmssFiniteNonNegativeFloat($entry['weight'] ?? null) ?? 0) * pow(($quotas[$user] ?? $median) / $median, $alpha);
+            $rows[$user]['share'] = (pmssFiniteNonNegativeFloat($entry['weight'] ?? null) ?? 0) * pow(($quotas[$user] ?? $median) / $median, $alpha);
         }
-        $sum = array_sum($weights);
+        $sum = array_sum(array_column($rows, 'share'));
         if (!is_finite($sum)) return null;
-        foreach ($rows as $user => &$row) {
-            $row['share'] = $sum > 0 ? $weights[$user] / $sum : 0.0;
+        foreach ($rows as &$row) {
+            $row['share'] = $sum > 0 ? $row['share'] / $sum : 0.0;
             if (!$row['explicit']) $lift += max(0.0, $row['floor'] - $pool * $row['share']);
         }
         unset($row);

@@ -53,18 +53,14 @@ function storageBenchmarkShowLast(string $jsonLog): int
 
     // Select the latest timestamp while retaining every row of that run.
     $runs = [];
-    $lastId = '';
-    $lastTs = '';
+    $latest = [];
     foreach (pmssJsonLineFileRead($jsonLog) as $entry) {
         if (!is_string($entry['run_id'] ?? null) || $entry['run_id'] === '') continue;
         $runs[$entry['run_id']][] = $entry;
-        $runTs = is_string($entry['run_ts'] ?? null) ? $entry['run_ts'] : '';
-        if ($runTs > $lastTs) {
-            $lastTs = $runTs;
-            $lastId = $entry['run_id'];
-        }
+        if (is_string($entry['run_ts'] ?? null) && $entry['run_ts'] > ($latest['run_ts'] ?? '')) $latest = $entry;
     }
 
+    $lastId = $latest['run_id'] ?? '';
     if ($lastId === '') {
         echo "No runs found.\n";
         return 0;

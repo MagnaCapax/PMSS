@@ -99,8 +99,7 @@ function pmssSystemStatsDiskBusyPercent(array $before, array $after, float $samp
     foreach ($after as $name => $ioTime) {
         $delta = max(0, $ioTime - ($before[$name] ?? $ioTime));
         // /proc/diskstats io_time is in milliseconds spent doing IO.
-        $pct = $sampleSeconds > 0 ? ($delta / ($sampleSeconds * 1000)) * 100 : 0.0;
-        $maxPct = max($maxPct, $pct);
+        $maxPct = max($maxPct, $sampleSeconds > 0 ? ($delta / ($sampleSeconds * 1000)) * 100 : 0.0);
     }
     return number_format(min(100, $maxPct), 1, '.', '');
 }
