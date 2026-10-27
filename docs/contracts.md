@@ -453,6 +453,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     every depth.
   - Final rsync copies session data but excludes the source host's
     `session/rtorrent.lock`; the target keeps its own runtime lock.
+    It also excludes `/.lighttpd/custom.d/pmss-qbittorrent.conf`, keeping the
+    target's generated proxy paired with its retained qBittorrent config and
+    port. Other `custom` and `custom.d` fragments still copy; the exclusion
+    is anchored to the home root.
   - Both rsync passes use one `--one-file-system`: recursion leaves separate
     filesystems as empty mount directories; same-device bind mounts still copy.
     Explicit source roots retain rsync's normal per-source filesystem boundary.

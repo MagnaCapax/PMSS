@@ -90,12 +90,13 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
 function pmssUserTransferBuildRsyncFinal(array $cfg): string
 {
     $remoteHome = '/home/'.$cfg['remoteUser'];
+    // qBittorrent keeps its target config and port, so retain its matching proxy too.
     return pmssUserTransferBuildRsyncCommand($cfg, [
         $remoteHome.'/./session', $remoteHome.'/./www/rutorrent/share', $remoteHome.'/./.lighttpd/custom',
         $remoteHome.'/./.lighttpd/custom.d', $remoteHome.'/./.local', $remoteHome.'/./www/public',
         $remoteHome.'/./.mcxPikkumies/pikkumies/local',
         $remoteHome.'/./.hermes',
-    ], ['/session/rtorrent.lock', '/.billingId', '/.billingServiceId', '/.billingClientId', '/.mcxPikkumies/pikkumies/local/eternals.hold'], ['-R', '--ignore-missing-args']);
+    ], ['/session/rtorrent.lock', '/.lighttpd/custom.d/pmss-qbittorrent.conf', '/.billingId', '/.billingServiceId', '/.billingClientId', '/.mcxPikkumies/pikkumies/local/eternals.hold'], ['-R', '--ignore-missing-args']);
 }
 
 /** Source commands run under the authenticated account, never through remote root. */
