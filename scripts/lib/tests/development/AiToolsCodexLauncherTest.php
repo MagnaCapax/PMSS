@@ -82,8 +82,7 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         $source = __DIR__.'/../../update/apps/templates/pmss-ai-launch.php';
         file_put_contents($stub, 'old binary');
         $this->assertTrue(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, false));
-        file_put_contents($binary, 'pinned binary fixture');
-        chmod($binary, 0755);
+        $this->pmssWriteExecutableFile($binary, 'pinned binary fixture');
         $uid = posix_geteuid();
         $gid = posix_getegid();
         $this->assertTrue(\pmssAiToolsCodexAtomicWrite($launcher, file_get_contents($source), 0644, $uid, $gid));

@@ -339,6 +339,11 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Executable test fixtures use `pmssWriteExecutableFile()` for the shared write
+and mode application. Keep stub bytes and paths at each test, passing the
+existing file mode explicitly when it differs from 0755. Permission-failure
+scenarios and later mode transitions retain their explicit `chmod()` calls.
+
 Temporary account fixtures share their home-root setup through
 `TemporaryHomeRootTestCase`; individual cases opt in with
 `TestCase::pmssTrackTempRootAsHomeRoot()`. Both retain the existing temporary-root

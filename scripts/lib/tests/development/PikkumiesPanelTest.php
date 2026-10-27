@@ -16,8 +16,7 @@ final class PikkumiesPanelTest extends TestCase
         file_put_contents($home.'/marker', '');
         file_put_contents($home.'/billing/alice', "123\n");
         $binary = $home.'/.mcxPikkumies/pikkumies/bin/pikkumies';
-        file_put_contents($binary, "#!/bin/sh\n");
-        chmod($binary, 0700);
+        $this->pmssWriteExecutableFile($binary, "#!/bin/sh\n", 0755, 0700);
         return $home;
     }
 

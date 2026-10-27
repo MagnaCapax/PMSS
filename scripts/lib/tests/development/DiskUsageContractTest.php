@@ -12,8 +12,7 @@ class DiskUsageContractTest extends TestCase
         $this->assertTrue(strpos($source, 'echo serialize($segments);') !== false);
 
         $binDir = $this->pmssMakeTempDir('pmss-disk-usage-bin-', 0700);
-        file_put_contents($binDir.'/df', "#!/bin/sh\nprintf '%s\\n' 'Filesystem Blocks Used Available' 'mock 100 25 75'\n");
-        chmod($binDir.'/df', 0700);
+        $this->pmssWriteExecutableFile($binDir.'/df', "#!/bin/sh\nprintf '%s\\n' 'Filesystem Blocks Used Available' 'mock 100 25 75'\n", 0755, 0700);
         $output = $this->pmssRunRepoPhpScript(
             'scripts/util/remote/diskUsage.php',
             [],

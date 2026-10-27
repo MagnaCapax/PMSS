@@ -317,8 +317,7 @@ class MdadmCheckarrayTest extends TestCase
     {
         $path = $this->fixtureRoot.'/checkarray';
         $body = "#!/usr/bin/env bash\nprintf '%s\\n' \"\$*\" >> \"\$PMSS_MDADM_CHECKARRAY_STUB_LOG\"\nexit ".$exitCode."\n";
-        file_put_contents($path, $body);
-        chmod($path, 0755);
+        $this->pmssWriteExecutableFile($path, $body);
         return $path;
     }
 

@@ -221,8 +221,7 @@ class CredentialProcessTransportTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-shadow-stderr-');
         mkdir($dir.'/bin');
-        file_put_contents($dir.'/bin/chpasswd', "#!/bin/sh\ncat >/dev/null\nprintf 'shadow failure\n' >&2\nexit 4\n");
-        chmod($dir.'/bin/chpasswd', 0700);
+        $this->pmssWriteExecutableFile($dir.'/bin/chpasswd', "#!/bin/sh\ncat >/dev/null\nprintf 'shadow failure\n' >&2\nexit 4\n", 0755, 0700);
         $output = [];
         $this->pmssWithEnv(['PATH' => $dir.'/bin:'.getenv('PATH')], function () use (&$output): void {
             [$status, $hash] = \pmssChangePwShadowUpdate('alice', 'provided-value', true, $output);

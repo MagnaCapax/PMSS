@@ -24,8 +24,7 @@ class LighttpdUserFileWriteTest extends TestCase
         $stub = $this->tempDir.'/stub';
         $this->assertTrue(@mkdir($stub, 0700));
         // Stand-in for runuser: drop "-u USER --" and run the rest as this user.
-        file_put_contents($stub.'/runuser', "#!/bin/sh\nshift 3\nexec \"\$@\"\n");
-        chmod($stub.'/runuser', 0700);
+        $this->pmssWriteExecutableFile($stub.'/runuser', "#!/bin/sh\nshift 3\nexec \"\$@\"\n", 0755, 0700);
         $received = $this->tempDir.'/received';
         $command = \pmssAccountPathShellCommand(0, 1001, 'alice', 'cat > '.escapeshellarg($received));
         $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin',

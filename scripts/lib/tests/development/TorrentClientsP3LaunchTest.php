@@ -157,8 +157,7 @@ final class TorrentClientsP3LaunchTest extends TestCase
         $script = '#!/usr/bin/env php'."\n".'<?php $server = stream_socket_server('
             .var_export('unix://'.$socket, true).'); file_put_contents('
             .var_export($pidFile, true).', getmypid()); sleep(3);' . "\n";
-        file_put_contents($binary, $script);
-        chmod($binary, 0755);
+        $this->pmssWriteExecutableFile($binary, $script);
         $ops = ['storeRoot' => $store, 'projection' => $projection];
         $this->assertTrue(\pmssTransmissionLaunch($home, $ops));
         $entry = lstat($socket);

@@ -56,8 +56,7 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
     private function host(string $pythonVersion, string $codename, callable $check): void
     {
         $root = $this->pmssMakeTempDir('pmss-deluge-host-');
-        file_put_contents($root.'/python3', "#!/bin/sh\nprintf '%s\\n' '".$pythonVersion."'\n");
-        chmod($root.'/python3', 0755);
+        $this->pmssWriteExecutableFile($root.'/python3', "#!/bin/sh\nprintf '%s\\n' '".$pythonVersion."'\n");
         $major = $codename === 'bookworm' ? '12' : '11';
         file_put_contents($root.'/os-release', "ID=debian\nVERSION_ID=$major\nVERSION_CODENAME=$codename\n");
         $this->pmssWithEnv(['PATH' => $root.':'.getenv('PATH'),

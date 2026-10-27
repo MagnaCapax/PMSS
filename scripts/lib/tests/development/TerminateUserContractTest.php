@@ -79,7 +79,7 @@ final class TerminateUserContractTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-terminate-shell-');
         $bin = $root.'/bin';
         mkdir($bin);
-        file_put_contents($bin.'/runuser', <<<'SH'
+        $this->pmssWriteExecutableFile($bin.'/runuser', <<<'SH'
 #!/bin/sh
 [ "$1" = --pty ] && shift
 [ "$1" = -u ] && [ "$2" = user1234 ] && [ "$3" = -- ] || exit 97
@@ -90,7 +90,6 @@ shift 2
 exec sh -c "$1"
 SH
         );
-        chmod($bin.'/runuser', 0755);
         $target = $root.'/socket';
         $command = \pmssTerminateUserAccountSocketRemoveCommand('user1234', $target);
         $this->assertStringContainsString('env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin ', $command);
@@ -104,8 +103,7 @@ SH
         mkdir($target);
         file_put_contents($target.'/child', 'keep');
         // A failing rm must surface through runuser and the outer timeout.
-        file_put_contents($bin.'/rm', "#!/bin/sh\nexit 1\n");
-        chmod($bin.'/rm', 0755);
+        $this->pmssWriteExecutableFile($bin.'/rm', "#!/bin/sh\nexit 1\n");
         exec($stubbed, $output, $rc);
         $this->assertSame(1, $rc, 'inner command failure must not be masked');
         $this->assertTrue(is_file($target.'/child'));
@@ -116,8 +114,7 @@ SH
         $root = $this->pmssMakeTempDir('pmss-terminate-pty-');
         $stub = $root.'/runuser';
         $effect = $root.'/effect';
-        file_put_contents($stub, "#!/bin/sh\n[ \"\$1\" = --pty ] && shift\n[ \"\$1\" = -u ] && [ \"\$2\" = user1234 ] && [ \"\$3\" = -- ] || exit 97\nshift 3\n[ \"\$1\" = sh ] && [ \"\$2\" = -c ] || exit 98\nshift 2\n[ -t 0 ] && exit 99\nexec sh -c \"\$1\"\n");
-        chmod($stub, 0755);
+        $this->pmssWriteExecutableFile($stub, "#!/bin/sh\n[ \"\$1\" = --pty ] && shift\n[ \"\$1\" = -u ] && [ \"\$2\" = user1234 ] && [ \"\$3\" = -- ] || exit 97\nshift 3\n[ \"\$1\" = sh ] && [ \"\$2\" = -c ] || exit 98\nshift 2\n[ -t 0 ] && exit 99\nexec sh -c \"\$1\"\n");
         $built = \pmssBuildUserShellNoPamCommand('user1234', '[ -z "$PMSS_TEST_SECRET" ] && touch '.escapeshellarg($effect));
         $this->assertSame(0, strpos($built, 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin '));
         $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($root.':/usr/sbin:/usr/bin:/sbin:/bin'), $built);
@@ -133,7 +130,7 @@ SH
         $root = $this->pmssMakeTempDir('pmss-runuser-capability-');
         $bin = $root.'/bin';
         mkdir($bin);
-        file_put_contents($bin.'/runuser', <<<'SH'
+        $this->pmssWriteExecutableFile($bin.'/runuser', <<<'SH'
 #!/bin/sh
 if [ "$1" = --help ]; then
     [ "$PMSS_TEST_PTY" = 1 ] && echo '  --pty'
@@ -148,7 +145,6 @@ shift 2
 exec sh -c "$1"
 SH
         );
-        chmod($bin.'/runuser', 0755);
         $builder = $root.'/build.php';
         file_put_contents($builder, '<?php require '.var_export($this->pmssRepoPath('scripts/lib/runtime/environment.php'), true)
             .'; echo pmssBuildUserShellNoPamCommand("user1234", "touch ".escapeshellarg($argv[1]));');

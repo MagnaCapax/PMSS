@@ -98,8 +98,7 @@ final class AddUserPostProvisionTest extends TestCase
         // The slice launcher resolves the uid with `id -u`; a stub keeps the test independent of the host's users.
         $name = 'alice';
         $this->pmssEnsureDir($this->tempDir.'/stub');
-        file_put_contents($this->tempDir.'/stub/id', "#!/bin/sh\necho 4321\n");
-        chmod($this->tempDir.'/stub/id', 0755);
+        $this->pmssWriteExecutableFile($this->tempDir.'/stub/id', "#!/bin/sh\necho 4321\n");
         $path = (string) getenv('PATH');
         $home = $this->tempDir.'/home';
         $this->pmssEnsureDir($home.'/bin');

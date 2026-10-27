@@ -198,8 +198,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->pmssEnsureDir($root.'/state');
         touch($root.'/state/done');
         $this->pmssEnsureDir($root.'/stub');
-        file_put_contents($root.'/stub/id', "#!/bin/sh\necho 4321\n");
-        chmod($root.'/stub/id', 0755);
+        $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
         $path = (string) getenv('PATH');
         $runs = [];
         $ops = [
@@ -257,8 +256,7 @@ public function testMarkerPathIsMadeInARootOnlyDirectoryAndRefusesLinksAndRepeat
         $this->pmssEnsureDir($home.'/bin');
         file_put_contents($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
         $this->pmssEnsureDir($root.'/stub');
-        file_put_contents($root.'/stub/id', "#!/bin/sh\necho 4321\n");
-        chmod($root.'/stub/id', 0755);
+        $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
         $path = (string) getenv('PATH');
         putenv('PATH='.$root.'/stub:'.$path);
         try {

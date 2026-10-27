@@ -29,8 +29,7 @@ class KernelHardeningSshKeysignTest extends KernelHardeningTestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sshkeysign-already-');
         $target = $dir.'/ssh-keysign';
-        file_put_contents($target, '#!/bin/sh'.PHP_EOL);
-        chmod($target, 0755);
+        $this->pmssWriteExecutableFile($target, '#!/bin/sh'.PHP_EOL);
         $logs = [];
 
         $this->pmssRunKernelHardeningSshKeysign(['PMSS_SSH_KEYSIGN_PATH' => $target], $logs);

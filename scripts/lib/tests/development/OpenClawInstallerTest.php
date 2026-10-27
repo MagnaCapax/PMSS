@@ -118,8 +118,7 @@ final class OpenClawInstallerTest extends TestCase
         \ocEnsureToken($paths);
         $token = file_get_contents($paths['env']);
         file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
-        file_put_contents($home.'/stubs/quota', "#!/bin/sh\ncat \"\$HOME/quota-output\"\n");
-        chmod($home.'/stubs/quota', 0700);
+        $this->pmssWriteExecutableFile($home.'/stubs/quota', "#!/bin/sh\ncat \"\$HOME/quota-output\"\n", 0755, 0700);
         file_put_contents($paths['entry'], '<?php
 $command = $argv[1] ?? "";
 file_put_contents(getenv("HOME")."/calls", $command."\\n", FILE_APPEND);
@@ -222,8 +221,7 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         file_put_contents($home.'/.lighttpd.conf', "server.port = 24000\n");
         foreach (array('quota' => 'exit 0', 'pkill' => 'exit 0', 'lighttpd' => 'exit 0', 'curl' => 'echo 401',
             'crontab' => 'if [ "$1" = "-l" ]; then echo "no crontab for alice"; exit 1; fi') as $name => $body) {
-            file_put_contents($home.'/stubs/'.$name, "#!/bin/sh\n".$body."\n");
-            chmod($home.'/stubs/'.$name, 0700);
+            $this->pmssWriteExecutableFile($home.'/stubs/'.$name, "#!/bin/sh\n".$body."\n", 0755, 0700);
         }
         $env = getenv();
         $env['HOME'] = $home;
@@ -329,8 +327,7 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
     {
         // A panel-launched install inherits the account login PATH, which has no /usr/sbin (lighttpd lives there).
         $root = $this->pmssMakeTempDir('pmss-oc-path-');
-        file_put_contents($root.'/lighttpd', "#!/bin/sh\n");
-        chmod($root.'/lighttpd', 0755);
+        $this->pmssWriteExecutableFile($root.'/lighttpd', "#!/bin/sh\n");
         $sbin = null;
         foreach ((array) @scandir('/usr/sbin') as $name) {
             if ($name !== '.' && $name !== '..' && is_file('/usr/sbin/'.$name) && is_executable('/usr/sbin/'.$name)) { $sbin = $name; break; }
@@ -439,10 +436,9 @@ function ocTestOnboardFlags() { return array("--non-interactive", "--accept-risk
         $paths = $this->openClawConfigFixture();
         // A pinned-node shim and npm no-op exercise the real fresh-install orchestration.
         $paths['node'] = $paths['home'].'/node';
-        file_put_contents($paths['node'], '#!'.PHP_BINARY."\n".'<?php
+        $this->pmssWriteExecutableFile($paths['node'], '#!'.PHP_BINARY."\n".'<?php
 if (($argv[1] ?? "") === "--version") { echo "v'.OC_NODE_VERSION.'"; exit; }
-$file = $argv[1]; array_shift($argv); require $file;');
-        chmod($paths['node'], 0700);
+$file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
         $paths['npm'] = $paths['home'].'/npm.php';
         file_put_contents($paths['npm'], '<?php // No network.');
         $this->assertTrue(\ocInstallFresh($paths, \ocVirsilipasCredentials($paths['home']), true, 23000));
@@ -666,8 +662,7 @@ $file = $argv[1]; array_shift($argv); require $file;');
         \ocPrivateMarkerWrite($paths['state'].'/pmss-virsilipas', "virsilipas\n");
         touch($paths['state'].'/pmss-kokko-disabled');
         mkdir($paths['home'].'/stubs', 0700);
-        file_put_contents($paths['home'].'/stubs/quota', "#!/bin/sh\nexit 0\n");
-        chmod($paths['home'].'/stubs/quota', 0700);
+        $this->pmssWriteExecutableFile($paths['home'].'/stubs/quota', "#!/bin/sh\nexit 0\n", 0755, 0700);
         file_put_contents($paths['home'].'/.media-stack-port-openclaw', "23000\n");
         $prior = getenv('PATH');
         putenv('PATH='.$paths['home'].'/stubs:'.$prior);
@@ -848,8 +843,7 @@ $file = $argv[1]; array_shift($argv); require $file;');
         $token = trim(substr(file_get_contents($paths['env']), strlen('OPENCLAW_GATEWAY_TOKEN=')));
         file_put_contents($paths['entry'], '<?php echo getenv("OPENCLAW_GATEWAY_TOKEN"), "|", getenv("OPENCLAW_SUPERVISOR_MODE"), "|", implode(" ", array_slice($argv, 1));');
         $wrapper = $home.'/openclaw-wrapper';
-        file_put_contents($wrapper, \ocCliWrapper($paths));
-        chmod($wrapper, 0700);
+        $this->pmssWriteExecutableFile($wrapper, \ocCliWrapper($paths), 0755, 0700);
         $env = getenv();
         $env['HOME'] = $home;
         unset($env['OPENCLAW_GATEWAY_TOKEN'], $env['CUSTOM_API_KEY']);

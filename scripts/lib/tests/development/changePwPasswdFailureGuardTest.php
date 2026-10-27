@@ -104,8 +104,7 @@ class changePwPasswdFailureGuardTest extends TestCase
         $argsPath = $this->tempDir.'/chpasswd-args';
         $binDir = $this->tempDir.'/bin';
         mkdir($binDir, 0700);
-        file_put_contents($binDir.'/chpasswd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n");
-        chmod($binDir.'/chpasswd', 0700);
+        $this->pmssWriteExecutableFile($binDir.'/chpasswd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n", 0755, 0700);
         $originalPath = getenv('PATH');
         putenv('PATH='.$binDir.':'.$originalPath);
         putenv('PMSS_TEST_INPUT='.$inputPath);
@@ -151,8 +150,7 @@ class changePwPasswdFailureGuardTest extends TestCase
         $argsPath = $this->tempDir.'/passwd-args';
         $binDir = $this->tempDir.'/bin';
         mkdir($binDir, 0700);
-        file_put_contents($binDir.'/passwd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n");
-        chmod($binDir.'/passwd', 0700);
+        $this->pmssWriteExecutableFile($binDir.'/passwd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n", 0755, 0700);
         $originalPath = getenv('PATH');
         putenv('PATH='.$binDir.':'.$originalPath);
         putenv('PMSS_TEST_INPUT='.$inputPath);
@@ -188,8 +186,7 @@ IFS= read -r password
 printf '%s' "$password" > "$PMSS_TEST_INPUT"
 printf '%s' "$password" | php -r '$hash = password_hash(stream_get_contents(STDIN), PASSWORD_BCRYPT); $rows = is_file($argv[1]) ? file($argv[1]) : []; $rows = array_filter($rows, function ($row) use ($argv) { return strpos($row, $argv[2].":") !== 0; }); $rows[] = $argv[2].":".$hash."\n"; file_put_contents($argv[1], implode("", $rows));' "$@"
 SH;
-        file_put_contents($binDir.'/htpasswd', $stub."\n");
-        chmod($binDir.'/htpasswd', 0700);
+        $this->pmssWriteExecutableFile($binDir.'/htpasswd', $stub."\n", 0755, 0700);
         $originalPath = getenv('PATH');
         putenv('PATH='.$binDir.':'.$originalPath);
         putenv('PMSS_TEST_ARGS='.$this->tempDir.'/htpasswd-args');

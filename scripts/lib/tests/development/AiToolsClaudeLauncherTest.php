@@ -126,8 +126,7 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         foreach (['22.9.0', '22.23.4'] as $version) {
             $bin = $this->tempDir.'/node-v'.$version.'-linux-x64/bin';
             mkdir($bin, 0755, true);
-            file_put_contents($bin.'/node', "#!/bin/sh\n");
-            chmod($bin.'/node', 0755);
+            $this->pmssWriteExecutableFile($bin.'/node', "#!/bin/sh\n");
         }
         $out = \pmssAiNodeRuntimePath($env, $this->tempDir);
         $this->assertSame($this->tempDir.'/node-v22.23.4-linux-x64/bin:/usr/bin:/bin', $out['PATH']);

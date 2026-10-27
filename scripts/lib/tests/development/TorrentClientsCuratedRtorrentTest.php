@@ -101,8 +101,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-rtorrent-watchdog-');
         $probe = $root.'/pgrep';
         // Mimic pgrep matching the 0.9.8 main thread; never inspect a live PID.
-        file_put_contents($probe, "#!/bin/sh\ncase \"\$*\" in *'^rtorrent'*) printf '123\\n';; *) exit 1;; esac\n");
-        chmod($probe, 0755);
+        $this->pmssWriteExecutableFile($probe, "#!/bin/sh\ncase \"\$*\" in *'^rtorrent'*) printf '123\\n';; *) exit 1;; esac\n");
         $this->pmssWithEnv(['PATH' => $root.':'.getenv('PATH')], function (): void {
             $this->assertSame([123], \pmssUserWatchdogProcessPids('testuser', '^rtorrent'));
         });
@@ -157,8 +156,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             if ($row['kind'] === 'system') continue;
             mkdir($store.'/rtorrent/'.$row['version'], 0755, true);
             // The fixture prints its argv so the test sees the exact launch arguments.
-            file_put_contents($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\nprintf '%s|' \"\$@\"\n");
-            chmod($store.'/rtorrent/'.$row['version'].'/rtorrent', 0755);
+            $this->pmssWriteExecutableFile($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\nprintf '%s|' \"\$@\"\n");
             $row['disabled'] = false;
             $rows[] = $row;
         }
