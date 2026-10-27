@@ -454,10 +454,10 @@ SH
             'scripts/terminateUser.php' => ['required' => [
                 'pmssTerminateUserReleaseRtorrentPortReservations($username',
             ]],
-            'scripts/lib/user/terminationCleanup.php' => ['required' => [
+            'scripts/lib/user/termination/ports.php' => ['required' => [
                 'function pmssTerminateUserReleaseRtorrentPortReservations',
                 'function pmssTerminateUserRtorrentPortRecord',
-                'pmssTerminateUserRtorrentStoredPorts',
+                'pmssTerminateUserRtorrentPorts',
                 '$configLines = @file($portFile',
                 'pmssNetworkPortParseDigits',
                 'cleanup_ports_config_read',
@@ -479,7 +479,7 @@ SH
     public function testTerminateUserRemovesNginxSubdomainRouteFiles(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/terminationCleanup.php' => ['required' => [
+            'scripts/lib/user/termination/filesystem.php' => ['required' => [
                 'function pmssTerminateUserRemoveNginxRouteFiles',
                 'function pmssTerminateUserNginxRouteFileSpecs',
                 'remove_nginx_route_file',
@@ -508,7 +508,7 @@ SH
     public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/terminationCleanup.php' => [
+            'scripts/lib/user/termination/filesystem.php' => [
                 'required' => [
                     'function pmssTerminateUserUnlinkPath',
                     'function pmssTerminateUserRemoveEmptyDir',

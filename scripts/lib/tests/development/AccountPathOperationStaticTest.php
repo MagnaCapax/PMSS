@@ -165,7 +165,7 @@ final class AccountPathOperationStaticTest extends TestCase
 
     public function testTerminationPurgeUsesPinnedSymlinkRefusingTree(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/terminationCleanup.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/termination/commands.php', [
             'pmssPinnedTreePurgeCommand($path, false)',
             'pmssPinnedTreePurgeCommand($path, true)',
         ]);

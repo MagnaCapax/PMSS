@@ -1343,6 +1343,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Output: With non-TTY stdout, emits empty heartbeat lines during silent steps. TTY output is unchanged.
 
 - scripts/terminateUser.php [--dry-run] [--confirm] USERNAME
+  - Helpers: `user/terminationCleanup.php` composes shell-step planning, direct filesystem cleanup, ordered rTorrent port discovery and completion verification from `user/termination/` (ADR 0191). Direct file and empty-directory removals share one audit lifecycle; stored port values retain precedence over legacy configuration.
   - Behavior: Validates the managed user and exact `/home/<user>` path, disables systemd linger and removes tmux and screen sockets under the account UID without a PAM session before `userdel`, then synchronously purges `/home/<user>`, `/home/backup-<user>`, and `/home/backup-<user>.superseded`. Socket cleanup uses `runuser --pty` where supported; older util-linux uses `setsid runuser` with stdin closed. The selected path is logged. After the final process kill, it waits for the user manager to stop before resetting a failed state. The linger, socket, and manager steps are time-bounded and run only when the initial passwd lookup succeeds.
   - Scope: The backup purge targets only the two exact recreate-backup paths; it never sweeps `backup-*` prefixes.
   - Output: With non-TTY stdout, emits empty heartbeat lines during silent steps, including preflight and synchronous purge. The existing completion line remains the last non-empty line. TTY output is unchanged.
