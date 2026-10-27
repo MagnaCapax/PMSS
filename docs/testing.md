@@ -22,10 +22,11 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
-Torrent-client operation fixtures use `TestCase::pmssMakeEventCallbacks($events,
-$results)` for callbacks that append their operation name and return a fixed
-value. Results remain explicit, including `false`, `null` and backup arrays;
-callbacks share the event array by reference. Argument-dependent behavior,
+Torrent-client operation fixtures use `TestCase::pmssMakeCallbacks($results,
+$events)` for callbacks that return a fixed value and, when an event array is
+passed, append their operation name to it. Results remain explicit, including
+`false`, `null` and backup arrays; callbacks share the event array by
+reference. Argument-dependent behavior,
 lock checks, filesystem effects and assertions stay in the individual tests.
 
 In-process environment fixtures use `TestCase::pmssWithEnv($values, $callback)`

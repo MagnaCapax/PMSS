@@ -34,9 +34,10 @@ final class TorrentClientsP1LaunchTest extends TestCase
             }
             $events = [];
             $this->assertTrue(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, [
-                'system' => !$selected, 'accountPids' => static function (): array { return []; },
-                'resolve' => static function (): string { return '/fixture/custom/qbittorrent-nox'; },
-            ] + $this->pmssMakeEventCallbacks($events, ['restore' => true, 'launch' => true, 'check' => true])));
+                'system' => !$selected,
+            ]
+                + self::pmssMakeCallbacks(['accountPids' => [], 'resolve' => '/fixture/custom/qbittorrent-nox'])
+                + self::pmssMakeCallbacks(['restore' => true, 'launch' => true, 'check' => true], $events)));
             $this->assertSame(['restore', 'launch', 'check'], $events);
         }
     }
@@ -69,9 +70,6 @@ final class TorrentClientsP1LaunchTest extends TestCase
         $reads = 0;
         $signals = array();
         $ops = array(
-            'account' => static function (): array { return array('uid' => 1000); },
-            'pids' => static function (): array { return array(123); },
-            'namespace' => static function (): string { return 'mnt:[1]'; },
             'read' => static function (string $path): string {
                 return substr($path, -5) === '/comm' ? "qbittorrent-nox\n" : "Uid:\t1000 1000 1000 1000\n";
             },
@@ -82,7 +80,7 @@ final class TorrentClientsP1LaunchTest extends TestCase
             'signal' => static function (int $pid, int $signal) use (&$signals): bool {
                 $signals[] = array($pid, $signal); return true;
             },
-        );
+        ) + self::pmssMakeCallbacks(['account' => array('uid' => 1000), 'pids' => array(123), 'namespace' => 'mnt:[1]']);
         $this->assertSame(0, \pmssTorrentClientNativeStop('t', 'qbittorrent', 15, $ops));
         $this->assertSame(array(), $signals);
     }

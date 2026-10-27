@@ -21,26 +21,26 @@ final class QbittorrentThrottleAccountTest extends TestCase
     private function ops(array $extra = []): array
     {
         return $extra + ['build' => '5.2.4', 'stopAttempts' => 0,
-            'accountPids' => static function (): array { return []; },
-            'restore' => static function (): bool { return true; },
-            'notice' => static function (): void {},
             'recordWrite' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); },
-            'write' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); }];
+            'write' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); },
+        ] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'notice' => null]);
     }
 
     public function testLiveComparisonDoesNotRestoreOrWrite(): void
     {
         $unreachable = static function (): void { throw new \RuntimeException('Live comparison wrote the configuration'); };
-        $ops = $this->ops(['accountPids' => static function (): array { return [101]; },
-            'restore' => $unreachable, 'write' => $unreachable]);
+        $ops = $this->ops([
+            'restore' => $unreachable, 'write' => $unreachable,
+        ] + self::pmssMakeCallbacks(['accountPids' => [101]]));
         $this->assertTrue(\pmssQbittorrentThrottleAccount($this->home, 512, false, $ops));
         $this->assertFalse(\pmssQbittorrentThrottleAccount($this->home, 0, false, $ops));
     }
 
     public function testAnyRunningSameUidDaemonRefusesWriteAndRestore(): void
     {
-        $ops = $this->ops(['accountPids' => static function (): array { return [101]; },
-            'restore' => static function (): void { throw new \RuntimeException('Running process allowed restore'); }]);
+        $ops = $this->ops([
+            'restore' => static function (): void { throw new \RuntimeException('Running process allowed restore'); },
+        ] + self::pmssMakeCallbacks(['accountPids' => [101]]));
         $this->assertSame(null, \pmssQbittorrentThrottleAccount($this->home, 512, true, $ops));
         $this->assertStringContainsString('GlobalUPSpeedLimit=0', file_get_contents($this->path));
     }
@@ -55,7 +55,7 @@ final class QbittorrentThrottleAccountTest extends TestCase
                 $events[] = 'exit-save';
                 file_put_contents($this->path, "[BitTorrent]\nSession\\GlobalUPSpeedLimit=900\nOther=preserved\n");
                 $live = false;
-            }] + $this->pmssMakeEventCallbacks($events, ['restore' => true]));
+            }] + self::pmssMakeCallbacks(['restore' => true], $events));
         $this->assertTrue(\pmssQbittorrentThrottleAccount($this->home, 512, true, $ops));
         $this->assertSame(['exit-save', 'restore'], $events);
         $this->assertStringContainsAllStrings(['GlobalUPSpeedLimit=512', 'Other=preserved'], file_get_contents($this->path));
@@ -64,8 +64,7 @@ final class QbittorrentThrottleAccountTest extends TestCase
     public function testPendingSaveIsPromotedBeforeThrottleIsApplied(): void
     {
         $this->pmssWriteFile(dirname($this->path).'/qBittorrent_new.conf', "[BitTorrent]\nSession\\GlobalUPSpeedLimit=900\nLatest=kept\n");
-        $ops = $this->ops(['restore' => 'pmssQbittorrentRestore',
-            'stopped' => static function (): bool { return true; }]);
+        $ops = $this->ops(['restore' => 'pmssQbittorrentRestore'] + self::pmssMakeCallbacks(['stopped' => true]));
         $this->assertTrue(\pmssQbittorrentThrottleAccount($this->home, 256, true, $ops));
         $this->assertStringContainsAllStrings(['GlobalUPSpeedLimit=256', 'Latest=kept'], file_get_contents($this->path));
         $this->assertFalse(file_exists(dirname($this->path).'/qBittorrent_new.conf'));
@@ -75,7 +74,7 @@ final class QbittorrentThrottleAccountTest extends TestCase
     {
         foreach (['restore', 'write'] as $operation) {
             $this->assertSame(null, \pmssQbittorrentThrottleAccount($this->home, 512, true,
-                $this->ops([$operation => static function (): bool { return false; }])));
+                $this->ops(self::pmssMakeCallbacks([$operation => false]))));
         }
     }
 

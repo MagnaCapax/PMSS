@@ -12,18 +12,15 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-qbt-review-');
         $native = $this->pmssWriteFile($root.'/qbittorrent-nox', 'binary');
         return [
-            'enabled' => static function (): bool { return true; },
-            'contextSafe' => static function (): bool { return true; },
-            'pathSafe' => static function (): bool { return true; },
-            'read' => static function (): string { return "[Preferences]\nWebUI\\LocalHostAuth=false\n"; },
-            'pids' => static function (): array { return [123]; },
             'roots' => [$native],
             'exe' => static function () use ($native): string { return $native; },
-            'mntNs' => static function (): string { return 'mnt:[1]'; },
             'log' => static function ($user, $message) use (&$events): void { $events[] = 'log:'.$message; },
             'stateDir' => $root.'/run',
             'now' => 100000,
-        ] + $this->pmssMakeEventCallbacks($events, ['write' => true, 'signal' => true]);
+        ] + self::pmssMakeCallbacks([
+            'enabled' => true, 'contextSafe' => true, 'pathSafe' => true,
+            'read' => "[Preferences]\nWebUI\\LocalHostAuth=false\n", 'pids' => [123], 'mntNs' => 'mnt:[1]'
+        ]) + self::pmssMakeCallbacks(['write' => true, 'signal' => true], $events);
     }
 
     /** A replaced on-disk binary keeps its native proc link name. */
@@ -55,7 +52,7 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
             $ops['exe'] = static function () use ($exe) { return $exe; };
             $this->assertFalse(\pmssQbittorrentWebUiAuthPidIsNative(123, $ops));
         }
-        $ops['mntNs'] = static function () { return false; };
+        $ops = self::pmssMakeCallbacks(['mntNs' => false]) + $ops;
         $this->assertFalse(\pmssQbittorrentWebUiAuthPidIsNative(123, $ops));
     }
 
@@ -64,7 +61,7 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
     {
         $events = [];
         $ops = $this->fixture($events);
-        $ops = $this->pmssMakeEventCallbacks($events, ['signal' => false]) + $ops;
+        $ops = self::pmssMakeCallbacks(['signal' => false], $events) + $ops;
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
         $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('alice', $ops));
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));

@@ -22,18 +22,15 @@ final class QbittorrentThrottleStartTest extends TestCase
                 $events[] = 'launch'; return true;
             };
             $ops = ['build' => '5.2.4', 'system' => true,
-                'accountPids' => static function (): array { return []; },
-                'throttleRead' => static function (): int { return 500; },
                 'write' => static function ($path, $value) use (&$events): bool {
                     $events[] = 'write'; return file_put_contents($path, $value) === strlen($value);
                 },
-                'pids' => static function (): array { return [101]; },
-                'listeners' => static function (): array { return []; },
-                'read' => static function (): string { return '23456'; },
                 'attempts' => 1,
-                'runningVersion' => static function (): string { return 'system'; },
                 'launch' => $launch,
-            ] + $this->pmssMakeEventCallbacks($events, ['restore' => true]);
+            ] + self::pmssMakeCallbacks([
+                'accountPids' => [], 'throttleRead' => 500, 'pids' => [101], 'listeners' => [], 'read' => '23456',
+                'runningVersion' => 'system'
+            ]) + self::pmssMakeCallbacks(['restore' => true], $events);
             if ($entry === 'apps') $ok = \pmssCustomerTorrentClientToggleStart('qbittorrent', $launch, $home, null, $ops);
             elseif ($entry === 'configure') $ok = \pmssConfigureTorrentClientStart($home, 'system', $ops);
             else $ok = \pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, $ops);
@@ -51,12 +48,9 @@ final class QbittorrentThrottleStartTest extends TestCase
         $notice = '';
         $this->assertFalse(\pmssQbittorrentFrontendStart($home,
             static function (): void { throw new \RuntimeException('Launch bypassed throttle refusal'); }, [
-                'build' => '5.2.4', 'accountPids' => static function (): array { return []; },
-                'restore' => static function (): bool { return true; },
-                'throttleRead' => static function (): int { return 500; },
-                'write' => static function (): bool { return false; },
+                'build' => '5.2.4',
                 'notice' => static function ($home, $message) use (&$notice): void { $notice = $message; },
-            ]));
+            ] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'throttleRead' => 500, 'write' => false])));
         $this->assertStringContainsString('stopped configuration could not be written', $notice);
         $this->assertSame("500\n", file_get_contents($home.'/.config/pmss/torrentClients/qbittorrent.throttleApplied'));
         $this->assertSame("[BitTorrent]\nSession\\GlobalUPSpeedLimit=0\n",

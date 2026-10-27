@@ -13,9 +13,10 @@ final class QbittorrentStartSafetyTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-start-');
         $events = [];
-        $ops = ['system' => true, 'accountPids' => static function (): array { return []; },
-            'check' => static function (): bool { throw new \RuntimeException('Unstarted socket checked'); }]
-            + $this->pmssMakeEventCallbacks($events, ['restore' => false, 'notice' => null]);
+        $ops = ['system' => true,
+            'check' => static function (): bool { throw new \RuntimeException('Unstarted socket checked'); },
+        ] + self::pmssMakeCallbacks(['accountPids' => []])
+            + self::pmssMakeCallbacks(['restore' => false, 'notice' => null], $events);
         $launch = static function (): void { throw new \RuntimeException('Failed restore started a daemon'); };
         $this->assertFalse(\pmssQbittorrentFrontendStart($home, $launch, $ops));
         $this->assertFalse(\pmssConfigureTorrentClientStart($home, 'system', $ops));
@@ -31,22 +32,17 @@ final class QbittorrentStartSafetyTest extends TestCase
         $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/qbittorrent/default');
         $restores = 0;
         $this->assertFalse(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, [
-            'resolve' => static function (): string { return '/must-not-be-executed'; },
-            'accountPids' => static function (): array { return []; },
             'restore' => static function () use (&$restores): bool { $restores++; return false; },
-            'notice' => static function (): void {},
-        ]));
+        ] + self::pmssMakeCallbacks(['resolve' => '/must-not-be-executed', 'accountPids' => [], 'notice' => null])));
         $this->assertSame(1, $restores);
     }
 
     public function testCommonStartRestoresLaunchesThenChecksSocket(): void
     {
         $events = [];
-        $launch = $this->pmssMakeEventCallbacks($events, ['launch' => null])['launch'];
+        $launch = self::pmssMakeCallbacks(['launch' => null], $events)['launch'];
         $this->assertTrue(\pmssQbittorrentFrontendStart('/fixture/t',
-            $launch, [
-                'accountPids' => static function (): array { return []; },
-            ] + $this->pmssMakeEventCallbacks($events, ['restore' => true, 'check' => true])));
+            $launch, self::pmssMakeCallbacks(['accountPids' => []]) + self::pmssMakeCallbacks(['restore' => true, 'check' => true], $events)));
         $this->assertSame(['restore', 'launch', 'check'], $events);
     }
 
@@ -56,13 +52,12 @@ final class QbittorrentStartSafetyTest extends TestCase
         $this->pmssTrackTempRootAsHomeRoot();
         $home = $this->pmssMakeTempDir('pmss-qbt-notice-');
         $notice = $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.notice', "qBittorrent start failed: old.\n");
-        $ops = ['build' => '4.5.2', 'accountPids' => static function (): array { return []; },
-            'restore' => static function (): bool { return true; }, 'throttle' => static function (): bool { return true; }];
+        $ops = ['build' => '4.5.2'] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'throttle' => true]);
         $this->assertFalse(\pmssQbittorrentFrontendStart($home, static function (): void {},
-            $ops + ['check' => static function (): bool { return false; }]));
+            $ops + self::pmssMakeCallbacks(['check' => false])));
         $this->assertStringContainsString('start failed', file_get_contents($notice));
         $this->assertTrue(\pmssQbittorrentFrontendStart($home, static function (): void {},
-            $ops + ['check' => static function (): bool { return true; }]));
+            $ops + self::pmssMakeCallbacks(['check' => true])));
         $this->assertSame('', file_get_contents($notice));
     }
 
@@ -73,11 +68,10 @@ final class QbittorrentStartSafetyTest extends TestCase
         $events = [];
         $result = \pmssConfigureTorrentClientSwitch($home, ['client' => 'qbittorrent', 'version' => '5.2.4'], [
             'versions' => ['5.2.4' => ['kind' => 'static']],
-            'backup' => static function (): array { return ['ok' => true]; },
-            'stop' => static function (): bool { return true; },
-            'repoint' => static function (): bool { return true; },
             'start' => static function ($home, $version) use (&$events): bool { $events[] = $version; return $version === 'system'; },
-        ] + $this->pmssMakeEventCallbacks($events, ['restore' => true]));
+        ]
+            + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true])
+            + self::pmssMakeCallbacks(['restore' => true], $events));
         $this->assertFalse($result['ok']);
         $this->assertSame(['restore', '5.2.4', 'restore', 'system'], $events);
     }
@@ -89,12 +83,8 @@ final class QbittorrentStartSafetyTest extends TestCase
         $starts = 0;
         $result = \pmssConfigureTorrentClientSwitch($home, ['client' => 'qbittorrent', 'version' => '5.2.4'], [
             'versions' => ['5.2.4' => ['kind' => 'static']],
-            'backup' => static function (): array { return ['ok' => true]; },
-            'stop' => static function (): bool { return true; },
-            'repoint' => static function (): bool { return true; },
-            'restore' => static function (): bool { return false; },
             'start' => static function () use (&$starts): bool { $starts++; return true; },
-        ]);
+        ] + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'restore' => false]));
         $this->assertFalse($result['ok']);
         $this->assertSame(0, $starts);
         $this->assertStringContainsString('manual recovery', file_get_contents($home.'/.config/pmss/torrentClients/qbittorrent.notice'));

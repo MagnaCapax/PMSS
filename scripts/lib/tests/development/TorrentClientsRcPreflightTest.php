@@ -79,10 +79,8 @@ final class TorrentClientsRcPreflightTest extends TestCase
         $raw = "throttle.up = 100\nlog.add_output = socket_critical,rtorrent.log\n";
         $this->pmssWriteFile($home.'/.rtorrent.rc.custom', $raw);
         $events = array();
-        $ops = array('versions' => array('0.16.26' => array('kind' => 'static')),
-            'resolve' => static function () { return '/fixture/rtorrent'; })
-            + $this->pmssMakeEventCallbacks($events,
-                ['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true]);
+        $ops = array('versions' => array('0.16.26' => array('kind' => 'static'))) + self::pmssMakeCallbacks(['resolve' => '/fixture/rtorrent'])
+            + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true], $events);
         $request = array('client' => 'rtorrent', 'version' => '0.16.26');
         $result = \pmssConfigureTorrentClientOtherSwitch($home, $request, $ops);
         $this->assertSame(409, $result['status']);

@@ -67,8 +67,6 @@ final class TorrentClientsOtherSwitchTest extends TestCase
             $this->pmssCreateSymlinkOrSkip($old, $home.'/bin/'.$client.'/default');
             $events = array();
             $ops = array('versions' => array($version => $entry),
-                'resolve' => static function () { return '/fixture/bin'; },
-                'backup' => static function (): array { return array('ok' => true); },
                 'repoint' => static function ($path, $name, $pick, $previous = null) use (&$events, $old): bool {
                     $events[] = array('repoint', $pick, $previous);
                     return $previous === null || $previous === $old;
@@ -76,7 +74,10 @@ final class TorrentClientsOtherSwitchTest extends TestCase
                 'start' => static function ($path, $name, $pick) use (&$events): bool {
                     $events[] = array('start', $pick);
                     return $pick === 'old';
-                }) + $this->pmssMakeEventCallbacks($events, ['stop' => true]);
+                },
+            )
+                + self::pmssMakeCallbacks(['resolve' => '/fixture/bin', 'backup' => array('ok' => true)])
+                + self::pmssMakeCallbacks(['stop' => true], $events);
             $result = \pmssConfigureTorrentClientOtherSwitch($home,
                 array('client' => $client, 'version' => $version), $ops);
             $this->assertSame(503, $result['status']);
@@ -94,7 +95,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
             list($version, $entry) = $this->version($client);
             $events = array();
             $ops = array('versions' => array($version => $entry))
-                + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true]]);
+                + self::pmssMakeCallbacks(['backup' => ['ok' => true]], $events);
             $base = array('client' => $client, 'version' => $version);
             $this->assertSame(403, \pmssConfigureActionApply($home, 'torrentClientSwitch', $base, $ops)['status']);
             $this->assertSame(403, \pmssConfigureActionApply($home, 'torrentClientSwitch',
@@ -119,7 +120,7 @@ final class TorrentClientsOtherSwitchTest extends TestCase
             $this->pmssWriteFile($home.'/bin/'.$client.'/default', 'keep');
             $events = array();
             $ops = array('versions' => array($version => $entry))
-                + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true]]);
+                + self::pmssMakeCallbacks(['backup' => ['ok' => true]], $events);
             $result = \pmssConfigureTorrentClientOtherSwitch($home,
                 array('client' => $client, 'version' => $version), $ops);
             $this->assertSame(409, $result['status']);

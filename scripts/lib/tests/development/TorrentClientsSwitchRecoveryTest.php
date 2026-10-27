@@ -25,18 +25,18 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                 $this->pmssCreateSymlinkOrSkip($target, $link);
                 $events = [];
                 $ops = ['versions' => ['system' => ['kind' => 'system'], '4.2.0' => ['kind' => $client === 'deluge' ? 'venv' : 'static']],
-                    'resolve' => static function () { return null; },
-                    'runningVersion' => static function () { return 'system'; },
                     'repoint' => static function ($home, ...$args) use ($client, &$events): bool {
                         if ($client !== 'qbittorrent') array_shift($args);
                         $events[] = 'repoint-'.$args[0];
                         return $client === 'qbittorrent' ? \pmssConfigureTorrentClientRepoint($home, ...$args)
                             : \pmssConfigureTorrentClientOtherRepoint($home, $client, ...$args);
                     },
-                    'restore' => static function (): bool { return true; },
                     'start' => static function ($home, ...$args) use (&$events, $starts): bool {
                         $events[] = 'start-'.end($args); return $starts;
-                    }] + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true]);
+                    },
+                ]
+                    + self::pmssMakeCallbacks(['resolve' => null, 'runningVersion' => 'system', 'restore' => true])
+                    + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true], $events);
                 $this->assertSame(409, $this->apply($home, $client, '4.2.0', $ops)['status']);
                 $this->assertSame([], $events);
                 $result = $this->apply($home, $client, 'system', $ops);
@@ -67,9 +67,9 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                 $events = [];
                 $unexpected = static function (): void { throw new \RuntimeException('Backup failure changed the client'); };
                 $ops = ['versions' => ['4.2.0' => ['kind' => $client === 'deluge' ? 'venv' : 'static', 'rpcUnixSocket' => true]],
-                    'resolve' => static function () { return '/fixture/binary'; },
                     'backup' => static function () use (&$events, $snapshot) { $events[] = 'backup'; return $snapshot; },
-                    'stop' => $unexpected, 'repoint' => $unexpected, 'start' => $unexpected];
+                    'stop' => $unexpected, 'repoint' => $unexpected, 'start' => $unexpected,
+                ] + self::pmssMakeCallbacks(['resolve' => '/fixture/binary']);
                 $result = $this->apply($home, $client, '4.2.0', $ops);
                 $message = 'Could not back up the current configuration: '
                     .(is_array($snapshot) ? 'Not enough free space' : 'Backup failed').'. Nothing was changed.';
@@ -91,8 +91,7 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-invalid-transmission-');
         $this->pmssEnsureDir($home.'/bin/transmission');
         $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/transmission/missing', $home.'/bin/transmission/default');
-        $ops = ['versions' => ['system' => ['kind' => 'system', 'rpcUnixSocket' => true]],
-            'resolve' => static function () { return null; }];
+        $ops = ['versions' => ['system' => ['kind' => 'system', 'rpcUnixSocket' => true]]] + self::pmssMakeCallbacks(['resolve' => null]);
         $this->assertSame(400, $this->apply($home, 'transmission', 'system', $ops)['status']);
         $this->assertFalse(is_dir($home.'/.config'));
     }

@@ -11,12 +11,13 @@ final class QbittorrentWatchdogRecoveryTest extends TemporaryHomeRootTestCase
     {
         $events = [];
         $this->assertFalse(\pmssQbittorrentWatchdogRunning('t', '/fixture/t', [
-            'running' => static function (): bool { return false; },
             'account' => static function ($user, $home, $observe = false, $release = false) use (&$events): bool {
                 $events[] = $release ? 'release' : 'restore'; return true;
             },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ] + $this->pmssMakeEventCallbacks($events, ['port' => true, 'auth' => false, 'managed' => null])));
+        ]
+            + self::pmssMakeCallbacks(['running' => false])
+            + self::pmssMakeCallbacks(['port' => true, 'auth' => false, 'managed' => null], $events)));
         $this->assertSame(['restore', 'port', 'auth', 'managed', 'release'], $events);
     }
 
@@ -24,15 +25,13 @@ final class QbittorrentWatchdogRecoveryTest extends TemporaryHomeRootTestCase
     {
         $events = [];
         $this->assertTrue(\pmssQbittorrentWatchdogRunning('t', '/fixture/t', [
-            'running' => static function (): bool { return true; },
             'account' => static function ($user, $home, $observe) use (&$events): bool {
                 $events[] = $observe ? 'observe' : 'restore'; return true;
             },
             'port' => static function (): void { throw new \RuntimeException('Running customer port was reconciled'); },
-            'auth' => static function (): bool { return false; },
             'managed' => static function ($user, $running) use (&$events): void { $events[] = $running ? 'running' : 'stopped'; },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ]));
+        ] + self::pmssMakeCallbacks(['running' => true, 'auth' => false])));
         $this->assertSame(['observe', 'running'], $events);
     }
 
@@ -45,22 +44,20 @@ final class QbittorrentWatchdogRecoveryTest extends TemporaryHomeRootTestCase
         $stops = 0; $notices = 0; $live = true;
         $ops = ['attempts' => 1, 'build' => '5.3.0',
             'pids' => static function () use (&$live): array { return $live ? [101] : []; },
-            'listeners' => static function (): array { return [['address' => '00000000', 'port' => 8080]]; },
             'stop' => static function () use (&$stops, &$live): bool { $stops++; $live = false; return true; },
             'notice' => static function ($home, $text) use (&$notices): void { $notices++; \pmssQbittorrentFrontendNotice($home, $text); },
-            'pause' => static function (): void { throw new \RuntimeException('Per-cycle observation slept'); }];
+            'pause' => static function (): void { throw new \RuntimeException('Per-cycle observation slept'); },
+        ] + self::pmssMakeCallbacks(['listeners' => [['address' => '00000000', 'port' => 8080]]]);
         $watchdog = ['running' => static function () use (&$live): bool { return $live; },
             'account' => static function ($user, $home, $observe = false, $release = false) use ($ops): bool {
                 if ($observe) return \pmssQbittorrentFrontendSocketWait($home, $ops);
                 if (!$release) return true;
                 return \pmssQbittorrentFrontendRefusalReady($home, [
-                    'build' => '5.3.0', 'accountPids' => static function (): array { return []; },
-                ]);
+                    'build' => '5.3.0',
+                ] + self::pmssMakeCallbacks(['accountPids' => []]));
             },
-            'port' => static function (): bool { return false; },
-            'auth' => static function (): bool { return false; },
-            'managed' => static function (): void {},
-            'throttle' => static function ($user, $running): bool { return $running; }];
+            'throttle' => static function ($user, $running): bool { return $running; },
+        ] + self::pmssMakeCallbacks(['port' => false, 'auth' => false, 'managed' => null]);
         for ($cycle = 0; $cycle < 2; $cycle++)
             $this->assertTrue(\pmssQbittorrentWatchdogRunning('t', $home, $watchdog));
         $this->assertSame(1, $stops);

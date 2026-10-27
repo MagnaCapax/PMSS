@@ -68,13 +68,13 @@ abstract class TestCase
     {
     }
 
-    /** Build fixed-result operation stubs that append their names to a shared event log. */
-    protected function pmssMakeEventCallbacks(array &$events, array $results): array
+    /** Build fixed-result operation stubs, optionally recording calls in a shared event log. */
+    protected static function pmssMakeCallbacks(array $results, ?array &$events = null): array
     {
         $callbacks = [];
         foreach ($results as $event => $result) {
             $callbacks[$event] = static function () use (&$events, $event, $result) {
-                $events[] = $event;
+                if ($events !== null) $events[] = $event;
                 return $result;
             };
         }

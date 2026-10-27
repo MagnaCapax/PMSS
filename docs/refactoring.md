@@ -348,6 +348,12 @@ builder use that same execution path. Fixture-specific arguments, archive
 members, malformed-member transforms, exit checks and content assertions stay
 with their tests; these fixtures run only on testing machines.
 
+Torrent-client fixtures use `TestCase::pmssMakeCallbacks()` for fixed operation
+results, with an optional event array for recording call order. Literal results,
+including false, null and empty arrays, stay in each test's operation map;
+argument-dependent, stateful and throwing callbacks remain explicit. This shares
+one callback factory without changing assertions or runtime service behavior.
+
 AI launcher tests share their temporary-directory setup, valid account state,
 passthrough cases, explicit-environment matrix and result assertions through
 `AiToolsLauncherTestCase`. Provider-specific arguments and refusal variants stay

@@ -17,15 +17,14 @@ final class TorrentClientsSameVersionTest extends TestCase
         $entry = array('kind' => $selected === 'system' ? 'system' : ($client === 'deluge' ? 'venv' : 'static'),
             'rpcUnixSocket' => true);
         $ops = array('versions' => array($selected => $entry),
-            'resolve' => static function () { return '/fixture/binary'; },
             'runningVersion' => function () use ($home, $client, $running) {
                 $other = fopen($home.'/.config/pmss/torrentClients/'.$client.'.lock', 'c');
                 $this->assertFalse(flock($other, LOCK_EX | LOCK_NB), 'Native build checked under lock');
                 fclose($other);
                 return $running;
             },
-            'restore' => static function (): bool { return true; })
-            + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true]);
+        ) + self::pmssMakeCallbacks(['resolve' => '/fixture/binary', 'restore' => true])
+            + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true], $events);
         return array($home, array('client' => $client, 'version' => $selected), $ops);
     }
 
@@ -134,7 +133,7 @@ final class TorrentClientsSameVersionTest extends TestCase
             $this->assertTrue(flock($lock, LOCK_EX | LOCK_NB));
             try { $this->assertSame(409, $this->apply($home, $request, $ops)['status']); }
             finally { fclose($lock); }
-            $ops['resolve'] = static function () { return null; };
+            $ops = self::pmssMakeCallbacks(['resolve' => null]) + $ops;
             $this->assertSame(409, $this->apply($home, $request, $ops)['status']);
             $this->assertSame(array(), $events);
             $expected = array('.', '..', $client.'.lock');

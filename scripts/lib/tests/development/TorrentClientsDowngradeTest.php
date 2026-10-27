@@ -51,9 +51,8 @@ final class TorrentClientsDowngradeTest extends TestCase
         $state = $home.'/.config/pmss/torrentClients/qbittorrent.lastRun';
         $this->pmssWriteFile($state, "4.3.9\n");
         $events = array();
-        $ops = array('versions' => array('5.1.0' => array('kind' => 'static')),
-            'restore' => static function (): bool { return true; })
-            + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true]);
+        $ops = array('versions' => array('5.1.0' => array('kind' => 'static'))) + self::pmssMakeCallbacks(['restore' => true])
+            + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true], $events);
         $result = \pmssConfigureTorrentClientSwitch($home,
             array('client' => 'qbittorrent', 'version' => '5.1.0'), $ops);
         $this->assertSame(200, $result['status']);
@@ -79,9 +78,8 @@ final class TorrentClientsDowngradeTest extends TestCase
         $events = array();
         $entry = array('kind' => $client === 'deluge' ? 'venv' : 'static');
         if ($client === 'transmission') $entry['rpcUnixSocket'] = true;
-        $ops = array('versions' => array($new => $entry),
-            'restore' => static function (): bool { return true; })
-            + $this->pmssMakeEventCallbacks($events, ['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true]);
+        $ops = array('versions' => array($new => $entry)) + self::pmssMakeCallbacks(['restore' => true])
+            + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'start' => true], $events);
         $request = array('client' => $client, 'version' => $new);
         $result = $client === 'qbittorrent'
             ? \pmssConfigureTorrentClientSwitch($home, $request, $ops)

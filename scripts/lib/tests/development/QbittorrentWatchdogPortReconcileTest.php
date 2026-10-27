@@ -39,15 +39,13 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
         $running = true;
         $events = [];
         $ops = [
-            'read' => static function (): int { return 256; },
             'running' => static function () use (&$events, &$running): bool { $events[] = 'running'; return $running; },
             'account' => static function ($user, $home, $cap, $apply) use (&$events, &$running): bool {
                 if ($apply && $running) throw new \RuntimeException('Slow shutdown reached the stopped writer');
                 $events[] = $apply ? 'write' : 'compare'; return true;
             },
             'stop' => static function () use (&$events): void { $events[] = 'term'; },
-            'log' => static function (): void {},
-        ];
+        ] + self::pmssMakeCallbacks(['read' => 256, 'log' => null]);
         $this->assertTrue(\pmssQbittorrentThrottleWatchdog('alice', $home, true, $ops));
         $this->assertSame(['compare', 'term', 'running'], $events);
         $running = false;
@@ -60,10 +58,10 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
     {
         $events = [];
         $this->assertFalse(\pmssQbittorrentWatchdogRunning('t', '/fixture/t', [
-            'running' => static function (): bool { return false; },
-            'account' => static function (): bool { return true; },
             'throttle' => static function ($user, $running) use (&$events): bool { $events[] = 'throttle'; return $running; },
-        ] + $this->pmssMakeEventCallbacks($events, ['port' => false, 'auth' => false, 'managed' => null])));
+        ]
+            + self::pmssMakeCallbacks(['running' => false, 'account' => true])
+            + self::pmssMakeCallbacks(['port' => false, 'auth' => false, 'managed' => null], $events)));
         $this->assertSame(['port', 'auth', 'managed', 'throttle'], $events);
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkQbittorrentInstances.php', [
             "require_once __DIR__.'/../lib/user/watchdog.php';",
@@ -80,10 +78,9 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
         $events = [];
         $unreachable = static function (): void { throw new \RuntimeException('Refused restore reached a managed writer'); };
         $this->assertTrue(\pmssQbittorrentWatchdogRunning('t', '/fixture/t', [
-            'running' => static function (): bool { return false; },
             'account' => static function () use (&$events): bool { $events[] = 'restore'; return false; },
             'port' => $unreachable, 'auth' => $unreachable, 'managed' => $unreachable,
-        ]));
+        ] + self::pmssMakeCallbacks(['running' => false])));
         $this->assertSame(['restore'], $events);
     }
 
@@ -91,12 +88,13 @@ final class QbittorrentWatchdogPortReconcileTest extends TestCase
     {
         $events = [];
         $this->assertTrue(\pmssQbittorrentWatchdogRunning('t', '/fixture/t', [
-            'running' => static function (): bool { return false; },
             'account' => static function ($user, $home, $observe = false, $release = false) use (&$events): bool {
                 $events[] = $release ? 'release' : 'restore'; return !$release;
             },
             'throttle' => static function (): void { throw new \RuntimeException('Refused account reached restart decisions'); },
-        ] + $this->pmssMakeEventCallbacks($events, ['port' => true, 'auth' => false, 'managed' => null])));
+        ]
+            + self::pmssMakeCallbacks(['running' => false])
+            + self::pmssMakeCallbacks(['port' => true, 'auth' => false, 'managed' => null], $events)));
         $this->assertSame(['restore', 'port', 'auth', 'managed', 'release'], $events);
         // The cron file is top-level with no injectable entry point; retain only its delegation check.
         $this->pmssAssertRepoFileContainsString('scripts/cron/checkQbittorrentInstances.php', 'pmssQbittorrentWatchdogRunning($thisUser, $home)');
