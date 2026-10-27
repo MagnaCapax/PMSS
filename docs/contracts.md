@@ -776,6 +776,12 @@ iptables helpers:
   Window values must remain finite after numeric conversion: infinity, NaN,
   and overflowing numeric strings use that same `null` failure path. Finite
   values and legacy missing-operation defaults retain their existing conversion.
+  Consumed metric and raw-window containers must be arrays when non-null; malformed
+  containers use the same `null` result instead of becoming missing counters or
+  causing object-offset errors. Invalid cached rows use the existing missing-user
+  path without affecting other accepted rows. Optional memory and task readings
+  retain their legacy float casts and zero defaults, including the existing JSON
+  encoding failure for non-finite current readings.
 - Usage reporting keeps scalar conversion and formatting inside their consumers.
   Terminal stats retain their help exit status and text layouts, including raw
   percentages beside clamped bars. Traffic columns retain unitless default rates

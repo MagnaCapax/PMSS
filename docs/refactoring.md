@@ -73,6 +73,13 @@ rows for normalization, and saved-run selection retains one latest entry.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Stored resource projections reject non-null scalar/object metric and raw-window
+containers before indexing them. Invalid cached rows follow the existing
+missing-user path; optional-reading casts, zero defaults, field order and other
+accepted users remain unchanged. `resourceReportSafetyTest` covers nested
+serialized objects, malformed containers and legacy conversions, including
+non-finite optional readings that retain the CLI's JSON-encoding failure.
+
 Lighttpd watchdog inode diagnosis requires a successful `df -i` exit and a
 percentage from 0 through 100. Failed probes with partial rows and malformed
 percentages retain the unavailable-result fallback instead of selecting the

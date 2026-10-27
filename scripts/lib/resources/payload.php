@@ -13,6 +13,9 @@ function pmssResourceReportTemplate(): array
 /** Normalize a stored metric window, rejecting malformed values and defaulting missing ops to zero. */
 function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
 {
+    // A malformed container is not a missing legacy counter, including decoded objects.
+    if ((isset($data[$metric]) && !is_array($data[$metric]))
+        || (isset($data[$metric]['raw']) && !is_array($data[$metric]['raw']))) return null;
     // Numeric strings can overflow on conversion; serialized floats can be INF/NAN.
     return pmssFiniteFloat($data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null));
 }
@@ -37,6 +40,11 @@ function pmssResourceStoredPayloadReportRow(array $data): ?array
         }
     }
 
+    // Check containers before indexing; keep legacy optional-reading casts and defaults.
+    foreach (ResourceStatsAccumulator::AVERAGE_METRICS as $metric) {
+        if (isset($data[$metric]) && !is_array($data[$metric])) return null;
+    }
+    if (isset($data['memory']['raw']) && !is_array($data['memory']['raw'])) return null;
     $row['memory']['current'] = (float) ($data['memory']['current'] ?? 0.0);
     $row['memory']['avg_month'] = (float) ($data['memory']['raw']['month'] ?? 0.0);
     $row['tasks']['current'] = (float) ($data['tasks']['current'] ?? 0.0);

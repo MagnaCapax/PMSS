@@ -88,6 +88,95 @@ class resourceReportSafetyTest extends TestCase
         }
     }
 
+    public function testStoredWindowRejectsMalformedContainers(): void
+    {
+        $metrics = array_merge(\ResourceStatsAccumulator::RAW_METRICS, \ResourceStatsAccumulator::AVERAGE_METRICS);
+        $payload = array_fill_keys($metrics, ['raw' => $this->pmssBuildWindowValues(1)]);
+        foreach ($metrics as $metric) {
+            foreach ([false, true, 0, 1.5, 'bad', new \stdClass()] as $invalid) {
+                foreach ([$invalid, ['raw' => $invalid]] as $container) {
+                    $data = $payload;
+                    $data[$metric] = $container;
+                    $this->assertSame(null, \pmssResourceStoredPayloadWindowValue($data, $metric, 'day'));
+                    $this->assertSame(null, \pmssResourceStoredPayloadWindowMetrics($data, 'day'));
+                }
+            }
+        }
+    }
+
+    public function testBuildReportRejectsNestedObjectsWithoutWakeup(): void
+    {
+        $metrics = array_merge(\ResourceStatsAccumulator::RAW_METRICS, \ResourceStatsAccumulator::AVERAGE_METRICS);
+        $payload = array_fill_keys($metrics, ['raw' => $this->pmssBuildWindowValues(1)]);
+        $probe = new ResourceReportSafetyWakeupProbe($this->markerPath);
+        foreach ($metrics as $metric) {
+            // Reports consume every metric container, but only memory's average window.
+            $containers = [$probe];
+            if ($metric !== 'tasks') $containers[] = ['raw' => $probe];
+            foreach ($containers as $container) {
+                $data = $payload;
+                $data[$metric] = $container;
+                $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
+                $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
+                $this->assertSame(['alice'], $report['missing']);
+                $this->assertSame([], $report['rows']);
+                $this->assertSame(\pmssResourceReportTemplate(), $report['totals']);
+                $this->assertTrue(!file_exists($this->markerPath));
+            }
+        }
+    }
+
+    public function testReportRejectsMalformedContainersAndKeepsValidUsers(): void
+    {
+        $payload = array_fill_keys(\ResourceStatsAccumulator::RAW_METRICS, ['raw' => $this->pmssBuildWindowValues(1)]);
+        $validRow = \pmssResourceReportTemplate();
+        foreach (\ResourceStatsAccumulator::RAW_METRICS as $metric) $validRow[$metric] = $this->pmssBuildWindowValues(1.0);
+        $this->pmssWriteSerializedFixture($this->statsDir.'/bob', $payload);
+        foreach ([false, true, 0, 1.5, 'bad', new \stdClass()] as $invalid) {
+            foreach ([
+                ['memory' => $invalid],
+                ['memory' => ['raw' => $invalid]],
+                ['tasks' => $invalid],
+            ] as $optional) {
+                $data = $payload + $optional;
+                $this->assertSame(null, \pmssResourceStoredPayloadReportRow($data));
+                $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
+                $report = \pmssResourceBuildReport($this->statsDir, ['alice', 'bob']);
+                $this->assertSame(['alice'], $report['missing']);
+                $this->assertSame(['bob' => $validRow], $report['rows']);
+                $this->assertSame($validRow, $report['totals']);
+                $this->assertTrue(is_string(json_encode($report)));
+            }
+        }
+    }
+
+    public function testReportPreservesLegacyOptionalConversionsAndDefaults(): void
+    {
+        $payload = array_fill_keys(\ResourceStatsAccumulator::RAW_METRICS, ['raw' => $this->pmssBuildWindowValues(1)]);
+        $expected = \pmssResourceReportTemplate();
+        foreach (\ResourceStatsAccumulator::RAW_METRICS as $metric) $expected[$metric] = $this->pmssBuildWindowValues(1.0);
+        foreach ([0, -1, 1.5, '00012', '2.5e2', PHP_FLOAT_MAX, -PHP_FLOAT_MAX,
+            INF, -INF, '1e9999', '-1e9999', false, true, '', 'bad', [],
+        ] as $value) {
+            $data = $payload + ['memory' => ['current' => $value, 'raw' => ['month' => $value]], 'tasks' => ['current' => $value]];
+            $row = $expected;
+            $row['memory'] = ['current' => (float) $value, 'avg_month' => (float) $value];
+            $row['tasks']['current'] = (float) $value;
+            $this->assertSame($row, \pmssResourceStoredPayloadReportRow($data));
+        }
+        foreach ([[], ['memory' => null, 'tasks' => null], ['memory' => [], 'tasks' => []],
+            ['memory' => ['current' => null, 'raw' => null], 'tasks' => ['current' => null]],
+            ['memory' => ['raw' => ['month' => null]]],
+        ] as $optional) {
+            $this->assertSame($expected, \pmssResourceStoredPayloadReportRow($payload + $optional));
+        }
+        foreach (['io_read_ops', 'io_write_ops'] as $metric) {
+            foreach ([null, [], ['raw' => null], ['raw' => []], ['raw' => ['day' => null]]] as $container) {
+                $this->assertSame(0.0, \pmssResourceStoredPayloadWindowValue([$metric => $container], $metric, 'day'));
+            }
+        }
+    }
+
     public function testBuildReportSkipsInvalidUserTraversalKeys(): void
     {
         $this->pmssWriteSerializedFixture($this->runtimeDir.'/outside-stats', $this->pmssBuildResourceStatsPayloadFromValues([
