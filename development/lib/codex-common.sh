@@ -69,9 +69,14 @@ codex_agentic_bootstrap_self() {
 	codex_agentic_bootstrap "$HERE" "$@"
 }
 
-# Millisecond timestamp helper with a portable fallback.
+# Millisecond clock for durations: monotonic /proc/uptime first, because a wall-clock
+# step backwards made durations negative and the event writer rejects them (CI flake).
 codex_now_ms() {
-	local now
+	local now up _
+	if read -r up _ < "${PMSS_CODEX_UPTIME_FILE:-/proc/uptime}" 2>/dev/null && [[ "$up" =~ ^([0-9]+)\.([0-9]{2})$ ]]; then
+		printf "%s\n" "$((10#${BASH_REMATCH[1]} * 1000 + 10#${BASH_REMATCH[2]} * 10))"
+		return 0
+	fi
 	now="$(date +%s%3N 2>/dev/null || true)"
 	if [[ "$now" =~ ^[0-9]+$ ]]; then
 		printf '%s\n' "$now"
@@ -79,6 +84,12 @@ codex_now_ms() {
 	fi
 	now="$(date +%s 2>/dev/null || echo 0)"
 	printf '%s000\n' "$now"
+}
+
+# Milliseconds since START; never negative, so a wall-clock fallback step cannot fail the event writer.
+codex_elapsed_ms() {
+	local elapsed=$(($(codex_now_ms) - $1))
+	printf '%s\n' "$((elapsed < 0 ? 0 : elapsed))"
 }
 
 # Run a static PHP JSON filter against stdin, with decoded payload in $j.

@@ -24,6 +24,33 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $this->assertSame(3, end($events)['rc']);
     }
 
+    public function testBackwardsWallClockNeverProducesInvalidDurations(): void
+    {
+        // CI runners can step the wall clock back; durations used to go negative and fail the launch.
+        $realDate = trim((string) shell_exec('command -v date'));
+        $state = $this->tempDir.'/clock-state';
+        file_put_contents($this->tempDir.'/uptime', "100.25 50.00\n");
+        // Monotonic case: the wall clock steps forward, so a duration of 0 proves the uptime file was read.
+        foreach ([$this->tempDir.'/uptime' => 7000, $this->tempDir.'/absent-uptime' => -5000] as $uptime => $step) {
+            $monotonic = $step > 0;
+            @unlink($state);
+            $this->pmssWriteExecutableFile($this->tempDir.'/bin/date', "#!/bin/sh\n"
+                ."if [ \"\$1\" = '+%s%3N' ]; then n=\$(cat '".$state."' 2>/dev/null || echo 2000000000000);"
+                ." echo \"\$n\"; echo \$((n + ".$step.")) > '".$state."'; exit 0; fi\n"
+                ."exec '".$realDate."' \"\$@\"\n");
+            foreach (glob($this->launcherRoot.'/log/codex-run/*/*.jsonl') ?: [] as $old) {
+                unlink($old);
+            }
+            $result = $this->launch('codex-run.sh', ['run', '--prompt', 'fixture'], ['PMSS_CODEX_UPTIME_FILE' => $uptime]);
+            $this->assertSame(0, $result['rc'], $result['output']);
+            $durations = array_values(array_filter(array_column($this->events(), 'duration_ms'), 'is_int'));
+            $this->assertSame(2, count($durations), $result['output']);
+            foreach ($durations as $duration) {
+                $this->assertTrue($monotonic ? $duration === 0 : $duration >= 0, 'duration_ms '.$duration);
+            }
+        }
+    }
+
     public function testMissingExecutableHasCompleteFailedLifecycle(): void
     {
         $result = $this->launch('codex-run.sh', ['run', '--prompt', 'fixture', '--exec', 'missing-fixture-assistant']);

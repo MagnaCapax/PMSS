@@ -47,7 +47,7 @@ set -e
 invoke_level=info
 [[ "$invoke_rc" == "0" ]] || invoke_level=error
 codex_emit_event_jsonl "$event_log" assistant_invoke_end "$invoke_level" "$run_step" "$run_id" "$invoke_rc" \
-	"$(($(codex_now_ms) - invoke_start_ms))" "assistant invocation completed"
+	"$(codex_elapsed_ms "$invoke_start_ms")" "assistant invocation completed"
 [[ "$invoke_rc" == "0" ]] || exit "$invoke_rc"
 
 run_step=post_checks

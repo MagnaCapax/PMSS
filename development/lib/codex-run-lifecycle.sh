@@ -9,7 +9,7 @@ codex_runner_finish() {
 	trap - EXIT
 	[[ "$rc" == "0" ]] || level=error
 	if ! codex_emit_event_jsonl "$event_log" runner_end "$level" "$run_step" "$run_id" "$rc" \
-		"$(($(codex_now_ms) - run_start_ms))" "run completed"; then
+		"$(codex_elapsed_ms "$run_start_ms")" "run completed"; then
 		[[ "$rc" != "0" ]] || rc=1
 	fi
 	exit "$rc"
