@@ -134,9 +134,7 @@ function pmssBfqFormulaWeight(
     if ($memoryMiB <= 0) {
         return 1;
     }
-    $customerMax = max(1, $customerMax);
-    $derived = (int) round($coefficient * sqrt($memoryMiB));
-    return max(1, min($customerMax, $derived));
+    return max(1, min(max(1, $customerMax), (int) round($coefficient * sqrt($memoryMiB))));
 }
 
 /**
@@ -144,10 +142,7 @@ function pmssBfqFormulaWeight(
  */
 function pmssBfqApplyBonusWeight(int $baseWeight, int $bonusPct, int $kernelMax = PMSS_BFQ_KERNEL_MAX): int
 {
-    $kernelMax = max(1, $kernelMax);
-    $bonusPct = max(0, $bonusPct);
-    $weighted = (int) round($baseWeight * (1 + $bonusPct / 100));
-    return max(1, min($kernelMax, $weighted));
+    return max(1, min(max(1, $kernelMax), (int) round($baseWeight * (1 + max(0, $bonusPct) / 100))));
 }
 
 /** Parse one kernel bfq.weight sysfs payload without silently coercing errors. */

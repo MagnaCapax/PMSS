@@ -17,27 +17,28 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $pool = $host * $multiplier;
     if (!is_finite($pool) || $pool >= PHP_INT_MAX) return null;
     $weightSum = pmssCgroupPolicyUserIoWeightSum(array_column($users, 'source'), $policy);
-    $quotas = []; $cohort = [];
+    $cohort = [];
     foreach ($users as $user => $entry) {
         $source = $entry['source'];
         $quota = pmssFiniteNonNegativeFloat($source['quota'] ?? null);
         $weight = pmssFiniteNonNegativeFloat($entry['weight'] ?? null);
-        if ($quota !== null && $quota > 0 && $weight !== null && $weight > 0 && $weight <= PMSS_BFQ_KERNEL_MAX) $quotas[$user] = $quota;
         // Account facts and legacy caps do not depend on the quota exponent.
         // Reserve share's payload position for weight calculation and normalization.
-        $cohort[$user] = ['quota' => $quotas[$user] ?? null, 'weight' => $entry['weight'] ?? null,
+        $cohort[$user] = ['quota' => $quota !== null && $quota > 0 && $weight !== null && $weight > 0 && $weight <= PMSS_BFQ_KERNEL_MAX ? $quota : null,
+            'weight' => $entry['weight'] ?? null,
             'share' => 0.0, 'floor' => pmssCgroupPolicyPositiveIntSetting($source['resourceIOPSReadMin'] ?? null) ?? (int) $settings['floor'],
             'ceiling' => pmssCgroupPolicyReadIopsTierCeiling($source, $policy),
             'explicit' => isset($source['IOReadIOPS']) && is_scalar($source['IOReadIOPS']),
             'legacy' => pmssCgroupPolicyDerivedReadIopsCap($source, $policy,
                 $legacyPassive ?? $passive, $weightSum, count($users), $storageClass, $legacyAllowed)];
     }
-    // Incomplete cohort data must not redistribute other accounts' shares.
-    $fallback = $host <= 0 ? 'missing-ceiling' : ($blend === null ? 'missing-pressure' :
-        (count($quotas) !== count($users) ? 'missing-quota-or-weight' : null));
-    $sorted = array_values($quotas);
+    // Valid cohort quotas are positive; only missing values drop out of the median.
+    $sorted = array_filter(array_column($cohort, 'quota'));
     sort($sorted, SORT_NUMERIC);
     $count = count($sorted);
+    // Incomplete cohort data must not redistribute other accounts' shares.
+    $fallback = $host <= 0 ? 'missing-ceiling' : ($blend === null ? 'missing-pressure' :
+        ($count !== count($users) ? 'missing-quota-or-weight' : null));
     $low = $count === 0 ? 1.0 : $sorted[intdiv($count - 1, 2)];
     $median = $count === 0 ? 1.0 : $low + ($sorted[intdiv($count, 2)] - $low) / 2;
     $result = ['pressure' => $pressure, 'passive_read_iops' => $passive, 'benchmark_read_iops' => $benchmark,
@@ -45,7 +46,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     foreach (['1.0' => 1.0, '0.5' => 0.5] as $label => $alpha) {
         $rows = $cohort; $lift = 0.0;
         foreach ($users as $user => $entry) {
-            $rows[$user]['share'] = (pmssFiniteNonNegativeFloat($entry['weight'] ?? null) ?? 0) * pow(($quotas[$user] ?? $median) / $median, $alpha);
+            $rows[$user]['share'] = (pmssFiniteNonNegativeFloat($entry['weight'] ?? null) ?? 0) * pow(($rows[$user]['quota'] ?? $median) / $median, $alpha);
         }
         $sum = array_sum(array_column($rows, 'share'));
         if (!is_finite($sum)) return null;

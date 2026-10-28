@@ -71,6 +71,13 @@ Pressure windows and fio latency means retain sums instead of sample lists;
 only present latency samples count, including zero. Shadow shares reuse their
 rows for normalization, and saved-run selection retains one latest entry.
 
+Cgroup shadow allocation also uses its cohort rows as the quota lookup instead
+of maintaining a second account map. Positive cohort quotas supply the same
+median and completeness count; missing entries still use the median for share
+arithmetic and select the legacy proposal. BFQ weights and read-IOPS caps apply
+their existing scalar clamps directly. Quota/weight validation, rounding order,
+fallback precedence and serialized field order retain their contracts.
+
 ## Minimal Contract Rules (Joukahainen)
 
 Stored resource projections reject non-null scalar/object metric and raw-window

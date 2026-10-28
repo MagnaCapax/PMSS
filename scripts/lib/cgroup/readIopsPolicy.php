@@ -42,8 +42,7 @@ function pmssCgroupPolicyReadIopsClassFloors(array $policy): array
 function pmssCgroupPolicyReadIopsClassFloor(?string $storageClass, array $policy): int
 {
     $floors = pmssCgroupPolicyReadIopsClassFloors($policy);
-    $class = $storageClass !== null ? strtolower($storageClass) : '';
-    return $floors[$class] ?? $floors['default'];
+    return $floors[strtolower($storageClass ?? '')] ?? $floors['default'];
 }
 
 /** Prefer explicit user IOWeight, then the policy default, then systemd's default-ish 100. */
@@ -86,9 +85,7 @@ function pmssCgroupPolicyReadIopsTierCeiling(array $source, array $policy): ?int
 /** Clamp the computed read-IOPS cap while honoring the absolute tier ceiling. */
 function pmssCgroupPolicyReadIopsClamp(int $candidate, int $classFloor, int $tierCeiling): int
 {
-    $classFloor = max(1, $classFloor);
-    $tierCeiling = max(1, $tierCeiling);
-    return min($tierCeiling, max($classFloor, $candidate));
+    return min(max(1, $tierCeiling), max(1, $classFloor, $candidate));
 }
 
 /**
@@ -137,6 +134,6 @@ function pmssCgroupPolicyDerivedReadIopsCap(
 
     $share = pmssCgroupPolicyUserIoWeight($source, $policy) / $weightSum;
     $oversell = pmssFiniteNonNegativeFloat($policy['cgroup']['assignMax']['iops'] ?? null);
-    $candidate = (int) floor(max(0.0, $hostMaxReadIops) * ($oversell !== null && $oversell > 0 ? $oversell : 2.0) * $share);
-    return pmssCgroupPolicyReadIopsClamp($candidate, $floor, $tierCeiling);
+    return pmssCgroupPolicyReadIopsClamp(
+        (int) floor(max(0.0, $hostMaxReadIops) * ($oversell !== null && $oversell > 0 ? $oversell : 2.0) * $share), $floor, $tierCeiling);
 }
