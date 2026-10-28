@@ -1537,6 +1537,38 @@ exists; see ADR 0128 for the legacy read.
 
 ---
 
+## Amendment 2026-10-28: account-creation app profiles
+
+This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
+(see [ADR 0197](adr/0197-account-creation-app-profiles-as-data.md)).
+
+- `addUser.php --app-profile=PROFILE` accepts exactly the keys returned by
+  `scripts/lib/user/appProfiles.php`. Names must match `^[a-z0-9-]{1,40}$`;
+  unknown or malformed names fail CLI parsing before account creation. The
+  omitted option selects `default`, preserving seedbox defaults.
+- `default`: rTorrent on, Pikkumies preinstall on, rootless Docker on.
+  `openclaw`: rTorrent off, Pikkumies and OpenClaw preinstall on, Docker on.
+  `storagebox`: rTorrent off, Pikkumies and Docker on, rclone and Copyparty
+  enable markers on. Other apps retain their existing defaults; no torrent
+  client is enabled by the storagebox profile.
+- `appSwitch.php` supplies config-store defaults to the existing user-config
+  apply path before configuration. Explicit `--docker-enabled` wins; the
+  existing RAM floor remains enforced. The generic profile walk then runs
+  after configuration and before service starts, logging each app's outcome.
+- rTorrent off writes `disabled\n` to `.rtorrentDisable` as the account and
+  omits its start step. Pikkumies retains its 400 MiB floor. OpenClaw retains
+  its 2048 MiB, 60000 free files, absent state and installer gates and existing
+  account/slice-contained launch. A failed disable marker still aborts creation;
+  preinstall gates and enable-marker failures log their outcomes.
+- qBittorrent, Deluge, rclone and each catalogued `enable` app use empty
+  mode-0600 enable markers through `pmssReplaceAccountFile()`; a false switch
+  makes no marker change at creation. Catalog reads use only
+  `pmssToggleAppCatalogRead()`. No profile value becomes a path or command.
+- Unknown app IDs in definitions are programming errors covered by tests;
+  runtime logs and skips them without failing creation. Profiles do not
+  configure products or alter moves, recreates, credentials, bind addresses,
+  panel routes, public names, DNS records or certificates.
+
 ## Notes for Agentic Coding
 - Prefer high-level helpers (`runStep`, `pmssRefreshRepositories`, `pmssApplyDpkgSelections`, `pmssUpdateUserEnvironment`) to keep logs/profile consistent.
 - Honor environment overrides in tests (`PMSS_*` flags) to avoid mutating the real system.

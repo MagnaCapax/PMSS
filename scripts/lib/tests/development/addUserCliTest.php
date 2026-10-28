@@ -7,18 +7,41 @@ require_once dirname(__DIR__, 2).'/user/add/userConfigApply.php';
 
 class addUserCliTest extends TestCase
 {
-    public function testOpenClawProfileIsExplicitAndRejectsOtherValues(): void
+    public function testProfilesUseTheDefinitionsAndRejectUnknownValues(): void
     {
         $args = array('alice', 'rand', '2048', '200');
-        $this->assertFalse(isset($this->parseAddUserCli($args)['user']['appProfile']));
-        $this->assertSame('openclaw', $this->parseAddUserCli(array_merge($args, array('--app-profile=openclaw')))['user']['appProfile']);
-        foreach (array('', 'OpenClaw', 'other', 'openclaw;id', '../openclaw') as $profile) {
+        $this->assertSame('default', $this->parseAddUserCli($args)['user']['appProfile']);
+        foreach (array_keys(\pmssUserAppProfiles()) as $profile) {
+            $this->assertSame($profile, $this->parseAddUserCli(array_merge($args, array('--app-profile='.$profile)))['user']['appProfile']);
+        }
+        foreach (array('', 'OpenClaw', 'other', 'openclaw;id', '../openclaw', str_repeat('a', 41), "default\n", "default\0") as $profile) {
             $threw = false;
             try { $this->parseAddUserCli(array_merge($args, array('--app-profile='.$profile))); }
             catch (\InvalidArgumentException $e) { $threw = true; }
             $this->assertTrue($threw, 'Invalid app profile accepted');
         }
-        $this->assertStringContainsString('--app-profile=openclaw', \pmssAddUserCliUsage());
+        $names = implode(', ', array_keys(\pmssUserAppProfiles()));
+        $this->assertStringContainsAllStrings(['--app-profile=PROFILE', $names], \pmssAddUserCliUsage());
+        $this->assertAddUserParseFails(array_merge($args, ['--app-profile']), 'Invalid --app-profile; expected '.$names);
+    }
+
+    public function testProfileConfigUsesTheExistingCommandAndExplicitDockerOptionWins(): void
+    {
+        foreach (\pmssUserAppProfiles() as $profile => $apps) {
+            $args = ['alice', 'rand', '2048', '200', '--app-profile='.$profile];
+            $user = $this->parseAddUserCli($args)['user'];
+            $command = \pmssAddUserBuildUserConfigCommand($user);
+            // Only a value that differs from the policy default (on) is passed, so the store keeps meaning a choice.
+            if (array_key_exists('docker', $apps) && $apps['docker'] === false) {
+                $this->assertStringContainsString("'--docker-enabled=false'", $command);
+            } else {
+                $this->assertStringNotContainsString('--docker-enabled=', $command);
+            }
+            foreach (['true', 'false'] as $enabled) {
+                $user = $this->parseAddUserCli(array_merge($args, ['--docker-enabled='.$enabled]))['user'];
+                $this->assertStringContainsString("'--docker-enabled=".$enabled."'", \pmssAddUserBuildUserConfigCommand($user));
+            }
+        }
     }
 
     public function testUsageDocumentsHelpAndResourceFlags(): void

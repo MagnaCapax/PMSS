@@ -73,3 +73,14 @@ What the code did on 2026-10-22:
   features OpenClaw on these accounts.
 - Reading credits through Pikkumies' `credits line`: absent on OpenClaw-profile accounts.
 - A separate tab-order file: a second file for the same job; `~/.customFrames` is the system customers already use.
+
+## Amendment 2026-10-28: Pikkumies included in the OpenClaw profile
+
+[ADR 0197](0197-account-creation-app-profiles-as-data.md) supersedes the
+creation-time Pikkumies exclusion described in the context and alternatives.
+The data-defined `openclaw` profile enables both Pikkumies and OpenClaw, plus
+rootless Docker, while keeping rTorrent disabled. Existing RAM and file-count
+gates still apply, and the explicit Docker option takes precedence over its
+profile default. The omitted profile remains the seedbox `default`.
+The tab priority and credit-card decisions still depend on account state and
+keep their existing behavior; profiles add no product-specific panel logic.

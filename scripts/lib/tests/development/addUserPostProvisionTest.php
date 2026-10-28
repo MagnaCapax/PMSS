@@ -29,14 +29,13 @@ final class AddUserPostProvisionTest extends TestCase
         unlink($home.'/.openclaw');
         unlink($home.'/bin/install-openclaw');
         $this->assertStringContainsString('installer', \pmssAddUserOpenClawGate($user, $home, $files));
-        unset($user['appProfile']);
-        $this->assertSame('profile not selected', \pmssAddUserOpenClawGate($user, $home, $files));
+        $this->assertSame(['message' => 'off; preinstall skipped'], \pmssAddUserOpenClawSwitch(false, $user, $home));
     }
 
     public function testOpenClawSkeletonInstallerIsLoadedOnlyWhenTheProfileIsUsed(): void
     {
         // A node without the skeleton installer must still create ordinary accounts.
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/user/add/appProfile.php');
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/user/add/openclaw.php');
         $loader = strpos($source, 'function pmssAddUserOpenClawInstallerLoad');
         $require = strpos($source, 'require_once $installer;');
         $guard = strpos($source, 'if (!is_file($installer) || is_link($installer)) return false;');

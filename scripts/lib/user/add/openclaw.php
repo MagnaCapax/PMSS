@@ -1,5 +1,5 @@
 <?php
-/** Creation-time app profile policy; no customer OpenClaw files are written by root. */
+/** Creation-time OpenClaw switch; no customer OpenClaw files are written by root. */
 require_once __DIR__.'/../serviceLaunch.php';
 
 /**
@@ -10,14 +10,16 @@ function pmssAddUserOpenClawInstallerLoad(): bool
 {
     $installer = dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw';
     if (!is_file($installer) || is_link($installer)) return false;
+    // The installer is a CLI script; some PHP builds echo its shebang line when it is included.
+    ob_start();
     require_once $installer;
+    ob_end_clean();
     return defined('OC_REQUIRED_FILES') && function_exists('ocQuotaFileHeadroom');
 }
 
 /** Fail closed unless the profile has enough measured file quota and RAM for a fresh install. */
 function pmssAddUserOpenClawGate(array $user, string $home, ?array $files): ?string
 {
-    if (($user['appProfile'] ?? '') !== 'openclaw') return 'profile not selected';
     if (!pmssAddUserOpenClawInstallerLoad()) return 'skeleton installer unavailable';
     if ((int) ($user['memory'] ?? 0) < 2048) return 'RAM below 2048 MiB';
     if (file_exists($home.'/.openclaw') || is_link($home.'/.openclaw')) return 'existing ~/.openclaw';
@@ -26,21 +28,20 @@ function pmssAddUserOpenClawGate(array $user, string $home, ?array $files): ?str
     return null;
 }
 
-/** Queue the same slice-contained, account-owned launch used for Pikkumies preinstalls. */
-function pmssAddUserOpenClawPreinstall(array $user, string $home): void
+/** Plan the same slice-contained, account-owned launch used for Pikkumies preinstalls. */
+function pmssAddUserOpenClawSwitch(bool $enabled, array $user, string $home): array
 {
+    if (!$enabled) return ['message' => 'off; preinstall skipped'];
     if (!pmssAddUserOpenClawInstallerLoad()) {
-        logProvisionMessage('OpenClaw not preinstalled: skeleton installer unavailable');
-        return;
+        return ['message' => 'preinstall skipped: skeleton installer unavailable'];
     }
     $quota = pmssCommandCapture('quota -w -p -u '.escapeshellarg($user['name']), 10);
     $files = $quota['rc'] === 0 && function_exists('ocQuotaFileHeadroom') ? ocQuotaFileHeadroom($quota['stdout']) : null;
     $reason = pmssAddUserOpenClawGate($user, $home, $files);
     if ($reason !== null) {
-        logProvisionMessage('OpenClaw not preinstalled: '.$reason);
-        return;
+        return ['message' => 'preinstall skipped: '.$reason];
     }
-    runProvisionStep('Queue OpenClaw preinstall', pmssAddUserOpenClawPreinstallCommand($user['name']));
+    return ['message' => 'preinstall queued', 'queue' => ['Queue OpenClaw preinstall', pmssAddUserOpenClawPreinstallCommand($user['name'])]];
 }
 
 /**

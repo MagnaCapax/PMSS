@@ -197,3 +197,19 @@ service": one click starts the app. The tile and the Apps row still describe it 
 "AI agent with shell access; uses your Pulsed Media AI credits by default". Turn off
 and the pmss-stopped marker are unchanged, and the installer already ran
 non-interactively with `install --yes` from the panel.
+
+## Amendment 2026-10-28: data-defined account app profiles
+
+[ADR 0197](0197-account-creation-app-profiles-as-data.md) supersedes the
+creation-time Pikkumies exclusion in the earlier amendment. The `openclaw`
+profile now enables Pikkumies and rootless Docker alongside OpenClaw, with
+rTorrent disabled. Pikkumies retains its 400 MiB floor and Docker its 245 MiB
+floor; an explicit `--docker-enabled` wins over profile defaults. OpenClaw's
+2048 MiB, 60000 free files, absent state and installer gates, account/slice
+launch and credential/exposure boundaries remain unchanged. Failed gates
+log their reason and leave account creation available.
+
+The flag accepts the keys of `scripts/lib/user/appProfiles.php`, defaulting to
+the seedbox `default` profile when omitted. Creation applies those definitions
+through the shared app-switch registry; PMSS knows apps and profiles, never
+products. No existing account is migrated by this creation-only policy.

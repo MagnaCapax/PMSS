@@ -95,3 +95,13 @@ the configure tab", and "announcements should be 5."
   consent prompts and qBittorrent password prompt as the Configure tab's Apps list. A media app that was never installed
   says "Set up" and opens Configure, which installs the media stack. "All apps and settings in Configure" opens that tab.
 - News shows five announcements.
+
+## Amendment 2026-10-28: generic account app profiles
+
+Creation-time app policy now follows [ADR 0197](0197-account-creation-app-profiles-as-data.md).
+`--app-profile=openclaw` keeps rTorrent off while enabling Pikkumies, rootless
+Docker and the gated OpenClaw preinstall. Omitted profiles preserve seedbox
+defaults; `storagebox` enables storage apps without a torrent client.
+Profiles are data and do not introduce product-specific Welcome behavior:
+the existing account app state still drives the featured tile and instructions.
+The status, news, credits and panel exposure contracts remain unchanged.

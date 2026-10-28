@@ -200,3 +200,28 @@ check the result:
 ~/bin/openclaw config set agents.defaults.model.primary 'provider/model'
 ~/bin/openclaw config get agents.defaults.model.primary
 ```
+
+## Amendment 2026-10-28: account app profiles
+
+The provisioning paragraph above is superseded by the data-defined app profiles
+in [ADR 0197](adr/0197-account-creation-app-profiles-as-data.md).
+`--app-profile=openclaw` disables rTorrent, queues both Pikkumies and OpenClaw,
+and enables rootless Docker through the existing user-config policy. Pikkumies
+still requires 400 MiB RAM and its skeleton installer; OpenClaw still requires
+2048 MiB RAM, 60000 free file-quota slots, its installer and no existing
+`~/.openclaw`. Failed gates log a skip reason.
+
+Omitting `--app-profile` selects `default`, the existing seedbox behavior:
+rTorrent, Pikkumies and rootless Docker. `--app-profile=storagebox` disables
+rTorrent, enables rclone and Copyparty, and retains Pikkumies and Docker. It
+enables no torrent-client opt-in markers. Other apps keep their previous
+defaults. An explicit `--docker-enabled=true|false` overrides the profile,
+subject to the existing 245 MiB RAM floor. Profiles affect account creation
+only; moves and recreates keep their existing flow.
+
+The valid names come from `scripts/lib/user/appProfiles.php`; add a profile as
+one array entry. App switches live in `scripts/lib/user/appSwitch.php`, with
+catalogued enable markers read through `pmssToggleAppCatalogRead()`. PMSS knows
+apps and profiles, never products. Marker writes run as the account, and app
+access keeps the existing authenticated panel routes without adding public
+names, certificates, DNS records or listeners.

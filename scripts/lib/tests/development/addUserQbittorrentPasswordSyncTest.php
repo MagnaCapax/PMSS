@@ -35,7 +35,7 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
         $this->assertTrue($syncPos < $returnPos, 'qBittorrent password sync must stay inside the user config phase');
         $this->assertOrderedStrings([
             'pmssAddUserUserConfigApply($userDb, $user, $homePath);',
-            '/scripts/startRtorrent',
+            'array_merge($appStartSteps',
         ], $addUserSource, '', 'user config must finish before service startup: ');
     }
 

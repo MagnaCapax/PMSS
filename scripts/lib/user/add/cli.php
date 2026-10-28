@@ -12,6 +12,7 @@
 
 require_once __DIR__.'/../../cli/optionParser.php';
 require_once __DIR__.'/../userConfigCli.php';
+require_once __DIR__.'/../appProfilePolicy.php';
 
 /**
  * Return the canonical addUser CLI help text.
@@ -44,7 +45,7 @@ function pmssAddUserCliUsage(): string
             pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         ], pmssUserConfigCliResourceHelpLines('addUserAdvancedOptions', 'usage', ['CPUWeight' => $derivedDefault, 'IOWeight' => $derivedDefault]), [
             pmssCliHelpLine('--docker-enabled=true|false', 'Persist the initial rootless Docker policy.'),
-            pmssCliHelpLine('--app-profile=openclaw', 'Disable rTorrent, skip Pikkumies, and queue account-owned OpenClaw (2048 MiB RAM and 60000 free files required).'),
+            pmssCliHelpLine('--app-profile=PROFILE', 'Initial apps: '.implode(', ', array_keys(pmssUserAppProfiles())).'; omitted selects the seedbox profile.'),
             pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
         ]),
         'Examples' => [
@@ -101,11 +102,7 @@ function pmssAddUserParseCli(array $argv): array
     }
 
     $bonusQuotaGiB = pmssAddUserBonusQuotaGiBParse(pmssCliOption($parsed, 'bonus-quota-gib', null, null));
-    $profile = pmssCliOption($parsed, 'app-profile', null, null);
-    if ($profile !== null) {
-        if ($profile !== 'openclaw') throw new InvalidArgumentException('Invalid --app-profile; expected openclaw');
-        $user['appProfile'] = $profile;
-    }
+    $user['appProfile'] = pmssUserAppProfileName(pmssCliOption($parsed, 'app-profile', null, null));
     if ($bonusQuotaGiB !== null) {
         $user['bonusQuotaGiB'] = $bonusQuotaGiB;
     }

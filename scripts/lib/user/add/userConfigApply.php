@@ -8,11 +8,13 @@
 
 require_once __DIR__.'/../qbittorrent.php';
 require_once __DIR__.'/../userConfigCli.php';
+require_once __DIR__.'/../appSwitch.php';
 /**
  * Build the canonical userConfig command for addUser provisioning.
  */
 function pmssAddUserBuildUserConfigCommand(array $user): string
 {
+    $user = pmssUserAppProfileConfig($user);
     $command = [
         '/scripts/util/userConfig.php',
         (string) $user['name'],
@@ -40,6 +42,7 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
  */
 function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath): void
 {
+    $user = pmssUserAppProfileConfig($user);
     // Record core attributes in the user config store before provisioning services.
     $payload = array(
         'ramMiB' => $user['memory'],

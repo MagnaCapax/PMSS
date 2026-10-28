@@ -46,7 +46,8 @@ class AddUserProvisioningGuardTest extends TestCase
                 ],
                 'ordered' => [
                     [
-                        'needles' => ['/scripts/startRtorrent', '/scripts/startLighttpd', '/scripts/util/setupNetwork.php'],
+                        // App starts (rTorrent in the seedbox profile) come from the profile walk, ahead of lighttpd (ADR 0197).
+                        'needles' => ['array_merge($appStartSteps', '/scripts/startLighttpd', '/scripts/util/setupNetwork.php'],
                         'missingPrefix' => 'addUser.php missing service/network substring: ',
                         'orderPrefix' => 'addUser.php service/network order changed near: ',
                     ],
@@ -212,7 +213,7 @@ class AddUserProvisioningGuardTest extends TestCase
         ]);
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/addUser.php', [
             'pmssAddUserSystemUserCreate($user, $homePath);',
-            '/scripts/startRtorrent',
+            'array_merge($appStartSteps',
         ]);
     }
 
