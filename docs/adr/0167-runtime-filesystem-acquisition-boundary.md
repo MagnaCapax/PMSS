@@ -51,6 +51,13 @@ metadata, failed/short/oversized reads, and cleanup after read exceptions. Exist
 FIFO, temporary-prefix, partial-write, and snapshot tests remain behavior locks.
 Fault injection targets the stream module after decomposition.
 
+Numeric file decoding rejects NUL bytes in the raw payload before trimming.
+The integer reader shares the digit reader's validation, then applies the
+existing representable-integer bound. Malformed bytes retain the null/default
+failure results; whitespace, leading zeroes, and zero remain accepted. Raw
+binary and generic trimmed-text reads keep their existing contracts.
+`RuntimeTest` covers these cases; execution stays on testing machines.
+
 ## References
 - [Architecture overview](../architecture.md)
 - [Runtime contracts](../contracts.md#runtime-execution--profiling)

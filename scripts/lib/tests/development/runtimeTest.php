@@ -149,6 +149,36 @@ PHP;
         }
     }
 
+    public function testNumericFileReadersRejectNulWithoutChangingRawReads(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-numeric-bytes-');
+        foreach ([
+            'leading NUL' => ["\0".'123', null, 99],
+            'trailing NUL' => ["123\0", null, 99],
+            'embedded NUL' => ["12\0".'3', null, 99],
+            'wrapped NUL' => ["\0 00123\r\n\0", null, 99],
+            'NUL after whitespace' => [" \t\0".'123', null, 99],
+            'NUL before whitespace' => ["123\0\r\n", null, 99],
+            'NUL around zero' => ["\0".'0'."\0", null, 99],
+            'only NUL' => ["\0", null, 99],
+            'legacy whitespace' => [" \t\r\n\x0B".'00123'."\x0B\r\n\t ", '00123', 123],
+            'zero' => [" 0000\n", '0000', 0],
+            'maximum' => ["\t".PHP_INT_MAX."\n", (string) PHP_INT_MAX, PHP_INT_MAX],
+            'oversized digits' => [(string) PHP_INT_MAX.'0', (string) PHP_INT_MAX.'0', 99],
+            'empty' => ['', null, 99],
+            'whitespace only' => [" \t\r\n\x0B", null, 99],
+            'signed' => ['+123', null, 99],
+            'fractional' => ['12.3', null, 99],
+        ] as $label => [$raw, $digits, $integer]) {
+            $this->assertSame(strlen($raw), file_put_contents($path, $raw));
+            $this->assertSame($digits, \pmssReadRegularFileDigits($path), $label);
+            $this->assertSame($integer, \pmssReadRegularFileInt($path, 99), $label);
+            // The binary and generic text readers retain their separate contracts.
+            $this->assertSame($raw, \pmssReadRegularFileContents($path), $label);
+            $this->assertSame(trim($raw), \pmssReadRegularFileTrimmed($path), $label);
+        }
+    }
+
     public function testCompleteWriteRejectsNulPathBeforeWriter(): void
     {
         $calls = 0;

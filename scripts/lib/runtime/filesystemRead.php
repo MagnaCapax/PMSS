@@ -61,7 +61,14 @@ function pmssReadRequiredRegularFile(string $path, string $label = 'required fil
     return $contents;
 }
 
-function pmssReadRegularFileDigits(string $path): ?string { return (($raw = pmssReadRegularFileTrimmed($path)) !== null && ctype_digit($raw)) ? $raw : null; }
+/** Reject malformed numeric bytes before whitespace normalization can hide them. */
+function pmssReadRegularFileDigits(string $path): ?string
+{
+    $raw = pmssReadRegularFileContents($path);
+    if ($raw === null || strpos($raw, "\0") !== false) return null;
+    $digits = trim($raw);
+    return ctype_digit($digits) ? $digits : null;
+}
 function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minFields = 2, bool $skipEmptyLines = true): ?array
 {
     if ($recordName === '' || $minFields < 1 || strpos($recordName, ':') !== false || preg_match('/[\r\n\0\/]/', $recordName) === 1 || !pmssRegularFilePathIsReadable($path)) return null;
@@ -79,5 +86,5 @@ function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minF
 
 function pmssReadRegularFileInt(string $path, int $default = 0): int
 {
-    return pmssUnsignedDecimalIntParse(pmssReadRegularFileTrimmed($path) ?? '') ?? $default;
+    return pmssUnsignedDecimalIntParse(pmssReadRegularFileDigits($path) ?? '') ?? $default;
 }
