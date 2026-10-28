@@ -85,6 +85,54 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $this->assertSame(1, $result['md']['degraded']);
     }
 
+    public function testSysfsNulBytesCannotBecomeValidMetadata(): void
+    {
+        $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
+        mkdir($sysfs.'/md0/queue', 0755, true);
+        mkdir($sysfs.'/md0/md', 0755, true);
+        $fields = ['queue/rotational' => '0', 'md/array_state' => 'clean',
+            'md/level' => 'raid10', 'md/degraded' => '0'];
+        $check = static function (): bool { return true; };
+        $canonical = static function (string $path): string { return $path; };
+        $size = static function (): int { return 1048576; };
+        $base = ['device' => '/dev/md0', 'rota' => 0, 'size' => 1048576, 'mode' => 'home-device'];
+        $metadata = ['array_state' => 'clean', 'degraded' => 0, 'level' => 'raid10'];
+
+        // Change one raw field at a time; callbacks prevent real device or command probes.
+        foreach ($fields as $field => $value) {
+            foreach (["\0".$value, $value."\0", substr($value, 0, 1)."\0".substr($value, 1),
+                " \t\0".$value."\0\r\n", " \t".$value."\r\n"] as $index => $raw) {
+                foreach ($fields as $path => $normal) {
+                    file_put_contents($sysfs.'/md0/'.$path, $path === $field ? $raw : $normal."\n");
+                }
+                $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+                $expected = $base;
+                if ($index === 4) {
+                    $expected += ['md' => $metadata, 'ok' => true];
+                } elseif ($field === 'queue/rotational') {
+                    $expected['rota'] = null;
+                    $expected += ['md' => $metadata, 'ok' => true];
+                } else {
+                    $expected += ['ok' => false, 'error' => 'unable to read md array status'];
+                }
+                $this->assertSame($expected, $result, $field.' case '.$index);
+            }
+        }
+
+        // A malformed nonredundant level must not authorize the missing-counter fallback.
+        unlink($sysfs.'/md0/md/degraded');
+        foreach (['raid0', 'linear'] as $level) {
+            foreach (["\0".$level, $level."\0", " \0".$level."\0\n", $level."\n"] as $index => $raw) {
+                file_put_contents($sysfs.'/md0/md/level', $raw);
+                $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+                $expected = $base + ($index === 3
+                    ? ['md' => array_replace($metadata, ['level' => $level]), 'ok' => true]
+                    : ['ok' => false, 'error' => 'unable to read md array status']);
+                $this->assertSame($expected, $result, $level.' fallback case '.$index);
+            }
+        }
+    }
+
     public function testUnsafeAndNonBlockMountsAreRejected(): void
     {
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');

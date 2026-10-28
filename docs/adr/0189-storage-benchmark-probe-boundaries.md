@@ -50,3 +50,8 @@ decoding and preserves execution/read exceptions.
   errors, missing job zero and ordered metric/raw payloads.
 - Static checks run on the development control host. The lane runs the development
   suite on a testing machine before publishing; no benchmark or test runs locally.
+- Mounted-device sysfs values reject NUL bytes before whitespace normalization.
+  Malformed rotational samples retain the unknown value; malformed md state,
+  level or degraded counts retain the existing status-read failure, including
+  when a missing degraded counter would otherwise use the raid0/linear fallback.
+  Ordinary whitespace and valid metadata retain their existing result shape.

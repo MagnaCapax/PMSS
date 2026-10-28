@@ -29,13 +29,20 @@ function storageBenchmarkHomeDeviceResolve(
 
     $sysfsDevice = rtrim($sysfsRoot, '/').'/'.basename($canonical);
     $rotational = @file_get_contents($sysfsDevice.'/queue/rotational');
-    $entry['rota'] = $rotational === false || !in_array(trim($rotational), ['0', '1'], true) ? null : (int) trim($rotational);
+    $entry['rota'] = $rotational === false || pmssFilesystemPathHasNulByte($rotational)
+        || !in_array(trim($rotational), ['0', '1'], true) ? null : (int) trim($rotational);
     $entry['size'] = $size;
     if (is_dir($sysfsDevice.'/md')) {
         $state = @file_get_contents($sysfsDevice.'/md/array_state');
         $level = @file_get_contents($sysfsDevice.'/md/level');
         $degradedPath = $sysfsDevice.'/md/degraded';
         $degraded = @file_get_contents($degradedPath);
+        // Reject raw NULs before trim can turn malformed metadata into a valid status.
+        foreach ([$state, $level, $degraded] as $raw) {
+            if (is_string($raw) && pmssFilesystemPathHasNulByte($raw)) {
+                return $entry + ['ok' => false, 'error' => 'unable to read md array status'];
+            }
+        }
         if ($degraded === false && !file_exists($degradedPath) && $level !== false
             && in_array(trim($level), ['raid0', 'linear'], true)) {
             $degraded = '0';
