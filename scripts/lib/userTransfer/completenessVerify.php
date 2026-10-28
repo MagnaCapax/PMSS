@@ -30,7 +30,9 @@ function pmssUserTransferBuildPayloadOwnershipCheckCommand(string $dataPath, int
 function pmssUserTransferBuildPayloadAccessCheckShell(string $dataPath): string
 {
     $quotedPath = escapeshellarg($dataPath);
-    return 'sample=$(find '.$quotedPath.' -type f -print -quit 2>/dev/null)' . "\n"
+    // su keeps root's working directory; find exits 1 when it cannot return to one the account cannot read.
+    return 'cd / || exit 1' . "\n"
+        .'sample=$(find '.$quotedPath.' -type f -print -quit 2>/dev/null)' . "\n"
         .'find_rc=$?' . "\n"
         .'if [ "$find_rc" -ne 0 ]; then exit "$find_rc"; fi' . "\n"
         .'if [ -n "$sample" ]; then test -r "$sample"; else test -x '.$quotedPath.'; fi' . "\n";

@@ -310,6 +310,23 @@ class UserTransferTest extends TestCase
         $this->assertStringNotContainsString('sudo', $shell);
     }
 
+    public function testPayloadAccessCheckPassesFromAnUnreadableWorkingDirectory(): void
+    {
+        $root = sys_get_temp_dir().'/pmss-ut-cwd-'.bin2hex(random_bytes(4));
+        mkdir($root.'/data', 0700, true);
+        mkdir($root.'/cwd', 0700);
+        file_put_contents($root.'/data/file', 'x');
+        $shell = \pmssUserTransferBuildPayloadAccessCheckShell($root.'/data');
+        // The caller's working directory becomes unreadable, as root's home is for the account under su.
+        exec('cd '.escapeshellarg($root.'/cwd').' && chmod 000 . && sh -c '.escapeshellarg($shell).'; echo $?', $out);
+        chmod($root.'/cwd', 0700);
+        unlink($root.'/data/file');
+        rmdir($root.'/data');
+        rmdir($root.'/cwd');
+        rmdir($root);
+        $this->assertSame('0', (string) end($out));
+    }
+
     public function testCrossUsernamePayloadGateStaysAfterPermissionNormalisation(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
