@@ -13,11 +13,8 @@ class RenderNodeAccessTest extends TestCase
         $target = $root.'/70-pmss-render-node.rules';
         $messages = [];
         $commands = [];
-        $logger = static function (string $message) use (&$messages): void { $messages[] = $message; };
-        $runner = static function (string $description, string $command) use (&$commands): int {
-            $commands[] = [$description, $command];
-            return 0;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
+        $runner = $this->pmssMakeStepRunner($commands);
         $path = static function (string $binary): string { return '/usr/bin/udevadm'; };
 
         \pmssEnsureIntelRenderNodeAccess($logger, $target, $runner, $path);
@@ -42,7 +39,7 @@ class RenderNodeAccessTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-render-missing-udev-', 0700);
         $messages = [];
         $commands = [];
-        $logger = static function (string $message) use (&$messages): void { $messages[] = $message; };
+        $logger = $this->pmssMakeArrayLogger($messages);
         $runner = static function (string $description, string $command) use (&$commands): int { $commands[] = $command; return 0; };
         $path = static function (string $binary): string { return ''; };
         \pmssEnsureIntelRenderNodeAccess($logger, $root.'/rule', $runner, $path);
@@ -68,7 +65,7 @@ class RenderNodeAccessTest extends TestCase
         $commands = [];
         $messages = [];
         $members = ['alice'];
-        $logger = static function (string $message) use (&$messages): void { $messages[] = $message; };
+        $logger = $this->pmssMakeArrayLogger($messages);
         $group = static function () use (&$members): array { return ['members' => $members]; };
         $list = static function (): array { return ['alice', 'bob', 'bad-name', 'carol']; };
         $runner = static function ($label, $command) use (&$commands, &$members): int {
@@ -112,7 +109,7 @@ class RenderNodeAccessTest extends TestCase
     {
         $messages = [];
         $commands = [];
-        $logger = static function (string $message) use (&$messages): void { $messages[] = $message; };
+        $logger = $this->pmssMakeArrayLogger($messages);
         $runner = static function ($label, $command) use (&$commands): int { $commands[] = $command; return 1; };
         $path = static function (string $binary): string { return $binary === 'usermod' ? '/usr/sbin/usermod' : ''; };
         $status = \pmssEnsureIntelRenderGroupMember('bob', $logger, static function (): bool { return true; }, static function (): array { return ['members' => []]; }, $runner, $path);

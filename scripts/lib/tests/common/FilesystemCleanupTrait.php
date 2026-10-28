@@ -177,6 +177,15 @@ trait FilesystemCleanupTrait
         };
     }
 
+    /** Record ordered step descriptions and commands without executing them. */
+    protected function pmssMakeStepRunner(array &$steps, int $exitCode = 0): callable
+    {
+        return static function (string $description, string $command) use (&$steps, $exitCode): int {
+            $steps[] = [$description, $command];
+            return $exitCode;
+        };
+    }
+
     /** Return environment overrides with PMSS test mode enabled. */
     protected function pmssTestModeEnv(array $overrides = []): array
     {

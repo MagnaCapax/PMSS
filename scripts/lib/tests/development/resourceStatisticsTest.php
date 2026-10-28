@@ -262,9 +262,7 @@ class ResourceStatisticsTest extends TestCase
         $valid = $this->resourceLine($timestamp, '1 2 3 4 5');
         $invalid = $this->resourceLine($timestamp, str_repeat('9', 400).' 2 3 4 5');
         $errors = [];
-        $result = $stats->collectWindowResultsFromData($invalid."\n".$valid, ['day' => $timestamp - 300], function (string $line) use (&$errors): void {
-            $errors[] = $line;
-        });
+        $result = $stats->collectWindowResultsFromData($invalid."\n".$valid, ['day' => $timestamp - 300], $this->pmssMakeArrayLogger($errors));
         $this->assertSame([$invalid], $errors);
         $this->assertSame(1.0, $result['io_read']['raw']['day']);
         $this->assertTrue(is_string(json_encode($result)));

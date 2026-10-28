@@ -121,7 +121,7 @@ class CgroupReadIopsDerivationTest extends TestCase
             300.0,
             200,
             2,
-            static function (string $message) use (&$messages): void { $messages[] = $message; }
+            $this->pmssMakeArrayLogger($messages)
         );
 
         $this->assertFalse($allowed);

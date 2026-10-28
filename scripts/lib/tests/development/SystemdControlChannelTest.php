@@ -24,7 +24,7 @@ class SystemdControlChannelTest extends TestCase
             ['rc' => 0, 'stdout' => ''],
         ], $commands);
         $step = static function ($description, $command) use (&$steps): int { $steps[] = $command; return 0; };
-        $log = static function ($message) use (&$logs): void { $logs[] = $message; };
+        $log = $this->pmssMakeArrayLogger($logs);
 
         $this->assertSame(0, \pmssSystemdControlChannelCheck($capture, $step, $log));
         $this->assertSame([['systemctl show --property=Version', 15], ['loginctl list-sessions', 15]], $commands);
@@ -66,7 +66,7 @@ class SystemdControlChannelTest extends TestCase
             ['rc' => 0, 'stdout' => "Version=252\n"], ['rc' => 0, 'stdout' => ''],
         ], $commands);
         $step = static function ($description, $command) use (&$steps): int { $steps[] = $command; return 0; };
-        $log = static function ($message) use (&$logs): void { $logs[] = $message; };
+        $log = $this->pmssMakeArrayLogger($logs);
 
         $this->assertSame(0, \pmssSystemdControlChannelCheck($capture, $step, $log));
         $this->assertSame([
@@ -87,7 +87,7 @@ class SystemdControlChannelTest extends TestCase
                 $steps[] = $command;
                 return count($steps) === $failedAt + 1 ? 1 : 0;
             };
-            $log = static function ($message) use (&$logs): void { $logs[] = $message; };
+            $log = $this->pmssMakeArrayLogger($logs);
 
             $this->assertSame(1, \pmssSystemdControlChannelCheck($capture, $step, $log));
             $this->assertSame($failedAt + 1, count($steps));
@@ -104,7 +104,7 @@ class SystemdControlChannelTest extends TestCase
             ['rc' => 0, 'stdout' => "Version=252\n"], ['rc' => 1, 'stdout' => ''],
         ], $commands);
         $step = static function ($description, $command): int { return 0; };
-        $log = static function ($message) use (&$logs): void { $logs[] = $message; };
+        $log = $this->pmssMakeArrayLogger($logs);
 
         $this->assertSame(1, \pmssSystemdControlChannelCheck($capture, $step, $log));
         $this->assertSame('control channel still failed: loginctl_sessions', $logs[1]);

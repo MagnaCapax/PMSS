@@ -354,10 +354,7 @@ class UserTransferTest extends TestCase
         mkdir($home, 0700);
         file_put_contents($home.'/.rtorrentRestart.php', '<?php');
         $commands = [];
-        $runner = static function (string $description, string $command) use (&$commands): int {
-            $commands[] = [$description, $command];
-            return 7;
-        };
+        $runner = $this->pmssMakeStepRunner($commands, 7);
 
         [, $failedOutput] = $this->pmssCaptureStdout(static function () use ($home, $runner): void {
             \pmssUserTransferRunRtorrentRestart($home, 'alice', $runner);

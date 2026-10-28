@@ -27,6 +27,12 @@ arrays and null. Pass an event array only when calls must be recorded. Keep
 stateful, argument-dependent and throwing callbacks explicit; scalar options
 such as build versions and attempt budgets remain ordinary values.
 
+Command-step fixtures use `TestCase::pmssMakeStepRunner($steps, $exitCode)` to
+record ordered `[description, command]` pairs and return a fixed status without
+executing commands. Log capture uses `pmssMakeArrayLogger($messages)`. Both
+retain the caller's array by reference, including when it is reset between
+calls. Callbacks with additional side effects or changing results stay explicit.
+
 CLI fixtures use `TestCase::pmssExecArgvCommand()` for literal argument vectors
 with environment overrides and captured results. Compound or asynchronous shell
 fixtures use `pmssBuildArgvCommand()` for their literal portions; environment

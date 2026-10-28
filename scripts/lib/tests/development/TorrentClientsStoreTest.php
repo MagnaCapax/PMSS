@@ -25,7 +25,7 @@ final class TorrentClientsStoreTest extends TestCase
         $results = \pmssTorrentClientsStoreConverge([$this->entry()], [
             'root' => $root,
             'install' => static function () use (&$events): bool { $events[] = 'download'; return true; },
-            'log' => static function (string $line) use (&$events): void { $events[] = $line; },
+            'log' => $this->pmssMakeArrayLogger($events),
         ] + self::pmssMakeCallbacks(['free' => 3 * 1024 * 1024 * 1024 + 9, 'size' => 10]));
         $this->assertSame(['rtorrent/0.9.9' => 'skipped-space'], $results);
         $this->assertSame(1, count($events));

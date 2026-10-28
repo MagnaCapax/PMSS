@@ -13,13 +13,8 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         $marker = $this->pmssWriteFile($directory.'/keep', 'preserved');
         $commands = [];
         $messages = [];
-        $logger = static function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
-        $runner = static function (string $description, string $command) use (&$commands): int {
-            $commands[] = [$description, $command];
-            return 0;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
+        $runner = $this->pmssMakeStepRunner($commands);
 
         foreach (['', '../pmss-', '-pmss-', '.pmss-', 'pmss/path', 'pmss space',
             "pmss-\n", "pmss-\r\n", "\npmss-", "pmss-\nextra", "pmss-\0", "pmss-\t"] as $prefix) {
@@ -57,7 +52,7 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         $this->assertTrue(mkdir($nested, 0700));
         $calls = 0;
         $messages = [];
-        $logger = static function (string $message) use (&$messages): void { $messages[] = $message; };
+        $logger = $this->pmssMakeArrayLogger($messages);
         $runner = static function () use (&$calls): int { $calls++; return 0; };
 
         $this->assertSame(null, \pmssPrivateTempDirRealpath($nested, 'pmss-prefix-', $logger));
@@ -80,10 +75,7 @@ class RuntimeTempPrefixSafetyTest extends TestCase
                 $this->assertSame(0700, fileperms($directory) & 0777);
                 $this->assertSame(realpath($directory), \pmssPrivateTempDirRealpath($directory, $prefix));
                 $calls = [];
-                $runner = static function (string $description, string $command) use (&$calls): int {
-                    $calls[] = [$description, $command];
-                    return 23;
-                };
+                $runner = $this->pmssMakeStepRunner($calls, 23);
                 $this->assertSame(23, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture', null, $runner));
                 $this->assertSame([['Cleanup fixture', 'rm -rf '.escapeshellarg(realpath($directory))]], $calls);
                 $this->assertTrue(is_dir($directory));

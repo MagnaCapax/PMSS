@@ -45,10 +45,7 @@ class NetconsoleConfigureTest extends TestCase
 
         $this->pmssWithEnv($this->netconsoleEnv($dir), function () use (&$calls): void {
             \pmssNetconsoleConfigure(function (): void {
-            }, function (string $description, string $command) use (&$calls): int {
-                $calls[] = [$description, $command];
-                return 0;
-            });
+            }, $this->pmssMakeStepRunner($calls));
         });
 
         $this->assertTrue(is_file($dir.'/modprobe.d/netconsole.conf'), 'expected modprobe config');
@@ -93,10 +90,7 @@ class NetconsoleConfigureTest extends TestCase
         $env['PMSS_NETCONSOLE_MODULE_LOADED'] = '1';
         $this->pmssWithEnv($env, function () use (&$calls): void {
             \pmssNetconsoleConfigure(function (): void {
-            }, function (string $description, string $command) use (&$calls): int {
-                $calls[] = [$description, $command];
-                return 0;
-            });
+            }, $this->pmssMakeStepRunner($calls));
         });
 
         $this->assertEquals(2, count($calls));

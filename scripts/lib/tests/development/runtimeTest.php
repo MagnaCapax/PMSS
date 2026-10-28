@@ -572,7 +572,7 @@ PHP;
     public function testRunCommandEchoSuccessCapturesStdout(): void
     {
         $captured = [];
-        $rc = \runCommand('echo HELLO_RUNTIME', false, function (string $m) use (&$captured): void { $captured[] = $m; });
+        $rc = \runCommand('echo HELLO_RUNTIME', false, $this->pmssMakeArrayLogger($captured));
         $this->assertEquals(0, $rc);
         $out = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
         $this->assertTrue(strpos($out, 'HELLO_RUNTIME') !== false);
@@ -603,7 +603,7 @@ PHP;
         $rc = \runCommand(
             'php -r '.escapeshellarg('fwrite(STDERR, "RUNTIME_ERR_MARKER\n"); exit(3);'),
             false,
-            function (string $m) use (&$logs): void { $logs[] = $m; }
+            $this->pmssMakeArrayLogger($logs)
         );
 
         $this->assertEquals(3, $rc);
@@ -658,8 +658,9 @@ PHP;
             foreach ([[false, false], [true, false], [false, true], [true, true]] as $options) {
                 $logs = [];
                 $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => 'stale', 'stderr' => 'stale'];
-                [$rc, $stdout] = $this->pmssCaptureStdout(static function () use ($command, $options, &$logs): int {
-                    return \runCommand($command, $options[0], function (string $message) use (&$logs): void { $logs[] = $message; }, $options[1]);
+                $logger = $this->pmssMakeArrayLogger($logs);
+                [$rc, $stdout] = $this->pmssCaptureStdout(static function () use ($command, $options, $logger): int {
+                    return \runCommand($command, $options[0], $logger, $options[1]);
                 });
                 $this->assertSame(1, $rc);
                 $this->assertSame('', $stdout);

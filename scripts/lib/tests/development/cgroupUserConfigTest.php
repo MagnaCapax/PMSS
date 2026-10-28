@@ -394,10 +394,7 @@ class CgroupUserConfigTest extends TestCase
     {
         $steps = [];
         $this->sys->findmnt['/home'] = '/dev/md0';
-        $this->mgr = new Manager($this->sys, function (string $description, string $command) use (&$steps): int {
-            $steps[] = [$description, $command];
-            return 0;
-        });
+        $this->mgr = new Manager($this->sys, $this->pmssMakeStepRunner($steps));
 
         $res = $this->runMgr(['testuser', '--apply', '--io-read-iops=/home:max']);
 
@@ -664,10 +661,7 @@ class CgroupUserConfigTest extends TestCase
     public function testApplyReturnsFailureWhenCgroupStepFails()
     {
         $steps = [];
-        $this->mgr = new Manager($this->sys, function (string $description, string $command) use (&$steps): int {
-            $steps[] = [$description, $command];
-            return 7;
-        });
+        $this->mgr = new Manager($this->sys, $this->pmssMakeStepRunner($steps, 7));
 
         $res = $this->runMgr(['testuser', '--apply', '--cpu-weight=400']);
 
@@ -681,10 +675,7 @@ class CgroupUserConfigTest extends TestCase
         $steps = [];
         $this->sys->findmnt['/home'] = '/dev/md0';
         $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
-        $this->mgr = new Manager($this->sys, function (string $description, string $command) use (&$steps): int {
-            $steps[] = [$description, $command];
-            return 0;
-        });
+        $this->mgr = new Manager($this->sys, $this->pmssMakeStepRunner($steps));
 
         $res = $this->runMgr([
             'testuser',
