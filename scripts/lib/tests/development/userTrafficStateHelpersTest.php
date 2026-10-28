@@ -34,6 +34,15 @@ class UserTrafficStateHelpersTest extends TestCase
         foreach ([
             ['missing', null, 0],
             ['invalid', 'not serialized', 0],
+            ['missing-raw', serialize([]), 0],
+            ['null-raw', serialize(['raw' => null]), 0],
+            ['empty-raw', serialize(['raw' => []]), 0],
+            ['string-raw', serialize(['raw' => '1536']), 0],
+            ['integer-raw', serialize(['raw' => 1536]), 0],
+            ['boolean-raw', serialize(['raw' => true]), 0],
+            ['object-raw', serialize(['raw' => (object) ['month' => 1536]]), 0],
+            ['array-month', serialize(['raw' => ['month' => [1536]]]), 0],
+            ['object-month', serialize(['raw' => ['month' => (object) ['value' => 1536]]]), 0],
             ['missing-month', serialize(['raw' => ['week' => 128]]), 0],
             ['valid', serialize(['raw' => ['month' => 1536.4]]), 1536],
         ] as [$name, $payload, $expected]) {
@@ -41,6 +50,21 @@ class UserTrafficStateHelpersTest extends TestCase
             $this->writeOptionalFixture($path, $payload);
 
             $this->assertEquals($expected, \pmssReadUserTrafficMonth($path), 'case '.$name);
+        }
+    }
+
+    public function testTrafficRawMonthPreservesNumericConversions(): void
+    {
+        foreach ([
+            [0, 0.0],
+            ['0', 0.0],
+            [1536, 1536.0],
+            [1536.4, 1536.4],
+            ['1536.4', 1536.4],
+            [-12, -12.0],
+            ['1e3', 1000.0],
+        ] as [$month, $expected]) {
+            $this->assertSame($expected, \pmssTrafficRawMonthMiB(['raw' => ['month' => $month]]));
         }
     }
 

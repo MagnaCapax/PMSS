@@ -56,7 +56,12 @@ function pmssTrafficStatsPath(string $username, ?string $statsDir = null, ?strin
 }
 
 /** Return a numeric monthly traffic total, or null for an invalid payload. */
-function pmssTrafficRawMonthMiB(array $data): ?float { return is_numeric($data['raw']['month'] ?? null) ? (float) $data['raw']['month'] : null; }
+function pmssTrafficRawMonthMiB(array $data): ?float
+{
+    // A serialized array can still contain an object where raw windows belong.
+    if (!is_array($data['raw'] ?? null)) return null;
+    return is_numeric($data['raw']['month'] ?? null) ? (float) $data['raw']['month'] : null;
+}
 
 /**
  * Read a trusted traffic stats payload owned by root and grouped to the user.
