@@ -214,7 +214,7 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame(null, $status['memory_max']);
         $this->assertSame('memory.high', $status['limit_source']);
         $this->assertStringContainsString('2.0 GiB / 3.0 GiB', $status['usage_text']);
-        $this->pmssAssertRepoFileContract('etc/skel/www/webCgroupMemoryStatus.php', array(
+        $this->pmssAssertRepoFileContract('etc/skel/www/webCgroupMemoryRead.php', array(
             'forbidden' => array('systemctl show user-'),
         ));
     }
@@ -348,7 +348,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testCustomerPanelsOmitUnavailableThrottleEventCount(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/webCgroupMemoryStatus.php', [
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/welcomeMemory.php', [
             "if (\$pressureStatus['throttle_events'] !== null)",
             "\$pressureParts[] = '<br />Throttle events: '",
         ]);
@@ -374,7 +374,7 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testWelcomePageSplitsThrottleAndOomWarningCopy(): void
     {
         $source = $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'etc/skel/www/webCgroupMemoryStatus.php',
+            'etc/skel/www/welcomeMemory.php',
             ['RAM THROTTLE ACTIVE', 'RAM LIMIT EXCEEDED', '$isThrottleActive', '$hasOomEvents']
         );
 
@@ -411,6 +411,88 @@ class WebCgroupMemoryStatusTest extends TestCase
 
         $this->assertSame('/sys/fs/cgroup/unified/user.slice/user-1234.slice/memory.stat', $paths[0]);
         $this->assertTrue(in_array('/sys/fs/cgroup/memory/user.slice/user-1234.slice/memory.stat', $paths, true));
+    }
+
+    /** Freeze policy boundaries and precedence independently of counter acquisition. */
+    public function testPressurePolicyBoundaryCharacterization(): void
+    {
+        foreach ([
+            ['LOW', ['usage_percent' => 79.9, 'high_percent' => null]],
+            ['MEDIUM', ['usage_percent' => 80.0, 'high_percent' => null]],
+            ['MEDIUM', ['usage_percent' => 94.9, 'high_percent' => null]],
+            ['HIGH', ['usage_percent' => 95.0, 'high_percent' => null]],
+            ['LOW', ['pressure_some_avg10' => 0.249]],
+            ['MEDIUM', ['pressure_some_avg10' => 0.25]],
+            ['MEDIUM', ['pressure_some_avg10' => 0.999]],
+            ['HIGH', ['pressure_some_avg10' => 1.0]],
+            ['LOW', ['pressure_full_avg10' => 0.099]],
+            ['HIGH', ['pressure_full_avg10' => 0.10]],
+            ['HIGH', ['high_percent' => 95.0, 'throttle_events' => 1000]],
+            ['THROTTLED', ['high_percent' => 95.0, 'throttle_events' => 1001]],
+            ['THROTTLED', ['memory_current' => 1000, 'throttle_events' => 1]],
+            ['HIGH', ['memory_current' => 1000, 'throttle_events' => 1, 'oom_kill_recent' => true]],
+            ['LOW', ['memory_current' => null, 'memory_high' => null, 'usage_percent' => null,
+                'high_percent' => null, 'pressure_some_avg10' => null, 'pressure_full_avg10' => null,
+                'throttle_events' => null]],
+        ] as [$expected, $overrides]) {
+            $this->assertClassifiesAs($expected, $overrides);
+        }
+    }
+
+    /** Freeze the inclusive sample window and exclusive last-increase cutoff. */
+    public function testOomRecencyBoundaryCharacterization(): void
+    {
+        foreach ([
+            [true, 5, ['count' => 4, 'sampled_at' => 99100]],
+            [false, 5, ['count' => 4, 'sampled_at' => 99099]],
+            [false, 5, ['count' => 4, 'sampled_at' => 100001]],
+            [true, 4, ['count' => 4, 'sampled_at' => 100000, 'last_increase' => 13601]],
+            [false, 4, ['count' => 4, 'sampled_at' => 100000, 'last_increase' => 13600]],
+            [false, 4, ['count' => 4, 'sampled_at' => 100000, 'last_increase' => 100001]],
+            [false, 3, ['count' => 4, 'sampled_at' => 100000, 'last_increase' => 100000]],
+            [false, 0, ['count' => 0, 'sampled_at' => 100000, 'last_increase' => 100000]],
+            [false, 5, ['count' => '4', 'sampled_at' => 100000]],
+            [false, 5, ['count' => 4, 'sampled_at' => '100000']],
+        ] as [$expected, $count, $state]) {
+            $this->assertSame($expected, \pmssWebCgroupMemoryStatusOomRecent($count, $state, 100000));
+        }
+    }
+
+    /** Distinct consumers retain first-anon versus complete-pair selection and fallback. */
+    public function testMemoryStatTraversalKeepsConsumerPolicies(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-memory-candidates-');
+        $paths = [];
+        foreach (['file 2', '', 'anon 3', "anon 4\nfile 5", 'total_cache 6'] as $index => $raw) {
+            $paths[] = $this->pmssWriteFile($dir.'/'.$index, $raw);
+        }
+        $this->assertSame(['anon' => 3.0], \pmssWebCgroupMemoryStatusMemoryStatBreakdownRead($paths, ['anon']));
+        $this->assertSame(['anon' => 4.0, 'file' => 5.0], \pmssWebCgroupMemoryStatusMemoryStatBreakdownRead($paths, ['anon', 'file']));
+        $this->assertSame(['file' => 2.0], \pmssWebCgroupMemoryStatusMemoryStatBreakdownRead(array_slice($paths, 0, 2), ['anon']));
+        $this->assertSame(['file' => 6.0], \pmssWebCgroupMemoryStatusMemoryStatBreakdownRead([$paths[2], $paths[4]], ['anon', 'file']));
+        $this->assertSame([], \pmssWebCgroupMemoryStatusMemoryStatBreakdownRead([$dir.'/absent', $paths[1]], ['anon']));
+        $this->assertSame([], \pmssWebCgroupMemoryStatusMemoryStatBreakdownRead([], ['anon']));
+    }
+
+    /** A heal arriving ahead of any module must leave all memory entrypoints unavailable. */
+    public function testPartialMemoryDeliveryDefinesNoEntrypoints(): void
+    {
+        $modules = ['webCgroupMemorySource', 'webCgroupMemoryPolicy', 'webCgroupMemoryRead', 'welcomeMemory'];
+        foreach ($modules as $missing) {
+            $dir = $this->pmssMakeTempDir('pmss-web-memory-delivery-');
+            $facade = $this->pmssWriteFile($dir.'/webCgroupMemoryStatus.php', $this->pmssReadRepoFile('etc/skel/www/webCgroupMemoryStatus.php'));
+            $this->pmssWriteFile($dir.'/scriptsInc.php', '<?php');
+            foreach ($modules as $module) {
+                if ($module !== $missing) $this->pmssWriteFile($dir.'/'.$module.'.php', $this->pmssReadRepoFile('etc/skel/www/'.$module.'.php'));
+            }
+            $this->assertSame('[false,false,false,false]', $this->pmssRunInlinePhpRequire($facade,
+                'echo json_encode(array_map("function_exists", ["pmssWebCgroupMemoryStatusRead",'
+                .'"pmssWelcomeMemoryStateBuild", "pmssWebCgroupMemoryStatusDetectDir", "pmssWebCgroupMemoryStatusClassify"]));', [], '2>&1'), $missing);
+        }
+        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        foreach ($modules as $module) {
+            $this->assertTrue(strpos($source, "'www/".$module.".php'") < strpos($source, "'www/webCgroupMemoryStatus.php'"));
+        }
     }
 
     private function assertClassifiesAs(string $expected, array $overrides): void

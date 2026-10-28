@@ -36,7 +36,8 @@ final class PanelHealCompatibilityTest extends TestCase
                             'scriptsIncFiles' => ['is_file($path)', '$path'],
                             'userOpenClaw' => ['!is_file($installer)', '$installer'],
                             'info' => [null, '$'], 'welcome' => [null, '$path'],
-                            'storageHealthNotice' => ['is_file($pmssStoragePath)', '$pmssStorageModule']];
+                            'storageHealthNotice' => ['is_file($pmssStoragePath)', '$pmssStorageModule'],
+                            'webCgroupMemoryStatus' => ['!is_file($pmssMemoryPath)', '$pmssMemoryModule']];
                         $this->assertTrue(isset($dynamic[$name]), 'Unreviewed dynamic heal include: '.$name);
                         list($guard, $variable) = $dynamic[$name];
                         $this->assertStringContainsString($variable, $expression);

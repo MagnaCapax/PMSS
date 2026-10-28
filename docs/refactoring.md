@@ -26,6 +26,15 @@ These rules complement the “Linux kernel style” note already present in the
 repository documentation and should be referenced before undertaking larger
 clean-ups.
 
+Customer memory status keeps its original include as a delivery preflight over
+source acquisition, pure pressure policy, payload assembly and Welcome RAM
+state/rendering (ADR 0198). Both memory-stat consumers share one ordered read
+traversal with their existing required fields; severity bands share one threshold
+table, and saved memory values normalize into one record. Status payload and RAM
+HTML snapshots retain their original hashes. Missing modules leave the existing
+page fallbacks active, and user maintenance delivers every module before the
+facade. Characterization tests run on testing machines only.
+
 Orphaned Apps status/action wrappers, the terminal uptime formatter, and the
 bootstrap date and OpenVPN renewal boolean wrappers have been removed after
 repository-wide reference checks. Callers already use the shared status reader,

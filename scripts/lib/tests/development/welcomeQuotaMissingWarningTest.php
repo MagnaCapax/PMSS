@@ -103,9 +103,9 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             'function quotaCreateSection(',
             'function trafficCreateSection(',
         ]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/webCgroupMemoryStatus.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcomeMemory.php', [
             '$readPressureStatus = pmssWebCgroupMemoryStatusRead();',
-            '$currentBytes = (float) $readPressureStatus',
+            '$memory[\'current\'] = (float) $readPressureStatus',
         ], [
             'systemctl show user-',
         ]);
