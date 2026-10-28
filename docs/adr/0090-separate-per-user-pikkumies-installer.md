@@ -211,3 +211,28 @@ accepted at signup (operator 2026-10-24: no "accepting terms before action in ou
 own service"). Pikkumies decides this itself from `/etc/seedbox` (its ADR-0032
 amendment of the same date), so existing accounts need no change. The test holds
 on every PMSS server, including PMSS hosts other operators run.
+
+## Amendment 2026-10-28: a stopped install is finished on every host
+
+"Tried again at a later update" did not hold in two cases. The update hook did
+nothing on a host without the rollout marker, so a new account's failed
+preinstall was never retried there. On a marked host, an account that already
+had `~/.mcxPikkumies` was marked as installed, so an install that stopped after
+its clone was marked too. From 2026-10-25 to 2026-10-28 Pikkumies stopped every
+install that had no key yet (its ADR-0110), and a new account's preinstall runs
+before the platform key reaches it, so those accounts kept a clone with no update
+line, no command on the PATH and no runtime.
+
+The hook now treats a clone without `pikkumies/local/hermes-managed/config.yaml`
+(written by every finished install and every session start, Pikkumies ADR-0062)
+as an install that may have stopped, on every host, marked or not, and whatever
+state file an earlier hook wrote for it. It runs the same command as the user
+again, preceded by a check, also as the user, that skips the install when the
+user's crontab already has the `# pikkumies-update` line (an install that
+finished before its key arrived), so root reads nothing the account controls
+(ADR 0121). When that command exits 0 it writes "finished" into the state file,
+and a clone whose state file says so is not run again, so a user who turned
+auto-update off is not updated every night; the empty state file an earlier hook
+or a new account wrote does not count. An account without a clone still needs the host marker, so
+the rollout stays host by host, and a user who removed Pikkumies (no clone)
+does not get it back.

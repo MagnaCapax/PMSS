@@ -61,14 +61,20 @@ function pmssAddUserPikkumiesPreinstallCommand(array $user, string $homePath, st
     return 'nohup sh -c '.escapeshellarg($chain).' >/dev/null 2>&1 &';
 }
 
-/** The foreground install as the user, in the user's slice, or null below the RAM floor or without the skeleton installer. */
-function pmssPikkumiesPreinstallLaunch(array $user, string $homePath): ?string
+/**
+ * The foreground install as the user, in the user's slice, or null below the RAM floor or without the skeleton installer.
+ * $unlessScheduled: skip it when the user's crontab already has the daily update line (an install that finished before
+ * the key arrived), checked as the user so root reads nothing the account controls (ADR 0121).
+ */
+function pmssPikkumiesPreinstallLaunch(array $user, string $homePath, bool $unlessScheduled = false): ?string
 {
     if ((int) ($user['memory'] ?? 0) < pmssUserPikkumiesPreinstallMinRamMiB() || !is_file(rtrim($homePath, '/').'/bin/install-pikkumies.sh')) {
         return null;
     }
+    $install = 'PIKKUMIES_SKIP_HERMES=1 bash "$HOME/bin/install-pikkumies.sh"';
+    if ($unlessScheduled) $install = 'crontab -l 2>/dev/null | grep -qF "# pikkumies-update" || '.$install;
 
-    return pmssBuildUserServiceShellCommand((string) $user['name'], 'PIKKUMIES_SKIP_HERMES=1 bash "$HOME/bin/install-pikkumies.sh"', true);
+    return pmssBuildUserServiceShellCommand((string) $user['name'], $install, true);
 }
 
 /**
