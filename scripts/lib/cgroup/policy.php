@@ -16,14 +16,18 @@ const PMSS_BFQ_FALLBACK_BASE_MAX = 250;
 const PMSS_BFQ_FALLBACK_REFERENCE_MEMORY_MIB = 131072; // 128 GiB.
 const PMSS_BFQ_FALLBACK_COEFFICIENT = 0.690533966002; // 250 / sqrt(131072).
 
-/** Load the PMSS cgroup policy array from the configured seedbox config tree. */
+/** Load shipped cgroup defaults followed by persistent host-local overrides. */
 function pmssCgroupPolicyLoad(?string $configDir = null): array
 {
     $cfgDir = rtrim($configDir ?? pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config'), '/');
     $policyFile = ($cfgDir !== '' ? $cfgDir : '/etc/seedbox/config').'/cgroup.policy.php';
     $loaded = file_exists($policyFile) ? @include $policyFile : null;
+    $loaded = is_array($loaded) ? $loaded : [];
 
-    return is_array($loaded) ? $loaded : [];
+    // This file is never shipped, so the updater's seedbox overlay preserves it.
+    $localFile = dirname($policyFile).'/cgroup.policy.local.php';
+    $local = is_file($localFile) && !is_link($localFile) ? @include $localFile : null;
+    return is_array($local) ? array_replace_recursive($loaded, $local) : $loaded;
 }
 
 /** Keep systemd IO property device targets to plain block-device paths. */

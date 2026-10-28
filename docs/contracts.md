@@ -627,6 +627,8 @@ Sub-handlers:
 
 - pmssEnsureCgroupsConfigured(?callable $logger=null): void → on cgroup v1, ensures `/sys/fs/cgroup` is present in `/etc/fstab` through the managed fstab reader/writer (regular-file guard + backup) and only mounts after a successful new entry; attempts to raise root slice PID limit. On cgroup v2, leaves fstab untouched.
 
+- pmssCgroupPolicyLoad(?string $configDir=null): array → loads shipped `cgroup.policy.php`, then recursively replaces matching keys from the operator-owned `cgroup.policy.local.php` in the same config directory. The local file is never shipped and survives updates; absent, non-array or symlinked local files leave shipped defaults intact. Existing consumer validation still applies (ADR 0176).
+
 - pmssEnsureSystemdSlices(?callable $logger=null): void → writes user slice override template to `/etc/systemd/system/user-.slice.d/15-pmss.conf` (never vendor paths), resolves the `/home` backing device for optional `IODeviceLatencyTargetSec` rendering from `cgroup.policy.php` on cgroup v2 hosts, optionally installs user manager `LimitNOFILE` drop-in at `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` from `cgroup.policy.php` (`limitNoFileSoft`/`limitNoFileHard`), installs per-user log namespace drop-in at `/etc/systemd/system/user@.service.d/30-pmss-log-namespace.conf` (`LogNamespace=user-%i`), then runs `daemon-reload`. A failed template read warns and leaves the existing slice drop-in untouched.
 
 - pmssConfigureTempMountNoexec(?callable $logger=null): void → when `PMSS_HARDEN_TMP_NOEXEC` is enabled, ensures `/tmp` and `/dev/shm` fstab entries include `noexec,nosuid,nodev`, and remounts when mounted; warns on missing mounts, unreadable fstab, or unsafe override paths.

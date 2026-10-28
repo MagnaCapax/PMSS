@@ -21,9 +21,10 @@ Defaults are computed conservatively with guardrails:
 - CPUWeight=200, IOWeight=200, TasksMax=4096.
 - CPUQuota = 85% of Total Logical Cores (e.g., 1020% on a 12-thread system). Falls back to 600% if detection fails.
 
-You can override defaults per host/SKU via a PHP array file:
+Shipped defaults live in `/etc/seedbox/config/cgroup.policy.php` and are replaced
+on updates. Put persistent host/SKU overrides in this operator-owned PHP array file:
 
-`/etc/seedbox/config/cgroup.policy.php`
+`/etc/seedbox/config/cgroup.policy.local.php`
 ```php
 <?php
 return [
@@ -43,6 +44,11 @@ return [
   // policy-level net shaping hints.
 ];
 ```
+
+The local file is not shipped by PMSS, so updates preserve it. The shared loader
+recursively replaces matching keys while retaining unspecified shipped defaults.
+It ignores non-array returns and symlinked local files. Keep this executable PHP
+configuration root-owned and non-writable by customers, like the shipped policy.
 
 Guardrails always apply: MemoryHigh ≥ 250 MiB; MemoryMax ≤ 95% of RAM.
 
@@ -189,7 +195,13 @@ include empty remnants and do not prove where processes run. Check actual
 process membership and obtain representative uncapped measurements on testing
 machines before planning rollout; the census does not authorize activation.
 
-Set `cgroup.ioSlicePlacement` to boolean `true` in `cgroup.policy.php` to opt in.
+Set `cgroup.ioSlicePlacement` to boolean `true` in `cgroup.policy.local.php` to opt in:
+
+```php
+<?php
+return ['cgroup' => ['ioSlicePlacement' => true]];
+```
+
 The default is `false`. During runtime-template convergence on v1, PMSS installs
 `/etc/systemd/system.conf.d/90-pmss-io-placement.conf` with
 `DefaultIOAccounting=no` before its existing systemd reexec. Account slices keep

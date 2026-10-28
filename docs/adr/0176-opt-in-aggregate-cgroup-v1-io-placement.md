@@ -36,6 +36,15 @@ it before daemon-reexec. Slice accounting remains explicit; default per-unit
 accounting is disabled. Disabled policy or non-v1 mode removes only this drop-in.
 The template and managed-file writer follow ADR 0036.
 
+Host opt-ins live in the operator-owned `cgroup.policy.local.php`, which the
+repository never ships. The shared policy loader recursively replaces shipped
+defaults with this array; unspecified defaults remain current. The seedbox
+overlay preserves files absent from the snapshot, so updates retain the opt-in
+and the managed placement drop-in. Non-array returns and symlinked local files
+are ignored. Set the local switch to false (or remove the local key) to restore
+the shipped default during the next convergence. This also preserves host-local
+shadow-measurement settings without changing the shipped off defaults.
+
 `cgroupIopsLimitApply.php --census` reuses the actual writer's cap computation and
 exits before every throttle write. Its TSV output compares caps with 24-hour
 nearest-rank read-IOPS P95 from existing bounded telemetry and exposes interval
