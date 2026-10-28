@@ -182,12 +182,7 @@ if (!function_exists('pmssCustomerBackupRestoreRtorrentRunning')) {
 if (!function_exists('pmssCustomerBackupRestoreSnapshotPathBuild')) {
 /** Reserve a pre-restore snapshot path without overwriting prior snapshots. */
  function pmssCustomerBackupRestoreSnapshotPathBuild($home) {
-  $base = rtrim((string) $home, '/').'/.pmss-pre-restore-'.gmdate('Ymd-His');
-  for ($i = 0; $i < 100; $i++) {
-   $path = $base.($i === 0 ? '' : '-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT)).'.tar.gz';
-   if (!file_exists($path) && !is_link($path) && pmssCustomerBackupRestoreTargetPathIsSafe($home, basename($path))) return $path;
-  }
-  return '';
+  return pmssCustomerBackupFilePathBuild($home, false);
  }
 }
 
@@ -208,31 +203,8 @@ if (!function_exists('pmssCustomerBackupRestoreSnapshotCreate')) {
    return '';
   }
 
-  $tmpPath = $snapshotPath.'.part';
-  $out = @fopen($tmpPath, 'wb');
-  if (!is_resource($out)) {
-   $error = 'Could not create the pre-restore snapshot file.';
-   return '';
-  }
-
-  $pipe = @popen($command, 'r');
-  if (!is_resource($pipe)) {
-   fclose($out);
-   @unlink($tmpPath);
-   $error = 'Could not start the pre-restore snapshot.';
-   return '';
-  }
-
-  $bytes = @stream_copy_to_stream($pipe, $out);
-  $closeOk = @fclose($out);
-  $returnCode = @pclose($pipe);
-  if ($bytes === false || !$closeOk || $returnCode !== 0 || !@rename($tmpPath, $snapshotPath)) {
-   @unlink($tmpPath);
-   $error = 'Pre-restore snapshot failed; restore aborted.';
-   return '';
-  }
-
-  return $snapshotPath;
+  $error = pmssCustomerBackupArchiveWrite($command, $snapshotPath, false);
+  return $error === '' ? $snapshotPath : '';
  }
 }
 

@@ -1338,6 +1338,15 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Archives are written as `~/.pmss-backups/config-YYYYMMDD-HHMMSS.tar.gz` with a private `0700` directory and `0600` files.
   - Retention keeps the newest 7 scheduled archives and prunes older files only after a newly written archive is verified as an existing non-empty file inside the same home.
 
+Archive creation and pre-restore snapshots share name selection and one
+open/copy/close/reap/rename transaction in the existing delivered Backup part
+(ADR 0200). Scheduled files retain exclusive `xb` creation, mode 0600, positive
+byte and final-name checks, and post-publication verification. Snapshots retain
+`wb`, their existing empty-output acceptance and failure strings. Tar metadata
+reads and payload skips share one padded-block loop; only metadata is retained
+in memory and subject to the existing 65536-byte cap. Member selection, link
+rejection, extraction and retention policy remain at their original boundaries.
+
 ## Customer Whole-Account Service Restart – `etc/skel/www/scriptsIncAppsHtml.php` and `scriptsIncActionJs.php`
 
 - Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone/slskd/Copyparty frontends, stopped media-stack tmux apps, and Lighttpd.

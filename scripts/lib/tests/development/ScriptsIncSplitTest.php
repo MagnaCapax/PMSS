@@ -126,9 +126,9 @@ class ScriptsIncSplitTest extends TestCase
             'pmssCustomerCgroupCounterRead', 'pmssCustomerCgroupMemoryRead', 'pmssCustomerHtmlAttr', 'pmssCustomerAccountContext', 'pmssCustomerContextualHelpLinkBuild', 'pmssJsonFileReadAssoc',
             'pmssCustomerHomeRoot', 'pmssCustomerHomePath', 'pmssCustomerPathIsSafe', 'pmssCustomerBackupRelativePaths', 'pmssCustomerBackupEntriesRead',
             'pmssCustomerBackupTarCommandBuild', 'pmssCustomerBackupDownload', 'pmssCustomerBackupFileResult', 'pmssCustomerBackupFileDirectoryEnsure', 'pmssCustomerBackupFilePathBuild',
-            'pmssCustomerBackupFileCreate', 'pmssCustomerBackupArchivesRead', 'pmssCustomerBackupRetentionPrune', 'pmssCustomerPathIsInsideHome', 'pmssCustomerBackupRestoreResult',
+            'pmssCustomerBackupFileCreate', 'pmssCustomerBackupArchiveWrite', 'pmssCustomerBackupArchivesRead', 'pmssCustomerBackupRetentionPrune', 'pmssCustomerPathIsInsideHome', 'pmssCustomerBackupRestoreResult',
             'pmssCustomerBackupRestoreTargetPathIsSafe', 'pmssCustomerBackupRestoreLog', 'pmssCustomerBackupRestoreFinish', 'pmssCustomerBackupRestoreArchiveResolve', 'pmssCustomerBackupRestoreDiskPrecheck',
-            'pmssCustomerBackupRestoreTarSize', 'pmssCustomerBackupRestoreTarSkipPayload', 'pmssCustomerBackupRestoreTarPayloadRead', 'pmssCustomerBackupRestorePaxPayloadParse', 'pmssCustomerBackupRestoreMemberNormalize',
+            'pmssCustomerBackupRestoreTarSize', 'pmssCustomerBackupRestoreTarSkipPayload', 'pmssCustomerBackupRestoreTarPayloadRead', 'pmssCustomerBackupRestoreTarBlocksRead', 'pmssCustomerBackupRestorePaxPayloadParse', 'pmssCustomerBackupRestoreMemberNormalize',
             'pmssCustomerBackupRestoreTarMemberTypesRead', 'pmssCustomerBackupRestoreMemberAllowed', 'pmssCustomerBackupRestoreMemberTypeAllowed', 'pmssCustomerBackupRestoreMemberNameFromPhar', 'pmssCustomerBackupRestoreEntriesSelect',
             'pmssCustomerBackupRestoreTouchesRtorrentLiveState', 'pmssCustomerBackupRestoreRtorrentProcRunning', 'pmssCustomerBackupRestoreRtorrentRunning', 'pmssCustomerBackupRestoreSnapshotPathBuild', 'pmssCustomerBackupRestoreSnapshotCreate',
             'pmssCustomerBackupRestore', 'pmssWelcomeMessageCustomerPathIsSafe', 'pmssWelcomeRequireLocalHelper', 'pmssCustomerManagedAppDefinitions', 'pmssWelcomeServiceAvailable',
@@ -147,7 +147,7 @@ class ScriptsIncSplitTest extends TestCase
                 $functions[$name] = $body;
             }
         }
-        $this->assertSame(94, count($functions));
+        $this->assertSame(96, count($functions));
         $actual = array_keys($functions);
         sort($actual);
         sort($expected);

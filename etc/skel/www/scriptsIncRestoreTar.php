@@ -13,13 +13,7 @@ if (!function_exists('pmssCustomerBackupRestoreTarSize')) {
 if (!function_exists('pmssCustomerBackupRestoreTarSkipPayload')) {
 /** Advance a gzipped tar stream over one padded payload. */
  function pmssCustomerBackupRestoreTarSkipPayload($handle, $size) {
-  $remaining = (int) (ceil(max(0, (int) $size) / 512) * 512);
-  while ($remaining > 0) {
-   $chunk = @gzread($handle, min(8192, $remaining));
-   if (!is_string($chunk) || $chunk === '') return false;
-   $remaining -= strlen($chunk);
-  }
-  return true;
+  return pmssCustomerBackupRestoreTarBlocksRead($handle, max(0, (int) $size), false);
  }
 }
 
@@ -27,14 +21,22 @@ if (!function_exists('pmssCustomerBackupRestoreTarPayloadRead')) {
 /** Read a bounded tar metadata payload and consume its padding. */
  function pmssCustomerBackupRestoreTarPayloadRead($handle, $size) {
   if ((int) $size < 0 || (int) $size > 65536) return false;
-  $padded = (int) (ceil((int) $size / 512) * 512);
+  return pmssCustomerBackupRestoreTarBlocksRead($handle, (int) $size, true);
+ }
+}
+
+if (!function_exists('pmssCustomerBackupRestoreTarBlocksRead')) {
+/** Consume padded blocks once after caller validation, retaining only requested metadata. */
+ function pmssCustomerBackupRestoreTarBlocksRead($handle, $size, $capture) {
+  $remaining = (int) (ceil((int) $size / 512) * 512);
   $raw = '';
-  while (strlen($raw) < $padded) {
-   $chunk = @gzread($handle, min(8192, $padded - strlen($raw)));
+  while ($remaining > 0) {
+   $chunk = @gzread($handle, min(8192, $remaining));
    if (!is_string($chunk) || $chunk === '') return false;
-   $raw .= $chunk;
+   $remaining -= strlen($chunk);
+   if ($capture) $raw .= $chunk;
   }
-  return substr($raw, 0, (int) $size);
+  return $capture ? substr($raw, 0, (int) $size) : true;
  }
 }
 
@@ -103,18 +105,15 @@ if (!function_exists('pmssCustomerBackupRestoreTarMemberTypesRead')) {
    $prefix = rtrim(substr($header, 345, 155), " \0");
    if ($prefix !== '') $name = $prefix.'/'.$name;
 
-   if ($type === 'L') {
+   // GNU long names and PAX paths share the bounded metadata read and advance.
+   if ($type === 'L' || $type === 'x') {
     $payload = pmssCustomerBackupRestoreTarPayloadRead($handle, $size);
     if (!is_string($payload)) { @gzclose($handle); return null; }
-    $pendingName = rtrim($payload, "\0");
-    continue;
-   }
-
-   if ($type === 'x') {
-    $payload = pmssCustomerBackupRestoreTarPayloadRead($handle, $size);
-    if (!is_string($payload)) { @gzclose($handle); return null; }
-    $pax = pmssCustomerBackupRestorePaxPayloadParse($payload);
-    if (isset($pax['path'])) $pendingName = $pax['path'];
+    if ($type === 'L') $pendingName = rtrim($payload, "\0");
+    else {
+     $pax = pmssCustomerBackupRestorePaxPayloadParse($payload);
+     if (isset($pax['path'])) $pendingName = $pax['path'];
+    }
     continue;
    }
 
@@ -122,7 +121,7 @@ if (!function_exists('pmssCustomerBackupRestoreTarMemberTypesRead')) {
    $member = pmssCustomerBackupRestoreMemberNormalize($pendingName !== null ? $pendingName : $name);
    $pendingName = null;
    if ($member !== '') {
-    $currentType = ($type === '0' || $type === '5') ? $type : '!';
+    $currentType = pmssCustomerBackupRestoreMemberTypeAllowed($type) ? $type : '!';
     $types[$member] = isset($types[$member]) && $types[$member] !== $currentType ? '!' : $currentType;
    }
   }

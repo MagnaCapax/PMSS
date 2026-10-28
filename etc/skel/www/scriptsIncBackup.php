@@ -141,17 +141,56 @@ if (!function_exists('pmssCustomerBackupFileDirectoryEnsure')) {
 }
 
 if (!function_exists('pmssCustomerBackupFilePathBuild')) {
-/** Reserve a scheduled backup archive name without overwriting older runs. */
- function pmssCustomerBackupFilePathBuild($home) {
+/** Select a fixed archive namespace; snapshots retain their existing part-file policy. */
+ function pmssCustomerBackupFilePathBuild($home, $scheduled = true) {
   $home = rtrim((string) $home, '/');
-  $base = $home.'/.pmss-backups/config-'.gmdate('Ymd-His');
+  $relative = ($scheduled ? '.pmss-backups/config-' : '.pmss-pre-restore-').gmdate('Ymd-His');
   for ($i = 0; $i < 100; $i++) {
-   $path = $base.($i === 0 ? '' : '-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT)).'.tar.gz';
+   $name = $relative.($i === 0 ? '' : '-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT)).'.tar.gz';
+   $path = $home.'/'.$name;
    if (!file_exists($path)
-       && !file_exists($path.'.part')
+       && (!$scheduled || !file_exists($path.'.part'))
        && !is_link($path)
-       && pmssCustomerBackupRestoreTargetPathIsSafe($home, '.pmss-backups/'.basename($path))) {
+       && pmssCustomerBackupRestoreTargetPathIsSafe($home, $name)) {
     return $path;
+   }
+  }
+  return '';
+ }
+}
+
+if (!function_exists('pmssCustomerBackupArchiveWrite')) {
+/** Stream, close, reap and publish once; return the caller's existing failure text or empty success. */
+ function pmssCustomerBackupArchiveWrite($command, $archivePath, $scheduled, &$size = null) {
+  $tmpPath = $archivePath.'.part';
+  $out = @fopen($tmpPath, $scheduled ? 'xb' : 'wb');
+  if (!is_resource($out)) return $scheduled ? 'Could not create the backup archive file.' : 'Could not create the pre-restore snapshot file.';
+  if ($scheduled) @chmod($tmpPath, 0600);
+
+  $pipe = @popen($command, 'r');
+  if (!is_resource($pipe)) {
+   fclose($out);
+   @unlink($tmpPath);
+   return $scheduled ? 'Could not start the backup archive process.' : 'Could not start the pre-restore snapshot.';
+  }
+
+  $bytes = @stream_copy_to_stream($pipe, $out);
+  $closeOk = @fclose($out);
+  $returnCode = @pclose($pipe);
+  // Scheduled archives also require nonempty output and an unoccupied final name.
+  if ($bytes === false || ($scheduled && (int) $bytes <= 0) || !$closeOk || $returnCode !== 0
+      || ($scheduled && file_exists($archivePath)) || !@rename($tmpPath, $archivePath)) {
+   @unlink($tmpPath);
+   return $scheduled ? 'Backup archive creation failed.' : 'Pre-restore snapshot failed; restore aborted.';
+  }
+
+  if ($scheduled) {
+   @chmod($archivePath, 0600);
+   clearstatcache(true, $archivePath);
+   $size = @filesize($archivePath);
+   if (!is_file($archivePath) || is_link($archivePath) || !is_numeric($size) || (int) $size <= 0) {
+    @unlink($archivePath);
+    return 'Backup archive verification failed.';
    }
   }
   return '';
@@ -181,35 +220,9 @@ if (!function_exists('pmssCustomerBackupFileCreate')) {
   $archivePath = pmssCustomerBackupFilePathBuild($home);
   if ($archivePath === '') return pmssCustomerBackupFileResult(false, 'Could not reserve a backup archive path.');
 
-  $tmpPath = $archivePath.'.part';
-  $out = @fopen($tmpPath, 'xb');
-  if (!is_resource($out)) return pmssCustomerBackupFileResult(false, 'Could not create the backup archive file.');
-  @chmod($tmpPath, 0600);
-
-  $pipe = @popen($command, 'r');
-  if (!is_resource($pipe)) {
-   fclose($out);
-   @unlink($tmpPath);
-   return pmssCustomerBackupFileResult(false, 'Could not start the backup archive process.');
-  }
-
-  $bytes = @stream_copy_to_stream($pipe, $out);
-  $closeOk = @fclose($out);
-  $returnCode = @pclose($pipe);
-  if ($bytes === false || (int) $bytes <= 0 || !$closeOk || $returnCode !== 0 || file_exists($archivePath) || !@rename($tmpPath, $archivePath)) {
-   @unlink($tmpPath);
-   return pmssCustomerBackupFileResult(false, 'Backup archive creation failed.');
-  }
-
-  @chmod($archivePath, 0600);
-  clearstatcache(true, $archivePath);
-  $size = @filesize($archivePath);
-  if (!is_file($archivePath) || is_link($archivePath) || !is_numeric($size) || (int) $size <= 0) {
-   @unlink($archivePath);
-   return pmssCustomerBackupFileResult(false, 'Backup archive verification failed.');
-  }
-
-  return pmssCustomerBackupFileResult(true, 'created config backup', (int) $size, $archivePath);
+  $error = pmssCustomerBackupArchiveWrite($command, $archivePath, true, $size);
+  return $error !== '' ? pmssCustomerBackupFileResult(false, $error)
+   : pmssCustomerBackupFileResult(true, 'created config backup', (int) $size, $archivePath);
  }
 }
 
