@@ -76,6 +76,9 @@ Storage benchmark dispatch keeps single-use options, commands and callbacks at
 their consumers. dd measurements return only after both fields validate; fio
 peer reporting shares one success guard. Command bytes, JSONL field order,
 fallbacks and cleanup retain the existing benchmark characterization contracts.
+Saved report rows share an ordered metric projection for file, dd, random-read
+and ioping output; scalar formatting also owns the preflight's empty-value
+fallback. Existing mixed-run snapshots cover output order and format.
 Pressure windows and fio latency means retain sums instead of sample lists;
 only present latency samples count, including zero. Shadow shares reuse their
 rows for normalization, and saved-run selection retains one latest entry.

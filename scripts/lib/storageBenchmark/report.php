@@ -13,10 +13,10 @@ require_once dirname(__DIR__).'/log.php';
 require_once dirname(__DIR__).'/runtime/cli.php';
 require_once dirname(__DIR__).'/runtime/environment.php';
 
-/** Convert untrusted JSONL display values to printable scalar text. */
-function storageBenchmarkScalarDisplay($value): string
+/** Convert untrusted JSONL values to scalar text, using the caller's empty-value fallback. */
+function storageBenchmarkScalarDisplay($value, string $default = ''): string
 {
-    return is_scalar($value) ? (string) $value : '';
+    return is_scalar($value) && ($value = (string) $value) !== '' ? $value : $default;
 }
 
 /** Read a numeric metric from untrusted JSONL entries without PHP coercion warnings. */
@@ -27,14 +27,11 @@ function storageBenchmarkMetricFloat(array $metrics, string $key): float
     return pmssFiniteFloat(is_string($value) ? trim($value) : $value) ?? 0.0;
 }
 
-/** Return the metrics object only when the decoded JSONL shape is valid. */
-function storageBenchmarkEntryMetrics(array $entry): array { return is_array($entry['metrics'] ?? null) ? $entry['metrics'] : []; }
-
-/** Return a printable metric for the preflight summary, defaulting when malformed. */
-function storageBenchmarkPreflightDisplay(array $entry, string $key): string
+/** Project a saved row's metrics in printf argument order, retaining malformed-container defaults. */
+function storageBenchmarkEntryMetricValues(array $entry, array $keys): array
 {
-    $value = storageBenchmarkScalarDisplay($entry[$key] ?? null);
-    return $value !== '' ? $value : 'n/a';
+    $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
+    return array_map(static function (string $key) use ($metrics): float { return storageBenchmarkMetricFloat($metrics, $key); }, $keys);
 }
 
 /** Return a safe device grouping key from an untrusted benchmark entry. */
@@ -74,7 +71,7 @@ function storageBenchmarkShowLast(string $jsonLog): int
     // Print only the first preflight recorded in the selected run.
     foreach ($run as $entry) {
         if (storageBenchmarkScalarDisplay($entry['test'] ?? '') !== 'preflight-idle') continue;
-        echo "Preflight: ioping=".storageBenchmarkPreflightDisplay($entry, 'ioping_avg_ms')." ms util=".storageBenchmarkPreflightDisplay($entry, 'iostat_util_pct')."%\n\n";
+        echo "Preflight: ioping=".storageBenchmarkScalarDisplay($entry['ioping_avg_ms'] ?? null, 'n/a')." ms util=".storageBenchmarkScalarDisplay($entry['iostat_util_pct'] ?? null, 'n/a')."%\n\n";
         break;
     }
 
@@ -86,8 +83,7 @@ function storageBenchmarkShowLast(string $jsonLog): int
         if ($test === '' || storageBenchmarkEntryDeviceName($entry) !== null
             || !is_array($entry['params'] ?? null)
             || storageBenchmarkScalarDisplay($entry['params']['rw'] ?? '') === '') continue;
-        $metrics = storageBenchmarkEntryMetrics($entry);
-        printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", $test, storageBenchmarkMetricFloat($metrics, 'read_bw_MBps'), storageBenchmarkMetricFloat($metrics, 'write_bw_MBps'), storageBenchmarkMetricFloat($metrics, 'read_iops'), storageBenchmarkMetricFloat($metrics, 'write_iops'), storageBenchmarkMetricFloat($metrics, 'read_p95_ms'), storageBenchmarkMetricFloat($metrics, 'write_p95_ms'));
+        printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", $test, ...storageBenchmarkEntryMetricValues($entry, ['read_bw_MBps', 'write_bw_MBps', 'read_iops', 'write_iops', 'read_p95_ms', 'write_p95_ms']));
     }
 
     // Preserve device encounter order, including headings for unknown test types.
@@ -98,10 +94,9 @@ function storageBenchmarkShowLast(string $jsonLog): int
         echo $device."\n";
         foreach ($entries as $entry) {
             $test = storageBenchmarkScalarDisplay($entry['test'] ?? '');
-            $metrics = storageBenchmarkEntryMetrics($entry);
-            if ($test === 'device-seqread-dd') printf("  %-18s seq_MB/s=%.2f t=%.2fs\n", $test, storageBenchmarkMetricFloat($metrics, 'seqread_MBps'), storageBenchmarkMetricFloat($metrics, 'elapsed_s'));
-            elseif (strpos($test, 'dev-randread') === 0) printf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", $test, storageBenchmarkMetricFloat($metrics, 'read_bw_MBps'), storageBenchmarkMetricFloat($metrics, 'read_iops'), storageBenchmarkMetricFloat($metrics, 'read_p95_ms'));
-            elseif ($test === 'device-ioping') printf("  %-18s avg_ms=%.2f\n", $test, storageBenchmarkMetricFloat($metrics, 'ioping_avg_ms'));
+            if ($test === 'device-seqread-dd') printf("  %-18s seq_MB/s=%.2f t=%.2fs\n", $test, ...storageBenchmarkEntryMetricValues($entry, ['seqread_MBps', 'elapsed_s']));
+            elseif (strpos($test, 'dev-randread') === 0) printf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", $test, ...storageBenchmarkEntryMetricValues($entry, ['read_bw_MBps', 'read_iops', 'read_p95_ms']));
+            elseif ($test === 'device-ioping') printf("  %-18s avg_ms=%.2f\n", $test, ...storageBenchmarkEntryMetricValues($entry, ['ioping_avg_ms']));
         }
     }
     return 0;
