@@ -109,7 +109,7 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
     $packageAvailable = $packageAvailable ?: 'pmssPackageAvailable';
     $intelDisplayPresent = $intelDisplayPresent ?: 'pmssHostHasIntelDisplayPciDevice';
     $result = ['sanitised' => [], 'warnings' => false, 'short_form_seen' => false, 'dropped_unavailable' => [], 'dropped_obsolete' => [], 'dropped_kernel' => [], 'dropped_hardware' => [], 'started_at' => microtime(true)];
-    foreach (pmssConfigLines($lines, []) as $idx => $trimmed) {
+    foreach (pmssConfigLines($lines) as $idx => $trimmed) {
         if (($parts = pmssConfigLineColumns($trimmed, 0, [])) === []) { pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0); $result['warnings'] = true; continue; }
         $package = (string) $parts[0];
         $state = (string) ($parts[1] ?? 'install');

@@ -44,6 +44,18 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $this->assertStringContainsString('Invalid dpkg selection entry at line 11: bad$name install', $output);
     }
 
+    public function testDpkgSelectionSanitizerSkipsCommentLinesWithoutWarning(): void
+    {
+        $available = static function (string $package): bool { return $package === 'alpha'; };
+        [$plan, $output] = $this->pmssCaptureStdout(function () use ($available): array {
+            return \pmssDpkgSelectionsSanitise(['# held per #436.', '  # indented note', 'alpha install', 'bad$name install'], 12, $available);
+        });
+
+        $this->assertSame(["alpha\tinstall"], $plan['sanitised']);
+        $this->assertStringNotContainsString('#', $output);
+        $this->assertStringContainsString('Invalid dpkg selection entry at line 4: bad$name install', $output);
+    }
+
     public function testWriteSanitisedDpkgSelectionsTempFileWritesPayloadWhenHelperExists(): void
     {
         $this->pmssSkipUnlessFunctionExists('pmssWriteSanitisedDpkgSelectionsTempFile');
