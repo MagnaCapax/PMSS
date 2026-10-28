@@ -149,15 +149,53 @@ final class PikkumiesPreinstallHookTest extends TestCase
         ]);
     }
 
-    public function testAbsentMarkerIsInert(): void
+    public function testAbsentMarkerOnlyFinishesAnInstallThatStoppedAfterItsClone(): void
     {
         $this->assertTrue(include_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php');
-        $root = $this->pmssMakeTempDir('pmss-pk-inert-');
-        $events = [];
-        $throw = static function () use (&$events): array { $events[] = 'called'; throw new \RuntimeException('called'); };
-        \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', ['users' => $throw, 'ramMiB' => $throw, 'run' => $throw]);
-        $this->assertSame([], $events);
-        $this->assertSame([], glob($root.'/*'));
+        $root = $this->pmssMakeTempDir('pmss-pk-unmarked-');
+        // fxfresh: no clone (a rollout install); fxfin: a finished install; fxstop: a clone whose install
+        // stopped; fxmark: the same, marked as installed by the earlier hook; fxdone: re-run once already
+        $users = ['fxfresh', 'fxfin', 'fxstop', 'fxmark', 'fxdone'];
+        foreach ($users as $user) {
+            $this->pmssEnsureDir($root.'/home/'.$user.'/bin');
+            file_put_contents($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
+            if ($user !== 'fxfresh') $this->pmssEnsureDir($root.'/home/'.$user.'/.mcxPikkumies/pikkumies/local');
+        }
+        $this->pmssEnsureDir($root.'/home/fxfin/.mcxPikkumies/pikkumies/local/hermes-managed');
+        file_put_contents($root.'/home/fxfin/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
+        $this->pmssEnsureDir($root.'/state');
+        touch($root.'/state/fxmark');
+        file_put_contents($root.'/state/fxdone', 'finished');
+        $this->pmssEnsureDir($root.'/stub');
+        $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
+        $path = (string) getenv('PATH');
+        $runs = [];
+        $ops = [
+            'users' => static function () use (&$users): array { return $users; },
+            'ramMiB' => static function (): int { return 4096; },
+            'run' => static function (string $command) use (&$runs): void { $runs[] = $command; },
+            'homeBase' => $root.'/home',
+        ];
+        putenv('PATH='.$root.'/stub:'.$path);
+        try {
+            \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', $ops);
+            $marked = array_map('basename', glob($root.'/state/*'));
+            $users = ['fxfresh', 'fxfin'];
+            \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', $ops);
+        } finally {
+            putenv('PATH='.$path);
+        }
+
+        sort($marked);
+        $this->assertSame(['fxdone', 'fxfin', 'fxmark'], $marked, 'a finished install is marked; a stopped one stays unmarked until it succeeds');
+        $this->assertSame(1, count($runs), 'without the host marker no new clone starts and a finished install never reruns: '.implode(' | ', $runs));
+        $this->assertSame(2, substr_count($runs[0], 'install-pikkumies.sh'), 'both stopped installs run again, the marked one too: '.$runs[0]);
+        $this->assertSame(2, substr_count($runs[0], 'grep -qF'), 'each skipped as the user when its crontab has the update line: '.$runs[0]);
+        foreach (['fxstop', 'fxmark'] as $user) {
+            $this->assertTrue(strpos($runs[0], ") && printf finished > '\\''".$root."/state/".$user."'\\''") !== false, "$user is recorded as finished only after it succeeds: ".$runs[0]);
+        }
+        $this->assertSame(0, substr_count($runs[0], ' && touch -- '), 'a clone is never marked with an empty file: '.$runs[0]);
+        $this->assertFalse(file_exists($root.'/home/fxfresh/.mcxPikkumies'));
     }
 
     public function testLinkedStateDirectoryAndMarkerAreNotWritten(): void
@@ -194,7 +232,8 @@ final class PikkumiesPreinstallHookTest extends TestCase
             $this->pmssEnsureDir($root.'/home/'.$user.'/bin');
             if ($user !== 'noinst') file_put_contents($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
         }
-        $this->pmssEnsureDir($root.'/home/has/.mcxPikkumies');
+        $this->pmssEnsureDir($root.'/home/has/.mcxPikkumies/pikkumies/local/hermes-managed');
+        file_put_contents($root.'/home/has/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
         $this->pmssEnsureDir($root.'/state');
         touch($root.'/state/done');
         $this->pmssEnsureDir($root.'/stub');
