@@ -1162,7 +1162,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     This permission pass
     normalizes ownership and mode only for a root-owned regular file; it logs and
     leaves non-root-owned, symlinked, or other non-regular entries unchanged.
-  - Provisioned recipient: Converges a root-owned `.notifyEmail` to `root:<user> 0640`, preserving customer read access. A non-root `.notifyEmail` is logged and left unadopted, so a customer-written address never becomes the trusted recipient.
+  - Provisioned recipient: Converges a root-owned `.notifyEmail` to `root:<user> 0640`, preserving customer read access. A non-root `.notifyEmail` is logged and left unadopted, so a customer-written address never becomes the trusted recipient. Unlike `.quota` and the traffic files, it has no periodic root writer in PMSS, so this state persists: the "left unadopted" line is logged on every permission pass, and `pmssUserNotificationEmailRead()` rejects the file, so usage alerts for the account stay off. The remedy is for billing-system provisioning (or an operator, as root) to rewrite the file; the next pass then converges it.
   - Root-produced measurements: `.quota` and the four `.trafficData*` files get the same gate. Their writers (`updateQuotas.php`, `trafficStats.php`, `trafficIngressStats.php`) publish fresh root-owned files, and usage alerts and the operator traffic report trust only a root owner. A non-root entry is left for the next writer run to replace. For a gated entry only the group is repaired, through the opened file after it is confirmed to be a single-link, root-owned regular file inside the home; the owner is never changed.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>

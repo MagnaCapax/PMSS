@@ -172,20 +172,8 @@ $chownItems = [
     ["/home/{$thisUser}/.lighttpd.conf", "root:root"],
 ];
 
-// Root-written files whose readers trust a root owner (notification recipient,
-// usage alerts, operator traffic report). The account can replace these names, so
-// only a file that is already root-owned is repaired; anything else stays as found.
-$rootArtifactWriters = [
-    "/home/{$thisUser}/.billingServiceId" => 'scripts/util/writeHomeMarker.php',
-    "/home/{$thisUser}/.billingId" => 'scripts/util/writeHomeMarker.php',
-    "/home/{$thisUser}/.billingClientId" => 'scripts/util/writeHomeMarker.php',
-    "/home/{$thisUser}/.notifyEmail" => 'billing-system provisioning',
-    "/home/{$thisUser}/.quota" => 'scripts/cron/updateQuotas.php',
-    $trafficPaths['normal'] => 'scripts/cron/trafficStats.php',
-    $trafficPaths['local'] => 'scripts/cron/trafficStats.php',
-    $trafficPaths['ingress'] => 'scripts/cron/trafficIngressStats.php',
-    $trafficPaths['ingressLocal'] => 'scripts/cron/trafficIngressStats.php',
-];
+// Root-written files whose readers trust a root owner; see pmssUserRootArtifactWriters().
+$rootArtifactWriters = pmssUserRootArtifactWriters($thisUser, $trafficPaths);
 
 // Check each such entry once with lstat before either repair phase.
 $rootArtifactRepairable = [];

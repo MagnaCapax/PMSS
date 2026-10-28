@@ -90,7 +90,7 @@ function pmssUserPermissionsOpenedGroupSet(string $user, string $home, string $p
     $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
     try {
         if ($opened === null) {
-            pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; owner left as-is', basename($path), $ownerUid));
+            pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; group left as-is', basename($path), $ownerUid));
             return false;
         }
         if (@chgrp($opened, $group)) {

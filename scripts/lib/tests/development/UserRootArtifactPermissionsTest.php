@@ -70,21 +70,40 @@ class UserRootArtifactPermissionsTest extends TestCase
     }
 
     /** Every root-owned entry whose reader trusts a root owner goes through the gate. */
-    public function testUserPermissionsGatesEveryRootTrustedEntry(): void
+    public function testGatedSetIsEveryRootTrustedEntryWithItsWriter(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/user/rootArtifactPermissions.php');
+        require_once $this->pmssRepoPath('scripts/lib/traffic/storage.php');
+        $traffic = \pmssTrafficDataPaths('alice');
+        $writers = \pmssUserRootArtifactWriters('alice', $traffic);
+        $expected = [
+            '/home/alice/.billingServiceId' => 'scripts/util/writeHomeMarker.php',
+            '/home/alice/.billingId' => 'scripts/util/writeHomeMarker.php',
+            '/home/alice/.billingClientId' => 'scripts/util/writeHomeMarker.php',
+            '/home/alice/.notifyEmail' => 'billing-system provisioning',
+            '/home/alice/.quota' => 'scripts/cron/updateQuotas.php',
+            $traffic['normal'] => 'scripts/cron/trafficStats.php',
+            $traffic['local'] => 'scripts/cron/trafficStats.php',
+            $traffic['ingress'] => 'scripts/cron/trafficIngressStats.php',
+            $traffic['ingressLocal'] => 'scripts/cron/trafficIngressStats.php',
+        ];
+        $this->assertSame($expected, $writers);
+        $this->assertSame(9, count(array_unique(array_keys($writers))));
+        foreach (array_unique(array_values($writers)) as $writer) {
+            if (strpos($writer, 'scripts/') === 0) {
+                $this->assertTrue(is_file($this->pmssRepoPath($writer)), $writer);
+            }
+        }
+    }
+
+    /** userPermissions.php takes its gate from the function above and applies it to both repair phases. */
+    public function testUserPermissionsAppliesTheGateToBothRepairPhases(): void
     {
         $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
         $this->assertStringContainsString('["/home/{$thisUser}/.billingId", 0640]', $source);
         $this->assertStringContainsString('["/home/{$thisUser}/.notifyEmail", "root:{$thisUser}"]', $source);
         $this->assertStringContainsAllStrings([
-            '"/home/{$thisUser}/.billingServiceId" => ',
-            '"/home/{$thisUser}/.billingId" => ',
-            '"/home/{$thisUser}/.billingClientId" => ',
-            '"/home/{$thisUser}/.notifyEmail" => ',
-            '"/home/{$thisUser}/.quota" => ',
-            "\$trafficPaths['normal'] => ",
-            "\$trafficPaths['local'] => ",
-            "\$trafficPaths['ingress'] => ",
-            "\$trafficPaths['ingressLocal'] => ",
+            '$rootArtifactWriters = pmssUserRootArtifactWriters($thisUser, $trafficPaths);',
             "pmssUserPermissionsOpenedGroupSet(\$thisUser, \$homeDir, \$path, substr(\$owner, strpos(\$owner, ':') + 1), 0);",
             "&& (\$rootArtifactRepairable[\$path] ?? true);",
         ], $source);
