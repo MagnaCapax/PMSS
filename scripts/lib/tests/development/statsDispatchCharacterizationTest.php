@@ -42,21 +42,18 @@ class StatsDispatchCharacterizationTest extends TestCase
     public function testDispatchSnapshots(): void
     {
         $windows = ['month', 'week', 'day', 'hour', '15min'];
+        // Both processors aggregate inline: prepare, take the run lock, then validate and process.
+        $inline = [['prepare'], ['lock'], ['discover'], ['validate', 'user10'], ['validate', 'ghost'], ['validate', 'user2-localnet'],
+            ['process', 'user10', $windows], ['process', 'user2-localnet', $windows]];
         foreach (['resource', 'traffic'] as $kind) {
-            $prepare = $kind === 'resource' ? [['prepare']] : [];
             foreach ([
-                [[], true, null, 0, '', $kind === 'resource'
-                    ? [['prepare'], ['lock'], ['discover'], ['spawn', '/worker.php', ['user10', 'ghost', 'user2-localnet']]]
-                    : [['discover'], ['validate', 'user10'], ['validate', 'ghost'], ['validate', 'user2-localnet'], ['process', 'user10', $windows], ['process', 'user2-localnet', $windows]]],
-                [[], true, [], 0, "No users in this system!\n", array_merge($prepare, $kind === 'resource' ? [['lock'], ['discover']] : [['discover']])],
-                [[], false, null, 0, '', $kind === 'resource' ? [['prepare'], ['lock']]
-                    : [['discover'], ['validate', 'user10'], ['validate', 'ghost'], ['validate', 'user2-localnet'], ['process', 'user10', $windows], ['process', 'user2-localnet', $windows]]],
+                [[], true, null, 0, '', $inline],
+                [[], true, [], 0, "No users in this system!\n", [['prepare'], ['lock'], ['discover']]],
+                [[], false, null, 0, '', [['prepare'], ['lock']]],
                 [['u!ser2-localnet'], false, null, 0, '', [['prepare'], ['validate', 'user2-localnet'], ['process', 'user2-localnet', $windows]]],
                 [['ghost'], true, null, 0, "Invalid user specified: ghost\n", [['prepare'], ['validate', 'ghost']]],
                 [['!!!'], true, null, 0, "Invalid user specified: \n", [['prepare'], ['validate', '']]],
-                [[], true, ['ghost'], 0, $kind === 'traffic' ? "No users in this system!\n" : '', array_merge($prepare, $kind === 'resource'
-                    ? [['lock'], ['discover'], ['spawn', '/worker.php', ['ghost']]]
-                    : [['discover'], ['validate', 'ghost']])],
+                [[], true, ['ghost'], 0, "No users in this system!\n", [['prepare'], ['lock'], ['discover'], ['validate', 'ghost']]],
             ] as [$args, $lock, $users, $expectedRc, $expectedOutput, $expectedEvents]) {
                 $processor = $kind === 'resource'
                     ? new class(new \resourceStatistics()) extends \ResourceStatsProcessor { use StatsDispatchRecording; }

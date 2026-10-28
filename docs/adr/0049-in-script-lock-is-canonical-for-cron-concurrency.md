@@ -78,7 +78,18 @@ script's idempotency and updating the existing flock-asserting tests) is tracked
   skip aggregation. Both ingress and egress use `TrafficStatsProcessor`, which
   filters discovered entries through its existing validator, including base-user
   mapping for localnet series. Explicit single-account invocations retain their
-  validation and processing path; resource-stat worker dispatch is unchanged.
+  validation and processing path.
+- Resource aggregation follows the same model. `ResourceStatsProcessor` runs inline
+  (`$detachedWorkers = false`) and keeps its `resourceStats.lock` for the whole
+  no-argument run; the shared loop now takes the run-lock hook for inline processors
+  too. Detached per-account workers held the lock only through the descriptor they
+  inherited, so serialization depended on that leak, and one hung worker made later
+  runs skip without a message. A busy lock is now logged, and each run logs a start
+  line, its account count, duration and slowest account. The lock stays at
+  `<runtime dir>/resourceStats.lock` rather than `pmssRuntimeLockPath()` for now: the
+  first run after the update must exclude workers the previous code started, which
+  still hold the old path. Moving it is a separate change with the one-run overlap the
+  2026-09-24 amendment describes.
 - Positive: one lock mechanism, protecting every invocation path (cron, manual, test), not
   only the cron path.
 - Positive: the #850 double-lock collision class is eliminated structurally (guard test) and

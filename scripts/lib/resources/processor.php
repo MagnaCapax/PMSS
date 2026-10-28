@@ -10,6 +10,8 @@ require_once __DIR__.'/../stats/userStatsProcessor.php';
 
 class ResourceStatsProcessor extends PmssUserStatsProcessor
 {
+    // Aggregate in the cron process so resourceStats.lock covers every account (ADR 0049).
+    protected $detachedWorkers = false;
     /** @var string */
     private $runtimeDir;
     /** @var string */
@@ -18,6 +20,8 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
     private $logger;
     /** @var resource|false|null */
     private $lockHandle;
+    /** @var array{0:int,1:string,2:float} accounts processed, slowest account and its seconds */
+    private $runTiming = [0, '', 0.0];
 
     public function __construct(resourceStatistics $stats, array $paths = [])
     {
@@ -40,7 +44,21 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         $this->ensureRuntime();
     }
 
-    /** Hold the cron spawn lock while detached workers start. */
+    /** Aggregate every account under the run lock and log one summary line per run. */
+    public function runCli(array $argv, string $scriptPath): int
+    {
+        $runStart = microtime(true);
+        $this->runTiming = [0, '', 0.0];
+        $rc = parent::runCli($argv, $scriptPath);
+        if (!isset($argv[1]) && $this->runTiming[0] > 0) {
+            // The run is the sum of the accounts; this shows how close it is to the 30-minute cadence.
+            ($this->logger)(sprintf('%s: resourceStats processed %d accounts in %.1fs; slowest %s %.1fs',
+                date('c'), $this->runTiming[0], microtime(true) - $runStart, $this->runTiming[1], $this->runTiming[2]));
+        }
+        return $rc;
+    }
+
+    /** Take the run lock; the handle stays open until the cron process exits. */
     public function beforeSpawn(): bool
     {
         $lockFile = $this->runtimeDir.'/resourceStats.lock';
@@ -48,6 +66,7 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         $this->lockHandle = pmssLockFileAcquire($lockFile, true, 'c+', false, true, $lockBusy);
         if ($this->lockHandle === false) {
             if ($lockBusy) {
+                ($this->logger)(date('c').": resourceStats lock {$lockFile} is held by an earlier run; skipping this run");
                 return false;
             }
             ($this->logger)(date('c').": Unable to open lock file {$lockFile} for resourceStats");
@@ -56,13 +75,29 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         if (!pmssLockHandleWritePid($this->lockHandle)) {
             pmssLockHandleRelease($this->lockHandle);
             $this->lockHandle = false;
-            ($this->logger)(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without spawn lock");
+            ($this->logger)(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without run lock");
         }
+        // Accounts run in sorted order, so a run with this line but no summary hung on the account after the last one saved.
+        ($this->logger)(date('c').': resourceStats run started, pid '.getmypid());
         return true;
     }
 
     /** Process and persist resource statistics for a single user. */
     public function processUser(string $user, array $compareTimes): void
+    {
+        $userStart = microtime(true);
+        try {
+            $this->processUserStats($user, $compareTimes);
+        } finally {
+            $seconds = microtime(true) - $userStart;
+            ++$this->runTiming[0];
+            if ($seconds >= $this->runTiming[2]) {
+                $this->runTiming = [$this->runTiming[0], $user, $seconds];
+            }
+        }
+    }
+
+    private function processUserStats(string $user, array $compareTimes): void
     {
         $logPrefix = date('c').': ';
         $loadedData = $this->loadStatsDataLines($user, [$this->stats, 'getData'], $logPrefix);
