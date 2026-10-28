@@ -786,6 +786,9 @@ iptables helpers:
   Terminal stats retain their help exit status and text layouts, including raw
   percentages beside clamped bars. Traffic columns retain unitless default rates
   and the extended display's 1000 MiB/s scaling threshold.
+- Stats context paths reject NUL, CR and LF bytes before whitespace trimming,
+  using the existing per-field fallback. Valid absolute paths, ordinary spaces
+  and tabs, directory normalization and override precedence retain their behavior.
 - `pmssShowTrafficRawCounters()` rejects non-finite values after numeric
   conversion in every required window. Infinity, NaN, and overflowing numeric
   strings use the existing invalid-payload result; their cached rows are omitted

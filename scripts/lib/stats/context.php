@@ -23,8 +23,10 @@ function pmssStatsContextUserNormalize(string $user): string
 
 function pmssStatsContextPathResolve($candidate, string $default, bool $directoryPath = false): string
 {
-    $path = trim((string) $candidate);
-    if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1 || $path[0] !== '/') $path = $default;
+    $path = (string) $candidate;
+    // Reject control bytes before trimming can turn malformed input into a valid path.
+    $path = preg_match('/[\r\n\0]/', $path) === 1 ? '' : trim($path);
+    if ($path === '' || $path[0] !== '/') $path = $default;
     return $directoryPath ? pmssDirPathNormalize($path) : $path;
 }
 
