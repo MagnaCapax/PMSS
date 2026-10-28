@@ -24,6 +24,8 @@ function storageBenchmarkDeviceSizeBytesRead(string $path): ?int
 function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $deviceEntry, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, $deviceEntry + ['test' => 'device-preflight', 'ok' => false, 'error' => $error]); printf("%s\tskipped: %s\n", $deviceEntry['device'], $error); }
 function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array
 {
+    // Match the probe failure shape without handing malformed paths to the shell.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return ['rc' => 1, 'mbps' => null, 'secs' => null];
     [$rc, $so, $se] = [runCommand(sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip), true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? ''];
     $raw = $se !== '' ? $se : $so;
     $line = trim($raw);

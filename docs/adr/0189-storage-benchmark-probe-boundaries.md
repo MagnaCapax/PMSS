@@ -55,3 +55,10 @@ decoding and preserves execution/read exceptions.
   level or degraded counts retain the existing status-read failure, including
   when a missing degraded counter would otherwise use the raid0/linear fallback.
   Ordinary whitespace and valid metadata retain their existing result shape.
+- Fio and dd execution reject empty or NUL-containing target paths before
+  shell quoting; fio also rejects NUL-containing textual job arguments before
+  allocating its output. Rejections use the existing failed-probe shapes and
+  never launch a command. Valid paths, job options, command bytes, metric payloads
+  and temporary-output cleanup retain their contracts. The isolated
+  `StorageBenchmarkCommandInputTest` covers both boundaries and runs only on
+  testing machines.
