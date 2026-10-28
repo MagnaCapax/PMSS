@@ -4,16 +4,23 @@
 /** Reserve the benchmark name before fio or fallocate can touch it. */
 function storageBenchmarkFileReserve(string $path): ?array
 {
+    // Keep malformed paths on the reservation-failure path before PHP file calls.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return null;
     $handle = @fopen($path, 'x');
     if ($handle === false) return null;
-    $identity = @fstat($handle);
-    @fclose($handle);
+    try {
+        $identity = @fstat($handle);
+    } finally {
+        @fclose($handle);
+    }
     return is_array($identity) ? ['dev' => $identity['dev'], 'ino' => $identity['ino']] : null;
 }
 
 /** Never remove a path replaced after this run reserved its file. */
 function storageBenchmarkFileCleanup(string $path, array $identity): bool
 {
+    // clearstatcache() can throw on malformed paths even with warnings suppressed.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     clearstatcache(true, $path);
     $current = @lstat($path);
     return is_array($current) && pmssFilesystemStatSameInode($current, $identity) && @unlink($path);

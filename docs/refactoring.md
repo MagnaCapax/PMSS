@@ -141,6 +141,11 @@ creation before preallocation or fio runs. A name collision fails without
 touching the existing entry. Normal and shutdown cleanup compare device and
 inode before unlinking, so a replaced path is left alone. Successful benchmark
 jobs and their report format remain unchanged.
+Reservation and inode-checked cleanup reject empty or NUL-containing paths before
+filesystem calls, retaining their null/false failure results. Reservation closes
+its stream in `finally` if metadata inspection throws, preserving the original
+throwable. `StorageBenchmarkFileSafetyTest` covers these guards and stream
+ownership; the existing benchmark safety tests retain normal cleanup coverage.
 The read-only home-device probe parses md degraded counts as representable
 unsigned integers. Malformed or overflowed sysfs values retain its existing
 preflight failure result; valid counts keep the same report shape.
