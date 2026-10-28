@@ -5,6 +5,10 @@ declare(strict_types=1);
 /** Execute a repository PHP script relative to the diagnostics script root. */
 function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = [], int $timeoutSec = PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT): array
 {
+    // trim() removes edge NULs; reject the original path before it can name a script.
+    if (pmssFilesystemPathHasNulByte($relativePath)) {
+        return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script path unsafe: NUL byte'];
+    }
     $relativePath = trim($relativePath);
     if ($relativePath === '' || $relativePath[0] === '/' || !pmssPathSegmentsAreSafe($relativePath, true, false)) {
         return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script path unsafe: '.$relativePath];
@@ -28,6 +32,13 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
         if (is_file($repositoryScriptPath)) $scriptPath = $repositoryScriptPath;
     }
     if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$reportedPath];
+    // Retain argv scalar conversion, but fail softly before shell quoting rejects NULs.
+    $arguments = array_map('strval', $arguments);
+    foreach ($arguments as $argument) {
+        if (pmssFilesystemPathHasNulByte($argument)) {
+            return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script argument unsafe: NUL byte'];
+        }
+    }
     // Use 'php' from $PATH instead of PHP_BINARY — consistent with update.php (GH#589).
     return pmssCommandCapture(pmssCommandArgvShellQuote(array_merge(['php', $scriptPath], $arguments)), max(1, $timeoutSec), false, 'Failed to launch command');
 }

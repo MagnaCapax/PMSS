@@ -33,6 +33,9 @@ Keep the canonical installer/update details under `docs/install.md` and
   PHP-script execution, and `collect.php` acquires and projects recursive results.
   Root/user guards and existing payload/error shapes remain at their original
   boundaries (ADR 0193).
+  Script execution rejects NUL-containing paths before trimming and arguments
+  before shell quoting, returning an rc-1 result without echoing malformed bytes.
+  Valid path whitespace, scalar argv conversion and command results are preserved.
 - **scripts/util/userDocker.php** – Stable rootless-Docker CLI wrapper.
   `user/docker/cli.php` validates requests and dispatches to daemon start, checked
   shutdown, status, and transferred-container handlers. `command.php` preserves

@@ -186,6 +186,43 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame('Diagnostics script path unsafe: ../scripts/listUsers.php', $result['stderr']);
     }
 
+    public function testPhpScriptRejectsNulPathsAndArgumentsWithoutLaunching(): void
+    {
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-nul-');
+        $marker = $root.'/launched';
+        $this->pmssWriteExecutablePhpFile($root.'/probe.php', 'file_put_contents('.var_export($marker, true).', "launched");');
+        $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $root], function () use ($marker): void {
+            foreach (["\0probe.php", "probe.php\0", "pro\0be.php", "\0 probe.php \0", " \0probe.php "] as $path) {
+                $this->assertSame(
+                    ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script path unsafe: NUL byte'],
+                    \pmssAgentDiagnosticsPhpScript($path)
+                );
+                $this->assertFalse(file_exists($marker));
+            }
+            foreach (["\0", "\0argument", "argument\0", "arg\0ument", " \0argument "] as $argument) {
+                foreach ([[$argument], ['--json', $argument], [$argument, '--json']] as $arguments) {
+                    $this->assertSame(
+                        ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script argument unsafe: NUL byte'],
+                        \pmssAgentDiagnosticsPhpScript('probe.php', $arguments)
+                    );
+                    $this->assertFalse(file_exists($marker));
+                }
+            }
+        });
+    }
+
+    public function testPhpScriptPreservesPathWhitespaceAndScalarArguments(): void
+    {
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-scalars-');
+        $this->pmssWriteExecutablePhpFile($root.'/probe.php', 'echo json_encode(array_slice($argv, 1));');
+        $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $root], function (): void {
+            $result = \pmssAgentDiagnosticsPhpScript(" \tprobe.php\r\n", [null, false, true, 0, -1, 1.5, '', "line\nbreak"]);
+            $this->assertSame(0, $result['rc']);
+            $this->assertSame(['', '', '1', '0', '-1', '1.5', '', "line\nbreak"], json_decode($result['stdout'], true));
+            $this->assertSame('', $result['stderr']);
+        });
+    }
+
     public function testPhpScriptRejectsUnsafeScriptRootBeforeExecution(): void
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');
