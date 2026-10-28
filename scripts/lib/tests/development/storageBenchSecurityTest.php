@@ -507,6 +507,45 @@ PHP;
         }
     }
 
+    public function testSizeOptionsRejectRawNulsBeforeNormalization(): void
+    {
+        // JSON carries bytes that an OS argv cannot; never start a real benchmark.
+        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/storageBenchmark.php'), true).';'
+            .'[$option, $value] = json_decode(getenv("PMSS_TEST_SIZE_VALUE"), true);'
+            .'$parsed = pmssParseCliTokens(["storageBenchmark.php", $option."=".$value]);'
+            .'echo json_encode(storageBenchmarkRequireSizeBytes($option, pmssCliOptionString($parsed, substr($option, 2))));';
+        foreach (['--size', '--dd-size'] as $option) {
+            foreach (["\0", "\0".'1M', "1M\0", "1\0M", " \t\0"."1M\0\r\n", "\0".'1048576', "1048576\0"] as $value) {
+                $run = $this->pmssExecInlinePhpWithTempStderr($script,
+                    ['PMSS_TEST_SIZE_VALUE' => json_encode([$option, $value])]);
+                $this->pmssAssertCommandFailsToStderr($run['result'], $run['stderrPath'],
+                    "Error: {$option} must be a positive size (examples: 1G, 512M, 1048576).\n");
+            }
+        }
+    }
+
+    public function testSizeOptionsPreserveValidValuesAndMinimumDiagnostics(): void
+    {
+        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/storageBenchmark.php'), true).';'
+            .'[$option, $value, $minimum] = json_decode(getenv("PMSS_TEST_SIZE_VALUE"), true);'
+            .'echo json_encode(storageBenchmarkRequireSizeBytes($option, $value, $minimum, "1 MiB"));';
+        foreach (['--size', '--dd-size'] as $option) {
+            foreach ([['1', 1, 1], ['0001', 1, 1], ['1K', 1, 1024], ['1mib', 1, 1048576],
+                [" \t1M\r\n", 1048576, 1048576], ['1048576', 1048576, 1048576],
+                ['1G', 1048576, 1073741824], ['512K', 1048576, null]] as [$value, $minimum, $expected]) {
+                $run = $this->pmssExecInlinePhpWithTempStderr($script,
+                    ['PMSS_TEST_SIZE_VALUE' => json_encode([$option, $value, $minimum])]);
+                if ($expected === null) {
+                    $this->pmssAssertCommandFailsToStderr($run['result'], $run['stderrPath'],
+                        "Error: {$option} must be at least 1 MiB.\n");
+                } else {
+                    $this->pmssAssertCommandSucceedsWithoutStderr($run['result'], $run['stderrPath']);
+                    $this->assertSame(json_encode($expected), $run['result']['output']);
+                }
+            }
+        }
+    }
+
     public function testBenchmarkInputGuardsRejectInvalidScalarOptions(): void
     {
         $sizeError = "Error: --size must be a positive size (examples: 1G, 512M, 1048576).\n";

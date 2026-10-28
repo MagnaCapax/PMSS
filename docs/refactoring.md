@@ -497,6 +497,9 @@ Storage benchmark integer options and block-device/free-space command output
 must fit a PHP integer before casting. Size options must also be finite and
 below the representable integer limit. Oversized values retain the existing
 input/command failure paths; ordinary decimal values keep their output shape.
+Size options reject NUL bytes before trimming, including leading and trailing
+bytes that would otherwise disappear. Valid whitespace, binary suffixes and
+minimum-size diagnostics retain their existing behavior.
 `StorageBenchSecurityTest` covers the boundary and oversized inputs.
 
 Regular-file integer reads reject decimal values above `PHP_INT_MAX` before
