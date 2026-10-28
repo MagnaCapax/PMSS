@@ -28,21 +28,30 @@ class RootCronIoPriorityScopeTest extends TestCase
         foreach (self::ACCOUNT_ONLY as $name) {
             $this->assertTrue(isset($lines[$name]), "root.cron should still schedule {$name}");
             foreach ($lines[$name] as $line) {
-                $this->assertStringContainsString("ps -o pid=,uid= -C {$name} | awk '\$2>=1000{print \$1}' |xargs -I'{1}' ", $line);
+                // Shape only; what each filter lets through is checked by running it below.
+                $this->assertStringContainsString("ps -o pid=,uid= -C {$name} | awk '", $line);
+                $this->assertStringContainsString("|xargs -I'{1}' ", $line);
             }
         }
     }
 
-    public function testUidFilterPassesOnlyAccountPids(): void
+    public function testUidFilterOnEveryDemotionLinePassesOnlyAccountPids(): void
     {
         if (!is_executable('/usr/bin/awk') && !is_executable('/bin/awk')) {
             throw new SkipTest('awk is not available');
         }
-        $line = $this->schedulingLines()['tar'][0];
-        $this->assertSame(1, preg_match("/awk '([^']+)'/", $line, $m));
         // root, www-data, the last system uid, the first and a later account uid.
-        $output = shell_exec('printf '.escapeshellarg("  101     0\n  102    33\n  103   999\n  104  1000\n  105 100999\n").' | awk '.escapeshellarg($m[1]));
-        $this->assertSame("104\n105\n", $output);
+        $fixture = escapeshellarg("  101     0\n  102    33\n  103   999\n  104  1000\n  105 100999\n");
+        $checked = 0;
+        $lines = $this->schedulingLines();
+        foreach (self::ACCOUNT_ONLY as $name) {
+            foreach ($lines[$name] ?? [] as $line) {
+                $this->assertSame(1, preg_match("/\\| awk '([^']+)' \\|/", $line, $m), "no awk stage in: {$line}");
+                $this->assertSame("104\n105\n", shell_exec('printf '.$fixture.' | awk '.escapeshellarg($m[1])), "filter in: {$line}");
+                ++$checked;
+            }
+        }
+        $this->assertSame(12, $checked);
     }
 
     public function testPromotionsAndInheritedOrContainmentRulesKeepTheirScope(): void
