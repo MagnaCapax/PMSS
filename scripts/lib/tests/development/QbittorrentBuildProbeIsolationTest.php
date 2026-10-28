@@ -31,9 +31,8 @@ final class QbittorrentBuildProbeIsolationTest extends TestCase
         $proc = $this->pmssMakeTempDir('pmss-qbt-proc-');
         $uid = posix_geteuid();
         foreach ([101 => "/x/qbittorrent-nox\0--version\0", 102 => "/x/qbittorrent-nox\0-d\0", 103 => "/x/qbittorrent-nox\0"] as $pid => $cmdline) {
-            $this->pmssWriteFile($proc.'/'.$pid.'/comm', "qbittorrent-nox\n");
-            $this->pmssWriteFile($proc.'/'.$pid.'/cmdline', $cmdline);
-            $this->pmssWriteFile($proc.'/'.$pid.'/status', "Name:\tqbittorrent-nox\nUid:\t".$uid."\t".$uid."\t".$uid."\t".$uid."\n");
+            $this->pmssWriteFiles($proc.'/'.$pid, ['comm' => "qbittorrent-nox\n", 'cmdline' => $cmdline,
+                'status' => "Name:\tqbittorrent-nox\nUid:\t".$uid."\t".$uid."\t".$uid."\t".$uid."\n"]);
         }
         $pids = \pmssQbittorrentAccountPids($proc, $uid);
         sort($pids);

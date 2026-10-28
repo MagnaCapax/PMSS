@@ -140,11 +140,9 @@ final class TorrentClientsP3LaunchTest extends TestCase
         $binary = $root.'/transmission-daemon';
         $ownNs = readlink('/proc/self/ns/mnt');
         foreach ([101, 102, 103] as $pid) {
-            mkdir($proc.'/'.$pid.'/ns', 0755, true);
-            file_put_contents($proc.'/'.$pid.'/comm', "transmission-da\n");
-            file_put_contents($proc.'/'.$pid.'/status', "Uid:\t".posix_geteuid()." 0 0 0\n");
-            symlink($pid === 102 ? 'mnt:[other]' : $ownNs, $proc.'/'.$pid.'/ns/mnt');
-            symlink($pid === 103 ? '/tmp/other-daemon' : $binary, $proc.'/'.$pid.'/exe');
+            $this->pmssWriteFiles($proc.'/'.$pid, ['comm' => "transmission-da\n", 'status' => "Uid:\t".posix_geteuid()." 0 0 0\n"]);
+            $this->pmssWriteSymlinks($proc.'/'.$pid, [
+                'ns/mnt' => $pid === 102 ? 'mnt:[other]' : $ownNs, 'exe' => $pid === 103 ? '/tmp/other-daemon' : $binary]);
         }
         $this->assertSame([101], \pmssTransmissionNativePids($binary, $proc));
     }

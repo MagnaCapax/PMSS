@@ -28,9 +28,8 @@ final class TorrentClientsIdentityTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-clients-proc-');
         foreach ([101, 102, 103, 104] as $pid) {
-            mkdir($root.'/'.$pid);
-            file_put_contents($root.'/'.$pid.'/comm', "qbittorrent-nox\n");
-            file_put_contents($root.'/'.$pid.'/status', "Name:\tqbittorrent-nox\nUid:\t1000 1000 1000 1000\n");
+            $this->pmssWriteFiles($root.'/'.$pid, ['comm' => "qbittorrent-nox\n",
+                'status' => "Name:\tqbittorrent-nox\nUid:\t1000 1000 1000 1000\n"]);
         }
         $exe = [
             101 => '/home/.pmss/clients/qbittorrent/5.1.0/qbittorrent-nox',
@@ -63,9 +62,8 @@ final class TorrentClientsIdentityTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($tenantTarget, $root.'/home/qafix081/bin/qbittorrent');
         $tenantExe = $this->pmssWriteFile($tenantTarget.'/qbittorrent-nox', 'binary');
         foreach ([201, 202] as $pid) {
-            $this->pmssEnsureDir($root.'/proc/'.$pid);
-            $this->pmssWriteFile($root.'/proc/'.$pid.'/comm', "qbittorrent-nox\n");
-            $this->pmssWriteFile($root.'/proc/'.$pid.'/status', "Uid:\t1000 1000 1000 1000\n");
+            $this->pmssWriteFiles($root.'/proc/'.$pid, ['comm' => "qbittorrent-nox\n",
+                'status' => "Uid:\t1000 1000 1000 1000\n"]);
         }
         $exe = [201 => $versioned, 202 => $tenantExe];
         $ops = [

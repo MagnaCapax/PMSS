@@ -92,13 +92,10 @@ final class TorrentClientsP1LaunchTest extends TestCase
         $proc = $root.'/proc';
         $ownNs = readlink('/proc/self/ns/mnt');
         foreach (array(101, 102, 103) as $pid) {
-            $dir = $this->pmssEnsureDir($proc.'/'.$pid.'/ns');
-            $this->pmssWriteFile($proc.'/'.$pid.'/comm', "qbittorrent-nox\n");
-            $this->pmssWriteFile($proc.'/'.$pid.'/status', "Uid:\t".posix_geteuid()." 0 0 0\n");
-            $this->pmssCreateSymlinkOrSkip($pid === 103 ? 'mnt:[foreign]' : $ownNs, $dir.'/mnt');
+            $this->pmssWriteFiles($proc.'/'.$pid, ['comm' => "qbittorrent-nox\n", 'status' => "Uid:\t".posix_geteuid()." 0 0 0\n"]);
             $binary = $pid === 102 ? $home.'/bin/qbittorrent/custom/qbittorrent-nox'
                 : '/home/.pmss/clients/qbittorrent/5.1.0/qbittorrent-nox';
-            $this->pmssCreateSymlinkOrSkip($binary, $proc.'/'.$pid.'/exe');
+            $this->pmssWriteSymlinks($proc.'/'.$pid, ['ns/mnt' => $pid === 103 ? 'mnt:[foreign]' : $ownNs, 'exe' => $binary]);
         }
         $this->assertSame(array(101, 102), \pmssConfigureTorrentClientNativePids($home, $proc));
     }

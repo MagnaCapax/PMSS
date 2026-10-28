@@ -13,10 +13,8 @@ final class QbittorrentStoppedConfigTest extends TemporaryHomeRootTestCase
         $proc = $this->pmssMakeTempDir('pmss-qbt-processes-');
         foreach ([101 => ['qbittorrent-nox', 1234], 102 => ['qbittorrent-nox', 2345],
             103 => ['another-app', 1234], 104 => ['qbittorrent-nox', 1234]] as $pid => list($comm, $uid)) {
-            $this->pmssWriteFile($proc.'/'.$pid.'/comm', $comm."\n");
-            $this->pmssWriteFile($proc.'/'.$pid.'/status', "Uid:\t".$uid."\t".$uid."\n");
-            $this->pmssEnsureDir($proc.'/'.$pid.'/ns');
-            $this->pmssCreateSymlinkOrSkip('mnt:['.$pid.']', $proc.'/'.$pid.'/ns/mnt');
+            $this->pmssWriteFiles($proc.'/'.$pid, ['comm' => $comm."\n", 'status' => "Uid:\t".$uid."\t".$uid."\n"]);
+            $this->pmssWriteSymlinks($proc.'/'.$pid, ['ns/mnt' => 'mnt:['.$pid.']']);
         }
         foreach (['pmssQbittorrentAccountPids', 'pmssQbittorrentFrontendAccountPids'] as $pids) {
             $this->assertSame([101, 104], $pids($proc, 1234));

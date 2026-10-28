@@ -130,6 +130,16 @@ trait FilesystemCleanupTrait
         return $baseDir;
     }
 
+    /** Create fixture links without resolving targets, including deliberately dangling targets. */
+    protected function pmssWriteSymlinks(string $baseDir, array $links, int $dirMode = 0755): void
+    {
+        foreach ($links as $relativePath => $target) {
+            $link = rtrim($baseDir, '/').'/'.ltrim((string) $relativePath, '/');
+            $this->pmssEnsureDir(dirname($link), $dirMode);
+            $this->pmssCreateSymlinkOrSkip($target, $link);
+        }
+    }
+
     /**
      * Create paired fstab/mounts files for hermetic mount-hardening tests.
      *

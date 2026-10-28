@@ -219,11 +219,11 @@ class BrowserConsoleArtifactsTest extends TestCase
             list($real, $effective, $comm, $exe, $cmdline, $children, $state) = $case;
             $dir = $root.'/'.$pid;
             mkdir($dir.'/task/'.$pid, 0700, true);
-            file_put_contents($dir.'/status', "Uid:\t$real\t$effective\t$effective\t$effective\n");
-            file_put_contents($dir.'/comm', $comm."\n");
-            if ($exe !== null) symlink($exe, $dir.'/exe');
-            if ($cmdline !== null) file_put_contents($dir.'/cmdline', $cmdline);
-            if ($children !== null) file_put_contents($dir.'/task/'.$pid.'/children', $children);
+            $files = ['status' => "Uid:\t$real\t$effective\t$effective\t$effective\n", 'comm' => $comm."\n"];
+            if ($cmdline !== null) $files['cmdline'] = $cmdline;
+            if ($children !== null) $files['task/'.$pid.'/children'] = $children;
+            $this->pmssWriteFiles($dir, $files, 0700);
+            if ($exe !== null) $this->pmssWriteSymlinks($dir, ['exe' => $exe], 0700);
             if ($state !== 'absent') $expected[$pid] = $state;
         }
         $this->assertSame($expected, \pmssConsoleTtydProcesses(12345, '/usr/bin/ttyd', $sock, $root));

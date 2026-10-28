@@ -10,10 +10,7 @@ class UserProcHeldBlocksTest extends TestCase
     {
         $procRoot = $this->pmssMakeTempDir('pmss-held-proc-');
         foreach ($pids as $pid => $uid) {
-            $pidRoot = $procRoot.'/'.$pid;
-            mkdir($pidRoot.'/fd', 0777, true);
-            file_put_contents($pidRoot.'/status', "Uid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n");
-            file_put_contents($pidRoot.'/fd/3', '');
+            $this->pmssWriteFiles($procRoot.'/'.$pid, ['status' => "Uid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n", 'fd/3' => ''], 0777);
         }
         return $procRoot;
     }

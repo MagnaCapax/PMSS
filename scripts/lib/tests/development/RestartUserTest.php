@@ -12,11 +12,10 @@ final class RestartUserTest extends TestCase
     /** Write only the proc fields the selector is allowed to inspect. */
     private function process(string $root, int $pid, int $uid, string $comm, string $cmdline = '', string $state = 'S'): void
     {
-        $base = $root.'/'.$pid;
-        $this->pmssEnsureDir($base);
-        $this->pmssWriteFile($base.'/status', "Name:\t{$comm}\nState:\t{$state} (sleeping)\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n");
-        $this->pmssWriteFile($base.'/comm', $comm."\n");
-        $this->pmssWriteFile($base.'/cmdline', str_replace(' ', "\0", $cmdline));
+        $this->pmssWriteFiles($root.'/'.$pid, [
+            'status' => "Name:\t{$comm}\nState:\t{$state} (sleeping)\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n",
+            'comm' => $comm."\n", 'cmdline' => str_replace(' ', "\0", $cmdline),
+        ]);
     }
 
     public function testProcSelectionUsesRealUidAndKeepsTheServiceManager(): void
@@ -28,8 +27,7 @@ final class RestartUserTest extends TestCase
         $this->process($root, 104, 1002, 'rtorrent', '/usr/bin/rtorrent');
         $this->process($root, 105, 1001, 'systemd', '/lib/systemd/systemd');
         $this->process($root, 106, 1001, 'lighttpd', '/usr/sbin/lighttpd', 'Z');
-        $this->pmssEnsureDir($root.'/107');
-        $this->pmssWriteFile($root.'/107/status', "Uid:\t1001\n");
+        $this->pmssWriteFiles($root.'/107', ['status' => "Uid:\t1001\n"]);
         $this->process($root, 108, 1002, 'other', '/bin/other');
         $this->pmssWriteFile($root.'/108/status', "State:\tS (sleeping)\nUid:\t1002\t1001\t1001\t1001\n");
         $this->process($root, 109, 1001, 'own', '/bin/own');

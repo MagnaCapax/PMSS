@@ -111,13 +111,10 @@ class UpdateServicesRuntimeTest extends TestCase
         ];
         $this->pmssWriteFile($proc.'/self/oom_score_adj', '-1000');
         foreach ($fixtures as $pid => list($score, $cgroup, $status)) {
-            $this->pmssWriteFile($proc.'/'.$pid.'/oom_score_adj', $score);
-            $this->pmssWriteFile($proc.'/'.$pid.'/cgroup', $cgroup);
-            $this->pmssWriteFile($proc.'/'.$pid.'/status', $status);
+            $this->pmssWriteFiles($proc.'/'.$pid, ['oom_score_adj' => $score, 'cgroup' => $cgroup, 'status' => $status]);
         }
         $this->pmssWriteFile($proc.'/107/status', "Uid:\t1000\n");
-        $this->pmssWriteFile($proc.'/not-a-pid/oom_score_adj', '-1000');
-        $this->pmssWriteFile($proc.'/not-a-pid/cgroup', '0::/user.slice/user-1000.slice');
+        $this->pmssWriteFiles($proc.'/not-a-pid', ['oom_score_adj' => '-1000', 'cgroup' => '0::/user.slice/user-1000.slice']);
 
         $this->assertSame(3, \pmssResetInheritedOomImmunity($proc));
         $this->assertSame('0', $this->pmssReadFileOrEmpty($proc.'/self/oom_score_adj'));

@@ -572,18 +572,11 @@ class AppsCatalogTest extends TestCase
         $container = $root.'/overlay/bin/qbittorrent-nox';
         $this->pmssWriteFile($native, 'native');
         $this->pmssWriteFile($container, 'container');
-        $this->pmssEnsureDir($root.'/proc/123');
-        $this->pmssEnsureDir($root.'/proc/456');
-        $this->pmssEnsureDir($root.'/proc/self/ns');
-        @symlink('mnt:[host]', $root.'/proc/self/ns/mnt');
-        $this->pmssEnsureDir($root.'/proc/555');
+        $this->pmssWriteSymlinks($root.'/proc/self', ['ns/mnt' => 'mnt:[host]']);
         foreach (array(123 => 'mnt:[host]', 456 => 'mnt:[guest]', 555 => 'mnt:[guest]') as $pid => $namespace) {
-            $this->pmssEnsureDir($root.'/proc/'.$pid.'/ns');
-            @symlink($namespace, $root.'/proc/'.$pid.'/ns/mnt');
+            $this->pmssWriteSymlinks($root.'/proc/'.$pid, ['ns/mnt' => $namespace,
+                'exe' => $pid === 456 ? $container : $native]);
         }
-        @symlink($native, $root.'/proc/123/exe');
-        @symlink($container, $root.'/proc/456/exe');
-        @symlink($native, $root.'/proc/555/exe');
         $this->assertSame(array(123), \pmssCustomerNativePidsRead(array($native), $root.'/proc', fileowner($root.'/proc/123')));
         $this->assertSame(array(), \pmssCustomerNativePidsRead(array($native), $root.'/proc', -1));
         $signals = array();
@@ -595,10 +588,8 @@ class AppsCatalogTest extends TestCase
         $deluged = $this->pmssWriteFile($root.'/usr/bin/deluged', '#!'.$python."\n");
         $guestPython = $this->pmssWriteFile($root.'/overlay/bin/python3', 'guest interpreter');
         foreach (array(789 => $python, 999 => $guestPython) as $pid => $exe) {
-            $this->pmssEnsureDir($root.'/proc/'.$pid);
-            $this->pmssEnsureDir($root.'/proc/'.$pid.'/ns');
-            @symlink($pid === 789 ? 'mnt:[host]' : 'mnt:[guest]', $root.'/proc/'.$pid.'/ns/mnt');
-            @symlink($exe, $root.'/proc/'.$pid.'/exe');
+            $this->pmssWriteSymlinks($root.'/proc/'.$pid, [
+                'ns/mnt' => $pid === 789 ? 'mnt:[host]' : 'mnt:[guest]', 'exe' => $exe]);
             $this->pmssWriteFile($root.'/proc/'.$pid.'/cmdline', $exe."\0".$deluged."\0");
         }
         $this->assertSame(array(789), \pmssCustomerNativePidsRead(array($deluged), $root.'/proc', fileowner($root.'/proc/789')));
@@ -611,8 +602,7 @@ class AppsCatalogTest extends TestCase
         $python = $this->pmssWriteFile($root.'/usr/bin/python3', 'interpreter');
         $otherPython = $this->pmssWriteFile($root.'/usr/bin/python3-other', 'other interpreter');
         $web = $this->pmssWriteFile($root.'/usr/bin/deluge-web', '#!'.$python."\n");
-        $this->pmssEnsureDir($root.'/proc/self/ns');
-        @symlink('mnt:[host]', $root.'/proc/self/ns/mnt');
+        $this->pmssWriteSymlinks($root.'/proc/self', ['ns/mnt' => 'mnt:[host]']);
         $cases = array(
             301 => array($python, "deluge-web".str_repeat("\0", 40), 'mnt:[host]'),
             302 => array($python, "deluge-webx".str_repeat("\0", 40), 'mnt:[host]'),
@@ -621,9 +611,7 @@ class AppsCatalogTest extends TestCase
             305 => array($python, "deluge-web".str_repeat("\0", 40), 'mnt:[guest]'),
         );
         foreach ($cases as $pid => list($exe, $cmdline, $namespace)) {
-            $this->pmssEnsureDir($root.'/proc/'.$pid.'/ns');
-            @symlink($namespace, $root.'/proc/'.$pid.'/ns/mnt');
-            @symlink($exe, $root.'/proc/'.$pid.'/exe');
+            $this->pmssWriteSymlinks($root.'/proc/'.$pid, ['ns/mnt' => $namespace, 'exe' => $exe]);
             $this->pmssWriteFile($root.'/proc/'.$pid.'/cmdline', $cmdline);
         }
         $this->assertSame(array(301), \pmssCustomerNativePidsRead(array($web), $root.'/proc', fileowner($root.'/proc/301')));

@@ -365,6 +365,12 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Process fixtures use `TestCase::pmssWriteFiles()` for literal `/proc` fields and
+`pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared
+fixture trait creates parents once; callers retain field bytes, absent entries,
+directory modes and link targets, including dangling targets. Process-selection
+assertions stay with their tests and execute only on testing machines.
+
 Executable test fixtures use `pmssWriteExecutableFile()` for the shared write
 and mode application. Keep stub bytes and paths at each test, passing the
 existing file mode explicitly when it differs from 0755. Permission-failure

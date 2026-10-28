@@ -470,9 +470,7 @@ abstract class TestCase
         $store = $root.'/store';
         $this->pmssEnsureDir($home.'/bin/'.$client, $homeMode);
         $build = $this->pmssEnsureDir($store.'/'.$client.'/'.$version);
-        foreach ($files as $path => $content) {
-            $this->pmssWriteFile($build.'/'.$path, $content);
-        }
+        $this->pmssWriteFiles($build, $files);
         return [$root, $home, $store];
     }
 

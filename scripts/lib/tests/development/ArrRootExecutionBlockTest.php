@@ -220,13 +220,11 @@ class ArrRootExecutionBlockTest extends TestCase
     ): void
     {
         $dir = $procRoot.'/'.$pid;
-        @mkdir($dir, 0700, true);
-        @file_put_contents($dir.'/status', "Name:\ttest\nUid:\t".$uid."\t".$uid."\t".$uid."\t".$uid."\n");
-        $this->pmssCreateSymlinkOrSkip($exeTarget, $dir.'/exe');
-        @mkdir($dir.'/fd', 0700, true);
-        foreach ($socketInodes as $inode) {
-            $this->pmssCreateSymlinkOrSkip('socket:['.$inode.']', $dir.'/fd/'.$inode);
-        }
+        $this->pmssWriteFiles($dir, ['status' => "Name:\ttest\nUid:\t".$uid."\t".$uid."\t".$uid."\t".$uid."\n"], 0700);
+        $this->pmssEnsureDir($dir.'/fd', 0700);
+        $links = ['exe' => $exeTarget];
+        foreach ($socketInodes as $inode) $links['fd/'.$inode] = 'socket:['.$inode.']';
+        $this->pmssWriteSymlinks($dir, $links, 0700);
     }
 
     /** Write the minimum /proc/net/tcp fixture needed by the inode matcher. */

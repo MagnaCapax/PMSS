@@ -10,9 +10,8 @@ class UserConfigRuntimeTest extends TestCase
     private function writeRtorrentProcFixture(string $name = 'rtorrent', int $uid = 1500, string $comm = 'rtorrent'): string
     {
         $procRoot = $this->pmssMakeTempDir('pmss-proc-');
-        mkdir($procRoot.'/12345');
-        file_put_contents($procRoot.'/12345/status', "Name:\t{$name}\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n");
-        file_put_contents($procRoot.'/12345/comm', $comm."\n");
+        $this->pmssWriteFiles($procRoot.'/12345', [
+            'status' => "Name:\t{$name}\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n", 'comm' => $comm."\n"]);
         return $procRoot;
     }
 
