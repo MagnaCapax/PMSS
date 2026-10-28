@@ -12,6 +12,7 @@ Update Flow Smoke
 
 rTorrent HTTPS Announce Acceptance (Refs #1188)
 - On a testing machine, announce a private fixture torrent to a controlled HTTPS tracker with the generated config under 0.16.25, 0.9.8-r16 and 0.9.8-stickz7.2; require a successful tracker reply using Debian's CA bundle.
+- Repeat through the executor with a pre-fix account rc and with custom CA file/directory overrides; jesec applies command-line options after rc imports, unlike upstream and stickz.
 - Repeat with an untrusted certificate and a hostname mismatch; both must fail certificate verification. Keep certificate verification enabled and redact tracker credentials from logs.
 - Add this matrix to the store-build acceptance gate before rollout; template assertions alone do not establish successful announces. This live acceptance remains unverified.
 

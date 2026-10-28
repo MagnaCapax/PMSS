@@ -896,7 +896,11 @@ read-only probes used by baseline sanitization and source-build guards.
   with usage on stderr; missing sockets and invalid SCGI responses print `n/a`
   on stderr and exit non-zero without partial stdout.
 - The per-user `.rtorrentExecute.php` supervisor launches the PMSS-built
-  `/usr/local/bin/rtorrent` directly, regardless of its inherited `PATH`.
+  `/usr/local/bin/rtorrent` directly when no published store build is selected,
+  regardless of its inherited `PATH`. Store launches pass a conditional `-O`
+  default for Debian's CA bundle only when `network.http.cacert` and
+  `network.http.capath` are both empty. This covers old account configs while
+  preserving customer rc overrides across before/after-import option ordering.
   Between child runs, a deleted PHP executable or a changed launcher checksum
   makes it clear its run marker and release its executor lock before exiting.
   The existing watchdog (or panel restart) then starts a fresh launcher. Failed

@@ -165,17 +165,20 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         });
         $home = $root.'/t';
         mkdir($home.'/bin/rtorrent', 0755, true);
-        foreach (['0.16.25', '0.16.26'] as $version) {
+        $caDefault = 'branch = "network.http.cacert=", "cat=", "network.http.capath=", "cat=", '
+            .'"network.http.cacert.set=/etc/ssl/certs/ca-certificates.crt"';
+        // Old account configs need no regeneration, and every family receives one shell-safe option.
+        file_put_contents($home.'/.rtorrent.rc', "try_import = .rtorrent.rc.custom\n");
+        file_put_contents($home.'/.rtorrent.rc.custom', "network.http.cacert.set = /custom/ca.pem\n");
+        foreach (['0.16.25', '0.16.26', '0.9.8-r16', '0.9.8-stickz7.2'] as $version) {
             symlink($store.'/rtorrent/'.$version, $home.'/bin/rtorrent/default');
             $output = [];
             exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
-            $this->assertSame([0, ['-D|']], [$rc, $output]);
+            $this->assertSame([0, ['-O|'.$caDefault.'|'.(strpos($version, '0.16.') === 0 ? '-D|' : '')]], [$rc, $output]);
+            $this->assertSame("try_import = .rtorrent.rc.custom\n", file_get_contents($home.'/.rtorrent.rc'));
+            $this->assertSame("network.http.cacert.set = /custom/ca.pem\n", file_get_contents($home.'/.rtorrent.rc.custom'));
             unlink($home.'/bin/rtorrent/default');
         }
-        symlink($store.'/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
-        // 0.9.8-family selections launch with no arguments, exactly as before.
-        $this->assertSame(escapeshellarg($store.'/rtorrent/0.9.8-r16/rtorrent'),
-            \pmssRtorrentExecutorCommand($home, $projection, $store));
         $this->assertFalse(\pmssRtorrentDeprecatedRedirects('0.16.25', $root.'/missing.json'));
     }
 

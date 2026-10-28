@@ -87,7 +87,10 @@ function pmssRtorrentExecutorCommand(
     $binary = pmssTorrentClientResolve($home, 'rtorrent', $projectionPath, $storeRoot);
     $storePrefix = rtrim($storeRoot, '/').'/rtorrent/';
     if ($binary === null || strpos($binary, $storePrefix) !== 0) return '/usr/local/bin/rtorrent';
-    return escapeshellarg($binary)
+    // jesec applies -O after rc imports; fill only unset trust paths so customer overrides survive.
+    return escapeshellarg($binary).' -O '.escapeshellarg(
+        'branch = "network.http.cacert=", "cat=", "network.http.capath=", "cat=", '
+        .'"network.http.cacert.set=/etc/ssl/certs/ca-certificates.crt"')
         .(pmssRtorrentDeprecatedRedirects(basename(dirname($binary)), $projectionPath) ? ' -D' : '');
 }
 

@@ -34,7 +34,9 @@ final class TorrentClientsP4R0Test extends TestCase
             ['client' => 'rtorrent', 'version' => '0.9.8-r16', 'kind' => 'static'],
         ]]));
         $this->assertSame($binary, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
-        $this->assertSame(escapeshellarg($binary),
+        $caDefault = 'branch = "network.http.cacert=", "cat=", "network.http.capath=", "cat=", '
+            .'"network.http.cacert.set=/etc/ssl/certs/ca-certificates.crt"';
+        $this->assertSame(escapeshellarg($binary).' -O '.escapeshellarg($caDefault),
             \pmssRtorrentExecutorCommand($home, $projection, $store));
         $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
         $loop = substr($source, strpos($source, 'while (true) {'));
