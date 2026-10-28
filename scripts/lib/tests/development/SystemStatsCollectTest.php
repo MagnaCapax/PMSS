@@ -39,6 +39,41 @@ class SystemStatsCollectTest extends TestCase
         }
     }
 
+    public function testLoadAndCpuParsersRejectNulsBeforeWhitespaceNormalization(): void
+    {
+        $load = '0.00 0.11 1.25';
+        $cpu = 'cpu 1 2 3 4 5';
+        foreach ([["\0", ''], ['', "\0"], [" \0", " \t"], ["\t", "\0\r\n"], ['', " \0 \n"]] as [$prefix, $suffix]) {
+            $this->assertSame('na,na,na', \pmssSystemStatsLoadAverageFromRaw($prefix.$load.$suffix));
+            $this->assertSame([], \pmssSystemStatsCpuCountersFromRaw($prefix.$cpu.$suffix));
+        }
+        $this->assertSame('na,na,na', \pmssSystemStatsLoadAverageFromRaw("0.00 0.\0"."11 1.25"));
+        $this->assertSame([], \pmssSystemStatsCpuCountersFromRaw("cpu 1 2\0 3 4 5"));
+        // Ordinary whitespace and ignored per-core rows keep their old behavior.
+        $this->assertSame('0.00,0.11,1.25', \pmssSystemStatsLoadAverageFromRaw(" \t".$load." \r\n"));
+        $this->assertSame([1, 2, 3, 4, 5], \pmssSystemStatsCpuCountersFromRaw(" \t".$cpu." \r\ncpu0 9\0\n"));
+    }
+
+    public function testMemoryAndDiskParsersSkipNulRowsWithoutLosingValidSiblings(): void
+    {
+        $memory = 'bad 123';
+        $disk = '8 0 sda 0 0 0 0 0 0 0 0 0 123';
+        foreach ([["\0", ''], ['', "\0"], [" \0", " \t"], ["\t", "\0\r\n"], ['', " \0 "]] as [$prefix, $suffix]) {
+            $memoryRow = $prefix.$memory.$suffix;
+            $diskRow = $prefix.$disk.$suffix;
+            $this->assertSame('na', \pmssSystemStatsTopMemoryFromPsRows([$memoryRow]));
+            $this->assertSame('cron:0K', \pmssSystemStatsTopMemoryFromPsRows([$memoryRow, " \tcron 000 \r\n"]));
+            $this->assertSame([], \pmssSystemStatsDiskIoTimeFromRaw($diskRow));
+            $this->assertSame(['sdb' => 0], \pmssSystemStatsDiskIoTimeFromRaw(
+                $diskRow."\n \t8 16 sdb 0 0 0 0 0 0 0 0 0 000 \r\n"
+            ));
+        }
+        $this->assertSame('cron:1K', \pmssSystemStatsTopMemoryFromPsRows(["ba\0d 123", 'cron 1']));
+        $this->assertSame([], \pmssSystemStatsDiskIoTimeFromRaw(str_replace('sda', "sd\0a", $disk)));
+        $this->assertSame('bad:123K', \pmssSystemStatsTopMemoryFromPsRows([" \t".$memory." \r\n"]));
+        $this->assertSame(['sda' => 123], \pmssSystemStatsDiskIoTimeFromRaw(" \t".$disk." \r\n"));
+    }
+
     public function testCollectReturnsExpectedMetricKeys(): void
     {
         $stats = \pmssSystemStatsCollect();

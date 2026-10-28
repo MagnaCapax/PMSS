@@ -25,7 +25,11 @@ function pmssSystemStatsKbToHuman(int $kb): string
 function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
 {
     $items = [];
-    foreach (pmssConfigRows($rows, 2, []) as [$command, $rssKiB]) {
+    foreach ($rows as $row) {
+        // Reject raw NULs before column trimming can hide malformed probe output.
+        $row = (string) $row;
+        if (strpos($row, "\0") !== false || ($parts = pmssConfigLineColumns($row, 2, [])) === []) continue;
+        [$command, $rssKiB] = $parts;
         if (preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || ($rssKiB = pmssUnsignedDecimalIntParse($rssKiB)) === null) {
             continue;
         }
@@ -41,6 +45,7 @@ function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
  */
 function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
 {
+    if ($raw !== null && strpos($raw, "\0") !== false) return 'na,na,na';
     $load = array_slice(pmssConfigLineColumns($raw ?? '', 3, []), 0, 3);
     if ($load === []) return 'na,na,na';
     foreach ($load as $value) {
@@ -58,7 +63,10 @@ function pmssSystemStatsCpuCountersFromRaw(?string $raw): array
 {
     if ($raw === null) return [];
 
-    $parts = pmssConfigLineColumns(pmssTextLines($raw, 2)[0], 6, []);
+    $line = pmssTextLines($raw, 2)[0];
+    // Only the aggregate CPU row is consumed; reject its NULs before trimming.
+    if (strpos($line, "\0") !== false) return [];
+    $parts = pmssConfigLineColumns($line, 6, []);
     if ($parts === [] || array_shift($parts) !== 'cpu') return [];
 
     $counters = array_map('pmssUnsignedDecimalIntParse', $parts);
@@ -83,7 +91,9 @@ function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
     $stats = [];
     if ($raw === null) return $stats;
 
-    foreach (pmssConfigTextRows($raw, 13, []) as $parts) {
+    foreach (pmssTextLines($raw) as $line) {
+        // A malformed device row must not discard other devices in the snapshot.
+        if (strpos($line, "\0") !== false || ($parts = pmssConfigLineColumns($line, 13, [])) === []) continue;
         $name = $parts[2];
         if (pmssBlockDeviceNameIsDataDevice($name) && ($ioTime = pmssUnsignedDecimalIntParse($parts[12])) !== null) {
             $stats[$name] = $ioTime;

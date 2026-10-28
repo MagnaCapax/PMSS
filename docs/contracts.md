@@ -716,6 +716,12 @@ iptables helpers:
 
 ## Resource Statistics
 
+- Host-statistics load and aggregate CPU parsers reject NUL bytes before
+  whitespace normalization, retaining `na,na,na` and empty-counter fallbacks.
+  Top-memory and diskstats parsers skip NUL-containing rows while preserving
+  valid sibling rows. Ordinary whitespace, zero counters, ignored per-core rows,
+  metric ordering and formatted output retain their existing behavior;
+  `SystemStatsCollectTest` covers raw rejection and accepted inputs.
 - `pmssReadSystemdProperties()` accepts properties only after a successful
   `systemctl show` exit. Failed execution or a nonzero exit discards any partial
   stdout and returns the requested keys with empty values. Successful queries
