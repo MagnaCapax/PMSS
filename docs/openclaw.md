@@ -213,7 +213,7 @@ still requires 400 MiB RAM and its skeleton installer; OpenClaw still requires
 
 Omitting `--app-profile` selects `default`, the existing seedbox behavior:
 rTorrent, Pikkumies and rootless Docker. `--app-profile=storagebox` disables
-rTorrent, enables rclone and Copyparty, and retains Pikkumies and Docker. It
+rTorrent and rootless Docker (#270), enables rclone and Copyparty, and retains Pikkumies. It
 enables no torrent-client opt-in markers. Other apps keep their previous
 defaults. An explicit `--docker-enabled=true|false` overrides the profile,
 subject to the existing 245 MiB RAM floor. Profiles affect account creation

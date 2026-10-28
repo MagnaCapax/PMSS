@@ -37,7 +37,7 @@ account creation. Omission selects `default`, meaning seedbox behavior.
 | --- | --- | --- |
 | `default` | rTorrent, Pikkumies, rootless Docker | none |
 | `openclaw` | Pikkumies, rootless Docker, OpenClaw | rTorrent |
-| `storagebox` | Pikkumies, rootless Docker, rclone, Copyparty | rTorrent |
+| `storagebox` | Pikkumies, rclone, Copyparty | rTorrent, rootless Docker (#270) |
 
 Omitted apps retain their current defaults. No qBittorrent, Deluge or
 Transmission enable marker is added by these profiles. PMSS knows apps and

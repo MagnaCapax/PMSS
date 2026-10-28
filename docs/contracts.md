@@ -1551,7 +1551,7 @@ This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
   omitted option selects `default`, preserving seedbox defaults.
 - `default`: rTorrent on, Pikkumies preinstall on, rootless Docker on.
   `openclaw`: rTorrent off, Pikkumies and OpenClaw preinstall on, Docker on.
-  `storagebox`: rTorrent off, Pikkumies and Docker on, rclone and Copyparty
+  `storagebox`: rTorrent and Docker off (#270), Pikkumies on, rclone and Copyparty
   enable markers on. Other apps retain their existing defaults; no torrent
   client is enabled by the storagebox profile.
 - `appSwitch.php` supplies config-store defaults to the existing user-config

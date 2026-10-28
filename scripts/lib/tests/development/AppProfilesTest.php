@@ -51,8 +51,8 @@ final class AppProfilesTest extends TestCase
         $result = $this->applyProfile('storagebox');
         $this->assertSame([], $result['starts']);
         $this->assertSame(['Queue Pikkumies preinstall'], array_column($result['queues'], 0));
-        // Docker on equals the policy default, so nothing is persisted and the store keeps meaning an explicit choice.
-        $this->assertFalse(isset($result['config']['dockerEnabled']));
+        // Storage boxes have no use for Docker (#270); the profile is the provisioner's explicit override (#309).
+        $this->assertSame('false', $result['config']['dockerEnabled'] ?? null);
         $this->assertSame(['.copypartyEnable' => '', '.rcloneEnable' => '', '.rtorrentDisable' => "disabled\n"], $result['markers']);
     }
 
