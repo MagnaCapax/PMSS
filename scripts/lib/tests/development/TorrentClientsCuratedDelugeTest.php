@@ -88,9 +88,8 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
                     $root.'/clients/deluge/'.$entry['version'], ['install' => static function () use (&$calls): void { $calls++; }]));
             }
             $this->assertSame(0, $calls);
-            $results = \pmssTorrentClientsStoreConverge($this->entries(), ['root' => $root.'/clients',
-                'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
-                'size' => static function (): int { return 0; }, 'log' => static function (): void {}]);
+            $results = \pmssTorrentClientsStoreConverge($this->entries(), ['root' => $root.'/clients']
+                + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
             $this->assertSame(array_fill_keys(['deluge/2.0.5', 'deluge/2.1.1', 'deluge/2.2.0'], 'failed'), $results);
             // Uninstalled versions have no customer selection; launchers retain the system command.
             $this->assertSame(null, \pmssTorrentClientResolve($root.'/customer', 'deluge', $root.'/missing.json', $root.'/clients'));

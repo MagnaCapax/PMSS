@@ -25,17 +25,15 @@ final class TorrentClientsTransmissionWebTest extends TestCase
                 $events[] = 'download';
                 return file_put_contents($path, 'archive') === 7;
             },
-            'list' => static function () use (&$events): array {
-                $events[] = 'list';
-                return [['path' => 'public_html/', 'type' => 'd'], ['path' => 'public_html/index.html', 'type' => '-']];
-            },
             'extract' => static function (string $archive, string $stage) use (&$events): bool {
                 $events[] = 'extract';
                 mkdir($stage.'/public_html', 0700);
                 return file_put_contents($stage.'/public_html/index.html', 'web') === 3;
             },
             'log' => static function (string $line) use (&$events): void { $events[] = $line; },
-        ];
+        ] + self::pmssMakeCallbacks(['list' => [
+            ['path' => 'public_html/', 'type' => 'd'], ['path' => 'public_html/index.html', 'type' => '-'],
+        ]], $events);
     }
 
     public function testExistingVerifiedBinaryReceivesWebThenSkipsCurrentPin(): void
@@ -83,10 +81,8 @@ final class TorrentClientsTransmissionWebTest extends TestCase
         $events = [];
         $this->assertSame(['transmission/4.1.3' => 'installed'], \pmssTorrentClientsStoreConverge([$entry], [
             'root' => $root, 'web' => $this->ops($events),
-            'free' => static function (): int { return 10 * 1024 * 1024 * 1024; },
-            'size' => static function (): int { return 0; },
             'install' => static function ($entry, $binary): bool { return file_put_contents($binary, 'daemon') === 6; },
-        ]));
+        ] + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0])));
         $this->assertSame(['download', 'list', 'extract'], $events);
         $this->assertSame('web', file_get_contents($dir.'/public_html/index.html'));
     }
@@ -99,10 +95,9 @@ final class TorrentClientsTransmissionWebTest extends TestCase
             file_put_contents($dir.'/public_html/index.html', 'old web');
             $events = [];
             $ops = $this->ops($events);
-            if ($case === 'traversal') $ops['list'] = static function (): array { return [['path' => 'public_html/../x', 'type' => '-']]; };
+            if ($case === 'traversal') $ops = self::pmssMakeCallbacks(['list' => [['path' => 'public_html/../x', 'type' => '-']]]) + $ops;
             if ($case === 'checksum') $entry['web']['sha256'] = str_repeat('0', 64);
-            if ($case === 'download') $ops['download'] = static function (): bool { return false; };
-            if ($case === 'extract') $ops['extract'] = static function (): bool { return false; };
+            if ($case === 'download' || $case === 'extract') $ops = self::pmssMakeCallbacks([$case => false]) + $ops;
             if ($case === 'exception') $ops['list'] = static function (): array { throw new \RuntimeException('private error'); };
             if (in_array($case, ['symlink', 'hardlink'], true)) {
                 $extract = $ops['extract'];

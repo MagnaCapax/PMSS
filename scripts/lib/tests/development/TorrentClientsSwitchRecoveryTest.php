@@ -67,9 +67,9 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                 $events = [];
                 $unexpected = static function (): void { throw new \RuntimeException('Backup failure changed the client'); };
                 $ops = ['versions' => ['4.2.0' => ['kind' => $client === 'deluge' ? 'venv' : 'static', 'rpcUnixSocket' => true]],
-                    'backup' => static function () use (&$events, $snapshot) { $events[] = 'backup'; return $snapshot; },
                     'stop' => $unexpected, 'repoint' => $unexpected, 'start' => $unexpected,
-                ] + self::pmssMakeCallbacks(['resolve' => '/fixture/binary']);
+                ] + self::pmssMakeCallbacks(['resolve' => '/fixture/binary'])
+                    + self::pmssMakeCallbacks(['backup' => $snapshot], $events);
                 $result = $this->apply($home, $client, '4.2.0', $ops);
                 $message = 'Could not back up the current configuration: '
                     .(is_array($snapshot) ? 'Not enough free space' : 'Backup failed').'. Nothing was changed.';

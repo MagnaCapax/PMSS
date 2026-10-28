@@ -8,9 +8,7 @@ final class TorrentClientsIdentityTest extends TestCase
 {
     public function testDirectAccountBinBuildRetainsUidNamespaceAndExecutableChecks(): void
     {
-        $ops = [
-            'account' => static function (): array { return ['uid' => 1000]; },
-            'pids' => static function (): array { return [101, 102, 103, 104]; },
+        $ops = self::pmssMakeCallbacks(['account' => ['uid' => 1000], 'pids' => [101, 102, 103, 104]]) + [
             'namespace' => static function ($pid): string { return $pid === 102 ? 'mnt:[foreign]' : 'mnt:[own]'; },
             'read' => static function ($path): string {
                 return substr($path, -5) === '/comm' ? 'qbittorrent-nox'
@@ -37,9 +35,7 @@ final class TorrentClientsIdentityTest extends TestCase
             103 => '/home/.pmss/clients/qbittorrent/5.1.0/qbittorrent-nox',
             104 => '/usr/bin/qbittorrent-nox',
         ];
-        $ops = [
-            'account' => static function (): array { return ['uid' => 1000]; },
-            'pids' => static function (): array { return [101, 102, 103, 104]; },
+        $ops = self::pmssMakeCallbacks(['account' => ['uid' => 1000], 'pids' => [101, 102, 103, 104]]) + [
             'read' => static function (string $path) use ($root) {
                 return @file_get_contents(str_replace('/proc/', $root.'/', $path));
             },
@@ -66,13 +62,10 @@ final class TorrentClientsIdentityTest extends TestCase
                 'status' => "Uid:\t1000 1000 1000 1000\n"]);
         }
         $exe = [201 => $versioned, 202 => $tenantExe];
-        $ops = [
-            'account' => static function (): array { return ['uid' => 1000]; },
-            'pids' => static function (): array { return [201, 202]; },
+        $ops = self::pmssMakeCallbacks(['account' => ['uid' => 1000], 'pids' => [201, 202], 'namespace' => 'mnt:[1]']) + [
             'read' => static function (string $path) use ($root) {
                 return @file_get_contents(str_replace('/proc/', $root.'/proc/', $path));
             },
-            'namespace' => static function (): string { return 'mnt:[1]'; },
             'exe' => static function (int $pid) use ($exe): string { return $exe[$pid]; },
             'installRoots' => [$installBin.'/qbittorrent-nox'],
             'accountRoots' => [$root.'/home/qafix081/bin/qbittorrent/'],
@@ -82,10 +75,7 @@ final class TorrentClientsIdentityTest extends TestCase
 
     public function testUidAndNameMismatchAreExcluded(): void
     {
-        $ops = [
-            'account' => static function (): array { return ['uid' => 1000]; },
-            'pids' => static function (): array { return [1, 2]; },
-            'namespace' => static function (): string { return 'mnt:[1]'; },
+        $ops = self::pmssMakeCallbacks(['account' => ['uid' => 1000], 'pids' => [1, 2], 'namespace' => 'mnt:[1]']) + [
             'read' => static function (string $path): string {
                 if (substr($path, -5) === '/comm') return strpos($path, '/2/') !== false ? 'other' : 'rtorrent';
                 return "Uid:\t2000 2000 2000 2000\n";

@@ -71,12 +71,11 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
             $this->assertSame([], \pmssConfigureTorrentClientVersionsRead($root.'/public/catalog.json'));
             // The injected installer writes fixture bytes only; no network or daemon is used.
             $result = \pmssTorrentClientsStoreConverge($entries, [
-                'root' => $store, 'free' => static function (): int { return 10 * 1024 ** 3; },
-                'size' => static function (): int { return 0; },
+                'root' => $store,
                 'install' => static function (array $entry, string $binary): bool {
                     return basename($binary) === 'qbittorrent-nox' && file_put_contents($binary, 'fixture') === 7;
-                }, 'log' => static function (): void {},
-            ]);
+                },
+            ] + self::pmssMakeCallbacks(['free' => 10 * 1024 ** 3, 'size' => 0, 'log' => null]));
             $this->assertSame(array_fill(0, 16, 'installed'), array_values($result));
             $this->assertFalse(file_exists($store.'/qbittorrent/default'));
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($entries, $root.'/public/catalog.json'));
@@ -105,11 +104,9 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
         file_put_contents($root.'/qbittorrent/old/qbittorrent-nox', 'old');
         foreach ([null, 3 * 1024 ** 3, 3 * 1024 ** 3 + 10] as $free) {
             $result = \pmssTorrentClientsStoreConverge($this->entries(), [
-                'root' => $root, 'free' => static function () use ($free) { return $free; },
-                'size' => static function (): int { return 10; },
+                'root' => $root,
                 'install' => static function (): bool { throw new \RuntimeException('must not install'); },
-                'log' => static function (): void {},
-            ]);
+            ] + self::pmssMakeCallbacks(['free' => $free, 'size' => 10, 'log' => null]));
             $this->assertSame(array_fill(0, 16, 'skipped-space'), array_values($result));
             $this->assertSame('old', file_get_contents($root.'/qbittorrent/old/qbittorrent-nox'));
         }
@@ -120,8 +117,8 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
         foreach (['load', 'store', 'project'] as $stage) {
             foreach ([\RuntimeException::class, \Error::class] as $type) {
                 $events = [];
-                $ops = ['load' => function (): array { return $this->entries(); },
-                    'store' => static function (): void {}, 'project' => static function (): bool { return true; }];
+                $ops = ['load' => function (): array { return $this->entries(); }]
+                    + self::pmssMakeCallbacks(['store' => null, 'project' => true]);
                 $ops[$stage] = static function () use ($stage, $type, &$events): void {
                     $events[] = $stage;
                     throw new $type('curated fixture failure');

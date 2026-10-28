@@ -54,12 +54,11 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $projection));
             $this->assertSame([], \pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent'));
             $this->assertSame(['rtorrent/0.9.8-r16' => 'installed'], \pmssTorrentClientsStoreConverge([$entry], [
-                'root' => $store, 'free' => static function (): int { return 10 * 1024 ** 3; },
-                'size' => static function (): int { return 0; },
+                'root' => $store,
                 'install' => static function ($row, $binary) use ($bytes): bool {
                     return file_put_contents($binary, $bytes) === strlen($bytes);
-                }, 'log' => static function (): void {},
-            ]));
+                },
+            ] + self::pmssMakeCallbacks(['free' => 10 * 1024 ** 3, 'size' => 0, 'log' => null])));
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $projection));
             $this->assertSame(['0.9.8-r16'], array_keys(\pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent')));
             $home = $root.'/t';

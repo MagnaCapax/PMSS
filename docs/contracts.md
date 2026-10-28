@@ -1617,6 +1617,11 @@ This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
   panel routes, public names, DNS records or certificates.
 
 ## Notes for Agentic Coding
+- Fixed-result test operations use `TestCase::pmssMakeCallbacks()`; its optional
+  event array records the operation key on each call. Captured values are fixed
+  when the map is built, including `false`, `null`, and empty arrays. Keep
+  argument-dependent, stateful, throwing, and differently named event callbacks
+  explicit. Merge overrides on the left so their callbacks retain precedence.
 - Prefer high-level helpers (`runStep`, `pmssRefreshRepositories`, `pmssApplyDpkgSelections`, `pmssUpdateUserEnvironment`) to keep logs/profile consistent.
 - Honor environment overrides in tests (`PMSS_*` flags) to avoid mutating the real system.
 - Treat vendor/third-party code as read-only unless a narrower rule explicitly allows the change. First-party `etc/skel/www` files are editable normally.

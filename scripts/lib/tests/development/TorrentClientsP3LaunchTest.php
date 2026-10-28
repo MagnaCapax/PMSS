@@ -89,9 +89,9 @@ final class TorrentClientsP3LaunchTest extends TestCase
         $command = '';
         $probes = 0;
         $ops = ['storeRoot' => $store, 'projection' => $projection,
-            'native' => static function (): array { return []; },
             'probe' => static function () use (&$probes): bool { return ++$probes > 1; },
-            'run' => static function (string $shell) use (&$command): void { $command = $shell; }];
+            'run' => static function (string $shell) use (&$command): void { $command = $shell; }]
+            + self::pmssMakeCallbacks(['native' => []]);
         $this->assertTrue(\pmssTransmissionLaunch($home, $ops));
         $this->assertStringContainsString('nohup /usr/bin/setsid flock -n', $command);
         $this->assertStringContainsString('.pmss-launch.lock', $command);
@@ -123,10 +123,9 @@ final class TorrentClientsP3LaunchTest extends TestCase
             $probes = 0;
             $this->assertTrue(\pmssTransmissionLaunch($home, [
                 'storeRoot' => $store, 'projection' => $projection,
-                'native' => static function (): array { return []; },
                 'probe' => static function () use (&$probes): bool { return ++$probes > 1; },
                 'run' => static function (string $shell) use (&$command): void { $command = $shell; },
-            ]));
+            ] + self::pmssMakeCallbacks(['native' => []])));
             if ($case === 'directory') {
                 $this->assertStringContainsString(escapeshellarg('TRANSMISSION_WEB_HOME='.$web).' '.escapeshellarg($binary), $command);
             } else $this->assertStringNotContainsString('TRANSMISSION_WEB_HOME=', $command);

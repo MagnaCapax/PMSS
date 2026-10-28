@@ -11,8 +11,7 @@ final class TorrentClientsHookTest extends TestCase
         $this->assertTrue(include_once $path);
         $events = [];
         $catalog = [['client' => 'rtorrent', 'version' => '0.16.25']];
-        \pmssTorrentClientStoreRun([
-            'load' => static function () use (&$events, $catalog): array { $events[] = 'load'; return $catalog; },
+        \pmssTorrentClientStoreRun(self::pmssMakeCallbacks(['load' => $catalog], $events) + [
             'store' => static function (array $entries) use (&$events): void { $events[] = ['store', $entries]; },
             'project' => static function (array $entries) use (&$events): bool { $events[] = ['project', $entries]; return true; },
         ]);
@@ -34,12 +33,10 @@ final class TorrentClientsHookTest extends TestCase
             ];
             $result = \pmssTorrentClientsStoreConverge([$entry], [
                 'root' => $root.'/store',
-                'free' => static function (): int { return 10 * 1024 ** 3; },
-                'size' => static function (): int { return 0; },
                 'install' => static function (array $row, string $binary) use (&$events): bool {
                     $events[] = 'download'; return file_put_contents($binary, 'fixture') === 7;
                 },
-            ]);
+            ] + self::pmssMakeCallbacks(['free' => 10 * 1024 ** 3, 'size' => 0]));
             $this->assertSame(['rtorrent/0.9.9' => 'installed'], $result);
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $root.'/public/catalog.json'));
             $this->assertSame('0.9.9', \pmssTorrentClientsProjectionVersionsRead($root.'/public/catalog.json')[0]['version']);

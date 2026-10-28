@@ -11,11 +11,8 @@ final class TorrentClientsP6IdentityTest extends TestCase
         $scripts = [101 => '/home/.pmss/clients/deluge/1.3.15/bin/deluged',
             102 => '/home/.pmss/clients/deluge/2.1.1/bin/deluged',
             103 => '/home/.pmss/clients/deluge/2.1.1/bin/deluge-web'];
-        $ops = [
-            'account' => static function (): array { return ['uid' => 1000]; },
-            'pids' => static function (): array { return [101, 102, 103]; },
-            'namespace' => static function (): string { return 'mnt:[1]'; },
-            'exe' => static function (): string { return '/usr/bin/python3.9'; },
+        $ops = self::pmssMakeCallbacks(['account' => ['uid' => 1000], 'pids' => [101, 102, 103],
+            'namespace' => 'mnt:[1]', 'exe' => '/usr/bin/python3.9']) + [
             'read' => static function (string $path) use ($scripts): string {
                 preg_match('~/proc/([0-9]+)/([^/]+)$~', $path, $match);
                 $pid = (int) ($match[1] ?? 0); $leaf = $match[2] ?? '';
@@ -46,10 +43,8 @@ final class TorrentClientsP6IdentityTest extends TestCase
         $exes[106] = false;
         $exes[107] = '/usr/bin/deluge-web';
         $signals = [];
-        $ops = [
-            'account' => static function () use ($home): array { return ['uid' => 1000, 'home' => $home, 'email' => 't@localhost']; },
-            'pids' => static function () use ($scripts): array { return array_keys($scripts); },
-            'namespace' => static function (): string { return 'mnt:[1]'; },
+        $ops = self::pmssMakeCallbacks(['account' => ['uid' => 1000, 'home' => $home, 'email' => 't@localhost'],
+            'pids' => array_keys($scripts), 'namespace' => 'mnt:[1]']) + [
             'exe' => static function (int $pid) use ($exes) { return $exes[$pid]; },
             'read' => static function (string $path) use ($scripts) {
                 preg_match('~/proc/([0-9]+)/([^/]+)$~', $path, $match);
