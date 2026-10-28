@@ -6,6 +6,15 @@ require_once dirname(__DIR__, 2).'/storageBenchmark.php';
 
 class StorageBenchmarkHomeDeviceTest extends TestCase
 {
+    /** Inspect fixture sysfs only; device readability, canonicalization and size never probe the host. */
+    private function deviceResolve(string $sysfs, string $path, int $size = 1048576, ?callable $deviceCheck = null): array
+    {
+        return \storageBenchmarkHomeDeviceResolve('/home', $path, $sysfs,
+            $deviceCheck ?? static function (): bool { return true; },
+            static function (string $path): string { return $path; },
+            static function () use ($size): int { return $size; });
+    }
+
     public function testOptionAndUsage(): void
     {
         $parsed = \pmssParseCliTokens(['storageBenchmark.php', '--home-device'], []);
@@ -18,25 +27,16 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
     public function testPlainDiskAndMdMetadata(): void
     {
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
-        mkdir($sysfs.'/sda/queue', 0755, true);
-        file_put_contents($sysfs.'/sda/queue/rotational', "1\n");
-        mkdir($sysfs.'/md0/queue', 0755, true);
-        mkdir($sysfs.'/md0/md', 0755, true);
-        file_put_contents($sysfs.'/md0/queue/rotational', "0\n");
-        file_put_contents($sysfs.'/md0/md/array_state', "clean\n");
-        file_put_contents($sysfs.'/md0/md/level', "raid10\n");
-        file_put_contents($sysfs.'/md0/md/degraded', "1\n");
-        $check = static function (): bool { return true; };
-        $canonical = static function (string $path): string { return $path; };
-        $size = static function (): int { return 1024 * 1024 * 1024; };
+        $this->pmssWriteFiles($sysfs, ['sda/queue/rotational' => "1\n", 'md0/queue/rotational' => "0\n",
+            'md0/md/array_state' => "clean\n", 'md0/md/level' => "raid10\n", 'md0/md/degraded' => "1\n"]);
 
-        $disk = \storageBenchmarkHomeDeviceResolve('/home', '/dev/sda', $sysfs, $check, $canonical, $size);
+        $disk = $this->deviceResolve($sysfs, '/dev/sda', 1024 * 1024 * 1024);
         $this->assertSame(true, $disk['ok']);
         $this->assertSame(1, $disk['rota']);
         $this->assertSame(1024 * 1024 * 1024, $disk['size']);
         $this->assertFalse(isset($disk['md']));
 
-        $md = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+        $md = $this->deviceResolve($sysfs, '/dev/md0', 1024 * 1024 * 1024);
         $this->assertSame(true, $md['ok']);
         $this->assertSame(0, $md['rota']);
         $this->assertSame(['array_state' => 'clean', 'degraded' => 1, 'level' => 'raid10'], $md['md']);
@@ -45,19 +45,15 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
     public function testMissingMdDegradedOnlyAllowedWithoutRedundancy(): void
     {
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
-        mkdir($sysfs.'/md0/md', 0755, true);
-        file_put_contents($sysfs.'/md0/md/array_state', "clean\n");
-        $check = function (): bool { return true; };
-        $canonical = function (string $path): string { return $path; };
-        $size = function (): int { return 1024 * 1024; };
+        $this->pmssWriteFiles($sysfs, ['md0/md/array_state' => "clean\n"]);
 
         file_put_contents($sysfs.'/md0/md/level', "raid0\n");
-        $raid0 = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+        $raid0 = $this->deviceResolve($sysfs, '/dev/md0');
         $this->assertSame(true, $raid0['ok']);
         $this->assertSame(['array_state' => 'clean', 'degraded' => 0, 'level' => 'raid0'], $raid0['md']);
 
         file_put_contents($sysfs.'/md0/md/level', "raid10\n");
-        $raid10 = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+        $raid10 = $this->deviceResolve($sysfs, '/dev/md0');
         $this->assertSame(false, $raid10['ok']);
         $this->assertSame('unable to read md array status', $raid10['error']);
     }
@@ -65,22 +61,17 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
     public function testMdDegradedCounterRejectsMalformedAndOverflowedValues(): void
     {
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
-        mkdir($sysfs.'/md0/md', 0755, true);
-        file_put_contents($sysfs.'/md0/md/array_state', "clean\n");
-        file_put_contents($sysfs.'/md0/md/level', "raid10\n");
-        $check = static function (): bool { return true; };
-        $canonical = static function (string $path): string { return $path; };
-        $size = static function (): int { return 1024 * 1024; };
+        $this->pmssWriteFiles($sysfs, ['md0/md/array_state' => "clean\n", 'md0/md/level' => "raid10\n"]);
 
         foreach (['', '-1', '1.0', '1x', (string) PHP_INT_MAX.'0'] as $counter) {
             file_put_contents($sysfs.'/md0/md/degraded', $counter."\n");
-            $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+            $result = $this->deviceResolve($sysfs, '/dev/md0');
             $this->assertSame(false, $result['ok']);
             $this->assertSame('unable to read md array status', $result['error']);
         }
 
         file_put_contents($sysfs.'/md0/md/degraded', "0001\n");
-        $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+        $result = $this->deviceResolve($sysfs, '/dev/md0');
         $this->assertSame(true, $result['ok']);
         $this->assertSame(1, $result['md']['degraded']);
     }
@@ -88,13 +79,8 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
     public function testSysfsNulBytesCannotBecomeValidMetadata(): void
     {
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
-        mkdir($sysfs.'/md0/queue', 0755, true);
-        mkdir($sysfs.'/md0/md', 0755, true);
         $fields = ['queue/rotational' => '0', 'md/array_state' => 'clean',
             'md/level' => 'raid10', 'md/degraded' => '0'];
-        $check = static function (): bool { return true; };
-        $canonical = static function (string $path): string { return $path; };
-        $size = static function (): int { return 1048576; };
         $base = ['device' => '/dev/md0', 'rota' => 0, 'size' => 1048576, 'mode' => 'home-device'];
         $metadata = ['array_state' => 'clean', 'degraded' => 0, 'level' => 'raid10'];
 
@@ -102,10 +88,9 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         foreach ($fields as $field => $value) {
             foreach (["\0".$value, $value."\0", substr($value, 0, 1)."\0".substr($value, 1),
                 " \t\0".$value."\0\r\n", " \t".$value."\r\n"] as $index => $raw) {
-                foreach ($fields as $path => $normal) {
-                    file_put_contents($sysfs.'/md0/'.$path, $path === $field ? $raw : $normal."\n");
-                }
-                $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+                $this->pmssWriteFiles($sysfs.'/md0', array_replace(
+                    array_map(static function (string $normal): string { return $normal."\n"; }, $fields), [$field => $raw]));
+                $result = $this->deviceResolve($sysfs, '/dev/md0');
                 $expected = $base;
                 if ($index === 4) {
                     $expected += ['md' => $metadata, 'ok' => true];
@@ -124,7 +109,7 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         foreach (['raid0', 'linear'] as $level) {
             foreach (["\0".$level, $level."\0", " \0".$level."\0\n", $level."\n"] as $index => $raw) {
                 file_put_contents($sysfs.'/md0/md/level', $raw);
-                $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+                $result = $this->deviceResolve($sysfs, '/dev/md0');
                 $expected = $base + ($index === 3
                     ? ['md' => array_replace($metadata, ['level' => $level]), 'ok' => true]
                     : ['ok' => false, 'error' => 'unable to read md array status']);
@@ -139,14 +124,12 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $fixture = $sysfs.'/regular';
         file_put_contents($fixture, 'fixture');
         $check = static function () use ($fixture): bool { return is_readable($fixture) && filetype($fixture) === 'block'; };
-        $canonical = static function (string $path): string { return $path; };
-        $size = static function (): int { return 1024 * 1024; };
         foreach (['overlay', '/dev/../etc/passwd', "/dev/sda\nother", '/dev/sda'.chr(0).'x'] as $unsafe) {
-            $result = \storageBenchmarkHomeDeviceResolve('/home', $unsafe, $sysfs, $check, $canonical, $size);
+            $result = $this->deviceResolve($sysfs, $unsafe, 1048576, $check);
             $this->assertSame(false, $result['ok']);
             $this->assertSame('unsafe or unavailable mount device', $result['error']);
         }
-        $result = \storageBenchmarkHomeDeviceResolve('/home', '/dev/sda', $sysfs, $check, $canonical, $size);
+        $result = $this->deviceResolve($sysfs, '/dev/sda', 1048576, $check);
         $this->assertSame(false, $result['ok']);
         $this->assertSame('mount device is not a readable block device', $result['error']);
     }
