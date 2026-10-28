@@ -116,7 +116,7 @@ function unlink($path) {
 }
 function exec($command, &$output, &$status) {
     $step = strpos($command, '--clear ') !== false ? 'clear' : 'set';
-    $GLOBALS['immutable'][] = $step;
+    $GLOBALS['immutableSteps'][] = $step;
     $status = $GLOBALS['fault'] === 'immutable-'.$step ? 1 : 0;
 }
 function proc_open($command, $descriptors, &$pipes) {
@@ -140,7 +140,7 @@ PHP;
             $script .= '$GLOBALS['.var_export($key, true).'] = '.var_export($value, true).';';
         }
         $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/lighttpd/userFileWrite.php'), true).';';
-        foreach (['rootStage.php', 'rootStagePublish.php', 'userFileMetadata.php', 'userFileSerialized.php'] as $module) {
+        foreach (['rootStage.php', 'rootStagePublish.php', 'userFilePath.php', 'userFileMetadata.php', 'userFileSerialized.php'] as $module) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/'.$module, 'RootStageFailureFixture');
         }
         $script .= 'ini_set("error_log", '.var_export($root.'/errors.log', true).');';
@@ -160,7 +160,7 @@ if ($GLOBALS['fault'] === 'metadata') {
 echo json_encode(['ok' => $ok, 'failure' => $failure, 'path' => $GLOBALS['path'], 'callbacks' => $callbacks,
     'content' => \file_get_contents($GLOBALS['path']),
     'movedContent' => is_file($GLOBALS['parent'].'-moved/target') ? \file_get_contents($GLOBALS['parent'].'-moved/target') : null,
-    'stages' => glob($GLOBALS['root'].'/.pmss-root-stage-*'), 'immutable' => $GLOBALS['immutable'] ?? [],
+    'stages' => glob($GLOBALS['root'].'/.pmss-root-stage-*'), 'immutable' => $GLOBALS['immutableSteps'] ?? [],
     'descriptor' => $GLOBALS['descriptor'] ?? null, 'captureOpen' => is_resource($GLOBALS['capture'] ?? null),
     'log' => is_file($GLOBALS['root'].'/errors.log') ? \file_get_contents($GLOBALS['root'].'/errors.log') : '']);
 PHP;
