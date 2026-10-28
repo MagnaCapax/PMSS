@@ -98,8 +98,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $this->assertFalse(file_exists($this->tempDir.'/ignored.jsonl'));
         $detail = "tab\t newline\n control\x01 backslash\\ quote\"";
         $args = [$log, 'fixture', 'info', 'check', 'fixture-id', '0', '0', $detail, 'fixture'];
-        $result = $this->pmssExecShellCommand('php '.escapeshellarg($this->launcherRoot.'/development/lib/codex-events.php').' '
-            .\pmssCommandArgvShellQuote($args));
+        $result = $this->pmssExecArgvCommand(array_merge(['php', $this->launcherRoot.'/development/lib/codex-events.php'], $args));
         $this->assertSame(0, $result['rc'], $result['output']);
         $rows = file($log, FILE_IGNORE_NEW_LINES);
         $this->assertSame(3, count($rows));
@@ -130,8 +129,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $log = $this->tempDir.'/invalid.jsonl';
         foreach (['failed', '-1', '0,null'] as $invalid) {
             $args = [$log, 'fixture', 'info', 'check', 'fixture-id', $invalid, '0', 'fixture', 'fixture'];
-            $result = $this->pmssExecShellCommand('php '.escapeshellarg($this->launcherRoot.'/development/lib/codex-events.php').' '
-                .\pmssCommandArgvShellQuote($args));
+            $result = $this->pmssExecArgvCommand(array_merge(['php', $this->launcherRoot.'/development/lib/codex-events.php'], $args));
             $this->assertSame(2, $result['rc'], $result['output']);
         }
         $this->assertFalse(file_exists($log));

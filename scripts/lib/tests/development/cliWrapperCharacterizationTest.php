@@ -42,7 +42,7 @@ final class CliWrapperCharacterizationTest extends TestCase
                 .'echo json_encode(array_slice($_SERVER["argv"], 1)); fwrite(STDERR, "child stderr\n"); exit(23);');
             $wrapper = $this->pmssWriteFile($root.'/wrapper.php', "<?php require_once {$runtime};\n"
                 .'pmssRequireCliEntrypointScript(__DIR__, '.var_export("target ' quoted.php", true).', false, ["--appended"]); echo "unexpected return";');
-            $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($wrapper).' '.implode(' ', array_map('escapeshellarg', $args));
+            $command = $this->pmssBuildArgvCommand(array_merge([PHP_BINARY, $wrapper], $args));
             ['result' => $result, 'stderrPath' => $stderrPath] = $this->pmssExecShellCommandWithTempStderr($command);
             $this->assertSame(23, $result['rc']);
             $this->assertSame(array_merge($args, ['--appended']), $this->pmssDecodeJsonArray($result['output']));

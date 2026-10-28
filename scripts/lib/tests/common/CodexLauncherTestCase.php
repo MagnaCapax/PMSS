@@ -61,7 +61,7 @@ PHP;
     {
         return $this->pmssExecShellCommand(
             'timeout --kill-after=5s 20s bash '.escapeshellarg($this->launcherRoot.'/development/'.$entry).' '
-            .\pmssCommandArgvShellQuote($args).' < /dev/null',
+            .$this->pmssBuildArgvCommand($args).' < /dev/null',
             array_replace($this->launcherEnv, $env)
         );
     }

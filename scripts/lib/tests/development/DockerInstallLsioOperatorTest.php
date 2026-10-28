@@ -75,10 +75,8 @@ final class DockerInstallLsioOperatorTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-lsio-operator-refuse-');
         foreach ([$home, '/'] as $candidate) {
-            $command = 'env '.implode(' ', array_map('escapeshellarg', [
-                'HOME='.$candidate, 'PATH=/usr/bin:/bin', PHP_BINARY, self::ENTRYPOINT, 'mariadb',
-            ])).' 2>&1';
-            $result = $this->pmssExecShellCommand($command, [], '');
+            $result = $this->pmssExecArgvCommand([PHP_BINARY, self::ENTRYPOINT, 'mariadb'],
+                ['HOME' => $candidate, 'PATH' => '/usr/bin:/bin']);
             $this->assertSame(1, $result['rc'], $result['output']);
             $this->assertStringContainsString("Set HOME to the account's home directory", $result['output']);
         }

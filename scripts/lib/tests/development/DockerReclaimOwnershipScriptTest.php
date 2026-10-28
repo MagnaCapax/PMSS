@@ -47,23 +47,12 @@ BASH;
      */
     private function runHelper(array $args, array $env = []): array
     {
-        $pathValue = array_key_exists('PATH', $env)
-            ? $env['PATH']
-            : $this->fakeBinDir.':'.(getenv('PATH') !== false ? getenv('PATH') : '/usr/bin:/bin');
-        unset($env['PATH']);
-
-        $envPairs = [
-            'HOME='.$this->homeDir,
-            'PATH='.$pathValue,
-            'PMSS_TEST_DOCKER_LOG='.$this->dockerLog,
-        ];
-        foreach ($env as $key => $value) {
-            $envPairs[] = $key.'='.$value;
-        }
-
-        $command = 'env '.\pmssCommandArgvShellQuote(array_merge($envPairs, [$this->bashBin, $this->scriptPath], $args)).' 2>&1';
-
-        $result = $this->pmssExecShellCommand($command, [], '');
+        $environment = array_replace([
+            'HOME' => $this->homeDir,
+            'PATH' => $this->fakeBinDir.':'.(getenv('PATH') !== false ? getenv('PATH') : '/usr/bin:/bin'),
+            'PMSS_TEST_DOCKER_LOG' => $this->dockerLog,
+        ], $env);
+        $result = $this->pmssExecArgvCommand(array_merge([$this->bashBin, $this->scriptPath], $args), $environment);
         return [
             'rc' => $result['rc'],
             'output' => $result['output'],

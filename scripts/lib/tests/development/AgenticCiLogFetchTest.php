@@ -18,10 +18,8 @@ class AgenticCiLogFetchTest extends TestCase
         $harness = $this->pmssMakeTempDir('pmss-ci-harness-').'/run.sh';
         $this->pmssWriteExecutableFile($harness, "#!/usr/bin/env bash\nset -euo pipefail\n".$body."\n");
         $prefix = 'cd '.escapeshellarg($cwd).' && env -u TMP -u TMPDIR';
-        foreach ($environment as $key => $value) {
-            $prefix .= ' '.escapeshellarg($key.'='.$value);
-        }
-        return $this->pmssExecShellCommand($prefix.' bash '.escapeshellarg($harness));
+        return $this->pmssExecShellCommand($prefix.' '.$this->pmssBuildCommandEnvironmentPrefix($environment)
+            .$this->pmssBuildArgvCommand(['bash', $harness]));
     }
 
     private function zipFixture(string $root): string

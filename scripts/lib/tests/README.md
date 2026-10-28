@@ -26,3 +26,10 @@ Torrent-client store, launch, stopped-settings and throttle fixtures use
 arrays and null. Pass an event array only when calls must be recorded. Keep
 stateful, argument-dependent and throwing callbacks explicit; scalar options
 such as build versions and attempt budgets remain ordinary values.
+
+CLI fixtures use `TestCase::pmssExecArgvCommand()` for literal argument vectors
+with environment overrides and captured results. Compound or asynchronous shell
+fixtures use `pmssBuildArgvCommand()` for their literal portions; environment
+prefixes share `pmssBuildCommandEnvironmentPrefix()`. Keep redirections, working
+directories and environment removal at the caller. Run fixtures only on testing
+machines, never on the control host.

@@ -54,7 +54,7 @@ class CodexLaunchersTest extends CodexLauncherTestCase
             $args = ['timeout', '--kill-after=1s', '3s', 'bash', '-c',
                 'source "$1"; codex_invoke "$2" "$3"', '_',
                 $this->launcherRoot.'/development/lib/codex-exec.sh', $command, $promptFile];
-            $process = proc_open(\pmssCommandArgvShellQuote($args),
+            $process = proc_open($this->pmssBuildArgvCommand($args),
                 [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes,
                 $this->launcherRoot, $this->launcherEnv);
             $this->assertTrue(is_resource($process));
@@ -75,7 +75,7 @@ class CodexLaunchersTest extends CodexLauncherTestCase
         $promptFile = $this->tempDir.'/prompt.txt';
         file_put_contents($promptFile, 'interactive');
         foreach (['bash -c "test -t 0" ##PROMPT##', 'bash -c "test -t 0"'] as $command) {
-            $inner = \pmssCommandArgvShellQuote(['bash', '-c', 'source "$1"; codex_invoke "$2" "$3"', '_',
+            $inner = $this->pmssBuildArgvCommand(['bash', '-c', 'source "$1"; codex_invoke "$2" "$3"', '_',
                 $this->launcherRoot.'/development/lib/codex-exec.sh', $command, $promptFile]);
             $result = $this->pmssExecShellCommand('timeout --kill-after=1s 3s script -q -e -c '
                 .escapeshellarg($inner).' /dev/null < /dev/null', $this->launcherEnv);

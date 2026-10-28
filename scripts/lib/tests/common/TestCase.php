@@ -1079,6 +1079,20 @@ abstract class TestCase
         return (string) @shell_exec($stderrRedirect !== '' ? $command.' '.$stderrRedirect : $command);
     }
 
+    /** Quote a literal argument vector, retaining empty arguments and embedded newlines. */
+    protected function pmssBuildArgvCommand(array $arguments): string
+    {
+        return implode(' ', array_map(static function ($argument): string {
+            return escapeshellarg((string) $argument);
+        }, $arguments));
+    }
+
+    /** Run a literal argument vector through the shared environment and output handling. */
+    protected function pmssExecArgvCommand(array $arguments, array $environment = [], string $stderrRedirect = '2>&1'): array
+    {
+        return $this->pmssExecShellCommand($this->pmssBuildArgvCommand($arguments), $environment, $stderrRedirect);
+    }
+
     /** @return array{rc:int, output:string, lines:array<int, string>} */
     protected function pmssExecShellCommand(string $command, array $environment = [], string $stderrRedirect = '2>&1'): array
     {
@@ -1108,7 +1122,7 @@ abstract class TestCase
     protected function pmssCreateTarGzArchive(string $archive, string $root, array $members, string $options = '', string $stderrRedirect = ''): void
     {
         $result = $this->pmssExecShellCommand('tar -czf '.escapeshellarg($archive).$options
-            .' -C '.escapeshellarg($root).' '.implode(' ', array_map('escapeshellarg', $members)), [], $stderrRedirect);
+            .' -C '.escapeshellarg($root).' '.$this->pmssBuildArgvCommand($members), [], $stderrRedirect);
         $this->assertSame(0, $result['rc'], $result['output']);
     }
 
@@ -1221,7 +1235,7 @@ PHP;
     /** Keep inline PHP quoting identical for captured, timed and asynchronous fixtures. */
     protected function pmssBuildInlinePhpCommand(string $script): string
     {
-        return escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script);
+        return $this->pmssBuildArgvCommand([PHP_BINARY, '-r', $script]);
     }
 
     protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
@@ -1374,12 +1388,7 @@ PHP
     /** Build a PHP CLI command with safely escaped arguments. */
     private function pmssBuildPhpCommand(string $scriptPath, array $arguments = []): string
     {
-        $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
-        foreach ($arguments as $argument) {
-            $command .= ' '.escapeshellarg((string) $argument);
-        }
-
-        return $command;
+        return $this->pmssBuildArgvCommand(array_merge([PHP_BINARY, $scriptPath], $arguments));
     }
 
     protected function pmssRunPhpScript(string $scriptPath, array $arguments = [], array $environment = [], string $stderrRedirect = '2>&1'): string
@@ -1541,7 +1550,7 @@ PHP
         return $this->pmssRunInlinePhp($script, $environment, '2>&1');
     }
 
-    private function pmssBuildCommandEnvironmentPrefix(array $environment): string
+    protected function pmssBuildCommandEnvironmentPrefix(array $environment): string
     {
         $prefix = '';
         foreach ($environment as $key => $value) {

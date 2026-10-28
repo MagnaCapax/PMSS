@@ -97,27 +97,16 @@ BASH;
      */
     private function runHelper(array $args, array $env = [], string $entry = 'current'): array
     {
-        $pathValue = array_key_exists('PATH', $env)
-            ? $env['PATH']
-            : $this->fakeBinDir.':'.(getenv('PATH') !== false ? getenv('PATH') : '/usr/bin:/bin');
-        unset($env['PATH']);
-
-        $envPairs = [
-            'HOME='.$this->homeDir,
-            'PATH='.$pathValue,
-            'PMSS_TEST_DOCKER_LOG='.$this->dockerLog,
-            'PMSS_DOCKER_INSTALL_LSIO_SCRIPT='.$this->helperPath,
-            'PMSS_DOCKER_INSTALL_LSIO_WRAPPER='.$this->installerPath,
-        ];
-        foreach ($env as $key => $value) {
-            $envPairs[] = $key.'='.$value;
-        }
-
+        $environment = array_replace([
+            'HOME' => $this->homeDir,
+            'PATH' => $this->fakeBinDir.':'.(getenv('PATH') !== false ? getenv('PATH') : '/usr/bin:/bin'),
+            'PMSS_TEST_DOCKER_LOG' => $this->dockerLog,
+            'PMSS_DOCKER_INSTALL_LSIO_SCRIPT' => $this->helperPath,
+            'PMSS_DOCKER_INSTALL_LSIO_WRAPPER' => $this->installerPath,
+        ], $env);
         $entryScript = $entry === 'legacy' ? $this->legacyInstallerPath : $this->installerPath;
         $runner = $entry === 'legacy' ? $this->bashBin : $this->phpBin;
-        $command = 'env '.\pmssCommandArgvShellQuote(array_merge($envPairs, [$runner, $entryScript], $args)).' 2>&1';
-
-        $result = $this->pmssExecShellCommand($command, [], '');
+        $result = $this->pmssExecArgvCommand(array_merge([$runner, $entryScript], $args), $environment);
         return [
             'rc' => $result['rc'],
             'output' => $result['output'],

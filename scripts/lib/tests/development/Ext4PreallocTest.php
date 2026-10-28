@@ -108,7 +108,7 @@ class Ext4PreallocTest extends TestCase
 
     private function decision(string $current, string $stripe, string $kernel): string
     {
-        $args = implode(' ', array_map('escapeshellarg', [$current, $stripe, $kernel]));
+        $args = $this->pmssBuildArgvCommand([$current, $stripe, $kernel]);
         return $this->pmssRunShellHarness($this->preamble().'pmss_ext4_prealloc_decide '.$args."\n");
     }
 
