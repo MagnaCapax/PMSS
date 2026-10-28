@@ -142,6 +142,6 @@ class TrafficStorage
         $serialized = serialize($data);
         $targets = [[pmssTrafficStatsPath($user, $this->statsDir), 'root', 0600, false]];
         is_dir($this->homeDir.'/'.$targetUser) && array_unshift($targets, [$homeTrafficPath, $targetUser, 0640, true]);
-        pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($user): void { $this->log('[WARN] Failed to write traffic state for '.$user.' at '.$path); });
+        pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path, string $failure = '') use ($user): void { $this->log('[WARN] Failed to write traffic state for '.$user.' at '.$path.($failure === '' ? '' : ' ('.$failure.')')); });
     }
 }

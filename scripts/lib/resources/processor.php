@@ -87,7 +87,7 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         $homePath = $this->homeDir.'/'.$user;
         $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
         is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
-        if (!pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($logPrefix, $user): void { ($this->logger)($logPrefix."Failed to write resource stats for {$user} at {$path}"); })) {
+        if (!pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path, string $failure = '') use ($logPrefix, $user): void { ($this->logger)($logPrefix."Failed to write resource stats for {$user} at {$path}".($failure === '' ? '' : ' ('.$failure.')')); })) {
             return;
         }
         ($this->logger)($logPrefix."Resource stats for {$user} saved, month read bytes: {$data['io_read']['raw']['month']}");

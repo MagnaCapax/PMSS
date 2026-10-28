@@ -3,6 +3,7 @@
 
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../runtime/filesystem.php';
+require_once __DIR__.'/rootStagePublish.php';
 
 /** Resolve an account home independently of whether the caller already is that account. */
 function pmssAccountHomeIdentity(string $path): ?array
@@ -73,19 +74,22 @@ function pmssRootStagePublishCommand(string $parent, string $home, string $stage
     $leaf = escapeshellarg('./'.$name);
     return 'pin=$(stat -Lc %d:%i -- '.$dir.') || exit 1; '
         .'( cd -P -- '.$dir.' || exit 1; here=$(pwd -P); '
-        .'case "$here" in '.$homeArg.'|'.$homeArg.'/*) ;; *) exit 1;; esac; '
-        .'[ "$(stat -Lc %d:%i -- .)" = "$pin" ] || exit 1; '
-        .'[ "$(stat -c %d -- .)" = '.escapeshellarg((string) $stageDevice).' ] || exit 1; '
+        .'case "$here" in '.$homeArg.'|'.$homeArg.'/*) ;; *) echo "publish parent outside home" >&2; exit 1;; esac; '
+        .'[ "$(stat -Lc %d:%i -- .)" = "$pin" ] || { echo "publish parent changed" >&2; exit 1; }; '
+        .'[ "$(stat -c %d -- .)" = '.escapeshellarg((string) $stageDevice).' ] '
+        .'|| { echo "publish device mismatch" >&2; exit 1; }; '
         .'mv -T -- '.$source.' '.$leaf.' )';
 }
 
-/** Replace an authoritative or enforced file without writing inside the account tree as root. */
-function pmssRootStageFileWrite(string $path, string $content, string $group, int $mode, bool $immutable = false): bool
+/** Replace a managed file; optional failure text is for logs, never machine input. */
+function pmssRootStageFileWrite(string $path, string $content, string $group, int $mode, bool $immutable = false, ?string &$failure = null): bool
 {
+    $failure = 'stage=context rc=not-started';
     $context = pmssRootStageContext($path);
     if ($context === null || $mode < 0 || $mode > 0777 || !function_exists('posix_geteuid')
         || posix_geteuid() !== 0) return false;
     list($root, $home) = $context;
+    $failure = 'stage=parent rc=not-started';
     $parent = dirname($path);
     $parentStat = @lstat($parent);
     $rootStat = @lstat($root);
@@ -99,33 +103,45 @@ function pmssRootStageFileWrite(string $path, string $content, string $group, in
         $sweptRoots[$root] = true;
     }
     $stage = $root.'/.pmss-root-stage-'.bin2hex(random_bytes(12));
+    $failure = 'stage=mkdir rc=not-started';
     if (!@mkdir($stage, 0700)) return false;
     $stageFile = $stage.'/file';
     try {
+        $failure = 'stage=stage-check rc=not-started';
         $stageStat = @lstat($stage);
         if (!is_array($stageStat) || $stageStat['uid'] !== 0
             || ($stageStat['mode'] & 0177777) !== 0040700 || $stageStat['dev'] !== $parentStat['dev']) return false;
+        $failure = 'stage=open rc=not-started';
         $handle = @fopen($stageFile, 'x+b');
         if (!pmssStreamHandleIsOpen($handle)) return false;
         try {
+            $failure = 'stage=write rc=not-started';
             if (!pmssStreamWriteAll($handle, $content) || !@fflush($handle)) return false;
         } finally {
             @fclose($handle);
         }
-        if (!@chown($stageFile, 'root') || !@chgrp($stageFile, $group)
-            || !@chmod($stageFile, $mode)) return false;
+        // Keep short-circuit order, but distinguish each metadata failure.
+        $failure = 'stage=owner rc=not-started';
+        if (!@chown($stageFile, 'root')) return false;
+        $failure = 'stage=group rc=not-started';
+        if (!@chgrp($stageFile, $group)) return false;
+        $failure = 'stage=mode rc=not-started';
+        if (!@chmod($stageFile, $mode)) return false;
+        $failure = 'stage=single-regular rc=not-started';
         $published = @lstat($stageFile);
         if (!pmssUserFileStatIsSingleRegular($published) || $published['dev'] !== $parentStat['dev']) return false;
         $old = @lstat($path);
         $oldCleared = $immutable && is_array($old);
+        $failure = 'stage=immutable-clear rc=not-started';
         if ($oldCleared && !pmssRootStageImmutableSet($path, $old, false)) return false;
         $command = pmssRootStagePublishCommand($parent, $home, $stageFile, basename($path), (int) $published['dev']);
-        @exec($command.' 2>/dev/null', $output, $rc);
-        if ($rc !== 0) {
+        if (!pmssRootStagePublishRun($command, $failure)) {
             if ($oldCleared) pmssRootStageImmutableSet($path, $old, true);
             return false;
         }
-        if ($immutable) return pmssRootStageImmutableSet($path, $published, true);
+        $failure = 'stage=immutable-set rc=not-started';
+        if ($immutable && !pmssRootStageImmutableSet($path, $published, true)) return false;
+        $failure = '';
         return true;
     } finally {
         @unlink($stageFile);

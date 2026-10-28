@@ -124,6 +124,24 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssRootStageFileWrite()` keeps its boolean result and accepts an optional
+  sixth by-reference failure string. Success clears it; failure sets
+  `stage=<step> rc=<status>`. PHP/pre-launch failures use `not-started`; publish
+  failures include the shell exit status. Stages distinguish context, parent,
+  mkdir, stage-check, open, write/flush, owner, group, mode, single-regular,
+  immutable-clear, publish-stderr, publish-launch, publish and immutable-set.
+  Publication captures stderr through a private unlinked temporary descriptor;
+  only its first 300 bytes, with control characters replaced, reach the failure
+  string. File content is never captured; stdout is discarded. Treat the reason
+  as log text only.
+  Parent containment, pinned inode, same-device and single-link checks remain.
+  Pre-publication failure leaves the old file intact; an immutable-set failure
+  occurs after replacement, as before. Cleanup and immutable restoration on
+  refused publication retain their existing behavior.
+  Managed metadata logs append the reason. Serialized-target failure callbacks
+  retain the path as their first argument and receive an optional second reason
+  for root-stage failures; traffic/resource logs append it when present.
+
 - `pmssAccountPathRun()` preserves its boolean result and optional timeout flag.
   Its optional eighth argument receives failure text with a stage, child exit
   status (or `not-started`), and at most the first 300 bytes of stderr with

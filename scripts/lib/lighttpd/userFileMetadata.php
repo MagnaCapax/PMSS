@@ -43,11 +43,12 @@ function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?stri
             }
             return;
         }
+        $failure = '';
         if ($context !== null && $owner === 'root' && $entry['uid'] === 0 && ($entry['mode'] & 0170000) === 0100000) {
             $content = pmssReadRegularFileContents($path);
-            if (is_string($content) && pmssRootStageFileWrite($path, $content, $group ?: 'root', $mode)) return;
+            if (is_string($content) && pmssRootStageFileWrite($path, $content, $group ?: 'root', $mode, false, $failure)) return;
         }
-        error_log("Unable to update managed metadata: {$path}");
+        error_log("Unable to update managed metadata: {$path}".($failure === '' ? '' : ' ('.$failure.')'));
         return;
     }
     if (pmssUserFileOpenedPathIs($path)) {

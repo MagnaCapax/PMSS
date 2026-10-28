@@ -76,8 +76,9 @@ function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, c
         }
 
         list($path, $group, $mode, $immutable) = $normalized;
+        $failure = '';
         if (pmssManagedAccountHomePath($path)) {
-            $ok = pmssRootStageFileWrite($path, $serialized, $group, $mode, $immutable);
+            $ok = pmssRootStageFileWrite($path, $serialized, $group, $mode, $immutable, $failure);
         } else {
             $immutable && pmssManagedFileImmutableSet($path, false);
             try {
@@ -88,7 +89,7 @@ function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, c
         }
         if (!$ok) {
             $allWritesSucceeded = false;
-            $failureLogger($path);
+            $failureLogger($path, $failure);
         }
     }
     return $allWritesSucceeded;
