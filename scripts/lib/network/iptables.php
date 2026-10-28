@@ -57,6 +57,37 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
         return true;
     }
 
+    return networkIptablesRestore($data);
+}
+
+/**
+ * Replace the filter OUTPUT chain with the monitoring rules in one commit.
+ *
+ * The in-transaction flush also resets the per-UID counters trafficLog bills
+ * from (iptables-nft 1.8.7 on Debian 11 ignores -Z). --noflush keeps INPUT,
+ * FORWARD and the other tables as they are.
+ */
+function networkReplaceOutputRulesAtomically(array $commands): bool
+{
+    foreach ($commands as $command) {
+        // Only OUTPUT appends: anything else would reach another chain inside the *filter commit.
+        if (!is_string($command) || strpos($command, '-A OUTPUT ') !== 0 || !networkIptablesCommandSafe($command)) {
+            $summary = is_scalar($command) ? str_replace("\0", '<NUL>', (string) $command) : gettype($command);
+            networkIptablesLog('ERROR', "rejected unsafe iptables-restore rule: {$summary}");
+            return false;
+        }
+    }
+
+    return networkIptablesRestore(implode("\n", array_merge(['*filter', '-F OUTPUT'], array_values($commands), ['COMMIT']))."\n", true);
+}
+
+/**
+ * Feed a ruleset to iptables-restore through a private temp file. With $noflush
+ * only the chains named in $data change. -w 30 waits at most 30 seconds for the
+ * xtables lock (ADR 0035), so a held lock fails over to the caller's fallback.
+ */
+function networkIptablesRestore(string $data, bool $noflush = false): bool
+{
     $tmp = pmssCreatePrivateTempFile('pmss-iptables-');
     if ($tmp === null) {
         networkIptablesLog('ERROR', 'unable to allocate iptables-restore temp file');
@@ -68,7 +99,7 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
             networkIptablesLog('ERROR', 'unable to write iptables-restore temp file');
             return false;
         }
-        $command = sprintf('sh -c %s', escapeshellarg('iptables-restore < '.escapeshellarg($tmp)));
+        $command = sprintf('sh -c %s', escapeshellarg('iptables-restore'.($noflush ? ' -w 30 --noflush' : '').' < '.escapeshellarg($tmp)));
         return runCommand($command, false, 'logMessage') === 0;
     } finally {
         // Command execution or logging may throw; the private file is still ours.

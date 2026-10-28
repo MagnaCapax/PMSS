@@ -118,6 +118,49 @@ class NetworkHelpersTest extends TestCase
         $this->assertFalse(\networkApplyIptablesAtomically(['-A OUTPUT -j ACCEPT'], [['not' => 'a rule']]));
     }
 
+    public function testOutputReplacementRejectsUnsafeRulesBeforeRestore(): void
+    {
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(["-A OUTPUT\0 -j ACCEPT"]));
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(['-A OUTPUT -j ACCEPT', ['not' => 'a rule']]));
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(['-A OUTPUT -j ACCEPT; iptables -F INPUT']));
+        // Every rule must append to OUTPUT; anything else would land in another chain of the commit.
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(['-A OUTPUT -j ACCEPT', '-A INPUT -j DROP']));
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(['-P OUTPUT DROP']));
+        $this->assertFalse(\networkReplaceOutputRulesAtomically(['-A OUTPUTX -j ACCEPT']));
+    }
+
+    public function testMonitoringOutputRulesFallBackToTheSequentialRebuildOnlyWhenTheCommitFails(): void
+    {
+        $rules = ['-A OUTPUT -d 127.0.0.0/8 -j ACCEPT', '-A OUTPUT -m owner --uid-owner 1001 -j MARK --set-mark 1001'];
+        foreach ([true, false] as $committed) {
+            $calls = [];
+            $replace = static function (array $commands) use (&$calls, $committed): bool {
+                $calls[] = ['restore', $commands];
+                return $committed;
+            };
+            $run = static function (string $rule) use (&$calls): void { $calls[] = ['iptables', $rule]; };
+            $log = static function (string $message) use (&$calls): void { $calls[] = ['log', $message]; };
+
+            $path = \networkMonitoringOutputRulesApply($rules, $replace, $run, $log);
+
+            $expected = [['restore', $rules]];
+            if (!$committed) {
+                $expected[] = ['log', 'trafficLog: atomic OUTPUT replacement failed or was refused; rebuilding one rule at a time'];
+                $expected[] = ['iptables', '-F OUTPUT'];
+                $expected[] = ['iptables', $rules[0]];
+                $expected[] = ['iptables', $rules[1]];
+            }
+            $this->assertSame($committed ? 'atomic' : 'sequential', $path);
+            $this->assertSame($expected, $calls);
+        }
+    }
+
+    public function testMonitoringOutputRulesLeaveOutputAloneWithoutRules(): void
+    {
+        $fail = function (): bool { $this->fail('nothing may run without rules'); return false; };
+        $this->assertSame('none', \networkMonitoringOutputRulesApply([], $fail, $fail, $fail));
+    }
+
     public function testFallbackRenderValidatesRulesBeforeFlush(): void
     {
         $rendered = \networkIptablesRenderCommandSets(
@@ -156,7 +199,8 @@ class NetworkHelpersTest extends TestCase
 
     public function testTrafficLogParsesMonitoringRulesBeforeApplying(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLog.php', ['networkParseMonitoringCommands(', "networkRunIptables('-F OUTPUT');"]);
+        // trafficLog loads the checked helper output and hands it to the tested apply step above.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLog.php', ['$monitoringCommands = networkLoadMonitoringCommands(', 'networkMonitoringOutputRulesApply($monitoringCommands, ']);
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', 'passthru($'.'monitoringRules)');
     }
 }
