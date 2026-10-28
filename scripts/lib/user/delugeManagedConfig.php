@@ -1,11 +1,13 @@
 <?php
 /**
- * Deluge managed configuration helpers.
+ * Deluge maintenance facade; codec and hostlist policy live alongside it.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 
+require_once __DIR__.'/delugeConfigCodec.php';
+require_once __DIR__.'/delugeHostlist.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/integerSetting.php';
 require_once __DIR__.'/../torrentClients/identity.php';
@@ -69,102 +71,13 @@ function pmssDelugeManagedConfigEntries(): array
 }
 
 /**
- * Decode Deluge's dual-JSON config format into metadata + config arrays.
- *
- * @return array{meta:array,config:array}|null
- */
-function pmssDelugeConfigDecode(string $raw): ?array
-{
-    if (strpos($raw, "\0") !== false) {
-        return null;
-    }
-
-    $length = strlen($raw);
-    $start = strspn($raw, " \t\n\r");
-    if ($start >= $length || $raw[$start] !== '{') {
-        return null;
-    }
-
-    $depth = 0;
-    $inString = false;
-    $escape = false;
-    $firstObjectEnd = null;
-    for ($index = $start; $index < $length; $index++) {
-        $ch = $raw[$index];
-        if ($inString) {
-            if ($escape) {
-                $escape = false;
-                continue;
-            }
-            if ($ch === '\\') {
-                $escape = true;
-                continue;
-            }
-            if ($ch === '"') {
-                $inString = false;
-            }
-            continue;
-        }
-        if ($ch === '"') {
-            $inString = true;
-            continue;
-        }
-        if ($ch === '{') {
-            $depth++;
-            continue;
-        }
-        if ($ch === '}') {
-            $depth--;
-            if ($depth === 0) {
-                $firstObjectEnd = $index + 1;
-                break;
-            }
-        }
-    }
-
-    if ($firstObjectEnd === null) {
-        return null;
-    }
-
-    $meta = pmssJsonDecodeAssoc(substr($raw, $start, $firstObjectEnd - $start));
-    $config = pmssJsonDecodeAssoc(ltrim(substr($raw, $firstObjectEnd)));
-    if ($meta === null || $config === null) {
-        return null;
-    }
-
-    return ['meta' => $meta, 'config' => $config];
-}
-
-/**
- * Encode Deluge metadata + config arrays back into the dual-JSON format.
- */
-function pmssDelugeConfigEncode(array $meta, array $config): ?string
-{
-    $metaJson = pmssJsonEncodePretty($meta, JSON_UNESCAPED_UNICODE);
-    $configJson = pmssJsonEncodePretty($config, JSON_UNESCAPED_UNICODE);
-
-    return ($metaJson === null || $configJson === null) ? null : $metaJson.$configJson;
-}
-
-/**
  * Load, transform, and atomically rewrite a user's Deluge core.conf.
  */
 function pmssDelugeConfigMutate(string $username, callable $mutator, ?string $configFile = null): bool
 {
     $configFile = $configFile ?? pmssDelugeConfigPath($username);
-    $raw = pmssReadRegularFileContents($configFile);
-    $parsed = $raw !== null ? pmssDelugeConfigDecode($raw) : null;
-    if (!is_array($parsed)) {
-        return false;
-    }
-
-    $updatedConfig = $mutator($parsed['config']);
-    if (!is_array($updatedConfig) || $updatedConfig === $parsed['config']) {
-        return false;
-    }
-
-    $updatedRaw = pmssDelugeConfigEncode($parsed['meta'], $updatedConfig);
-    if (!is_string($updatedRaw) || $updatedRaw === $raw) {
+    $updatedRaw = pmssDelugeConfigTransform(pmssReadRegularFileContents($configFile), $mutator);
+    if ($updatedRaw === null) {
         return false;
     }
 
@@ -177,64 +90,6 @@ function pmssDelugeConfigMutate(string $username, callable $mutator, ?string $co
         $username,
         $username
     );
-}
-
-/**
- * Return true for the hostlist entry Deluge Web UI uses for the local daemon.
- *
- * @param mixed $host
- * @param mixed $login
- */
-function pmssDelugeHostlistEntryIsLocalclient($host, $login): bool
-{
-    return is_string($host)
-        && is_string($login)
-        && $login === 'localclient'
-        && in_array($host, ['127.0.0.1', 'localhost'], true);
-}
-
-/**
- * Synchronize hostlist.conf with the current daemon localclient password.
- */
-function pmssDelugeHostlistSyncLocalclientPassword(string $username, ?string $hostlistFile = null, ?string $authFile = null): bool
-{
-    $authFile = $authFile ?? pmssDelugeManagedAuthPath($username);
-    $localclientPassword = pmssDelugeManagedAuthLocalclientPasswordRead($authFile);
-    if ($localclientPassword === '') {
-        return false;
-    }
-
-    $hostlistFile = $hostlistFile ?? pmssDelugeHostlistPath($username);
-    $raw = pmssReadRegularFileContents($hostlistFile);
-    $parsed = $raw !== null ? pmssDelugeConfigDecode($raw) : null;
-    if (!is_array($parsed) || !is_array($parsed['config']['hosts'] ?? null)) {
-        return false;
-    }
-
-    $config = $parsed['config'];
-    $changed = false;
-    foreach ($config['hosts'] as $index => $entry) {
-        if (!is_array($entry) || count($entry) < 5 || !pmssDelugeHostlistEntryIsLocalclient($entry[1] ?? null, $entry[3] ?? null)) {
-            continue;
-        }
-
-        if (($entry[4] ?? null) === $localclientPassword) {
-            continue;
-        }
-
-        $entry[4] = $localclientPassword;
-        $config['hosts'][$index] = $entry;
-        $changed = true;
-    }
-
-    if (!$changed) {
-        return false;
-    }
-
-    $updatedRaw = pmssDelugeConfigEncode($parsed['meta'], $config);
-    return is_string($updatedRaw)
-        && $updatedRaw !== $raw
-        && pmssReplaceUserFilePreservingMetadata($hostlistFile, $updatedRaw, 0644);
 }
 
 /**

@@ -1,119 +1,16 @@
 <?php
 /**
- * Deluge configuration helpers.
+ * Deluge provisioning controller; template and publication helpers live alongside it.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/delugeTemplates.php';
+require_once __DIR__.'/delugeProvisioning.php';
 require_once __DIR__.'/delugePasswords.php';
 pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFileWrite.php', 'traffic.php', 'delugeManagedConfig.php', 'passwords.php', '../portManager.php']);
-
-/**
- * Pick the Deluge core template path for the active Debian release.
- *
- * Debian 12+ ships libtorrent 2.0, which removed the legacy cache_*
- * settings. Older releases keep the cache directives enabled.
- *
- * @param array{name?:string,version?:int,codename?:string}|null $distro
- */
-function pmssDelugeCoreTemplatePath(?array $distro = null): string
-{
-    return (int) (($distro['version'] ?? 0)) >= 12
-        ? pmssDelugeTemplatePath('template.deluge.core.nocache.conf')
-        : pmssDelugeTemplatePath('template.deluge.core.conf');
-}
-
-/**
- * Resolve an auxiliary Deluge template under the configured seedbox config dir.
- */
-function pmssDelugeTemplatePath(string $templateName): string
-{
-    return pmssResolvePathFromEnv('PMSS_SEEDBOX_CONFIG_DIR', '/etc/seedbox/config').'/'.$templateName;
-}
-
-/**
- * Read a required Deluge template and emit a structured warning on failure.
- */
-function pmssDelugeTemplateRead(string $templatePath, string $label): string
-{
-    $template = @file_get_contents($templatePath);
-    if (is_string($template) && $template !== '') {
-        return $template;
-    }
-
-    pmssLogStatus('WARN', sprintf(
-        'Skipping Deluge %s template because it is %s: %s',
-        $label,
-        file_exists($templatePath) ? 'empty' : 'missing',
-        $templatePath
-    ), 1);
-    return '';
-}
-
-/**
- * Render Deluge core.conf from the PMSS template and runtime values.
- *
- * @param array{name:string,memory:int|float} $user
- * @param array{name?:string,version?:int,codename?:string}|null $distro
- */
-function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $uploadThrottle, ?array $distro = null): string
-{
-    $username = (string) $user['name'];
-    $template = pmssDelugeTemplateRead(pmssDelugeCoreTemplatePath($distro ?? pmssDetectDistro()), 'core');
-    if ($template === '') {
-        return '';
-    }
-
-    return str_replace(
-        ['##USERNAME##', '##CACHE', '##DAEMONPORT', '##UPLOAD_THROTTLE##'],
-        [$username, (int) ($user['memory'] * 1024 / 16), $delugePort, $uploadThrottle],
-        $template
-    );
-}
-
-/**
- * Persist a Deluge config file through the shared symlink-safe writer.
- */
-function pmssDelugeConfigFileWrite(string $path, string $content, string $label, ?string $owner = null, ?int $modeOverride = null): bool
-{
-    $existing = @lstat($path);
-    if ($owner !== null && is_array($existing) && !pmssUserFileStatIsSingleRegular($existing)) {
-        pmssLogStatus('WARN', sprintf('Refusing Deluge %s config path: %s', $label, $path), 1);
-        return false;
-    }
-    $mode = $modeOverride ?? (is_array($existing) ? ($existing['mode'] & 0777) : 0644);
-    if ($owner !== null
-        ? pmssWriteUserFile($path, $content, $owner, $mode)
-        : pmssReplaceUserFilePreservingMetadata($path, $content, 0644)) {
-        return true;
-    }
-
-    pmssLogStatus('WARN', sprintf('Failed to write Deluge %s config: %s', $label, $path), 1);
-    return false;
-}
-
-function pmssDelugeWebPortEnsure(string $username, string $home, int $delugePort): ?int
-{
-    $webPortFile = $home.'/.delugeWebPort';
-    $existingWebPort = pmssReadRegularFileNetworkPort($webPortFile, 1024, 65000);
-    if ($existingWebPort !== null) {
-        pmssPortManagerAssignServicePort($username, 'deluge-web', $existingWebPort);
-        return $existingWebPort;
-    }
-
-    $preferredWebPort = $delugePort + 1;
-    $preferredWebPort = pmssNetworkPortInRange($preferredWebPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)
-        ? $preferredWebPort
-        : null;
-    $webPort = pmssPortManagerAssignServicePort($username, 'deluge-web', $preferredWebPort);
-    if ($webPort === null || !pmssWriteUserFile($webPortFile, (string) $webPort, $username, 0644)) {
-        return null;
-    }
-
-    return $webPort;
-}
 
 function userConfigureDeluge(array $user, array $configuration): void
 {

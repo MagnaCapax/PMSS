@@ -96,6 +96,12 @@ Keep the canonical installer/update details under `docs/install.md` and
   owns skeleton traversal. The locked reconciler retains full/partial recovery
   orchestration (ADR 0172).
 - **scripts/lib/user/qbittorrentWebUiAuth.php** – Opt-in qBittorrent WebUI config reconciliation. It checks the same path predicate as the writer, updates every managed key copy, and stops a matching native daemon at most once per account per day until a stopped pass applies the file. The customer panel's password-required helper lives under `etc/skel/www/`.
+- **scripts/lib/user/deluge.php** and **delugeManagedConfig.php** retain provisioning
+  and maintenance entry points. Template rendering and file/port publication live
+  in `delugeTemplates.php` and `delugeProvisioning.php`; `delugeConfigCodec.php`
+  owns the dual-JSON format and one transform path for core and hostlist updates.
+  `delugeHostlist.php` retains localclient selection and metadata-preserving writes.
+  Writer ownership policies and credential generation remain unchanged (ADR 0199).
 - **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
 - **scripts/lib/update/apps/arr.php** – Shared ARR installer facade and app dispatch.
   `arr/config.php` retains input guards, `arr/release.php` owns metadata-only

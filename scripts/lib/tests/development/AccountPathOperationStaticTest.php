@@ -81,6 +81,8 @@ final class AccountPathOperationStaticTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/deluge.php', [
             "pmssDelugeConfigFileWrite(\$configFile, \$updated, 'upload throttle')",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/delugeProvisioning.php', [
             'pmssWriteUserFile($path, $content, $owner, $mode)',
             'pmssReplaceUserFilePreservingMetadata($path, $content, 0644)',
         ]);
@@ -100,7 +102,7 @@ final class AccountPathOperationStaticTest extends TestCase
             'pmssReplaceUserFile($configFile, $json, static function (string $openedPath): bool',
             '@chmod($openedPath, 0600)',
         ]);
-        foreach (['scripts/lib/user/deluge.php', 'scripts/lib/update.php', 'scripts/lib/user/rootlessDockerConfig.php'] as $file) {
+        foreach (['scripts/lib/user/deluge.php', 'scripts/lib/user/delugeProvisioning.php', 'scripts/lib/update.php', 'scripts/lib/user/rootlessDockerConfig.php'] as $file) {
             $source = $this->pmssReadRepoFile($file);
             foreach (['tempnam(', 'rename(', 'copy('] as $operation) {
                 $this->assertStringNotContainsString($operation, $source, $file);
