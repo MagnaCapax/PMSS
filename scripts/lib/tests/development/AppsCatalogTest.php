@@ -152,8 +152,7 @@ class AppsCatalogTest extends TestCase
                     $name.' has an unguarded dynamic include: '.$expression);
             }
         }
-        $this->assertStringContainsString("pmssWelcomeRequireLocalHelper('mediaStackRecoveryCommand.php')",
-            $this->pmssReadRepoFile('etc/skel/www/userMediaStackPanel.php'));
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/userMediaStackPanel.php', "pmssWelcomeRequireLocalHelper('mediaStackRecoveryCommand.php')");
     }
 
     public function testWelcomeAndAppsShareRowsAndReadOnlyStatus(): void
@@ -263,16 +262,13 @@ class AppsCatalogTest extends TestCase
     public function testMovedOperationsExistOnlyInSharedHelper(): void
     {
         $shared = $this->pmssReadScriptsIncSources();
-        foreach (array('pmssCustomerAppsStatusRead', 'pmssCustomerAppRowHtmlBuild',
-            'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsStatusJsonEmit', 'pmssAppsRestartAll') as $name) {
-            $this->assertStringContainsString('function '.$name.'(', $shared);
-        }
+        $this->assertStringContainsAllStrings(['function pmssCustomerAppsStatusRead(', 'function pmssCustomerAppRowHtmlBuild(',
+            'function pmssCustomerAppsSectionHtmlBuild(', 'function pmssCustomerAppsStatusJsonEmit(', 'function pmssAppsRestartAll('], $shared);
         foreach (array('welcome.php', 'apps.php') as $page) {
-            $source = $this->pmssReadRepoFile('etc/skel/www/'.$page);
-            foreach (array('pmssWelcomeManagedAppsHtmlBuild', 'pmssWelcomeServiceRestartActionsBuild',
-                'pmssAppsLiveRowBuild', 'pmssAppsMediaRowsBuild', 'pmssAppsAct', 'pmssAppsRestartAll') as $name) {
-                $this->assertStringNotContainsString('function '.$name.'(', $source);
-            }
+            $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/'.$page, [], [
+                'function pmssWelcomeManagedAppsHtmlBuild(', 'function pmssWelcomeServiceRestartActionsBuild(',
+                'function pmssAppsLiveRowBuild(', 'function pmssAppsMediaRowsBuild(', 'function pmssAppsAct(', 'function pmssAppsRestartAll(',
+            ]);
         }
     }
 

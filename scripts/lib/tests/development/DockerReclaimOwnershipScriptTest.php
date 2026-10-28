@@ -123,8 +123,6 @@ BASH;
 
     public function testSkeletonCopiesInstallerScript(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-
-        $this->assertStringContainsString("'bin/docker-reclaim-ownership'", $source);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'bin/docker-reclaim-ownership'");
     }
 }

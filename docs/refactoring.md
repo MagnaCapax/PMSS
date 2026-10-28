@@ -373,6 +373,10 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Source-contract fixtures use the existing repository assertion helpers for
+required and forbidden fragments. Keep each file's checks together so shared
+contract tables avoid duplicate reads and local assertion loops.
+
 Process fixtures use `TestCase::pmssWriteFiles()` for literal `/proc` fields and
 `pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared
 fixture trait creates parents once; callers retain field bytes, absent entries,

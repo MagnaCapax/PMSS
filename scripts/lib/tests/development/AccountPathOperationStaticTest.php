@@ -79,35 +79,32 @@ final class AccountPathOperationStaticTest extends TestCase
 
     public function testConfigAndSkeletonWritesKeepSharedWriterRouting(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/deluge.php', [
-            "pmssDelugeConfigFileWrite(\$configFile, \$updated, 'upload throttle')",
+        $forbidden = ['tempnam(', 'rename(', 'copy('];
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/deluge.php' => ['required' => [
+                "pmssDelugeConfigFileWrite(\$configFile, \$updated, 'upload throttle')",
+            ], 'forbidden' => $forbidden],
+            'scripts/lib/user/delugeProvisioning.php' => ['required' => [
+                'pmssWriteUserFile($path, $content, $owner, $mode)',
+                'pmssReplaceUserFilePreservingMetadata($path, $content, 0644)',
+            ], 'forbidden' => $forbidden],
+            'scripts/lib/lighttpd/userFileReplace.php' => ['required' => [
+                'function pmssReplaceUserFilePreservingMetadata(',
+                "pmssRootStageFileWrite(\$path, \$content, \$group['name'], \$mode)",
+                'pmssReplaceAccountFile($user, $home, $path, $content, $mode, true)',
+            ]],
+            'scripts/lib/update.php' => ['required' => [
+                'pmssReadRegularFileContents((string) $sourceFile)',
+                'pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true)',
+            ], 'forbidden' => $forbidden],
+            'scripts/lib/user/rootlessDockerConfig.php' => ['required' => [
+                'pmssAccountHomeIdentity($configFile)',
+                '$identity[2] === $uid',
+                'pmssReplaceAccountFile($identity[1], $identity[0], $configFile, $json, 0600, true)',
+                'pmssReplaceUserFile($configFile, $json, static function (string $openedPath): bool',
+                '@chmod($openedPath, 0600)',
+            ], 'forbidden' => $forbidden],
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/delugeProvisioning.php', [
-            'pmssWriteUserFile($path, $content, $owner, $mode)',
-            'pmssReplaceUserFilePreservingMetadata($path, $content, 0644)',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/userFileReplace.php', [
-            'function pmssReplaceUserFilePreservingMetadata(',
-            "pmssRootStageFileWrite(\$path, \$content, \$group['name'], \$mode)",
-            'pmssReplaceAccountFile($user, $home, $path, $content, $mode, true)',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update.php', [
-            'pmssReadRegularFileContents((string) $sourceFile)',
-            'pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true)',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/rootlessDockerConfig.php', [
-            'pmssAccountHomeIdentity($configFile)',
-            '$identity[2] === $uid',
-            'pmssReplaceAccountFile($identity[1], $identity[0], $configFile, $json, 0600, true)',
-            'pmssReplaceUserFile($configFile, $json, static function (string $openedPath): bool',
-            '@chmod($openedPath, 0600)',
-        ]);
-        foreach (['scripts/lib/user/deluge.php', 'scripts/lib/user/delugeProvisioning.php', 'scripts/lib/update.php', 'scripts/lib/user/rootlessDockerConfig.php'] as $file) {
-            $source = $this->pmssReadRepoFile($file);
-            foreach (['tempnam(', 'rename(', 'copy('] as $operation) {
-                $this->assertStringNotContainsString($operation, $source, $file);
-            }
-        }
     }
 
     public function testTransferSessionRewriteUsesVerifiedOpenInode(): void
@@ -148,8 +145,6 @@ final class AccountPathOperationStaticTest extends TestCase
 
     public function testWebRootDirectoryMovesRunUnderAccount(): void
     {
-        $migration = $this->pmssReadRepoFile('scripts/lib/update/users/webRoot.php');
-        $reconcile = $this->pmssReadRepoFile('scripts/lib/update/users/webRootReconcile.php');
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/webRoot.php', [
             'pmssPathTargetIsSafe($source, true, true)',
             'pmssPathTargetIsSafe($target, true, true)',
@@ -158,11 +153,12 @@ final class AccountPathOperationStaticTest extends TestCase
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)',
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source)',
             "pmssUserWebRootMigrationRun(\$user, \$home, [\$source],",
+            '&& @rename($source, $target)',
         ]);
-        $this->assertTrue(strpos($migration, '&& @rename($source, $target)') !== false);
-        $this->assertFalse(strpos($reconcile, '@rename($stage, $www)') !== false);
-        $this->assertTrue(strpos($reconcile, 'pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www)') !== false);
-        $this->assertTrue(strpos($reconcile, 'pmssUserWebRootMigrationRun($user, $home, [$target]') !== false);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/webRootReconcile.php', [
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www)',
+            'pmssUserWebRootMigrationRun($user, $home, [$target]',
+        ], ['@rename($stage, $www)']);
     }
 
     public function testTerminationPurgeUsesPinnedSymlinkRefusingTree(): void

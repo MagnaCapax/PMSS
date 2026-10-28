@@ -582,11 +582,9 @@ BASH;
 
     public function testSkeletonCopiesInstallerScript(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-
-        $this->assertStringContainsString("'bin/docker-install-lsio'", $source);
-        $this->assertStringContainsString("'bin/dockerInstallLsio.php'", $source);
-        $this->assertStringContainsString("'bin/dockerInstallLsioTorrent.php'", $source);
-        $this->assertStringContainsString("'bin/linuxserverInstall.sh'", $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/filesystem.php', [
+            "'bin/docker-install-lsio'", "'bin/dockerInstallLsio.php'",
+            "'bin/dockerInstallLsioTorrent.php'", "'bin/linuxserverInstall.sh'",
+        ]);
     }
 }

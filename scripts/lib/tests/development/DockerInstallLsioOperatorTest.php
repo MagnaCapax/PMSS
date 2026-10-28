@@ -85,9 +85,8 @@ final class DockerInstallLsioOperatorTest extends TestCase
 
     public function testEntrypointRunsTheInstallOnlyThroughTheAccountRunner(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/dockerInstallLsio.php');
-        $this->assertStringContainsString("passthru(pmssBuildUserShellNoPamCommand((string) \$account['name'], \$command), \$rc);", $source);
-        $this->assertStringNotContainsString('/etc/skel', $source);
-        $this->assertStringNotContainsString('pmssDockerInstallLsioMain', $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/dockerInstallLsio.php', [
+            "passthru(pmssBuildUserShellNoPamCommand((string) \$account['name'], \$command), \$rc);",
+        ], ['/etc/skel', 'pmssDockerInstallLsioMain']);
     }
 }
