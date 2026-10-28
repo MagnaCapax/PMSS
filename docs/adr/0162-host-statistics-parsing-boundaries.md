@@ -55,3 +55,10 @@ failure result. An even-sized median halves its middle values before adding
 only when their sum overflows; ordinary median arithmetic is unchanged.
 `IopingOutputSafetyTest` covers these boundaries with pure fixtures, including
 unit conversion, zero, sample ordering, and very large finite latencies.
+
+The shared ioping capture checks its exit status before interpreting stdout or
+stderr. Failed, timed-out and lock-contended captures retain the nullable
+unavailable result even when partial output contains valid samples or a summary.
+Successful captures retain stream precedence, trimming, mean/median selection,
+command quoting, lock wrapping and the 15-second deadline. Isolated capture
+fixtures in `IopingOutputSafetyTest` cover both streams without running probes.

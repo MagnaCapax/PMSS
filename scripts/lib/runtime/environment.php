@@ -104,6 +104,8 @@ function pmssIopingProbeOutput(?string $target): ?string
     // lock; that produces empty output -> null -> callers report the existing 'na'
     // sentinel for that tick (a skipped probe under contention is correct).
     $result = pmssCommandCapture($command, PMSS_IOPING_PROBE_TIMEOUT);
+    // Failed or timed-out probes can leave parseable partial latency samples.
+    if ((int) ($result['rc'] ?? 1) !== 0) return null;
     $out = trim($result['stdout'] !== '' ? $result['stdout'] : $result['stderr']);
     return $out === '' ? null : $out;
 }
