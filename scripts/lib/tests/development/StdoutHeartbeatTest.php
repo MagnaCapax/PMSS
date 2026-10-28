@@ -98,7 +98,7 @@ PHP;
         $code = 'require '.$library.'; $pid = pmssStdoutHeartbeatStart(5); '
             .'fwrite(STDERR, "HEARTBEAT {$pid}\\n"); passthru("sleep 12"); '
             .'pmssStdoutHeartbeatStop(); echo "LAST\\n"; exit(7);';
-        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code),
+        $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand($code),
             [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
         $started = microtime(true);
@@ -138,7 +138,7 @@ PHP;
         $library = var_export($this->pmssRepoPath('scripts/lib/runtime/stdoutHeartbeat.php'), true);
         $code = 'require '.$library.'; $pid = pmssStdoutHeartbeatStart(2); '
             .'fwrite(STDERR, "HEARTBEAT {$pid}\\n"); sleep(30);';
-        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code),
+        $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand($code),
             [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
         $metadata = fgets($pipes[2]);

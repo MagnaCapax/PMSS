@@ -1220,9 +1220,27 @@ PHP;
         return sprintf($shims, var_export($tempFailureMode, true)).$this->pmssInlinePhpFileWriteCompleteShim();
     }
 
+    /** Keep inline PHP quoting identical for captured, timed and asynchronous fixtures. */
+    protected function pmssBuildInlinePhpCommand(string $script): string
+    {
+        return escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script);
+    }
+
     protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
     {
-        return $this->pmssRunShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script), $environment, $stderrRedirect);
+        return $this->pmssRunShellCommand($this->pmssBuildInlinePhpCommand($script), $environment, $stderrRedirect);
+    }
+
+    /** Capture inline PHP exit status and line output through the existing shell runner. */
+    protected function pmssExecInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>&1'): array
+    {
+        return $this->pmssExecShellCommand($this->pmssBuildInlinePhpCommand($script), $environment, $stderrRedirect);
+    }
+
+    /** Capture inline PHP stderr separately with the existing tracked-file lifetime. */
+    protected function pmssExecInlinePhpWithTempStderr(string $script, array $environment = [], string $stderrPrefix = 'pmss-stderr-'): array
+    {
+        return $this->pmssExecShellCommandWithTempStderr($this->pmssBuildInlinePhpCommand($script), $environment, $stderrPrefix);
     }
 
     protected function pmssRunInlinePhpJson(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): array

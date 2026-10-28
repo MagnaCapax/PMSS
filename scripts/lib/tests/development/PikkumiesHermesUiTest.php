@@ -68,7 +68,7 @@ final class PikkumiesHermesUiTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-b-rotation-', 0700);
         $paths = \pmssPikkumiesHermesPaths($home);
         $this->assertTrue(\pmssPikkumiesHermesWrite($paths, str_repeat('a', 64), str_repeat('b', 64)));
-        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('sleep(30);')
+        $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand('sleep(30);')
             .' dashboard hermes', [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
         $pid = proc_get_status($process)['pid'];
@@ -109,7 +109,7 @@ final class PikkumiesHermesUiTest extends TestCase
         $body = '';
         for ($i = 0; strlen($body) < $size; $i++) $body .= sprintf('%08d|', $i);
         $body = substr($body, 0, $size);
-        $backend = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+        $backend = proc_open('exec '.$this->pmssBuildInlinePhpCommand(
             '$s = stream_socket_server("tcp://127.0.0.1:0"); echo substr(strrchr(stream_socket_get_name($s, false), ":"), 1), "\n";'
             .' fflush(STDOUT); $c = stream_socket_accept($s, 20); while (($l = fgets($c)) !== false && $l !== "\r\n");'
             .' $b = ""; for ($i = 0; strlen($b) < '.$size.'; $i++) $b .= sprintf("%08d|", $i);'
@@ -118,7 +118,7 @@ final class PikkumiesHermesUiTest extends TestCase
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $backendPipes);
         $this->assertTrue(is_resource($backend));
         $port = (int) trim((string) fgets($backendPipes[1]));
-        $relay = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+        $relay = proc_open('exec '.$this->pmssBuildInlinePhpCommand(
             'require '.var_export(dirname(__DIR__, 4).'/etc/skel/bin/pmssHermesRelay.php', true).';'
             .' exit(pmssHermesRelayServe('.var_export($socket, true).', '.$port.', static function (): bool { return true; }));'),
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $relayPipes);
@@ -176,7 +176,7 @@ final class PikkumiesHermesUiTest extends TestCase
             .' ? "HTTP/1.1 '.$status.' X\r\n".'.$cookies.'."Content-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}"'
             .' : "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nplain";'
             .' fwrite($c, $out); fclose($c); }';
-        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+        $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand($script),
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
         return [$process, $pipes, (int) trim((string) fgets($pipes[1]))];
@@ -184,7 +184,7 @@ final class PikkumiesHermesUiTest extends TestCase
 
     private function startRelay(string $socket, int $port, string $credentials): array
     {
-        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+        $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand(
             'require '.var_export(dirname(__DIR__, 4).'/etc/skel/bin/pmssHermesRelay.php', true).';'
             .' exit(pmssHermesRelayServe('.var_export($socket, true).', '.$port.', static function (): bool { return true; }, '
             .var_export($credentials, true).', "exampleuser"));'),
@@ -339,7 +339,7 @@ final class PikkumiesHermesUiTest extends TestCase
     public function testRelayWithoutTheCredentialsArgumentIsNotCurrent(): void
     {
         $directory = $this->pmssMakeTempDir('pmss-relay-current-', 0700);
-        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('sleep(30);')
+        $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand('sleep(30);')
             .' /home/exampleuser/bin/pmssHermesRelay.php serve '.escapeshellarg($directory.'/ui.sock').' 24000 '
             .escapeshellarg($directory.'/credentials'), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
@@ -365,7 +365,7 @@ final class PikkumiesHermesUiTest extends TestCase
         $paths = \pmssPikkumiesHermesPaths($home);
         mkdir($paths['base'], 0700, true);
         file_put_contents($paths['port'], "24000\n");
-        $process = proc_open('exec '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('sleep(30);')
+        $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand('sleep(30);')
             .' dashboard hermes', [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
         $pid = proc_get_status($process)['pid'];
@@ -389,7 +389,7 @@ final class PikkumiesHermesUiTest extends TestCase
                 .'$peer=stream_socket_accept($server,5); if ($peer) { fread($peer,4096); '
                 .'fwrite($peer,"HTTP/1.1 '.$status.' Status\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"); '
                 .'fclose($peer); } fclose($server);';
-            $process = proc_open(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+            $process = proc_open($this->pmssBuildInlinePhpCommand($script),
                 [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
             $this->assertTrue(is_resource($process));
             fclose($pipes[0]);

@@ -14,9 +14,7 @@ class UserBillingPermissionsTest extends TestCase
             .'$allowed = pmssUserBillingFileRepairable("testuser", '
             .var_export($path, true).', '.var_export($stat, true).'); '
             .'echo json_encode([$allowed, $GLOBALS["logs"]]);';
-        $run = $this->pmssExecShellCommandWithTempStderr(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code)
-        );
+        $run = $this->pmssExecInlinePhpWithTempStderr($code);
         $this->assertSame(0, $run['result']['rc']);
         return json_decode($run['result']['output'], true);
     }

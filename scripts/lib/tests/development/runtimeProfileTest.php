@@ -27,8 +27,7 @@ class RuntimeProfileTest extends TestCase
             .'runStep("ordinary success", "exit 0"); '
             .'pmssProfileSummary(); '
             .'echo "PROFILE=".json_encode($GLOBALS["PMSS_PROFILE"])."\n";';
-        $result = $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code),
+        $result = $this->pmssExecInlinePhp($code,
             ['PMSS_LOG_DIR' => $logDir, 'PMSS_PROFILE_OUTPUT' => $profilePath, 'PMSS_DRY_RUN' => '0']
         );
         $this->assertSame(0, $result['rc'], $result['output']);

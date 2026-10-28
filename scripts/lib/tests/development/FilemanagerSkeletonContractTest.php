@@ -80,10 +80,10 @@ ob_start();
 register_shutdown_function(function () { ob_end_clean(); echo json_encode([http_response_code(), file_exists(%s)]); });
 require %s;
 PHP;
-            $run = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(sprintf(
+            $run = $this->pmssExecInlinePhp(sprintf(
                 $script, var_export('../'.ltrim($home, '/'), true), var_export($method, true),
                 var_export($method, true), var_export($token, true), var_export($home.'/victim', true), var_export($source, true)
-            )));
+            ));
             $this->assertSame(0, $run['rc'], $run['output']);
             $result = json_decode($run['output'], true);
             $this->assertTrue(is_array($result), $run['output']);
@@ -157,10 +157,10 @@ PHP;
                 'ajax-json-number' => 1, 'ajax-json-array' => [], 'ajax-json-null' => null];
             $body = array_key_exists($name, $types)
                 ? json_encode(['ajax' => 1, 'type' => $types[$name], 'x' => 'save', 'content' => 'changed']) : '';
-            $run = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(sprintf(
+            $run = $this->pmssExecInlinePhp(sprintf(
                 $script, var_export('../'.ltrim($home, '/'), true), var_export($post, true),
                 var_export($files, true), var_export($body, true), var_export($home.'/victim', true), var_export($source, true)
-            )));
+            ));
             $this->assertSame(0, $run['rc'], $name.': '.$run['output']);
             $result = json_decode($run['output'], true);
             if (strpos($name, 'readonly-') === 0) {
@@ -193,9 +193,9 @@ PHP;
             ['ren' => 'created', 'to' => 'renamed'],
             ['savedata' => 'updated through the legacy editor'],
         ] as $post) {
-            $run = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(sprintf(
+            $run = $this->pmssExecInlinePhp(sprintf(
                 $script, var_export('../'.ltrim($home, '/'), true), var_export($post, true), var_export($source, true)
-            )));
+            ));
             $this->assertSame(0, $run['rc'], $run['output']);
         }
         $this->assertFalse(file_exists($home.'/created'));
@@ -248,7 +248,7 @@ PHP;
             var_export($source, true),
             var_export($local, true)
         );
-        $run = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script));
+        $run = $this->pmssExecInlinePhp($script);
         $this->assertSame(0, $run['rc'], 'Filemanager settings probe failed: '.$run['output']);
         $result = json_decode($run['output'], true);
         $this->assertTrue(is_array($result), 'Filemanager settings probe did not return JSON: '.$run['output']);
@@ -320,7 +320,7 @@ $result = array(
 echo json_encode($result);
 PHP;
         $script = sprintf($script, var_export($user, true), var_export($source, true));
-        $run = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script));
+        $run = $this->pmssExecInlinePhp($script);
         $this->assertSame(0, $run['rc'], 'Filemanager helper probe failed: '.$run['output']);
         $result = json_decode($run['output'], true);
         $this->assertTrue(is_array($result), 'Filemanager helper probe did not return JSON: '.$run['output']);

@@ -86,15 +86,11 @@ class UpdateBootstrapLockReleaseTest extends TestCase
     public function testRuntimeShellInvocationClosesExportedUpdateLockFds(): void
     {
         $runtime = dirname(__DIR__, 3).'/lib/runtime.php';
-        $result = $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
-                'putenv("PMSS_UPDATE_LOCK_FDS=0,2,003,4,9,9,1048576,1048577,invalid,-4,+8,1.5,'.PHP_INT_MAX.'0"); '
-                .'require '.var_export($runtime, true).'; '
-                .'echo pmssCommandBashInvocation("printf ok");'
-            ),
-            $this->pmssTestModeEnv(),
-            '2>&1'
-        );
+        $result = $this->pmssExecInlinePhp(
+            'putenv("PMSS_UPDATE_LOCK_FDS=0,2,003,4,9,9,1048576,1048577,invalid,-4,+8,1.5,'.PHP_INT_MAX.'0"); '
+            .'require '.var_export($runtime, true).'; '
+            .'echo pmssCommandBashInvocation("printf ok");',
+            $this->pmssTestModeEnv());
 
         $this->assertEquals(0, $result['rc'], 'runtime shell invocation should complete');
         $this->assertStringContainsString('exec 3>&- 4>&- 9>&- 1048576>&-; ', $result['output']);
@@ -104,20 +100,16 @@ class UpdateBootstrapLockReleaseTest extends TestCase
     public function testRuntimeLockFdListRejectsUnsafeFdRootFailSoft(): void
     {
         $runtime = dirname(__DIR__, 3).'/lib/runtime.php';
-        $result = $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
-                'require '.var_export($runtime, true).'; '
-                .'$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
-                .'$handle = fopen($path, "c+"); '
-                .'echo json_encode(['
-                .'"empty" => pmssLockHandleFdList($handle, ""), '
-                .'"nul" => pmssLockHandleFdList($handle, "/tmp".chr(0)."fd")'
-                .']); '
-                .'fclose($handle);'
-            ),
-            $this->pmssTestModeEnv(),
-            '2>&1'
-        );
+        $result = $this->pmssExecInlinePhp(
+            'require '.var_export($runtime, true).'; '
+            .'$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
+            .'$handle = fopen($path, "c+"); '
+            .'echo json_encode(['
+            .'"empty" => pmssLockHandleFdList($handle, ""), '
+            .'"nul" => pmssLockHandleFdList($handle, "/tmp".chr(0)."fd")'
+            .']); '
+            .'fclose($handle);',
+            $this->pmssTestModeEnv());
 
         $this->assertEquals(0, $result['rc'], 'runtime lock fd scan should reject unsafe roots without warnings');
         $payload = $this->pmssDecodeJsonArray($result['output']);
@@ -128,15 +120,11 @@ class UpdateBootstrapLockReleaseTest extends TestCase
     public function testRuntimeLockReleaseIgnoresInvalidHandleFailSoft(): void
     {
         $runtime = dirname(__DIR__, 3).'/lib/runtime.php';
-        $result = $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
-                'require '.var_export($runtime, true).'; '
-                .'pmssLockHandleRelease(false); '
-                .'echo "ok";'
-            ),
-            $this->pmssTestModeEnv(),
-            '2>&1'
-        );
+        $result = $this->pmssExecInlinePhp(
+            'require '.var_export($runtime, true).'; '
+            .'pmssLockHandleRelease(false); '
+            .'echo "ok";',
+            $this->pmssTestModeEnv());
 
         $this->assertEquals(0, $result['rc'], 'runtime lock release should tolerate invalid handles');
         $this->assertSame('ok', trim($result['output']));
@@ -179,10 +167,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
     private function runBootstrapInline(string $script): array
     {
         $libraryPath = dirname(__DIR__).'/common/updateBootstrapShim.php';
-        return $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('require '.var_export($libraryPath, true).'; '.$script),
-            $this->pmssTestModeEnv(),
-            '2>&1'
-        );
+        return $this->pmssExecInlinePhp('require '.var_export($libraryPath, true).'; '.$script,
+            $this->pmssTestModeEnv());
     }
 }

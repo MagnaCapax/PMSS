@@ -88,7 +88,7 @@ class LighttpdSocketCleanupTest extends TestCase
             try {
                 // A separate holder avoids passing the parent's lock descriptor to the starter.
                 $holder = '$handle = fopen($argv[1], "c"); flock($handle, LOCK_EX); touch($argv[2]); usleep(1000000);';
-                $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($holder)
+                $command = $this->pmssBuildInlinePhpCommand($holder)
                     .' '.escapeshellarg($path).' '.escapeshellarg($marker);
                 $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
                 $this->assertTrue(is_resource($process));

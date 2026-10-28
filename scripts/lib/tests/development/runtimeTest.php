@@ -189,7 +189,7 @@ PHP;
             .'pmssReadRegularFileContents('.var_export($dir.'/fifo', true).'),'
             .'pmssReadRegularFileContentsVerified('.var_export($dir.'/fifo', true).')]);';
         $output = [];
-        exec('timeout --kill-after=2s 5s '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code), $output, $rc);
+        exec('timeout --kill-after=2s 5s '.$this->pmssBuildInlinePhpCommand($code), $output, $rc);
         $this->assertSame(0, $rc);
         $this->assertSame('[null,null,null]', implode("\n", $output));
         $this->pmssAssertPathOwnerAndModeSame($before, $target);
@@ -201,7 +201,7 @@ PHP;
         foreach (['', "failure\n", "  failure  ", "first\nsecond\n", "binary\0payload"] as $message) {
             $code = 'require '.var_export(dirname(__DIR__, 2).'/runtime/cli.php', true).'; '
                 .'echo pmssCliReturnWithStderr('.var_export($message, true).', 7); echo " continued";';
-            $capture = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+            $capture = $this->pmssExecInlinePhpWithTempStderr($code);
             $this->assertSame(0, $capture['result']['rc']);
             $this->assertSame('7 continued', $capture['result']['output']);
             $this->assertSame($message, file_get_contents($capture['stderrPath']));
@@ -214,7 +214,7 @@ PHP;
             foreach (['', "failure\n", "  failure  ", "first\nsecond\n", "binary\0payload"] as $message) {
                 $code = 'require '.var_export(dirname(__DIR__, 2).'/runtime/cli.php', true).'; '
                     .'exit(pmssCliReturnWithStderr('.var_export($message, true).', '.$exitCode.')); echo "unexpected return";';
-                $capture = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+                $capture = $this->pmssExecInlinePhpWithTempStderr($code);
                 $this->assertSame($exitCode, $capture['result']['rc']);
                 $this->assertSame('', $capture['result']['output']);
                 $this->assertSame($message, file_get_contents($capture['stderrPath']));
@@ -670,7 +670,7 @@ PHP;
     public function testPipedCaptureKeepsTailBoundedOutputSnapshot(): void
     {
         $code = 'fwrite(STDOUT, "1234567890"); fwrite(STDERR, "abcdefghij");';
-        $bash = '/bin/bash -lc '.escapeshellarg(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+        $bash = '/bin/bash -lc '.escapeshellarg($this->pmssBuildInlinePhpCommand($code));
         $result = \pmssCommandPipedCapture($bash, 'pipe-tail-test', 0, 4);
 
         $this->assertSame(['rc' => 0, 'stdout' => '7890', 'stderr' => 'ghij', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => false], $result);
@@ -680,7 +680,7 @@ PHP;
     {
         $cwd = $this->pmssMakeTempDir('pmss-piped-cwd-');
         $code = 'echo basename(getcwd()).":".getenv("PMSS_PIPE_ENV");';
-        $bash = '/bin/bash -lc '.escapeshellarg(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+        $bash = '/bin/bash -lc '.escapeshellarg($this->pmssBuildInlinePhpCommand($code));
         $result = \pmssCommandPipedCapture($bash, 'pipe-env-test', 0, 0, false, 'proc_open failed', 1, false, 'stream_select failed', $cwd, ['PMSS_PIPE_ENV' => 'ok']);
 
         $this->assertSame(0, $result['rc']);
@@ -736,7 +736,7 @@ PHP;
         // Native process launch may omit empty entries; their effective string value stays empty.
         $code = 'echo json_encode(array_map(static function ($key) { return (string) getenv($key); }, '
             .var_export(array_keys($env), true).'));';
-        $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code);
+        $command = $this->pmssBuildInlinePhpCommand($code);
         $result = \pmssCommandPipedCapture($command, 'pipe-env-literal-test', 2, 0, false, 'proc_open failed', 1, false, 'stream_select failed', null, $env);
 
         // Direct process values stay literal; only variable names use the identifier grammar.
@@ -763,7 +763,7 @@ PHP;
             .'fwrite(STDOUT, "E-fwrite\n"); echo "F-echo\n"; '
             .'pmssCredentialProcessRun("/bin/echo G-credential", null); '
             .'fwrite(STDOUT, "H-fwrite\n");';
-        exec('timeout --kill-after=2s 10s '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code)
+        exec('timeout --kill-after=2s 10s '.$this->pmssBuildInlinePhpCommand($code)
             .' > '.escapeshellarg($out).' 2>/dev/null', $ignored, $rc);
         $this->assertSame(0, $rc);
         $this->assertSame("A-fwrite\nB-echo\nC-child\nD-inherited\nE-fwrite\nF-echo\nG-credential\nH-fwrite\n",
@@ -785,7 +785,7 @@ PHP;
             $stdout = str_repeat('0123456789', 2000)."\0out\n";
             $stderr = str_repeat('abcdefghij', 2000)."\0err\n";
             $code = 'if (fread(STDIN, 1) !== "") exit(1); fwrite(STDOUT, '.var_export($stdout, true).'); fwrite(STDERR, '.var_export($stderr, true).'); exit(124);';
-            $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code);
+            $command = $this->pmssBuildInlinePhpCommand($code);
             $result = \pmssCommandPipedCapture($command, 'channel-characterization', 2, $limit);
             $this->assertSame([
                 'rc' => 124, 'stdout' => $limit > 0 ? substr($stdout, -$limit) : $stdout,

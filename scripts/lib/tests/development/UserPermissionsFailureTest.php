@@ -22,9 +22,7 @@ class UserPermissionsFailureTest extends TestCase
                     return 'pmssUserPermissionsRun('.var_export($command, true).');';
                 }, $commands))
                 .'exit(pmssUserPermissionsResult());';
-            $run = $this->pmssExecShellCommandWithTempStderr(
-                escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code)
-            );
+            $run = $this->pmssExecInlinePhpWithTempStderr($code);
 
             $this->assertSame($expectedRc, $run['result']['rc']);
             $this->assertSame($expectedStderr, file_get_contents($run['stderrPath']));

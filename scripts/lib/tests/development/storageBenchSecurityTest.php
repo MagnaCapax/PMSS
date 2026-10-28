@@ -133,8 +133,7 @@ PHP;
                 ['-1', 0, $kind === 'field' ? '-1' : null],
             ] as $case) {
                 $expected = $case[2] ?? null;
-                $run = $this->pmssExecShellCommandWithTempStderr(
-                    escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+                $run = $this->pmssExecInlinePhpWithTempStderr($script,
                     ['PMSS_TEST_BENCH_KIND' => $kind,
                         'PMSS_TEST_BENCH_CAPTURE' => json_encode(['stdout' => $case[0], 'rc' => $case[1] ?? 0])]
                 );

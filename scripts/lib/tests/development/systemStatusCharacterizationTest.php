@@ -94,10 +94,8 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     private function runStatusEmitScript(string $script): array
     {
-        return $this->pmssExecShellCommandWithTempStderr(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
-                'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'.$script
-            ),
+        return $this->pmssExecInlinePhpWithTempStderr(
+            'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'.$script,
             [],
             'pmss-status-stderr-'
         );

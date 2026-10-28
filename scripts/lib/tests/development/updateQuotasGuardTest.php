@@ -75,7 +75,7 @@ class UpdateQuotasGuardTest extends TestCase
             .'$results = []; foreach ('.var_export($paths, true).' as $quotaFile) {'
             .$matches[0].'$results[] = [$existingQuotaContent, $hasExistingSnapshot]; }'
             .'echo json_encode($results);';
-        $result = $this->pmssExecShellCommand('timeout --kill-after=2s 5s '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script));
+        $result = $this->pmssExecShellCommand('timeout --kill-after=2s 5s '.$this->pmssBuildInlinePhpCommand($script));
 
         $this->assertSame(0, $result['rc'], 'Snapshot reads must finish without opening the FIFO');
         $this->assertSame(array_merge([[$content, true]], array_fill(0, 6, ['', false])), json_decode($result['output'], true));

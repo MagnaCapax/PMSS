@@ -286,7 +286,7 @@ class RuntimeLockSafetyTest extends TestCase
         ] as [$callback, $rc, $stdout, $stderr]) {
             $code = 'require '.var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true).'; '
                 .'pmssCronLockAcquire("test", '.$callback.', static function ($path) { return false; }); exit(99);';
-            ['result' => $result, 'stderrPath' => $stderrPath] = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+            ['result' => $result, 'stderrPath' => $stderrPath] = $this->pmssExecInlinePhpWithTempStderr($code);
             $this->assertSame($rc, $result['rc']);
             $this->assertSame($stdout, preg_replace('/\d{4}-\d\d-\d\d \d\d:\d\d:\d\d/', 'TIMESTAMP', $result['output']));
             $this->assertSame($stderr, file_get_contents($stderrPath));

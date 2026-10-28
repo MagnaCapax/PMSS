@@ -116,7 +116,7 @@ class CredentialProcessTransportTest extends TestCase
 
     public function testCapturedStderrSharesStdoutOnPhp73Descriptors(): void
     {
-        $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('fwrite(STDERR, "diagnostic\n"); exit(7);');
+        $command = $this->pmssBuildInlinePhpCommand('fwrite(STDERR, "diagnostic\n"); exit(7);');
         $output = [];
         foreach ([null, 2.0] as $timeout) {
             $this->assertSame(7, \pmssCredentialProcessRun($command, 'provided-value', $output, false, $timeout));
@@ -128,7 +128,7 @@ class CredentialProcessTransportTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-credential-timed-stderr-');
         $library = $this->pmssRepoPath('scripts/lib/user/credentialProcess.php');
-        $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('echo "generated-value\n"; fwrite(STDERR, "diagnostic\n"); exit(7);');
+        $command = $this->pmssBuildInlinePhpCommand('echo "generated-value\n"; fwrite(STDERR, "diagnostic\n"); exit(7);');
         foreach ([false, true] as $capture) {
             file_put_contents($dir.'/harness.php', '<?php require '.var_export($library, true).'; '
                 .'echo "before\n"; $output = '.($capture ? '[]' : 'null').'; '

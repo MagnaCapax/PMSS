@@ -39,10 +39,10 @@ register_shutdown_function(function () { echo json_encode([http_response_code(),
 pmssFrontendPostActionRequired();
 file_put_contents(%s, 'changed');
 PHP;
-            $run = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(sprintf(
+            $run = $this->pmssExecInlinePhp(sprintf(
                 $script, var_export($case === 'POST-XHR' ? 'POST' : $case, true), var_export($case, true),
                 var_export($guard, true), var_export($sentinel, true), var_export($sentinel, true)
-            )));
+            ));
             $this->assertSame(0, $run['rc']);
             $result = json_decode($run['output'], true);
             $this->assertSame($case === 'GET' ? 405 : ($case === 'POST' ? 403 : 200), $result[0]);

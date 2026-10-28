@@ -793,7 +793,7 @@ class AppsCatalogTest extends TestCase
             .($action === null ? '' : '$_GET["action"]='.var_export($action, true).';')
             .'register_shutdown_function(function(){echo "HTTP=".(http_response_code() ?: 200);});'
             .'require '.var_export($home.'/www/'.$endpoint, true).';';
-        $command = 'cd '.escapeshellarg($home.'/www').' && '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($php);
+        $command = 'cd '.escapeshellarg($home.'/www').' && '.$this->pmssBuildInlinePhpCommand($php);
         $result = $this->pmssExecShellCommand($command);
         $this->assertSame(0, $result['rc'], $result['output']);
         return $result['output'];

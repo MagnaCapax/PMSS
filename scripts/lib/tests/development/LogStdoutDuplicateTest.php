@@ -59,7 +59,7 @@ PHP;
             .'(new \Logger("job", '.var_export($dir, true).', '.var_export($dir, true).', null, '.($stream === 'STDERR' ? 'true' : 'false').'))->msg("marker-line");';
         $target = $intoLog ? $log : $other;
         $spec = [0 => ['file', '/dev/null', 'r'], 1 => ['file', $target, 'a'], 2 => ['file', $target, 'a']];
-        $proc = proc_open(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code), $spec, $pipes);
+        $proc = proc_open($this->pmssBuildInlinePhpCommand($code), $spec, $pipes);
         $this->assertTrue(is_resource($proc), 'child php did not start');
         proc_close($proc);
         return substr_count((string) file_get_contents($log), 'marker-line');

@@ -28,7 +28,7 @@ foreach (['enabled', 'disabled', 'masked', '', 'not-found', null] as $state) {
 echo json_encode($results);
 PHP;
         $source = sprintf($source, var_export(dirname(__DIR__, 2).'/update/services/systemd.php', true));
-        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($source), [], '2>&1');
+        $result = $this->pmssExecInlinePhp($source, [], '2>&1');
         $this->assertSame(0, $result['rc']);
         $states = json_decode($result['output'], true);
         $this->assertTrue(is_array($states), $result['output']);

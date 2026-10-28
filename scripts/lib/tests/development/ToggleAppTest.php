@@ -243,7 +243,7 @@ PROXY;
                     .'$_GET["app"]='.var_export($app, true).';$_GET["action"]="start";'
                     .'register_shutdown_function(function(){echo "HTTP=".(http_response_code() ?: 200);});'
                     .'require '.var_export($home.'/www/toggleApp.php', true).';';
-                $result = $this->pmssExecShellCommand('cd '.escapeshellarg($home.'/www').' && '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($php));
+                $result = $this->pmssExecShellCommand('cd '.escapeshellarg($home.'/www').' && '.$this->pmssBuildInlinePhpCommand($php));
                 $this->assertSame(0, $result['rc'], $result['output']);
                 $this->assertStringContainsString($app === 'slskd' ? 'HTTP=200' : 'HTTP=404', $result['output']);
                 if ($app !== 'slskd') $this->assertFalse(is_file($home.'/.slskdEnable'));

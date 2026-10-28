@@ -30,8 +30,7 @@ function pmssAccountPathRun($user, $home, $paths, $command) { return false; }
 eval($GLOBALS['suspendSource']);
 PHP;
         $script = '$GLOBALS[\'suspendSource\'] = '.var_export($source, true).'; '.$script;
-        $result = $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+        $result = $this->pmssExecInlinePhp($script,
             ['PMSS_SUSPEND_STEP_RECORD' => $record]
         );
         $this->assertSame(1, $result['rc']);

@@ -22,6 +22,12 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
+Inline PHP fixtures share `TestCase::pmssBuildInlinePhpCommand()` across captured,
+timed and asynchronous launches. Use `pmssExecInlinePhp()` for exit status and
+line output, or `pmssExecInlinePhpWithTempStderr()` for a tracked stderr file.
+Both reuse the shell runners; callers retain environment, redirection, timeout,
+process descriptors and assertions. These fixtures run only on testing machines.
+
 Torrent-client operation fixtures use `TestCase::pmssMakeCallbacks($results,
 $events)` for callbacks that return a fixed value and, when an event array is
 passed, append their operation name to it. Results remain explicit, including

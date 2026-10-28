@@ -388,7 +388,7 @@ class ConfigureSettingsTest extends TestCase
                 .'$_SERVER["REQUEST_METHOD"]="POST"; $_POST["action"]="webCertsDefault";'
                 .'register_shutdown_function(function(){echo "HTTP=".http_response_code();});'
                 .'require '.var_export($home.'/www/configure.php', true).';';
-            $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($php));
+            $result = $this->pmssExecInlinePhp($php);
             $this->assertSame(0, $result['rc']);
             $this->assertStringContainsString('HTTP=403', $result['output']);
             $this->assertFalse(file_exists($home.'/.request-web-certs'));

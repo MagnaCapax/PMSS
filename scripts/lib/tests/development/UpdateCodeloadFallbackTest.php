@@ -46,7 +46,7 @@ class UpdateCodeloadFallbackTest extends TestCase
                 .' require '.var_export($root.'/bootstrap.php', true).';'
                 .' $spec = ["type" => "git", "repo" => $argv[1], "branch" => "main", "pin" => $argv[2]];'
                 .' echo "FETCHED=".fetchSnapshot($spec, $argv[3]);';
-            $php = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script);
+            $php = $this->pmssBuildInlinePhpCommand($script);
             $cases = [
                 ['file://'.$repo, '2020-01-02', $commits[0]],
                 ['file://'.$repo, '2020-01-04', $commits[1]],

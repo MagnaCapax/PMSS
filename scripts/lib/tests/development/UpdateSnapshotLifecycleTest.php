@@ -20,10 +20,9 @@ class UpdateSnapshotLifecycleTest extends TestCase
             foreach (['', 'curl', 'tar'] as $failure) {
                 $spec = ['type' => $type, 'repo' => 'https://github.com/example/project.git',
                     'branch' => 'topic/a b', 'pin' => $type === 'release' ? 'tag/a b' : ''];
-                $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+                $result = $this->pmssExecInlinePhp(
                     'require '.var_export($bootstrap, true).'; echo "FETCHED=".fetchSnapshot('
-                    .var_export($spec, true).', '.var_export($root, true).');'
-                ), $this->pmssPathPrefixedEnvironment($bin, ['PMSS_SNAPSHOT_FAIL' => $failure]));
+                    .var_export($spec, true).', '.var_export($root, true).');', $this->pmssPathPrefixedEnvironment($bin, ['PMSS_SNAPSHOT_FAIL' => $failure]));
                 $curl = 'curl -sfL '.($type === 'git' ? '--http1.1 ' : '').'-A '.escapeshellarg(\CURL_UA).' '
                     .escapeshellarg($type === 'git'
                         ? 'https://codeload.github.com/example/project/tar.gz/refs/heads/topic%2Fa%20b'
@@ -59,7 +58,7 @@ class UpdateSnapshotLifecycleTest extends TestCase
                 if ($state === 'populated') $this->pmssWriteFile($root.'/'.$tree.'/.hidden', 'keep');
             }
             $outputPath = $root.'/dry-run-output';
-            $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+            $result = $this->pmssExecShellCommand($this->pmssBuildInlinePhpCommand(
                 'require '.var_export($bootstrap, true).'; stageSnapshot('.var_export($root, true).', true);'
             ).' > '.escapeshellarg($outputPath).' 2>&1');
             $result['output'] = (string) file_get_contents($outputPath);
@@ -87,9 +86,9 @@ class UpdateSnapshotLifecycleTest extends TestCase
                 $this->pmssCreateSymlinkOrSkip('/etc/passwd', $root.'/etc/unsafe');
             }
             if ($kind === 'file-tree') $this->pmssWriteFile($root.'/etc', 'not a directory');
-            $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+            $result = $this->pmssExecInlinePhp(
                 'require '.var_export($bootstrap, true).'; stageSnapshot('.var_export($root, true).', true);'
-            ));
+            );
             $this->assertSame(13, $result['rc'], $result['output']);
             $this->assertStringContainsString('Unsafe snapshot etc tree', $result['output']);
             $this->assertStringNotContainsString('Would copy var', $result['output']);
@@ -107,10 +106,9 @@ class UpdateSnapshotLifecycleTest extends TestCase
                 }
                 if ($seedbox !== 'missing') $this->pmssEnsureDir($root.'/etc/seedbox');
                 if ($seedbox === 'populated') $this->pmssWriteFile($root.'/etc/seedbox/config', 'config');
-                $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+                $result = $this->pmssExecInlinePhp(
                     'require '.var_export($bootstrap, true).'; stageSnapshot('.var_export($root, true).', false);'
-                    .' echo json_encode($GLOBALS["snapshotCalls"]);'
-                ), ['PMSS_SNAPSHOT_INSTALLED' => $installed ? '1' : '0']);
+                    .' echo json_encode($GLOBALS["snapshotCalls"]);', ['PMSS_SNAPSHOT_INSTALLED' => $installed ? '1' : '0']);
                 $this->assertSame(0, $result['rc'], $result['output']);
                 $trace = preg_replace('/pmss-(staging|backup)-[a-f0-9]{8}/', 'pmss-$1-RUN', $result['output']);
                 $expected = [

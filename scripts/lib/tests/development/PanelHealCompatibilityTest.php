@@ -74,7 +74,7 @@ final class PanelHealCompatibilityTest extends TestCase
             $script = 'require '.var_export($file, true).'; $calls=0;'
                 .'$ok=pmssCustomerTorrentClientToggleStart("qbittorrent",function()use(&$calls){$calls++;},'
                 .var_export($home, true).'); echo json_encode([$ok,$calls]);';
-            $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script));
+            $result = $this->pmssExecInlinePhp($script);
             $this->assertSame(0, $result['rc'], $result['output']);
             $this->assertSame('[true,1]', $result['output']);
         }
@@ -94,7 +94,7 @@ PHP
         );
         $script = 'require '.var_export($endpoint, true).'; echo (http_response_code() ?: 200)."\\n";'
             .'echo pmssQbittorrentFrontendPreferenceSet("[Preferences]\\r\\nWebUI\\\\Port=8080\\r\\n", "WebUI\\\\Port", "23456");';
-        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script));
+        $result = $this->pmssExecInlinePhp($script);
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame("200\n[Preferences]\nWebUI\\Port=23456", $result['output']);
     }
@@ -103,7 +103,7 @@ PHP
     {
         $script = 'require '.var_export($this->pmssRepoPath('etc/skel/www/qbittorrentPassword.php'), true).';'
             .'echo json_encode(pmssQbittorrentFrontendPasswordApplyStopped("/must-not-be-read", "separate-secret"));';
-        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script));
+        $result = $this->pmssExecInlinePhp($script);
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame('false', $result['output']);
     }
