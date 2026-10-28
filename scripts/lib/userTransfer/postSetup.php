@@ -17,6 +17,10 @@ require_once __DIR__.'/qbittorrentRestart.php';
 
 function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths): void
 {
+    // Recovery adds files under the live home; its existing setup must stay intact.
+    if (isset($cfg['into'])) {
+        return;
+    }
     $localUser = $cfg['localUser'];
     $remoteUser = $cfg['remoteUser'];
 

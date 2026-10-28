@@ -451,6 +451,20 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
 - User transfer – `scripts/util/userTransfer.php`
+  - `--into DIR` (or `--into=DIR`) recovers into `/home/LOCAL_USERNAME/DIR/`
+    with `--ignore-existing` and `--compare-dest=/home/LOCAL_USERNAME/` on every rsync pass, so a
+    file the live home already holds unchanged is not copied again. `DIR` must be one plain
+    component matching `[A-Za-z0-9._-]+`, excluding `.` and `..`; invalid values
+    are refused before network access or filesystem changes. For example:
+    `/scripts/util/userTransfer.php alice old-host.example --into old-copy`.
+    The receiver creates a missing directory as the account with mode `0700`,
+    refuses links, non-directories and foreign owners, and pins the checked
+    inode as its working directory (ADR 0092). Existing files are skipped;
+    existing directories under the recovery directory can receive rsync metadata.
+    Post-transfer setup (permissions, session rewrites, category merge, restarts
+    and completeness checks) is skipped because the live account is already set
+    up. Authentication, pass counts, logging, quota and the remaining hand-over
+    flow retain their existing behavior. Omitting `--into` retains normal transfer.
   - Receiver runs as the target account inside a user namespace and a private
     mount view with filesystem paths outside the target home read-only. Source
     subordinate IDs map to the target allocation; unmappable ownership fails

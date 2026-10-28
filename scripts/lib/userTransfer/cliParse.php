@@ -5,6 +5,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/../cli/optionParser.php';
+require_once __DIR__.'/intoDestination.php';
 
 /**
  * Parse argv and return a normalised configuration array.
@@ -17,6 +18,7 @@ function pmssUserTransferParseCli(array $argv): array
         '/scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_HOSTNAME',
         '/scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_USERNAME REMOTE_HOSTNAME',
     ], [
+        ['--into DIR', 'Recover into DIR without replacing existing files; skip post-transfer setup'],
         ['--main-passes N', 'Number of passes for the main rsync (default 31)'],
         ['--final-passes N', 'Number of passes for the final rsync (default 3)'],
         ['--sleep-min N', 'Minimum sleep seconds between passes (default 60)'],
@@ -28,9 +30,11 @@ function pmssUserTransferParseCli(array $argv): array
     ], 20, [
         'If REMOTE_HOSTNAME does not contain a dot, ".pulsedmedia.com" is appended.',
         'Password can be provided via env: PMSS_USER_TRANSFER_PASSWORD',
+        'DIR must be one component: [A-Za-z0-9._-]+, excluding . and ..',
     ], false, ['--help, -h', 'Show this help']);
 
     $optionSpecs = [
+        'into' => ['field' => 'into', 'default' => null, 'expectsValue' => true],
         'main-passes' => ['field' => 'mainPasses', 'default' => 31, 'expectsValue' => true, 'range' => [1, 500]],
         'final-passes' => ['field' => 'finalPasses', 'default' => 3, 'expectsValue' => true, 'range' => [1, 100]],
         'sleep-min' => ['field' => 'sleepMin', 'default' => 60, 'expectsValue' => true],
@@ -56,6 +60,10 @@ function pmssUserTransferParseCli(array $argv): array
         }
         if (!$spec['expectsValue']) {
             $options[$spec['field']] = true;
+            continue;
+        }
+        if ($key === 'into') {
+            $options['into'] = pmssUserTransferValidateInto($value);
             continue;
         }
         if (!is_string($value) || $value === '') {
@@ -120,6 +128,10 @@ function pmssUserTransferParseCli(array $argv): array
 
     foreach (['mainPasses', 'finalPasses', 'sleepMin', 'sleepMax', 'verifyThreshold', 'dryRun', 'printPassword'] as $field) {
         $cfg[$field] = $options[$field];
+    }
+    // Preserve the legacy configuration shape when recovery was not requested.
+    if ($options['into'] !== null) {
+        $cfg['into'] = $options['into'];
     }
 
     return $cfg;

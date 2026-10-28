@@ -51,6 +51,9 @@ function pmssUserTransferMain(array $argv): int
         $cfg = pmssUserTransferParseCli($argv);
         $home = pmssUserTransferAssertSafeLocalHome($cfg['localUser']);
 
+        // Validate options before even the best-effort log directory creation.
+        is_dir('/var/log/pmss') || @mkdir('/var/log/pmss', 0755, true);
+
         if ($cfg['dryRun']) {
             putenv('PMSS_DRY_RUN=1');
         }
@@ -76,11 +79,17 @@ function pmssUserTransferMain(array $argv): int
 
         // Dry runs should be fully non-interactive and avoid writing temp scripts.
         if ($cfg['dryRun']) {
+            if (isset($cfg['into'])) {
+                logMessage('[INFO] Recovery mode: destination /home/'.$cfg['localUser'].'/'.$cfg['into']
+                    .'/, rsync adds --ignore-existing --compare-dest=/home/'.$cfg['localUser'].'/, post-transfer setup skipped');
+            }
             $scratchPaths = pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>');
             runStep('Validating remote SSH authentication', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['authProbe']]));
             pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], 1, 0, 0);
             pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], 1, 0, 0);
-            runStep('Normalising user permissions', pmssBuildCommand('php', [dirname(__DIR__).'/util/userPermissions.php', $cfg['localUser']]));
+            if (!isset($cfg['into'])) {
+                runStep('Normalising user permissions', pmssBuildCommand('php', [dirname(__DIR__).'/util/userPermissions.php', $cfg['localUser']]));
+            }
             logMessage('[SKIP] Dry run complete');
             return 0;
         }
@@ -138,25 +147,33 @@ function pmssUserTransferMain(array $argv): int
             }
 
             $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
-            $holdUntil = time() + 21600;
-            pmssUserTransferWriteFile($scratchPaths['sourceHoldScript'], pmssUserTransferBuildEternalSourceCommand($cfg, $holdUntil), 0700);
-            $sourceHeld = true;
-            if (runStep('Holding source Eternals', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceHoldScript']])) !== 0) {
-                throw new RuntimeException('Could not hold source Eternals before final transfer', 1);
-            }
-            $targetHeld = true;
-            if (runStep('Holding target Eternals', pmssUserTransferTargetEternalCommand($cfg['localUser'], $holdUntil)) !== 0) {
-                throw new RuntimeException('Could not hold target Eternals before final transfer', 1);
+            // Recovery copies files into a live account; the hand-over of services (Eternals holds, Docker) belongs
+            // to a migration only and must never pause, start or hold anything on the live account.
+            $recovery = !pmssUserTransferRunsHandOver($cfg);
+            if (!$recovery) {
+                $holdUntil = time() + 21600;
+                pmssUserTransferWriteFile($scratchPaths['sourceHoldScript'], pmssUserTransferBuildEternalSourceCommand($cfg, $holdUntil), 0700);
+                $sourceHeld = true;
+                if (runStep('Holding source Eternals', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceHoldScript']])) !== 0) {
+                    throw new RuntimeException('Could not hold source Eternals before final transfer', 1);
+                }
+                $targetHeld = true;
+                if (runStep('Holding target Eternals', pmssUserTransferTargetEternalCommand($cfg['localUser'], $holdUntil)) !== 0) {
+                    throw new RuntimeException('Could not hold target Eternals before final transfer', 1);
+                }
             }
             $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
 
-            $dockerQuiesceRc = runStep('Quiescing source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerQuiesceScript']]));
-            if ($dockerQuiesceRc !== 0) {
-                logMessage(sprintf('[WARN] Docker quiesce probe returned rc=%d', $dockerQuiesceRc));
+            $dockerIds = [];
+            if (!$recovery) {
+                $dockerQuiesceRc = runStep('Quiescing source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerQuiesceScript']]));
+                if ($dockerQuiesceRc !== 0) {
+                    logMessage(sprintf('[WARN] Docker quiesce probe returned rc=%d', $dockerQuiesceRc));
+                }
+                $dockerIds = pmssUserTransferValidDockerIds((string) @file_get_contents($scratchPaths['dockerIds']));
+                logMessage(sprintf('[INFO] Docker hand-over: %d running container(s) stopped on source', count($dockerIds)));
             }
-            $dockerIds = pmssUserTransferValidDockerIds((string) @file_get_contents($scratchPaths['dockerIds']));
             $dockerCount = count($dockerIds);
-            logMessage(sprintf('[INFO] Docker hand-over: %d running container(s) stopped on source', $dockerCount));
             $dockerFinalRc = 0;
             if ($dockerCount > 0) {
                 $dockerFinalRc = pmssUserTransferRunPasses('Pulling volatile data (containers stopped)', $scratchPaths['expect'], $scratchPaths['finalScript'], 1, 0, 0);
@@ -192,9 +209,11 @@ function pmssUserTransferMain(array $argv): int
                 return 1;
             }
 
-            pmssUserTransferWriteFile($scratchPaths['sourceReleaseScript'], pmssUserTransferBuildEternalSourceOffCommand($cfg), 0700);
-            if (runStep('Keeping source Eternals off after transfer',
-                pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceReleaseScript']])) !== 0) return 1;
+            if (!$recovery) {
+                pmssUserTransferWriteFile($scratchPaths['sourceReleaseScript'], pmssUserTransferBuildEternalSourceOffCommand($cfg), 0700);
+                if (runStep('Keeping source Eternals off after transfer',
+                    pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceReleaseScript']])) !== 0) return 1;
+            }
 
             logMessage('[OK] User transfer complete');
             $transferComplete = true;

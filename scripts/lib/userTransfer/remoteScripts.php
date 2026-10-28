@@ -48,6 +48,15 @@ function pmssUserTransferBuildRsyncCommand(
     array $rsyncOptions = []
 ): string
 {
+    $destination = '/home/'.$cfg['localUser'].'/';
+    if (isset($cfg['into'])) {
+        $destination .= pmssUserTransferValidateInto($cfg['into']).'/';
+        $rsyncOptions[] = '--ignore-existing';
+        // Unchanged files the live home already holds are not copied twice. The path is absolute on purpose: with a
+        // relative '..' a delta transfer uses the differing live file as its basis and rsync discards the update
+        // ("failed verification", rc 23), while a local whole-file copy hides it.
+        $rsyncOptions[] = '--compare-dest=/home/'.$cfg['localUser'].'/';
+    }
     $options = pmssCommandArgvShellQuote(array_map(static function (string $option): string { return $option; }, $rsyncOptions));
     $arguments = array_map(static function (string $item): string {
         return '--exclude='.escapeshellarg($item);
@@ -66,7 +75,7 @@ function pmssUserTransferBuildRsyncCommand(
         .' --filter='.escapeshellarg('-x user.rsync.*').' --filter='.escapeshellarg('-x! user.*')
         .($options === '' ? '' : ' '.$options).' -e '
         .escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
-        .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/');
+        .' '.implode(' ', $arguments).' '.escapeshellarg($destination);
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildReceiver($cfg, $rsync);
 }
 

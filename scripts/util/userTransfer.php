@@ -15,9 +15,6 @@
 
 defined('PMSS_LOG_FILE') || define('PMSS_LOG_FILE', '/var/log/pmss/userTransfer.log');
 
-// Best-effort log directory creation so interactive runs keep their history.
-is_dir('/var/log/pmss') || @mkdir('/var/log/pmss', 0755, true);
-
 require_once __DIR__.'/../lib/userTransfer.php';
 
 pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTransferMain');

@@ -7,6 +7,7 @@
  */
 
 require_once dirname(__DIR__).'/user/subordinateIds.php';
+require_once __DIR__.'/intoDestination.php';
 
 /** Obtain the source account and subordinate ranges without trusting names in rsync's file list. */
 function pmssUserTransferBuildIdentityProbe(array $cfg): string
@@ -113,6 +114,9 @@ function pmssUserTransferBuildReceiver(array $cfg, string $rsync): string
         throw new RuntimeException('Receiver namespace was not prepared', 1);
     }
     $receiver = $cfg['receiver'];
+    if (isset($cfg['into'])) {
+        $rsync = pmssUserTransferBuildIntoReceiver($cfg, $rsync);
+    }
     $inner = 'for i in {1..500}; do [ "$(id -u)" = 0 ] && break; sleep 0.02; done; '
         .'[ "$(id -u)" = 0 ] || exit 1; exec '.$rsync;
     // Expect keeps the password in the root parent; the account-owned child

@@ -84,6 +84,7 @@ class UserTransferTest extends TestCase
             ."  /scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_HOSTNAME\n"
             ."  /scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_USERNAME REMOTE_HOSTNAME\n\n"
             ."Options:\n"
+            ."  --into DIR          Recover into DIR without replacing existing files; skip post-transfer setup\n"
             ."  --main-passes N     Number of passes for the main rsync (default 31)\n"
             ."  --final-passes N    Number of passes for the final rsync (default 3)\n"
             ."  --sleep-min N       Minimum sleep seconds between passes (default 60)\n"
@@ -95,7 +96,8 @@ class UserTransferTest extends TestCase
             ."  --help, -h          Show this help\n\n"
             ."Notes:\n"
             ."  - If REMOTE_HOSTNAME does not contain a dot, \".pulsedmedia.com\" is appended.\n"
-            ."  - Password can be provided via env: PMSS_USER_TRANSFER_PASSWORD\n";
+            ."  - Password can be provided via env: PMSS_USER_TRANSFER_PASSWORD\n"
+            ."  - DIR must be one component: [A-Za-z0-9._-]+, excluding . and ..\n";
 
         try {
             \pmssUserTransferParseCli(['userTransfer.php', '--help']);

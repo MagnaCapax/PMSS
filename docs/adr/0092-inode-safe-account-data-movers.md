@@ -59,6 +59,14 @@ order. A skipped legitimate migration is a data-preservation failure.
   identity is read from that store (ADR 0152); the client ID is present once
   it is recorded there. Rsync does not
   interpret sender `user.rsync.*` fake-super xattrs as privileged metadata.
+- With `userTransfer --into DIR`, the account-mapped receiver opens the home
+  and recovery directory using `O_DIRECTORY | O_NOFOLLOW`. It creates a missing
+  recovery directory as the account, verifies the directory owner and matching
+  open/name device and inode, then uses `fchdir` through Perl's directory handle.
+  Rsync receives `.` as its final destination after this check, pinning the
+  selected directory even if the account swaps its original name. Both passes
+  use `--ignore-existing`; post-transfer account convergence is skipped. The
+  existing receiver namespace and credential isolation remain in effect.
 - `recreateUser.php` renames the top-level home and backup only between checked
   real directories under the same parent, then verifies the moved inode.
   Superseded archives use the same pinned purge as termination.
