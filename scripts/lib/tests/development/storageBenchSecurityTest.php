@@ -12,6 +12,8 @@ class StorageBenchSecurityTest extends TestCase
         foreach ([
             [NAN, null], [INF, null], [-INF, null], ['1e309', null], ['-1e309', null],
             [str_repeat('9', 400), null], ['', null], ['invalid', null],
+            ["\0".'85', null], ["85\0", null], ["8\0".'5', null],
+            [" \t\0"."85\0\r\n", null], ["\0", null], [" \0 ", null],
             [null, null], [true, null], [false, null], [[], null], [[85], null],
             [0, 0.0], [85, 85.0], [85.5, 85.5], [' 85.5 ', 85.5],
             ["\t85\r\n", 85.0], ['8.5e1', 85.0], ['1e308', 1.0e308],
@@ -44,7 +46,9 @@ PHP;
         $script .= <<<'PHP'
 $results = [];
 foreach ([[NAN, null], [INF, null], [-INF, null], ['1e309', null], ['-1e309', null],
-    [null, null], ['85', null], ['85.5', null], [0, 100], [NAN, 101]] as [$util, $latency]) {
+    [null, null], ['85', null], ['85.5', null], [0, 100], [NAN, 101],
+    ["\0".'85', null], ["85\0", null], ["8\0".'5', null],
+    [" \t\0"."85\0\r\n", null], ["\0", null], ["85\0", 101]] as [$util, $latency]) {
     $GLOBALS['util'] = $util;
     $GLOBALS['latency'] = $latency;
     $ok = storageBenchmarkIdlePreflight('unused', ['run_id' => 'fixture'], '/unused', 100, 85);
@@ -59,6 +63,10 @@ PHP;
             + ['iostat_util_pct' => 85.5, 'warn_util' => 'iostat util high']];
         $expected[] = [true, array_replace($idle, ['ioping_avg_ms' => 100, 'iostat_util_pct' => 0])];
         // Missing utilization must not erase a busy latency result.
+        $expected[] = [false, array_replace($idle, ['ok' => false, 'ioping_avg_ms' => 101])
+            + ['warn' => 'ioping above threshold']];
+        // Corrupt utilization follows missing-data policy without erasing busy latency.
+        $expected = array_merge($expected, array_fill(0, 5, [true, $idle]));
         $expected[] = [false, array_replace($idle, ['ok' => false, 'ioping_avg_ms' => 101])
             + ['warn' => 'ioping above threshold']];
         $this->assertSame($expected, $this->pmssRunInlinePhpJson($script));
@@ -311,6 +319,13 @@ PHP;
         foreach ([
             [0, $summary, '', $measured],
             [0, '', $summary, $measured],
+            [0, " \t".$summary."\r\n", '', $measured],
+            [0, "\0".$summary, '', $missing],
+            [0, $summary."\0", '', $missing],
+            [0, 'corrupt'."\0".$summary, '', $missing],
+            [0, '', "\0".$summary, $missing],
+            [0, '', $summary."\0", $missing],
+            [0, $summary, " \t\0".$summary."\0\r\n", $missing],
             [0, 'copied, 0 s, 0 MB/s', '', ['mbps' => 0, 'secs' => 0]],
             [1, $summary, '', $missing],
             [124, '', $summary, $missing],

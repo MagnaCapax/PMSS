@@ -25,9 +25,12 @@ function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $deviceEntry
 function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array
 {
     [$rc, $so, $se] = [runCommand(sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip), true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? ''];
-    $line = trim($se !== '' ? $se : $so);
+    $raw = $se !== '' ? $se : $so;
+    $line = trim($raw);
     // A failed read can leave a partial transfer summary; it is not a measurement.
-    if ($rc === 0 && preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $match)) {
+    // NUL-containing output must not match a valid summary embedded within it.
+    if ($rc === 0 && !pmssFilesystemPathHasNulByte($raw)
+        && preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $match)) {
         $secs = pmssFiniteNonNegativeFloat($match[1]);
         $mbps = pmssFiniteNonNegativeFloat($match[2]);
         if ($secs !== null && $mbps !== null) return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs];

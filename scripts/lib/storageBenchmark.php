@@ -20,6 +20,8 @@ function storageBenchmarkIostatUtilPctRead(string $path): ?float
     $payload = pmssReadSerializedArrayFile($path);
     $util = $payload['diskUtil'] ?? null;
     if (!is_int($util) && !is_float($util) && !is_string($util)) return null;
+    // Reject corrupt cached bytes before trim() can erase edge NULs.
+    if (pmssFilesystemPathHasNulByte((string) $util)) return null;
     // Retain legacy scalar normalization, then check numeric-string overflow too.
     return pmssFiniteFloat(trim((string) $util));
 }
