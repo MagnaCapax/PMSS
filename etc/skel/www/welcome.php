@@ -18,6 +18,9 @@ require_once __DIR__.'/scriptsInc.php';
 $pmssConfigureAvailable = is_file(__DIR__.'/configure.php') && is_file(__DIR__.'/configureSettings.php');
 if (isset($_GET['status'])) { pmssCustomerAppsStatusJsonEmit(); exit; }
 if (isset($_GET['log'])) { pmssCustomerAppsLogJsonEmit(); exit; }
+// The credits card asks for its own figures only: answer before the helpers and the page-state reads below, so a slow or noisy
+// read there cannot hold or corrupt the card's JSON (the card used to wait behind them and then sit on "reading the balance").
+if (isset($_GET['credits'])) { pmssWelcomeHomeCreditsEmit(dirname(__DIR__)); exit; }
 
 if (isset($_GET['backup']) && $_GET['backup'] === 'download') {
     pmssCustomerBackupDownload(dirname(__DIR__));
@@ -79,7 +82,6 @@ $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAl
 
 
 // Welcome home view model (ADR 0147). Every number comes from an existing reader; nothing is recomputed here.
-if (isset($_GET['credits'])) { pmssWelcomeHomeCreditsEmit(dirname(__DIR__)); exit; }
 if (isset($_GET['support'])) { pmssWelcomeHomeSupportEmit(dirname(__DIR__)); exit; }
 if (isset($_GET['news'])) { pmssWelcomeHomeNewsEmit(dirname(__DIR__)); exit; }
 $homeTrafficState = pmssWelcomeHomeTrafficStateBuild(
@@ -346,10 +348,18 @@ if (file_exists('openvpn-config.tgz')) {
                 if (rows.length) store('news-seen', String(now));
             }
             if (news && news.querySelector('.h-news-wait') && window.fetch) {
+                // A read that fails or never answers ends in the same words the server uses when no news can be read.
+                var newsDown = <?= json_encode(pmssWelcomeHomeNewsUnavailableHtml(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                var newsWatchdog = setTimeout(function () { if (news.querySelector('.h-news-wait')) news.innerHTML = newsDown; }, 20000);
                 fetch(news.getAttribute('data-src'), {credentials: 'same-origin', cache: 'no-store'})
                     .then(function (response) { return response.ok ? response.text() : ''; })
-                    .then(function (html) { if (html) { news.innerHTML = html; newsMark(); } })
-                    .catch(function () {});
+                    .then(function (html) {
+                        clearTimeout(newsWatchdog);
+                        if (!news.querySelector('.h-news-wait')) return;
+                        news.innerHTML = html ? html : newsDown;
+                        if (html) newsMark();
+                    })
+                    .catch(function () { clearTimeout(newsWatchdog); if (news.querySelector('.h-news-wait')) news.innerHTML = newsDown; });
             } else if (news) {
                 newsMark();
             }
@@ -437,34 +447,6 @@ if (file_exists('openvpn-config.tgz')) {
                 && event.data === 'pikkumies:tab-ready' && !pmssPikkumiesBarReady && frame) frame.src = pmssPikkumiesBarOrigin + '/bar';
         });
         pmssPikkumiesBarPoll(); pmssPikkumiesBarTimer = setInterval(pmssPikkumiesBarPoll, 5000);
-<?php endif; ?>
-<?php if ($homeCreditsKey): ?>
-
-        /* AI credits: the status-strip card (ADR 0148). */
-        (function () {
-            var card = document.getElementById('h-credits');
-            if (!card || !window.fetch) return;
-            fetch('welcome.php?credits=1', {credentials: 'same-origin', cache: 'no-store'})
-                .then(function (response) { return response.json(); })
-                .then(function (credits) {
-                    if (credits.state !== 'ok') {
-                        var strip = card.parentNode;
-                        card.parentNode.removeChild(card);
-                        if (strip) strip.className = strip.className.replace(/\s*h-m5\b/, '');
-                        return;
-                    }
-                    card.querySelector('[data-credits-value]').textContent = credits.value;
-                    card.querySelector('[data-credits-meta]').textContent = credits.meta;
-                    if (credits.pct_left !== null) {
-                        var fill = document.createElement('i');
-                        fill.className = credits.pct_left < 10 ? 't-warn' : 's-base';
-                        fill.style.width = Math.max(0, Math.min(100, credits.pct_left)).toFixed(2) + '%';
-                        var meter = card.querySelector('[data-credits-bar]');
-                        meter.className = 'h-bar';
-                        meter.appendChild(fill);
-                    }
-                }).catch(function () {});
-        })();
 <?php endif; ?>
 
         /* App tiles (operator 2026-10-23: "single click installs and management"): Start and Restart call the same endpoints
@@ -561,6 +543,48 @@ if (file_exists('openvpn-config.tgz')) {
             }, 4000);
         }
     </script>
+<?php if ($homeCreditsKey): ?>
+<script type="text/javascript">
+    /* AI credits: the status-strip card (ADR 0148). Its own script element, so an error anywhere in the page script above cannot
+       stop it from running and leave the card on its placeholder. */
+    (function () {
+        var card = document.getElementById('h-credits');
+        if (!card || !window.fetch) return;
+        /* A read that fails removes the card instead of leaving it on its placeholder (ADR 0148): a failed or slow request,
+           a non-JSON answer and a service that cannot say all end the same way. */
+        function pmssCreditsCardDrop() {
+            var strip = card.parentNode;
+            if (!strip) return;
+            strip.removeChild(card);
+            strip.className = strip.className.replace(/\s*h-m5\b/, '');
+        }
+        var watchdog = setTimeout(pmssCreditsCardDrop, 20000);
+        fetch('welcome.php?credits=1', {credentials: 'same-origin', cache: 'no-store'})
+            .then(function (response) {
+                if (!response.ok) throw new Error('credits ' + response.status);
+                return response.json();
+            })
+            .then(function (credits) {
+                clearTimeout(watchdog);
+                if (!card.parentNode) return;
+                if (credits.state !== 'ok') {
+                    pmssCreditsCardDrop();
+                    return;
+                }
+                card.querySelector('[data-credits-value]').textContent = credits.value;
+                card.querySelector('[data-credits-meta]').textContent = credits.meta;
+                if (credits.pct_left !== null) {
+                    var fill = document.createElement('i');
+                    fill.className = credits.pct_left < 10 ? 't-warn' : 's-base';
+                    fill.style.width = Math.max(0, Math.min(100, credits.pct_left)).toFixed(2) + '%';
+                    var meter = card.querySelector('[data-credits-bar]');
+                    meter.className = 'h-bar';
+                    meter.appendChild(fill);
+                }
+            }).catch(function () { clearTimeout(watchdog); pmssCreditsCardDrop(); });
+    })();
+</script>
+<?php endif; ?>
 <script type="text/javascript">if (window.pmssAppsStatePost) pmssAppsStatePost(<?= json_encode($homeAppStates, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode($homeAttention, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>);</script>
 </body>
 </html>
@@ -1311,6 +1335,12 @@ function pmssWelcomeHomeNewsPartHtmlBuild($heading, array $rows, $allUrl = '', $
     }
     return $html.'</ul></div>';
 }
+/** The News card's words when no news can be read (also what the page shows when its own News request fails). */
+function pmssWelcomeHomeNewsUnavailableHtml()
+{
+    return '<p class="h-muted">News is unavailable right now. <a href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">Read the announcements</a>.</p>';
+}
+
 /** Render What's new from the account cache; with $allowNetwork the stale sources are refetched first. */
 function pmssWelcomeHomeNewsHtmlRead($home, $allowNetwork)
 {
@@ -1330,7 +1360,7 @@ function pmssWelcomeHomeNewsHtmlRead($home, $allowNetwork)
     );
     $html = pmssWelcomeHomeNewsPartHtmlBuild('Announcements', $news['announcements'], 'https://pulsedmedia.com/clients/announcements.php')
         .pmssWelcomeHomeNewsPartHtmlBuild('Väinämöinen\'s articles', $news['articles'], '', false);
-    if ($html === '') return '<p class="h-muted">News is unavailable right now. <a href="https://pulsedmedia.com/clients/announcements.php" target="_blank" rel="noopener">Read the announcements</a>.</p>';
+    if ($html === '') return pmssWelcomeHomeNewsUnavailableHtml();
     return $html;
 }
 

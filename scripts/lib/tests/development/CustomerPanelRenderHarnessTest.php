@@ -88,6 +88,59 @@ class CustomerPanelRenderHarnessTest extends TestCase
         });
     }
 
+    /** The credits request answers before the page's helpers and state reads, so output or a stall there cannot sit in front of its JSON. */
+    public function testWelcomeCreditsRequestAnswersPureJsonBeforeThePageReads(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $key = 'vsk-'.str_repeat('a', 24);
+            $keyFile = $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1\nkey=".$key."\n");
+            $this->assertTrue(chmod($keyFile, 0600));
+            $this->pmssWriteFile($home.'/.cache/pmss-welcome/credits.json', (string) json_encode(array(
+                'at' => time(), 'key' => substr(hash('sha256', $key), 0, 12),
+                'figures' => array('balance' => 900000, 'tokens_30d' => 1234567, 'pct_left' => 45.5))), 0700);
+            // Helpers the page loads and runs before building its state: one that prints text and one that never returns quickly.
+            $this->pmssWriteFile($home.'/www/welcomeAnnouncements.php', '<?php echo "STRAY OUTPUT";');
+            $this->pmssWriteFile($home.'/www/userTrafficLimit.php', '<?php sleep(30);');
+
+            $started = microtime(true);
+            $result = $render('welcome.php', array('query' => 'credits=1', 'minBytes' => 10));
+            $this->assertTrue(microtime(true) - $started < 15, 'The credits request must not wait for the page reads');
+            $credits = json_decode($result['stdout'], true);
+            $this->assertTrue(is_array($credits), 'The credits response must be JSON alone: '.substr($result['stdout'], 0, 120));
+            $this->assertSame('ok', $credits['state']);
+            $this->assertSame('900k', $credits['value']);
+            $this->assertStringNotContainsString($key, $result['stdout']);
+
+            $this->assertTrue(unlink($keyFile));
+            $none = json_decode($render('welcome.php', array('query' => 'credits=1', 'minBytes' => 10))['stdout'], true);
+            $this->assertSame('none', $none['state'], 'An account without a key gets a state, not an empty answer');
+        });
+    }
+
+    /** A credits read that fails, stalls or answers with anything but JSON removes the card; it never stays on its placeholder (ADR 0148). */
+    public function testWelcomeCreditsCardLeavesNoPlaceholderWhenTheReadFails(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $key = $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1\nkey=vsk-".str_repeat('a', 24)."\n");
+            $this->assertTrue(chmod($key, 0600));
+            $expectations = \pmssCustomerPanelRenderExpectations();
+            $page = $render('welcome.php', $expectations['welcome.php'])['stdout'];
+            $this->assertStringContainsString('function pmssCreditsCardDrop()', $page);
+            $this->assertStringContainsString('setTimeout(pmssCreditsCardDrop, 20000)', $page, 'A request that never answers must not leave the card waiting');
+            $this->assertStringContainsString("if (!response.ok) throw new Error('credits ' + response.status);", $page);
+            $this->assertStringContainsString('.catch(function () { clearTimeout(watchdog); pmssCreditsCardDrop(); })', $page);
+            // The card's script is its own element: an error in the page script above it cannot stop it from running.
+            $creditsScript = null;
+            foreach (explode('<script', $page) as $script) {
+                if (strpos($script, "getElementById('h-credits')") !== false) { $creditsScript = $script; }
+            }
+            $this->assertTrue($creditsScript !== null, 'The credits card must have a script');
+            $this->assertStringNotContainsString('.catch(function () {})', $creditsScript, 'A swallowed failure leaves the card on "reading the balance"');
+            $this->assertStringNotContainsString('/* Welcome home. */', $creditsScript, 'The credits card must not share a script element with the page script');
+            $this->assertStringContainsString('News is unavailable right now.', $page, 'A News request that fails must end in words, not in "Loading the latest news"');
+        });
+    }
+
     /** The Help card's Get help form renders with and without an AI key; only the key-less form says it opens in the client area. */
     public function testWelcomeRendersGetHelpFormWithAndWithoutAKey(): void
     {
