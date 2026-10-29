@@ -90,44 +90,47 @@ if (!function_exists('pmssCustomerBackupRestoreTarMemberTypesRead')) {
 
   $types = array();
   $pendingName = null;
-  while (!@gzeof($handle)) {
-   $header = @gzread($handle, 512);
-   if (!is_string($header) || $header === '') break;
-   if (strlen($header) !== 512) { @gzclose($handle); return null; }
-   if (trim($header, "\0") === '') break;
+  try {
+   while (!@gzeof($handle)) {
+    $header = @gzread($handle, 512);
+    if (!is_string($header) || $header === '') break;
+    if (strlen($header) !== 512) return null;
+    if (trim($header, "\0") === '') break;
 
-   $type = substr($header, 156, 1);
-   $type = ($type === '' || $type === "\0") ? '0' : $type;
-   $size = pmssCustomerBackupRestoreTarSize(substr($header, 124, 12));
-   if ($size === null) { @gzclose($handle); return null; }
+    $type = substr($header, 156, 1);
+    $type = ($type === '' || $type === "\0") ? '0' : $type;
+    $size = pmssCustomerBackupRestoreTarSize(substr($header, 124, 12));
+    if ($size === null) return null;
 
-   $name = rtrim(substr($header, 0, 100), " \0");
-   $prefix = rtrim(substr($header, 345, 155), " \0");
-   if ($prefix !== '') $name = $prefix.'/'.$name;
+    $name = rtrim(substr($header, 0, 100), " \0");
+    $prefix = rtrim(substr($header, 345, 155), " \0");
+    if ($prefix !== '') $name = $prefix.'/'.$name;
 
-   // GNU long names and PAX paths share the bounded metadata read and advance.
-   if ($type === 'L' || $type === 'x') {
-    $payload = pmssCustomerBackupRestoreTarPayloadRead($handle, $size);
-    if (!is_string($payload)) { @gzclose($handle); return null; }
-    if ($type === 'L') $pendingName = rtrim($payload, "\0");
-    else {
-     $pax = pmssCustomerBackupRestorePaxPayloadParse($payload);
-     if (isset($pax['path'])) $pendingName = $pax['path'];
+    // GNU long names and PAX paths share the bounded metadata read and advance.
+    if ($type === 'L' || $type === 'x') {
+     $payload = pmssCustomerBackupRestoreTarPayloadRead($handle, $size);
+     if (!is_string($payload)) return null;
+     if ($type === 'L') $pendingName = rtrim($payload, "\0");
+     else {
+      $pax = pmssCustomerBackupRestorePaxPayloadParse($payload);
+      if (isset($pax['path'])) $pendingName = $pax['path'];
+     }
+     continue;
     }
-    continue;
-   }
 
-   if (!pmssCustomerBackupRestoreTarSkipPayload($handle, $size)) { @gzclose($handle); return null; }
-   $member = pmssCustomerBackupRestoreMemberNormalize($pendingName !== null ? $pendingName : $name);
-   $pendingName = null;
-   if ($member !== '') {
-    $currentType = pmssCustomerBackupRestoreMemberTypeAllowed($type) ? $type : '!';
-    $types[$member] = isset($types[$member]) && $types[$member] !== $currentType ? '!' : $currentType;
+    if (!pmssCustomerBackupRestoreTarSkipPayload($handle, $size)) return null;
+    $member = pmssCustomerBackupRestoreMemberNormalize($pendingName !== null ? $pendingName : $name);
+    $pendingName = null;
+    if ($member !== '') {
+     $currentType = pmssCustomerBackupRestoreMemberTypeAllowed($type) ? $type : '!';
+     $types[$member] = isset($types[$member]) && $types[$member] !== $currentType ? '!' : $currentType;
+    }
    }
+   return $types;
+  } finally {
+   // Header, metadata and payload failures all release the same gzip stream.
+   @gzclose($handle);
   }
-
-  @gzclose($handle);
-  return $types;
  }
 }
 

@@ -10,6 +10,9 @@ class CustomerBackupTransactionTest extends TestCase
     {
         $script = <<<'PHP'
 namespace BackupTransactionFixture;
+function failAt($stage) {
+    if (($GLOBALS['failureStage'] ?? '') === $stage) throw $GLOBALS['failure'];
+}
 function function_exists($name) { return false; }
 function pmssCustomerPathIsSafe($path) { return true; }
 function pmssCustomerPathIsInsideHome($home, $path) { return true; }
@@ -30,21 +33,24 @@ function is_file($path) { return substr($path, -12) === '.rtorrent.rc' || !empty
 function filesize($path) { return $GLOBALS['case'] === 'verify' ? 0 : 42; }
 function fopen($path, $mode) {
     $GLOBALS['events'][] = ['open', $path, $mode];
-    return $GLOBALS['case'] === 'open' ? false : \fopen('php://temp', 'w+');
+    return $GLOBALS['case'] === 'open' ? false : ($GLOBALS['out'] = \fopen('php://temp', 'w+'));
 }
-function chmod($path, $mode) { $GLOBALS['events'][] = ['mode', $path, $mode]; return true; }
+function chmod($path, $mode) { $GLOBALS['events'][] = ['mode', $path, $mode]; failAt('mode'); return true; }
 function popen($command, $mode) {
     $GLOBALS['events'][] = ['pipe', $command, $mode];
+    failAt('pipe');
     $GLOBALS['published'] = true;
-    return $GLOBALS['case'] === 'pipe' ? false : \fopen('php://temp', 'w+');
+    return $GLOBALS['case'] === 'pipe' ? false : ($GLOBALS['pipe'] = \fopen('php://temp', 'w+'));
 }
 function stream_copy_to_stream($in, $out) {
     $GLOBALS['events'][] = ['copy'];
+    failAt('copy');
     return $GLOBALS['case'] === 'copy' ? false : ($GLOBALS['case'] === 'empty' ? 0 : 42);
 }
 function fclose($handle) {
     $GLOBALS['events'][] = ['close'];
     \fclose($handle);
+    failAt('close');
     return $GLOBALS['case'] !== 'close';
 }
 function pclose($handle) {
@@ -59,15 +65,91 @@ function rename($from, $to) {
 }
 function gzread($handle, $size) {
     $GLOBALS['reads'][] = $size;
+    failAt($size === 512 && count($GLOBALS['reads']) === 1 ? 'header' : 'payload');
+    if (isset($GLOBALS['chunks'])) return array_shift($GLOBALS['chunks']) ?? '';
     $chunk = substr($GLOBALS['payload'], 0, min($size, 333));
     $GLOBALS['payload'] = substr($GLOBALS['payload'], strlen($chunk));
     return $chunk;
 }
+function gzopen($path, $mode) { return $GLOBALS['gzip'] = \fopen('php://temp', 'w+'); }
+function gzeof($handle) { failAt('eof'); return false; }
+function gzclose($handle) { $GLOBALS['events'][] = ['gzip-close']; return \fclose($handle); }
 PHP;
         foreach (['Backup', 'RestoreTar', 'Restore'] as $part) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/www/scriptsInc'.$part.'.php', 'BackupTransactionFixture');
         }
         return $this->pmssRunInlinePhpJson($script.$body);
+    }
+
+    public function testArchiveExceptionsCloseOutputAndReapStartedPipes(): void
+    {
+        $actual = $this->fixture(<<<'PHP'
+$results = [];
+$GLOBALS['case'] = 'ok';
+foreach ([new \RuntimeException('fixture failure'), new \Error('fixture failure')] as $failure) {
+    foreach (['mode', 'pipe', 'copy', 'close'] as $stage) {
+        foreach ([true, false] as $scheduled) {
+            if (!$scheduled && $stage === 'mode') continue;
+            $GLOBALS['failureStage'] = $stage;
+            $GLOBALS['failure'] = $failure;
+            $GLOBALS['events'] = [];
+            $GLOBALS['pipe'] = null;
+            $caught = null;
+            try {
+                pmssCustomerBackupArchiveWrite('unused', '/fixture/archive', $scheduled);
+            } catch (\Throwable $error) {
+                $caught = $error;
+            }
+            $events = array_column($GLOBALS['events'], 0);
+            $results[] = [$caught === $failure, is_resource($GLOBALS['out']),
+                is_resource($GLOBALS['pipe']), count(array_keys($events, 'close', true)),
+                count(array_keys($events, 'reap', true)), in_array('rename', $events, true)];
+        }
+    }
+}
+echo json_encode($results);
+PHP
+        );
+        // Both throwable classes preserve identity; failures before pipe startup cannot reap.
+        $expected = [[true, false, false, 1, 0, false]];
+        $expected = array_merge($expected, array_fill(0, 2, $expected[0]),
+            array_fill(0, 4, [true, false, false, 1, 1, false]));
+        $this->assertSame(array_merge($expected, $expected), $actual);
+    }
+
+    public function testTarInspectionClosesOnExceptionsAndNormalReturns(): void
+    {
+        $actual = $this->fixture(<<<'PHP'
+$results = [];
+// One metadata header forces the scanner through its padded payload reader.
+$header = substr_replace(str_repeat("\0", 512), '00000000001', 124, 11);
+$header[156] = 'L';
+foreach ([new \RuntimeException('fixture failure'), new \Error('fixture failure')] as $failure) {
+    foreach (['eof', 'header', 'payload', 'short', 'size', 'truncated', 'ok'] as $stage) {
+        $GLOBALS['failureStage'] = $stage;
+        $GLOBALS['failure'] = $failure;
+        $GLOBALS['events'] = $GLOBALS['reads'] = [];
+        $GLOBALS['chunks'] = [$header, str_repeat('x', 512), str_repeat("\0", 512)];
+        if ($stage === 'short') $GLOBALS['chunks'] = ['short'];
+        if ($stage === 'size') $GLOBALS['chunks'] = [substr_replace($header, 'invalid-size', 124, 12)];
+        if ($stage === 'truncated') $GLOBALS['chunks'] = [$header, ''];
+        $caught = null;
+        $result = null;
+        try {
+            $result = pmssCustomerBackupRestoreTarMemberTypesRead('/unused/archive');
+        } catch (\Throwable $error) {
+            $caught = $error;
+        }
+        $results[] = [$result, $caught === $failure, is_resource($GLOBALS['gzip']), $GLOBALS['events']];
+    }
+}
+echo json_encode($results);
+PHP
+        );
+        $closed = [['gzip-close']];
+        $expected = array_merge(array_fill(0, 3, [null, true, false, $closed]),
+            array_fill(0, 3, [null, false, false, $closed]), [[[], false, false, $closed]]);
+        $this->assertSame(array_merge($expected, $expected), $actual);
     }
 
     public function testScheduledAndSnapshotPublicationKeepTheirDistinctContracts(): void

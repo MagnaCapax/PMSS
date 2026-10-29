@@ -165,18 +165,24 @@ if (!function_exists('pmssCustomerBackupArchiveWrite')) {
   $tmpPath = $archivePath.'.part';
   $out = @fopen($tmpPath, $scheduled ? 'xb' : 'wb');
   if (!is_resource($out)) return $scheduled ? 'Could not create the backup archive file.' : 'Could not create the pre-restore snapshot file.';
-  if ($scheduled) @chmod($tmpPath, 0600);
-
-  $pipe = @popen($command, 'r');
-  if (!is_resource($pipe)) {
-   fclose($out);
+  $pipe = null;
+  try {
+   if ($scheduled) @chmod($tmpPath, 0600);
+   $pipe = @popen($command, 'r');
+   if (is_resource($pipe)) $bytes = @stream_copy_to_stream($pipe, $out);
+  } finally {
+   // Closing the output must not prevent reaping an already-started archive process.
+   try {
+    $closeOk = @fclose($out);
+   } finally {
+    if (is_resource($pipe)) $returnCode = @pclose($pipe);
+   }
+  }
+  if ($pipe === false) {
    @unlink($tmpPath);
    return $scheduled ? 'Could not start the backup archive process.' : 'Could not start the pre-restore snapshot.';
   }
 
-  $bytes = @stream_copy_to_stream($pipe, $out);
-  $closeOk = @fclose($out);
-  $returnCode = @pclose($pipe);
   // Scheduled archives also require nonempty output and an unoccupied final name.
   if ($bytes === false || ($scheduled && (int) $bytes <= 0) || !$closeOk || $returnCode !== 0
       || ($scheduled && file_exists($archivePath)) || !@rename($tmpPath, $archivePath)) {

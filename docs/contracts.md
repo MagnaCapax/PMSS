@@ -1353,6 +1353,10 @@ byte and final-name checks, and post-publication verification. Snapshots retain
 reads and payload skips share one padded-block loop; only metadata is retained
 in memory and subject to the existing 65536-byte cap. Member selection, link
 rejection, extraction and retention policy remain at their original boundaries.
+Archive output closes and any started pipe is reaped even when setup or copying
+throws; a close exception still permits pipe reaping. Tar inspection closes its
+gzip stream on every return and on header, metadata or payload exceptions.
+Exceptions propagate without publishing an archive or changing partial-file policy.
 
 ## Customer Whole-Account Service Restart – `etc/skel/www/scriptsIncAppsHtml.php` and `scriptsIncActionJs.php`
 

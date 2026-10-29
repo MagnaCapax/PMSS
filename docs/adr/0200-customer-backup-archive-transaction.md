@@ -41,6 +41,12 @@ Characterization covers publication failures and exact side-effect traces,
 name collisions, padding, truncation and the metadata size boundary. Tests run
 only on testing machines; existing backup/restore integration tests remain.
 
+Stream lifetimes use `finally`: archive output closes after setup/copy exceptions,
+and a started pipe is reaped even if closing the output throws. Tar inspection
+closes its gzip stream on normal returns, malformed input and read exceptions.
+Exception identity, publication order and partial-file handling remain unchanged;
+isolated fixtures cover both exceptions and errors without launching tar.
+
 Archives can contain private tracker URLs and separate application credentials;
 exposure therefore reaches the affected account's applications. This change
 does not generate, store or log primary account credentials, alter credential
