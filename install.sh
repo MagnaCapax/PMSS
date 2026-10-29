@@ -569,8 +569,8 @@ bootstrap_bullseye_security_archive() {
 # archive.debian.org (as template.sources.buster does); other sources stay untouched.
 bootstrap_buster_archive() {
 	local os_release="$1" apt_dir="$2" codename="" file backup
-	local main_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://[A-Za-z0-9.-]*debian\.org/debian/?([[:space:]]+buster(-updates|-backports)?([[:space:]]|$))'
-	local sec_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://[A-Za-z0-9.-]*debian\.org/debian-security/?([[:space:]]+buster/updates([[:space:]]|$))'
+	local main_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://(deb|security|httpredir|ftp(\.[a-z]{2})?)\.debian\.org/debian/?([[:space:]]+buster(-updates|-backports)?([[:space:]]|$))'
+	local sec_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://(deb|security|httpredir|ftp(\.[a-z]{2})?)\.debian\.org/debian-security/?([[:space:]]+buster/updates([[:space:]]|$))'
 	if [ -r "$os_release" ]; then
 		codename=$(sed -nE "s/^VERSION_CODENAME=[\"']?([^\"']*)[\"']?[[:space:]]*\$/\1/p" "$os_release" | head -n 1)
 	fi
@@ -586,7 +586,7 @@ bootstrap_buster_archive() {
 			log_warn "Debian 10: could not back up ${file}; leaving it unchanged"
 			continue
 		fi
-		if sed -E -i -e "s#${main_re}#\1http://archive.debian.org/debian\4#" -e "s#${sec_re}#\1http://archive.debian.org/debian-security\4#" "$file"; then
+		if sed -E -i -e "s#${main_re}#\1http://archive.debian.org/debian\6#" -e "s#${sec_re}#\1http://archive.debian.org/debian-security\6#" "$file"; then
 			log_info "Debian 10: buster lines in ${file} now use archive.debian.org (backup: ${backup})"
 		else
 			log_warn "Debian 10: could not update ${file}; bootstrap packages may fail with 404"
