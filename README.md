@@ -7,7 +7,7 @@ This builds and installs all the software and scripts to operate a seedbox serve
 
 Works on Debian 10/11/12/13. Debian 12 (Bookworm) is the recommended
 production target. Debian 13 (Trixie) support is experimental/development.
-Debian 10 is upstream end-of-life, but existing installations continue to function.
+Debian 10 is upstream end-of-life, and PMSS support for it ends with the last PMSS release of 2026: move Debian 10 servers to Debian 12 before then.
 
 This can be used standalone fully, does not require a server from Pulsed Media. You can _freely_ use this for your own self-hosted seedbox.
 No commercial restrictions, you are free to provide seedbox services using this and there are even some minimalistic whitelabeling features.
