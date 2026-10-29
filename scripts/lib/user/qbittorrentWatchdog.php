@@ -16,6 +16,14 @@ function pmssQbittorrentWatchdogRunning(string $user, string $home, array $ops =
         pmssUserWatchdogApplyManagedConfigWhenStopped($user, $running, 'pmssQbittorrentApplyManagedConfig');
     };
     $running = $runningRead($user);
+    $repairNeeded = $ops['portRepairNeeded'] ?? 'pmssQbittorrentPortRepairNeeded';
+    if ($running && $repairNeeded($user, $home)) {
+        $stop = $ops['portRepairStop'] ?? static function (string $user): void { pmssTorrentClientNativeStop($user, 'qbittorrent', 15); };
+        $stop($user);
+        // Qt saves on exit: defer restoration, writes and start until all daemons stop.
+        $running = $runningRead($user);
+        if ($running) return true;
+    }
     // Account observation logs the refusal transition once, when it creates the marker.
     if ($running && !$account($user, $home, true)) return true;
     if (!$running) {

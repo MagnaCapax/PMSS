@@ -1,6 +1,7 @@
 <?php
 /** Load operator code before dropping privileges for account-owned restoration. */
 require_once __DIR__.'/qbittorrentStoppedConfig.php';
+require_once __DIR__.'/qbittorrentPortRepair.php';
 require_once dirname(__DIR__, 3).'/etc/skel/www/configureTorrentClients.php';
 require_once dirname(__DIR__, 3).'/etc/skel/www/qbittorrentRefusal.php';
 
@@ -37,7 +38,8 @@ function pmssQbittorrentAccountWatchdog(string $home, bool $observe, array $ops 
         return pmssQbittorrentFrontendRefusalReady($home, $ops);
     });
     $restore = $ops['restore'] ?? 'pmssQbittorrentRestore';
-    return pmssQbittorrentConfigLocked($home, static function () use ($home, $restore): bool {
-        return $restore($home);
+    return pmssQbittorrentConfigLocked($home, static function () use ($home, $restore, $ops): bool {
+        return $restore($home)
+            && pmssQbittorrentPortRepairMissing(basename($home), $home, $ops);
     });
 }

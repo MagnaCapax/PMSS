@@ -171,6 +171,16 @@ PortEnsure retains account-port reconciliation; a running daemon is not stopped
 merely because its owner changed the WebUI port. Customer addresses are not
 added to the managed key set (ADRs 0102/0111).
 
+An absent WebUI port is repaired upstream of PortEnsure, whose missing-port
+rejection remains unchanged. When the config contains QSettings keys and the
+assigned port is valid, the watchdog requests native SIGTERM before observing
+the default listener. A still-live daemon defers repair and launch. Once stopped,
+the existing account-identity restoration step promotes pending saves, then
+upserts the missing port and address 127.0.0.1 under the switch lock. It rechecks
+the authoritative build section and preserves present ports, credentials and
+other settings. Empty, unreadable and linked configs do not request repair.
+This restores the existing panel route without adding public exposure (ADR 0150).
+
 Positive unexpected-8080 evidence stops the daemon, records a private refusal
 marker and logs/notices the transition once. Subsequent watchdog starts remain
 blocked, but stopped restore, PortEnsure and WebUiAuthEnsure still run. The
@@ -217,7 +227,9 @@ asserting ownership over customer-chosen listener settings.
 ## Verification
 
 Only `php -l` is run on the control node. Development tests are prepared for QA,
-not claimed as passing. Added/updated coverage includes section/build parity,
+not claimed as passing. `QbittorrentPortRepairTest` covers missing-port recovery,
+unchanged strict reconciliation, pending saves, live processes and busy locks.
+Added/updated coverage includes section/build parity,
 version cache invalidation, 5.3 → 4.3.9 → 5.3 speed/password preservation and proxy
 privacy, live slow starts versus dead or mismatched builds, stopped refusal
 recovery, once-only unsafe notices, post-KILL waiting, symlink notices, lock-wait

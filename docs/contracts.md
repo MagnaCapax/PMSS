@@ -556,6 +556,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     Password-sync prerequisite and failure branches write reason-only PHP error-log entries.
   - The qBittorrent watchdog reports a count of accounts skipped for a missing
     enable marker on each run; other service watchdogs retain their prior output.
+  - A missing WebUI port in a readable nonempty config with a valid assignment
+    triggers native SIGTERM before running-client observation. After exit, the
+    existing account-identity restore step repairs the absent port and loopback
+    address under the switch lock, after pending-save promotion. Present ports
+    keep their existing behavior; the strict PortEnsure contract is unchanged.
   - Upload-throttle drift is compared without writing. After native SIGTERM, the
     watchdog rechecks liveness and writes only while stopped; a slow shutdown
     defers the write and start to a later pass. The selected build chooses the
