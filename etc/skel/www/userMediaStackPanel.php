@@ -188,7 +188,7 @@ function pmssMediaStackPanelPidRunning(string $home, int $pid, ?array $commandAr
         return false;
     }
 
-    // A newly forked launcher can publish its pid before nohup execs Bash.
+    // A newly forked launcher can publish its pid before nohup and setsid exec Bash.
     $expected = implode("\0", $commandArgs ?? array('/bin/bash', pmssCustomerHomePath($home, 'install-media-stack.sh')))."\0";
     for ($attempt = 0; $attempt < 10; $attempt++) {
         $command = @file_get_contents($proc.'/cmdline', false, null, 0, 4096);
@@ -598,7 +598,7 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username, ar
     $innerCommand = 'cd '.escapeshellarg($home)
         .(isset($launcher['log']) ? ' && umask 077' : '')
         .' && rm -f -- '.escapeshellarg($pidPath)
-        .' && { nohup '.$command.' >'.$log.' 2>&1 </dev/null & echo $! > '.escapeshellarg($pidPath).'; }';
+        .' && { nohup /usr/bin/setsid '.$command.' >'.$log.' 2>&1 </dev/null & echo $! > '.escapeshellarg($pidPath).'; }';
 
     return 'HOME='.escapeshellarg($home)
         .' USER='.escapeshellarg($username)

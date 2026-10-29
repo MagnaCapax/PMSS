@@ -12,7 +12,7 @@ pmssFrontendToggleAction(
             echo 'rclone port not provisioned; cannot start rclone web GUI.';
             return;
         }
-        pmssFrontendShellExec("nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &");
+        pmssFrontendShellExec("nohup /usr/bin/setsid rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &");
     },
     static function () { pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['rclone']['binaries']); }
 );

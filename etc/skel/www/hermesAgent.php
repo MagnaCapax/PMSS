@@ -45,7 +45,7 @@ function pmssHermesPanelAction($home, $action, $request, $ops = array()): array
     if (!pmssConfigureFileWrite($base.'/pmss-install.status', "installing\n"))
         return array('ok' => false, 'status' => 500, 'message' => 'Could not start Hermes setup.');
     $command = 'umask 077 && cd '.escapeshellarg($home).' && HOME='.escapeshellarg($home)
-        .' nohup '.escapeshellarg($script).' install </dev/null >>'.escapeshellarg($home.'/.hermes-panel.log').' 2>&1 & echo $!';
+        .' nohup /usr/bin/setsid '.escapeshellarg($script).' install </dev/null >>'.escapeshellarg($home.'/.hermes-panel.log').' 2>&1 & echo $!';
     $runner = $ops['run'] ?? 'pmssFrontendShellExec';
     $pid = is_callable($runner) ? trim((string) call_user_func($runner, $command)) : '';
     if (preg_match('/^[1-9][0-9]*$/D', $pid))
