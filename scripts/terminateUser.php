@@ -66,24 +66,70 @@ $username = pmssRequireCliUsername(
     "Refusing to terminate invalid username: %s\n"
 );
 
+// A missing passwd entry permits only a proven, explicitly requested purge resume.
+$resume = false;
+$accountInfo = pmssUserAccountLookup($username);
+$uid = $accountInfo === null ? null : (int) $accountInfo['uid'];
+if ($accountInfo === null) {
+    $resumePaths = array('home' => '/home/'.$username, 'user_backup' => '/home/backup-'.$username,
+        'user_backup_superseded' => '/home/backup-'.$username.'.superseded');
+    $resumeRefuse = static function (string $reason) use ($username, $resumePaths, $dryRun): void {
+        $message = "Refusing to resume {$username}: {$reason}";
+        if (strpos($reason, 'uid_reassigned:') === 0) {
+            foreach ($resumePaths as $path) {
+                $info = @lstat($path);
+                if ($info === false) continue;
+                if (($info['mode'] & 0170000) !== 0040000 || realpath($path) !== $path
+                    || $info['dev'] !== stat('/home')['dev'] || $info['uid'] < 1000) {
+                    $message .= "; seal refused for changed path {$path}";
+                    continue;
+                }
+                $live = posix_getpwuid($info['uid']);
+                if (!is_array($live) || ($live['name'] ?? '') !== substr($reason, 15)) {
+                    $message .= "; seal refused for changed UID {$info['uid']}";
+                    continue;
+                }
+                $arg = escapeshellarg($path);
+                $pin = escapeshellarg($info['dev'].':'.$info['ino']);
+                $message .= "; privacy finding: UID {$info['uid']} now belongs to ".substr($reason, 15);
+                // Pin the proof's inode, open physically, and seal only the opened directory.
+                $command = 'timeout --kill-after=5s 45s sh -c '.escapeshellarg(
+                    '[ -d '.$arg.' ] && [ ! -L '.$arg.' ] && pin=$(stat -Lc %d:%i -- '.$arg.')'
+                    .' && [ "$pin" = '.$pin.' ] && ( cd -P -- '.$arg.' && [ "$(pwd -P)" = '.$arg.' ]'
+                    .' && [ "$(stat -Lc %d:%i -- .)" = "$pin" ] && chown root:root -- . && chmod 0700 -- . )');
+                $sealRc = pmssUserLifecycleStep('terminate', $username, 'seal_reassigned_uid_leftover', $command, $dryRun);
+                if ($sealRc !== 0) $message .= "; seal failed for {$path} (rc {$sealRc})";
+            }
+        }
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'resume_refused', $username, 'ERR', $message, array('reason' => $reason));
+        fwrite(STDERR, $message."\n");
+        exit(1);
+    };
+    $proof = pmssTerminateUserResumeUid($username, $resumePaths);
+    $running = $proof['reason'] === 'nothing_to_resume' ? false : pmssTerminateUserResumeRunning($username);
+    $reason = $running === true ? 'terminate_running' : ($running === null ? 'lookup_failed' : $proof['reason']);
+    if ($reason !== '' && $reason !== 'nothing_to_resume') $resumeRefuse($reason);
+    $resume = $proof['uid'] !== null;
+    $uid = $proof['uid'];
+}
+
 // Cross-check against the managed user list to avoid acting on unexpected
 // system accounts. This mirrors scripts/listUsers.php behaviour without
 // spawning a separate process.
-$knownUsers = pmssManagedHomeUsersList();
-if (!in_array($username, $knownUsers, true)) {
+$knownUsers = $resume ? array() : pmssManagedHomeUsersList();
+if (!$resume && !in_array($username, $knownUsers, true)) {
     pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in managed user list');
     die("\t**** USER NOT FOUND IN MANAGED LIST ****\n\n");
 }
 
-if (!is_dir("/home/{$username}")) {
+if (!$resume && !is_dir("/home/{$username}")) {
     pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Home directory missing');
     die("\t**** USER HOME NOT FOUND ****\n\n");
 }
 
 // Ensure a passwd entry exists before continuing so we do not silently act on
 // stray directories or stale state.
-$accountInfo = pmssUserAccountLookup($username);
-if ($accountInfo === null) {
+if (!$resume && $accountInfo === null) {
     pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in /etc/passwd');
     die("Refusing to terminate {$username}: no passwd entry found\n");
 }
@@ -94,7 +140,7 @@ $billingServiceId = pmssUserBillingIdentityRead($username, 'billingServiceId');
 // cleanup because /home/user2 also starts with /home/user.
 $expectedHome = "/home/{$username}";
 $realHome = realpath($expectedHome);
-if ($realHome === false || $realHome !== $expectedHome) {
+if ((!$resume || file_exists($expectedHome)) && ($realHome === false || $realHome !== $expectedHome)) {
     pmssUserLifecycleContextLogStatusMessage(
         'terminate',
         'invariant_home_prefix',
@@ -113,6 +159,8 @@ $toggleApps = pmssToggleAppCatalogRead();
 $overallStart = microtime(true);
 pmssUserLifecycleContextLog('terminate', 'start', $username, array(
     'dry_run' => $dryRun,
+    'resume' => $resume,
+    'uid' => $uid,
 ));
 
 echo "\n\t *** TERMINATE USER:  {$username} *** \n";
@@ -133,51 +181,64 @@ if ($continue == 'N') {
 }
 
 echo "Terminating user {$username}\n";
-$expireRc = pmssUserLifecycleStep('terminate', $username, 'expire_account_before_kill',
-    'usermod --expiredate 1 '.escapeshellarg($username), $dryRun);
-if ($expireRc !== 0 && !$dryRun) exit(1);
-$killUserCommand = 'killall -9 -u '.escapeshellarg($username);
-pmssUserLifecycleStep('terminate', $username, 'kill_processes_initial', $killUserCommand, $dryRun);
-
-echo "\nRunning processes by user:\n";
-pmssUserLifecycleStep('terminate', $username,
-    'list_processes',
-    'ps aux | grep -F '.escapeshellarg($username),
-    $dryRun
-); // Informal purposes, if tasks running, ie. ftp ;)
-
-sleep(3);   // Allow time for rTorrent to die
-
-pmssUserLifecycleStep('terminate', $username, 'kill_processes_retry', $killUserCommand, $dryRun);  // Sometimes things just don't dieee!
-
-// Clean up reserved rTorrent ports before removing the home directory.
-pmssTerminateUserReleaseRtorrentPortReservations($username, "/home/{$username}/.rtorrent.rc", $dryRun);
-
-// Reset per-user slice properties so no stale limits linger (safe if slice missing)
-$uid = (int) $accountInfo['uid'];
-if (pmssUserAccountLookup($username) !== null) {
-    // Use systemd revert to drop any drop-ins for user slice if present
-    pmssUserLifecycleStep('terminate', $username,
-        'revert_slice',
-        'systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true',
-        $dryRun
-    );
-    // Disable linger while the account still resolves.
-    pmssUserLifecycleStep('terminate', $username,
-        'disable_linger',
-        'if [ -e '.escapeshellarg('/var/lib/systemd/linger/'.$username).' ]; then timeout --kill-after=5s 45s loginctl disable-linger '.escapeshellarg($username).'; fi',
-        $dryRun
-    );
+// Recheck after a potentially long confirmation prompt, before the sole UID kill.
+if ($resume) {
+    $proof = pmssTerminateUserResumeUid($username, $resumePaths);
+    $running = pmssTerminateUserResumeRunning($username);
+    if ($proof['uid'] !== $uid || $running !== false) {
+        $reason = $running === true ? 'terminate_running' : ($running === null ? 'lookup_failed' : $proof['reason']);
+        if ($reason === '') $reason = 'owner_mismatch';
+        $resumeRefuse($reason);
+    }
+    $killRc = pmssUserLifecycleStep('terminate', $username, 'kill_processes_resume', 'timeout --kill-after=5s 45s pkill -9 -U '.(int) $uid, $dryRun);
+    // pkill exit 1 means there were no processes; other errors must remain visible.
+    if ($killRc !== 0 && $killRc !== 1) exit(1);
 }
-
+$killUserCommand = 'killall -9 -u '.escapeshellarg($username);
 echo "\nDeleting user, user data and HTTP password:\n";
-
-// Clear any per-user crontab before removing the account to avoid leaving stale
-// cron entries behind (Debian keeps them under /var/spool/cron/crontabs/).
 $userdelCommand = 'userdel '.escapeshellarg($username);
 $groupdelCommand = 'groupdel '.escapeshellarg($username);
-// Account-owned sockets must be removed before userdel, without opening logind.
-pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserInitialRemovalSteps($username, $uid), $dryRun);
+if (!$resume) {
+    $expireRc = pmssUserLifecycleStep('terminate', $username, 'expire_account_before_kill',
+        'usermod --expiredate 1 '.escapeshellarg($username), $dryRun);
+    if ($expireRc !== 0 && !$dryRun) exit(1);
+    pmssUserLifecycleStep('terminate', $username, 'kill_processes_initial', $killUserCommand, $dryRun);
+
+    echo "\nRunning processes by user:\n";
+    pmssUserLifecycleStep('terminate', $username,
+        'list_processes',
+        'ps aux | grep -F '.escapeshellarg($username),
+        $dryRun
+    ); // Informal purposes, if tasks running, ie. ftp ;)
+
+    sleep(3);   // Allow time for rTorrent to die
+
+    pmssUserLifecycleStep('terminate', $username, 'kill_processes_retry', $killUserCommand, $dryRun);  // Sometimes things just don't dieee!
+
+    // Clean up reserved rTorrent ports before removing the home directory.
+    pmssTerminateUserReleaseRtorrentPortReservations($username, "/home/{$username}/.rtorrent.rc", $dryRun);
+
+    // Reset per-user slice properties so no stale limits linger (safe if slice missing)
+    if (pmssUserAccountLookup($username) !== null) {
+        // Use systemd revert to drop any drop-ins for user slice if present
+        pmssUserLifecycleStep('terminate', $username,
+            'revert_slice',
+            'systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true',
+            $dryRun
+        );
+        // Disable linger while the account still resolves.
+        pmssUserLifecycleStep('terminate', $username,
+            'disable_linger',
+            'if [ -e '.escapeshellarg('/var/lib/systemd/linger/'.$username).' ]; then timeout --kill-after=5s 45s loginctl disable-linger '.escapeshellarg($username).'; fi',
+            $dryRun
+        );
+    }
+
+    // Clear any per-user crontab before removing the account to avoid leaving stale
+    // cron entries behind (Debian keeps them under /var/spool/cron/crontabs/).
+    // Account-owned sockets must be removed before userdel, without opening logind.
+    pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserInitialRemovalSteps($username, $uid), $dryRun);
+}
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);
 pmssUserLifecycleRefreshNginxConfig(
@@ -236,8 +297,8 @@ foreach ($toggleApps as $toggleApp => $row) {
 //
 // This stays SYNCHRONOUS and un-renamed, which is the property #729 protects (revert of
 // the async rename-aside reclaim, 4d3548d2): backgrounding the purge would let this script
-// return while the home still exists, and addUser.php has no existence guard, so a
-// re-provisioned username could race the deletion. Running the purge later in the SAME
+// return before deletion finishes. addUser.php refuses an orphaned home; keeping
+// termination blocking also gives callers its final result. Running the purge later in the SAME
 // blocking run reintroduces none of that -- see the forbidden list in
 // TerminateUserContractTest, which is what actually holds #729.
 //

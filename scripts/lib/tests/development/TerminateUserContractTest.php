@@ -234,8 +234,8 @@ SH
      *
      * The protected property is SYNCHRONOUS-NOT-QUEUED, held by the forbidden list below:
      * backgrounding or renaming the home aside would let terminateUser.php return while
-     * the directory still exists, and addUser.php has no existence guard, so a
-     * re-provisioned username could race the deletion.
+     * deletion is unfinished. addUser.php refuses an orphaned home; callers must
+     * still receive the final termination result before provisioning again.
      *
      * The purge's POSITION is a separate concern and deliberately moved (#908). It is the
      * only unbounded step; when it overran the caller's timeout it took the entire cleanup
@@ -267,6 +267,97 @@ SH
                 "exit(\$completion['rc']);",
             ]],
         ]);
+    }
+
+    /** The leftover proof replaces only the account guards and the initial account phase. */
+    public function testResumeProofPrecedesGuardsAndSkipsOneAccountPhase(): void
+    {
+        $source = $this->pmssReadRepoExecutableSource('scripts/terminateUser.php');
+        $this->assertOrderedStrings([
+            '$username = pmssRequireCliUsername(',
+            'pmssTerminateUserResumeUid($username, $resumePaths)',
+            '$knownUsers =',
+            "if (\$continue == 'N')",
+            "'kill_processes_resume'",
+            'if (!$resume) {',
+            "'expire_account_before_kill'",
+            "'kill_processes_initial'",
+            "'kill_processes_retry'",
+            'pmssTerminateUserReleaseRtorrentPortReservations(',
+            "'disable_linger'",
+            'pmssTerminateUserInitialRemovalSteps($username, $uid)',
+            'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+        ], $source);
+        $this->assertSame(1, substr_count($source, 'if (!$resume) {'));
+        $this->assertSame(1, substr_count($source, 'pkill -9 -U '));
+        $this->assertStringContainsString("\$killUserCommand = 'killall -9 -u '", $source);
+        $this->assertStringContainsString("'resume' => \$resume", $source);
+        $this->assertStringContainsString("'uid' => \$uid", $source);
+        $this->assertStringContainsString('if (!$resume && !in_array($username, $knownUsers, true))', $source);
+        $this->assertStringContainsString('if (!$resume && !is_dir(', $source);
+        $this->assertStringContainsString('if (!$resume && $accountInfo === null)', $source);
+        $this->assertMatches('/InitialRemovalSteps\(\$username, \$uid\), \$dryRun\);\s*\}/', $source);
+        $this->assertStringNotContainsString('.terminating-', $source);
+        $this->assertStringNotContainsString('pmssTerminateUserMoveHomeForReclaim', $source);
+    }
+
+    /** Run the actual refusal block with NSS snapshots, then exercise its shell guards on temp trees. */
+    public function testReassignedUidSealsOnlyPinnedTopDirectoriesAndReportsFailures(): void
+    {
+        $source = $this->pmssReadRepoExecutableSource('scripts/terminateUser.php');
+        $start = strpos($source, '$resume = false;');
+        $block = substr($source, $start, strpos($source, '$knownUsers =', $start) - $start);
+        $root = $this->pmssMakeTempDir('pmss-resume-seal-');
+        $this->pmssEnsureDir($root.'/bin');
+        $this->pmssWriteExecutableFile($root.'/bin/chown', "#!/bin/sh\n[ \"\$*\" = 'root:root -- .' ] || exit 97\nexit \"\${SEAL_RC:-0}\"\n");
+        $paths = ['/home/user1234', '/home/backup-user1234', '/home/backup-user1234.superseded'];
+        foreach ($paths as $index => $path) {
+            mkdir($root.'/tree'.$index, 0755);
+            file_put_contents($root.'/tree'.$index.'/keep', 'private');
+        }
+        $script = 'namespace ResumeSealFixture; $root = '.var_export($root, true).';';
+        $script .= <<<'PHP'
+$username = 'user1234'; $dryRun = true; $events = [];
+function pmssUserAccountLookup($name) { return null; }
+function pmssTerminateUserResumeUid($name, $paths) { return ['uid' => null, 'reason' => 'uid_reassigned:liveuser']; }
+function pmssTerminateUserResumeRunning($name) { return false; }
+function lstat($path) {
+    $index = array_search($path, ['/home/user1234', '/home/backup-user1234', '/home/backup-user1234.superseded'], true);
+    $info = \lstat($GLOBALS['root'].'/tree'.$index); $info['uid'] = 1000; return $info;
+}
+function stat($path) { return \stat($GLOBALS['root']); }
+function realpath($path) { return $path; }
+function posix_getpwuid($uid) { return ['name' => 'liveuser']; }
+function pmssUserLifecycleStep(...$args) { $GLOBALS['events'][] = $args; return count($GLOBALS['events']) === 2 ? 9 : 0; }
+function pmssUserLifecycleContextLogStatusMessage(...$args) { $GLOBALS['events'][] = $args; }
+register_shutdown_function(static function () { echo json_encode($GLOBALS['events']); });
+PHP;
+        $result = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script.$block));
+        $this->assertSame(1, $result['result']['rc']);
+        $this->assertStringContainsString('UID 1000 now belongs to liveuser', file_get_contents($result['stderrPath']));
+        $this->assertStringContainsString('seal failed', file_get_contents($result['stderrPath']));
+        $events = json_decode($result['result']['output'], true);
+        $this->assertSame(4, count($events));
+        $this->assertSame('resume_refused', $events[3][1]);
+        foreach ($paths as $index => $path) {
+            $this->assertSame('seal_reassigned_uid_leftover', $events[$index][2]);
+            $this->assertTrue($events[$index][4], 'dry run must be passed to the step runner');
+            // Replace only the approved path literal; the recorded inode pin stays unchanged.
+            $command = str_replace($path, $root.'/tree'.$index, $events[$index][3]);
+            $env = ['PATH' => $root.'/bin:'.getenv('PATH')];
+            $this->assertSame(0, $this->pmssExecShellCommand($command, $env)['rc']);
+            clearstatcache();
+            $this->assertSame(0700, fileperms($root.'/tree'.$index) & 0777);
+            $this->assertSame('private', file_get_contents($root.'/tree'.$index.'/keep'));
+            $env['SEAL_RC'] = '9';
+            $this->assertSame(9, $this->pmssExecShellCommand($command, $env)['rc']);
+            rename($root.'/tree'.$index, $root.'/saved'.$index);
+            symlink($root.'/saved'.$index, $root.'/tree'.$index);
+            $this->assertTrue($this->pmssExecShellCommand($command, $env)['rc'] !== 0);
+            unlink($root.'/tree'.$index);
+            mkdir($root.'/tree'.$index);
+            $this->assertTrue($this->pmssExecShellCommand($command, $env)['rc'] !== 0, 'replacement inode must refuse');
+        }
     }
 
     /**
