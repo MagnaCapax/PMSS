@@ -14,6 +14,7 @@
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/dpkgSelections.php';
+require_once __DIR__.'/dpkgRecovery.php';
 require_once __DIR__.'/managedPath.php';
 
 /** Treat any known dpkg state except not-installed as legacy package presence. */
@@ -118,6 +119,9 @@ CONF;
         }
 
         $rc = runStep('Completing pending dpkg configuration', dpkgCmd('--force-confdef --force-confold --configure -a'));
+        if ($rc !== 0 && !pmssWaitForDpkgLocks(60, 1, 'package recovery')) {
+            return;
+        }
         if ($rc !== 0 && $hasSystemd) {
             runStep('Unmasking proftpd for dpkg retry', 'systemctl unmask proftpd.service || true');
         }
@@ -178,8 +182,8 @@ CONF;
         $installCmd = aptCmd('dselect-upgrade -y');
         $rc = runStep('Installing packages from selection baseline', $installCmd);
         if ($rc !== 0) {
-            runStep('Attempting apt fix-broken install (dpkg baseline)', aptCmd('--fix-broken install -y'));
-            $retryRc = runStep('Retrying package selection install', $installCmd);
+            $retryRc = pmssRecoverDpkgBaseline('Attempting apt fix-broken install (dpkg baseline)')
+                ? runStep('Retrying package selection install', $installCmd) : 1;
             if ($retryRc !== 0) {
                 logmsg('[ERROR] Package baseline installation still failing after retry');
             }

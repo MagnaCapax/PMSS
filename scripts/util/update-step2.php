@@ -315,8 +315,9 @@ pmssRunProfiledCallable('Hardening legacy Apache systemd unit (post-purge)', 'pm
 if ($repoLogMessage !== '') { logmsg($repoLogMessage); }
 if (!$dpkgBaselineOk) {
     logmsg('[WARN] Dpkg baseline application reported issues; attempting recovery');
-    runStep('Attempting apt fix-broken install (dpkg baseline recovery)', aptCmd('--fix-broken install -y'));
-    $dpkgBaselineOk = pmssRunProfiledCallable('Reapplying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
+    if (pmssRecoverDpkgBaseline('Attempting apt fix-broken install (dpkg baseline recovery)')) {
+        $dpkgBaselineOk = pmssRunProfiledCallable('Reapplying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
+    }
     if (!$dpkgBaselineOk) {
         logmsg('[ERROR] Dpkg baseline still failing after recovery attempt; continuing with caution');
         pmssLogJson(['event' => 'package_phase', 'status' => 'warn', 'reason' => 'dpkg_baseline']);

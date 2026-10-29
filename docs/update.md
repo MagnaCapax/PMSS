@@ -187,6 +187,17 @@ run. The sequence is:
 4. `pmssApplyDpkgSelections()` – apply the codename-specific baseline snapshot.
 5. `pmssApplyDpkgSelections()` recovery + post-phase fix-broken/autoremove checks.
 
+If the selection-baseline install fails or times out, both its immediate retry
+and step2's baseline reapplication first wait up to 60 seconds for package locks,
+then call `pmssCompletePendingDpkg()` before fix-broken. Recovery waits again
+after configuration, and repeats configuration if fix-broken itself fails,
+before retrying the baseline. A lock that remains busy logs an error and skips
+that recovery/retry; the baseline result stays failed. Lock files are never
+removed and their owners are never killed by recovery. The existing fuser-based
+waiter is shared with dist-upgrade, whose default wait remains 1800 seconds;
+missing fuser retains its warning-only fallback. ADR 0035's process-group kill
+and the 1200-second command deadline remain unchanged.
+
 Legacy MediaArea cleanup queries dpkg once per cleanup pass. Package removal,
 purge, and hold run only when dpkg reports a state other than `not-installed`;
 repository and cache cleanup still run when the package is absent.

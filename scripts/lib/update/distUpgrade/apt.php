@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../dpkgLocks.php';
+
 function pmssDistUpgradeAptEnv(bool $warnWhenInteractiveUnavailable = true): array
 {
     $interactiveRequested = pmssEnvFlagEnabled('PMSS_DIST_UPGRADE_INTERACTIVE');
@@ -37,34 +39,6 @@ function pmssDistUpgradeAptCommand(string $env, string $action, string $argument
     return trim($env.' apt-get '.$action.$opts.($suffix !== '' ? ' '.$suffix : ''));
 }
 
-function pmssWaitForDpkgLocks(int $timeoutSeconds = 1800, int $sleepSeconds = 5): bool
-{
-    if (pmssCommandPath('fuser') === '') {
-        logMessage('[WARN] dist-upgrade: fuser not available; skipping dpkg lock checks');
-        return true;
-    }
-
-    $paths = ['/var/lib/dpkg/lock-frontend', '/var/lib/dpkg/lock', '/var/lib/apt/lists/lock', '/var/cache/apt/archives/lock'];
-    $start = time();
-    $announced = false;
-    while (pmssDpkgLockActive($paths)) {
-        if (!$announced) {
-            logMessage('dist-upgrade: dpkg lock detected; waiting for release');
-            $announced = true;
-        }
-        if ((time() - $start) >= $timeoutSeconds) {
-            logMessage('[ERROR] dist-upgrade: dpkg lock did not clear within '.$timeoutSeconds.' seconds');
-            return false;
-        }
-        sleep($sleepSeconds);
-    }
-
-    if ($announced) {
-        logMessage('dist-upgrade: dpkg lock cleared; continuing');
-    }
-    return true;
-}
-
 function pmssDistUpgradeWaitForLocksOrLog(string $message): bool
 {
     if (pmssWaitForDpkgLocks()) {
@@ -78,18 +52,6 @@ function pmssDistUpgradeWaitForLocksOrLog(string $message): bool
 function pmssDistUpgradeRunLockedCommand(string $command, string $lockMessage, bool $inheritTty = false): ?int
 {
     return pmssDistUpgradeWaitForLocksOrLog($lockMessage) ? runCommand($command, true, null, $inheritTty) : null;
-}
-
-function pmssDpkgLockActive(array $paths): bool
-{
-    foreach ($paths as $path) {
-        $rc = 1;
-        @exec('fuser '.escapeshellarg($path).' 2>/dev/null', $output, $rc);
-        if ($rc === 0) {
-            return true;
-        }
-    }
-    return false;
 }
 
 function pmssExecuteUpgrade(): bool
