@@ -168,6 +168,68 @@ class installBootstrapSafetyTest extends TestCase
         $this->assertSame($original, file_get_contents($root.'/apt/sources.list.pmss-bootstrap.save'), 'Backup is not overwritten');
     }
 
+    public function testBusterArchiveRewriteRunsBeforeBootstrapPackages(): void
+    {
+        $this->assertOrderedStrings([
+            'bootstrap_buster_archive /etc/os-release /etc/apt',
+            'run_cmd apt update',
+            'ensure_packages git rsync curl wget ca-certificates unzip php php-cli',
+        ], $this->script);
+    }
+
+    public function testBusterRewriteMovesOnlyBusterDebianLinesToTheArchive(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-install-buster-');
+        mkdir($root.'/apt/sources.list.d', 0755, true);
+        $original = implode("\n", [
+            'deb http://deb.debian.org/debian buster main',
+            'deb-src http://deb.debian.org/debian/ buster main contrib',
+            'deb http://ftp.fi.debian.org/debian buster-updates main',
+            'deb http://security.debian.org/debian-security buster/updates main',
+            'deb [arch=amd64] https://deb.debian.org/debian buster-backports main',
+            '# deb http://deb.debian.org/debian buster main',
+            'deb https://mediaarea.net/repo/deb/debian buster main',
+            'deb http://deb.debian.org/debian bullseye main',
+        ])."\n";
+        file_put_contents($root.'/apt/sources.list', $original);
+        file_put_contents($root.'/target.list', "deb http://deb.debian.org/debian buster main\n");
+        symlink($root.'/target.list', $root.'/apt/sources.list.d/link.list');
+        file_put_contents($root.'/bookworm', "VERSION_CODENAME=bookworm\n");
+        file_put_contents($root.'/buster', "PRETTY_NAME=\"Debian GNU/Linux 10 (buster)\"\nVERSION_CODENAME=buster\n");
+
+        $script = $root.'/run.sh';
+        file_put_contents($script, "log_info() { echo \"INFO \$*\"; }\nlog_warn() { echo \"WARN \$*\"; }\n"
+            .$this->pmssExtractShellFunction($this->script, 'bootstrap_buster_archive')."\n"
+            .'bootstrap_buster_archive "$1" "$2"'."\n");
+
+        $run = function (string $release) use ($script, $root): array {
+            return $this->pmssExecShellCommand('bash '.escapeshellarg($script).' '.escapeshellarg($root.'/'.$release).' '.escapeshellarg($root.'/apt'));
+        };
+
+        $result = $run('bookworm');
+        $this->assertSame(0, $result['rc']);
+        $this->assertSame($original, file_get_contents($root.'/apt/sources.list'), 'Other releases stay untouched');
+
+        $result = $run('buster');
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertSame(implode("\n", [
+            'deb http://archive.debian.org/debian buster main',
+            'deb-src http://archive.debian.org/debian buster main contrib',
+            'deb http://archive.debian.org/debian buster-updates main',
+            'deb http://archive.debian.org/debian-security buster/updates main',
+            'deb [arch=amd64] http://archive.debian.org/debian buster-backports main',
+            '# deb http://deb.debian.org/debian buster main',
+            'deb https://mediaarea.net/repo/deb/debian buster main',
+            'deb http://deb.debian.org/debian bullseye main',
+        ])."\n", file_get_contents($root.'/apt/sources.list'));
+        $this->assertSame($original, file_get_contents($root.'/apt/sources.list.pmss-bootstrap.save'), 'Backup keeps the original');
+        $this->assertStringContainsString('deb.debian.org', (string) file_get_contents($root.'/target.list'), 'Symlinked lists are not followed');
+        $this->assertStringContainsString('WARN Debian 10: '.$root.'/apt/sources.list.d/link.list is a symlink', $result['output']);
+
+        $second = $run('buster');
+        $this->assertSame(0, $second['rc']);
+        $this->assertStringNotContainsString('INFO', $second['output'], 'A second run changes nothing');
+    }
     public function testSharedConvergenceRemainsInUpdateStep2(): void
     {
         $path = $this->pmssRepoPath('scripts/util/update-step2.php');

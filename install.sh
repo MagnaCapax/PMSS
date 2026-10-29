@@ -564,7 +564,38 @@ bootstrap_bullseye_security_archive() {
 	done
 }
 
-log_info "Installer bootstrap: leaving existing apt sources untouched (except Debian 11 bullseye-security)"
+# Debian 10 left the live mirrors entirely: deb.debian.org and security.debian.org answer 404 for
+# buster, so a stock buster host cannot even install git. Point its Debian lines at
+# archive.debian.org (as template.sources.buster does); other sources stay untouched.
+bootstrap_buster_archive() {
+	local os_release="$1" apt_dir="$2" codename="" file backup
+	local main_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://[A-Za-z0-9.-]*debian\.org/debian/?([[:space:]]+buster(-updates|-backports)?([[:space:]]|$))'
+	local sec_re='^([[:space:]]*deb(-src)?[[:space:]]+(\[[^]]*\][[:space:]]+)?)https?://[A-Za-z0-9.-]*debian\.org/debian-security/?([[:space:]]+buster/updates([[:space:]]|$))'
+	if [ -r "$os_release" ]; then
+		codename=$(sed -nE "s/^VERSION_CODENAME=[\"']?([^\"']*)[\"']?[[:space:]]*\$/\1/p" "$os_release" | head -n 1)
+	fi
+	[ "$codename" = "buster" ] || return 0
+	for file in "$apt_dir/sources.list" "$apt_dir"/sources.list.d/*.list; do
+		{ [ -f "$file" ] && grep -Eq "$main_re|$sec_re" "$file"; } || continue
+		if [ -L "$file" ]; then
+			log_warn "Debian 10: ${file} is a symlink; not rewriting it, so bootstrap packages may fail with 404"
+			continue
+		fi
+		backup="${file}.pmss-bootstrap.save"
+		if [ ! -e "$backup" ] && ! cp -p "$file" "$backup"; then
+			log_warn "Debian 10: could not back up ${file}; leaving it unchanged"
+			continue
+		fi
+		if sed -E -i -e "s#${main_re}#\1http://archive.debian.org/debian\4#" -e "s#${sec_re}#\1http://archive.debian.org/debian-security\4#" "$file"; then
+			log_info "Debian 10: buster lines in ${file} now use archive.debian.org (backup: ${backup})"
+		else
+			log_warn "Debian 10: could not update ${file}; bootstrap packages may fail with 404"
+		fi
+	done
+}
+
+log_info "Installer bootstrap: leaving existing apt sources untouched (except archived Debian 10 and Debian 11 bullseye-security lines)"
+bootstrap_buster_archive /etc/os-release /etc/apt
 bootstrap_bullseye_security_archive /etc/os-release /etc/apt
 log_step "Updating package lists"
 run_cmd apt update
