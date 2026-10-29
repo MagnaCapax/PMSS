@@ -152,21 +152,23 @@ if (!function_exists('pmssCustomerBackupRestoreRtorrentProcRunning')) {
   $dir = @opendir($procRoot);
   if (!is_resource($dir)) return false;
 
-  while (($entry = readdir($dir)) !== false) {
-   if (!ctype_digit($entry)) continue;
-   $status = pmssCustomerFileRead(rtrim($procRoot, '/').'/'.$entry.'/status', true);
-   $comm = pmssCustomerFileRead(rtrim($procRoot, '/').'/'.$entry.'/comm', true);
-   if (is_string($status)
-       && is_string($comm)
-       && preg_match('/^Uid:\s+'.preg_quote((string) $uid, '/').'\s/m', $status) === 1
-       && strpos(trim($comm), 'rtorrent') === 0) {
-    closedir($dir);
-    return true;
+  try {
+   while (($entry = readdir($dir)) !== false) {
+    if (!ctype_digit($entry)) continue;
+    $status = pmssCustomerFileRead(rtrim($procRoot, '/').'/'.$entry.'/status', true);
+    $comm = pmssCustomerFileRead(rtrim($procRoot, '/').'/'.$entry.'/comm', true);
+    if (is_string($status)
+        && is_string($comm)
+        && preg_match('/^Uid:\s+'.preg_quote((string) $uid, '/').'\s/m', $status) === 1
+        && strpos(trim($comm), 'rtorrent') === 0) {
+     return true;
+    }
    }
+   return false;
+  } finally {
+   // Enumeration and status-read exceptions must not leak the open directory.
+   closedir($dir);
   }
-
-  closedir($dir);
-  return false;
  }
 }
 

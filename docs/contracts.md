@@ -1358,6 +1358,14 @@ throws; a close exception still permits pipe reaping. Tar inspection closes its
 gzip stream on every return and on header, metadata or payload exceptions.
 Exceptions propagate without publishing an archive or changing partial-file policy.
 
+Failed gzip header reads discard any partial member list and use the existing
+restore member-list failure message before member selection or extraction.
+Empty-string EOF and zero-block endings retain their existing results.
+The read-only rTorrent process scan closes its directory on matches, exhaustion,
+and enumeration/status-read exceptions; original exceptions still propagate.
+Isolated backup transaction and restore probe tests cover these failure paths
+and the unchanged successful results without reading live process state.
+
 ## Customer Whole-Account Service Restart – `etc/skel/www/scriptsIncAppsHtml.php` and `scriptsIncActionJs.php`
 
 - Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone/slskd/Copyparty frontends, stopped media-stack tmux apps, and Lighttpd.

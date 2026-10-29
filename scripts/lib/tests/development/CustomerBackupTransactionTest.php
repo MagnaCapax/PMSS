@@ -152,6 +152,40 @@ PHP
         $this->assertSame(array_merge($expected, $expected), $actual);
     }
 
+    public function testFailedTarHeaderReadsDiscardPartialListsAndKeepRestoreFailureText(): void
+    {
+        $actual = $this->fixture(<<<'PHP'
+$results = [];
+$header = substr_replace(str_repeat("\0", 512), '.rtorrent.rc', 0, 12);
+$header = substr_replace($header, '00000000000', 124, 11);
+foreach ([[], [$header]] as $prefix) {
+    // Failed reads differ from the legacy empty-string EOF and zero-block endings.
+    foreach ([false, '', str_repeat("\0", 512)] as $ending) {
+        $GLOBALS['events'] = $GLOBALS['reads'] = [];
+        $GLOBALS['chunks'] = array_merge($prefix, [$ending]);
+        $types = pmssCustomerBackupRestoreTarMemberTypesRead('/unused/archive');
+        $results[] = [$types, is_resource($GLOBALS['gzip']), $GLOBALS['events']];
+        if ($ending === false) {
+            $GLOBALS['chunks'] = array_merge($prefix, [$ending]);
+            $skipped = 99;
+            $error = '';
+            $touched = true;
+            $selected = pmssCustomerBackupRestoreEntriesSelect('/fixture', '/unused/archive', $skipped, $error, $touched);
+            $results[] = [$selected, $skipped, $error, $touched];
+        }
+    }
+}
+echo json_encode($results);
+PHP
+        );
+        $closed = [null, false, [['gzip-close']]];
+        $failure = [null, 0, 'Could not read the backup archive member list.', false];
+        $empty = [[], false, [['gzip-close']]];
+        $members = [['.rtorrent.rc' => '0'], false, [['gzip-close']]];
+        $this->assertSame([$closed, $failure, $empty, $empty,
+            $closed, $failure, $members, $members], $actual);
+    }
+
     public function testScheduledAndSnapshotPublicationKeepTheirDistinctContracts(): void
     {
         $actual = $this->fixture(<<<'PHP'

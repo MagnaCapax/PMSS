@@ -93,7 +93,9 @@ if (!function_exists('pmssCustomerBackupRestoreTarMemberTypesRead')) {
   try {
    while (!@gzeof($handle)) {
     $header = @gzread($handle, 512);
-    if (!is_string($header) || $header === '') break;
+    // A failed read cannot authorize restore from a partial member list.
+    if (!is_string($header)) return null;
+    if ($header === '') break;
     if (strlen($header) !== 512) return null;
     if (trim($header, "\0") === '') break;
 
