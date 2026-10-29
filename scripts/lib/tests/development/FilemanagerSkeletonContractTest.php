@@ -6,6 +6,15 @@ require_once __DIR__.'/../common/filemanagerActionScan.php';
 
 class FilemanagerSkeletonContractTest extends TestCase
 {
+    public function testUploadPathStaysInsideTheCurrentFolder(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/filemanager.php');
+        $this->assertStringContainsString('$relPath = fm_clean_path(isset($_REQUEST[\'fullpath\'])', $source);
+        $this->assertStringContainsString('$fullPath = $path . \'/\' . $relPath;', $source);
+        $this->pmssAssertStringNotContainsString('$path . \'/\' . $_REQUEST[\'fullpath\']', $source);
+        $this->pmssAssertStringNotContainsString('umask(0)', $source, 'upload folders keep the account umask');
+    }
+
     public function testChangingBranchesRequireSessionToken(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/filemanager.php');

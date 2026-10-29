@@ -879,8 +879,15 @@ if (!empty($_FILES) && !FM_READONLY) {
     $isFileAllowed = ($allowed) ? in_array($ext, $allowed) : true;
 
     $targetPath = $path . $ds;
-    if ( is_writable($targetPath) ) {
-        $fullPath = $path . '/' . $_REQUEST['fullpath'];
+    // The browser names the file and any folders it came from; keep that inside the current folder.
+    $relPath = fm_clean_path(isset($_REQUEST['fullpath']) ? (string) $_REQUEST['fullpath'] : '');
+    if ($relPath === '') {
+        $response = array (
+            'status' => 'error',
+            'info'   => 'Invalid upload path.'
+        );
+    } elseif ( is_writable($targetPath) ) {
+        $fullPath = $path . '/' . $relPath;
         $folder = substr($fullPath, 0, strrpos($fullPath, "/"));
 
         if(file_exists ($fullPath) && !$override_file_name) {
@@ -889,9 +896,7 @@ if (!empty($_FILES) && !FM_READONLY) {
         }
 
         if (!is_dir($folder)) {
-            $old = umask(0);
-            mkdir($folder, 0777, true);
-            umask($old);
+            mkdir($folder, 0750, true);
         }
 
         if (empty($f['file']['error']) && !empty($tmp_name) && $tmp_name != 'none' && $isFileAllowed) {
