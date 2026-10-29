@@ -147,7 +147,13 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $output = $this->pmssRunInlinePhpRequire(
             $fixture,
             'echo json_encode(array('
+            .'"empty" => pmssWelcomeRequireLocalHelpers(array()),'
+            .'"missing" => pmssWelcomeRequireLocalHelpers(array("safeHelper.php", "absent.php")),'
+            .'"batchTraversal" => pmssWelcomeRequireLocalHelpers(array("safeHelper.php", "../safeHelper.php")),'
+            .'"invalid" => pmssWelcomeRequireLocalHelpers(array("safeHelper.php", null)),'
+            .'"notLoaded" => function_exists("pmssWelcomeSafeHelperLoaded"),'
             .'"safe" => pmssWelcomeRequireLocalHelper("safeHelper.php"),'
+            .'"repeated" => pmssWelcomeRequireLocalHelpers(array("safeHelper.php", "safeHelper.php")),'
             .'"loaded" => function_exists("pmssWelcomeSafeHelperLoaded"),'
             .'"traversal" => pmssWelcomeRequireLocalHelper("../safeHelper.php"),'
             .'"absolute" => pmssWelcomeRequireLocalHelper("/tmp/safeHelper.php")'
@@ -155,7 +161,8 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         );
 
         $this->assertSame(
-            array('safe' => true, 'loaded' => true, 'traversal' => false, 'absolute' => false),
+            array('empty' => true, 'missing' => false, 'batchTraversal' => false, 'invalid' => false, 'notLoaded' => false,
+                'safe' => true, 'repeated' => true, 'loaded' => true, 'traversal' => false, 'absolute' => false),
             $this->pmssDecodeJsonArray($output)
         );
     }

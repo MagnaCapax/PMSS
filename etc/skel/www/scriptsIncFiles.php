@@ -127,23 +127,24 @@ if (!function_exists('pmssWelcomeMessageCustomerPathIsSafe')) {
  function pmssWelcomeMessageCustomerPathIsSafe($path) { return pmssCustomerPathIsSafe($path); }
 }
 
-if (!function_exists('pmssWelcomeRequireLocalHelper')) {
-/**
-  * Require one PHP helper from the customer tree when present.
-  */
- function pmssWelcomeRequireLocalHelper($file) {
-  if (!is_string($file)
+if (!function_exists('pmssWelcomeRequireLocalHelpers')) {
+/** Preflight the complete delivery before loading any customer helpers, in order. */
+ function pmssWelcomeRequireLocalHelpers(array $files) {
+  $paths = array();
+  foreach ($files as $file) {
+   if (!is_string($file)
       || !preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]*\.php\z/', $file)
-      || basename($file) !== $file) {
-   return false;
+      || basename($file) !== $file) return false;
+   $path = __DIR__.'/'.$file;
+   if (!is_file($path) || is_link($path) || !is_readable($path)) return false;
+   $paths[] = $path;
   }
-
-  $path = __DIR__.'/'.$file;
-  if (is_file($path) && !is_link($path) && is_readable($path)) {
-   require_once $path;
-   return true;
-  }
-
-  return false;
+  foreach ($paths as $path) require_once $path;
+  return true;
  }
+}
+
+if (!function_exists('pmssWelcomeRequireLocalHelper')) {
+/** Require one PHP helper using the same delivery and filename checks. */
+ function pmssWelcomeRequireLocalHelper($file) { return pmssWelcomeRequireLocalHelpers(array($file)); }
 }

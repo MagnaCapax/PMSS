@@ -7,13 +7,9 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/scriptsInc.php';
-$pmssStorageModules = ['storageHealthRaidDisplay', 'storageHealthRaid', 'storageHealthPressure', 'storageHealthDisplay'];
-foreach ($pmssStorageModules as $pmssStorageModule) {
-    $pmssStoragePath = __DIR__.'/'.$pmssStorageModule.'.php';
-    if (!is_file($pmssStoragePath) || is_link($pmssStoragePath) || !is_readable($pmssStoragePath)) return;
-}
-foreach ($pmssStorageModules as $pmssStorageModule) require_once __DIR__.'/'.$pmssStorageModule.'.php';
-unset($pmssStorageModules, $pmssStorageModule, $pmssStoragePath);
+if (!function_exists('pmssWelcomeRequireLocalHelpers') || !pmssWelcomeRequireLocalHelpers(array(
+    'storageHealthRaidDisplay.php', 'storageHealthRaid.php', 'storageHealthPressure.php', 'storageHealthDisplay.php',
+))) return;
 if (!function_exists('pmssStorageHealthNoticeHtmlRead')) {
     /** Prefer the specific /home RAID explanation over a generic pressure alert. */
     function pmssStorageHealthNoticeHtmlRead(

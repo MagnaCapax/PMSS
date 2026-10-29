@@ -32,6 +32,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   and tile projection. **userMediaStackPanel.php** projects installed-state
   observations after its existing reads. Both keep their delivery boundaries,
   output contracts and action policies (ADR 0203).
+- **etc/skel/www/scriptsIncFiles.php** preflights complete local helper groups before loading them in order.
+  Statistics, storage notices and memory status share this loader; incomplete deliveries retain their unavailable fallbacks.
 - **scripts/lib/agentDiagnostics.php** – Stable diagnostic CLI and text renderer.
   `agentDiagnostics/catalog.php` defines ordered probes, `command.php` owns checked
   PHP-script execution, and `collect.php` acquires and projects recursive results.

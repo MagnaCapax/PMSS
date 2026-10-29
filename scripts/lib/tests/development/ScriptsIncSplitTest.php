@@ -131,7 +131,7 @@ class ScriptsIncSplitTest extends TestCase
             'pmssCustomerBackupRestoreTarSize', 'pmssCustomerBackupRestoreTarSkipPayload', 'pmssCustomerBackupRestoreTarPayloadRead', 'pmssCustomerBackupRestoreTarBlocksRead', 'pmssCustomerBackupRestorePaxPayloadParse', 'pmssCustomerBackupRestoreMemberNormalize',
             'pmssCustomerBackupRestoreTarMemberTypesRead', 'pmssCustomerBackupRestoreMemberAllowed', 'pmssCustomerBackupRestoreMemberTypeAllowed', 'pmssCustomerBackupRestoreMemberNameFromPhar', 'pmssCustomerBackupRestoreEntriesSelect',
             'pmssCustomerBackupRestoreTouchesRtorrentLiveState', 'pmssCustomerBackupRestoreRtorrentProcRunning', 'pmssCustomerBackupRestoreRtorrentRunning', 'pmssCustomerBackupRestoreSnapshotPathBuild', 'pmssCustomerBackupRestoreSnapshotCreate',
-            'pmssCustomerBackupRestore', 'pmssWelcomeMessageCustomerPathIsSafe', 'pmssWelcomeRequireLocalHelper', 'pmssCustomerManagedAppDefinitions', 'pmssWelcomeServiceAvailable',
+            'pmssCustomerBackupRestore', 'pmssWelcomeMessageCustomerPathIsSafe', 'pmssWelcomeRequireLocalHelpers', 'pmssWelcomeRequireLocalHelper', 'pmssCustomerManagedAppDefinitions', 'pmssWelcomeServiceAvailable',
             'pmssCustomerNativePidsRead', 'pmssCustomerNativeSignal', 'pmssCustomerNativeStop', 'pmssCustomerDelugeSystemCommand', 'pmssCustomerTorrentClientToggleStart', 'pmssCustomerTorrentClientSelectedBinary', 'pmssCustomerRtorrentBinaries', 'pmssWelcomeHttpContextCreate', 'pmssCustomerAppsMediaIdsRead',
             'pmssCustomerAppsTmuxSessionsParse', 'pmssCustomerAppsTmuxSessionsRead', 'pmssCustomerAppsStatusRead', 'pmssCustomerAppsDescriptionsRead', 'pmssCustomerAppRowStart',
             'pmssCustomerAppButton', 'pmssCustomerAppRowHtmlBuild', 'pmssCustomerAppsMediaRowsBuild', 'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsCss',
@@ -147,7 +147,7 @@ class ScriptsIncSplitTest extends TestCase
                 $functions[$name] = $body;
             }
         }
-        $this->assertSame(96, count($functions));
+        $this->assertSame(97, count($functions));
         $actual = array_keys($functions);
         sort($actual);
         sort($expected);

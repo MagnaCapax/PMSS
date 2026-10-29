@@ -19,10 +19,6 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/scriptsInc.php';
-$pmssMemoryModules = array('webCgroupMemorySource', 'webCgroupMemoryPolicy', 'webCgroupMemoryRead', 'welcomeMemory');
-foreach ($pmssMemoryModules as $pmssMemoryModule) {
-    $pmssMemoryPath = __DIR__.'/'.$pmssMemoryModule.'.php';
-    if (!is_file($pmssMemoryPath) || is_link($pmssMemoryPath) || !is_readable($pmssMemoryPath)) return;
-}
-foreach ($pmssMemoryModules as $pmssMemoryModule) require_once __DIR__.'/'.$pmssMemoryModule.'.php';
-unset($pmssMemoryModules, $pmssMemoryModule, $pmssMemoryPath);
+if (!function_exists('pmssWelcomeRequireLocalHelpers') || !pmssWelcomeRequireLocalHelpers(array(
+    'webCgroupMemorySource.php', 'webCgroupMemoryPolicy.php', 'webCgroupMemoryRead.php', 'welcomeMemory.php',
+))) return;
