@@ -138,13 +138,12 @@ class UpdateAppInstallerContractsTest extends TestCase
             ],
             'rclone.php' => [
                 'required' => [
-                    "pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')",
-                    'Warning: Unable to determine latest rclone version, falling back to pinned release.',
                     '/usr/bin/rclone version 2>/dev/null',
                     '/usr/bin/rclone -V 2>/dev/null',
                     'pmssCreatePrivateTempDir(',
                     "runStep('Installing rclone '.\$version",
-                    "pmssBuildCommand('wget'",
+                    'pmssPinnedRemoteArtifactTempFileUse(',
+                    "pmssPinnedRemoteAmd64OrSkip('rclone', 'install')",
                     "pmssBuildCommand('install'",
                     "pmssBuildCommand('mv'",
                     'pmssRemovePrivateTempDir',

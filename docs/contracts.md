@@ -1048,8 +1048,8 @@ trust checks, commands, diagnostics and failure behavior are preserved.
   - Client profiles and artifact names use the hostname as given when it contains a dot; bare hostnames gain `.pulsedmedia.com`. The system status artifact probe uses the same rule.
 
 - rclone.php
-  - Logic: Picks the pinned version by default, optionally fetches the latest release when requested, replaces `/usr/bin/rclone` when version mismatch, installs from the official zip.
-  - Env: `PMSS_RCLONE_FETCH_LATEST=1` to request latest.
+  - Logic: Installs the pinned version only, replaces `/usr/bin/rclone` when the version differs, and installs from the official amd64 zip only after its SHA-256 matches the pin. A failed or refused download leaves the current binary in place. Skips on other architectures. Version bumps change the pin and its SHA-256 in a reviewed commit.
+  - Env: `PMSS_RCLONE_FETCH_LATEST` is no longer read; a host that still sets it logs one line and gets the pin.
 
 - wireguard.php
   - See WireGuard section above.
