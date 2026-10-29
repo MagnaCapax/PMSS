@@ -51,8 +51,12 @@ function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, b
     $prefix = false;
     $handle = @fopen($scriptPath, 'rb');
     if (pmssStreamHandleIsOpen($handle)) {
-        $prefix = @fread($handle, 2);
-        @fclose($handle);
+        try {
+            $prefix = @fread($handle, 2);
+        } finally {
+            // Prefix inspection owns this stream even when the read throws.
+            @fclose($handle);
+        }
     }
     if ($prefix === '#!') {
         $argv = $_SERVER['argv'] ?? ($GLOBALS['argv'] ?? []);

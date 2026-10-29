@@ -105,6 +105,12 @@ fallback precedence and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+CLI wrapper prefix inspection closes its stream in `finally` when the read
+throws, preserving the original exception or error before delegation. Successful,
+empty, short and failed reads retain their existing include/shebang dispatch;
+`CliWrapperCharacterizationTest` checks cleanup and target ordering with isolated
+prefix-I/O stubs. These fixtures run only on testing machines.
+
 Stored resource projections reject non-null scalar/object metric and raw-window
 containers before indexing them. Invalid cached rows follow the existing
 missing-user path; optional-reading casts, zero defaults, field order and other

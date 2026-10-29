@@ -50,6 +50,57 @@ final class CliWrapperCharacterizationTest extends TestCase
         }
     }
 
+    public function testPrefixInspectionClosesStreamBeforeDelegatingOrRethrowing(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cli-prefix-');
+        $this->pmssWriteFile($root.'/target.php', '<?php $GLOBALS["prefixEvents"][] = "target";');
+        $runtime = var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true);
+        // Inject only the prefix I/O; resolution and target inclusion use real fixture files.
+        $script = <<<'PHP'
+namespace CliPrefixFixture;
+function fopen($path, $mode) {
+    $GLOBALS['prefixEvents'][] = ['open', basename($path), $mode];
+    return $GLOBALS['prefixHandle'] = $GLOBALS['prefixCase'] === 'open-failure' ? false : \tmpfile();
+}
+function fread($handle, $length) {
+    $GLOBALS['prefixEvents'][] = ['read', $length];
+    if ($GLOBALS['prefixFailure'] !== null) throw $GLOBALS['prefixFailure'];
+    return ['ordinary' => '<?', 'empty' => '', 'short' => '<', 'read-failure' => false][$GLOBALS['prefixCase']];
+}
+function fclose($handle) {
+    $GLOBALS['prefixEvents'][] = 'close';
+    return \fclose($handle);
+}
+PHP;
+        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/cli.php', 'CliPrefixFixture');
+        $script .= <<<'PHP'
+$GLOBALS['prefixCase'] = getenv('PMSS_TEST_CLI_PREFIX_CASE');
+$GLOBALS['prefixEvents'] = [];
+$GLOBALS['prefixFailure'] = $GLOBALS['prefixCase'] === 'exception' ? new \RuntimeException('prefix read failed')
+    : ($GLOBALS['prefixCase'] === 'error' ? new \Error('prefix read failed') : null);
+$caught = null;
+try {
+    pmssRequireCliEntrypointScript(getenv('PMSS_TEST_CLI_PREFIX_ROOT'), 'target.php');
+} catch (\Throwable $error) {
+    $caught = $error;
+}
+echo json_encode([$GLOBALS['prefixEvents'], is_resource($GLOBALS['prefixHandle']),
+    $caught === $GLOBALS['prefixFailure']]);
+PHP;
+        foreach (['ordinary', 'empty', 'short', 'read-failure', 'open-failure', 'exception', 'error'] as $case) {
+            $events = [['open', 'target.php', 'rb']];
+            if ($case !== 'open-failure') {
+                $events[] = ['read', 2];
+                $events[] = 'close';
+            }
+            if ($case !== 'exception' && $case !== 'error') $events[] = 'target';
+            $this->assertSame([$events, false, true], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_CLI_PREFIX_CASE' => $case,
+                'PMSS_TEST_CLI_PREFIX_ROOT' => $root,
+            ]), $case);
+        }
+    }
+
     public function testThinWrappersDelegateDirectlyToUtilScripts(): void
     {
         $this->pmssAssertRepoFileContractCases([
