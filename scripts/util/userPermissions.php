@@ -12,7 +12,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/shell.php';
 require_once __DIR__.'/../lib/user/permissionsCommands.php';
 require_once __DIR__.'/../lib/user/permissionsApply.php';
-require_once __DIR__.'/../lib/user/billingPermissions.php';
+require_once __DIR__.'/../lib/user/rootArtifactPermissions.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/user/subordinateIds.php';
@@ -157,7 +157,7 @@ $chownItems = [
     // Billing identity files are created root-owned by writeHomeMarker.php,
     // recreateUser restore with identity uid 0, and management-host backfill.
     // userTransfer's root-run rsync -a preserves root ownership. Readers require
-    // a root owner; this pass never adopts a non-root file.
+    // a root owner; this pass never adopts a non-root file (see $rootArtifactWriters).
     ["/home/{$thisUser}/.billingServiceId", "root:{$thisUser}"],
     ["/home/{$thisUser}/.billingId", "root:{$thisUser}"],
     ["/home/{$thisUser}/.billingClientId", "root:{$thisUser}"],
@@ -182,19 +182,23 @@ $chownItems = [
     ["/home/{$thisUser}/.lighttpd.conf", "root:root"],
 ];
 
+// Root-written files whose readers trust a root owner; see pmssUserRootArtifactWriters().
+$rootArtifactWriters = pmssUserRootArtifactWriters($thisUser, $trafficPaths);
+
+// Check each such entry once with lstat before either repair phase.
+$rootArtifactRepairable = [];
+foreach ($rootArtifactWriters as $artifactPath => $artifactWriter) {
+    clearstatcache(true, $artifactPath);
+    $rootArtifactRepairable[$artifactPath] = pmssUserRootArtifactRepairable($thisUser, $artifactPath, @lstat($artifactPath), $artifactWriter);
+}
+
 // Toggle only the traffic files present now: an optional one never written (often the
 // localnet ingress file) has no flag to change. One that vanishes before the final set still logs.
-$trafficFiles = array_values(array_filter($trafficPaths, static function (string $path): bool {
+// A traffic file left unadopted above is not touched at all.
+$trafficFiles = array_values(array_filter($trafficPaths, static function (string $path) use ($rootArtifactRepairable): bool {
     clearstatcache(true, $path);
-    return @lstat($path) !== false;
+    return @lstat($path) !== false && ($rootArtifactRepairable[$path] ?? true);
 }));
-
-// Check each identity entry once with lstat before either repair phase.
-$billingRepairable = [];
-foreach (['.billingServiceId', '.billingId', '.billingClientId'] as $billingName) {
-    $billingPath = $homeDir.'/'.$billingName;
-    $billingRepairable[$billingPath] = pmssUserBillingFileRepairable($thisUser, $billingPath, @lstat($billingPath));
-}
 
 // Ensure traffic files are mutable while ownership and permissions are repaired.
 foreach ($trafficFiles as $trafficFile) {
@@ -258,10 +262,17 @@ pmssUserPermissionsRun(implode(' ', $findParts));
 
 foreach ($chownItems as $item) {
     $path = $item[0];
-    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
+    if (array_key_exists($path, $rootArtifactRepairable) && !$rootArtifactRepairable[$path]) {
         continue;
     }
     $owner = $item[1];
+    if (array_key_exists($path, $rootArtifactRepairable)) {
+        // The file is already root-owned, so only its group can need repair. Set it
+        // through the opened inode, which must still be root-owned: a file swapped in
+        // after the check is never adopted, and no path is resolved twice.
+        pmssUserPermissionsOpenedGroupSet($thisUser, $homeDir, $path, substr($owner, strpos($owner, ':') + 1), 0);
+        continue;
+    }
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
     $predicate = $recursive ? pmssFindOwnerMismatchPredicate($owner) : '';
     pmssUserPermissionsOwnerApply($homeDir, $path, $owner, $predicate, $predicate !== '');
@@ -286,7 +297,7 @@ pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf('find %s -
 
 foreach ($chmodItems as $item) {
     $path = $item[0];
-    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
+    if (array_key_exists($path, $rootArtifactRepairable) && !$rootArtifactRepairable[$path]) {
         continue;
     }
     $perm = $item[1];

@@ -215,6 +215,34 @@ class UserPermissionsApplyTest extends TestCase
         $this->assertSame(posix_geteuid(), fileowner($file));
     }
 
+    public function testOpenedGroupSetNeverAdoptsAFileOwnedBySomeoneElse(): void
+    {
+        $home = $this->home();
+        $uid = posix_geteuid();
+        $owner = $this->pmssCurrentOwner();
+        $group = posix_getgrgid(posix_getegid());
+        if (!is_array($group)) {
+            throw new SkipTest('current group has no name');
+        }
+        $file = $this->file($home.'/.notifyEmail', 0640, "elsewhere@example.test\n");
+        $outside = $this->file($this->tempDir.'/outside/.quota', 0600);
+        $this->pmssCreateSymlinkOrSkip($outside, $home.'/.quota');
+
+        // A file swapped in after the lstat gate has the wrong owner; nothing changes on it.
+        $this->assertFalse(\pmssUserPermissionsOpenedGroupSet($owner, $home, $file, $group['name'], $uid + 1));
+        $this->assertSame($uid, fileowner($file));
+        $this->assertSame(0, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
+        foreach (['/.quota', '/missing'] as $name) {
+            $this->assertFalse(\pmssUserPermissionsOpenedGroupSet($owner, $home, $home.$name, $group['name'], $uid), $name);
+        }
+
+        // The expected owner gets its group set through the opened inode; content and owner stay.
+        $this->assertTrue(\pmssUserPermissionsOpenedGroupSet($owner, $home, $file, $group['name'], $uid));
+        $this->assertSame($uid, fileowner($file));
+        $this->assertSame(posix_getegid(), filegroup($file));
+        $this->assertSame("elsewhere@example.test\n", file_get_contents($file));
+    }
+
     public function testUserPermissionsRoutesEveryRepairThroughTheCheckedObject(): void
     {
         $this->pmssAssertRepoFileContract('scripts/util/userPermissions.php', [
@@ -233,7 +261,7 @@ class UserPermissionsApplyTest extends TestCase
             ],
         ]);
         $this->assertOrderedStrings([
-            'return @lstat($path) !== false;',
+            'return @lstat($path) !== false && ($rootArtifactRepairable[$path] ?? true);',
             'pmssTrafficSetImmutable($trafficFile, false);',
             "\$findParts[] = '-execdir chown -h';",
             'pmssUserPermissionsOwnerApply($homeDir, $path, $owner',

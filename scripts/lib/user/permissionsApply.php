@@ -8,6 +8,8 @@
  *   only its own files;
  * - modes on root-owned files change through the opened inode, after the
  *   handle is confirmed to be a single-link regular file inside the home;
+ * - the group of a root-owned file whose reader trusts a root owner changes
+ *   the same way, and its owner never changes, so no account file is adopted;
  * - owners change from a find that starts at the home and descends only
  *   through directories it opens itself; -execdir runs chown -h inside the
  *   directory find holds, so no path is resolved again by name.
@@ -69,6 +71,32 @@ function pmssUserPermissionsOpenedModeSet(string $user, string $home, string $pa
             return true;
         }
         pmssUserPermissionsFailed(sprintf('chmod %04o on opened %s', $mode, $path));
+        return false;
+    } finally {
+        if ($handle !== null) {
+            @fclose($handle);
+        }
+    }
+}
+
+/**
+ * Set the group of one single-link regular file owned by $ownerUid through its
+ * opened inode. The owner is never changed, so a file the account placed at
+ * that name cannot be adopted. Anything else at that name is logged and left.
+ */
+function pmssUserPermissionsOpenedGroupSet(string $user, string $home, string $path, string $group, int $ownerUid): bool
+{
+    $handle = pmssUserFileOpenVerified($path, 'rbn');
+    $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
+    try {
+        if ($opened === null) {
+            pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; group left as-is', basename($path), $ownerUid));
+            return false;
+        }
+        if (@chgrp($opened, $group)) {
+            return true;
+        }
+        pmssUserPermissionsFailed(sprintf('chgrp %s on opened %s', $group, $path));
         return false;
     } finally {
         if ($handle !== null) {
