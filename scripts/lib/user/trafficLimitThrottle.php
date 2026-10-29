@@ -148,6 +148,22 @@ function pmssTrafficLimitThrottleOrphanReconcile(
 }
 
 /**
+ * Lift an expired throttle: drop the runtime marker, then remove ~/.throttle.
+ * Removal does not always take effect on the first attempt, so it runs twice;
+ * the result is the second attempt's.
+ */
+function pmssTrafficLimitThrottleLiftAfterCooldown(string $user, string $enabledMarkerPath, string $reason, string $homeRoot = '/home'): bool
+{
+    if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {
+        return false;
+    }
+    pmssTrafficLimitLog($user, $reason);
+    pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
+    sleep(1);
+    return pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
+}
+
+/**
  * Reconcile throttle state when usage data is missing or invalid.
  *
  * No data is not "under limit": the payload reader returns null for a
@@ -179,16 +195,12 @@ function pmssTrafficLimitThrottleReconcileWithoutUsage(string $user, string $ena
     if ($assertedAt === false || (time() - $assertedAt) <= $cooldownSeconds) {
         return true;
     }
-    if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {
-        return false;
-    }
-    pmssTrafficLimitLog($user, 'traffic throttle removed after cooldown');
-    pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
-    // Second disable mirrors the cooldown branch in trafficLimits.php:
-    // removal does not always take effect on the first attempt.
-    sleep(1);
-    pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
-    return true;
+    return pmssTrafficLimitThrottleLiftAfterCooldown(
+        $user,
+        $enabledMarkerPath,
+        'traffic throttle removed after cooldown (no usage data)',
+        $homeRoot
+    );
 }
 
 /** Lift persisted throttle state when the root-owned traffic limit is cleared. */

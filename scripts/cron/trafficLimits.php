@@ -103,14 +103,7 @@ foreach($users AS $thisUser) {
     } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
 
         if ((time() - (int) filemtime($userTrafficLimitEnabledFile)) > $trafficLimitPeriod) {   // Time to remove the limit
-            if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {
-                continue;
-            }
-            pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
-            pmssTrafficLimitThrottleApply($thisUser, $trafficCapMbit, false);
-			// Do it second time as removal does not always work for some reason
-			sleep(1);
-			pmssTrafficLimitThrottleApply($thisUser, $trafficCapMbit, false);
+            pmssTrafficLimitThrottleLiftAfterCooldown($thisUser, $userTrafficLimitEnabledFile, 'traffic throttle removed after cooldown');
         }
 
     } else {

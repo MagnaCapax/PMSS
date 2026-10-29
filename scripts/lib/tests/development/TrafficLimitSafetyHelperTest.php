@@ -283,6 +283,24 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertTrue(file_exists($realPath));
     }
 
+    public function testThrottleApplyRefreshesMtimeWhenCapIsUnchanged(): void
+    {
+        // The no-usage lift dates the last reassertion by ~/.throttle's mtime
+        // once the tmpfs marker is gone, so rewriting the same cap must refresh it.
+        $homeRoot = $this->tempDir.'/home';
+        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        $throttleFile = $home.'/.throttle';
+
+        $this->assertTrue(\pmssTrafficLimitThrottleApply('alice', 25, true, $homeRoot));
+        $this->assertTrue(touch($throttleFile, time() - 4 * 24 * 60 * 60));
+        clearstatcache(true, $throttleFile);
+        $this->assertTrue(\pmssTrafficLimitThrottleApply('alice', 25, true, $homeRoot));
+        clearstatcache(true, $throttleFile);
+
+        $this->assertSame('25', trim((string) file_get_contents($throttleFile)));
+        $this->assertTrue(time() - (int) filemtime($throttleFile) < 60);
+    }
+
     public function testReconcileWithoutUsageLeavesFreshThrottleUntouched(): void
     {
         $homeRoot = $this->tempDir.'/home';
@@ -321,7 +339,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
             $this->assertFalse(file_exists($enabledMarker), $state);
             $this->assertFalse(file_exists($home.'/.throttle'), $state);
             if ($state === 'expired') {
-                $this->assertTrue(strpos($output, 'traffic throttle removed after cooldown') !== false, $state);
+                $this->assertTrue(strpos($output, 'traffic throttle removed after cooldown (no usage data)') !== false, $state);
             } else {
                 $this->assertTrue(strpos($output, 'orphaned traffic throttle file removed') !== false, $state);
             }

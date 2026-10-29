@@ -39,12 +39,13 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
                 'pmssTrafficLimitCliUsernameNormalize($user)',
                 '@realpath($home) !== $home',
                 'pmssUserFilePathIsSafe($path)',
+                'if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {',
             ]],
             'scripts/cron/trafficLimits.php' => ['required' => [
                 'if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(\'/scripts/listUsers.php\'))) === null) {',
                 'exit(1);',
                 'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {',
-                'if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {',
+                'pmssTrafficLimitThrottleLiftAfterCooldown($thisUser, $userTrafficLimitEnabledFile, ',
                 'pmssTrafficLimitThrottleApply($thisUser, $throttlePlan[\'effectiveCapMbit\']);',
             ]],
         ]);
@@ -70,13 +71,6 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $this->assertTrue($reconcile !== false);
         $this->assertTrue($usage !== false);
         $this->assertTrue($reconcile < $usage);
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/trafficLimitThrottle.php' => ['required' => [
-                'function pmssTrafficLimitThrottleReconcileWithoutUsage(',
-                'pmssTrafficLimitThrottleOrphanReconcile($user, 0, $enabledMarkerPath, $homeRoot)',
-                'traffic throttle removed after cooldown',
-            ]],
-        ]);
     }
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void
