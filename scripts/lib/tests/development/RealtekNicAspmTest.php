@@ -15,7 +15,7 @@ class RealtekNicAspmTest extends TestCase
         $commands = [];
         $logger = $this->pmssMakeArrayLogger($messages);
         $runner = $this->pmssMakeStepRunner($commands);
-        $path = static function (string $binary): string { return '/usr/bin/udevadm'; };
+        $path = self::pmssMakeCallbacks(['path' => '/usr/bin/udevadm'])['path'];
 
         \pmssEnsureRealtekNicAspmOff($logger, $target, $runner, $path);
         $match = 'ACTION=="add|bind|change", SUBSYSTEM=="pci", ATTR{vendor}=="0x10ec", ATTR{class}=="0x020000"';
@@ -43,7 +43,7 @@ class RealtekNicAspmTest extends TestCase
         $commands = [];
         $logger = $this->pmssMakeArrayLogger($messages);
         $runner = static function (string $description, string $command) use (&$commands): int { $commands[] = $command; return 0; };
-        $path = static function (string $binary): string { return ''; };
+        $path = self::pmssMakeCallbacks(['path' => ''])['path'];
         \pmssEnsureRealtekNicAspmOff($logger, $root.'/rule', $runner, $path);
         $this->assertSame([], $commands);
         $this->assertTrue(in_array('[WARN] udevadm unavailable; Realtek NIC ASPM rule will apply on the next device event', $messages, true));

@@ -9,18 +9,16 @@ class IntelGpuFirmwareSelectionTest extends TestCase
 {
     public function testFirmwareIsDroppedWithoutIntelDisplayButOtherPackagesRemain(): void
     {
-        $available = static function (string $package): bool { return true; };
-        $absent = static function (): bool { return false; };
-        $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'firmware-misc-nonfree install', 'beta hold'], 12, $available, $absent);
+        $ops = self::pmssMakeCallbacks(['available' => true, 'intelDisplay' => false]);
+        $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'firmware-misc-nonfree install', 'beta hold'], 12, $ops['available'], $ops['intelDisplay']);
         $this->assertSame(["alpha\tinstall", "beta\thold"], $plan['sanitised']);
         $this->assertSame(['firmware-misc-nonfree'], $plan['dropped_hardware']);
     }
 
     public function testFirmwareIsSelectedWithIntelDisplay(): void
     {
-        $available = static function (string $package): bool { return true; };
-        $present = static function (): bool { return true; };
-        $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'firmware-misc-nonfree install'], 12, $available, $present);
+        $ops = self::pmssMakeCallbacks(['available' => true, 'intelDisplay' => true]);
+        $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'firmware-misc-nonfree install'], 12, $ops['available'], $ops['intelDisplay']);
         $this->assertSame(["alpha\tinstall", "firmware-misc-nonfree\tinstall"], $plan['sanitised']);
         $this->assertSame([], $plan['dropped_hardware']);
     }

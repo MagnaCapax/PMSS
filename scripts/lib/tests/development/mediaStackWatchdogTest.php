@@ -35,7 +35,7 @@ class MediaStackWatchdogTest extends TestCase
     public function testRepeatedMissingSessionsBecomeFailedAtThirdObservation(): void
     {
         $apps = array('sonarr' => \pmssMediaStackWatchdogAppDefinitions()['sonarr']);
-        $probe = static function (): bool { return false; };
+        $probe = self::pmssMakeCallbacks(['probe' => false])['probe'];
 
         $first = \pmssMediaStackWatchdogSnapshot('alice', $apps, array(), $probe);
         $second = \pmssMediaStackWatchdogSnapshot('alice', $apps, $first, $probe);
@@ -52,7 +52,7 @@ class MediaStackWatchdogTest extends TestCase
         $apps = array('sonarr' => \pmssMediaStackWatchdogAppDefinitions()['sonarr']);
         $previous = array('apps' => array('sonarr' => array('state' => 'failed', 'consecutiveFailures' => 8)));
 
-        $status = \pmssMediaStackWatchdogSnapshot('alice', $apps, $previous, static function (): bool { return true; });
+        $status = \pmssMediaStackWatchdogSnapshot('alice', $apps, $previous, self::pmssMakeCallbacks(['probe' => true])['probe']);
 
         $this->assertSame('healthy', $status['state']);
         $this->assertSame('running', $status['apps']['sonarr']['state']);
@@ -70,7 +70,7 @@ class MediaStackWatchdogTest extends TestCase
                 $this->assertSame($expected, $status['state']);
             }
         }
-        $this->assertSame('healthy', \pmssMediaStackWatchdogSnapshot('alice', [], [], static function (): bool { return false; })['state']);
+        $this->assertSame('healthy', \pmssMediaStackWatchdogSnapshot('alice', [], [], self::pmssMakeCallbacks(['probe' => false])['probe'])['state']);
     }
 
     public function testDeliberatelyStoppedAppIsOffWithoutFailureOrAlert(): void
@@ -97,7 +97,7 @@ class MediaStackWatchdogTest extends TestCase
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
         $this->pmssWriteRelativeFile($home, '.config/sonarr/config.xml', '<Config />');
 
-        $status = \pmssMediaStackWatchdogRunUser('alice', $homeRoot, static function (): bool { return true; });
+        $status = \pmssMediaStackWatchdogRunUser('alice', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']);
 
         $this->assertSame('healthy', $status['state']);
         $this->assertSame('running', $status['apps']['sonarr']['state']);

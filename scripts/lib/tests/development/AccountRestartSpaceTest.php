@@ -19,7 +19,7 @@ class AccountRestartSpaceTest extends TestCase
         $restart = static function () use (&$running, &$warnings): bool {
             return pmssAccountRestartSpaceAllows('alice', '/srv/pmss-test-home', 'automatic lighttpd restart',
                 static function (string $line) use (&$warnings): void { $warnings[] = $line; },
-                static function (): int { return 0; });
+                self::pmssMakeCallbacks(['freeBytes' => 0])['freeBytes']);
         };
         $running = pmssUserWatchdogRestartProcessesIf('alice', $running, ['lighttpd', 'php-cgi'], $restart,
             'lighttpd restart requested', 15,
@@ -41,7 +41,7 @@ class AccountRestartSpaceTest extends TestCase
             static function () use (&$warnings): bool {
                 return pmssAccountRestartSpaceAllows('alice', '/srv/pmss-test-home', 'automatic lighttpd restart',
                     static function (string $line) use (&$warnings): void { $warnings[] = $line; },
-                    static function (): int { return PMSS_ACCOUNT_RESTART_MIN_FREE_BYTES; });
+                    self::pmssMakeCallbacks(['freeBytes' => PMSS_ACCOUNT_RESTART_MIN_FREE_BYTES])['freeBytes']);
             }, 'lighttpd restart requested', 15,
             static function () use (&$stopped): void { $stopped = true; });
 
@@ -52,12 +52,10 @@ class AccountRestartSpaceTest extends TestCase
 
     public function testLowSpaceBoundariesAndFailedProbe(): void
     {
-        $measure = static function (string $home): int { return PMSS_ACCOUNT_RESTART_MIN_FREE_BYTES - 1; };
+        $measure = self::pmssMakeCallbacks(['freeBytes' => PMSS_ACCOUNT_RESTART_MIN_FREE_BYTES - 1])['freeBytes'];
         $this->assertFalse(pmssAccountRestartSpaceAvailable('/srv/pmss-test-home', $measure));
-        $this->assertTrue(pmssAccountRestartSpaceAvailable('/srv/pmss-test-home', static function (): int {
-            return PMSS_ACCOUNT_RESTART_MIN_FREE_BYTES;
-        }));
-        $this->assertFalse(pmssAccountRestartSpaceAvailable('/srv/pmss-test-home', static function () { return false; }));
-        $this->assertFalse(pmssAccountRestartSpaceAvailable('/srv/pmss-test-home', static function (): int { return 0; }));
+        $this->assertTrue(pmssAccountRestartSpaceAvailable('/srv/pmss-test-home', self::pmssMakeCallbacks(['freeBytes' => PMSS_ACCOUNT_RESTART_MIN_FREE_BYTES])['freeBytes']));
+        $this->assertFalse(pmssAccountRestartSpaceAvailable('/srv/pmss-test-home', self::pmssMakeCallbacks(['freeBytes' => false])['freeBytes']));
+        $this->assertFalse(pmssAccountRestartSpaceAvailable('/srv/pmss-test-home', self::pmssMakeCallbacks(['freeBytes' => 0])['freeBytes']));
     }
 }

@@ -47,9 +47,7 @@ class UserSystemdWatchdogTest extends TestCase
             [['rc' => 0, 'stdout' => "activating\n"], 'unknown'],
             [['rc' => 4, 'stdout' => "unknown\n"], 'unknown'],
         ] as $case) {
-            $actual = \pmssUserSystemdWatchdogManagerState(1001, static function () use ($case): array {
-                return $case[0];
-            });
+            $actual = \pmssUserSystemdWatchdogManagerState(1001, self::pmssMakeCallbacks(['probe' => $case[0]])['probe']);
             $this->assertSame($case[1], $actual);
         }
         $this->assertSame('unknown', \pmssUserSystemdWatchdogManagerState(0));
@@ -104,17 +102,16 @@ class UserSystemdWatchdogTest extends TestCase
         $lingerRoot = $this->pmssMakeTempDir('user-systemd-watchdog-linger-');
         $this->pmssWriteRelativeFile($homeRoot.'/alice', '.config/systemd/user/custom.service', '[Unit]');
         $this->pmssWriteRelativeFile($lingerRoot, 'alice', '');
-        $lookup = static function (): array { return ['uid' => 1001]; };
-        $probe = static function (): array { return ['rc' => 0, 'stdout' => "active\n"]; };
+        $ops = self::pmssMakeCallbacks(['lookup' => ['uid' => 1001], 'probe' => ['rc' => 0, 'stdout' => "active\n"]]);
         $status = null;
 
-        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], static function () use (&$status, $homeRoot, $lingerRoot, $probe, $lookup): void {
-            $status = \pmssUserSystemdWatchdogRunUser('alice', $homeRoot, $lingerRoot, $probe, $lookup);
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], static function () use (&$status, $homeRoot, $lingerRoot, $ops): void {
+            $status = \pmssUserSystemdWatchdogRunUser('alice', $homeRoot, $lingerRoot, $ops['probe'], $ops['lookup']);
         });
 
         $this->assertSame('healthy', $status['state']);
         $this->assertTrue(is_file($homeRoot.'/alice/.systemd-user-status.json'));
-        $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('bad-name', $homeRoot, $lingerRoot, $probe, $lookup));
+        $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('bad-name', $homeRoot, $lingerRoot, $ops['probe'], $ops['lookup']));
     }
 
     public function testRunUserSkipsAccountsWithoutIntentAndCgroupV2(): void
@@ -124,7 +121,7 @@ class UserSystemdWatchdogTest extends TestCase
         $this->pmssWriteRelativeFile($homeRoot.'/alice', '.config/systemd/user/docker.service', '[Unit]');
         $this->pmssWriteRelativeFile($lingerRoot, 'alice', '');
         $probe = static function (): array { throw new \RuntimeException('probe must not run'); };
-        $lookup = static function (): array { return ['uid' => 1001]; };
+        $lookup = self::pmssMakeCallbacks(['lookup' => ['uid' => 1001]])['lookup'];
 
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($homeRoot, $lingerRoot, $probe, $lookup): void {
             $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('alice', $homeRoot, $lingerRoot, $probe, $lookup));

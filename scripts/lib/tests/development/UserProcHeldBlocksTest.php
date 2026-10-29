@@ -43,25 +43,20 @@ class UserProcHeldBlocksTest extends TestCase
     public function testReturnsNullWhenNoAccountProcessExists(): void
     {
         $procRoot = $this->makeProcFixture([12345 => 1600]);
-        $this->assertSame(null, pmssUserProcHeldBlocks(1500, 7, $procRoot, static function (): array {
-            return [];
-        }));
+        $this->assertSame(null, pmssUserProcHeldBlocks(1500, 7, $procRoot, self::pmssMakeCallbacks(['stat' => []])['stat']));
     }
 
     public function testReturnsNullWhenDescriptorStatIsUnreadable(): void
     {
         $procRoot = $this->makeProcFixture([12345 => 1500]);
-        $this->assertSame(null, pmssUserProcHeldBlocks(1500, 7, $procRoot, static function (): bool {
-            return false;
-        }));
+        $this->assertSame(null, pmssUserProcHeldBlocks(1500, 7, $procRoot, self::pmssMakeCallbacks(['stat' => false])['stat']));
     }
 
     public function testReturnsNullWhenDescriptorMetadataIsIncomplete(): void
     {
         $procRoot = $this->makeProcFixture([12345 => 1500]);
-        $this->assertSame(null, pmssUserProcHeldBlocks(1500, 7, $procRoot, static function (): array {
-            return ['dev' => 7, 'ino' => 10, 'nlink' => 0];
-        }));
+        $this->assertSame(null, pmssUserProcHeldBlocks(1500, 7, $procRoot,
+            self::pmssMakeCallbacks(['stat' => ['dev' => 7, 'ino' => 10, 'nlink' => 0]])['stat']));
     }
 
     public function testReturnsNullWhenHeldBlockSumWouldOverflow(): void

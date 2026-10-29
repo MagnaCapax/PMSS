@@ -99,10 +99,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         file_put_contents($root.'/target/state/alice', 'keep');
         symlink($root.'/target', $root.'/parent-link');
         $calls = [];
-        $ops = [
-            'users' => static function () use (&$calls): array { $calls[] = 'users'; return ['alice']; },
-            'run' => static function () use (&$calls): void { $calls[] = 'run'; },
-        ];
+        $ops = self::pmssMakeCallbacks(['users' => ['alice'], 'run' => null], $calls);
         foreach (['state', 'new-state'] as $leaf) {
             \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/parent-link/'.$leaf, $ops);
         }
@@ -172,10 +169,9 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $runs = [];
         $ops = [
             'users' => static function () use (&$users): array { return $users; },
-            'ramMiB' => static function (): int { return 4096; },
             'run' => static function (string $command) use (&$runs): void { $runs[] = $command; },
             'homeBase' => $root.'/home',
-        ];
+        ] + self::pmssMakeCallbacks(['ramMiB' => 4096]);
         putenv('PATH='.$root.'/stub:'.$path);
         try {
             \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', $ops);
@@ -206,10 +202,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->pmssEnsureDir($root.'/target');
         symlink($root.'/target', $root.'/state-link');
         $calls = [];
-        $ops = [
-            'users' => static function () use (&$calls): array { $calls[] = 'users'; return ['alice']; },
-            'run' => static function () use (&$calls): void { $calls[] = 'run'; },
-        ];
+        $ops = self::pmssMakeCallbacks(['users' => ['alice'], 'run' => null], $calls);
         \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state-link', $ops);
         $this->assertSame([], $calls);
         $this->assertSame([], glob($root.'/target/*'));
@@ -241,11 +234,10 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $path = (string) getenv('PATH');
         $runs = [];
         $ops = [
-            'users' => static function () use ($ram): array { return array_merge(array_keys($ram), ['../etc']); },
             'ramMiB' => static function (string $user) use ($ram): int { return $ram[$user]; },
             'run' => static function (string $command) use (&$runs): void { $runs[] = $command; },
             'homeBase' => $root.'/home',
-        ];
+        ] + self::pmssMakeCallbacks(['users' => array_merge(array_keys($ram), ['../etc'])]);
         putenv('PATH='.$root.'/stub:'.$path);
         try {
             \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
