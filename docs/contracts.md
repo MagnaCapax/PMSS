@@ -1114,6 +1114,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - WebDAV: `/webdav-<user>/` is protected by per-user htpasswd at `/home/<user>/.lighttpd/.htpasswd`.
   - WebDAV: nginx WebDAV locations include `/etc/nginx/webdav_proxy_params`, which preserves forwarded auth/origin headers, disables request buffering, and uses 600s body/proxy timeouts for large uploads.
   - WebDAV: make `~/www` writable by creating `/home/<user>/.lighttpd/webdav.www-writable` (default is read-only except `~/www/public`).
+  - WebDAV: dotfiles and dot directories are refused, including as a COPY/MOVE `Destination`; a read-only `~/www` also refuses COPY/MOVE into it. `url.access-deny` matches only the end of the path, so these rules are `$HTTP["url"]` and `$REQUEST_HEADER["Destination"]` conditions.
   - Side-effects: Writes under `/etc/nginx/` and reloads/restarts nginx via callers.
 
 - scripts/util/checkUserHtpasswd.php

@@ -26,7 +26,8 @@
  *
  * Security Model:
  * - WebDAV exposes user entire home directory (~/*)
- * - Dotfiles are BLOCKED via url.access-deny = ( "/." )
+ * - Dotfiles are BLOCKED by a "/\." URL condition and a Destination-header
+ *   condition (url.access-deny alone matches only the end of the path)
  * - ~/www is read-only by default (protects web stack)
  * - ~/www/public is writable by default (user uploads)
  * - Full ~/www write requires explicit opt-in marker file
@@ -146,45 +147,45 @@ class WebdavSecurityTest extends TestCase
     // =========================================================================
 
     /**
-     * TEST 7: Dotfile deny pattern is present in template
+     * TEST 7: Dotfile deny is a URL condition, not a url.access-deny suffix
      *
-     * HARDENS: Verifies the critical security control exists.
+     * HARDENS: url.access-deny = ( "/." ) only denies paths ending in "/.";
+     * GET, PUT and PROPFIND of /webdav-user/.bashrc passed it on lighttpd
+     * 1.4.53, 1.4.59 and 1.4.69.
      */
-    public function testDotfileDenyPatternExistsInTemplate(): void
+    public function testDotfileDenyIsAUrlCondition(): void
     {
-        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.lighttpd', 'url.access-deny = ( "/." )');
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
+        $this->assertStringContainsString("\$HTTP[\"url\"] =~ \"/\\.\" {\n        url.access-deny = ( \"\" )", $template);
+        $this->assertStringNotContainsString('url.access-deny = ( "/." )', $template);
     }
 
     /**
-     * TEST 8: Path traversal via ../ is blocked by dotfile rule
+     * TEST 8: COPY and MOVE targets are checked for dot segments
      *
-     * HARDENS: The "/." pattern matches "/.." traversal sequence.
-     *
-     * ADVERSARIAL: Attacker requests /webdav-user/../../../etc/passwd
+     * HARDENS: the Destination header is not part of the request URL, so a
+     * COPY onto ~/.bashrc passed a URL-only rule. The header is not decoded
+     * before matching, so encoded ".", "/" and "w" are refused outright.
      */
-    public function testPathTraversalBlockedByDotfileRule(): void
+    public function testDestinationHeaderDotSegmentsAreDenied(): void
     {
-        $denyPattern = '/.';
-        $attacks = array(
-            '/webdav-user/../etc/passwd',
-            '/webdav-user/data/../../.ssh/id_rsa',
-            '/webdav-user/./hidden',
-            '/webdav-user/.bashrc',
-            '/webdav-user/.ssh/authorized_keys',
-        );
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
+        $this->assertStringContainsString('$REQUEST_HEADER["Destination"] =~ "/\\.|%(2[eEfF]|77)"', $template);
 
-        foreach ($attacks as $attack) {
-            $this->assertStringContainsString($denyPattern, $attack,
-                "Attack path '$attack' should be caught by '$denyPattern' rule");
+        $pattern = '#/\\.|%(2[eEfF]|77)#';
+        foreach (['/webdav-user/.bashrc', '/webdav-user/%2ebashrc', '/webdav-user/dir%2F.bashrc', '/webdav-user/%77ww/index.html', '/webdav-user/.ssh/x'] as $target) {
+            $this->assertSame(1, preg_match($pattern, $target), $target);
+        }
+        foreach (['/webdav-user/dir/file.txt', '/webdav-user/dir/a%20b.txt', '/webdav-user/www/public/x.txt'] as $target) {
+            $this->assertSame(0, preg_match($pattern, $target), $target);
         }
     }
 
     /**
-     * TEST 9: URL-encoded traversal patterns documentation
+     * TEST 9: Encoded dot segments in the URL
      *
-     * HARDENS: Documents %2e handling depends on lighttpd normalization.
-     *
-     * ADVERSARIAL: Attacker uses %2e%2e%2f to bypass pattern matching.
+     * HARDENS: lighttpd decodes the request path before $HTTP["url"]
+     * conditions, so %2e reaches the "/\." condition as a dot.
      */
     public function testUrlEncodedTraversalDocumentation(): void
     {
@@ -196,8 +197,7 @@ class WebdavSecurityTest extends TestCase
         );
 
         foreach ($encodedAttacks as $encoded => $decoded) {
-            $this->assertStringContainsString('.', $decoded,
-                "Decoded '$encoded' -> '$decoded' contains dot, will be blocked");
+            $this->assertSame(1, preg_match('#/\\.#', '/'.$decoded), "Decoded '$encoded' -> '$decoded'");
         }
     }
 
@@ -405,6 +405,29 @@ LIGHTTPD;
             '', 'www/public block must come after www block for lighttpd precedence: ');
     }
 
+    /**
+     * TEST 19b: Read-only www also refuses COPY and MOVE targets inside it
+     *
+     * HARDENS: is-readonly follows the request URL, so COPY file.txt with
+     * Destination www/index.html overwrote the file on lighttpd 1.4.59/1.4.69.
+     */
+    public function testReadOnlyWwwRefusesCopyAndMoveTargets(): void
+    {
+        $policy = pmssWebdavWwwPolicyBlock('testuser');
+        $this->assertStringContainsString(
+            '$REQUEST_HEADER["Destination"] =~ "/webdav-testuser/www($|/(?!public($|/)))" {'."\n".'    url.access-deny = ( "" )',
+            $policy
+        );
+
+        $pattern = '#/webdav-testuser/www($|/(?!public($|/)))#';
+        foreach (['https://h/webdav-testuser/www/index.html', 'https://h/webdav-testuser/www', 'https://h/webdav-testuser/www/publicity.html'] as $target) {
+            $this->assertSame(1, preg_match($pattern, $target), $target);
+        }
+        foreach (['https://h/webdav-testuser/www/public/x.txt', 'https://h/webdav-testuser/www/public', 'https://h/webdav-testuser/wwwroot/x', 'https://h/webdav-testuser/dir/x'] as $target) {
+            $this->assertSame(0, preg_match($pattern, $target), $target);
+        }
+    }
+
     // =========================================================================
     // SECTION 5: ISOLATION / MULTI-USER
     // =========================================================================
@@ -519,7 +542,7 @@ LIGHTTPD;
         $markerPath = '/home/testuser/.lighttpd/webdav.www-writable';
 
         $this->assertStringContainsString('/.lighttpd/', $markerPath);
-        $this->assertStringContainsString('/.', '/.lighttpd');
+        $this->assertSame(1, preg_match('#/\\.#', '/webdav-testuser/.lighttpd/webdav.www-writable'));
     }
 
     // =========================================================================

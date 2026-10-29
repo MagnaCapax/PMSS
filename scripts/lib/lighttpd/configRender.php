@@ -41,10 +41,15 @@ LIGHTTPD;
         return sprintf($policy, 'disable');
     }
 
+    // is-readonly follows the request URL, so a COPY or MOVE from elsewhere would
+    // still write into www/; refuse a Destination there (other than www/public).
     return sprintf($policy, 'enable').<<<LIGHTTPD
 
 \$HTTP["url"] =~ "^/webdav-{$user}/www/public(\$|/)" {
     webdav.is-readonly = "disable"
+}
+\$REQUEST_HEADER["Destination"] =~ "/webdav-{$user}/www(\$|/(?!public(\$|/)))" {
+    url.access-deny = ( "" )
 }
 LIGHTTPD;
 }
