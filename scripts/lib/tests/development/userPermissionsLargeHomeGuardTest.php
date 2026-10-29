@@ -38,7 +38,9 @@ PHP;
                 $ownerSpec,
                 "require_once __DIR__.'/../lib/user/subordinateIds.php';",
                 "\$findParts[] = '-execdir chown -h';",
-                'find %s \( -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
+                'find %s \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
+                'escapeshellarg("/home/{$thisUser}/.config"),',
+                '["/home/{$thisUser}/.config", 0770, true, true],',
                 'find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +',
                 'function pmssFindOwnerMismatchPredicate(string $owner): string',
                 '\( -not -user %s -o -not -group %s \)',
@@ -46,6 +48,7 @@ PHP;
             ],
             'forbidden' => [
                 '["/home/{$thisUser}/data", 0750, true],' => 'Expected data tree chmod to avoid recursive mode',
+                '["/home/{$thisUser}/.config", 0770, true],' => '~/.config is strip-only so owner-only modes survive (#1217)',
                 "pmssRun(sprintf('chown %s%s %s'" => 'Direct ownership command must stay out of the account tree',
                 "pmssRun(sprintf('chmod %s%o %s'" => 'Direct mode command must stay out of the account tree',
             ],

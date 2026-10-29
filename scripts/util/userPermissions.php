@@ -120,7 +120,8 @@ $chmodItems = [
     // Heal non-executable skeleton files copied with mode 0755 before #1019.
     ["/home/{$thisUser}/radarr-sonarr.txt", 0644],
     ["/home/{$thisUser}/.tmp", 0770],
-    ["/home/{$thisUser}/.config", 0770, true],
+    // Strip-only: keep owner-only modes, clear other bits and setuid/setgid (#1217).
+    ["/home/{$thisUser}/.config", 0770, true, true],
     ["/home/{$thisUser}/.trafficData", 0640],
     ["/home/{$thisUser}/.trafficDataIngress", 0640],
     ["/home/{$thisUser}/.rtorrent.rc", 0644],
@@ -282,9 +283,10 @@ foreach ($chownItems as $item) {
 // account that changes them; directories it does not own are left out. Directories
 // first; the explicit items below override.
 pmssUserPermissionsAccountRun($thisUser, $homeDir, [$homeDir], sprintf(
-    'find %s \( -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
+    'find %s \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
     escapeshellarg('/home/'.$thisUser),
     escapeshellarg("/home/{$thisUser}/.local"),
+    escapeshellarg("/home/{$thisUser}/.config"),
     $accountUid
 ));
 
@@ -302,7 +304,7 @@ foreach ($chmodItems as $item) {
     }
     $perm = $item[1];
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
-    pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive);
+    pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));
 }
 
 if (file_exists("/home/{$thisUser}/.ssh")) {

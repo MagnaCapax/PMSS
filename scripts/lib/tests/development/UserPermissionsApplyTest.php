@@ -47,6 +47,46 @@ class UserPermissionsApplyTest extends TestCase
         return lstat($path)['mtime'];
     }
 
+    public function testStripOnlyKeepsStricterModesAndClearsOtherBits(): void
+    {
+        $home = $this->home();
+        $config = $this->pmssEnsureDir($home.'/.config');
+        $this->assertTrue(chmod($config, 0755));
+        $private = $this->pmssEnsureDir($config.'/private');
+        $this->assertTrue(chmod($private, 0700));
+        $secret = $this->file($private.'/secret', 0600);
+        $readable = $this->file($config.'/readable', 0644);
+        $open = $this->file($config.'/open', 0777);
+        $setuid = $this->file($config.'/setuid', 04755);
+        $hard = $this->file($config.'/hard', 0644);
+        $this->assertTrue(link($hard, $config.'/hard2'));
+
+        \pmssUserPermissionsModeApply($this->pmssCurrentOwner(), $home, posix_geteuid(), $config, 0770, true, true);
+
+        $this->assertSame(0750, $this->mode($config));
+        $this->assertSame(0700, $this->mode($private));
+        $this->assertSame(0600, $this->mode($secret));
+        $this->assertSame(0640, $this->mode($readable));
+        $this->assertSame(0770, $this->mode($open));
+        $this->assertSame(0750, $this->mode($setuid));
+        $this->assertSame(0644, $this->mode($hard), 'hard-linked files stay untouched');
+
+        clearstatcache();
+        $before = lstat($secret)['ctime'];
+        sleep(1);
+        \pmssUserPermissionsModeApply($this->pmssCurrentOwner(), $home, posix_geteuid(), $config, 0770, true, true);
+        clearstatcache();
+        $this->assertSame($before, lstat($secret)['ctime'], 'a second strip-only pass changes nothing');
+        $this->assertSame(0, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
+    }
+
+    public function testStripSymbolicNamesExactlyTheClearedBits(): void
+    {
+        $this->assertSame('u-s,g-s,o-rwx', \pmssUserPermissionsModeStripSymbolic(06007));
+        $this->assertSame('', \pmssUserPermissionsModeStripSymbolic(0));
+        $this->assertSame('g-w,o-rwx', \pmssUserPermissionsModeStripSymbolic(0027));
+    }
+
     public function testAccountOwnedTreeIsNormalisedWithoutFollowingLinks(): void
     {
         $home = $this->home();
@@ -248,7 +288,8 @@ class UserPermissionsApplyTest extends TestCase
         $this->pmssAssertRepoFileContract('scripts/util/userPermissions.php', [
             'required' => [
                 "require_once __DIR__.'/../lib/user/permissionsApply.php';",
-                'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive);',
+                'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));',
+                '["/home/{$thisUser}/.config", 0770, true, true],',
                 "pmssUserPermissionsOwnerApply(\$homeDir, \$path, \$owner, \$predicate, \$predicate !== '');",
                 'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$homeDir], sprintf(',
                 'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf(',
@@ -265,9 +306,9 @@ class UserPermissionsApplyTest extends TestCase
             'pmssTrafficSetImmutable($trafficFile, false);',
             "\$findParts[] = '-execdir chown -h';",
             'pmssUserPermissionsOwnerApply($homeDir, $path, $owner',
-            "'find %s \( -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +'",
+            "'find %s \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +'",
             "'find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +'",
-            'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive);',
+            'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));',
             'pmssTrafficSetImmutable($trafficFile, true);',
         ], $this->pmssReadRepoFile('scripts/util/userPermissions.php'));
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/permissionsApply.php', [

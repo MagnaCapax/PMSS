@@ -37,9 +37,32 @@ function pmssUserPermissionsAccountRun(string $user, string $home, array $paths,
  * entry changes as the account, which skips entries owned by anyone else and
  * does not descend into directories it does not own.
  */
-function pmssUserPermissionsModeApply(string $user, string $home, int $uid, string $path, int $mode, bool $recursive = false): void
+/**
+ * Symbolic chmod that clears exactly the bits in $strip (e.g. 06007 -> "u-s,g-s,o-rwx").
+ */
+function pmssUserPermissionsModeStripSymbolic(int $strip): string
+{
+    $parts = [];
+    foreach (['u' => [6, 04000], 'g' => [3, 02000], 'o' => [0, 0]] as $who => [$shift, $special]) {
+        $bits = ($strip >> $shift) & 7;
+        $letters = ($bits & 4 ? 'r' : '').($bits & 2 ? 'w' : '').($bits & 1 ? 'x' : '').($special !== 0 && ($strip & $special) ? 's' : '');
+        if ($letters !== '') {
+            $parts[] = $who.'-'.$letters;
+        }
+    }
+    return implode(',', $parts);
+}
+
+/**
+ * $stripOnly (recursive only): clear the bits $mode lacks and never add one, so a
+ * stricter mode the account set (0700, 0600) is kept (#1217). Sticky is left alone.
+ */
+function pmssUserPermissionsModeApply(string $user, string $home, int $uid, string $path, int $mode, bool $recursive = false, bool $stripOnly = false): void
 {
     $octal = sprintf('%04o', $mode);
+    $strip = 06777 & ~$mode;
+    $select = $stripOnly ? sprintf('-perm /%04o', $strip) : '-not -perm '.$octal;
+    $set = $stripOnly ? pmssUserPermissionsModeStripSymbolic($strip) : $octal;
     foreach (pmssPathShellTargetPaths($path) as $target) {
         clearstatcache(true, $target);
         $entry = @lstat($target);
@@ -48,7 +71,7 @@ function pmssUserPermissionsModeApply(string $user, string $home, int $uid, stri
             continue;
         }
         $command = $recursive
-            ? sprintf('find %s -type d -not -uid %d -prune -o -uid %d -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +', escapeshellarg($target), $uid, $uid, $octal, $octal)
+            ? sprintf('find %s -type d -not -uid %d -prune -o -uid %d -not -type l \( ! -type f -o -links 1 \) %s -exec chmod %s {} +', escapeshellarg($target), $uid, $uid, $select, $set)
             : sprintf('find %s -maxdepth 0 -uid %d -not -type l \( ! -type f -o -links 1 \) -exec chmod %s {} +', escapeshellarg($target), $uid, $octal);
         pmssUserPermissionsAccountRun($user, $home, [$target], $command);
     }
