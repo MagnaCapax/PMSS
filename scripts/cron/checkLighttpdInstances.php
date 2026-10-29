@@ -106,49 +106,8 @@ foreach($users AS $thisUser) {
     $nginxRecoveryRequired = $nginxRecoveryAction === 'restart' || $nginxRecoveryAction === 'reconfigure';
 
     $phpCgiRunning = pmssUserWatchdogProcessRunning($thisUser, 'php-cgi');
-    $socketError = false;
     $socketPaths = pmssLighttpdWatchdogSocketPaths($homeDir, $configPath);
-
-    if (!$phpCgiRunning) {
-        echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
-        pmssLighttpdWatchdogClearSocketFailure($thisUser);
-        $socketError = true;
-    } else {
-        // Probe every expected php-cgi socket so partial worker crashes become
-        // visible instead of leaving the user with intermittent 502 responses.
-        $socketProbeFailed = false;
-        foreach ($socketPaths as $socketPath) {
-            $probeResult = pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);
-            if (!$probeResult['ok']) {
-                $listeningSocketPaths = (int) $probeResult['errno'] === PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED
-                    ? pmssLighttpdWatchdogListeningSocketSnapshot($homeDir)['paths']
-                    : array();
-                if (pmssLighttpdWatchdogSocketFailureIsStaleIndex(
-                    (int) $probeResult['errno'],
-                    $socketPaths,
-                    $listeningSocketPaths
-                )) {
-                    echo "Configured php-cgi socket {$socketPath} refused the probe, but live listener coverage is healthy for user: {$thisUser}; skipping restart.\n";
-                    pmssLighttpdWatchdogClearSocketFailure($thisUser);
-                    break;
-                }
-                $socketProbeFailed = true;
-                $failureState = pmssLighttpdWatchdogRecordSocketFailure($thisUser);
-                echo "Error when attempting to connect to socket {$socketPath}: {$probeResult['errno']}, {$probeResult['errstr']} (after {$probeResult['attempts']} attempts)\n";
-                echo "php-cgi socket probe failed for user: {$thisUser}; consecutive failures {$failureState['count']}/{$failureState['threshold']}.\n";
-                if ($failureState['action'] === 'restart') {
-                    echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";
-                    $socketError = true;
-                } else {
-                    echo "Deferring lighttpd restart for user: {$thisUser}; waiting for sustained socket failure.\n";
-                }
-                break;
-            }
-        }
-        if (!$socketProbeFailed) {
-            pmssLighttpdWatchdogClearSocketFailure($thisUser);
-        }
-    }
+    $socketError = pmssLighttpdWatchdogSocketRestartRequired($thisUser, $homeDir, $socketPaths, $phpCgiRunning);
     $lighttpdRunningBeforeRestart = pmssUserWatchdogProcessRunning($thisUser, 'lighttpd');
     $lighttpdStartTime = $lighttpdRunningBeforeRestart
         ? pmssUserWatchdogProcessStartTime($thisUser, 'lighttpd')

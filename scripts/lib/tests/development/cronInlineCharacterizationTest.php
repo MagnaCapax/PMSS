@@ -90,11 +90,9 @@ class CronInlineCharacterizationTest extends TestCase
             'pmssLighttpdWatchdogWriteErrorPage(',
             'pmssLighttpdWatchdogDetectReason(',
             "'lighttpd watchdog: ' . \$watchdogReason",
-            'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
-            "pmssLighttpdWatchdogListeningSocketSnapshot(\$homeDir)['paths']",
+            'pmssLighttpdWatchdogSocketRestartRequired($thisUser, $homeDir, $socketPaths, $phpCgiRunning)',
             'pmssLighttpdWatchdogRestartVerify($homeDir, $socketPaths)',
             '$restartVerification[\'status\'] !== \'healthy\'',
-            'pmssLighttpdWatchdogSocketFailureIsStaleIndex(',
             'pmssUserWatchdogHandleSuspended(',
             "'lighttpd stopped: suspended or moved'",
             'pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')',
@@ -111,6 +109,12 @@ class CronInlineCharacterizationTest extends TestCase
             "pmssCronLockAcquire('checkLighttpdInstances', \$onBusy, 'pmssUserWatchdogLockAcquire')",
             "pmssUserWatchdogServiceSpec('lighttpd'",
         ], $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php'), 'lighttpd shared lock-fd close contract: ');
+        // Socket decision wiring moved intact behind the cron-facing helper.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/watchdogSocketHealth.php', [
+            'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
+            "pmssLighttpdWatchdogListeningSocketSnapshot(\$homeDir)['paths']",
+            'pmssLighttpdWatchdogSocketFailureIsStaleIndex(',
+        ]);
     }
 
     public function testMediaStackWatchdogKeepsRootGuardAndUserLoopSingleInstance(): void

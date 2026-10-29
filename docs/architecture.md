@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/lighttpd/watchdogSocketProbe.php** retains the socket-health include
+  and connection API. `watchdogSocketListeners.php` owns live listener snapshots
+  and restart verification; `watchdogSocketState.php` owns consecutive-failure
+  markers. Both probe consumers use `watchdogSocketRetry.php` for timing, and
+  `watchdogSocketHealth.php` supplies the cron's socket restart decision (ADR 0209).
 - **etc/skel/www/welcome.php** keeps customer app presentation in one local catalog
   and tile projection. **userMediaStackPanel.php** projects installed-state
   observations after its existing reads. Both keep their delivery boundaries,

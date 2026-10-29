@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Lighttpd socket health retains its existing include and public helpers while
+separating connections, listener evidence, retry cadence, failure markers and
+the cron decision (ADR 0209). Connection and post-restart observations share one
+retry controller. The cron decision returns directly after the first unresolved
+failure rather than maintaining a second cycle-failure flag. Characterization
+cases lock result key order, timing, diagnostics, first-failure stopping and
+exception propagation; existing tests retain marker and listener validation.
+
 Customer app presentation uses one Welcome catalog and named tile/installed-state
 projections within the existing delivered files (ADR 0203). Common ordering,
 fallback descriptions, suggestions and icons share that catalog; toggle labels

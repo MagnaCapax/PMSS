@@ -96,7 +96,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 'required' => ["\$fragment .= '\$HTTP[\"url\"] == \"'.\$rule[1]"],
                 'forbidden' => ['function pmssLighttpdProxyExact'.'RedirectFragment(' => 'the sole redirect renderer should stay in the rule branch'],
             ],
-            'scripts/lib/lighttpd/watchdogSocketProbe.php' => [
+            'scripts/lib/lighttpd/watchdogSocketListeners.php' => [
                 'required' => ['function pmssLighttpdWatchdogListeningSocketSnapshot(', 'function pmssLighttpdWatchdogSocketPathsFromLines('],
                 'forbidden' => ['function pmssLighttpdWatchdogListeningSocketPath'.'s(' => 'callers should consume paths from the status-preserving snapshot', 'pmssLighttpdWatchdogListeningSocketPath'.'sFromLines(' => 'the parser name should not retain the removed pass-through prefix'],
             ],

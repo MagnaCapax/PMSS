@@ -1081,6 +1081,13 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Directory preparation seeds `.lighttpd/custom` at `0640` and reapplies that mode to existing regular files without rewriting their contents or modification time; symlinks and non-file targets remain rejected.
 
 - scripts/cron/checkLighttpdInstances.php [<user>]
+  - Socket-health boundary: the existing `lighttpd/watchdogSocketProbe.php`
+    include retains every public helper and overrideable constant. Connection
+    probes and post-restart listener verification share the same retry cadence;
+    each keeps its existing result keys, ordering and success policy (ADR 0209).
+    The socket restart decision preserves the first-failure stop, stale-index
+    listener gate, diagnostics and failure-marker operations, including cleared
+    state when php-cgi is missing. No service is restarted by the helper itself.
   - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy. A non-blocking runtime lock makes overlapping invocations print the existing skip line. A busy single-account invocation exits 75; the no-argument cron invocation still exits 0. The updater records the single-account result as `SKIP` and continues marking the account refreshed. The 502 page file helpers reject invalid account names before writing or treating a missing file as a completed deletion.
   - Socket failure markers: validates both the runtime directory and marker path before recording or clearing consecutive failures. Symlinks and non-regular markers remain untouched; an unsafe path or incomplete counter write retains the existing `wait` action with count zero and cannot authorize a socket-failure restart.
   - Socket health: An `ECONNREFUSED` result for a configured `php.socket-N` path is treated as stale-index drift when strict `ss -xln` parsing finds at least the configured number of live listeners under the same account's `.lighttpd` directory. Missing, malformed, or incomplete listener evidence retains the consecutive-failure restart gate.
