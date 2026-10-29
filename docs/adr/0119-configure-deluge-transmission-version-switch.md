@@ -36,7 +36,14 @@ entries are named once at the end of the first card. When no client has controls
 one general card lists installed clients and their running builds, notices and
 availability sentences, with one matching index entry. An absent, unreadable,
 symlinked, oversized or invalid projection instead shows one general version-choice
-unavailable card. The existing account password check guards version switches
+unavailable card. Availability, counts and installed-version filtering share the
+same bounded projection reader: a read requests at most 65537 bytes and rejects
+anything above 65536 even when the size observation fails or becomes stale.
+Empty, non-string and NUL-containing paths use the existing unavailable results
+before filesystem access. Accepted entries, ordering, duplicate-version precedence
+and per-client filtering retain their contracts. Isolated development fixtures
+cover these boundaries without reading the installed projection.
+The existing account password check guards version switches
 for every client. Deluge and Transmission use their own
 account lock, private lastRun/lastgood/notice files, configuration snapshot,
 native stop, checked atomic default-link replacement, and restart. A failed

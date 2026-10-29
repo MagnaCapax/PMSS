@@ -4,6 +4,7 @@
 /** Read a bounded projection, retaining null for unavailable or malformed files. */
 function pmssConfigureTorrentClientProjectionRead($path)
 {
+    if (!is_string($path) || $path === '' || strpos($path, "\0") !== false) return null;
     if (!is_file($path) || is_link($path) || !is_readable($path) || @filesize($path) > 65536) return null;
     $raw = @file_get_contents($path, false, null, 0, 65537);
     if (!is_string($raw) || strlen($raw) > 65536) return null;
@@ -33,8 +34,8 @@ function pmssConfigureTorrentClientNotInstalledRead($path = '/var/lib/pmss/publi
 /** Read only installed versions from the root-published projection. */
 function pmssConfigureTorrentClientVersionsRead($path = '/var/lib/pmss/public/torrentClients.json', $client = 'qbittorrent')
 {
-    if (!is_file($path) || is_link($path) || @filesize($path) > 65536) return array();
-    $data = json_decode((string) @file_get_contents($path), true);
+    // Enforce the read bound even when stat fails or the projection grows after it.
+    $data = pmssConfigureTorrentClientProjectionRead($path);
     $versions = array();
     foreach ((array) ($data['versions'] ?? array()) as $entry) {
         if (!is_array($entry) || ($entry['client'] ?? '') !== $client
