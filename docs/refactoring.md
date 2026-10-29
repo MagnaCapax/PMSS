@@ -1,5 +1,11 @@
 # Refactoring Guidelines
 
+Critical-config backups retain their original creation facade. Target preparation
+and filename labels live in `configBackups/context.php`; pruning lives in
+`configBackups/retention.php` (ADR 0201). Count expiry uses the sorted list position
+directly, independently of TTL expiry. Existing warning bytes, guard order,
+filename matching and backup metadata remain covered by characterization tests.
+
 PMSS follows Linux kernel style expectations when restructuring code. Keep the
 following points in mind whenever you touch large files:
 
