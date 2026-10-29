@@ -32,24 +32,25 @@ $localnets = networkLoadLocalnets();
 	require_once '/scripts/lib/networkInfo.php';
 	$linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (float) $linkSpeed : null;
 
-	    // Collect the current iptables stats and then reset the counters.
-	$usage = pmssTrafficCollectOutputUsage(null, [$logger, 'msg']);
-	if ($usage === null || trim($usage) === '') die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
-
-// Debian 11 iptables -Z output doesn't work anymore .... we might miss a tiny fraction this way, but atleast not exponential growth
+// Render the rules before listing the counters, so the bytes sent between the list
+// and the reset commit below are as few as possible.
+// networkLoadMonitoringCommands() checks helper status before networkParseMonitoringCommands().
 $monitoringCommands = networkLoadMonitoringCommands(
     null,
     static function (string $message) use ($logger): void {
         $logger->msg(str_replace('setupNetwork:', 'trafficLog:', $message));
     }
 );
-// networkLoadMonitoringCommands() checks helper status before networkParseMonitoringCommands().
-if ($monitoringCommands !== []) {
-    networkRunIptables('-F OUTPUT'); // let's first clear old rules
-    foreach ($monitoringCommands as $monitoringCommand) {
-        networkRunIptables($monitoringCommand);
-    }
-}
+
+	    // Collect the current iptables stats and then reset the counters.
+	$usage = pmssTrafficCollectOutputUsage(null, [$logger, 'msg']);
+	if ($usage === null || trim($usage) === '') die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
+
+// Rebuilding OUTPUT every run is also the counter reset: iptables-nft 1.8.7
+// (Debian 11) returns 0 from -Z but leaves rule counters as they were.
+// One restore commit leaves no window in which OUTPUT is empty or half built,
+// so no egress goes uncounted or unmarked for FireQOS during the rebuild.
+networkMonitoringOutputRulesApply($monitoringCommands, null, null, [$logger, 'msg']);
 
 $parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);
 
