@@ -240,9 +240,12 @@ function copyToUserSpace($sourceFile, $targetFile, $user, array $ops = []) {
         return false;
     }
     $content = pmssReadRegularFileContents((string) $sourceFile);
-    $accountWrite = $ops['accountWrite'] ?? 'pmssReplaceAccountFile';
     if ($content !== null) {
-        if ($accountWrite((string) $user, $homeDir, $targetFile, $content, 0755, true)) return true;
+        // Skeleton writes stay on the account writer (ADR 0121); the seam only replaces it in tests.
+        $written = isset($ops['accountWrite'])
+            ? $ops['accountWrite']((string) $user, $homeDir, $targetFile, $content, 0755, true)
+            : pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true);
+        if ($written) return true;
         $eligible = $ops['eligible'] ?? 'pmssUpdateUserRootStageEligible';
         $reason = $eligible((string) $user, $homeDir, strlen($content));
         if ($reason === 'root reserve low') {
