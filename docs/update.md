@@ -201,6 +201,11 @@ and the 1200-second command deadline remain unchanged.
 Legacy MediaArea cleanup queries dpkg once per cleanup pass. Package removal,
 purge, and hold run only when dpkg reports a state other than `not-installed`;
 repository and cache cleanup still run when the package is absent.
+The cleanup leaves the MediaArea line in `/etc/apt/sources.list` to the apt
+templates, which own that file, and removes older
+`/etc/apt/sources.list.pmss-backup-<YmdHis>` copies left by earlier runs, keeping
+the newest (#1216). The buster template carries no MediaArea line: that
+upstream repository answers 404.
 
 After the package phase, update-step2 compares the installed versions of
 `containerd.io`, `docker-ce`, and `docker-ce-rootless-extras` with a snapshot
@@ -250,7 +255,7 @@ whether trust is scoped or global.
 | Repository | Source template/path | Key install path | `signed-by` usage | Trust scope | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Docker | `/etc/apt/sources.list.d/docker.sources` (written by `pmssEnsureDockerRepository()` in `scripts/lib/update/repositories.php`) | `/etc/apt/keyrings/docker.gpg` (override root: `PMSS_APT_KEYRING_DIR`) | Yes (`Signed-By` field in deb822 source) | Scoped to Docker source entry | Matches ADR 0008 guidance for key scoping without migrating base Debian templates. |
-| MediaArea | `etc/seedbox/config/template.sources.buster`, `etc/seedbox/config/template.sources.bullseye`, `etc/seedbox/config/template.sources.bookworm`, `etc/seedbox/config/template.sources.trixie` | `/etc/apt/trusted.gpg.d/mediaarea.asc` (override: `PMSS_APT_MEDIAAREA_KEY_PATH`) | No | Global (`trusted.gpg.d`) | Repository handling is intentionally frozen; audit only in this phase. |
+| MediaArea | `etc/seedbox/config/template.sources.bullseye`, `etc/seedbox/config/template.sources.bookworm`, `etc/seedbox/config/template.sources.trixie` | `/etc/apt/trusted.gpg.d/mediaarea.asc` (override: `PMSS_APT_MEDIAAREA_KEY_PATH`) | No | Global (`trusted.gpg.d`) | Repository handling is intentionally frozen; audit only in this phase. |
 | Sonarr (legacy key support) | No active PMSS-managed source template; legacy host entries may still exist outside templates | `/etc/apt/keyrings/sonarr.gpg` (overrides: `PMSS_APT_KEYRING_DIR`, `PMSS_APT_SONARR_KEY_PATH`) | `pmssEnsureSonarrKey()` rewrites legacy Sonarr/NzbDrone `deb` lines with `signed-by=` | Scoped after rewrite; legacy global key removed when migration succeeds | App install still uses GitHub release tarballs; this path only keeps mixed/legacy hosts compatible during apt refresh. |
 
 Base Debian repos remain in `sources.list` templates per ADR 0008, so this

@@ -32,35 +32,51 @@ function pmssRepoMediaareaDpkgStatus(): string
 }
 
 /**
+ * Remove the timestamped sources.list copies left by the old MediaArea prune, keeping the newest.
+ *
+ * Until #1216 the prune commented out the templates' own MediaArea line and copied
+ * sources.list first, and the next template apply put the line back, so every update
+ * added a copy. Only regular files named sources.list.pmss-backup-<14 digits> qualify;
+ * the plain sources.list.pmss-backup written by pmssSafeWriteSources() is left alone.
+ *
+ * @return int number of copies removed
+ */
+function pmssPruneSourcesListBackups(string $aptDir = '/etc/apt'): int
+{
+    $copies = [];
+    foreach (glob($aptDir.'/sources.list.pmss-backup-*') ?: [] as $path) {
+        if (preg_match('~/sources\.list\.pmss-backup-[0-9]{14}$~D', $path) === 1 && is_file($path) && !is_link($path)) {
+            $copies[] = $path;
+        }
+    }
+    sort($copies, SORT_STRING); // fixed-width YmdHis names sort oldest first
+    array_pop($copies);
+    $removed = 0;
+    foreach ($copies as $path) {
+        if (@unlink($path)) {
+            $removed++;
+        }
+    }
+    if ($removed > 0) {
+        logMessage(sprintf('Removed %d older apt sources.list.pmss-backup-* copies (kept the newest)', $removed));
+    }
+    return $removed;
+}
+
+/**
      * Remove lingering MediaArea apt sources and cached bootstrap packages.
      *
-     * Older repo-mediaarea packages now use control.tar.zst and are not needed
-     * since we ship our own apt templates. Best-effort cleanup keeps dpkg
-     * baseline apply from tripping over stale .list files or cached .debs.
+     * Older repo-mediaarea packages now use control.tar.zst and are not needed.
+     * The MediaArea line in /etc/apt/sources.list belongs to the apt templates
+     * (template.sources.*), which own that file, so it is not touched here (#1216).
+     * Best-effort cleanup keeps dpkg baseline apply from tripping over stale .list
+     * files or cached .debs.
      */
     function pmssPruneLegacyMediaArea(): void
     {
         runStep('Removing legacy MediaArea apt list files', 'rm -f /etc/apt/sources.list.d/mediaarea*.list');
         runStep('Removing legacy MediaArea apt preferences/keys', 'rm -f /etc/apt/preferences.d/mediaarea* /etc/apt/trusted.gpg.d/mediaarea*.gpg');
-
-        $sources = '/etc/apt/sources.list';
-        if (pmssManagedPathIsSafe($sources, 'apt sources.list', 'logMessage') && is_readable($sources)) {
-            $data = @file_get_contents($sources);
-            if ($data !== false && preg_match('/^[ \t]*[^#\r\n].*mediaarea/im', $data) === 1) {
-                $backup = $sources.'.pmss-backup-'.date('YmdHis');
-                if (!pmssManagedPathIsSafe($backup, 'apt sources.list backup', 'logMessage')) {
-                    return;
-                }
-                if (!@copy($sources, $backup)) {
-                    logMessage('[WARN] Unable to back up apt sources.list before pruning MediaArea entries: '.$backup);
-                    return;
-                }
-                $mutated = preg_replace('/^([ \t]*)([^#\r\n].*mediaarea.*)$/im', '$1# PMSS-disabled mediaarea: $2', $data);
-                if ($mutated !== null && $mutated !== $data && !pmssWriteManagedPathFile($sources, $mutated, 'apt sources.list', 'logMessage')) {
-                    return;
-                }
-            }
-        }
+        pmssPruneSourcesListBackups();
 
         if (pmssDpkgStatusIndicatesPresent(pmssRepoMediaareaDpkgStatus())) {
             runStep('Purging legacy MediaArea package', aptCmd('purge -y repo-mediaarea || true'));

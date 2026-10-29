@@ -10,6 +10,3 @@ deb-src http://archive.debian.org/debian-security buster/updates main contrib no
 # Buster updates (archived)
 deb http://archive.debian.org/debian buster-updates main contrib non-free
 deb-src http://archive.debian.org/debian buster-updates main contrib non-free
-
-# MediaArea repository
-deb https://mediaarea.net/repo/deb/debian buster main
