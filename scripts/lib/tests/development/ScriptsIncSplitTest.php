@@ -163,11 +163,11 @@ class ScriptsIncSplitTest extends TestCase
             return "'".$part."'";
         }, self::PARTS), $loader);
         $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        $checkGui = $this->pmssReadRepoFile('scripts/cron/checkGui.php');
         foreach (self::PARTS as $part) {
             $this->assertStringContainsString("'".$part."'", $loader);
             $this->assertStringContainsString("'www/scriptsInc".$part.".php'", $manifest);
-            $this->assertStringContainsString("'scriptsInc".$part.".php'",
-                $this->pmssReadRepoFile('scripts/cron/checkGui.php'));
+            $this->assertStringContainsString("'scriptsInc".$part.".php'", $checkGui);
         }
     }
 

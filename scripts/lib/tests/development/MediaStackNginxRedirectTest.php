@@ -18,19 +18,19 @@ class MediaStackNginxRedirectTest extends TestCase
         'whisparr',
     ];
 
-    private function publicProxyBlock(): string
+    private function proxyBlock(string $prefix = 'public-'): string
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
         $matches = array();
-        preg_match('/location \/public-##username\/ \{.*?\n\}/s', $template, $matches);
-        $this->assertTrue(isset($matches[0]), 'Expected /public nginx location block');
+        preg_match('/location \/'.preg_quote($prefix, '/').'##username\/ \{.*?\n\}/s', $template, $matches);
+        $this->assertTrue(isset($matches[0]), 'Expected /'.rtrim($prefix, '-').' nginx location block');
 
         return $matches[0];
     }
 
     public function testPublicProxyBlockDoesNotCarryAppSpecificRedirectRules(): void
     {
-        $block = $this->publicProxyBlock();
+        $block = $this->proxyBlock();
 
         foreach (self::PUBLIC_SESSION_COOKIE_APPS as $app) {
             $this->assertFalse(
@@ -42,7 +42,7 @@ class MediaStackNginxRedirectTest extends TestCase
 
     public function testPublicProxyBlockRewritesPublicSessionCookiePaths(): void
     {
-        $block = $this->publicProxyBlock();
+        $block = $this->proxyBlock();
 
         foreach (self::PUBLIC_SESSION_COOKIE_APPS as $app) {
             $this->assertTrue(
@@ -54,27 +54,24 @@ class MediaStackNginxRedirectTest extends TestCase
 
     public function testTildeProxyBlockRewritesPublicSessionCookiePaths(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-        $matches = array();
-        preg_match('/location \/~##username\/ \{.*?\n\}/s', $template, $matches);
-        $this->assertTrue(isset($matches[0]), 'Expected /~ nginx location block');
+        $block = $this->proxyBlock('~');
 
         foreach (self::PUBLIC_SESSION_COOKIE_APPS as $app) {
             $this->assertStringContainsString(
                 'proxy_cookie_path /'.$app.' /~##username/'.$app.';',
-                $matches[0]
+                $block
             );
         }
     }
 
     public function testPublicProxyBlockRewritesGenericRedirects(): void
     {
-        $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;', $this->publicProxyBlock());
+        $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;', $this->proxyBlock());
     }
 
     public function testPublicProxyBlockKeepsGenericRedirectWithoutAppSpecificRulesAheadOfIt(): void
     {
-        $block = $this->publicProxyBlock();
+        $block = $this->proxyBlock();
         $genericRule = 'proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;';
 
         $this->assertStringContainsAndOmitsStrings([$genericRule], ['/jellyfin(/.*)?$' => 'Expected nginx public block to stay free of app-specific redirect rules'], $block);

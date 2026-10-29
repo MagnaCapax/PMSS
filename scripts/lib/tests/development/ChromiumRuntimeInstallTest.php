@@ -83,8 +83,7 @@ final class ChromiumRuntimeInstallTest extends TestCase
             $this->assertStringNotContainsString('chromium-sandbox', $command);
             $this->assertStringNotContainsString('allow-change-held-packages', $command);
         }
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/update/apps/chromium.php');
-        $this->assertStringNotContainsString('allow-change-held-packages', $source);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/update/apps/chromium.php', 'allow-change-held-packages');
     }
 
     public function testAdministratorOptOutAndUnreadyPackagePhaseAreRespected(): void

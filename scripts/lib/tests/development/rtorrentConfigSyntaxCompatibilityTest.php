@@ -145,16 +145,8 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
             'pieces.hash.on_completion.set = no',
         ];
 
-        foreach ($forbiddenLines as $line) {
-            $this->assertTrue(
-                strpos($content, $line) === false,
-                'Skeleton still ships legacy line '.$line
-            );
-        }
-
-        foreach ($requiredLines as $line) {
-            $this->assertStringContainsString($line, $content, 'Skeleton is missing modern line '.$line);
-        }
+        $this->assertStringContainsAndOmitsStrings([], $forbiddenLines, $content, 'Skeleton still ships legacy line ');
+        $this->assertStringContainsAllStrings($requiredLines, $content, 'Skeleton is missing modern line ');
     }
 
 }
