@@ -195,7 +195,6 @@ if ($resume) {
     if ($killRc !== 0 && $killRc !== 1) exit(1);
 }
 $killUserCommand = 'killall -9 -u '.escapeshellarg($username);
-echo "\nDeleting user, user data and HTTP password:\n";
 $userdelCommand = 'userdel '.escapeshellarg($username);
 $groupdelCommand = 'groupdel '.escapeshellarg($username);
 if (!$resume) {
@@ -234,10 +233,13 @@ if (!$resume) {
         );
     }
 
+    echo "\nDeleting user, user data and HTTP password:\n";
     // Clear any per-user crontab before removing the account to avoid leaving stale
     // cron entries behind (Debian keeps them under /var/spool/cron/crontabs/).
     // Account-owned sockets must be removed before userdel, without opening logind.
     pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserInitialRemovalSteps($username, $uid), $dryRun);
+} else {
+    echo "\nDeleting user, user data and HTTP password:\n";
 }
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);
