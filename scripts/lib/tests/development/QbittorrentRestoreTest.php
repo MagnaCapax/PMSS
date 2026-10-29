@@ -63,9 +63,8 @@ final class QbittorrentRestoreTest extends TemporaryHomeRootTestCase
                 $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=34567\n");
                 $new = $this->pmssWriteFile(dirname($path).'/qBittorrent_new.conf', $pending);
                 $this->assertTrue($restore($home, [
-                    'stopped' => static function (): bool { return true; },
                     'write' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); },
-                ]));
+                ] + self::pmssMakeCallbacks(['stopped' => true])));
                 $expected = $pending === '' || ltrim($pending)[0] === ';' ? '34567' : '23456';
                 $this->assertSame($expected, \pmssQbittorrentWebUiValue(file_get_contents($path), 'Port'));
                 if ($expected === '23456') $this->assertFalse(file_exists($new));
@@ -79,13 +78,12 @@ final class QbittorrentRestoreTest extends TemporaryHomeRootTestCase
             $home = $this->pmssMakeTempDir('pmss-qbt-refuse-');
             $config = "[Meta]\nMigrationVersion=12\n[WebUI]\nPort=23456\n";
             $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', $config);
-            $this->assertFalse($restore($home, ['stopped' => static function (): bool { return false; }]));
+            $this->assertFalse($restore($home, self::pmssMakeCallbacks(['stopped' => false])));
             $this->assertSame($config, file_get_contents($path));
-            $this->assertFalse($restore($home, ['stopped' => static function (): bool { return true; },
-                'write' => static function (): bool { return false; }]));
+            $this->assertFalse($restore($home, self::pmssMakeCallbacks(['stopped' => true, 'write' => false])));
             $this->assertSame($config, file_get_contents($path));
             $this->pmssCreateSymlinkOrSkip($path, dirname($path).'/qBittorrent_new.conf');
-            $this->assertFalse($restore($home, ['stopped' => static function (): bool { return true; }]));
+            $this->assertFalse($restore($home, self::pmssMakeCallbacks(['stopped' => true])));
             $this->assertSame($config, file_get_contents($path));
         }
     }

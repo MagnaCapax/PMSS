@@ -54,18 +54,18 @@ final class QbittorrentFrontendDiskIoTypeTest extends TemporaryHomeRootTestCase
             $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf',
                 "[BitTorrent]\nSession\\DiskIOType=Posix\n\n[Meta]\nMigrationVersion=4\n\n[Preferences]\nWebUI\\Port=2345\n");
             $this->assertTrue(\pmssQbittorrentFrontendRestore($home, $ops + [
-                'stopped' => static function (): bool { return true; },
                 'build' => preg_replace('/-.*/', '', $version),
                 'write' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); },
-            ]));
+            ] + self::pmssMakeCallbacks(['stopped' => true])));
             $values = \pmssQbittorrentConfigValues(file_get_contents($path));
             $this->assertSame($type, $values['BitTorrent']['Session\\DiskIOType'], $version);
             $this->assertSame('2345', $values['Preferences']['WebUI\\Port']);
         }
         list($home, $ops) = $this->fixture('5.2.4-lt1.2');
         $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', "[BitTorrent]\nSession\\DiskIOType=Posix\nOther=1\n");
-        $this->assertTrue(\pmssQbittorrentFrontendRestore($home, $ops + ['stopped' => static function (): bool { return true; }, 'build' => '5.2.4',
-            'write' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); }]));
+        $this->assertTrue(\pmssQbittorrentFrontendRestore($home, $ops + ['build' => '5.2.4',
+            'write' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); }]
+            + self::pmssMakeCallbacks(['stopped' => true])));
         $this->assertStringNotContainsString('DiskIOType', file_get_contents($path));
     }
 
@@ -78,11 +78,6 @@ final class QbittorrentFrontendDiskIoTypeTest extends TemporaryHomeRootTestCase
             $seen = [];
             $result = \pmssConfigureTorrentClientSwitch($home, ['client' => 'qbittorrent', 'version' => '5.2.4-lt2.0'], $ops + [
                 'versions' => ['5.2.4-lt2.0' => ['kind' => 'static']],
-                'resolve' => static function () { return '/fixture/qbittorrent-nox'; },
-                'runningVersion' => static function () { return 'system'; },
-                'backup' => static function (): array { return ['ok' => true]; },
-                'stop' => static function (): bool { return true; },
-                'stopped' => static function (): bool { return true; },
                 'repoint' => static function ($home, $version) use ($ops): bool {
                     @unlink($home.'/bin/qbittorrent/default');
                     return $version === 'system' || symlink($ops['store'].'/qbittorrent/'.$version, $home.'/bin/qbittorrent/default');
@@ -93,7 +88,8 @@ final class QbittorrentFrontendDiskIoTypeTest extends TemporaryHomeRootTestCase
                     return $starts || $version === 'system';
                 },
                 'write' => static function ($path, $content): bool { return file_put_contents($path, $content) === strlen($content); },
-            ]);
+            ] + self::pmssMakeCallbacks(['resolve' => '/fixture/qbittorrent-nox', 'runningVersion' => 'system',
+                'backup' => ['ok' => true], 'stop' => true, 'stopped' => true]));
             $this->assertSame($starts, $result['ok']);
             $this->assertSame('SimplePreadPwrite', $seen['5.2.4-lt2.0']);
             if (!$starts) $this->assertSame('Posix', $seen['system']);
@@ -106,8 +102,7 @@ final class QbittorrentFrontendDiskIoTypeTest extends TemporaryHomeRootTestCase
         list($home, $ops) = $this->fixture('5.2.4-lt2.0');
         $config = "[BitTorrent]\nSession\\DiskIOType=Posix\n";
         $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', $config);
-        $this->assertFalse(\pmssQbittorrentFrontendRestore($home, $ops + ['stopped' => static function (): bool { return false; },
-            'notice' => static function (): void {}]));
+        $this->assertFalse(\pmssQbittorrentFrontendRestore($home, $ops + self::pmssMakeCallbacks(['stopped' => false, 'notice' => null])));
         $this->assertSame($config, file_get_contents($path));
     }
 }

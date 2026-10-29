@@ -413,7 +413,8 @@ builder use that same execution path. Fixture-specific arguments, archive
 members, malformed-member transforms, exit checks and content assertions stay
 with their tests; these fixtures run only on testing machines.
 
-Torrent-client fixtures use `TestCase::pmssMakeCallbacks()` for fixed operation
+Torrent-client fixtures, including qBittorrent build, restore, reconciliation and
+socket scenarios, use `TestCase::pmssMakeCallbacks()` for fixed operation
 results, with an optional event array for recording call order. Literal results,
 including false, null and empty arrays, stay in each test's operation map;
 argument-dependent, stateful and throwing callbacks remain explicit. This shares

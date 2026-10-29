@@ -50,7 +50,7 @@ final class QbittorrentBuildTest extends TestCase
         $binary = $this->pmssWriteFile($home.'/qbittorrent-nox', 'fixture');
         foreach ([null, '', 'unrelated 5.3.0', 'qBittorrent broken'] as $output)
             foreach (['pmssQbittorrentBuildVersion', 'pmssQbittorrentFrontendBuildVersion'] as $version) {
-                $number = $version($home, $binary, ['probe' => static function () use ($output) { return $output; }]);
+                $number = $version($home, $binary, self::pmssMakeCallbacks(['probe' => $output]));
                 $this->assertSame(null, $number);
                 $this->assertSame(['WebUI', ''], \pmssQbittorrentWebUiSection("[Meta]\nMigrationVersion=12\n", $number));
             }

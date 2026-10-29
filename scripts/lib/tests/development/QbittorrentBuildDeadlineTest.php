@@ -60,14 +60,14 @@ final class QbittorrentBuildDeadlineTest extends TestCase
         posix_mkfifo($cache, 0600);
         foreach (['pmssQbittorrentBuildVersion', 'pmssQbittorrentFrontendBuildVersion'] as $version) {
             $start = microtime(true);
-            $this->assertSame(null, $version($home, $binary, ['probe' => static function () { return null; }]));
+            $this->assertSame(null, $version($home, $binary, self::pmssMakeCallbacks(['probe' => null])));
             $this->assertTrue(microtime(true) - $start < 0.5);
         }
         unlink($cache);
         $target = $this->pmssWriteFile($home.'/target', '5.3.0');
         $this->pmssCreateSymlinkOrSkip($target, $cache);
         foreach (['pmssQbittorrentBuildVersion', 'pmssQbittorrentFrontendBuildVersion'] as $version)
-            $this->assertSame(null, $version($home, $binary, ['probe' => static function () { return null; }]));
+            $this->assertSame(null, $version($home, $binary, self::pmssMakeCallbacks(['probe' => null])));
     }
 
     public function testBothBoundedReadersRejectSpecialOversizedAndWrongOwnerFiles(): void

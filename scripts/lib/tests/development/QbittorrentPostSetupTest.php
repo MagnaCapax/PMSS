@@ -46,9 +46,8 @@ final class QbittorrentPostSetupTest extends TestCase
         $calls = 0;
         foreach ([[101], []] as $pids) {
             $this->assertTrue(\pmssQbittorrentFrontendRestoreForRepair('/fixture/t', [
-                'accountPids' => static function () use ($pids): array { return $pids; },
                 'restore' => static function () use (&$calls): bool { $calls++; return true; },
-            ]));
+            ] + self::pmssMakeCallbacks(['accountPids' => $pids])));
             $this->assertSame($pids === [] ? 1 : 0, $calls);
         }
     }

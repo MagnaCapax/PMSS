@@ -64,14 +64,15 @@ final class QbittorrentWebUiAuthConfigTest extends TestCase
     public function testFrontendRequestsReplacementForSentinelAndMissingValue(): void
     {
         $path = $this->pmssMakeTempPath('pmss-qbt-front-', '.conf');
-        $safe = static function (): bool { return true; };
+        $callbacks = self::pmssMakeCallbacks(['safe' => true, 'unsafe' => false]);
+        $safe = $callbacks['safe'];
         $this->pmssWriteFile($path, "[Preferences]\n");
         $this->assertTrue(\pmssQbittorrentFrontendPasswordRequired($path, $safe));
         $this->pmssWriteFile($path, \pmssQbittorrentWebUiAuthForce("[Preferences]\n"));
         $this->assertTrue(\pmssQbittorrentFrontendPasswordRequired($path, $safe));
         $this->pmssWriteFile($path, "[Preferences]\nWebUI\\Password_PBKDF2=@ByteArray(existing)\n");
         $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, $safe));
-        $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, static function (): bool { return false; }));
+        $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, $callbacks['unsafe']));
     }
 
     /** The rollout marker is the first check, before file access. */
@@ -79,9 +80,8 @@ final class QbittorrentWebUiAuthConfigTest extends TestCase
     {
         $read = 0;
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', [
-            'enabled' => static function (): bool { return false; },
             'read' => static function () use (&$read) { $read++; return ''; },
-        ]));
+        ] + self::pmssMakeCallbacks(['enabled' => false])));
         $this->assertSame(0, $read);
     }
 
@@ -96,10 +96,8 @@ final class QbittorrentWebUiAuthConfigTest extends TestCase
         @symlink($target, $home.'/.config');
         $reads = 0;
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', $home, [
-            'enabled' => static function (): bool { return true; },
-            'contextSafe' => static function (): bool { return true; },
             'read' => static function () use (&$reads) { $reads++; return ''; },
-        ]));
+        ] + self::pmssMakeCallbacks(['enabled' => true, 'contextSafe' => true])));
         $this->assertSame(0, $reads);
     }
 }

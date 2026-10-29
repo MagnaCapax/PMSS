@@ -23,7 +23,7 @@ final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
         $this->assertSame(3, $restores);
         $this->pmssWriteFile($home.'/.qbittorrentPort', '23456');
         $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', "[Meta]\nMigrationVersion=12\n[WebUI]\nPort=8080\n");
-        $release = ['build' => '5.3.0', 'accountPids' => static function (): array { return []; }];
+        $release = ['build' => '5.3.0'] + self::pmssMakeCallbacks(['accountPids' => []]);
         $this->assertFalse(\pmssQbittorrentFrontendRefusalReady($home, $release));
         $this->pmssWriteFile($path, "[Meta]\nMigrationVersion=12\n[WebUI]\nPort=23456\nPassword_PBKDF2=@ByteArray(c2FsdA==:aGFzaA==)\n");
         $this->assertTrue(\pmssQbittorrentFrontendRefusalReady($home, $release));
@@ -35,11 +35,8 @@ final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
             $home = $this->pmssMakeTempDir('pmss-qbt-retry-');
             $this->assertTrue(\pmssQbittorrentFrontendRefuse($home));
             $this->assertSame($ok, \pmssCustomerTorrentClientToggleStart('qbittorrent',
-                static function (): void {}, $home, null, [
-                    'accountPids' => static function (): array { return []; },
-                    'restore' => static function (): bool { return true; },
-                    'check' => static function () use ($ok): bool { return $ok; },
-                ]));
+                self::pmssMakeCallbacks(['start' => null])['start'], $home, null,
+                self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true, 'check' => $ok])));
             $this->assertFalse(file_exists($home.'/.config/pmss/torrentClients/qbittorrent.refused'));
         }
     }
@@ -51,9 +48,8 @@ final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
         $this->assertTrue(\pmssQbittorrentFrontendRefuse($home));
         $result = \pmssConfigureTorrentClientSwitch($home, ['client' => 'qbittorrent', 'version' => 'system'], [
             'versions' => ['system' => ['kind' => 'system']],
-            'runningVersion' => static function (): string { return 'system'; },
             'backup' => static function (): array { throw new \RuntimeException('No-op made backup'); },
-        ]);
+        ] + self::pmssMakeCallbacks(['runningVersion' => 'system']));
         $this->assertTrue($result['ok']);
         $this->assertFalse(file_exists($home.'/.config/pmss/torrentClients/qbittorrent.refused'));
     }
@@ -73,11 +69,10 @@ final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
     public function testAlreadyRunningRefusalHasDistinctNoticeAndDoesNoConfigWork(): void
     {
         $message = '';
-        $this->assertFalse(\pmssQbittorrentFrontendStart('/fixture/t', static function (): void {}, [
-            'accountPids' => static function (): array { return [101]; },
+        $this->assertFalse(\pmssQbittorrentFrontendStart('/fixture/t', self::pmssMakeCallbacks(['start' => null])['start'], [
             'restore' => static function (): bool { throw new \RuntimeException('Running daemon config touched'); },
             'notice' => static function ($home, $text) use (&$message): void { $message = $text; },
-        ]));
+        ] + self::pmssMakeCallbacks(['accountPids' => [101]])));
         $this->assertStringContainsString('already running', $message);
         $this->assertStringNotContainsString('could not be restored', $message);
     }

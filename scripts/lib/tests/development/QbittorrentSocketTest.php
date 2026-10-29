@@ -44,10 +44,9 @@ final class QbittorrentSocketTest extends TestCase
             $events = [];
             $result = \pmssQbittorrentFrontendSocketWait('/fixture/t', [
                 'read' => static function ($path): string { return substr($path, -16) === '.qbittorrentPort' ? '23456' : ''; },
-                'listeners' => static function () use ($address, $port): array { return [['address' => $address, 'port' => $port]]; },
                 'pause' => static function (): void { throw new \RuntimeException('Immediate decision slept'); },
             ]
-                + self::pmssMakeCallbacks(['pids' => [101]])
+                + self::pmssMakeCallbacks(['pids' => [101], 'listeners' => [['address' => $address, 'port' => $port]]])
                 + self::pmssMakeCallbacks(['stop' => true, 'notice' => null, 'refuse' => true], $events));
             $this->assertSame($ok, $result);
             $this->assertSame($ok ? [] : ['stop', 'refuse', 'notice'], $events);
@@ -58,10 +57,8 @@ final class QbittorrentSocketTest extends TestCase
     {
         foreach ([[], null] as $sockets) {
             $events = [];
-            $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/t', [
-                'listeners' => static function () use ($sockets) { return $sockets; }, 'attempts' => 2,
-            ]
-                + self::pmssMakeCallbacks(['read' => '23456', 'pids' => [101], 'pause' => null])
+            $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/t', ['attempts' => 2]
+                + self::pmssMakeCallbacks(['read' => '23456', 'pids' => [101], 'pause' => null, 'listeners' => $sockets])
                 + self::pmssMakeCallbacks(['stop' => true, 'notice' => null, 'refuse' => true], $events)));
             $this->assertSame([], $events);
         }

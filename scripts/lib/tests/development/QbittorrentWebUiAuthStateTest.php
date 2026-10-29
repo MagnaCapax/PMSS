@@ -15,9 +15,6 @@ final class QbittorrentWebUiAuthStateTest extends TestCase
         $pids = [123];
         $now = 100000;
         $opts = [
-            'enabled' => static function (): bool { return true; },
-            'contextSafe' => static function (): bool { return true; },
-            'pathSafe' => static function (): bool { return true; },
             'read' => static function () use (&$config): string { return $config; },
             'currentConfig' => static function () use (&$config): string { return $config; },
             'setConfig' => static function (string $value) use (&$config): void { $config = $value; },
@@ -28,15 +25,14 @@ final class QbittorrentWebUiAuthStateTest extends TestCase
             },
             'pids' => static function () use (&$pids): array { return $pids; },
             'roots' => [$native],
-            'exe' => static function () use ($native): string { return $native; },
-            'mntNs' => static function (): string { return 'mnt:[1]'; },
             'signal' => static function (int $pid) use (&$events): bool { $events[] = 'signal:'.$pid; return true; },
             'log' => static function (string $user, string $message) use (&$events): void { $events[] = 'log:'.$message; },
             // Marker locking still depends on a suite-owned temporary directory.
             'stateDir' => $root.'/run',
             // A fixed clock makes the daily interval deterministic.
             'now' => $now,
-        ];
+        ] + self::pmssMakeCallbacks(['enabled' => true, 'contextSafe' => true, 'pathSafe' => true,
+            'exe' => $native, 'mntNs' => 'mnt:[1]']);
         return $opts;
     }
 
@@ -77,10 +73,9 @@ final class QbittorrentWebUiAuthStateTest extends TestCase
         $events = [];
         $opts = $this->fixture($events);
         $this->assertTrue(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $opts));
-        $opts['pids'] = static function (): array { return []; };
+        $opts = self::pmssMakeCallbacks(['pids' => []]) + $opts;
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $opts));
-        $opts['pids'] = static function (): array { return [123]; };
-        $opts['read'] = static function (): string { return "[Preferences]\nWebUI\\LocalHostAuth=false\n"; };
+        $opts = self::pmssMakeCallbacks(['pids' => [123], 'read' => "[Preferences]\nWebUI\\LocalHostAuth=false\n"]) + $opts;
         $this->assertTrue(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $opts));
     }
 
@@ -101,7 +96,7 @@ final class QbittorrentWebUiAuthStateTest extends TestCase
     {
         $events = [];
         $opts = $this->fixture($events);
-        $opts['write'] = static function (): bool { return false; };
+        $opts = self::pmssMakeCallbacks(['write' => false]) + $opts;
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $opts));
         $this->assertSame(1, count($events));
         $this->assertStringContainsString('write failed', $events[0]);
@@ -125,8 +120,7 @@ final class QbittorrentWebUiAuthStateTest extends TestCase
         $opts['mntNs'] = static function (int $pid): string { return $pid === 0 ? 'mnt:[1]' : 'mnt:[2]'; };
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $opts));
         $this->assertSame(['write'], $events);
-        $opts['mntNs'] = static function (): string { return 'mnt:[1]'; };
-        $opts['exe'] = static function () { return false; };
+        $opts = self::pmssMakeCallbacks(['mntNs' => 'mnt:[1]', 'exe' => false]) + $opts;
         $this->assertSame([], \pmssQbittorrentWebUiAuthNativePids('alice', $opts));
     }
 
