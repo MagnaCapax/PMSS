@@ -31,6 +31,11 @@ class SharedShellHelperUsageTest extends TestCase
                 'required' => ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsCommands.php'", 'pmssUserPermissionsRun('],
                 'forbidden' => ['function run(string $cmd): int' => 'Expected userPermissions.php to stop defining a local run() helper'],
             ],
+            // permissionsApply.php reaches pmssRun() and does not load shell.php itself,
+            // so every entry point that applies permissions loads it.
+            'scripts/util/setupUserHomePermissions.php' => [
+                'required' => ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsApply.php'"],
+            ],
             'scripts/recreateUser.php' => [
                 'required' => ["require_once __DIR__.'/lib/shell.php';", 'pmssRunOrExit('],
                 'forbidden' => ['function run(string $cmd): void' => 'Expected recreateUser.php to stop defining a local run() helper'],

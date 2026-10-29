@@ -13,6 +13,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/shell.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/user/permissionsApply.php';
