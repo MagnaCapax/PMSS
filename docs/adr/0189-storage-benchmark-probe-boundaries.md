@@ -62,3 +62,10 @@ decoding and preserves execution/read exceptions.
   and temporary-output cleanup retain their contracts. The isolated
   `StorageBenchmarkCommandInputTest` covers both boundaries and runs only on
   testing machines.
+- Fio's integer-cast options (`runtime`, `iodepth`, `numjobs`, `direct`, and
+  `rwmixread`) reject non-scalar non-null values and NUL-containing strings
+  before output allocation or execution. These malformed representations use
+  the existing `fio failed` result instead of becoming plausible integers.
+  Legacy scalar casts, optional-null defaults, command bytes and textual
+  conversion exceptions retain their existing contracts. Isolated command-input
+  tests cover every guarded option and scalar/default compatibility.

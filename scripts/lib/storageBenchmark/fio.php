@@ -10,6 +10,14 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
             return ['ok' => false, 'error' => 'fio failed'];
         }
     }
+    // Casts can turn containers into 1 or truncate NUL-bearing strings into valid options.
+    // Keep scalar conversions and optional-null defaults, but reject corrupt representations.
+    foreach (['runtime', 'iodepth', 'numjobs', 'direct', 'rwmixread'] as $key) {
+        if (isset($job[$key]) && (!is_scalar($job[$key])
+            || (is_string($job[$key]) && pmssFilesystemPathHasNulByte($job[$key])))) {
+            return ['ok' => false, 'error' => 'fio failed'];
+        }
+    }
     $json = pmssCreatePrivateTempFile('fio-'); if ($json === null) return ['ok' => false, 'error' => 'unable to allocate fio JSON temp file'];
     try {
         $opts = ['--name='.escapeshellarg($job['name']), '--filename='.escapeshellarg($file), '--size='.$size, '--time_based=1', '--runtime='.(int) ($job['runtime'] ?? $runtime), '--rw='.escapeshellarg($job['rw']), '--ioengine=libaio', '--iodepth='.(int) $job['iodepth'], '--numjobs='.(int) $job['numjobs'], '--direct='.(int) $job['direct'], '--group_reporting=1']; if (isset($job['bs'])) $opts[] = '--bs='.escapeshellarg($job['bs']); if (isset($job['bssplit'])) $opts[] = '--bssplit='.escapeshellarg($job['bssplit']); if (isset($job['rwmixread'])) $opts[] = '--rwmixread='.(int) $job['rwmixread']; if (!empty($job['readonly'])) $opts[] = '--readonly'; $rc = runCommand('fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ', $opts), true); $payload = @file_get_contents($json);
