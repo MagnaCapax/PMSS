@@ -41,7 +41,8 @@ function pmssUserNotificationEmailRead(string $home, int $expectedGroup): ?strin
         return null;
     }
 
-    $handle = @fopen($path, 'rb');
+    // Non-blocking: a FIFO swapped in after the lstat must not hang the root caller.
+    $handle = @fopen($path, 'rbn');
     $handleStat = null;
     $openedPathMatches = pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat);
     $pathAfterOpen = @lstat($path);

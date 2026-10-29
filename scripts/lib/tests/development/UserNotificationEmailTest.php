@@ -83,6 +83,13 @@ class UserNotificationEmailTest extends TestCase
         $this->assertSame(null, \pmssUserNotificationEmailRead($this->home, $group));
     }
 
+    public function testReaderOpensWithoutBlocking(): void
+    {
+        // lstat has already refused a FIFO; the open itself must not block if one is swapped in after it.
+        $source = $this->pmssReadRepoFile('scripts/lib/user/notificationEmail.php');
+        $this->assertStringContainsString('fopen($path, \'rbn\')', $source);
+    }
+
     public function testStoreReaderRejectsInvalidOrUnknownUsername(): void
     {
         $root = dirname($this->home);
