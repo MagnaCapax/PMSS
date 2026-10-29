@@ -282,4 +282,70 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertSame('refusing to remove non-file/symlink: '.$linkPath, $error);
         $this->assertTrue(file_exists($realPath));
     }
+
+    public function testReconcileWithoutUsageLeavesFreshThrottleUntouched(): void
+    {
+        $homeRoot = $this->tempDir.'/home';
+        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $this->pmssEnsureDir(dirname($enabledMarker), 0700);
+        file_put_contents($enabledMarker, '');
+        file_put_contents($home.'/.throttle', '25');
+
+        list($result) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
+            return \pmssTrafficLimitThrottleReconcileWithoutUsage('alice', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
+        });
+        $this->assertTrue($result);
+        $this->assertTrue(file_exists($enabledMarker));
+        $this->assertSame('25', trim((string) file_get_contents($home.'/.throttle')));
+    }
+
+    public function testReconcileWithoutUsageLiftsExpiredAndOrphanedThrottles(): void
+    {
+        foreach (['expired' => true, 'orphan' => false] as $state => $markerExists) {
+            $homeRoot = $this->tempDir.'/'.$state.'/home';
+            $home = $this->pmssEnsureDir($homeRoot.'/alice');
+            $enabledMarker = $this->tempDir.'/'.$state.'/runtime/alice.enabled';
+            $this->pmssEnsureDir(dirname($enabledMarker), 0700);
+            if ($markerExists) {
+                file_put_contents($enabledMarker, '');
+                touch($enabledMarker, time() - 4 * 24 * 60 * 60);
+            }
+            file_put_contents($home.'/.throttle', '25');
+            touch($home.'/.throttle', time() - 4 * 24 * 60 * 60);
+
+            list($result, $output) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
+                return \pmssTrafficLimitThrottleReconcileWithoutUsage('alice', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
+            });
+            $this->assertTrue($result, $state);
+            $this->assertFalse(file_exists($enabledMarker), $state);
+            $this->assertFalse(file_exists($home.'/.throttle'), $state);
+            if ($state === 'expired') {
+                $this->assertTrue(strpos($output, 'traffic throttle removed after cooldown') !== false, $state);
+            } else {
+                $this->assertTrue(strpos($output, 'orphaned traffic throttle file removed') !== false, $state);
+            }
+        }
+    }
+
+    public function testReconcileWithoutUsageKeepsRecentlyAssertedThrottleAfterMarkerLoss(): void
+    {
+        // After a reboot the tmpfs marker and the runtime stats copy are both
+        // gone; an account throttled an hour ago must stay throttled until
+        // trafficStats reports usage again.
+        $homeRoot = $this->tempDir.'/home';
+        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $this->pmssEnsureDir(dirname($enabledMarker), 0700);
+        file_put_contents($home.'/.throttle', '25');
+        touch($home.'/.throttle', time() - 60 * 60);
+
+        list($result, $output) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
+            return \pmssTrafficLimitThrottleReconcileWithoutUsage('alice', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
+        });
+        $this->assertTrue($result);
+        $this->assertFalse(file_exists($enabledMarker));
+        $this->assertSame('25', trim((string) file_get_contents($home.'/.throttle')));
+        $this->assertSame('', $output);
+    }
 }

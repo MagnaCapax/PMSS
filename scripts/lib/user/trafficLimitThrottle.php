@@ -147,6 +147,50 @@ function pmssTrafficLimitThrottleOrphanReconcile(
     return pmssTrafficLimitThrottleApply($user, $trafficCapMbit, false, $homeRoot);
 }
 
+/**
+ * Reconcile throttle state when usage data is missing or invalid.
+ *
+ * No data is not "under limit": the payload reader returns null for a
+ * permission drift as well as for corrupt data, and the runtime stats copy
+ * is gone after every reboot until trafficStats runs again. So lift the
+ * throttle only when nothing has reasserted it for a full cooldown. Every
+ * over-limit run touches the runtime marker and rewrites ~/.throttle, so
+ * the marker's mtime dates the last reassertion, and ~/.throttle's mtime
+ * does once the marker (tmpfs) is gone after a reboot.
+ */
+function pmssTrafficLimitThrottleReconcileWithoutUsage(string $user, string $enabledMarkerPath, int $cooldownSeconds, string $homeRoot = '/home'): bool
+{
+    if (!pmssTrafficLimitMarkerPathIsSafe($enabledMarkerPath)) {
+        pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$enabledMarkerPath})");
+        return false;
+    }
+    if (!pmssPathExistsOrLink($enabledMarkerPath)) {
+        $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
+        if ($throttleFile === null || !pmssRegularFilePathIsReadable($throttleFile)) {
+            return true;
+        }
+        $assertedAt = @filemtime($throttleFile);
+        if ($assertedAt === false || (time() - $assertedAt) <= $cooldownSeconds) {
+            return true;
+        }
+        return pmssTrafficLimitThrottleOrphanReconcile($user, 0, $enabledMarkerPath, $homeRoot);
+    }
+    $assertedAt = @filemtime($enabledMarkerPath);
+    if ($assertedAt === false || (time() - $assertedAt) <= $cooldownSeconds) {
+        return true;
+    }
+    if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {
+        return false;
+    }
+    pmssTrafficLimitLog($user, 'traffic throttle removed after cooldown');
+    pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
+    // Second disable mirrors the cooldown branch in trafficLimits.php:
+    // removal does not always take effect on the first attempt.
+    sleep(1);
+    pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
+    return true;
+}
+
 /** Lift persisted throttle state when the root-owned traffic limit is cleared. */
 function pmssTrafficLimitThrottleClearUnlimited(string $user, string $enabledMarkerPath, string $homeRoot = '/home'): bool
 {
