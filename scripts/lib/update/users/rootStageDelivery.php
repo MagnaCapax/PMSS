@@ -4,6 +4,7 @@
 require_once dirname(__DIR__, 2).'/quotaSnapshotCron.php';
 require_once dirname(__DIR__, 2).'/lighttpd/userFileWrite.php';
 require_once dirname(__DIR__).'/diskSpace.php';
+require_once dirname(__DIR__, 2).'/runtime/environment.php';
 
 /**
  * Return a root-measured delivery reason, null, or the non-deliverable 'root reserve low'.
@@ -24,11 +25,18 @@ function pmssUpdateUserRootStageEligible(string $user, string $home, int $bytes,
             return $result['rc'] === 0 ? trim($result['stdout']) : null;
         };
         $quotaRead = $ops['repquota'] ?? static function (string $mount): ?array {
-            $result = pmssCommandCapture('repquota -u -n '.escapeshellarg($mount));
+            $binary = pmssCommandPath('repquota');
+            if ($binary === '') return null;
+            $result = pmssCommandCapture(escapeshellarg($binary).' -u -n '.escapeshellarg($mount));
             return $result['rc'] === 0 ? explode("\n", $result['stdout']) : null;
         };
         $mount = $mountRead($root);
         $lines = is_string($mount) && $mount !== '' ? $quotaRead($mount) : null;
+        if ($lines === null) {
+            // Say once why over-quota accounts fall back to the free-space test only.
+            $log = $ops['log'] ?? (function_exists('logMessage') ? 'logMessage' : 'error_log');
+            $log('[update] Quota observation unavailable (repquota missing or failed); root-stage delivery uses the free-space test only');
+        }
         foreach (pmssQuotaSnapshotParseRepquotaUserRows($lines ?? []) as $row) {
             $rows[$row[0]] = $row;
         }

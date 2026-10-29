@@ -49,14 +49,17 @@ PHP
 $calls = 0;
 $ops = ['mount' => function () { return '/'; },
     'repquota' => function () use (&$calls) { ++$calls; return null; },
-    'freeBytes' => function () { return 999999; }, 'rootFreeBytes' => function () { return 999999999; }];
+    'freeBytes' => function () { return 999999; }, 'rootFreeBytes' => function () { return 999999999; },
+    'log' => function ($m) use (&$logged) { $logged[] = $m; }];
+$logged = [];
 $first = pmssUpdateUserRootStageEligible('1002', '/fixture/1002', 1024, $ops);
 $ops['freeBytes'] = function () { return 0; };
 $second = pmssUpdateUserRootStageEligible('1002', '/fixture/1002', 1024, $ops);
-echo json_encode([$first, $second, $calls]);
+echo json_encode([$first, $second, $calls, count($logged)]);
 PHP
         );
-        $this->assertSame([null, 'home full', 1], $result);
+        // One explanation per process, not one per file.
+        $this->assertSame([null, 'home full', 1, 1], $result);
     }
 
     public function testDeliveryUsesPrimaryGroupLiteralModeAndReportsFailures(): void
