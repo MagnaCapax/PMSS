@@ -340,7 +340,7 @@ pmssRunProfiledCallableBatch([
 // state.
 logmsg('[OK] Package phase relies on dpkg baseline selections only');
 
-runStep('Attempting apt fix-broken install (post-package phase)', aptCmd('--fix-broken install -y'));
+pmssRecoverDpkgBaseline('Attempting apt fix-broken install (post-package phase)');
 runStep('Removing packages no longer required', aptCmd('autoremove -y'));
 
 $pmssDockerPackageVersionsAfter = pmssDockerPackageVersions();
