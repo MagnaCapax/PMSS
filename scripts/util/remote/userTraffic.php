@@ -7,10 +7,14 @@
  * - Exactly one PHP serialized array: array<string,array{normal:int,local:int,ingress:int}>
  * - Outer key: PMSS username
  * - Empty result set serializes as a:0:{}
+ * - When STDOUT is not a TTY, heartbeat newlines may precede the payload while
+ *   the traffic files are read, so a slow cold-cache read is not cut off by the
+ *   caller's read timeout. The heartbeat stops before the payload is written.
  *
  * Consumer contract:
- * - Hallinta callback path expects unserialize()-compatible payload
- * - Any extra STDOUT bytes can break callback parsing
+ * - Hallinta callback path expects an unserialize()-compatible payload after trim()
+ * - Leading newlines are allowed; any other STDOUT bytes, and anything written
+ *   after the payload, can break callback parsing
  *
  * Implementation rule:
  * - Do not call /scripts/listUsers.php from this callback producer.
@@ -22,12 +26,18 @@
  */
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2).'/lib/runtime.php';
+require_once dirname(__DIR__, 2).'/lib/runtime/stdoutHeartbeat.php';
 require_once dirname(__DIR__, 2).'/lib/user/selection.php';
 require_once dirname(__DIR__, 2).'/lib/user/traffic.php';
+
+pmssStdoutHeartbeatStartForStdout();
 
 $userTrafficData = [];
 foreach (pmssManagedHomeUsersList() as $userName) {
     $userTrafficData[$userName] = pmssReadUserTrafficStates($userName);
 }
 
+// Stop and reap the heartbeat first so no newline can land inside or after the payload.
+pmssStdoutHeartbeatStop();
 echo serialize($userTrafficData);
