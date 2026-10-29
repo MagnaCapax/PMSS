@@ -59,8 +59,10 @@ if ! grep -qE '[[:space:]]/home[[:space:]]' /proc/mounts; then
 fi
 
 # If an update run removed `/etc/cron.d/pmss` mid-flight, restore the template
-# without restarting cron (restarting cron can re-trigger @reboot jobs).
-if [ -f /etc/seedbox/config/root.cron ]; then
+# without restarting cron (restarting cron can re-trigger @reboot jobs). While
+# update.php keeps root cron off on purpose it holds /run/pmss-root-cron-disabled,
+# so the rc.local run inside update-step2 leaves the file alone (#1185).
+if [ -f /etc/seedbox/config/root.cron ] && [ ! -e /run/pmss-root-cron-disabled ]; then
     install -m 0644 /etc/seedbox/config/root.cron /etc/cron.d/pmss >/dev/null 2>&1 || true
 fi
 

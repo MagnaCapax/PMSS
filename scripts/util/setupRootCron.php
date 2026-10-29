@@ -36,6 +36,9 @@ $failed = runStep(
     )
 ) !== 0;
 
+// Root cron is back, so the update's "kept off on purpose" marker no longer applies (#1185).
+@unlink(pmssRootCronDisabledMarker());
+
 // Guardrail: PMSS cron entries must be deployed via /etc/cron.d/pmss (root.cron).
 // If a stray /etc/cron.d/updateQuotas entry exists from historical/manual changes,
 // remove it so quota refresh runs only under the unified PMSS cron template.

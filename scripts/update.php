@@ -1127,6 +1127,7 @@ function pmssRootCronShutdownRestore(string $context = 'shutdown'): void
     }
 
     restoreRootCronBestEffort($context);
+    @unlink('/run/pmss-root-cron-disabled');
     $GLOBALS['PMSS_ROOT_CRON_DISABLED_BY_UPDATE'] = false;
 }
 
@@ -1164,6 +1165,11 @@ function pmssDisableRootCronForUpdateStep2(): void
     $GLOBALS['PMSS_ROOT_CRON_BACKUP_CONTENT'] = is_file($target) && !is_link($target)
         ? @file_get_contents($target)
         : null;
+    // Tell rc.local and cron's ExecStartPre not to put the file back during phase 2 (#1185).
+    // update.php loads no library, so the path is spelled out; it must match pmssRootCronDisabledMarker().
+    if (@file_put_contents('/run/pmss-root-cron-disabled', "update\n") === false) {
+        logmsg('[WARN] Unable to write /run/pmss-root-cron-disabled; rc.local may restore root cron during update-step2');
+    }
 
     if (file_exists($target) || is_link($target)) {
         pmssRemoveFileFatal($target, 'root cron file');

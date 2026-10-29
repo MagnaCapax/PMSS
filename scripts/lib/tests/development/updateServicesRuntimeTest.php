@@ -219,7 +219,20 @@ class UpdateServicesRuntimeTest extends TestCase
 
         $this->assertTrue(strpos($content, "[Service]\n") === 0);
         $this->assertStringContainsAllStrings(["TasksAccounting=yes\n", "TasksMax=8192\n", "Restart=always\n"], $content);
-        $this->assertSame('654e9acdf7d6b95aa03214b2f74e4355c84437ce0f4ffb9f8c67d7733f43eeb4', hash('sha256', \pmssCronRestartDropinContent(4)));
+        $this->assertSame('a0d40d17fa9a6ea67011fbcd78925caff9bc2a03b25606b647706f450ee4f45d', hash('sha256', \pmssCronRestartDropinContent(4)));
+    }
+
+    /** #1180/#1185: cron restores its own file before reading /etc/cron.d, except while update.php holds it off. */
+    public function testCronDropinRestoresRootCronBeforeStartUnlessUpdateHoldsIt(): void
+    {
+        $content = \pmssCronRestartDropinContent(4);
+        $this->assertStringContainsAllStrings([
+            "ExecStartPre=-/bin/sh -c 'test -e /run/pmss-root-cron-disabled || test -e /etc/cron.d/pmss",
+            "install -m 0644 /etc/seedbox/config/root.cron /etc/cron.d/pmss'\n",
+        ], $content);
+        // update.php is self-contained, so its literal marker path must stay in step with the library.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/update.php', ["'".\pmssRootCronDisabledMarker()."'"]);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.rc.local', ["[ ! -e ".\pmssRootCronDisabledMarker()." ]"]);
     }
 
     public function testCronRestartDropinReservesCpuHeadroomForSystemSlice(): void

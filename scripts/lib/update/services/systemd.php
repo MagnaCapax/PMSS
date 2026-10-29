@@ -135,7 +135,17 @@ function pmssCronRestartDropinContent(?int $cpuThreads = null): string
         ."CPUAccounting=yes\n"
         .$cronQuotaLine
         ."Restart=always\n"
-        ."RestartSec=10\n";
+        ."RestartSec=10\n"
+        ."# Restore /etc/cron.d/pmss before cron reads /etc/cron.d, so its @reboot jobs run on\n"
+        ."# a boot after an interrupted update (#1180). update.php holds the marker while it\n"
+        ."# keeps root cron off on purpose; /run is cleared at boot (#1185).\n"
+        ."ExecStartPre=-/bin/sh -c 'test -e ".pmssRootCronDisabledMarker()." || test -e /etc/cron.d/pmss || ! test -f /etc/seedbox/config/root.cron || install -m 0644 /etc/seedbox/config/root.cron /etc/cron.d/pmss'\n";
+}
+
+/** Marker update.php holds while it keeps /etc/cron.d/pmss removed on purpose (#1185). */
+function pmssRootCronDisabledMarker(): string
+{
+    return '/run/pmss-root-cron-disabled';
 }
 
 /** Restart a failed ProFTPD master after transient startup dependencies recover. */
