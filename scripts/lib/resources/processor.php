@@ -78,7 +78,7 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
             ($this->logger)(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without run lock");
         }
         // Accounts run in sorted order, so a run with this line but no summary hung on the account after the last one saved.
-        ($this->logger)(date('c').': resourceStats run started, pid '.getmypid());
+        ($this->logger)(date('c').': resourceStats run started, pid '.getmypid().($this->lockHandle === false ? ' (without run lock)' : ''));
         return true;
     }
 

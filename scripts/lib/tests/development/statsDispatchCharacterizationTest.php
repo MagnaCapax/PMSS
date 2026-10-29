@@ -70,4 +70,13 @@ class StatsDispatchCharacterizationTest extends TestCase
             }
         }
     }
+
+    /** The shared inline loop calls beforeRunCli() and beforeSpawn() on the traffic path too; they must stay the base no-ops there (#1167 review). */
+    public function testTrafficProcessorInheritsTheNoOpRunHooks(): void
+    {
+        foreach (['beforeRunCli', 'beforeSpawn'] as $hook) {
+            $declaring = (new \ReflectionMethod(\TrafficStatsProcessor::class, $hook))->getDeclaringClass()->getName();
+            $this->assertSame(\PmssUserStatsProcessor::class, $declaring, "TrafficStatsProcessor overrides {$hook}()");
+        }
+    }
 }
