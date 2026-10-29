@@ -21,7 +21,7 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
 
         $this->assertEquals(\pmssDirtyFragBlacklistBody(), file_get_contents($dir.'/modprobe.d/dirtyfrag.conf'));
         $this->assertTrue($this->pmssMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/dirtyfrag.conf'), 'expected blacklist update log');
-        $this->assertEquals('Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)', $calls[0][0]);
+        $this->assertEquals('Unloading Dirty Frag modules (esp4_offload esp6_offload xfrm_interface esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)', $calls[0][0]);
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected runtime flag to stay absent');
     }
 

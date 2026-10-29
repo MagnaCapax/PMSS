@@ -84,7 +84,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
         }
         $this->assertEquals([
             'Unloading Copy Fail algif_aead kernel module',
-            'Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)',
+            'Unloading Dirty Frag modules (esp4_offload esp6_offload xfrm_interface esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)',
         ], array_column($calls, 0));
     }
 

@@ -12,10 +12,10 @@ const PMSS_KERNEL_HARDENING = [
         'builtin_warning' => 'algif_aead is built into this kernel; the PMSS modprobe blacklist is ineffective. '.'Install a patched kernel and reboot, or add initcall_blacklist=algif_aead_init until the patch lands.',
     ],
     'dirtyfrag' => [
-        'path' => ['PMSS_DIRTYFRAG_MODPROBE_PATH', '/etc/modprobe.d/dirtyfrag.conf'], 'rationale' => "# PMSS: block autoload of Dirty Frag attack-surface modules\n"."# Module set: V4bel PoC + AWS bulletin 2026-027 + Sysdig analysis\n"."# espintcp added 2026-05-13 (Fragnesia / copyfail 3.0, Sam James / v12-security PoC)\n",
-        'modules' => ['esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'xfrm_user', 'espintcp'],
-        'evict' => ['esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'espintcp'], // xfrm_user is blacklisted but pinned on live hosts.
-        'label' => 'Dirty Frag blacklist', 'short' => 'Dirty Frag', 'unload' => 'Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)',
+        'path' => ['PMSS_DIRTYFRAG_MODPROBE_PATH', '/etc/modprobe.d/dirtyfrag.conf'], 'rationale' => "# PMSS: block autoload of Dirty Frag attack-surface modules\n"."# Module set: V4bel PoC + AWS bulletin 2026-027 + Sysdig analysis\n"."# espintcp added 2026-05-13 (Fragnesia / copyfail 3.0, Sam James / v12-security PoC)\n"."# esp4_offload esp6_offload xfrm_interface added 2026-10-29 (standalone modules on the ESP/XFRM path)\n",
+        'modules' => ['esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'xfrm_user', 'espintcp', 'esp4_offload', 'esp6_offload', 'xfrm_interface'],
+        'evict' => ['esp4_offload', 'esp6_offload', 'xfrm_interface', 'esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'espintcp'], // Offloads first: they hold esp4/esp6. xfrm_user is blacklisted but pinned on live hosts.
+        'label' => 'Dirty Frag blacklist', 'short' => 'Dirty Frag', 'unload' => 'Unloading Dirty Frag modules (esp4_offload esp6_offload xfrm_interface esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)',
         'runtime_flag' => ['PMSS_DIRTYFRAG_FLAG_PATH', 'dirtyfrag-modules-loaded'],
     ],
 ];
