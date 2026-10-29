@@ -79,8 +79,10 @@ class cgroupSliceTest extends TestCase
             'v1Template' => $v1Body,
             'totalMemMiB' => 4096,
         ]));
-        $this->assertTrue(strpos($content, 'BlockIOAccounting=yes') !== false, 'v1 template not applied');
-        $this->assertTrue(strpos($content, '%%') === false, 'placeholders remained');
+        $this->pmssAssertStringContract($content, [
+            'required' => ['BlockIOAccounting=yes' => 'v1 template not applied'],
+            'forbidden' => ['%%' => 'placeholders remained'],
+        ]);
     }
 
     public function testNoVendorPathsUsedForDropins(): void
@@ -142,20 +144,13 @@ class cgroupSliceTest extends TestCase
     {
         $tplBody = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
 
-        // Clamp floor: 512 * max(1, 1) = 512 → 2048
-        $out = $this->renderSlice($tplBody, 1, 1024);
-        $this->assertTrue(strpos($out, 'TasksMax=2048') !== false, 'TasksMax floor clamp not applied');
-
-        // CPU dominates: 512 * max(8, 2) = 4096
-        $out = $this->renderSlice($tplBody, 8, 2048);
-        $this->assertTrue(strpos($out, 'TasksMax=4096') !== false, 'TasksMax did not scale with CPU threads');
-
-        // RAM dominates: 512 * max(2, 16) = 8192
-        $out = $this->renderSlice($tplBody, 2, 16384);
-        $this->assertTrue(strpos($out, 'TasksMax=8192') !== false, 'TasksMax did not scale with RAM GiB');
-
-        // Clamp ceiling: 512 * max(64, 256) = 131072 → 16384
-        $out = $this->renderSlice($tplBody, 64, 262144);
-        $this->assertTrue(strpos($out, 'TasksMax=16384') !== false, 'TasksMax ceiling clamp not applied');
+        foreach ([
+            [1, 1024, 'TasksMax=2048', 'TasksMax floor clamp not applied'], // 512 * max(1, 1) = 512 → 2048
+            [8, 2048, 'TasksMax=4096', 'TasksMax did not scale with CPU threads'], // CPU dominates.
+            [2, 16384, 'TasksMax=8192', 'TasksMax did not scale with RAM GiB'], // RAM dominates.
+            [64, 262144, 'TasksMax=16384', 'TasksMax ceiling clamp not applied'], // 131072 → 16384
+        ] as [$cpuThreads, $memMiB, $needle, $message]) {
+            $this->pmssAssertStringContract($this->renderSlice($tplBody, $cpuThreads, $memMiB), ['required' => [$needle => $message]]);
+        }
     }
 }

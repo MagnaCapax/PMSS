@@ -9,49 +9,40 @@ class LighttpdSocketCleanupTest extends TestCase
     public function testStartScriptCreatesManagedDirectoriesViaSuBeforeLaunch(): void
     {
         $script = $this->readStartScript();
-        $this->assertOrderedStrings([
-            'function pmssStartLighttpdEnsureDirectory(',
-            "pmssUserWatchdogCommandRun(pmssBuildUserShellCommand(\$user, 'mkdir -p '.escapeshellarg(\$dir))",
-        ], $script);
-        $this->assertOrderedStrings([
-            'foreach ($requiredDirs as $dir) {',
-            'pmssStartLighttpdEnsureDirectory($user, $homeDir, $dir)',
-            "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);",
-        ], $script);
-        $this->assertTrue(strpos($script, "if (\$deflateEnabled) {") !== false);
-        $this->assertTrue(strpos($script, "\$requiredDirs[] = \$lighttpdDir.'/compress';") !== false);
-        $this->assertTrue(strpos($script, 'pmssStartLighttpdPathWithinHome($dir, $homeDir)') !== false);
-        $this->assertTrue(strpos($script, "if (\$result['rc'] !== 0) {") !== false);
-        $this->assertTrue(strpos($script, 'Unable to prepare lighttpd directory') !== false);
+        $this->pmssAssertStringContract($script, [
+            'required' => ["if (\$deflateEnabled) {", "\$requiredDirs[] = \$lighttpdDir.'/compress';",
+                'pmssStartLighttpdPathWithinHome($dir, $homeDir)', "if (\$result['rc'] !== 0) {", 'Unable to prepare lighttpd directory'],
+            'ordered' => [
+                ['function pmssStartLighttpdEnsureDirectory(',
+                    "pmssUserWatchdogCommandRun(pmssBuildUserShellCommand(\$user, 'mkdir -p '.escapeshellarg(\$dir))"],
+                ['foreach ($requiredDirs as $dir) {', 'pmssStartLighttpdEnsureDirectory($user, $homeDir, $dir)',
+                    "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);"],
+            ],
+        ]);
     }
 
     public function testStartScriptRemovesPhpSocketEntriesBeforeLaunch(): void
     {
         $script = $this->readStartScript();
-        $this->assertOrderedStrings([
-            "foreach (glob(rtrim(\$lighttpdDir, '/').'/php.socket*') ?: [] as \$socketPath) {",
-            'pmssStartLighttpdRemoveSocket($user, $homeDir, $socketPath)',
-            "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);",
-        ], $script);
-        $this->assertTrue(strpos($script, 'is_link($socketPath)') !== false);
-        $this->assertTrue(strpos($script, 'Unable to remove stale lighttpd socket') !== false);
+        $this->pmssAssertStringContract($script, [
+            'required' => ['is_link($socketPath)', 'Unable to remove stale lighttpd socket'],
+            'ordered' => [["foreach (glob(rtrim(\$lighttpdDir, '/').'/php.socket*') ?: [] as \$socketPath) {",
+                'pmssStartLighttpdRemoveSocket($user, $homeDir, $socketPath)',
+                "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);"]],
+        ]);
     }
 
     public function testStartScriptEntersUserHomeBeforeLaunchingLighttpd(): void
     {
         $script = $this->readStartScript();
-        $this->assertOrderedStrings([
-            '@chdir($homeDir)',
-            "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);",
-            'pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $startCommand)',
-        ], $script);
-        $this->assertTrue(strpos($script, "require_once __DIR__.'/lib/user/serviceLaunch.php';") !== false);
-        $this->assertTrue(strpos($script, 'fwrite(STDERR, "Unable to enter user home\n");') !== false);
-        $this->assertTrue(strpos($script, 'fwrite(STDERR, "Unable to start lighttpd inside user slice\n");') !== false);
-        $this->assertTrue(strpos($script, 'return 1;') !== false);
-        $this->assertTrue(strpos($script, 'cd {$homeDir}; su {$user}') === false);
-        $this->assertTrue(strpos($script, "passthru('su '.escapeshellarg(\$user).' -c '") === false);
-        $this->assertTrue(strpos($script, "ps aux | grep '.escapeshellarg(\$user)") !== false);
+        $this->pmssAssertStringContract($script, [
+            'required' => ["require_once __DIR__.'/lib/user/serviceLaunch.php';", 'fwrite(STDERR, "Unable to enter user home\n");',
+                'fwrite(STDERR, "Unable to start lighttpd inside user slice\n");', 'return 1;', "ps aux | grep '.escapeshellarg(\$user)"],
+            'forbidden' => ['cd {$homeDir}; su {$user}', "passthru('su '.escapeshellarg(\$user).' -c '"],
+            'ordered' => [['@chdir($homeDir)',
+                "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);",
+                'pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $startCommand)']],
+        ]);
     }
 
     public function testRunningInstanceKeepsItsSocketAndSkipsLaunch(): void

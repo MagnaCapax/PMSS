@@ -21,12 +21,9 @@ class UserCgroupCliDryRunTest extends TestCase
             '--io-write-iops=/dev/sda:100',
         ]);
         $this->assertTrue(is_string($out) && $out !== '', 'no output');
-        $this->assertTrue(strpos($out, 'CPUWeight=300') !== false);
-        $this->assertTrue(strpos($out, 'IOWeight=250') !== false);
-        $this->assertTrue(strpos($out, 'TasksMax=9000') !== false);
-        $this->assertTrue(strpos($out, 'MemoryHigh=') !== false);
-        $this->assertTrue(strpos($out, 'MemoryMax=') !== false);
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=/dev/sda 5M') !== false);
-        $this->assertTrue(strpos($out, 'IOWriteIOPSMax=/dev/sda 100') !== false);
+        $this->pmssAssertStringContract($out, ['required' => [
+            'CPUWeight=300', 'IOWeight=250', 'TasksMax=9000', 'MemoryHigh=', 'MemoryMax=',
+            'IOReadBandwidthMax=/dev/sda 5M', 'IOWriteIOPSMax=/dev/sda 100',
+        ]]);
     }
 }

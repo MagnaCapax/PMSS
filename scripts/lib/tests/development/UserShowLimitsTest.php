@@ -130,23 +130,14 @@ final class UserShowLimitsTest extends TestCase
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) {
             \pmssUserShowLimitsMain(array('userShowLimits'), $o);
         }, array('NO_COLOR' => '1'));
-        $this->assertTrue(strpos($human, 'Server (shared by all accounts)') !== false);
-        $this->assertTrue(strpos($human, 'configured)') !== false);
-        $this->assertTrue(strpos($human, "\033") === false);
-        $this->assertTrue(strpos($human, '11.10 [proc]') !== false);
-        $this->assertTrue(strpos($human, '12.15 [proc]') !== false);
-        $this->assertTrue(strpos($human, '953.7 MiB/s enforced') !== false);
-        $this->assertTrue(strpos($human, '20.0 MiB/s [account-config]') !== false);
-        $this->assertTrue(strpos($human, '71 IOPS enforced') !== false);
-        $this->assertTrue(strpos($human, '0.09 GiB-hours [resource-data]') !== false && strpos($human, '<0.01 hours [resource-data]') !== false);
-        $this->assertTrue(strpos($human, '25% [') !== false);
-        $this->assertTrue(strpos($human, '/ 100 percent enforced') === false);
-        $this->assertTrue(strpos($human, '1d 1h 1m [proc]') !== false);
-        $this->assertTrue(strpos($human, '1m [quota-snapshot]') !== false);
-        $this->assertTrue(strpos($human, '71 / 16384 enforced') !== false);
-        $this->assertTrue(strpos($human, 'count /') === false);
-        $this->assertTrue((bool) preg_match('/CPU quota enforced\s+unlimited \[cgroup\]/', $human));
-        $this->assertTrue(strpos($human, 'n/a [cgroup]') !== false);
+        $this->pmssAssertStringContract($human, [
+            'required' => ['Server (shared by all accounts)', 'configured)', '11.10 [proc]', '12.15 [proc]',
+                '953.7 MiB/s enforced', '20.0 MiB/s [account-config]', '71 IOPS enforced',
+                '0.09 GiB-hours [resource-data]', '<0.01 hours [resource-data]', '25% [', '1d 1h 1m [proc]',
+                '1m [quota-snapshot]', '71 / 16384 enforced', 'n/a [cgroup]'],
+            'forbidden' => ["\033", '/ 100 percent enforced', 'count /'],
+            'matches' => ['/CPU quota enforced\s+unlimited \[cgroup\]/'],
+        ]);
         touch($o['home'].'/.quota', $o['now'] - 5);
         clearstatcache(true, $o['home'].'/.quota');
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits'), $o); }, array('NO_COLOR' => '1'));

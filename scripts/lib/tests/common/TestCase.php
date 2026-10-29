@@ -228,10 +228,13 @@ abstract class TestCase
         $this->assertStringNotContainsString($needle, $haystack, $message);
     }
 
+    /** Check required fragments, allowing fragment => diagnostic maps as well as lists. */
     protected function assertStringContainsAllStrings(array $needles, string $haystack, string $messagePrefix = ''): void
     {
-        foreach ($needles as $needle) {
-            $this->assertStringContainsString($needle, $haystack, $messagePrefix !== '' ? $messagePrefix.$needle : '');
+        foreach ($needles as $key => $value) {
+            $needle = is_int($key) ? $value : $key;
+            $message = is_int($key) ? ($messagePrefix !== '' ? $messagePrefix.$needle : '') : (string) $value;
+            $this->assertStringContainsString($needle, $haystack, $message);
         }
     }
 
@@ -1704,27 +1707,29 @@ PHP
         return $source;
     }
 
+    /** Check literal, regex and ordering contracts for either generated or repository text. */
+    protected function pmssAssertStringContract(string $source, array $case): void
+    {
+        $this->assertStringContainsAndOmitsStrings($case['required'] ?? [], $case['forbidden'] ?? [], $source);
+        foreach ($case['matches'] ?? [] as $pattern) {
+            $this->assertMatches((string) $pattern, $source);
+        }
+        foreach ($case['ordered'] ?? [] as $ordered) {
+            $needles = array_key_exists('needles', $ordered) ? $ordered['needles'] : $ordered;
+            $this->assertOrderedStrings(
+                $needles,
+                $source,
+                (string) ($ordered['missingPrefix'] ?? ''),
+                (string) ($ordered['orderPrefix'] ?? '')
+            );
+        }
+    }
+
     /** Assert repeated source-contract tables without per-test boilerplate. */
     protected function pmssAssertRepoFileContractCases(array $cases, string $pathPrefix = ''): void
     {
         foreach ($cases as $relativePath => $case) {
-            $source = $this->pmssAssertRepoFileContainsAndOmitsStrings(
-                $pathPrefix.ltrim((string) $relativePath, '/'),
-                $case['required'] ?? [],
-                $case['forbidden'] ?? []
-            );
-            foreach ($case['matches'] ?? [] as $pattern) {
-                $this->assertMatches((string) $pattern, $source);
-            }
-            foreach ($case['ordered'] ?? [] as $ordered) {
-                $needles = array_key_exists('needles', $ordered) ? $ordered['needles'] : $ordered;
-                $this->assertOrderedStrings(
-                    $needles,
-                    $source,
-                    (string) ($ordered['missingPrefix'] ?? ''),
-                    (string) ($ordered['orderPrefix'] ?? '')
-                );
-            }
+            $this->pmssAssertStringContract($this->pmssReadRepoFile($pathPrefix.ltrim((string) $relativePath, '/')), $case);
         }
     }
 

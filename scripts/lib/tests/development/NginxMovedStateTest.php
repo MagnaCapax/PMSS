@@ -32,18 +32,16 @@ class NginxMovedStateTest extends TestCase
         $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('mvdtst', $ctx, true));
         foreach ([$ctx['nginxUsersDir'].'/mvdtst', $ctx['subdomainConfigDir'].'/pmss-user-mvdtst.conf'] as $path) {
             $rendered = file_get_contents($path);
-            $this->assertTrue(strpos($rendered, '2026-11-30') !== false);
-            $this->assertFalse(strpos($rendered, 'proxy_pass') !== false);
-            $this->assertFalse(strpos($rendered, '##') !== false);
+            $this->pmssAssertStringContract($rendered, [
+                'required' => ['2026-11-30'], 'forbidden' => ['proxy_pass', '##'],
+            ]);
             preg_match_all('/<!DOCTYPE html>.*?<\/html>/s', $rendered, $matches);
             $this->assertSame(2, count($matches[0]));
             foreach ($matches[0] as $html) {
-                $this->assertFalse(strpos($html, 'mvdtst') !== false);
-                $this->assertFalse(strpos($html, 'old.example.test') !== false);
-                $this->assertFalse(strpos($html, '<script') !== false);
-                $this->assertTrue(strpos($html, '/css/error-styles.css') !== false);
-                $this->assertTrue(strpos($html, 'Your service has moved') !== false);
-                $this->assertTrue(strpos($html, 'https://pulsedmedia.com/clients/clientarea.php') !== false);
+                $this->pmssAssertStringContract($html, [
+                    'required' => ['/css/error-styles.css', 'Your service has moved', 'https://pulsedmedia.com/clients/clientarea.php'],
+                    'forbidden' => ['mvdtst', 'old.example.test', '<script'],
+                ]);
             }
         }
         $primary = file_get_contents($ctx['nginxUsersDir'].'/mvdtst');
