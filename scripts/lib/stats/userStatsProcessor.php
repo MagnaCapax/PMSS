@@ -11,7 +11,7 @@ require_once dirname(__DIR__).'/runtime.php';
 abstract class PmssUserStatsProcessor
 {
     protected $stats;
-    // Resource workers detach; traffic stays inside the cron's aggregation lock.
+    // Inline processors (traffic, resources) aggregate in the cron process under its run lock.
     protected $detachedWorkers = true;
     protected $statsDataDir;
     protected $homeDir;
@@ -60,9 +60,10 @@ abstract class PmssUserStatsProcessor
 
     public function runCli(array $argv, string $scriptPath): int
     {
-        if ($this->detachedWorkers || isset($argv[1])) $this->beforeRunCli();
+        $this->beforeRunCli();
         if (isset($argv[1])) { $user = (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $argv[1]); if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $this->processUser($user, pmssStatsCompareTimesBuild()); return 0; }
-        if ($this->detachedWorkers && !$this->beforeSpawn()) return 0;
+        // The run lock hook guards inline loops too; for inline work it is held until the process exits.
+        if (!$this->beforeSpawn()) return 0;
         $users = $this->discoverUsers();
         if (!$this->detachedWorkers) $users = array_filter($users, [$this, 'validateUser']);
         if (empty($users)) { echo "No users in this system!\n"; return 0; }
