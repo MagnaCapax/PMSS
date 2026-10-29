@@ -8,6 +8,8 @@
  *   in `/home/<user>/.quota` for support tooling.
  * - Logs failures via `Logger`, then continues to the next user so one broken
  *   account does not halt the sweep.
+ * - Bounds each `quota` call and stops the sweep at the first one that times out,
+ *   since that call is hung and the next one would hang the same way (GH #1183).
  *
  * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
@@ -26,6 +28,8 @@ $logger = new Logger(__FILE__);
 // snapshot writes and stack on a hung mount (GH #850/#853). Non-blocking: skip
 // if another run holds the lock. Hold the handle until exit.
 $updateQuotasLock = pmssCronLockAcquire('updateQuotas');
+// A quota call stuck in the kernel outlives its kill; it must not keep holding this lock.
+pmssLockHandleExportChildCloseFds($updateQuotasLock);
 
 $logger->msg('Updating quota information');
 $users = pmssListManagedUsers('/scripts/listUsers.php');
@@ -47,7 +51,8 @@ $writeQuotaUserLogs = static function (
     }
 };
 
-foreach ($users as $thisUser) {
+// Returns false only when this account's quota call timed out, which stops the sweep.
+$refreshUserQuota = static function (string $thisUser) use ($logger, $writeQuotaUserLogs): bool {
 #TODO Check that quota is working
     // Invariant: verify the resolved home directory exactly matches the
     // expected /home/<username> path before touching any files.
@@ -67,7 +72,7 @@ foreach ($users as $thisUser) {
             null,
             false
         );
-        continue;
+        return true;
     }
 
     $quotaFile = "/home/{$thisUser}/.quota";
@@ -82,9 +87,23 @@ foreach ($users as $thisUser) {
     // produces valid output. We only treat it as failure if no output or
     // exit code > 1 (which indicates actual errors like invalid user).
     $quotaCmd = 'quota -u '.escapeshellarg($thisUser).' -v -s 2>&1';
-    $outputLines = [];
-    $ret = 0;
-    exec($quotaCmd, $outputLines, $ret);
+    $quotaRun = pmssQuotaReportCapture($quotaCmd);
+    if ($quotaRun['timed_out']) {
+        // Leave ~/.quota untouched: a hung quota usually means /home is unhealthy, and the
+        // fallback write below would touch it outside any deadline.
+        $logger->msg("quota command for {$thisUser} exceeded its ".PMSS_QUOTA_REPORT_TIMEOUT_SECONDS.'s deadline and was killed');
+        $writeQuotaUserLogs(
+            $thisUser,
+            'refresh',
+            'ERR',
+            'Quota command timed out',
+            array('rc' => $quotaRun['rc'], 'timeout_seconds' => PMSS_QUOTA_REPORT_TIMEOUT_SECONDS),
+            sprintf('quota refresh timed out after %ds', PMSS_QUOTA_REPORT_TIMEOUT_SECONDS)
+        );
+        return false;
+    }
+    $outputLines = $quotaRun['lines'];
+    $ret = $quotaRun['rc'];
 
     $content = implode(PHP_EOL, $outputLines).PHP_EOL;
     $content = pmssQuotaSnapshotNormalizeHumanReadableOutput($content);
@@ -141,7 +160,7 @@ foreach ($users as $thisUser) {
                 'ERR',
                 'Quota snapshot write failed'
             );
-            continue;
+            return true;
         }
         $logStatus = ($ret === 1) ? 'WARN' : 'OK';
         $logMsg = ($ret === 1) ? 'Quota refreshed (user over quota)' : 'Quota refreshed';
@@ -152,4 +171,7 @@ foreach ($users as $thisUser) {
             $logMsg
         );
     }
-}
+    return true;
+};
+
+pmssQuotaSweepRun($users, $refreshUserQuota, array($logger, 'msg'));

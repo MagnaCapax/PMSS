@@ -9,11 +9,12 @@
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/accountPath.php';
 require_once __DIR__.'/watchdogErrorPageProbe.php';
+require_once dirname(__DIR__).'/quotaSnapshot.php';
 
 /** Require a successful live quota probe; a stale snapshot cannot authorize writes. */
 function pmssLighttpdSymlinkRepairQuotaAllows(string $username): bool
 {
-    $result = pmssCommandCapture(pmssBuildCommand('quota', ['-u', $username, '-s']));
+    $result = pmssCommandCapture(pmssBuildCommand('quota', ['-u', $username, '-s']), PMSS_QUOTA_REPORT_TIMEOUT_SECONDS);
     if ($result['rc'] !== 0) return false;
     $state = pmssLighttpdWatchdogQuotaStateParse($result['stdout']);
     return $state !== null

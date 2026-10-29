@@ -38,13 +38,19 @@ function pmssLighttpdWatchdogQuotaStateParse(string $output): ?array
     return $fallback;
 }
 
-/** Read live quota state, falling back to ~/.quota only when output is empty. */
+/** Read live quota state under a deadline, falling back to ~/.quota only when output is empty. */
 function pmssLighttpdWatchdogQuotaStateRead(string $username, string $homeDir): ?array
 {
-    // An unquotable account name leaves the existing snapshot fallback available.
-    $quotaResult = strpos($username, "\0") !== false ? null
-        : pmssLighttpdWatchdogCommandCapture('quota', '-u '.escapeshellarg($username).' -s 2>/dev/null');
-    $output = $quotaResult['output'] ?? '';
+    // An unquotable account name or a missing binary leaves the existing snapshot fallback available.
+    $quotaPath = strpos($username, "\0") !== false ? '' : pmssCommandPath('quota');
+    $quotaResult = $quotaPath === '' ? null
+        : pmssQuotaReportCapture(escapeshellarg($quotaPath).' -u '.escapeshellarg($username).' -s 2>/dev/null');
+    if (!empty($quotaResult['timed_out'])) {
+        // A hung live probe yields no output, so the saved snapshot decides instead (GH #1183).
+        fwrite(STDERR, "[user:{$username}] quota probe exceeded its ".PMSS_QUOTA_REPORT_TIMEOUT_SECONDS."s deadline and was killed; using the saved ~/.quota snapshot\n");
+    }
+    $lines = $quotaResult['lines'] ?? [];
+    $output = $lines !== [] ? implode(PHP_EOL, $lines).PHP_EOL : '';
     if ($output === '') {
         $output = pmssReadRegularFileContents(rtrim($homeDir, '/').'/.quota');
     }
