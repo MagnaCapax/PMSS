@@ -64,3 +64,16 @@ and notice files are private; the public projection contains only host
 availability. Exposure of the chosen binary path identifies a version but
 does not grant access to another account's filesystem. Rollout still depends
 on the canary and WebUI authentication checks from ADR 0102 and issue #1061.
+
+## Amendment 2026-10-29: the disk backend is set in the panel's stopped window too
+
+A Configure switch stops qBittorrent, repoints the selection and starts the new
+build inside one locked call, so the watchdog never sees it stopped and the root
+applier could not set `Session\\DiskIOType` before the first run: an account
+switched from 4.x kept `Posix` on 5.x (#1061). The customer-side restore that runs
+in every panel start's stopped window (switch, Apps start, and the resolver launch that the
+watchdog also uses to start qBittorrent) now
+applies the rule above from the selected build's `compatFamily`
+(`pmssQbittorrentFrontendDiskIoType` in `etc/skel/www/qbittorrentBuild.php`, a
+twin of `pmssQbittorrentCompatFamily` plus `pmssQbittorrentDiskIoType`). It never writes while the account's
+qBittorrent runs.

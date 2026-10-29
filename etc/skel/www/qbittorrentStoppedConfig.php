@@ -84,6 +84,8 @@ function pmssQbittorrentFrontendRestore(string $home, array $ops = []): bool
     if (!is_string($config)) { $notice($home, 'qBittorrent.conf could not be read.'); return false; }
     $version = $ops['build'] ?? pmssQbittorrentFrontendBuildVersion($home, $ops['binary'] ?? null, $ops);
     $updated = pmssQbittorrentFrontendRestoreContent($config, $version, pmssQbittorrentFrontendLastBuild($home));
+    // A switch restarts the daemon inside this stopped window, so the selected build's disk backend is set here (#983).
+    $updated = pmssQbittorrentFrontendDiskIoTypeApply($updated, pmssQbittorrentFrontendDiskIoType($home, $ops));
     if ($updated === $config) return true;
     $write = $ops['write'] ?? 'pmssConfigureFileWrite';
     if ($write($path, $updated)) return true;

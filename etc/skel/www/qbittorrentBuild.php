@@ -88,3 +88,39 @@ function pmssQbittorrentFrontendBuildRecord(string $home, ?string $version): voi
     if (!is_dir(dirname($path)) && !@mkdir(dirname($path), 0700, true)) return;
     pmssConfigureFileWrite($path, $number."\n");
 }
+
+/**
+ * The disk backend the selected build starts with: the customer-side twin of scripts/lib/user/qbittorrentVersion.php
+ * (#983). '' drops the key, because lt1.2 builds do not know it; anything not in the store follows the system rule.
+ */
+function pmssQbittorrentFrontendDiskIoType(string $home, array $ops = []): string
+{
+    $target = @readlink($home.'/bin/qbittorrent/default');
+    $store = rtrim($ops['store'] ?? '/home/.pmss/clients', '/').'/qbittorrent/';
+    $family = '';
+    if (is_string($target) && strpos($target, $store) === 0) {
+        $version = substr($target, strlen($store));
+        $data = json_decode((string) @file_get_contents($ops['projection'] ?? '/var/lib/pmss/public/torrentClients.json'), true);
+        foreach ((array) ($data['versions'] ?? []) as $entry) {
+            if (($entry['client'] ?? null) === 'qbittorrent' && ($entry['version'] ?? null) === $version
+                && (is_string($entry['compatFamily'] ?? null) || is_int($entry['compatFamily'] ?? null)))
+                $family = (string) $entry['compatFamily'];
+        }
+    }
+    if ($family === 'lt1.2') return '';
+    return preg_match('/\A[0-9]+(?:\.[0-9]+){0,2}\z/', $family) === 1 && version_compare($family, '5.0.1', '>=')
+        ? 'SimplePreadPwrite' : 'Posix';
+}
+
+/** Set, or for '' remove, Session\DiskIOType in [BitTorrent] without touching any other byte; unchanged on any error. */
+function pmssQbittorrentFrontendDiskIoTypeApply(string $config, string $type): string
+{
+    if ($type === '') {
+        $updated = preg_replace('/^Session\\\\DiskIOType=.*\r?\n?/m', '', $config);
+    } else {
+        $values = pmssQbittorrentFrontendConfigValues($config);
+        if (($values['BitTorrent']['Session\\DiskIOType'] ?? null) === $type) return $config;
+        $updated = pmssQbittorrentFrontendConfigSet($config, 'BitTorrent', 'Session\\DiskIOType', $type, true);
+    }
+    return is_string($updated) ? $updated : $config;
+}
