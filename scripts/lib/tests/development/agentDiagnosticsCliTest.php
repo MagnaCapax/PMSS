@@ -227,7 +227,7 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');
         $unsafeRoot = $root.'/safe/../safe';
-        @mkdir($root.'/safe', 0700, true);
+        $this->pmssEnsureDir($root.'/safe', 0700);
 
         $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $unsafeRoot], function () use ($unsafeRoot): void {
             $result = \pmssAgentDiagnosticsPhpScript('scripts/listUsers.php');
@@ -318,14 +318,14 @@ final class agentDiagnosticsCliTest extends TestCase
     private function makeScriptRoot(bool $brokenCheckUsers = false): string
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');
-        mkdir($root.'/scripts/util', 0777, true);
-        $this->pmssWriteExecutablePhpFile($root.'/scripts/listUsers.php', "echo \"alice\\nbob\\n\";");
-        $this->pmssWriteExecutablePhpFile($root.'/scripts/showTraffic.php', "echo json_encode([['user' => 'alice', 'monthMiB' => 1024]]), PHP_EOL;");
-        $this->pmssWriteExecutablePhpFile($root.'/scripts/userSetting.php', "echo json_encode(['label' => 'Alice Setting']), PHP_EOL;");
-        $this->pmssWriteExecutablePhpFile($root.'/scripts/util/systemTest.php', "echo json_encode(['summary' => ['ok' => 3]]), PHP_EOL;");
-        $checkUsersBody = $brokenCheckUsers ? "fwrite(STDERR, 'boom'); exit(3);" : "echo json_encode(['consistent' => ['alice']]), PHP_EOL;";
-        $this->pmssWriteExecutablePhpFile($root.'/scripts/util/checkUsers.php', $checkUsersBody);
-        $this->pmssWriteExecutablePhpFile($root.'/scripts/util/userResourcesList.php', "echo json_encode([['user' => 'alice', 'uid' => 1001]]), PHP_EOL;");
+        foreach ([
+            'listUsers.php' => "echo \"alice\\nbob\\n\";",
+            'showTraffic.php' => "echo json_encode([['user' => 'alice', 'monthMiB' => 1024]]), PHP_EOL;",
+            'userSetting.php' => "echo json_encode(['label' => 'Alice Setting']), PHP_EOL;",
+            'util/systemTest.php' => "echo json_encode(['summary' => ['ok' => 3]]), PHP_EOL;",
+            'util/checkUsers.php' => $brokenCheckUsers ? "fwrite(STDERR, 'boom'); exit(3);" : "echo json_encode(['consistent' => ['alice']]), PHP_EOL;",
+            'util/userResourcesList.php' => "echo json_encode([['user' => 'alice', 'uid' => 1001]]), PHP_EOL;",
+        ] as $path => $body) $this->pmssWriteExecutablePhpFile($root.'/scripts/'.$path, $body, 0777);
         return $root;
     }
 

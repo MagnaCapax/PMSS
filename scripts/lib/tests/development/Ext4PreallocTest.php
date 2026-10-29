@@ -81,7 +81,7 @@ class Ext4PreallocTest extends TestCase
         $this->assertSame('write-failed', $rows[0]['result']);
         $this->assertSame(null, $rows[0]['after']);
 
-        file_put_contents($root.'/sys/md1/mb_group_prealloc', "1536\n");
+        $this->pmssWriteFile($root.'/sys/md1/mb_group_prealloc', "1536\n");
         // Emulate a kernel accepting the write but retaining a different value.
         $rows = $this->apply($root, 'printf() { if [ "$1" = "%s\\n" ]; then command printf "1536\\n"; else command printf "$@"; fi; }');
         $this->assertSame('readback-mismatch', $rows[0]['result']);
@@ -100,7 +100,7 @@ class Ext4PreallocTest extends TestCase
         $block = str_replace('/etc/seedbox/config/ext4-group-prealloc.enabled', $root.'/absent', $block);
         $this->assertSame('untouched', $this->pmssRunShellHarness("#!/bin/sh\n".$block."\nprintf '%s' \"\${ext4_prealloc_audit:-untouched}\"\n"));
         // With a marker but missing helper, audit the delivery problem explicitly.
-        file_put_contents($root.'/absent', '');
+        $this->pmssWriteFile($root.'/absent', '');
         $block = str_replace('/scripts/lib/update/systemPrep/ext4Prealloc.sh', $root.'/missing-helper', $block);
         $this->assertSame('[{"result":"skip:missing-helper"}]', $this->pmssRunShellHarness("#!/bin/sh\n".$block."\nprintf '%s' \"\$ext4_prealloc_audit\"\n"));
         $this->assertStringContainsString('"ext4_group_prealloc": ${ext4_prealloc_audit:-[]}', $source);
@@ -130,11 +130,11 @@ class Ext4PreallocTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-ext4-prealloc-');
         foreach ($mounts as $dev => $values) {
-            mkdir($root.'/proc/'.$dev, 0700, true);
-            mkdir($root.'/sys/'.$dev, 0700, true);
-            file_put_contents($root.'/proc/'.$dev.'/options', "rw\nstripe=".$values[0]."\n");
+            $this->pmssWriteFile($root.'/proc/'.$dev.'/options', "rw\nstripe=".$values[0]."\n", 0700);
+            // Even an absent knob retains its device directory for the missing-read case.
+            $this->pmssEnsureDir($root.'/sys/'.$dev, 0700);
             if ($values[1] !== null) {
-                file_put_contents($root.'/sys/'.$dev.'/mb_group_prealloc', $values[1]."\n");
+                $this->pmssWriteFile($root.'/sys/'.$dev.'/mb_group_prealloc', $values[1]."\n", 0700);
             }
         }
         return $root;

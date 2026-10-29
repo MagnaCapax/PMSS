@@ -93,8 +93,7 @@ class CgroupReadIopsDerivationTest extends TestCase
             true
         ));
 
-        $thin = $this->pmssWriteTempFile('pmss-thin-io-ceiling-', '');
-        file_put_contents($thin, json_encode([
+        $thin = $this->pmssWriteTempFile('pmss-thin-io-ceiling-', json_encode([
             'min_days' => 2,
             'min_samples_per_day' => 144,
             'days' => ['2026-09-20' => ['samples' => 144]],
@@ -141,9 +140,8 @@ class CgroupReadIopsDerivationTest extends TestCase
     public function testMdBackedHomeIsDetectedSoCallersCanLeaveDerivedCapsUnset(): void
     {
         $root = $this->pmssMakeTempDir('pmss-read-iops-class-', 0700);
-        @mkdir($root.'/md1/md', 0700, true);
-        @mkdir($root.'/sda/queue', 0700, true);
-        file_put_contents($root.'/sda/queue/rotational', "1\n");
+        $this->pmssEnsureDir($root.'/md1/md', 0700);
+        $this->pmssWriteFile($root.'/sda/queue/rotational', "1\n", 0700);
 
         $this->assertTrue(\pmssCgroupPolicyHomeDeviceIsMdBacked('/dev/md1', $root));
         $this->assertSame('hdd', \pmssCgroupPolicyHomeStorageClassResolve('/dev/sda', $root));
@@ -154,17 +152,17 @@ class CgroupReadIopsDerivationTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-read-iops-topology-', 0700);
         foreach (['md0', 'md1', 'sda', 'sdb', 'nvme0n1', 'dm0'] as $device) {
-            @mkdir($root.'/'.$device.'/queue', 0700, true);
-            @mkdir($root.'/'.$device.'/slaves', 0700, true);
+            $this->pmssEnsureDir($root.'/'.$device.'/queue', 0700);
+            $this->pmssEnsureDir($root.'/'.$device.'/slaves', 0700);
         }
-        file_put_contents($root.'/sda/queue/rotational', "1\n");
-        file_put_contents($root.'/sdb/queue/rotational', "0\n");
-        file_put_contents($root.'/dm0/queue/rotational', "0\n");
-        file_put_contents($root.'/md1/queue/rotational', "1\n");
-        symlink($root.'/sdb', $root.'/md0/slaves/sdb');
-        symlink($root.'/sda', $root.'/md0/slaves/sda');
-        symlink($root.'/nvme0n1', $root.'/dm0/slaves/nvme0n1');
-        symlink($root.'/sdb', $root.'/md1/slaves/sdb');
+        $this->pmssWriteFiles($root, [
+            'sda/queue/rotational' => "1\n", 'sdb/queue/rotational' => "0\n",
+            'dm0/queue/rotational' => "0\n", 'md1/queue/rotational' => "1\n",
+        ], 0700);
+        $this->pmssWriteSymlinks($root, [
+            'md0/slaves/sdb' => $root.'/sdb', 'md0/slaves/sda' => $root.'/sda',
+            'dm0/slaves/nvme0n1' => $root.'/nvme0n1', 'md1/slaves/sdb' => $root.'/sdb',
+        ], 0700);
 
         foreach (['sda' => 'hdd', 'sdb' => 'ssd', 'nvme0n1' => 'nvme',
             'md0' => 'hdd', 'md1' => 'hdd', 'dm0' => 'nvme', 'missing' => null] as $device => $class) {
@@ -178,9 +176,8 @@ class CgroupReadIopsDerivationTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-read-iops-paths-', 0700);
         // A root queue would otherwise let dot components masquerade as a disk.
-        @mkdir($root.'/queue', 0700, true);
-        @mkdir($root.'/md', 0700, true);
-        file_put_contents($root.'/queue/rotational', "1\n");
+        $this->pmssWriteFile($root.'/queue/rotational', "1\n", 0700);
+        $this->pmssEnsureDir($root.'/md', 0700);
         foreach (["\0/dev/sda", "/dev/sda\0", "/bad\0/dev/sda", "/dev/md0\0",
             "/dev/nvme0n1\0", '/dev/.', '/dev/..', '', '/dev/bad name'] as $path) {
             $this->assertSame(null, \pmssCgroupPolicyBlockDeviceName($path));

@@ -7,22 +7,6 @@ require_once dirname(__DIR__, 2).'/user/userConfigRuntime.php';
 
 class UserConfigRuntimeTest extends TestCase
 {
-    private function writeRtorrentProcFixture(string $name = 'rtorrent', int $uid = 1500, string $comm = 'rtorrent'): string
-    {
-        $procRoot = $this->pmssMakeTempDir('pmss-proc-');
-        $this->pmssWriteFiles($procRoot.'/12345', [
-            'status' => "Name:\t{$name}\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n", 'comm' => $comm."\n"]);
-        return $procRoot;
-    }
-
-    private function assertRtorrentLockPid(?int $expected, string $content): void
-    {
-        $lockFile = $this->pmssMakeTempFile('pmss-rtorrent-lock-');
-        file_put_contents($lockFile, $content);
-
-        $this->assertSame($expected, \pmssUserConfigRtorrentLockPid($lockFile));
-    }
-
     public function testRtorrentLockPidParsesCanonicalAndRejectsMalformedValues(): void
     {
         foreach ([
@@ -32,15 +16,17 @@ class UserConfigRuntimeTest extends TestCase
             ['1:+session', null],
             ['abc:+session', null],
             ['-5:+session', null],
-        ] as $case) {
-            $this->assertRtorrentLockPid($case[1], $case[0]);
+        ] as [$content, $expected]) {
+            $lockFile = $this->pmssMakeTempFile('pmss-rtorrent-lock-');
+            $this->pmssWriteFile($lockFile, $content);
+            $this->assertSame($expected, \pmssUserConfigRtorrentLockPid($lockFile));
         }
     }
 
     public function testRtorrentLockPidRejectsSymlink(): void
     {
         $target = $this->pmssMakeTempFile('pmss-rtorrent-lock-target-');
-        file_put_contents($target, "12345:+session\n");
+        $this->pmssWriteFile($target, "12345:+session\n");
         $link = $this->pmssMakeTempPath('pmss-rtorrent-lock-link-');
         symlink($target, $link);
 
@@ -53,11 +39,13 @@ class UserConfigRuntimeTest extends TestCase
             'matching rtorrent process' => ['rtorrent', 1500, 'rtorrent', 1500, true],
             'wrong command' => ['bash', 1500, 'bash', 1500, false],
             'wrong uid' => ['rtorrent', 1500, 'rtorrent', 1600, false],
-        ] as $label => $case) {
-            $procRoot = $this->writeRtorrentProcFixture($case[0], $case[1], $case[2]);
+        ] as $label => [$name, $uid, $comm, $ownerUid, $owned]) {
+            $procRoot = $this->pmssMakeTempDir('pmss-proc-');
+            $this->pmssWriteFiles($procRoot.'/12345', [
+                'status' => "Name:\t{$name}\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n", 'comm' => $comm."\n"]);
 
-            $this->assertSame($case[1], \pmssUserConfigProcStatusUid(12345, $procRoot), $label.' uid');
-            $this->assertSame($case[4], \pmssUserConfigRtorrentProcessOwnedBy(12345, $case[3], $procRoot), $label);
+            $this->assertSame($uid, \pmssUserConfigProcStatusUid(12345, $procRoot), $label.' uid');
+            $this->assertSame($owned, \pmssUserConfigRtorrentProcessOwnedBy(12345, $ownerUid, $procRoot), $label);
         }
     }
 

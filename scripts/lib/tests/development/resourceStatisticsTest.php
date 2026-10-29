@@ -43,7 +43,7 @@ class ResourceStatisticsTest extends TestCase
     public function testGetDataRejectsTraversalUsernames(): void
     {
         $root = $this->pmssMakeTempDir('pmss-resource-getdata-');
-        file_put_contents($root.'/outside', "should-not-read\n");
+        $this->pmssWriteFile($root.'/outside', "should-not-read\n");
 
         $stats = new \resourceStatistics(['resource_dir' => $root]);
 
@@ -53,7 +53,7 @@ class ResourceStatisticsTest extends TestCase
     public function testGetDataAcceptsWwwData(): void
     {
         $root = $this->pmssMakeTempDir('pmss-resource-getdata-www-');
-        file_put_contents($root.'/www-data', "first\nsecond\n");
+        $this->pmssWriteFile($root.'/www-data', "first\nsecond\n");
 
         $stats = new \resourceStatistics(['resource_dir' => $root]);
 
@@ -83,9 +83,7 @@ class ResourceStatisticsTest extends TestCase
     public function testGetDataRejectsSymlinkedResourceDirectory(): void
     {
         $root = $this->pmssMakeTempDir('pmss-resource-getdata-link-');
-        $target = $root.'/target';
-        @mkdir($target, 0700);
-        file_put_contents($target.'/www-data', "should-not-read\n");
+        $target = $this->pmssWriteFiles($root.'/target', ['www-data' => "should-not-read\n"], 0700);
         $link = $root.'/link';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
