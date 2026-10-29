@@ -1,5 +1,12 @@
 # Refactoring Guidelines
 
+Customer app presentation uses one Welcome catalog and named tile/installed-state
+projections within the existing delivered files (ADR 0203). Common ordering,
+fallback descriptions, suggestions and icons share that catalog; toggle labels
+retain precedence. The grid builds its overflow bucket directly, and media-stack
+preflight has one result shape. Characterization cases retain action policy,
+icon bytes, state payload order and recovery messages without new guiv dependencies.
+
 Critical-config backups retain their original creation facade. Target preparation
 and filename labels live in `configBackups/context.php`; pruning lives in
 `configBackups/retention.php` (ADR 0201). Count expiry uses the sorted list position

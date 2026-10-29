@@ -101,26 +101,15 @@ function pmssMediaStackPanelMemoryPreflightRead(): array
     $minimum = PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES;
     $limit = pmssMediaStackPanelMemoryLimitBytesRead();
     if ($limit === null) {
-        return array(
-            'ok' => true,
-            'message' => 'Account memory limit could not be detected; SSH install will perform the same check.',
-            'limitBytes' => null,
-            'minimumBytes' => $minimum,
-        );
+        $message = 'Account memory limit could not be detected; SSH install will perform the same check.';
+    } elseif ($limit >= $minimum) {
+        $message = 'Detected account memory limit: '.pmssFormatBytes($limit, 0, 2, true).'.';
+    } else {
+        $message = 'Media stack needs about '.pmssFormatBytes($minimum, 0, 2, true).' of memory; this account is limited to '.pmssFormatBytes($limit, 0, 2, true).'. Use SSH with install-media-stack.sh --force only if you accept the throttling risk.';
     }
-
-    if ($limit >= $minimum) {
-        return array(
-            'ok' => true,
-            'message' => 'Detected account memory limit: '.pmssFormatBytes($limit, 0, 2, true).'.',
-            'limitBytes' => $limit,
-            'minimumBytes' => $minimum,
-        );
-    }
-
     return array(
-        'ok' => false,
-        'message' => 'Media stack needs about '.pmssFormatBytes($minimum, 0, 2, true).' of memory; this account is limited to '.pmssFormatBytes($limit, 0, 2, true).'. Use SSH with install-media-stack.sh --force only if you accept the throttling risk.',
+        'ok' => $limit === null || $limit >= $minimum,
+        'message' => $message,
         'limitBytes' => $limit,
         'minimumBytes' => $minimum,
     );
@@ -660,40 +649,7 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
 
     if ($installed) {
         $recoveryGate = pmssMediaStackPanelRecoveryGateRead($home);
-        $runtime = pmssMediaStackPanelRuntimeStatusRead($home);
-        if ($runtime !== null) {
-            $runtimeState = (string) ($runtime['state'] ?? 'healthy');
-            $hasOff = in_array('off', array_column($runtime['apps'], 'state'), true);
-            $panelState = $runtimeState === 'failed' ? 'failed' : ($runtimeState === 'degraded' ? 'degraded' : 'installed');
-            $message = $runtimeState === 'failed'
-                ? 'Media stack is installed, but one or more apps failed repeatedly.'
-                : ($runtimeState === 'degraded'
-                    ? 'Media stack is installed, but one or more apps are not running.'
-                    : ($hasOff ? 'Media stack is installed. Apps you stopped remain off.' : 'Media stack is installed and all managed apps are running.'));
-            return array_merge($status, array(
-                'state' => $panelState,
-                'message' => $message,
-                'details' => array_merge(
-                    pmssMediaStackPanelRuntimeDetailsRead($runtime),
-                    array($recoveryGate['ok']
-                        ? 'Automatic crash-loop restart remains disabled; review the app log, then use Start all stopped for one recovery attempt.'
-                        : $recoveryGate['message'])
-                ),
-                'canRestart' => $recoveryGate['ok'],
-            ));
-        }
-
-        return array_merge($status, array(
-            'state' => 'installed',
-            'message' => 'Media stack is installed for this account.',
-            'details' => array(
-                'Runtime status is not available yet; the host watchdog will publish it shortly.',
-                'Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.',
-                'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
-                $recoveryGate['ok'] ? 'Use Start all stopped for a one-time recovery after a host restart.' : $recoveryGate['message'],
-            ),
-            'canRestart' => $recoveryGate['ok'],
-        ));
+        return array_merge($status, pmssMediaStackPanelStateFromRuntimeBuild(pmssMediaStackPanelRuntimeStatusRead($home), $recoveryGate));
     }
 
     if ($logTail !== '') {
@@ -730,6 +686,29 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
         'security' => array(),
         'canStart' => true,
     ));
+}
+
+/** Project installed-app observations without filesystem reads or duplicated status records. */
+function pmssMediaStackPanelStateFromRuntimeBuild(?array $runtime, array $recoveryGate): array
+{
+    $messages = array(
+        'failed' => 'Media stack is installed, but one or more apps failed repeatedly.',
+        'degraded' => 'Media stack is installed, but one or more apps are not running.',
+    );
+    $state = (string) ($runtime['state'] ?? 'healthy');
+    $message = $runtime === null ? 'Media stack is installed for this account.'
+        : ($messages[$state] ?? (in_array('off', array_column($runtime['apps'], 'state'), true)
+            ? 'Media stack is installed. Apps you stopped remain off.' : 'Media stack is installed and all managed apps are running.'));
+    $details = $runtime === null ? array(
+        'Runtime status is not available yet; the host watchdog will publish it shortly.',
+        'Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.',
+        'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
+        $recoveryGate['ok'] ? 'Use Start all stopped for a one-time recovery after a host restart.' : $recoveryGate['message'],
+    ) : array_merge(pmssMediaStackPanelRuntimeDetailsRead($runtime), array($recoveryGate['ok']
+        ? 'Automatic crash-loop restart remains disabled; review the app log, then use Start all stopped for one recovery attempt.'
+        : $recoveryGate['message']));
+    return array('state' => isset($messages[$state]) ? $state : 'installed',
+        'message' => $message, 'details' => $details, 'canRestart' => $recoveryGate['ok']);
 }
 
 /**

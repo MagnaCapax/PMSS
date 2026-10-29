@@ -11,14 +11,16 @@ final class WelcomeHomeTest extends TestCase
      * Run PHP against welcome.php's helper tail in a child process and decode its JSON answer.
      * Everything from pmssWelcomeTrafficUpgradeUrlBuild() on is function definitions only.
      */
-    private function runWelcomeHome(string $script, bool $offline = false): array
+    private function runWelcomeHome(string $script, bool $offline = false, ?array $toggle = null): array
     {
         // Written per call: the harness removes each test's temporary files when the test ends.
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
         $start = strpos($source, 'function pmssWelcomeTrafficUpgradeUrlBuild');
         $this->assertTrue($start !== false, 'welcome.php view helpers should remain present');
+        $fixtureDir = $this->pmssMakeTempDir('pmss-welcome-home-');
+        if ($toggle !== null) $this->pmssWriteFile($fixtureDir.'/toggleAppCatalog.php', '<?php return '.var_export($toggle, true).';');
         $fixture = $this->pmssWriteFile(
-            $this->pmssMakeTempPath('pmss-welcome-home-', '.php'),
+            $fixtureDir.'/welcome.php',
             "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).";\n"
             .preg_replace('/\?>\s*$/', '', substr($source, $start))
         );
@@ -45,6 +47,53 @@ final class WelcomeHomeTest extends TestCase
     {
         return $this->runWelcomeHome('echo json_encode(pmssWelcomeHomeNewsSelect('
             .var_export($announcements, true).', '.var_export($articles, true).'));');
+    }
+
+    /** Freeze all tile actions and field order through the pre-existing grid entrypoint. */
+    public function testAppPresentationActionsAndCatalogOverlay(): void
+    {
+        $cases = ['running' => 'open', 'not-running' => 'start', 'off' => 'start', 'stopped' => 'start',
+            'failed' => 'start', 'gave up' => 'start', 'installing' => 'none', 'not secured' => 'manage',
+            'absent' => 'setup', '' => 'manage', 'unknown' => 'manage'];
+        foreach ($cases as $state => $action) {
+            $tiles = $this->runWelcomeHome('echo json_encode(pmssWelcomeHomeAppsBuild('.var_export(['apps' => [
+                'qBittorrent' => ['state' => $state, 'url' => 'https://example.test/?x="&y=<'],
+                'rtorrent' => ['state' => 'not-running', 'url' => '/rutorrent/'],
+                'custom' => false, 'lighttpd' => ['state' => 'running'],
+            ]], true).', false));', false, ['qBittorrent' => ['label' => 'Custom torrent label']]);
+            $byId = array_column($tiles, null, 'id');
+            $tile = $byId['qBittorrent'];
+            $this->assertSame(['id', 'name', 'desc', 'state', 'url', 'open', 'action', 'restart', 'start', 'hero', 'more'], array_keys($tile));
+            $this->assertSame('Custom torrent label', $tile['name']);
+            $this->assertSame('A second torrent client with a modern web UI', $tile['desc']);
+            $this->assertSame($action, $tile['action'], $state);
+            $this->assertSame($state === 'running', $tile['restart']);
+            $this->assertSame(false, $tile['start']);
+            $this->assertSame('open', $byId['rtorrent']['action']);
+            $this->assertSame(true, $byId['rtorrent']['start']);
+            $this->assertSame('manage', $byId['custom']['action']);
+            $this->assertFalse(isset($byId['lighttpd']));
+        }
+    }
+
+    /** App kinds, unknown-ID fallbacks and media suggestions retain their original sets. */
+    public function testAppIconsAndAbsentSuggestionsCharacterization(): void
+    {
+        $paths = ['torrent' => '<path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/>',
+            'media' => '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l4 2-4 2z"/><path d="M8 20h8"/>',
+            'cloud' => '<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18z"/>',
+            'agent' => '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',
+            'files' => '<path d="M4 6h6l2 2h8v10H4z"/>'];
+        $groups = ['torrent' => ['rtorrent', 'qBittorrent', 'Deluge', 'qui'],
+            'media' => ['jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'autobrr', 'Scryer'],
+            'cloud' => ['rclone', 'cloudplow'], 'agent' => ['openclaw'], 'files' => ['unknown', '', 'Jellyfin', null, false, 0, [], ['rtorrent']]];
+        foreach ($groups as $kind => $ids) {
+            $icons = $this->runWelcomeHome('echo json_encode(array_map("pmssWelcomeHomeAppIcon", '.var_export($ids, true).'));');
+            foreach ($icons as $icon) $this->assertSame('<svg class="h-ico" viewBox="0 0 24 24" aria-hidden="true">'.$paths[$kind].'</svg>', $icon);
+        }
+        $tiles = $this->runWelcomeHome('echo json_encode(pmssWelcomeHomeAppsBuild([], false));');
+        $this->assertSame(['jellyfin', 'sonarr', 'radarr', 'prowlarr'], array_column($tiles, 'id'));
+        $this->assertSame(array_fill(0, 4, 'setup'), array_column($tiles, 'action'));
     }
 
     public function testNewsSelectKeepsFiveAnnouncementsAndTenArticlesNewestFirst(): void

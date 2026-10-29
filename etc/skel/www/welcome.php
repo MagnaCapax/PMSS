@@ -1546,17 +1546,36 @@ function pmssWelcomeHomeAgentFirst(array $appsStatus)
 {
     $apps = is_array($appsStatus['apps'] ?? null) ? $appsStatus['apps'] : array();
     if (!isset($apps['openclaw']) || ($apps['openclaw']['state'] ?? 'off') === 'off') return false;
-    foreach (array('rtorrent', 'qBittorrent', 'Deluge') as $id) {
-        if (isset($apps[$id]) && ($apps[$id]['state'] ?? 'off') !== 'off') return false;
+    foreach (pmssWelcomeHomeAppCatalog() as $id => $definition) {
+        if (!empty($definition['common']) && $definition['icon'] === 'torrent'
+            && isset($apps[$id]) && ($apps[$id]['state'] ?? 'off') !== 'off') return false;
     }
     return true;
 }
 
-/** Visible apps in display order, with name, description, state word and where Open goes. */
+/** Welcome-only presentation policy; common entries retain their display order. */
+function pmssWelcomeHomeAppCatalog()
+{
+    return array(
+        'rtorrent' => array('label' => 'ruTorrent', 'icon' => 'torrent', 'common' => true),
+        'qBittorrent' => array('label' => 'qBittorrent', 'icon' => 'torrent', 'common' => true, 'idea' => 'A second torrent client with a modern web UI'),
+        'Deluge' => array('label' => 'Deluge', 'icon' => 'torrent', 'common' => true, 'idea' => 'A torrent client with a web UI'),
+        'jellyfin' => array('label' => 'Jellyfin', 'icon' => 'media', 'common' => true, 'idea' => 'Stream your library to TV, phone and browser'),
+        'sonarr' => array('label' => 'Sonarr', 'icon' => 'media', 'common' => true, 'idea' => 'Finds and downloads TV episodes'),
+        'radarr' => array('label' => 'Radarr', 'icon' => 'media', 'common' => true, 'idea' => 'Finds and downloads movies'),
+        'prowlarr' => array('label' => 'Prowlarr', 'icon' => 'media', 'common' => true, 'idea' => 'One indexer list for Sonarr and Radarr'),
+        'rclone' => array('label' => 'rclone', 'icon' => 'cloud', 'common' => true, 'idea' => 'Sync files to and from cloud storage'),
+        'openclaw' => array('label' => 'OpenClaw', 'icon' => 'agent', 'common' => true, 'idea' => 'An AI agent that works in your account, on your AI credits'),
+        'sabnzbd' => array('label' => 'SABnzbd', 'icon' => 'media'), 'autobrr' => array('label' => 'Autobrr', 'icon' => 'media'),
+        'cloudplow' => array('label' => 'Cloudplow', 'icon' => 'cloud'),
+        'qui' => array('icon' => 'torrent'), 'Scryer' => array('icon' => 'media'),
+    );
+}
+
 /** The common apps that fill the first three rows when the account does not run them yet, in this order. */
 function pmssWelcomeHomeCommonApps()
 {
-    return array('rtorrent', 'qBittorrent', 'Deluge', 'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'rclone', 'openclaw');
+    return array_keys(array_filter(pmssWelcomeHomeAppCatalog(), function ($row) { return !empty($row['common']); }));
 }
 
 /**
@@ -1569,46 +1588,22 @@ function pmssWelcomeHomeCommonApps()
 function pmssWelcomeHomeAppsBuild(array $appsStatus, $agentFirst)
 {
     $apps = is_array($appsStatus['apps'] ?? null) ? $appsStatus['apps'] : array();
-    $names = array('jellyfin' => 'Jellyfin', 'sonarr' => 'Sonarr', 'radarr' => 'Radarr', 'prowlarr' => 'Prowlarr',
-        'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr', 'cloudplow' => 'Cloudplow', 'rtorrent' => 'ruTorrent',
-        'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone', 'openclaw' => 'OpenClaw');
+    $catalog = pmssWelcomeHomeAppCatalog();
     $toggle = is_file(__DIR__.'/toggleAppCatalog.php') ? (require __DIR__.'/toggleAppCatalog.php') : array();
-    foreach ($toggle as $id => $row) $names[$id] = $row['label'];
+    foreach ($toggle as $id => $row) $catalog[$id]['label'] = $row['label'];
     $descriptions = function_exists('pmssCustomerAppsDescriptionsRead') ? pmssCustomerAppsDescriptionsRead() : array();
     $descriptions['ruTorrent'] = $descriptions['rTorrent + ruTorrent'] ?? 'Your main torrent client';
-    $ideas = array('qBittorrent' => 'A second torrent client with a modern web UI', 'Deluge' => 'A torrent client with a web UI',
-        'jellyfin' => 'Stream your library to TV, phone and browser', 'sonarr' => 'Finds and downloads TV episodes',
-        'radarr' => 'Finds and downloads movies', 'prowlarr' => 'One indexer list for Sonarr and Radarr',
-        'rclone' => 'Sync files to and from cloud storage', 'openclaw' => 'An AI agent that works in your account, on your AI credits');
-    $media = array('jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'autobrr', 'cloudplow');
-    $tile = function ($id, $app) use ($names, $descriptions, $ideas, $agentFirst) {
-        $name = $names[$id] ?? (string) $id;
-        $state = $app === null ? 'absent' : (string) ($app['state'] ?? '');
-        $url = $app === null ? '' : (string) ($app['url'] ?? '');
-        $ready = $state === 'running' || ($id === 'rtorrent' && $state === 'not-running');
-        if ($state === 'absent') $action = 'setup';
-        elseif ($ready && $url !== '') $action = 'open';
-        elseif (in_array($state, array('off', 'stopped', 'not-running', 'failed', 'gave up'), true)) $action = 'start';
-        elseif ($state === 'installing') $action = 'none';
-        else $action = 'manage';
-        $desc = (string) ($descriptions[$name] ?? '');
-        return array('id' => (string) $id, 'name' => $name, 'desc' => $desc !== '' ? $desc : ($ideas[$id] ?? ''), 'state' => $state, 'url' => $url,
-            'open' => $action === 'open', 'action' => $action, 'restart' => $state === 'running',
-            // ruTorrent opens while rTorrent is down; the tile also offers the start that brings it back.
-            'start' => $action === 'open' && $state !== 'running',
-            'hero' => $agentFirst && $id === 'openclaw' && $state !== 'off' && $state !== 'absent', 'more' => false);
-    };
     $active = $inactive = array();
     foreach ($apps as $id => $app) {
         if ($id === 'lighttpd') continue;
-        $t = $tile($id, is_array($app) ? $app : array());
+        $t = pmssWelcomeHomeAppTileBuild($id, is_array($app) ? $app : array(), $catalog[$id] ?? array(), $descriptions, $agentFirst);
         if ($t['state'] === 'off') $inactive[$t['id']] = $t; else $active[$t['id']] = $t;
     }
     // A media app the account has never installed is not in the status list; the common ones still get a tile.
-    foreach (pmssWelcomeHomeCommonApps() as $id) {
-        if (!isset($active[$id]) && !isset($inactive[$id]) && in_array($id, $media, true)) $inactive[$id] = $tile($id, null);
-    }
     $rank = array_flip(pmssWelcomeHomeCommonApps());
+    foreach ($rank as $id => $unused) {
+        if (!isset($active[$id]) && !isset($inactive[$id]) && $catalog[$id]['icon'] === 'media') $inactive[$id] = pmssWelcomeHomeAppTileBuild($id, null, $catalog[$id], $descriptions, $agentFirst);
+    }
     $order = function ($a, $b) use ($rank) {
         if ($a['hero'] !== $b['hero']) return $b['hero'] - $a['hero'];
         return ($rank[$a['id']] ?? 99) - ($rank[$b['id']] ?? 99) ?: strcmp($a['name'], $b['name']);
@@ -1617,15 +1612,31 @@ function pmssWelcomeHomeAppsBuild(array $appsStatus, $agentFirst)
     uasort($inactive, $order);
     $list = array_values($active);
     $plain = count(array_filter($list, function ($t) { return !$t['hero']; }));
+    $more = array();
     foreach ($inactive as $t) {
         // An OpenClaw-first account is not nudged back to a second torrent client in the first rows.
         $nudge = isset($rank[$t['id']]) && !($agentFirst && in_array($t['id'], array('qBittorrent', 'Deluge'), true));
         $t['more'] = !($nudge && $plain < 9);
-        if (!$t['more']) $plain++;
-        $list[] = $t;
+        if ($t['more']) $more[] = $t; else { $plain++; $list[] = $t; }
     }
     // PHP 7 sorts are not stable, so the order is kept by splitting rather than sorting.
-    return array_merge(array_values(array_filter($list, function ($t) { return !$t['more']; })), array_values(array_filter($list, function ($t) { return $t['more']; })));
+    return array_merge($list, $more);
+}
+
+/** Project one observed or absent app; ordering and catalog acquisition stay with the grid. */
+function pmssWelcomeHomeAppTileBuild($id, $app, array $definition, array $descriptions, $agentFirst)
+{
+    $name = $definition['label'] ?? (string) $id;
+    $state = $app === null ? 'absent' : (string) ($app['state'] ?? '');
+    $url = $app === null ? '' : (string) ($app['url'] ?? '');
+    $action = array('absent' => 'setup', 'off' => 'start', 'stopped' => 'start', 'not-running' => 'start', 'failed' => 'start', 'gave up' => 'start', 'installing' => 'none')[$state] ?? 'manage';
+    if ($url !== '' && ($state === 'running' || ($id === 'rtorrent' && $state === 'not-running'))) $action = 'open';
+    $desc = (string) ($descriptions[$name] ?? '');
+    return array('id' => (string) $id, 'name' => $name, 'desc' => $desc !== '' ? $desc : ($definition['idea'] ?? ''), 'state' => $state, 'url' => $url,
+        'open' => $action === 'open', 'action' => $action, 'restart' => $state === 'running',
+        // ruTorrent opens while rTorrent is down; the tile also offers the start that brings it back.
+        'start' => $action === 'open' && $state !== 'running',
+        'hero' => $agentFirst && $id === 'openclaw' && $state !== 'off' && $state !== 'absent', 'more' => false);
 }
 
 /** One app tile: state, a one-click action where the panel has one, Restart while it runs. */
@@ -1663,7 +1674,6 @@ function pmssWelcomeHomeStateWord($state)
 
 function pmssWelcomeHomeAppIcon($id)
 {
-    $media = array('jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'autobrr', 'Scryer');
     $paths = array(
         'torrent' => '<path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/>',
         'media' => '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l4 2-4 2z"/><path d="M8 20h8"/>',
@@ -1671,9 +1681,7 @@ function pmssWelcomeHomeAppIcon($id)
         'agent' => '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',
         'files' => '<path d="M4 6h6l2 2h8v10H4z"/>',
     );
-    $kind = in_array($id, array('rtorrent', 'qBittorrent', 'Deluge', 'qui'), true) ? 'torrent'
-        : (in_array($id, $media, true) ? 'media' : (in_array($id, array('rclone', 'cloudplow'), true) ? 'cloud'
-        : ($id === 'openclaw' ? 'agent' : 'files')));
+    $kind = is_string($id) ? (pmssWelcomeHomeAppCatalog()[$id]['icon'] ?? 'files') : 'files';
     return '<svg class="h-ico" viewBox="0 0 24 24" aria-hidden="true">'.$paths[$kind].'</svg>';
 }
 

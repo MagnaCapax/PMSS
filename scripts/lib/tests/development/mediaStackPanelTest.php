@@ -82,6 +82,47 @@ class MediaStackPanelTest extends TestCase
         $this->pmssAssertArraySubsetSame(['state' => 'ready', 'canStart' => true], $status);
     }
 
+    /** Freeze installed-status precedence, messages, detail order and recovery gating. */
+    public function testInstalledStatusCharacterization(): void
+    {
+        $cases = [
+            [null, 'installed', 'Media stack is installed for this account.', []],
+            [['apps' => []], 'installed', 'Media stack is installed and all managed apps are running.', []],
+            [['state' => 'healthy', 'apps' => ['sonarr' => ['state' => 'off']]], 'installed',
+                'Media stack is installed. Apps you stopped remain off.', ['Sonarr: stopped by you.']],
+            [['state' => 'degraded', 'apps' => ['sonarr' => ['state' => 'off']]], 'degraded',
+                'Media stack is installed, but one or more apps are not running.', ['Sonarr: stopped by you.']],
+            [['state' => 'failed', 'apps' => ['sonarr' => ['state' => 'failed', 'consecutiveFailures' => 3]]], 'failed',
+                'Media stack is installed, but one or more apps failed repeatedly.', ['Sonarr: failed repeatedly (3 consecutive failed checks).']],
+            [['state' => 'unexpected', 'apps' => []], 'installed', 'Media stack is installed and all managed apps are running.', []],
+        ];
+        foreach ([true, false] as $canRestart) {
+            foreach ($cases as [$runtime, $state, $message, $details]) {
+                $home = $this->mediaHomeCreate('pmss-media-installed-lock-');
+                $this->pmssWriteFile($home.'/.config/jellyfin/config/network.xml', '');
+                if ($canRestart) $this->pmssWriteFile($home.'/.bashrc.custom', '');
+                if ($runtime !== null) $this->pmssWriteFile($home.'/.media-stack-status.json', json_encode($runtime));
+                $denied = 'Media stack launch aliases are missing or unsafe.';
+                if ($runtime === null) {
+                    $details = [
+                        'Runtime status is not available yet; the host watchdog will publish it shortly.',
+                        'Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.',
+                        'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
+                        $canRestart ? 'Use Start all stopped for a one-time recovery after a host restart.' : $denied,
+                    ];
+                } else {
+                    $details[] = $canRestart
+                        ? 'Automatic crash-loop restart remains disabled; review the app log, then use Start all stopped for one recovery attempt.'
+                        : $denied;
+                }
+                $status = $this->mediaStatusRead($home);
+                $this->assertSame(['tail', 'urls', 'security', 'canStart', 'canRestart', 'poll', 'state', 'message', 'details'], array_keys($status));
+                $this->assertSame([$state, $message, $details, $canRestart, false, false],
+                    [$status['state'], $status['message'], $status['details'], $status['canRestart'], $status['canStart'], $status['poll']]);
+            }
+        }
+    }
+
     public function testStatusBlocksWhenBinAlreadyPopulated(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-blocked-bin-');
