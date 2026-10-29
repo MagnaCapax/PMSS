@@ -97,8 +97,8 @@ function pmssQuotaReportCapture(string $command, int $timeoutSec = PMSS_QUOTA_RE
  * account per run. Stopping ends the run, which releases the cron lock, and the next
  * run starts again from the first account.
  *
- * @param callable $refreshUser fn(string $user): bool, false only when that account's quota call timed out
- * @param callable $log         fn(string $message): void
+ * @param callable $refreshUser callable(string $user): bool, false only when that account's quota call timed out
+ * @param callable $log         callable(string $message): void
  * @return int accounts left unrefreshed by a stop, 0 when the sweep completed
  */
 function pmssQuotaSweepRun(array $users, callable $refreshUser, callable $log): int
