@@ -117,10 +117,9 @@ PHP
             'qBittorrent is already running; stop it before requesting another start.',
             'qBittorrent did not start: its settings file could not be updated. Check that ~/.config/qBittorrent is writable, then start it again.'] as $message) {
             $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.notice', $message."\n");
-            $output = []; $rc = 1;
-            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($home.'/www/qbittorrent.php'), $output, $rc);
-            $this->assertSame(0, $rc);
-            $this->assertSame([json_encode(['message' => $message]).'status=409'], $output);
+            $result = $this->pmssExecArgvCommand([PHP_BINARY, $home.'/www/qbittorrent.php'], [], '');
+            $this->assertSame(0, $result['rc']);
+            $this->assertSame([json_encode(['message' => $message]).'status=409'], $result['lines']);
         }
     }
 }

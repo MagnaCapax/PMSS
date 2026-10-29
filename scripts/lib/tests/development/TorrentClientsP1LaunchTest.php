@@ -50,9 +50,7 @@ final class TorrentClientsP1LaunchTest extends TestCase
         $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
         $handle = fopen($dir.'/qbittorrent.lock', 'c');
         flock($handle, LOCK_EX);
-        $status = 0;
-        exec('flock -n '.escapeshellarg($dir.'/qbittorrent.lock').' true', $unused, $status);
-        $this->assertSame(1, $status);
+        $this->assertSame(1, $this->pmssExecShellCommand('flock -n '.escapeshellarg($dir.'/qbittorrent.lock').' true', [], '')['rc']);
         $this->assertTrue(\pmssTorrentClientResolverLaunch($home, 'qbittorrent'));
         flock($handle, LOCK_UN);
         fclose($handle);

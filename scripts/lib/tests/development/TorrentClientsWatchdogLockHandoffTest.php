@@ -30,10 +30,10 @@ final class TorrentClientsWatchdogLockHandoffTest extends TestCase
         $pidFile = $dir.'/daemon.pid';
         $daemon = 'sleep 5 >/dev/null 2>&1 </dev/null & echo $! >'.escapeshellarg($pidFile);
         foreach (['leaks' => $daemon, 'closed' => '{ '.$daemon.'; } 9>&-'] as $label => $launch) {
-            exec('sh -c '.escapeshellarg('exec 9>>'.escapeshellarg($lock).'; flock -n 9 || exit 3; '.$launch), $unused, $rc);
-            $this->assertSame(0, $rc, $label);
-            exec('flock -n '.escapeshellarg($lock).' true', $unused, $free);
-            $this->assertSame($label === 'closed' ? 0 : 1, $free, $label.': lock state after the watchdog shell exits');
+            $result = $this->pmssExecShellCommand('sh -c '.escapeshellarg('exec 9>>'.escapeshellarg($lock).'; flock -n 9 || exit 3; '.$launch), [], '');
+            $this->assertSame(0, $result['rc'], $label);
+            $result = $this->pmssExecShellCommand('flock -n '.escapeshellarg($lock).' true', [], '');
+            $this->assertSame($label === 'closed' ? 0 : 1, $result['rc'], $label.': lock state after the watchdog shell exits');
             $pid = (int) trim((string) @file_get_contents($pidFile));
             if ($pid > 1) posix_kill($pid, SIGKILL);
             usleep(100000);

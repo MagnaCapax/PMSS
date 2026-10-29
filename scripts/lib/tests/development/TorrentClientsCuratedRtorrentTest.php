@@ -66,9 +66,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             $binary = $store.'/rtorrent/0.9.8-r16/rtorrent';
             symlink(dirname($binary), $home.'/bin/rtorrent/default');
             $this->assertSame($binary, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
-            exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
-            $this->assertSame(0, $rc);
-            $this->assertSame(['selected-rtorrent'], $output);
+            $result = $this->pmssExecShellCommand(\pmssRtorrentExecutorCommand($home, $projection, $store), [], '');
+            $this->assertSame(0, $result['rc']);
+            $this->assertSame(['selected-rtorrent'], $result['lines']);
             $this->assertFalse(is_link($store.'/rtorrent/default'));
             unlink($binary);
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $projection));
@@ -171,9 +171,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         file_put_contents($home.'/.rtorrent.rc.custom', "network.http.cacert.set = /custom/ca.pem\n");
         foreach (['0.16.25', '0.16.26', '0.9.8-r16', '0.9.8-stickz7.2'] as $version) {
             symlink($store.'/rtorrent/'.$version, $home.'/bin/rtorrent/default');
-            $output = [];
-            exec(\pmssRtorrentExecutorCommand($home, $projection, $store), $output, $rc);
-            $this->assertSame([0, ['-O|'.$caDefault.'|'.(strpos($version, '0.16.') === 0 ? '-D|' : '')]], [$rc, $output]);
+            $result = $this->pmssExecShellCommand(\pmssRtorrentExecutorCommand($home, $projection, $store), [], '');
+            $this->assertSame([0, ['-O|'.$caDefault.'|'.(strpos($version, '0.16.') === 0 ? '-D|' : '')]], [$result['rc'], $result['lines']]);
             $this->assertSame("try_import = .rtorrent.rc.custom\n", file_get_contents($home.'/.rtorrent.rc'));
             $this->assertSame("network.http.cacert.set = /custom/ca.pem\n", file_get_contents($home.'/.rtorrent.rc.custom'));
             unlink($home.'/bin/rtorrent/default');

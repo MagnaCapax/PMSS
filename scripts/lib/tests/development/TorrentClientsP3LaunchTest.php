@@ -161,10 +161,8 @@ final class TorrentClientsP3LaunchTest extends TestCase
         try {
             $this->assertFalse(\pmssTransmissionLaunch($home, $ops));
             $this->assertSame($entry['ino'], lstat($socket)['ino']);
-            $output = [];
-            $rc = 0;
-            exec('flock -n '.escapeshellarg($home.'/.config/transmission-daemon/.pmss-launch.lock').' true', $output, $rc);
-            $this->assertSame(1, $rc);
+            $this->assertSame(1, $this->pmssExecShellCommand(
+                'flock -n '.escapeshellarg($home.'/.config/transmission-daemon/.pmss-launch.lock').' true', [], '')['rc']);
         } finally {
             $pid = (int) file_get_contents($pidFile);
             if ($pid > 0) posix_kill($pid, 15);

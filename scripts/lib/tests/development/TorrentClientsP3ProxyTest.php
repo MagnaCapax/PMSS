@@ -59,9 +59,7 @@ final class TorrentClientsP3ProxyTest extends TestCase
             .'server.port = 30000' . "\n".$match[0]."\n";
         $path = $root.'/lighttpd.conf';
         file_put_contents($path, $config);
-        $output = [];
-        $rc = 1;
-        exec(escapeshellarg($binary).' -t -f '.escapeshellarg($path).' 2>&1', $output, $rc);
-        $this->assertSame(0, $rc, implode("\n", $output));
+        $result = $this->pmssExecShellCommand(escapeshellarg($binary).' -t -f '.escapeshellarg($path));
+        $this->assertSame(0, $result['rc'], $result['output']);
     }
 }
