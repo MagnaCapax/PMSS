@@ -99,6 +99,9 @@ alias.url += (
 # Match /webdav-<user> exactly OR /webdav-<user>/* (end-of-string anchor or slash).
 # The ($|/) alternation ensures we don't match /webdav-<user>foo or similar.
 $HTTP["url"] =~ "^/webdav-##username($|/)" {
+    # The global ( "~", ".inc" ) list does not apply to WebDAV; only the
+    # conditions below refuse paths here.
+    url.access-deny = ( )
     webdav.activate = "enable"
     webdav.sqlite-db-name = "/home/##username/.lighttpd/webdav.lock.db"
     dir-listing.activate = "disable"
@@ -107,12 +110,13 @@ $HTTP["url"] =~ "^/webdav-##username($|/)" {
     # breaking runtimes by editing internal config/state). url.access-deny only
     # matches the end of the path, so the dot segment is matched by condition.
     # COPY and MOVE name their target in the Destination header, which the URL
-    # condition never sees; that header is not decoded, so encoded "." "/" and
-    # "w" (no client needs to encode them) are refused as well.
+    # condition never sees. The header is matched as sent, so spellings of a
+    # path that no client needs are refused as well.
+    # $REQUEST_HEADER conditions need lighttpd 1.4.46 or newer.
     $HTTP["url"] =~ "/\." {
         url.access-deny = ( "" )
     }
-    $REQUEST_HEADER["Destination"] =~ "/\.|%(2[eEfF]|77)" {
+    $REQUEST_HEADER["Destination"] =~ "/\.|(^|[^:])//|%(2[d-fD-F]|3[0-9]|6[1-9a-fA-F]|7[0-9aA])" {
         url.access-deny = ( "" )
     }
 }

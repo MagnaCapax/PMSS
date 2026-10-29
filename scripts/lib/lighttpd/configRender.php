@@ -37,7 +37,7 @@ function pmssWebdavWwwPolicyBlock(string $user): string
     webdav.is-readonly = "%s"
 }
 LIGHTTPD;
-    if (file_exists("/home/{$user}/.lighttpd/webdav.www-writable")) {
+    if (file_exists(pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home')."/{$user}/.lighttpd/webdav.www-writable")) {
         return sprintf($policy, 'disable');
     }
 
@@ -48,7 +48,7 @@ LIGHTTPD;
 \$HTTP["url"] =~ "^/webdav-{$user}/www/public(\$|/)" {
     webdav.is-readonly = "disable"
 }
-\$REQUEST_HEADER["Destination"] =~ "/webdav-{$user}/www(\$|/(?!public(\$|/)))" {
+\$REQUEST_HEADER["Destination"] =~ "/webdav-{$user}/www(\$|[?]|/(?!public(\$|[?/])))" {
     url.access-deny = ( "" )
 }
 LIGHTTPD;

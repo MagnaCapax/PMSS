@@ -53,6 +53,72 @@ class WebdavSecurityTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-webdav-test', 0700]; }
 
+    /** Render testuser's lighttpd config; homes resolve under the test's temp dir. */
+    private function renderUserConfig(bool $wwwWritable = false): string
+    {
+        if ($wwwWritable) {
+            mkdir($this->tempDir.'/testuser/.lighttpd', 0700, true);
+            touch($this->tempDir.'/testuser/.lighttpd/webdav.www-writable');
+        }
+        $rendered = '';
+        $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir], function () use (&$rendered): void {
+            $rendered = \pmssLighttpdRenderUserConfig($this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd'),
+                'testuser', 31234, 0, 0, ['maxProcs' => 2, 'children' => 6], [], false);
+        });
+        return $rendered;
+    }
+
+    /** The ^/webdav-testuser($|/) block of a rendered config, nested blocks included. */
+    private function webdavBlock(string $config): string
+    {
+        $start = strpos($config, '$HTTP["url"] =~ "^/webdav-testuser($|/)" {');
+        $this->assertTrue($start !== false, 'rendered config has the WebDAV block');
+        for ($i = (int) $start, $depth = 0, $n = strlen($config); $i < $n; $i++) {
+            if ($config[$i] === '{') {
+                $depth++;
+            } elseif ($config[$i] === '}' && --$depth === 0) {
+                return substr($config, (int) $start, $i - (int) $start + 1);
+            }
+        }
+        $this->fail('WebDAV block is not closed');
+        return '';
+    }
+
+    /** PCRE patterns of the $<field> conditions in $config whose body denies every path. */
+    private function denyPatterns(string $config, string $field): array
+    {
+        preg_match_all('/\$'.preg_quote($field, '/').' =~ "((?:[^"\\\\]|\\\\.)*)" \{\s*url\.access-deny = \( "" \)\s*\}/',
+            $config, $matches);
+        return array_map(static function (string $pattern): string {
+            return '#'.str_replace(['\\"', '#'], ['"', '\\#'], $pattern).'#';
+        }, $matches[1]);
+    }
+
+    /** True when any of the patterns matches the subject. */
+    private function anyMatches(array $patterns, string $subject): bool
+    {
+        foreach ($patterns as $pattern) {
+            $result = preg_match($pattern, $subject);
+            $this->assertTrue($result !== false, 'pattern compiles: '.$pattern);
+            if ($result === 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Assert which subjects the patterns refuse and which they let through. */
+    private function assertDenies(array $patterns, array $denied, array $allowed): void
+    {
+        $this->assertTrue($patterns !== [], 'deny patterns found in the rendered config');
+        foreach ($denied as $subject) {
+            $this->assertTrue($this->anyMatches($patterns, $subject), 'refused: '.$subject);
+        }
+        foreach ($allowed as $subject) {
+            $this->assertFalse($this->anyMatches($patterns, $subject), 'allowed: '.$subject);
+        }
+    }
+
     // =========================================================================
     // SECTION 1: USERNAME VALIDATION
     // =========================================================================
@@ -155,30 +221,87 @@ class WebdavSecurityTest extends TestCase
      */
     public function testDotfileDenyIsAUrlCondition(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
-        $this->assertStringContainsString("\$HTTP[\"url\"] =~ \"/\\.\" {\n        url.access-deny = ( \"\" )", $template);
-        $this->assertStringNotContainsString('url.access-deny = ( "/." )', $template);
+        $rendered = $this->renderUserConfig();
+        $this->assertStringNotContainsString('url.access-deny = ( "/." )', $rendered);
+
+        // Subjects are request paths as lighttpd matches them: decoded, dot segments resolved.
+        $this->assertDenies($this->denyPatterns($this->webdavBlock($rendered), 'HTTP["url"]'), [
+            '/webdav-testuser/.bashrc',
+            '/webdav-testuser/.ssh/authorized_keys',
+            '/webdav-testuser/dir/.hidden/file.txt',
+            '/webdav-testuser/.lighttpd/',
+        ], [
+            '/webdav-testuser/',
+            '/webdav-testuser/dir/file.txt',
+            '/webdav-testuser/www/public/a.b.txt',
+            '/webdav-testuser/file~',
+        ]);
+    }
+
+    /**
+     * TEST 7b: WebDAV keeps the global deny list out of its scope
+     *
+     * HARDENS: the old ( "/." ) assignment replaced the global ( "~", ".inc" )
+     * list inside WebDAV; the explicit empty list keeps that behaviour.
+     */
+    public function testWebdavBlockClearsTheGlobalDenyList(): void
+    {
+        $rendered = $this->renderUserConfig();
+        $this->assertStringContainsString('url.access-deny            = ( "~", ".inc" )', $rendered);
+        $this->assertOrderedStrings(
+            ['url.access-deny = ( )', '$HTTP["url"] =~ "/\\."', '$REQUEST_HEADER["Destination"]'],
+            $this->webdavBlock($rendered),
+            '', 'WebDAV clears the deny list before its own conditions: '
+        );
     }
 
     /**
      * TEST 8: COPY and MOVE targets are checked for dot segments
      *
      * HARDENS: the Destination header is not part of the request URL, so a
-     * COPY onto ~/.bashrc passed a URL-only rule. The header is not decoded
-     * before matching, so encoded ".", "/" and "w" are refused outright.
+     * COPY onto ~/.bashrc passed a URL-only rule. The header is matched as
+     * sent, so encoded dots and slashes are refused as well.
      */
     public function testDestinationHeaderDotSegmentsAreDenied(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
-        $this->assertStringContainsString('$REQUEST_HEADER["Destination"] =~ "/\\.|%(2[eEfF]|77)"', $template);
+        // Subjects are Destination headers as sent: not decoded, not simplified.
+        $this->assertDenies($this->denyPatterns($this->webdavBlock($this->renderUserConfig()), 'REQUEST_HEADER["Destination"]'), [
+            '/webdav-testuser/.bashrc',
+            'https://host.example/webdav-testuser/.ssh/authorized_keys',
+            '/webdav-testuser/%2ebashrc',
+            '/webdav-testuser/%2Essh/x',
+            '/webdav-testuser/dir%2F.bashrc',
+            '/webdav-testuser/dir/../.bashrc',
+        ], [
+            '/webdav-testuser/dir/file.txt',
+            'https://host.example/webdav-testuser/dir/a%20b.txt',
+            '/webdav-testuser/dir/%C3%A4.txt',
+            '/webdav-testuser/a.b/c.txt',
+        ]);
+    }
 
-        $pattern = '#/\\.|%(2[eEfF]|77)#';
-        foreach (['/webdav-user/.bashrc', '/webdav-user/%2ebashrc', '/webdav-user/dir%2F.bashrc', '/webdav-user/%77ww/index.html', '/webdav-user/.ssh/x'] as $target) {
-            $this->assertSame(1, preg_match($pattern, $target), $target);
-        }
-        foreach (['/webdav-user/dir/file.txt', '/webdav-user/dir/a%20b.txt', '/webdav-user/www/public/x.txt'] as $target) {
-            $this->assertSame(0, preg_match($pattern, $target), $target);
-        }
+    /**
+     * TEST 8b: Destination spellings that resolve to another path are refused
+     *
+     * HARDENS: the header is matched as sent but resolved before use, so a
+     * spelling that changes on resolution must not slip past the rules.
+     */
+    public function testDestinationSpellingsThatResolveDifferentlyAreDenied(): void
+    {
+        $this->assertDenies($this->denyPatterns($this->webdavBlock($this->renderUserConfig()), 'REQUEST_HEADER["Destination"]'), [
+            '/webdav-testuser//www/index.html',
+            'https://host.example/webdav-testuser//dir/x',
+            '//webdav-testuser/dir/x',
+            '/w%65bdav-testuser/dir/x',
+            '/webdav%2dtestuser/dir/x',
+            '/webdav-t%65stuser/dir/x',
+            '/webdav-testuser/%77ww/index.html',
+            '/webdav-testuser/dir%31/x',
+        ], [
+            'https://host.example/webdav-testuser/dir/x',
+            'http://host.example/webdav-testuser/dir/x',
+            '/webdav-testuser/dir/%25.txt',
+        ]);
     }
 
     /**
@@ -196,8 +319,9 @@ class WebdavSecurityTest extends TestCase
             '%2e/'      => './',
         );
 
+        $patterns = $this->denyPatterns($this->webdavBlock($this->renderUserConfig()), 'HTTP["url"]');
         foreach ($encodedAttacks as $encoded => $decoded) {
-            $this->assertSame(1, preg_match('#/\\.#', '/'.$decoded), "Decoded '$encoded' -> '$decoded'");
+            $this->assertTrue($this->anyMatches($patterns, '/webdav-testuser/'.$decoded.'x'), "Decoded '$encoded' -> '$decoded'");
         }
     }
 
@@ -413,19 +537,49 @@ LIGHTTPD;
      */
     public function testReadOnlyWwwRefusesCopyAndMoveTargets(): void
     {
-        $policy = pmssWebdavWwwPolicyBlock('testuser');
-        $this->assertStringContainsString(
-            '$REQUEST_HEADER["Destination"] =~ "/webdav-testuser/www($|/(?!public($|/)))" {'."\n".'    url.access-deny = ( "" )',
-            $policy
-        );
+        $rendered = $this->renderUserConfig();
+        $this->assertStringContainsString('webdav.is-readonly = "enable"', $rendered);
 
-        $pattern = '#/webdav-testuser/www($|/(?!public($|/)))#';
-        foreach (['https://h/webdav-testuser/www/index.html', 'https://h/webdav-testuser/www', 'https://h/webdav-testuser/www/publicity.html'] as $target) {
-            $this->assertSame(1, preg_match($pattern, $target), $target);
-        }
-        foreach (['https://h/webdav-testuser/www/public/x.txt', 'https://h/webdav-testuser/www/public', 'https://h/webdav-testuser/wwwroot/x', 'https://h/webdav-testuser/dir/x'] as $target) {
-            $this->assertSame(0, preg_match($pattern, $target), $target);
-        }
+        // Every Destination rule in the config applies: the WebDAV block's and the policy's.
+        $this->assertDenies($this->denyPatterns($rendered, 'REQUEST_HEADER["Destination"]'), [
+            'https://host.example/webdav-testuser/www/index.html',
+            '/webdav-testuser/www',
+            '/webdav-testuser/www/',
+            '/webdav-testuser/www?x=1',
+            '/webdav-testuser/www/index.html?x=1',
+            '/webdav-testuser/www/publicity.html',
+            '/webdav-testuser/www/public#x',
+            '/webdav-testuser/www//index.html',
+            '/webdav-testuser//www/index.html',
+            '/webdav-%74estuser/www/index.html',
+            '/webdav-testuser/www/public/../index.html',
+        ], [
+            'https://host.example/webdav-testuser/www/public/x.txt',
+            '/webdav-testuser/www/public',
+            '/webdav-testuser/www/public/',
+            '/webdav-testuser/www/public?x=1',
+            'https://host.example/webdav-testuser/wwwroot/x',
+            '/webdav-testuser/dir/x',
+        ]);
+    }
+
+    /**
+     * TEST 19c: A writable www gets no Destination rule for www
+     *
+     * HARDENS: the webdav.www-writable opt-in must keep COPY and MOVE into www working.
+     */
+    public function testWritableWwwAllowsCopyAndMoveTargets(): void
+    {
+        $rendered = $this->renderUserConfig(true);
+        $this->assertStringContainsAndOmitsStrings(['webdav.is-readonly = "disable"'], ['webdav.is-readonly = "enable"'], $rendered);
+
+        $this->assertDenies($this->denyPatterns($rendered, 'REQUEST_HEADER["Destination"]'), [
+            '/webdav-testuser/www/.htaccess',
+        ], [
+            'https://host.example/webdav-testuser/www/index.html',
+            '/webdav-testuser/www',
+            '/webdav-testuser/www/public/x.txt',
+        ]);
     }
 
     // =========================================================================
@@ -542,7 +696,8 @@ LIGHTTPD;
         $markerPath = '/home/testuser/.lighttpd/webdav.www-writable';
 
         $this->assertStringContainsString('/.lighttpd/', $markerPath);
-        $this->assertSame(1, preg_match('#/\\.#', '/webdav-testuser/.lighttpd/webdav.www-writable'));
+        $patterns = $this->denyPatterns($this->webdavBlock($this->renderUserConfig()), 'HTTP["url"]');
+        $this->assertTrue($this->anyMatches($patterns, '/webdav-testuser/.lighttpd/webdav.www-writable'));
     }
 
     // =========================================================================
