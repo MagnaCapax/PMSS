@@ -15,8 +15,8 @@ function pmssSysctlMemorySettingsBuild(array $profile): array
     return [
         'vm.swappiness' => !$hasSwap ? '60' : ($fastSwap ? '100' : '10'),
         'vm.vfs_cache_pressure' => $fastSwap ? '2' : '50',
-        'vm.min_free_kbytes' => $hasSwap && $isVm ? '131072'
-            : (string) min($fastSwap ? 4194304 : 2097152, max(131072, $ramGb * ($fastSwap ? 10240 : 5120))),
+        // 1 GiB floor = the long-standing legacy 99-pmss.conf value (#221 baseline); RAM-scaled above it.
+        'vm.min_free_kbytes' => (string) min($fastSwap ? 4194304 : 2097152, max(1048576, $ramGb * ($fastSwap ? 10240 : 5120))),
         'vm.dirty_ratio' => $fastSwap ? '40' : '20',
         'vm.dirty_background_ratio' => $fastSwap ? '10' : '5',
         'vm.dirty_expire_centisecs' => '1500',

@@ -129,7 +129,7 @@ class SysctlBaselineTest extends TestCase
         $cases = [
             'vm' => [
                 ['PMSS_SYSCTL_IS_VM' => '1', 'PMSS_SYSCTL_HAS_SWAP' => '1', 'PMSS_SYSCTL_SWAP_IS_FAST' => '1'],
-                ['vm.swappiness = 10', 'vm.vfs_cache_pressure = 50', 'vm.min_free_kbytes = 131072', 'vm.dirty_ratio = 20'],
+                ['vm.swappiness = 10', 'vm.vfs_cache_pressure = 50', 'vm.min_free_kbytes = 1048576', 'vm.dirty_ratio = 20'],
             ],
             'noswap' => [
                 ['PMSS_SYSCTL_IS_VM' => '0', 'PMSS_SYSCTL_HAS_SWAP' => '0', 'PMSS_SYSCTL_SWAP_IS_FAST' => '0'],
@@ -149,10 +149,10 @@ class SysctlBaselineTest extends TestCase
         $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-proc-', 0700);
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
         $cases = [
-            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '4c187f796cc18d2db8fe56955a6fc217dd119a8ccb33d878db0f029c37edffaa'],
-            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], 'c5cc1ecee1ff795c8881b03ffabd0acf20f3d85dfb51a8a3f89da4c9956afce8'],
+            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '5535536214adc6cc48f00eaec8ba0e691cf6303d41c3ef66be992af7b26f9dfe'],
+            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], '9ea1b73ea0ef5123279a3e91812a5063d44ee52f9390d02f79cbead5980738cf'],
             'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], 'c3838b52e37d193d2e6740915c29e471d47ca89b4ed7da99ca479f6fad86a051'],
-            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '6165674bef1934011c6912bf0d64794add2f242ecf9d6eac67eeb86a2666a1a8'],
+            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '9ea1b73ea0ef5123279a3e91812a5063d44ee52f9390d02f79cbead5980738cf'],
         ];
 
         foreach ($cases as $label => [$profile, $expectedHash]) {
