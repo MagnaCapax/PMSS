@@ -39,7 +39,7 @@ function exec($command, &$output, &$rc) {
     $rc = 0;
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'WatchdogPatternFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'WatchdogPatternFixture', ['watchdogProcess.php']);
         $script .= <<<'PHP'
 $results = [];
 foreach ([['^demo', []], ["demo's", ['full' => true]], [' demo ', ['exact' => true]],

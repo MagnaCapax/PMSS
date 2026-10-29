@@ -363,7 +363,7 @@ PHP;
         // Catalog callbacks name global renderers even when bootstrap is namespaced.
         $script .= 'require_once '.var_export($this->pmssRepoPath('etc/skel/www/toggleAppRuntime.php'), true).';';
         $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/www/toggleAppRuntime.php', 'ToggleRegenerationFixture');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'ToggleRegenerationFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'ToggleRegenerationFixture', ['watchdogPolicy.php']);
         $script .= '$root = '.var_export($root, true).';';
         $script .= <<<'PHP'
 putenv('PMSS_TEST_MODE=1');

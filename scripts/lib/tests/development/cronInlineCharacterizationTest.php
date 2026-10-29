@@ -69,12 +69,15 @@ class CronInlineCharacterizationTest extends TestCase
             'scripts/lib/user/serviceLaunch.php' => ['required' => ['function pmssBuildUserServiceShellCommand(', "'--scope'", "'--slice='.\$slice", "pmssBuildCommand('systemd-run'", "pmssBuildCommand('systemctl', ['start', \$slice])"]],
             'scripts/lib/user/watchdog.php' => ['required' => [
                 "pmssRequireRelativeFiles(__DIR__, ['log.php', 'selection.php', 'serviceLaunch.php']);",
-                'function pmssUserWatchdogLockAcquire(',
-                'function pmssUserWatchdogRestartProcessesIf(',
-                'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
+                "pmssRequireRelativeFiles(__DIR__, ['watchdogProcess.php', 'watchdogPolicy.php']);",
                 'function pmssUserWatchdogServiceSpec(',
                 'function pmssUserWatchdogEnsureServices(',
                 'function pmssUserWatchdogRunService(',
+            ]],
+            'scripts/lib/user/watchdogProcess.php' => ['required' => [
+                'function pmssUserWatchdogLockAcquire(',
+                'function pmssUserWatchdogRestartProcessesIf(',
+                'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
             ]],
         ]);
     }

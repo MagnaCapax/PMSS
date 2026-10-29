@@ -5,6 +5,8 @@ require_once dirname(__DIR__).'/runtime.php';
 require_once dirname(__DIR__).'/pathSafety.php';
 require_once __DIR__.'/identity.php';
 
+const PMSS_USER_WATCHDOG_SERVICE_PATTERN = '/^[a-z][a-z0-9-]{0,31}$/D';
+
 /** Tests shorten deadlines without changing production watchdog limits. */
 function pmssUserWatchdogTimeoutSeconds(int $seconds): int
 {
@@ -16,7 +18,7 @@ function pmssUserWatchdogTimeoutSeconds(int $seconds): int
 /** Keep state outside account homes; only simple service names become filenames. */
 function pmssUserWatchdogBackoffPath(string $username, string $service): ?string
 {
-    if (!pmssValidateUsername($username) || preg_match('/^[a-z][a-z0-9-]{0,31}$/D', $service) !== 1) return null;
+    if (!pmssValidateUsername($username) || preg_match(PMSS_USER_WATCHDOG_SERVICE_PATTERN, $service) !== 1) return null;
     $dir = pmssRuntimeDir();
     $root = !function_exists('posix_geteuid') || posix_geteuid() === 0;
     // Root never keeps state in an account-controlled tree; a non-root caller writes with its own UID.
