@@ -83,14 +83,14 @@ function pmssConfigureTorrentClientSwitchApply($home, $request, $ops = array())
     $start = $ops['start'] ?? static function ($home, $version) use ($ops): bool { return pmssConfigureTorrentClientStart($home, $version, $ops); };
     $restoreConfig = $ops['restore'] ?? static function ($home) use ($ops): bool { return pmssQbittorrentFrontendRestore($home, $ops); };
     $repoint = $ops['repoint'] ?? 'pmssConfigureTorrentClientRepoint';
+    error_clear_last();
     $snapshot = $backup($home);
     if (!is_array($snapshot) || empty($snapshot['ok'])) {
-        $detail = is_string($snapshot['message'] ?? null) ? $snapshot['message'] : 'Backup failed';
-        $message = 'Could not back up the current configuration: '.rtrim($detail, ". \r\n").'. Nothing was changed.';
-        pmssConfigureFileWrite($dir.'/qbittorrent.notice', $message."\n");
+        $refusal = pmssConfigureTorrentClientBackupRefusal($snapshot);
+        pmssConfigureFileWrite($dir.'/qbittorrent.notice', $refusal['message']."\n");
         flock($lock, LOCK_UN);
         fclose($lock);
-        return array('ok' => false, 'status' => 503, 'message' => $message);
+        return $refusal;
     }
     $stopped = $stop($home);
     $repointed = $stopped && $repoint($home, $version);

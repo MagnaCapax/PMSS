@@ -87,14 +87,14 @@ function pmssConfigureTorrentClientOtherSwitch($home, $request, $ops = array())
     $stop = $ops['stop'] ?? 'pmssConfigureTorrentClientOtherStop';
     $start = $ops['start'] ?? 'pmssConfigureTorrentClientOtherStart';
     $repoint = $ops['repoint'] ?? 'pmssConfigureTorrentClientOtherRepoint';
+    error_clear_last();
     $snapshot = $backup($home);
     if (!is_array($snapshot) || empty($snapshot['ok'])) {
-        $detail = is_string($snapshot['message'] ?? null) ? $snapshot['message'] : 'Backup failed';
-        $message = 'Could not back up the current configuration: '.rtrim($detail, ". \r\n").'. Nothing was changed.';
-        pmssConfigureFileWrite($dir.'/'.$client.'.notice', $message."\n");
+        $refusal = pmssConfigureTorrentClientBackupRefusal($snapshot);
+        pmssConfigureFileWrite($dir.'/'.$client.'.notice', $refusal['message']."\n");
         flock($lock, LOCK_UN);
         fclose($lock);
-        return array('ok' => false, 'status' => 503, 'message' => $message);
+        return $refusal;
     }
     $stopped = $stop($home, $client);
     $repointed = $stopped && $repoint($home, $client, $version);

@@ -76,14 +76,30 @@ function pmssConfigureTorrentClientMajorDowngrade($previous, $requested): bool
         || strlen($newMajor) === strlen($oldMajor) && strcmp($newMajor, $oldMajor) < 0;
 }
 
+/** True when this request's last failed filesystem call ran out of quota or disk space (never account stderr). */
+function pmssConfigureTorrentClientOutOfSpace()
+{
+    $error = error_get_last();
+    return is_array($error) && preg_match('/quota exceeded|no space left/i', (string) $error['message']) === 1;
+}
+
+/** The refusal for a failed pre-switch backup; a full account is told why. Callers clear the last error first. */
+function pmssConfigureTorrentClientBackupRefusal($snapshot)
+{
+    if (pmssConfigureTorrentClientOutOfSpace()) return array('ok' => false, 'status' => 507,
+        'message' => 'Your account is out of disk space, so the current configuration could not be backed up. Nothing was changed. Free some space and try again.');
+    $detail = is_array($snapshot) && is_string($snapshot['message'] ?? null) ? $snapshot['message'] : 'Backup failed';
+    return array('ok' => false, 'status' => 503,
+        'message' => 'Could not back up the current configuration: '.rtrim($detail, ". \r\n").'. Nothing was changed.');
+}
+
 /** Open one client's switch lock; a full account is told so instead of "unavailable" or "already running". */
 function pmssConfigureTorrentClientLockOpen($dir, $client, $label)
 {
     $full = array('ok' => false, 'status' => 507,
         'message' => 'Your account is out of disk space, so the switch could not start. Nothing was changed. Free some space and try again.');
     $failed = static function () use ($full) {
-        $error = error_get_last();
-        return is_array($error) && preg_match('/quota exceeded|no space left/i', (string) $error['message']) === 1
+        return pmssConfigureTorrentClientOutOfSpace()
             ? $full : array('ok' => false, 'status' => 503, 'message' => 'The switch lock is unavailable.');
     };
     error_clear_last();

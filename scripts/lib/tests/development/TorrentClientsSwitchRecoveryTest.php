@@ -86,6 +86,30 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
         }
     }
 
+    public function testBackupFailureOnAFullAccountSaysTheAccountIsOutOfDiskSpace(): void
+    {
+        foreach (['qbittorrent', 'rtorrent', 'deluge', 'transmission'] as $client) {
+            foreach (['mkdir(): Disk quota exceeded', 'fwrite(): No space left on device'] as $warning) {
+                $home = $this->pmssMakeTempDir('pmss-backup-full-');
+                $this->pmssEnsureDir($home.'/bin/'.$client);
+                $target = '/home/.pmss/clients/'.$client.'/4.1.3';
+                $this->pmssCreateSymlinkOrSkip($target, $home.'/bin/'.$client.'/default');
+                $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
+                $unexpected = static function (): void { throw new \RuntimeException('Backup failure changed the client'); };
+                // The backup fails the way the real one does at quota: a suppressed filesystem warning, then a false result.
+                $backup = static function () use ($warning): array { @trigger_error($warning, E_USER_WARNING); return ['ok' => false, 'message' => 'Could not create backup directory.']; };
+                $ops = ['versions' => ['4.2.0' => ['kind' => $client === 'deluge' ? 'venv' : 'static', 'rpcUnixSocket' => true]],
+                    'stop' => $unexpected, 'repoint' => $unexpected, 'start' => $unexpected, 'backup' => $backup,
+                ] + self::pmssMakeCallbacks(['resolve' => '/fixture/binary']);
+                $result = $this->apply($home, $client, '4.2.0', $ops);
+                $this->assertSame(507, $result['status'], $client);
+                $this->assertStringContainsString('out of disk space', $result['message']);
+                $this->assertStringContainsString('Nothing was changed.', $result['message']);
+                $this->assertSame($target, readlink($home.'/bin/'.$client.'/default'));
+            }
+        }
+    }
+
     public function testInvalidTransmissionStillCannotSelectSystem(): void
     {
         $home = $this->pmssMakeTempDir('pmss-invalid-transmission-');
