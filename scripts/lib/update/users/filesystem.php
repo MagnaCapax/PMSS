@@ -396,4 +396,9 @@ PHP;
         $relative = strpos($file, $skelBase.'/') === 0 ? substr($file, strlen($skelBase) + 1) : str_replace('/etc/skel/', '', $file);
         updateUserFile($relative, $user);
     }
+
+    [$delivered, $failed] = pmssUpdateUserRootStageCounts($user);
+    if ($delivered + $failed > 0) {
+        logMessage("[user:{$user}] Root-stage skeleton delivery summary: {$delivered} delivered, {$failed} failed");
+    }
 }

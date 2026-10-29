@@ -17,6 +17,7 @@ require_once __DIR__.'/rtorrentConfig.php';
 require_once __DIR__.'/rutorrent/config.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/user/directories.php';
+require_once __DIR__.'/update/users/rootStageDelivery.php';
 pmssRequireRelativeFiles(__DIR__, ['version.php', 'update/apt.php', 'update/osRelease.php']);
 
 /**
@@ -222,24 +223,41 @@ function updateUserFile($file, $user) {
  * @param string $sourceFile The source file path.
  * @param string $targetFile The target file path in the user's home directory.
  * @param string $user       The username for setting file ownership.
+ * @param array<string,callable> $ops Optional accountWrite, eligible, deliver and log seams.
  *
  * @return bool True when the file was copied into place.
  */
-function copyToUserSpace($sourceFile, $targetFile, $user) {
+function copyToUserSpace($sourceFile, $targetFile, $user, array $ops = []) {
+    $log = $ops['log'] ?? 'logMessage';
     $homeDir = pmssUpdateUserHomeDir((string) $user);
     if ($homeDir === '' || !pmssUpdateUserCandidatePathIsInsideHome($targetFile, $homeDir) || is_link($targetFile)) {
-        logMessage("[ERROR] Refusing to copy user file outside home for {$user}: {$targetFile}");
+        $log("[ERROR] Refusing to copy user file outside home for {$user}: {$targetFile}");
         return false;
     }
 
     if (!is_dir(dirname($targetFile))) {
-        logMessage("[user:{$user}] Failed to copy; parent directory missing: ".dirname($targetFile));
+        $log("[user:{$user}] Failed to copy; parent directory missing: ".dirname($targetFile));
         return false;
     }
     $content = pmssReadRegularFileContents((string) $sourceFile);
-    if ($content === null || !pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true)) {
-        logMessage("[user:{$user}] Failed to copy {$sourceFile} to {$targetFile}");
-        return false;
+    $accountWrite = $ops['accountWrite'] ?? 'pmssReplaceAccountFile';
+    if ($content !== null) {
+        if ($accountWrite((string) $user, $homeDir, $targetFile, $content, 0755, true)) return true;
+        $eligible = $ops['eligible'] ?? 'pmssUpdateUserRootStageEligible';
+        $reason = $eligible((string) $user, $homeDir, strlen($content));
+        if ($reason === 'root reserve low') {
+            $log("[user:{$user}] Root-stage delivery of {$targetFile} skipped: root reserve low");
+        } elseif ($reason !== null) {
+            $deliver = $ops['deliver'] ?? 'pmssUpdateUserRootStageDeliver';
+            $failure = null;
+            $delivered = $deliver((string) $user, $targetFile, $content, $failure);
+            pmssUpdateUserRootStageCounts((string) $user, $delivered);
+            $log($delivered
+                ? "[user:{$user}] Delivered {$targetFile} through the root stage ({$reason})"
+                : "[user:{$user}] Root-stage delivery of {$targetFile} failed: {$failure}");
+            return $delivered;
+        }
     }
-    return true;
+    $log("[user:{$user}] Failed to copy {$sourceFile} to {$targetFile}");
+    return false;
 }
