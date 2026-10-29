@@ -5,9 +5,7 @@ class PanelSessionGateSourceTest extends TestCase
 {
     public function testLuaGateSourcePreservesCookieOrBasicDecisionOrder(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/panelSessionGate.lua');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContract('scripts/lib/lighttpd/panelSessionGate.lua', ['required' => [
             'local COOKIE_NAME = "pmss_panel_session"',
             'local SESSION_FILE = "panel-session"',
             'local ABSOLUTE_LIFETIME = 28800',
@@ -18,8 +16,9 @@ class PanelSessionGateSourceTest extends TestCase
             'log_event(user, "basic", "delegated")',
             'lighty.header["Location"] = prefix .. "/" .. LOGIN_SCRIPT',
             'return 302',
-        ], $source);
-        $this->assertOrderedStrings([
+            "if authorization ~= \"\" then\n    log_event(user, \"basic\", \"delegated\")\n    return nil\nend",
+            "log_event(user, \"basic\", \"required\")\nreturn nil",
+        ], 'ordered' => [[
             'local session_id = cookie_value(request_header("Cookie"), COOKIE_NAME)',
             'if session_valid(session, session_id, now) then',
             'set_remote_user(user, "cookie")',
@@ -28,27 +27,16 @@ class PanelSessionGateSourceTest extends TestCase
             'if accepts_html() then',
             'return 302',
             'log_event(user, "basic", "required")',
-        ], $source);
-        $this->assertStringContainsString(
-            "if authorization ~= \"\" then\n    log_event(user, \"basic\", \"delegated\")\n    return nil\nend",
-            $source
-        );
-        $this->assertStringContainsString(
-            "log_event(user, \"basic\", \"required\")\nreturn nil",
-            $source
-        );
+        ]]]);
     }
 
     public function testLuaGateAllowsOnlyLoginAndLogoutPublicHandlersInsideUserZone(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/panelSessionGate.lua');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContract('scripts/lib/lighttpd/panelSessionGate.lua', ['required' => [
             'local LOGIN_SCRIPT = "panelSessionLogin.php"',
             'local LOGOUT_SCRIPT = "panelSessionLogout.php"',
             'relative == "/" .. LOGIN_SCRIPT or relative == "/" .. LOGOUT_SCRIPT',
             'set_remote_user(user, "login")',
-        ], $source);
-        $this->assertStringNotContainsString('/webdav-', $source, 'WebDAV must stay outside the Lua gate');
+        ], 'forbidden' => ['/webdav-' => 'WebDAV must stay outside the Lua gate']]);
     }
 }

@@ -17,9 +17,7 @@ final class TorrentClientsWatchdogLockHandoffTest extends TestCase
             'scripts/cron/checkDelugeInstances.php' => ['--launch deluged >/dev/null 2>&1) 9>&-', '--launch deluge-web >/dev/null 2>&1) 9>&-'],
             'scripts/cron/checkQbittorrentInstances.php' => ['--launch --held --system 9>&-', 'qbittorrent-nox -d 9>&-'],
         ] as $file => $needles) {
-            $source = $this->pmssReadRepoFile($file);
-            $this->assertStringContainsString('exec 9>>', $source, $file);
-            foreach ($needles as $needle) $this->assertStringContainsString($needle, $source, $file);
+            $this->pmssAssertRepoFileContainsAllStrings($file, array_fill_keys(array_merge(['exec 9>>'], $needles), $file));
         }
     }
 
