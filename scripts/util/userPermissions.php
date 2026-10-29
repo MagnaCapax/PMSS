@@ -28,6 +28,16 @@ if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
 $userIds = function_exists('pmssUserAccountLookup') ? pmssUserAccountLookup($thisUser) : null;
 if (!is_array($userIds)) die("No such user\n");
 
+// One pass per account at a time: rc.local's background sweep, update, transfer, recreate
+// and provisioning all run this script, and a concurrent pass re-sets the traffic files'
+// immutable flag between this pass's clear and chown (EPERM). Close-on-exec keeps the
+// descriptor out of the commands below; the handle is held until exit.
+$permissionsLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-userPermissions-'.$thisUser.'.lock'), false, 'ce');
+if ($permissionsLock === false) {
+    fwrite(STDERR, "Unable to lock permissions for {$thisUser}\n");
+    exit(1);
+}
+
 // Each repair acts on the object it checked (scripts/lib/user/permissionsApply.php):
 // modes change as the account or through an opened root-owned file, and owners change
 // with chown -h run by -execdir from a find that starts at the home.
