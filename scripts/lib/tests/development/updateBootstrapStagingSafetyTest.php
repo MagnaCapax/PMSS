@@ -9,25 +9,12 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
     {
         $tmpPrefix = rtrim(sys_get_temp_dir(), '/').'/pmss-update-';
 
-        foreach ([$tmpPrefix.'abc123', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123', '/etc/seedbox.pmss-staging-abc123', '/etc/seedbox.pmss-backup-abc123'] as $path) {
+        foreach ([$tmpPrefix.'abc123', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123', '/etc/seedbox.pmss-staging-abc123', '/etc/seedbox.pmss-backup-abc123', '/etc/skel.pmss-staging-abc123', '/etc/skel.pmss-backup-abc123'] as $path) {
             $this->assertTrue(pmssIsSafeUpdateRemovePath($path), 'expected safe generated removal path: '.$path);
         }
 
-        foreach (['', '/', '/home', '/scripts', '/etc/seedbox', $tmpPrefix, $tmpPrefix.'abc123/../escape', '/scripts.pmss-staging-', '/etc/seedbox.pmss-backup-'] as $path) {
+        foreach (['', '/', '/home', '/scripts', '/etc/seedbox', $tmpPrefix, $tmpPrefix.'abc123/../escape', '/scripts.pmss-staging-', '/etc/seedbox.pmss-backup-', '/etc/skel', '/etc/skel.pmss-staging-', '/etc/skel.pmss-backup-', '/etc/skel.pmss-staging-abc/../../home', '/etc/skelx.pmss-staging-abc123', '/etc/passwd'] as $path) {
             $this->assertFalse(pmssIsSafeUpdateRemovePath($path), 'expected unsafe removal path: '.$path);
-        }
-    }
-
-    public function testDirectoryClearGuardAcceptsOnlySkeletonAndGeneratedTempPaths(): void
-    {
-        $tmpPrefix = rtrim(sys_get_temp_dir(), '/').'/pmss-update-clear-';
-
-        foreach (['/etc/skel', $tmpPrefix.'abc123'] as $path) {
-            $this->assertTrue(pmssIsSafeDirectoryContentsClearPath($path), 'expected safe clear path: '.$path);
-        }
-
-        foreach (['', '/', '/etc', '/home', $tmpPrefix, $tmpPrefix.'abc123/../escape'] as $path) {
-            $this->assertFalse(pmssIsSafeDirectoryContentsClearPath($path), 'expected unsafe clear path: '.$path);
         }
     }
 
@@ -37,6 +24,7 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
 
         $this->assertTrue(pmssIsSafeAtomicSwapDirectoryPath('/scripts', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123'));
         $this->assertTrue(pmssIsSafeAtomicSwapDirectoryPath('/etc/seedbox', '/etc/seedbox.pmss-staging-abc123', '/etc/seedbox.pmss-backup-abc123'));
+        $this->assertTrue(pmssIsSafeAtomicSwapDirectoryPath('/etc/skel', '/etc/skel.pmss-staging-abc123', '/etc/skel.pmss-backup-abc123'));
         $this->assertTrue(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/backup'));
 
         $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123'));
@@ -44,6 +32,11 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/scripts', '/tmp/staging', '/scripts.pmss-backup-abc123'));
         $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/scripts', '/scripts.pmss-staging-abc123', '/tmp/backup'));
         $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/../backup'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/etc/skel', '/etc/seedbox.pmss-staging-abc123', '/etc/seedbox.pmss-backup-abc123'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/etc/skel', '/etc/skel.pmss-staging-', '/etc/skel.pmss-backup-abc123'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/etc/skel', '/etc/skel.pmss-staging-abc123', '/tmp/backup'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/etc', '/etc/skel.pmss-staging-abc123', '/etc/skel.pmss-backup-abc123'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/etc/passwd', '/etc/skel.pmss-staging-abc123', '/etc/skel.pmss-backup-abc123'));
     }
 
     public function testAtomicSwapGuardRejectsSymlinkedTarget(): void
@@ -124,34 +117,6 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         foreach (['', '/', '/scripts', '/etc/seedbox', $tempRoot.'/scripts', $tempRoot.'/scripts/../scripts'] as $path) {
             $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath($path), 'expected unsafe nested scripts path: '.$path);
         }
-    }
-
-    public function testClearDirectoryContentsRemovesEntriesWithoutFollowingSymlinks(): void
-    {
-        $root = $this->pmssMakeTempDir('pmss-update-clear-');
-        $outsideRoot = $this->pmssMakeTempDir('pmss-update-clear-outside-');
-        $outsideFile = $this->pmssWriteFile($outsideRoot.'/keep.txt', 'keep');
-
-        $this->pmssWriteFile($root.'/visible.txt', 'visible');
-        $this->pmssWriteFile($root.'/.hidden', 'hidden');
-        $this->pmssWriteFile($root.'/nested/child.txt', 'child');
-        $this->pmssCreateSymlinkOrSkip($outsideFile, $root.'/outside-link');
-
-        $error = null;
-        $this->assertTrue(pmssClearDirectoryContents($root, 'test tree', $error), (string) $error);
-
-        $this->assertTrue(is_dir($root), 'clear must leave the root directory in place');
-        $entries = array_values(array_diff(scandir($root) ?: [], ['.', '..']));
-        $this->assertSame([], $entries, 'clear must remove every child entry');
-        $this->assertTrue(is_file($outsideFile), 'clear must unlink symlinks without following them');
-    }
-
-    public function testClearDirectoryContentsRefusesUnsafePath(): void
-    {
-        $error = null;
-
-        $this->assertFalse(pmssClearDirectoryContents('/home', 'home tree', $error));
-        $this->assertStringContainsString('Refusing unsafe home tree clear path', (string) $error);
     }
 
     public function testRemoveFileRefusesDirectoriesAndUnlinksSymlinksOnly(): void

@@ -64,7 +64,7 @@ class UpdateSnapshotLifecycleTest extends TestCase
             $result['output'] = (string) file_get_contents($outputPath);
             $expected = '[DRY RUN] Would atomically swap /scripts from '.$root.'/scripts'."\n";
             $expected .= $state === 'populated'
-                ? '[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from '.$root.'/etc'."\n"
+                ? '[DRY RUN] Would atomically swap /etc/skel and /etc/seedbox and overlay other /etc files from '.$root.'/etc'."\n"
                     .'[DRY RUN] Would copy var from '.$root.'/var'."\n"
                 : "[WARN] Snapshot etc tree missing or empty, skipping copy\n[WARN] Snapshot var tree missing or empty, skipping copy\n";
             $this->assertSame(0, $result['rc'], $result['output']);
@@ -116,7 +116,10 @@ class UpdateSnapshotLifecycleTest extends TestCase
                     ['run', 'cp -a '.escapeshellarg($root.'/scripts')."/. '/scripts.pmss-staging-RUN'", 13],
                     ['publish', '/scripts', '/scripts.pmss-staging-RUN', '/scripts.pmss-backup-RUN', 'scripts'],
                     ['remove', '/scripts.pmss-backup-RUN', 'scripts backup'],
-                    ['clear', '/etc/skel', 'skeleton tree'],
+                    ['remove', '/etc/skel.pmss-staging-RUN', 'skel staging'],
+                    ['run', 'cp -a '.escapeshellarg($root.'/etc/skel')."/. '/etc/skel.pmss-staging-RUN'", 13],
+                    ['publish', '/etc/skel', '/etc/skel.pmss-staging-RUN', '/etc/skel.pmss-backup-RUN', 'skeleton tree'],
+                    ['remove', '/etc/skel.pmss-backup-RUN', 'skel backup'],
                 ];
                 if ($installed || $seedbox === 'populated') {
                     $expected[] = ['remove', '/etc/seedbox.pmss-staging-RUN', 'seedbox staging'];
@@ -129,7 +132,6 @@ class UpdateSnapshotLifecycleTest extends TestCase
                     $expected[] = ['publish', '/etc/seedbox', '/etc/seedbox.pmss-staging-RUN', '/etc/seedbox.pmss-backup-RUN', 'seedbox config'];
                     $expected[] = ['remove', '/etc/seedbox.pmss-backup-RUN', 'seedbox backup'];
                 }
-                $expected[] = ['run', 'cp -rpu '.escapeshellarg($root.'/etc/skel').' /etc', 13];
                 $expected[] = ['run', 'cp -a '.escapeshellarg($root.'/var').' /', 13];
                 $expected[] = ['run', 'chmod -R o-rwx /scripts /root /etc/skel /etc/seedbox', 13];
                 $expected[] = ['run', 'find /scripts -type f -name "*.php" -exec chmod 0750 {} +', 13];
@@ -138,6 +140,97 @@ class UpdateSnapshotLifecycleTest extends TestCase
                 $this->assertSame($expected, json_decode($trace, true), $result['output']);
             }
         }
+    }
+
+    public function testSkeletonSwapReplacesTreeAndSkipsOverlay(): void
+    {
+        [$root, $live] = $this->skeletonFixtureTrees(true);
+        $result = $this->runSkeletonStage($root, $live);
+
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertSame('new', (string) @file_get_contents($live.'/etc/skel/new.txt'));
+        $this->assertTrue(!file_exists($live.'/etc/skel/old.txt'), 'files removed from the snapshot skeleton must not survive');
+        $this->assertTrue(!file_exists($live.'/etc/skel/nested'), 'removed skeleton directories must not survive');
+        $this->assertSame([], glob($live.'/etc/skel.pmss-*') ?: [], 'staging and backup trees must be cleaned up');
+        $this->assertStringNotContainsString('cp -rpu', $result['output'], 'skel must not be overlaid after the swap');
+    }
+
+    public function testSkeletonStagingFailureLeavesInstalledTreeIntact(): void
+    {
+        [$root, $live] = $this->skeletonFixtureTrees(true);
+        $bin = $root.'/bin';
+        // Fail the staging copy half way: one file lands in staging, then cp exits non-zero.
+        $this->pmssWriteExecutableFile($bin.'/cp', '#!/bin/sh'."\n".'mkdir -p "$3" && echo partial > "$3/partial.txt"'."\n".'exit 1'."\n");
+        $result = $this->runSkeletonStage($root, $live, $this->pmssPathPrefixedEnvironment($bin));
+
+        $this->assertSame(13, $result['rc'], $result['output']);
+        $this->assertInstalledSkeletonUnchanged($live);
+    }
+
+    public function testFailedSkeletonRenameRestoresInstalledTree(): void
+    {
+        [$root, $live] = $this->skeletonFixtureTrees(true);
+        $result = $this->runSkeletonStage($root, $live, ['PMSS_SKEL_FAIL_RENAME' => '1']);
+
+        $this->assertSame(13, $result['rc'], $result['output']);
+        $this->assertStringContainsString('restored previous tree', $result['output']);
+        $this->assertInstalledSkeletonUnchanged($live);
+        $this->assertSame([], glob($live.'/etc/skel.pmss-backup-*') ?: [], 'backup must be renamed back into place');
+    }
+
+    public function testEmptySnapshotSkeletonDoesNotReplaceInstalledTree(): void
+    {
+        [$root, $live] = $this->skeletonFixtureTrees(false);
+        $result = $this->runSkeletonStage($root, $live);
+
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertStringContainsString('[WARN] Snapshot skel tree is empty, keeping installed /etc/skel', $result['output']);
+        $this->assertInstalledSkeletonUnchanged($live);
+    }
+
+    /** @return array{0: string, 1: string} snapshot root and relocated live root */
+    private function skeletonFixtureTrees(bool $populatedSnapshot): array
+    {
+        $root = $this->pmssMakeTempDir('pmss-snapshot-skel-');
+        $live = $this->pmssMakeTempDir('pmss-snapshot-skel-live-');
+        $this->pmssEnsureDir($root.'/etc/skel');
+        if ($populatedSnapshot) $this->pmssWriteFile($root.'/etc/skel/new.txt', 'new');
+        $this->pmssWriteFile($live.'/etc/skel/old.txt', 'old');
+        $this->pmssWriteFile($live.'/etc/skel/nested/keep.txt', 'keep');
+        return [$root, $live];
+    }
+
+    private function assertInstalledSkeletonUnchanged(string $live): void
+    {
+        $this->assertSame('old', (string) @file_get_contents($live.'/etc/skel/old.txt'), 'installed skeleton must stay intact');
+        $this->assertSame('keep', (string) @file_get_contents($live.'/etc/skel/nested/keep.txt'), 'installed skeleton must stay intact');
+        $this->assertTrue(!file_exists($live.'/etc/skel/new.txt'), 'snapshot files must not leak into the installed skeleton');
+        $this->assertTrue(!file_exists($live.'/etc/skel/partial.txt'), 'a partial staging copy must not leak into the installed skeleton');
+    }
+
+    /** Run the real etc staging with /etc/skel and /etc/seedbox relocated under $live. */
+    private function runSkeletonStage(string $root, string $live, array $environment = []): array
+    {
+        $source = preg_replace('/^#![^\n]*\n/', '', $this->pmssReadRepoFile('scripts/update.php'));
+        $source = str_replace("const JSON_LOG              = '/var/log/pmss-update.jsonl';",
+            'const JSON_LOG = '.var_export($root.'/events.jsonl', true).';', $source);
+        $source = str_replace('if (!function_exists(\'logmsg\')) {',
+            'function logmsg(string $message): void { echo $message."\\n"; } if (false) {', $source);
+        // Relocate the live trees and their allow-listed staging/backup names together.
+        $source = str_replace(["'/etc/skel", "'/etc/seedbox"], ["'".$live.'/etc/skel', "'".$live.'/etc/seedbox'], $source);
+        $source = str_replace('@rename(', '@skelFixtureRename(', $source);
+        $source .= <<<'PHP'
+
+function skelFixtureRename(string $from, string $to): bool {
+    if (getenv('PMSS_SKEL_FAIL_RENAME') === '1' && strpos($from, '/etc/skel.pmss-staging-') !== false) {
+        return false;
+    }
+    return rename($from, $to);
+}
+PHP;
+        $bootstrap = $this->pmssWriteFile($root.'/bootstrap.php', $source);
+        return $this->pmssExecInlinePhp('require '.var_export($bootstrap, true).'; pmssStageSnapshotEtc('
+            .var_export($root, true).', '.var_export($root.'/etc', true).', "abcd1234");', $environment);
     }
 
     /** Redirect bootstrap diagnostics into the fixture; do not invoke its CLI. */
@@ -151,7 +244,7 @@ class UpdateSnapshotLifecycleTest extends TestCase
         if ($recordPublication) {
             // Replace only mutation boundaries. Validation and orchestration run unchanged.
             foreach (['pmssRunBootstrapCommand', 'pmssRemoveTreeBestEffort', 'pmssAtomicSwapDirectory',
-                'pmssClearDirectoryContents', 'pmssEnsureDirectory', 'flattenScriptsLayout'] as $name) {
+                'pmssEnsureDirectory', 'flattenScriptsLayout'] as $name) {
                 $source = str_replace('function '.$name.'(', 'function snapshotUnused'.$name.'(', $source);
             }
             $source = str_replace('is_dir(', 'snapshotFixtureIsDir(', $source);
@@ -171,9 +264,6 @@ function pmssRemoveTreeBestEffort(string $path, string $label): void {
 }
 function pmssAtomicSwapDirectory(string $target, string $staging, string $backup, string $label): void {
     $GLOBALS['snapshotCalls'][] = ['publish', $target, $staging, $backup, $label];
-}
-function pmssClearDirectoryContents(string $path, string $label, ?string &$error = null): bool {
-    $GLOBALS['snapshotCalls'][] = ['clear', $path, $label]; return true;
 }
 function pmssEnsureDirectory(string $path, int $mode = 0755): void {
     $GLOBALS['snapshotCalls'][] = ['mkdir', $path, $mode];

@@ -836,6 +836,8 @@ function pmssIsSafeUpdateRemovePath(string $path): bool
             '/scripts.pmss-backup-',
             '/etc/seedbox.pmss-staging-',
             '/etc/seedbox.pmss-backup-',
+            '/etc/skel.pmss-staging-',
+            '/etc/skel.pmss-backup-',
         ]);
 }
 
@@ -868,6 +870,7 @@ function pmssIsSafeAtomicSwapDirectoryPath(string $target, string $staging, stri
     $allowedPairs = [
         '/scripts' => ['/scripts.pmss-staging-', '/scripts.pmss-backup-'],
         '/etc/seedbox' => ['/etc/seedbox.pmss-staging-', '/etc/seedbox.pmss-backup-'],
+        '/etc/skel' => ['/etc/skel.pmss-staging-', '/etc/skel.pmss-backup-'],
     ];
     if (isset($allowedPairs[$target])) {
         [$stagingPrefix, $backupPrefix] = $allowedPairs[$target];
@@ -925,24 +928,6 @@ function pmssRemoveFileFatal(string $path, string $label): void
     if (!pmssRemoveFile($path, $label, $error)) {
         fatal($error ?? "Failed to remove {$label}: {$path}", EXIT_COPY);
     }
-}
-
-/**
- * Allow content-clears only for the live skeleton tree or hermetic test fixtures.
- */
-function pmssIsSafeDirectoryContentsClearPath(string $path): bool
-{
-    $path = rtrim($path, '/');
-    if (pmssBootstrapPathLooksUnsafe($path)) {
-        return false;
-    }
-    if ($path === '/etc/skel') {
-        return true;
-    }
-
-    $tempRoot = rtrim(sys_get_temp_dir(), '/').'/';
-    return strpos($path, $tempRoot) === 0
-        && pmssBootstrapPathHasGeneratedPrefix(basename($path), ['pmss-update-clear-']);
 }
 
 /**
@@ -1013,39 +998,6 @@ function pmssRemoveNestedScriptsLayout(string $path): bool
     logmsg('[WARN] Failed to remove nested scripts layout: '.($error ?? $path));
     logEvent('nested_scripts_remove_failed', ['path' => $path, 'error' => $error ?? 'unknown']);
     return false;
-}
-
-/**
- * Clear child entries while leaving the guarded root directory itself in place.
- */
-function pmssClearDirectoryContents(string $path, string $label, ?string &$error = null): bool
-{
-    $error = null;
-    $path = rtrim($path, '/');
-    if (!pmssIsSafeDirectoryContentsClearPath($path)) {
-        $error = "Refusing unsafe {$label} clear path: {$path}";
-        return false;
-    }
-    if (is_link($path) || !is_dir($path)) {
-        $error = "Refusing to clear missing or non-directory {$label}: {$path}";
-        return false;
-    }
-
-    $entries = @scandir($path);
-    if (!is_array($entries)) {
-        $error = "Unable to read {$label} before clearing: {$path}".pmssLastFilesystemError();
-        return false;
-    }
-    foreach ($entries as $entry) {
-        if ($entry === '.' || $entry === '..') {
-            continue;
-        }
-        if (!pmssRemoveFilesystemEntry($path.'/'.$entry, $error)) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 /**
@@ -1459,9 +1411,9 @@ function pmssStageSnapshotDirectory(string $source, string $target, string $runI
  * Stage snapshot trees into place.
  *
  * Copies `scripts/`, `etc/`, and `var/` from `$tmp` into the live filesystem.
- * Wipes previous `/scripts/*`, clears `/etc/skel/*` when snapshot contains a
- * skel tree, and hardens permissions. When `$dryRun` is true, only logs planned
- * actions. Fatal on copy/permission failures.
+ * Replaces `/scripts` and, when the snapshot carries one, `/etc/skel` through
+ * staged atomic swaps, and hardens permissions. When `$dryRun` is true, only
+ * logs planned actions. Fatal on copy/permission failures.
  */
 function stageSnapshot(string $tmp, bool $dryRun): void
 {
@@ -1472,7 +1424,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
     // Preserve tree order and validate before either logging a dry run or publishing.
     foreach ([
         'scripts' => '[DRY RUN] Would atomically swap /scripts from ',
-        'etc' => '[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from ',
+        'etc' => '[DRY RUN] Would atomically swap /etc/skel and /etc/seedbox and overlay other /etc files from ',
         'var' => '[DRY RUN] Would copy var from ',
     ] as $tree => $dryRunMessage) {
         if (!pmssSnapshotTreePresent($tmp, $tree)) continue;
@@ -1495,20 +1447,22 @@ function stageSnapshot(string $tmp, bool $dryRun): void
     flattenScriptsLayout();
 }
 
-/** Clear delivered skeleton files, merge seedbox config, then overlay other etc entries. */
+/** Swap in the delivered skeleton, merge seedbox config, then overlay other etc entries. */
 function pmssStageSnapshotEtc(string $tmp, string $etcSource, string $runId): void
 {
+    // Replace /etc/skel whole: stage a complete copy and swap it in, so the live
+    // skeleton is always the old tree or the new one, never emptied or half-copied.
     $skelSource = $etcSource.'/skel';
     if (file_exists($skelSource) || is_link($skelSource)) {
         $error = null;
         if (!pmssIsSafeSnapshotPath($tmp, $skelSource, 'directory', $error)) {
             fatal("Unsafe snapshot skel tree: ".($error ?? $skelSource), EXIT_COPY);
         }
-    }
-    if (is_dir($skelSource) && is_dir('/etc/skel')) {
-        $error = null;
-        if (!pmssClearDirectoryContents('/etc/skel', 'skeleton tree', $error)) {
-            fatal($error ?? 'Unable to clear skeleton tree: /etc/skel', EXIT_COPY);
+        if (directoryHasContent($skelSource) || !is_dir('/etc/skel')) {
+            pmssStageSnapshotDirectory($skelSource, '/etc/skel', $runId, 'skeleton tree');
+        } else {
+            logmsg('[WARN] Snapshot skel tree is empty, keeping installed /etc/skel');
+            logEvent('tree_skipped', ['tree' => 'etc/skel']);
         }
     }
 
@@ -1526,13 +1480,13 @@ function pmssStageSnapshotEtc(string $tmp, string $etcSource, string $runId): vo
         pmssStageSnapshotDirectory($haveSeedboxSnapshot ? $seedboxSource : '', '/etc/seedbox', $runId, 'seedbox config', true);
     }
 
-    // Overlay remaining /etc content (excluding seedbox) to preserve local edits.
+    // Overlay remaining /etc content (excluding skel and seedbox) to preserve local edits.
     $entries = @scandir($etcSource);
     if (!is_array($entries)) {
         fatal("Unable to read snapshot etc tree: {$etcSource}".pmssLastFilesystemError(), EXIT_COPY);
     }
     foreach ($entries as $entry) {
-        if ($entry === '.' || $entry === '..' || $entry === 'seedbox') {
+        if ($entry === '.' || $entry === '..' || $entry === 'skel' || $entry === 'seedbox') {
             continue;
         }
         $path = $etcSource.'/'.$entry;

@@ -7,9 +7,10 @@ heavyweight configuration work after the full repository is in place.
 The standalone bootstrap shares archive download/extraction and atomic directory
 publication internally (ADR 0158). Its ordered scripts/etc/var dispatcher
 validates each tree before dry-run reporting or publication. The etc phase
-retains skeleton clearing, installed seedbox-config merging and the remaining
-config overlay; permission repair follows all three trees. Characterization
-tests lock the command sequence, exit boundaries and dry-run output.
+swaps in the staged skeleton, merges the installed seedbox config and overlays
+the remaining config entries; permission repair follows all three trees.
+Characterization tests lock the command sequence, exit boundaries and dry-run
+output.
 
 ## Phase 1 – `scripts/update.php`
 
@@ -22,8 +23,11 @@ Responsibilities:
   `git/<branch>`) and allowed for pinned specs (`release:<tag>`,
   `git/<branch>:YYYY-MM-DD`).
 - Stage the snapshot by replacing `/scripts` and refreshing `/etc` and `/var`
-  trees. `/scripts` and `/etc/skel` are wiped before copying so stale files do
-  not survive.
+  trees. `/scripts` and `/etc/skel` are replaced, not merged, so stale files do
+  not survive: each is copied to a staging directory and renamed into place, so
+  an interrupted or failed update leaves the previous tree intact (a failed
+  final rename restores it). An empty snapshot skeleton never replaces the
+  installed one.
 - Record the selected version under `/etc/seedbox/config/version` and
   `version.meta`.
   `version` means the snapshot was staged; `version.completed` equal to it means
