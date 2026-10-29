@@ -8,6 +8,19 @@ class PathShellTargetSafetyTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-path-shell-target-']; }
 
+    public function testAbsolutePathRetainsItsLexicalPolicy(): void
+    {
+        // Absolute callers keep their edge-slash and control-byte policy around the shared relative check.
+        foreach ([['', false], ['/', false], ['//', false], ['/one', true], ['//one///', true],
+            ['/one/two/', true], ['/one//two', false], ['/one/./two', false], ['/one/../two', false],
+            ['/one/.../two', true], ["/one\ntwo", true], ["/one\rtwo", true], ["/one\0two", false]] as [$path, $safe]) {
+            $this->assertSame($safe, \pmssPathAbsoluteStringIsSafe($path), bin2hex($path));
+        }
+        $this->assertTrue(\pmssPathAbsoluteStringIsSafe('/', ['allowRoot' => true]));
+        $this->assertFalse(\pmssPathAbsoluteStringIsSafe('/one/', ['allowTrailingSlash' => false]));
+        $this->assertFalse(\pmssPathAbsoluteStringIsSafe("/one\ntwo", ['allowWhitespace' => false]));
+    }
+
     public function testShellTargetAcceptsExistingRegularFile(): void
     {
         $path = $this->tempDir.'/state.dat';

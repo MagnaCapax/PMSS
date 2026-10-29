@@ -400,6 +400,11 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Operator CLI, anchored permission paths and pinned archive validators reuse
+`pmssPathRelativeStringIsSafe()` for lexical components. Absolute-path framing,
+control-byte rules, archive types, prefixes and empty-component policies stay
+with each caller; the shared check performs no filesystem access.
+
 Source-contract fixtures use the existing repository assertion helpers for
 required and forbidden fragments. Keep each file's checks together so shared
 contract tables avoid duplicate reads and local assertion loops.

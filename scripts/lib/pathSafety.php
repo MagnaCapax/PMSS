@@ -79,13 +79,7 @@ function pmssPathAbsoluteStringIsSafe(string $path, array $options = []): bool
     }
     if ($path === '/') return $allowRoot;
 
-    foreach (explode('/', trim($path, '/')) as $segment) {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
-    }
-
-    return true;
+    return pmssPathRelativeStringIsSafe(trim($path, '/'), ['allowControlChars' => true]);
 }
 
 /**

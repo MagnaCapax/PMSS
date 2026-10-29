@@ -167,11 +167,7 @@ function pmssUserPermissionsAnchoredFind(string $home, string $target, bool $rec
     if (strpos($target, $home.'/') !== 0) {
         return null;
     }
-    foreach (explode('/', substr($target, strlen($home) + 1)) as $segment) {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return null;
-        }
-    }
+    if (!pmssPathRelativeStringIsSafe(substr($target, strlen($home) + 1), ['allowControlChars' => true])) return null;
 
     $pattern = static function (string $path, string $suffix = ''): string {
         return '-path '.escapeshellarg(addcslashes($path, '\\*?[]').$suffix);

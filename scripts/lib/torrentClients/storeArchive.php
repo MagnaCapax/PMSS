@@ -11,9 +11,7 @@ function pmssTorrentClientsStoreArchiveIsSafe(string $archive): bool
         if ($path === '' || $path[0] === '/'
             || preg_match('/\A[A-Za-z0-9._\/-]+\z/', $path) !== 1
             || !in_array($member['type'], ['-', 'd'], true)) return false;
-        foreach (explode('/', rtrim($path, '/')) as $part) {
-            if ($part === '' || $part === '.' || $part === '..') return false;
-        }
+        if (!pmssPathRelativeStringIsSafe(rtrim($path, '/'))) return false;
     }
     return true;
 }

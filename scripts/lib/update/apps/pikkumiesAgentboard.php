@@ -26,8 +26,7 @@ function pmssPikkumiesAgentboardArchiveMembersSafe(string $archive): bool
         if ($path !== 'agentboard' && $path !== 'dist' && $path !== 'dist/client'
             && strpos($path, 'dist/client/') !== 0) return false;
         if (preg_match('/[\x00-\x1f\x7f\\\\]/', $path) === 1
-            || in_array('..', explode('/', $path), true)
-            || in_array('.', explode('/', $path), true)) return false;
+            || !pmssPathRelativeStringIsSafe($path, ['allowEmptySegments' => true])) return false;
     }
     return true;
 }

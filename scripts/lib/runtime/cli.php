@@ -34,13 +34,7 @@ function pmssCliEntrypointRelativePathIsSafe(string $relativePath): bool
         return false;
     }
 
-    foreach (explode('/', $relativePath) as $segment) {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
-    }
-
-    return true;
+    return pmssPathRelativeStringIsSafe($relativePath);
 }
 
 function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, bool $rootRequired = false, array $argvAppend = []): void

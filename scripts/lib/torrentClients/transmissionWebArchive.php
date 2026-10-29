@@ -14,9 +14,7 @@ function pmssTorrentClientsTransmissionWebArchiveSafe(array $members): bool
             || !in_array($member['type'] ?? '', ['-', 'd'], true)
             || preg_match('~\Apublic_html/(?:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*/?)?\z~', $member['path']) !== 1) return false;
         $path = rtrim($member['path'], '/');
-        foreach (explode('/', $path) as $part) {
-            if ($part === '.' || $part === '..') return false;
-        }
+        if (!pmssPathRelativeStringIsSafe($path, ['allowEmptySegments' => true])) return false;
         if (isset($seen[$path]) || ($path === 'public_html' && $member['type'] !== 'd')
             || (substr($member['path'], -1) === '/' && $member['type'] !== 'd')) return false;
         $seen[$path] = true;
