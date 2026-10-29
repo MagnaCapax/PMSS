@@ -1278,8 +1278,6 @@ ucf						install
 udev						install
 uidmap						install
 unar						install
-unbound						install
-unbound-anchor					install
 unionfs-fuse					install
 unp						install
 unrar						install
