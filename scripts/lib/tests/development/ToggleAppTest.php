@@ -474,13 +474,15 @@ PHP;
 <?php
 $config = $argv[3] ?? '';
 file_put_contents(getenv('PMSS_TEST_QUI_LOG'), json_encode($argv)."\n", FILE_APPEND);
-file_put_contents(getenv('PMSS_TEST_QUI_STDIN'), stream_get_contents(STDIN));
+$password = stream_get_contents(STDIN);
+file_put_contents(getenv('PMSS_TEST_QUI_STDIN'), $password);
 if (getenv('PMSS_TEST_QUI_MODE') === 'fail') exit(2);
-if (getenv('PMSS_TEST_QUI_MODE') === 'exists' && $argv[1] === 'create-user') {
-    fwrite(STDERR, 'User account already exists. Only one user account is allowed.');
-    exit(1);
+if (in_array(getenv('PMSS_TEST_QUI_MODE'), array('exists', 'exists-zero', 'change-fail'), true) && $argv[1] === 'create-user') {
+    fwrite(getenv('PMSS_TEST_QUI_MODE') === 'exists' ? STDERR : STDOUT, 'User account already exists. Only one user account is allowed.');
+    exit(getenv('PMSS_TEST_QUI_MODE') === 'exists' ? 1 : 0);
 }
-file_put_contents($config.'/qui.db', 'account');
+if (getenv('PMSS_TEST_QUI_MODE') === 'change-fail') exit(2);
+file_put_contents($config.'/qui.db', hash('sha256', $password));
 PHP
         );
         chmod($fixture, 0700);
@@ -498,13 +500,43 @@ PHP
             $login = $home.'/.pmss/apps/qui.login';
             $this->assertSame(0600, fileperms($login) & 0777);
             $this->assertSame(explode("\n", trim(file_get_contents($login)))[1]."\n", file_get_contents($home.'/stdin'));
+            // A config mode repair keeps the existing database and must rotate its password too.
+            foreach (array('exists-zero', 'exists') as $cycle => $mode) {
+                $previousLogin = file_get_contents($login);
+                chmod($config, 0644);
+                clearstatcache();
+                putenv('PMSS_TEST_QUI_MODE='.$mode);
+                $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+                $credentials = file_get_contents($login);
+                $this->assertTrue($previousLogin !== $credentials);
+                $password = explode("\n", trim($credentials))[1]."\n";
+                $this->assertSame(hash('sha256', $password), file_get_contents($home.'/.config/qui/qui.db'));
+                $commands = array_map('json_decode', file($home.'/argv.log', FILE_IGNORE_NEW_LINES));
+                $this->assertSame(3 + 2 * $cycle, count($commands));
+                $this->assertSame(array('create-user', 'change-password'), array($commands[count($commands) - 2][1], $commands[count($commands) - 1][1]));
+                foreach ($commands as $command) $this->assertFalse(in_array(trim($password), $command, true));
+                $this->assertSame(0600, fileperms($login) & 0777);
+                $this->assertSame(0600, fileperms($config) & 0777);
+                $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+                $this->assertSame($credentials, file_get_contents($login));
+                $this->assertSame(count($commands), count(file($home.'/argv.log')));
+            }
             unlink($home.'/.config/qui/qui.db');
             putenv('PMSS_TEST_QUI_MODE=exists');
             $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
             $argv = file($home.'/argv.log', FILE_IGNORE_NEW_LINES);
-            $this->assertSame(3, count($argv));
-            $this->assertStringContainsString('change-password', $argv[2]);
+            $this->assertSame(7, count($argv));
+            $this->assertStringContainsString('change-password', $argv[6]);
             foreach ($argv as $line) $this->assertStringNotContainsString(explode("\n", trim(file_get_contents($login)))[1], $line);
+            putenv('PMSS_TEST_QUI_MODE=change-fail');
+            chmod($config, 0644);
+            clearstatcache();
+            $previousLogin = file_get_contents($login);
+            $previousDb = file_get_contents($home.'/.config/qui/qui.db');
+            $this->assertFalse(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $this->assertSame($previousLogin, file_get_contents($login));
+            $this->assertSame($previousDb, file_get_contents($home.'/.config/qui/qui.db'));
+            $this->assertFalse(is_file($home.'/.pmss/apps/qui.secured'));
             unlink($login);
             putenv('PMSS_TEST_QUI_MODE=fail');
             $this->assertFalse(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));

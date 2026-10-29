@@ -73,12 +73,11 @@ function pmssToggleAppQuiAccountCommand(string $binary, string $configDir, strin
     return array(proc_close($process) === 0, $output);
 }
 
-/** An existing database may already contain qui's single account; rotate it then. */
+/** qui reports an existing account with exit 0 too; rotate before publishing the login. */
 function pmssToggleAppQuiAccountSet(string $binary, string $configDir, string $user, string $password): bool
 {
     list($created, $output) = pmssToggleAppQuiAccountCommand($binary, $configDir, $user, $password, 'create-user');
-    if ($created) return true;
-    if (strpos($output, 'User account already exists. Only one user account is allowed.') === false) return false;
+    if (strpos($output, 'User account already exists. Only one user account is allowed.') === false) return $created;
     list($changed) = pmssToggleAppQuiAccountCommand($binary, $configDir, $user, $password, 'change-password');
     return $changed;
 }
