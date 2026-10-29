@@ -366,21 +366,50 @@ function pmssStopDisableMaskSeedboxSystemServices(): void
 }
 
 /**
- * Purge the unbound DNS resolver if its service is in failed state.
+ * Pure: whether `systemctl show unbound` output describes a failing resolver.
+ *
+ * "failed" counts, and so does a unit cycling through Restart=on-failure: it is
+ * "activating" or "inactive" between attempts, never "failed", while NRestarts
+ * climbs and Result is not "success" (Debian 10's unbound with a stale root trust
+ * anchor loops like this and takes DNS down with it).
+ */
+function pmssUnboundShowIndicatesFailure(string $show): bool
+{
+    $props = [];
+    foreach (explode("\n", $show) as $line) {
+        $pos = strpos($line, '=');
+        if ($pos !== false) {
+            $props[substr($line, 0, $pos)] = trim(substr($line, $pos + 1));
+        }
+    }
+    $state = $props['ActiveState'] ?? '';
+    if ($state === 'failed') {
+        return true;
+    }
+    return in_array($state, ['activating', 'inactive'], true)
+        && (int) ($props['NRestarts'] ?? '0') > 0
+        && ($props['Result'] ?? 'success') !== 'success';
+}
+
+/**
+ * Purge the unbound DNS resolver if its service is failing.
  *
  * Debian 11/12 servers may have unbound installed but failing because
- * external nameservers (1.1.1.1, 1.0.0.1) are configured instead. When
- * the service is in failed state, purge the package to eliminate noise
- * in systemd status and logs.
+ * external nameservers are configured instead, and a
+ * Debian 10 install from the old baseline loops on a stale root trust anchor.
+ * Purging the failing package removes its resolver registration.
  *
- * Only removes when the service is explicitly "failed" - not when it is
- * active, inactive, or not installed.
+ * Only removes a unit that is failed or restart-looping - not one that is
+ * active, cleanly stopped, or not installed.
  */
 function pmssPurgeFailedUnbound(): void
 {
     // Skip if systemd is not available (containers, very old systems)
-    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(), 'Checking unbound service status')
-        || pmssSystemdUnitState('is-active', 'unbound') !== 'failed') {
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(), 'Checking unbound service status')) {
+        return;
+    }
+    $show = (string) @shell_exec('systemctl show unbound -p ActiveState -p NRestarts -p Result 2>/dev/null');
+    if (!pmssUnboundShowIndicatesFailure($show)) {
         return;
     }
 
