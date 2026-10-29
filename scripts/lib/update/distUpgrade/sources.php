@@ -15,7 +15,15 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
         return;
     }
 
-    static $paths = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'];
+    // The target release's own template names the mirrors that still serve it (bullseye-security
+    // packages now live only on archive.debian.org), so it replaces sources.list when one ships.
+    // The rewrite below then covers only the lists the template does not own (#1119).
+    $paths = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'];
+    $template = pmssLoadRepoTemplate($to);
+    if ($template !== '' && pmssSafeWriteSources($template, ucfirst($to).' (dist-upgrade)')) {
+        logMessage(sprintf('Applied the %s apt template before the upgrade', $to));
+        $paths = ['/etc/apt/sources.list.d/*.list'];
+    }
     $sedExpressions = [
         sprintf("s/\\<%s\\>/%s/g", $from, $to),
         sprintf("s#%s/updates#%s-security#g", $to, $to),

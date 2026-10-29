@@ -178,4 +178,19 @@ class DistUpgradeHelpersTest extends TestCase
             $this->assertStringContainsAllStrings($needles, $output);
         }
     }
+
+    public function testRewriteAppliesTheTargetTemplateBeforeTheSedRewrites(): void
+    {
+        // #1119: the archive-to-live rewrite sent bullseye-security to a pool that no longer serves
+        // packages; the target's own template is applied to sources.list first instead.
+        $this->pmssAssertRepoFileMatches(
+            'scripts/lib/update/distUpgrade/sources.php',
+            '~\$template = pmssLoadRepoTemplate\(\$to\);\s*if \(\$template !== \'\' && pmssSafeWriteSources\(\$template,.*?\$paths = \[\'/etc/apt/sources\.list\.d/\*\.list\'\];.*?\$sedExpressions = \[~s'
+        );
+        $template = (string) file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.sources.bullseye');
+        $this->assertTrue(
+            strpos($template, 'archive.debian.org/debian-security bullseye-security') !== false,
+            'the bullseye template points bullseye-security at the archive'
+        );
+    }
 }
