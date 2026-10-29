@@ -62,7 +62,7 @@ class RuntimeTest extends TestCase
     public function testFilesystemFacadeAloneExportsAllResponsibilityGroups(): void
     {
         $script = 'require_once '.var_export(dirname(__DIR__, 2).'/runtime/filesystem.php', true).';';
-        $symbols = ['pmssDirectoryEntriesRead', 'pmssCreatePrivateTempFile', 'pmssStreamWriteAll',
+        $symbols = ['pmssDirectoryEntriesRead', 'pmssCreatePrivateTempFile', 'pmssStreamWriteAll', 'pmssSerializedArrayDecode',
             'pmssReadRegularFileContentsVerified', 'pmssReadSerializedArrayFile', 'pmssColonRecordFieldsLookup',
             'pmssProcMeminfoFieldsRead', 'pmssHostnameIsValid', 'pmssNetworkPortParseDigits'];
         $script .= 'echo json_encode(array_map("function_exists", '.var_export($symbols, true).'));';
@@ -143,10 +143,24 @@ PHP;
             $this->assertSame($case[3], \pmssReadRegularFileDigits($path));
             $this->assertSame($case[4], \pmssReadRegularFileInt($path, 99));
         }
-        foreach ([[], ['zero' => 0, 'false' => false], 'text', 0, null] as $value) {
-            file_put_contents($path, serialize($value));
+        foreach ([[], ['zero' => 0, 'false' => false, 'nested' => ['binary' => "a\0b"]], 'text', 0, null, false, 1.5, (object) ['field' => 'value']] as $value) {
+            $raw = serialize($value);
+            $this->assertSame(is_array($value) ? $value : null, \pmssSerializedArrayDecode($raw));
+            file_put_contents($path, $raw);
             $this->assertSame(is_array($value) ? $value : null, \pmssReadSerializedArrayFile($path));
         }
+    }
+
+    public function testSerializedArrayDecodePreservesLegacyPayloadRules(): void
+    {
+        foreach (['', 'invalid', 'a:1:{', 'a:1:{i:0;s:4:"cut";}', "\0".serialize([])] as $raw) {
+            $this->assertSame(null, \pmssSerializedArrayDecode($raw));
+        }
+        // Keep PHP's accepted trailing bytes and nested object placeholders unchanged.
+        $this->assertSame(['value' => null], \pmssSerializedArrayDecode(serialize(['value' => null])."\n"));
+        $decoded = \pmssSerializedArrayDecode(serialize(['object' => (object) ['field' => 'value']]));
+        $this->assertSame('__PHP_Incomplete_Class', get_class($decoded['object']));
+        $this->assertSame(['__PHP_Incomplete_Class_Name' => 'stdClass', 'field' => 'value'], (array) $decoded['object']);
     }
 
     public function testNumericFileReadersRejectNulWithoutChangingRawReads(): void

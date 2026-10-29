@@ -37,13 +37,10 @@ function pmssRegularFileRead(string $path, ?int $requiredUid = null, ?int $maxBy
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
 function pmssReadRegularFileNonEmptyLines(string $path): array { return pmssNonEmptyStrings(pmssTextLines(pmssReadRegularFileContents($path) ?? '')); }
 
-function pmssReadSerializedArrayFile(string $path): ?array
-{
-    $raw = pmssReadRegularFileContents($path);
-    if ($raw === null || $raw === '') return null;
-    $data = @unserialize($raw, ['allowed_classes' => false]);
-    return is_array($data) ? $data : null;
-}
+/** Decode legacy array payloads without instantiating serialized classes. */
+function pmssSerializedArrayDecode(string $raw): ?array { $data = @unserialize($raw, ['allowed_classes' => false]); return is_array($data) ? $data : null; }
+
+function pmssReadSerializedArrayFile(string $path): ?array { $raw = pmssReadRegularFileContents($path); return $raw === null || $raw === '' ? null : pmssSerializedArrayDecode($raw); }
 
 function pmssReadOptionalSerializedArrayFile(string $path, string $label = 'serialized array file'): array
 {

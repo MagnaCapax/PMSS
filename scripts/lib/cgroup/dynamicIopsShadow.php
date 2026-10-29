@@ -35,8 +35,7 @@ function pmssDynamicIopsHistory(string $path): iterable
     foreach ([$path.'.1', $path] as $file) {
         foreach (pmssDynamicIopsTailLines($file) as $line) {
             if (strlen($line) > 8192 || strpos($line, ' || ') !== 19) continue;
-            $row = @unserialize(substr($line, 23), ['allowed_classes' => false]);
-            if (is_array($row)) yield $row;
+            if (($row = pmssSerializedArrayDecode(substr($line, 23))) !== null) yield $row;
         }
     }
 }

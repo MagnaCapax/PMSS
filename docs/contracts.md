@@ -124,6 +124,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssSerializedArrayDecode()` decodes legacy serialized payloads with class
+  instantiation disabled and returns only arrays, or `null` for malformed and
+  non-array payloads. Regular-file reads and both serialized I/O history readers
+  share this decoder; file guards, record limits, timestamps and rotation order
+  stay with the callers. Nested object placeholders retain PHP's existing
+  incomplete-class representation.
+
 - `pmssRootStageFileWrite()` keeps its boolean result and accepts an optional
   sixth by-reference failure string. Success clears it; failure sets
   `stage=<step> rc=<status>`. PHP/pre-launch failures use `not-started`; publish

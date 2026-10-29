@@ -43,8 +43,8 @@ function pmssIoCeilingHistorySamples(string $path): iterable
                 if ($skip || strpos($line, ' || ') !== 19) {
                     continue;
                 }
-                $sample = @unserialize(substr($line, 23), ['allowed_classes' => false]);
-                if (!is_array($sample) || !is_int($sample['time'] ?? null)) {
+                $sample = pmssSerializedArrayDecode(substr($line, 23));
+                if ($sample === null || !is_int($sample['time'] ?? null)) {
                     continue;
                 }
                 // Never compute a percentile from a day cut by the byte budget.
