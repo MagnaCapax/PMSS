@@ -34,7 +34,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
             $status = $render('apps.php', array('query' => 'status=1', 'minBytes' => 100))['stdout'];
-            $this->assertTrue(is_array(json_decode($status, true)));
+            $this->pmssDecodeJsonArray($status);
             $this->assertStringContainsString('"apps"', $status);
         });
     }
@@ -105,8 +105,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $started = microtime(true);
             $result = $render('welcome.php', array('query' => 'credits=1', 'minBytes' => 10));
             $this->assertTrue(microtime(true) - $started < 15, 'The credits request must not wait for the page reads');
-            $credits = json_decode($result['stdout'], true);
-            $this->assertTrue(is_array($credits), 'The credits response must be JSON alone: '.substr($result['stdout'], 0, 120));
+            $credits = $this->pmssDecodeJsonArray($result['stdout'], 'The credits response must be JSON alone: '.substr($result['stdout'], 0, 120));
             $this->assertSame('ok', $credits['state']);
             $this->assertSame('900k', $credits['value']);
             $this->assertStringNotContainsString($key, $result['stdout']);

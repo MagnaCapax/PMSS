@@ -30,8 +30,7 @@ PHP;
         $source = sprintf($source, var_export(dirname(__DIR__, 2).'/update/services/systemd.php', true));
         $result = $this->pmssExecInlinePhp($source, [], '2>&1');
         $this->assertSame(0, $result['rc']);
-        $states = json_decode($result['output'], true);
-        $this->assertTrue(is_array($states), $result['output']);
+        $states = $this->pmssDecodeJsonArray($result['output'], $result['output']);
 
         $empty = ['commands' => [], 'descriptions' => [], 'logs' => []];
         $this->assertSame($empty, $states['enabled']);

@@ -43,3 +43,7 @@ fixtures use `pmssBuildArgvCommand()` for their literal portions; environment
 prefixes share `pmssBuildCommandEnvironmentPrefix()`. Keep redirections, working
 directories and environment removal at the caller. Run fixtures only on testing
 machines, never on the control host.
+
+Decode expected array payloads with `pmssDecodeJsonArray()` or read JSON fixture
+files with `pmssReadJsonArrayFile()`. These helpers retain the array assertion;
+keep payload checks and specific failure messages at the caller.

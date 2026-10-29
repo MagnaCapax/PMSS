@@ -11,8 +11,7 @@ class RtorrentThrottleInitTest extends TestCase
         $result = $this->runStartupHelper($fixture['script']);
 
         $this->assertSame(0, $result['rc'], $result['output']);
-        $observed = json_decode((string) file_get_contents($fixture['observed']), true);
-        $this->assertTrue(is_array($observed), 'Expected throttle helper observation');
+        $observed = $this->pmssReadJsonArrayFile($fixture['observed'], null, 'Expected throttle helper observation');
         $this->assertMatches('/^[a-z_][a-z0-9_-]{0,31}$/D', (string) ($observed['user'] ?? ''));
         $this->assertSame($fixture['php_root'], (string) ($observed['cwd'] ?? ''));
     }

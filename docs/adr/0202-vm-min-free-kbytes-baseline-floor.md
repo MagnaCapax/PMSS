@@ -1,7 +1,7 @@
 # ADR 0202: vm.min_free_kbytes keeps the 1 GiB baseline floor on every profile
 
 Date: 2026-10-29
-Category: system-prep
+Category: architecture
 
 ## Status
 

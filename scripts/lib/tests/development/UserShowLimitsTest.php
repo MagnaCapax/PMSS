@@ -108,13 +108,13 @@ final class UserShowLimitsTest extends TestCase
     {
         $o = $this->fixture();
         list(, $json) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits', '--json'), $o); });
-        $this->assertTrue(is_array(json_decode($json, true)));
-        $this->assertSame('11.10', $this->metric(json_decode($json, true), 'account', 'Debian version')['value']);
-        $this->assertSame('12.15', $this->metric(json_decode($json, true), 'account', 'PMSS version')['value']);
+        $data = $this->pmssDecodeJsonArray($json);
+        $this->assertSame('11.10', $this->metric($data, 'account', 'Debian version')['value']);
+        $this->assertSame('12.15', $this->metric($data, 'account', 'PMSS version')['value']);
         $this->assertTrue(strpos($json, '\\u001b') === false);
         list(, $jsonl) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits', '--jsonl'), $o); });
         foreach (explode("\n", trim($jsonl)) as $line) {
-            $metric = json_decode($line, true);
+            $metric = $this->pmssDecodeJsonArray($line);
             $this->assertSame(array('section', 'metric', 'value', 'limit', 'unit', 'percent', 'source'), array_keys($metric));
             if ($metric['metric'] === 'Debian version') $this->assertSame('11.10', $metric['value']);
         }

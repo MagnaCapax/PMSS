@@ -102,7 +102,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $this->assertSame(0, $result['rc'], $result['output']);
         $rows = file($log, FILE_IGNORE_NEW_LINES);
         $this->assertSame(3, count($rows));
-        $this->assertSame($detail, json_decode($rows[2], true)['detail']);
+        $this->assertSame($detail, $this->pmssDecodeJsonArray($rows[2])['detail']);
     }
 
     public function testConcurrentExplicitLogAppendsAreComplete(): void
@@ -116,8 +116,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $this->assertSame(12, count($rows));
         $ids = [];
         foreach ($rows as $row) {
-            $event = json_decode($row, true);
-            $this->assertTrue(is_array($event));
+            $event = $this->pmssDecodeJsonArray($row);
             $this->assertSame(14000, strlen($event['detail']));
             $ids[] = $event['correlationId'];
         }

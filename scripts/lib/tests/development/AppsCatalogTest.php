@@ -168,9 +168,8 @@ class AppsCatalogTest extends TestCase
             $this->assertSame(str_replace('apps.php?status=1', 'welcome.php?status=1', $appsSection[0]), $welcomeSection[0]);
             $this->assertSame(1, substr_count($welcomeSection[0], 'Restart all my services'));
 
-            $appsStatus = json_decode($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true);
-            $welcomeStatus = json_decode($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true);
-            $this->assertTrue(is_array($appsStatus) && is_array($welcomeStatus));
+            $appsStatus = $this->pmssDecodeJsonArray($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout']);
+            $welcomeStatus = $this->pmssDecodeJsonArray($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout']);
             $this->assertSame($appsStatus, $welcomeStatus);
             $this->assertSame('off', $appsStatus['apps']['jellyfin']['state']);
             $this->assertSame(true, $appsStatus['mediaAppControl']);
@@ -190,7 +189,7 @@ class AppsCatalogTest extends TestCase
             $this->pmssEnsureDir($home.'/bin/deluge');
             // The selection points at the own build; the store build may still be running from before.
             $this->pmssCreateSymlinkOrSkip('mybuild', $home.'/bin/qbittorrent/default');
-            [$qbittorrent, $deluge] = json_decode($render('qaBinaries.php', ['minBytes' => 10])['stdout'], true);
+            [$qbittorrent, $deluge] = $this->pmssDecodeJsonArray($render('qaBinaries.php', ['minBytes' => 10])['stdout']);
             foreach (['/usr/bin/qbittorrent-nox', $store, $own] as $binary) $this->assertTrue(in_array($binary, $qbittorrent, true), $binary);
             foreach (['/usr/bin/deluged', $deluged, dirname($deluged).'/deluge-web'] as $binary) $this->assertTrue(in_array($binary, $deluge, true), $binary);
         });
@@ -202,8 +201,8 @@ class AppsCatalogTest extends TestCase
             // Keep the real selection validator, replacing only its fixed store root in the copied tree.
             $path = $home.'/www/scriptsIncAppProcess.php';
             file_put_contents($path, str_replace('/home/.pmss/clients/', $home.'/store/', file_get_contents($path)));
-            $read = static function () use ($render): array {
-                return json_decode($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true)['apps'];
+            $read = function () use ($render): array {
+                return $this->pmssDecodeJsonArray($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'])['apps'];
             };
             $this->assertFalse(isset($read()['Transmission']));
             $this->pmssEnsureDir($home.'/bin/transmission');
@@ -253,7 +252,7 @@ class AppsCatalogTest extends TestCase
             $this->assertStringContainsString('Jellyfin', $html);
             $this->assertStringNotContainsString('data-action="stop"', $html);
             $this->assertStringNotContainsString('data-action="log"', $html);
-            $status = json_decode($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true);
+            $status = $this->pmssDecodeJsonArray($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout']);
             $this->assertSame(false, $status['mediaAppControl']);
             $this->assertSame(false, $status['canRestart']);
         });
@@ -419,8 +418,7 @@ class AppsCatalogTest extends TestCase
                 $this->assertStringNotContainsString('data-app=', $media);
                 $this->assertStringNotContainsString('data-action=', $media);
                 $this->assertStringNotContainsString('id="pmss-start-all"', $media);
-                $json = $render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'];
-                $status = json_decode($json, true);
+                $status = $this->pmssDecodeJsonArray($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout']);
                 $this->assertTrue($status['poll']);
                 $this->assertStringContainsString('Installing the media stack…', $status['mediaHtml']);
                 $this->assertFalse(isset($status['rows']['jellyfin']));
@@ -543,9 +541,7 @@ class AppsCatalogTest extends TestCase
         $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
             $this->pmssWriteFile($home.'/.jellyfinDisable', '');
-            $json = $render('apps.php', array('query' => 'status=1', 'minBytes' => 100))['stdout'];
-            $status = json_decode($json, true);
-            $this->assertTrue(is_array($status));
+            $status = $this->pmssDecodeJsonArray($render('apps.php', array('query' => 'status=1', 'minBytes' => 100))['stdout']);
             $this->assertSame('off', $status['apps']['jellyfin']['state']);
             $this->assertSame('running', $status['apps']['lighttpd']['state']);
             $this->assertStringContainsString('<span class="pill p-run">Running</span>', $status['rows']['lighttpd']);

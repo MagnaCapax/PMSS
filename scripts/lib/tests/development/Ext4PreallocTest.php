@@ -121,9 +121,7 @@ class Ext4PreallocTest extends TestCase
     {
         $json = $this->pmssRunShellHarness($this->preamble().$injection."\n".'pmss_ext4_prealloc_apply '
             .escapeshellarg($root.'/proc').' '.escapeshellarg($root.'/sys').' '.escapeshellarg($kernel)."\n");
-        $rows = json_decode($json, true);
-        $this->assertTrue(is_array($rows), 'invalid audit JSON: '.$json);
-        return $rows;
+        return $this->pmssDecodeJsonArray($json, 'invalid audit JSON: '.$json);
     }
 
     private function fixture(array $mounts): string
