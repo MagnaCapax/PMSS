@@ -48,7 +48,7 @@ install-openclaw status
 ```
 
 The installer asks for confirmation (`--yes` skips the prompt). It installs
-Node v24.21.0 and OpenClaw in your home, verifies the Node archive against
+Node v24.22.1 and OpenClaw in your home, verifies the Node archive against
 the pinned SHA256, configures a token-authenticated loopback gateway, and
 adds two marked jobs to your own crontab. It skips channel setup. On a fresh
 install, a nonempty key in your account-owned, mode-0600 `~/.virsilipasKey`
@@ -75,10 +75,11 @@ Tailscale Serve is an optional way to reach the same loopback service if you
 already use Tailscale. Do not make the gateway public or switch its bind away
 from loopback.
 
-The installer pins Node v24.21.0 from
-`https://nodejs.org/dist/v24.21.0/SHASUMS256.txt` (linux-x64 archive SHA256
-`fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6`).
-Its bundled npm 11.19.0 supports `--allow-scripts`; npm defaults to denying
+The installer pins Node v24.22.1 from
+`https://nodejs.org/dist/v24.22.1/SHASUMS256.txt` (linux-x64 archive SHA256
+`6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6`), the
+24.x security release for CVE-2026-111497 (Brotli decoder out-of-bounds write).
+Its bundled npm 11.19.1 supports `--allow-scripts`; npm defaults to denying
 install scripts outside the allowlist, so the installer permits the required
 `@google/genai`, `esbuild`, `koffi`, `protobufjs`, and `openclaw` scripts.
 OpenClaw onboarding uses non-interactive local mode, skips the daemon and
@@ -142,8 +143,10 @@ limit 1.25 times that, so an account holding little besides OpenClaw
 (about 55,000 files) can update on a plan of about 184 GiB or more; a smaller
 plan can run OpenClaw but `update` refuses until files are freed.
 
-The update holds the watchdog lock, stops the gateway,
-removes old `openclaw-update-runtime-*` directories directly under the private
+The update holds the watchdog lock, stops the gateway, replaces the private
+Node runtime when it is not the pinned version (download and SHA256 check
+first; a failure keeps the old runtime and restarts the gateway), removes
+old `openclaw-update-runtime-*` directories directly under the private
 `~/.local/share/openclaw/lib`, installs the current npm release, runs Doctor's
 non-interactive repair and migrations, and starts the gateway again. npm or
 Doctor failure still triggers a start attempt; inspect `~/.openclaw/logs`
