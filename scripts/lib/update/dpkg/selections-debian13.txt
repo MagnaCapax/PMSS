@@ -90,6 +90,7 @@ file						install
 findutils					install
 fio						install
 firmware-bnx2x					install
+firmware-realtek				install
 fontconfig					install
 fontconfig-config				install
 fonts-dejavu-core				install

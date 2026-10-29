@@ -115,6 +115,7 @@ firmware-bnx2	install
 firmware-bnx2x	install
 firmware-linux-free	install
 firmware-misc-nonfree	install
+firmware-realtek	install
 flac	install
 fontconfig	install
 fontconfig-config	install
