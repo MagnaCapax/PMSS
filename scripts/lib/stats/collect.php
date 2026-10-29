@@ -21,12 +21,11 @@ function pmssStatsReadQuotaSnapshot(string $home): array
     if ($raw === null || trim($raw) === '') return $result;
     $result['raw'] = $raw;
 
-    foreach (pmssQuotaSnapshotDataRows($raw, '/dev/') as $columns) {
+    if (($columns = pmssQuotaSnapshotDataRows($raw, '/dev/')[0] ?? null) !== null) {
         foreach (['used' => 1, 'soft' => 2, 'hard' => 3] as $key => $column) {
             $result[$key.'_text'] = $columns[$column];
             $result[$key.'_bytes'] = pmssParseSizeToBytes($columns[$column]);
         }
-        break;
     }
     return $result;
 }
@@ -86,9 +85,7 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
     try {
         foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
             // A malformed RPC value must not turn into a successful zero reading.
-            $number = pmssFiniteNonNegativeFloat($caller($socketPath, $method, [], 2));
-            if ($number === null) return $stats;
-            $stats[$key] = $number;
+            if (($stats[$key] = pmssFiniteNonNegativeFloat($caller($socketPath, $method, [], 2))) === null) return $stats;
         }
         $stats['ok'] = true;
         // Finite counters can still overflow during division; retain other RPC fields.

@@ -93,6 +93,13 @@ projections update their existing fields and accumulate into the returned model.
 Serialized field order, missing-data defaults, write ordering and diagnostics
 retain their contracts and existing snapshot coverage.
 
+Statistics projections select the first quota row directly, assign validated RPC
+fields in place, and share the traffic payload's acceptance guard. Host-pressure
+publication passes its payload directly to encoding; missing PSI and diskstats
+inputs use the existing parsers' unavailable results. Blkio fallback selects a
+zero throttle sample immediately only when BFQ is absent, preserving positive
+source precedence and BFQ's tie-breaking preference for idle samples.
+
 Storage benchmark dispatch keeps single-use options, commands and callbacks at
 their consumers. dd measurements return only after both fields validate; fio
 peer reporting shares one success guard. Command bytes, JSONL field order,

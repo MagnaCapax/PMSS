@@ -89,9 +89,7 @@ function pmssSystemStatsCpuIowaitPercent(array $before, array $after): string
 function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
 {
     $stats = [];
-    if ($raw === null) return $stats;
-
-    foreach (pmssTextLines($raw) as $line) {
+    foreach (pmssTextLines($raw ?? '') as $line) {
         // A malformed device row must not discard other devices in the snapshot.
         if (strpos($line, "\0") !== false || ($parts = pmssConfigLineColumns($line, 13, [])) === []) continue;
         $name = $parts[2];

@@ -34,9 +34,8 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
             continue;
         }
 
-        $data = pmssReadSerializedArrayFile($statsPath);
-        $rawCounters = $data === null ? null : pmssShowTrafficRawCounters($data);
-        if ($rawCounters === null) {
+        if (($data = pmssReadSerializedArrayFile($statsPath)) === null
+            || ($rawCounters = pmssShowTrafficRawCounters($data)) === null) {
             continue;
         }
 

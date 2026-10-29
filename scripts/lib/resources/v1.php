@@ -58,12 +58,10 @@ function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $
     $bfq = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$bfqFile);
     if ($bfq !== null && ($bfq['read'] > 0 || $bfq['write'] > 0)) return $bfq + ['source' => 'bfq'];
     $throttle = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$throttleFile);
-    if ($throttle !== null && ($throttle['read'] > 0 || $throttle['write'] > 0)) return $throttle + ['source' => 'throttle'];
+    if ($throttle !== null && ($bfq === null || $throttle['read'] > 0 || $throttle['write'] > 0)) return $throttle + ['source' => 'throttle'];
     // Both absent or genuinely zero: keep a stable source label from whichever file exists so
     // an idle user does not thrash io_source (which would force a spurious reseed each sample).
-    if ($bfq !== null) return $bfq + ['source' => 'bfq'];
-    if ($throttle !== null) return $throttle + ['source' => 'throttle'];
-    return null;
+    return $bfq === null ? null : $bfq + ['source' => 'bfq'];
 }
 
 /** Read requested v1 key/value counters once, retaining the first valid row per field. */

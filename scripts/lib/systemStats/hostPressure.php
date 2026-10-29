@@ -29,9 +29,7 @@ function pmssSystemStatsHostPressurePayloadBuild(array $stats, ?int $timestamp =
     return [
         'timestamp' => $timestamp ?? time(),
         // systemStats PSI order keeps full_avg300 at index 5.
-        'psi_io_full_avg300' => isset($psiFields[5])
-            ? pmssSystemStatsHostPressureMetricParse($psiFields[5])
-            : null,
+        'psi_io_full_avg300' => pmssSystemStatsHostPressureMetricParse($psiFields[5] ?? null),
         'ioping_home_ms' => pmssSystemStatsHostPressureMetricParse($stats['iopingHome'] ?? null, 'ms'),
     ];
 }
@@ -44,7 +42,6 @@ function pmssSystemStatsHostPressureSnapshotWrite(string $path, array $stats, ?i
     if (!pmssCheckDirectoriesEnsurePublicDirectory(dirname($path), static function (string $message): void {
         fwrite(STDERR, $message.PHP_EOL);
     }, $ownerUid, $ownerGid)) return false;
-    $payload = pmssSystemStatsHostPressurePayloadBuild($stats, $timestamp);
-    $json = pmssJsonEncodeSafe($payload, JSON_UNESCAPED_SLASHES);
+    $json = pmssJsonEncodeSafe(pmssSystemStatsHostPressurePayloadBuild($stats, $timestamp), JSON_UNESCAPED_SLASHES);
     return is_string($json) && pmssAtomicWriteFile($path, $json.PHP_EOL, 0644);
 }
