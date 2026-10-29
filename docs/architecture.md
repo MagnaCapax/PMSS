@@ -28,6 +28,12 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/update/services/systemd.php** retains the service include, cron
+  containment and shared restart-drop-in writer. Its `systemd/guard.php` module
+  owns disabled-service policy, boot activation and bounded Exim cleanup;
+  `timer.php` owns weekly TRIM, and `resolver.php` owns failed-Unbound diagnosis
+  and recovery. Includes only define helpers; callers retain execution order
+  and the existing fail-soft command path (ADR 0210).
 - **scripts/lib/lighttpd/watchdogSocketProbe.php** retains the socket-health include
   and connection API. `watchdogSocketListeners.php` owns live listener snapshots
   and restart verification; `watchdogSocketState.php` owns consecutive-failure

@@ -1,5 +1,12 @@
 # Refactoring Guidelines
 
+Systemd service maintenance retains its existing include and every public helper
+while separating disabled-service/boot policy, weekly TRIM and resolver recovery
+(ADR 0210). Optional masking uses a fixed action traversal, spool membership uses
+its original allowlist directly, and resolver rows split once at the first `=`.
+Timer skip diagnostics share one return path. Characterization cases retain exact
+state matching, last-property precedence, field bytes, quota boundaries and cleanup order.
+
 Lighttpd socket health retains its existing include and public helpers while
 separating connections, listener evidence, retry cadence, failure markers and
 the cron decision (ADR 0209). Connection and post-restart observations share one
