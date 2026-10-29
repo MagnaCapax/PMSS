@@ -30,6 +30,17 @@ function pmssTerminateUserClearPreinstallState(string $username, bool $dryRun, b
     return $status;
 }
 
+/** Retire a raced linger flag only after the account name is no longer assigned. */
+function pmssTerminateUserClearLinger(string $username, bool $dryRun): bool
+{
+    if (!pmssUsernameIsValid($username)) {
+        throw new \InvalidArgumentException('Refusing unsafe linger cleanup');
+    }
+    if (pmssUserAccountLookup($username) !== null) return false;
+    // The systemd directory is root-controlled; unlink only this exact entry, never its target.
+    return pmssTerminateUserUnlinkPath($username, 'remove_stale_linger', '/var/lib/systemd/linger/'.$username, $dryRun);
+}
+
 /** Return the final line, exit code, and audit status after every purge has run. */
 function pmssTerminateUserCompletion(string $username, array $paths, array $purgeResults, bool $dryRun, string $lingerRoot = '/var/lib/systemd/linger'): array
 {

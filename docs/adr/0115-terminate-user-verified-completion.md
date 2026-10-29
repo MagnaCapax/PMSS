@@ -20,6 +20,13 @@ Use the existing purge-step runner's labeled return codes and add an exact purge
 
 ## Consequences
 
+- Amended 2026-10-29 (#1219): before the read-only completion check, normal
+  termination and an ADR 0206 proven resume retire the exact linger entry through
+  the existing audited unlink helper, only while the account name remains absent.
+  Docker maintenance can recreate the flag between the initial disable and
+  `userdel`; direct unlink no longer needs a resolving account. Dry runs preserve
+  the flag, live accounts retain it, and failed removal leaves completion
+  incomplete. The resume proof and the final absence checks are unchanged.
 - Automation can distinguish completed termination from partial cleanup using the last line and exit code.
 - A failed purge step makes the result incomplete even if a later retry removed the path. Operators can inspect its lifecycle log; rerunning cleanup after `userdel` requires the leftover proof in [ADR 0206](0206-terminate-resumes-a-purge-after-userdel.md).
 - Amended 2026-10-20: the first removal of each path is excluded from that rule. It fails by design whenever immutable files remain, and PMSS itself writes `~/.trafficData*` and `~/.resourceData` immutable, so with it every account that had collected traffic stats reported `## Incomplete: remove_home_initial` after a full purge. The immutable clear and the leftover removal still count, every step must still have run, and the final path checks are unchanged.

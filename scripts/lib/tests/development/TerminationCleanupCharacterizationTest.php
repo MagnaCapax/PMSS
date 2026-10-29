@@ -6,6 +6,61 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Lock removal decisions and audit bytes without touching account paths or services. */
 class TerminationCleanupCharacterizationTest extends TestCase
 {
+    public function testRacedLingerCleanupPreservesLiveAccountsAndCompletionGuards(): void
+    {
+        $script = 'namespace TerminationLingerFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/user/terminationCleanup.php'), true).';';
+        $script .= <<<'PHP'
+function pmssUserAccountLookup($username) { return $GLOBALS['live'] ? ['uid' => 1000] : null; }
+function pmssPathExistsOrLink($path) { return $path === '/var/lib/systemd/linger/user1234' && $GLOBALS['linger']; }
+function pmssTerminateUserUnlinkPath($username, $phase, $path, $dryRun) {
+    $GLOBALS['calls'][] = [$username, $phase, $path, $dryRun];
+    if (!$dryRun && $GLOBALS['removeOk']) $GLOBALS['linger'] = false;
+    return $GLOBALS['removeOk'];
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/termination/completion.php', 'TerminationLingerFixture');
+        $script .= <<<'PHP'
+$paths = ['home' => '/absent-home', 'user_backup' => '/absent-backup', 'user_backup_superseded' => '/absent-superseded'];
+$purge = [];
+foreach (array_keys($paths) as $label) {
+    $purge['remove_'.$label.'_initial'] = $purge['clear_immutable_'.$label] = $purge['remove_'.$label.'_leftovers'] = 0;
+}
+$results = [];
+foreach ([[false, false, true, true], [false, false, true, false], [false, true, true, true],
+    [true, false, true, true], [false, false, false, true]] as [$live, $dry, $linger, $removeOk]) {
+    $calls = [];
+    $cleared = pmssTerminateUserClearLinger('user1234', $dry);
+    $results[] = [$cleared, $linger, $calls, pmssTerminateUserCompletion('user1234', $paths, $purge, $dry)['line']];
+}
+$live = false;
+foreach (['', '../user1234', "user1234\0other", 'user1234/other', 'user1234;other'] as $invalid) {
+    $calls = [];
+    try { pmssTerminateUserClearLinger($invalid, false); $results[] = 'accepted'; }
+    catch (\InvalidArgumentException $error) { $results[] = [$error->getMessage(), $calls]; }
+}
+echo json_encode($results);
+PHP;
+        $call = ['user1234', 'remove_stale_linger', '/var/lib/systemd/linger/user1234', false];
+        $dryCall = $call;
+        $dryCall[3] = true;
+        $expected = [
+            [true, false, [$call], '## Done. User termination verified.'],
+            [false, true, [$call], '## Incomplete: linger_still_present'],
+            [true, true, [$dryCall], '## Done. User termination flow completed (dry run).'],
+            [false, true, [], '## Incomplete: account_still_present'],
+            [true, false, [$call], '## Done. User termination verified.'],
+        ];
+        foreach (range(1, 5) as $unused) $expected[] = ['Refusing unsafe linger cleanup', []];
+        $this->assertSame($expected, $this->pmssRunInlinePhpJson($script));
+
+        // Keep the cleanup outside the initial account-only phase, including resumes.
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
+            'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
+            'pmssTerminateUserClearLinger($username, $dryRun);',
+            'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
+        ]]]);
+    }
+
     public function testPortValidationRetainsExistingValuesAndWarningPayloads(): void
     {
         $script = 'namespace TerminationPortsFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/user/terminationCleanup.php'), true).';';

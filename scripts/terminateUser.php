@@ -370,6 +370,10 @@ if (pmssUserAccountLookup($username) === null) {
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 
+// Docker maintenance may have re-enabled linger before userdel. Both normal
+// termination and a proven resume retire that exact flag before verification.
+pmssTerminateUserClearLinger($username, $dryRun);
+
 $overallDuration = microtime(true) - $overallStart;
 $completion = pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun);
 if (!$dryRun && !$sliceCleanupOk && $completion['rc'] === 0) {
