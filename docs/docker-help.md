@@ -67,7 +67,7 @@ If you ever need to change the driver, edit `~/.config/docker/daemon.json` and r
 
 ## Bridge MTU
 
-Rootless Docker reaches the network through a user-space stack (normally slirp4netns) whose link inside your account's network namespace has MTU 65520. PMSS adds one key to an existing `~/.config/docker/daemon.json` so networks you create match it, which makes container transfers several times faster (ADR 0173):
+Rootless Docker reaches the network through a user-space stack (normally slirp4netns) whose link inside your account's network namespace has MTU 65520. PMSS adds one key to an existing `~/.config/docker/daemon.json` so networks you create match it, which makes container transfers several times faster (ADR 0204):
 
 ```json
 "default-network-opts": {"bridge": {"com.docker.network.driver.mtu": "65520"}}

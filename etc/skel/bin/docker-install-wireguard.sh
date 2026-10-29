@@ -9,7 +9,7 @@ echo "Using port: $PORT"
 mkdir -p "$CONFIG_DIR"
 
 # WireGuard sizes wg0 from eth0 (MTU - 80). PMSS raises rootless bridges to 65520
-# (ADR 0173), which would let tunnel packets leave the host as IP fragments, so the
+# (ADR 0204), which would let tunnel packets leave the host as IP fragments, so the
 # server gets its own network at the usual 1500.
 NETWORK=wireguard
 if docker network inspect "$NETWORK" >/dev/null 2>&1; then

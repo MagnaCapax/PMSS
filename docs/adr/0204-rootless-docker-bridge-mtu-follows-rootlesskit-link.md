@@ -1,4 +1,4 @@
-# ADR 0173: Rootless Docker bridge MTU follows the RootlessKit link
+# ADR 0204: Rootless Docker bridge MTU follows the RootlessKit link
 
 Date: 2026-10-23
 Category: architecture
@@ -94,8 +94,8 @@ package keeps 1500, and the key is added at the first maintenance run after an u
     keep them at 1500.
   - An account that starts dockerd with a smaller link MTU (`DOCKERD_ROOTLESS_ROOTLESSKIT_MTU`) or
     with vpnkit gets new networks larger than the link. It still works, because path MTU discovery runs
-    inside the namespace, but measured 475 against 770 MB/s at 1500/1500. Such an account sets `mtu`
-    the network option itself and PMSS keeps it.
+    inside the namespace, but measured 475 against 770 MB/s at 1500/1500. Such an account sets the bridge
+    network option itself, and PMSS keeps it.
 - **Debian 10/11 before the slirp4netns fix (#1120, a7532170 and ff03fa08):** PMSS installs no distro
   slirp4netns, and Debian 10's 0.2.3 would be below v0.4.0 anyway. Without the pinned helper on PATH,
   `dockerd-rootless.sh` exits before dockerd reads daemon.json, so the keys have no effect. A host
