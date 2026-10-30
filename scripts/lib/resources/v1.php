@@ -25,20 +25,19 @@ function pmssResourceLogReadSysfsCounter(string $path): ?int
  */
 function pmssResourceLogReadBlkioReadWrite(string $path): ?array
 {
-    $totals = ['read' => 0, 'write' => 0];
-    $matched = false;
+    $totals = null;
     foreach (pmssConfigTextLines(pmssReadRegularFileContents($path) ?? '', []) as $line) {
         if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', $line, $m) !== 1) continue;
         $value = pmssUnsignedDecimalIntParse($m[2]);
         if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
         $direction = $m[1] === 'Read' ? 'read' : 'write';
+        $totals = $totals ?? ['read' => 0, 'write' => 0];
         // Check before addition: integer overflow becomes a float and can later cast negative.
         if ($value >= PMSS_RESOURCE_COUNTER_SENTINEL - $totals[$direction]) return null;
         $totals[$direction] += $value;
-        $matched = true;
     }
 
-    return $matched ? $totals : null;
+    return $totals;
 }
 
 /**

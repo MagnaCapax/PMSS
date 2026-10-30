@@ -117,6 +117,7 @@ fallback. Existing mixed-run snapshots cover output order and format.
 Pressure windows and fio latency means retain sums instead of sample lists;
 only present latency samples count, including zero. Shadow shares reuse their
 rows for normalization, and saved-run selection retains one latest entry.
+Pressure windows share prefix sums; iostat reads raw rows; blkio/day gates carry their own state.
 
 Cgroup shadow allocation also uses its cohort rows as the quota lookup instead
 of maintaining a second account map. Positive cohort quotas supply the same

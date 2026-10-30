@@ -11,15 +11,14 @@ require_once dirname(__DIR__).'/runtime.php';
  */
 function pmssDiskIostatParseSampleFields(string $iostatRaw): array
 {
-    $lines = explode("\n", $iostatRaw);
     $colMap = $values = null;
     // Each header starts a new sample; only its first group row is eligible.
-    foreach (pmssConfigLines($lines, []) as $i => $line) {
-        if (preg_match('/^Device\s/', $line)) {
+    foreach (explode("\n", $iostatRaw) as $line) {
+        if (preg_match('/^Device\s/', trim($line))) {
             $colMap = array_flip(pmssConfigLineColumns($line, 1, []));
             $values = null;
-        } elseif ($colMap !== null && $values === null && preg_match('/^\s*grp1\s/', $lines[$i])) {
-            $values = pmssConfigLineColumns($lines[$i], 1, []);
+        } elseif ($colMap !== null && $values === null && preg_match('/^\s*grp1\s/', $line)) {
+            $values = pmssConfigLineColumns($line, 1, []);
         }
     }
     if ($colMap === null) {

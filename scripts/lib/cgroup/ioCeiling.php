@@ -65,10 +65,11 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
             continue;
         }
         $days[$day] = ['samples' => $count];
+        $rank = (int) ceil($settings['percentile'] * $count / 100) - 1;
         foreach (PMSS_IO_CEILING_DIMENSIONS as $dimension => $field) {
             $values = array_column($rows, $dimension);
             sort($values, SORT_NUMERIC);
-            $value = $values[(int) ceil($settings['percentile'] * $count / 100) - 1];
+            $value = $values[$rank];
             $days[$day][$dimension.'_percentile'] = $value;
             if (!isset($published[$dimension]) || $value > $published[$dimension]) {
                 $published[$dimension] = $value;

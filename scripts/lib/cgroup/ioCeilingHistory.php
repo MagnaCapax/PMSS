@@ -96,15 +96,9 @@ function pmssIoCeilingPublishedReadIops(string $statePath = PMSS_IO_CEILING_STAT
     if ($minDays <= 0 || $minSamples <= 0 || !is_array($days)) {
         return null;
     }
-    $qualified = 0;
     foreach ($days as $day) {
-        if (is_array($day) && is_int($day['samples'] ?? null) && $day['samples'] >= $minSamples) {
-            $qualified++;
-        }
+        if (is_array($day) && is_int($day['samples'] ?? null) && $day['samples'] >= $minSamples
+            && --$minDays === 0) return pmssFiniteNonNegativeFloat($state['published']['read_iops'] ?? null);
     }
-    if ($qualified < $minDays) {
-        return null;
-    }
-
-    return pmssFiniteNonNegativeFloat($state['published']['read_iops'] ?? null);
+    return null;
 }

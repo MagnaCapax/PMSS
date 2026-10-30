@@ -85,6 +85,11 @@ class DynamicIopsShadowTest extends TestCase
             [['time' => $now + 1]], [['time' => $now - 3600]], [['time' => (string) $now]]] as $bad) {
             $this->assertSame(null, \pmssDynamicIopsPressure($bad, $now)['blend']);
         }
+        // A gap invalidates only windows reaching it, including a missing final bucket.
+        foreach ([1 => [5 => 12.0, 15 => null, 60 => null], 3 => [5 => 12.0, 15 => 4.0, 60 => null], 11 => [5 => 12.0, 15 => 4.0, 60 => null]] as $bucket => $expected) {
+            $bad = $samples; unset($bad[$bucket]);
+            $this->assertSame($expected, \pmssDynamicIopsPressure($bad, $now)['io']);
+        }
         foreach ([101, -1, NAN, INF, [], null] as $value) {
             $samples[0]['psiFullAvg300'] = $value;
             $this->assertSame(null, \pmssDynamicIopsPressure($samples, $now)['blend']);

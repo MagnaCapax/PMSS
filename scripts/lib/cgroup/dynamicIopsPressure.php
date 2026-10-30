@@ -14,9 +14,10 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
     }
     $pressure = [];
     foreach (['io' => 'psiFullAvg300', 'memory' => 'psiMemFullAvg300', 'cpu' => 'psiCpuFullAvg300'] as $kind => $field) {
+        // Longer windows extend the same ordered sum; a gap still blocks every later window.
+        $sum = 0.0; $n = 0;
         foreach ([5 => 1, 15 => 3, 60 => 12] as $minutes => $count) {
-            $sum = 0.0;
-            for ($n = 0; $n < $count; $n++) {
+            for (; $n < $count; $n++) {
                 $value = pmssFiniteNonNegativeFloat($rows[$n][$field] ?? null);
                 if ($value === null || $value > 100) break;
                 $sum += $value;
