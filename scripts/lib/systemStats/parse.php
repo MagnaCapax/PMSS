@@ -127,13 +127,12 @@ function pmssSystemStatsPsiFromRaw(?string $raw): string
 {
     if ($raw === null) return 'na';
 
-    $fields = [
+    $values = [];
+    foreach ([
         ['some', 'avg10', 1], ['some', 'avg60', 1], ['full', 'avg10', 1],
         ['some', 'avg300', 1], ['full', 'avg60', 1], ['full', 'avg300', 1],
         ['some', 'total', 0], ['full', 'total', 0],
-    ];
-    $values = [];
-    foreach ($fields as [$row, $name, $decimals]) {
+    ] as [$row, $name, $decimals]) {
         $number = pmssSystemStatsPsiMetricFromRaw($raw, $row, $name);
         if ($number === null && $row === 'some' && $name === 'avg10') return 'na';
         $values[] = $number === null ? 'na' : number_format($number, $decimals, '.', '');

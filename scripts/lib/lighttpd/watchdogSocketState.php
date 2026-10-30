@@ -32,17 +32,15 @@ function pmssLighttpdWatchdogSocketFailureStatePath(string $username, string $ru
 function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $options = array()): array
 {
     $threshold = max(1, (int) ($options['threshold'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES));
-    $runtimeDir = (string) ($options['runtimeDir'] ?? '');
-    $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, $runtimeDir);
+    $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, (string) ($options['runtimeDir'] ?? ''));
 
     if ($statePath === '' || !pmssDirEnsureExists(dirname($statePath), 0755)) {
         return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
     }
 
     $count = max(0, pmssReadRegularFileInt($statePath)) + 1;
-    $encodedCount = (string) $count;
     // A partial write must not authorize a destructive restart.
-    if (!pmssFileWriteComplete($statePath, $encodedCount, LOCK_EX)) {
+    if (!pmssFileWriteComplete($statePath, (string) $count, LOCK_EX)) {
         return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
     }
 
@@ -56,8 +54,7 @@ function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $option
 /** Clear resolved php-cgi socket failure state for a user. */
 function pmssLighttpdWatchdogClearSocketFailure(string $username, array $options = array()): void
 {
-    $runtimeDir = (string) ($options['runtimeDir'] ?? '');
-    $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, $runtimeDir);
+    $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, (string) ($options['runtimeDir'] ?? ''));
     if (pmssRegularFilePathIsReadable($statePath)) {
         @unlink($statePath);
     }

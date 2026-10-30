@@ -45,12 +45,10 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
             continue;
         }
         $values = [];
-        foreach (PMSS_IO_CEILING_DIMENSIONS as $dimension => $field) {
-            $value = pmssFiniteNonNegativeFloat($sample[$field] ?? null);
-            if ($value === null) {
+        foreach (PMSS_IO_CEILING_DIMENSIONS as $field) {
+            if (($values[$field] = pmssFiniteNonNegativeFloat($sample[$field] ?? null)) === null) {
                 continue 2;
             }
-            $values[$dimension] = $value;
         }
         // Epoch time, not the collector's local-time prefix, defines the UTC day.
         // Deduplicate overlapping rotations; repeated rows cannot satisfy the gate.
@@ -67,7 +65,7 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
         $days[$day] = ['samples' => $count];
         $rank = (int) ceil($settings['percentile'] * $count / 100) - 1;
         foreach (PMSS_IO_CEILING_DIMENSIONS as $dimension => $field) {
-            $values = array_column($rows, $dimension);
+            $values = array_column($rows, $field);
             sort($values, SORT_NUMERIC);
             $value = $values[$rank];
             $days[$day][$dimension.'_percentile'] = $value;

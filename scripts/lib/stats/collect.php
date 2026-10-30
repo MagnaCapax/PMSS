@@ -115,8 +115,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
 {
     $context = pmssStatsResolveContext($overrides);
     $home = $context['home'];
-    $store = new UserConfigStore($context['config_dir']);
-    $config = $store->get($context['user']);
+    $config = (new UserConfigStore($context['config_dir']))->get($context['user']);
     $config = is_array($config) ? $config : [];
     $quota = pmssStatsReadQuotaSnapshot($home);
     $traffic = pmssReadSerializedArrayFile($home.'/.trafficData') ?: [];

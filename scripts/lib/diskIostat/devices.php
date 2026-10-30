@@ -45,8 +45,8 @@ function pmssDiskIostatBuildCommand(array $devices, string $iostatBinary = ''): 
 
     if ($iostatBinary === '') $iostatBinary = pmssCommandPath('iostat') ?: 'iostat';
 
-    $deviceArgs = $devices ? ' '.pmssCommandArgvShellQuote($devices) : '';
-    return escapeshellarg($iostatBinary).' -xm 120 2 -g grp1'.$deviceArgs.' 2>&1';
+    return escapeshellarg($iostatBinary).' -xm 120 2 -g grp1'
+        .($devices ? ' '.pmssCommandArgvShellQuote($devices) : '').' 2>&1';
 }
 
 /** Resolve only sampled leaf disks behind /home; unknown topology stays unknown. */
