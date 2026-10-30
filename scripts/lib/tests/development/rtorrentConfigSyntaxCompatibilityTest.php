@@ -43,8 +43,8 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
         $this->assertStringContainsString($expectedRssHook, $templateContent);
 
         $skeletonContent = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc');
-        $this->assertStringContainsString('schedule2 = watch_directory,1,1,"load.start_verbose=~/watch/*.torrent"', $skeletonContent);
-        $this->assertStringContainsString($expectedRssHook, $skeletonContent);
+        $this->assertStringContainsAllStrings(['schedule2 = watch_directory,1,1,"load.start_verbose=~/watch/*.torrent"',
+            $expectedRssHook], $skeletonContent);
     }
 
     /**
@@ -102,8 +102,8 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     public function testSkeletonRtorrentCustomConfigGuardsEveryCriticalLogGroup(): void
     {
         $content = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom');
-        $this->assertStringContainsString('catch = {"log.add_output=storage_critical,rtorrent.log"}', $content);
-        $this->assertStringContainsString('catch = {"log.add_output=socket_critical,rtorrent.log"}', $content);
+        $this->assertStringContainsAllStrings(['catch = {"log.add_output=storage_critical,rtorrent.log"}',
+            'catch = {"log.add_output=socket_critical,rtorrent.log"}'], $content);
         $this->assertSame(0, preg_match('/^\s*log\.add_output\s*=\s*["\']?[a-z0-9_]+_critical\b/im', $content));
     }
 

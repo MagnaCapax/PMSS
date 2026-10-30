@@ -154,8 +154,8 @@ class OpenSslSsh2CompatTest extends TestCase
             '/tmp/openssh-server.deb',
         ]);
 
-        $this->assertStringContainsString('dpkg --force-confdef --force-confold -i', $command);
-        $this->assertStringContainsString("'/tmp/openssh-client.deb' '/tmp/openssh-server.deb'", $command);
+        $this->assertStringContainsAllStrings(['dpkg --force-confdef --force-confold -i',
+            "'/tmp/openssh-client.deb' '/tmp/openssh-server.deb'"], $command);
     }
 
     public function testVersionQueryCommandUsesPayloadOnlyDpkgFormat(): void
@@ -171,7 +171,6 @@ class OpenSslSsh2CompatTest extends TestCase
         }
 
         $source = $this->pmssReadRepoFile('scripts/lib/update/opensslSsh2Compat.php');
-        $this->assertStringNotContainsString('Pin-Priority', $source);
-        $this->assertStringNotContainsString('preferences.d/pmss-libssl3-openssh.pref', $source);
+        $this->assertStringContainsAndOmitsStrings([], ['Pin-Priority', 'preferences.d/pmss-libssl3-openssh.pref'], $source);
     }
 }

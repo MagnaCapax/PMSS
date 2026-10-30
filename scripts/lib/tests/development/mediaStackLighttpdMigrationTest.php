@@ -44,8 +44,7 @@ class MediaStackLighttpdMigrationTest extends TestCase
         $home = $this->pmssRunPrepareLighttpd($custom);
         $migrated = (string) file_get_contents($home.'/.lighttpd/custom.d/custom-migrated.conf');
 
-        $this->assertStringNotContainsString('^/sabnzbd(\$|/)', $migrated);
-        $this->assertStringNotContainsString('^/radarr(\$|/)', $migrated);
+        $this->assertStringContainsAndOmitsStrings([], ['^/sabnzbd(\$|/)', '^/radarr(\$|/)'], $migrated);
         $this->assertStringContainsString('^/custom(\$|/)', $migrated);
         $this->assertSame('', (string) file_get_contents($home.'/.lighttpd/custom'));
     }
@@ -63,8 +62,7 @@ class MediaStackLighttpdMigrationTest extends TestCase
         $home = $this->pmssRunPrepareLighttpd($custom);
         $migrated = (string) file_get_contents($home.'/.lighttpd/custom.d/custom-migrated.conf');
 
-        $this->assertStringContainsString('# user-owned rules stay intact', $migrated);
-        $this->assertStringContainsString('^/custom(\$|/)', $migrated);
+        $this->assertStringContainsAllStrings(['# user-owned rules stay intact', '^/custom(\$|/)'], $migrated);
     }
 
     public function testPrepareLighttpdBlanksLegacyManagedFileInsteadOfMigrating(): void

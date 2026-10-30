@@ -50,8 +50,7 @@ final class HermesInstallerTest extends TestCase
         $this->assertSame(null, \pmssHermesProviderSeed(array('key' => 'x', 'endpoint' => $endpoint), true));
         $this->assertSame(null, \pmssHermesProviderSeed(null, false));
         $source = $this->pmssReadRepoFile('etc/skel/bin/pmssHermesInstall.php');
-        $this->assertStringContainsString("'model.base_url', \$provider['endpoint']", $source);
-        $this->assertStringContainsString("'model.api_key', '\${'.\$keyEnv.'}'", $source);
+        $this->assertStringContainsAllStrings(["'model.base_url', \$provider['endpoint']", "'model.api_key', '\${'.\$keyEnv.'}'"], $source);
         $this->assertFalse(strpos($source, "rtrim(\$provider['endpoint'], '/').'/v1'") !== false);
     }
 
@@ -70,8 +69,7 @@ final class HermesInstallerTest extends TestCase
     {
         $wrapper = $this->pmssReadRepoFile('etc/skel/bin/install-hermes');
         $cli = $this->pmssReadRepoFile('etc/skel/bin/pmssHermesCli.php');
-        $this->assertStringContainsString('flock -x -w 10 -o', $wrapper);
-        $this->assertStringContainsString('/.hermes/pmss.lock', $wrapper);
+        $this->assertStringContainsAllStrings(['flock -x -w 10 -o', '/.hermes/pmss.lock'], $wrapper);
         $this->assertFalse(strpos($cli, "'@reboot php") !== false);
         $this->assertFalse(strpos($cli, "'* * * * * php") !== false);
     }
@@ -88,8 +86,7 @@ final class HermesInstallerTest extends TestCase
         $this->assertSame($paths['base'].'/locks', $env['HERMES_GATEWAY_LOCK_DIR']);
         $this->assertSame('https://0123456789abcdef.mcx.fi:846/', $env['HERMES_DASHBOARD_PUBLIC_URL']);
         $source = $this->pmssReadRepoFile('etc/skel/bin/pmssHermesRuntime.php');
-        $this->assertStringContainsString('proc_open($command,', $source);
-        $this->assertStringContainsString('$pipes, null, array())', $source);
+        $this->assertStringContainsAllStrings(['proc_open($command,', '$pipes, null, array())'], $source);
         $command = \pmssHermesStartCommand($paths, $env['HERMES_DASHBOARD_PUBLIC_URL'], 24000, $paths['base'].'/dashboard.log');
         $this->assertStringContainsString('/usr/bin/env -i', $command);
         // Its own session: php-cgi signals its whole process group when it recycles (live QA 2026-10-21).

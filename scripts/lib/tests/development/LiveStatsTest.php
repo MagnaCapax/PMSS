@@ -35,8 +35,8 @@ class LiveStatsTest extends TestCase
         foreach ([[500.0, 50.0, 10000, '5'], [5.0, 0.5, 10000, '0.05'], [5000.0, 500.0, 10000, '50'],
             [15000.0, 1500.0, 10000, '100'], [0.0, 0.0, 10000, '0']] as $case) {
             $html = \pmssStatsLiveCell($case[0], $case[1], ' Mbit/s', $case[2]);
-            $this->assertStringContainsString('live-node" style="width:'.$case[3].'%', $html);
-            $this->assertStringContainsString('live-you" style="width:'.($case[0] > 0 ? 10 : 0).'%', $html);
+            $this->assertStringContainsAllStrings(['live-node" style="width:'.$case[3].'%',
+                'live-you" style="width:'.($case[0] > 0 ? 10 : 0).'%'], $html);
         }
         $this->assertStringContainsString('live-node" style="width:37%', \pmssStatsLiveCell(37.0, 5.0, '%'));
     }
@@ -46,8 +46,7 @@ class LiveStatsTest extends TestCase
         foreach ([0, -1] as $capacity) {
             $html = \pmssStatsLiveCell(500.0, 50.0, ' Mbit/s', $capacity);
             $this->assertFalse(strpos($html, 'class="live-bar"') !== false);
-            $this->assertStringContainsString('node 500 Mbit/s', $html);
-            $this->assertStringContainsString('you 50 Mbit/s', $html);
+            $this->assertStringContainsAllStrings(['node 500 Mbit/s', 'you 50 Mbit/s'], $html);
         }
         // Old rings have no capacity fields, so the optional argument must also hide the bar.
         $this->assertFalse(strpos(\pmssStatsLiveCell(5.0, 0.5, ' Mbit/s'), 'class="live-bar"') !== false);
@@ -57,8 +56,7 @@ class LiveStatsTest extends TestCase
     {
         $points = [[500.0, 50.0], [5000.0, 500.0]];
         $svg = \pmssStatsLiveSvg($points, 10000);
-        $this->assertStringContainsString('class="live-node" points="0,36.2 300,20"', $svg);
-        $this->assertStringContainsString('class="live-you" points="0,37.8 300,36.2"', $svg);
+        $this->assertStringContainsAllStrings(['class="live-node" points="0,36.2 300,20"', 'class="live-you" points="0,37.8 300,36.2"'], $svg);
         $this->assertStringContainsString('points="0,2 300,2"', \pmssStatsLiveSvg([[10000, 1000], [15000, 1500]], 10000));
         foreach ([0, -1] as $capacity) {
             $this->assertFalse(strpos(\pmssStatsLiveSvg($points, $capacity), '<polyline') !== false);

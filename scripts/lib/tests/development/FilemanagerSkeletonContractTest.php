@@ -9,8 +9,8 @@ class FilemanagerSkeletonContractTest extends TestCase
     public function testUploadPathStaysInsideTheCurrentFolder(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/filemanager.php');
-        $this->assertStringContainsString('$relPath = fm_clean_path(isset($_REQUEST[\'fullpath\'])', $source);
-        $this->assertStringContainsString('$fullPath = $path . \'/\' . $relPath;', $source);
+        $this->assertStringContainsAllStrings(['$relPath = fm_clean_path(isset($_REQUEST[\'fullpath\'])',
+            '$fullPath = $path . \'/\' . $relPath;'], $source);
         $this->pmssAssertStringNotContainsString('$path . \'/\' . $_REQUEST[\'fullpath\']', $source);
         $this->pmssAssertStringNotContainsString('umask(0)', $source, 'upload folders keep the account umask');
     }
@@ -19,8 +19,7 @@ class FilemanagerSkeletonContractTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/filemanager.php');
         $this->assertSame([], pmssFilemanagerUnguardedWrites($source));
-        $this->assertStringContainsString('hash_equals(', $source);
-        $this->assertStringContainsString("formData.append('action_token'", $source);
+        $this->assertStringContainsAllStrings(['hash_equals(', "formData.append('action_token'"], $source);
     }
 
     public function testWriteScannerRejectsMissingLateAndSiblingGuards(): void

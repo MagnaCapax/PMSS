@@ -202,9 +202,7 @@ BASH;
             $this->homeDir.'/watch:/watch',
             '--env-file '.$this->homeDir.'/docker/transmission/pmss-credentials.env',
         ], $result['dockerLog']);
-        $this->assertStringNotContainsString('PASS=', $result['dockerLog']);
-        $this->assertStringNotContainsString('USER=', $result['dockerLog']);
-        $this->assertStringNotContainsString('WHITELIST=', $result['dockerLog']);
+        $this->assertStringContainsAndOmitsStrings([], ['PASS=', 'USER=', 'WHITELIST='], $result['dockerLog']);
         $credentialFile = $this->homeDir.'/docker/transmission/pmss-credentials.env';
         $this->assertTrue(is_file($credentialFile));
         $this->assertSame(0600, fileperms($credentialFile) & 0777);
@@ -369,14 +367,11 @@ BASH;
             }));
             $this->assertSame(2, count($runs));
             $this->assertStringNotContainsString(' -p ', $runs[0]);
-            $this->assertStringContainsString($this->homeDir.'/docker/'.$app.'/config:/config', $runs[1]);
-            $this->assertStringContainsString('sha256:'.str_repeat('0', 64), $runs[1]);
+            $this->assertStringContainsAllStrings([$this->homeDir.'/docker/'.$app.'/config:/config', 'sha256:'.str_repeat('0', 64)], $runs[1]);
             $file = $this->homeDir.'/docker/'.$app.'/pmss-credentials.env';
             $this->assertSame(0600, fileperms($file) & 0777);
             $credentials = parse_ini_file($file);
-            foreach ($credentials as $secret) {
-                $this->assertStringNotContainsString($secret, $result['output'].$result['dockerLog']);
-            }
+            $this->assertStringContainsAndOmitsStrings([], array_values($credentials), $result['output'].$result['dockerLog']);
         }
     }
 
@@ -385,8 +380,7 @@ BASH;
         $result = $this->runHelper(['radarr'], ['PMSS_TEST_DOCKER_PUT_CODE' => '500']);
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('no port published', $result['output']);
-        $this->assertStringNotContainsString(' -p ', $result['dockerLog']);
-        $this->assertStringNotContainsString('rm radarr', $result['dockerLog']);
+        $this->assertStringContainsAndOmitsStrings([], [' -p ', 'rm radarr'], $result['dockerLog']);
         $this->assertTrue(is_file($this->homeDir.'/docker/radarr/pmss-credentials.env'));
     }
 
@@ -514,10 +508,8 @@ BASH;
         $result = $this->runHelper(['prowlarr']);
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertStringContainsString('network inspect pmss-media', $result['dockerLog']);
-        $this->assertStringContainsString('network create pmss-media', $result['dockerLog']);
-        $this->assertStringContainsString('container inspect prowlarr', $result['dockerLog']);
-        $this->assertStringContainsString('run -d --name prowlarr', $result['dockerLog']);
+        $this->assertStringContainsAllStrings(['network inspect pmss-media', 'network create pmss-media',
+            'container inspect prowlarr', 'run -d --name prowlarr'], $result['dockerLog']);
     }
 
     public function testRunRefusesExistingContainer(): void
@@ -537,8 +529,7 @@ BASH;
         $result = $this->runHelper(['prowlarr', '--dry-run'], [], 'legacy');
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertStringContainsString('docker run -d --name prowlarr', $result['output']);
-        $this->assertStringContainsString('--network pmss-media', $result['output']);
+        $this->assertStringContainsAllStrings(['docker run -d --name prowlarr', '--network pmss-media'], $result['output']);
     }
 
     public function testCustomerTreeDryRunNeedsNoOperatorScripts(): void

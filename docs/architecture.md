@@ -193,6 +193,8 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Generated CLI, service-command and torrent-client fixtures use the same batch
   assertions as source contracts; case labels stay in fragment-to-message maps.
   Keep loops that perform fixture operations or compute distinct diagnostics explicit.
+  Installer, storage, live-statistics and memory-status text checks reuse these
+  batches too; associative fixture values become lists before forbidden checks.
 - Structured result checks share `TestCase::pmssAssertArraySubsetSame()` for
   required fields and strict values. Keep expected field order and fixture cases
   at callers; custom diagnostics, transformed values and exact-shape assertions

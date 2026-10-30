@@ -132,8 +132,7 @@ class SupportCommandTest extends TestCase
         $clientId = fileowner($record) === 0 ? 99 : 0;
         $this->assertSame($serviceId, $diagnostics['billingServiceId']);
         $this->assertSame($clientId, $diagnostics['billingClientId']);
-        $this->assertStringContainsString('billing_service_id='.$serviceId, $diagnostics['body']);
-        $this->assertStringContainsString('billing_client_id='.$clientId, $diagnostics['body']);
+        $this->assertStringContainsAllStrings(['billing_service_id='.$serviceId, 'billing_client_id='.$clientId], $diagnostics['body']);
     }
 
     public function testDiagnosticsBuildUsesOwnMarkersWhenStoreHasNoValue(): void
@@ -189,9 +188,7 @@ class SupportCommandTest extends TestCase
             "pmssSupportStreamWriteAll(\$handle, (string) (\$diagnostics['body'] ?? ''), 'support snapshot file');",
             $source
         );
-        $this->assertStringContainsString("@fflush(\$handle) !== true", $source);
-        $this->assertStringContainsString("@chmod(\$snapshotDir, 0700);", $source);
-        $this->assertStringContainsString("@chmod(\$path, 0600);", $source);
+        $this->assertStringContainsAllStrings(["@fflush(\$handle) !== true", "@chmod(\$snapshotDir, 0700);", "@chmod(\$path, 0600);"], $source);
     }
 
     public function testSnapshotWriteRejectsSymlinkedSupportPathAncestor(): void
@@ -222,8 +219,8 @@ class SupportCommandTest extends TestCase
 
         $this->assertTrue(is_file($result['snapshotPath']));
         $this->assertEquals('support@example.com', $deliveries[0]['config']['targetEmail']);
-        $this->assertStringContainsString('Subject: [PMSS Support] billing_service=0', $deliveries[0]['envelope']['data']);
-        $this->assertStringContainsString('Snapshot: '.$result['snapshotPath'], $deliveries[0]['envelope']['data']);
+        $this->assertStringContainsAllStrings(['Subject: [PMSS Support] billing_service=0',
+            'Snapshot: '.$result['snapshotPath']], $deliveries[0]['envelope']['data']);
     }
 
     public function testApplySkeletonFilesCopiesSupportCommandForExistingUsers(): void

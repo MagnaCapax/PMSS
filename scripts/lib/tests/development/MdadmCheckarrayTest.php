@@ -183,8 +183,8 @@ class MdadmCheckarrayTest extends TestCase
         $result = $this->runCommand($mdstat, $stub);
 
         $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsString('skipping md1 (degraded); requested sync_action=idle', $result['output']);
-        $this->assertStringContainsString('checking non-degraded arrays: md0', $result['output']);
+        $this->assertStringContainsAllStrings(['skipping md1 (degraded); requested sync_action=idle',
+            'checking non-degraded arrays: md0'], $result['output']);
         $this->assertSame("--idle --quiet md0\n", $this->readStubLog());
         $this->assertSame("idle\n", (string) file_get_contents($syncTarget));
     }
@@ -295,9 +295,8 @@ class MdadmCheckarrayTest extends TestCase
     {
         $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
 
-        $this->assertStringContainsString('/scripts/cron/mdadmCheckarray.php', $cron);
-        $this->assertStringContainsString('[ $(date +\%d) -le 7 ]', $cron);
-        $this->assertStringContainsString('$(($(date +\%-m) \% 3)) -eq $((H \% 3))', $cron);
+        $this->assertStringContainsAllStrings(['/scripts/cron/mdadmCheckarray.php', '[ $(date +\%d) -le 7 ]',
+            '$(($(date +\%-m) \% 3)) -eq $((H \% 3))'], $cron);
         $this->assertStringNotContainsString('/usr/share/mdadm/checkarray'.' --cron --all', $cron);
     }
 

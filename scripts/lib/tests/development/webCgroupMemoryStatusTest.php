@@ -234,8 +234,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
         $this->assertSame(4, $status['oom_kill_events']);
         $this->assertSame('HIGH', $status['status']);
-        $this->assertStringContainsString('out-of-memory', $status['message']);
-        $this->assertStringContainsString('Extra RAM', $status['message']);
+        $this->assertStringContainsAllStrings(['out-of-memory', 'Extra RAM'], $status['message']);
     }
 
     public function testReadReadsChildServiceSliceOomKillWhenParentSliceIsZero(): void
@@ -365,8 +364,7 @@ class WebCgroupMemoryStatusTest extends TestCase
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
         $this->pmssAssertArraySubsetSame(['status' => 'THROTTLED', 'status_color' => '#d2691e'], $status);
-        $this->assertStringContainsString('reduced speed', $status['message']);
-        $this->assertStringContainsString('upgrading your plan', $status['message']);
+        $this->assertStringContainsAllStrings(['reduced speed', 'upgrading your plan'], $status['message']);
         $this->pmssAssertStringNotContainsString('killed', $status['message']);
         $this->pmssAssertStringNotContainsString('OOM', $status['message']);
     }

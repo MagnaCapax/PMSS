@@ -91,7 +91,7 @@ class installBootstrapSafetyTest extends TestCase
 
     public function testInstallerDoesNotDuplicateSharedSystemPrepConvergence(): void
     {
-        foreach ([
+        $this->assertStringContainsAndOmitsStrings([], [
             'install_sysctl'.'_defaults()',
             'install_configure_temp'.'_disk_backed_mount()',
             'install_root_shell'.'_defaults()',
@@ -101,9 +101,7 @@ class installBootstrapSafetyTest extends TestCase
             'ensure_grub_cmdline'.'_option()',
             'mount -o remount,hidepid=2 /proc',
             'mount -o remount /home',
-        ] as $forbidden) {
-            $this->assertStringNotContainsString($forbidden, $this->script);
-        }
+        ], $this->script);
     }
 
     public function testBullseyeSecurityMovesToArchiveBeforeBootstrapPackages(): void

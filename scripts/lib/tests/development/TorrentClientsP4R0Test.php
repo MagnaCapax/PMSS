@@ -21,8 +21,8 @@ final class TorrentClientsP4R0Test extends TestCase
         $this->assertSame('/usr/local/bin/rtorrent',
             \pmssRtorrentExecutorCommand($home, $projection, $store));
         $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
-        $this->assertStringContainsString("\$rtorrentCommand = '/usr/local/bin/rtorrent';", $source);
-        $this->assertStringContainsString('passthru($rtorrentCommand, $rtorrentRc);', $source);
+        $this->assertStringContainsAllStrings(["\$rtorrentCommand = '/usr/local/bin/rtorrent';",
+            'passthru($rtorrentCommand, $rtorrentRc);'], $source);
     }
 
     public function testPublishedStoreSelectionResolvesBinary(): void
@@ -53,8 +53,7 @@ final class TorrentClientsP4R0Test extends TestCase
             \pmssRtorrentExecutorCommand($home, $projection, $store));
         $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
         $loop = substr($source, strpos($source, 'while (true) {'));
-        $this->assertStringContainsString('catch (Throwable $error)', $loop);
-        $this->assertStringContainsString("\$rtorrentCommand = '/usr/local/bin/rtorrent';", $loop);
+        $this->assertStringContainsAllStrings(['catch (Throwable $error)', "\$rtorrentCommand = '/usr/local/bin/rtorrent';"], $loop);
         $this->assertFalse(strpos($loop, 'exit(') !== false);
     }
 

@@ -60,8 +60,7 @@ class DbusPolicyHardeningTest extends TestCase
     {
         $messages = [];
         $xml = $this->installDisclosureArtifacts($messages)['10-pmss-login1-restrict.conf'];
-        $this->assertStringContainsString('<policy context="default">', $xml);
-        $this->assertStringContainsString('<deny send_destination="org.freedesktop.login1"/>', $xml);
+        $this->assertStringContainsAllStrings(['<policy context="default">', '<deny send_destination="org.freedesktop.login1"/>'], $xml);
 
         foreach (['GetSessionByPID', 'GetUserByPID'] as $member) {
             $this->assertStringContainsString('send_member="'.$member.'"/>', $xml, 'preserves self-query '.$member);
@@ -111,8 +110,7 @@ class DbusPolicyHardeningTest extends TestCase
         foreach (['users', 'sessions'] as $leaf) {
             $body = $bodies['pmss-run-systemd-'.$leaf.'.conf'];
             $this->assertStringContainsString('d /run/systemd/'.$leaf.' 0750 root root', $body);
-            $this->assertStringNotContainsString('0644', $body);
-            $this->assertStringNotContainsString('0755', $body);
+            $this->assertStringContainsAndOmitsStrings([], ['0644', '0755'], $body);
         }
     }
 

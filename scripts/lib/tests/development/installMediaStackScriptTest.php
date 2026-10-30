@@ -52,14 +52,12 @@ class installMediaStackScriptTest extends TestCase
 
     public function testServarrBranchDefaultsAndOverridesPresent(): void
     {
-        foreach (array(
+        $this->assertStringContainsAllStrings(array(
             'SONARR_BRANCH="${OVR_SONARR_BRANCH:-main}"' => 'Sonarr default branch should be main',
             'RADARR_BRANCH="${OVR_RADARR_BRANCH:-master}"' => 'Radarr default branch should be master',
             'PROWLARR_BRANCH="${OVR_PROWLARR_BRANCH:-master}"' => 'Prowlarr default branch should be master',
             'SONARR_MAJOR="${OVR_SONARR_VERSION:-4}"' => 'Sonarr version default should be 4',
-        ) as $needle => $message) {
-            $this->assertStringContainsString($needle, $this->script, $message);
-        }
+        ), $this->script);
     }
 
     public function testRadarrGlibcPinPresent(): void
@@ -220,8 +218,7 @@ class installMediaStackScriptTest extends TestCase
             array_unshift($metadata['releases'][1]['aspnetcore-runtime']['files'], ['name' => 'dotnet-runtime-linux-'.$arch.'.tar.gz']);
             $output = $this->aspnetcoreResolverHarness(json_encode($metadata), $arch);
             $file = $metadata['releases'][1]['aspnetcore-runtime']['files'][1];
-            $this->assertStringContainsString('resolved:'.$file['url'].'|'.strtolower($file['hash']), $output);
-            $this->assertStringContainsString('releases.json', $output);
+            $this->assertStringContainsAllStrings(['resolved:'.$file['url'].'|'.strtolower($file['hash']), 'releases.json'], $output);
         }
         $this->assertStringContainsString('fetch_verified_archive "$ASPDOTNET_URL" "aspnetcore.tar.gz" "ASP.NET runtime" "" "$ASPDOTNET_SHA512"', $this->script);
     }

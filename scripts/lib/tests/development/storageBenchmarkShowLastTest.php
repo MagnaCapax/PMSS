@@ -47,10 +47,10 @@ class StorageBenchmarkShowLastTest extends TestCase
         ]);
 
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
-        $this->assertStringContainsString(sprintf("randread-small\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", 0, 0, 0, 42, 2.5, 0), $out);
-        $this->assertStringContainsString(sprintf("  %-18s seq_MB/s=%.2f t=%.2fs\n", 'device-seqread-dd', 0, 0), $out);
-        $this->assertStringContainsString(sprintf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", 'dev-randread-4k', 0, 0, 0), $out);
-        $this->assertStringContainsString(sprintf("  %-18s avg_ms=%.2f\n", 'device-ioping', 0), $out);
+        $this->assertStringContainsAllStrings([sprintf("randread-small\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", 0, 0, 0, 42, 2.5, 0),
+            sprintf("  %-18s seq_MB/s=%.2f t=%.2fs\n", 'device-seqread-dd', 0, 0),
+            sprintf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", 'dev-randread-4k', 0, 0, 0),
+            sprintf("  %-18s avg_ms=%.2f\n", 'device-ioping', 0)], $out);
     }
 
     public function testShowLastParsesAndPrintsSummary(): void
