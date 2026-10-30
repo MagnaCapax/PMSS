@@ -45,8 +45,8 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         'host_read_iops' => $host, 'multiplier' => $multiplier, 'pool' => $pool, 'fallback' => $fallback, 'variants' => []];
     foreach (['1.0' => 1.0, '0.5' => 0.5] as $label => $alpha) {
         $rows = $cohort; $lift = 0.0;
-        foreach ($users as $user => $entry) {
-            $rows[$user]['share'] = (pmssFiniteNonNegativeFloat($entry['weight'] ?? null) ?? 0) * pow(($rows[$user]['quota'] ?? $median) / $median, $alpha);
+        foreach ($rows as $user => $row) {
+            $rows[$user]['share'] = (pmssFiniteNonNegativeFloat($row['weight']) ?? 0) * pow(($row['quota'] ?? $median) / $median, $alpha);
         }
         $sum = array_sum(array_column($rows, 'share'));
         if (!is_finite($sum)) return null;

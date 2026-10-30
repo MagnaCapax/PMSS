@@ -42,19 +42,10 @@ function pmssQuotaSnapshotNormalizeHumanReadableLine(string $line): string
     $tokens = pmssQuotaSnapshotDataRows($line)[0] ?? [];
     if ($tokens === []) return $line;
 
-    $changed = false;
-    for ($index = 1; $index <= 3; $index++) {
-        if (preg_match('/^([0-9]+)(\*)?$/', $tokens[$index], $matches) !== 1) {
-            continue;
-        }
-
-        $changed = true;
-        $tokens[$index] = $matches[1].'K'.($matches[2] ?? '');
-    }
-
-    if (!$changed) {
-        return $line;
-    }
+    // Only the three size columns gain units; preserve an unchanged line byte-for-byte.
+    $sizes = preg_replace('/^([0-9]+)(\*)?$/', '$1K$2', array_slice($tokens, 1, 3), -1, $changed);
+    if ($changed === 0) return $line;
+    array_splice($tokens, 1, 3, $sizes);
 
     $indent = substr($line, 0, strlen($line) - strlen(ltrim($line)));
     return $indent.implode(' ', $tokens);

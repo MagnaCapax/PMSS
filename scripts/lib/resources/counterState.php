@@ -67,9 +67,8 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
         $persisted = false;
         if ($handle !== false && is_string($payload = pmssJsonEncodeSafe($state))) {
             $written = pmssCounterStateWritePayload($handle, $payload);
-            $modeSet = @chmod($statePath, 0600);
-            $persisted = $written && $modeSet;
-            if (!$written || !$modeSet) {
+            $persisted = @chmod($statePath, 0600) && $written;
+            if (!$persisted) {
                 error_log('[WARN] Unable to persist counter state: '.json_encode($statePath));
             }
         }

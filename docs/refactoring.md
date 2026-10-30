@@ -106,6 +106,11 @@ publication passes its payload directly to encoding; missing PSI and diskstats
 inputs use the existing parsers' unavailable results. Blkio fallback selects a
 zero throttle sample immediately only when BFQ is absent, preserving positive
 source precedence and BFQ's tie-breaking preference for idle samples.
+Shadow-share variants likewise read weight and quota from their cohort rows.
+Traffic ingress projections pass state and localnet keys directly to their consumers;
+counter persistence uses its combined write/mode result for the warning gate.
+Quota size columns share one substitution and preserve unchanged lines verbatim.
+Arithmetic, payload key order, lock lifetime and write-before-chmod order stay intact.
 
 Storage benchmark dispatch keeps single-use options, commands and callbacks at
 their consumers. dd measurements return only after both fields validate; fio

@@ -26,7 +26,6 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
     $report = ['rows' => [], 'missingStats' => []];
     $limitCache = [];
     foreach ($users as $thisUser) {
-        $isLocalnet = pmssTrafficUserKeyIsLocalnet($thisUser);
         $baseUser = pmssTrafficUserKeyBaseUser($thisUser);
         $statsPath = pmssTrafficStatsPath($thisUser, $statsDir);
         if (!is_file($statsPath)) {
@@ -39,7 +38,7 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
             continue;
         }
 
-        $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey($isLocalnet, 'ingress')];
+        $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey(pmssTrafficUserKeyIsLocalnet($thisUser), 'ingress')];
         $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
         $inboundMonth = $ingressData !== null ? pmssTrafficRawMonthMiB($ingressData) : null;
 

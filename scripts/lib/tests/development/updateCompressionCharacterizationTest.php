@@ -127,8 +127,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
             ],
             'scripts/lib/quotaSnapshot.php' => [
                 'required' => [
-                    "preg_match('/^([0-9]+)(\\*)?$/', \$tokens[\$index], \$matches)",
-                    "\$tokens[\$index] = \$matches[1].'K'.(\$matches[2] ?? '');",
+                    "preg_replace('/^([0-9]+)(\\*)?$/', '\$1K\$2', array_slice(\$tokens, 1, 3), -1, \$changed)",
+                    'array_splice($tokens, 1, 3, $sizes);',
                 ],
                 'forbidden' => [
                     'function pmssQuotaSnapshotNormalize'.'SizeToken(' => 'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer',

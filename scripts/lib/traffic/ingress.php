@@ -24,16 +24,14 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
  */
 function pmssTrafficIngressUpdateState(string $path, array $counters): array
 {
-    $state = [
+    $result = pmssCounterStateUpdate($path, [
         'ingress' => (int) $counters['ingress'],
         'egress' => (int) $counters['egress'],
         'ts' => time(),
-    ];
-    $result = pmssCounterStateUpdate($path, $state, ['ingress']);
-    $previousIngress = isset($result['previous_state']['ingress']) ? (int) $result['previous_state']['ingress'] : null;
+    ], ['ingress']);
 
     return [
         'delta' => $result['delta']['ingress'],
-        'previous_ingress' => $previousIngress,
+        'previous_ingress' => isset($result['previous_state']['ingress']) ? (int) $result['previous_state']['ingress'] : null,
     ];
 }
