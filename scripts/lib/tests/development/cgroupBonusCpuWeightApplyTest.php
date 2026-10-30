@@ -6,7 +6,8 @@ require_once __DIR__.'/../../cgroup/bonusCpuWeight.php';
 
 /**
  * Hermetic tests for the Free Bonus Disk -> CPU priority helpers used by
- * /scripts/cron/cgroupBonusCpuWeightApply.php, and for the shared ~/.bonus reader.
+ * /scripts/cron/cgroupBonusCpuWeightApply.php. The root-owned positive path of the marker
+ * read needs root and runs in the end-to-end acceptance on a disposable PMSS VM.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -42,39 +43,34 @@ class CgroupBonusCpuWeightApplyTest extends TestCase
         $this->assertSame(null, \pmssBonusCpuBaseWeight([]));
     }
 
-    public function testMarkerIsReadWithTheSharedValueClamp(): void
+    public function testMarkerTheAccountCouldHaveWrittenIsIgnored(): void
     {
         $root = $this->pmssMakeTempDir('bonus-cpu-home');
         $home = $root.'/alice';
         mkdir($home, 0770);
-        file_put_contents($home.'/.bonus', "50\n");
-        $this->assertSame(50, \pmssUserBonusPercentRead('alice', $root));
-
-        // A padded marker (the tenant owns the home) is clamped to the 300% policy maximum.
-        file_put_contents($home.'/.bonus', "999999\n");
-        $this->assertSame(\PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, \pmssUserBonusPercentRead('alice', $root));
-
-        // Garbage reads as 0; so does a negative number.
-        file_put_contents($home.'/.bonus', "lots\n");
-        $this->assertSame(0, \pmssUserBonusPercentRead('alice', $root));
-        file_put_contents($home.'/.bonus', "-40\n");
-        $this->assertSame(0, \pmssUserBonusPercentRead('alice', $root));
+        // Written by this (non-root) test process: the account owns it, so it must not count.
+        file_put_contents($home.'/.bonus', "300\n");
+        $this->assertSame(0, \pmssUserBonusPercentReadTrusted('alice', $root));
 
         // A link to a file elsewhere is refused before it is opened.
         unlink($home.'/.bonus');
         file_put_contents($root.'/target', "300\n");
         symlink($root.'/target', $home.'/.bonus');
-        $this->assertSame(0, \pmssUserBonusPercentRead('alice', $root));
-
-        // A bulky file is refused.
-        unlink($home.'/.bonus');
-        file_put_contents($home.'/.bonus', str_repeat('1', 100));
-        $this->assertSame(0, \pmssUserBonusPercentRead('alice', $root));
+        $this->assertSame(0, \pmssUserBonusPercentReadTrusted('alice', $root));
 
         // Missing marker, invalid username.
         unlink($home.'/.bonus');
-        $this->assertSame(0, \pmssUserBonusPercentRead('alice', $root));
-        $this->assertSame(0, \pmssUserBonusPercentRead('../etc', $root));
+        $this->assertSame(0, \pmssUserBonusPercentReadTrusted('alice', $root));
+        $this->assertSame(0, \pmssUserBonusPercentReadTrusted('../etc', $root));
+    }
+
+    public function testTrustRuleIsTheSharedRootArtifactRule(): void
+    {
+        $regular = 0100640;
+        $this->assertTrue(\pmssRootArtifactMetadataIsTrusted(['mode' => $regular, 'uid' => 0, 'gid' => 1001]));
+        $this->assertFalse(\pmssRootArtifactMetadataIsTrusted(['mode' => $regular, 'uid' => 1001, 'gid' => 1001]));
+        $this->assertFalse(\pmssRootArtifactMetadataIsTrusted(['mode' => 0100660, 'uid' => 0, 'gid' => 1001]));
+        $this->assertFalse(\pmssRootArtifactMetadataIsTrusted(['mode' => 0100642, 'uid' => 0, 'gid' => 0]));
     }
 
     public function testSliceStateParse(): void
@@ -91,7 +87,7 @@ class CgroupBonusCpuWeightApplyTest extends TestCase
             'required' => [
                 "require_once __DIR__.'/../lib/cgroup/bonusCpuWeight.php';",
                 'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
-                'pmssCpuApplyBonusWeight($base, pmssUserBonusPercentRead($user))',
+                'pmssCpuApplyBonusWeight($base, pmssUserBonusPercentReadTrusted($user))',
                 "pmssBuildCommand('systemctl', ['set-property', \$slice, 'CPUWeight='.\$want])",
                 'if ($state[\'weight\'] === $want) {',
             ],

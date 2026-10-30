@@ -3,9 +3,8 @@
  * Free Bonus Disk percent -> per-user CPU priority (systemd CPUWeight).
  *
  * The provisioning backend writes the account's applied bonus percent into ~/.bonus through
- * writeHomeMarker.php (ADR-0046 "enforced" class; on hosts the file is owned by the account). cgroupBfqWeightApply.php already
- * raises disk priority from it; cgroupBonusCpuWeightApply.php raises CPU priority the same way,
- * through the same reader and the same #945 value clamp (pmssUserBonusPercentRead() in policy.php).
+ * writeHomeMarker.php (root-owned, ADR-0046 "enforced" class). cgroupBfqWeightApply.php already
+ * raises disk priority from it; cgroupBonusCpuWeightApply.php raises CPU priority the same way.
  * The account never drops below the CPU weight its plan (plus bought extras) gives it.
  *
  * @license GPL-3.0-only
@@ -14,8 +13,35 @@
 
 require_once __DIR__.'/policy.php';
 require_once __DIR__.'/Manager.php';
+require_once dirname(__DIR__).'/runtime/filesystem.php';
+require_once dirname(__DIR__).'/user/identity.php';
+require_once dirname(__DIR__).'/user/rootArtifactTrust.php';
 
 const PMSS_CPU_WEIGHT_MAX = 10000; // systemd CPUWeight upper bound.
+
+/**
+ * Bonus percent from the account's ~/.bonus marker, or 0.
+ *
+ * Only a root-owned, tenant-non-writable regular file counts: the home directory belongs to the
+ * account, so any file the account could have written there is ignored (rootArtifactTrust.php).
+ * The opened handle must be the inode that was checked, so a swap between check and read fails.
+ */
+function pmssUserBonusPercentReadTrusted(string $user, string $homeRoot = '/home'): int
+{
+    if (!pmssValidateUsername($user)) {
+        return 0;
+    }
+    $metadata = null;
+    $raw = pmssRegularFileRead(rtrim($homeRoot, '/').'/'.$user.'/.bonus', 0, 64, $metadata);
+    if (!is_string($raw) || !is_array($metadata) || !pmssRootArtifactMetadataIsTrusted($metadata)) {
+        return 0;
+    }
+    $value = trim($raw);
+    if (preg_match('/^[0-9]{1,9}$/', $value) !== 1) {
+        return 0;
+    }
+    return min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, (int) $value);
+}
 
 /** The CPU weight userConfig gives the account: explicit CPUWeight, else the RAM-derived default. */
 function pmssBonusCpuBaseWeight(array $config): ?int

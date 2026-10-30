@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 The provisioning backend writes each account's applied Free Bonus Disk percent
-into the `~/.bonus` marker in the account's home through `writeHomeMarker.php`.
+into the root-owned `~/.bonus` marker through `writeHomeMarker.php`.
 `cgroupBfqWeightApply.php` already multiplies the account's disk priority
 (`blkio.bfq.weight`) by that percent. CPU priority (`CPUWeight` on
 `user-<uid>.slice`) stayed at the plan value, so long-standing accounts got a
@@ -29,13 +29,10 @@ raise CPU priority on the same path as the bonus marker.
 boot. For each managed account it takes the base weight `userConfig.php`
 applies (explicit `CPUWeight` in the user config, else the RAM-derived default)
 and sets `max(base, min(10000, round(base * (1 + bonus/100))))` with
-`systemctl set-property`, only when the active slice differs. Nothing is
-restarted. Both crons read the marker through one function,
-`pmssUserBonusPercentRead()` in `lib/cgroup/policy.php` (moved there from the
-disk-priority cron unchanged): a regular file of at most 64 bytes, links refused,
-the value clamped to the 300% policy maximum (#945). The marker sits in the
-account's home, so an account can pad its own percent up to that maximum; the
-value clamp, not file ownership, is the accepted bound, as for disk priority.
+`systemctl set-property`, only when the active slice differs. The bonus is read
+only from a root-owned, tenant-non-writable regular `~/.bonus`, through a
+handle checked against the inspected inode, and is clamped to the 300% policy
+maximum. Any other marker counts as 0. Nothing is restarted.
 
 ## Consequences
 - An account never drops below the CPU weight its plan and bought extras give
@@ -45,7 +42,6 @@ value clamp, not file ownership, is the accepted bound, as for disk priority.
   `user.slice`; system services are not affected.
 - `userConfig.php` runs set the base weight again; the next cron run restores
   the bonus within five minutes.
-- An ownership rule was considered and rejected: production markers are owned
-  by the account, including recently rewritten ones, so it would have raised no
-  one, and it needs an ownership migration that the value clamp makes
-  unnecessary.
+- Markers written before the backend used `writeHomeMarker.php` may be owned by
+  the account; those accounts get the CPU bonus once the backend rewrites the
+  marker. The disk-priority reader keeps its existing value clamp (#945).
