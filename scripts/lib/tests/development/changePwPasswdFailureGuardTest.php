@@ -105,18 +105,10 @@ class changePwPasswdFailureGuardTest extends TestCase
         $binDir = $this->tempDir.'/bin';
         mkdir($binDir, 0700);
         $this->pmssWriteExecutableFile($binDir.'/chpasswd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n", 0755, 0700);
-        $originalPath = getenv('PATH');
-        putenv('PATH='.$binDir.':'.$originalPath);
-        putenv('PMSS_TEST_INPUT='.$inputPath);
-        putenv('PMSS_TEST_ARGS='.$argsPath);
         $output = [];
-        try {
+        $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_TEST_INPUT' => $inputPath, 'PMSS_TEST_ARGS' => $argsPath], function () use ($username, $password, &$output, &$status, &$hash): void {
             [$status, $hash] = \pmssChangePwShadowUpdate($username, $password, true, $output);
-        } finally {
-            putenv('PATH='.$originalPath);
-            putenv('PMSS_TEST_INPUT');
-            putenv('PMSS_TEST_ARGS');
-        }
+        });
         $this->assertEquals(0, $status);
         $this->assertTrue(strpos($hash, '$2y$') === 0);
         $this->assertTrue(password_verify($password, $hash));
@@ -151,18 +143,10 @@ class changePwPasswdFailureGuardTest extends TestCase
         $binDir = $this->tempDir.'/bin';
         mkdir($binDir, 0700);
         $this->pmssWriteExecutableFile($binDir.'/passwd', "#!/bin/sh\nprintf '%s' \"\$*\" > \"\$PMSS_TEST_ARGS\"\ncat > \"\$PMSS_TEST_INPUT\"\n", 0755, 0700);
-        $originalPath = getenv('PATH');
-        putenv('PATH='.$binDir.':'.$originalPath);
-        putenv('PMSS_TEST_INPUT='.$inputPath);
-        putenv('PMSS_TEST_ARGS='.$argsPath);
         $output = [];
-        try {
+        $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_TEST_INPUT' => $inputPath, 'PMSS_TEST_ARGS' => $argsPath], function () use (&$output, &$status, &$hash): void {
             [$status, $hash] = \pmssChangePwShadowUpdate('alice', 'legacy-secret', false, $output);
-        } finally {
-            putenv('PATH='.$originalPath);
-            putenv('PMSS_TEST_INPUT');
-            putenv('PMSS_TEST_ARGS');
-        }
+        });
         $this->assertSame(0, $status);
         $this->assertSame('', $hash);
         $this->assertSame('alice', (string) file_get_contents($argsPath));
@@ -187,12 +171,8 @@ printf '%s' "$password" > "$PMSS_TEST_INPUT"
 printf '%s' "$password" | php -r '$hash = password_hash(stream_get_contents(STDIN), PASSWORD_BCRYPT); $rows = is_file($argv[1]) ? file($argv[1]) : []; $rows = array_filter($rows, function ($row) use ($argv) { return strpos($row, $argv[2].":") !== 0; }); $rows[] = $argv[2].":".$hash."\n"; file_put_contents($argv[1], implode("", $rows));' "$@"
 SH;
         $this->pmssWriteExecutableFile($binDir.'/htpasswd', $stub."\n", 0755, 0700);
-        $originalPath = getenv('PATH');
-        putenv('PATH='.$binDir.':'.$originalPath);
-        putenv('PMSS_TEST_ARGS='.$this->tempDir.'/htpasswd-args');
-        putenv('PMSS_TEST_INPUT='.$this->tempDir.'/htpasswd-input');
         $output = [];
-        try {
+        $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_TEST_ARGS' => $this->tempDir.'/htpasswd-args', 'PMSS_TEST_INPUT' => $this->tempDir.'/htpasswd-input'], function () use ($username, $path, &$output, &$legacyEntry): void {
             $this->assertEquals(0, \pmssUserHtpasswdPasswordUpdate($username, 'test-pass-1', $path, $output));
             $this->assertSame('test-pass-1', (string) file_get_contents($this->tempDir.'/htpasswd-input'));
             $this->assertFalse(strpos((string) file_get_contents($this->tempDir.'/htpasswd-args'), 'test-pass-1') !== false);
@@ -206,11 +186,7 @@ SH;
             $legacyEntry = 'legacy:$apr1$old$unchanged';
             file_put_contents($path, $line."\n".$legacyEntry."\n");
             $this->assertEquals(0, \pmssUserHtpasswdPasswordUpdate($username, 'test-pass-2', $path, $output));
-        } finally {
-            putenv('PATH='.$originalPath);
-            putenv('PMSS_TEST_ARGS');
-            putenv('PMSS_TEST_INPUT');
-        }
+        });
         $lines = file($path, FILE_IGNORE_NEW_LINES);
         $this->assertEquals(2, count($lines));
         $this->assertSame($legacyEntry, $lines[0]);

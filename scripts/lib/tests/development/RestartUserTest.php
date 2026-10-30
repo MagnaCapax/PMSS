@@ -110,13 +110,13 @@ SH
         $locks = \pmssRestartUserLocksAcquire($user, $reason);
         $this->assertTrue(is_array($locks));
         try {
-            $previous = $this->pmssCaptureEnv([\PMSS_UPDATE_LOCK_FDS_ENV]);
-            \pmssRestartUserLocksPrepareChildren($locks);
-            $this->assertStringContainsString('>&-', \pmssLockChildClosePrefix());
-            $this->assertSame(null, \pmssRestartUserLocksAcquire($user, $reason));
-            $this->assertSame('restart already running', $reason);
+            $this->pmssWithTrackedEnv([], function () use ($locks, $user, &$reason): void {
+                \pmssRestartUserLocksPrepareChildren($locks);
+                $this->assertStringContainsString('>&-', \pmssLockChildClosePrefix());
+                $this->assertSame(null, \pmssRestartUserLocksAcquire($user, $reason));
+                $this->assertSame('restart already running', $reason);
+            }, [\PMSS_UPDATE_LOCK_FDS_ENV]);
         } finally {
-            $this->pmssRestoreEnvMap($previous);
             fclose($locks['restart']);
             fclose($locks['recreate']);
         }

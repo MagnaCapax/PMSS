@@ -1663,6 +1663,11 @@ This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
   panel routes, public names, DNS records or certificates.
 
 ## Notes for Agentic Coding
+- Test environment scopes use `TestCase::pmssWithEnv()` and
+  `pmssWithPathPrefixedEnv()` for override/restoration lifetimes. Use
+  `pmssWithTrackedEnv()` when the callback changes additional keys. These helpers
+  restore absent, empty and populated prior values even when callbacks throw;
+  fixture-specific cache and resource cleanup remains with the caller.
 - Fixed-result test operations use `TestCase::pmssMakeCallbacks()`; its optional
   event array records the operation key on each call. Captured values are fixed
   when the map is built, including `false`, `null`, and empty arrays. Keep

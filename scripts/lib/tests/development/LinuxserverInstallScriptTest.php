@@ -392,18 +392,12 @@ BASH;
 
     public function testFirstRunRequiresExplicitUnauthenticatedRefusal(): void
     {
-        $originalPath = getenv('PATH');
         foreach (['200', '302', '404', '500', '000'] as $code) {
             $app = 'radarr';
             $spec = \pmssDockerInstallLsioAppSpec($app, $this->homeDir, false);
-            putenv('PATH='.$this->fakeBinDir.':'.getenv('PATH'));
-            putenv('PMSS_TEST_DOCKER_UNAUTH_CODE='.$code);
-            try {
+            $this->pmssWithPathPrefixedEnv($this->fakeBinDir, ['PMSS_TEST_DOCKER_UNAUTH_CODE' => $code], function () use ($app, $spec): void {
                 $this->assertFalse(\pmssDockerLsioSeedLogin($app, $spec, \pmssDockerLsioSeedCatalog()[$app], ['USER' => 'test', 'PASS' => 'secret']));
-            } finally {
-                putenv('PMSS_TEST_DOCKER_UNAUTH_CODE');
-                putenv('PATH='.$originalPath);
-            }
+            });
         }
     }
 

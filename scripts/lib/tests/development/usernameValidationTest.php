@@ -141,9 +141,7 @@ class UsernameValidationTest extends TestCase
 
     public function testTestAccountPrefixIsReservedForCreateUnlessMarked(): void
     {
-        $saved = getenv('PMSS_TEST_ACCOUNT');
-        putenv('PMSS_TEST_ACCOUNT');
-        try {
+        $this->pmssWithEnv(['PMSS_TEST_ACCOUNT' => null], function (): void {
             foreach (['qatst1a2', 'qatst', 'QATST9'] as $name) {
                 $error = \pmssUsernameCreateValidationError($name);
                 $this->assertTrue(is_array($error) && $error['code'] === 'reserved', 'Expected the test-account prefix to be refused: '.$name);
@@ -158,8 +156,6 @@ class UsernameValidationTest extends TestCase
             $this->assertEquals(null, \pmssUsernameCreateValidationError('qatst1a2'));
             $this->assertTrue(\pmssUsernameIsValidForCreate('qatst1a2'), 'A marked create may use the prefix');
             $this->assertEquals('reserved', \pmssUsernameCreateValidationError('seedbox')['code'] ?? null);
-        } finally {
-            putenv($saved === false ? 'PMSS_TEST_ACCOUNT' : 'PMSS_TEST_ACCOUNT=' . $saved);
-        }
+        });
     }
 }

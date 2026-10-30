@@ -168,18 +168,15 @@ JSON
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
         file_put_contents($jsonLog, '');
 
-        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
-        putenv('PMSS_DRY_RUN=1');
-        putenv('PMSS_JSON_LOG='.$jsonLog);
-        putenv('PMSS_SKEL_DIR');
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 
         $cmd = null;
         try {
-            \pmssUserConfigureHttp($ctx);
-            $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config');
+            $this->pmssWithEnv(['PMSS_DRY_RUN' => '1', 'PMSS_JSON_LOG' => $jsonLog, 'PMSS_SKEL_DIR' => null], function () use ($ctx, $jsonLog, &$cmd): void {
+                \pmssUserConfigureHttp($ctx);
+                $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config');
+            });
         } finally {
-            $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         }
 
@@ -196,16 +193,14 @@ JSON
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
         file_put_contents($jsonLog, '');
 
-        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG']);
-        putenv('PMSS_DRY_RUN=1');
-        putenv('PMSS_JSON_LOG='.$jsonLog);
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         try {
-            \pmssUserConfigureHttp($this->pmssUserUpdateContext($home));
-            $this->assertSame(null, $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config'));
-            $this->assertSame('customer content', file_get_contents($home.'/.irssi'));
+            $this->pmssWithEnv(['PMSS_DRY_RUN' => '1', 'PMSS_JSON_LOG' => $jsonLog], function () use ($home, $jsonLog): void {
+                \pmssUserConfigureHttp($this->pmssUserUpdateContext($home));
+                $this->assertSame(null, $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config'));
+                $this->assertSame('customer content', file_get_contents($home.'/.irssi'));
+            });
         } finally {
-            $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         }
     }
@@ -222,18 +217,15 @@ JSON
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
         file_put_contents($jsonLog, '');
 
-        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
-        putenv('PMSS_DRY_RUN=1');
-        putenv('PMSS_JSON_LOG='.$jsonLog);
-        putenv('PMSS_SKEL_DIR='.$skel);
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 
         $cmd = null;
         try {
-            \pmssUserConfigureHttp($ctx);
-            $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config');
+            $this->pmssWithEnv(['PMSS_DRY_RUN' => '1', 'PMSS_JSON_LOG' => $jsonLog, 'PMSS_SKEL_DIR' => $skel], function () use ($ctx, $jsonLog, &$cmd): void {
+                \pmssUserConfigureHttp($ctx);
+                $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config');
+            });
         } finally {
-            $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         }
 

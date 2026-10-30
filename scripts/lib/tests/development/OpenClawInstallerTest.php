@@ -331,15 +331,11 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         foreach ((array) @scandir('/usr/sbin') as $name) {
             if ($name !== '.' && $name !== '..' && is_file('/usr/sbin/'.$name) && is_executable('/usr/sbin/'.$name)) { $sbin = $name; break; }
         }
-        $path = (string) getenv('PATH');
-        putenv('PATH='.$root);
-        try {
+        $this->pmssWithEnv(['PATH' => $root], function () use ($root, $sbin): void {
             $this->assertSame($root.'/lighttpd', \ocCommandPath('lighttpd'));
             $this->assertSame('pmss-oc-absent-binary', \ocCommandPath('pmss-oc-absent-binary'));
             if ($sbin !== null) $this->assertSame('/usr/sbin/'.$sbin, \ocCommandPath($sbin));
-        } finally {
-            putenv('PATH='.$path);
-        }
+        });
     }
 
     public function testLateProviderDecisionTableProtectsUserChoice(): void
@@ -367,12 +363,10 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $this->assertFalse(\ocPendingProviderApply($paths));
         file_put_contents($home.'/.virsilipasKey', "endpoint=https://ai.example/v1\nkey=private-test-service-key\n");
         chmod($home.'/.virsilipasKey', 0600);
-        $prior = getenv('HOME');
-        putenv('HOME='.$home);
-        try {
+        $this->pmssWithEnv(['HOME' => $home], function () use ($paths): void {
             $this->assertTrue(\ocPendingProviderApply($paths));
             $this->assertFalse(\ocPendingProviderApply($paths));
-        } finally { $prior === false ? putenv('HOME') : putenv('HOME='.$prior); }
+        });
         $calls = file_get_contents($home.'/calls');
         $this->assertSame(2, substr_count($calls, "\n"));
         $this->assertStringContainsString('CUSTOM_API_KEY', $calls);
@@ -664,12 +658,10 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
         mkdir($paths['home'].'/stubs', 0700);
         $this->pmssWriteExecutableFile($paths['home'].'/stubs/quota', "#!/bin/sh\nexit 0\n", 0755, 0700);
         file_put_contents($paths['home'].'/.media-stack-port-openclaw', "23000\n");
-        $prior = getenv('PATH');
-        putenv('PATH='.$paths['home'].'/stubs:'.$prior);
-        try {
+        $this->pmssWithPathPrefix($paths['home'].'/stubs', function () use ($paths): void {
             // The fake gateway exits; no real service or listening socket is created.
             $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Gateway did not stay running');
-        } finally { $prior === false ? putenv('PATH') : putenv('PATH='.$prior); }
+        });
         $model = \ocConfigRead($paths)['models']['providers']['virsilipas']['models'][0];
         $this->assertSame(array('text'), $model['input']);
         $this->assertSame(true, $model['compat']['supportsUsageInStreaming']);
@@ -695,10 +687,7 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
             ."\nwhile [ \$# -gt 0 ]; do [ \"\$1\" = -o ] && printf 'not node' >\"\$2\"; shift; done\n");
         chmod($home.'/stubs/quota', 0700);
         chmod($home.'/stubs/curl', 0700);
-        $prior = getenv('PATH');
-        putenv('PATH='.$home.'/stubs:'.$prior);
-        putenv('OC_TEST_NPM_MARK='.$home.'/npm-ran');
-        try {
+        $this->pmssWithPathPrefixedEnv($home.'/stubs', ['OC_TEST_NPM_MARK' => $home.'/npm-ran'], function () use ($paths, $home): void {
             $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Node download or SHA256 verification failed');
             $url = 'https://nodejs.org/dist/v'.OC_NODE_VERSION.'/node-v'.OC_NODE_VERSION.'-linux-x64.tar.xz';
             $this->assertStringContainsString($url, file_get_contents($home.'/curl-args'));
@@ -715,10 +704,7 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
             $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Gateway did not stay running');
             $this->assertFalse(file_exists($home.'/curl-args'));
             $this->assertTrue(file_exists($home.'/npm-ran'));
-        } finally {
-            $prior === false ? putenv('PATH') : putenv('PATH='.$prior);
-            putenv('OC_TEST_NPM_MARK');
-        }
+        });
     }
 
     /** A node shim at the private runtime path reports a version and runs PHP entry scripts in place of Node. */
@@ -992,22 +978,14 @@ $file = $argv[1]; array_shift($argv); require $file;');
         $keyFile = $home.'/.virsilipasKey';
         file_put_contents($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=first-private-key\n");
         chmod($keyFile, 0600);
-        $prior = getenv('CUSTOM_API_KEY');
-        putenv('CUSTOM_API_KEY');
-        try {
+        $this->pmssWithEnv(['CUSTOM_API_KEY' => null], function () use ($paths, $keyFile): void {
             $this->assertSame('first-private-key', \ocGatewayEnv($paths)['CUSTOM_API_KEY']);
             file_put_contents($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=second-private-key\n");
             $this->assertSame('second-private-key', \ocGatewayEnv($paths)['CUSTOM_API_KEY']);
             $this->assertSame(false, strpos(file_get_contents($paths['env']), 'private-key'));
             unlink($paths['state'].'/pmss-virsilipas');
             $this->assertFalse(isset(\ocGatewayEnv($paths)['CUSTOM_API_KEY']));
-        } finally {
-            if ($prior === false) {
-                putenv('CUSTOM_API_KEY');
-            } else {
-                putenv('CUSTOM_API_KEY='.$prior);
-            }
-        }
+        });
     }
 
     public function testPortCatalogAdoptsGatewayPortAndRejectsInvalidContent(): void
