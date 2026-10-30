@@ -144,10 +144,9 @@ final class TorrentClientsP3CatalogTest extends TestCase
             'cf9d0c1e1e8ef494de78a5cb5b9a0fdfd28f404bb5b0cb1d2ab693c634155200',
         ], array_column(array_column($entries, 'web'), 'sha256'));
         foreach ($entries as $entry) {
-            $this->assertSame('static', $entry['kind']);
-            $this->assertSame(true, $entry['rpcUnixSocket']);
-            $this->assertSame(false, $entry['disabled']);
-            $this->assertSame([], $entry['cve']);
+            $this->pmssAssertArraySubsetSame([
+                'kind' => 'static', 'rpcUnixSocket' => true, 'disabled' => false, 'cve' => [],
+            ], $entry);
             $this->assertSame(['https://pulsedmedia.com/remote/pkg/transmission-daemon-'
                 .$entry['version'].'-static-amd64-r2'], $entry['url']);
             $this->assertSame(['https://pulsedmedia.com/remote/pkg/transmission-web-'

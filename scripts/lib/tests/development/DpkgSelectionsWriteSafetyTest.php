@@ -12,8 +12,7 @@ class DpkgSelectionsWriteSafetyTest extends TestCase
         $length = strlen(implode(PHP_EOL, $lines).PHP_EOL);
         foreach ([0, 1, $length - 1] as $limit) {
             $result = $this->stageWithFileSizeLimit($lines, $limit);
-            $this->assertSame(null, $result['path']);
-            $this->assertSame([], $result['files']);
+            $this->pmssAssertArraySubsetSame(['path' => null, 'files' => []], $result);
             $this->assertSame(
                 ['[ERROR] Unable to write temporary file for sanitized dpkg selections baseline'],
                 $result['logs']
@@ -27,10 +26,9 @@ class DpkgSelectionsWriteSafetyTest extends TestCase
             $payload = implode(PHP_EOL, $lines).PHP_EOL;
             $result = $this->stageWithFileSizeLimit($lines, strlen($payload));
             $this->assertTrue(is_string($result['path']));
-            $this->assertSame([$result['path']], $result['files']);
-            $this->assertSame($payload, $result['payload']);
-            $this->assertSame(0600, $result['mode']);
-            $this->assertSame([], $result['logs']);
+            $this->pmssAssertArraySubsetSame([
+                'files' => [$result['path']], 'payload' => $payload, 'mode' => 0600, 'logs' => [],
+            ], $result);
         }
     }
 

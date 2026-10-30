@@ -22,11 +22,12 @@ final class TorrentClientsEnhancedEditionTest extends TestCase
         $entry = $entries[0];
         $this->assertSame(self::VERSION, $entry['version']);
         $this->assertTrue(\pmssTorrentClientsVersionValid($entry['version']));
-        $this->assertSame(['https://pulsedmedia.com/remote/pkg/qbittorrent-enhanced-nox-5.2.4.10-static-amd64-r1'], $entry['url']);
-        $this->assertSame('4b291578e28663c7d1c88bf41993a832c0eb68b3f9bd345716524c3f37d0565a', $entry['sha256']);
-        $this->assertSame('static', $entry['kind']);
-        $this->assertSame('lt1.2', $entry['compatFamily']);
-        $this->assertSame('Community build of 5.2.4. Its authors ask that it not be used on private trackers.', $entry['note']);
+        $this->pmssAssertArraySubsetSame([
+            'url' => ['https://pulsedmedia.com/remote/pkg/qbittorrent-enhanced-nox-5.2.4.10-static-amd64-r1'],
+            'sha256' => '4b291578e28663c7d1c88bf41993a832c0eb68b3f9bd345716524c3f37d0565a', 'kind' => 'static',
+            'compatFamily' => 'lt1.2',
+            'note' => 'Community build of 5.2.4. Its authors ask that it not be used on private trackers.',
+        ], $entry);
         $this->assertFalse($entry['disabled']);
         $this->assertFalse($entry['isDefault']);
     }

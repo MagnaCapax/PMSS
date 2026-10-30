@@ -64,9 +64,9 @@ final class agentDiagnosticsCliTest extends TestCase
             ['nginx', 'proftpd', 'cron', 'ssh', 'rtorrent_count', 'lighttpd_count'],
             array_keys($payload['sections']['services'])
         );
-        $this->assertSame('git/main@2026-03-28', $payload['version']);
-        $this->assertSame('git/main@2026-03-28', $payload['version_completed']);
-        $this->assertSame('fixtur01', $payload['user']);
+        $this->pmssAssertArraySubsetSame([
+            'version' => 'git/main@2026-03-28', 'version_completed' => 'git/main@2026-03-28', 'user' => 'fixtur01',
+        ], $payload);
         $this->assertSame("hello host\n", $payload['sections']['motd']['raw']);
         $this->assertSame(['fixtur01', 'fixtur02'], $payload['sections']['users']['list']);
         $this->assertSame(4, $payload['sections']['services']['rtorrent_count']);
@@ -75,11 +75,12 @@ final class agentDiagnosticsCliTest extends TestCase
             ['ts' => 1756200000, 'uid' => 1001, 'mem_failcnt' => 126389728, 'mem_current' => 327155712, 'mem_peak' => 327155712, 'mem_limit' => 327155712, 'mem_oom_kill' => 0],
             $payload['sections']['user_metrics_latest']
         );
-        $this->assertSame($payload['sections']['user_metrics_latest'], $payload['sections']['user_metrics_24h_ago']);
-        $this->assertSame(['raw' => 'uid=1001(fixtur01) gid=1001(fixtur01) groups=1001(fixtur01)'], $payload['sections']['user_identity']);
-        $this->assertSame(['raw' => 'Disk quotas for user fixtur01'], $payload['sections']['user_quota']);
-        $this->assertSame(['raw' => '12G /home/fixtur01'], $payload['sections']['user_disk']);
-        $this->assertSame(['raw' => '401 0.012s'], $payload['sections']['user_http_responsiveness']);
+        $this->pmssAssertArraySubsetSame([
+            'user_metrics_24h_ago' => $payload['sections']['user_metrics_latest'],
+            'user_identity' => ['raw' => 'uid=1001(fixtur01) gid=1001(fixtur01) groups=1001(fixtur01)'],
+            'user_quota' => ['raw' => 'Disk quotas for user fixtur01'], 'user_disk' => ['raw' => '12G /home/fixtur01'],
+            'user_http_responsiveness' => ['raw' => '401 0.012s'],
+        ], $payload['sections']);
         $this->assertSame('Fixtur01 Setting', $payload['sections']['user_settings']['label']);
     }
 
@@ -98,8 +99,7 @@ final class agentDiagnosticsCliTest extends TestCase
         $user = "fixtur01'; printf injected";
         $spec = \pmssAgentDiagnosticsSectionSpecs($user)['user_metrics_24h_ago'];
 
-        $this->assertSame('command', $spec['type']);
-        $this->assertSame('json', $spec['format']);
+        $this->pmssAssertArraySubsetSame(['type' => 'command', 'format' => 'json'], $spec);
         $this->assertSame(
             'cat '.escapeshellarg('/var/log/pmss/metrics/archive/'.$user.'.1').' '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null | tail -n 289 | head -1',
             $spec['command']
@@ -181,9 +181,9 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $result = \pmssAgentDiagnosticsPhpScript('../scripts/listUsers.php');
 
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame('', $result['stdout']);
-        $this->assertSame('Diagnostics script path unsafe: ../scripts/listUsers.php', $result['stderr']);
+        $this->pmssAssertArraySubsetSame([
+            'rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script path unsafe: ../scripts/listUsers.php',
+        ], $result);
     }
 
     public function testPhpScriptRejectsNulPathsAndArgumentsWithoutLaunching(): void
@@ -232,9 +232,9 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $unsafeRoot], function () use ($unsafeRoot): void {
             $result = \pmssAgentDiagnosticsPhpScript('scripts/listUsers.php');
 
-            $this->assertSame(1, $result['rc']);
-            $this->assertSame('', $result['stdout']);
-            $this->assertSame('Diagnostics script root unsafe: '.$unsafeRoot, $result['stderr']);
+            $this->pmssAssertArraySubsetSame([
+                'rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script root unsafe: '.$unsafeRoot,
+            ], $result);
         });
     }
 

@@ -34,10 +34,10 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         $decision = \pmssAiClaudeDecision(['-p', 'hello'], $env, $state);
         $this->assertSame([\PMSS_AI_CLAUDE_BINARY, '-p', 'hello'], $decision['argv']);
         $this->assertStringNotContainsString('private-test-key', implode(' ', $decision['argv']));
-        $this->assertSame('https://virsilipas.mcx.fi', $decision['env']['ANTHROPIC_BASE_URL']);
-        $this->assertSame('private-test-key', $decision['env']['ANTHROPIC_AUTH_TOKEN']);
-        $this->assertSame('own', $decision['env']['ANTHROPIC_MODEL']);
-        $this->assertSame('', $decision['env']['ANTHROPIC_DEFAULT_HAIKU_MODEL']);
+        $this->pmssAssertArraySubsetSame([
+            'ANTHROPIC_BASE_URL' => 'https://virsilipas.mcx.fi', 'ANTHROPIC_AUTH_TOKEN' => 'private-test-key',
+            'ANTHROPIC_MODEL' => 'own', 'ANTHROPIC_DEFAULT_HAIKU_MODEL' => '',
+        ], $decision['env']);
         foreach (['ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL',
             'ANTHROPIC_SMALL_FAST_MODEL'] as $name) {
             $this->assertSame('default', $decision['env'][$name]);
@@ -129,8 +129,9 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
             $this->pmssWriteExecutableFile($bin.'/node', "#!/bin/sh\n");
         }
         $out = \pmssAiNodeRuntimePath($env, $this->tempDir);
-        $this->assertSame($this->tempDir.'/node-v22.23.4-linux-x64/bin:/usr/bin:/bin', $out['PATH']);
-        $this->assertSame('/tmp/pmss-test-home', $out['HOME']);
+        $this->pmssAssertArraySubsetSame([
+            'PATH' => $this->tempDir.'/node-v22.23.4-linux-x64/bin:/usr/bin:/bin', 'HOME' => '/tmp/pmss-test-home',
+        ], $out);
         $bare = \pmssAiNodeRuntimePath(['HOME' => '/tmp/pmss-test-home'], $this->tempDir);
         $this->assertSame($this->tempDir.'/node-v22.23.4-linux-x64/bin', $bare['PATH']);
     }

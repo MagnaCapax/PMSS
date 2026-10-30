@@ -81,8 +81,7 @@ RC;
         foreach ([$stock, $previous, $legacy] as $old) {
             $result = $this->runRefreshPermissionsWithStepRc(0, $old);
             $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
-            $this->assertSame($skeleton, $result['content']);
-            $this->assertSame(0640, $result['mode']);
+            $this->pmssAssertArraySubsetSame(['content' => $skeleton, 'mode' => 0640], $result);
         }
     }
 
@@ -99,18 +98,17 @@ RC;
     {
         $result = $this->runRefreshPermissionsWithStepRc(0, null, 'repeat');
 
-        $this->assertSame($this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom'), $result['content']);
-        $this->assertSame(0640, $result['mode']);
-        $this->assertSame($result['expectedUid'], $result['uid']);
-        $this->assertSame($result['firstInode'], $result['inode']);
+        $this->pmssAssertArraySubsetSame([
+            'content' => $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom'), 'mode' => 0640,
+            'uid' => $result['expectedUid'], 'inode' => $result['firstInode'],
+        ], $result);
     }
 
     public function testRefreshPermissionsPreservesEmptyAndCurrentConfigs(): void
     {
         foreach (['', $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom')] as $content) {
             $result = $this->runRefreshPermissionsWithStepRc(0, $content);
-            $this->assertSame($content, $result['content']);
-            $this->assertSame(0600, $result['mode']);
+            $this->pmssAssertArraySubsetSame(['content' => $content, 'mode' => 0600], $result);
         }
     }
 
@@ -127,8 +125,7 @@ RC;
     {
         foreach (['dry', 'missing-skeleton'] as $kind) {
             $result = $this->runRefreshPermissionsWithStepRc(0, null, $kind);
-            $this->assertSame(false, $result['content']);
-            $this->assertSame('', $result['exception']);
+            $this->pmssAssertArraySubsetSame(['content' => false, 'exception' => ''], $result);
         }
     }
 

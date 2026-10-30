@@ -24,10 +24,11 @@ final class DockerTorrentClientProxyTest extends TestCase
     {
         $spec = \pmssDockerInstallLsioAppSpec('transmission', '/srv/customer', false);
         $spec['peerPort'] = 23002;
-        $this->assertSame('127.0.0.1', $spec['bindHost']);
-        $this->assertSame('9091', $spec['containerPort']);
-        $this->assertSame('/srv/customer/docker/transmission/pmss-credentials.env', $spec['credentialFile']);
-        $this->assertSame(['/srv/customer/docker/transmission/config', '/srv/customer/downloads', '/srv/customer/watch'], $spec['mkdirPaths']);
+        $this->pmssAssertArraySubsetSame([
+            'bindHost' => '127.0.0.1', 'containerPort' => '9091',
+            'credentialFile' => '/srv/customer/docker/transmission/pmss-credentials.env',
+            'mkdirPaths' => ['/srv/customer/docker/transmission/config', '/srv/customer/downloads', '/srv/customer/watch'],
+        ], $spec);
         $command = \pmssDockerInstallLsioDockerRunCommand('transmission', '23001', 'UTC', $spec);
         $this->assertSame('pmss.client=transmission', $command[array_search('--label', $command, true) + 1]);
         $this->assertSame('127.0.0.1:23001:9091', $command[array_search('-p', $command, true) + 1]);

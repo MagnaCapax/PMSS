@@ -31,15 +31,13 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
             'md0/md/array_state' => "clean\n", 'md0/md/level' => "raid10\n", 'md0/md/degraded' => "1\n"]);
 
         $disk = $this->deviceResolve($sysfs, '/dev/sda', 1024 * 1024 * 1024);
-        $this->assertSame(true, $disk['ok']);
-        $this->assertSame(1, $disk['rota']);
-        $this->assertSame(1024 * 1024 * 1024, $disk['size']);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'rota' => 1, 'size' => 1024 * 1024 * 1024], $disk);
         $this->assertFalse(isset($disk['md']));
 
         $md = $this->deviceResolve($sysfs, '/dev/md0', 1024 * 1024 * 1024);
-        $this->assertSame(true, $md['ok']);
-        $this->assertSame(0, $md['rota']);
-        $this->assertSame(['array_state' => 'clean', 'degraded' => 1, 'level' => 'raid10'], $md['md']);
+        $this->pmssAssertArraySubsetSame([
+            'ok' => true, 'rota' => 0, 'md' => ['array_state' => 'clean', 'degraded' => 1, 'level' => 'raid10'],
+        ], $md);
     }
 
     public function testMissingMdDegradedOnlyAllowedWithoutRedundancy(): void
@@ -49,13 +47,13 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
 
         file_put_contents($sysfs.'/md0/md/level', "raid0\n");
         $raid0 = $this->deviceResolve($sysfs, '/dev/md0');
-        $this->assertSame(true, $raid0['ok']);
-        $this->assertSame(['array_state' => 'clean', 'degraded' => 0, 'level' => 'raid0'], $raid0['md']);
+        $this->pmssAssertArraySubsetSame([
+            'ok' => true, 'md' => ['array_state' => 'clean', 'degraded' => 0, 'level' => 'raid0'],
+        ], $raid0);
 
         file_put_contents($sysfs.'/md0/md/level', "raid10\n");
         $raid10 = $this->deviceResolve($sysfs, '/dev/md0');
-        $this->assertSame(false, $raid10['ok']);
-        $this->assertSame('unable to read md array status', $raid10['error']);
+        $this->pmssAssertArraySubsetSame(['ok' => false, 'error' => 'unable to read md array status'], $raid10);
     }
 
     public function testMdDegradedCounterRejectsMalformedAndOverflowedValues(): void
@@ -66,8 +64,7 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         foreach (['', '-1', '1.0', '1x', (string) PHP_INT_MAX.'0'] as $counter) {
             file_put_contents($sysfs.'/md0/md/degraded', $counter."\n");
             $result = $this->deviceResolve($sysfs, '/dev/md0');
-            $this->assertSame(false, $result['ok']);
-            $this->assertSame('unable to read md array status', $result['error']);
+            $this->pmssAssertArraySubsetSame(['ok' => false, 'error' => 'unable to read md array status'], $result);
         }
 
         file_put_contents($sysfs.'/md0/md/degraded', "0001\n");
@@ -126,12 +123,12 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $check = static function () use ($fixture): bool { return is_readable($fixture) && filetype($fixture) === 'block'; };
         foreach (['overlay', '/dev/../etc/passwd', "/dev/sda\nother", '/dev/sda'.chr(0).'x'] as $unsafe) {
             $result = $this->deviceResolve($sysfs, $unsafe, 1048576, $check);
-            $this->assertSame(false, $result['ok']);
-            $this->assertSame('unsafe or unavailable mount device', $result['error']);
+            $this->pmssAssertArraySubsetSame(['ok' => false, 'error' => 'unsafe or unavailable mount device'], $result);
         }
         $result = $this->deviceResolve($sysfs, '/dev/sda', 1048576, $check);
-        $this->assertSame(false, $result['ok']);
-        $this->assertSame('mount device is not a readable block device', $result['error']);
+        $this->pmssAssertArraySubsetSame([
+            'ok' => false, 'error' => 'mount device is not a readable block device',
+        ], $result);
     }
 
     public function testMissingFioRecordsUnmeasuredRandomAndRunsDdOnly(): void

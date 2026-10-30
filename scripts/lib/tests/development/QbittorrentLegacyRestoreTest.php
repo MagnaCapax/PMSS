@@ -38,15 +38,16 @@ final class QbittorrentLegacyRestoreTest extends TemporaryHomeRootTestCase
             ."[State]\nBannedIPs=192.0.2.1\n[Preferences]\nDownloads\\SavePath=/owner-edit\n";
         foreach (['pmssQbittorrentRestoreContent', 'pmssQbittorrentFrontendRestoreContent'] as $restore) {
             $values = \pmssQbittorrentConfigValues($restore($config));
-            $this->assertSame('/owner-edit', $values['Preferences']['Downloads\\SavePath']);
-            $this->assertSame('false', $values['Preferences']['Downloads\\NewAdditionDialog']);
+            $this->pmssAssertArraySubsetSame([
+                'Downloads\\SavePath' => '/owner-edit', 'Downloads\\NewAdditionDialog' => 'false',
+            ], $values['Preferences']);
             $this->assertSame('@ByteArray(state)', $values['AddNewTorrentDialog']['qt5\\treeHeaderState']);
             $this->assertSame('/home/qafix081', $values['TorrentAdditionDlg']['save_path_history']);
-            $this->assertSame('false', $values['Preferences']['Bittorrent\\DHT']);
-            $this->assertSame('50000', $values['Preferences']['Connection\\PortRangeMin']);
-            $this->assertSame('true', $values['Preferences']['Advanced\\trackerEnabled']);
-            $this->assertSame('proxy.example', $values['Preferences']['Connection\\Proxy\\IP']);
-            $this->assertSame('192.0.2.1', $values['Preferences']['IPFilter\\BannedIPs']);
+            $this->pmssAssertArraySubsetSame([
+                'Bittorrent\\DHT' => 'false', 'Connection\\PortRangeMin' => '50000',
+                'Advanced\\trackerEnabled' => 'true', 'Connection\\Proxy\\IP' => 'proxy.example',
+                'IPFilter\\BannedIPs' => '192.0.2.1',
+            ], $values['Preferences']);
         }
     }
 
@@ -54,8 +55,9 @@ final class QbittorrentLegacyRestoreTest extends TemporaryHomeRootTestCase
     {
         $config = file_get_contents(__DIR__.'/../fixtures/qbittorrentMigrated53.conf');
         $values = \pmssQbittorrentConfigValues(\pmssQbittorrentRestoreContent($config));
-        $this->assertSame('/home/qafix081/export', $values['Preferences']['Downloads\\TorrentExportDir']);
-        $this->assertSame('', $values['Preferences']['Downloads\\FinishedTorrentExportDir']);
+        $this->pmssAssertArraySubsetSame([
+            'Downloads\\TorrentExportDir' => '/home/qafix081/export', 'Downloads\\FinishedTorrentExportDir' => '',
+        ], $values['Preferences']);
     }
 
     public function testPre44RoundTripPreservesOwnerSpeedAndPasswordEditsWithoutChangingMeta(): void
@@ -89,10 +91,10 @@ final class QbittorrentLegacyRestoreTest extends TemporaryHomeRootTestCase
             foreach ([$old, $restore($old, '5.3.0', '4.2.5')] as $result) {
                 $values = \pmssQbittorrentConfigValues($result);
                 $this->assertSame('12', $values['Meta']['MigrationVersion']);
-                $this->assertSame('true', $values['Network']['Proxy\Profiles\BitTorrent']);
-                $this->assertSame('false', $values['Network']['Proxy\Profiles\RSS']);
-                $this->assertSame('false', $values['Network']['Proxy\Profiles\Misc']);
-                $this->assertSame('true', $values['Network']['Proxy\HostnameLookupEnabled']);
+                $this->pmssAssertArraySubsetSame([
+                    'Proxy\Profiles\BitTorrent' => 'true', 'Proxy\Profiles\RSS' => 'false',
+                    'Proxy\Profiles\Misc' => 'false', 'Proxy\HostnameLookupEnabled' => 'true',
+                ], $values['Network']);
             }
         }
     }

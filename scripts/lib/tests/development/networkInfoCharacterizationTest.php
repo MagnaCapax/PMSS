@@ -40,11 +40,12 @@ echo json_encode(['speeds' => $results, 'commands' => $speedCommands,
     'rejectedCalls' => $rejectedCalls, 'routes' => $routes, 'routeCommands' => $GLOBALS['commands']]);
 PHP;
         $result = $this->pmssRunInlinePhpJson($script);
-        $this->assertSame([0, 0, 0, 0, 0, 0, 1000, PHP_INT_MAX, 0, 0, 0, 0, 0], $result['speeds']);
-        $this->assertSame(0, $result['rejectedCalls']);
-        $this->assertSame(array_fill(0, 8, "/sbin/ethtool 'fixture0' 2>/dev/null"), $result['commands']);
-        $this->assertSame(['eth0', 'eth0', 'eth0', 'eth0', 'eth0', 'route9'], $result['routes']);
-        $this->assertSame(array_fill(0, 6, "/sbin/ip route | awk '/default/ {print \$5; exit}'"), $result['routeCommands']);
+        $this->pmssAssertArraySubsetSame([
+            'speeds' => [0, 0, 0, 0, 0, 0, 1000, PHP_INT_MAX, 0, 0, 0, 0, 0], 'rejectedCalls' => 0,
+            'commands' => array_fill(0, 8, "/sbin/ethtool 'fixture0' 2>/dev/null"),
+            'routes' => ['eth0', 'eth0', 'eth0', 'eth0', 'eth0', 'route9'],
+            'routeCommands' => array_fill(0, 6, "/sbin/ip route | awk '/default/ {print \$5; exit}'"),
+        ], $result);
     }
 
     public function testGlobalsStayAlignedWithHelperResults(): void
@@ -56,8 +57,7 @@ PHP;
             .'"speed" => getLinkSpeed(detectPrimaryInterface()),'
             .']);', [], '2>/dev/null', true);
 
-        $this->assertSame($result['detect'], $result['link']);
-        $this->assertSame($result['speed'], $result['linkSpeed']);
+        $this->pmssAssertArraySubsetSame(['link' => $result['detect'], 'linkSpeed' => $result['speed']], $result);
     }
 
     public function testConfigProbeDelegatesToSharedHelper(): void

@@ -27,11 +27,11 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             'kind' => 'system', 'compatFamily' => 'rtorrent', 'cve' => [], 'disabled' => false,
             'isDefault' => false, 'binary' => '/usr/local/bin/rtorrent'], $system);
         $this->assertTrue($this->entries()[2]['isDefault']);
-        $this->assertSame('0.9.8-r16', $entry['version']);
-        $this->assertSame('static', $entry['kind']);
-        $this->assertSame('0.9.8', $entry['compatFamily']);
-        $this->assertSame(['https://github.com/jesec/rtorrent/releases/download/v0.9.8-r16/rtorrent-linux-amd64'], $entry['url']);
-        $this->assertSame('974c367b92eca69b85de8afde4937559b8396dc996694da2e7cb4fdc38dc8b40', $entry['sha256']);
+        $this->pmssAssertArraySubsetSame([
+            'version' => '0.9.8-r16', 'kind' => 'static', 'compatFamily' => '0.9.8',
+            'url' => ['https://github.com/jesec/rtorrent/releases/download/v0.9.8-r16/rtorrent-linux-amd64'],
+            'sha256' => '974c367b92eca69b85de8afde4937559b8396dc996694da2e7cb4fdc38dc8b40',
+        ], $entry);
         $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $entry['sha256']));
         $this->assertFalse($entry['isDefault']);
         // Offered again with the bundled ruTorrent compatibility patches (ADR 0146).
@@ -67,8 +67,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             symlink(dirname($binary), $home.'/bin/rtorrent/default');
             $this->assertSame($binary, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
             $result = $this->pmssExecShellCommand(\pmssRtorrentExecutorCommand($home, $projection, $store), [], '');
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame(['selected-rtorrent'], $result['lines']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'lines' => ['selected-rtorrent']], $result);
             $this->assertFalse(is_link($store.'/rtorrent/default'));
             unlink($binary);
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $projection));
@@ -139,11 +138,11 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         foreach (['0.16.25' => '84f2b40561f353249fa463d1f79a8d3f6c5ce886cbd974372d4e5553201e2f49',
             '0.16.26' => '27a5150d55e6eeec7db95d4808cb51a32025e6171a23897b3a5ce173834cd3be'] as $version => $sha256) {
             $entry = $this->entries()[$version === '0.16.25' ? 2 : 3];
-            $this->assertSame('static', $entry['kind']);
-            $this->assertSame('0.16', $entry['compatFamily']);
-            $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-'.$version.'-static-amd64-r1'], $entry['url']);
-            $this->assertSame($sha256, $entry['sha256']);
-            $this->assertSame($version === '0.16.25', $entry['isDefault']);
+            $this->pmssAssertArraySubsetSame([
+                'kind' => 'static', 'compatFamily' => '0.16',
+                'url' => ['https://pulsedmedia.com/remote/pkg/rtorrent-'.$version.'-static-amd64-r1'],
+                'sha256' => $sha256, 'isDefault' => $version === '0.16.25',
+            ], $entry);
             $this->assertFalse($entry['disabled']);
             $this->assertSame([], $entry['cve']);
         }
@@ -195,12 +194,13 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     public function testStickzForkEntryIsPinnedOptInZeroNineEightFamily(): void
     {
         $entry = $this->entries()[4];
-        $this->assertSame('0.9.8-stickz7.2', $entry['version']);
-        $this->assertSame('static', $entry['kind']);
+        $this->pmssAssertArraySubsetSame(['version' => '0.9.8-stickz7.2', 'kind' => 'static'], $entry);
         // Same rc and process-name family as 0.9.8, so it launches without -D.
-        $this->assertSame('0.9.8', $entry['compatFamily']);
-        $this->assertSame(['https://pulsedmedia.com/remote/pkg/rtorrent-stickz-7.2-static-amd64-r1'], $entry['url']);
-        $this->assertSame('726f9ce28d2675425d45a624b95957b22f2777d4ccacf3634e5f9f7da3cf003c', $entry['sha256']);
+        $this->pmssAssertArraySubsetSame([
+            'compatFamily' => '0.9.8',
+            'url' => ['https://pulsedmedia.com/remote/pkg/rtorrent-stickz-7.2-static-amd64-r1'],
+            'sha256' => '726f9ce28d2675425d45a624b95957b22f2777d4ccacf3634e5f9f7da3cf003c',
+        ], $entry);
         $this->assertFalse($entry['isDefault']);
         $this->assertFalse($entry['disabled']);
     }

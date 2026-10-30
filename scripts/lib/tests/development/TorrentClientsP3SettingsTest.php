@@ -28,12 +28,11 @@ final class TorrentClientsP3SettingsTest extends TestCase
         [$home, $path, $ops] = $this->fixture('{}');
         $this->assertTrue(\pmssTransmissionSettingsApply('t', $home, $ops));
         $settings = json_decode((string) file_get_contents($path), true);
-        $this->assertSame('unix:'.$home.'/.lighttpd/transmission.sock', $settings['rpc-bind-address']);
-        $this->assertSame('0700', $settings['rpc-socket-mode']);
-        $this->assertSame(true, $settings['rpc-whitelist-enabled']);
-        $this->assertSame('', $settings['rpc-whitelist']);
-        $this->assertSame(false, $settings['rpc-authentication-required']);
-        $this->assertSame('/user-t/transmission/', $settings['rpc-url']);
+        $this->pmssAssertArraySubsetSame([
+            'rpc-bind-address' => 'unix:'.$home.'/.lighttpd/transmission.sock', 'rpc-socket-mode' => '0700',
+            'rpc-whitelist-enabled' => true, 'rpc-whitelist' => '', 'rpc-authentication-required' => false,
+            'rpc-url' => '/user-t/transmission/',
+        ], $settings);
     }
 
     public function testKebabKeysStayKebabAndTwinsDisappear(): void

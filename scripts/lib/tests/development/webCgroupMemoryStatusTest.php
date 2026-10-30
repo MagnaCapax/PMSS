@@ -180,9 +180,9 @@ class WebCgroupMemoryStatusTest extends TestCase
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
-        $this->assertSame('THROTTLED', $status['status']);
-        $this->assertSame(50.0, $status['usage_percent']);
-        $this->assertSame(100.0, $status['high_percent']);
+        $this->pmssAssertArraySubsetSame([
+            'status' => 'THROTTLED', 'usage_percent' => 50.0, 'high_percent' => 100.0,
+        ], $status);
         $this->assertStringContainsString('reduced speed', $status['message']);
     }
 
@@ -192,8 +192,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
-        $this->assertSame('memory.high', $status['limit_source']);
-        $this->assertSame(3221225472, $status['limit_bytes']);
+        $this->pmssAssertArraySubsetSame(['limit_source' => 'memory.high', 'limit_bytes' => 3221225472], $status);
         $this->assertStringContainsString('2.0 GiB / 3.0 GiB', $status['usage_text']);
     }
 
@@ -209,10 +208,10 @@ class WebCgroupMemoryStatusTest extends TestCase
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
 
         $this->assertTrue($status['available']);
-        $this->assertSame(2147483648, $status['memory_current']);
-        $this->assertSame(3221225472, $status['memory_high']);
-        $this->assertSame(null, $status['memory_max']);
-        $this->assertSame('memory.high', $status['limit_source']);
+        $this->pmssAssertArraySubsetSame([
+            'memory_current' => 2147483648, 'memory_high' => 3221225472, 'memory_max' => null,
+            'limit_source' => 'memory.high',
+        ], $status);
         $this->assertStringContainsString('2.0 GiB / 3.0 GiB', $status['usage_text']);
         $this->pmssAssertRepoFileContract('etc/skel/www/webCgroupMemoryRead.php', array(
             'forbidden' => array('systemctl show user-'),
@@ -232,8 +231,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
 
-        $this->assertSame(4, $status['oom_kill_events']);
-        $this->assertSame('HIGH', $status['status']);
+        $this->pmssAssertArraySubsetSame(['oom_kill_events' => 4, 'status' => 'HIGH'], $status);
         $this->assertStringContainsAllStrings(['out-of-memory', 'Extra RAM'], $status['message']);
     }
 
@@ -252,8 +250,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
 
-        $this->assertSame(3, $status['oom_kill_events']);
-        $this->assertSame('HIGH', $status['status']);
+        $this->pmssAssertArraySubsetSame(['oom_kill_events' => 3, 'status' => 'HIGH'], $status);
     }
 
     public function testReadSurfacesNestedSessionOomKills(): void
@@ -265,9 +262,9 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->pmssWriteFile($dir.'/session-1.scope/run-1.scope/memory.oom_control', "oom_kill 2\n");
         $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 0, 'last_increase' => null, 'sampled_at' => 100]));
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
-        $this->assertSame(2, $status['oom_kill_events']);
-        $this->assertSame(true, $status['oom_kill_recent']);
-        $this->assertSame('HIGH', $status['status']);
+        $this->pmssAssertArraySubsetSame([
+            'oom_kill_events' => 2, 'oom_kill_recent' => true, 'status' => 'HIGH',
+        ], $status);
     }
 
     public function testOomRecencyRejectsLifetimeAndStaleSignals(): void
@@ -289,9 +286,7 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 4, 'last_increase' => 100, 'sampled_at' => 86500]));
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 86500]);
-        $this->assertSame(4, $status['oom_kill_events']);
-        $this->assertSame('LOW', $status['status']);
-        $this->assertSame('', $status['message']);
+        $this->pmssAssertArraySubsetSame(['oom_kill_events' => 4, 'status' => 'LOW', 'message' => ''], $status);
     }
 
     public function testReadUsesAnonymousMemoryForPressureButReportsInclusiveCurrent(): void
@@ -340,9 +335,9 @@ class WebCgroupMemoryStatusTest extends TestCase
         unlink($dir.'/cgroup.controllers');
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
 
-        $this->assertSame(null, $status['pressure_some_avg10']);
-        $this->assertSame(null, $status['pressure_full_avg10']);
-        $this->assertSame('LOW', $status['status']);
+        $this->pmssAssertArraySubsetSame([
+            'pressure_some_avg10' => null, 'pressure_full_avg10' => null, 'status' => 'LOW',
+        ], $status);
     }
 
     public function testCustomerPanelsOmitUnavailableThrottleEventCount(): void

@@ -9,7 +9,7 @@ class addUserCliTest extends TestCase
 {
     public function testProfilesUseTheDefinitionsAndRejectUnknownValues(): void
     {
-        $args = array('alice', 'rand', '2048', '200');
+        $args = array('fixtur01', 'rand', '2048', '200');
         $this->assertSame('default', $this->parseAddUserCli($args)['user']['appProfile']);
         foreach (array_keys(\pmssUserAppProfiles()) as $profile) {
             $this->assertSame($profile, $this->parseAddUserCli(array_merge($args, array('--app-profile='.$profile)))['user']['appProfile']);
@@ -28,7 +28,7 @@ class addUserCliTest extends TestCase
     public function testProfileConfigUsesTheExistingCommandAndExplicitDockerOptionWins(): void
     {
         foreach (\pmssUserAppProfiles() as $profile => $apps) {
-            $args = ['alice', 'rand', '2048', '200', '--app-profile='.$profile];
+            $args = ['fixtur01', 'rand', '2048', '200', '--app-profile='.$profile];
             $user = $this->parseAddUserCli($args)['user'];
             $command = \pmssAddUserBuildUserConfigCommand($user);
             // Only a value that differs from the policy default (on) is passed, so the store keeps meaning a choice.
@@ -70,21 +70,18 @@ class addUserCliTest extends TestCase
 
     public function testLegacyPositionalArgumentsRemainSupported(): void
     {
-        $cli = $this->parseAddUserCli(['alice', 'rand', '512', '100', '500', '80', '16']);
+        $cli = $this->parseAddUserCli(['fixtur01', 'rand', '512', '100', '500', '80', '16']);
 
-        $this->assertSame('alice', $cli['user']['name']);
-        $this->assertSame('', $cli['user']['password']);
-        $this->assertSame('512', $cli['user']['memory']);
-        $this->assertSame('100', $cli['user']['quota']);
-        $this->assertSame('500', $cli['user']['trafficLimit']);
-        $this->assertSame('80', $cli['user']['trafficCapMbit']);
-        $this->assertSame(16, $cli['user']['torrentThrottle']);
+        $this->pmssAssertArraySubsetSame([
+            'name' => 'fixtur01', 'password' => '', 'memory' => '512', 'quota' => '100', 'trafficLimit' => '500',
+            'trafficCapMbit' => '80', 'torrentThrottle' => 16,
+        ], $cli['user']);
     }
 
     public function testLongOptionsPopulateAdvancedResources(): void
     {
         $cli = $this->parseAddUserCli([
-            '--user=alice',
+            '--user=fixtur01',
             '--password=secret',
             '--ram-mib=512',
             '--disk-quota-gib=100',
@@ -103,25 +100,18 @@ class addUserCliTest extends TestCase
             '--docker-enabled=false',
         ]);
 
-        $this->assertSame('200', $cli['user']['CPUWeight']);
-        $this->assertSame('300', $cli['user']['IOWeight']);
-        $this->assertSame('/dev/sda:5M', $cli['user']['IOReadBW']);
-        $this->assertSame('/dev/sda:7M', $cli['user']['IOWriteBW']);
-        $this->assertSame('/dev/sda:100', $cli['user']['IOReadIOPS']);
-        $this->assertSame('/dev/sda:200', $cli['user']['IOWriteIOPS']);
-        $this->assertSame('150', $cli['user']['cpuQuotaPercent']);
-        $this->assertSame('123456', $cli['user']['iopsLimit']);
-        $this->assertSame('50', $cli['user']['ioLatencyMs']);
-        $this->assertSame('enable=1 ctrl=user', $cli['user']['ioCostQos']);
-        $this->assertSame('ctrl=user model=linear', $cli['user']['ioCostModel']);
-        $this->assertSame('80', $cli['user']['trafficCapMbit']);
-        $this->assertSame('false', $cli['user']['dockerEnabled']);
+        $this->pmssAssertArraySubsetSame([
+            'CPUWeight' => '200', 'IOWeight' => '300', 'IOReadBW' => '/dev/sda:5M', 'IOWriteBW' => '/dev/sda:7M',
+            'IOReadIOPS' => '/dev/sda:100', 'IOWriteIOPS' => '/dev/sda:200', 'cpuQuotaPercent' => '150',
+            'iopsLimit' => '123456', 'ioLatencyMs' => '50', 'ioCostQos' => 'enable=1 ctrl=user',
+            'ioCostModel' => 'ctrl=user model=linear', 'trafficCapMbit' => '80', 'dockerEnabled' => 'false',
+        ], $cli['user']);
     }
 
     public function testDockerEnabledRequiresExplicitValue(): void
     {
         $this->assertAddUserParseFails([
-            '--user=alice',
+            '--user=fixtur01',
             '--password=secret',
             '--ram-mib=512',
             '--disk-quota-gib=100',
@@ -132,20 +122,20 @@ class addUserCliTest extends TestCase
     public function testBonusQuotaRequiresANonNegativeInteger(): void
     {
         $cli = $this->parseAddUserCli([
-            '--user=alice', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100',
+            '--user=fixtur01', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100',
             '--bonus-quota-gib=25',
         ]);
         $this->assertSame(25, $cli['user']['bonusQuotaGiB']);
 
         $zero = $this->parseAddUserCli([
-            '--user=alice', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100',
+            '--user=fixtur01', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100',
             '--bonus-quota-gib=0',
         ]);
         $this->assertSame(0, $zero['user']['bonusQuotaGiB']);
 
         foreach (['--bonus-quota-gib', '--bonus-quota-gib=-1', '--bonus-quota-gib=1.5', '--bonus-quota-gib= 1', '--bonus-quota-gib=999999999999999999999999'] as $invalid) {
             $this->assertAddUserParseFails([
-                '--user=alice', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100', $invalid,
+                '--user=fixtur01', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100', $invalid,
             ], 'Invalid --bonus-quota-gib value');
         }
     }
@@ -153,7 +143,7 @@ class addUserCliTest extends TestCase
     public function testLongOptionsOverrideLegacyPositionals(): void
     {
         $cli = $this->parseAddUserCli([
-            'alice',
+            'fixtur01',
             'secret',
             '512',
             '100',
@@ -162,32 +152,28 @@ class addUserCliTest extends TestCase
             '--traffic-limit-gb=900',
         ]);
 
-        $this->assertSame('1024', $cli['user']['memory']);
-        $this->assertSame('250', $cli['user']['quota']);
-        $this->assertSame('900', $cli['user']['trafficLimit']);
+        $this->pmssAssertArraySubsetSame(['memory' => '1024', 'quota' => '250', 'trafficLimit' => '900'], $cli['user']);
     }
 
     public function testFirstPositionalUsernameCanMixWithNamedOptions(): void
     {
         $cli = $this->parseAddUserCli([
-            'alice',
+            'fixtur01',
             '--password=secret',
             '--ram-mib=1024',
             '--disk-quota-gib=250',
             '--io-weight=300',
         ]);
 
-        $this->assertSame('alice', $cli['user']['name']);
-        $this->assertSame('secret', $cli['user']['password']);
-        $this->assertSame('1024', $cli['user']['memory']);
-        $this->assertSame('250', $cli['user']['quota']);
-        $this->assertSame('300', $cli['user']['IOWeight']);
+        $this->pmssAssertArraySubsetSame([
+            'name' => 'fixtur01', 'password' => 'secret', 'memory' => '1024', 'quota' => '250', 'IOWeight' => '300',
+        ], $cli['user']);
     }
 
     public function testRejectsNegativeUploadThrottle(): void
     {
         $this->assertAddUserParseFails([
-            '--user=alice',
+            '--user=fixtur01',
             '--password=secret',
             '--ram-mib=512',
             '--disk-quota-gib=100',
@@ -198,7 +184,7 @@ class addUserCliTest extends TestCase
     public function testUserConfigCommandPadsSkippedOptionalSlots(): void
     {
         $command = \pmssAddUserBuildUserConfigCommand([
-            'name' => 'alice',
+            'name' => 'fixtur01',
             'memory' => '512',
             'quota' => '100',
             'CPUWeight' => '200',
@@ -208,7 +194,7 @@ class addUserCliTest extends TestCase
             'dockerEnabled' => 'false',
         ]);
 
-        $this->assertStringContainsAllStrings(["'/scripts/util/userConfig.php' 'alice' '512' '100' '' '200' '' '' '' '' '' '150'", "'--upload-throttle-kib=16'", "'--iops-limit=1234'", "'--docker-enabled=false'"], $command);
+        $this->assertStringContainsAllStrings(["'/scripts/util/userConfig.php' 'fixtur01' '512' '100' '' '200' '' '' '' '' '' '150'", "'--upload-throttle-kib=16'", "'--iops-limit=1234'", "'--docker-enabled=false'"], $command);
     }
 
     private function parseAddUserCli(array $args): array

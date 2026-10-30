@@ -21,7 +21,7 @@ class PmssStatsCollectTest extends TestCase
         $this->configDir = $this->pmssMakeTempDir('pmss-stats-config-');
         $this->cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');
 
-        $this->pmssWriteRelativeFile($this->configDir, 'users/alice.json', json_encode([
+        $this->pmssWriteRelativeFile($this->configDir, 'users/fixtur01.json', json_encode([
             'ramMiB' => 8192,
             'quota' => 4096,
             'quotaBurst' => 5120,
@@ -31,7 +31,7 @@ class PmssStatsCollectTest extends TestCase
 
         foreach ([
             '.quota' => implode("\n", [
-                'Disk quotas for user alice (uid 1000):',
+                'Disk quotas for user fixtur01 (uid 1000):',
                 'Filesystem  blocks   quota   limit   grace',
                 '/dev/md0  1.2T  4.0T  4.0T',
             ]),
@@ -72,7 +72,7 @@ class PmssStatsCollectTest extends TestCase
             'socket_path' => $this->home.'/.rtorrent.socket',
         ]);
 
-        $this->pmssAssertArraySubsetSame(['user' => 'alice'], $stats['context']);
+        $this->pmssAssertArraySubsetSame(['user' => 'fixtur01'], $stats['context']);
         $this->pmssAssertArraySubsetSame(['product' => 'M10G S', 'pmss_version' => '2.8.14'], $stats);
         $this->assertEquals(30.0, round((float) $stats['disk']['percent'], 2));
         $this->pmssAssertArraySubsetSame(['limit_mib' => 6144.0], $stats['traffic']);
@@ -112,8 +112,7 @@ class PmssStatsCollectTest extends TestCase
         };
         $stats = \pmssStatsReadRtorrentStats($failingView, '/unused');
         $this->assertTrue($stats['ok']);
-        $this->assertSame(0.0, $stats['upload_rate']);
-        $this->assertSame(null, $stats['torrent_total']);
+        $this->pmssAssertArraySubsetSame(['upload_rate' => 0.0, 'torrent_total' => null], $stats);
 
         $payload = $this->collectStats([], $failingRate);
         $this->assertSame('M10G S', $payload['product']);
@@ -162,10 +161,10 @@ class PmssStatsCollectTest extends TestCase
             };
             $stats = \pmssStatsReadRtorrentStats($caller, '/unused');
             $this->assertTrue($stats['ok']);
-            $this->assertSame($uploaded, $stats['upload_total']);
-            $this->assertSame($downloaded, $stats['download_total']);
-            $this->assertSame($expected, $stats['ratio']);
-            $this->assertSame(1, $stats['torrent_total']);
+            $this->pmssAssertArraySubsetSame([
+                'upload_total' => $uploaded, 'download_total' => $downloaded, 'ratio' => $expected,
+                'torrent_total' => 1,
+            ], $stats);
             $this->assertTrue(is_string(json_encode($stats)), 'Ratio arithmetic must not prevent JSON encoding');
         }
     }
@@ -179,7 +178,7 @@ class PmssStatsCollectTest extends TestCase
     private function collectStats(array $overrides = [], ?callable $rtorrentCaller = null): array
     {
         return \pmssStatsCollect(array_replace([
-            'user' => 'alice',
+            'user' => 'fixtur01',
             'home' => $this->home,
             'config_dir' => $this->configDir,
             'cgroup_dir' => $this->cgroupDir,
