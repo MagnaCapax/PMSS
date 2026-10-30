@@ -49,8 +49,12 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
 
         $limitMiB = ($limitCache[$baseUser] !== null) ? ($limitCache[$baseUser] * 1024) : null;
         $pctUsed = $limitMiB !== null ? ($rawCounters['month'] / $limitMiB) * 100 : null;
+        $rates = [];
+        foreach (['week' => 7 * 24 * 60 * 60, 'day' => 24 * 60 * 60, 'hour' => 60 * 60, '15min' => 15 * 60] as $window => $seconds) {
+            $rates[$window] = round($rawCounters[$window] / $seconds, 2);
+        }
         $report['rows'][] = ['user' => $thisUser,
-            'rates' => ['week' => round(($rawCounters['week'] / (7 * 24 * 60 * 60)), 2), 'day' => round(($rawCounters['day'] / (24 * 60 * 60)), 2), 'hour' => round(($rawCounters['hour'] / (60 * 60)), 2), '15min' => round(($rawCounters['15min'] / (15 * 60)), 2)],
+            'rates' => $rates,
             'inboundMonthMiB' => $inboundMonth, 'inboundRatio' => ($inboundMonth !== null && $rawCounters['month'] > 0) ? round($inboundMonth / $rawCounters['month'], 2) : null,
             'limitMiB' => $limitMiB, 'pctUsed' => $pctUsed, 'overLimit' => $pctUsed !== null && $pctUsed >= 100, 'nearLimit' => $pctUsed !== null && $pctUsed >= 80 && $pctUsed < 100, 'rawMiB' => $data['raw']];
     }

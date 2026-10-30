@@ -38,7 +38,7 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
     }
     $end = intdiv($now, 86400) * 86400;
     $start = $end - $settings['windowDays'] * 86400;
-    $buckets = [];
+    $days = [];
     foreach ($samples as $sample) {
         if (!is_array($sample) || !isset($sample['time']) || !is_int($sample['time'])
             || $sample['time'] < $start || $sample['time'] >= $end) {
@@ -52,14 +52,15 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
         }
         // Epoch time, not the collector's local-time prefix, defines the UTC day.
         // Deduplicate overlapping rotations; repeated rows cannot satisfy the gate.
-        $buckets[gmdate('Y-m-d', $sample['time'])][$sample['time']] = $values;
+        $days[gmdate('Y-m-d', $sample['time'])][$sample['time']] = $values;
     }
-    ksort($buckets);
-    $days = [];
+    ksort($days);
     $published = ['from_day' => []];
-    foreach ($buckets as $day => $rows) {
+    // Replace accepted buckets with their published summary in the same day order.
+    foreach ($days as $day => $rows) {
         $count = count($rows);
         if ($count < $settings['minSamplesPerDay']) {
+            unset($days[$day]);
             continue;
         }
         $days[$day] = ['samples' => $count];

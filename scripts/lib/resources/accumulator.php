@@ -70,7 +70,8 @@ class ResourceStatsAccumulator
     /** Use the same sum/average calculation for rolling windows and complete days. */
     private function totalsResult(array $totals): array
     {
-        $values = array_intersect_key($totals, array_flip(self::RAW_METRICS)) + array_fill_keys(self::RAW_METRICS, 0.0);
+        $values = [];
+        foreach (self::RAW_METRICS as $metric) $values[$metric] = $totals[$metric] ?? 0.0;
         foreach (self::AVERAGE_METRICS as $metric) {
             $values[$metric] = ($totals['samples'] ?? 0) > 0 ? $totals[$metric] / $totals['samples'] : 0.0;
         }

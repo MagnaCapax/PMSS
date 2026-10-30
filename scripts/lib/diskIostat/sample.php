@@ -30,21 +30,14 @@ function pmssDiskIostatParseSampleFields(string $iostatRaw): array
 
     // Column-name lookup keeps sysstat 12+ additions from shifting meanings;
     // legacy await/svctm names remain fallbacks for older hosts.
-    $fields = [];
-    foreach ([
-        'iopsRead' => ['r/s'], 'iopsWrite' => ['w/s'],
-        'throughputRead' => ['rMB/s'], 'throughputWrite' => ['wMB/s'],
-        'diskAwait' => ['r_await', 'await'], 'diskServiceTime' => ['w_await', 'svctm'],
-        'diskUtil' => ['%util'], 'avgQueueSize' => ['aqu-sz', 'avgqu-sz'],
-    ] as $field => $colNames) {
-        $fields[$field] = '0';
-        foreach ($colNames as $name) {
-            if (isset($colMap[$name])) {
-                $fields[$field] = $values[$colMap[$name]] ?? '0';
-                break;
-            }
-        }
-    }
-    return $fields;
+    return array_map(static function (?int $column) use ($values): string {
+        return $column === null ? '0' : ($values[$column] ?? '0');
+    }, [
+        'iopsRead' => $colMap['r/s'] ?? null, 'iopsWrite' => $colMap['w/s'] ?? null,
+        'throughputRead' => $colMap['rMB/s'] ?? null, 'throughputWrite' => $colMap['wMB/s'] ?? null,
+        'diskAwait' => $colMap['r_await'] ?? $colMap['await'] ?? null,
+        'diskServiceTime' => $colMap['w_await'] ?? $colMap['svctm'] ?? null,
+        'diskUtil' => $colMap['%util'] ?? null, 'avgQueueSize' => $colMap['aqu-sz'] ?? $colMap['avgqu-sz'] ?? null,
+    ]);
 }
 
