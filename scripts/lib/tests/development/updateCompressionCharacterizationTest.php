@@ -88,7 +88,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
                     'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
                 ],
             ],
-            'scripts/lib/update/services/bootstrap.php' => [
+            'scripts/lib/update/services/sshd.php' => [
                 'required' => ["pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.ssh.service.pmss-starvation.conf'"],
                 'forbidden' => ['function pmssSshdStarvation'.'DropinTemplatePath(' => 'the sole drop-in caller should resolve its template directly'],
             ],

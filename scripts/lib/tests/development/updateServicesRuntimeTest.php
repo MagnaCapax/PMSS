@@ -334,7 +334,7 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testSshdStarvationDropinRestartRequiresChangedContentAndValidSyntax(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/services/bootstrap.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/services/sshd.php', [
             "if (\$changed) {\n        runStep('Reloading systemd unit files (ssh starvation resistance)'",
             "if (runStep('Validating sshd before restarting for OOM inheritance', pmssSshdValidationCommand()) === 0) {",
             "runStep('Restarting sshd for normal session OOM scores', '/usr/bin/systemctl try-restart ssh');",

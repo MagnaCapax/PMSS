@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Runtime service bootstrap keeps its original include and public helpers while
+separating hostname convergence, SSH config transforms/publication, SSH recovery
+and inherited OOM repair (ADR 0216). Normalization derives missing directives
+from its rendered lines; self and tenant repairs share write/readback accounting;
+SSH fallback validation has one retry path. Characterization cases preserve
+config bytes, duplicate directives, warning order, failure counts and self-before-scan
+ordering. Existing dry-run command and guarded-writer contracts remain in force.
+
 Systemd service maintenance retains its existing include and every public helper
 while separating disabled-service/boot policy, weekly TRIM and resolver recovery
 (ADR 0210). Optional masking uses a fixed action traversal, spool membership uses

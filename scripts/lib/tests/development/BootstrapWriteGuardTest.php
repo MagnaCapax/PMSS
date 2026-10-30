@@ -50,13 +50,16 @@ class BootstrapWriteGuardTest extends TestCase
 
     public function testBootstrapUsesSharedManagedPathWriterForHostnameAndSshdConfig(): void
     {
-        $path = 'scripts/lib/update/services/bootstrap.php';
-        $this->pmssAssertRepoFileContainsAllStrings($path, [
-            "'../managedPath.php'",
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/services/bootstrap.php', ["'../managedPath.php'"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/services/hostname.php', [
             "pmssWriteManagedPathFile('/etc/hostname', \$hostname.PHP_EOL, 'hostname', \$log, 'root', 'root')",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/services/sshdConfig.php', [
             'pmssSshdConfigWriteUpdated(',
             'pmssSshdAuthorizedKeysDirectiveNormalize(',
         ]);
-        $this->pmssAssertRepoFileNotContainsStrings($path, ["file_put_contents('/etc/hostname'", 'file_put_contents($sshdConfig, $updated)']);
+        foreach (['bootstrap.php', 'hostname.php', 'sshdConfig.php', 'sshd.php'] as $module) {
+            $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/services/'.$module, ["file_put_contents('/etc/hostname'", 'file_put_contents($sshdConfig, $updated)']);
+        }
     }
 }
