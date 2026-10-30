@@ -20,6 +20,7 @@ if (function_exists('posix_geteuid') && posix_geteuid() === 0
 }
 require_once $pmssStorageRaidDisplay;
 unset($pmssStorageRaidDisplay);
+require_once __DIR__.'/raidParse.php';
 
 /**
  * Read mdadm array status from `/proc/mdstat`.
@@ -34,45 +35,6 @@ function pmssStorageHealthSnapshotRaid(string $timestamp, string $mdstatPath = '
     }
     $mdstat = @file_get_contents($mdstatPath);
     return $mdstat === false ? [] : pmssStorageHealthRaidEntriesParse($mdstat, $timestamp);
-}
-
-/**
- * Parse mdadm array status text.
- *
- * @return array<int, array<string, mixed>>
- */
-function pmssStorageHealthRaidEntriesParse(string $mdstat, string $timestamp): array
-{
-    $entries = [];
-    foreach (pmssConfigTextLines($mdstat, []) as $trimmed) {
-        if (preg_match('/^(md\\d+)\\s*:\\s*(\\w+)\\s+(raid\\d)\\s+(.*)$/', $trimmed, $matches)) {
-            $entries[] = [
-                'timestamp' => $timestamp,
-                'kind' => 'raid',
-                'array' => $matches[1],
-                'level' => $matches[3],
-                'state' => $matches[2],
-                'detail' => $matches[4],
-                'ok' => true,
-                'severity' => 'ok',
-                'flags' => [],
-            ];
-            $last = count($entries) - 1;
-            if (preg_match('/\\[(\\d+)\\/(\\d+)\\]\\s*\\[([U_]+)\\]/', $entries[$last]['detail'], $detail) && (strpos($detail[3], '_') !== false || (int) $detail[1] !== (int) $detail[2])) {
-                $entries[$last]['flags'][] = 'degraded';
-            }
-        } elseif (!empty($entries) && preg_match('/\b(check|resync|recovery|reshape)\b/', $trimmed, $operation) === 1) {
-            $entries[$last]['flags'][] = 'rebuild_in_progress';
-            $entries[$last]['operation'] = $operation[1];
-            $entries[$last]['resync'] = $trimmed;
-        }
-    }
-    // Keep RAID's field order and repeated activity flags in the persisted payload.
-    foreach ($entries as &$entry) {
-        $entry['severity'] = pmssStorageHealthFlagsSeverity($entry['flags']);
-        $entry['ok'] = $entry['severity'] === 'ok';
-    }
-    return $entries;
 }
 
 /** Resolve the md array that backs /home, if /home is mounted directly on md. */

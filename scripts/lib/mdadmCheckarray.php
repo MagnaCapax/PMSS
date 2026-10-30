@@ -21,101 +21,8 @@ const PMSS_MDADM_CHECKARRAY_STATE_DEFAULT = '/var/lib/pmss/mdadm-checkarray-last
 /** Emit one cron-friendly status line with a stable prefix. */
 function pmssMdadmCheckarrayLog(string $message): void { echo pmssLogFormatTimestampedLine($message, 'c', ' pmss-mdadm-checkarray: '); }
 
-/** Keep array names constrained before composing sysfs paths or shell args. */
-function pmssMdadmCheckarrayArrayNameIsSafe(string $array): bool
-{
-    return preg_match('/\Amd[0-9]+\z/', $array) === 1;
-}
-
-/** Prefer valid sysfs state; missing or malformed data falls back to mdstat. */
-function pmssMdadmCheckarrayEntryDegradedState(array $entry, string $sysBlockRoot): ?bool
-{
-    $array = (string) ($entry['array'] ?? '');
-    if (pmssMdadmCheckarrayArrayNameIsSafe($array) && !pmssFilesystemPathHasNulByte($sysBlockRoot)) {
-        $raw = @file_get_contents(rtrim($sysBlockRoot, '/').'/'.$array.'/md/degraded');
-        if (is_string($raw) && ctype_digit(trim($raw))) {
-            return (int) trim($raw) > 0;
-        }
-    }
-
-    // Preserve unknown state when neither source can decide.
-    $detail = (string) ($entry['detail'] ?? '');
-    if (preg_match('/\[(\d+)\/(\d+)\]\s*\[([U_]+)\]/', $detail, $matches) !== 1) {
-        return null;
-    }
-
-    return strpos($matches[3], '_') !== false || (int) $matches[1] !== (int) $matches[2];
-}
-
-/**
- * Build the array selection plan for one checkarray run.
- *
- * @return array{fallback_all:bool,reason:string,healthy:array<int,string>,degraded:array<int,string>,unknown:array<int,string>}
- */
-function pmssMdadmCheckarrayPlan(string $mdstatPath, string $sysBlockRoot): array
-{
-    $plan = ['fallback_all' => false, 'reason' => '', 'healthy' => [], 'degraded' => [], 'unknown' => []];
-    // Malformed paths follow the same fallback as an unreadable mdstat file.
-    $mdstat = $mdstatPath === '' || pmssFilesystemPathHasNulByte($mdstatPath)
-        ? false : @file_get_contents($mdstatPath);
-    if (!is_string($mdstat)) {
-        $plan['fallback_all'] = true;
-        $plan['reason'] = 'mdstat_unreadable';
-        return $plan;
-    }
-
-    $entries = pmssStorageHealthRaidEntriesParse($mdstat, date('c'));
-    // Distinguish an empty host from array records the parser cannot enumerate.
-    if (empty($entries) && preg_match('/^md\d+\s*:/m', $mdstat) === 1) {
-        $plan['fallback_all'] = true;
-        $plan['reason'] = 'mdstat_parse_empty';
-        return $plan;
-    }
-
-    foreach ($entries as $entry) {
-        $array = (string) ($entry['array'] ?? '');
-        if (!pmssMdadmCheckarrayArrayNameIsSafe($array)) {
-            continue;
-        }
-
-        $state = pmssMdadmCheckarrayEntryDegradedState($entry, $sysBlockRoot);
-        $plan[$state === true ? 'degraded' : ($state === false ? 'healthy' : 'unknown')][] = $array;
-    }
-
-    return $plan;
-}
-
-/** Best-effort cancellation for a queued/interrupted check on skipped arrays. */
-function pmssMdadmCheckarrayRequestIdle(string $array, string $sysBlockRoot): bool
-{
-    if (!pmssMdadmCheckarrayArrayNameIsSafe($array) || pmssFilesystemPathHasNulByte($sysBlockRoot)) {
-        return false;
-    }
-
-    $path = rtrim($sysBlockRoot, '/').'/'.$array.'/md/sync_action';
-    return file_exists($path) && pmssFileWriteComplete($path, "idle\n");
-}
-
-/** Run Debian checkarray and preserve its stdout/stderr in the cron log. */
-function pmssMdadmCheckarrayRunCommand(string $binary, array $arrays): int
-{
-    // Validate the entire request before quoting or launching any command.
-    if ($binary === '' || pmssFilesystemPathHasNulByte($binary)) return 1;
-    foreach ($arrays as $array) {
-        if (!is_string($array) || !pmssMdadmCheckarrayArrayNameIsSafe($array)) return 1;
-    }
-    // PMSS owns the cron schedule; --cron would let AUTOCHECK silently skip it.
-    $args = array_merge(['--idle', '--quiet'], empty($arrays) ? ['--all'] : array_values($arrays));
-    $result = pmssCommandCapture(pmssBuildCommand($binary, $args), 120);
-    if ((string) ($result['stdout'] ?? '') !== '') {
-        echo (string) $result['stdout'];
-    }
-    if ((string) ($result['stderr'] ?? '') !== '') {
-        fwrite(STDERR, (string) $result['stderr']);
-    }
-
-    return (int) ($result['rc'] ?? 1);
-}
+require_once __DIR__.'/mdadmCheckarray/plan.php';
+require_once __DIR__.'/mdadmCheckarray/command.php';
 
 /** Treat absent, malformed, or out-of-range file contents as unset. */
 function pmssMdadmCheckarrayReadInteger(string $path): ?int
@@ -130,19 +37,6 @@ function pmssMdadmCheckarrayReadInteger(string $path): ?int
 function pmssMdadmCheckarrayWithinMinDays(int $minDays, ?int $lastStarted, int $now): bool
 {
     return $minDays > 0 && $lastStarted !== null && $now - $lastStarted < $minDays * 86400;
-}
-
-/** A failed state write must not turn a successful checkarray invocation into failure. */
-function pmssMdadmCheckarrayRunAndRemember(string $binary, array $arrays, string $statePath): int
-{
-    $startedAt = time();
-    $rc = pmssMdadmCheckarrayRunCommand($binary, $arrays);
-    if ($rc === 0 && ($statePath === '' || pmssFilesystemPathHasNulByte($statePath)
-        || (!is_dir(dirname($statePath)) && !@mkdir(dirname($statePath), 0755, true))
-        || !pmssFileWriteComplete($statePath, (string) $startedAt."\n"))) {
-        pmssMdadmCheckarrayLog('unable to write last-check state');
-    }
-    return $rc;
 }
 
 /** Cron entrypoint for the quarterly mdadm redundancy check. */
@@ -178,21 +72,20 @@ function pmssMdadmCheckarrayMain(array $argv): int
 
     if ($plan['fallback_all']) {
         pmssMdadmCheckarrayLog('unable to enumerate md arrays ('.$plan['reason'].'); preserving checkarray --all behavior');
-        return pmssMdadmCheckarrayRunAndRemember($binary, [], $statePath);
-    }
-
-    foreach (['degraded' => 'degraded', 'unknown' => 'state unknown'] as $key => $label) {
-        foreach ($plan[$key] as $array) {
-            $idle = pmssMdadmCheckarrayRequestIdle($array, $sysBlockRoot) ? '; requested sync_action=idle' : '';
-            pmssMdadmCheckarrayLog('skipping '.$array.' ('.$label.')'.$idle);
+    } else {
+        foreach (['degraded' => 'degraded', 'unknown' => 'state unknown'] as $key => $label) {
+            foreach ($plan[$key] as $array) {
+                $idle = pmssMdadmCheckarrayRequestIdle($array, $sysBlockRoot) ? '; requested sync_action=idle' : '';
+                pmssMdadmCheckarrayLog('skipping '.$array.' ('.$label.')'.$idle);
+            }
         }
+
+        if (empty($plan['healthy'])) {
+            pmssMdadmCheckarrayLog(empty($plan['degraded']) && empty($plan['unknown']) ? 'no md arrays found' : 'no non-degraded md arrays to check');
+            return 0;
+        }
+        pmssMdadmCheckarrayLog('checking non-degraded arrays: '.implode(' ', $plan['healthy']));
     }
 
-    if (empty($plan['healthy'])) {
-        pmssMdadmCheckarrayLog(empty($plan['degraded']) && empty($plan['unknown']) ? 'no md arrays found' : 'no non-degraded md arrays to check');
-        return 0;
-    }
-
-    pmssMdadmCheckarrayLog('checking non-degraded arrays: '.implode(' ', $plan['healthy']));
     return pmssMdadmCheckarrayRunAndRemember($binary, $plan['healthy'], $statePath);
 }
