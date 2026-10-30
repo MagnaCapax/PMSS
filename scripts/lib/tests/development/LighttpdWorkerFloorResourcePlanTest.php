@@ -10,9 +10,7 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
     {
         $resources = \pmssLighttpdResourcePlan([], ['cpuQuotaPercent' => 100]);
 
-        $this->assertSame(1, $resources['maxProcs']);
-        $this->assertSame(6, $resources['children']);
-        $this->assertSame(6, $resources['totalThreads']);
+        $this->pmssAssertArraySubsetSame(['maxProcs' => 1, 'children' => 6, 'totalThreads' => 6], $resources);
     }
 
     public function testSystemdShowQuotaSetsPhpPoolSize(): void
@@ -23,10 +21,9 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
         );
         $resources = \pmssLighttpdResourcePlan($props, ['cpuQuotaPercent' => 85]);
 
-        $this->assertSame(200, $resources['cpuQuotaPercent']);
-        $this->assertSame(2, $resources['maxProcs']);
-        $this->assertSame(6, $resources['children']);
-        $this->assertSame(12, $resources['totalThreads']);
+        $this->pmssAssertArraySubsetSame([
+            'cpuQuotaPercent' => 200, 'maxProcs' => 2, 'children' => 6, 'totalThreads' => 12,
+        ], $resources);
     }
 
     public function testWorkerFloorRaisesPlanToProcessGroupBoundary(): void
@@ -37,9 +34,7 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
             ['lighttpdMinThreads' => 13]
         );
 
-        $this->assertSame(3, $resources['maxProcs']);
-        $this->assertSame(6, $resources['children']);
-        $this->assertSame(18, $resources['totalThreads']);
+        $this->pmssAssertArraySubsetSame(['maxProcs' => 3, 'children' => 6, 'totalThreads' => 18], $resources);
     }
 
     public function testWorkerFloorCannotExceedThreadCap(): void

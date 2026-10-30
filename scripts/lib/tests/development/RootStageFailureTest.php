@@ -27,20 +27,20 @@ class RootStageFailureTest extends TestCase
     {
         $result = $this->runWriter('parent-swap');
         $this->assertFalse($result['ok']);
-        $this->assertSame('stage=publish rc=1 stderr=publish parent changed', $result['failure']);
-        $this->assertSame('old', $result['movedContent']);
-        $this->assertSame('replacement-parent', $result['content']);
-        $this->assertSame([], $result['stages']);
+        $this->pmssAssertArraySubsetSame([
+            'failure' => 'stage=publish rc=1 stderr=publish parent changed', 'movedContent' => 'old',
+            'content' => 'replacement-parent', 'stages' => [],
+        ], $result);
     }
 
     public function testPublishCapturesBoundedSanitizedStderrAndRestoresImmutableState(): void
     {
         $result = $this->runWriter('publish');
         $this->assertFalse($result['ok']);
-        $this->assertSame('stage=publish rc=23 stderr=quota full [31m '.str_repeat('E', 283), $result['failure']);
-        $this->assertSame('old', $result['content']);
-        $this->assertSame(['clear', 'set'], $result['immutable']);
-        $this->assertSame([0, 0600], $result['descriptor']);
+        $this->pmssAssertArraySubsetSame([
+            'failure' => 'stage=publish rc=23 stderr=quota full [31m '.str_repeat('E', 283), 'content' => 'old',
+            'immutable' => ['clear', 'set'], 'descriptor' => [0, 0600],
+        ], $result);
         $this->assertFalse($result['captureOpen']);
         $this->assertSame([], $result['stages']);
     }
@@ -50,9 +50,9 @@ class RootStageFailureTest extends TestCase
         foreach (['success', 'legacy', 'immutable-success'] as $scenario) {
             $result = $this->runWriter($scenario);
             $this->assertTrue($result['ok']);
-            $this->assertSame($scenario === 'legacy' ? 'stale' : '', $result['failure']);
-            $this->assertSame('private-payload', $result['content']);
-            $this->assertSame([], $result['stages']);
+            $this->pmssAssertArraySubsetSame([
+                'failure' => $scenario === 'legacy' ? 'stale' : '', 'content' => 'private-payload', 'stages' => [],
+            ], $result);
             $this->assertFalse($result['captureOpen']);
         }
     }
@@ -61,10 +61,10 @@ class RootStageFailureTest extends TestCase
     {
         $result = $this->runWriter('immutable-set');
         $this->assertFalse($result['ok']);
-        $this->assertSame('stage=immutable-set rc=not-started', $result['failure']);
-        $this->assertSame('private-payload', $result['content']);
-        $this->assertSame(['clear', 'set'], $result['immutable']);
-        $this->assertSame([], $result['stages']);
+        $this->pmssAssertArraySubsetSame([
+            'failure' => 'stage=immutable-set rc=not-started', 'content' => 'private-payload',
+            'immutable' => ['clear', 'set'], 'stages' => [],
+        ], $result);
     }
 
     public function testExistingMetadataLogAndSerializedCallbackReceiveCauseWithoutContent(): void

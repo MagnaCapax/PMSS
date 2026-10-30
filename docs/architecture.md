@@ -184,6 +184,10 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Generated text and repository source contracts share `TestCase::pmssAssertStringContract()`
   for required/forbidden fragments, regexes and ordered fragments. Required and
   forbidden maps retain per-fragment diagnostic messages.
+- Structured result checks share `TestCase::pmssAssertArraySubsetSame()` for
+  required fields and strict values. Keep expected field order and fixture cases
+  at callers; custom diagnostics, transformed values and exact-shape assertions
+  remain explicit.
 - CLI probes: `/scripts/util/systemTest.php`, `/scripts/util/componentStatus.php`, `/scripts/util/agentDiagnostics.php`
 
 Development tests must avoid network/system changes; production tests and the CLI probe are intended for curated post-provision runs.

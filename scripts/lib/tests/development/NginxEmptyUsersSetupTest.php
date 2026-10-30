@@ -44,9 +44,9 @@ PHP;
     public function testEmptyListingRefreshesDefaultSiteAndTestsConfig(): void
     {
         $result = $this->runSelection(['exitCode' => 0, 'username' => '', 'users' => []]);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame(1, $result['setupCalls']);
-        $this->assertSame([[false, false]], $result['configTestCalls']);
+        $this->pmssAssertArraySubsetSame([
+            'rc' => 0, 'setupCalls' => 1, 'configTestCalls' => [[false, false]],
+        ], $result);
         $this->assertMatches('/location \/\s*\{/', $result['site']);
         $this->assertTrue(strpos($result['site'], 'try_files $uri $uri/ =404;') !== false);
     }
@@ -54,9 +54,7 @@ PHP;
     public function testEmptyListingWithRestartUsesExistingRestartPath(): void
     {
         $result = $this->runSelection(['exitCode' => 0, 'username' => '', 'users' => []], ['--restart']);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame(1, $result['setupCalls']);
-        $this->assertSame([[true, false]], $result['configTestCalls']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'setupCalls' => 1, 'configTestCalls' => [[true, false]]], $result);
     }
 
     public function testEmptyListingWithReloadActivatesConfig(): void
@@ -69,18 +67,16 @@ PHP;
     public function testMissingRequestedUserSkipsSetup(): void
     {
         $result = $this->runSelection(['exitCode' => 1, 'username' => 'missing', 'users' => []], ['--user', 'missing']);
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame(0, $result['setupCalls']);
-        $this->assertSame([], $result['configTestCalls']);
-        $this->assertSame(null, $result['site']);
+        $this->pmssAssertArraySubsetSame([
+            'rc' => 1, 'setupCalls' => 0, 'configTestCalls' => [], 'site' => null,
+        ], $result);
     }
 
     public function testListingFailureSkipsSetup(): void
     {
         $result = $this->runSelection(['exitCode' => 2, 'username' => '', 'users' => []]);
-        $this->assertSame(2, $result['rc']);
-        $this->assertSame(0, $result['setupCalls']);
-        $this->assertSame([], $result['configTestCalls']);
-        $this->assertSame(null, $result['site']);
+        $this->pmssAssertArraySubsetSame([
+            'rc' => 2, 'setupCalls' => 0, 'configTestCalls' => [], 'site' => null,
+        ], $result);
     }
 }

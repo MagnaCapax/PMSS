@@ -29,12 +29,10 @@ class userConfigCliCharacterizationTest extends TestCase
             'resolved'
         );
 
-        $this->assertSame(0, $parsed['trafficLimit']);
-        $this->assertSame(200, $parsed['CPUWeight']);
-        $this->assertSame(0, $parsed['IOWeight']);
-        $this->assertSame('/dev/sda:5M', $parsed['IOReadBW']);
-        $this->assertSame('150', $parsed['cpuQuotaPercent']);
-        $this->assertSame(0, $parsed['trafficCapMbit']);
+        $this->pmssAssertArraySubsetSame([
+            'trafficLimit' => 0, 'CPUWeight' => 200, 'IOWeight' => 0, 'IOReadBW' => '/dev/sda:5M',
+            'cpuQuotaPercent' => '150', 'trafficCapMbit' => 0,
+        ], $parsed);
     }
 
     public function testResolvedResourcesPreferNamedOptionsOverPositionals(): void
@@ -88,10 +86,9 @@ class userConfigCliCharacterizationTest extends TestCase
         $this->assertSame('300', $raw['IOWeight']);
 
         $explicit = \pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'explicit');
-        $this->assertSame(500, $explicit['trafficLimit']);
-        $this->assertSame(0, $explicit['trafficCapMbit']);
-        $this->assertSame(200, $explicit['CPUWeight']);
-        $this->assertSame(300, $explicit['IOWeight']);
+        $this->pmssAssertArraySubsetSame([
+            'trafficLimit' => 500, 'trafficCapMbit' => 0, 'CPUWeight' => 200, 'IOWeight' => 300,
+        ], $explicit);
 
         $resolved = \pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'resolved');
         $this->assertSame(0, $resolved['CPUWeight']);
@@ -151,11 +148,10 @@ class userConfigCliCharacterizationTest extends TestCase
             $presence
         );
 
-        $this->assertSame(200, $payload['CPUWeight']);
-        $this->assertSame(12, $payload['trafficCapMbit']);
-        $this->assertSame(45, $payload['ioLatencyMs']);
-        $this->assertSame('enable=1 ctrl=user', $payload['ioCostQos']);
-        $this->assertSame(0, $payload['trafficLimit']);
+        $this->pmssAssertArraySubsetSame([
+            'CPUWeight' => 200, 'trafficCapMbit' => 12, 'ioLatencyMs' => 45, 'ioCostQos' => 'enable=1 ctrl=user',
+            'trafficLimit' => 0,
+        ], $payload);
     }
 
     public function testPersistedStoredResourcesMirrorSharedPersistedKeys(): void

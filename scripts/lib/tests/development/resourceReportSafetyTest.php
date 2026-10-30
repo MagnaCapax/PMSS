@@ -63,9 +63,9 @@ class resourceReportSafetyTest extends TestCase
                 if (!in_array($metric, \ResourceStatsAccumulator::RAW_METRICS, true)) continue;
                 $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
                 $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
-                $this->assertSame(['alice'], $report['missing']);
-                $this->assertSame([], $report['rows']);
-                $this->assertSame(\pmssResourceReportTemplate(), $report['totals']);
+                $this->pmssAssertArraySubsetSame([
+                    'missing' => ['alice'], 'rows' => [], 'totals' => \pmssResourceReportTemplate(),
+                ], $report);
                 $this->assertTrue(is_string(json_encode($report)));
             }
         }
@@ -118,9 +118,9 @@ class resourceReportSafetyTest extends TestCase
                 $data[$metric] = $container;
                 $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
                 $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
-                $this->assertSame(['alice'], $report['missing']);
-                $this->assertSame([], $report['rows']);
-                $this->assertSame(\pmssResourceReportTemplate(), $report['totals']);
+                $this->pmssAssertArraySubsetSame([
+                    'missing' => ['alice'], 'rows' => [], 'totals' => \pmssResourceReportTemplate(),
+                ], $report);
                 $this->assertTrue(!file_exists($this->markerPath));
             }
         }
@@ -142,9 +142,9 @@ class resourceReportSafetyTest extends TestCase
                 $this->assertSame(null, \pmssResourceStoredPayloadReportRow($data));
                 $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
                 $report = \pmssResourceBuildReport($this->statsDir, ['alice', 'bob']);
-                $this->assertSame(['alice'], $report['missing']);
-                $this->assertSame(['bob' => $validRow], $report['rows']);
-                $this->assertSame($validRow, $report['totals']);
+                $this->pmssAssertArraySubsetSame([
+                    'missing' => ['alice'], 'rows' => ['bob' => $validRow], 'totals' => $validRow,
+                ], $report);
                 $this->assertTrue(is_string(json_encode($report)));
             }
         }

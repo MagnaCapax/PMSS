@@ -30,12 +30,11 @@ class PortableInstallerCharacterizationTest extends TestCase
                     ." && install -o root -g root -m 0755 '{$root}/{$app}.tmp' '{$root}/{$app}'"
                     ." && rm -f '{$root}/{$app}.tmp'");
             $result = $this->fixture($app);
-            $this->assertSame([[$label.' '.$version, $url, $sha]], $result['downloads']);
-            $this->assertSame([['Installing '.$label.' '.$version, $command]], $result['commands']);
-            $this->assertSame($guards, $result['guards']);
-            $this->assertSame([[$marker, $version."\n"]], $result['writes']);
-            $this->assertSame(true, $result['callback']);
-            $this->assertSame('', $result['stdout']);
+            $this->pmssAssertArraySubsetSame([
+                'downloads' => [[$label.' '.$version, $url, $sha]],
+                'commands' => [['Installing '.$label.' '.$version, $command]], 'guards' => $guards,
+                'writes' => [[$marker, $version."\n"]], 'callback' => true, 'stdout' => '',
+            ], $result);
         }
     }
 
@@ -45,9 +44,7 @@ class PortableInstallerCharacterizationTest extends TestCase
             foreach (['unsupported', 'current'] as $case) {
                 $result = $this->fixture($app, $case === 'unsupported'
                     ? ['architecture' => 'aarch64'] : ['binary' => true, 'version' => " {$version}\n"]);
-                $this->assertSame([], $result['downloads']);
-                $this->assertSame([], $result['commands']);
-                $this->assertSame([], $result['writes']);
+                $this->pmssAssertArraySubsetSame(['downloads' => [], 'commands' => [], 'writes' => []], $result);
                 $this->assertSame($case === 'unsupported'
                     ? ['[SKIP] '.$label.' bootstrap skipped on unsupported architecture: aarch64'] : [], $result['logs']);
             }
@@ -75,9 +72,7 @@ class PortableInstallerCharacterizationTest extends TestCase
             foreach ($paths as $index => $unsafe) {
                 $result = $this->fixture($app, ['unsafe' => $unsafe]);
                 $this->assertSame(array_slice($paths, 0, $index + 1), array_column($result['guards'], 0));
-                $this->assertSame([], $result['commands']);
-                $this->assertSame([], $result['writes']);
-                $this->assertSame(false, $result['callback']);
+                $this->pmssAssertArraySubsetSame(['commands' => [], 'writes' => [], 'callback' => false], $result);
             }
         }
     }

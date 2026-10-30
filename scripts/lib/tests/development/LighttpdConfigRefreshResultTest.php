@@ -50,9 +50,7 @@ class LighttpdConfigRefreshResultTest extends TestCase
     {
         foreach ([[], ['--strict']] as $arguments) {
             $result = $this->refreshFixture('ineligible', $arguments);
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame(null, $result['config']);
-            $this->assertSame([], $result['writes']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'config' => null, 'writes' => []], $result);
         }
     }
 
@@ -70,9 +68,7 @@ class LighttpdConfigRefreshResultTest extends TestCase
     {
         foreach ([['../alice'], ['--strict', '../alice'], ['--unknown'], ['--strict', '--unknown'], ['alice', 'bob']] as $arguments) {
             $result = $this->refreshFixture('ready', $arguments);
-            $this->assertSame(1, $result['rc']);
-            $this->assertSame([], $result['attempted']);
-            $this->assertSame([], $result['writes']);
+            $this->pmssAssertArraySubsetSame(['rc' => 1, 'attempted' => [], 'writes' => []], $result);
         }
     }
 

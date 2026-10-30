@@ -42,11 +42,11 @@ class PmssStatsContextSafetyTest extends TestCase
                     'socket_path' => $path, 'version_file' => $path, 'cgroup_dir' => '/fixture/cgroup',
                 ]);
 
-                $this->assertSame('/home/fixtur01', $context['home']);
-                $this->assertSame('/etc/seedbox/config', $context['config_dir']);
-                $this->assertSame('/home/fixtur01/.rtorrent.socket', $context['socket_path']);
-                $this->assertSame('/etc/seedbox/config/version', $context['version_file']);
-                $this->assertSame('/fixture/cgroup', $context['cgroup_dir']);
+                $this->pmssAssertArraySubsetSame([
+                    'home' => '/home/fixtur01', 'config_dir' => '/etc/seedbox/config',
+                    'socket_path' => '/home/fixtur01/.rtorrent.socket',
+                    'version_file' => '/etc/seedbox/config/version', 'cgroup_dir' => '/fixture/cgroup',
+                ], $context);
             }
         }
     }
@@ -63,11 +63,11 @@ class PmssStatsContextSafetyTest extends TestCase
                 ], function (): void {
                     $context = \pmssStatsResolveContext(['user' => 'fixtur01']);
 
-                    $this->assertSame('/home/fixtur01', $context['home']);
-                    $this->assertSame('/etc/seedbox/config', $context['config_dir']);
-                    $this->assertSame('/home/fixtur01/.rtorrent.socket', $context['socket_path']);
-                    $this->assertSame('/etc/seedbox/config/version', $context['version_file']);
-                    $this->assertSame('/fixture/cgroup', $context['cgroup_dir']);
+                    $this->pmssAssertArraySubsetSame([
+                        'home' => '/home/fixtur01', 'config_dir' => '/etc/seedbox/config',
+                        'socket_path' => '/home/fixtur01/.rtorrent.socket',
+                        'version_file' => '/etc/seedbox/config/version', 'cgroup_dir' => '/fixture/cgroup',
+                    ], $context);
                 });
             }
         }
@@ -75,17 +75,17 @@ class PmssStatsContextSafetyTest extends TestCase
 
     public function testResolveContextNormalizesValidUsernameOverrides(): void
     {
-        $context = \pmssStatsResolveContext(['user' => ' Alice ']);
+        $context = \pmssStatsResolveContext(['user' => ' Fixtur02 ']);
 
-        $this->assertSame('alice', $context['user']);
-        $this->assertSame('/home/alice', $context['home']);
-        $this->assertSame('/home/alice/.rtorrent.socket', $context['socket_path']);
+        $this->pmssAssertArraySubsetSame([
+            'user' => 'fixtur02', 'home' => '/home/fixtur02', 'socket_path' => '/home/fixtur02/.rtorrent.socket',
+        ], $context);
     }
 
     public function testResolveContextFallsBackFromRelativeAndMalformedPathOverrides(): void
     {
         $context = \pmssStatsResolveContext([
-            'user' => 'alice',
+            'user' => 'fixtur02',
             'home' => "../unsafe\n",
             'config_dir' => 'relative/config',
             'socket_path' => "socket\0path",
@@ -93,10 +93,10 @@ class PmssStatsContextSafetyTest extends TestCase
             'cgroup_dir' => 'relative/cgroup',
         ]);
 
-        $this->assertSame('/home/alice', $context['home']);
-        $this->assertSame('/etc/seedbox/config', $context['config_dir']);
-        $this->assertSame('/home/alice/.rtorrent.socket', $context['socket_path']);
-        $this->assertSame('/etc/seedbox/config/version', $context['version_file']);
+        $this->pmssAssertArraySubsetSame([
+            'home' => '/home/fixtur02', 'config_dir' => '/etc/seedbox/config',
+            'socket_path' => '/home/fixtur02/.rtorrent.socket', 'version_file' => '/etc/seedbox/config/version',
+        ], $context);
         $this->assertTrue($context['cgroup_dir'] === '' || $context['cgroup_dir'][0] === '/');
     }
 
@@ -104,19 +104,19 @@ class PmssStatsContextSafetyTest extends TestCase
     {
         $baseDir = $this->pmssMakeTempDir('pmss-stats-context-');
         $context = \pmssStatsResolveContext([
-            'user' => 'alice',
-            'home' => $baseDir.'/home/alice/',
+            'user' => 'fixtur02',
+            'home' => $baseDir.'/home/fixtur02/',
             'config_dir' => $baseDir.'/config/',
-            'socket_path' => $baseDir.'/home/alice/.rtorrent.socket',
+            'socket_path' => $baseDir.'/home/fixtur02/.rtorrent.socket',
             'version_file' => $baseDir.'/config/version',
             'cgroup_dir' => $baseDir.'/cgroup/',
         ]);
 
-        $this->assertSame($baseDir.'/home/alice', $context['home']);
-        $this->assertSame($baseDir.'/config', $context['config_dir']);
-        $this->assertSame($baseDir.'/home/alice/.rtorrent.socket', $context['socket_path']);
-        $this->assertSame($baseDir.'/config/version', $context['version_file']);
-        $this->assertSame($baseDir.'/cgroup', $context['cgroup_dir']);
+        $this->pmssAssertArraySubsetSame([
+            'home' => $baseDir.'/home/fixtur02', 'config_dir' => $baseDir.'/config',
+            'socket_path' => $baseDir.'/home/fixtur02/.rtorrent.socket', 'version_file' => $baseDir.'/config/version',
+            'cgroup_dir' => $baseDir.'/cgroup',
+        ], $context);
     }
 
     public function testResolveContextUsesShellHomeOnlyWithoutStatsUser(): void
@@ -135,11 +135,11 @@ class PmssStatsContextSafetyTest extends TestCase
         $this->pmssWithEnv([
             'HOME' => $baseDir.'/shell-home',
             'PMSS_STATS_HOME' => null,
-            'PMSS_STATS_USER' => 'alice',
+            'PMSS_STATS_USER' => 'fixtur02',
         ], function (): void {
             $context = \pmssStatsResolveContext();
 
-            $this->assertSame('/home/alice', $context['home']);
+            $this->assertSame('/home/fixtur02', $context['home']);
         });
     }
 
@@ -147,24 +147,24 @@ class PmssStatsContextSafetyTest extends TestCase
     {
         $context = \pmssStatsResolveContext(['user' => '../../escape']);
 
-        $this->assertSame('../../escape', $context['user']);
-        $this->assertSame('/home', $context['home']);
-        $this->assertSame('/home/.rtorrent.socket', $context['socket_path']);
+        $this->pmssAssertArraySubsetSame([
+            'user' => '../../escape', 'home' => '/home', 'socket_path' => '/home/.rtorrent.socket',
+        ], $context);
     }
 
     public function testResolveContextFallsBackWhenOverridesAreBlank(): void
     {
         $context = \pmssStatsResolveContext([
-            'user' => 'alice',
+            'user' => 'fixtur02',
             'home' => '   ',
             'config_dir' => ' ',
             'socket_path' => '',
             'version_file' => "\t",
         ]);
 
-        $this->assertSame('/home/alice', $context['home']);
-        $this->assertSame('/etc/seedbox/config', $context['config_dir']);
-        $this->assertSame('/home/alice/.rtorrent.socket', $context['socket_path']);
-        $this->assertSame('/etc/seedbox/config/version', $context['version_file']);
+        $this->pmssAssertArraySubsetSame([
+            'home' => '/home/fixtur02', 'config_dir' => '/etc/seedbox/config',
+            'socket_path' => '/home/fixtur02/.rtorrent.socket', 'version_file' => '/etc/seedbox/config/version',
+        ], $context);
     }
 }

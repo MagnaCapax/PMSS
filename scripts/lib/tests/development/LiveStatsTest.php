@@ -25,11 +25,9 @@ class LiveStatsTest extends TestCase
         $c = \pmssLiveStatsNodeCountersParse($this->stat(100), $meminfo, $this->netDev(7000, 3000), 'eth0');
         $this->assertSame(1100, $c['total']);
         $this->assertSame(200, $c['busy']); // total - idle - iowait
-        $this->assertSame(1024000, $c['mem_total']);
-        $this->assertSame(614400, $c['mem_used']);
-        $this->assertSame(7000, $c['rx']);
-        $this->assertSame(3000, $c['tx']);
-        $this->assertSame(0, $c['steal']);
+        $this->pmssAssertArraySubsetSame([
+            'mem_total' => 1024000, 'mem_used' => 614400, 'rx' => 7000, 'tx' => 3000, 'steal' => 0,
+        ], $c);
         $this->assertSame(null, \pmssLiveStatsNodeCountersParse($this->stat(100), $meminfo, $this->netDev(1, 1), 'nope0'));
         $this->assertSame(null, \pmssLiveStatsNodeCountersParse('garbage', $meminfo, $this->netDev(1, 1), 'eth0'));
     }
@@ -125,10 +123,9 @@ class LiveStatsTest extends TestCase
         $rows = \pmssStatsLiveRows($node, $user, 1600, 400);
         $this->assertSame(2, count($rows)); // 1000 falls outside the 400 s window
         $s = \pmssStatsLiveSummary($rows);
-        $this->assertSame(50.0, $s['cpu_node']);
-        $this->assertSame(10.0, $s['cpu_you']);
-        $this->assertSame(50.0, $s['ram_node']);
-        $this->assertSame(10.0, $s['ram_you']);
+        $this->pmssAssertArraySubsetSame([
+            'cpu_node' => 50.0, 'cpu_you' => 10.0, 'ram_node' => 50.0, 'ram_you' => 10.0,
+        ], $s);
         $this->assertSame(0.1, round($s['tx_node'], 1));
         $this->assertSame(0.01, round($s['tx_you'], 2));
         $this->assertSame(null, \pmssStatsLiveSummary([]));

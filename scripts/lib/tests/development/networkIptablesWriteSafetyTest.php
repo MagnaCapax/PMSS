@@ -9,11 +9,10 @@ class NetworkIptablesWriteSafetyTest extends TestCase
     {
         foreach (['false', 'zero', 'short'] as $mode) {
             $result = $this->applyFixture($mode);
-            $this->assertSame(false, $result['result']);
-            $this->assertSame([], $result['commands']);
-            $this->assertSame(null, $result['exception']);
-            $this->assertSame(false, $result['exists']);
-            $this->assertSame(['unable to write iptables-restore temp file'], $result['logs']);
+            $this->pmssAssertArraySubsetSame([
+                'result' => false, 'commands' => [], 'exception' => null, 'exists' => false,
+                'logs' => ['unable to write iptables-restore temp file'],
+            ], $result);
         }
     }
 
@@ -21,10 +20,9 @@ class NetworkIptablesWriteSafetyTest extends TestCase
     {
         foreach (['writeThrow', 'logThrow', 'commandThrow', 'commandError'] as $mode) {
             $result = $this->applyFixture($mode);
-            $this->assertSame(null, $result['result']);
-            $this->assertSame(true, $result['sameThrowable']);
-            $this->assertSame($mode, $result['exception']);
-            $this->assertSame(false, $result['exists']);
+            $this->pmssAssertArraySubsetSame([
+                'result' => null, 'sameThrowable' => true, 'exception' => $mode, 'exists' => false,
+            ], $result);
             $this->assertSame(strpos($mode, 'command') === 0 ? 1 : 0, count($result['commands']));
         }
     }
@@ -33,11 +31,10 @@ class NetworkIptablesWriteSafetyTest extends TestCase
     {
         foreach (['success', 'commandFail'] as $mode) {
             $result = $this->applyFixture($mode);
-            $this->assertSame($mode === 'success', $result['result']);
-            $this->assertSame(null, $result['exception']);
-            $this->assertSame(false, $result['exists']);
-            $this->assertSame([], $result['logs']);
-            $this->assertSame(0600, $result['permissions']);
+            $this->pmssAssertArraySubsetSame([
+                'result' => $mode === 'success', 'exception' => null, 'exists' => false, 'logs' => [],
+                'permissions' => 0600,
+            ], $result);
             $this->assertSame("*filter\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [0:0]\n".
                 "-A OUTPUT -j ACCEPT\nCOMMIT\n*nat\n:PREROUTING ACCEPT [0:0]\n:INPUT ACCEPT [0:0]\n".
                 ":OUTPUT ACCEPT [0:0]\n:POSTROUTING ACCEPT [0:0]\n-A POSTROUTING -j MASQUERADE\nCOMMIT\n",
@@ -51,9 +48,9 @@ class NetworkIptablesWriteSafetyTest extends TestCase
     {
         foreach (['success', 'commandFail'] as $mode) {
             $result = $this->applyFixture($mode, 'output');
-            $this->assertSame($mode === 'success', $result['result']);
-            $this->assertSame(false, $result['exists']);
-            $this->assertSame([], $result['logs']);
+            $this->pmssAssertArraySubsetSame([
+                'result' => $mode === 'success', 'exists' => false, 'logs' => [],
+            ], $result);
             // No chain declarations: they would reset other chains' policies and counters.
             $this->assertSame("*filter\n-F OUTPUT\n-A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n".
                 "-A OUTPUT ! -d 10.0.0.0/8 -m owner --uid-owner 1001 -j MARK --set-mark 1001\nCOMMIT\n", $result['bytes']);
@@ -61,9 +58,7 @@ class NetworkIptablesWriteSafetyTest extends TestCase
                 false, 'logMessage']], $result['commands']);
         }
         $result = $this->applyFixture('false', 'output');
-        $this->assertSame(false, $result['result']);
-        $this->assertSame([], $result['commands']);
-        $this->assertSame(false, $result['exists']);
+        $this->pmssAssertArraySubsetSame(['result' => false, 'commands' => [], 'exists' => false], $result);
     }
 
     private function applyFixture(string $mode, string $target = 'all'): array
