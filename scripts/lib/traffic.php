@@ -77,20 +77,19 @@ function pmssTrafficCollectOutputUsage(?callable $executor = null, ?callable $lo
 /** Parse OUTPUT chain accounting into external/local per-UID byte totals. */
 function pmssTrafficParseOutputUsage(string $usage, array $localnets): array
 {
-    $traffic = $local = [];
-    $unmatched = 0;
+    $traffic = ['traffic' => [], 'local' => [], 'unmatched' => 0];
     $localnetLookup = array_fill_keys(array_filter($localnets, 'is_string'), true);
     foreach (pmssConfigTextLines($usage, []) as $trimmed) {
         if (strpos($trimmed, 'Chain OUTPUT (') === 0) {
-            preg_match('/,\s*([0-9]+)\s+bytes\)/', $trimmed, $matches) === 1 && $unmatched = (int) $matches[1];
+            preg_match('/,\s*([0-9]+)\s+bytes\)/', $trimmed, $matches) === 1 && $traffic['unmatched'] = (int) $matches[1];
             continue;
         }
         $rule = pmssTrafficParseOutputRule($trimmed);
         if ($rule === null) continue;
         $bucket = $rule['destination'] === '0.0.0.0/0' ? 'traffic' : (isset($localnetLookup[$rule['destination']]) ? 'local' : '');
-        $bucket !== '' && ${$bucket}[$rule['uid']] = (${$bucket}[$rule['uid']] ?? 0) + $rule['bytes'];
+        $bucket !== '' && $traffic[$bucket][$rule['uid']] = ($traffic[$bucket][$rule['uid']] ?? 0) + $rule['bytes'];
     }
-    return ['traffic' => $traffic, 'local' => $local, 'unmatched' => $unmatched];
+    return $traffic;
 }
 /** Log and notify when a traffic sample exceeds the five-minute link budget. */
 function pmssTrafficBudgetExceeded(string $path, string $user, string $label, int $bytes, ?float $linkSpeed, string $debugBody, string $userMessage): bool
@@ -116,11 +115,9 @@ class trafficStatistics {
     public function __construct(array $paths = [])
     {
         $this->trafficDir = pmssDirPathResolve($paths['traffic_dir'] ?? null, 'PMSS_TRAFFIC_DIR', '/var/log/pmss/traffic');
-        $homeDir = pmssDirPathResolve($paths['home_dir'] ?? null, 'PMSS_HOME_DIR', '/home');
-        $runtimeDir = pmssDirPathResolve($paths['runtime_dir'] ?? null, 'PMSS_RUNTIME_DIR', '/var/run/pmss');
         $this->storage = new \TrafficStorage([
-            'home_dir' => $homeDir,
-            'runtime_dir' => $runtimeDir,
+            'home_dir' => $paths['home_dir'] ?? null,
+            'runtime_dir' => $paths['runtime_dir'] ?? null,
             'traffic_mode' => $paths['traffic_mode'] ?? 'egress',
         ]);
     }

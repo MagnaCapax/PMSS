@@ -48,10 +48,7 @@ function pmssTrafficLimitPath(string $username, ?string $homeDir = null): string
 /** Resolve the runtime traffic statistics cache path for a user key. */
 function pmssTrafficStatsPath(string $username, ?string $statsDir = null, ?string $runtimeDir = null): string
 {
-    if ($statsDir === null) {
-        $statsDir = pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/var/run/pmss').'/trafficStats';
-    }
-
+    $statsDir = $statsDir ?? pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/var/run/pmss').'/trafficStats';
     return pmssDirPathNormalize($statsDir).'/'.$username;
 }
 
@@ -140,9 +137,8 @@ class TrafficStorage
             return;
         }
 
-        $isLocalUser = pmssTrafficUserKeyIsLocalnet($user);
         $targetUser = pmssTrafficUserKeyBaseUser($user);
-        $homeTrafficPath = pmssTrafficDataPaths($targetUser, $this->homeDir)[pmssTrafficDataPathKey($isLocalUser, $this->trafficMode)];
+        $homeTrafficPath = pmssTrafficDataPaths($targetUser, $this->homeDir)[pmssTrafficDataPathKey(pmssTrafficUserKeyIsLocalnet($user), $this->trafficMode)];
 
         $serialized = serialize($data);
         $targets = [[pmssTrafficStatsPath($user, $this->statsDir), 'root', 0600, false]];

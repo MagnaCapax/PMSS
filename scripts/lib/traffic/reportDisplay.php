@@ -49,9 +49,9 @@ function pmssShowTrafficRateColumns(array $rates, bool $withUnits): array
 {
     return array_map(static function (string $key) use ($rates, $withUnits): string {
         $rate = (float) $rates[$key];
-        if (!$withUnits) return sprintf('%.2f', $rate);
         // Extended columns auto-scale from MiB/s to GiB/s at the legacy threshold.
-        return $rate >= 1000 ? sprintf('%.2fGiB/s', $rate / 1024) : sprintf('%.2fMiB/s', $rate);
+        if ($withUnits && $rate >= 1000) return sprintf('%.2fGiB/s', $rate / 1024);
+        return sprintf($withUnits ? '%.2fMiB/s' : '%.2f', $rate);
     }, ['week', 'day', 'hour', '15min']);
 }
 

@@ -134,6 +134,9 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   remain unchanged.
 - `trafficLog.php` – Capture recent traffic counters for aggregation.
 - `trafficStats.php` – Fold raw logs into long-term statistics.
+  Traffic accounting accumulates directly in its returned counter map; storage
+  owns home/runtime path normalization. Reports retain unitless rates and the
+  extended layout's 1000 MiB/s threshold for switching to GiB/s.
 - `systemdServicesGuard.php` – Enforce stop/disable/mask policy for system services.
 - `updateQuotas.php` – Refresh user disk quota information.
 - `userTrackerCleaner.php` – Remove obsolete trackers from torrents.
