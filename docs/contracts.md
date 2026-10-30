@@ -1108,6 +1108,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/cron/checkRtorrent.php
   - Behavior: Keeps per-user rTorrent/executor processes healthy and recovers missing `.rtorrent.rc` files from canonical templates when enough user config data exists.
   - Process facade: `rtorrent/process.php` loads inspection and lifecycle helpers. Snapshot headings and rows keep their callback order, and the SCGI decision retains the same queue and process-state gates.
+  - Transition boundaries: the existing process/state/flow includes retain their public helpers. Missing-process recovery, escalation persistence/retry and live SCGI recovery live in focused modules (ADR 0212). Grace extension clears wedge evidence; wedge observation preserves it. A confirmed-wedge restart clears both SCGI markers after restart, while a process lost during grace retains its socket cleanup before restart and clears only the unresponsive marker afterward.
   - Session recovery reports success only after the recreated `~/session` directory has customer ownership and, when POSIX account lookup is available, the customer's primary group. Ownership failures are logged and leave the directory for a later repair attempt without writing the session-reset marker.
   - Side-effects: Publishes `/root/changedConfigs` when a user's `.rtorrent.rc` is not owned by root; clears the stale report when no drift remains; write/remove failures are logged instead of hidden.
 

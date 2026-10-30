@@ -28,6 +28,12 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/rtorrent/watchdogProcessFlow.php** retains the transition include.
+  `watchdogMissing.php` owns missing-process recovery, `watchdogEscalation.php`
+  owns escalation markers and bounded retries, and `watchdogScgi.php` owns live
+  SCGI grace, wedge decisions and recovery. Marker I/O stays in `watchdogState.php`
+  and signals/launches stay in `processLifecycle.php`. Pending SCGI decisions
+  and restart completion each share one path (ADR 0212).
 - **scripts/lib/update/services/systemd.php** retains the service include, cron
   containment and shared restart-drop-in writer. Its `systemd/guard.php` module
   owns disabled-service policy, boot activation and bounded Exim cleanup;

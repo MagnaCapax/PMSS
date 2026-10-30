@@ -1,43 +1,11 @@
 <?php
 /**
- * rTorrent watchdog decisions, signals, and process lifecycle.
+ * rTorrent signals and process lifecycle; watchdog decisions live in watchdogScgi.php.
  *
  * @license Proprietary
  */
 
-/** Decide what to do with an alive but SCGI-unresponsive process.
- * @return array{action:string,message:string} action is extend_grace|observe_wedge|restart.
- */
-function rtorrentProcessScgiUnresponsiveDecision(
-    array $rtorrentPids,
-    array $processStates,
-    ?array $queueSnapshot,
-    string $wedgeStateFile,
-    int $wedgeCycles
-): array {
-    $pidsText = implode(',', rtorrentProcessNormalizePids($rtorrentPids));
-    if ($processStates === []) {
-        return ['action' => 'extend_grace', 'message' => 'SCGI unresponsive but rtorrent process state is unavailable (pids='.$pidsText.'); extending grace'];
-    }
-
-    if (rtorrentProcessStatesHaveUninterruptibleIo($processStates)) {
-        return ['action' => 'extend_grace', 'message' => 'SCGI unresponsive but rtorrent is in uninterruptible I/O state (pids='.$pidsText.'); extending grace'];
-    }
-
-    $queueText = $queueSnapshot === null
-        ? 'queue=unavailable'
-        : 'recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ'];
-    if ($queueSnapshot === null || !rtorrentScgiSocketQueueSaturated($queueSnapshot)) {
-        return ['action' => 'extend_grace', 'message' => 'SCGI unresponsive but rtorrent still alive (pids='.$pidsText.'; '.$queueText.'); extending grace'];
-    }
-
-    $wedgeState = rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles);
-    if (($wedgeState['action'] ?? '') !== 'stale') {
-        return ['action' => 'observe_wedge', 'message' => 'SCGI accept queue saturated for rtorrent (pids='.$pidsText.'; '.$queueText.'; count='.(int) ($wedgeState['count'] ?? 0).'/'.$wedgeCycles.'); observing'];
-    }
-
-    return ['action' => 'restart', 'message' => 'SCGI accept queue saturated for consecutive checks (pids='.$pidsText.'; '.$queueText.'); restarting rtorrent'];
-}
+require_once __DIR__.'/watchdogScgi.php';
 
 /**
  * Send a signal to multiple PIDs.

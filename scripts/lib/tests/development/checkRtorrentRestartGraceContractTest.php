@@ -69,17 +69,28 @@ class checkRtorrentRestartGraceContractTest extends TestCase
                 "require_once __DIR__.'/watchdogProcessFlow.php';",
             ]],
             'scripts/lib/rtorrent/watchdogProcessFlow.php' => ['required' => [
+                "require_once __DIR__.'/watchdogEscalation.php';",
+                "require_once __DIR__.'/watchdogMissing.php';",
+                "require_once __DIR__.'/watchdogScgi.php';",
+            ]],
+            'scripts/lib/rtorrent/watchdogState.php' => ['required' => [
+                "require_once __DIR__.'/watchdogEscalation.php';",
+                "require_once __DIR__.'/watchdogScgi.php';",
+            ]],
+            'scripts/lib/rtorrent/watchdogMissing.php' => ['required' => [
                 'function pmssCheckRtorrentHandleMissingProcess(',
                 "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
                 'persistent start failure recovery: reset session directory',
+            ]],
+            'scripts/lib/rtorrent/watchdogEscalation.php' => ['required' => [
                 'persistent start failure escalated; leaving retry disabled for external monitoring',
+            ]],
+            'scripts/lib/rtorrent/watchdogScgi.php' => ['required' => [
                 'function pmssCheckRtorrentHandleAliveProcess(',
                 'rtorrentProcessUnresponsiveGraceState($restartMarker, $unresponsiveGrace)',
                 '$restartAge = $graceState[\'restartAge\'];',
                 '$effectiveGrace = $graceState[\'grace\'];',
                 'rtorrentProcessScgiUnresponsiveDecision(',
-            ]],
-            'scripts/lib/rtorrent/watchdogState.php' => ['required' => [
                 'function rtorrentProcessUnresponsiveGraceState(',
                 '$restartAge < 7200',
                 '$restartAge < 14400',

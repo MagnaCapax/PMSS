@@ -39,7 +39,7 @@ class rtorrentWatchdogDecisionTest extends TestCase
 
     private function escalatedStatePaths(): array
     {
-        return \rtorrentProcessWatchdogStatePaths($this->tempDir, 'alice');
+        return \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
     }
 
     public function testCronLogHonorsForceAndDebugFlags(): void
@@ -58,22 +58,22 @@ class rtorrentWatchdogDecisionTest extends TestCase
 
     public function testWatchdogStatePathsPreserveExistingFileNames(): void
     {
-        $paths = \rtorrentProcessWatchdogStatePaths('/run/pmss/', 'alice');
+        $paths = \rtorrentProcessWatchdogStatePaths('/run/pmss/', 'fixtur01');
 
         $this->assertEquals([
-            'missing' => '/run/pmss/checkRtorrent-missing-alice.ts',
-            'unresponsive' => '/run/pmss/checkRtorrent-unresponsive-alice.ts',
-            'acceptQueueWedge' => '/run/pmss/checkRtorrent-accept-queue-alice.count',
-            'startMarker' => '/run/pmss/checkRtorrent-started-alice.ts',
-            'startFailure' => '/run/pmss/checkRtorrent-start-failure-alice.count',
-            'sessionReset' => '/run/pmss/checkRtorrent-session-reset-alice.ts',
-            'escalation' => '/run/pmss/checkRtorrent-escalated-alice.flag',
+            'missing' => '/run/pmss/checkRtorrent-missing-fixtur01.ts',
+            'unresponsive' => '/run/pmss/checkRtorrent-unresponsive-fixtur01.ts',
+            'acceptQueueWedge' => '/run/pmss/checkRtorrent-accept-queue-fixtur01.count',
+            'startMarker' => '/run/pmss/checkRtorrent-started-fixtur01.ts',
+            'startFailure' => '/run/pmss/checkRtorrent-start-failure-fixtur01.count',
+            'sessionReset' => '/run/pmss/checkRtorrent-session-reset-fixtur01.ts',
+            'escalation' => '/run/pmss/checkRtorrent-escalated-fixtur01.flag',
         ], $paths);
     }
 
     public function testClearResolvedWatchdogStatePreservesExistingMarkerSemantics(): void
     {
-        $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'alice');
+        $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
         $this->writeWatchdogStateFiles($state);
 
         \rtorrentProcessClearResolvedWatchdogState($state, true, false);
@@ -96,17 +96,17 @@ class rtorrentWatchdogDecisionTest extends TestCase
     {
         // Inject write results in a child process without touching live marker files.
         $script = 'namespace WatchdogStateWriteFixture;'.$this->pmssInlinePhpLimitedWriteShims().$this->pmssInlinePhpFileWriteCompleteShim();
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/watchdogState.php', 'WatchdogStateWriteFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/watchdogState.php', 'WatchdogStateWriteFixture', ['watchdogEscalation.php']);
         $script .= <<<'PHP'
 [$path, $payload, $GLOBALS['limit'], $escalation] = json_decode(getenv('PMSS_TEST_STATE_WRITE'), true);
 $GLOBALS['requests'] = [];
 $result = $escalation
-    ? rtorrentProcessWriteEscalationState($path, 'alice', 6, 900)
+    ? rtorrentProcessWriteEscalationState($path, 'fixtur01', 6, 900)
     : rtorrentProcessWriteStateFile($path, $payload);
 echo json_encode([$result, file_get_contents($path), $GLOBALS['requests']]);
 PHP;
         $path = $this->tempDir.'/write-marker';
-        foreach (['', '0', '1700000000', "binary\0payload", '{"timestamp":900,"user":"alice","count":6}'] as $payload) {
+        foreach (['', '0', '1700000000', "binary\0payload", '{"timestamp":900,"user":"fixtur01","count":6}'] as $payload) {
             $escalation = substr($payload, 0, 1) === '{';
             foreach ([false, 0, 1, max(0, strlen($payload) - 1), strlen($payload), null] as $limit) {
                 file_put_contents($path, 'prior marker');
@@ -123,9 +123,9 @@ PHP;
     public function testEscalationEncodingFailurePreservesExistingAndAbsentMarkers(): void
     {
         $path = $this->escalatedStatePaths()['escalation'];
-        $original = '{"timestamp":900,"user":"alice","count":6}';
+        $original = '{"timestamp":900,"user":"fixtur01","count":6}';
         // Invalid UTF-8 at each position and truncated/overlong sequences fail encoding.
-        foreach (["\xffalice", "ali\xffce", "alice\xff", "\xc3", "\xc0\xaf"] as $user) {
+        foreach (["\xfffixtur01", "fix\xfftur01", "fixtur01\xff", "\xc3", "\xc0\xaf"] as $user) {
             file_put_contents($path, $original);
             $this->assertFalse(\rtorrentProcessWriteEscalationState($path, $user, 7, 1000));
             $this->assertSame($original, file_get_contents($path));
@@ -141,7 +141,7 @@ PHP;
     {
         $path = $this->escalatedStatePaths()['escalation'];
         foreach ([
-            ['alice', 'alice'],
+            ['fixtur01', 'fixtur01'],
             ['', ''],
             ['a/b', 'a\\/b'],
             ["a\n", 'a\\n'],
@@ -150,7 +150,7 @@ PHP;
             $this->assertTrue(\rtorrentProcessWriteEscalationState($path, $case[0], 6, 900));
             $this->assertSame('{"timestamp":900,"user":"'.$case[1].'","count":6}', file_get_contents($path));
         }
-        $this->assertFalse(\rtorrentProcessWriteEscalationState($this->tempDir.'/missing/marker', 'alice', 6, 900));
+        $this->assertFalse(\rtorrentProcessWriteEscalationState($this->tempDir.'/missing/marker', 'fixtur01', 6, 900));
     }
 
     public function testEscalationRetryStateUsesMarkerTimestamp(): void
@@ -159,7 +159,7 @@ PHP;
 
         $this->assertSame(['action' => 'record', 'age' => 0], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1000));
 
-        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, 900);
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, 900);
         $this->assertSame(['action' => 'wait', 'age' => 99], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 999));
         $this->assertSame(['action' => 'retry', 'age' => 180], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1080));
 
@@ -173,13 +173,13 @@ PHP;
     public function testEscalatedStartFailureRetriesOnceAfterBoundedIntervalAndClearsOnSuccess(): void
     {
         $state = $this->escalatedStatePaths();
-        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, time() - 3600);
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time() - 3600);
         $attempts = 0;
         $logger = static function (string $message, bool $force = false): void {};
 
         $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
-                'alice',
+                'fixtur01',
                 $state,
                 6,
                 180,
@@ -201,14 +201,14 @@ PHP;
     public function testEscalatedStartFailureWaitsBeforeBoundedInterval(): void
     {
         $state = $this->escalatedStatePaths();
-        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, time());
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time());
         $before = (string) file_get_contents($state['escalation']);
         $attempts = 0;
         $logger = static function (string $message, bool $force = false): void {};
 
         $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
-                'alice',
+                'fixtur01',
                 $state,
                 6,
                 3600,
@@ -229,14 +229,14 @@ PHP;
     public function testEscalatedStartFailureRearmsAfterFailedOneShot(): void
     {
         $state = $this->escalatedStatePaths();
-        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, time() - 3600);
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time() - 3600);
         $before = time();
         $attempts = 0;
         $logger = static function (string $message, bool $force = false): void {};
 
         $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
-                'alice',
+                'fixtur01',
                 $state,
                 7,
                 180,
@@ -252,7 +252,7 @@ PHP;
         $payload = json_decode((string) file_get_contents($state['escalation']), true);
         $this->assertSame(1, $attempts, 'failed one-shot still attempts only once');
         $this->assertTrue(is_array($payload), 'failed one-shot should leave a JSON escalation marker');
-        $this->assertSame('alice', $payload['user']);
+        $this->assertSame('fixtur01', $payload['user']);
         $this->assertSame(7, $payload['count']);
         $this->assertTrue((int) $payload['timestamp'] >= $before, 'failed one-shot should re-arm the interval from now');
     }
@@ -308,8 +308,8 @@ PHP;
     {
         $path = $this->tempDir.'/changedConfigs';
 
-        \pmssCheckRtorrentPublishChangedConfigReport(['alice -> bob'], $path, false);
-        $this->assertSame('alice -> bob', (string) file_get_contents($path));
+        \pmssCheckRtorrentPublishChangedConfigReport(['fixtur01 -> fixtur02'], $path, false);
+        $this->assertSame('fixtur01 -> fixtur02', (string) file_get_contents($path));
 
         \pmssCheckRtorrentPublishChangedConfigReport([], $path, false);
         $this->assertFalse(file_exists($path));
@@ -320,7 +320,7 @@ PHP;
         $path = $this->tempDir.'/nested/../changedConfigs';
 
         $output = $this->pmssCaptureStdout(static function () use ($path): void {
-            \pmssCheckRtorrentPublishChangedConfigReport(['alice -> bob'], $path, false);
+            \pmssCheckRtorrentPublishChangedConfigReport(['fixtur01 -> fixtur02'], $path, false);
         })[1];
 
         $this->assertStringContainsString('WARN: unsafe changed config report path:', $output);
@@ -342,7 +342,7 @@ echo json_encode([$result, file_get_contents($path),
     strpos($output, 'WARN: failed to write changed config report: '.$path) !== false, $GLOBALS['requests']]);
 PHP;
         $path = $this->tempDir.'/changedConfigs';
-        foreach ([[''], ['0'], ['alice -> bob'], ['alice -> bob', 'carol -> dave']] as $changes) {
+        foreach ([[''], ['0'], ['fixtur01 -> fixtur02'], ['fixtur01 -> fixtur02', 'fixtur03 -> fixtur04']] as $changes) {
             $payload = implode("\n", $changes);
             foreach ([false, 0, 1, max(0, strlen($payload) - 1), strlen($payload), null] as $limit) {
                 file_put_contents($path, 'prior report');

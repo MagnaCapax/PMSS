@@ -19,7 +19,7 @@ class checkRtorrentContractTest extends TestCase
             'scripts/lib/rtorrent/watchdog.php' => [
                 'required' => ['function pmssCheckRtorrentCleanupStaleSocket('],
             ],
-            'scripts/lib/rtorrent/watchdogProcessFlow.php' => [
+            'scripts/lib/rtorrent/watchdogMissing.php' => [
                 'required' => ["rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])"],
             ],
         ]);
@@ -60,12 +60,9 @@ class checkRtorrentContractTest extends TestCase
                     'function pmssCheckRtorrentCleanupStaleSocket(',
                 ],
             ],
-            'scripts/lib/rtorrent/processLifecycle.php' => [
-                'required' => [
-                    'SCGI unresponsive but rtorrent still alive (pids=',
-                    'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
-                    'rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles)',
-                    "'action' => 'restart'",
+            'scripts/lib/rtorrent/watchdogMissing.php' => [
+                'matches' => [
+                    '/pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?if \(!\$executorPresent\).*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
                 ],
             ],
             'scripts/cron/checkRtorrent.php' => [
@@ -77,18 +74,21 @@ class checkRtorrentContractTest extends TestCase
                     'pmssCheckRtorrentHandleAliveProcess(',
                 ],
             ],
-            'scripts/lib/rtorrent/watchdogProcessFlow.php' => [
+            'scripts/lib/rtorrent/watchdogScgi.php' => [
                 'required' => [
+                    'SCGI unresponsive but rtorrent still alive (pids=',
+                    'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
+                    'rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles)',
+                    "'action' => 'restart'",
                     'rtorrentProcessStatesForPids($rtorrentPids)',
                     'rtorrentScgiSocketQueueSnapshot($socketPath)',
-                    "if (\$decision['action'] === 'observe_wedge')",
+                    "\$decision['action'] === 'extend_grace' || \$decision['action'] === 'observe_wedge'",
                     'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
                 ],
                 'matches' => [
-                    '/pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?if \(!\$executorPresent\).*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
                     '/rtorrentScgiCall\(\$socketPath, \'system\.api_version\', \[\], 5\) !== false.*?pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);/s',
                     '/if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
-                    '/if \(\$decision\[\'action\'\] === \'extend_grace\'\) \{\s*rtorrentProcessWriteStateFile\(\$state\[\'unresponsive\'\], \(string\) time\(\)\);\s*rtorrentProcessClearStaleState\(\$state\[\'acceptQueueWedge\'\]\);\s*pmssCheckRtorrentLogBoth\(\$user, \$decision\[\'message\'\], \$debug\);/s',
+                    '/rtorrentProcessWriteStateFile\(\$state\[\'unresponsive\'\], \(string\) time\(\)\);\s*if \(\$decision\[\'action\'\] === \'extend_grace\'\) rtorrentProcessClearStaleState\(\$state\[\'acceptQueueWedge\'\]\);\s*pmssCheckRtorrentLogBoth\(\$user, \$decision\[\'message\'\], \$debug\);/s',
                 ],
             ],
         ]);
@@ -122,7 +122,7 @@ class checkRtorrentContractTest extends TestCase
                     'missingPrefix' => 'checkRtorrent throttle guard missing: ',
                 ]],
             ],
-            'scripts/lib/rtorrent/watchdogProcessFlow.php' => [
+            'scripts/lib/rtorrent/watchdogScgi.php' => [
                 'matches' => ['/pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s'],
             ],
         ]);

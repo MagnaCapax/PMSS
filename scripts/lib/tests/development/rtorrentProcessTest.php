@@ -264,7 +264,7 @@ PHP;
         $this->pmssWithPathPrefix($binDir, function () use ($lines): void {
             $rc = null;
             $output = null;
-            $this->assertSame([17, PHP_INT_MAX, 9], pmssUserWatchdogProcessPids('alice', '^rtorrent', [], $rc, $output));
+            $this->assertSame([17, PHP_INT_MAX, 9], pmssUserWatchdogProcessPids('fixtur01', '^rtorrent', [], $rc, $output));
             $this->assertSame(0, $rc);
             $this->assertSame(array_map('rtrim', $lines), $output);
         });
@@ -326,7 +326,7 @@ PHP;
             $rc = null;
             $output = null;
             $this->assertSame(['php' => [17], 'screen' => [9], 'all' => [17, 9, PHP_INT_MAX]],
-                rtorrentProcessExecutorPids('alice', $rc, $output));
+                rtorrentProcessExecutorPids('fixtur01', $rc, $output));
             $this->assertSame(0, $rc);
             $this->assertSame($lines, $output);
         });
@@ -455,8 +455,8 @@ PHP;
 
     public function testRestartMarkerLivesWithRootOwnedWatchdogState(): void
     {
-        $path = \rtorrentProcessRestartMarkerPath('alice');
-        $this->assertSame('/run/pmss/checkRtorrent-restart-alice.ts', $path);
+        $path = \rtorrentProcessRestartMarkerPath('fixtur01');
+        $this->assertSame('/run/pmss/checkRtorrent-restart-fixtur01.ts', $path);
         $this->pmssAssertStringNotContainsString('/tmp/', $path);
     }
 
@@ -464,7 +464,8 @@ PHP;
     {
         $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/processLifecycle.php');
         $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
-        $flowSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/watchdogProcessFlow.php');
+        $flowSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/watchdogMissing.php')
+            .$this->pmssReadRepoFile('scripts/lib/rtorrent/watchdogScgi.php');
 
         $this->assertSame(1, substr_count($processSource, "pmssUserWatchdogCommandRun('/scripts/startRtorrent "));
         $this->assertStringContainsAllStrings([
@@ -485,7 +486,7 @@ PHP;
     public function testStartRtorrentLoginLaunchTimeoutLeavesCustomRcCounterAlone(): void
     {
         $root = $this->pmssMakeTempDir('pmss-rtorrent-launch-timeout-');
-        $user = 'alice';
+        $user = 'fixtur01';
         $home = $root.'/homes/'.$user;
         $runtime = $root.'/runtime';
         mkdir($home.'/session', 0755, true);
@@ -578,7 +579,7 @@ PHP;
     public function testResetSessionDirectoryRejectsUnexpectedPath(): void
     {
         [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger): bool {
-            return rtorrentProcessResetSessionDirectory($this->tempDir.'/alice', 'bob', $logger);
+            return rtorrentProcessResetSessionDirectory($this->tempDir.'/fixtur01', 'fixtur02', $logger);
         });
 
         $this->assertTrue(!$result, 'Unexpected home path should be rejected');

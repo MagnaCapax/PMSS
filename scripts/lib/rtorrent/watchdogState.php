@@ -12,6 +12,8 @@
 
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/watchdogEscalation.php';
+require_once __DIR__.'/watchdogScgi.php';
 
 /**
  * Validate a watchdog marker path before writing or removing it.
@@ -78,49 +80,6 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
 }
 
 /**
- * Write the persistent-start-failure escalation marker.
- */
-function rtorrentProcessWriteEscalationState(string $stateFile, string $user, int $failureCount, ?int $now = null): bool
-{
-    $payload = json_encode([
-        'timestamp' => $now ?? time(),
-        'user' => $user,
-        'count' => $failureCount,
-    ]);
-    // Encoding failure must not truncate an existing escalation marker.
-    return $payload !== false && rtorrentProcessWriteStateFile($stateFile, $payload);
-}
-
-/**
- * Decide whether an escalated account is due for one bounded recovery start.
- *
- * @return array{action:string,age:int}
- */
-function rtorrentProcessEscalationRetryState(string $stateFile, int $retryInterval, ?int $now = null): array
-{
-    if (!rtorrentProcessStateFilePathIsSafe($stateFile)) {
-        return ['action' => 'wait', 'age' => 0];
-    }
-
-    // Accept the current JSON marker and the legacy scalar timestamp format.
-    $payload = is_file($stateFile) ? @file_get_contents($stateFile) : false;
-    $trimmed = is_string($payload) ? trim($payload) : '';
-    $decoded = $trimmed !== '' ? pmssJsonDecodeAssoc($payload) : null;
-    if (is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)) {
-        $timestamp = max(0, (int) $decoded['timestamp']);
-    } else {
-        $timestamp = is_numeric($trimmed) ? max(0, (int) $trimmed) : 0;
-    }
-    if ($timestamp <= 0) {
-        return ['action' => 'record', 'age' => 0];
-    }
-
-    $age = max(0, ($now ?? time()) - $timestamp);
-
-    return ['action' => $age < max(1, $retryInterval) ? 'wait' : 'retry', 'age' => $age];
-}
-
-/**
  * Return all checkRtorrent marker paths for one user.
  */
 function rtorrentProcessWatchdogStatePaths(string $stateDir, string $user): array
@@ -153,42 +112,13 @@ function rtorrentProcessRestartMarkerPath(string $user): string
  */
 function rtorrentProcessClearResolvedWatchdogState(array $state, bool $rtorrentPresent, bool $executorPresent): void
 {
-    $clear = [];
-    if ($rtorrentPresent || !$executorPresent) {
-        $clear[] = 'missing';
-    }
-    if (!$rtorrentPresent) {
-        $clear[] = 'acceptQueueWedge';
-    }
-    if ($rtorrentPresent || $executorPresent) {
-        $clear = array_merge($clear, ['startMarker', 'startFailure', 'sessionReset', 'escalation']);
-    }
-
-    foreach ($clear as $key) {
-        if (isset($state[$key])) {
+    // Policy order is also removal order; there is no separate list to build and replay.
+    foreach (['missing' => $rtorrentPresent || !$executorPresent, 'acceptQueueWedge' => !$rtorrentPresent]
+        + array_fill_keys(['startMarker', 'startFailure', 'sessionReset', 'escalation'], $rtorrentPresent || $executorPresent) as $key => $clear) {
+        if ($clear && isset($state[$key])) {
             rtorrentProcessClearStaleState((string) $state[$key]);
         }
     }
-}
-
-/**
- * Return the SCGI grace period, extending it after recent restart markers.
- *
- * @return array{grace:int,restartAge:int}
- */
-function rtorrentProcessUnresponsiveGraceState(string $restartMarker, int $baseGrace, ?int $now = null): array
-{
-    $now = $now ?? time();
-    $restartTs = is_file($restartMarker) ? (int) trim((string) @file_get_contents($restartMarker)) : 0;
-    $restartAge = $restartTs > 0 ? max(0, $now - $restartTs) : 0;
-    $grace = $baseGrace;
-    if ($restartAge > 0 && $restartAge < 7200) {
-        $grace = max($baseGrace, 600);
-    } elseif ($restartAge > 0 && $restartAge < 14400) {
-        $grace = max($baseGrace, 1200);
-    }
-
-    return ['grace' => $grace, 'restartAge' => $restartAge];
 }
 
 /**
