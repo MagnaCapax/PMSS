@@ -1,6 +1,8 @@
 <?php
 /** Missing-process recovery, retaining executor-specific grace. @license GPL-3.0-only */
 
+require_once __DIR__.'/sessionResetPreflight.php';
+
 /**
  * Handle absent rTorrent processes while preserving executor-specific grace.
  *
@@ -28,7 +30,13 @@ function pmssCheckRtorrentHandleMissingProcess(
             pmssCheckRtorrentLogBoth($user, "rTorrent still missing after start attempt; persistent failure {$persistentFailureCount}/{$startFailureEscalate}", $debug);
 
             if ($persistentFailureCount >= $startFailureSessionReset && !is_file($state['sessionReset'])) {
-                if (rtorrentProcessResetSessionDirectory($home, $user, $logCallback)) {
+                // Keep the original session when a non-session startup prerequisite fails.
+                $sessionLog = static function (string $message, bool $force) use ($user, $logCallback): void {
+                    $logCallback($message, $force);
+                    pmssUserLog($user, 'checkRtorrent: '.$message);
+                };
+                if (pmssCheckRtorrentSessionResetEnvironmentReady($user, $home, $debug)
+                    && rtorrentProcessResetSessionDirectory($home, $user, $sessionLog)) {
                     rtorrentProcessWriteStateFile($state['sessionReset'], (string) time());
                     pmssCheckRtorrentLogBoth($user, 'persistent start failure recovery: reset session directory', $debug);
                 }
