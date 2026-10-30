@@ -32,8 +32,8 @@ require_once %s;
 $error = null;
 $errorCode = null;
 echo json_encode([
-    'resolved' => pmssTrafficLimitResolveCliUserHome('alice', '', $errorCode),
-    'targetModes' => pmssTrafficLimitCliTargetModes('alice', '/tmp/home'),
+    'resolved' => pmssTrafficLimitResolveCliUserHome('fixtur01', '', $errorCode),
+    'targetModes' => pmssTrafficLimitCliTargetModes('fixtur01', '/tmp/home'),
     'parsed' => pmssTrafficLimitParseGiB('42GiB', $error),
     'error' => $error,
     'operatorWriterLoaded' => function_exists('pmssIntegerSettingFileWrite'),
@@ -55,14 +55,14 @@ PHP,
     {
         // Runs the real resolver in a clean process: other tests stub this function.
         $script = sprintf(
-            'require_once %s; echo json_encode(array_keys(pmssTrafficLimitCliTargetModes("alice", "/srv/home/alice")));',
+            'require_once %s; echo json_encode(array_keys(pmssTrafficLimitCliTargetModes("fixtur01", "/srv/home/fixtur01")));',
             var_export($this->pmssRepoPath('scripts/lib/user/trafficLimit.php'), true)
         );
         $keys = $this->pmssRunInlinePhpJson($script);
 
         $this->assertSame(2, count($keys));
-        $this->assertSame('/srv/home/alice/.trafficLimit', $keys[1]);
-        $this->assertSame('/trafficLimits/alice', substr($keys[0], -strlen('/trafficLimits/alice')));
+        $this->assertSame('/srv/home/fixtur01/.trafficLimit', $keys[1]);
+        $this->assertSame('/trafficLimits/fixtur01', substr($keys[0], -strlen('/trafficLimits/fixtur01')));
     }
 
     public function testRejectsInvalidGiBValues(): void

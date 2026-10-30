@@ -78,17 +78,17 @@ class UsernameValidationTest extends TestCase
     public function testPasswdEntryLookupRequiresExactUserMatch(): void
     {
         $passwd = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-passwd-').'/passwd', implode("\n", [
-            'alice2:x:1000:1000::/home/alice2:/bin/bash',
-            'alice:x:1001:1001::/home/alice:/bin/bash',
+            'fixtur012:x:1000:1000::/home/fixtur012:/bin/bash',
+            'fixtur01:x:1001:1001::/home/fixtur01:/bin/bash',
             '',
         ]));
 
-        $entry = \pmssPasswdEntryLookup('alice', $passwd);
+        $entry = \pmssPasswdEntryLookup('fixtur01', $passwd);
 
         $this->assertTrue(is_array($entry));
-        $this->assertEquals('alice', $entry['name']);
+        $this->assertEquals('fixtur01', $entry['name']);
         $this->assertEquals(1001, $entry['uid']);
-        $this->assertEquals('/home/alice', $entry['dir']);
+        $this->assertEquals('/home/fixtur01', $entry['dir']);
     }
 
     public function testPasswdEntryLookupRejectsInvalidUsernameAndSymlinkPath(): void
@@ -96,25 +96,25 @@ class UsernameValidationTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-passwd-link-');
         $passwd = $root.'/passwd';
         $link = $root.'/passwd.link';
-        $this->pmssWriteFile($passwd, "alice:x:1001:1001::/home/alice:/bin/bash\n");
+        $this->pmssWriteFile($passwd, "fixtur01:x:1001:1001::/home/fixtur01:/bin/bash\n");
         $this->pmssCreateSymlinkOrSkip($passwd, $link);
 
-        $this->assertEquals(null, \pmssPasswdEntryLookup('../alice', $passwd));
-        $this->assertEquals(null, \pmssPasswdEntryLookup('alice', $link));
+        $this->assertEquals(null, \pmssPasswdEntryLookup('../fixtur01', $passwd));
+        $this->assertEquals(null, \pmssPasswdEntryLookup('fixtur01', $link));
     }
 
     public function testColonRecordFieldsLookupRequiresExactMatchAndMinimumFields(): void
     {
         $passwd = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-passwd-fields-').'/passwd', implode("\n", [
-            'alice2:x:1000:1000::/home/alice2:/bin/bash',
-            'alice:x:1001:1001::/home/alice:/bin/bash',
+            'fixtur012:x:1000:1000::/home/fixtur012:/bin/bash',
+            'fixtur01:x:1001:1001::/home/fixtur01:/bin/bash',
             'broken:x',
             '',
         ]));
 
         $this->assertEquals(
-            ['alice', 'x', '1001', '1001', '', '/home/alice', '/bin/bash'],
-            \pmssColonRecordFieldsLookup($passwd, 'alice', 7, false)
+            ['fixtur01', 'x', '1001', '1001', '', '/home/fixtur01', '/bin/bash'],
+            \pmssColonRecordFieldsLookup($passwd, 'fixtur01', 7, false)
         );
         $this->assertEquals(null, \pmssColonRecordFieldsLookup($passwd, 'ali', 7, false));
         $this->assertEquals(null, \pmssColonRecordFieldsLookup($passwd, 'broken', 7, false));

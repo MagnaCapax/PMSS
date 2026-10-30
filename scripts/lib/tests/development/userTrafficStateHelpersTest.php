@@ -71,20 +71,20 @@ class UserTrafficStateHelpersTest extends TestCase
     public function testTrafficDataPathsUseEnvOverrideAndModeSuffix(): void
     {
         $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir.'/home'], function (): void {
-            $paths = \pmssTrafficDataPaths('alice');
+            $paths = \pmssTrafficDataPaths('fixtur01');
 
-            $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
+            $this->assertEquals($this->tempDir.'/home/fixtur01/.trafficDataIngressLocal', $paths['ingressLocal']);
         });
     }
 
     public function testTrafficDataPathsExposeCanonicalKeys(): void
     {
         $this->assertEquals([
-            'normal' => $this->tempDir.'/home/alice/.trafficData',
-            'local' => $this->tempDir.'/home/alice/.trafficDataLocal',
-            'ingress' => $this->tempDir.'/home/alice/.trafficDataIngress',
-            'ingressLocal' => $this->tempDir.'/home/alice/.trafficDataIngressLocal',
-        ], \pmssTrafficDataPaths('alice', $this->tempDir.'/home'));
+            'normal' => $this->tempDir.'/home/fixtur01/.trafficData',
+            'local' => $this->tempDir.'/home/fixtur01/.trafficDataLocal',
+            'ingress' => $this->tempDir.'/home/fixtur01/.trafficDataIngress',
+            'ingressLocal' => $this->tempDir.'/home/fixtur01/.trafficDataIngressLocal',
+        ], \pmssTrafficDataPaths('fixtur01', $this->tempDir.'/home'));
     }
 
     public function testTrafficDataPathKeyCharacterizationCoversModeAndBucketMatrix(): void
@@ -151,42 +151,42 @@ class UserTrafficStateHelpersTest extends TestCase
         $homeDir = $this->tempDir.'/home';
         $runtimeDir = $this->tempDir.'/runtime';
         $messages = [];
-        $this->pmssEnsureDir($homeDir.'/alice');
+        $this->pmssEnsureDir($homeDir.'/fixtur01');
 
-        $this->assertFalse(\pmssTrafficSeedInitialState('alice', $homeDir, $runtimeDir, $this->pmssMakeArrayLogger($messages)));
+        $this->assertFalse(\pmssTrafficSeedInitialState('fixtur01', $homeDir, $runtimeDir, $this->pmssMakeArrayLogger($messages)));
 
         $expected = ['raw' => array_fill_keys(array_keys(\pmssStatsCompareTimesBuild(0)), 0.0), 'daily' => []];
         foreach ([
-            $homeDir.'/alice/.trafficData',
-            $homeDir.'/alice/.trafficDataLocal',
+            $homeDir.'/fixtur01/.trafficData',
+            $homeDir.'/fixtur01/.trafficDataLocal',
         ] as $path) {
             $this->assertEquals($expected, \pmssReadSerializedArrayFile($path));
         }
-        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$runtimeDir.'/trafficStats/alice');
-        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice-localnet at '.$runtimeDir.'/trafficStats/alice-localnet');
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for fixtur01 at '.$runtimeDir.'/trafficStats/fixtur01');
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for fixtur01-localnet at '.$runtimeDir.'/trafficStats/fixtur01-localnet');
     }
 
     public function testReadUserTrafficStatesRejectsInvalidUsernameBeforePathResolution(): void
     {
-        $this->pmssEnsureDir($this->tempDir.'/home/alice/evil');
+        $this->pmssEnsureDir($this->tempDir.'/home/fixtur01/evil');
         file_put_contents(
-            $this->tempDir.'/home/alice/evil/.trafficData',
+            $this->tempDir.'/home/fixtur01/evil/.trafficData',
             serialize(['raw' => ['month' => 4096]])
         );
 
         $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir.'/home'], function (): void {
-            $this->assertEquals([], \pmssReadUserTrafficStates('alice/evil'));
+            $this->assertEquals([], \pmssReadUserTrafficStates('fixtur01/evil'));
         });
     }
 
     public function testTrafficLimitAndStatsPathsHonorExplicitBases(): void
     {
         $this->assertEquals([
-            'limit' => $this->tempDir.'/home/alice/.trafficLimit',
-            'stats' => $this->tempDir.'/runtime/trafficStats/alice-localnet',
+            'limit' => $this->tempDir.'/home/fixtur01/.trafficLimit',
+            'stats' => $this->tempDir.'/runtime/trafficStats/fixtur01-localnet',
         ], [
-            'limit' => \pmssTrafficLimitPath('alice', $this->tempDir.'/home'),
-            'stats' => \pmssTrafficStatsPath('alice-localnet', null, $this->tempDir.'/runtime'),
+            'limit' => \pmssTrafficLimitPath('fixtur01', $this->tempDir.'/home'),
+            'stats' => \pmssTrafficStatsPath('fixtur01-localnet', null, $this->tempDir.'/runtime'),
         ]);
     }
 
@@ -202,14 +202,14 @@ class UserTrafficStateHelpersTest extends TestCase
 
         $target = $this->tempDir.'/runtime-target';
         file_put_contents($target, 'keep-me');
-        $statsPath = \pmssTrafficStatsPath('alice', null, $this->tempDir.'/runtime');
+        $statsPath = \pmssTrafficStatsPath('fixtur01', null, $this->tempDir.'/runtime');
         $this->pmssCreateSymlinkOrSkip($target, $statsPath);
 
-        $storage->save('alice', ['raw' => ['month' => 2048]]);
+        $storage->save('fixtur01', ['raw' => ['month' => 2048]]);
 
         $this->assertEquals('keep-me', file_get_contents($target));
         $this->assertTrue(is_link($statsPath));
-        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$statsPath);
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for fixtur01 at '.$statsPath);
     }
 
     public function testTrafficStorageEnsureRuntimeRejectsSymlinkedRuntimeDir(): void
@@ -237,7 +237,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $homeDir = $this->tempDir.'/home';
         $runtimeDir = $this->tempDir.'/runtime';
         $messages = [];
-        $this->pmssEnsureDir($homeDir.'/alice');
+        $this->pmssEnsureDir($homeDir.'/fixtur01');
 
         $storage = new \TrafficStorage([
             'home_dir' => $homeDir,
@@ -248,14 +248,14 @@ class UserTrafficStateHelpersTest extends TestCase
 
         $target = $this->tempDir.'/home-target';
         file_put_contents($target, 'keep-home');
-        $homeTrafficPath = \pmssTrafficDataPaths('alice', $homeDir)['normal'];
+        $homeTrafficPath = \pmssTrafficDataPaths('fixtur01', $homeDir)['normal'];
         $this->pmssCreateSymlinkOrSkip($target, $homeTrafficPath);
 
-        $storage->save('alice', ['raw' => ['month' => 4096]]);
+        $storage->save('fixtur01', ['raw' => ['month' => 4096]]);
 
         $this->assertEquals('keep-home', file_get_contents($target));
         $this->assertTrue(is_link($homeTrafficPath));
-        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$homeTrafficPath);
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for fixtur01 at '.$homeTrafficPath);
     }
 
     public function testTrafficStorageSavePreservesIngressLocalnetRouting(): void
@@ -263,7 +263,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $homeDir = $this->tempDir.'/home';
         $statsDir = $this->tempDir.'/trafficStats';
         $payload = ['raw' => ['month' => 4096], 'daily' => ['today' => 2048]];
-        $this->pmssEnsureDir($homeDir.'/alice');
+        $this->pmssEnsureDir($homeDir.'/fixtur01');
         $this->pmssEnsureDir($statsDir);
 
         $storage = new \TrafficStorage([
@@ -271,10 +271,10 @@ class UserTrafficStateHelpersTest extends TestCase
             'stats_dir' => $statsDir,
             'traffic_mode' => 'ingress',
         ]);
-        $storage->save('alice-localnet', $payload);
+        $storage->save('fixtur01-localnet', $payload);
 
-        $this->assertEquals($payload, \pmssReadSerializedArrayFile($homeDir.'/alice/.trafficDataIngressLocal'));
-        $this->assertEquals($payload, \pmssReadSerializedArrayFile($statsDir.'/alice-localnet'));
+        $this->assertEquals($payload, \pmssReadSerializedArrayFile($homeDir.'/fixtur01/.trafficDataIngressLocal'));
+        $this->assertEquals($payload, \pmssReadSerializedArrayFile($statsDir.'/fixtur01-localnet'));
     }
 
     public function testTrafficStorageSaveRejectsInvalidUserKeys(): void
@@ -290,9 +290,9 @@ class UserTrafficStateHelpersTest extends TestCase
                 $this->tempDir.'/runtime/trafficStats/../evil',
                 $this->tempDir.'/home/../evil/.trafficData',
             ],
-            'alice-localnet-extra' => [
-                $this->tempDir.'/runtime/trafficStats/alice-localnet-extra',
-                $this->tempDir.'/home/alice/.trafficDataIngressLocal',
+            'fixtur01-localnet-extra' => [
+                $this->tempDir.'/runtime/trafficStats/fixtur01-localnet-extra',
+                $this->tempDir.'/home/fixtur01/.trafficDataIngressLocal',
             ],
         ] as $userKey => $unexpectedPaths) {
             $storage->save($userKey, ['raw' => ['month' => 1024]]);

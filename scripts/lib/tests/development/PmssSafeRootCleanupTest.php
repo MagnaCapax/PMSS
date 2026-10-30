@@ -18,8 +18,8 @@ class PmssSafeRootCleanupTest extends TestCase
     public function testWhitelistRefusesCustomerAndSystemPaths(): void
     {
         $refused = [
-            '/home/alice/data/movie.mkv',
-            '/home/bob/.rtorrent.rc',
+            '/home/fixtur01/data/movie.mkv',
+            '/home/fixtur02/.rtorrent.rc',
             '/var/www/site/index.php',
             '/var/www/html/10GiB.dat',       // a large SERVED file — needs human judgment, never auto-rm
             '/etc/passwd',

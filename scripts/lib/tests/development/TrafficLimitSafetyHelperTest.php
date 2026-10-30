@@ -79,7 +79,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testThrottleFileWritePersistsCapWithReadableMode(): void
     {
-        $path = $this->tempDir.'/home/alice/.throttle';
+        $path = $this->tempDir.'/home/fixtur01/.throttle';
         $this->pmssEnsureDir(dirname($path));
 
         $error = 'stale';
@@ -91,7 +91,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testThrottleFileWriteRejectsNegativeCap(): void
     {
-        $path = $this->tempDir.'/home/alice/.throttle';
+        $path = $this->tempDir.'/home/fixtur01/.throttle';
         $this->pmssEnsureDir(dirname($path));
 
         $error = null;
@@ -102,7 +102,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testThrottleFileRemoveTreatsMissingFileAsSuccess(): void
     {
-        $path = $this->tempDir.'/home/alice/.throttle';
+        $path = $this->tempDir.'/home/fixtur01/.throttle';
         $this->pmssEnsureDir(dirname($path));
 
         $error = 'stale';
@@ -113,25 +113,25 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testThrottleOrphanReconcileRemovesHomeThrottleWhenMarkerMissing(): void
     {
         $homeRoot = $this->tempDir.'/home';
-        $home = $this->pmssEnsureDir($homeRoot.'/alice');
-        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/fixtur01.enabled';
         $this->pmssEnsureDir(dirname($enabledMarker), 0700);
         file_put_contents($home.'/.throttle', '25');
 
-        $this->assertTrue(\pmssTrafficLimitThrottleOrphanReconcile('alice', 100, $enabledMarker, $homeRoot));
+        $this->assertTrue(\pmssTrafficLimitThrottleOrphanReconcile('fixtur01', 100, $enabledMarker, $homeRoot));
         $this->assertFalse(file_exists($home.'/.throttle'));
     }
 
     public function testThrottleOrphanReconcileLeavesActiveThrottleWhenMarkerExists(): void
     {
         $homeRoot = $this->tempDir.'/home';
-        $home = $this->pmssEnsureDir($homeRoot.'/alice');
-        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/fixtur01.enabled';
         $this->pmssEnsureDir(dirname($enabledMarker), 0700);
         file_put_contents($enabledMarker, '1');
         file_put_contents($home.'/.throttle', '25');
 
-        $this->assertTrue(\pmssTrafficLimitThrottleOrphanReconcile('alice', 100, $enabledMarker, $homeRoot));
+        $this->assertTrue(\pmssTrafficLimitThrottleOrphanReconcile('fixtur01', 100, $enabledMarker, $homeRoot));
         $this->assertSame('25', trim((string) file_get_contents($home.'/.throttle')));
     }
 
@@ -139,8 +139,8 @@ class TrafficLimitSafetyHelperTest extends TestCase
     {
         foreach (['both', 'marker', 'throttle', 'neither'] as $state) {
             $homeRoot = $this->tempDir.'/'.$state.'/home';
-            $home = $this->pmssEnsureDir($homeRoot.'/alice');
-            $enabledMarker = $this->tempDir.'/'.$state.'/runtime/alice.enabled';
+            $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
+            $enabledMarker = $this->tempDir.'/'.$state.'/runtime/fixtur01.enabled';
             $this->pmssEnsureDir(dirname($enabledMarker), 0700);
             if ($state === 'both' || $state === 'marker') {
                 file_put_contents($enabledMarker, '');
@@ -150,7 +150,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
             }
 
             list($result, $output) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
-                return \pmssTrafficLimitThrottleClearUnlimited('alice', $enabledMarker, $homeRoot);
+                return \pmssTrafficLimitThrottleClearUnlimited('fixtur01', $enabledMarker, $homeRoot);
             });
             $this->assertTrue($result, $state);
             $this->assertFalse(file_exists($enabledMarker), $state);
@@ -168,14 +168,14 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testClearedLimitRefusesSymlinkMarker(): void
     {
         $homeRoot = $this->tempDir.'/home';
-        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
         file_put_contents($home.'/.throttle', '25');
         [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip(
-            $this->tempDir.'/real-marker', $this->tempDir.'/runtime/alice.enabled', 'old', 0700
+            $this->tempDir.'/real-marker', $this->tempDir.'/runtime/fixtur01.enabled', 'old', 0700
         );
 
         list($result) = $this->pmssCaptureStdout(function () use ($linkPath, $homeRoot): bool {
-            return \pmssTrafficLimitThrottleClearUnlimited('alice', $linkPath, $homeRoot);
+            return \pmssTrafficLimitThrottleClearUnlimited('fixtur01', $linkPath, $homeRoot);
         });
         $this->assertFalse($result);
         $this->assertSame('old', file_get_contents($realPath));
@@ -192,7 +192,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
                 return \pmssTrafficLimitThrottleFileRemove($path, $error);
             },
         ] as $name => $operation) {
-            [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-'.$name, $this->tempDir.'/home/alice/.throttle-'.$name, 'old');
+            [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-'.$name, $this->tempDir.'/home/fixtur01/.throttle-'.$name, 'old');
 
             $error = null;
             $this->assertFalse($operation($linkPath, $error), 'operation '.$name);
@@ -203,30 +203,30 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testMarkerTouchCreatesSafeMarkerWithStrictMode(): void
     {
-        $path = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $path = $this->tempDir.'/runtime/trafficLimits/fixtur01.enabled';
         $this->pmssEnsureDir(dirname($path), 0700);
 
-        $this->assertTrue(\pmssTrafficLimitMarkerTouch('alice', $path));
+        $this->assertTrue(\pmssTrafficLimitMarkerTouch('fixtur01', $path));
         $this->assertTrue(is_file($path));
         $this->assertEquals(0600, fileperms($path) & 0777);
     }
 
     public function testMarkerRemoveTreatsMissingFileAsSuccess(): void
     {
-        $this->assertTrue(\pmssTrafficLimitMarkerRemove('alice', $this->tempDir.'/runtime/trafficLimits/alice.enabled'));
+        $this->assertTrue(\pmssTrafficLimitMarkerRemove('fixtur01', $this->tempDir.'/runtime/trafficLimits/fixtur01.enabled'));
     }
 
     public function testMarkerOperationsRejectSymlinkTargets(): void
     {
         foreach ([
             'touch' => function (string $path): bool {
-                return \pmssTrafficLimitMarkerTouch('alice', $path);
+                return \pmssTrafficLimitMarkerTouch('fixtur01', $path);
             },
             'remove' => function (string $path): bool {
-                return \pmssTrafficLimitMarkerRemove('alice', $path);
+                return \pmssTrafficLimitMarkerRemove('fixtur01', $path);
             },
         ] as $name => $operation) {
-            [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker-'.$name, $this->tempDir.'/runtime/trafficLimits/alice-'.$name.'.enabled', 'old', 0700);
+            [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker-'.$name, $this->tempDir.'/runtime/trafficLimits/fixtur01-'.$name.'.enabled', 'old', 0700);
 
             list($result) = $this->pmssCaptureStdout(function () use ($operation, $linkPath): bool {
                 return $operation($linkPath);
@@ -241,26 +241,26 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testPersistTargetModesWritesAllTargetsWithRequestedModes(): void
     {
         $runtimeDir = $this->pmssEnsureDir($this->tempDir.'/runtime/trafficLimits', 0700);
-        $homeDir = $this->pmssEnsureDir($this->tempDir.'/home/alice');
+        $homeDir = $this->pmssEnsureDir($this->tempDir.'/home/fixtur01');
 
         $targets = [
-            $runtimeDir.'/alice' => 0600,
+            $runtimeDir.'/fixtur01' => 0600,
             $homeDir.'/.trafficLimit' => 0664,
         ];
         $error = null;
 
         $this->assertTrue(\pmssTrafficLimitPersistTargetModes($targets, 42, $error));
         $this->assertSame(null, $error);
-        $this->assertSame('42', trim((string) file_get_contents($runtimeDir.'/alice')));
+        $this->assertSame('42', trim((string) file_get_contents($runtimeDir.'/fixtur01')));
         $this->assertSame('42', trim((string) file_get_contents($homeDir.'/.trafficLimit')));
-        $this->assertEquals(0600, fileperms($runtimeDir.'/alice') & 0777);
+        $this->assertEquals(0600, fileperms($runtimeDir.'/fixtur01') & 0777);
         $this->assertEquals(0664, fileperms($homeDir.'/.trafficLimit') & 0777);
     }
 
     public function testPersistTargetModesRemovesExistingFilesForZeroValue(): void
     {
-        $runtimePath = $this->tempDir.'/runtime/trafficLimits/alice';
-        $homePath = $this->tempDir.'/home/alice/.trafficLimit';
+        $runtimePath = $this->tempDir.'/runtime/trafficLimits/fixtur01';
+        $homePath = $this->tempDir.'/home/fixtur01/.trafficLimit';
         $this->pmssEnsureDir(dirname($runtimePath), 0700);
         $this->pmssEnsureDir(dirname($homePath));
         file_put_contents($runtimePath, '5');
@@ -288,13 +288,13 @@ class TrafficLimitSafetyHelperTest extends TestCase
         // The no-usage lift dates the last reassertion by ~/.throttle's mtime
         // once the tmpfs marker is gone, so rewriting the same cap must refresh it.
         $homeRoot = $this->tempDir.'/home';
-        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
         $throttleFile = $home.'/.throttle';
 
-        $this->assertTrue(\pmssTrafficLimitThrottleApply('alice', 25, true, $homeRoot));
+        $this->assertTrue(\pmssTrafficLimitThrottleApply('fixtur01', 25, true, $homeRoot));
         $this->assertTrue(touch($throttleFile, time() - 4 * 24 * 60 * 60));
         clearstatcache(true, $throttleFile);
-        $this->assertTrue(\pmssTrafficLimitThrottleApply('alice', 25, true, $homeRoot));
+        $this->assertTrue(\pmssTrafficLimitThrottleApply('fixtur01', 25, true, $homeRoot));
         clearstatcache(true, $throttleFile);
 
         $this->assertSame('25', trim((string) file_get_contents($throttleFile)));
@@ -304,14 +304,14 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testReconcileWithoutUsageLeavesFreshThrottleUntouched(): void
     {
         $homeRoot = $this->tempDir.'/home';
-        $home = $this->pmssEnsureDir($homeRoot.'/alice');
-        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/fixtur01.enabled';
         $this->pmssEnsureDir(dirname($enabledMarker), 0700);
         file_put_contents($enabledMarker, '');
         file_put_contents($home.'/.throttle', '25');
 
         list($result) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
-            return \pmssTrafficLimitThrottleReconcileWithoutUsage('alice', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
+            return \pmssTrafficLimitThrottleReconcileWithoutUsage('fixtur01', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
         });
         $this->assertTrue($result);
         $this->assertTrue(file_exists($enabledMarker));
@@ -322,8 +322,8 @@ class TrafficLimitSafetyHelperTest extends TestCase
     {
         foreach (['expired' => true, 'orphan' => false] as $state => $markerExists) {
             $homeRoot = $this->tempDir.'/'.$state.'/home';
-            $home = $this->pmssEnsureDir($homeRoot.'/alice');
-            $enabledMarker = $this->tempDir.'/'.$state.'/runtime/alice.enabled';
+            $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
+            $enabledMarker = $this->tempDir.'/'.$state.'/runtime/fixtur01.enabled';
             $this->pmssEnsureDir(dirname($enabledMarker), 0700);
             if ($markerExists) {
                 file_put_contents($enabledMarker, '');
@@ -333,7 +333,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
             touch($home.'/.throttle', time() - 4 * 24 * 60 * 60);
 
             list($result, $output) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
-                return \pmssTrafficLimitThrottleReconcileWithoutUsage('alice', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
+                return \pmssTrafficLimitThrottleReconcileWithoutUsage('fixtur01', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
             });
             $this->assertTrue($result, $state);
             $this->assertFalse(file_exists($enabledMarker), $state);
@@ -352,14 +352,14 @@ class TrafficLimitSafetyHelperTest extends TestCase
         // gone; an account throttled an hour ago must stay throttled until
         // trafficStats reports usage again.
         $homeRoot = $this->tempDir.'/home';
-        $home = $this->pmssEnsureDir($homeRoot.'/alice');
-        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $home = $this->pmssEnsureDir($homeRoot.'/fixtur01');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/fixtur01.enabled';
         $this->pmssEnsureDir(dirname($enabledMarker), 0700);
         file_put_contents($home.'/.throttle', '25');
         touch($home.'/.throttle', time() - 60 * 60);
 
         list($result, $output) = $this->pmssCaptureStdout(function () use ($enabledMarker, $homeRoot): bool {
-            return \pmssTrafficLimitThrottleReconcileWithoutUsage('alice', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
+            return \pmssTrafficLimitThrottleReconcileWithoutUsage('fixtur01', $enabledMarker, 3 * 24 * 60 * 60, $homeRoot);
         });
         $this->assertTrue($result);
         $this->assertFalse(file_exists($enabledMarker));

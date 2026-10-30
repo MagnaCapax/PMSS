@@ -10,7 +10,7 @@ class RtorrentThrottleGetTest extends TestCase
     {
         $calls = [];
         [$exitCode, $output] = $this->pmssCaptureStdout(static function () use (&$calls): int {
-            return \pmssRtorrentThrottleGetCli(['script', 'alice'], static function ($socket, $method) use (&$calls) {
+            return \pmssRtorrentThrottleGetCli(['script', 'fixtur01'], static function ($socket, $method) use (&$calls) {
                 $calls[] = [$socket, $method];
                 return strpos($method, 'global_up') !== false ? 0 : 2048;
             });
@@ -19,15 +19,15 @@ class RtorrentThrottleGetTest extends TestCase
         $this->assertSame(0, $exitCode);
         $this->assertSame("upload_bytes_per_second=0\ndownload_bytes_per_second=2048\n", $output);
         $this->assertSame([
-            ['/home/alice/.rtorrent.socket', 'throttle.global_up.max_rate'],
-            ['/home/alice/.rtorrent.socket', 'throttle.global_down.max_rate'],
+            ['/home/fixtur01/.rtorrent.socket', 'throttle.global_up.max_rate'],
+            ['/home/fixtur01/.rtorrent.socket', 'throttle.global_down.max_rate'],
         ], $calls);
     }
 
     public function testFailedOrMalformedReadsNeverEmitPartialOutput(): void
     {
         [$firstFailure, $output] = $this->pmssCaptureStdout(static function (): int {
-            return \pmssRtorrentThrottleGetCli(['script', 'alice'], static function () {
+            return \pmssRtorrentThrottleGetCli(['script', 'fixtur01'], static function () {
                 return false;
             });
         });
@@ -37,7 +37,7 @@ class RtorrentThrottleGetTest extends TestCase
         foreach ([false, -1, '2048', null] as $badRate) {
             $calls = 0;
             [$exitCode, $output] = $this->pmssCaptureStdout(static function () use (&$calls, $badRate): int {
-                return \pmssRtorrentThrottleGetCli(['script', 'alice'], static function () use (&$calls, $badRate) {
+                return \pmssRtorrentThrottleGetCli(['script', 'fixtur01'], static function () use (&$calls, $badRate) {
                     return ++$calls === 1 ? 1024 : $badRate;
                 });
             });
@@ -49,7 +49,7 @@ class RtorrentThrottleGetTest extends TestCase
 
     public function testInvalidUsernameNeverCallsScgi(): void
     {
-        foreach ([[], ['script'], ['script', '../root'], ['script', 'ALICE'], ['script', 'alice', 'extra']] as $argv) {
+        foreach ([[], ['script'], ['script', '../root'], ['script', 'FIXTUR01'], ['script', 'fixtur01', 'extra']] as $argv) {
             $calls = 0;
             [$exitCode, $output] = $this->pmssCaptureStdout(static function () use ($argv, &$calls): int {
                 return \pmssRtorrentThrottleGetCli($argv, static function () use (&$calls) {

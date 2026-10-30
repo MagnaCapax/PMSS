@@ -37,9 +37,9 @@ class MediaStackWatchdogTest extends TestCase
         $apps = array('sonarr' => \pmssMediaStackWatchdogAppDefinitions()['sonarr']);
         $probe = self::pmssMakeCallbacks(['probe' => false])['probe'];
 
-        $first = \pmssMediaStackWatchdogSnapshot('alice', $apps, array(), $probe);
-        $second = \pmssMediaStackWatchdogSnapshot('alice', $apps, $first, $probe);
-        $third = \pmssMediaStackWatchdogSnapshot('alice', $apps, $second, $probe);
+        $first = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, array(), $probe);
+        $second = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, $first, $probe);
+        $third = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, $second, $probe);
 
         $this->assertSame('stopped', $first['apps']['sonarr']['state']);
         $this->assertSame(2, $second['apps']['sonarr']['consecutiveFailures']);
@@ -52,7 +52,7 @@ class MediaStackWatchdogTest extends TestCase
         $apps = array('sonarr' => \pmssMediaStackWatchdogAppDefinitions()['sonarr']);
         $previous = array('apps' => array('sonarr' => array('state' => 'failed', 'consecutiveFailures' => 8)));
 
-        $status = \pmssMediaStackWatchdogSnapshot('alice', $apps, $previous, self::pmssMakeCallbacks(['probe' => true])['probe']);
+        $status = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, $previous, self::pmssMakeCallbacks(['probe' => true])['probe']);
 
         $this->assertSame('healthy', $status['state']);
         $this->assertSame('running', $status['apps']['sonarr']['state']);
@@ -66,11 +66,11 @@ class MediaStackWatchdogTest extends TestCase
             $previous = ['apps' => ['sonarr' => ['consecutiveFailures' => $failures]]];
             $probe = static function ($user, $app) use ($sonarr, $radarr): bool { return $app === 'sonarr' ? $sonarr : $radarr; };
             foreach ([$apps, array_reverse($apps, true)] as $ordered) {
-                $status = \pmssMediaStackWatchdogSnapshot('alice', $ordered, $previous, $probe);
+                $status = \pmssMediaStackWatchdogSnapshot('fixtur01', $ordered, $previous, $probe);
                 $this->assertSame($expected, $status['state']);
             }
         }
-        $this->assertSame('healthy', \pmssMediaStackWatchdogSnapshot('alice', [], [], self::pmssMakeCallbacks(['probe' => false])['probe'])['state']);
+        $this->assertSame('healthy', \pmssMediaStackWatchdogSnapshot('fixtur01', [], [], self::pmssMakeCallbacks(['probe' => false])['probe'])['state']);
     }
 
     public function testDeliberatelyStoppedAppIsOffWithoutFailureOrAlert(): void
@@ -80,7 +80,7 @@ class MediaStackWatchdogTest extends TestCase
         $apps = array('sonarr' => \pmssMediaStackWatchdogAppDefinitions()['sonarr']);
         $previous = array('apps' => array('sonarr' => array('state' => 'failed', 'consecutiveFailures' => 9)));
         $probes = 0;
-        $status = \pmssMediaStackWatchdogSnapshot('alice', $apps, $previous, static function () use (&$probes): bool {
+        $status = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, $previous, static function () use (&$probes): bool {
             $probes++;
             return false;
         }, $home);
@@ -93,11 +93,11 @@ class MediaStackWatchdogTest extends TestCase
     public function testRunUserPublishesTheObservedAccountSnapshot(): void
     {
         $homeRoot = $this->pmssMakeTempDir('media-stack-watchdog-run-');
-        $home = $homeRoot.'/alice';
+        $home = $homeRoot.'/fixtur01';
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
         $this->pmssWriteRelativeFile($home, '.config/sonarr/config.xml', '<Config />');
 
-        $status = \pmssMediaStackWatchdogRunUser('alice', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']);
+        $status = \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']);
 
         $this->assertSame('healthy', $status['state']);
         $this->assertSame('running', $status['apps']['sonarr']['state']);
@@ -125,7 +125,7 @@ class MediaStackWatchdogTest extends TestCase
 
     public function testUnsafeStatusPathIsRejected(): void
     {
-        $this->assertSame('', \pmssMediaStackWatchdogStatusPath('/tmp/../home/alice'));
+        $this->assertSame('', \pmssMediaStackWatchdogStatusPath('/tmp/../home/fixtur01'));
         $home = $this->pmssMakeTempDir('media-stack-watchdog-unsafe-status-');
         $this->assertFalse(\pmssMediaStackWatchdogStatusWrite($home, '/tmp/relative-status.json', array()));
     }

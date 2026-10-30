@@ -52,7 +52,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         return array('runtimeDir' => $runtimeDir, 'threshold' => $threshold);
     }
 
-    private function recordSocketFailure(string $runtimeDir, int $threshold, string $username = 'alice'): array
+    private function recordSocketFailure(string $runtimeDir, int $threshold, string $username = 'fixtur01'): array
     {
         return \pmssLighttpdWatchdogRecordSocketFailure($username, $this->socketFailureOptions($runtimeDir, $threshold));
     }
@@ -169,7 +169,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testListeningSocketParserAcceptsCurrentNumberedAndLegacyPaths(): void
     {
-        $home = '/home/alice';
+        $home = '/home/fixtur01';
         $this->assertSame(
             array($home.'/.lighttpd/php.socket-1', $home.'/.lighttpd/php.socket'),
             \pmssLighttpdWatchdogSocketPathsFromLines(array(
@@ -181,12 +181,12 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testListeningSocketParserRejectsUntrustedRowsAndPaths(): void
     {
-        $home = '/home/alice';
+        $home = '/home/fixtur01';
         $this->assertSame(array(), \pmssLighttpdWatchdogSocketPathsFromLines(array(
             'u_str ESTAB 0 1024 '.$home.'/.lighttpd/php.socket-1 12345 * 0',
             'u_str LISTEN nope 1024 '.$home.'/.lighttpd/php.socket-2 12346 * 0',
             'u_str LISTEN 0 nope '.$home.'/.lighttpd/php.socket-3 12347 * 0',
-            'u_str LISTEN 0 1024 /home/bob/.lighttpd/php.socket-1 12348 * 0',
+            'u_str LISTEN 0 1024 /home/fixtur02/.lighttpd/php.socket-1 12348 * 0',
             'u_str LISTEN 0 1024 '.$home.'/.lighttpd/php.socket-old 12349 * 0',
             'malformed',
         ), $home));
@@ -195,12 +195,12 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testListeningSocketParserDeduplicatesListenerRows(): void
     {
-        $path = '/home/alice/.lighttpd/php.socket-2';
+        $path = '/home/fixtur01/.lighttpd/php.socket-2';
         $line = 'u_str LISTEN 0 1024 '.$path.' 12345 * 0';
 
         $this->assertSame(
             array($path),
-            \pmssLighttpdWatchdogSocketPathsFromLines(array($line, $line), '/home/alice')
+            \pmssLighttpdWatchdogSocketPathsFromLines(array($line, $line), '/home/fixtur01')
         );
     }
 
@@ -215,27 +215,27 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         ) as $reader) {
             $this->assertSame(
                 array('ok' => false, 'paths' => array()),
-                \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $reader))
+                \pmssLighttpdWatchdogListeningSocketSnapshot('/home/fixtur01', array('reader' => $reader))
             );
         }
     }
 
     public function testListeningSocketReaderReturnsStrictlyParsedPaths(): void
     {
-        $path = '/home/alice/.lighttpd/php.socket-4';
+        $path = '/home/fixtur01/.lighttpd/php.socket-4';
         $reader = static function () use ($path): array {
             return array('lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0);
         };
 
         $this->assertSame(
             array('ok' => true, 'paths' => array($path)),
-            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $reader))
+            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/fixtur01', array('reader' => $reader))
         );
     }
 
     public function testListeningSocketSnapshotPreservesProbeStatus(): void
     {
-        $path = '/home/alice/.lighttpd/php.socket-1';
+        $path = '/home/fixtur01/.lighttpd/php.socket-1';
         $healthyReader = static function () use ($path): array {
             return array('lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0);
         };
@@ -245,11 +245,11 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
         $this->assertSame(
             array('ok' => true, 'paths' => array($path)),
-            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $healthyReader))
+            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/fixtur01', array('reader' => $healthyReader))
         );
         $this->assertSame(
             array('ok' => false, 'paths' => array()),
-            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $failedReader))
+            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/fixtur01', array('reader' => $failedReader))
         );
     }
 
@@ -269,7 +269,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $sleeps = array();
         $reader = static function () use (&$calls): array {
             $calls++;
-            $lines = $calls < 2 ? array() : array_fill(0, 2, 'u_str LISTEN 0 1024 /home/alice/.lighttpd/php.socket-4 12345 * 0');
+            $lines = $calls < 2 ? array() : array_fill(0, 2, 'u_str LISTEN 0 1024 /home/fixtur01/.lighttpd/php.socket-4 12345 * 0');
             return array('lines' => $lines, 'rc' => 0);
         };
         $sleep = static function (int $seconds) use (&$sleeps): void {
@@ -278,7 +278,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
         $this->assertSame(
             array('status' => 'healthy', 'attempts' => 2, 'expected' => 1, 'observed' => 1),
-            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0', '/socket-0'), array(
+            \pmssLighttpdWatchdogRestartVerify('/home/fixtur01', array('/socket-0', '/socket-0'), array(
                 'attemptCount' => 3,
                 'retryDelaySeconds' => 1,
                 'reader' => $reader,
@@ -296,11 +296,11 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
         $this->assertSame(
             array('status' => 'restart_attempted_still_down', 'attempts' => 1, 'expected' => 1, 'observed' => 0),
-            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0'), $options + array('reader' => $noListeners))
+            \pmssLighttpdWatchdogRestartVerify('/home/fixtur01', array('/socket-0'), $options + array('reader' => $noListeners))
         );
         $this->assertSame(
             array('status' => 'restart_attempted_unverified', 'attempts' => 1, 'expected' => 1, 'observed' => 0),
-            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0'), $options + array('reader' => $probeFailure))
+            \pmssLighttpdWatchdogRestartVerify('/home/fixtur01', array('/socket-0'), $options + array('reader' => $probeFailure))
         );
     }
 
@@ -339,19 +339,19 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
         $this->assertSame(
             array('action' => 'wait', 'count' => 1, 'threshold' => 2),
-            \pmssLighttpdWatchdogRecordSocketFailure('alice', $options)
+            \pmssLighttpdWatchdogRecordSocketFailure('fixtur01', $options)
         );
-        \pmssLighttpdWatchdogClearSocketFailure('alice', $options);
+        \pmssLighttpdWatchdogClearSocketFailure('fixtur01', $options);
         $this->assertSame(
             array('action' => 'wait', 'count' => 1, 'threshold' => 2),
-            \pmssLighttpdWatchdogRecordSocketFailure('alice', $options)
+            \pmssLighttpdWatchdogRecordSocketFailure('fixtur01', $options)
         );
     }
 
     public function testSocketFailureStatePreservesRegularMarkerContract(): void
     {
         $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-regular-');
-        $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+        $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir);
         file_put_contents($statePath, '8');
         chmod($statePath, 0640);
 
@@ -374,19 +374,19 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         // Cover both an existing foreign file and a dangling link's absent target.
         foreach (array(false, true) as $targetExists) {
             $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-symlink-');
-            $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+            $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir);
             $target = $runtimeDir.'/foreign';
             if ($targetExists) {
                 file_put_contents($target, 'sentinel');
             }
             $this->assertTrue(symlink($target, $statePath));
 
-            $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir));
+            $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir));
             $this->assertSame(
                 array('action' => 'wait', 'count' => 0, 'threshold' => 1),
                 $this->recordSocketFailure($runtimeDir, 1)
             );
-            \pmssLighttpdWatchdogClearSocketFailure('alice', $this->socketFailureOptions($runtimeDir, 1));
+            \pmssLighttpdWatchdogClearSocketFailure('fixtur01', $this->socketFailureOptions($runtimeDir, 1));
             $this->assertSame($target, readlink($statePath));
             $this->assertSame($targetExists, file_exists($target));
             if ($targetExists) {
@@ -399,7 +399,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     {
         foreach (array('directory', 'fifo') as $type) {
             $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-type-');
-            $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+            $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir);
             if ($type === 'directory') {
                 $this->assertTrue(mkdir($statePath));
             } else {
@@ -410,12 +410,12 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
             }
 
             // Reject the FIFO before file_put_contents can block waiting for a reader.
-            $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir));
+            $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir));
             $this->assertSame(
                 array('action' => 'wait', 'count' => 0, 'threshold' => 1),
                 $this->recordSocketFailure($runtimeDir, 1)
             );
-            \pmssLighttpdWatchdogClearSocketFailure('alice', $this->socketFailureOptions($runtimeDir, 1));
+            \pmssLighttpdWatchdogClearSocketFailure('fixtur01', $this->socketFailureOptions($runtimeDir, 1));
             $this->assertSame($type === 'directory' ? 'dir' : 'fifo', filetype($statePath));
         }
     }
@@ -427,7 +427,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
             array('action' => 'wait', 'count' => 1, 'threshold' => 3),
             $this->recordSocketFailure($runtimeDir, 3)
         );
-        $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+        $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir);
         $this->assertSame('1', file_get_contents($statePath));
     }
 
@@ -444,7 +444,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testSocketFailureStateRejectsUnsafeRuntimeDir(): void
     {
-        $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', 'relative/runtime'));
-        $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', '/'));
+        $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', 'relative/runtime'));
+        $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', '/'));
     }
 }

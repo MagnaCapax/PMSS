@@ -9,7 +9,7 @@ class WelcomeMessageTest extends TestCase
 
     private function makeUserHome(): string
     {
-        $home = $this->tempDir.'/home/alice';
+        $home = $this->tempDir.'/home/fixtur01';
         @mkdir($home.'/.config', 0755, true);
         return $home;
     }
@@ -28,13 +28,13 @@ class WelcomeMessageTest extends TestCase
         return $path;
     }
 
-    /** Render the standard alice welcome fixture against the default message store. */
+    /** Render the standard fixtur01 welcome fixture against the default message store. */
     private function renderWelcome(array $quotaInfo, string $home, string $messagesPath = ''): string
     {
         return \pmssWelcomeMessageForUser(
             $quotaInfo,
             $home,
-            'alice',
+            'fixtur01',
             $messagesPath !== '' ? $messagesPath : $this->tempDir.'/welcomeMessages.json'
         );
     }
@@ -47,7 +47,7 @@ class WelcomeMessageTest extends TestCase
             $this->writeWelcomeMessages(['free' => '<p>fallback</p>']);
 
             $message = $this->renderWelcome(['totalSpace' => 214748364800], $home);
-            $this->assertEquals('<p>Hello alice / 200 GiB</p>', $message);
+            $this->assertEquals('<p>Hello fixtur01 / 200 GiB</p>', $message);
     }
 
     public function testProductLookupCasesRenderExpectedMessages(): void
@@ -61,7 +61,7 @@ class WelcomeMessageTest extends TestCase
             'productName alias in nested map' => [
                 ['productName' => 'M900'],
                 ['products' => ['m900' => '<b>{{product}}/{{username}}</b>']],
-                '<b>M900/alice</b>',
+                '<b>M900/fixtur01</b>',
             ],
             'case-insensitive product key' => [
                 ['product' => 'M500'],
@@ -129,22 +129,22 @@ class WelcomeMessageTest extends TestCase
             $home = $this->makeUserHome();
             $this->writeUserConfig($home, ['welcomeMessage' => '<p>legacy {{username}}</p>']);
 
-            $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/missing.json');
-            $this->assertEquals('<p>legacy alice</p>', $message);
+            $message = \pmssWelcomeMessageForUser([], $home, 'fixtur01', $this->tempDir.'/missing.json');
+            $this->assertEquals('<p>legacy fixtur01</p>', $message);
     }
 
     public function testManagedUserMessageFileReadWriteAndClearRoundTrip(): void
     {
             $home = $this->makeUserHome();
 
-            $this->assertTrue(\pmssWelcomeUserMessageSet('alice', $home, '<p>hello</p>'));
+            $this->assertTrue(\pmssWelcomeUserMessageSet('fixtur01', $home, '<p>hello</p>'));
             $this->assertEquals('<p>hello</p>', \pmssWelcomeUserMessageRead($home));
 
             $path = \pmssWelcomeUserMessagePath($home);
             $this->assertSame($home.'/.config/welcome-message.html', $path);
             $this->assertTrue(is_file($path));
 
-            $this->assertTrue(\pmssWelcomeUserMessageSet('alice', $home, '   '));
+            $this->assertTrue(\pmssWelcomeUserMessageSet('fixtur01', $home, '   '));
             $this->assertEquals('', \pmssWelcomeUserMessageRead($home));
             $this->assertFalse(is_file($path));
     }
@@ -154,8 +154,8 @@ class WelcomeMessageTest extends TestCase
             $home = $this->makeUserHome();
             $unsafeHome = $home.'/../escape';
 
-            $this->assertFalse(\pmssWelcomeUserMessageSet('alice', $unsafeHome, '<p>hello</p>'));
-            $this->assertFalse(\pmssWelcomeUserMessageSet('alice', $unsafeHome, '   '));
+            $this->assertFalse(\pmssWelcomeUserMessageSet('fixtur01', $unsafeHome, '<p>hello</p>'));
+            $this->assertFalse(\pmssWelcomeUserMessageSet('fixtur01', $unsafeHome, '   '));
             $this->assertFalse(is_file($this->tempDir.'/home/escape/.config/welcome-message.html'));
     }
 
@@ -169,7 +169,7 @@ class WelcomeMessageTest extends TestCase
             @file_put_contents($messagesTarget, json_encode(['free' => '<p>fallback</p>'], JSON_UNESCAPED_SLASHES));
             $this->pmssCreateSymlinkOrSkip($messagesTarget, $messagesLink);
 
-            $this->assertEquals('', \pmssWelcomeMessageForUser([], $home, 'alice', $messagesLink));
+            $this->assertEquals('', \pmssWelcomeMessageForUser([], $home, 'fixtur01', $messagesLink));
     }
 
     public function testProductMessageSetWritesNestedProductsMap(): void
@@ -205,12 +205,12 @@ class WelcomeMessageTest extends TestCase
             $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>{{product}}/{{username}}</p>', $nestedPath));
 
             $this->assertEquals(
-                '<p>m1000/alice</p>',
-                \pmssWelcomeMessageForUser([], $home, 'alice', $plainPath)
+                '<p>m1000/fixtur01</p>',
+                \pmssWelcomeMessageForUser([], $home, 'fixtur01', $plainPath)
             );
             $this->assertEquals(
-                '<p>m1000/alice</p>',
-                \pmssWelcomeMessageForUser([], $home, 'alice', $nestedPath)
+                '<p>m1000/fixtur01</p>',
+                \pmssWelcomeMessageForUser([], $home, 'fixtur01', $nestedPath)
             );
 
             $plainDecoded = $this->pmssReadJsonArrayFile($plainPath, null, 'Plain product map must remain a plain root map');
@@ -229,15 +229,15 @@ class WelcomeMessageTest extends TestCase
             $plainPath = $this->writeWelcomeMessages(['m1000' => 'plain {{username}}'], 'welcomeMessages-direct-plain.json');
             $nestedPath = $this->writeWelcomeMessages(['products' => ['m1000' => 'nested {{username}}']], 'welcomeMessages-direct-nested.json');
 
-            $this->assertEquals('plain alice', \pmssWelcomeMessageForUser([], $home, 'alice', $plainPath));
-            $this->assertEquals('nested alice', \pmssWelcomeMessageForUser([], $home, 'alice', $nestedPath));
+            $this->assertEquals('plain fixtur01', \pmssWelcomeMessageForUser([], $home, 'fixtur01', $plainPath));
+            $this->assertEquals('nested fixtur01', \pmssWelcomeMessageForUser([], $home, 'fixtur01', $nestedPath));
     }
 
     public function testCustomerWelcomeMessageRendersPlainAndNestedStores(): void
     {
             $homeRoot = $this->tempDir.'/customer-home';
-            $home = $homeRoot.'/alice';
-            $overrideHome = $homeRoot.'/bob';
+            $home = $homeRoot.'/fixtur01';
+            $overrideHome = $homeRoot.'/fixtur02';
             $script = ''
                 .'$lib = '.var_export($this->pmssRepoPath('etc/skel/www/welcomeMessage.php'), true).';'
                 .'$home = '.var_export($home, true).';'
@@ -252,18 +252,18 @@ class WelcomeMessageTest extends TestCase
                 .'file_put_contents($root."/nested.json", json_encode(["products" => ["m1000" => "nested {{username}}"]]));'
                 .'require $lib;'
                 .'echo json_encode(['
-                .'"plain" => pmssWelcomeMessageForUser([], $home, "alice", $root."/plain.json"),'
-                .'"nested" => pmssWelcomeMessageForUser([], $home, "alice", $root."/nested.json"),'
-                .'"override" => pmssWelcomeMessageForUser(["totalSpace" => 1073741824], $overrideHome, "bob", $root."/missing.json"),'
+                .'"plain" => pmssWelcomeMessageForUser([], $home, "fixtur01", $root."/plain.json"),'
+                .'"nested" => pmssWelcomeMessageForUser([], $home, "fixtur01", $root."/nested.json"),'
+                .'"override" => pmssWelcomeMessageForUser(["totalSpace" => 1073741824], $overrideHome, "fixtur02", $root."/missing.json"),'
                 .'"productSet" => function_exists("pmssWelcomeProductMessageSet"),'
                 .'"userSet" => function_exists("pmssWelcomeUserMessageSet")'
                 .']);';
 
             $this->assertEquals(
                 [
-                    'plain' => 'plain alice',
-                    'nested' => 'nested alice',
-                    'override' => 'custom bob / 1 GiB',
+                    'plain' => 'plain fixtur01',
+                    'nested' => 'nested fixtur01',
+                    'override' => 'custom fixtur02 / 1 GiB',
                     'productSet' => false,
                     'userSet' => false,
                 ],

@@ -42,7 +42,7 @@ final class agentDiagnosticsCliTest extends TestCase
         file_put_contents($completedPath, "git/main@2026-03-28\n");
 
         $binDir = $this->makeCommandStubs();
-        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json', '--pretty', '--user=alice'], $this->pmssPathPrefixedEnvironment($binDir, $this->pmssTestModeEnv([
+        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json', '--pretty', '--user=fixtur01'], $this->pmssPathPrefixedEnvironment($binDir, $this->pmssTestModeEnv([
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
             'PMSS_AGENT_DIAGNOSTICS_MOTD_PATH' => $motdPath,
             'PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH' => $mdstatPath,
@@ -66,9 +66,9 @@ final class agentDiagnosticsCliTest extends TestCase
         );
         $this->assertSame('git/main@2026-03-28', $payload['version']);
         $this->assertSame('git/main@2026-03-28', $payload['version_completed']);
-        $this->assertSame('alice', $payload['user']);
+        $this->assertSame('fixtur01', $payload['user']);
         $this->assertSame("hello host\n", $payload['sections']['motd']['raw']);
-        $this->assertSame(['alice', 'bob'], $payload['sections']['users']['list']);
+        $this->assertSame(['fixtur01', 'fixtur02'], $payload['sections']['users']['list']);
         $this->assertSame(4, $payload['sections']['services']['rtorrent_count']);
         $this->assertSame(['pid1 rtorrent'], $payload['sections']['user_processes']);
         $this->assertSame(
@@ -76,11 +76,11 @@ final class agentDiagnosticsCliTest extends TestCase
             $payload['sections']['user_metrics_latest']
         );
         $this->assertSame($payload['sections']['user_metrics_latest'], $payload['sections']['user_metrics_24h_ago']);
-        $this->assertSame(['raw' => 'uid=1001(alice) gid=1001(alice) groups=1001(alice)'], $payload['sections']['user_identity']);
-        $this->assertSame(['raw' => 'Disk quotas for user alice'], $payload['sections']['user_quota']);
-        $this->assertSame(['raw' => '12G /home/alice'], $payload['sections']['user_disk']);
+        $this->assertSame(['raw' => 'uid=1001(fixtur01) gid=1001(fixtur01) groups=1001(fixtur01)'], $payload['sections']['user_identity']);
+        $this->assertSame(['raw' => 'Disk quotas for user fixtur01'], $payload['sections']['user_quota']);
+        $this->assertSame(['raw' => '12G /home/fixtur01'], $payload['sections']['user_disk']);
         $this->assertSame(['raw' => '401 0.012s'], $payload['sections']['user_http_responsiveness']);
-        $this->assertSame('Alice Setting', $payload['sections']['user_settings']['label']);
+        $this->assertSame('Fixtur01 Setting', $payload['sections']['user_settings']['label']);
     }
 
     public function testInvalidUserReturnsFailure(): void
@@ -95,7 +95,7 @@ final class agentDiagnosticsCliTest extends TestCase
 
     public function testUserMetricsHistoryCommandReadsNewestRotationThenLiveWithBoundedOutput(): void
     {
-        $user = "alice'; printf injected";
+        $user = "fixtur01'; printf injected";
         $spec = \pmssAgentDiagnosticsSectionSpecs($user)['user_metrics_24h_ago'];
 
         $this->assertSame('command', $spec['type']);
@@ -109,11 +109,11 @@ final class agentDiagnosticsCliTest extends TestCase
     public function testUserMetricsHistorySelectsArchiveSampleAndHandlesMissingFiles(): void
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-metrics-');
-        $rotatedPath = $root.'/alice.1';
-        $livePath = $root.'/alice';
-        $spec = \pmssAgentDiagnosticsSectionSpecs('alice')['user_metrics_24h_ago'];
+        $rotatedPath = $root.'/fixtur01.1';
+        $livePath = $root.'/fixtur01';
+        $spec = \pmssAgentDiagnosticsSectionSpecs('fixtur01')['user_metrics_24h_ago'];
         $spec['command'] = str_replace(
-            [escapeshellarg('/var/log/pmss/metrics/archive/alice.1'), escapeshellarg('/var/log/pmss/metrics/alice')],
+            [escapeshellarg('/var/log/pmss/metrics/archive/fixtur01.1'), escapeshellarg('/var/log/pmss/metrics/fixtur01')],
             [escapeshellarg($rotatedPath), escapeshellarg($livePath)],
             $spec['command']
         );
@@ -262,7 +262,7 @@ final class agentDiagnosticsCliTest extends TestCase
             $this->assertSame("hello host\n", $sections['motd']['raw']);
             $this->assertSame(['rtorrent_count'], array_keys($sections['services']));
             $this->assertSame(4, $sections['services']['rtorrent_count']);
-            $this->assertSame(['alice', 'bob'], $sections['users']['list']);
+            $this->assertSame(['fixtur01', 'fixtur02'], $sections['users']['list']);
         });
     }
 
@@ -270,11 +270,11 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $section = \pmssAgentDiagnosticsSpecCollect([
             'type' => 'command',
-            'command' => "printf 'uid=1001(alice)\\n'",
+            'command' => "printf 'uid=1001(fixtur01)\\n'",
             'wrap' => 'raw',
         ]);
 
-        $this->assertSame(['raw' => 'uid=1001(alice)'], $section);
+        $this->assertSame(['raw' => 'uid=1001(fixtur01)'], $section);
     }
 
     public function testSpecTimeoutBoundsInvalidAndLargeValues(): void
@@ -306,9 +306,9 @@ final class agentDiagnosticsCliTest extends TestCase
                 'path' => 'scripts/util/checkUsers.php',
                 'args' => ['--json'],
             ],
-            'userSetting.php view alice' => [
+            'userSetting.php view fixtur01' => [
                 'path' => 'scripts/userSetting.php',
-                'args' => ['view', 'alice'],
+                'args' => ['view', 'fixtur01'],
             ],
         ] as $expected => $spec) {
             $this->assertSame($expected, \pmssAgentDiagnosticsSpecLabel($spec));
@@ -319,12 +319,12 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');
         foreach ([
-            'listUsers.php' => "echo \"alice\\nbob\\n\";",
-            'showTraffic.php' => "echo json_encode([['user' => 'alice', 'monthMiB' => 1024]]), PHP_EOL;",
-            'userSetting.php' => "echo json_encode(['label' => 'Alice Setting']), PHP_EOL;",
+            'listUsers.php' => "echo \"fixtur01\\nfixtur02\\n\";",
+            'showTraffic.php' => "echo json_encode([['user' => 'fixtur01', 'monthMiB' => 1024]]), PHP_EOL;",
+            'userSetting.php' => "echo json_encode(['label' => 'Fixtur01 Setting']), PHP_EOL;",
             'util/systemTest.php' => "echo json_encode(['summary' => ['ok' => 3]]), PHP_EOL;",
-            'util/checkUsers.php' => $brokenCheckUsers ? "fwrite(STDERR, 'boom'); exit(3);" : "echo json_encode(['consistent' => ['alice']]), PHP_EOL;",
-            'util/userResourcesList.php' => "echo json_encode([['user' => 'alice', 'uid' => 1001]]), PHP_EOL;",
+            'util/checkUsers.php' => $brokenCheckUsers ? "fwrite(STDERR, 'boom'); exit(3);" : "echo json_encode(['consistent' => ['fixtur01']]), PHP_EOL;",
+            'util/userResourcesList.php' => "echo json_encode([['user' => 'fixtur01', 'uid' => 1001]]), PHP_EOL;",
         ] as $path => $body) $this->pmssWriteExecutablePhpFile($root.'/scripts/'.$path, $body, 0777);
         return $root;
     }
@@ -337,9 +337,9 @@ final class agentDiagnosticsCliTest extends TestCase
             'systemctl' => "#!/bin/sh\nprintf 'active\\n'\n",
             'ps' => "#!/bin/sh\nprintf 'rtorrent main\\nrtorrent main\\nrtorrent main\\nrtorrent main\\n'\n",
             'pgrep' => "#!/bin/sh\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n",
-            'id' => "#!/bin/sh\nprintf 'uid=1001(alice) gid=1001(alice) groups=1001(alice)\\n'\n",
-            'quota' => "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n",
-            'du' => "#!/bin/sh\nprintf '12G /home/alice\\n'\n",
+            'id' => "#!/bin/sh\nprintf 'uid=1001(fixtur01) gid=1001(fixtur01) groups=1001(fixtur01)\\n'\n",
+            'quota' => "#!/bin/sh\nprintf 'Disk quotas for user fixtur01\\n'\n",
+            'du' => "#!/bin/sh\nprintf '12G /home/fixtur01\\n'\n",
             'tail' => "#!/bin/sh\nprintf '{\"ts\":1756200000,\"uid\":1001,\"mem_failcnt\":126389728,\"mem_current\":327155712,\"mem_peak\":327155712,\"mem_limit\":327155712,\"mem_oom_kill\":0}\\n'\n",
             'curl' => "#!/bin/sh\nprintf '401 0.012s'\n",
         ]);

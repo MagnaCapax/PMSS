@@ -26,7 +26,7 @@ class DelugeManagedConfigTest extends TestCase
     "file": 1,
     "format": 1
 }{
-    "download_location": "/home/alice/data",
+    "download_location": "/home/fixtur01/data",
     "max_active_downloading": 5,
     "max_active_limit": 500,
     "max_connections_global": 300,
@@ -40,7 +40,7 @@ JSON
     public function testApplyManagedConfigRestoresFleetSafetyLimits(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-managed-');
-        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/core.conf', <<<'JSON'
+        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/core.conf', <<<'JSON'
 {
     "file": 1,
     "format": 1
@@ -55,7 +55,7 @@ JSON
         );
         chmod($configPath, 0640);
 
-        $this->assertTrue(\pmssDelugeApplyManagedConfig('alice'));
+        $this->assertTrue(\pmssDelugeApplyManagedConfig('fixtur01'));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsAllStrings(['"download_location": "/srv/downloads"', '"max_active_downloading": 5', '"max_active_limit": 500', '"max_connections_global": 300', '"max_upload_slots_global": 15', '"pre_allocate_storage": true'], $updated);
@@ -65,12 +65,12 @@ JSON
     public function testApplyManagedConfigPreservesUserOwnedSettings(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-managed-preserve-');
-        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/core.conf', <<<'JSON'
+        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/core.conf', <<<'JSON'
 {
     "file": 1,
     "format": 1
 }{
-    "download_location": "/home/alice/data",
+    "download_location": "/home/fixtur01/data",
     "enabled_plugins": [
         "Label"
     ],
@@ -81,21 +81,21 @@ JSON
 JSON
         );
 
-        $this->assertTrue(\pmssDelugeApplyManagedConfig('alice'));
+        $this->assertTrue(\pmssDelugeApplyManagedConfig('fixtur01'));
 
         $updated = (string) file_get_contents($configPath);
-        $this->assertStringContainsAllStrings(['"download_location": "/home/alice/data"', '"enabled_plugins": [', '"Label"', '"max_upload_speed": 250', '"max_active_limit": 500', '"max_upload_slots_global": 15'], $updated);
+        $this->assertStringContainsAllStrings(['"download_location": "/home/fixtur01/data"', '"enabled_plugins": [', '"Label"', '"max_upload_speed": 250', '"max_active_limit": 500', '"max_upload_slots_global": 15'], $updated);
     }
 
     public function testApplyManagedConfigReturnsFalseWhenAlreadyConverged(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-managed-nochange-');
-        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/core.conf', <<<'JSON'
+        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/core.conf', <<<'JSON'
 {
     "file": 1,
     "format": 1
 }{
-    "download_location": "/home/alice/data",
+    "download_location": "/home/fixtur01/data",
     "max_active_downloading": 5,
     "max_active_limit": 500,
     "max_connections_global": 300,
@@ -106,30 +106,30 @@ JSON
         );
         $original = (string) file_get_contents($configPath);
 
-        $this->assertFalse(\pmssDelugeApplyManagedConfig('alice'));
+        $this->assertFalse(\pmssDelugeApplyManagedConfig('fixtur01'));
         $this->assertSame($original, (string) file_get_contents($configPath));
     }
 
     public function testApplyManagedConfigRejectsSymlinkTarget(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-managed-symlink-');
-        $configDir = $homeRoot.'/alice/.config/deluge';
+        $configDir = $homeRoot.'/fixtur01/.config/deluge';
         @mkdir($configDir, 0755, true);
         @symlink($homeRoot.'/missing-target', $configDir.'/core.conf');
 
-        $this->assertFalse(\pmssDelugeApplyManagedConfig('alice'));
+        $this->assertFalse(\pmssDelugeApplyManagedConfig('fixtur01'));
     }
 
     public function testApplyManagedConfigSynchronizesHostlistPasswordFromAuth(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-hostlist-sync-');
-        $this->pmssWriteConvergedCoreConfig($homeRoot, 'alice');
-        $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/auth', "localclient:new-secret:10\n");
-        $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('old-secret'));
+        $this->pmssWriteConvergedCoreConfig($homeRoot, 'fixtur01');
+        $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/auth', "localclient:new-secret:10\n");
+        $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('old-secret'));
 
-        $this->assertTrue(\pmssDelugeApplyManagedConfig('alice'));
+        $this->assertTrue(\pmssDelugeApplyManagedConfig('fixtur01'));
 
-        $updated = (string) file_get_contents($homeRoot.'/alice/.config/deluge/hostlist.conf');
+        $updated = (string) file_get_contents($homeRoot.'/fixtur01/.config/deluge/hostlist.conf');
         $this->assertStringContainsString('"new-secret"', $updated);
         $this->assertStringNotContainsString('"old-secret"', $updated);
     }
@@ -137,51 +137,51 @@ JSON
     public function testHostlistSyncPreservesMode(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-hostlist-mode-');
-        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/auth', "localclient:fresh-token:10\n");
-        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('stale-token'));
+        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/auth', "localclient:fresh-token:10\n");
+        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('stale-token'));
         chmod($hostlistPath, 0640);
 
-        $this->assertTrue(\pmssDelugeHostlistSyncLocalclientPassword('alice', $hostlistPath, $authPath));
+        $this->assertTrue(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $hostlistPath, $authPath));
         $this->assertSame(0640, fileperms($hostlistPath) & 0777);
     }
 
     public function testHostlistSyncAcceptsLocalhostEntry(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-hostlist-localhost-');
-        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/auth', "localclient:fresh-token:10\n");
-        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('stale-token', 'localhost'));
+        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/auth', "localclient:fresh-token:10\n");
+        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('stale-token', 'localhost'));
 
-        $this->assertTrue(\pmssDelugeHostlistSyncLocalclientPassword('alice', $hostlistPath, $authPath));
+        $this->assertTrue(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $hostlistPath, $authPath));
         $this->assertStringContainsString('"fresh-token"', (string) file_get_contents($hostlistPath));
     }
 
     public function testHostlistSyncReturnsFalseWhenAlreadyConverged(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-hostlist-nochange-');
-        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/auth', "localclient:same-token:10\n");
-        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('same-token'));
+        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/auth', "localclient:same-token:10\n");
+        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('same-token'));
         $original = (string) file_get_contents($hostlistPath);
 
-        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('alice', $hostlistPath, $authPath));
+        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $hostlistPath, $authPath));
         $this->assertSame($original, (string) file_get_contents($hostlistPath));
     }
 
     public function testHostlistSyncReturnsFalseWhenAuthHasNoLocalclient(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-hostlist-noauth-');
-        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/auth', "other:token:5\n");
-        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('old-secret'));
+        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/auth', "other:token:5\n");
+        $hostlistPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('old-secret'));
 
-        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('alice', $hostlistPath, $authPath));
+        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $hostlistPath, $authPath));
         $this->assertStringContainsString('"old-secret"', (string) file_get_contents($hostlistPath));
     }
 
     public function testHostlistSyncRejectsSymlinkTarget(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-hostlist-link-');
-        $configDir = $homeRoot.'/alice/.config/deluge';
+        $configDir = $homeRoot.'/fixtur01/.config/deluge';
         @mkdir($configDir, 0755, true);
-        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'alice/.config/deluge/auth', "localclient:new-secret:10\n");
+        $authPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/auth', "localclient:new-secret:10\n");
         $targetPath = $configDir.'/hostlist-real.conf';
         $linkPath = $configDir.'/hostlist.conf';
         file_put_contents($targetPath, $this->pmssDelugeHostlistFixture('old-secret'));
@@ -189,7 +189,7 @@ JSON
             throw new SkipTest('symlink not supported in this environment');
         }
 
-        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('alice', $linkPath, $authPath));
+        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $linkPath, $authPath));
         $this->assertStringContainsString('"old-secret"', (string) file_get_contents($targetPath));
     }
 }

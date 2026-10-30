@@ -12,15 +12,15 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
     {
         $logPath = $this->pmssMakeTempFile('pmss-adduser-log-');
         $lines = array(
-            '2026-04-01 10:00:00 (alice): ###ADDUSER_JSON:{"event":"adduser_summary","status":"ERROR","user":"alice","message":"user_exists"}',
-            '2026-04-01 10:05:00 (bob): ###ADDUSER_JSON:{"event":"adduser_summary","status":"FAIL","user":"bob","message":"user_config_failed"}',
-            '2026-04-01 10:10:00 (alice): ###ADDUSER_JSON:{"event":"adduser_summary","status":"FAIL","user":"alice","message":"password_failed"}',
+            '2026-04-01 10:00:00 (fixtur01): ###ADDUSER_JSON:{"event":"adduser_summary","status":"ERROR","user":"fixtur01","message":"user_exists"}',
+            '2026-04-01 10:05:00 (fixtur02): ###ADDUSER_JSON:{"event":"adduser_summary","status":"FAIL","user":"fixtur02","message":"user_config_failed"}',
+            '2026-04-01 10:10:00 (fixtur01): ###ADDUSER_JSON:{"event":"adduser_summary","status":"FAIL","user":"fixtur01","message":"password_failed"}',
         );
         file_put_contents($logPath, implode(PHP_EOL, $lines).PHP_EOL);
 
         $this->pmssWithEnv(array('PMSS_ADDUSER_LOG_PATH' => $logPath), function (): void {
-            $summary = pmssAddUserLatestProvisionSummary('alice');
-            $this->assertTrue(is_array($summary), 'Expected latest addUser summary for alice');
+            $summary = pmssAddUserLatestProvisionSummary('fixtur01');
+            $this->assertTrue(is_array($summary), 'Expected latest addUser summary for fixtur01');
             $this->assertSame('FAIL', $summary['status']);
             $this->assertSame('password_failed', $summary['message']);
             $this->assertTrue((int) $summary['timestamp'] > 0, 'Expected parsed summary timestamp');
@@ -52,7 +52,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         $summary = array('status' => 'FAIL', 'timestamp' => 1000);
         $this->assertFalse(
             pmssAddUserFailedProvisionCanRecover(
-                'alice',
+                'fixtur01',
                 $summary,
                 array('rtorrent' => true, 'lighttpd' => false),
                 1100
@@ -60,7 +60,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         );
         $this->assertTrue(
             pmssAddUserFailedProvisionCanRecover(
-                'alice',
+                'fixtur01',
                 $summary,
                 array('rtorrent' => false, 'lighttpd' => false),
                 1100
@@ -70,16 +70,16 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
 
     public function testCleanupTargetValidationRejectsUnsafePaths(): void
     {
-        $this->assertTrue(pmssAddUserCleanupFailedProvisionTargetValid('alice', '/home/alice'));
+        $this->assertTrue(pmssAddUserCleanupFailedProvisionTargetValid('fixtur01', '/home/fixtur01'));
 
         foreach (array(
-            array('Alice', '/home/Alice'),
-            array('alice', '/home/bob'),
-            array('alice', '/home'),
-            array('alice', '/'),
-            array('alice', '/home/alice/../bob'),
-            array('alice-', '/home/alice-'),
-            array('alice', "\0/home/alice"),
+            array('Fixtur01', '/home/Fixtur01'),
+            array('fixtur01', '/home/fixtur02'),
+            array('fixtur01', '/home'),
+            array('fixtur01', '/'),
+            array('fixtur01', '/home/fixtur01/../fixtur02'),
+            array('fixtur01-', '/home/fixtur01-'),
+            array('fixtur01', "\0/home/fixtur01"),
         ) as $case) {
             $this->assertFalse(pmssAddUserCleanupFailedProvisionTargetValid($case[0], $case[1]));
         }
@@ -88,11 +88,11 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
     public function testCleanupTargetValidationRejectsUnsafePathState(): void
     {
         $checkedPath = null;
-        $this->assertFalse(pmssAddUserCleanupFailedProvisionTargetValid('alice', '/home/alice', static function (string $homePath, bool $directoryTarget, bool $requireParentDirectory, bool $allowEmptySegments) use (&$checkedPath): bool {
+        $this->assertFalse(pmssAddUserCleanupFailedProvisionTargetValid('fixtur01', '/home/fixtur01', static function (string $homePath, bool $directoryTarget, bool $requireParentDirectory, bool $allowEmptySegments) use (&$checkedPath): bool {
             $checkedPath = array($homePath, $directoryTarget, $requireParentDirectory, $allowEmptySegments);
             return false;
         }));
-        $this->assertSame(array('/home/alice', true, false, false), $checkedPath);
+        $this->assertSame(array('/home/fixtur01', true, false, false), $checkedPath);
     }
 
     public function testCleanupCommandsKeepExpectedRecoverySteps(): void

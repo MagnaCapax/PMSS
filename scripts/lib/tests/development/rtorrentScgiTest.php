@@ -108,7 +108,7 @@ class RtorrentScgiTest extends TestCase
     public function testSocketPathGeneration(): void
     {
         foreach ([
-            'alice' => '/home/alice/.rtorrent.socket',
+            'fixtur01' => '/home/fixtur01/.rtorrent.socket',
             'bob123' => '/home/bob123/.rtorrent.socket',
         ] as $username => $expected) {
             $this->assertEquals($expected, rtorrentScgiSocketPath($username), $username);
@@ -121,27 +121,27 @@ class RtorrentScgiTest extends TestCase
             'matching listen socket' => [
                 [
                     'Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port',
-                    'u_str LISTEN 101    100    /home/alice/.rtorrent.socket 12345 * 0',
+                    'u_str LISTEN 101    100    /home/fixtur01/.rtorrent.socket 12345 * 0',
                 ],
                 ['recvQ' => 101, 'sendQ' => 100],
             ],
             'other socket' => [
-                ['u_str LISTEN 101 100 /home/bob/.rtorrent.socket 12345 * 0'],
+                ['u_str LISTEN 101 100 /home/fixtur02/.rtorrent.socket 12345 * 0'],
                 null,
             ],
             'substring path without exact socket column' => [
-                ['u_str LISTEN 101 100 /srv/home/alice/.rtorrent.socket.backup 12345 * 0'],
+                ['u_str LISTEN 101 100 /srv/home/fixtur01/.rtorrent.socket.backup 12345 * 0'],
                 null,
             ],
             'malformed columns' => [
                 [
-                    'u_str LISTEN nope 100 /home/alice/.rtorrent.socket 12345 * 0',
-                    'u_str ESTAB 101 100 /home/alice/.rtorrent.socket 12345 * 0',
+                    'u_str LISTEN nope 100 /home/fixtur01/.rtorrent.socket 12345 * 0',
+                    'u_str ESTAB 101 100 /home/fixtur01/.rtorrent.socket 12345 * 0',
                 ],
                 null,
             ],
         ] as $label => $case) {
-            $this->assertSame($case[1], rtorrentScgiSocketQueueSnapshotFromLines($case[0], '/home/alice/.rtorrent.socket'), $label);
+            $this->assertSame($case[1], rtorrentScgiSocketQueueSnapshotFromLines($case[0], '/home/fixtur01/.rtorrent.socket'), $label);
         }
     }
 

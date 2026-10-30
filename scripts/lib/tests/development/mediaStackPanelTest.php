@@ -20,7 +20,7 @@ class MediaStackPanelTest extends TestCase
 
     private function mediaStatusRead(string $home): array
     {
-        return \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+        return \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
     }
 
     public function testFormatBytesPreservesWholeNumbersAndTrimsFractions(): void
@@ -184,7 +184,7 @@ class MediaStackPanelTest extends TestCase
         $status = $this->mediaStatusFixture('pmss-media-installed-', '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
 
         $this->assertSame('installed', $status['state']);
-        $this->assertStringContainsString('/public-alice/jellyfin/web/', $status['urls']['Jellyfin']);
+        $this->assertStringContainsString('/public-fixtur01/jellyfin/web/', $status['urls']['Jellyfin']);
         $this->assertSame(array('Jellyfin'), array_keys($status['urls']));
     }
 
@@ -235,7 +235,7 @@ class MediaStackPanelTest extends TestCase
 
         $status = $this->mediaStatusRead($home);
 
-        $this->assertSame('https://seedbox.example/public-alice/autobrr/', $status['urls']['Autobrr']);
+        $this->assertSame('https://seedbox.example/public-fixtur01/autobrr/', $status['urls']['Autobrr']);
     }
 
     public function testSecurityStatusDetectsConfiguredAuthPerApp(): void
@@ -243,7 +243,7 @@ class MediaStackPanelTest extends TestCase
         $home = $this->mediaHomeCreate('pmss-media-auth-protected-');
         $this->pmssWriteRelativeFile($home, '.config/radarr/config.xml', "<Config>\n<AuthenticationMethod>Forms</AuthenticationMethod>\n<AuthenticationRequired>Enabled</AuthenticationRequired>\n</Config>\n");
         $this->pmssWriteRelativeFile($home, '.bin/Radarr/Radarr.dll', 'marker');
-        $this->pmssWriteRelativeFile($home, '.config/sabnzbd/sabnzbd.ini', "[misc]\nusername = alice\npassword = secret\n");
+        $this->pmssWriteRelativeFile($home, '.config/sabnzbd/sabnzbd.ini', "[misc]\nusername = fixtur01\npassword = secret\n");
         $this->pmssWriteRelativeFile($home, '.bin/sabnzbd/sabnzbd/SABnzbd.py', 'marker');
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/system.xml', '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>');
@@ -289,7 +289,7 @@ class MediaStackPanelTest extends TestCase
         $this->pmssEnsureDir($home.'/.config/autobrr');
         $db = new \SQLite3($home.'/.config/autobrr/autobrr.db');
         $db->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)');
-        $db->exec("INSERT INTO users (username) VALUES ('alice')");
+        $db->exec("INSERT INTO users (username) VALUES ('fixtur01')");
         $db->close();
 
         $status = $this->mediaStatusRead($home);
@@ -352,13 +352,13 @@ class MediaStackPanelTest extends TestCase
         $this->assertSame(array_fill_keys($apps, true), $prerequisites);
         $this->assertSame($apps, $actions);
         $this->assertSame(array(
-            'Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/',
-            'Radarr' => 'https://seedbox.example/public-alice/radarr/',
-            'Sonarr' => 'https://seedbox.example/public-alice/sonarr/',
-            'Prowlarr' => 'https://seedbox.example/public-alice/prowlarr/',
-            'SABnzbd' => 'https://seedbox.example/public-alice/sabnzbd/',
-            'Autobrr' => 'https://seedbox.example/public-alice/autobrr/',
-        ), \pmssMediaStackPanelUrlsRead($home, 'alice', 'seedbox.example'));
+            'Jellyfin' => 'https://seedbox.example/public-fixtur01/jellyfin/web/',
+            'Radarr' => 'https://seedbox.example/public-fixtur01/radarr/',
+            'Sonarr' => 'https://seedbox.example/public-fixtur01/sonarr/',
+            'Prowlarr' => 'https://seedbox.example/public-fixtur01/prowlarr/',
+            'SABnzbd' => 'https://seedbox.example/public-fixtur01/sabnzbd/',
+            'Autobrr' => 'https://seedbox.example/public-fixtur01/autobrr/',
+        ), \pmssMediaStackPanelUrlsRead($home, 'fixtur01', 'seedbox.example'));
         $this->assertSame(array(
             'Sonarr: running.',
             'Radarr: failed repeatedly (3 consecutive failed checks).',
@@ -457,18 +457,18 @@ class MediaStackPanelTest extends TestCase
             'message' => 'Media stack is installed for this account.',
             'details' => array('Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.'),
             'tail' => '',
-            'urls' => array('Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/'),
+            'urls' => array('Jellyfin' => 'https://seedbox.example/public-fixtur01/jellyfin/web/'),
         ));
 
-        $this->assertStringContainsAllStrings(['.media-stack-credentials.txt', 'public-alice/jellyfin'], $html);
+        $this->assertStringContainsAllStrings(['.media-stack-credentials.txt', 'public-fixtur01/jellyfin'], $html);
     }
 
     public function testStartCommandIncludesPidFileAndScriptPath(): void
     {
-        $home = '/home/alice';
-        $command = \pmssMediaStackPanelStartCommandBuild($home, 'alice');
+        $home = '/home/fixtur01';
+        $command = \pmssMediaStackPanelStartCommandBuild($home, 'fixtur01');
 
-        $this->assertStringContainsAllStrings(['.install-media-stack-web.pid', 'install-media-stack.sh', "USER='alice'"], $command);
+        $this->assertStringContainsAllStrings(['.install-media-stack-web.pid', 'install-media-stack.sh', "USER='fixtur01'"], $command);
     }
 
     public function testStartCommandDetachesInstallerFromFrontendPipe(): void
@@ -477,7 +477,7 @@ class MediaStackPanelTest extends TestCase
         $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 5\n:\n");
 
         $start = microtime(true);
-        \pmssFrontendShellExec(\pmssMediaStackPanelStartCommandBuild($home, 'alice'));
+        \pmssFrontendShellExec(\pmssMediaStackPanelStartCommandBuild($home, 'fixtur01'));
         $elapsed = microtime(true) - $start;
 
         $this->assertTrue($elapsed < 2, 'Frontend command waited for the background installer: '.$elapsed.'s');
@@ -488,12 +488,12 @@ class MediaStackPanelTest extends TestCase
 
     public function testRecoveryCommandUsesFixedInstallerMode(): void
     {
-        $command = \pmssMediaStackPanelRecoveryCommandBuild('/home/alice', 'alice');
+        $command = \pmssMediaStackPanelRecoveryCommandBuild('/home/fixtur01', 'fixtur01');
 
         $this->assertStringContainsAllStrings([
-            "HOME='/home/alice'",
-            "USER='alice'",
-            "'/home/alice/install-media-stack.sh' --start-stopped",
+            "HOME='/home/fixtur01'",
+            "USER='fixtur01'",
+            "'/home/fixtur01/install-media-stack.sh' --start-stopped",
             'pmss-media-stack-started',
         ], $command);
     }
@@ -503,15 +503,15 @@ class MediaStackPanelTest extends TestCase
         $this->assertSame('radarr', \pmssMediaStackPanelSecureActionAppIdRead('confirm-secure-radarr'));
         $this->assertSame(null, \pmssMediaStackPanelSecureActionAppIdRead('confirm-secure-../../evil'));
 
-        $command = \pmssMediaStackPanelSecureCommandBuild('/home/alice', 'alice', 'radarr');
+        $command = \pmssMediaStackPanelSecureCommandBuild('/home/fixtur01', 'fixtur01', 'radarr');
         $this->assertStringContainsAllStrings([
-            "HOME='/home/alice'",
-            "USER='alice'",
-            "'/home/alice/install-media-stack.sh'",
+            "HOME='/home/fixtur01'",
+            "USER='fixtur01'",
+            "'/home/fixtur01/install-media-stack.sh'",
             "'--secure-app=radarr'",
         ], $command);
         $this->assertStringContainsAndOmitsStrings([], array('&&' => $command, ';' => $command, '||' => $command), $command);
-        $this->assertSame('', \pmssMediaStackPanelSecureCommandBuild('/home/alice', 'alice', '../../evil'));
+        $this->assertSame('', \pmssMediaStackPanelSecureCommandBuild('/home/fixtur01', 'fixtur01', '../../evil'));
     }
 
     public function testRecoveryRequestRequiresAjaxPost(): void
@@ -546,11 +546,11 @@ class MediaStackPanelTest extends TestCase
 
     public function testCustomerHomePathBuildsStableInstallerPaths(): void
     {
-        $home = '/home/alice/';
+        $home = '/home/fixtur01/';
 
-        $this->assertSame('/home/alice/install-media-stack.sh', \pmssCustomerHomePath($home, 'install-media-stack.sh'));
-        $this->assertSame('/home/alice/.install-media-stack.log', \pmssCustomerHomePath($home, '.install-media-stack.log'));
-        $this->assertSame('/home/alice/.install-media-stack-web.pid', \pmssCustomerHomePath($home, '.install-media-stack-web.pid'));
+        $this->assertSame('/home/fixtur01/install-media-stack.sh', \pmssCustomerHomePath($home, 'install-media-stack.sh'));
+        $this->assertSame('/home/fixtur01/.install-media-stack.log', \pmssCustomerHomePath($home, '.install-media-stack.log'));
+        $this->assertSame('/home/fixtur01/.install-media-stack-web.pid', \pmssCustomerHomePath($home, '.install-media-stack-web.pid'));
     }
 
     private function mediaStatusFixture(string $prefix, string $relativePath, string $content): array
