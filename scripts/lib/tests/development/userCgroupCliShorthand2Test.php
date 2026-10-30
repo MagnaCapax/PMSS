@@ -18,17 +18,14 @@ class UserCgroupCliShorthand2Test extends TestCase
     public function testSingleCpuWeightFlagOnly(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--cpu-weight=300']);
-        $this->assertStringContainsString('Planned properties', $out);
-        $this->assertStringContainsString('CPUWeight=300', $out);
+        $this->assertStringContainsAllStrings(['Planned properties', 'CPUWeight=300'], $out);
         // Memory should not be planned unless explicitly provided
-        $this->assertStringNotContainsString('MemoryHigh=', $out);
-        $this->assertStringNotContainsString('MemoryMax=', $out);
+        $this->assertStringContainsAndOmitsStrings([], ['MemoryHigh=', 'MemoryMax='], $out);
     }
 
     public function testMemProfileHeavySetsHigh(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--mem-profile=heavy']);
-        $this->assertStringContainsString('Planned properties', $out);
-        $this->assertStringContainsString('MemoryHigh=1024M', $out);
+        $this->assertStringContainsAllStrings(['Planned properties', 'MemoryHigh=1024M'], $out);
     }
 }

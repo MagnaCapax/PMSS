@@ -46,12 +46,8 @@ class UserCgroupCliTasksAndCpuProfilesTest extends TestCase
             '--memory-high=333',
         ]);
 
-        $this->assertStringContainsString('CPUWeight=111', $out);
-        $this->assertStringContainsString('TasksMax=222', $out);
-        $this->assertStringContainsString('MemoryHigh=333M', $out);
-        $this->assertStringNotContainsString('CPUWeight=300', $out);
-        $this->assertStringNotContainsString('TasksMax=8192', $out);
-        $this->assertStringNotContainsString('MemoryHigh=1024M', $out);
+        $this->assertStringContainsAndOmitsStrings(['CPUWeight=111', 'TasksMax=222', 'MemoryHigh=333M'],
+            ['CPUWeight=300', 'TasksMax=8192', 'MemoryHigh=1024M'], $out);
     }
 
     private function assertNamedProfile(string $profileArg, string $expected): void

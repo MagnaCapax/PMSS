@@ -22,8 +22,7 @@ class UserRutorrentCompatPatchTest extends TestCase
             \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
             $content = (string) file_get_contents($path);
 
-            $this->assertStringContainsString($case['expected'], $content);
-            $this->pmssAssertStringNotContainsString($case['unexpected'], $content);
+            $this->assertStringContainsAndOmitsStrings([$case['expected']], [$case['unexpected']], $content);
         }
     }
 
@@ -114,9 +113,8 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->assertStringContainsString('@ob_flush();', (string) file_get_contents($rssPath));
         $this->assertStringContainsString('return (int) $field;', (string) file_get_contents($hddquotaPath));
         $throttleContent = (string) file_get_contents($throttlePath);
-        $this->assertStringContainsString('new rXMLRPCCommand( "set_upload_rate", 0 )', $throttleContent);
-        $this->assertStringContainsString('new rXMLRPCCommand( "set_download_rate", 0 )', $throttleContent);
-        $this->pmssAssertStringNotContainsString('MAX_SPEED', $throttleContent);
+        $this->assertStringContainsAndOmitsStrings(['new rXMLRPCCommand( "set_upload_rate", 0 )',
+            'new rXMLRPCCommand( "set_download_rate", 0 )'], ['MAX_SPEED'], $throttleContent);
     }
 
     public function testSkeletonHddquotaActionReturnsInt(): void
@@ -132,8 +130,8 @@ class UserRutorrentCompatPatchTest extends TestCase
         $path = $this->pmssRepoPath('etc/skel/www/rutorrent/php/Snoopy.class.inc');
         $content = (string) file_get_contents($path);
 
-        $this->assertStringContainsString('var $accept			=	"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";', $content);
-        $this->pmssAssertStringNotContainsString('image/x-xbitmap', $content);
+        $this->assertStringContainsAndOmitsStrings(['var $accept			=	"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";'],
+            ['image/x-xbitmap'], $content);
     }
 
     public function testCompatibilityRebuildsSkeletonFilesAndIsIdempotent(): void
@@ -337,9 +335,8 @@ PHP;
         }
         $start = strpos($source, 'case "stg":');
         $stg = substr($source, $start, strpos($source, "\tcase ", $start+1)-$start);
-        $this->assertStringContainsString('$req->success($trusted)', $stg);
-        $this->assertStringContainsString('$addReq->success(false)', $stg);
-        $this->assertStringContainsString('$addReq = ($trusted && count($add)) ? new rXMLRPCRequest() : $req;', $stg);
+        $this->assertStringContainsAllStrings(['$req->success($trusted)', '$addReq->success(false)',
+            '$addReq = ($trusted && count($add)) ? new rXMLRPCRequest() : $req;'], $stg);
         foreach (['list', 'ttl', 'prp', 'trkall', 'setsettings', 'setul', 'setdl', 'getchunks'] as $mode) {
             $start = strpos($source, 'case "'.$mode.'":');
             $end = strpos($source, "\tcase ", $start+1);

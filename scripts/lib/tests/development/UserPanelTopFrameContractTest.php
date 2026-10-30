@@ -21,18 +21,15 @@ class UserPanelTopFrameContractTest extends TestCase
     {
         $html = $this->pmssRenderCopiedUserPanelIndex(array(), array(),
             array('apps.php', 'configure.php', 'configureSettings.php'), array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
-        $this->assertStringContainsString('href="#pmssconfigure"', $html);
-        $this->assertStringNotContainsString('href="#apps"', $html);
+        $this->assertStringContainsAndOmitsStrings(['href="#pmssconfigure"'], ['href="#apps"'], $html);
         $this->assertTrue(strrpos($html, 'href="#pmssconfigure"') > strrpos($html, 'href="#wiki"'));
         $this->assertStringContainsString('aria-label="Configure"', $html);
         $legacy = $this->pmssRenderCopiedUserPanelIndex(array(), array(), array('apps.php'),
             array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
-        $this->assertStringContainsString('href="#apps"', $legacy);
-        $this->assertStringNotContainsString('href="#pmssconfigure"', $legacy);
+        $this->assertStringContainsAndOmitsStrings(['href="#apps"'], ['href="#pmssconfigure"'], $legacy);
         $partial = $this->pmssRenderCopiedUserPanelIndex(array(), array(), array('apps.php', 'configure.php'),
             array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
-        $this->assertStringContainsString('href="#apps"', $partial);
-        $this->assertStringNotContainsString('href="#pmssconfigure"', $partial);
+        $this->assertStringContainsAndOmitsStrings(['href="#apps"'], ['href="#pmssconfigure"'], $partial);
     }
 
     public function testConfigureStaysLastAfterCustomerFrames(): void
@@ -57,15 +54,14 @@ class UserPanelTopFrameContractTest extends TestCase
         }
         $this->pmssWriteFile($home.'/.customFrames', "custom0|My guide|<b>Guide</b>|https://example.com\n");
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
-        $this->assertStringContainsString('<ul class="tabs-nav" role="tablist" aria-label="Panel sections">', $html);
-        $this->assertStringContainsString('<li><a href="#welcome" title="Welcome to your seedbox. Basic information" id="pmss-tab-welcome" role="tab" aria-controls="welcome" aria-selected="true" tabindex="0" data-tab="welcome"', $html);
+        $this->assertStringContainsAllStrings(['<ul class="tabs-nav" role="tablist" aria-label="Panel sections">',
+            '<li><a href="#welcome" title="Welcome to your seedbox. Basic information" id="pmss-tab-welcome" role="tab" aria-controls="welcome" aria-selected="true" tabindex="0" data-tab="welcome"'], $html);
         $this->assertSame(1, substr_count($html, 'aria-selected="true" tabindex="0"'));
         $this->assertSame(substr_count($html, 'role="tab" aria-controls='), substr_count($html, 'aria-selected="false" tabindex="-1"') + 1);
-        $this->assertStringContainsString('<use href="#pmss-i-house" xlink:href="#pmss-i-house"></use></svg><span class="pt-lbl">Welcome</span>', $html);
-        $this->assertStringContainsString('<span class="pt-lbl">Wiki</span>', $html);
-        $this->assertStringContainsString('<li class="pt-end"><a href="#pmssconfigure"', $html);
-        $this->assertStringContainsString('#pmss-i-settings"></use></svg><span class="pt-lbl">Configure</span>', $html);
-        $this->assertStringNotContainsString('⚙', $html);
+        $this->assertStringContainsAndOmitsStrings(['<use href="#pmss-i-house" xlink:href="#pmss-i-house"></use></svg><span class="pt-lbl">Welcome</span>',
+            '<span class="pt-lbl">Wiki</span>', '<li class="pt-end"><a href="#pmssconfigure"',
+            '#pmss-i-settings"></use></svg><span class="pt-lbl">Configure</span>'],
+            ['⚙'], $html);
         $this->assertStringContainsString('#pmss-i-app-window"></use></svg><span class="pt-lbl">&lt;b&gt;Guide&lt;/b&gt;</span>', $html);
         $this->assertSame(1, substr_count($html, '<symbol id="pmss-i-house"'));
         $this->assertStringContainsString("data.type !== 'pmss:apps-state'", $html);
@@ -109,8 +105,7 @@ class UserPanelTopFrameContractTest extends TestCase
             'PMSS_CONSOLE_TTYD_BIN' => $ttyd,
             'PMSS_DISABLE_REMOTE_FRAMES' => '1',
         ]);
-        $this->assertStringContainsString("loadFrame('console'", $html);
-        $this->assertStringNotContainsString('target="_blank"', $html);
+        $this->assertStringContainsAndOmitsStrings(["loadFrame('console'"], ['target="_blank"'], $html);
         $this->assertSame('welcome', $this->firstTabId($html));
     }
 

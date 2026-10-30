@@ -89,8 +89,8 @@ class LighttpdProxyFragmentsTest extends TestCase
             '$HTTP["url"] =~ "^/user-demo/qbittorrent/" {',
             '"/user-demo/qbittorrent/"  => "/"',
         ], $fragment);
-        $this->assertStringNotContainsString('"/user-demo/qbittorrent" => ""', $fragment);
-        $this->assertStringNotContainsString('$HTTP["url"] =~ "^/user-demo/qbittorrent($|/)" {', $fragment);
+        $this->assertStringContainsAndOmitsStrings([], ['"/user-demo/qbittorrent" => ""',
+            '$HTTP["url"] =~ "^/user-demo/qbittorrent($|/)" {'], $fragment);
     }
 
     public function testQbittorrentFragmentPreservesBrowserVisibleOrigin(): void
@@ -102,8 +102,8 @@ class LighttpdProxyFragmentsTest extends TestCase
             'proxy.forwarded = ( "for" => 1,',
             '"host" => 1',
         ], $fragment);
-        $this->assertStringNotContainsString('setenv.set-request-header = ( "Origin"', $fragment);
-        $this->assertStringNotContainsString('setenv.set-request-header = ( "Referer"', $fragment);
+        $this->assertStringContainsAndOmitsStrings([], ['setenv.set-request-header = ( "Origin"',
+            'setenv.set-request-header = ( "Referer"'], $fragment);
     }
 
     public function testOnlyQbittorrentFragmentStripsPanelAuthorization(): void

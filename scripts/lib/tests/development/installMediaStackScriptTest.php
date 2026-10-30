@@ -47,8 +47,7 @@ class installMediaStackScriptTest extends TestCase
         // A failed $(...) that fires the inherited ERR trap in its subshell must not claim the install stopped.
         $this->assertStringContainsString("continued\nsub_rc=0", $output);
         $this->assertSame(1, substr_count($output, 'install stopped after a command failed'));
-        $this->assertStringContainsString('real_rc=1', $output);
-        $this->assertStringNotContainsString('unreachable', $output);
+        $this->assertStringContainsAndOmitsStrings(['real_rc=1'], ['unreachable'], $output);
     }
 
     public function testServarrBranchDefaultsAndOverridesPresent(): void
@@ -208,9 +207,8 @@ class installMediaStackScriptTest extends TestCase
         $oldTarCommand = 'tar -xvzf '.'"aspnetcore.tar.gz"';
         $oldRemoveCommand = 'rm -f '.'"aspnetcore.tar.gz"';
 
-        $this->assertStringContainsString('extract_tgz "aspnetcore.tar.gz" "$installdir"', $this->script);
-        $this->assertStringNotContainsString($oldTarCommand, $this->script);
-        $this->assertStringNotContainsString($oldRemoveCommand, $this->script);
+        $this->assertStringContainsAndOmitsStrings(['extract_tgz "aspnetcore.tar.gz" "$installdir"'],
+            [$oldTarCommand, $oldRemoveCommand], $this->script);
     }
 
     public function testAspnetcoreMetadataSelectsLatestReleaseForEachArchitecture(): void
@@ -251,8 +249,7 @@ class installMediaStackScriptTest extends TestCase
         }
         foreach ($invalid as $json) {
             $output = $this->aspnetcoreResolverHarness($json, 'x64');
-            $this->assertStringContainsString('rejected', $output);
-            $this->assertStringNotContainsString('resolved:', $output);
+            $this->assertStringContainsAndOmitsStrings(['rejected'], ['resolved:'], $output);
         }
         // A transfer error must reject even a complete-looking response body.
         $this->assertStringContainsString('rejected', $this->aspnetcoreResolverHarness(json_encode($valid), 'x64', 1));
@@ -300,8 +297,8 @@ class installMediaStackScriptTest extends TestCase
                 .escapeshellarg($archive).' runtime "" '.escapeshellarg($expectedHash)
                 .') && echo accepted || echo rejected'."\n");
             $accept = in_array($scenario, ['valid', 'dry-run', 'legacy'], true);
-            $this->assertStringContainsString($accept ? 'accepted' : 'rejected', $output);
-            $this->assertStringNotContainsString('unexpected-hash', $output);
+            $this->assertStringContainsAndOmitsStrings([$accept ? 'accepted' : 'rejected'],
+                ['unexpected-hash'], $output);
             if ($scenario !== 'fetch-failed') {
                 $this->assertStringContainsString('existing-check', $output);
             }
@@ -391,8 +388,8 @@ class installMediaStackScriptTest extends TestCase
             '--config=\\"$HOME/.config/autobrr\\"',
         ], $this->script);
         $this->assertSame(3, substr_count($this->script, 'AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL'));
-        $this->assertStringContainsString('"http://127.0.0.1:${seed_port}${AUTOBRR_BASE_URL}"', $this->script);
-        $this->assertStringContainsString('AUTOBRR__BASE_URL=/public-$(id -un)/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=false', $this->script);
+        $this->assertStringContainsAllStrings(['"http://127.0.0.1:${seed_port}${AUTOBRR_BASE_URL}"',
+            'AUTOBRR__BASE_URL=/public-$(id -un)/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=false'], $this->script);
     }
 
     public function testMediaStackCredentialsUseDelugeStylePhpCsprngAndOwnerOnlyFile(): void
@@ -856,8 +853,7 @@ BASH
             if ($count === '1') {
                 $this->assertSame('ok', trim($output));
             } else {
-                $this->assertStringContainsString('stop and reinstall', $output);
-                $this->assertStringContainsString('refused', $output);
+                $this->assertStringContainsAllStrings(['stop and reinstall', 'refused'], $output);
             }
             $this->assertSame('preserve-me', file_get_contents($home.'/config/autobrr.db'));
         }
@@ -935,10 +931,8 @@ SH
             if ($users === $expectedUser && $status === '200' && $curlExit === 0 && $token === 'testtoken') {
                 $this->assertSame('ok', $output);
             } else {
-                $this->assertStringContainsString('stop and reinstall', $output);
-                $this->assertStringContainsString('refused', $output);
-                $this->assertStringContainsString('pending-refused', $output);
-                $this->assertStringContainsString('HTTP '.($token === 'testtoken' ? $status : '000'), $output);
+                $this->assertStringContainsAllStrings(['stop and reinstall', 'refused', 'pending-refused',
+                    'HTTP '.($token === 'testtoken' ? $status : '000')], $output);
                 $this->assertSame(0600, fileperms($home.'/config/.pmss-auth-seed-pending') & 0777);
             }
             $this->assertStringNotContainsString('testtoken', $output);
@@ -1043,8 +1037,7 @@ SH
         $chmod = strpos($this->script, 'chmod 700 "$HOME/.config/jellyfin"', $mkdir);
         $network = strpos($this->script, 'if [ ! -f "$configdir/network.xml" ]; then', $chmod);
 
-        $this->assertStringContainsString('JELLYFIN_CONFIG_RESET=0', $this->script);
-        $this->assertStringContainsString('JELLYFIN_CONFIG_RESET=1', $this->script);
+        $this->assertStringContainsAllStrings(['JELLYFIN_CONFIG_RESET=0', 'JELLYFIN_CONFIG_RESET=1'], $this->script);
         $this->assertTrue($preflight !== false && $portPick !== false && $servarrSeed !== false && $download !== false);
         $this->assertTrue($extract !== false && $reset !== false && $mkdir !== false && $chmod !== false && $network !== false);
         $this->assertTrue($preflight < $portPick && $portPick < $servarrSeed && $servarrSeed < $download);
@@ -1281,9 +1274,8 @@ LIGHTTPD;
 
     public function testLighttpdMediaStackFragmentWriteIsAtomic(): void
     {
-        $this->assertStringContainsString('local temp_target="${target}.pmss.$$"', $this->script);
-        $this->assertStringContainsString('} >"$temp_target" || {', $this->script);
-        $this->assertStringContainsString('if ! mv "$temp_target" "$target"; then', $this->script);
+        $this->assertStringContainsAllStrings(['local temp_target="${target}.pmss.$$"', '} >"$temp_target" || {',
+            'if ! mv "$temp_target" "$target"; then'], $this->script);
     }
 
     public function testHomePathGuardRunsBeforeLogFileCreation(): void
@@ -1375,9 +1367,8 @@ BASHRC
 
         $output = $this->pmssRunShellHarness($harness);
 
-        $this->assertStringContainsString('OK:Started sonarr', $output);
-        $this->assertStringContainsString('new-session -d -s sonarr true', $output);
-        $this->assertStringNotContainsString('new-session -d -s radarr true', $output);
+        $this->assertStringContainsAndOmitsStrings(['OK:Started sonarr', 'new-session -d -s sonarr true'],
+            ['new-session -d -s radarr true'], $output);
     }
 
     public function testCloudplowConfigIsCreatedBeforeFirstSession(): void
@@ -1474,9 +1465,8 @@ BASH
         $output = $this->pmssRunShellHarness($harness);
         $this->assertSame(1, substr_count($output, 'new-session -s sonarr'));
         $this->assertSame(1, substr_count($output, 'new-session -s radarr'));
-        $this->assertStringContainsString('APP_ACTION_REQUESTED=0', $this->script);
-        $this->assertStringContainsString('media_stack_app_id_valid "${START_APP:-$STOP_APP}"', $this->script);
-        $this->assertStringContainsString('media_stack_session_kill_owned "$STOP_APP"', $this->script);
+        $this->assertStringContainsAllStrings(['APP_ACTION_REQUESTED=0',
+            'media_stack_app_id_valid "${START_APP:-$STOP_APP}"', 'media_stack_session_kill_owned "$STOP_APP"'], $this->script);
     }
 
     public function testAppStopFlagKillsOnlyValidatedSession(): void
@@ -1941,11 +1931,10 @@ BASH
         $output = $this->pmssRunShellHarness($script);
 
         // The value carries the port and nothing else...
-        $this->assertStringContainsString('captured:[8080]', $output);
-        $this->assertStringContainsString('fatal:[<aborted>]', $output);
+        $this->assertStringContainsAllStrings(['captured:[8080]', 'fatal:[<aborted>]'], $output);
         // ...while both diagnostics still reach the operator on stderr.
-        $this->assertStringContainsString('preserving its existing port', $output);
-        $this->assertStringContainsString('No PMSS-reserved port is available for sonarr', $output);
+        $this->assertStringContainsAllStrings(['preserving its existing port',
+            'No PMSS-reserved port is available for sonarr'], $output);
     }
 
 }

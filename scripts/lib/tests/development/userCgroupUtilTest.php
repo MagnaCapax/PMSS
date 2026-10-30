@@ -260,11 +260,8 @@ class UserCgroupUtilTest extends TestCase
             });
 
             $this->assertEquals(0, $rc);
-            $this->assertStringContainsString('CPUWeight=250', $out);
-            $this->assertStringContainsString('IOReadBandwidthMax=/dev/sdb 9M', $out);
-            $this->assertStringContainsString('IOReadIOPSMax=/dev/sdb 44', $out);
-            $this->assertStringNotContainsString('IOWriteBandwidthMax=/dev/sdb', $out);
-            $this->assertStringNotContainsString('IOWriteIOPSMax=/dev/sdb', $out);
+            $this->assertStringContainsAndOmitsStrings(['CPUWeight=250', 'IOReadBandwidthMax=/dev/sdb 9M',
+                'IOReadIOPSMax=/dev/sdb 44'], ['IOWriteBandwidthMax=/dev/sdb', 'IOWriteIOPSMax=/dev/sdb'], $out);
         });
     }
 
@@ -302,8 +299,8 @@ class UserCgroupUtilTest extends TestCase
             });
 
             $this->assertEquals(0, $rc);
-            $this->assertStringContainsString('IODeviceLatencyTargetSec skipped', $out);
-            $this->assertStringNotContainsString('IODeviceLatencyTargetSec='.$device, $out);
+            $this->assertStringContainsAndOmitsStrings(['IODeviceLatencyTargetSec skipped'],
+                ['IODeviceLatencyTargetSec='.$device], $out);
         }
     }
 

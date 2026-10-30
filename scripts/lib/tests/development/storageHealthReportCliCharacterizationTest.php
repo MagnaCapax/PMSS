@@ -67,13 +67,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
 
         $output = $this->runStorageHealthReport($jsonPath, ['--device', 'sdb', '--only-problems']);
 
-        $this->assertStringContainsString('Performance status: OK', $output);
-        $this->assertStringContainsString('Summary: 0 ok, 0 warn, 1 fail', $output);
-        $this->assertStringContainsString('Broken Disk', $output);
-        $this->assertStringContainsString('pending_sectors', $output);
-        $this->pmssAssertStringNotContainsString('Healthy Disk', $output);
-        $this->pmssAssertStringNotContainsString('MD RAID', $output);
-        $this->pmssAssertStringNotContainsString(' sda ', $output);
+        $this->assertStringContainsAndOmitsStrings(['Performance status: OK', 'Summary: 0 ok, 0 warn, 1 fail',
+            'Broken Disk', 'pending_sectors'], ['Healthy Disk', 'MD RAID', ' sda '], $output);
     }
 
     public function testMixedSmartAndNvmeDisksShareSeverityOrdering(): void

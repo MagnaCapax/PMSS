@@ -24,9 +24,8 @@ class BrowserConsoleArtifactsTest extends TestCase
         // Pinned version + SHA256 + arch gate + supported fetch helper (no ad-hoc curl|bash).
         $this->assertStringContainsString('1.7.7', $src);
         $this->assertMatches('/[a-f0-9]{64}/', $src, 'ttyd installer must pin a SHA256');
-        $this->assertStringContainsString("pmssPinnedRemoteAmd64OrSkip('ttyd', 'install')", $src);
-        $this->assertStringContainsString('pmssPinnedRemoteArtifactTempFileUse', $src);
-        $this->assertStringContainsString('/usr/bin/ttyd', $src);
+        $this->assertStringContainsAllStrings(["pmssPinnedRemoteAmd64OrSkip('ttyd', 'install')",
+            'pmssPinnedRemoteArtifactTempFileUse', '/usr/bin/ttyd'], $src);
     }
 
     public function testLauncherKeepsCustomerTreeSeparation(): void
@@ -95,10 +94,7 @@ class BrowserConsoleArtifactsTest extends TestCase
     {
         $src = $this->repoFile('etc/skel/www/console.php');
         // Loopback UNIX socket, origin-checked, and no root.
-        $this->assertStringContainsString('console.sock', $src);
-        $this->assertStringContainsString('--check-origin', $src);
-        $this->assertStringNotContainsString('sudo', $src);
-        $this->assertStringNotContainsString(' su ', $src);
+        $this->assertStringContainsAndOmitsStrings(['console.sock', '--check-origin'], ['sudo', ' su '], $src);
         // Mode is a fixed enum: request data must not build the spawned command.
         $this->assertStringContainsString("'persist'", $src);
         $this->assertFalse(
@@ -111,35 +107,28 @@ class BrowserConsoleArtifactsTest extends TestCase
     {
         $src = $this->repoFile('etc/skel/www/console.php');
         // Disabled-path behaviour: guard on the binary before spawning.
-        $this->assertStringContainsString('is_executable', $src);
-        $this->assertStringContainsString('--once', $src);
+        $this->assertStringContainsAllStrings(['is_executable', '--once'], $src);
     }
 
     public function testLauncherReportsSocketSpawnFailure(): void
     {
         $src = $this->repoFile('etc/skel/www/console.php');
         // A failed detached spawn must not fall through to a guaranteed proxy 503.
-        $this->assertStringContainsString('console-error.log', $src);
-        $this->assertStringContainsString('error_log(', $src);
-        $this->assertStringContainsString('http_response_code(503)', $src);
-        $this->assertStringContainsString('Try again', $src);
+        $this->assertStringContainsAllStrings(['console-error.log', 'error_log(', 'http_response_code(503)',
+            'Try again'], $src);
     }
 
     public function testEndedSessionReturnsToLauncher(): void
     {
         $src = $this->repoFile('etc/skel/www/console.php');
-        $this->assertStringContainsString('disableReconnect=true', $src);
-        $this->assertStringContainsString('querySelectorAll(".xterm > div")', $src);
-        $this->assertStringContainsString('Press ⏎ to Reconnect', $src);
-        $this->assertStringContainsString('window.location.reload()', $src);
+        $this->assertStringContainsAllStrings(['disableReconnect=true', 'querySelectorAll(".xterm > div")',
+            'Press ⏎ to Reconnect', 'window.location.reload()'], $src);
     }
 
     public function testProxyBlockUsesLoopbackSocketUpgrade(): void
     {
         $src = $this->repoFile('etc/seedbox/config/template.lighttpd');
-        $this->assertStringContainsString('^/user-##username/console/', $src);
-        $this->assertStringContainsString('console.sock', $src);
-        $this->assertStringContainsString('"upgrade" => "enable"', $src);
+        $this->assertStringContainsAllStrings(['^/user-##username/console/', 'console.sock', '"upgrade" => "enable"'], $src);
     }
 
     public function testConsoleButtonIsAdditive(): void
@@ -309,7 +298,6 @@ class BrowserConsoleArtifactsTest extends TestCase
         }
         $this->assertTrue($lock < $probe && $probe < $cleanup && $cleanup < $unlink
             && $unlink < $spawn && $spawn < $unlock);
-        $this->assertStringContainsString("console.lock', 'ce'", $src);
-        $this->assertStringContainsString("'exec '.\$cmd", $src);
+        $this->assertStringContainsAllStrings(["console.lock', 'ce'", "'exec '.\$cmd"], $src);
     }
 }

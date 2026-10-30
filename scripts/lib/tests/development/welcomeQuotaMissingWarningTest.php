@@ -290,8 +290,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $this->assertSame('ok', $home['quotaState']);
         $this->assertStringContainsAllStrings(array('<div class="h-metric-l">Storage</div>', '10 B<span>of 50 B</span>', '20.0% used'), $home['quota']);
-        $this->pmssAssertStringNotContainsString('burst limit', $home['quota']);
-        $this->pmssAssertStringNotContainsString('No bonus is applied', $home['quota']);
+        $this->assertStringContainsAndOmitsStrings([], ['burst limit', 'No bonus is applied'], $home['quota']);
         $this->assertSame('', $home['alerts']);
     }
 
@@ -354,10 +353,8 @@ final class welcomeQuotaMissingWarningTest extends TestCase
                     'Datacenter internal and inbound bandwidth is unrestricted.', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42'),
                 $home['alerts']
             );
-            $this->pmssAssertStringNotContainsString('Approaching monthly traffic cap', $home['alerts']);
-            $this->pmssAssertStringNotContainsString('Current effective: full plan port speed', $home['alerts']);
-            $this->pmssAssertStringNotContainsString('Throttled to', $home['alerts']);
-            $this->pmssAssertStringNotContainsString('h-alert-bad', $home['alerts']);
+            $this->assertStringContainsAndOmitsStrings([], ['Approaching monthly traffic cap',
+                'Current effective: full plan port speed', 'Throttled to', 'h-alert-bad'], $home['alerts']);
             $this->assertStringContainsAllStrings(array('class="t-bad"', 'full port speed', 'Add traffic', 'type=configoptions&amp;id=42'), $home['traffic']);
         }
     }
@@ -395,8 +392,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             array('Traffic speed is reduced', 'Throttle cooldown active', 'current ceiling is 25 Mbps', 'remaining under-cap cooldown: about 2 days', 'Add extra traffic to your plan'),
             $home['alerts']
         );
-        $this->pmssAssertStringNotContainsString('Over your monthly traffic limit', $home['alerts']);
-        $this->pmssAssertStringNotContainsString('can be limited to', $home['alerts']);
+        $this->assertStringContainsAndOmitsStrings([], ['Over your monthly traffic limit', 'can be limited to'], $home['alerts']);
     }
 
     public function testWelcomeHomeAlertsReportMemoryThrottleAndOverLimit(): void

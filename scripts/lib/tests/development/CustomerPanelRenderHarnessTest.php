@@ -9,14 +9,12 @@ class CustomerPanelRenderHarnessTest extends TestCase
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
             $new = $render('welcome.php', array('minBytes' => 10000))['stdout'];
-            $this->assertStringContainsString('href="configure.php#apps"', $new);
-            $this->assertStringNotContainsString('id="h-legacy-title"', $new);
-            $this->assertStringNotContainsString('<h6>Usage alert email</h6>', $new);
+            $this->assertStringContainsAndOmitsStrings(['href="configure.php#apps"'],
+                ['id="h-legacy-title"', '<h6>Usage alert email</h6>'], $new);
             $this->assertTrue(unlink($home.'/www/configureSettings.php'));
             $old = $render('welcome.php', array('minBytes' => 10000))['stdout'];
-            $this->assertStringContainsString('<h2 id="h-legacy-title" class="h-label">Apps and settings</h2>', $old);
-            $this->assertStringContainsString('<h6>Usage alert email</h6>', $old);
-            $this->assertStringContainsString('<h6>App passwords</h6>', $old);
+            $this->assertStringContainsAllStrings(['<h2 id="h-legacy-title" class="h-label">Apps and settings</h2>',
+                '<h6>Usage alert email</h6>', '<h6>App passwords</h6>'], $old);
         });
     }
 
@@ -25,9 +23,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('configure.php', [], [
             'minBytes' => 4000,
         ]);
-        $this->assertStringContainsString('Find more apps', $html);
-        $this->assertStringContainsString('Media Stack is not installed', $html);
-        $this->assertStringContainsString("$('details.catalog').prop('open', query !== '')", $html);
+        $this->assertStringContainsAllStrings(['Find more apps', 'Media Stack is not installed',
+            "$('details.catalog').prop('open', query !== '')"], $html);
     }
 
     public function testAppsStatusEndpointSurvivesConfigureDelivery(): void
@@ -78,9 +75,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $this->assertTrue(chmod($key, 0600));
             $expectations = \pmssCustomerPanelRenderExpectations();
             $result = $render('welcome.php', $expectations['welcome.php']);
-            $this->assertStringContainsString('id="h-credits"', $result['stdout']);
-            $this->assertStringContainsString('class="h-metrics h-m5"', $result['stdout']);
-            $this->assertStringNotContainsString('vsk-', $result['stdout']);
+            $this->assertStringContainsAndOmitsStrings(['id="h-credits"', 'class="h-metrics h-m5"'],
+                ['vsk-'], $result['stdout']);
 
             $this->assertTrue(chmod($key, 0644));
             $loose = $render('welcome.php', $expectations['welcome.php']);
@@ -126,8 +122,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $page = $render('welcome.php', $expectations['welcome.php'])['stdout'];
             $this->assertStringContainsString('function pmssCreditsCardDrop()', $page);
             $this->assertStringContainsString('setTimeout(pmssCreditsCardDrop, 20000)', $page, 'A request that never answers must not leave the card waiting');
-            $this->assertStringContainsString("if (!response.ok) throw new Error('credits ' + response.status);", $page);
-            $this->assertStringContainsString('.catch(function () { clearTimeout(watchdog); pmssCreditsCardDrop(); })', $page);
+            $this->assertStringContainsAllStrings(["if (!response.ok) throw new Error('credits ' + response.status);",
+                '.catch(function () { clearTimeout(watchdog); pmssCreditsCardDrop(); })'], $page);
             // The card's script is its own element: an error in the page script above it cannot stop it from running.
             $creditsScript = null;
             foreach (explode('<script', $page) as $script) {
@@ -159,15 +155,13 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $keyless = $render('welcome.php', $expectations['welcome.php'])['stdout'];
             $this->assertStringContainsAllStrings($form, $keyless);
             $this->assertSame(4, substr_count($keyless, 'name="topic"'));
-            $this->assertStringContainsString('Opens in the client area.', $keyless);
-            $this->assertStringNotContainsString('vsk-', $keyless);
+            $this->assertStringContainsAndOmitsStrings(['Opens in the client area.'], ['vsk-'], $keyless);
 
             $key = $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1\nkey=vsk-".str_repeat('a', 24)."\n");
             $this->assertTrue(chmod($key, 0600));
             $keyed = $render('welcome.php', $expectations['welcome.php'])['stdout'];
             $this->assertStringContainsAllStrings($form, $keyed);
-            $this->assertStringNotContainsString('Opens in the client area.', $keyed);
-            $this->assertStringNotContainsString('vsk-', $keyed);
+            $this->assertStringContainsAndOmitsStrings([], ['Opens in the client area.', 'vsk-'], $keyed);
 
             // The billing service page link appears only when the account knows its service id (the harness seeds 12345).
             $this->assertStringContainsString('clientarea.php?action=productdetails&amp;id=12345" target="_blank" rel="noopener">Your service in the client area</a>', $keyed);
@@ -247,8 +241,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $offered = $render('welcome.php', $expectations['welcome.php'])['stdout'];
             $this->assertStringContainsString('id="pmss-pikkumies-bar"', $offered);
             $this->assertStringContainsAllStrings($pikkumiesFirst, $offered);
-            $this->assertStringNotContainsString('data-pikkumies="0"', $offered);
-            $this->assertStringNotContainsString('vsk-', $offered);
+            $this->assertStringContainsAndOmitsStrings([], ['data-pikkumies="0"', 'vsk-'], $offered);
 
             $this->assertTrue(unlink($key));
             $keyless = $render('welcome.php', $expectations['welcome.php'])['stdout'];
@@ -267,8 +260,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
                 ['minBytes' => 1024, 'markers' => ['Traffic · 30 days']]
             );
 
-            $this->assertStringContainsString('<div class="h-metric-v">15 GiB<span>out · unlimited</span></div>', $result['stdout']);
-            $this->assertStringNotContainsString('Over your monthly traffic limit', $result['stdout']);
+            $this->assertStringContainsAndOmitsStrings(['<div class="h-metric-v">15 GiB<span>out · unlimited</span></div>'],
+                ['Over your monthly traffic limit'], $result['stdout']);
         });
     }
 
@@ -286,11 +279,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
                 );
             });
 
-            $this->assertStringContainsString('full port speed', $result['stdout']);
-            $this->assertStringNotContainsString('<b>speed reduced</b>', $result['stdout']);
-            $this->assertStringNotContainsString('Traffic speed is reduced', $result['stdout']);
-            $this->assertStringNotContainsString('Current effective: 25 Mbps (reduced)', $result['stdout']);
-            $this->assertStringNotContainsString('Throttle cooldown active', $result['stdout']);
+            $this->assertStringContainsAndOmitsStrings(['full port speed'], ['<b>speed reduced</b>',
+                'Traffic speed is reduced', 'Current effective: 25 Mbps (reduced)', 'Throttle cooldown active'], $result['stdout']);
         });
     }
 
@@ -309,10 +299,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
                 );
             });
 
-            $this->assertStringContainsString('Traffic speed is reduced', $result['stdout']);
-            $this->assertStringContainsString('<b>speed reduced</b>', $result['stdout']);
-            $this->assertStringContainsString('Current effective: 25 Mbps (reduced)', $result['stdout']);
-            $this->assertStringContainsString('Throttle cooldown active', $result['stdout']);
+            $this->assertStringContainsAllStrings(['Traffic speed is reduced', '<b>speed reduced</b>',
+                'Current effective: 25 Mbps (reduced)', 'Throttle cooldown active'], $result['stdout']);
         });
     }
 
@@ -334,12 +322,10 @@ class CustomerPanelRenderHarnessTest extends TestCase
                 );
             });
 
-            $this->assertStringContainsString('Over your monthly traffic limit', $result['stdout']);
-            $this->assertStringContainsString('bandwidth is limited to 100 Mbps.', $result['stdout']);
-            $this->assertStringContainsString('Current effective: 100 Mbps (reduced)', $result['stdout']);
-            $this->assertStringContainsString('Throttled to 100 Mbps', $result['stdout']);
-            $this->assertStringNotContainsString('Current effective: full plan port speed', $result['stdout']);
-            $this->assertStringNotContainsString('Approaching monthly traffic cap', $result['stdout']);
+            $this->assertStringContainsAndOmitsStrings(['Over your monthly traffic limit',
+                'bandwidth is limited to 100 Mbps.', 'Current effective: 100 Mbps (reduced)',
+                'Throttled to 100 Mbps'], ['Current effective: full plan port speed',
+                'Approaching monthly traffic cap'], $result['stdout']);
         });
     }
 
@@ -357,8 +343,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
         ]);
 
         $this->assertSame(1, $run['result']['rc']);
-        $this->assertStringContainsString('[customer-panel-render-harness] FAIL', $run['stderr']);
-        $this->assertStringContainsString('Call to undefined function', $run['stderr']);
+        $this->assertStringContainsAllStrings(['[customer-panel-render-harness] FAIL', 'Call to undefined function'], $run['stderr']);
         $payload = $this->pmssDecodeJsonArray($run['result']['output']);
         $this->assertSame(false, $payload['ok']);
         $this->assertFalse(is_dir($payload['environmentRoot']), 'Harness must clean failed synthetic customer homes');
