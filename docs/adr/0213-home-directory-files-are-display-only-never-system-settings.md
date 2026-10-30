@@ -5,9 +5,14 @@ Category: security
 
 ## Status
 
-Accepted. Supersedes the "enforced" class that ADR 0046 gives home markers
-such as `.bonus` and `.bonusTraffic`, and the `~/.bonus` reader in ADR 0212's
-decision.
+Accepted. Supersedes, for files inside a home directory, ADR 0046's
+"Enforced" class and the sentence in ADR 0121 that lets root place an
+Authoritative or Enforced file in an account directory as an input; a root
+file written into a home is a display copy. Supersedes the `~/.bonus` reader in
+ADR 0212's decision; ADR 0177's bonus-adjusted BFQ weights take the bonus from
+the store instead of the home file. Extends ADR 0152, which already made billing
+identity come only from the provisioning store with home markers kept for
+display.
 
 ## Context
 
@@ -16,99 +21,96 @@ directory, `~/.bonusQuota`, and only in the customer panel (`welcome.php`).
 Limits came from values the provisioning backend sent or root wrote outside the
 home: the disk bonus was already inside the quota the backend set with
 `setquota`, and the traffic limit was the root-only file
-`/etc/seedbox/runtime/trafficLimits/<user>` (mode 0600). The backend still
-works this way for disk: it sets the final quota, then writes `.bonusQuota` as
-a display figure.
+`/etc/seedbox/runtime/trafficLimits/<user>` (mode 0600). The 2023 traffic cron
+did read the account's usage counter from the home (`~/.trafficData`) until it
+moved to a root runtime copy. The backend still sets the final disk quota and
+writes `.bonusQuota` as a display figure.
 
-In 2026 root jobs started reading home files as inputs to system settings:
+In 2026 root jobs started reading home bonus markers as inputs: `~/.bonusTraffic`
+for the monthly traffic allowance (34b341eb, 2026-02-21), `~/.bonus` for disk
+I/O weight (62b5dfa6, 2026-05-29) and for CPU weight (3a6fde94, 2026-10-30).
+Other root jobs read other home files as well.
 
-| Since | Root job | Home file | Decides |
-| --- | --- | --- | --- |
-| 2026-02-21 (34b341eb) | `cron/trafficLimits.php` | `~/.bonusTraffic` | monthly traffic allowance |
-| 2026-02-24 (ad4acbaa) | rTorrent watchdog, `lib/user/deluge.php`, `lib/user/qbittorrentThrottle.php`, `util/userConfig.php` | `~/.torrentThrottle` | upload cap written into the client config |
-| 2026-05-29 (62b5dfa6) | `cron/cgroupBfqWeightApply.php` | `~/.bonus` | disk I/O weight |
-| 2026-08-26 (5b83f6f9) | `cron/usageAlertsNotify.php` | `~/.bonusTraffic` | traffic alert threshold |
-| 2026-10-30 (3a6fde94) | `cron/cgroupBonusCpuWeightApply.php` | `~/.bonus` | CPU weight |
-
-`lib/user/resourcesListModel.php` also reports `~/.trafficLimit` to the backend
-through `userResourcesList.php --jsonl`.
-
-Everything under `/home/<account>` is account-controlled (ADR 0121). The
-account can create or replace these files, and `util/userPermissions.php`
-returns home files to the account on boot and on update, so a root-owned copy
-does not stay root-owned. A value clamp (#945) only bounds how much an account
-can grant itself; it does not remove the trust. An ownership check rejects a
-replaced file but still reads a path the account controls, and gives no value
-once the ownership sweep has run.
+Everything under `/home/<account>` is account-controlled (ADR 0121). A value
+clamp (#945) only bounds how much an account can grant itself. An ownership
+check on such a file is not a substitute: the path is still account-controlled
+(ADR 0121).
 
 A root-owned per-user store already exists: `/etc/seedbox/config/users/<user>.json`
 (`UserConfigStore`, written `root:root 0640`). `cron/cgroupIopsLimitApply.php`
 already reads per-user limits from it, and `util/writeHomeMarker.php` already
-records billing identity there before it writes the home copy.
+records billing identity there before it writes the home copy (ADR 0152).
 
 ## Decision
 
 1. **A file under `/home/<account>` is never a system setting.** A setting or
    marker file in a home directory exists only for display in the account's
    panel and the account's own tools. No system process (root cron, root
-   utility, provisioning script, service watchdog, report sent to the backend)
-   reads such a file to decide anything the system grants, limits or reports:
-   quota, traffic allowance, throttle, CPU or I/O weight, priority, port bound
-   by a shared service, billing state, or any future limit.
+   utility, provisioning script, service watchdog, config generator, report
+   sent to the backend) reads such a file to decide or report
+   anything the system grants, limits, routes or reports: quota, traffic
+   allowance or usage, throttle, CPU or I/O weight, priority, shared-service
+   configuration, alert settings, billing state, or any future limit.
 2. **System settings live only in root stores outside `/home`:** the per-user
    store `/etc/seedbox/config/users/<user>.json` and the existing
    `/etc/seedbox/runtime/` files. A missing or invalid value means the plan
    default, never a value taken from a home file.
-3. **The writer is the provisioning backend, through the root CLIs.** A CLI
-   that sets a per-user value (`writeHomeMarker.php`, `userBonusTraffic.php`,
-   `userTrafficLimit.php`, `userConfig.php`) writes the root store first. Only
-   then may it write a home copy for display. If the store write fails, the CLI
-   fails and writes no display copy.
-4. **The account's own configuration stays the account's.** Files the account
-   edits for its own applications (client configs, the `*.custom` overrides,
-   lighttpd drop-ins: ADR 0046 "customer-editable") are read by those
-   applications running as the account. They are not system settings and root
-   does not act on their content.
+3. **The writer is the provisioning backend, through the root CLIs.** Every
+   CLI that sets a per-user value (`writeHomeMarker.php` for every value
+   marker it accepts, `userBonusTraffic.php`, `userTrafficLimit.php`,
+   `userConfig.php` including its store-only mode) writes the root store first.
+   Only then may it write a home copy for display. If the store write fails,
+   the CLI exits non-zero with a logged line and writes no display copy. Store
+   read-modify-write runs under a per-user lock.
+4. **The account's own applications and switches.** Files the account edits
+   for its own applications (client configs, the `*.custom` overrides, lighttpd
+   drop-ins: ADR 0046 "customer-editable") are read by those applications
+   running as the account. A root job may honour an account's own on/off or
+   preference flag only when the worst a forged value can do is switch off, or
+   choose among, the account's own services within its plan. A port the
+   account prefers is a request the root port manager validates and assigns.
+   No home file may raise a limit, priority, cap or allowance, or change a
+   shared service.
 5. **Bonus values:** `bonusPercent` (integer, 0 to the 300% policy maximum) for
    disk I/O and CPU weight, and `bonusTrafficGiB` (integer GiB) added to the
-   root traffic limit, both in the per-user store. Disk is unchanged: the
-   backend's `setquota` value is the limit and `.bonusQuota` stays display only.
+   root traffic limit, both in the per-user store, next to the other per-user
+   limits root crons already read there. Disk is unchanged: the backend's
+   `setquota` value is the limit and `.bonusQuota` stays display only.
 6. **Enforcement:** `homeMarkerRegistry.php` classes every marker "display". A
-   contract test fails when root-run code under `scripts/cron`, `scripts/util`
-   or `scripts/lib` reads a file under a home path for anything other than the
-   account's panel or customer-facing stats.
-7. **Rollout:** ship PMSS first, then have the backend re-push each account's
-   current values from its own records. A value is never imported from a home
-   file. Until the re-push reaches an account, that account has its plan
-   defaults (no priority bonus); its disk bonus is unaffected.
+   contract test fails when root-run code parses a value from a file under a
+   home path and uses it as a setting, except in an explicit allowlist of files
+   that may do so under Decision 4 (account switches) or that operate on the
+   home itself (permissions, transfer, termination).
+7. **Rollout:** the reader change ships through the PMSS security-fix release
+   process, not the rolling update. The backend re-asserts each account's
+   stored values on every reward cycle, so a node picks them up within one
+   cycle after it updates. A value is never imported from a home file: upload
+   caps come back from the backend's own userConfig values, and traffic
+   bonuses granted with the operator CLI are re-applied only from the CLI's own
+   root log entries. Until a node has the store values, its accounts have their
+   plan defaults (no priority bonus); disk bonus is unaffected.
 
 ## Consequences
 
-- An account can no longer raise its own disk or CPU priority, traffic
-  allowance or upload cap by writing a file.
-- The #945 value clamps and the root-owned-marker reader are removed with the
+- No file in a home directory can change a system setting.
+- The #945 value clamps and the root-owned-marker readers are removed with the
   readers.
-- The ownership sweep in `userPermissions.php` no longer matters for system
-  settings, because none are read from a home file.
-- Existing readers move to the root store in one sweep: the five listed in
-  Context plus the `~/.trafficLimit` report. `.torrentThrottle` gets a store
-  key; its writer is root.
-- Values that exist today only in home files (operator-CLI traffic bonuses,
-  upload caps) are listed with a read-only fleet check and re-applied through
-  the CLIs, so they land in the store; nobody's grant is taken from the file.
-- Priority bonus is absent for an account between the PMSS update and the
-  backend re-push.
+- Every root reader of a home file is moved or allowlisted in one change; the
+  census lives with the implementation.
+- The backend gains one change: re-asserting stored values each reward cycle.
+- Priority bonus is absent for an account between its node's update and the
+  next reward cycle.
 
 ## Alternatives considered
 
 - **Keep reading the home file, clamp the value** (#945): the account still
   sets its own bonus up to the clamp. Rejected.
 - **Keep reading the home file, trust only a root-owned file**: still a read of
-  an account-controlled path (ADR 0121), and the ownership sweep turns every
-  marker back to the account. Rejected.
-- **Send final weights on the `userConfig.php` line from the backend**: matches
-  the store design, but `userConfig.php` restarts rTorrent (ADR 0212) and
-  bonuses change often. Possible later if a no-restart path exists; the store
-  keys above stay the same.
+  an account-controlled path (ADR 0121). Rejected.
+- **Send the values on the backend's `userConfig.php` line**: `userConfig.php`
+  has a store-only mode that does not restart rTorrent, so this works too.
+  Recording the store in the CLIs the backend already calls needs no change to
+  the ongoing backend path, so it is the simpler route; the store keys stay the
+  same either way.
 - **Drop the priority bonus and keep disk only, as in 2023**: a product
   decision, not a security one; out of scope here.
