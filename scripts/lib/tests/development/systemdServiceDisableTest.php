@@ -35,7 +35,7 @@ class SystemdServiceDisableTest extends TestCase
 
         $commands = $this->pmssProfileCommands();
         $joined = implode("\n", $commands);
-        foreach ([
+        $this->assertStringContainsAllStrings([
             "systemctl stop 'deluged'",
             "systemctl disable 'deluged'",
             "systemctl mask 'deluged'",
@@ -62,9 +62,7 @@ class SystemdServiceDisableTest extends TestCase
             "find '/var/spool/exim4/input' -xdev -type f -delete",
             "find '/var/spool/exim4/msglog' -xdev -type f -delete",
             "find '/var/spool/exim4/db' -xdev -type f -delete",
-        ] as $fragment) {
-            $this->assertStringContainsString($fragment, $joined);
-        }
+        ], $joined);
 
         $purgeIndex = array_search(
             \aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light'),

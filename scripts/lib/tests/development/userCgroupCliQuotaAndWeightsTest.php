@@ -17,9 +17,7 @@ class UserCgroupCliQuotaAndWeightsTest extends TestCase
             [['root', '--apply', '--dry-run', '--device=/home', '--io-profile=bulk'], ['PMSS_HOME_DEVICE' => '/dev/null'], ['IOWeight=500', 'CPUWeight=300', 'TasksMax=8192']],
         ] as [$argv, $env, $expectedFragments]) {
             $out = $this->pmssRunUserConfigCgroupCli($argv, $env);
-            foreach ($expectedFragments as $fragment) {
-                $this->assertStringContainsString($fragment, $out);
-            }
+            $this->assertStringContainsAllStrings($expectedFragments, $out);
         }
     }
 }

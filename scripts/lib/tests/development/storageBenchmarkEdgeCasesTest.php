@@ -25,12 +25,9 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
             $log = $this->pmssWriteStorageBenchmarkRunLog($case['run_id'], $case['run_ts'], $case['entries'], $case['preflight'] ?? ['timestamp' => $case['run_ts']], 'pmss-bench-edge-');
             $out = $this->pmssRunStorageBenchmarkShowLast($log);
 
-            foreach ($case['contains'] as $needle) {
-                $this->assertStringContainsString($needle, $out, $label);
-            }
-            foreach ($case['omits'] ?? [] as $needle) {
-                $this->assertStringNotContainsString($needle, $out, $label);
-            }
+            $this->assertStringContainsAndOmitsStrings(
+                array_fill_keys($case['contains'], $label),
+                array_fill_keys($case['omits'] ?? [], $label), $out);
         }
     }
 
@@ -95,8 +92,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $ts = date('c');
         $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps' => 10]), $this->pmssStorageBenchmarkPreflightEntry($rid, $ts)]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
-        $this->assertStringContainsString('File-backed tests', $out);
-        $this->assertStringContainsString('randread-small', $out);
+        $this->assertStringContainsAllStrings(['File-backed tests', 'randread-small'], $out);
     }
 
     public function testEqualTimestampsFavorFirstSeen(): void

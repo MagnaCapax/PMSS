@@ -28,11 +28,11 @@ class ArrInstallerNoExecPolicyTest extends TestCase
 
     public function testSharedOwnershipStepLoadsArrWithoutAutoloadingTreeHelper(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
-        $this->assertStringContainsString("glob('/scripts/lib/update/apps/*.php')", $source);
-        $this->assertStringContainsString("'servarr.php'", $source);
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/update/apps/arr.php';", $source);
-        $this->assertStringContainsString("pmssRunProfiledCallable('Converging shared ARR install ownership'", $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
+            "glob('/scripts/lib/update/apps/*.php')", "'servarr.php'",
+            "require_once __DIR__.'/../lib/update/apps/arr.php';",
+            "pmssRunProfiledCallable('Converging shared ARR install ownership'",
+        ]);
         $this->assertTrue(is_file($this->pmssRepoPath('scripts/lib/update/rootOwnedTree.php')));
         $this->assertFalse(is_file($this->pmssRepoPath('scripts/lib/update/apps/rootOwnedTree.php')));
         $this->assertSame('/opt/Radarr', \pmssArrAppConfig('Radarr', \PMSS_ARR_APP_BRANCHES['Radarr'])['install_path']);

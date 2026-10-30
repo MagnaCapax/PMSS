@@ -190,6 +190,9 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Generated text and repository source contracts share `TestCase::pmssAssertStringContract()`
   for required/forbidden fragments, regexes and ordered fragments. Required and
   forbidden maps retain per-fragment diagnostic messages.
+- Generated CLI, service-command and torrent-client fixtures use the same batch
+  assertions as source contracts; case labels stay in fragment-to-message maps.
+  Keep loops that perform fixture operations or compute distinct diagnostics explicit.
 - Structured result checks share `TestCase::pmssAssertArraySubsetSame()` for
   required fields and strict values. Keep expected field order and fixture cases
   at callers; custom diagnostics, transformed values and exact-shape assertions

@@ -62,11 +62,9 @@ final class DockerTorrentClientProxyTest extends TestCase
     {
         $transmission = \pmssLighttpdManagedProxyFragment('transmission', 'customer', 9091);
         $this->assertStringNotContainsString('auth.require = ()', $transmission);
-        $this->assertStringContainsString('"Authorization" => ""', $transmission);
-        $this->assertStringContainsString('"host" => "127.0.0.1"', $transmission);
-        $this->assertStringContainsString('^/user-customer/transmission/', $transmission);
-        $this->assertStringContainsString('"/user-customer/transmission/"  => "/transmission/"', $transmission);
-        $this->assertStringContainsString('"port" => 9091', $transmission);
+        $this->assertStringContainsAllStrings(['"Authorization" => ""', '"host" => "127.0.0.1"',
+            '^/user-customer/transmission/', '"/user-customer/transmission/"  => "/transmission/"',
+            '"port" => 9091'], $transmission);
     }
 
     public function testQbittorrentInspectIgnoresPeerPublishesButRejectsUnsafeWebui(): void

@@ -37,12 +37,10 @@ class TorrentPortFrontendTest extends TestCase
 
             $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/'.$file));
             $this->assertEquals($source, $content);
-            foreach (array_merge([
+            $this->assertStringContainsAndOmitsStrings([], array_merge([
                 "if (is_readable('/scripts/lib/user/torrentPort.php')) {",
                 "require_once '/scripts/lib/user/torrentPort.php';",
-            ], $forbidden) as $needle) {
-                $this->assertStringNotContainsString($needle, $content);
-            }
+            ], $forbidden), $content);
         }
     }
 

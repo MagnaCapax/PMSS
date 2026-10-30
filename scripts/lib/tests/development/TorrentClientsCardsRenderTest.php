@@ -45,13 +45,12 @@ final class TorrentClientsCardsRenderTest extends TestCase
             $cards = $page();
             $this->assertSame(array('torrent-client-versions'), array_keys($cards));
             foreach ($cards as $card) {
-                $this->assertStringContainsAllStrings(array('qBittorrent: system', 'Deluge: system', 'rTorrent: system',
-                    'Other versions are not installed on this server. This depends on the server, not on your account.'), $card);
-                foreach (array('<select', '<input type="password"', 'Switch version') as $control)
-                    $this->assertStringNotContainsString($control, $card);
+                $this->assertStringContainsAndOmitsStrings(array('qBittorrent: system', 'Deluge: system', 'rTorrent: system',
+                    'Other versions are not installed on this server. This depends on the server, not on your account.'),
+                    array('<select', '<input type="password"', 'Switch version'), $card);
             }
-            $this->assertStringContainsString('<p role="status">Kept &lt;notice&gt; &amp; status</p>', $cards['torrent-client-versions']);
-            $this->assertStringContainsString('Transmission is not installed on this server.', $cards['torrent-client-versions']);
+            $this->assertStringContainsAllStrings(['<p role="status">Kept &lt;notice&gt; &amp; status</p>',
+                'Transmission is not installed on this server.'], $cards['torrent-client-versions']);
             $this->assertSame(1, substr_count(implode('', $cards), 'Transmission is not installed'));
             $this->assertSame(1, substr_count(implode('', $cards), 'Other versions are not installed'));
         }, array('qbittorrent' => 2, 'deluge' => 1, 'rtorrent' => 1, 'transmission' => 2));
@@ -103,8 +102,8 @@ final class TorrentClientsCardsRenderTest extends TestCase
         $this->withProjection(array(), function ($page): void {
             $cards = $page();
             $this->assertSame(array('torrent-client-versions'), array_keys($cards));
-            $this->assertStringContainsString('qBittorrent, Deluge, Transmission and rTorrent are not installed on this server.', $cards['torrent-client-versions']);
-            $this->assertStringNotContainsString('Version choice is not available', $cards['torrent-client-versions']);
+            $this->assertStringContainsAndOmitsStrings(['qBittorrent, Deluge, Transmission and rTorrent are not installed on this server.'],
+                ['Version choice is not available'], $cards['torrent-client-versions']);
         });
     }
 }
