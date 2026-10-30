@@ -138,6 +138,41 @@ function pmssBfqFormulaWeight(
 }
 
 /**
+ * Free Bonus Disk percent from the account's ~/.bonus marker, or 0.
+ *
+ * The one reader of the marker for every enforcement cron (disk priority, CPU priority).
+ * #945 fairness clamp: ~/.bonus sits in the tenant's own home, so a tenant can pad the percent
+ * (observed live: a marker holding 999999). Bound the READ to the sanctioned policy maximum: a
+ * legit grant (<= PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT) is unchanged, an inflated marker is
+ * clamped down. Value clamp against a constant: no root-owned source file, no ownership
+ * migration, no ordering dependency (operator ruling 2026-09-26: value clamp over ownership trust).
+ */
+function pmssUserBonusPercentRead(string $user, string $homeRoot = '/home'): int
+{
+    require_once dirname(__DIR__).'/user/identity.php';
+    if (!pmssValidateUsername($user)) {
+        return 0;
+    }
+
+    $path = rtrim($homeRoot, '/').'/'.$user.'/.bonus';
+    $stat = @lstat($path);
+    if (!is_array($stat)) {
+        return 0;
+    }
+
+    // The bonus marker is a tiny scalar. Refuse links, devices, and bulky files.
+    if ((($stat['mode'] ?? 0) & 0170000) !== 0100000 || (int) ($stat['size'] ?? 0) > 64) {
+        return 0;
+    }
+
+    require_once dirname(__DIR__).'/runtime/filesystem.php';
+    $raw = pmssReadRegularFileContentsVerified($path, null, 64);
+    return is_string($raw)
+        ? min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, max(0, (int) trim($raw)))
+        : 0;
+}
+
+/**
  * Apply a non-negative BFQ bonus percent and clamp to the kernel range.
  */
 function pmssBfqApplyBonusWeight(int $baseWeight, int $bonusPct, int $kernelMax = PMSS_BFQ_KERNEL_MAX): int

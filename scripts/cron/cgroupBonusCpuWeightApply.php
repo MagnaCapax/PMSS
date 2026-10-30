@@ -2,13 +2,14 @@
 <?php
 /**
  * Raise each account's CPU priority (systemd CPUWeight on user-<uid>.slice) by its Free Bonus
- * Disk percent, read from the root-owned ~/.bonus marker the provisioning backend writes.
+ * Disk percent, read from the ~/.bonus marker the provisioning backend writes.
  *
  * Sibling of cgroupBfqWeightApply.php, which does the same for disk priority. The target is
  * max(base, min(10000, round(base * (1 + bonus/100)))), where base is the CPUWeight userConfig
  * applies (explicit CPUWeight in /etc/seedbox/config/users/<user>.json, else the RAM-derived
- * default). A missing or untrusted marker means bonus 0, which means the base weight: no account
- * ever drops below what its plan gives it.
+ * default). The marker is read exactly as the disk-priority cron reads it (#945 value clamp at the
+ * 300% policy maximum); a missing or unreadable marker means bonus 0, which means the base weight:
+ * no account ever drops below what its plan gives it.
  *
  * Only `systemctl set-property` is used, and only when the slice is active and its CPUWeight
  * differs. Nothing is restarted. userConfig runs set the base again; the next run here restores
@@ -41,7 +42,7 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
     return pmssBonusCpuBaseWeight($json);
 }) as $entry) {
     list($user, $uid, $base) = $entry;
-    $want  = pmssCpuApplyBonusWeight($base, pmssUserBonusPercentReadTrusted($user));
+    $want  = pmssCpuApplyBonusWeight($base, pmssUserBonusPercentRead($user));
     $slice = 'user-'.$uid.'.slice';
 
     $out = [];

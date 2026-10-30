@@ -188,14 +188,8 @@ class CgroupBfqWeightApplyTest extends TestCase
                 'required' => [
                     "require_once __DIR__.'/../lib/cgroup/directApply.php';",
                     'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
-                    'pmssBfqUserBonusPercentRead($user)',
+                    'pmssUserBonusPercentRead($user)',
                     'pmssBfqApplyBonusWeight($wRaw, $bonusPct',
-                    'function pmssBfqUserBonusPercentRead(string $user): int',
-                    '$stat = @lstat($path);',
-                    "((\$stat['mode'] ?? 0) & 0170000) !== 0100000",
-                    "(int) (\$stat['size'] ?? 0) > 64",
-                    'pmssReadRegularFileContentsVerified($path, null, 64)',
-                    'min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, max(0, (int) trim($raw)))',
                     'pmssCgroupDirectWritableFileTarget($cgPath)',
                     'pmssCgroupDirectIntegerFileWrite($cgPath, $w, 1, PMSS_BFQ_KERNEL_MAX)',
                 ],
@@ -213,7 +207,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                         'needles' => [
                             'foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
                             'list($user, $uid, $wRaw) = $entry;',
-                            'pmssBfqUserBonusPercentRead($user)',
+                            'pmssUserBonusPercentRead($user)',
                         ],
                         'missingPrefix' => 'missing BFQ username boundary guard: ',
                         'orderPrefix' => 'BFQ username guard must run before user paths: ',
@@ -248,5 +242,16 @@ class CgroupBfqWeightApplyTest extends TestCase
                     ],
                 ],
             ]);
+        // The marker reader now lives in policy.php, shared with the CPU-priority cron; same rules.
+        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/policy.php', [
+            'required' => [
+                'function pmssUserBonusPercentRead(string $user, string $homeRoot = \'/home\'): int',
+                '$stat = @lstat($path);',
+                "((\$stat['mode'] ?? 0) & 0170000) !== 0100000",
+                "(int) (\$stat['size'] ?? 0) > 64",
+                'pmssReadRegularFileContentsVerified($path, null, 64)',
+                'min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, max(0, (int) trim($raw)))',
+            ],
+        ]);
     }
 }

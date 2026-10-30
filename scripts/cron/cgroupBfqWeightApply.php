@@ -16,7 +16,8 @@
  * When JSON IOWeight is absent, the RAM fallback uses the shared BFQ
  * headroom curve so a 300% bonus can fit under the kernel cap. The Free
  * Bonus Disk Policy percent from /home/<user>/.bonus multiplies the
- * selected base before the final kernel clamp.
+ * selected base before the final kernel clamp (pmssUserBonusPercentRead() in
+ * lib/cgroup/policy.php, shared with cgroupBonusCpuWeightApply.php).
  *
  * Idempotent: writes only when current kernel value differs from
  * desired. Hard fail on missing prerequisites (root, cgroup-v1, BFQ
@@ -62,37 +63,6 @@ if (!$bfqActive) {
     exit(pmssCliReturnWithStderr("FATAL: BFQ is not the active elevator on the device backing /home; per-user weights would be inert\n", 2));
 }
 
-function pmssBfqUserBonusPercentRead(string $user): int
-{
-    if (!pmssValidateUsername($user)) {
-        return 0;
-    }
-
-    $path = '/home/'.$user.'/.bonus';
-    $stat = @lstat($path);
-    if (!is_array($stat)) {
-        return 0;
-    }
-
-    // The bonus marker is a tiny scalar. Refuse links, devices, and bulky files.
-    if ((($stat['mode'] ?? 0) & 0170000) !== 0100000 || (int) ($stat['size'] ?? 0) > 64) {
-        return 0;
-    }
-
-    require_once __DIR__.'/../lib/runtime/filesystem.php';
-    $raw = pmssReadRegularFileContentsVerified($path, null, 64);
-    // #945 fairness clamp: ~/.bonus is tenant-writable, so a tenant can pad the percent
-    // to self-grant maximum I/O weight (observed live: a marker holding 999999). The
-    // applied weight is already kernel-clamped, but an inflated percent still lifts a
-    // small base to the ceiling. Bound the READ to the sanctioned policy max: a legit
-    // grant (<= PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT) is unchanged; an inflated marker is
-    // clamped down. Value-clamp against a constant — no root-owned source file, no
-    // ownership migration, no ordering dependency.
-    return is_string($raw)
-        ? min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, max(0, (int) trim($raw)))
-        : 0;
-}
-
 openlog('pmss-bfq', LOG_PID, LOG_DAEMON);
 
 $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
@@ -121,7 +91,7 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
     list($user, $uid, $wRaw) = $entry;
 
     // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
-    $bonusPct = pmssBfqUserBonusPercentRead($user);
+    $bonusPct = pmssUserBonusPercentRead($user);
     $w        = pmssBfqApplyBonusWeight($wRaw, $bonusPct);
     if ($shadowEnabled) $shadowUsers[$user] = ['source' => $shadowConfigs[$user], 'weight' => $w];
 
