@@ -84,8 +84,9 @@ function pmssUserPermissionsModeApply(string $user, string $home, int $uid, stri
 function pmssUserPermissionsOpenedModeSet(string $user, string $home, string $path, int $mode, int $ownerUid): bool
 {
     $handle = pmssUserFileOpenVerified($path, 'rbn');
-    $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
     try {
+        // Metadata inspection can throw too; the acquired stream already needs cleanup.
+        $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
         if ($opened === null) {
             pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; mode left as-is', basename($path), $ownerUid));
             return false;
@@ -110,8 +111,9 @@ function pmssUserPermissionsOpenedModeSet(string $user, string $home, string $pa
 function pmssUserPermissionsOpenedGroupSet(string $user, string $home, string $path, string $group, int $ownerUid): bool
 {
     $handle = pmssUserFileOpenVerified($path, 'rbn');
-    $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
     try {
+        // Keep every post-open check inside the stream's cleanup lifetime.
+        $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
         if ($opened === null) {
             pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; group left as-is', basename($path), $ownerUid));
             return false;

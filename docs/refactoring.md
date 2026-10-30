@@ -133,6 +133,13 @@ fallback precedence and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Opened-file mode and group repairs include home/owner metadata inspection in
+their existing `finally` lifetime. Inspection exceptions and errors propagate
+unchanged after the acquired stream closes, before any permission mutation.
+`UserPermissionsStreamSafetyTest` isolates each inspection boundary and retains
+success, refusal, mutation-failure and diagnostic ordering. Owner, inode and
+home-containment policies remain unchanged; tests run on testing machines.
+
 CLI wrapper prefix inspection closes its stream in `finally` when the read
 throws, preserving the original exception or error before delegation. Successful,
 empty, short and failed reads retain their existing include/shebang dispatch;
