@@ -34,6 +34,43 @@ class LiveStatsLastLineSafetyTest extends TestCase
         }
     }
 
+    public function testTailReadStaysBoundedWhenTheLogGrows(): void
+    {
+        // Append after size/seek, immediately before the real stream read.
+        $script = <<<'PHP'
+namespace LiveStatsTailGrowthFixture;
+function stream_get_contents($handle, $length = -1) {
+    $GLOBALS['length'] = $length;
+    $GLOBALS['handle'] = $handle;
+    \file_put_contents($GLOBALS['path'], $GLOBALS['append'], FILE_APPEND);
+    return \stream_get_contents($handle, $length);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/liveStats.php', 'LiveStatsTailGrowthFixture');
+        $script .= <<<'PHP'
+[$GLOBALS['path'], $GLOBALS['append']] = json_decode(getenv('PMSS_TEST_LIVE_TAIL_GROWTH'), true);
+$result = pmssLiveStatsLastLine($GLOBALS['path']);
+echo json_encode([$result, $GLOBALS['length'], !is_resource($GLOBALS['handle'])]);
+PHP;
+        $path = $this->pmssMakeTempFile('pmss-live-tail-growth-');
+        foreach ([
+            ['', '', null],
+            ["first\nlast\n", '', 'last'],
+            ["first\npartial", '', 'first'],
+            [str_repeat('x', 1023)."\n", '', str_repeat('x', 1023)],
+            [str_repeat("old\n", 300)."latest\n", '', 'latest'],
+            [str_repeat("old\n", 300)."latest\n", str_repeat("new\n", 1000), 'latest'],
+            ["first\n", "second\n", 'second'],
+            ["first\n", str_repeat('x', 1018)."\nnew\n", 'first'],
+            ["first\n", str_repeat('x', 1017)."\nnew\n", str_repeat('x', 1017)],
+        ] as [$content, $append, $expected]) {
+            file_put_contents($path, $content);
+            $this->assertSame([$expected, 1024, true], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_LIVE_TAIL_GROWTH' => json_encode([$path, $append]),
+            ]));
+        }
+    }
+
     public function testFailuresSkipLaterOperationsAndCloseTheStream(): void
     {
         foreach (['size', 'seek', 'read'] as $operation) {

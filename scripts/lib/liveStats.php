@@ -62,7 +62,8 @@ function pmssLiveStatsLastLine(string $path): ?string
         // Failed positioning must not fall back to reading the entire log.
         $size = @filesize($path);
         if ($size === false || fseek($h, max(0, $size - 1024)) !== 0) return null;
-        $tail = stream_get_contents($h);
+        // Keep the tail bounded even if the log grows after the size check.
+        $tail = stream_get_contents($h, 1024);
         if ($tail === false) return null;
     } finally {
         fclose($h);

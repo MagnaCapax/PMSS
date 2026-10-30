@@ -82,3 +82,7 @@ per-user samples come from the logs that already handle the cgroup mode.
   seek, or read fails, and reject NUL-containing paths before filesystem calls.
   Opened streams close even when those operations throw; the original exception
   propagates. Successful tail selection and partial-line handling are unchanged.
+- The tail stream read is capped at 1024 bytes even when a concurrent append
+  makes the size check stale. Stable-file results and incomplete-line rejection
+  retain their existing behavior. `LiveStatsLastLineSafetyTest` covers growth
+  and exact-budget boundaries; fixtures run only on testing machines.
