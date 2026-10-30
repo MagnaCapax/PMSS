@@ -41,13 +41,15 @@ class ServiceBootstrapCharacterizationTest extends TestCase
         $original = "HostKeyAlgorithms +fixture\n";
         $updated = \pmssSshdLegacyParserTemplateNormalize($original);
         $unchanged = \pmssSshdLegacyParserTemplateNormalize('');
+        // Normalization must warn before attempting either successful or failed publication.
+        $warning = ['log', '[WARN] Legacy-parser fallback is commenting out security-affecting sshd directive: HostKeyAlgorithms +fixture'];
         foreach ([
             [[0], null, true, true, [$initial]],
             [[127], $original, true, false, [$initial, ['log', '[ERR] sshd binary unavailable (rc=127); skipping legacy-parser fallback and sshd restart']]],
             [[1, 0], null, true, true, [$initial, ['read', $path], ['log', '[WARN] Cannot read sshd_config for legacy-parser normalization'], $retry]],
             [[1, 0], $unchanged, true, true, [$initial, ['read', $path], ['log', '[INFO] sshd legacy-parser normalization made no changes'], $retry]],
-            [[1, 0], $original, true, true, [$initial, ['read', $path], ['log', '[WARN] Applying sshd legacy-parser compatibility fallback'], ['config', $path, $original, $updated, 'sshd config legacy parser fallback'], $retry]],
-            [[1, 2], $original, false, false, [$initial, ['read', $path], ['log', '[WARN] Applying sshd legacy-parser compatibility fallback'], ['config', $path, $original, $updated, 'sshd config legacy parser fallback'], ['log', '[ERR] Failed to write sshd legacy-parser fallback configuration'], $retry, ['log', '[ERR] sshd validation failed after legacy-parser fallback; skipping sshd restart']]],
+            [[1, 0], $original, true, true, [$initial, ['read', $path], $warning, ['log', '[WARN] Applying sshd legacy-parser compatibility fallback'], ['config', $path, $original, $updated, 'sshd config legacy parser fallback'], $retry]],
+            [[1, 2], $original, false, false, [$initial, ['read', $path], $warning, ['log', '[WARN] Applying sshd legacy-parser compatibility fallback'], ['config', $path, $original, $updated, 'sshd config legacy parser fallback'], ['log', '[ERR] Failed to write sshd legacy-parser fallback configuration'], $retry, ['log', '[ERR] sshd validation failed after legacy-parser fallback; skipping sshd restart']]],
         ] as [$codes, $config, $write, $expected, $trace]) {
             $state = ['returnCodes' => $codes, 'files' => [$path => $config], 'configWrite' => $write];
             $this->assertSame(['result' => $expected, 'trace' => $trace], $this->trace(
