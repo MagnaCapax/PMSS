@@ -79,6 +79,12 @@ Finite signed samples retain their normalization and thresholds. Namespace-local
 telemetry and log shims verify idle evidence without running disk probes; execute
 these tests only on a testing machine.
 
+`RtorrentScgiTransportSafetyTest` injects socket I/O failures using memory
+streams. It checks closure and original exception/error identity at every I/O
+boundary after connection, plus existing timeout, short-write, partial-read and
+successful-response results. Request bytes, connection arguments and read sizes
+remain covered without opening real sockets. Run it only on a testing machine.
+
 Deluge compatibility-patch tests share fixture execution and symlink-refusal
 checks in `DelugeAppTestCase`. Keep patch-specific source, expected bytes,
 return-value assertions, and log expectations in each named test; the shared

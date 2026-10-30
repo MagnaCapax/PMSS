@@ -23,34 +23,35 @@ function rtorrentScgiSend(string $socketPath, string $request, int $timeout = 5)
     if ($socket === false) {
         return false;
     }
-    if (!stream_set_timeout($socket, $timeout)) {
-        @fclose($socket);
-        return false;
-    }
-
-    $written = @fwrite($socket, $request);
-    if ($written === false || $written < strlen($request)) {
-        @fclose($socket);
-        return false;
-    }
-
-    $response = '';
-    while (!feof($socket)) {
-        $chunk = @fread($socket, 4096);
-        if ($chunk === false) {
-            break;
-        }
-        $response .= $chunk;
-
-        $meta = stream_get_meta_data($socket);
-        if (!empty($meta['timed_out'])) {
-            @fclose($socket);
+    // Own the socket until every return or thrown I/O failure has unwound.
+    try {
+        if (!stream_set_timeout($socket, $timeout)) {
             return false;
         }
-    }
 
-    @fclose($socket);
-    return $response;
+        $written = @fwrite($socket, $request);
+        if ($written === false || $written < strlen($request)) {
+            return false;
+        }
+
+        $response = '';
+        while (!feof($socket)) {
+            $chunk = @fread($socket, 4096);
+            if ($chunk === false) {
+                break;
+            }
+            $response .= $chunk;
+
+            $meta = stream_get_meta_data($socket);
+            if (!empty($meta['timed_out'])) {
+                return false;
+            }
+        }
+
+        return $response;
+    } finally {
+        @fclose($socket);
+    }
 }
 
 /**
