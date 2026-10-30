@@ -6,24 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/profile.php';
-require_once __DIR__.'/../../runtime.php';
-
-/** Record one command-style profile entry with the stable runStep fields. */
-function pmssCommandProfileRecord(string $description, string $command, string $status, int $rc, float $duration, bool $dryRun, string $stdoutExcerpt = '', string $stderrExcerpt = ''): void
-{
-    pmssRecordProfile([
-        'description'    => $description,
-        'command'        => $command,
-        'status'         => $status,
-        'rc'             => $rc,
-        'duration'       => round($duration, 4),
-        'dry_run'        => $dryRun,
-        'stdout_excerpt' => $stdoutExcerpt,
-        'stderr_excerpt' => $stderrExcerpt,
-    ]);
-}
 
 /**
  * Execute a shell command, keeping failures soft.
@@ -126,15 +109,4 @@ function aptCmd(string $args): string
 function dpkgCmd(string $args): string
 {
     return pmssAptDpkgEnvPrefix().' dpkg '.$args;
-}
-
-/**
- * Log a status line with duration/rc in the same format as runStep(), without executing a command.
- */
-function pmssLogStatus(string $status, string $description, int $rc = 0, ?float $duration = null): void
-{
-    $dur = $duration ?? 0.0;
-    $statusUpper = strtoupper($status);
-    logMessage(sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description));
-    pmssCommandProfileRecord($description, '', $statusUpper, $rc, $dur, false);
 }

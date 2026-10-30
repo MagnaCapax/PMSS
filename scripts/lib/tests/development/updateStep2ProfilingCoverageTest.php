@@ -21,7 +21,8 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
     public function testUpdateStep2UsesProfiledWrappersForModuleCalls(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/runtime/profile.php' => ['required' => ['function pmssRunProfiledStep(', 'function pmssRunProfiledCallable(', 'function pmssRunProfiledCallableBatch(']],
+            'scripts/lib/update/runtime/profile.php' => ['required' => ["require_once __DIR__.'/profileCallables.php';", "require_once __DIR__.'/profileSummary.php';"]],
+            'scripts/lib/update/runtime/profileCallables.php' => ['required' => ['function pmssRunProfiledStep(', 'function pmssRunProfiledCallable(', 'function pmssRunProfiledCallableBatch(']],
             'scripts/util/update-step2.php' => [
                 'required' => [
                     'Preparing noninteractive apt defaults',

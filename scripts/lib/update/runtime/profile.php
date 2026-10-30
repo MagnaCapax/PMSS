@@ -1,12 +1,5 @@
 <?php
-/**
- * Profiling helpers for `update-step2.php` orchestration.
- *
- * Collects per-step timing/return-code metadata emitted by `runStep()` so the
- * orchestrator can stream JSON events, log human-readable summaries, and stash
- * full traces to disk for later debugging when updates behave oddly or run
- * slower than expected.
- *
+/** Stable updater profiling include and shared shell/callable capture.
  * @license GPL-3.0-only
  * @author PMSS Team
  */
@@ -14,6 +7,8 @@
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../../runtime.php';
 require_once __DIR__.'/stepPolicy.php';
+require_once __DIR__.'/profileCallables.php';
+require_once __DIR__.'/profileSummary.php';
 
 /**
  * Track a single step execution in memory and JSON logs.
@@ -27,163 +22,28 @@ function pmssRecordProfile(array $entry): void
     pmssLogJson(['event' => 'step', 'data' => $entry]);
 }
 
-/**
- * Run non-shell orchestration work with profiling metadata.
- *
- * Wrapper keeps phase-2 profiling complete even when a step is pure PHP and
- * does not invoke runStep() directly.
- *
- * @param callable $step
- * @return mixed
- */
-function pmssRunProfiledStep(string $description, callable $step)
+/** Record one command-style profile entry with the stable runStep fields. */
+function pmssCommandProfileRecord(string $description, string $command, string $status, int $rc, float $duration, bool $dryRun, string $stdoutExcerpt = '', string $stderrExcerpt = ''): void
 {
-    $started = microtime(true);
-    logmsg('[START] '.$description.' :: [callable]');
-    $status = 'ERR';
-    try {
-        $result = $step();
-        $status = 'OK';
-        return $result;
-    } finally {
-        // Keep both outcomes on the same profiling path, including thrown steps.
-        pmssLogStatus($status, $description, $status === 'OK' ? 0 : 1, microtime(true) - $started);
-    }
-}
-
-/**
- * Profile a direct function/method invocation with optional arguments.
- *
- * @param callable $callable
- * @param array<int, mixed> $arguments
- * @return mixed
- */
-function pmssRunProfiledCallable(string $description, callable $callable, array $arguments = [], string $classification = '')
-{
-    try {
-        return pmssRunProfiledStep($description, static function () use ($callable, $arguments) { return $callable(...$arguments); });
-    } catch (\Throwable $throwable) {
-        if ($classification === '') {
-            throw $throwable;
-        }
-        $reason = get_class($throwable).($throwable->getMessage() !== '' ? ': '.$throwable->getMessage() : '');
-        pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
-    }
-}
-
-/**
- * Run a table of profiled callables in order.
- *
- * @param array<int,array{0:string,1:callable,2?:array<int,mixed>,3?:string}> $steps
- */
-function pmssRunProfiledCallableBatch(array $steps): void
-{
-    foreach ($steps as $step) {
-        $description = (string) $step[0];
-        $arguments = is_array($step[2] ?? null) ? $step[2] : [];
-        $classification = (string) ($step[3] ?? '');
-        pmssRunProfiledCallable($description, $step[1], $arguments, $classification);
-    }
-}
-
-/**
- * Normalize one profile row before summary sorting and JSON persistence.
- */
-function pmssProfileSummaryEntry(array $entry): array
-{
-    return array(
-        'description'    => pmssLogScalarText($entry['description'] ?? null, 'unknown'),
-        'command'        => pmssLogScalarText($entry['command'] ?? null),
-        'status'         => strtoupper(pmssLogScalarText($entry['status'] ?? null, 'OTHER')),
-        'rc'             => is_numeric($entry['rc'] ?? null) ? (int) $entry['rc'] : 0,
-        'duration'       => is_numeric($entry['duration'] ?? null) ? round(max(0.0, (float) $entry['duration']), 4) : 0.0,
-        'dry_run'        => (bool) ($entry['dry_run'] ?? false),
-        'stdout_excerpt' => pmssLogScalarText($entry['stdout_excerpt'] ?? null),
-        'stderr_excerpt' => pmssLogScalarText($entry['stderr_excerpt'] ?? null),
-    );
-}
-
-/**
- * Emit a short summary of the slowest steps and persist full traces.
- *
- * Logs:
- *  - status counts (OK/ERR/SKIP/other) for quick at-a-glance health.
- *  - top 5 steps by duration, including status and rc.
- * Persists the full step list to PMSS_PROFILE_OUTPUT or
- * (<PMSS_JSON_LOG>.profile.json) when configured.
- */
-function pmssProfileSummary(): void
-{
-    $rawProfile = $GLOBALS['PMSS_PROFILE'] ?? [];
-    if (empty($rawProfile) || !is_array($rawProfile)) {
-        return;
-    }
-
-    $profile = array();
-    foreach ($rawProfile as $entry) {
-        if (is_array($entry)) {
-            $profile[] = pmssProfileSummaryEntry($entry);
-        }
-    }
-    if (empty($profile)) {
-        return;
-    }
-
-    // Summarise statuses so operators can see whether any ERR/SKIP steps
-    // occurred without scanning the entire log.
-    $counts = array_fill_keys(['OK', 'ERR', 'SKIP', 'OTHER'], 0);
-    foreach ($profile as $entry) {
-        $status = $entry['status'];
-        ++$counts[isset($counts[$status]) ? $status : 'OTHER'];
-    }
-    logmsg(sprintf(
-        'Step status summary: %d OK, %d ERR, %d SKIP, %d other',
-        $counts['OK'],
-        $counts['ERR'],
-        $counts['SKIP'],
-        $counts['OTHER']
-    ));
-
-    usort($profile, static function ($a, $b) {
-        return $b['duration'] <=> $a['duration'];
-    });
-    $topSteps = array_slice($profile, 0, 5);
-    logmsg('Step duration summary (top 5):');
-    foreach ($topSteps as $entry) {
-        logmsg(sprintf(
-            '  - %s [%s %.3fs rc=%d]',
-            $entry['description'],
-            $entry['status'],
-            $entry['duration'],
-            $entry['rc']
-        ));
-    }
-    pmssLogJson([
-        'event'         => 'profile_summary',
-        'steps'         => $topSteps,
-        'status_counts' => $counts,
+    pmssRecordProfile([
+        'description'    => $description,
+        'command'        => $command,
+        'status'         => $status,
+        'rc'             => $rc,
+        'duration'       => round($duration, 4),
+        'dry_run'        => $dryRun,
+        'stdout_excerpt' => $stdoutExcerpt,
+        'stderr_excerpt' => $stderrExcerpt,
     ]);
+}
 
-    $profileOutput = getenv('PMSS_PROFILE_OUTPUT')
-        ?: (($jsonLogPath = (getenv('PMSS_JSON_LOG') ?: '')) !== '' ? $jsonLogPath.'.profile.json' : '');
-    if ($profileOutput === '') {
-        return;
-    }
-    // Encoding must succeed before opening the report: an empty fallback erases prior evidence.
-    $encoded = pmssJsonEncodePretty($profile);
-    // An override must not redirect a root-run profile write through a symlink.
-    if ($encoded === null) {
-        return;
-    }
-    if (!pmssPathTargetIsSafe($profileOutput, false)) {
-        logmsg('[WARN] Unable to write complete step profile report');
-        return;
-    }
-    if (!pmssDirEnsureExists(dirname($profileOutput), 0755)) {
-        return;
-    }
-    // A failed or short write must be visible; the summary remains best-effort.
-    if (!pmssFileWriteComplete($profileOutput, $encoded)) {
-        logmsg('[WARN] Unable to write complete step profile report');
-    }
+/**
+ * Log a status line with duration/rc in the same format as runStep(), without executing a command.
+ */
+function pmssLogStatus(string $status, string $description, int $rc = 0, ?float $duration = null): void
+{
+    $dur = $duration ?? 0.0;
+    $statusUpper = strtoupper($status);
+    logMessage(sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description));
+    pmssCommandProfileRecord($description, '', $statusUpper, $rc, $dur, false);
 }

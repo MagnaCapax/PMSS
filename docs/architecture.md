@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/update/runtime/profile.php** retains the profiling include and
+  shared command/status row capture. `profileCallables.php` owns PHP invocation
+  and classified exceptions; `profileSummary.php` normalizes and counts in one
+  pass before sorting, logging and guarded report publication. Shell execution
+  stays in `commands.php`, with no reverse dependency from capture (ADR 0217).
 - **scripts/lib/rtorrent/watchdogProcessFlow.php** retains the transition include.
   `watchdogMissing.php` owns missing-process recovery, `watchdogEscalation.php`
   owns escalation markers and bounded retries, and `watchdogScgi.php` owns live

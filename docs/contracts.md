@@ -302,6 +302,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Rejects unsafe/symlinked targets through the shared managed-file writer.
 
 - pmssRecordProfile(array $entry): void → lazily initializes `$GLOBALS['PMSS_PROFILE']`, appends the entry, and emits JSON `step` event.
+- Profiling keeps the existing `runtime/profile.php` and `runtime/commands.php`
+  includes and public helper signatures. Capture, callable invocation and report
+  projection have separate definition-only modules (ADR 0217). Normalization and
+  counting share a traversal; the raw store remains unchanged. Command rows keep
+  raw status/excerpts, while summaries retain normalized fields and their order.
 - pmssProfileSummary(): void → logs status counts and top 5 durations; writes full JSON to `PMSS_PROFILE_OUTPUT` or `(<PMSS_JSON_LOG>.profile.json)`.
   - Rejects malformed paths and symlinked targets or parents before preparing report directories or writing the report.
   - If JSON encoding fails, leaves any existing report untouched and creates no
