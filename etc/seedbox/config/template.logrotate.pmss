@@ -187,6 +187,7 @@
 /var/log/pmss/backupEtc.log
 /var/log/pmss/certbotRenewalCheck.log
 /var/log/pmss/cgroupBfqWeightApply.log
+/var/log/pmss/cgroupBonusCpuWeightApply.log
 /var/log/pmss/cgroupIopsLimitApply.log
 /var/log/pmss/cgroupPolicyRefresh.log
 /var/log/pmss/cgroupRootCheck.log
