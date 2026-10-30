@@ -58,6 +58,11 @@ function pmssSysctlNetworkSettingsBuild(array $profile): array
 /** Build PMSS security sysctl settings. */
 function pmssSysctlSecuritySettingsBuild(): array
 {
+    $procSysRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_SYS_PATH', '/proc/sys');
+    // MPTCP off where the kernel has it: no PMSS service uses it, and Go 1.24+ programs open MPTCP listeners by
+    // default, which widens the kernel network attack surface for no gain. New sockets fall back to plain TCP.
+    $mptcp = is_file($procSysRoot.'/net/mptcp/enabled') ? ['net.mptcp.enabled' => '0'] : [];
+
     return [
         'kernel.pid_max' => '262144',
         'kernel.unprivileged_userns_clone' => '1',
@@ -81,7 +86,7 @@ function pmssSysctlSecuritySettingsBuild(): array
         'net.ipv4.icmp_ignore_bogus_error_responses' => '1',
         'net.ipv6.conf.all.disable_ipv6' => '1',
         'net.ipv6.conf.default.disable_ipv6' => '1',
-    ];
+    ] + $mptcp;
 }
 
 /** Build conntrack settings only when the host exposes conntrack sysctls. */

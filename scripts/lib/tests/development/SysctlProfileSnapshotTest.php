@@ -51,4 +51,15 @@ final class SysctlProfileSnapshotTest extends TestCase
         $this->assertSame('15', $settings['net.ipv4.netfilter.ip_conntrack_tcp_timeout_time_wait']);
         $this->assertFalse(isset($settings['net.netfilter.nf_conntrack_tcp_timeout_time_wait']));
     }
+
+    public function testSecurityBuilderDisablesMptcpOnlyWhenKernelHasIt(): void
+    {
+        $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-profile-mptcp-proc-', 0700);
+        $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
+        $this->assertFalse(isset(\pmssSysctlSecuritySettingsBuild()['net.mptcp.enabled']));
+
+        file_put_contents($this->pmssEnsureDir($procSysRoot.'/net/mptcp').'/enabled', "1\n");
+
+        $this->assertSame('0', \pmssSysctlSecuritySettingsBuild()['net.mptcp.enabled']);
+    }
 }
