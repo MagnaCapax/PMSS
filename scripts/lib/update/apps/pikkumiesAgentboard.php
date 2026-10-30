@@ -17,6 +17,8 @@ function pmssPikkumiesAgentboardVersionOwned(string $versionDir, int $ownerUid):
 /** Accept only the two release members and paths beneath the frontend bundle. */
 function pmssPikkumiesAgentboardArchiveMembersSafe(string $archive): bool
 {
+    // Invalid filenames must fail before shell quoting can throw or truncate them.
+    if ($archive === '' || pmssFilesystemPathHasNulByte($archive)) return false;
     $members = pmssPinnedRemoteArchiveMembersRead('tar -tzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null', 'tar -tvzf '.escapeshellarg($archive).' --quoting-style=literal 2>/dev/null');
     if ($members === []) return false;
     foreach ($members as $member) {

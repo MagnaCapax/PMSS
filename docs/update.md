@@ -292,6 +292,12 @@ table only tracks external/non-Debian sources.
 
 Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely on the system interpreter; track them for future virtualenv migrations so pip activity stays isolated per app.
 
+Torrent-client venv, Transmission web, and Agentboard archive inspection rejects
+empty or NUL-containing filenames before shell quoting or tar execution, using
+the existing false/empty-list failure results. Valid filename bytes, listing
+commands, and member validation remain unchanged. `ArchiveListingPathSafetyTest`
+covers these boundaries with recording dependencies on the testing machine.
+
 The shared rTorrent template explicitly sets `network.http.cacert.set` to
 `/etc/ssl/certs/ca-certificates.crt`, the Debian CA bundle, so static store builds
 do not depend on their compiled-in CA path. Certificate and hostname verification

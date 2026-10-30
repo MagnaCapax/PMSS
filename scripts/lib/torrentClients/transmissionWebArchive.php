@@ -2,7 +2,13 @@
 /** Inspect web archives before extraction and verify their filesystem result. */
 
 /** List names and types separately; escaped unusual names fail the lexical check. */
-function pmssTorrentClientsTransmissionWebArchiveList(string $archive): array { $arg = escapeshellarg($archive); return @pmssPinnedRemoteArchiveMembersRead('LC_ALL=C tar --quoting-style=escape -tzf '.$arg.' 2>/dev/null', 'LC_ALL=C tar --quoting-style=escape -tvzf '.$arg.' 2>/dev/null'); }
+function pmssTorrentClientsTransmissionWebArchiveList(string $archive): array
+{
+    // Keep malformed filenames on the same unavailable-listing path as tar failures.
+    if ($archive === '' || pmssFilesystemPathHasNulByte($archive)) return [];
+    $arg = escapeshellarg($archive);
+    return @pmssPinnedRemoteArchiveMembersRead('LC_ALL=C tar --quoting-style=escape -tzf '.$arg.' 2>/dev/null', 'LC_ALL=C tar --quoting-style=escape -tvzf '.$arg.' 2>/dev/null');
+}
 
 /** Accept only unique regular files/directories strictly below public_html. */
 function pmssTorrentClientsTransmissionWebArchiveSafe(array $members): bool

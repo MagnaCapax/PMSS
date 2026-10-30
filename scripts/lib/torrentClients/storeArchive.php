@@ -4,6 +4,8 @@
 /** Accept only regular files and directories with lexical relative member paths. */
 function pmssTorrentClientsStoreArchiveIsSafe(string $archive): bool
 {
+    // Invalid filenames must fail before shell quoting can throw or truncate them.
+    if ($archive === '' || pmssFilesystemPathHasNulByte($archive)) return false;
     $members = @pmssPinnedRemoteArchiveMembersRead('tar -tzf '.escapeshellarg($archive).' 2>/dev/null', 'tar -tvzf '.escapeshellarg($archive).' 2>/dev/null');
     if ($members === []) return false;
     foreach ($members as $member) {
