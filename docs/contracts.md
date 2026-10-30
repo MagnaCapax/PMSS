@@ -1458,6 +1458,7 @@ and the unchanged successful results without reading live process state.
     `/var/log/pmss/users.jsonl`), and per-user logs under `/var/log/pmss/users/<user>.log`.
     Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep plus
     `###ADDUSER_JSON:{...}` with explicit `success`/`exit_code` fields for automation.
+  - Output: With non-TTY stdout, emits empty heartbeat lines during silent steps (useradd, skeleton copy, service setup), so a reader with a short silence timeout stays attached for the whole run (#1187). TTY output is unchanged.
 
 - scripts/changePw.php [--jsonl] [--password-stdin] USERNAME [PASSWORD]
   - Behavior: Sets the Unix password (generated if omitted), writes the per-user htpasswd and any existing qBittorrent config with the account's privileges, and prints the password.
@@ -1465,6 +1466,7 @@ and the unchanged successful results without reading live process state.
     `--password-stdin` reads one line in place of the positional value; an empty line generates a random password and EOF without a line fails. The positional form remains available for existing callers.
     On Debian 11 and newer, shadow and htpasswd receive the same `$2y$` bcrypt hash. Debian 10 and unreadable or nonnumeric Debian versions retain the `passwd` and `htpasswd -B` path. Both shadow paths feed credentials through stdin.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
+  - Unread stdout: When the caller's stdout reader is gone (addUser passes its own stdout), the credential update still completes and exits 0 on success instead of PHP CLI's exit 255 after a failed write (#1187).
 
 - scripts/suspend.php USERNAME
   - Output: With non-TTY stdout, emits empty heartbeat lines during silent steps. TTY output is unchanged.

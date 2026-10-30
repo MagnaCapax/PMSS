@@ -42,6 +42,12 @@ require_once __DIR__.'/lib/user/add/userConfigApply.php';
 require_once __DIR__.'/lib/user/add/artifactVerification.php';
 require_once __DIR__.'/lib/user/add/postProvision.php';
 require_once __DIR__.'/lib/user/add/preflight.php';
+require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';
+
+// The backend reads this script over SSH and gives up after 15 s of silence, while useradd,
+// the skeleton copy and the service setup routinely run for minutes without printing (PMSS#1187).
+// Keep stdout alive the same way terminateUser, suspend and unsuspend do.
+pmssStdoutHeartbeatStartForStdout();
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Creating
 // a user when /home is unavailable would write to the wrong location or fail

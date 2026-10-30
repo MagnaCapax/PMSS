@@ -15,6 +15,13 @@
  *
  * @license GPL-3.0-only
  */
+// addUser (and a recreateUser run over a connection that may drop) hands this script its own
+// stdout. When the backend that started it stops reading (it closes an SSH channel after 15 s of silence while addUser works),
+// the first echo below fails with EPIPE and PHP CLI aborts with exit 255 before any
+// credential is set, so addUser rolls the account back (PMSS#1187). The credential update
+// must finish, and report success, whether or not anyone is still reading its output.
+ignore_user_abort(true);
+
 $jsonlOutput = false;
 $passwordStdin = false;
 $arguments = [];
@@ -157,6 +164,10 @@ if ($jsonlOutput) {
 
 // The account password has changed: an optional client sync must not abort recreate/addUser.
 pmssQbittorrentPasswordSyncWarning($qbittorrentUpdated, is_file(pmssQbittorrentConfigPath($username)));
+
+// Say success explicitly. After a failed write to a stdout nobody reads, PHP CLI keeps exit status 255
+// even with ignore_user_abort, unless the script exits with its own code (PMSS#1187).
+exit(0);
 
 function generatePassword(): string
 {

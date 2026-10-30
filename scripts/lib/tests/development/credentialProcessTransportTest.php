@@ -141,6 +141,36 @@ class CredentialProcessTransportTest extends TestCase
         }
     }
 
+    /**
+     * PMSS#1187: addUser ignores SIGPIPE and hands changePw its stdout. When the backend stops
+     * reading, changePw's first write fails; it must not abort with exit 255 because of that.
+     */
+    public function testChangePwSurvivesAStdoutNobodyReads(): void
+    {
+        // The success path needs root and a real account, so hold changePw to the two lines that matter.
+        $this->pmssAssertRepoFileContract('scripts/changePw.php', ['ordered' => [[
+            'ignore_user_abort(true);',
+            'echo "\t *******  {$username}     new password:',
+            'pmssQbittorrentPasswordSyncWarning(',
+            'exit(0);',
+            'function generatePassword(): string',
+        ]]]);
+        // Why both are needed: with the reader gone, PHP CLI exits 255 after a failed write even when
+        // ignore_user_abort lets the script run on, unless the script exits with its own code.
+        foreach (['' => 255, ' exit(0);' => 0] as $tail => $expected) {
+            // The child waits for stdin EOF, so it cannot write before its reader is gone.
+            $code = 'fgets(STDIN); ignore_user_abort(true); echo "banner\n"; fwrite(STDERR, "ran-on\n");'.$tail;
+            $process = proc_open($this->pmssBuildInlinePhpCommand($code), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            $this->assertTrue(is_resource($process));
+            fclose($pipes[1]); // the reader is gone, as after the backend's read timeout
+            fclose($pipes[0]);
+            $stderr = (string) stream_get_contents($pipes[2]);
+            fclose($pipes[2]);
+            $this->assertSame($expected, proc_close($process), 'exit code with a closed stdout, tail '.json_encode($tail));
+            $this->assertSame("ran-on\n", $stderr);
+        }
+    }
+
     public function testProvisionStepLogsFailureStderrAndPreservesExitStatus(): void
     {
         $result = $this->provisionStepHarness('fwrite(STDERR, "PHP Fatal error: fixture failed\n"); exit(255);', 'provided-value');
