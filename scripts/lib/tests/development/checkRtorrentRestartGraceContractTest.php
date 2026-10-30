@@ -88,14 +88,13 @@ class checkRtorrentRestartGraceContractTest extends TestCase
             'scripts/lib/rtorrent/watchdogScgi.php' => ['required' => [
                 'function pmssCheckRtorrentHandleAliveProcess(',
                 'rtorrentProcessUnresponsiveGraceState($restartMarker, $unresponsiveGrace)',
-                '$restartAge = $graceState[\'restartAge\'];',
+                "time() - \$graceState['restartAge']",
                 '$effectiveGrace = $graceState[\'grace\'];',
                 'rtorrentProcessScgiUnresponsiveDecision(',
                 'function rtorrentProcessUnresponsiveGraceState(',
                 '$restartAge < 7200',
                 '$restartAge < 14400',
-                'max($baseGrace, 600)',
-                'max($baseGrace, 1200)',
+                'max($baseGrace, $restartAge < 7200 ? 600 : 1200)',
             ]],
         ]);
     }

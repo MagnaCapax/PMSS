@@ -12,12 +12,8 @@ function rtorrentProcessUnresponsiveGraceState(string $restartMarker, int $baseG
     $now = $now ?? time();
     $restartTs = is_file($restartMarker) ? (int) trim((string) @file_get_contents($restartMarker)) : 0;
     $restartAge = $restartTs > 0 ? max(0, $now - $restartTs) : 0;
-    $grace = $baseGrace;
-    if ($restartAge > 0 && $restartAge < 7200) {
-        $grace = max($baseGrace, 600);
-    } elseif ($restartAge > 0 && $restartAge < 14400) {
-        $grace = max($baseGrace, 1200);
-    }
+    $grace = $restartAge > 0 && $restartAge < 14400
+        ? max($baseGrace, $restartAge < 7200 ? 600 : 1200) : $baseGrace;
 
     return ['grace' => $grace, 'restartAge' => $restartAge];
 }
@@ -90,10 +86,9 @@ function pmssCheckRtorrentHandleAliveProcess(
 
     $restartMarker = rtorrentProcessRestartMarkerPath($user);
     $graceState = rtorrentProcessUnresponsiveGraceState($restartMarker, $unresponsiveGrace);
-    $restartAge = $graceState['restartAge'];
     $effectiveGrace = $graceState['grace'];
     if ($effectiveGrace > $unresponsiveGrace) {
-        $restartTime = date('Y-m-d H:i:s', time() - $restartAge);
+        $restartTime = date('Y-m-d H:i:s', time() - $graceState['restartAge']);
         pmssCheckRtorrentLog("Extending SCGI grace to {$effectiveGrace}s for {$user} (recent restart at {$restartTime})", false, $debug);
     }
 

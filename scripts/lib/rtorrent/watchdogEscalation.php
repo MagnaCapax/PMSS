@@ -31,11 +31,9 @@ function rtorrentProcessEscalationRetryState(string $stateFile, int $retryInterv
     $payload = is_file($stateFile) ? @file_get_contents($stateFile) : false;
     $trimmed = is_string($payload) ? trim($payload) : '';
     $decoded = $trimmed !== '' ? pmssJsonDecodeAssoc($payload) : null;
-    if (is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)) {
-        $timestamp = max(0, (int) $decoded['timestamp']);
-    } else {
-        $timestamp = is_numeric($trimmed) ? max(0, (int) $trimmed) : 0;
-    }
+    $timestamp = is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)
+        ? $decoded['timestamp'] : (is_numeric($trimmed) ? $trimmed : 0);
+    $timestamp = max(0, (int) $timestamp);
     if ($timestamp <= 0) {
         return ['action' => 'record', 'age' => 0];
     }

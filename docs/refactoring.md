@@ -133,6 +133,12 @@ fallback precedence and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Watchdog state projections share socket-failure results and escalation timestamp
+normalization, select recent-restart grace once, and consume single-use fields
+directly (ADRs 0209 and 0212). Marker guards, complete writes, thresholds, payload
+order and diagnostics retain their contracts. Characterization fixtures cover
+persistence and transitions; grace boundary cases run on the testing machine.
+
 Opened-file mode and group repairs include home/owner metadata inspection in
 their existing `finally` lifetime. Inspection exceptions and errors propagate
 unchanged after the acquired stream closes, before any permission mutation.

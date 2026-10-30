@@ -24,8 +24,7 @@ function pmssCheckRtorrentHandleMissingProcess(
 
     if (!$executorPresent) {
         if (is_file($state['startMarker'])) {
-            $persistentFailureState = rtorrentProcessCheckFailureCountState($state['startFailure'], $startFailureEscalate);
-            $persistentFailureCount = $persistentFailureState['count'];
+            $persistentFailureCount = rtorrentProcessCheckFailureCountState($state['startFailure'], $startFailureEscalate)['count'];
             pmssCheckRtorrentLogBoth($user, "rTorrent still missing after start attempt; persistent failure {$persistentFailureCount}/{$startFailureEscalate}", $debug);
 
             if ($persistentFailureCount >= $startFailureSessionReset && !is_file($state['sessionReset'])) {

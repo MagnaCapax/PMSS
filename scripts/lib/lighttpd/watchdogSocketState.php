@@ -34,14 +34,11 @@ function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $option
     $threshold = max(1, (int) ($options['threshold'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES));
     $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, (string) ($options['runtimeDir'] ?? ''));
 
-    if ($statePath === '' || !pmssDirEnsureExists(dirname($statePath), 0755)) {
-        return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
-    }
-
-    $count = max(0, pmssReadRegularFileInt($statePath)) + 1;
-    // A partial write must not authorize a destructive restart.
-    if (!pmssFileWriteComplete($statePath, (string) $count, LOCK_EX)) {
-        return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
+    $count = 0;
+    if ($statePath !== '' && pmssDirEnsureExists(dirname($statePath), 0755)) {
+        $count = max(0, pmssReadRegularFileInt($statePath)) + 1;
+        // A partial write must not authorize a destructive restart.
+        if (!pmssFileWriteComplete($statePath, (string) $count, LOCK_EX)) $count = 0;
     }
 
     return array(
