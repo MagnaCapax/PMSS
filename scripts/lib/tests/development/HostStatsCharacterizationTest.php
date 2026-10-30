@@ -27,6 +27,30 @@ class HostStatsCharacterizationTest extends TestCase
         }
     }
 
+    public function testPressureFieldsRequireTheirOwnRowAndCompleteNames(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-host-psi-boundary-');
+        foreach ([
+            ["some\nfull avg10=7 avg300=9\n", 'na', 9.0],
+            ["some\rfull avg10=7 avg300=9\n", 'na', null],
+            ["some avg10=1\nfull\nother avg300=9\n", '1.0/na/na/na/na/na/na/na', null],
+            ["some avg10=1\nfull\rother avg300=9\n", '1.0/na/na/na/na/na/na/na', null],
+            ["some badavg10=7\nfull avg300=9\n", 'na', 9.0],
+            ["some x_avg10=7\nfull avg300=9\n", 'na', 9.0],
+            ["some avg10=1\nfull notavg300=9\n", '1.0/na/na/na/na/na/na/na', null],
+            ["some avg10=1\nfull total=0avg300=9\n", '1.0/na/na/na/na/na/na/na', null],
+            // Valid fields after unrelated tokens still win over lookalike names.
+            ["some badavg10=7 avg10=1\nfull badavg300=99 avg300=2\n", '1.0/na/na/na/na/2.0/na/na', 2.0],
+            ["some\tavg10=0\nfull\ttotal=0\tavg300=100\r\n", '0.0/na/na/na/na/100.0/na/0', 100.0],
+            // Repeated rows and fields retain the first matching value.
+            ["some avg60=3\nsome avg10=1\nfull total=0\nfull avg300=2 avg300=9\n", '1.0/3.0/na/na/na/2.0/na/0', 2.0],
+        ] as [$raw, $formatted, $numeric]) {
+            file_put_contents($path, $raw);
+            $this->assertSame($formatted, \pmssSystemStatsPsiFromRaw($raw));
+            $this->assertSame($numeric, \pmssDiskIostatReadPsiFullAvg300($path));
+        }
+    }
+
     public function testCpuDiskAndMemoryProjectionSnapshots(): void
     {
         $this->assertSame([10, 20, 30, 40, 50, 60], \pmssSystemStatsCpuCountersFromRaw("cpu 10 20 30 40 50 60\ncpu0 1 2 3 4 5\n"));

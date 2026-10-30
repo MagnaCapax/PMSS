@@ -62,3 +62,12 @@ unavailable result even when partial output contains valid samples or a summary.
 Successful captures retain stream precedence, trimming, mean/median selection,
 command quoting, lock wrapping and the 15-second deadline. Isolated capture
 fixtures in `IopingOutputSafetyTest` cover both streams without running probes.
+
+The shared PSI validator requires complete whitespace-delimited field names
+within the requested row. A missing row payload cannot borrow a metric from
+the following line, and a field-name suffix cannot supply the requested value.
+Malformed input retains each consumer's existing `na` or `null` fallback;
+valid metrics, first-match precedence, formatting and output order are unchanged.
+`HostStatsCharacterizationTest` covers both consumers with malformed row and
+field boundaries, tabs, CRLF, repeated rows and repeated fields. These fixtures
+run only on testing machines.
