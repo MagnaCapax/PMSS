@@ -83,7 +83,8 @@ if (!function_exists('pmssStatsLiveRender')) {
             echo '<pre>Live statistics are being collected. Check back in about 10 minutes.</pre></div>';
             return;
         }
-        $now = (int) end($node)['t'];
+        $latest = end($node);
+        $now = (int) $latest['t'];
         $windows = array('15 min' => 900, '1 hour' => 3600, '24 hours' => 86400);
         $metrics = array('CPU' => array('cpu', '%'), 'RAM' => array('ram', '%'), 'Network out' => array('tx', ' Mbit/s'), 'Network in' => array('rx', ' Mbit/s'));
         $all = pmssStatsLiveRows($node, $mine, $now, 86400);
@@ -92,35 +93,38 @@ if (!function_exists('pmssStatsLiveRender')) {
         foreach ($windows as $label => $seconds) echo '<th>'.$label.'</th>';
         echo '<th>24 h trend</th></tr>';
         foreach ($metrics as $name => $m) {
+            // Use the latest sampled capacity for every window and the fixed trend scale.
+            $max = $m[1] === '%' ? 100 : (float) ($latest[$m[0].'_capacity'] ?? 0);
             echo '<tr><th>'.$name.'</th>';
             foreach ($windows as $seconds) {
                 $s = pmssStatsLiveSummary(pmssStatsLiveRows($node, $mine, $now, $seconds));
-                echo $s === null ? '<td>n/a</td>' : pmssStatsLiveCell($s[$m[0].'_node'], $s[$m[0].'_you'], $m[1]);
+                echo $s === null ? '<td>n/a</td>' : pmssStatsLiveCell($s[$m[0].'_node'], $s[$m[0].'_you'], $m[1], $max);
             }
-            $max = $m[1] === '%' ? 100 : max(1, max(array_map(function ($p) { return $p[0]; }, $series[$m[0]] ?: array(array(1, 0)))));
             echo '<td>'.pmssStatsLiveSvg($series[$m[0]], $max).'</td></tr>';
         }
         echo '</table><div class="memory-pressure-note"><span class="live-k-node">&#9632; node</span> = whole server &nbsp; '
-            .'<span class="live-k-you">&#9632; you</span> = your own usage. Averages of 5-minute samples; you only see the node total and your own numbers.</div></div>';
+            .'<span class="live-k-you">&#9632; you</span> = your own usage. Averages of 5-minute samples; you only see the node total and your own numbers. Network bars and trends use the latest sampled capacity; hidden when unknown.</div></div>';
     }
 }
 
 if (!function_exists('pmssStatsLiveCell')) {
-    /** Table cell: share bar (you inside node) and the two values. */
-    function pmssStatsLiveCell($node, $you, $unit) {
+    /** Table cell: capacity-scaled node bar (you inside node), or just values when unknown. */
+    function pmssStatsLiveCell($node, $you, $unit, $capacity = 0) {
         $fmt = function ($v) use ($unit) { return number_format($v, $v < 10 ? 1 : 0, '.', '').$unit; };
-        return '<td><div class="live-bar"><span class="live-node" style="width:'.($unit === '%' ? round($node) : 100).'%"><span class="live-you" style="width:'
-            .round($node > 0 ? min(100, $you / $node * 100) : 0).'%"></span></span></div><div class="live-txt"><span class="live-k-node">node '
+        $max = $unit === '%' ? 100 : $capacity;
+        $bar = $max > 0 ? '<div class="live-bar"><span class="live-node" style="width:'.($unit === '%' ? round($node) : round(min(100, $node / $max * 100), 2)).'%"><span class="live-you" style="width:'
+            .round($node > 0 ? min(100, $you / $node * 100) : 0).'%"></span></span></div>' : '';
+        return '<td>'.$bar.'<div class="live-txt"><span class="live-k-node">node '
             .$fmt($node).'</span> &middot; <span class="live-k-you">you '.$fmt($you).'</span></div></td>';
     }
 }
 
 if (!function_exists('pmssStatsLiveSvg')) {
-    /** Two-line trend (node, you) scaled to $max as inline SVG. */
+    /** Two-line trend scaled to capacity; no lines when capacity is unknown. */
     function pmssStatsLiveSvg(array $points, $max) {
         $n = count($points);
         $lines = '';
-        foreach ($n < 2 ? array() : array('live-node', 'live-you') as $i => $class) {
+        foreach ($n < 2 || $max <= 0 ? array() : array('live-node', 'live-you') as $i => $class) {
             $c = array();
             foreach ($points as $x => $p) $c[] = round($x * 300 / ($n - 1), 1).','.round(38 - min(1, $p[$i] / $max) * 36, 1);
             $lines .= '<polyline class="'.$class.'" points="'.implode(' ', $c).'"/>';

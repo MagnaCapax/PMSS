@@ -19,6 +19,52 @@ class LiveStatsTest extends TestCase
         return "Inter-|   Receive\n face |bytes\n    lo: 5 1 0 0 0 0 0 0 5 1 0 0 0 0 0 0\n  eth0: {$rx} 10 0 0 0 0 0 0 {$tx} 10 0 0 0 0 0 0\n";
     }
 
+    public function testNetworkCapacityUsesDetectionAndEgressShapingWithoutGuesses(): void
+    {
+        foreach ([[10000, 1000, 1000, 10000], [1000, 10000, 1000, 1000], [10000, 0, 10000, 10000],
+            [0, 2000, 2000, 0], [0, 0, 0, 0], [-1, -1, 0, 0]] as $case) {
+            $capacity = \pmssLiveStatsNetworkCapacity($case[0], $case[1]);
+            $this->assertSame(['tx_capacity' => $case[2], 'rx_capacity' => $case[3]], $capacity);
+            $sample = ['t' => 1000, 'tx' => 100, 'rx' => 200] + $capacity;
+            $this->assertSame([$sample], json_decode(\pmssLiveStatsRingEncode([], $sample), true)['samples']);
+        }
+    }
+
+    public function testNetworkBarsScaleToCapacityAndKeepTheOwnShareInsideNode(): void
+    {
+        foreach ([[500.0, 50.0, 10000, '5'], [5.0, 0.5, 10000, '0.05'], [5000.0, 500.0, 10000, '50'],
+            [15000.0, 1500.0, 10000, '100'], [0.0, 0.0, 10000, '0']] as $case) {
+            $html = \pmssStatsLiveCell($case[0], $case[1], ' Mbit/s', $case[2]);
+            $this->assertStringContainsString('live-node" style="width:'.$case[3].'%', $html);
+            $this->assertStringContainsString('live-you" style="width:'.($case[0] > 0 ? 10 : 0).'%', $html);
+        }
+        $this->assertStringContainsString('live-node" style="width:37%', \pmssStatsLiveCell(37.0, 5.0, '%'));
+    }
+
+    public function testUnknownNetworkCapacityShowsNumbersWithoutABar(): void
+    {
+        foreach ([0, -1] as $capacity) {
+            $html = \pmssStatsLiveCell(500.0, 50.0, ' Mbit/s', $capacity);
+            $this->assertFalse(strpos($html, 'class="live-bar"') !== false);
+            $this->assertStringContainsString('node 500 Mbit/s', $html);
+            $this->assertStringContainsString('you 50 Mbit/s', $html);
+        }
+        // Old rings have no capacity fields, so the optional argument must also hide the bar.
+        $this->assertFalse(strpos(\pmssStatsLiveCell(5.0, 0.5, ' Mbit/s'), 'class="live-bar"') !== false);
+    }
+
+    public function testNetworkTrendUsesCapacityAndHidesLinesWhenUnknown(): void
+    {
+        $points = [[500.0, 50.0], [5000.0, 500.0]];
+        $svg = \pmssStatsLiveSvg($points, 10000);
+        $this->assertStringContainsString('class="live-node" points="0,36.2 300,20"', $svg);
+        $this->assertStringContainsString('class="live-you" points="0,37.8 300,36.2"', $svg);
+        $this->assertStringContainsString('points="0,2 300,2"', \pmssStatsLiveSvg([[10000, 1000], [15000, 1500]], 10000));
+        foreach ([0, -1] as $capacity) {
+            $this->assertFalse(strpos(\pmssStatsLiveSvg($points, $capacity), '<polyline') !== false);
+        }
+    }
+
     public function testNodeCountersParseBusyTotalMemoryAndNetwork(): void
     {
         $meminfo = "MemTotal:       1000 kB\nMemAvailable:    400 kB\n";
@@ -85,12 +131,12 @@ class LiveStatsTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-livestats');
         foreach (['resources', 'traffic', 'traffic-ingress'] as $d) mkdir($root.'/'.$d);
         $now = strtotime('2026-10-17 10:00:00');
-        file_put_contents($root.'/resources/bob', "2026-10-17 09:55:01 0 0 0 0 1000 1 1 1 1\n2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n");
-        file_put_contents($root.'/traffic/bob', "2026-10-17 09:59:59: 12345\n");
-        file_put_contents($root.'/traffic-ingress/bob', "2026-10-17 09:40:00: 999\n"); // stale
-        $s = \pmssLiveStatsUserSample('bob', $now, $root);
+        file_put_contents($root.'/resources/fixtur01', "2026-10-17 09:55:01 0 0 0 0 1000 1 1 1 1\n2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n");
+        file_put_contents($root.'/traffic/fixtur01', "2026-10-17 09:59:59: 12345\n");
+        file_put_contents($root.'/traffic-ingress/fixtur01', "2026-10-17 09:40:00: 999\n"); // stale
+        $s = \pmssLiveStatsUserSample('fixtur01', $now, $root);
         $this->assertEquals(['t' => $now, 'cpu' => 5.0, 'mem' => 2048, 'tx' => 12345, 'rx' => 0], $s);
-        $this->assertEquals(['t' => $now, 'cpu' => 0.0, 'mem' => 0, 'tx' => 0, 'rx' => 0], \pmssLiveStatsUserSample('nobody', $now, $root));
+        $this->assertEquals(['t' => $now, 'cpu' => 0.0, 'mem' => 0, 'tx' => 0, 'rx' => 0], \pmssLiveStatsUserSample('fixtur02', $now, $root));
     }
 
     public function testUserSampleNeverCountsTheSameLogLineTwiceAndIgnoresPartialLines(): void
@@ -98,11 +144,11 @@ class LiveStatsTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-livestats');
         foreach (['resources', 'traffic', 'traffic-ingress'] as $d) mkdir($root.'/'.$d);
         $now = strtotime('2026-10-17 10:00:30');
-        file_put_contents($root.'/resources/bob', "2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n");
-        file_put_contents($root.'/traffic/bob', "2026-10-17 09:59:59: 12345\n2026-10-17 10:00:20: 99");
-        $first = \pmssLiveStatsUserSample('bob', $now, $root, 0);
+        file_put_contents($root.'/resources/fixtur01', "2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n");
+        file_put_contents($root.'/traffic/fixtur01', "2026-10-17 09:59:59: 12345\n2026-10-17 10:00:20: 99");
+        $first = \pmssLiveStatsUserSample('fixtur01', $now, $root, 0);
         $this->assertSame(12345, $first['tx'], 'half-written last line is ignored');
-        $again = \pmssLiveStatsUserSample('bob', $now + 60, $root, $now);
+        $again = \pmssLiveStatsUserSample('fixtur01', $now + 60, $root, $now);
         $this->assertEquals(['t' => $now + 60, 'cpu' => 0.0, 'mem' => 0, 'tx' => 0, 'rx' => 0], $again, 'already consumed');
     }
 

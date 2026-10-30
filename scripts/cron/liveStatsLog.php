@@ -30,9 +30,10 @@ if (!pmssEnsureSafeDir(dirname($stateFile), 0700) || !pmssEnsureSafeDir($userDir
     exit(1);
 }
 
+$iface = getenv('PMSS_LIVESTATS_IFACE') ?: detectPrimaryInterface();
 $cur = pmssLiveStatsNodeCountersParse(
     (string) @file_get_contents('/proc/stat'), (string) @file_get_contents('/proc/meminfo'),
-    (string) @file_get_contents('/proc/net/dev'), getenv('PMSS_LIVESTATS_IFACE') ?: detectPrimaryInterface()
+    (string) @file_get_contents('/proc/net/dev'), $iface
 );
 if ($cur === null) exit(pmssCliReturnWithStderr("liveStats: cannot read node counters\n"));
 $cur['time'] = $now;
@@ -41,6 +42,11 @@ $prev = pmssJsonFileReadAssoc($stateFile, true);
 pmssAtomicJsonFileWrite($stateFile, $cur, 0600);
 $nodeSample = $prev === null ? null : pmssLiveStatsNodeSample($prev, $cur, $now);
 if ($nodeSample === null) exit(0); // first run, reboot or gap: wait for the next clean interval
+
+// Never use getLinkSpeed()'s guessed fallback; an override NIC may have no shaping cap.
+$network = networkLoadConfig();
+$nodeSample += pmssLiveStatsNetworkCapacity(getDetectedLinkSpeed($iface),
+    $iface === networkInterfaceNameNormalized((string) ($network['interface'] ?? 'eth0')) ? (int) ($network['speed'] ?? 0) : 0);
 
 $nodePath = $publicDir.'/node-live.json';
 if (!pmssAtomicWriteFile($nodePath, pmssLiveStatsRingEncode(pmssLiveStatsRingRead($nodePath), $nodeSample), 0644)) {

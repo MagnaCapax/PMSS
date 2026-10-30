@@ -15,6 +15,15 @@ require_once __DIR__.'/resources.php';
 const PMSS_LIVESTATS_SLOTS = 288;     // 24 h at one sample per five minutes
 const PMSS_LIVESTATS_MAX_LINE_AGE = 420;
 
+/** Directional capacity in Mbit/s; shaping limits egress only, and zero means unknown. */
+function pmssLiveStatsNetworkCapacity(int $detected, int $configured): array
+{
+    $detected = max(0, $detected);
+    $configured = max(0, $configured);
+    return ['tx_capacity' => $configured > 0 ? ($detected > 0 ? min($detected, $configured) : $configured) : $detected,
+        'rx_capacity' => $detected];
+}
+
 /** One node counter snapshot from /proc/stat, /proc/meminfo and /proc/net/dev text. */
 function pmssLiveStatsNodeCountersParse(string $stat, string $meminfo, string $netDev, string $iface): ?array
 {

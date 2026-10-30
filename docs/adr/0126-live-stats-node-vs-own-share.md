@@ -46,6 +46,16 @@ The customer panel (`etc/skel/www/statsLive.php`) reads
 those two files and renders averages for 15 min, 1 h and 24 h plus a 24 h trend
 as server-side SVG. No JavaScript, no polling, no `/scripts` access (ADR 0016).
 
+Network samples add `tx_capacity` and `rx_capacity` in Mbit/s (zero means
+unknown). Both use the sampled interface's detected link speed; egress is
+also bounded by its configured shaping rate, or uses that rate alone when
+detection is unavailable. A different `PMSS_LIVESTATS_IFACE` never inherits
+the configured interface's shaping rate. The guessed `getLinkSpeed()` fallback
+is not a capacity. Bars and the 24 h trend use the latest sample's capacity
+as their fixed scale, with fills clipped at 100%. Unknown capacity, including
+older samples without these fields, leaves the numbers visible and hides the
+network bars and trend lines (Refs #1141).
+
 Privacy rule: a customer sees the node total and their own numbers, never
 another customer's samples. Ring files are not placed in `/home/<user>` so a
 tenant cannot replace them with a symlink that a root writer would follow.
