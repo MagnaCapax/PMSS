@@ -85,6 +85,7 @@ class UserTransferTest extends TestCase
             ."  /scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_USERNAME REMOTE_HOSTNAME\n\n"
             ."Options:\n"
             ."  --into DIR          Recover into DIR without replacing existing files; skip post-transfer setup\n"
+            ."  --force             Permit overwriting a completed transfer or newer target files\n"
             ."  --main-passes N     Number of passes for the main rsync (default 31)\n"
             ."  --final-passes N    Number of passes for the final rsync (default 3)\n"
             ."  --sleep-min N       Minimum sleep seconds between passes (default 60)\n"
@@ -357,20 +358,20 @@ class UserTransferTest extends TestCase
         $runner = $this->pmssMakeStepRunner($commands, 7);
 
         [, $failedOutput] = $this->pmssCaptureStdout(static function () use ($home, $runner): void {
-            \pmssUserTransferRunRtorrentRestart($home, 'alice', $runner);
+            \pmssUserTransferRunRtorrentRestart($home, 'fixtur01', $runner);
         });
         $this->assertEquals(1, count($commands));
         $this->assertStringContainsString('restart command failed; skipping reload verification', $failedOutput);
         $this->assertStringNotContainsString('verification skipped', $failedOutput);
 
         [, $successOutput] = $this->pmssCaptureStdout(static function () use ($home): void {
-            \pmssUserTransferRunRtorrentRestart($home, 'alice', static function (): int { return 0; });
+            \pmssUserTransferRunRtorrentRestart($home, 'fixtur01', static function (): int { return 0; });
         });
         $this->assertStringContainsString('verification skipped: no session torrent files found', $successOutput);
 
         unlink($home.'/.rtorrentRestart.php');
         [, $missingOutput] = $this->pmssCaptureStdout(static function () use ($home, $runner): void {
-            \pmssUserTransferRunRtorrentRestart($home, 'alice', $runner);
+            \pmssUserTransferRunRtorrentRestart($home, 'fixtur01', $runner);
         });
         $this->assertEquals(1, count($commands));
         $this->assertStringContainsString('restart script missing or unsafe', $missingOutput);
@@ -467,6 +468,7 @@ SNAP;
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
         $expectedScratchPaths['sourceHoldScript'] = '/root/pmss-userTransfer-<generated>/eternal-hold.sh';
         $expectedScratchPaths['sourceReleaseScript'] = '/root/pmss-userTransfer-<generated>/eternal-release.sh';
+        $expectedScratchPaths['newestProbe'] = '/root/pmss-userTransfer-<generated>/newest-probe.sh';
         $this->assertEquals($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
         $this->assertSame($expectedPayloadKeys, array_keys(\pmssUserTransferScratchPayloads($cfg)));
         $this->assertStringContainsString('/etc/sub$kind', \pmssUserTransferScratchPayloads($cfg)['identityProbe']);

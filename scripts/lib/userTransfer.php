@@ -21,6 +21,7 @@
 require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/systemPrep/renderNodeAccess.php';
 pmssRequireRelativeFiles(__DIR__, ['update/runtime/commands.php', 'userTransfer/cliParse.php', 'userTransfer/postSetup.php', 'userTransfer/transferRuntime.php', 'userTransfer/eternalHold.php']);
+require_once __DIR__.'/userTransfer/repeatSafety.php';
 
 /** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
 function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array
@@ -50,6 +51,8 @@ function pmssUserTransferMain(array $argv): int
         }
         $cfg = pmssUserTransferParseCli($argv);
         $home = pmssUserTransferAssertSafeLocalHome($cfg['localUser']);
+        $transferStore = new UserConfigStore();
+        pmssUserTransferAssertNotRepeated($cfg, $transferStore);
 
         // Validate options before even the best-effort log directory creation.
         is_dir('/var/log/pmss') || @mkdir('/var/log/pmss', 0755, true);
@@ -67,6 +70,9 @@ function pmssUserTransferMain(array $argv): int
         }
 
         logMessage('[START] User transfer initialised');
+        if (!empty($cfg['force'])) {
+            logMessage('[WARN] --force permits overwriting a completed transfer or a newer target home');
+        }
         logMessage(sprintf('[INFO] Local user=%s Remote user=%s Host=%s', $cfg['localUser'], $cfg['remoteUser'], $cfg['hostname']));
         logMessage(sprintf(
             '[INFO] Main passes=%d Final passes=%d Sleep=%d..%d Verify threshold=%d%%',
@@ -146,6 +152,7 @@ function pmssUserTransferMain(array $argv): int
                 }
             }
 
+            pmssUserTransferAssertSourceNotOlder($cfg, $home, $scratchPaths);
             $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
             // Recovery copies files into a live account; the hand-over of services (Eternals holds, Docker) belongs
             // to a migration only and must never pause, start or hold anything on the live account.
@@ -215,6 +222,7 @@ function pmssUserTransferMain(array $argv): int
                     pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['sourceReleaseScript']])) !== 0) return 1;
             }
 
+            pmssUserTransferRecordCompletion($cfg, $transferStore);
             logMessage('[OK] User transfer complete');
             $transferComplete = true;
             return 0;

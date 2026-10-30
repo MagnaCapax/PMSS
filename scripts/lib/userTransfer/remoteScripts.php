@@ -15,6 +15,7 @@ function pmssUserTransferScratchPaths(string $scratchRoot): array
     return [
         'expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh',
         'identityProbe' => $scratchRoot.'/identity-probe.sh', 'namespaceProbe' => $scratchRoot.'/namespace-probe.sh',
+        'newestProbe' => $scratchRoot.'/newest-probe.sh',
         'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh',
         'remoteSizeScript' => $scratchRoot.'/remote-size.sh', 'qbittorrentProbeScript' => $scratchRoot.'/qbittorrent-categories.sh',
         'dockerQuiesceScript' => $scratchRoot.'/docker-quiesce.sh', 'dockerIds' => $scratchRoot.'/docker-ids',

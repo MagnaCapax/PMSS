@@ -476,12 +476,28 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
 - User transfer – `scripts/util/userTransfer.php`
+  - Normal migrations refuse a previously completed source host/account pair
+    before authentication, and refuse target regular files newer than the newest
+    source file before the first rsync pass. `--force` explicitly permits these
+    two overwrite risks and logs a warning; existing home, ownership and receiver
+    guards still apply. Missing/malformed completion state and failed/incomplete
+    timestamp probes fail closed, including unreadable source files in the
+    compatibility namespace path. Timestamp scans use `find -P -xdev`, preserve
+    fractional precision and emit no customer paths.
+  - Successful normal migrations save a UTC timestamp under
+    `userTransferCompleted["<lowercase-source-host>/<remote-account>"]` in the
+    canonical root-owned user store, preserving earlier sources. A failed save
+    returns nonzero without reporting completion. `--into` skips both new guards
+    and never records a migration. Dry runs check stored history but perform no
+    timestamp scans or completion writes. Fresh provisioning files or clock skew
+    can trigger the age guard; review before using `--force`. No records are
+    backfilled, and DNS aliases are distinct source keys (ADR 0214).
   - `--into DIR` (or `--into=DIR`) recovers into `/home/LOCAL_USERNAME/DIR/`
     with `--ignore-existing` and `--compare-dest=/home/LOCAL_USERNAME/` on every rsync pass, so a
     file the live home already holds unchanged is not copied again. `DIR` must be one plain
     component matching `[A-Za-z0-9._-]+`, excluding `.` and `..`; invalid values
     are refused before network access or filesystem changes. For example:
-    `/scripts/util/userTransfer.php alice old-host.example --into old-copy`.
+    `/scripts/util/userTransfer.php fixtur01 old-host.example --into old-copy`.
     The receiver creates a missing directory as the account with mode `0700`,
     refuses links, non-directories and foreign owners, and pins the checked
     inode as its working directory (ADR 0092). Existing files are skipped;

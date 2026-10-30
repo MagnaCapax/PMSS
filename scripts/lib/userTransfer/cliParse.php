@@ -19,6 +19,7 @@ function pmssUserTransferParseCli(array $argv): array
         '/scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_USERNAME REMOTE_HOSTNAME',
     ], [
         ['--into DIR', 'Recover into DIR without replacing existing files; skip post-transfer setup'],
+        ['--force', 'Permit overwriting a completed transfer or newer target files'],
         ['--main-passes N', 'Number of passes for the main rsync (default 31)'],
         ['--final-passes N', 'Number of passes for the final rsync (default 3)'],
         ['--sleep-min N', 'Minimum sleep seconds between passes (default 60)'],
@@ -35,6 +36,7 @@ function pmssUserTransferParseCli(array $argv): array
 
     $optionSpecs = [
         'into' => ['field' => 'into', 'default' => null, 'expectsValue' => true],
+        'force' => ['field' => 'force', 'default' => false, 'expectsValue' => false],
         'main-passes' => ['field' => 'mainPasses', 'default' => 31, 'expectsValue' => true, 'range' => [1, 500]],
         'final-passes' => ['field' => 'finalPasses', 'default' => 3, 'expectsValue' => true, 'range' => [1, 100]],
         'sleep-min' => ['field' => 'sleepMin', 'default' => 60, 'expectsValue' => true],
@@ -59,6 +61,9 @@ function pmssUserTransferParseCli(array $argv): array
             throw new RuntimeException('Unknown option: '.(strlen((string) $key) === 1 ? '-' : '--').$key, 1);
         }
         if (!$spec['expectsValue']) {
+            if ($key === 'force' && $value !== true) {
+                throw new RuntimeException('Option --force does not accept a value', 1);
+            }
             $options[$spec['field']] = true;
             continue;
         }
@@ -133,6 +138,7 @@ function pmssUserTransferParseCli(array $argv): array
     if ($options['into'] !== null) {
         $cfg['into'] = $options['into'];
     }
+    if ($options['force']) $cfg['force'] = true;
 
     return $cfg;
 }
