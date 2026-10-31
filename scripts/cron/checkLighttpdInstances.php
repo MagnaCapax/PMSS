@@ -10,6 +10,7 @@ require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogNginxLogReader.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
+require_once __DIR__.'/../lib/lighttpd/watchdogCustomConfig.php';
 require_once __DIR__.'/../lib/lighttpd/hermesUiConverge.php';
 require_once __DIR__.'/../lib/lighttpd/transmissionProxy.php';
 require_once __DIR__.'/../lib/runtime.php';
@@ -155,7 +156,11 @@ foreach($users AS $thisUser) {
             usleep(50000);
         }
     );
-    pmssUserWatchdogEnsureServices($thisUser, [pmssUserWatchdogServiceSpec('lighttpd', '/scripts/startLighttpd ' . $thisUser, 'lighttpd start requested')], ['lighttpd' => $lighttpdRunning]);
+    for ($startAttempt = 0; $startAttempt < 2; $startAttempt++) {
+        pmssUserWatchdogEnsureServices($thisUser, [pmssUserWatchdogServiceSpec('lighttpd', '/scripts/startLighttpd ' . $thisUser, 'lighttpd start requested')], ['lighttpd' => $lighttpdRunning]);
+        // At most one fragment is set aside, followed by one ordinary start.
+        if ($startAttempt > 0 || !pmssLighttpdWatchdogCustomConfigRecover($thisUser, $homeDir, $configPath, $lighttpdRunning)) break;
+    }
     if ($restartRequired) {
         $restartVerification = pmssLighttpdWatchdogRestartVerify($homeDir, $socketPaths);
         if ($restartVerification['status'] !== 'healthy') {
