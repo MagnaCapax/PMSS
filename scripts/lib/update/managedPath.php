@@ -147,15 +147,31 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
             $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
             return '';
         }
-        if (!pmssLockFileHandleMatchesPath($source, $path)) {
+        $target = false;
+        try {
+            $sourceMatches = pmssLockFileHandleMatchesPath($source, $path);
+            if ($sourceMatches) {
+                $target = @fopen($backup, 'xb');
+                if (is_resource($target)) {
+                    try {
+                        $sourceStat = @fstat($source);
+                        $copied = @stream_copy_to_stream($source, $target);
+                    } finally {
+                        // The destination closes before the source, including failed copies.
+                        $targetClosed = @fclose($target);
+                    }
+                }
+            }
+        } finally {
+            // Metadata/open/copy throwables must not retain the acquired source.
             @fclose($source);
+        }
+        if (!$sourceMatches) {
             $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
             return '';
         }
 
-        $target = @fopen($backup, 'xb');
-        if (!is_resource($target)) {
-            @fclose($source);
+        if ($target === false) {
             if (pmssPathExistsOrLink($backup)) {
                 continue;
             }
@@ -163,10 +179,6 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
             return '';
         }
 
-        $sourceStat = @fstat($source);
-        $copied = @stream_copy_to_stream($source, $target);
-        $targetClosed = @fclose($target);
-        @fclose($source);
         // A short copy must not be published as a usable backup.
         if (is_array($sourceStat) && isset($sourceStat['size'], $sourceStat['mode']) && $copied === $sourceStat['size'] && $targetClosed
             && @chmod($backup, $sourceStat['mode'] & 0777)) {

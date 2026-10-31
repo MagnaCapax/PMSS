@@ -141,6 +141,14 @@ fallback precedence and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Managed-path backups own their source and destination streams through nested
+`finally` blocks. Inode checks, target opens, metadata reads and copy failures
+release acquired handles before propagating the original throwable; the source
+also closes if destination close throws. Normal destination-before-source close
+order, collision retries, short-copy refusal, modes, return values and warnings
+remain unchanged. `ManagedPathBackupSafetyTest` injects exceptions and errors
+without opening managed files; execution stays on the testing machine.
+
 Quota recovery header inspection closes its stream in `finally` when the read
 throws an exception or error, preserving the original throwable. Normal header
 decisions, failed/short reads and pre-open refusals retain their existing results;
