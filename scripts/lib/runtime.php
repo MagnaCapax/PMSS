@@ -12,7 +12,7 @@
 
 require_once __DIR__.'/log.php';
 require_once __DIR__.'/cli/helpText.php';
-// environment.php owns the path and probe defaults below; load it before anything derives from them.
+// The environment include exports value/probe helpers before runtime consumers load.
 require_once __DIR__.'/runtime/environment.php';
 
 const PMSS_RUNTIME_FALLBACK_LOG = PMSS_LOG_DIR_DEFAULT.'/runtime.log';
@@ -45,11 +45,8 @@ if (!function_exists('pmssFormatBytes')) {
         $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
         $index = 0;
         $minimumUnitIndex = max(0, min($minimumUnitIndex, count($units) - 1));
-        while ($index < $minimumUnitIndex && $index < count($units) - 1) {
-            $bytes /= 1024.0;
-            $index++;
-        }
-        while ($bytes >= 1024.0 && $index < count($units) - 1) {
+        // Minimum-unit and magnitude promotion share the same scaling sequence.
+        while ($index < count($units) - 1 && ($index < $minimumUnitIndex || $bytes >= 1024.0)) {
             $bytes /= 1024.0;
             $index++;
         }

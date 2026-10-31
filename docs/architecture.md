@@ -100,6 +100,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   trimming binary names or raw lookup output; ioping probes reject NUL targets before shell quoting.
   These boundaries retain their empty-string/null failure results and preserve
   ordinary whitespace normalization and valid probe arguments.
+  This stable include owns environment defaults and loads pure numeric values,
+  config rows, executable lookup, shell construction and latency observations
+  from focused runtime modules. Command capture shares one status-polling loop
+  while retaining each I/O mode's deadline and failed-status policy (ADR 0220).
 - **scripts/lib/runtime/filesystem.php** – Stable include for path/inode primitives,
   temporary workspaces, stream writes, file reads, and host values. Its sibling
   modules keep those responsibilities separate. Bounded and unbounded readers

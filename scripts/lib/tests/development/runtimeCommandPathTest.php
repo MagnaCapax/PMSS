@@ -54,7 +54,7 @@ function shell_exec($command) {
     return $GLOBALS['lookupOutput'];
 }
 PHP;
-        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/environment.php', 'CommandPathOutputFixture');
+        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/commandLookup.php', 'CommandPathOutputFixture');
         $script .= <<<'PHP'
 $path = PHP_BINARY;
 $cases = [

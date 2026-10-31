@@ -75,7 +75,8 @@ function pmssCommandCapture($command, $timeout) {
 }
 PHP;
         $script .= 'require_once '.var_export(dirname(__DIR__, 2).'/runtime.php', true).';';
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/environment.php', 'IopingCaptureFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/commandLookup.php', 'IopingCaptureFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/ioping.php', 'IopingCaptureFixture');
         $script .= <<<'PHP'
 [$GLOBALS['flock'], $cases] = json_decode(getenv('PMSS_TEST_IOPING_CAPTURE'), true);
 $GLOBALS['calls'] = [];

@@ -92,29 +92,22 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
 
     $startedAt = microtime(true);
     $lastStatus = null;
-    $capture = ['stdout' => '', 'stderr' => '', 'timed_out' => false];
-    if ($inheritTty) {
+    $capture = $inheritTty ? ['stdout' => '', 'stderr' => '', 'timed_out' => false]
+        : pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
+    if (!$inheritTty) pmssProcessPipesClose([$pipes[1], $pipes[2]]);
+    // Both modes wait here; closed pipes do not prove a bounded child has exited.
+    // Keep inherited-terminal cadence, strict deadline and failed-status behavior.
+    if ($inheritTty || (!$capture['timed_out'] && $timeoutSec > 0)) {
         while (true) {
             $status = proc_get_status($process);
             $lastStatus = is_array($status) ? $status : $lastStatus;
-            if (!is_array($status) || empty($status['running'])) break;
-            if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) { $capture['timed_out'] = true; break; }
-            usleep(200000);
-        }
-    } else {
-        $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
-        pmssProcessPipesClose([$pipes[1], $pipes[2]]);
-        // A child can close both output pipes and keep running. Never enter
-        // proc_close() until it exits or the same group deadline fires.
-        if (!$capture['timed_out'] && $timeoutSec > 0) {
-            while (true) {
-                $status = proc_get_status($process);
-                $lastStatus = is_array($status) ? $status : $lastStatus;
-                if (!is_array($status)) { $capture['timed_out'] = true; break; }
-                if (empty($status['running'])) break;
-                if (microtime(true) - $startedAt >= $timeoutSec) { $capture['timed_out'] = true; break; }
-                usleep(100000);
+            if (!is_array($status)) { $capture['timed_out'] = !$inheritTty; break; }
+            if (empty($status['running'])) break;
+            if ($timeoutSec > 0) {
+                $elapsed = microtime(true) - $startedAt;
+                if ($inheritTty ? $elapsed > $timeoutSec : $elapsed >= $timeoutSec) { $capture['timed_out'] = true; break; }
             }
+            usleep($inheritTty ? 200000 : 100000);
         }
     }
     $rc = $capture['timed_out']

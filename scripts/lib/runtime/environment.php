@@ -1,13 +1,5 @@
 <?php
-/**
- * Scalar, environment, and command-discovery helpers for the runtime facade.
- *
- * Loaded only through `scripts/lib/runtime.php`; the facade keeps caller
- * includes stable while this module owns pure value transforms.
- *
- * @license GPL-3.0-only
- * @author PMSS Team
- */
+/** Environment defaults and the stable value/probe include. @license GPL-3.0-only */
 
 // The dir helpers below resolve through pathSafety.php; load it so a direct require can call them.
 require_once dirname(__DIR__).'/pathSafety.php';
@@ -18,144 +10,15 @@ const PMSS_LOG_DIR_DEFAULT = '/var/log/pmss';
 const PMSS_RUNTIME_DIR_DEFAULT = '/var/run/pmss';
 const PMSS_STATE_DIR_DEFAULT = '/var/lib/pmss';
 const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
-const PMSS_IOPING_PROBE_COUNT = 60;
-const PMSS_IOPING_PROBE_INTERVAL = '0.1';
-const PMSS_IOPING_PROBE_TIMEOUT = 15;
+
+require_once __DIR__.'/values.php';
+require_once __DIR__.'/config.php';
+require_once __DIR__.'/commandLookup.php';
+require_once __DIR__.'/commandShell.php';
+require_once __DIR__.'/ioping.php';
 
 function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
-function pmssCommandBinaryNameIsSafe(string $binary): bool { return preg_match('/^[A-Za-z0-9._+-]+$/', $binary) === 1; }
-function pmssCommandPathCandidateIsSafe(string $path): bool { return strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false; }
 function pmssBlockDeviceNameIsDataDevice(string $device): bool { return preg_match(PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN, $device) === 1; }
-
-/** Parse numeric scalars without trimming strings or accepting non-finite conversions. */
-function pmssFiniteFloat($value): ?float
-{
-    if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) return null;
-    $number = (float) $value;
-    return is_finite($number) ? $number : null;
-}
-
-/** Accept finite, non-negative numeric scalars from telemetry and policy data. */
-function pmssFiniteNonNegativeFloat($value): ?float
-{
-    $number = pmssFiniteFloat($value);
-    return $number !== null && $number >= 0 ? $number : null;
-}
-
-function pmssCommandPath(string $binary): string
-{
-    // trim() removes edge NULs; reject them before they can name another binary.
-    if (pmssFilesystemPathHasNulByte($binary)) return '';
-    $binary = trim($binary);
-    if (!pmssCommandBinaryNameIsSafe($binary)) return '';
-    $resolved = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
-    // Reject raw NUL bytes before trim() can turn malformed output into a valid path.
-    if (!is_string($resolved) || pmssFilesystemPathHasNulByte($resolved)) return '';
-    $path = trim($resolved);
-    return pmssCommandPathCandidateIsSafe($path) && is_executable($path) ? $path : '';
-}
-
-function pmssCommandArgvShellQuote(array $argv): string { return implode(' ', array_map(static function ($arg): string { return escapeshellarg((string) $arg); }, $argv)); }
-
-/**
- * Build a shell-safe argv-style command string from a program and arguments.
- */
-function pmssBuildCommand(string $program, array $args = []): string
-{
-    $prog = escapeshellcmd($program);
-    return empty($args) ? $prog : $prog.' '.pmssCommandArgvShellQuote($args);
-}
-
-function pmssBuildUserShellCommand(string $username, string $command, string $shell = ''): string { return $shell === '' ? 'su '.escapeshellarg($username).' -c '.escapeshellarg($command) : 'su -s '.escapeshellarg($shell).' -c '.escapeshellarg($command).' '.escapeshellarg($username); }
-
-/** Avoid su's logind session; isolate the operator TTY and environment from the account process. */
-function pmssBuildUserShellNoPamCommand(string $username, string $command): string
-{
-    static $supportsPty = null;
-    if ($supportsPty === null) {
-        $help = @shell_exec('runuser --help 2>&1');
-        $supportsPty = is_string($help) && strpos($help, '--pty') !== false;
-        error_log('PMSS no-PAM runuser mode: '.($supportsPty ? 'pty' : 'setsid'));
-    }
-    $runner = $supportsPty ? 'runuser --pty' : 'setsid runuser';
-    return 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin '.$runner.' -u '.escapeshellarg($username).' -- sh -c '.escapeshellarg($command).' </dev/null';
-}
-
-/** Run the canonical direct-I/O 4 KiB latency probe and return raw output. */
-function pmssIopingProbeOutput(?string $target): ?string
-{
-    // Keep malformed paths on the null-result path before shell quoting can throw.
-    if ($target !== null && pmssFilesystemPathHasNulByte($target)) return null;
-    $bin = pmssCommandPath('ioping');
-    if ($bin === '' || $target === null || trim($target) === '') return null;
-    $command = pmssCommandArgvShellQuote([$bin, '-c', (string) PMSS_IOPING_PROBE_COUNT, '-i', PMSS_IOPING_PROBE_INTERVAL, '-D', $target]);
-    // Single-instance guard (#751): bind the lock to the ioping process itself, so a
-    // direct-I/O probe orphaned in D-state past the timeout wrapper blocks only its
-    // OWN next tick instead of piling up N-deep and DoSing the host it measures.
-    // A PHP-level flock() would release when the wrapper is proc_terminate'd at the
-    // timeout while the stuck probe still holds the device queue — so keep the lock
-    // on the exec'd command (same idiom as the storage-health probes, Refs #758).
-    $flock = pmssCommandPath('flock');
-    if ($flock !== '') {
-        $lockPath = pmssRuntimeLockPath('pmss-ioping-'.(preg_replace('#[^A-Za-z0-9]+#', '-', trim((string) $target, '/')) ?: 'root').'.lock');
-        $command = escapeshellarg($flock).' -xn -E 75 '.escapeshellarg($lockPath).' '.$command;
-    }
-    // flock -xn exits 75 without launching ioping when a prior probe still holds the
-    // lock; that produces empty output -> null -> callers report the existing 'na'
-    // sentinel for that tick (a skipped probe under contention is correct).
-    $result = pmssCommandCapture($command, PMSS_IOPING_PROBE_TIMEOUT);
-    // Failed or timed-out probes can leave parseable partial latency samples.
-    if ((int) ($result['rc'] ?? 1) !== 0) return null;
-    $out = trim($result['stdout'] !== '' ? $result['stdout'] : $result['stderr']);
-    return $out === '' ? null : $out;
-}
-
-function pmssIopingValueToMs(float $value, string $unit): float { return strtolower($unit) === 'us' ? $value / 1000.0 : (strtolower($unit) === 's' ? $value * 1000.0 : $value); }
-/** Reject malformed or overflowing averages before publishing a latency sample. */
-function pmssIopingAverageMsFromOutput(string $output): ?float
-{
-    if (!preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(us|ms|s)\s*\//i', $output, $m)) return null;
-    return pmssFiniteFloat(pmssIopingValueToMs((float) $m[1], $m[2]));
-}
-
-/** Parse per-request ioping samples, ignoring summary lines. */
-function pmssIopingSamplesMsFromOutput(string $output): array
-{
-    preg_match_all('/\btime\s*=\s*([0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(us|ms|s)\b/i', $output, $matches, PREG_SET_ORDER);
-    $values = [];
-    foreach ($matches as $match) {
-        $value = pmssIopingValueToMs((float) $match[1], $match[2]);
-        // Seconds-to-milliseconds conversion can overflow even a finite input.
-        if (is_finite($value)) $values[] = $value;
-    }
-    return $values;
-}
-
-function pmssIopingMedianMsFromSamples(array $values): ?float
-{
-    if (empty($values)) return null;
-    sort($values, SORT_NUMERIC);
-    $count = count($values);
-    $mid = (int) floor(($count - 1) / 2);
-    if ($count % 2 === 1) return (float) $values[$mid];
-    $sum = (float) $values[$mid] + (float) $values[$mid + 1];
-    // Keep legacy rounding unless adding two finite latencies overflows.
-    return is_finite($sum) ? $sum / 2.0 : (float) $values[$mid] / 2.0 + (float) $values[$mid + 1] / 2.0;
-}
-
-function pmssIopingAverageMs(?string $target): ?float
-{
-    $out = pmssIopingProbeOutput($target);
-    return $out === null ? null : pmssIopingAverageMsFromOutput($out);
-}
-
-function pmssIopingMedianMs(?string $target): ?float
-{
-    $out = pmssIopingProbeOutput($target);
-    if ($out === null) return null;
-    $median = pmssIopingMedianMsFromSamples(pmssIopingSamplesMsFromOutput($out));
-    return $median ?? pmssIopingAverageMsFromOutput($out);
-}
 
 /** Read a trimmed override; blank values use the default verbatim, while zero is retained. */
 function pmssEnvTrimmed(string $envKey, string $default = ''): string
@@ -167,102 +30,12 @@ function pmssEnvTrimmed(string $envKey, string $default = ''): string
 /** Read unsigned decimal overrides without trimming; callers own defaults and zero policy. */
 function pmssEnvReadDigits(string $envKey): ?int { return (($value = getenv($envKey)) !== false && ctype_digit($value)) ? (int) $value : null; }
 
-/** Parse an untrimmed unsigned decimal only when PHP can represent it exactly. */
-function pmssUnsignedDecimalIntParse(string $raw): ?int
-{
-    if (!ctype_digit($raw)) return null;
-    $digits = ltrim($raw, '0');
-    $limit = (string) PHP_INT_MAX;
-    if (strlen($digits) > strlen($limit)
-        || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) return null;
-    return (int) $raw;
-}
-
 function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }
 function pmssValueMatchesNormalized($value, array $tokens): bool { return in_array(pmssEnvValueNormalized($value), $tokens, true); }
 function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized($value, ['', '0', 'false', 'no']); }
 function pmssEnvValueIsTruthy($value): bool { return pmssValueMatchesNormalized($value, ['1', 'true', 'yes', 'on']); }
 function pmssEnvFlagEnabled(string $envKey): bool { return getenv($envKey) === '1'; }
 function pmssTestModeEnabled(): bool { return (defined('PMSS_TEST_MODE') && pmssEnvValueIsTruthy(constant('PMSS_TEST_MODE'))) || pmssEnvValueIsTruthy(getenv('PMSS_TEST_MODE')); }
-function pmssNonEmptyStrings(array $values): array { return array_values(array_filter($values, 'strlen')); }
-
-function pmssParseSizeToBytes(string $value, bool $wholeNumberOnly = false, bool $allowBareBinarySuffix = false): ?float
-{
-    $value = trim($value);
-    $numberPattern = $wholeNumberOnly ? '[0-9]+' : '[0-9]+(?:\.[0-9]+)?';
-    $suffixPattern = $allowBareBinarySuffix ? '(?:i?B?)?' : '(?:i?B)?';
-    if (preg_match('/^('.$numberPattern.')\s*([KMGTPE]?)'.$suffixPattern.'$/i', $value, $matches) !== 1) return null;
-    $powers = ['' => 0, 'K' => 1, 'M' => 2, 'G' => 3, 'T' => 4, 'P' => 5, 'E' => 6];
-    return (float) $matches[1] * pow(1024, $powers[strtoupper($matches[2])]);
-}
-
-function pmssParseSizeToMiB($value): ?int
-{
-    $raw = trim((string) $value);
-    if ($raw === '' || $raw === 'infinity' || $raw === '0') return null;
-    if (preg_match('/^[0-9.]+\s*[KMG]?B?$/i', $raw) !== 1) return is_numeric($raw) ? (int) round(((float) $raw) / 1048576) : null;
-    $bytes = pmssParseSizeToBytes($raw);
-    return $bytes !== null ? (int) round($bytes / 1048576) : null;
-}
-
-function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): string
-{
-    $trimmed = trim($line);
-    foreach ($commentPrefixes as $prefix) if ($prefix !== '' && strpos($trimmed, $prefix) === 0) return '';
-    return $trimmed;
-}
-
-/** Yield trimmed, nonempty lines with source keys and caller-owned comment policy. */
-function pmssConfigLines(array $lines, array $commentPrefixes = ['#']): \Generator
-{
-    foreach ($lines as $index => $line) {
-        if (($trimmed = pmssConfigLineTrimmed((string) $line, $commentPrefixes)) !== '') {
-            yield $index => $trimmed;
-        }
-    }
-}
-
-/** Split LF/CRLF text, retaining whitespace, comments, empty fields and lone CR bytes. */
-function pmssTextLines(string $text, int $limit = -1): array { return preg_split('/\r?\n/', $text, $limit); }
-
-/** Split LF/CRLF text into filtered lines without losing source indices. */
-function pmssConfigTextLines(string $text, array $commentPrefixes = ['#']): \Generator { return pmssConfigLines(pmssTextLines($text), $commentPrefixes); }
-/** Parse LF/CRLF text through the same column and comment rules as array rows. */
-function pmssConfigTextRows(string $text, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): \Generator { return pmssConfigRows(pmssTextLines($text), $minColumns, $commentPrefixes, $limit); }
-
-/** A positive split limit preserves the remaining text in the final column. */
-function pmssConfigLineColumns(string $line, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): array
-{
-    $trimmed = pmssConfigLineTrimmed($line, $commentPrefixes);
-    if ($trimmed === '') return [];
-    $columns = preg_split('/\s+/', $trimmed, $limit);
-    return is_array($columns) && count($columns) >= $minColumns ? $columns : [];
-}
-
-/** Yield accepted column rows lazily, preserving source keys and caller-owned validation. */
-function pmssConfigRows(array $lines, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): \Generator
-{
-    foreach ($lines as $index => $line) {
-        if (($columns = pmssConfigLineColumns((string) $line, $minColumns, $commentPrefixes, $limit)) !== []) {
-            yield $index => $columns;
-        }
-    }
-}
-
-function pmssConfigOptionsUpdatePlan(string $optionList, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false): array
-{
-    $options = pmssNonEmptyStrings(explode(',', $optionList));
-    if ($dropDefaultsOnly && $options === ['defaults']) $options = [];
-    $removed = [];
-    foreach ($removeOptions as $removeOption) {
-        $index = array_search($removeOption, $options, true);
-        if ($index === false) continue;
-        unset($options[$index]);
-        $removed[] = $removeOption;
-    }
-    $added = array_values(array_diff($requiredOptions, $options));
-    return ['options' => array_merge($options, $added), 'added' => $added, 'removed' => $removed];
-}
 
 function pmssLogDir(): string { return pmssResolvePathFromEnv('PMSS_LOG_DIR', PMSS_LOG_DIR_DEFAULT); }
 function pmssRuntimeDir(): string { return pmssResolvePathFromEnv('PMSS_RUNTIME_DIR', PMSS_RUNTIME_DIR_DEFAULT); }

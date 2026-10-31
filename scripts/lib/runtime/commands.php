@@ -82,14 +82,11 @@ function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null
     }
 
     $exitCode = $result['rc'];
-    $stdout = $result['stdout'];
-    $stderr = $result['stderr'];
-    $timedOut = $result['timed_out'];
-    $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => $stdout, 'stderr' => $stderr];
+    $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => $result['stdout'], 'stderr' => $result['stderr']];
     if ($exitCode !== 0) {
-        $excerpt = trim($stderr);
+        $excerpt = trim($result['stderr']);
         $excerpt = $excerpt !== '' ? ' :: '.pmssLogWhitespaceCollapse(substr($excerpt, 0, 300)) : '';
-        if ($timedOut) {
+        if ($result['timed_out']) {
             $msg = pmssCliAnsiStyle('[TIMEOUT]', '1;31', $isInteractive)
                 .' Command timed out after '.$timeoutSec.'s: '.$cmd;
             fwrite(STDERR, $msg.PHP_EOL);
