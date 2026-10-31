@@ -141,6 +141,12 @@ fallback precedence and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Quota recovery header inspection closes its stream in `finally` when the read
+throws an exception or error, preserving the original throwable. Normal header
+decisions, failed/short reads and pre-open refusals retain their existing results;
+quota recount selection remains unchanged (ADR 0159). `QuotaFixGuardTest` covers
+the stream lifetime with isolated read faults on the testing machine.
+
 Watchdog state projections share socket-failure results and escalation timestamp
 normalization, select recent-restart grace once, and consume single-use fields
 directly (ADRs 0209 and 0212). Marker guards, complete writes, thresholds, payload

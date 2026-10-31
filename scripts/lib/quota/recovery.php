@@ -15,8 +15,12 @@ function pmssQuotaFileHeaderInvalid(string $path, string $type): bool
     if ($magic === null || !is_file($path) || ($handle = @fopen($path, 'rb')) === false) {
         return false;
     }
-    $header = fread($handle, 8);
-    fclose($handle);
+    try {
+        $header = fread($handle, 8);
+    } finally {
+        // A read exception must release the stream before recovery unwinds.
+        fclose($handle);
+    }
     if (!is_string($header) || strlen($header) < 8) {
         return true;
     }

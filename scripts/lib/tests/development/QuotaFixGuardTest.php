@@ -321,4 +321,72 @@ class QuotaFixGuardTest extends TestCase
         $this->assertFalse(\pmssQuotaFileHeaderInvalid($dir.'/missing', 'user'));
         $this->assertFalse(\pmssQuotaFileHeaderInvalid($dir, 'user'));
     }
+
+    public function testQuotaHeaderReadClosesStreamsAndPreservesThrowables(): void
+    {
+        // Isolate native read faults; no quota file or quota command is touched.
+        $script = <<<'PHP'
+namespace QuotaHeaderStreamFixture;
+function is_file($path) { return $GLOBALS['fault'] !== 'missing'; }
+function fopen($path, $mode) {
+    $GLOBALS['events'][] = ['open', $mode];
+    return $GLOBALS['fault'] === 'open-false' ? false : ($GLOBALS['stream'] = \fopen('php://temp', 'w+'));
+}
+function fread($handle, $length) {
+    $GLOBALS['events'][] = ['read', $length];
+    if ($GLOBALS['failure'] !== null) throw $GLOBALS['failure'];
+    return $GLOBALS['fault'] === 'read-false' ? false : hex2bin($GLOBALS['header']);
+}
+function fclose($handle) {
+    $GLOBALS['events'][] = ['close'];
+    return \fclose($handle);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/quota/recovery.php', 'QuotaHeaderStreamFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach (json_decode(getenv('PMSS_TEST_QUOTA_HEADER_CASES'), true) as [$type, $header, $fault, $expected]) {
+    $GLOBALS['fault'] = $fault;
+    $GLOBALS['header'] = $header;
+    $GLOBALS['failure'] = $fault === 'exception' ? new \RuntimeException('read failure')
+        : ($fault === 'error' ? new \Error('read failure') : null);
+    $GLOBALS['stream'] = null;
+    $GLOBALS['events'] = [];
+    $result = $caught = null;
+    try { $result = pmssQuotaFileHeaderInvalid('/fixture/aquota.'.$type, $type); }
+    catch (\Throwable $error) { $caught = $error; }
+    $results[] = [$result, $caught !== null && $caught === $GLOBALS['failure'],
+        is_resource($GLOBALS['stream']), $GLOBALS['events']];
+}
+echo json_encode($results);
+PHP;
+        // Keep the user/group v0/v1 decisions and all pre-open refusal paths.
+        $cases = [
+            ['user', '111fc0d900000000', 'ok', false],
+            ['user', '111fc0d901000000', 'ok', false],
+            ['group', '2719c0d900000000', 'ok', false],
+            ['group', '2719c0d901000000', 'ok', false],
+            ['group', '111fc0d901000000', 'ok', true],
+            ['user', '111fc0d902000000', 'ok', true],
+            ['user', '111fc0d9', 'ok', true],
+            ['group', '', 'ok', true],
+            ['user', '', 'read-false', true],
+            ['user', '', 'exception', null],
+            ['group', '', 'error', null],
+            ['user', '', 'open-false', false],
+            ['group', '', 'missing', false],
+            ['project', '', 'ok', false],
+        ];
+        $results = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_QUOTA_HEADER_CASES' => json_encode($cases)]);
+        $this->assertSame(count($cases), count($results));
+        foreach ($cases as $index => [$type, $header, $fault, $expected]) {
+            $events = $type === 'project' || $fault === 'missing' ? [] : [['open', 'rb']];
+            if ($events !== [] && $fault !== 'open-false') {
+                $events[] = ['read', 8];
+                $events[] = ['close'];
+            }
+            $this->assertSame([$expected, in_array($fault, ['exception', 'error'], true), false, $events],
+                $results[$index], 'quota header case '.$index);
+        }
+    }
 }
