@@ -40,16 +40,18 @@ remains a separate Basic-only `auth.require` zone and is never routed through Lu
 
 The login/logout PHP lives in `etc/skel/www/` and is synced to existing users by
 the normal skeleton file flow. It validates passwords only against the existing
-per-user htpasswd file with `crypt()` comparison. It writes one flat per-user
+per-user htpasswd file with constant-time hash comparison, using `crypt()` for
+its supported formats and a local Apache MD5-crypt calculation for legacy
+`$apr1$` entries. It writes one flat per-user
 session file under `~/.lighttpd/` with mode `0600`, regenerates the session id on
 successful login, requires a CSRF token for POST, and emits a host-scoped cookie
 with `Secure`, `HttpOnly`, and `SameSite=Lax`.
 
 Password changes write bcrypt (`$2y$`) to the per-user htpasswd file so
 lighttpd, the PHP panel verifier, and rclone can all use the new entry. Existing
-`$apr1$` entries are not rewritten by an update: they remain usable by lighttpd
-and rclone but cannot pass the PHP session or Configure password check until a
-password change writes a bcrypt entry. Unsuspend continues to copy the shadow
+`$apr1$` entries are verified in place, without being rewritten by an update or
+login, so Configure saves and opt-in session login work before the next password
+change writes a bcrypt entry. Unsuspend continues to copy the shadow
 hash verbatim; its compatibility with every reader requires separate validation.
 
 ## Invariants
@@ -79,6 +81,33 @@ Basic spine that preserves the existing htpasswd `auth.require` rule. If the Lua
 gate cannot read the session file, it falls back to Basic instead of failing the
 request pipeline.
 
+## Legacy htpasswd verification (2026-10-31, GH #1093)
+
+PHP `crypt()` cannot calculate Apache's `$apr1$` dialect. The customer helper
+therefore calculates that legacy format in PHP and retains the same full-hash
+`hash_equals()` password gate. Malformed apr1 hashes and NUL-containing apr1
+passwords fail closed. Other formats retain their existing `crypt()` path.
+Fixed OpenSSL-generated vectors cover both the verifier and its Configure/login
+callers; tests require no external hashing tool at runtime.
+
+Alternatives considered: invoking htpasswd would depend on customer PHP process
+permissions and introduce a credential transport; migrating from shadow would
+assume the panel and Unix credentials match. Local verification adds neither
+dependency. The existing skeleton manifest already delivers this helper.
+
+Security review: legacy MD5 hashes permit cheap offline guessing if the existing
+account-owned htpasswd file is exposed; a recovered account password can expose
+the panel, account files and any SSH access using that password. This change
+creates no credential store, service credential, file permission change or public
+listener. New password writes remain bcrypt. Review of lighttpd's
+[CVE-2015-3200](https://security-tracker.debian.org/tracker/CVE-2015-3200)
+(authentication log injection) and
+[CVE-2011-4362](https://security-tracker.debian.org/tracker/CVE-2011-4362)
+(authentication parser out-of-bounds read) reinforces keeping this calculation
+independent of HTTP header decoding and keeping passwords/hashes out of logs.
+Existing CSRF, cookie, session-file mode and account/service separation guards
+remain in their current callers.
+
 ## Consequences
 - Positive: existing users see no config change until explicitly opted in.
 - Positive: browser login improves without moving auth policy into nginx or PHP
@@ -98,3 +127,5 @@ request pipeline.
 - OWASP Session Management Cheat Sheet.
 - OWASP CSRF Prevention Cheat Sheet.
 - lighttpd `mod_magnet` and `mod_auth` documentation/source.
+- [Apache password formats](https://httpd.apache.org/docs/2.4/misc/password_encryptions.html): apr1 encoding.
+- [OpenSSL passwd](https://docs.openssl.org/4.1/man1/openssl-passwd/): independent apr1 fixture generation.

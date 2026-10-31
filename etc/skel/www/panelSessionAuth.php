@@ -24,13 +24,63 @@ function pmssPanelSessionHtpasswdHashRead(array $paths, string $username): ?stri
     return null;
 }
 
+/** Compute legacy Apache MD5-crypt for verification only; writers keep bcrypt. */
+function pmssPanelSessionApr1Hash(string $password, string $salt): string
+{
+    $length = strlen($password);
+    $context = $password.'$apr1$'.$salt;
+    $digest = md5($password.$salt.$password, true);
+    for ($remaining = $length; $remaining > 0; $remaining -= 16) {
+        $context .= substr($digest, 0, min(16, $remaining));
+    }
+    // MD5-crypt mixes the password length bits, using NUL for each set bit.
+    for ($bits = $length; $bits > 0; $bits >>= 1) {
+        $context .= ($bits & 1) ? "\0" : $password[0];
+    }
+    $digest = md5($context, true);
+    // Apache MD5-crypt always performs 1,000 mixing rounds.
+    for ($round = 0; $round < 1000; $round++) {
+        $context = ($round & 1) ? $password : $digest;
+        if ($round % 3 !== 0) {
+            $context .= $salt;
+        }
+        if ($round % 7 !== 0) {
+            $context .= $password;
+        }
+        $context .= ($round & 1) ? $digest : $password;
+        $digest = md5($context, true);
+    }
+
+    // The digest uses crypt's alphabet and byte permutation, not MIME base64.
+    $alphabet = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    $encoded = '';
+    foreach ([[0, 6, 12], [1, 7, 13], [2, 8, 14], [3, 9, 15], [4, 10, 5]] as $group) {
+        $value = (ord($digest[$group[0]]) << 16) | (ord($digest[$group[1]]) << 8) | ord($digest[$group[2]]);
+        for ($count = 0; $count < 4; $count++) {
+            $encoded .= $alphabet[$value & 63];
+            $value >>= 6;
+        }
+    }
+    $encoded .= $alphabet[ord($digest[11]) & 63].$alphabet[ord($digest[11]) >> 6];
+    return '$apr1$'.$salt.'$'.$encoded;
+}
+
 function pmssPanelSessionPasswordMatchesHash(string $password, string $hash): bool
 {
     if ($hash === '' || strpbrk($hash, "\r\n\0") !== false) {
         return false;
     }
 
-    $computed = crypt($password, $hash);
+    // PHP crypt() does not implement Apache's apr1 dialect.
+    if (strpos($hash, '$apr1$') === 0) {
+        if (strpos($password, "\0") !== false
+            || preg_match('~^\$apr1\$([./0-9A-Za-z]{1,8})\$[./0-9A-Za-z]{22}$~D', $hash, $matches) !== 1) {
+            return false;
+        }
+        $computed = pmssPanelSessionApr1Hash($password, $matches[1]);
+    } else {
+        $computed = crypt($password, $hash);
+    }
     return is_string($computed) && hash_equals($hash, $computed);
 }
 

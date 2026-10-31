@@ -30,11 +30,61 @@ class ConfigureSettingsTest extends TestCase
 
     private function home(): string
     {
-        $home = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-configure-home-').'/alice');
+        $home = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-configure-home-').'/fixtur01');
         $this->pmssEnsureDir($home.'/.lighttpd');
         $hash = crypt('secret', '$6$rounds=5000$pmssconfigure$');
-        $this->pmssWriteFile($home.'/.lighttpd/.htpasswd', 'alice:'.$hash."\n");
+        $this->pmssWriteFile($home.'/.lighttpd/.htpasswd', 'fixtur01:'.$hash."\n");
         return $home;
+    }
+
+    public function testApr1AccountPasswordGatesConfigureSaves(): void
+    {
+        // Fixed OpenSSL 3.5.7 apr1 vectors, generated outside the verifier.
+        foreach (array(
+            array('secret', '$apr1$abcdefgh$h9FWgUz3n9YxylKLlR5SQ/'),
+            array('päss \'$"; `echo fixture` \\ end', '$apr1$abcdefgh$zNhXk28cvJIaE69oK8Unf/'),
+        ) as $vector) {
+            list($password, $hash) = $vector;
+            $home = $this->home();
+            $htpasswd = 'fixtur01:'.$hash."\n";
+            $this->pmssWriteFile($home.'/.lighttpd/.htpasswd', $htpasswd);
+            $frames = $home.'/.customFrames';
+            $rtorrent = $home.'/.rtorrent.rc.custom';
+            $this->pmssWriteFile($frames, "# retained\nold|Old|Old|/old\n");
+            $this->pmssWriteFile($rtorrent, "old\n");
+            $request = array('rows' => array(array('label' => 'Docs', 'tooltip' => 'Help', 'url' => '/docs')),
+                'content' => "new\n", 'ctAcknowledged' => 1);
+            foreach (array('customFrames', 'rtorrentCustom', 'rtorrentRestore', 'webCertsUsername', 'torrentClientSwitch') as $action) {
+                foreach (array(array(), array('password' => 'wrong'), array('password' => array($password))) as $credentials) {
+                    $result = \pmssConfigureActionApply($home, $action, $credentials + $request);
+                    $this->assertSame(403, $result['status']);
+                }
+            }
+            $this->assertSame("# retained\nold|Old|Old|/old\n", file_get_contents($frames));
+            $this->assertSame("old\n", file_get_contents($rtorrent));
+            $this->assertFalse(file_exists($rtorrent.'.prev'));
+            $this->assertFalse(file_exists($home.'/.request-web-certs'));
+            // Legacy account hashes must still prevent primary/service password reuse.
+            $service = $this->slskdRequest(array('password' => $password, 'soulseekPassword' => $password));
+            $this->assertSame(400, \pmssConfigureActionApply($home, 'slskdSettings', $service)['status']);
+            $this->assertFalse(file_exists(\pmssSlskdEnvPath($home)));
+            $request['password'] = $password;
+            foreach (array('customFrames', 'rtorrentCustom', 'webCertsUsername') as $action) {
+                $this->assertTrue(\pmssConfigureActionApply($home, $action, $request)['ok']);
+            }
+            $this->assertSame("# retained\ncustom0|Help|Docs|/docs\n", file_get_contents($frames));
+            $this->assertSame("new\n", file_get_contents($rtorrent));
+            $this->assertSame("old\n", file_get_contents($rtorrent.'.prev'));
+            $this->assertTrue(\pmssConfigureActionApply($home, 'rtorrentRestore', $request)['ok']);
+            $this->assertSame("old\n", file_get_contents($rtorrent));
+            $this->assertSame("username\n", file_get_contents($home.'/.request-web-certs'));
+            $this->assertSame(0600, fileperms($frames) & 0777);
+            $this->assertSame(0600, fileperms($rtorrent) & 0777);
+            $this->assertSame($htpasswd, file_get_contents($home.'/.lighttpd/.htpasswd'));
+            $log = file_get_contents($home.'/.lighttpd/error.log');
+            $this->assertStringNotContainsString($password, $log);
+            $this->assertStringNotContainsString($hash, $log);
+        }
     }
 
     /** Keep account authentication separate from the external credential fixture. */
