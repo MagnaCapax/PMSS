@@ -539,19 +539,19 @@ PHP
 
     public function testUserValidationRejectsUppercase(): void
     {
-        $this->assertTrue(!\pmssResourceUserIsValid('Alice'));
+        $this->assertTrue(!\pmssResourceUserIsValid('Fixtur01'));
     }
 
     public function testManagedUidLookupRejectsInvalidUser(): void
     {
-        $this->assertSame(null, \pmssResourceLogLookupManagedUid('Alice'));
+        $this->assertSame(null, \pmssResourceLogLookupManagedUid('Fixtur01'));
     }
 
     public function testManagedUserUidsRejectsMalformedNamesAndNonpositiveResolverResults(): void
     {
         $resolved = [];
-        $users = ['alice', 'www-data', '', 'Alice', '../etc', "bad\nname", "bad\0name", 'bob', 'carol'];
-        $uids = ['alice' => 1001, 'www-data' => 33, 'bob' => 0, 'carol' => -1];
+        $users = ['fixtur01', 'www-data', '', 'Fixtur01', '../etc', "bad\nname", "bad\0name", 'fixtur02', 'fixtur03'];
+        $uids = ['fixtur01' => 1001, 'www-data' => 33, 'fixtur02' => 0, 'fixtur03' => -1];
         $result = \pmssResourceLogManagedUserUids(
             ['www-data'],
             static function (array $additional) use ($users): array { return $users; },
@@ -561,8 +561,8 @@ PHP
             }
         );
 
-        $this->assertSame(['alice' => 1001, 'www-data' => 33], $result);
-        $this->assertSame(['alice', 'www-data', 'bob', 'carol'], $resolved);
+        $this->assertSame(['fixtur01' => 1001, 'www-data' => 33], $result);
+        $this->assertSame(['fixtur01', 'www-data', 'fixtur02', 'fixtur03'], $resolved);
     }
 
     public function testTrafficIngressLoadsResourceHelpersDirectly(): void
@@ -608,8 +608,7 @@ PHP
     {
         $root = $this->makeRoot();
         $path = $root.'/user.slice/user-1000.slice';
-        @mkdir($path, 0755, true);
-        file_put_contents($path.'/memory.stat', "anon\t123\nslab 999\nfile 456\nanon 777 extra\nfile 888\t999\nfile\n");
+        $this->pmssWriteFiles($path, ['memory.stat' => "anon\t123\nslab 999\nfile 456\nanon 777 extra\nfile 888\t999\nfile\n"]);
 
         $breakdown = \pmssResourceLogReadMemoryBreakdown(1000, $root);
 
@@ -620,8 +619,7 @@ PHP
     {
         $root = $this->makeRoot();
         $path = $root.'/user.slice/user-1000.slice';
-        @mkdir($path, 0755, true);
-        file_put_contents($path.'/memory.stat', "anon 123\nslab 456\n");
+        $this->pmssWriteFiles($path, ['memory.stat' => "anon 123\nslab 456\n"]);
 
         $this->assertTrue(\pmssResourceLogReadMemoryBreakdown(1000, $root) === null);
     }

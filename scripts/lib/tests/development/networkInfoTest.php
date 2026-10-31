@@ -10,9 +10,7 @@ class NetworkInfoTest extends TestCase
     private function networkSpeedFixture(string $iface, string $speed): string
     {
         $root = $this->pmssMakeTempDir('pmss-network-sys-class-net-');
-        $this->pmssEnsureDir($root.'/'.$iface);
-        file_put_contents($root.'/'.$iface.'/speed', $speed);
-        return $root;
+        return $this->pmssWriteFiles($root, [$iface.'/speed' => $speed]);
     }
 
     private function withNetworkConfig(array $config, callable $callback, array $env = []): void

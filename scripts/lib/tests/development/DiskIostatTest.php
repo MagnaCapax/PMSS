@@ -123,8 +123,7 @@ PHP;
         foreach (range('a', 'f') as $letter) {
             $disk = 'sd'.$letter;
             $part = $disk.'1';
-            $this->pmssEnsureDir($devices.'/'.$disk.'/'.$part, 0755);
-            file_put_contents($devices.'/'.$disk.'/'.$part.'/partition', '1');
+            $this->pmssWriteFiles($devices, [$disk.'/'.$part.'/partition' => '1']);
             @symlink($devices.'/'.$disk, $class.'/'.$disk);
             @symlink($devices.'/'.$disk.'/'.$part, $class.'/'.$part);
             @symlink($devices.'/'.$disk.'/'.$part, $devices.'/md0/slaves/'.$part);
@@ -141,16 +140,14 @@ PHP;
     public function testBcacheThroughMdAndMapperResolveLeaves(): void
     {
         list($root, $class, $devices) = $this->homeTree(['bcache0' => ['md1'], 'md1' => []]);
-        $this->pmssEnsureDir($devices.'/sda/sda1', 0755);
-        file_put_contents($devices.'/sda/sda1/partition', '1');
+        $this->pmssWriteFiles($devices, ['sda/sda1/partition' => '1']);
         @symlink($devices.'/sda', $class.'/sda');
         @symlink($devices.'/sda/sda1', $class.'/sda1');
         @symlink($devices.'/sda/sda1', $devices.'/md1/slaves/sda1');
         $this->assertSame(['sda'], $this->homeDevices(['sda'], $root.'/dev/bcache0', $class, $root.'/dev'));
 
         $this->pmssEnsureDir($devices.'/dm-0/slaves', 0755);
-        $this->pmssEnsureDir($devices.'/sdb/sdb2', 0755);
-        file_put_contents($devices.'/sdb/sdb2/partition', '2');
+        $this->pmssWriteFiles($devices, ['sdb/sdb2/partition' => '2']);
         @symlink($devices.'/dm-0', $class.'/dm-0');
         @symlink($devices.'/sdb', $class.'/sdb');
         @symlink($devices.'/sdb/sdb2', $class.'/sdb2');

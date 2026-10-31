@@ -28,7 +28,7 @@ class BootDefaultsEnsureTest extends TestCase
         foreach ($cases as $case) {
             $dir = $this->pmssMakeTempDir('pmss-boot-defaults-'.$case['label'].'-', 0700);
             $fstab = $dir.'/fstab'; $grub = $dir.'/grub';
-            file_put_contents($fstab, $case['fstab']); file_put_contents($grub, $case['grub']."\n");
+            $this->pmssWriteFiles($dir, ['fstab' => $case['fstab'], 'grub' => $case['grub']."\n"]);
             $originalGrub = (string)file_get_contents($grub);
             \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
             $updatedFstab = (string)file_get_contents($fstab);
@@ -47,8 +47,7 @@ class BootDefaultsEnsureTest extends TestCase
 
         $fstab = $dir.'/fstab';
         $grub = $dir.'/grub';
-        file_put_contents($fstab, "proc /proc proc defaults,hidepid=2 0 0\n");
-        file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\n");
+        $this->pmssWriteFiles($dir, ['fstab' => "proc /proc proc defaults,hidepid=2 0 0\n", 'grub' => "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\n"]);
 
         \pmssEnsureBootDefaults(
             $logger,
@@ -72,8 +71,7 @@ class BootDefaultsEnsureTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-boot-defaults-normalize-', 0700);
         $fstab = $dir.'/fstab';
         $grub = $dir.'/grub';
-        file_put_contents($fstab, "proc /proc proc defaults,hidepid=2 0 0\n");
-        file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\nGRUB_TERMINAL=\"old\"\n");
+        $this->pmssWriteFiles($dir, ['fstab' => "proc /proc proc defaults,hidepid=2 0 0\n", 'grub' => "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\nGRUB_TERMINAL=\"old\"\n"]);
 
         \pmssEnsureBootDefaults($logger, $fstab, $grub, ' systemd.unified_cgroup_hierarchy=0 ', ['console=tty0', 'console=tty0', '  '], ['GRUB_TERMINAL' => ' console ', 'BAD-KEY' => 'ignored']);
         $updatedGrub = (string) file_get_contents($grub);
@@ -90,8 +88,7 @@ class BootDefaultsEnsureTest extends TestCase
         $option = 'systemd.unified_cgroup_hierarchy=0';
         $duplicateQuote = '"'.'"';
         $malformedLine = 'GRUB_CMDLINE_LINUX="text '.$option.$duplicateQuote;
-        file_put_contents($fstab, "proc /proc proc defaults,hidepid=2 0 0\n");
-        file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet $option\"\n".$malformedLine."\n");
+        $this->pmssWriteFiles($dir, ['fstab' => "proc /proc proc defaults,hidepid=2 0 0\n", 'grub' => "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet $option\"\n".$malformedLine."\n"]);
 
         \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
         $updatedGrub = (string) file_get_contents($grub);
@@ -139,8 +136,7 @@ class BootDefaultsEnsureTest extends TestCase
             $grubBody = $kind === 'append' ? "# no cmdline entry\n"
                 : 'GRUB_CMDLINE_LINUX_DEFAULT="quiet'.($kind === 'unchanged' ? ' '.$option : '')."\"\n";
             if ($kind !== 'missing') {
-                file_put_contents($real.'/fstab', $fstabBody);
-                file_put_contents($real.'/grub', $grubBody);
+                $this->pmssWriteFiles($real, ['fstab' => $fstabBody, 'grub' => $grubBody]);
             }
             $fstab = $real.'/fstab';
             $grub = $real.'/grub';
@@ -213,28 +209,29 @@ PHP
             }],
             ['label' => 'noexec', 'expect' => "tmpfs\t/tmp\ttmpfs\tdefaults,noexec,nosuid,nodev\t0\t0\ntmpfs\t/dev/shm\ttmpfs\tdefaults,noexec,nosuid,nodev\t0\t0\n", 'log' => 'Updated /tmp mount options', 'runner' => function (string $dir, callable $logger): string {
                 $fstab = $dir.'/fstab'; $mounts = $dir.'/mounts';
-                file_put_contents($fstab, "tmpfs /tmp tmpfs defaults,exec,suid,dev 0 0\n"."tmpfs /dev/shm tmpfs defaults,exec,suid,dev 0 0\n");
-                file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n"."tmpfs /dev/shm tmpfs rw,exec,suid,dev 0 0\n");
+                $this->pmssWriteFiles($dir, ['fstab' => "tmpfs /tmp tmpfs defaults,exec,suid,dev 0 0\n"."tmpfs /dev/shm tmpfs defaults,exec,suid,dev 0 0\n",
+                    'mounts' => "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n"."tmpfs /dev/shm tmpfs rw,exec,suid,dev 0 0\n"]);
                 putenv('PMSS_HARDEN_TMP_NOEXEC=1'); putenv('PMSS_DRY_RUN=1');
                 \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
                 return (string) file_get_contents($fstab);
             }],
             ['label' => 'tmpfs', 'expect' => "UUID=abc / ext4 defaults 0 0\ntmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0\n", 'log' => 'Added /tmp tmpfs entry', 'runner' => function (string $dir, callable $logger): string {
-                $fstab = $dir.'/fstab'; $mounts = $dir.'/mounts'; file_put_contents($fstab, "UUID=abc / ext4 defaults 0 0\n"); file_put_contents($mounts, '');
+                $fstab = $dir.'/fstab'; $mounts = $dir.'/mounts';
+                $this->pmssWriteFiles($dir, ['fstab' => "UUID=abc / ext4 defaults 0 0\n", 'mounts' => '']);
                 putenv('PMSS_HARDEN_TMP_TMPFS=1'); putenv('PMSS_DRY_RUN=1');
                 \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
                 return (string) file_get_contents($fstab);
             }],
             ['label' => 'tmpfs-update', 'expect' => "tmpfs\t/tmp\ttmpfs\tdefaults,size=2G,noexec,nosuid,nodev\t0\t0\n", 'log' => 'Updated /tmp tmpfs options', 'runner' => function (string $dir, callable $logger): string {
                 $fstab = $dir.'/fstab'; $mounts = $dir.'/mounts';
-                file_put_contents($fstab, "tmpfs /tmp tmpfs defaults,exec,size=1G,suid,dev 0 0\n");
-                file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,size=1G,suid,dev 0 0\n");
+                $this->pmssWriteFiles($dir, ['fstab' => "tmpfs /tmp tmpfs defaults,exec,size=1G,suid,dev 0 0\n", 'mounts' => "tmpfs /tmp tmpfs rw,exec,size=1G,suid,dev 0 0\n"]);
                 putenv('PMSS_HARDEN_TMP_TMPFS=1'); putenv('PMSS_DRY_RUN=1');
                 \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
                 return (string) file_get_contents($fstab);
             }],
             ['label' => 'boot-defaults', 'expect' => "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0\n", 'log' => 'Updated /proc mount options', 'runner' => function (string $dir, callable $logger): string {
-                $fstab = $dir.'/fstab'; $grub = $dir.'/grub'; file_put_contents($fstab, "proc /proc proc defaults,hidepid=1 0 0\n"); file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet systemd.unified_cgroup_hierarchy=0\"\n");
+                $fstab = $dir.'/fstab'; $grub = $dir.'/grub';
+                $this->pmssWriteFiles($dir, ['fstab' => "proc /proc proc defaults,hidepid=1 0 0\n", 'grub' => "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet systemd.unified_cgroup_hierarchy=0\"\n"]);
                 putenv('PMSS_DRY_RUN=1'); // The preceding matrix case clears this flag.
                 \pmssEnsureBootDefaults($logger, $fstab, $grub, 'systemd.unified_cgroup_hierarchy=0');
                 return (string) file_get_contents($fstab);

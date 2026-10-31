@@ -22,6 +22,11 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
+Host-probe fixtures share `TestCase::pmssWriteFiles()` for ordered sysfs,
+cgroup, boot and network file trees. Use `pmssWriteRelativeFile()` when a fixture
+also needs the written path, such as before setting its mtime. Keep deliberately
+empty directories, absent files and mode transitions explicit at the caller.
+
 Inline PHP fixtures share `TestCase::pmssBuildInlinePhpCommand()` across captured,
 timed and asynchronous launches. Use `pmssExecInlinePhp()` for exit status and
 line output, or `pmssExecInlinePhpWithTempStderr()` for a tracked stderr file.

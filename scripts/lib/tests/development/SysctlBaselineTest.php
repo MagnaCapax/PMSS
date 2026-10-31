@@ -166,9 +166,10 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-nic-speed-', 0700);
         $routePath = $dir.'/route';
         $sysNetRoot = $dir.'/net';
-        @mkdir($sysNetRoot.'/eno1', 0755, true);
-        file_put_contents($routePath, "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n"."eno1\t00000000\t00000000\t0003\t0\t0\t0\t00000000\t0\t0\t0\n");
-        file_put_contents($sysNetRoot.'/eno1/speed', "25000\n");
+        $this->pmssWriteFiles($dir, [
+            'route' => "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n"."eno1\t00000000\t00000000\t0003\t0\t0\t0\t00000000\t0\t0\t0\n",
+            'net/eno1/speed' => "25000\n",
+        ]);
 
         $this->pmssTrackEnvOverrides([
             'PMSS_SYSCTL_PROC_NET_ROUTE_PATH' => $routePath,
@@ -182,10 +183,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-block-', 0700);
         $root = $dir.'/block';
-        @mkdir($root.'/vda/queue', 0755, true);
-        @mkdir($dir.'/queue', 0755, true);
-        file_put_contents($root.'/vda/queue/rotational', "0\n");
-        file_put_contents($dir.'/queue/rotational', "0\n");
+        $this->pmssWriteFiles($dir, ['block/vda/queue/rotational' => "0\n", 'queue/rotational' => "0\n"]);
 
         foreach (['', '.', '..', "vda\0other", "vda\n"] as $name) {
             $seen = [];
@@ -223,10 +221,11 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-nic-unsafe-', 0700);
         $routePath = $dir.'/route';
         $sysNetRoot = $dir.'/net';
-        @mkdir($sysNetRoot, 0755, true);
-        @mkdir($dir.'/outside', 0755, true);
-        file_put_contents($routePath, "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n"."../outside\t00000000\t00000000\t0003\t0\t0\t0\t00000000\t0\t0\t0\n");
-        file_put_contents($dir.'/outside/speed', "40000\n");
+        $this->pmssEnsureDir($sysNetRoot);
+        $this->pmssWriteFiles($dir, [
+            'route' => "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n"."../outside\t00000000\t00000000\t0003\t0\t0\t0\t00000000\t0\t0\t0\n",
+            'outside/speed' => "40000\n",
+        ]);
 
         $this->pmssTrackEnvOverrides([
             'PMSS_SYSCTL_PROC_NET_ROUTE_PATH' => $routePath,

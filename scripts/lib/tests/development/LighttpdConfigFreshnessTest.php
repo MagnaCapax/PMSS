@@ -16,9 +16,7 @@ class LighttpdConfigFreshnessTest extends TestCase
 
     private function writeConfigFile(string $relativePath, string $content, int $mtime): string
     {
-        $path = $this->home.'/'.$relativePath;
-        $this->pmssEnsureDir(dirname($path));
-        file_put_contents($path, $content);
+        $path = $this->pmssWriteRelativeFile($this->home, $relativePath, $content);
         touch($path, $mtime);
 
         return $path;

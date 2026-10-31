@@ -19,10 +19,9 @@ class CgroupPolicyHomeBfqTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-home-bfq-', 0700);
         foreach ($devices as $device => $scheduler) {
-            @mkdir($root.'/'.$device.'/queue', 0700, true);
-            if ($scheduler !== null) {
-                file_put_contents($root.'/'.$device.'/queue/scheduler', $scheduler."\n");
-            }
+            // A missing scheduler is distinct from an absent queue directory.
+            if ($scheduler === null) $this->pmssEnsureDir($root.'/'.$device.'/queue', 0700);
+            else $this->pmssWriteFiles($root, [$device.'/queue/scheduler' => $scheduler."\n"], 0700);
         }
         foreach ($slaves as $device => $members) {
             @mkdir($root.'/'.$device.'/slaves', 0700, true);
@@ -32,8 +31,7 @@ class CgroupPolicyHomeBfqTest extends TestCase
         }
         foreach ($partitions as $disk => $members) {
             foreach ($members as $member) {
-                @mkdir($root.'/'.$disk.'/'.$member, 0700, true);
-                file_put_contents($root.'/'.$disk.'/'.$member.'/partition', "1\n");
+                $this->pmssWriteFiles($root, [$disk.'/'.$member.'/partition' => "1\n"], 0700);
             }
         }
         return $root;

@@ -26,30 +26,22 @@ final class UserShowLimitsTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-show-limits-');
         $slice = $home.'/slice';
-        mkdir($slice);
-        file_put_contents($slice.'/memory.stat', "total_rss 1073741824\ntotal_cache 536870912\n");
-        file_put_contents($slice.'/memory.usage_in_bytes', "1610612736\n");
-        file_put_contents($slice.'/memory.limit_in_bytes', "4294967296\n");
-        file_put_contents($slice.'/pids.current', "12\n");
-        file_put_contents($slice.'/pids.max', "max\n");
-        file_put_contents($slice.'/cpu.shares', "1024\n");
-        file_put_contents($slice.'/cpu.cfs_quota_us', "-1\n");
-        file_put_contents($slice.'/cpu.cfs_period_us', "100000\n");
-        file_put_contents($slice.'/blkio.throttle.read_bps_device', "8:0 1000000000\n");
-        file_put_contents($slice.'/blkio.throttle.write_bps_device', "8:0 2000000\n");
-        file_put_contents($slice.'/blkio.throttle.read_iops_device', "8:0 71\n");
-        mkdir($home.'/.config');
-        file_put_contents($home.'/.config/pmss-user.json', json_encode(array('quota' => 10, 'ramMiB' => 4096, 'dockerEnabled' => true, 'IOReadBW' => '/dev/sda:20M', 'IOReadIOPS' => '/dev/sda:71')));
-        file_put_contents($home.'/.quota', "Disk quotas for user\nFilesystem blocks quota limit grace files quota limit grace\n/dev/mapper/data 1024 2048 3072 1 2 3\n");
-        file_put_contents($home.'/.trafficLimit', "10\n");
-        file_put_contents($home.'/.bonusTraffic', "20\n");
-        file_put_contents($home.'/.trafficData', serialize(array('raw' => array('month' => 1024))));
-        file_put_contents($home.'/.trafficDataIngress', serialize(array('raw' => array('month' => 500))));
-        file_put_contents($home.'/.resourceData', serialize(array('ram_hours' => array('raw' => array('month' => 8)), 'cpu' => array('raw' => array('month' => 3600000000000)))));
-        file_put_contents($home.'/debian-version', "11.10\n");
-        file_put_contents($home.'/pmss-version', "12.15\n");
-        mkdir($home.'/proc');
-        file_put_contents($home.'/proc/uptime', "90060.00 0.00\n");
+        // Keep the customer files and kernel counters in their original write order.
+        $this->pmssWriteFiles($home, [
+            'slice/memory.stat' => "total_rss 1073741824\ntotal_cache 536870912\n",
+            'slice/memory.usage_in_bytes' => "1610612736\n", 'slice/memory.limit_in_bytes' => "4294967296\n",
+            'slice/pids.current' => "12\n", 'slice/pids.max' => "max\n",
+            'slice/cpu.shares' => "1024\n", 'slice/cpu.cfs_quota_us' => "-1\n", 'slice/cpu.cfs_period_us' => "100000\n",
+            'slice/blkio.throttle.read_bps_device' => "8:0 1000000000\n",
+            'slice/blkio.throttle.write_bps_device' => "8:0 2000000\n", 'slice/blkio.throttle.read_iops_device' => "8:0 71\n",
+            '.config/pmss-user.json' => json_encode(array('quota' => 10, 'ramMiB' => 4096, 'dockerEnabled' => true, 'IOReadBW' => '/dev/sda:20M', 'IOReadIOPS' => '/dev/sda:71')),
+            '.quota' => "Disk quotas for user\nFilesystem blocks quota limit grace files quota limit grace\n/dev/mapper/data 1024 2048 3072 1 2 3\n",
+            '.trafficLimit' => "10\n", '.bonusTraffic' => "20\n",
+            '.trafficData' => serialize(array('raw' => array('month' => 1024))),
+            '.trafficDataIngress' => serialize(array('raw' => array('month' => 500))),
+            '.resourceData' => serialize(array('ram_hours' => array('raw' => array('month' => 8)), 'cpu' => array('raw' => array('month' => 3600000000000)))),
+            'debian-version' => "11.10\n", 'pmss-version' => "12.15\n", 'proc/uptime' => "90060.00 0.00\n",
+        ], 0777);
         return array('home' => $home, 'uid' => 1000, 'euid' => 1000, 'host' => "host\033[31mname", 'debian' => $home.'/debian-version', 'version' => $home.'/pmss-version', 'cgroups' => array('memory' => $slice, 'pids' => $slice, 'cpu' => $slice, 'io' => $slice), 'proc' => $home.'/proc', 'home_fs' => $home, 'now' => time(), 'cpu_count' => 4);
     }
 
@@ -123,8 +115,7 @@ final class UserShowLimitsTest extends TestCase
     public function testHumanViewShowsSharedStatsAndConfiguredLimit(): void
     {
         $o = $this->fixture();
-        file_put_contents($o['cgroups']['pids'].'/pids.current', "71\n");
-        file_put_contents($o['cgroups']['pids'].'/pids.max', "16384\n");
+        $this->pmssWriteFiles($o['cgroups']['pids'], ['pids.current' => "71\n", 'pids.max' => "16384\n"]);
         file_put_contents($o['home'].'/.resourceData', serialize(array('ram_hours' => array('raw' => array('month' => 0.086071551640828)), 'cpu' => array('raw' => array('month' => 5633041754)))));
         touch($o['home'].'/.quota', $o['now'] - 65);
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) {
