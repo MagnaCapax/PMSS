@@ -1131,6 +1131,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Quota diagnosis: when quota is exceeded, compares the charged-over-soft amount with deleted blocks held by account-owned processes on the home device; an uncertain `/proc` or `stat()` scan or an overflowing block sum keeps the conservative quota reason. The `quota_descriptors` page never exposes descriptor paths and states that further deletion will not release held blocks.
   - Per-user toggle: when user config `lighttpdEnabled` is false, kills any running `lighttpd`/`php-cgi` for that user, removes the watchdog error page, and skips restart. Default remains true.
 
+- scripts/startRtorrent <user>
+  - Behavior: Starts the account's rTorrent under screen and requires the same observed PID to survive the existing 30-second stability window after up to 30 seconds for startup.
+  - Custom-config recovery: Counts observed startup/survival failures toward the existing four-failure quarantine limit. Launch-command errors or timeouts, screen ownership/directory errors, failed legacy session cleanup, and attempts where no rTorrent PID is observed leave `.rtorrent.rc.custom` and its counter untouched. Diagnostics retain the launch error or report that no rTorrent process appeared (Refs #1130).
+  - Observation limit: A process that exits between PID probes cannot establish a custom-config failure; this includes very fast config errors. A stable launch still clears the counter. Quarantine path, ownership and symlink guards are unchanged (ADR 0219).
+
 - scripts/cron/checkRtorrent.php
   - Behavior: Keeps per-user rTorrent/executor processes healthy and recovers missing `.rtorrent.rc` files from canonical templates when enough user config data exists.
   - Process facade: `rtorrent/process.php` loads inspection and lifecycle helpers. Snapshot headings and rows keep their callback order, and the SCGI decision retains the same queue and process-state gates.

@@ -55,18 +55,24 @@ function pmssStartRtorrentLaunch(string $user, string $home, string $executor): 
             pmssUserWatchdogTimeoutSeconds(15), $timedOut)) {
             if ($timedOut) pmssUserWatchdogBackoffRecord($user, 'rtorrent');
             logmsg("[WARN] Failed to clear legacy session files for {$user}");
-            return !$timedOut;
+            return false;
         }
         $cmd = pmssBuildUserServiceShellCommand($user, 'screen -S rtorrent -fa -d -m rtorrent', true);
-        $result = pmssUserWatchdogCommandRun($cmd, 60, $user, 'rtorrent');
-        return !$result['timed_out'];
+    } else {
+        // Newer versions use .rtorrentExecute.php wrapper.
+        logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
+        $cmd = pmssBuildUserServiceShellCommand($user, 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php', true);
     }
 
-    // Newer versions use .rtorrentExecute.php wrapper.
-    logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
-    $cmd = pmssBuildUserServiceShellCommand($user, 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php', true);
     $result = pmssUserWatchdogCommandRun($cmd, 60, $user, 'rtorrent');
-    return !$result['timed_out'];
+    $output = trim($result['stdout']."\n".$result['stderr']);
+    // A failed screen/account launch is not evidence against the custom rc.
+    if ($result['timed_out'] || $result['rc'] !== 0
+        || preg_match('/not the owner of|Cannot make directory/i', $output)) {
+        logmsg("[WARN] rTorrent launcher failed for {$user} (rc={$result['rc']}): {$output}; custom config failure counter unchanged");
+        return false;
+    }
+    return true;
 }
 
 /**
@@ -75,12 +81,20 @@ function pmssStartRtorrentLaunch(string $user, string $home, string $executor): 
  * The executor intentionally sleeps 2-8 seconds before starting rtorrent. A
  * later crash must not count as a healthy launch, so success requires both
  * initial appearance and a second survival check for the same PID.
+ * The optional observation output distinguishes an unseen process from a crash.
  */
-function pmssStartRtorrentWaitForRtorrent(string $user, int $startupTimeoutSeconds, int $stabilityWindowSeconds): bool
-{
+function pmssStartRtorrentWaitForRtorrent(
+    string $user,
+    int $startupTimeoutSeconds,
+    int $stabilityWindowSeconds,
+    ?bool &$rtorrentObserved = null
+): bool {
+    $rtorrentObserved = false;
     return rtorrentProcessWaitForStablePids(
-        function () use ($user): array {
-            return pmssUserWatchdogProcessPids($user, '^rtorrent');
+        function () use ($user, &$rtorrentObserved): array {
+            $pids = pmssUserWatchdogProcessPids($user, '^rtorrent');
+            if (!empty($pids)) $rtorrentObserved = true;
+            return $pids;
         },
         (float) max(1, $startupTimeoutSeconds),
         (float) max(1, $stabilityWindowSeconds)
@@ -213,9 +227,16 @@ $failureStateFile = $stateDir.'/startRtorrent-customrc-fail-'.$user.'.count';
 logmsg(
     "[INFO] Waiting up to {$startupWaitSeconds}s for rTorrent to appear for {$user} and {$startupStabilitySeconds}s more to confirm survival"
 );
-if (pmssStartRtorrentWaitForRtorrent($user, $startupWaitSeconds, $startupStabilitySeconds)) {
+$rtorrentObserved = false;
+if (pmssStartRtorrentWaitForRtorrent($user, $startupWaitSeconds, $startupStabilitySeconds, $rtorrentObserved)) {
     rtorrentProcessClearStaleState($legacyStateFile);
     rtorrentProcessClearStaleState($failureStateFile);
+    exit(0);
+}
+
+// No observed rTorrent process means the failure cannot be attributed to its rc.
+if (!$rtorrentObserved) {
+    logmsg("[WARN] rTorrent never appeared for {$user}; leaving .rtorrent.rc.custom and its failure counter unchanged; check launcher/executor output");
     exit(0);
 }
 
