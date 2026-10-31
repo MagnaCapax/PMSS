@@ -34,18 +34,17 @@ class resourceReportSafetyTest extends TestCase
     public function setUp(): void
     {
         $this->runtimeDir = $this->pmssMakeTempDir('pmss-resource-safety-');
-        $this->statsDir = $this->runtimeDir.'/resourceStats';
+        $this->statsDir = $this->pmssEnsureDir($this->runtimeDir.'/resourceStats');
         $this->markerPath = $this->runtimeDir.'/wakeup-marker';
-        @mkdir($this->statsDir, 0755, true);
     }
 
     public function testBuildReportRejectsSerializedObjectsWithoutWakeup(): void
     {
-        $this->pmssWriteSerializedFixture($this->statsDir.'/alice', new ResourceReportSafetyWakeupProbe($this->markerPath));
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', new ResourceReportSafetyWakeupProbe($this->markerPath));
 
-        $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
+        $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01']);
 
-        $this->assertEquals(['alice'], $report['missing']);
+        $this->assertEquals(['fixtur01'], $report['missing']);
         $this->assertEquals([], $report['rows']);
         $this->assertTrue(!file_exists($this->markerPath));
     }
@@ -61,10 +60,10 @@ class resourceReportSafetyTest extends TestCase
                 $this->assertSame(null, \pmssResourceStoredPayloadWindowValue($data, $metric, 'day'));
                 $this->assertSame(null, \pmssResourceStoredPayloadWindowMetrics($data, 'day'));
                 if (!in_array($metric, \ResourceStatsAccumulator::RAW_METRICS, true)) continue;
-                $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
-                $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
+                $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $data);
+                $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01']);
                 $this->pmssAssertArraySubsetSame([
-                    'missing' => ['alice'], 'rows' => [], 'totals' => \pmssResourceReportTemplate(),
+                    'missing' => ['fixtur01'], 'rows' => [], 'totals' => \pmssResourceReportTemplate(),
                 ], $report);
                 $this->assertTrue(is_string(json_encode($report)));
             }
@@ -116,10 +115,10 @@ class resourceReportSafetyTest extends TestCase
             foreach ($containers as $container) {
                 $data = $payload;
                 $data[$metric] = $container;
-                $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
-                $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
+                $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $data);
+                $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01']);
                 $this->pmssAssertArraySubsetSame([
-                    'missing' => ['alice'], 'rows' => [], 'totals' => \pmssResourceReportTemplate(),
+                    'missing' => ['fixtur01'], 'rows' => [], 'totals' => \pmssResourceReportTemplate(),
                 ], $report);
                 $this->assertTrue(!file_exists($this->markerPath));
             }
@@ -131,7 +130,7 @@ class resourceReportSafetyTest extends TestCase
         $payload = array_fill_keys(\ResourceStatsAccumulator::RAW_METRICS, ['raw' => $this->pmssBuildWindowValues(1)]);
         $validRow = \pmssResourceReportTemplate();
         foreach (\ResourceStatsAccumulator::RAW_METRICS as $metric) $validRow[$metric] = $this->pmssBuildWindowValues(1.0);
-        $this->pmssWriteSerializedFixture($this->statsDir.'/bob', $payload);
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur02', $payload);
         foreach ([false, true, 0, 1.5, 'bad', new \stdClass()] as $invalid) {
             foreach ([
                 ['memory' => $invalid],
@@ -140,10 +139,10 @@ class resourceReportSafetyTest extends TestCase
             ] as $optional) {
                 $data = $payload + $optional;
                 $this->assertSame(null, \pmssResourceStoredPayloadReportRow($data));
-                $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
-                $report = \pmssResourceBuildReport($this->statsDir, ['alice', 'bob']);
+                $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $data);
+                $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01', 'fixtur02']);
                 $this->pmssAssertArraySubsetSame([
-                    'missing' => ['alice'], 'rows' => ['bob' => $validRow], 'totals' => $validRow,
+                    'missing' => ['fixtur01'], 'rows' => ['fixtur02' => $validRow], 'totals' => $validRow,
                 ], $report);
                 $this->assertTrue(is_string(json_encode($report)));
             }

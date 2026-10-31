@@ -35,10 +35,9 @@ class ShowTrafficSafetyTest extends TestCase
     {
         $this->runtimeDir = $this->pmssMakeTempDir('pmss-show-traffic-safety-');
         $this->markerPath = $this->runtimeDir.'/wakeup-marker';
-        $this->statsPath = $this->runtimeDir.'/trafficStats/alice';
+        $this->statsPath = $this->runtimeDir.'/trafficStats/fixtur01';
 
-        @mkdir(dirname($this->statsPath), 0755, true);
-        @file_put_contents($this->statsPath, serialize(new ShowTrafficSafetyWakeupProbe($this->markerPath)));
+        $this->pmssWriteSerializedFixture($this->statsPath, new ShowTrafficSafetyWakeupProbe($this->markerPath));
     }
 
     public function testSharedTrafficPayloadReaderRejectsSerializedObjectsWithoutWakeup(): void

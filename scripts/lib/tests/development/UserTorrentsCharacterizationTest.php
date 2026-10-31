@@ -6,29 +6,27 @@ require_once dirname(__DIR__, 3).'/userTorrents.php';
 
 class UserTorrentsCharacterizationTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-user-torrents-characterization-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-user-torrents-characterization-']; }
 
     public function testMixedLegacyLayoutsCharacterization(): void
     {
         $home = $this->tempDir.'/home';
 
-        $this->pmssWriteFile($home.'/alice/session/base.torrent', 'test');
-        $this->pmssWriteFile($home.'/alice/.config/deluge/state/deluge-one.torrent', 'test');
-        $this->pmssWriteFile($home.'/alice/.delugeSession/deluge-one.torrent', 'test');
-        $this->pmssWriteFile($home.'/alice/.sessionDeluge/deluge-two.torrent', 'test');
-        $this->pmssWriteFile($home.'/alice/.local/share/data/qBittorrent/BT_backup/qbit-one.torrent', 'test');
-        $this->pmssWriteFile($home.'/alice/.local/share/data/qBittorrent/BT_backup/qbit-one.fastresume', 'test');
-        $this->pmssWriteFile($home.'/alice/.local/share/qBittorrent/BT_backup/qbit-two.torrent', 'test');
-        $this->pmssWriteFile($home.'/alice/.config/qBittorrent/BT_backup/qbit-three.fastresume', 'test');
+        // Keep the duplicate legacy Deluge and qBittorrent entries in the fixture tree.
+        $this->pmssWriteFiles($home.'/fixtur01', array_fill_keys([
+            'session/base.torrent', '.config/deluge/state/deluge-one.torrent',
+            '.delugeSession/deluge-one.torrent', '.sessionDeluge/deluge-two.torrent',
+            '.local/share/data/qBittorrent/BT_backup/qbit-one.torrent',
+            '.local/share/data/qBittorrent/BT_backup/qbit-one.fastresume',
+            '.local/share/qBittorrent/BT_backup/qbit-two.torrent',
+            '.config/qBittorrent/BT_backup/qbit-three.fastresume',
+        ], 'test'));
 
         $this->assertSame([
             'rtorrent' => 1,
             'deluge' => 2,
             'qbittorrent' => 3,
             'total' => 6,
-        ], \pmssUserTorrentsCountForUser($home, 'alice'));
+        ], \pmssUserTorrentsCountForUser($home, 'fixtur01'));
     }
 }

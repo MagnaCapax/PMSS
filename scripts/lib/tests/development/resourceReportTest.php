@@ -11,8 +11,7 @@ class ResourceReportTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->statsDir = $this->pmssMakeTempDir('pmss-resource-report-').'/stats';
-        @mkdir($this->statsDir, 0755, true);
+        $this->statsDir = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-resource-report-').'/stats');
     }
 
     private function writeUserStats(string $user, array $values): void
@@ -22,24 +21,24 @@ class ResourceReportTest extends TestCase
 
     public function testBuildReportAggregatesRowsAndTotals(): void
     {
-        $aliceValues = [
+        $fixtur01Values = [
             'io_read' => $this->pmssBuildWindowValues(1000, 100, 10, 1), 'io_write' => $this->pmssBuildWindowValues(2000, 200, 20, 2), 'io_read_ops' => $this->pmssBuildWindowValues(3000, 300, 30, 3),
             'io_write_ops' => $this->pmssBuildWindowValues(4000, 400, 40, 4), 'cpu' => $this->pmssBuildWindowValues(5000, 500, 50, 5), 'ram_hours' => $this->pmssBuildWindowValues(6000, 600, 60, 6),
             'memory_current' => 700, 'memory_avg_month' => 70, 'tasks_current' => 7,
         ];
-        $bobValues = [
+        $fixtur02Values = [
             'io_read' => $this->pmssBuildWindowValues(11, 12, 13, 14), 'io_write' => $this->pmssBuildWindowValues(21, 22, 23, 24), 'io_read_ops' => $this->pmssBuildWindowValues(31, 32, 33, 34),
             'io_write_ops' => $this->pmssBuildWindowValues(41, 42, 43, 44), 'cpu' => $this->pmssBuildWindowValues(51, 52, 53, 54), 'ram_hours' => $this->pmssBuildWindowValues(61, 62, 63, 64),
             'memory_current' => 71, 'memory_avg_month' => 72, 'tasks_current' => 73,
         ];
-        $this->writeUserStats('alice', $aliceValues);
-        $this->writeUserStats('bob', $bobValues);
+        $this->writeUserStats('fixtur01', $fixtur01Values);
+        $this->writeUserStats('fixtur02', $fixtur02Values);
         $expectedRows = [
-            'alice' => $this->pmssBuildResourceReportRowFromValues($aliceValues),
-            'bob' => $this->pmssBuildResourceReportRowFromValues($bobValues),
+            'fixtur01' => $this->pmssBuildResourceReportRowFromValues($fixtur01Values),
+            'fixtur02' => $this->pmssBuildResourceReportRowFromValues($fixtur02Values),
         ];
 
-        $report = \pmssResourceBuildReport($this->statsDir, ['alice', 'bob']);
+        $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01', 'fixtur02']);
 
         $this->assertEquals([], $report['missing']);
         $this->assertEquals($expectedRows, $report['rows']);
@@ -64,11 +63,11 @@ class ResourceReportTest extends TestCase
             'memory_current' => 1, 'memory_avg_month' => 1, 'tasks_current' => 1,
         ]);
         unset($payload['cpu']);
-        $this->writeUserData('alice', $payload);
+        $this->writeUserData('fixtur01', $payload);
 
-        $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
+        $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01']);
 
-        $this->assertEquals(['alice'], $report['missing']);
+        $this->assertEquals(['fixtur01'], $report['missing']);
         $this->assertEquals([], $report['rows']);
     }
 
@@ -80,16 +79,16 @@ class ResourceReportTest extends TestCase
         ]);
         unset($payload['io_read_ops']);
         unset($payload['io_write_ops']);
-        $this->writeUserData('alice', $payload);
+        $this->writeUserData('fixtur01', $payload);
 
-        $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
+        $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01']);
 
         $this->assertEquals([], $report['missing']);
-        $this->assertEquals(0.0, $report['rows']['alice']['io_read_ops']['month']);
-        $this->assertEquals(0.0, $report['rows']['alice']['io_write_ops']['hour']);
-        $this->assertEquals(5.0, $report['rows']['alice']['memory']['current']);
-        $this->assertEquals(6.0, $report['rows']['alice']['memory']['avg_month']);
-        $this->assertEquals(7.0, $report['rows']['alice']['tasks']['current']);
+        $this->assertEquals(0.0, $report['rows']['fixtur01']['io_read_ops']['month']);
+        $this->assertEquals(0.0, $report['rows']['fixtur01']['io_write_ops']['hour']);
+        $this->assertEquals(5.0, $report['rows']['fixtur01']['memory']['current']);
+        $this->assertEquals(6.0, $report['rows']['fixtur01']['memory']['avg_month']);
+        $this->assertEquals(7.0, $report['rows']['fixtur01']['tasks']['current']);
     }
 
     public function testBuildReportSnapshotSkipsInvalidUsersAndKeepsMissingSeparate(): void
@@ -105,14 +104,14 @@ class ResourceReportTest extends TestCase
             'memory_avg_month' => 20,
             'tasks_current' => 21,
         ];
-        $this->writeUserStats('alice', $values);
+        $this->writeUserStats('fixtur01', $values);
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
 
         $this->assertEquals([
-            'rows' => ['alice' => $expectedRow],
+            'rows' => ['fixtur01' => $expectedRow],
             'missing' => ['ghost'],
             'totals' => $expectedRow,
-        ], \pmssResourceBuildReport($this->statsDir, ['alice', 'Alice', 'ghost']));
+        ], \pmssResourceBuildReport($this->statsDir, ['fixtur01', 'Fixtur01', 'ghost']));
     }
 
     public function testStoredPayloadReportRowMatchesSnapshot(): void
@@ -126,14 +125,14 @@ class ResourceReportTest extends TestCase
     public function testBuildReportSingleUserMatchesSnapshot(): void
     {
         $values = $this->standardValues();
-        $this->writeUserStats('alice', $values);
+        $this->writeUserStats('fixtur01', $values);
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
 
         $this->assertEquals([
-            'rows' => ['alice' => $expectedRow],
+            'rows' => ['fixtur01' => $expectedRow],
             'missing' => [],
             'totals' => $expectedRow,
-        ], \pmssResourceBuildReport($this->statsDir, ['alice']));
+        ], \pmssResourceBuildReport($this->statsDir, ['fixtur01']));
     }
 
     private function writeUserData(string $user, array $data): void
