@@ -64,7 +64,10 @@ class RuntimeBoundariesCharacterizationTest extends TestCase
             [false, 5, [], [10], true, 124, true, [['timeout']]],
         ] as [$inherited, $timeout, $statuses, $times, $drainTimeout, $rc, $timedOut, $tail]) {
             $script = $this->pmssReadRepoFile('scripts/lib/tests/fixtures/runtimeProcessCharacterization.php');
-            $script = substr($script, 5).$this->pmssInlinePhpLibraryInNamespace(
+            // Supply the real pipe descriptor helper while keeping process I/O stubbed.
+            $script = substr($script, 5).'require_once '
+                .var_export(dirname(__DIR__, 2).'/runtime/commandPipes.php', true).';'
+                .$this->pmssInlinePhpLibraryInNamespace(
                 'scripts/lib/runtime/commandProcess.php', 'RuntimeProcessCharacterization');
             $script .= <<<'PHP'
 $GLOBALS['case'] = json_decode(getenv('PMSS_TEST_PROCESS_CASE'), true);
