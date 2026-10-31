@@ -250,21 +250,18 @@ class UpdateAppInstallerContractsTest extends TestCase
     public function testSourceArchiveInstallersReuseRemoteArchiveExtraction(): void
     {
         foreach (['deluge.php', 'rtorrent.php'] as $installer) {
-            $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.$installer, [
+            $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.$installer, [
                 'pmssRunPinnedRemoteArchiveStep(',
             ], [
                 "pmssBuildCommand('tar'" => $installer.' should delegate source archive extraction to remoteBinary.php',
+                'pmssPinnedRemoteArtifactTempFileUse(' => $installer.' should not keep a parallel source extraction callback',
             ]);
-
-            $this->assertTrue(strpos($contents, "pmssPinnedRemoteArtifactTempFileUse(") === false, $installer.' should not keep a parallel source extraction callback');
         }
     }
 
     public function testRtorrentXmlrpcBuildUsesRootCompileWorkspace(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/rtorrent.php');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/rtorrent.php', [
             '$xmlrpcBuildRoot = \'/root/compile\';',
             '$xmlrpcBuildDir = $xmlrpcBuildRoot.\'/xmlrpc-c\';',
             '"Checking out and building xmlrpc-c rev {$xmlrpcVersion}"',
@@ -273,10 +270,8 @@ class UpdateAppInstallerContractsTest extends TestCase
             "'rm -rf '.escapeshellarg(\$xmlrpcBuildDir)",
             "pmssBuildCommand('svn', ['checkout', 'https://svn.code.sf.net/p/xmlrpc-c/code/advanced', \$xmlrpcBuildDir, '-r', \$xmlrpcVersion])",
             "'cd '.escapeshellarg(\$xmlrpcBuildDir)",
-        ], $source);
-
-        $this->assertStringNotContainsString('cd /tmp/xmlrpc-c', $source);
-        $this->assertStringNotContainsString("pmssBuildCommand('svn', ['checkout', 'https://svn.code.sf.net/p/xmlrpc-c/code/advanced', 'xmlrpc-c'", $source);
+        ], ['cd /tmp/xmlrpc-c',
+            "pmssBuildCommand('svn', ['checkout', 'https://svn.code.sf.net/p/xmlrpc-c/code/advanced', 'xmlrpc-c'"]);
     }
 
     public function testSyncthingPinMatchesCheckedReleaseManifest(): void

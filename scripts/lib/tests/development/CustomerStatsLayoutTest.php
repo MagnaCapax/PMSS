@@ -27,16 +27,10 @@ final class CustomerStatsLayoutTest extends TestCase
 
     public function testInfoFlexRowChildrenOtherThanStatsSpanFullRow(): void
     {
-        $this->pmssAssertRepoFileContainsString(
-            'etc/skel/www/info.php',
-            ".portfoliobox > :not(#stats) {\n        flex: 0 0 100%;",
-            'Every info-page flex child except #stats must span the full row (#1115).'
-        );
-        $this->pmssAssertRepoFileContainsString(
-            'etc/skel/www/info.php',
-            "flex: 0 0 100%;\n        box-sizing: border-box;",
-            'The full-width RAID notice must include its padding and border in the 100% width.'
-        );
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/info.php', [
+            ".portfoliobox > :not(#stats) {\n        flex: 0 0 100%;" => 'Every info-page flex child except #stats must span the full row (#1115).',
+            "flex: 0 0 100%;\n        box-sizing: border-box;" => 'The full-width RAID notice must include its padding and border in the 100% width.',
+        ]);
     }
 
     public function testResourceBasicsRenderAsCompactTopSnapshot(): void
@@ -196,9 +190,8 @@ final class CustomerStatsLayoutTest extends TestCase
             chdir($cwd);
         }
 
-        $this->assertStringContainsString('Week: 512MiB, Day: 2MiB', $output);
-        $this->assertStringContainsString('Past 30 days upload traffic: 1GiB', $output);
-        $this->assertStringContainsString('Past 30 days inbound traffic: 2GiB', $output);
+        $this->assertStringContainsAllStrings(['Week: 512MiB, Day: 2MiB',
+            'Past 30 days upload traffic: 1GiB', 'Past 30 days inbound traffic: 2GiB'], $output);
     }
 
     public function testTrafficDisplayValueKeepsDisplayAndFallsBackToRaw(): void
@@ -234,10 +227,8 @@ final class CustomerStatsLayoutTest extends TestCase
             \pmssStatsRenderResourceBlocks(array('data' => $resourceData, 'time' => 0, 'error' => null));
         });
 
-        $this->assertStringContainsString('RAM-hours: 12.5GB-hrs / 6.5GB-hrs / 1.25GB-hrs', $output);
-        $this->assertStringContainsString('Average: 3GiB / 2GiB / 1024MiB', $output);
-        $this->assertStringNotContainsString('RAM-hours: n/a', $output);
-        $this->assertStringNotContainsString('Average: n/a', $output);
+        $this->assertStringContainsAndOmitsStrings(['RAM-hours: 12.5GB-hrs / 6.5GB-hrs / 1.25GB-hrs',
+            'Average: 3GiB / 2GiB / 1024MiB'], ['RAM-hours: n/a', 'Average: n/a'], $output);
     }
 
     public function testStorageIoRendersRawOnlyWindowsAndPreservesDisplay(): void
@@ -253,8 +244,8 @@ final class CustomerStatsLayoutTest extends TestCase
         [, $output] = $this->pmssCaptureStdout(function () use ($resourceData): void {
             \pmssStatsRenderResourceBlocks(array('data' => $resourceData, 'time' => 0, 'error' => null));
         });
-        $this->assertStringContainsString('I/O Read (month/week/day/hour): saved read / 2MiB / 0KiB / 1KiB', $output);
-        $this->assertStringContainsString('I/O Write (month/week/day/hour): 3MiB / 4MiB / 5MiB / 6KiB', $output);
+        $this->assertStringContainsAllStrings(['I/O Read (month/week/day/hour): saved read / 2MiB / 0KiB / 1KiB',
+            'I/O Write (month/week/day/hour): 3MiB / 4MiB / 5MiB / 6KiB'], $output);
     }
 
     public function testStorageIoRenderKeepsSeparatePreformattedLines(): void
@@ -295,8 +286,7 @@ final class CustomerStatsLayoutTest extends TestCase
             $baseResources['text']
         );
         foreach ($commands as $command) {
-            $this->assertStringNotContainsString('systemctl status', $command);
-            $this->assertStringNotContainsString('systemctl show', $command);
+            $this->assertStringContainsAndOmitsStrings([], ['systemctl status', 'systemctl show'], $command);
         }
 
         $interfacesRoot = $this->pmssMakeTempDir('pmss-stats-net-');

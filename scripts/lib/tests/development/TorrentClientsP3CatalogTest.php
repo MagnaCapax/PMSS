@@ -152,8 +152,7 @@ final class TorrentClientsP3CatalogTest extends TestCase
             $this->assertSame(['https://pulsedmedia.com/remote/pkg/transmission-web-'
                 .$entry['version'].'-r1.tar.gz'], $entry['web']['url']);
         }
-        $adr = (string) file_get_contents(dirname(__DIR__, 4).'/docs/adr/0108-transmission-socket-integration.md');
-        $this->assertStringContainsString('4.1.3 as default and 4.0.5 as legacy', $adr);
-        $this->assertStringContainsString("Do not\npublish 4.0.6 because of its tracker announce race.", $adr);
+        $this->pmssAssertRepoFileContainsAllStrings('docs/adr/0108-transmission-socket-integration.md', [
+            '4.1.3 as default and 4.0.5 as legacy', "Do not\npublish 4.0.6 because of its tracker announce race."]);
     }
 }

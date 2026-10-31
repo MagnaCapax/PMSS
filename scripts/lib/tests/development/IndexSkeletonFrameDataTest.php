@@ -158,8 +158,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             $html = $this->pmssRenderUserPanelIndexFromHome($home);
         });
 
-        $this->assertStringContainsString('<a href="#welcome"', $html);
-        $this->assertStringContainsString('<iframe id="welcomeFrame"', $html);
+        $this->assertStringContainsAllStrings(['<a href="#welcome"', '<iframe id="welcomeFrame"'], $html);
     }
 
     public function testWelcomePageOffersScopedFrameSourceControl(): void
@@ -222,12 +221,11 @@ class IndexSkeletonFrameDataTest extends TestCase
     {
         $html = \pmssCustomerContextualHelpLinkBuild('panelFrameSource');
 
-        $this->assertStringContainsString('class="pmss-contextual-help"', $html);
-        $this->assertStringContainsString('href="https://wiki.pulsedmedia.com/index.php/Panel_Frame_Source"', $html);
-        $this->assertStringContainsString('title="Read about panel frame sources in the Pulsed Media Wiki"', $html);
-        $this->assertStringContainsString('aria-label="Read about panel frame sources in the Pulsed Media Wiki"', $html);
-        $this->assertStringContainsString('target="_blank" rel="noopener noreferrer"', $html);
-        $this->assertStringContainsString('>(?)</a>', $html);
+        $this->assertStringContainsAllStrings(['class="pmss-contextual-help"',
+            'href="https://wiki.pulsedmedia.com/index.php/Panel_Frame_Source"',
+            'title="Read about panel frame sources in the Pulsed Media Wiki"',
+            'aria-label="Read about panel frame sources in the Pulsed Media Wiki"',
+            'target="_blank" rel="noopener noreferrer"', '>(?)</a>'], $html);
 
         $this->assertSame('', \pmssCustomerContextualHelpLinkBuild(null));
         $this->assertSame('', \pmssCustomerContextualHelpLinkBuild(''));
@@ -352,8 +350,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['qbittorrent', 'deluge'] as $frame) {
-            $this->assertStringContainsString('<a href="#'.$frame.'"', $html);
-            $this->assertStringContainsString("loadFrame('".$frame."', '".$frame."/')", $html);
+            $this->assertStringContainsAllStrings(['<a href="#'.$frame.'"', "loadFrame('".$frame."', '".$frame."/')"], $html);
         }
         $this->assertStringContainsAllStrings(['title="qBittorrent - Torrent web UI"',
             '<div id="qbittorrent" class="tabs-container"></div>'], $html);
@@ -466,8 +463,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr', 'autobrr'] as $app) {
             $this->assertStringContainsString("loadFrame('".$app."', '/public-fixtur01/".$app."/')", $html);
         }
-        $this->assertStringContainsString("loadFrame('jellyfin', '/public-fixtur01/jellyfin/web/')", $html);
-        $this->assertStringNotContainsString('<a href="#notebook"', $html);
+        $this->assertStringContainsAndOmitsStrings(["loadFrame('jellyfin', '/public-fixtur01/jellyfin/web/')"], ['<a href="#notebook"'], $html);
     }
 
     public function testCustomFrameParserIgnoresBlankLinesBeforeFieldAccess(): void
@@ -477,8 +473,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $output = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'), true);
 
-        $this->assertStringContainsString('<a href="#custom"', $output);
-        $this->assertStringNotContainsString('Undefined array key', $output);
+        $this->assertStringContainsAndOmitsStrings(['<a href="#custom"'], ['Undefined array key'], $output);
     }
 
     public function testCustomFrameParserLocksAcceptedRows(): void
