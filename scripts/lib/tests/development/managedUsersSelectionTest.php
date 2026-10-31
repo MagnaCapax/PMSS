@@ -13,14 +13,9 @@ class ManagedUsersSelectionTest extends TestCase
         $this->listUsersScript = $this->pmssMakeTempDir('pmss-list-users').'/listUsers.php';
     }
 
-    private function writeListUsersScript(string $body): void
-    {
-        $this->pmssWriteExecutablePhpFile($this->listUsersScript, $body);
-    }
-
     public function testManagedUsersSelectFromCommandReturnsSanitizedUsersWhenNoUsernameRequested(): void
     {
-        $this->writeListUsersScript("echo \"user1\\nINVALID\\nuser1\\nuser2\\n\";");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"user1\\nINVALID\\nuser1\\nuser2\\n\";");
 
         $selection = \pmssManagedUsersSelectFromCommand($this->listUsersScript);
 
@@ -31,7 +26,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testListManagedUsersResultKeepsExitCodeWhileSanitizingOutput(): void
     {
-        $this->writeListUsersScript("fwrite(STDOUT, \" user1 \\nINVALID\\nuser1\\nuser2\\n\"); exit(7);");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "fwrite(STDOUT, \" user1 \\nINVALID\\nuser1\\nuser2\\n\"); exit(7);");
 
         $result = \pmssListManagedUsersResult($this->listUsersScript);
 
@@ -41,7 +36,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testListManagedUsersResultFailsClosedOnDiagnosticOutput(): void
     {
-        $this->writeListUsersScript("echo \"PHP Fatal error: Uncaught Error: missing dependency\\nStack trace:\\n#0 /scripts/listUsers.php(1): demo()\\nuser1\\n\";");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"PHP Fatal error: Uncaught Error: missing dependency\\nStack trace:\\n#0 /scripts/listUsers.php(1): demo()\\nuser1\\n\";");
 
         $result = \pmssListManagedUsersResult($this->listUsersScript);
 
@@ -61,7 +56,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testListManagedUsersReturnsEmptyListOnDiagnosticOutput(): void
     {
-        $this->writeListUsersScript("echo \"Warning: require_once(/scripts/lib/users.php): Failed opening required\\nuser1\\n\";");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"Warning: require_once(/scripts/lib/users.php): Failed opening required\\nuser1\\n\";");
 
         $this->assertEquals([], \pmssListManagedUsers($this->listUsersScript));
     }
@@ -77,7 +72,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testManagedUsersSelectFromCommandFindsSpecificManagedUser(): void
     {
-        $this->writeListUsersScript("echo \"user1\\nuser2\\n\";");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"user1\\nuser2\\n\";");
 
         $selection = \pmssManagedUsersSelectFromCommand($this->listUsersScript, ' user2 ');
 
@@ -88,7 +83,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testManagedUsersSelectFromCommandPropagatesCommandFailure(): void
     {
-        $this->writeListUsersScript("echo \"user1\\n\"; exit(7);");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"user1\\n\"; exit(7);");
 
         list($selection) = $this->pmssCaptureStdout(function (): array {
             return \pmssManagedUsersSelectFromCommand(
@@ -105,7 +100,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testManagedUsersSelectFromCommandRejectsInvalidUsername(): void
     {
-        $this->writeListUsersScript("echo \"user1\\n\";");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"user1\\n\";");
 
         list($selection) = $this->pmssCaptureStdout(function (): array { return \pmssManagedUsersSelectFromCommand($this->listUsersScript, 'User1', ['strictInput' => true]); });
 
@@ -116,7 +111,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testManagedUsersSelectFromCommandRejectsUnknownManagedUser(): void
     {
-        $this->writeListUsersScript("echo \"user1\\n\";");
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"user1\\n\";");
 
         list($selection) = $this->pmssCaptureStdout(function (): array { return \pmssManagedUsersSelectFromCommand($this->listUsersScript, 'user2'); });
 
@@ -127,7 +122,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     public function testManagedUsersSelectFromCommandEmitsEmptyMessageWhenRequested(): void
     {
-        $this->writeListUsersScript('');
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, '');
 
         list($selection, $output) = $this->pmssCaptureStdout(function (): array { return \pmssManagedUsersSelectFromCommand($this->listUsersScript, '', ['emitEmptyMessage' => true]); });
 

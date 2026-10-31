@@ -27,8 +27,8 @@ final class QbittorrentBuildDeadlineTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-qbt-probe-deadline-');
         $ready = $root.'/ready';
-        $binary = $this->pmssWriteFile($root.'/qbittorrent-nox', "#!/bin/sh\ntouch ".escapeshellarg($ready)."\nsleep 30 &\nexit 0\n");
-        chmod($binary, 0700);
+        $binary = $root.'/qbittorrent-nox';
+        $this->pmssWriteExecutableFile($binary, "#!/bin/sh\ntouch ".escapeshellarg($ready)."\nsleep 30 &\nexit 0\n", 0755, 0700);
         foreach (['pmssQbittorrentBuildProbe', 'pmssQbittorrentFrontendBuildProbe'] as $probe) {
             if (is_file($ready)) unlink($ready);
             $start = microtime(true);
@@ -43,8 +43,8 @@ final class QbittorrentBuildDeadlineTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-qbt-probe-output-');
         foreach (["printf 'qBittorrent v5.3.0\\n'" => "qBittorrent v5.3.0\n", 'exit 1' => null,
             'head -c 8192 /dev/zero' => null] as $body => $expected) {
-            $binary = $this->pmssWriteFile($root.'/qbittorrent-nox', "#!/bin/sh\n".$body."\n");
-            chmod($binary, 0700);
+            $binary = $root.'/qbittorrent-nox';
+            $this->pmssWriteExecutableFile($binary, "#!/bin/sh\n".$body."\n", 0755, 0700);
             foreach (['pmssQbittorrentBuildProbe', 'pmssQbittorrentFrontendBuildProbe'] as $probe)
                 $this->assertSame($expected, $probe($binary));
         }
@@ -86,8 +86,8 @@ final class QbittorrentBuildDeadlineTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-qbt-account-deadline-');
         $ready = $root.'/ready';
-        $fake = $this->pmssWriteFile($root.'/stalled', "#!/bin/sh\ntouch ".escapeshellarg($ready)."\nsleep 30 &\nexit 0\n");
-        chmod($fake, 0700);
+        $fake = $root.'/stalled';
+        $this->pmssWriteExecutableFile($fake, "#!/bin/sh\ntouch ".escapeshellarg($ready)."\nsleep 30 &\nexit 0\n", 0755, 0700);
         $output = [];
         $start = microtime(true);
         $this->assertSame(124, \pmssCredentialProcessRun(escapeshellarg($fake), null, $output, false, 45, $this->deadlineOps($ready)));

@@ -26,8 +26,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
     {
         $systemPath = $this->makeExecutable('usr/bin/deluge-console');
         $localPath = $this->tempDir.'/usr/local/bin/deluge-console';
-        $this->pmssWriteFile($localPath, "#!/bin/sh\necho legacy\n");
-        @chmod($localPath, 0755);
+        $this->pmssWriteExecutableFile($localPath, "#!/bin/sh\necho legacy\n");
 
         $result = \pmssEnsureDelugeCommandSymlink('deluge-console', $systemPath, $localPath, false, $this->logger);
 
@@ -41,8 +40,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
         $systemPath = $this->makeExecutable('usr/bin/deluged');
         $localPath = $this->tempDir.'/usr/local/bin/deluged';
         $legacy = "#!/bin/sh\necho legacy\n";
-        $this->pmssWriteFile($localPath, $legacy);
-        @chmod($localPath, 0755);
+        $this->pmssWriteExecutableFile($localPath, $legacy);
 
         $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, true, $this->logger);
 

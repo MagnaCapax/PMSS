@@ -15,9 +15,9 @@ final class QbittorrentBuildProbeIsolationTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-probe-home-');
         $config = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', "[Meta]\nMigrationVersion=6\n");
-        $bin = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-qbt-probe-bin-').'/qbittorrent-nox',
+        $bin = $this->pmssMakeTempDir('pmss-qbt-probe-bin-').'/qbittorrent-nox';
+        $this->pmssWriteExecutableFile($bin,
             "#!/bin/sh\nmkdir -p \"\$HOME/.config/qBittorrent\" && echo '[Meta]' > \"\$HOME/.config/qBittorrent/qBittorrent.conf\"\necho 'qBittorrent v5.3.0'\n");
-        chmod($bin, 0755);
         $this->pmssTrackEnvOverrides(['HOME' => $home]);
         $before = glob(rtrim(sys_get_temp_dir(), '/').'/pmss-qbt-probe-*') ?: [];
 

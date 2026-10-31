@@ -205,7 +205,7 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
     {
         if (posix_geteuid() === 0) throw new SkipTest('installer refuses root');
         $root = $this->pmssMakeTempDir('pmss-oc-repeat-');
-        $home = $root.'/alice';
+        $home = $root.'/fixtur01';
         mkdir($home.'/stubs', 0700, true);
         $paths = \ocPaths($home);
         mkdir(dirname($paths['node']), 0700, true);
@@ -219,7 +219,7 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
         file_put_contents($home.'/.lighttpd.conf', "server.port = 24000\n");
         foreach (array('quota' => 'exit 0', 'pkill' => 'exit 0', 'lighttpd' => 'exit 0', 'curl' => 'echo 401',
-            'crontab' => 'if [ "$1" = "-l" ]; then echo "no crontab for alice"; exit 1; fi') as $name => $body) {
+            'crontab' => 'if [ "$1" = "-l" ]; then echo "no crontab for fixtur01"; exit 1; fi') as $name => $body) {
             $this->pmssWriteExecutableFile($home.'/stubs/'.$name, "#!/bin/sh\n".$body."\n", 0755, 0700);
         }
         $env = getenv();
@@ -237,13 +237,13 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $this->assertSame($token, file_get_contents($paths['env']));
         $this->assertStringContainsString('own/model', file_get_contents($paths['state'].'/openclaw.json'));
         $this->assertSame(0600, fileperms($paths['state'].'/pmss-provider-pending') & 0777);
-        $this->assertSame(\ocProxyFragment('/user-alice/openclaw', 23000), file_get_contents($home.'/.lighttpd/custom.d/openclaw.conf'));
+        $this->assertSame(\ocProxyFragment('/user-fixtur01/openclaw', 23000), file_get_contents($home.'/.lighttpd/custom.d/openclaw.conf'));
     }
 
     public function testBrowserFragmentMatchesSharedKeepPrefixRenderer(): void
     {
         require_once dirname(__DIR__, 2).'/lighttpd/proxyFragments.php';
-        foreach (array('alice' => 12345, 'bob' => 65500, 'abc123' => 20000) as $user => $port) {
+        foreach (array('fixtur01' => 12345, 'fixtur02' => 65500, 'abc123' => 20000) as $user => $port) {
             $base = '/user-'.$user.'/openclaw';
             $this->assertSame(\pmssLighttpdProxyRuleFragment('^'.$base.'($|/)', $port), \ocProxyFragment($base, $port));
         }
@@ -251,7 +251,7 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
 
     public function testDashboardRewritePreservesBootstrapAndUsesCanonicalWebsocket(): void
     {
-        $base = '/user-alice/openclaw';
+        $base = '/user-fixtur01/openclaw';
         $fields = array('bootstrapToken' => 'single+use/secret=', 'bootstrapProfile' => 'owner',
             'gatewayUrl' => 'ws://127.0.0.1:23000'.$base, 'extra' => 'kept');
         $json = json_encode(array('browserUrl' => 'http://127.0.0.1:23000'.$base.'/#'.http_build_query($fields)));
@@ -280,8 +280,8 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
     public function testProxyFailureRemovesFragmentAndRestartsPanelAgain(): void
     {
         $root = $this->pmssMakeTempDir('pmss-oc-proxy-');
-        mkdir($root.'/alice');
-        $paths = array('home' => $root.'/alice');
+        mkdir($root.'/fixtur01');
+        $paths = array('home' => $root.'/fixtur01');
         $calls = 0;
         try {
             \ocProxyApply($paths, 23000, static function () use (&$calls): bool { return ++$calls > 1; });
@@ -293,7 +293,7 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $file = $paths['home'].'/.lighttpd/custom.d/openclaw.conf';
         $this->assertFalse(file_exists($file));
         \ocProxyApply($paths, 23000, static function (): bool { return true; });
-        $this->assertSame(\ocProxyFragment('/user-alice/openclaw', 23000), file_get_contents($file));
+        $this->assertSame(\ocProxyFragment('/user-fixtur01/openclaw', 23000), file_get_contents($file));
         \ocProxyApply($paths, null, static function (): bool { return true; });
         $this->assertFalse(file_exists($file));
         symlink($root.'/outside', $file);
@@ -680,13 +680,12 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
         file_put_contents($paths['npm'], '<?php touch(getenv("OC_TEST_NPM_MARK"));');
         touch($paths['state'].'/pmss-kokko-disabled');
         file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
-        mkdir($home.'/stubs', 0700);
-        file_put_contents($home.'/stubs/quota', "#!/bin/sh\nexit 0\n");
         // The fake download is never the pinned archive, so its SHA256 check must fail.
-        file_put_contents($home.'/stubs/curl', "#!/bin/sh\necho \"\$@\" >>".escapeshellarg($home.'/curl-args')
-            ."\nwhile [ \$# -gt 0 ]; do [ \"\$1\" = -o ] && printf 'not node' >\"\$2\"; shift; done\n");
-        chmod($home.'/stubs/quota', 0700);
-        chmod($home.'/stubs/curl', 0700);
+        $this->pmssWriteExecutableFiles($home.'/stubs', [
+            'quota' => "#!/bin/sh\nexit 0\n",
+            'curl' => "#!/bin/sh\necho \"\$@\" >>".escapeshellarg($home.'/curl-args')
+                ."\nwhile [ \$# -gt 0 ]; do [ \"\$1\" = -o ] && printf 'not node' >\"\$2\"; shift; done\n",
+        ], 0700, 0700);
         $this->pmssWithPathPrefixedEnv($home.'/stubs', ['OC_TEST_NPM_MARK' => $home.'/npm-ran'], function () use ($paths, $home): void {
             $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Node download or SHA256 verification failed');
             $url = 'https://nodejs.org/dist/v'.OC_NODE_VERSION.'/node-v'.OC_NODE_VERSION.'-linux-x64.tar.xz';
@@ -711,11 +710,9 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
     private function openClawNodeShim(array $paths, string $version = OC_NODE_VERSION): string
     {
         $node = \ocPaths($paths['home'])['node'];
-        if (!is_dir(dirname($node))) mkdir(dirname($node), 0700, true);
-        file_put_contents($node, '#!'.PHP_BINARY."\n".'<?php
+        $this->pmssWriteExecutableFile($node, '#!'.PHP_BINARY."\n".'<?php
 if (($argv[1] ?? "") === "--version") { echo "v'.$version.'"; exit; }
-$file = $argv[1]; array_shift($argv); require $file;');
-        chmod($node, 0700);
+$file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         return $node;
     }
 

@@ -14,12 +14,7 @@ class PythonVenvHelperTest extends TestCase
             'pmss-python-path-'
         );
 
-        $systemPath = getenv('PATH');
-        if (!is_string($systemPath) || $systemPath === '') {
-            return $stubPath;
-        }
-
-        return $stubPath.':'.$systemPath;
+        return $this->pmssPathPrefixedEnvironment($stubPath)['PATH'];
     }
 
     private function makeVenvPython(string $venvDir): void

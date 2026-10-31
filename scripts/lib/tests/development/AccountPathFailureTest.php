@@ -17,7 +17,7 @@ class AccountPathFailureTest extends TestCase
         $this->assertSame([true, 0, 0600, '/'], $result['descriptor']);
         $this->assertFalse($result['captureOpen']);
         $this->assertTrue($result['rootBranch']);
-        $this->assertSame("-u alice --\n", $result['runuser']);
+        $this->assertSame("-u fixtur01 --\n", $result['runuser']);
     }
 
     public function testNoisyStderrDoesNotBlockLargeStandardInput(): void
@@ -99,9 +99,8 @@ class AccountPathFailureTest extends TestCase
         $inputPath = $this->tempDir.'/input';
         if ($input !== null) $this->pmssWriteFile($inputPath, $input);
         $inputExpression = $input === null ? 'null' : 'file_get_contents('.var_export($inputPath, true).')';
-        $this->pmssWriteFile($stub.'/runuser', "#!/bin/sh\nprintf '%s %s %s\\n' \"\$1\" \"\$2\" \"\$3\" > "
-            .escapeshellarg($record)."\nshift 3\nexec \"\$@\"\n");
-        chmod($stub.'/runuser', 0700);
+        $this->pmssWriteExecutableFile($stub.'/runuser', "#!/bin/sh\nprintf '%s %s %s\\n' \"\$1\" \"\$2\" \"\$3\" > "
+            .escapeshellarg($record)."\nshift 3\nexec \"\$@\"\n", 0755, 0700);
         $script = <<<'PHP'
 namespace AccountFailureFixture;
 function posix_geteuid() { return 0; }
@@ -127,8 +126,8 @@ PHP;
         $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/lighttpd/userFileWrite.php'), true).';';
         $script .= 'ini_set("error_log", '.var_export($this->tempDir.'/errors.log', true).');'
             .'$home = '.var_export($home, true).'; $timedOut = true; $failure = "stale";'
-            .'$ok = $GLOBALS["fault"] === "replacement" ? pmssReplaceAccountFile("alice", $home, $home."/config", "private-input", 0600)'
-            .': pmssAccountPathRun("alice", $home, [$GLOBALS["fault"] === "validation" ? dirname($home)."/outside" : $home."/target"], '
+            .'$ok = $GLOBALS["fault"] === "replacement" ? pmssReplaceAccountFile("fixtur01", $home, $home."/config", "private-input", 0600)'
+            .': pmssAccountPathRun("fixtur01", $home, [$GLOBALS["fault"] === "validation" ? dirname($home)."/outside" : $home."/target"], '
             .var_export($command, true).', '.$inputExpression.', '.$timeout.', $timedOut, $failure);'
             .'echo json_encode(["ok" => $ok, "timedOut" => $timedOut, "failure" => $failure,'
             .'"descriptor" => $GLOBALS["descriptor"] ?? null, "captureOpen" => is_resource($GLOBALS["capture"] ?? null),'

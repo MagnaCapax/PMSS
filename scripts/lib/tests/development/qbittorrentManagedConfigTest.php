@@ -18,8 +18,8 @@ class QbittorrentManagedConfigTest extends TestCase
     public function testConfigPathHonoursManagedHomeOverride(): void
     {
         $this->assertSame(
-            $this->homeRoot.'/alice/.config/qBittorrent/qBittorrent.conf',
-            pmssQbittorrentConfigPath('alice')
+            $this->homeRoot.'/fixtur01/.config/qBittorrent/qBittorrent.conf',
+            pmssQbittorrentConfigPath('fixtur01')
         );
     }
 
@@ -27,11 +27,11 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
-            'alice/.config/qBittorrent/qBittorrent.conf',
+            'fixtur01/.config/qBittorrent/qBittorrent.conf',
             "[BitTorrent]\nSession\\DiskCacheSize=16384\nSession\\MaxConnections=9999\n\n[Preferences]\nDownloads\\DiskWriteCacheSize=16384\nBittorrent\\MaxConnecs=9999\n"
         );
 
-        $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
+        $this->assertTrue(pmssQbittorrentApplyManagedConfig('fixtur01'));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsAllStrings(["Session\\DiskCacheSize=128\n", "Session\\MaxConnections=300\n", "Downloads\\DiskWriteCacheSize=128\n", "Bittorrent\\MaxConnecs=300\n"], $updated);
@@ -41,11 +41,11 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
-            'alice/.config/qBittorrent/qBittorrent.conf',
+            'fixtur01/.config/qBittorrent/qBittorrent.conf',
             "[Preferences]\nWebUI\\CSRFProtection=false\nWebUI\\ClickjackingProtection=false\nWebUI\\HostHeaderValidation=false\n"
         );
 
-        $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
+        $this->assertTrue(pmssQbittorrentApplyManagedConfig('fixtur01'));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsAllStrings(["WebUI\\CSRFProtection=true\n", "WebUI\\ClickjackingProtection=true\n", "WebUI\\HostHeaderValidation=false\n"], $updated);
@@ -55,11 +55,11 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
-            'alice/.config/qBittorrent/qBittorrent.conf',
+            'fixtur01/.config/qBittorrent/qBittorrent.conf',
             "[Preferences]\nGeneral\\Locale=fi\nWebUI\\Port=23456\nDownloads\\DiskWriteCacheSize=8192\n"
         );
 
-        $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
+        $this->assertTrue(pmssQbittorrentApplyManagedConfig('fixtur01'));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsAllStrings(["General\\Locale=fi\n", "WebUI\\Port=23456\n", "Downloads\\DiskWriteCacheSize=128\n"], $updated);
@@ -69,11 +69,11 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
-            'alice/.config/qBittorrent/qBittorrent.conf',
+            'fixtur01/.config/qBittorrent/qBittorrent.conf',
             "[BitTorrent]\nSession\\DiskIOType=MemoryMappedFiles\n\n[Preferences]\nLocale=en\n"
         );
 
-        $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
+        $this->assertTrue(pmssQbittorrentApplyManagedConfig('fixtur01'));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsAllStrings(["Session\\DiskIOType=Posix\n", "Session\\AsyncIOThreadsCount=4\n", "Downloads\\PreAllocation=true\n"], $updated);
@@ -83,11 +83,11 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
-            'alice/.config/qBittorrent/qBittorrent.conf',
+            'fixtur01/.config/qBittorrent/qBittorrent.conf',
             "[Application]\nMemoryWorkingSetLimit=2048\n"
         );
 
-        $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
+        $this->assertTrue(pmssQbittorrentApplyManagedConfig('fixtur01'));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsAllStrings(["[BitTorrent]\n", "Session\\DiskCacheSize=128\n", "[Preferences]\n", "Bittorrent\\MaxConnecs=300\n", "WebUI\\HostHeaderValidation=false\n"], $updated);
@@ -95,25 +95,25 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testApplyManagedConfigRejectsSymlinkTarget(): void
     {
-        $configDir = $this->homeRoot.'/alice/.config/qBittorrent';
+        $configDir = $this->homeRoot.'/fixtur01/.config/qBittorrent';
         @mkdir($configDir, 0755, true);
         $target = $configDir.'/qBittorrent.conf';
         @symlink($this->homeRoot.'/missing-target', $target);
 
-        $this->assertFalse(pmssQbittorrentApplyManagedConfig('alice'));
+        $this->assertFalse(pmssQbittorrentApplyManagedConfig('fixtur01'));
     }
 
     public function testApplyUploadThrottlePreservesFileMode(): void
     {
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
-            'alice/.config/qBittorrent/qBittorrent.conf',
+            'fixtur01/.config/qBittorrent/qBittorrent.conf',
             "[Preferences]\nConnection\\GlobalUPLimit=900\n"
         );
         chmod($configPath, 0640);
 
         require_once dirname(__DIR__, 2).'/user/qbittorrentThrottleAccount.php';
-        $this->assertTrue(pmssQbittorrentThrottleAccount($this->homeRoot.'/alice', 512, true, [
+        $this->assertTrue(pmssQbittorrentThrottleAccount($this->homeRoot.'/fixtur01', 512, true, [
             'build' => '4.3.9',
             'recordWrite' => static function ($path, $value): bool { return file_put_contents($path, $value) === strlen($value); },
             'accountPids' => static function (): array { return []; },
@@ -129,11 +129,11 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         $realHomeRoot = $this->homeRoot.'/real-home';
         $linkedHomeRoot = $this->homeRoot.'/linked-home';
-        $configPath = $this->pmssWriteRelativeFile($realHomeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nConnection\\GlobalUPLimit=10\n");
+        $configPath = $this->pmssWriteRelativeFile($realHomeRoot, 'fixtur01/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nConnection\\GlobalUPLimit=10\n");
         symlink($realHomeRoot, $linkedHomeRoot);
         $this->pmssTrackHomeRoot($linkedHomeRoot);
 
-        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice', 512));
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('fixtur01', 512));
         $this->assertSame(
             "[Preferences]\nConnection\\GlobalUPLimit=10\n",
             (string) file_get_contents($configPath)
@@ -144,24 +144,23 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         // ADR 0182 keys the throttle on the discovered build; pin a 4.4+ build so the host's system build cannot decide.
         $bin = $this->pmssMakeTempDir('pmss-qbt-bin-');
-        $this->pmssWriteFile($bin.'/qbittorrent-nox', "#!/bin/sh\necho 'qBittorrent v4.6.7'\n");
-        chmod($bin.'/qbittorrent-nox', 0755);
+        $this->pmssWriteExecutableFile($bin.'/qbittorrent-nox', "#!/bin/sh\necho 'qBittorrent v4.6.7'\n");
         $this->pmssTrackEnvOverrides(['PATH' => $bin.':'.(string) getenv('PATH')]);
         $before = "[Meta]\nMigrationVersion=2\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=10\n[Preferences]\nLocale=en\n";
-        $path = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', $before);
-        $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.torrentThrottle', "512\n");
-        $this->assertTrue(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
+        $path = $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.config/qBittorrent/qBittorrent.conf', $before);
+        $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.torrentThrottle', "512\n");
+        $this->assertTrue(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
         $this->assertSame($before, file_get_contents($path));
 
         // Simulate the daemon saving its old settings on SIGTERM before PMSS writes.
         file_put_contents($path, $before."WebUI\\Port=23456\n");
-        $this->assertTrue(pmssQbittorrentApplyUploadThrottle('alice'));
+        $this->assertTrue(pmssQbittorrentApplyUploadThrottle('fixtur01'));
         $updated = file_get_contents($path);
         $this->assertStringContainsString("Session\\GlobalUPSpeedLimit=512\n", $updated);
         $this->assertStringContainsString("WebUI\\Port=23456\n", $updated);
         $this->assertStringNotContainsString('Connection\\GlobalUPLimit', $updated);
-        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
-        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice'));
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('fixtur01'));
     }
 
     public function testMigratedThrottleIgnoresObsoleteKeyAndSurvivesDaemonSave(): void
@@ -200,16 +199,16 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testThrottleComparisonSkipsMissingMalformedAndLinkedConfigs(): void
     {
-        $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.torrentThrottle', "500\n");
-        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
-        $path = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[invalid\n");
-        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
-        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice'));
+        $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.torrentThrottle', "500\n");
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
+        $path = $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.config/qBittorrent/qBittorrent.conf', "[invalid\n");
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('fixtur01'));
         unlink($path);
         $target = $this->pmssWriteRelativeFile($this->homeRoot, 'target.conf', "[Preferences]\n");
         symlink($target, $path);
-        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('alice'));
-        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice'));
+        $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('fixtur01'));
         $this->assertSame("[Preferences]\n", file_get_contents($target));
     }
 
