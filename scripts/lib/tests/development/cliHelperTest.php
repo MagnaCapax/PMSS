@@ -17,8 +17,8 @@ class CliHelperTest extends TestCase
 
     public function testParsesLongOptionsWithValues(): void
     {
-        $parsed = \pmssParseCliTokens(['script.php', '--user=alice', '--limit=42', 'extra']);
-        $this->assertEquals('alice', $parsed['options']['user'] ?? '');
+        $parsed = \pmssParseCliTokens(['script.php', '--user=fixtur01', '--limit=42', 'extra']);
+        $this->assertEquals('fixtur01', $parsed['options']['user'] ?? '');
         $this->assertEquals('42', $parsed['options']['limit'] ?? '');
         $this->assertEquals(['extra'], $parsed['arguments']);
     }
@@ -32,11 +32,11 @@ class CliHelperTest extends TestCase
 
     public function testCliOptionHelperPrefersLongThenShort(): void
     {
-        $parsed = \pmssParseCliTokens(['script.php', '--user=alice', '-l', '50']);
+        $parsed = \pmssParseCliTokens(['script.php', '--user=fixtur01', '-l', '50']);
         $value = \pmssCliOption($parsed, 'limit', 'l');
         $this->assertEquals('50', $value);
         $fallback = \pmssCliOption($parsed, 'user', 'u');
-        $this->assertEquals('alice', $fallback);
+        $this->assertEquals('fixtur01', $fallback);
         $defaulted = \pmssCliOption($parsed, 'missing', 'm', 'fallback');
         $this->assertEquals('fallback', $defaulted);
         $parsed = \pmssParseCliTokens(['script.php', '--json=0', '-p']);
@@ -48,7 +48,7 @@ class CliHelperTest extends TestCase
         foreach ([['runtime', 60, 60], ['idle-util', 85, 70], ['empty', 85, 0]] as $case) {
             $this->assertEquals($case[2], \pmssCliOptionInt($parsed, $case[0], null, $case[1]));
         }
-        foreach ([[['script.php', '--debug', 'alice'], true, ['script.php', 'alice']], [[], false, []], [['--debug', '--debug', '--debug=1', '-debug'], true, ['--debug=1', '-debug']]] as [$argv, $debug, $remaining]) {
+        foreach ([[['script.php', '--debug', 'fixtur01'], true, ['script.php', 'fixtur01']], [[], false, []], [['--debug', '--debug', '--debug=1', '-debug'], true, ['--debug=1', '-debug']]] as [$argv, $debug, $remaining]) {
             $this->assertSame([$debug, $remaining], \pmssCliArgvDebugSplit($argv));
         }
         $this->assertSame('', \pmssCliHelpSectionText([], false));
@@ -86,9 +86,9 @@ class CliHelperTest extends TestCase
 
     public function testDeclaredValueModeKeepsUndeclaredLongOptionsBoolean(): void
     {
-        $parsed = \pmssParseCliTokens(['script.php', '--dry-run', 'alice', '--target', '-literal'], ['target']);
+        $parsed = \pmssParseCliTokens(['script.php', '--dry-run', 'fixtur01', '--target', '-literal'], ['target']);
         $this->assertTrue(\pmssCliOption($parsed, 'dry-run'));
-        $this->assertEquals(['alice'], $parsed['arguments']);
+        $this->assertEquals(['fixtur01'], $parsed['arguments']);
         $this->assertEquals('-literal', \pmssCliOption($parsed, 'target'));
     }
 
@@ -113,7 +113,7 @@ class CliHelperTest extends TestCase
     public function testCliExitWithStderrPreservesPayloadAndStatus(): void
     {
         $script = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-cli-exit-', '.php'), "<?php\nrequire_once ".var_export(dirname(__DIR__, 2).'/cli/optionParser.php', true).";\npmssCliExitWithStderr(\"exact failure\\n\", 7);\n");
-        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script), [], '2>&1');
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $script]);
 
         $this->assertSame(7, $result['rc']);
         $this->assertSame('exact failure', $result['output']);

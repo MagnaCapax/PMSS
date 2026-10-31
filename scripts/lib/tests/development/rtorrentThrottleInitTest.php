@@ -8,7 +8,7 @@ class RtorrentThrottleInitTest extends TestCase
     public function testStartupHelperRestoresThrottleForCurrentUser(): void
     {
         $fixture = $this->startupFixture('return true;');
-        $result = $this->runStartupHelper($fixture['script']);
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $fixture['script']]);
 
         $this->assertSame(0, $result['rc'], $result['output']);
         $observed = $this->pmssReadJsonArrayFile($fixture['observed'], null, 'Expected throttle helper observation');
@@ -19,7 +19,7 @@ class RtorrentThrottleInitTest extends TestCase
     public function testStartupHelperReturnsFailureWhenRestoreFails(): void
     {
         $fixture = $this->startupFixture('return false;');
-        $result = $this->runStartupHelper($fixture['script']);
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $fixture['script']]);
 
         $this->assertSame(1, $result['rc'], 'Failed throttle restore should return non-zero');
     }
@@ -31,7 +31,7 @@ class RtorrentThrottleInitTest extends TestCase
         $this->pmssEnsureDir($home.'/www/rutorrent/php');
         copy($this->pmssRepoPath('etc/skel/.rtorrentThrottleInit.php'), $script);
 
-        $result = $this->runStartupHelper($script);
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $script]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertSame('', $result['output']);
@@ -46,7 +46,7 @@ class RtorrentThrottleInitTest extends TestCase
             $fixture = $this->startupFixture('return true;');
             file_put_contents(dirname($fixture['script']).'/.rtorrent.rc.custom', $customConfig);
 
-            $result = $this->runStartupHelper($fixture['script']);
+            $result = $this->pmssExecArgvCommand([PHP_BINARY, $fixture['script']]);
 
             $this->assertSame(0, $result['rc'], $result['output']);
             $this->assertFalse(is_file($fixture['observed']), 'Custom named throttle should skip plugin restore');
@@ -58,7 +58,7 @@ class RtorrentThrottleInitTest extends TestCase
         $fixture = $this->startupFixture('return true;');
         file_put_contents(dirname($fixture['script']).'/.rtorrent.rc.custom', "# throttle.up = thr_0, 64\n");
 
-        $result = $this->runStartupHelper($fixture['script']);
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $fixture['script']]);
 
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertTrue(is_file($fixture['observed']), 'Commented example should not suppress plugin restore');
@@ -103,11 +103,5 @@ class rThrottle
 ');
 
         return ['script' => $script, 'observed' => $observed, 'php_root' => $phpRoot];
-    }
-
-    /** Execute the copied customer helper without touching a real account. */
-    private function runStartupHelper(string $script): array
-    {
-        return $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script));
     }
 }

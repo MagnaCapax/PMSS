@@ -709,7 +709,7 @@ class AppsCatalogTest extends TestCase
             .'$_POST["action"]="restart";'
             .'pmssFrontendToggleAction($marker, $start, '.var_export('printf disabled > '.escapeshellarg($disabled), true).', '.var_export('printf restarted > '.escapeshellarg($restarted), true).');';
         $script = $this->pmssWriteFile($root.'/toggle.php', $source);
-        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script));
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $script]);
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertFalse(is_file($marker));
         $this->assertSame('disabled', file_get_contents($disabled));
@@ -726,7 +726,7 @@ class AppsCatalogTest extends TestCase
             .'pmssFrontendToggleAction('.var_export($root, true).', static function () { echo "started"; }, "true");'
             .'echo "HTTP=".http_response_code();';
         $script = $this->pmssWriteFile($root.'/toggle.php', $source);
-        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' 2>&1');
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $script]);
 
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertStringContainsString('HTTP=500', $result['output']);

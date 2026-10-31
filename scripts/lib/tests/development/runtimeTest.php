@@ -509,7 +509,7 @@ PHP;
             "pmssRequireCliEntrypointScript(__DIR__, 'util/shebangTarget.php', false, ['--appended']);\n"
         );
 
-        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($wrapperPath).' --json', [], '2>&1');
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $wrapperPath, '--json']);
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->pmssAssertStringNotContainsString('#!/usr/bin/env php', $result['output']);
         $this->assertSame([

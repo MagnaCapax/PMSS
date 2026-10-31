@@ -44,6 +44,10 @@ prefixes share `pmssBuildCommandEnvironmentPrefix()`. Keep redirections, working
 directories and environment removal at the caller. Run fixtures only on testing
 machines, never on the control host.
 
+PHP script and sudo/env fixtures use the same argv helpers; keep sudo's `env`
+assignments in its argument vector so they apply to the elevated child. Use
+`pmssBuildArgvCommand()` for asynchronous launches that own their process and pipes.
+
 Use `pmssExecShellCommand()` for shell fixtures that need an exit status, joined
 output, or output lines; use `pmssRunShellCommand()` when raw stdout bytes suffice.
 Pass an empty stderr redirect to preserve inherited stderr, or the original
