@@ -24,6 +24,9 @@ function pmssQbittorrentWatchdogRunning(string $user, string $home, array $ops =
         $running = $runningRead($user);
         if ($running) return true;
     }
+    // A WebUI bind failure can leave the torrent daemon running indefinitely.
+    $collision = $ops['portCollision'] ?? 'pmssQbittorrentPortCollisionObserve';
+    if ($running) $collision($user, $home);
     // Account observation logs the refusal transition once, when it creates the marker.
     if ($running && !$account($user, $home, true)) return true;
     if (!$running) {

@@ -587,6 +587,16 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Starts missing service specs after applying the exported lock-fd close prefix;
     the watchdog parent retains its lock while long-lived daemons cannot inherit it.
 - qBittorrent toggle and watchdog diagnostics
+  - Native watchdog passes report a foreign IPv4 UID listening on the assigned
+    WebUI port, including while the torrent daemon remains running. Matching
+    file/config ports also perform this observation in `pmssQbittorrentPortEnsure()`.
+    One `/proc/net/tcp` snapshot is shared per process; only loopback/wildcard
+    listeners with a foreign UID and a socket inode produce a structured
+    `user_port` / `collision` warning. Same-UID listeners, unrelated interfaces,
+    absent listeners and unreadable tables are inconclusive. Docker clients keep
+    their existing watchdog exclusion. This is detection only for #1091:
+    automatic reassignment, rollback and bounded recovery remain unimplemented.
+    Observation does not change the reconciler's return contract or service state.
   - A failed enable-marker write returns HTTP 500 before attempting a start.
     Password-sync prerequisite and failure branches write reason-only PHP error-log entries.
   - The qBittorrent watchdog reports a count of accounts skipped for a missing

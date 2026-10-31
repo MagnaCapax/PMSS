@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../runtime.php';
 pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userConfigApply.php', '../torrentClients/identity.php', 'qbittorrent.php', 'identity.php']);
+require_once __DIR__.'/qbittorrentPortCollision.php';
 
 /**
  * Validate the user/home pair before crossing process or filesystem boundaries.
@@ -116,6 +117,7 @@ function pmssQbittorrentPortEnsure(string $user, string $home): bool
         return false;
     }
     if ($currentPort === (string) $expectedPort) {
+        pmssQbittorrentPortCollisionObserve($user, $home);
         return true;
     }
 
