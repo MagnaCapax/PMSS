@@ -12,32 +12,9 @@
 
 require_once __DIR__.'/../cli/helpText.php';
 require_once __DIR__.'/../runtime.php';
-
-/** @return array<string,array<string,mixed>> Shared resource option specification. */
-function pmssUserConfigCliResourceSpecs(): array
-{
-    return [
-        'trafficLimit' => ['addUserOption' => 'traffic-limit-gb', 'addUserLegacyIndex' => 5, 'userConfigIndex' => 4, 'usage' => '--traffic-limit-gb=GIB', 'parameter' => 'TRAFFIC_LIMIT_GB', 'description' => 'Monthly traffic quota in GiB.', 'parse' => 'int', 'default' => null, 'persist' => false],
-        'iopsLimit' => ['addUserOption' => 'iops-limit', 'usage' => '--iops-limit=OPS', 'parameter' => 'IOPS_LIMIT', 'description' => 'Monthly combined read+write I/O operations budget.', 'parse' => 'int', 'default' => null, 'persist' => false],
-        'trafficCapMbit' => ['addUserOption' => 'traffic-cap-mbit', 'addUserLegacyIndex' => 6, 'userConfigIndex' => 12, 'usage' => '--traffic-cap-mbit=MBIT', 'parameter' => 'TRAFFIC_CAP_MBIT', 'description' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.', 'parse' => 'int', 'default' => 0, 'persist' => true],
-        'CPUWeight' => ['addUserOption' => 'cpu-weight', 'addUserLegacyIndex' => 8, 'userConfigIndex' => 5, 'usage' => '--cpu-weight=WEIGHT', 'parameter' => 'CPUWEIGHT', 'description' => 'systemd CPUWeight; systemd expects 1-10000.', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--cpu-weight='],
-        'IOWeight' => ['addUserOption' => 'io-weight', 'addUserLegacyIndex' => 9, 'userConfigIndex' => 6, 'usage' => '--io-weight=WEIGHT', 'parameter' => 'IOWEIGHT', 'description' => 'systemd IOWeight; systemd expects 1-10000.', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-weight='],
-        'IOReadBW' => ['addUserOption' => 'io-read-bw', 'addUserLegacyIndex' => 10, 'userConfigIndex' => 7, 'usage' => '--io-read-bw=/dev/DEVICE:RATE', 'parameter' => 'IO_READ_BW', 'description' => 'Read bandwidth cap in /dev/DEVICE:RATE form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-read-bw='],
-        'IOWriteBW' => ['addUserOption' => 'io-write-bw', 'addUserLegacyIndex' => 11, 'userConfigIndex' => 8, 'usage' => '--io-write-bw=/dev/DEVICE:RATE', 'parameter' => 'IO_WRITE_BW', 'description' => 'Write bandwidth cap in /dev/DEVICE:RATE form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-bw='],
-        'IOReadIOPS' => ['addUserOption' => 'io-read-iops', 'addUserLegacyIndex' => 12, 'userConfigIndex' => 9, 'usage' => '--io-read-iops=/dev/DEVICE:IOPS', 'parameter' => 'IO_READ_IOPS', 'description' => 'Read IOPS cap in /dev/DEVICE:IOPS form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-read-iops='],
-        'IOWriteIOPS' => ['addUserOption' => 'io-write-iops', 'addUserLegacyIndex' => 13, 'userConfigIndex' => 10, 'usage' => '--io-write-iops=/dev/DEVICE:IOPS', 'parameter' => 'IO_WRITE_IOPS', 'description' => 'Write IOPS cap in /dev/DEVICE:IOPS form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-iops='],
-        'cpuQuotaPercent' => ['addUserOption' => 'cpu-quota-percent', 'addUserLegacyIndex' => 14, 'userConfigIndex' => 11, 'usage' => '--cpu-quota-percent=PERCENT|infinity', 'parameter' => 'CPU_QUOTA_PERCENT', 'description' => 'CPU quota percent; use infinity to remove the limit.', 'parse' => 'string', 'default' => 0, 'persist' => true],
-        'ioLatencyMs' => ['addUserOption' => 'io-latency-ms', 'addUserLegacyIndex' => 15, 'userConfigIndex' => 13, 'usage' => '--io-latency-ms=MS', 'parameter' => 'IO_LATENCY_MS', 'description' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-latency-ms='],
-        'ioCostQos' => ['addUserOption' => 'io-cost-qos', 'addUserLegacyIndex' => 16, 'userConfigIndex' => 14, 'usage' => '--io-cost-qos=SETTING', 'parameter' => 'IO_COST_QOS', 'description' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-qos='],
-        'ioCostModel' => ['addUserOption' => 'io-cost-model', 'addUserLegacyIndex' => 17, 'userConfigIndex' => 15, 'usage' => '--io-cost-model=SETTING', 'parameter' => 'IO_COST_MODEL', 'description' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-model='],
-    ];
-}
-
-/** Prefer an explicit long option over a legacy positional slot. */
-function pmssUserConfigCliLegacyValue(array $parsed, string $option, array $args, int $legacyIndex, $default = null) { $value = pmssCliOption($parsed, $option, null, null); return ($value !== null && $value !== true) ? $value : (array_key_exists($legacyIndex, $args) ? $args[$legacyIndex] : $default); }
-
-/** @return array<int,string> List shared long-option names for resource flags. */
-function pmssUserConfigCliResourceOptionNames(): array { return array_column(pmssUserConfigCliResourceSpecs(), 'addUserOption'); }
+require_once __DIR__.'/userConfigResourceSpecs.php';
+require_once __DIR__.'/userConfigCgroup.php';
+require_once __DIR__.'/userConfigParse.php';
 
 /** @return array<int,string> Stable resource-key groups for CLI help rendering. */
 function pmssUserConfigCliResourceGroupKeys(string $group): array
@@ -52,7 +29,7 @@ function pmssUserConfigCliResourceGroupKeys(string $group): array
         return array_slice(array_keys($specs), $group === 'addUserPrimaryOptions' ? 0 : 3, $group === 'addUserPrimaryOptions' ? 3 : null);
     }
     if ($group !== 'userConfigPositionals' && $group !== 'userConfigNamedOptions') return [];
-    $positionals = array_filter($specs, static function (array $spec): bool { return isset($spec['userConfigIndex']); });
+    $positionals = pmssUserConfigCliResourceSpecs('userConfigIndex');
     uasort($positionals, static function (array $left, array $right): int { return $left['userConfigIndex'] <=> $right['userConfigIndex']; });
     $keys = array_keys($positionals);
     if ($group === 'userConfigNamedOptions') array_splice($keys, 1, 0, ['iopsLimit']);
@@ -63,158 +40,6 @@ function pmssUserConfigCliResourceGroupKeys(string $group): array
 function pmssUserConfigCliResourceHelpLines(string $group, string $labelKey, array $descriptionSuffixes = []): array
 {
     $lines = []; $specs = pmssUserConfigCliResourceSpecs(); foreach (pmssUserConfigCliResourceGroupKeys($group) as $key) { isset($specs[$key][$labelKey]) && $lines[] = pmssCliHelpLine($specs[$key][$labelKey], $specs[$key]['description'].($descriptionSuffixes[$key] ?? '')); } return $lines;
-}
-
-/** @return array<string,mixed> Read shared resource options for creation, explicit updates, or defaulted updates. */
-function pmssUserConfigCliResources(array $parsed, array $args, string $indexKey, string $mode): array
-{
-    $values = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if ($mode === 'explicit') {
-            $optionValue = $parsed['options'][$spec['addUserOption']] ?? null;
-            $index = $spec[$indexKey] ?? -1;
-            $value = $optionValue !== null && $optionValue !== true && $optionValue !== ''
-                ? $optionValue : ((isset($spec[$indexKey]) && array_key_exists($index, $args) && $args[$index] !== '') ? $args[$index] : null);
-        } else {
-            $value = pmssUserConfigCliLegacyValue($parsed, $spec['addUserOption'], $args, (int) ($spec[$indexKey] ?? -1), $mode === 'resolved' ? $spec['default'] : null);
-        }
-        if ($mode === 'resolved' || ($value !== null && $value !== '')) {
-            $values[$key] = $mode !== 'raw' && $spec['parse'] === 'int' && $value !== null ? (int) $value : $value;
-        }
-    }
-    return $values;
-}
-
-/** Parse the optional Docker toggle while keeping legacy CLI semantics. */
-function pmssUserConfigParseDockerEnabledOption($rawOption): ?bool
-{
-    if ($rawOption === null) {
-        return null;
-    }
-    if ($rawOption === true || $rawOption === '') {
-        throw new InvalidArgumentException('--docker-enabled requires true or false');
-    }
-    if (pmssValueMatchesNormalized($rawOption, ['true', '1', 'yes', 'on'])) return true;
-    if (pmssValueMatchesNormalized($rawOption, ['false', '0', 'no', 'off'])) return false;
-    throw new InvalidArgumentException('Invalid --docker-enabled value');
-}
-
-/** Parse the optional torrent throttle while ignoring legacy empty flags. */
-function pmssUserConfigCliParseUploadThrottleOption($rawOption, string $negativeMessage = 'Upload throttle must be >= 0'): ?int
-{
-    if ($rawOption === null || $rawOption === true || $rawOption === '') {
-        return null;
-    }
-    if (!is_numeric($rawOption)) {
-        throw new InvalidArgumentException('Invalid --upload-throttle-kib value');
-    }
-    $value = (int) $rawOption;
-    if ($value < 0) {
-        throw new InvalidArgumentException($negativeMessage);
-    }
-    return $value;
-}
-
-/** @return array<string,mixed> Copy persisted shared resources from stored payloads. */
-function pmssUserConfigCliPersistedStoredResources(array $payload): array
-{
-    $values = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (empty($spec['persist']) || !array_key_exists($key, $payload)) {
-            continue;
-        }
-        $values[$key] = $payload[$key];
-    }
-    return $values;
-}
-
-/** @return array<string,mixed> Copy explicit persisted resources into a payload. */
-function pmssUserConfigCliApplyPersistedResources(array $payload, array $user, array $presence): array
-{
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (empty($spec['persist'])) {
-            continue;
-        }
-        if (!empty($presence[$key]) && array_key_exists($key, $user)) {
-            $payload[$key] = $user[$key];
-        }
-    }
-    return $payload;
-}
-
-/** @return array<int,string> Render sparse userConfig positionals. */
-function pmssUserConfigCliBuildUserConfigPositionals(array $user): array
-{
-    $optionalArgs = array_fill(4, 9, '');
-    $lastOptionalIndex = 3;
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (!isset($spec['userConfigIndex'])) {
-            continue;
-        }
-        $index = $spec['userConfigIndex'];
-        $optionalArgs[$index] = (string) ($user[$key] ?? '');
-        if ($optionalArgs[$index] !== '') {
-            $lastOptionalIndex = $index;
-        }
-    }
-    return array_slice($optionalArgs, 0, max(0, $lastOptionalIndex - 3));
-}
-
-/** @return array<int,string> Build canonical userConfigCgroup.php apply arguments. */
-function pmssUserConfigCliBuildCgroupApplyArgs(string $username, int $memoryMiB, array $user): array
-{
-    $args = ['/scripts/util/userConfigCgroup.php', $username, '--apply', '--memory-high='.(string) $memoryMiB];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (empty($spec['cgroupFlag'])) {
-            continue;
-        }
-
-        if (!empty($user[$key])) {
-            $args[] = $spec['cgroupFlag'].$user[$key];
-            continue;
-        }
-
-        if (pmssUserConfigCliCgroupIoClearRequested($user, $key)) {
-            $args[] = $spec['cgroupFlag'].'/home:max';
-        }
-    }
-    if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
-        $args[] = '--cpu-quota-percent='.(string) $user['cpuQuotaPercent'];
-    }
-    return $args;
-}
-
-/** Return true when an explicit stored IOPS zero/blank should clear a stale systemd throttle. */
-function pmssUserConfigCliCgroupIoClearRequested(array $user, string $key): bool
-{
-    if (!in_array($key, ['IOReadIOPS', 'IOWriteIOPS'], true) || !array_key_exists($key, $user) || $user[$key] === null || !is_scalar($user[$key])) {
-        return false;
-    }
-
-    $value = trim((string) $user[$key]);
-    return $value === '' || $value === '0';
-}
-
-/** @return array<int,string>|null Build cgroup apply args from a stored payload. */
-function pmssUserConfigCliBuildStoredCgroupApplyArgs(string $username, array $payload): ?array
-{
-    $memory = is_numeric($payload['ramMiB'] ?? null) ? (int) $payload['ramMiB'] : 0;
-    if ($memory <= 0) {
-        return null;
-    }
-
-    return pmssUserConfigCliBuildCgroupApplyArgs(
-        $username,
-        $memory,
-        array_merge(['name' => $username, 'memory' => $memory], pmssUserConfigCliPersistedStoredResources($payload))
-    );
-}
-
-/** Build the PHP command for a stored plan; a missing RAM baseline remains a skip. */
-function pmssUserConfigCliBuildStoredCgroupApplyCommand(string $username, array $payload): ?string
-{
-    $args = pmssUserConfigCliBuildStoredCgroupApplyArgs($username, $payload);
-    return $args === null ? null : pmssBuildCommand('php', $args);
 }
 
 /** Render the canonical userConfig.php help output. */

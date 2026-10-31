@@ -91,4 +91,26 @@ class userConfigCliSpecificationTest extends TestCase
             $this->assertSame($expected, \pmssUserConfigCliResourceGroupKeys($group));
         }
     }
+
+    public function testResourceRolesKeepSchemaOrderAndExcludeUnrelatedFields(): void
+    {
+        foreach ([
+            'persist' => ['trafficCapMbit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+            'cgroupFlag' => ['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+            'userConfigIndex' => ['trafficLimit', 'trafficCapMbit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+            'unknown' => [],
+        ] as $role => $expected) {
+            $this->assertSame($expected, array_keys(\pmssUserConfigCliResourceSpecs($role)));
+        }
+        $this->assertSame(13, count(\pmssUserConfigCliResourceSpecs()));
+    }
+
+    public function testMetadataCanLoadWithoutRuntimeOrHelpDependencies(): void
+    {
+        $result = $this->pmssRunRepoInlinePhpRequireJson('scripts/lib/user/userConfigResourceSpecs.php',
+            'echo json_encode([count(pmssUserConfigCliResourceSpecs()), '
+            .'pmssUserConfigCliPersistedStoredResources(["CPUWeight" => null, "trafficLimit" => 20]), '
+            .'function_exists("pmssCommandCapture"), function_exists("pmssUserConfigCliUsage")]);');
+        $this->assertSame([13, ['CPUWeight' => null], false, false], $result);
+    }
 }
