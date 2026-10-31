@@ -20,11 +20,9 @@ function pmssUserTransferQtSettingsBytesDecode(string $encoded): string
         if (isset($escapes[$next])) {
             $out .= $escapes[$next];
         } elseif ($next === 'x') {
-            $hex = '';
-            while ($i + 1 < $length && strlen($hex) < 2 && ctype_xdigit($encoded[$i + 1])) {
-                $hex .= $encoded[++$i];
-            }
-            $out .= $hex === '' ? 'x' : chr(hexdec($hex));
+            $digits = $i + 1 < $length ? strspn($encoded, '0123456789abcdefABCDEF', $i + 1, 2) : 0;
+            $out .= $digits === 0 ? 'x' : chr(hexdec(substr($encoded, $i + 1, $digits)));
+            $i += $digits;
         } else {
             $out .= $next;
         }
@@ -73,10 +71,6 @@ function pmssUserTransferQtReadString(string $bytes, int &$offset): ?string
     if ($length === null || $length < -1 || ($length % 2) !== 0 || $offset + $length > strlen($bytes)) {
         return null;
     }
-    if ($length === -1) {
-        return '';
-    }
-
     $raw = substr($bytes, $offset, $length);
     $offset += $length;
     if (is_string($converted = function_exists('iconv') ? @iconv('UTF-16BE', 'UTF-8//IGNORE', $raw) : false)) {

@@ -481,6 +481,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
 - User transfer – `scripts/util/userTransfer.php`
+  - Metadata helpers retain their public names and original includes while
+    session decoding, category preservation and aggregate probe interpretation
+    live in focused modules (ADR 0223). Bencode retains its nine-digit length
+    limit, length normalization, identical-name bypass and partial replacement
+    count on failure. Qt retains its two-digit hex escape limit and null result
+    for the rejected `-1` QString length. Category probe order and script bytes
+    remain unchanged; characterization tests perform no command execution.
   - Normal migrations refuse a previously completed source host/account pair
     before authentication, and refuse target regular files newer than the newest
     source file before the first rsync pass. `--force` explicitly permits these

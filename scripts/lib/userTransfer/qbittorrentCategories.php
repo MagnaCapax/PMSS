@@ -6,71 +6,8 @@
  */
 
 require_once __DIR__.'/qbittorrentLegacyCategories.php';
-require_once __DIR__.'/remoteScripts.php';
+require_once __DIR__.'/qbittorrentCategoryPreservation.php';
 require_once __DIR__.'/../user/directories.php';
-/** Build a remote probe that stores qBittorrent category-bearing files in scratch. */
-function pmssUserTransferBuildQbittorrentCategoryProbe(array $cfg, string $localConfigPath, string $localCategoriesPath): string
-{
-    $remoteHome = '/home/'.$cfg['remoteUser'];
-    $remoteConfig = $remoteHome.'/.config/qBittorrent/qBittorrent.conf';
-    $remoteCategories = $remoteHome.'/.config/qBittorrent/categories.json';
-    $readRemote = static function (string $path): string {
-        return 'if [ -r '.escapeshellarg($path).' ]; then cat '.escapeshellarg($path).'; fi';
-    };
-
-    return "#!/bin/bash\nset -e\numask 077\n"
-        .pmssUserTransferBuildSshProbeCommand($cfg, $readRemote($remoteConfig))
-        .' > '.escapeshellarg($localConfigPath)."\n"
-        .pmssUserTransferBuildSshProbeCommand($cfg, $readRemote($remoteCategories))
-        .' > '.escapeshellarg($localCategoriesPath)."\n";
-}
-
-/** Preserve source qBittorrent categories without copying server-specific config. */
-function pmssUserTransferPreserveQbittorrentCategories(
-    array $cfg,
-    string $home,
-    string $expectPath,
-    string $probeScriptPath,
-    string $remoteConfigPath,
-    string $remoteCategoriesPath
-): void {
-    $targetPath = rtrim($home, '/').'/.config/qBittorrent/categories.json';
-    $existing = pmssUserTransferQbittorrentCategoriesJsonRead($targetPath);
-    if ($existing === null || count($existing) > 0) {
-        if ($existing === null) logMessage('[WARN] Skipping qBittorrent category preservation (local categories.json is invalid)');
-        return;
-    }
-
-    $rc = runStep('Reading remote qBittorrent category metadata', pmssBuildCommand($expectPath, [$probeScriptPath]));
-    if ($rc !== 0) {
-        logMessage(sprintf('[WARN] Skipping qBittorrent category preservation (remote probe rc=%d)', $rc));
-        return;
-    }
-
-    $source = pmssUserTransferQbittorrentCategoriesJsonRead($remoteCategoriesPath);
-    if ($source === null) {
-        logMessage('[WARN] Ignoring invalid remote qBittorrent categories.json');
-        $source = [];
-    }
-    if (count($source) < 1 && is_file($remoteConfigPath)) {
-        $source = pmssUserTransferQbittorrentLegacyCategoriesFromConfig(
-            (string) @file_get_contents($remoteConfigPath),
-            $cfg
-        );
-    }
-    if (count($source) < 1) {
-        logMessage('[INFO] No remote qBittorrent categories found to preserve');
-        return;
-    }
-
-    $added = pmssUserTransferQbittorrentCategoriesMerge($targetPath, $existing, $source);
-    if ($added < 1) {
-        logMessage('[INFO] No new remote qBittorrent categories needed preservation');
-        return;
-    }
-    logMessage(sprintf('[OK] Preserved %d qBittorrent categor%s', $added, $added === 1 ? 'y' : 'ies'));
-}
-
 /** Read qBittorrent categories.json as a normalized associative array. */
 function pmssUserTransferQbittorrentCategoriesJsonRead(string $path): ?array
 {

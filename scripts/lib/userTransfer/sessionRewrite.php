@@ -4,6 +4,8 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/sessionBencode.php';
+
 /**
  * Rewrite /home/<remote>/ path strings in local rTorrent session files.
  *
@@ -57,71 +59,4 @@ function pmssUserTransferRewriteRtorrentSessionPaths(array $cfg, string $home): 
     logMessage($rewrittenPaths > 0
         ? sprintf('[OK] Rewrote %d path reference(s) across %d rTorrent session file(s)', $rewrittenPaths, $rewrittenFiles)
         : '[INFO] rTorrent session rewrite found no /home path references to update');
-}
-/**
- * Rewrite bencoded string values containing /home/<oldUser>/ paths.
- *
- * Returns null when the payload is malformed and cannot be safely rewritten.
- */
-function pmssUserTransferRewriteBencodedHomePaths(string $payload, string $oldUser, string $newUser, int &$replacementCount = 0): ?string
-{
-    $replacementCount = 0;
-    $needle = '/home/'.$oldUser.'/';
-    $replacement = '/home/'.$newUser.'/';
-    if ($needle === $replacement) {
-        return $payload;
-    }
-    $offset = 0;
-    $payloadLength = strlen($payload);
-    $rewritten = '';
-    while ($offset < $payloadLength) {
-        $token = $payload[$offset];
-        if ($token >= '0' && $token <= '9') {
-            $digitsStart = $offset;
-            while ($offset < $payloadLength) {
-                $digit = $payload[$offset];
-                if ($digit < '0' || $digit > '9') {
-                    break;
-                }
-                $offset++;
-            }
-            if ($offset >= $payloadLength || $payload[$offset] !== ':') {
-                return null;
-            }
-            $lengthToken = substr($payload, $digitsStart, $offset - $digitsStart);
-            if ($lengthToken === '' || strlen($lengthToken) > 9) {
-                return null;
-            }
-            $stringLength = (int) $lengthToken;
-            $offset++;
-            if ($offset + $stringLength > $payloadLength) {
-                return null;
-            }
-            $value = substr($payload, $offset, $stringLength);
-            $offset += $stringLength;
-            $replaced = str_replace($needle, $replacement, $value, $hits);
-            if ($hits > 0) {
-                $replacementCount += $hits;
-                $value = $replaced;
-            }
-            $rewritten .= strlen($value).':'.$value;
-            continue;
-        }
-        if ($token === 'i') {
-            $intEnd = strpos($payload, 'e', $offset + 1);
-            if ($intEnd === false) {
-                return null;
-            }
-            $rewritten .= substr($payload, $offset, $intEnd - $offset + 1);
-            $offset = $intEnd + 1;
-            continue;
-        }
-        if ($token === 'l' || $token === 'd' || $token === 'e') {
-            $rewritten .= $token;
-            $offset++;
-            continue;
-        }
-        return null;
-    }
-    return $rewritten;
 }

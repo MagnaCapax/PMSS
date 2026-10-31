@@ -59,8 +59,6 @@ function pmssUserTransferQbittorrentCategoryPathRewrite(string $path, array $cfg
     if ($remote === $local || $remote === '/home/' || $path === '') {
         return $path;
     }
-    if ($path === $remote) {
-        return $local;
-    }
-    return strpos($path, $remote.'/') === 0 ? $local.substr($path, strlen($remote)) : $path;
+    return $path === $remote || strpos($path, $remote.'/') === 0
+        ? $local.substr($path, strlen($remote)) : $path;
 }

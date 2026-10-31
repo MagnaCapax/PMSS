@@ -28,6 +28,12 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/userTransfer/** keeps metadata interpretation behind the existing
+  transfer includes. `sessionBencode.php` owns pure session decoding,
+  `qbittorrentCategoryPreservation.php` owns category probes and preservation
+  ordering, and `homeStats.php` owns aggregate probes and result interpretation.
+  Inode-safe session mutation, category JSON publication, ownership checks and
+  advisory execution stay with their existing controllers (ADR 0223).
 - **scripts/lib/update/runtime/profile.php** retains the profiling include and
   shared command/status row capture. `profileCallables.php` owns PHP invocation
   and classified exceptions; `profileSummary.php` normalizes and counts in one
