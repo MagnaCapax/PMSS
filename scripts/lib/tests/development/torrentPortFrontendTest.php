@@ -134,9 +134,9 @@ class TorrentPortFrontendTest extends TestCase
     public function testDelugePortEnsureUpdatesMismatchedPort(): void
     {
         $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
-        @mkdir($home.'/.config/deluge', 0755, true);
-        file_put_contents($home.'/.delugePort', "34567\n");
-        file_put_contents($home.'/.config/deluge/web.conf', "{\"file\":1,\"format\":1}{\"port\":12345,\"sessions\":[]}");
+        $this->pmssWriteFiles($home, ['.delugePort' => "34567\n",
+            '.config/deluge/web.conf' => "{\"file\":1,\"format\":1}{\"port\":12345,\"sessions\":[]}",
+        ]);
 
         $this->assertTrue(\pmssDelugePortEnsure($this->user, $home));
 
@@ -147,9 +147,9 @@ class TorrentPortFrontendTest extends TestCase
     public function testQbittorrentPortEnsureUpdatesMismatchedPort(): void
     {
         $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
-        @mkdir($home.'/.config/qBittorrent', 0755, true);
-        file_put_contents($home.'/.qbittorrentPort', "45678\n");
-        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=12345\n");
+        $this->pmssWriteFiles($home, ['.qbittorrentPort' => "45678\n",
+            '.config/qBittorrent/qBittorrent.conf' => "[Preferences]\nWebUI\\Port=12345\n",
+        ]);
 
         $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $home));
         $updated = (string) file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
@@ -160,9 +160,9 @@ class TorrentPortFrontendTest extends TestCase
     public function testQbittorrentPortEnsureRejectsMissingWebUiPort(): void
     {
         $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
-        @mkdir($home.'/.config/qBittorrent', 0755, true);
-        file_put_contents($home.'/.qbittorrentPort', "45678\n");
-        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nLocale=en\n");
+        $this->pmssWriteFiles($home, ['.qbittorrentPort' => "45678\n",
+            '.config/qBittorrent/qBittorrent.conf' => "[Preferences]\nLocale=en\n",
+        ]);
 
         $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $home) === false);
     }
@@ -171,9 +171,9 @@ class TorrentPortFrontendTest extends TestCase
     {
         $user = 'bad-user';
         $home = $this->pmssUserHomePath($this->homeRoot, $user);
-        @mkdir($home.'/.config/deluge', 0755, true);
-        file_put_contents($home.'/.delugePort', "34567\n");
-        file_put_contents($home.'/.config/deluge/web.conf', "{\"file\":1,\"format\":1}{\"port\":12345,\"sessions\":[]}");
+        $this->pmssWriteFiles($home, ['.delugePort' => "34567\n",
+            '.config/deluge/web.conf' => "{\"file\":1,\"format\":1}{\"port\":12345,\"sessions\":[]}",
+        ]);
 
         $this->assertTrue(\pmssDelugePortEnsure($user, $home) === false);
         $parsed = \pmssDelugeReadWebConf($home.'/.config/deluge/web.conf');
@@ -184,9 +184,9 @@ class TorrentPortFrontendTest extends TestCase
     public function testQbittorrentPortEnsureRejectsUserHomeMismatchBeforeConfigWrite(): void
     {
         $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
-        @mkdir($home.'/.config/qBittorrent', 0755, true);
-        file_put_contents($home.'/.qbittorrentPort', "45678\n");
-        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=12345\n");
+        $this->pmssWriteFiles($home, ['.qbittorrentPort' => "45678\n",
+            '.config/qBittorrent/qBittorrent.conf' => "[Preferences]\nWebUI\\Port=12345\n",
+        ]);
 
         $this->assertTrue(\pmssQbittorrentPortEnsure('otherusr', $home) === false);
         $this->assertSame("[Preferences]\nWebUI\\Port=12345\n", (string) file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf'));
@@ -206,9 +206,9 @@ class TorrentPortFrontendTest extends TestCase
     {
         $realHome = $this->pmssUserHomePath($this->homeRoot, $this->user);
         $linkedHome = $this->homeRoot.'/linked-home-qbit';
-        @mkdir($realHome.'/.config/qBittorrent', 0755, true);
-        file_put_contents($realHome.'/.qbittorrentPort', "45678\n");
-        file_put_contents($realHome.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=12345\n");
+        $this->pmssWriteFiles($realHome, ['.qbittorrentPort' => "45678\n",
+            '.config/qBittorrent/qBittorrent.conf' => "[Preferences]\nWebUI\\Port=12345\n",
+        ]);
         symlink($realHome, $linkedHome);
 
         $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $linkedHome) === false);
@@ -218,7 +218,7 @@ class TorrentPortFrontendTest extends TestCase
     public function testTorrentPortExpectedReadAcceptsValidRange(): void
     {
         $path = $this->pmssUserHomePath($this->homeRoot, $this->user, '.expected-port');
-        file_put_contents($path, "45678\n");
+        $this->pmssWriteFile($path, "45678\n");
 
         $this->assertEquals(45678, \pmssTorrentPortExpectedRead($path));
     }
@@ -232,7 +232,7 @@ class TorrentPortFrontendTest extends TestCase
         ];
 
         foreach ($cases as $case) {
-            file_put_contents($case['path'], $case['content']);
+            $this->pmssWriteFile($case['path'], $case['content']);
             $this->assertTrue(\pmssTorrentPortExpectedRead($case['path']) === null);
         }
     }
@@ -240,7 +240,7 @@ class TorrentPortFrontendTest extends TestCase
     public function testUserPatchWritableFileRejectsPathOutsideHomeRoot(): void
     {
         $outsidePath = $this->pmssMakeTempDir('pmss-user-patch-outside-').'/frontend.php';
-        file_put_contents($outsidePath, "legacy\n");
+        $this->pmssWriteFile($outsidePath, "legacy\n");
 
         \pmssUserPatchWritableFile($outsidePath, static function (string $content): string {
             return "patched\n";
@@ -266,7 +266,7 @@ class TorrentPortFrontendTest extends TestCase
     public function testUserDeletePathIfPresentRejectsPathOutsideHomeRoot(): void
     {
         $outsidePath = $this->pmssMakeTempDir('pmss-user-delete-outside-').'/legacy.php';
-        file_put_contents($outsidePath, "legacy\n");
+        $this->pmssWriteFile($outsidePath, "legacy\n");
 
         \pmssUserDeletePathIfPresent($outsidePath);
 

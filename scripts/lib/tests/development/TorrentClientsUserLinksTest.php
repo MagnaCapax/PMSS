@@ -13,8 +13,7 @@ final class TorrentClientsUserLinksTest extends TestCase
         $home = $root.'/t';
         $store = $root.'/store/qbittorrent';
         mkdir($home, 0755);
-        mkdir($store.'/5.1.0', 0755, true);
-        file_put_contents($store.'/5.1.0/qbittorrent-nox', 'binary');
+        $this->pmssWriteRelativeFile($store, '5.1.0/qbittorrent-nox', 'binary');
         symlink('5.1.0', $store.'/default');
         $ops = ['root' => $root.'/store', 'homeRoot' => $root, 'run' => $this->pmssAccountPathCommandRunner(),
             'catalog' => dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json'];
@@ -23,8 +22,7 @@ final class TorrentClientsUserLinksTest extends TestCase
         $defaultLink = $home.'/bin/qbittorrent/default';
         $this->assertSame($store.'/5.1.0', readlink($versionLink));
         $this->assertFalse(is_link($defaultLink));
-        mkdir($home.'/bin/qbittorrent/custom');
-        file_put_contents($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'custom');
+        $this->pmssWriteRelativeFile($home, 'bin/qbittorrent/custom/qbittorrent-nox', 'custom', 0777);
         symlink('custom', $defaultLink);
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
         $this->assertSame('custom', readlink($defaultLink));

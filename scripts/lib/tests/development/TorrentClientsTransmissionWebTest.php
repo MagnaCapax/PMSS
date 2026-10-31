@@ -10,8 +10,8 @@ final class TorrentClientsTransmissionWebTest extends TestCase
     private function fixture(): array
     {
         $root = $this->pmssMakeTempDir('pmss-transmission-web-').'/store';
-        $dir = $this->pmssEnsureDir($root.'/transmission/4.1.3');
-        file_put_contents($dir.'/transmission-daemon', 'daemon');
+        $dir = $root.'/transmission/4.1.3';
+        $this->pmssWriteRelativeFile($dir, 'transmission-daemon', 'daemon');
         $entry = ['client' => 'transmission', 'version' => '4.1.3', 'kind' => 'static',
             'sha256' => hash('sha256', 'daemon'), 'web' => [
                 'url' => ['https://example.invalid/web'], 'sha256' => hash('sha256', 'archive')]];
@@ -62,10 +62,10 @@ final class TorrentClientsTransmissionWebTest extends TestCase
     public function testMismatchedPinReplacesOnlyTheWebTree(): void
     {
         [$root, $dir, $entry] = $this->fixture();
-        mkdir($dir.'/public_html');
-        file_put_contents($dir.'/public_html/index.html', 'old web');
-        file_put_contents($dir.'/public_html/obsolete.js', 'old');
-        file_put_contents($dir.'/public_html.sha256', str_repeat('0', 64)."\n");
+        $this->pmssWriteFiles($dir, [
+            'public_html/index.html' => 'old web', 'public_html/obsolete.js' => 'old',
+            'public_html.sha256' => str_repeat('0', 64)."\n",
+        ], 0777);
         $events = [];
         $this->assertTrue(\pmssTorrentClientsTransmissionWebConverge($entry, $root, $this->ops($events)));
         $this->assertSame('web', file_get_contents($dir.'/public_html/index.html'));
@@ -91,8 +91,7 @@ final class TorrentClientsTransmissionWebTest extends TestCase
     {
         foreach (['traversal', 'symlink', 'hardlink', 'checksum', 'download', 'extract', 'exception'] as $case) {
             [$root, $dir, $entry] = $this->fixture();
-            mkdir($dir.'/public_html');
-            file_put_contents($dir.'/public_html/index.html', 'old web');
+            $this->pmssWriteRelativeFile($dir, 'public_html/index.html', 'old web', 0777);
             $events = [];
             $ops = $this->ops($events);
             if ($case === 'traversal') $ops = self::pmssMakeCallbacks(['list' => [['path' => 'public_html/../x', 'type' => '-']]]) + $ops;

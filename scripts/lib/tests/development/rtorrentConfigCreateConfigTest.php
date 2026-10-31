@@ -410,7 +410,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $target = $this->pmssEnsureDir($root.'/target', 0700);
         $link = $root.'/linked';
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        file_put_contents($root.'/occupied', 'preserved');
+        $this->pmssWriteRelativeFile($root, 'occupied', 'preserved');
 
         foreach (['relative', $root.'/../other', $root."/nul\0byte", $link, $root.'/occupied'] as $base) {
             $this->assertThrows(\InvalidArgumentException::class, static function () use ($base): void {
@@ -426,8 +426,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
     public function testPortReservationSkipsOccupiedFilesAndCreatesExclusiveReservation(): void
     {
         $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-ports-');
-        @mkdir($portRoot.'/scgi', 0755, true);
-        file_put_contents($portRoot.'/scgi/4000', '');
+        $this->pmssWriteRelativeFile($portRoot, 'scgi/4000', '');
         $cfg = $this->rtorrentPortReservationFixture($portRoot);
 
         // This seed draws the occupied slot for all 16 random attempts, exercising fallback.
@@ -442,9 +441,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
     public function testPortReservationRefusesExhaustedOrSymlinkedRange(): void
     {
         $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-ports-');
-        @mkdir($portRoot.'/scgi', 0755, true);
-        file_put_contents($portRoot.'/scgi/4000', '');
-        file_put_contents($portRoot.'/scgi/4001', '');
+        $this->pmssWriteFiles($portRoot, ['scgi/4000' => '', 'scgi/4001' => '']);
         $cfg = $this->rtorrentPortReservationFixture($portRoot);
 
         $this->assertThrowsRuntime(static function () use ($cfg): void {
@@ -495,7 +492,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
         foreach (['dht' => [24001, 44000], 'listen' => [44001, 64000]] as $type => $range) {
             $this->pmssEnsureDir($portRoot.'/'.$type);
             for ($port = $range[0]; $port <= $range[1]; $port++) {
-                file_put_contents($portRoot.'/'.$type.'/'.$port, '');
+                $this->pmssWriteRelativeFile($portRoot, $type.'/'.$port, '');
             }
         }
         $cfg = $this->rtorrentPortReservationFixture($portRoot);

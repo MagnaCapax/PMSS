@@ -30,7 +30,7 @@ final class TorrentClientsP4R0Test extends TestCase
         [$home, $store, $projection] = $this->fixture();
         $binary = $store.'/rtorrent/0.9.8-r16/rtorrent';
         symlink($store.'/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
-        file_put_contents($projection, json_encode(['versions' => [
+        $this->pmssWriteFile($projection, json_encode(['versions' => [
             ['client' => 'rtorrent', 'version' => '0.9.8-r16', 'kind' => 'static'],
         ]]));
         $this->assertSame($binary, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
@@ -60,8 +60,7 @@ final class TorrentClientsP4R0Test extends TestCase
     public function testAccountLocalSelectionDoesNotChangeSystemCommand(): void
     {
         [$home, $store, $projection] = $this->fixture();
-        mkdir($home.'/bin/rtorrent/local');
-        file_put_contents($home.'/bin/rtorrent/local/rtorrent', 'fixture');
+        $this->pmssWriteRelativeFile($home, 'bin/rtorrent/local/rtorrent', 'fixture', 0777);
         symlink('local', $home.'/bin/rtorrent/default');
         $this->assertSame('/usr/local/bin/rtorrent',
             \pmssRtorrentExecutorCommand($home, $projection, $store));

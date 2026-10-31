@@ -104,8 +104,7 @@ final class TorrentClientsStoreTest extends TestCase
     public function testProjectionIsAtomicPublicAndHostOnly(): void
     {
         $root = $this->pmssMakeTempDir('pmss-clients-projection-');
-        $binary = $root.'/binary';
-        file_put_contents($binary, 'shipped');
+        $binary = $this->pmssWriteRelativeFile($root, 'binary', 'shipped');
         $entry = $this->entry();
         $entry['kind'] = 'system';
         $entry['binary'] = $binary;
@@ -131,7 +130,7 @@ final class TorrentClientsStoreTest extends TestCase
     public function testVenvArchiveAcceptsRegularMembersButRejectsLinks(): void
     {
         $root = $this->pmssMakeTempDir('pmss-clients-archive-');
-        file_put_contents($root.'/rtorrent', 'binary');
+        $this->pmssWriteRelativeFile($root, 'rtorrent', 'binary');
         $safe = $root.'/safe.tar.gz';
         $this->pmssCreateTarGzArchive($safe, $root, ['rtorrent']);
         $this->assertTrue(\pmssTorrentClientsStoreArchiveIsSafe($safe));
@@ -181,8 +180,7 @@ final class TorrentClientsStoreTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-clients-install-');
         $store = $root.'/pmss/clients';
-        mkdir($store.'/rtorrent/old', 0755, true);
-        file_put_contents($store.'/rtorrent/old/rtorrent', 'older');
+        $this->pmssWriteRelativeFile($store, 'rtorrent/old/rtorrent', 'older');
         $entry = $this->entry();
         $result = \pmssTorrentClientsStoreConverge([$entry], [
             'root' => $store,

@@ -10,10 +10,9 @@ final class TorrentClientsP6VenvTest extends TestCase
     private function fixture(): array
     {
         $root = $this->pmssMakeTempDir('pmss-p6-venv-').'/clients';
-        mkdir($root.'/wheels', 0755, true);
-        mkdir($root.'/deluge', 0755);
         $file = 'deluge-2.1.1-py3-none-any.whl';
-        file_put_contents($root.'/wheels/'.$file, 'fixture wheel');
+        $this->pmssWriteRelativeFile($root, 'wheels/'.$file, 'fixture wheel');
+        $this->pmssEnsureDir($root.'/deluge');
         $entry = ['client' => 'deluge', 'version' => '2.1.1', 'kind' => 'venv',
             'wheels' => [['file' => $file, 'sha256' => hash_file('sha256', $root.'/wheels/'.$file)]]];
         return [$root, $entry];
@@ -34,11 +33,10 @@ final class TorrentClientsP6VenvTest extends TestCase
     {
         [$root, $entry] = $this->fixture();
         $calls = [];
-        $install = static function ($dir, $label, $steps, $cli, $link) use (&$calls): void {
+        $install = function ($dir, $label, $steps, $cli, $link) use (&$calls): void {
             $calls = [$dir, $label, $steps, $cli, $link];
-            mkdir($dir.'/bin', 0755, true);
-            file_put_contents($cli, 'fixture');
-            file_put_contents($dir.'/bin/deluge-web', 'fixture');
+            $this->pmssWriteFile($cli, 'fixture');
+            $this->pmssWriteRelativeFile($dir, 'bin/deluge-web', 'fixture');
             symlink($cli, $link);
         };
         $this->assertTrue(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', ['install' => $install]));
@@ -61,7 +59,7 @@ final class TorrentClientsP6VenvTest extends TestCase
         $fetched = [];
         $fetch = static function (string $file) use (&$fetched): void { $fetched[] = $file; };
         $ops = ['install' => $install, 'fetch' => $fetch];
-        file_put_contents($root.'/wheels/'.$entry['wheels'][0]['file'], 'changed');
+        $this->pmssWriteRelativeFile($root, 'wheels/'.$entry['wheels'][0]['file'], 'changed');
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', $ops));
         unlink($root.'/wheels/'.$entry['wheels'][0]['file']);
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', $ops));
@@ -76,14 +74,13 @@ final class TorrentClientsP6VenvTest extends TestCase
         $file = $entry['wheels'][0]['file'];
         unlink($root.'/wheels/'.$file);
         $args = [];
-        $fetch = static function (string $name, string $sha256, string $path) use (&$args): void {
+        $fetch = function (string $name, string $sha256, string $path) use (&$args): void {
             $args[] = [$name, $sha256, $path];
-            file_put_contents($path, 'fixture wheel');
+            $this->pmssWriteFile($path, 'fixture wheel');
         };
-        $install = static function ($dir, $label, $steps, $cli, $link): void {
-            mkdir($dir.'/bin', 0755, true);
-            file_put_contents($cli, 'fixture');
-            file_put_contents($dir.'/bin/deluge-web', 'fixture');
+        $install = function ($dir, $label, $steps, $cli, $link): void {
+            $this->pmssWriteFile($cli, 'fixture');
+            $this->pmssWriteRelativeFile($dir, 'bin/deluge-web', 'fixture');
             symlink($cli, $link);
         };
         $this->assertTrue(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1',
@@ -95,10 +92,9 @@ final class TorrentClientsP6VenvTest extends TestCase
     {
         [$root, $entry] = $this->fixture();
         $versionDir = $root.'/deluge/2.1.1';
-        $install = static function ($dir, $label, $steps, $cli, $link): void {
-            mkdir($dir.'/bin', 0755, true);
-            file_put_contents($cli, 'fixture');
-            file_put_contents($dir.'/bin/deluge-web', 'fixture');
+        $install = function ($dir, $label, $steps, $cli, $link): void {
+            $this->pmssWriteFile($cli, 'fixture');
+            $this->pmssWriteRelativeFile($dir, 'bin/deluge-web', 'fixture');
             symlink($cli, $link);
         };
         $cleanupCalls = 0;

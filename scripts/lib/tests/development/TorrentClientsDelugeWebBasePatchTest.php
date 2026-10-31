@@ -10,21 +10,18 @@ final class TorrentClientsDelugeWebBasePatchTest extends TestCase
     private function fixture(bool $legacy = true, array $pythons = ['3.11']): array
     {
         $root = $this->pmssMakeTempDir('pmss-deluge-web-venv-').'/clients';
-        mkdir($root.'/wheels', 0755, true);
-        mkdir($root.'/deluge', 0755);
         $wheel = 'deluge-2.1.1-py3-none-any.whl';
-        file_put_contents($root.'/wheels/'.$wheel, 'fixture wheel');
+        $this->pmssWriteRelativeFile($root, 'wheels/'.$wheel, 'fixture wheel');
+        $this->pmssEnsureDir($root.'/deluge');
         $entry = ['client' => 'deluge', 'version' => '2.1.1', 'kind' => 'venv',
             'wheels' => [['file' => $wheel, 'sha256' => hash_file('sha256', $root.'/wheels/'.$wheel)]]];
-        $install = static function ($dir, $label, $steps, $cli, $link) use ($legacy, $pythons): void {
-            mkdir($dir.'/bin', 0755, true);
-            file_put_contents($cli, 'fixture');
-            file_put_contents($dir.'/bin/deluge-web', 'fixture');
+        $install = function ($dir, $label, $steps, $cli, $link) use ($legacy, $pythons): void {
+            $this->pmssWriteFile($cli, 'fixture');
+            $this->pmssWriteRelativeFile($dir, 'bin/deluge-web', 'fixture');
             symlink($cli, $link);
             foreach ($pythons as $python) {
                 $web = $dir.'/lib/python'.$python.'/site-packages/deluge/ui/web';
-                mkdir($web, 0755, true);
-                file_put_contents($web.'/server.py', $legacy
+                $this->pmssWriteRelativeFile($web, 'server.py', $legacy
                     ? "    self.top_level.putChild(self.base.strip('/'), self.top_level)\n"
                     : "    self.site = Site(self.top_level)\n");
             }

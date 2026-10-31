@@ -36,8 +36,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
     public function testQuarantineMovesRegularFile(): void
     {
-        $src = $this->tempHome.'/.rtorrent.rc.custom';
-        @file_put_contents($src, "broken_line\n");
+        $src = $this->pmssWriteRelativeFile($this->tempHome, '.rtorrent.rc.custom', "broken_line\n");
 
         $dst = $this->quarantineCustomConfig();
         $this->assertTrue(is_string($dst) && $dst !== '');
@@ -53,8 +52,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
     public function testQuarantineRefusesSymlink(): void
     {
-        $target = $this->tempHome.'/target';
-        @file_put_contents($target, 'x');
+        $target = $this->pmssWriteRelativeFile($this->tempHome, 'target', 'x');
         $src = $this->tempHome.'/.rtorrent.rc.custom';
         if (@symlink($target, $src) === false) {
             throw new SkipTest('symlink() not available; skipping');
@@ -73,8 +71,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
         $targetHome = $this->tempHome.'-target';
         $linkHome = $this->tempHome.'-link';
-        @mkdir($targetHome, 0755, true);
-        @file_put_contents($targetHome.'/.rtorrent.rc.custom', "broken_line\n");
+        $this->pmssWriteRelativeFile($targetHome, '.rtorrent.rc.custom', "broken_line\n");
         if (@symlink($targetHome, $linkHome) === false) {
             throw new SkipTest('symlink() failed');
         }
@@ -88,8 +85,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
     public function testQuarantineRefusesUnexpectedOwnerWhenUserIsDifferent(): void
     {
-        $src = $this->tempHome.'/.rtorrent.rc.custom';
-        @file_put_contents($src, "x\n");
+        $src = $this->pmssWriteRelativeFile($this->tempHome, '.rtorrent.rc.custom', "x\n");
 
         $dst = $this->quarantineCustomConfig('root');
         $this->assertTrue($dst === null, 'Should refuse when file is not owned by root for user=root');
@@ -130,8 +126,8 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
     public function testQuarantineLogsLegacyDirectivesBeforeMovingFile(): void
     {
-        $src = $this->tempHome.'/.rtorrent.rc.custom';
-        @file_put_contents($src, "schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\nexecute = sh,-c,echo ok\n");
+        $src = $this->pmssWriteRelativeFile($this->tempHome, '.rtorrent.rc.custom',
+            "schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\nexecute = sh,-c,echo ok\n");
 
         $messages = [];
         $logFn = function (string $message, bool $force = true) use (&$messages): void {

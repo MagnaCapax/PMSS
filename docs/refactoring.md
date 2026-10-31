@@ -475,6 +475,12 @@ directory modes and link targets, including dangling targets. Monitoring callers
 retain newline normalization and explicitly create deliberately empty directories. Process-selection
 assertions stay with their tests and execute only on testing machines.
 
+Torrent store, virtualenv, web archive, port and custom-config fixtures reuse
+the same checked writers for parent creation and payload writes. Keep simulated
+installer return values and staged missing-file cases explicit; these exercise
+runtime failure boundaries rather than fixture setup. Empty directories and
+permission transitions remain separate from file publication.
+
 Executable test fixtures use `pmssWriteExecutableFile()` for the shared write
 and mode application. Keep stub bytes and paths at each test, passing the
 existing file mode explicitly when it differs from 0755. Permission-failure
