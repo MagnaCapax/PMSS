@@ -767,6 +767,11 @@ iptables helpers:
 
 ## Resource Statistics
 
+- `pmssStatsCollect()` checks that persisted `memory` metrics are arrays before
+  reading `current`. Malformed containers, including serialized object placeholders,
+  use the existing cgroup/null fallback; valid numeric conversions, payload fields
+  and the returned raw resource data remain unchanged. `PmssStatsResourceSafetyTest`
+  covers these boundaries on the testing machine.
 - Host-statistics load and aggregate CPU parsers reject NUL bytes before
   whitespace normalization, retaining `na,na,na` and empty-counter fallbacks.
   Top-memory and diskstats parsers skip NUL-containing rows while preserving

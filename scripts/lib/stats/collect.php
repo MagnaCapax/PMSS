@@ -130,7 +130,10 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $rtorrent = pmssStatsReadRtorrentStats($rtorrentCaller ?: 'rtorrentScgiCall', $context['socket_path']);
     $diskLimitBytes = $quota['soft_bytes'];
     if ($diskLimitBytes === null && is_numeric($config['quota'] ?? null)) $diskLimitBytes = ((float) $config['quota']) * 1024 * 1024 * 1024;
-    $memoryCurrentBytes = is_numeric($resource['memory']['current'] ?? null) ? (float) $resource['memory']['current'] : (is_int($cgroup['memory_current'] ?? null) ? (float) $cgroup['memory_current'] : null);
+    // Serialized arrays can retain object placeholders where the memory metric belongs.
+    $memoryCurrentBytes = is_array($resource['memory'] ?? null) && is_numeric($resource['memory']['current'] ?? null)
+        ? (float) $resource['memory']['current']
+        : (is_int($cgroup['memory_current'] ?? null) ? (float) $cgroup['memory_current'] : null);
     $memoryLimitBytes = is_numeric($config['ramMiB'] ?? null) ? ((float) $config['ramMiB']) * 1024 * 1024 : (is_int($cgroup['memory_limit'] ?? null) ? (float) $cgroup['memory_limit'] : null);
     $trafficLimitMiB = $trafficLimitState['effectiveLimitGiB'] > 0 ? $trafficLimitState['effectiveLimitGiB'] * 1024.0 : null;
     $trafficUsedMiB = pmssTrafficRawMonthMiB($traffic);
