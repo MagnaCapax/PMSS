@@ -8,14 +8,21 @@ function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMo
     return [0 => ['pipe', $stdinMode], 1 => ['pipe', $stdoutMode], 2 => ['pipe', $stderrMode]];
 }
 
-/** Close only live process pipes; cleanup may run after individual pipes were closed. */
+/** Attempt every live pipe close, then propagate the first close failure unchanged. */
 function pmssProcessPipesClose(array $pipes): void
 {
+    $failure = null;
     foreach ($pipes as $pipe) {
         if (pmssStreamHandleIsOpen($pipe)) {
-            fclose($pipe);
+            try {
+                fclose($pipe);
+            } catch (\Throwable $error) {
+                // One wrapper's failure must not strand the remaining descriptors.
+                if ($failure === null) $failure = $error;
+            }
         }
     }
+    if ($failure !== null) throw $failure;
 }
 
 /**

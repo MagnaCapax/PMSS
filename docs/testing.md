@@ -22,6 +22,12 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
+`RuntimeCommandPipesSafetyTest` injects close exceptions and errors with memory
+streams. Pipe cleanup attempts every remaining live stream before rethrowing the
+first failure unchanged; invalid and already-closed entries remain no-ops.
+The fixture also covers duplicate handles, multiple close failures and ignored
+false close returns. Execute it only on a testing machine.
+
 Host-probe fixtures share `TestCase::pmssWriteFiles()` for ordered sysfs,
 cgroup, boot and network file trees. Use `pmssWriteRelativeFile()` when a fixture
 also needs the written path, such as before setting its mtime. Keep deliberately

@@ -17,6 +17,58 @@ class RuntimeCommandPipesSafetyTest extends TestCase
         $this->assertFalse(is_resource($live));
     }
 
+    public function testPipeCleanupAttemptsEveryCloseAndRethrowsFirstFailure(): void
+    {
+        $script = <<<'PHP'
+namespace CommandPipeCloseFixture;
+function fclose($handle) {
+    $index = array_search($handle, $GLOBALS['handles'], true);
+    $GLOBALS['events'][] = $index;
+    \fclose($handle);
+    if (isset($GLOBALS['failures'][$index])) throw $GLOBALS['failures'][$index];
+    return !$GLOBALS['returnFalse'];
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/commandPipes.php', 'CommandPipeCloseFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach ([[], [0], [1], [2], [0, 1], [1, 2], [2, 0, 1]] as $slots) {
+    foreach ([false, true] as $errorFirst) {
+        foreach ([false, true] as $returnFalse) {
+            $GLOBALS['handles'] = [\fopen('php://memory', 'w+'), \fopen('php://memory', 'w+'), \fopen('php://memory', 'w+')];
+            $GLOBALS['events'] = []; $GLOBALS['failures'] = []; $GLOBALS['returnFalse'] = $returnFalse;
+            foreach ($slots as $index) {
+                // Mix throwable families so later failures cannot replace the first.
+                $GLOBALS['failures'][$index] = ($errorFirst !== ($index % 2 === 1))
+                    ? new \Error('close failure') : new \RuntimeException('close failure');
+            }
+            $handles = $GLOBALS['handles'];
+            $closed = \fopen('php://memory', 'w+');
+            \fclose($closed);
+            $context = stream_context_create();
+            $caught = null; $result = null;
+            try {
+                // Invalid entries and aliases stay harmless even after a close throws.
+                $result = pmssProcessPipesClose([$handles[0], null, $closed, $context, $handles[1],
+                    false, [], new \stdClass(), $handles[2], $handles[0], $handles[1], $handles[2]]);
+            } catch (\Throwable $error) { $caught = $error; }
+            $live = array_filter($handles, 'is_resource');
+            foreach ($live as $handle) \fclose($handle); // Observe leaks before fixture cleanup.
+            $expected = $slots === [] ? null : $GLOBALS['failures'][min($slots)];
+            $results[] = [$slots, $errorFirst, $returnFalse, $caught === $expected, count($live), $GLOBALS['events'], $result];
+        }
+    }
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script);
+        $this->assertSame(28, count($results));
+        foreach ($results as [$slots, $errorFirst, $returnFalse, $sameFailure, $live, $events, $result]) {
+            $this->assertSame([true, 0, [0, 1, 2], null], [$sameFailure, $live, $events, $result],
+                json_encode([$slots, $errorFirst, $returnFalse]));
+        }
+    }
+
     public function testInvalidChannelsLeaveTheOtherStreamUnreadAndOpen(): void
     {
         $valid = tmpfile();
