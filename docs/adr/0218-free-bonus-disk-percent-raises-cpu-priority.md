@@ -1,7 +1,7 @@
-# ADR 0212: The Free Bonus Disk percent also raises CPU priority
+# ADR 0218: The Free Bonus Disk percent also raises CPU priority
 
 Date: 2026-10-30
-Category: behavior
+Category: domain
 
 ## Status
 Accepted

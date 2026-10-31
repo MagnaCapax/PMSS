@@ -9,7 +9,7 @@ Accepted. Supersedes, for files inside a home directory, ADR 0046's
 "Enforced" class and the sentence in ADR 0121 that lets root place an
 Authoritative or Enforced file in an account directory as an input; a root
 file written into a home is a display copy. Supersedes the `~/.bonus` reader in
-ADR 0212's decision; ADR 0177's bonus-adjusted BFQ weights take the bonus from
+ADR 0218's decision; ADR 0177's bonus-adjusted BFQ weights take the bonus from
 the store instead of the home file. Extends ADR 0152, which already made billing
 identity come only from the provisioning store with home markers kept for
 display.

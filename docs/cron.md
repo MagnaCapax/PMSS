@@ -50,7 +50,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   `IOWeight` use the shared RAM fallback curve with 300% bonus headroom.
 - `cgroupBonusCpuWeightApply.php` - Raise each account's CPU priority
   (`CPUWeight` on its user slice) by the Free Bonus Disk percent in the
-  root-owned `~/.bonus` marker, never below the plan weight (ADR 0212).
+  root-owned `~/.bonus` marker, never below the plan weight (ADR 0218).
 - `cgroup.php` – Apply cgroup limits for active users.
 - `checkDelugeInstances.php` – Ensure Deluge daemons stay running when enabled.
 - `checkDirectories.php` – Repair expected directory hierarchy if it drifts.

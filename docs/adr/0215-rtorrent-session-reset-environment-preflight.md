@@ -1,7 +1,7 @@
 # ADR 0215: Preflight the environment before automatic rTorrent session reset
 
 Date: 2026-10-30
-Category: reliability
+Category: architecture
 
 ## Status
 Accepted
