@@ -127,11 +127,11 @@ class LiveStatsTest extends TestCase
     public function testUserSampleReadsExistingLogsAndIgnoresStaleLines(): void
     {
         $root = $this->pmssMakeTempDir('pmss-livestats');
-        foreach (['resources', 'traffic', 'traffic-ingress'] as $d) mkdir($root.'/'.$d);
         $now = strtotime('2026-10-17 10:00:00');
-        file_put_contents($root.'/resources/fixtur01', "2026-10-17 09:55:01 0 0 0 0 1000 1 1 1 1\n2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n");
-        file_put_contents($root.'/traffic/fixtur01', "2026-10-17 09:59:59: 12345\n");
-        file_put_contents($root.'/traffic-ingress/fixtur01', "2026-10-17 09:40:00: 999\n"); // stale
+        $this->pmssWriteFiles($root, [
+            'resources/fixtur01' => "2026-10-17 09:55:01 0 0 0 0 1000 1 1 1 1\n2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n",
+            'traffic/fixtur01' => "2026-10-17 09:59:59: 12345\n", 'traffic-ingress/fixtur01' => "2026-10-17 09:40:00: 999\n", // stale
+        ]);
         $s = \pmssLiveStatsUserSample('fixtur01', $now, $root);
         $this->assertEquals(['t' => $now, 'cpu' => 5.0, 'mem' => 2048, 'tx' => 12345, 'rx' => 0], $s);
         $this->assertEquals(['t' => $now, 'cpu' => 0.0, 'mem' => 0, 'tx' => 0, 'rx' => 0], \pmssLiveStatsUserSample('fixtur02', $now, $root));
@@ -140,10 +140,12 @@ class LiveStatsTest extends TestCase
     public function testUserSampleNeverCountsTheSameLogLineTwiceAndIgnoresPartialLines(): void
     {
         $root = $this->pmssMakeTempDir('pmss-livestats');
-        foreach (['resources', 'traffic', 'traffic-ingress'] as $d) mkdir($root.'/'.$d);
+        $this->pmssEnsureDir($root.'/traffic-ingress');
         $now = strtotime('2026-10-17 10:00:30');
-        file_put_contents($root.'/resources/fixtur01', "2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n");
-        file_put_contents($root.'/traffic/fixtur01', "2026-10-17 09:59:59: 12345\n2026-10-17 10:00:20: 99");
+        $this->pmssWriteFiles($root, [
+            'resources/fixtur01' => "2026-10-17 09:59:58 0 0 0 0 5000000000 2048 7 1024 1024\n",
+            'traffic/fixtur01' => "2026-10-17 09:59:59: 12345\n2026-10-17 10:00:20: 99",
+        ]);
         $first = \pmssLiveStatsUserSample('fixtur01', $now, $root, 0);
         $this->assertSame(12345, $first['tx'], 'half-written last line is ignored');
         $again = \pmssLiveStatsUserSample('fixtur01', $now + 60, $root, $now);

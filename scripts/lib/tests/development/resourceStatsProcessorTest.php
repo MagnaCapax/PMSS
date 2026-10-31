@@ -46,9 +46,7 @@ class ResourceStatsProcessorTest extends TestCase
 
     public function testDiscoverUsersReturnsNaturalSortedFiles(): void
     {
-        file_put_contents($this->paths['resource_dir'].'/user2', 'seed');
-        file_put_contents($this->paths['resource_dir'].'/user10', 'seed');
-        file_put_contents($this->paths['resource_dir'].'/user1', 'seed');
+        $this->pmssWriteFiles($this->paths['resource_dir'], array_fill_keys(['user2', 'user10', 'user1'], 'seed'));
 
         $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
         $users = $processor->discoverUsers();
@@ -58,7 +56,7 @@ class ResourceStatsProcessorTest extends TestCase
 
     public function testValidateUserRequiresResourcePasswdAndHome(): void
     {
-        $user = 'alice';
+        $user = 'fixtur01';
         $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
 
         $this->assertTrue(!$processor->validateUser($user));
@@ -187,24 +185,22 @@ class ResourceStatsProcessorTest extends TestCase
 
         $configDir = $this->pmssMakeTempDir('pmss-stats-config-');
         $cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');
-        $this->pmssWriteRelativeFile($configDir, 'users/alice.json', json_encode([
+        $this->pmssWriteRelativeFile($configDir, 'users/fixtur01.json', json_encode([
             'ramMiB' => 4096,
             'product' => 'M10G S',
         ]));
-        foreach ([
+        $this->pmssWriteFiles($cgroupDir, [
             'memory.current' => "2147483648\n",
             'memory.max' => "4294967296\n",
             'pids.current' => "12\n",
             'cpu.stat' => "usage_usec 42000000\n",
             'io.stat' => "8:0 rbytes=1024 wbytes=2048 rios=1 wios=2 dbytes=0 dios=0\n",
-        ] as $relativePath => $content) {
-            $this->pmssWriteRelativeFile($cgroupDir, $relativePath, $content);
-        }
+        ]);
         $this->pmssWriteFile(dirname($cgroupDir).'/io.pressure', "some avg10=1.5 avg60=0.5 avg300=0.1 total=10\n");
 
         $payload = \pmssStatsCollect([
-            'user' => 'alice',
-            'home' => $this->paths['home_dir'].'/alice',
+            'user' => 'fixtur01',
+            'home' => $this->paths['home_dir'].'/fixtur01',
             'config_dir' => $configDir,
             'cgroup_dir' => $cgroupDir,
             'version_file' => $this->pmssWriteTempFile('stats-version', "3.0.0\n"),
@@ -212,7 +208,7 @@ class ResourceStatsProcessorTest extends TestCase
             return false;
         });
 
-        $this->assertEquals('alice', $payload['context']['user']);
+        $this->assertEquals('fixtur01', $payload['context']['user']);
         $this->assertEquals(2147483648.0, $payload['memory']['current_bytes']);
         $this->assertEquals('M10G S', $payload['product']);
     }
@@ -277,7 +273,7 @@ class ResourceStatsProcessorTest extends TestCase
             $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
         ]);
 
-        $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php', 'a!li@ce'], '/scripts/cron/resourceStats.php'));
+        $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php', 'fi!xtur@01'], '/scripts/cron/resourceStats.php'));
         $this->assertTrue($this->readSavedResourceStats($user) !== null);
         $this->assertEquals([], $processor->spawnCalls);
     }
@@ -330,23 +326,23 @@ class ResourceStatsProcessorTest extends TestCase
         };
         $processor->lockPath = $this->paths['runtime_dir'].'/resourceStats.lock';
         $now = time();
-        foreach (['alice', 'bob'] as $user) {
+        foreach (['fixtur01', 'fixtur02'] as $user) {
             $this->seedManagedUser($user);
             $this->setResourceData($stats, $user, [
                 $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
                 $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
             ]);
         }
-        file_put_contents($this->paths['passwd_file'], "bob:x:1001:1001::{$this->paths['home_dir']}/bob:/bin/bash\n", FILE_APPEND);
+        file_put_contents($this->paths['passwd_file'], "fixtur02:x:1001:1001::{$this->paths['home_dir']}/fixtur02:/bin/bash\n", FILE_APPEND);
         // Ghost series: data without a home, and data plus home without a passwd record.
         file_put_contents($this->paths['resource_dir'].'/ghost', 'seed');
         $this->seedManagedUser('no-passwd');
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'));
 
-        $this->assertEquals(['alice' => true, 'bob' => true], $processor->lockBusyDuring);
-        $this->assertTrue($this->readSavedResourceStats('alice') !== null);
-        $this->assertTrue($this->readSavedResourceStats('bob') !== null);
+        $this->assertEquals(['fixtur01' => true, 'fixtur02' => true], $processor->lockBusyDuring);
+        $this->assertTrue($this->readSavedResourceStats('fixtur01') !== null);
+        $this->assertTrue($this->readSavedResourceStats('fixtur02') !== null);
         $this->assertTrue(!is_file($this->paths['home_dir'].'/no-passwd/.resourceData'));
         $this->assertTrue($this->pmssMessagesContain($messages, 'resourceStats processed 2 accounts in'));
         $busy = false;
@@ -431,7 +427,7 @@ class ResourceStatsProcessorTest extends TestCase
         return new \ResourceStatsProcessor($stats, $this->paths);
     }
 
-    private function seedManagedUser(string $user = 'alice'): string
+    private function seedManagedUser(string $user = 'fixtur01'): string
     {
         file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
         @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
@@ -464,7 +460,7 @@ class ResourceStatsProcessorTest extends TestCase
         @mkdir($paths['resource_dir'], 0755, true);
         @mkdir($paths['home_dir'], 0755, true);
         @mkdir($paths['runtime_dir'], 0755, true);
-        file_put_contents($paths['passwd_file'], "alice:x:1000:1000::{$paths['home_dir']}/alice:/bin/bash\n");
+        file_put_contents($paths['passwd_file'], "fixtur01:x:1000:1000::{$paths['home_dir']}/fixtur01:/bin/bash\n");
 
         return $paths;
     }

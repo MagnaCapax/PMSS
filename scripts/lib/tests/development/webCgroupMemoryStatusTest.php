@@ -509,13 +509,11 @@ class WebCgroupMemoryStatusTest extends TestCase
         string $pressure = "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
     ): string
     {
-        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
-        $this->pmssWriteFile($dir.'/cgroup.controllers', "memory\n");
-        $this->pmssWriteFile($dir.'/memory.stat', "anon {$current}\nfile 0\n");
-        foreach (['current' => $current, 'high' => $high, 'max' => $max, 'events' => $events, 'pressure' => $pressure] as $name => $contents) {
-            $this->pmssWriteFile($dir.'/memory.'.$name, rtrim((string) $contents, "\n")."\n");
-        }
-
-        return $dir;
+        return $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-web-cgroup-'), [
+            'cgroup.controllers' => "memory\n", 'memory.stat' => "anon {$current}\nfile 0\n",
+        ] + array_map(static function (string $contents): string { return rtrim($contents, "\n")."\n"; }, [
+            'memory.current' => $current, 'memory.high' => $high, 'memory.max' => $max,
+            'memory.events' => $events, 'memory.pressure' => $pressure,
+        ]));
     }
 }

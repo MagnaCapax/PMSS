@@ -304,7 +304,7 @@ final class CustomerStatsLayoutTest extends TestCase
         $statusCommands = array();
         $statusRunner = function (string $command, string $label) use (&$statusCommands): array {
             $statusCommands[] = $command;
-            $outputs = array('App status' => "alice rtorrent\nbob deluged\ncarol rclone\n", 'Docker status' => '');
+            $outputs = array('App status' => "fixtur01 rtorrent\nfixtur02 deluged\nfixtur03 rclone\n", 'Docker status' => '');
             return array('output' => $outputs[$label] ?? '', 'error' => null);
         };
 
@@ -368,16 +368,14 @@ final class CustomerStatsLayoutTest extends TestCase
     public function testCgroupCountersPreserveFallbacksAndLimitSentinels(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-stats-cgroup-counters-');
-        foreach (['memory.usage_in_bytes' => '42', 'memory.soft_limit_in_bytes' => '200', 'memory.limit_in_bytes' => '400', 'pids.current' => '0'] as $file => $value) {
-            $this->pmssWriteFile($dir.'/'.$file, $value."\n");
-        }
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "42\n", 'memory.soft_limit_in_bytes' => "200\n", 'memory.limit_in_bytes' => "400\n", 'pids.current' => "0\n"]);
         foreach ([
             ['0', 0, 0, 0], ['001', 1, 1, 1], ['-1', 42, 200, 400],
             ['1.5', 42, 200, 400], ['max', 42, 200, 400],
             ['1125899906842623', 1125899906842623, 1125899906842623, 1125899906842623],
             ['1125899906842624', 1125899906842624, 200, 400],
         ] as [$raw, $current, $high, $max]) {
-            foreach (['current', 'high', 'max'] as $key) $this->pmssWriteFile($dir.'/memory.'.$key, $raw."\n");
+            $this->pmssWriteFiles($dir, array_fill_keys(['memory.current', 'memory.high', 'memory.max'], $raw."\n"));
             $this->assertSame(['memory_current' => $current, 'memory_high' => $high, 'memory_max' => $max, 'tasks_current' => 0], \pmssStatsCgroupCountersRead('-1', $dir));
         }
         unlink($dir.'/memory.current');

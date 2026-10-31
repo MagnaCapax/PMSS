@@ -454,10 +454,11 @@ self-update and watchdog lock handoff use these same helpers. Keep test methods,
 fragment bytes, ordering checks and per-fragment diagnostics at the callers;
 the protected common harness needs no change for additional adopters.
 
-Process fixtures use `TestCase::pmssWriteFiles()` for literal `/proc` fields and
-`pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared
+Process and monitoring fixtures use `TestCase::pmssWriteFiles()` for ordered
+file trees and `pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared
 fixture trait creates parents once; callers retain field bytes, absent entries,
-directory modes and link targets, including dangling targets. Process-selection
+directory modes and link targets, including dangling targets. Monitoring callers
+retain newline normalization and explicitly create deliberately empty directories. Process-selection
 assertions stay with their tests and execute only on testing machines.
 
 Executable test fixtures use `pmssWriteExecutableFile()` for the shared write

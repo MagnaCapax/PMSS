@@ -29,7 +29,7 @@ class PmssStatsCollectTest extends TestCase
             'product' => 'M10G S',
         ]));
 
-        foreach ([
+        $this->pmssWriteFiles($this->home, [
             '.quota' => implode("\n", [
                 'Disk quotas for user fixtur01 (uid 1000):',
                 'Filesystem  blocks   quota   limit   grace',
@@ -48,19 +48,15 @@ class PmssStatsCollectTest extends TestCase
             ]),
             '.trafficLimit' => "5\n",
             '.bonusTraffic' => "1\n",
-        ] as $relativePath => $content) {
-            $this->pmssWriteRelativeFile($this->home, $relativePath, $content);
-        }
+        ]);
 
-        foreach ([
+        $this->pmssWriteFiles($this->cgroupDir, [
             'memory.current' => "2147483648\n",
             'memory.max' => "8589934592\n",
             'pids.current' => "12\n",
             'cpu.stat' => "usage_usec 42000000\n",
             'io.stat' => "8:0 rbytes=1024 wbytes=2048 rios=1 wios=2 dbytes=0 dios=0\n",
-        ] as $relativePath => $content) {
-            $this->pmssWriteRelativeFile($this->cgroupDir, $relativePath, $content);
-        }
+        ]);
 
         $this->pmssWriteFile(dirname($this->cgroupDir).'/io.pressure', "some avg10=1.5 avg60=0.5 avg300=0.1 total=10\n");
     }
