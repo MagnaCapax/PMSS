@@ -31,10 +31,10 @@ class UpdateAppsBootstrapTest extends TestCase
         $output = $this->pmssRunInlinePhp('include '.var_export($sandboxDir.'/'.$installerFile, true).';', [], '2>&1');
         $this->assertTrue(is_string($output), 'Unable to execute sandboxed installer');
 
-        foreach (['Lidarr', 'Prowlarr', 'Radarr', 'Readarr', 'Sonarr'] as $label) {
-            $this->assertStringContainsString($label.' updater: missing runtime helper', $output);
-        }
-        $this->pmssAssertStringNotContainsString('Fatal error', $output, 'Servarr bootstrap should soft-return when runtime is missing');
+        $this->assertStringContainsAndOmitsStrings([
+            'Lidarr updater: missing runtime helper', 'Prowlarr updater: missing runtime helper', 'Radarr updater: missing runtime helper',
+            'Readarr updater: missing runtime helper', 'Sonarr updater: missing runtime helper',
+        ], ['Fatal error' => 'Servarr bootstrap should soft-return when runtime is missing'], $output);
     }
 
     public function testUpdateStep2SkipsHelperModulesInAppLoader(): void

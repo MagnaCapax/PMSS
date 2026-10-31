@@ -14,7 +14,7 @@ final class MediaStackPortManagerTest extends TestCase
 
     public function setUp(): void
     {
-        $this->user = 'alice';
+        $this->user = 'fixtur01';
         $root = $this->pmssMakeTempDir('pmss-media-stack-ports-');
         $this->home = $root.'/'.$this->user;
         $this->pmssEnsureDir($this->home);
@@ -52,7 +52,7 @@ final class MediaStackPortManagerTest extends TestCase
     public function testEnsureDoesNotAdoptAnotherManagedServicePort(): void
     {
         $this->pmssWriteFile($this->home.'/.config/radarr/config.xml', "<Config><Port>23003</Port></Config>\n");
-        \pmssPortManagerAssignServicePort('bob', 'lighttpd', 23003);
+        \pmssPortManagerAssignServicePort('fixtur02', 'lighttpd', 23003);
 
         $ports = \pmssMediaStackPortsEnsure($this->user, $this->home);
 
@@ -123,9 +123,7 @@ final class MediaStackPortManagerTest extends TestCase
 
     public function testTerminateUserReleasesEveryMediaStackReservation(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/terminateUser.php');
-        foreach (array_keys(\pmssMediaStackPortDefinitions()) as $app) {
-            $this->assertStringContainsString('media-stack-'.$app, $source);
-        }
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/terminateUser.php',
+            array_map(static function (string $app): string { return 'media-stack-'.$app; }, array_keys(\pmssMediaStackPortDefinitions())));
     }
 }

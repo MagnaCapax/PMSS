@@ -28,14 +28,13 @@ class AppsCatalogTest extends TestCase
             '"openclaw":180', 'pmssManagedAppEndpoints[id]'), $js);
         // One click starts an app in our own service: no accept or confirm step before Turn on (operator 2026-10-24).
         $this->assertFalse(isset($row['consent']));
-        $this->assertStringNotContainsString('pmssManagedAppConsent[id]', $js);
-        $this->assertStringNotContainsString("id === 'qBittorrent' || id === 'Deluge'", $js);
+        $this->assertStringContainsAndOmitsStrings([], ['pmssManagedAppConsent[id]', "id === 'qBittorrent' || id === 'Deluge'"], $js);
     }
 
     public function testOpenClawInstallableRowNeedsReservedPortAndOffersSharedControls(): void
     {
         $home = $this->pmssMakeTempDir('pmss-oc-row-');
-        $read = static function () use ($home): array { return \pmssCustomerAppsStatusRead($home, 'alice', 'server.example'); };
+        $read = static function () use ($home): array { return \pmssCustomerAppsStatusRead($home, 'fixtur01', 'server.example'); };
         $this->assertFalse(isset($read()['apps']['openclaw']));
         file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
         $app = $read()['apps']['openclaw'];
@@ -71,11 +70,11 @@ class AppsCatalogTest extends TestCase
 
     public function testOpenClawLauncherUsesSharedPrivateBackgroundCommand(): void
     {
-        $home = '/tmp/pmss-alice home';
-        $command = \pmssMediaStackPanelStartCommandBuild($home, 'alice', array('script' => 'bin/install-openclaw',
+        $home = '/tmp/pmss-fixtur01 home';
+        $command = \pmssMediaStackPanelStartCommandBuild($home, 'fixtur01', array('script' => 'bin/install-openclaw',
             'interpreter' => '/usr/bin/php', 'args' => array('install', '--yes'),
             'pid' => '.install-openclaw-web.pid', 'log' => '.install-openclaw.log'));
-        $this->assertStringContainsAllStrings(array("HOME='".$home."'", "USER='alice'", 'umask 077',
+        $this->assertStringContainsAllStrings(array("HOME='".$home."'", "USER='fixtur01'", 'umask 077',
             'install-openclaw', '--yes', '.install-openclaw-web.pid', '.install-openclaw.log', 'nohup '), $command);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/userOpenClaw.php', array(
             "if (\$action !== 'open') pmssFrontendPostActionRequired();", "header('Cache-Control: no-store');", "header('Location: '.\$url, true, 302);"));
@@ -138,8 +137,7 @@ class AppsCatalogTest extends TestCase
                     continue;
                 }
                 if ($name === 'scriptsInc' && trim($expression) === '$p') {
-                    $this->assertStringContainsString("\$p = __DIR__.'/scriptsInc'.\$part.'.php'", $source);
-                    $this->assertStringContainsString('is_file($p) && !is_link($p)', $source);
+                    $this->assertStringContainsAllStrings(["\$p = __DIR__.'/scriptsInc'.\$part.'.php'", 'is_file($p) && !is_link($p)'], $source);
                     foreach ($guiv as $part) {
                         if ($part === 'scriptsInc' || strpos($part, 'scriptsInc') !== 0) continue;
                         $this->assertStringContainsString("'".substr($part, strlen('scriptsInc'))."'", $source);
@@ -217,8 +215,7 @@ class AppsCatalogTest extends TestCase
             $this->pmssWriteFile($home.'/.transmissionDisable', '');
             $this->assertSame('off', $read()['Transmission']['state']);
             $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
-            $this->assertStringContainsString('"Transmission":"transmission.php"', $html);
-            $this->assertStringContainsString('data-app="Transmission"', $html);
+            $this->assertStringContainsAllStrings(['"Transmission":"transmission.php"', 'data-app="Transmission"'], $html);
             unlink($binary);
             $this->assertFalse(isset($read()['Transmission']));
         });
@@ -248,10 +245,7 @@ class AppsCatalogTest extends TestCase
                 $this->assertTrue(unlink($home.'/www/'.$file));
             }
             $html = $render('welcome.php', ['minBytes' => 10000])['stdout'];
-            $this->assertStringContainsString('Your apps', $html);
-            $this->assertStringContainsString('Jellyfin', $html);
-            $this->assertStringNotContainsString('data-action="stop"', $html);
-            $this->assertStringNotContainsString('data-action="log"', $html);
+            $this->assertStringContainsAndOmitsStrings(['Your apps', 'Jellyfin'], ['data-action="stop"', 'data-action="log"'], $html);
             $status = $this->pmssDecodeJsonArray($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout']);
             $this->assertSame(false, $status['mediaAppControl']);
             $this->assertSame(false, $status['canRestart']);
@@ -297,9 +291,8 @@ class AppsCatalogTest extends TestCase
     public function testFreshHomeHasInstallBannerAndOnlyAllowedWikiLinks(): void
     {
         $html = $this->pmssRenderLegacyAppsPage('apps.php', [], ['minBytes' => 4000]);
-        $this->assertStringContainsString('Media Stack is not installed', $html);
-        $this->assertStringContainsString('Install Media Stack', $html);
-        $this->assertStringContainsString('function pmssActionRequest(action, passwordValue)', $html);
+        $this->assertStringContainsAllStrings(['Media Stack is not installed', 'Install Media Stack',
+            'function pmssActionRequest(action, passwordValue)'], $html);
         $wiki = substr($html, strpos($html, 'id="pmss-more-apps"'), strpos($html, 'More from LinuxServer.io') - strpos($html, 'id="pmss-more-apps"'));
         preg_match_all('/href="([^"]+)"[^>]*>Setup guide &#8599;<\/a>/', $wiki, $matches);
         $this->assertSame(39, count($matches[1]));
@@ -364,18 +357,14 @@ class AppsCatalogTest extends TestCase
         $catalog = require dirname(__DIR__, 4).'/etc/skel/www/appsLsioCatalog.php';
         $this->assertStringContainsString('More from LinuxServer.io ('.count($catalog).')', $html);
         $lsio = substr($html, strpos($html, 'id="pmss-lsio-apps"'));
-        $this->assertStringContainsString('data-search="thelounge"', $lsio);
-        $this->assertStringContainsString('https://docs.linuxserver.io/images/docker-thelounge/', $lsio);
+        $this->assertStringContainsAllStrings(['data-search="thelounge"', 'https://docs.linuxserver.io/images/docker-thelounge/'], $lsio);
         $this->assertStringContainsString('https://docs.linuxserver.io/images/docker-blender/', $html);
         $this->assertSame(count($catalog), substr_count($html, 'data-search="'));
         foreach ($catalog as $app) $this->assertStringContainsString('data-search="'.$app['name'].'"', $html);
         $this->assertSame(1, substr_count($html, 'id="pmss-apps-search"'));
-        $this->assertStringContainsString('127.0.0.1:8080:8080', $html);
-        $this->assertStringContainsString("#pmss-more-apps .mrow, #pmss-lsio-apps .mrow", $html);
-        $this->assertStringContainsString("query.replace(/[\\s-]/g, '')", $html);
-        $this->assertStringContainsString("search.indexOf(query) !== -1 || search.replace(/[\\s-]/g, '').indexOf(compactQuery) !== -1", $html);
-        $this->assertStringContainsString("row.attr('data-search')", $html);
-        $this->assertStringNotContainsString("$('details.catalog').prop('open'", $html);
+        $this->assertStringContainsAndOmitsStrings(['127.0.0.1:8080:8080', "#pmss-more-apps .mrow, #pmss-lsio-apps .mrow",
+            "query.replace(/[\\s-]/g, '')", "search.indexOf(query) !== -1 || search.replace(/[\\s-]/g, '').indexOf(compactQuery) !== -1",
+            "row.attr('data-search')"], ["$('details.catalog').prop('open'"], $html);
     }
 
     public function testMissingLsioCatalogLeavesWikiGuidesAvailable(): void
@@ -413,11 +402,8 @@ class AppsCatalogTest extends TestCase
                 $media = substr($media, 0, strpos($media, '<div class="group">Torrent clients</div>'));
                 $this->assertStringContainsString('data-installing="1"', $media);
                 $this->assertSame(1, substr_count($media, 'class="row"'));
-                $this->assertStringContainsString('Installing the media stack…', $media);
-                $this->assertStringContainsString('Media stack install is running.', $media);
-                $this->assertStringNotContainsString('data-app=', $media);
-                $this->assertStringNotContainsString('data-action=', $media);
-                $this->assertStringNotContainsString('id="pmss-start-all"', $media);
+                $this->assertStringContainsAndOmitsStrings(['Installing the media stack…', 'Media stack install is running.'],
+                    ['data-app=', 'data-action=', 'id="pmss-start-all"'], $media);
                 $status = $this->pmssDecodeJsonArray($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout']);
                 $this->assertTrue($status['poll']);
                 $this->assertStringContainsString('Installing the media stack…', $status['mediaHtml']);
@@ -464,9 +450,8 @@ class AppsCatalogTest extends TestCase
         $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $this->pmssWriteFile($home.'/.install-media-stack.log', "[ERR ] Download failed\n");
             $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
-            $this->assertStringContainsString('A previous web install stopped before completion.', $html);
-            $this->assertStringContainsString('>Install Media Stack</button>', $html);
-            $this->assertStringNotContainsString('Installing the media stack…', $html);
+            $this->assertStringContainsAndOmitsStrings(['A previous web install stopped before completion.', '>Install Media Stack</button>'],
+                ['Installing the media stack…'], $html);
         });
     }
 
@@ -486,8 +471,7 @@ class AppsCatalogTest extends TestCase
             }
         });
         $shared = $this->pmssReadScriptsIncSources();
-        $this->assertStringContainsString('data-bulk-action="start-stopped"', $shared);
-        $this->assertStringContainsString("$(document).on('click', '#pmss-start-all[data-bulk-action]'", $shared);
+        $this->assertStringContainsAllStrings(['data-bulk-action="start-stopped"', "$(document).on('click', '#pmss-start-all[data-bulk-action]'"], $shared);
     }
 
     public function testInstalledStackRendersRuntimeRowsAndSecurityState(): void
@@ -505,12 +489,8 @@ class AppsCatalogTest extends TestCase
             )));
             $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
             $this->assertStringNotContainsString('Media Stack is not installed', $html);
-            $this->assertStringContainsString('Stream your library to TV, phone and browser', $html);
-            $this->assertStringContainsString('>Not running</span>', $html);
-            $this->assertStringContainsString('>Stopped by you</span>', $html);
-            $this->assertStringContainsString('No login set', $html);
-            $this->assertStringContainsString('data-action="start">Start</button>', $html);
-            $this->assertStringContainsString('data-action="log">Show log</button>', $html);
+            $this->assertStringContainsAllStrings(['Stream your library to TV, phone and browser', '>Not running</span>',
+                '>Stopped by you</span>', 'No login set', 'data-action="start">Start</button>', 'data-action="log">Show log</button>'], $html);
         });
     }
 
@@ -518,22 +498,12 @@ class AppsCatalogTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/apps.php');
         $shared = $this->pmssReadScriptsIncSources();
-        $this->assertStringContainsString("require_once __DIR__.'/scriptsInc.php'", $source);
-        $this->assertStringContainsString("require_once __DIR__.'/userMediaStackPanel.php'", $source);
-        $this->assertStringNotContainsString('/scripts/', $source);
-        $this->assertStringNotContainsString('location.reload', $source);
-        $this->assertStringNotContainsString('<form', $source);
-        $this->assertStringContainsString('rtorrentRestart.php?action=', $shared);
-        foreach (array('pmssMediaStackStart', 'pmssMediaStackSecureApp') as $function) {
-            $this->assertStringContainsString('function '.$function.'(', $shared);
-        }
-        foreach (array('mediaStack.php?action=status', 'mediaStack.php?action=', 'mediaStack.php') as $route) {
-            $this->assertStringContainsString($route, $shared);
-        }
-        $this->assertStringContainsString("'endpoint' => 'qbittorrent.php'", $this->pmssReadScriptsIncSources());
+        $this->assertStringContainsAndOmitsStrings(["require_once __DIR__.'/scriptsInc.php'", "require_once __DIR__.'/userMediaStackPanel.php'"],
+            ['/scripts/', 'location.reload', '<form'], $source);
+        $this->assertStringContainsAllStrings(['rtorrentRestart.php?action=', 'function pmssMediaStackStart(', 'function pmssMediaStackSecureApp(',
+            'mediaStack.php?action=status', 'mediaStack.php?action=', 'mediaStack.php', "'endpoint' => 'qbittorrent.php'"], $shared);
         $this->assertStringContainsString('pmssActionScriptJs()', $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
-        $this->assertStringContainsString("'www/appsRuntime.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
-        $this->assertStringContainsString("'www/appsLsioCatalog.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/filesystem.php', ["'www/appsRuntime.php'", "'www/appsLsioCatalog.php'"]);
     }
 
     public function testLiveStatusJsonAndBoundedEscapedLog(): void
@@ -674,11 +644,9 @@ class AppsCatalogTest extends TestCase
     public function testWelcomeStillRendersControlsUsingPostRequests(): void
     {
         $html = $this->pmssRenderLegacyAppsPage('welcome.php', array(), array('minBytes' => 10000));
-        $this->assertStringContainsString('rtorrentRestart.php', $html);
-        $this->assertStringContainsString('lighttpdRestart.php?action=confirm-restart', $html);
+        $this->assertStringContainsAllStrings(['rtorrentRestart.php', 'lighttpdRestart.php?action=confirm-restart'], $html);
         $shared = $this->pmssReadScriptsIncSources();
-        $this->assertStringContainsString("type: action.type || 'POST'", $shared);
-        $this->assertStringContainsString("headers: {'X-Requested-With': 'XMLHttpRequest'}", $shared);
+        $this->assertStringContainsAllStrings(["type: action.type || 'POST'", "headers: {'X-Requested-With': 'XMLHttpRequest'}"], $shared);
     }
 
     public function testAppsShowsUpdatingNoticeWhenGuivHelperIsOld(): void
@@ -690,8 +658,7 @@ class AppsCatalogTest extends TestCase
             file_put_contents($bootstrap, "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);
             $result = $render('apps.php', array('minBytes' => 100));
             $this->assertSame(0, $result['rc']);
-            $this->assertStringContainsString('The Apps page is being updated on this server. Reload it in a few minutes.', $result['stdout']);
-            $this->assertStringContainsString('HTTP=200', $result['stdout']);
+            $this->assertStringContainsAllStrings(['The Apps page is being updated on this server. Reload it in a few minutes.', 'HTTP=200'], $result['stdout']);
         });
     }
 

@@ -52,13 +52,11 @@ class ArrInstallerNoExecPolicyTest extends TestCase
         }
 
         $this->assertStringContainsString('pmssArrInstalledVersionRead', $source, 'sanity: installer source loaded');
-        foreach (['is_executable', 'pmssAppVersionProbe', 'proc_open'] as $primitive) {
-            $this->assertStringNotContainsString(
-                $primitive,
-                $source,
-                'arr.php must not reach for '.$primitive.' -- installed binaries are never run'
-            );
-        }
+        $this->assertStringContainsAndOmitsStrings([], [
+            'is_executable' => 'arr.php must not reach for is_executable -- installed binaries are never run',
+            'pmssAppVersionProbe' => 'arr.php must not reach for pmssAppVersionProbe -- installed binaries are never run',
+            'proc_open' => 'arr.php must not reach for proc_open -- installed binaries are never run',
+        ], $source);
     }
 
     public function testInstalledVersionReadUsesMetadataOnlyAndIgnoresBinaries(): void

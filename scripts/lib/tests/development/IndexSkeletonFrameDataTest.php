@@ -9,11 +9,11 @@ class IndexSkeletonFrameDataTest extends TestCase
     public function testOpenClawTabRequiresProxyAndStaysInsidePanel(): void
     {
         $this->loadIndexFrameHelpers();
-        $home = $this->pmssMakeTempDir('pmss-oc-tab-').'/alice';
+        $home = $this->pmssMakeTempDir('pmss-oc-tab-').'/fixtur01';
         mkdir($home.'/.lighttpd/custom.d', 0700, true);
         $dir = $home.'/.lighttpd/custom.d';
         $this->assertFalse(isset(\pmssLocalFrameProxyAppFramesRead($dir, $home)['openclaw']));
-        file_put_contents($dir.'/openclaw.conf', '$HTTP["url"] =~ "^/user-alice/openclaw($|/)" { }');
+        file_put_contents($dir.'/openclaw.conf', '$HTTP["url"] =~ "^/user-fixtur01/openclaw($|/)" { }');
         $frames = \pmssLocalFrameProxyAppFramesRead($dir, $home);
         $this->assertTrue(isset($frames['openclaw']));
         $this->assertSame('configure.php#apps', $frames['openclaw']['url']);
@@ -150,7 +150,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testPerUserLocalOnlyMarkerSelectsBundledFramesWithoutEnvironmentFlag(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-local-only-home-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-local-only-home-', 'fixtur01');
         $this->pmssWriteFile($home.'/.guiFramesLocalOnly', '');
 
         $html = '';
@@ -306,7 +306,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testRemoteDisabledRenderCarriesQuotaInWelcomeIframe(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-home-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-home-', 'fixtur01');
         $this->pmssWriteFile(
             $home.'/.quota',
             "Disk quotas for user panel (uid 1000):\n"
@@ -324,30 +324,29 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testRemoteDisabledRenderAddsDelugeFrameWhenEnabled(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-deluge-home-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-deluge-home-', 'fixtur01');
         touch($home.'/.delugeEnable');
         touch($home.'/www/deluge.php');
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#deluge"', 'title="Deluge - Torrent web UI"', "loadFrame('deluge', 'deluge/')", '<div id="deluge" class="tabs-container"></div>'] as $needle) {
-            $this->assertStringContainsString($needle, $html);
-        }
+        $this->assertStringContainsAllStrings(['<a href="#deluge"', 'title="Deluge - Torrent web UI"',
+            "loadFrame('deluge', 'deluge/')", '<div id="deluge" class="tabs-container"></div>'], $html);
     }
 
     public function testRemoteDisabledRenderAddsTorrentFramesFromProxyFragments(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-proxy-root-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-proxy-root-', 'fixtur01');
         $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
         touch($home.'/.qbittorrentEnable');
         touch($home.'/.delugeEnable');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
-            '$HTTP["url"] =~ "^/user-alice/qbittorrent/" {'."\n}\n"
+            '$HTTP["url"] =~ "^/user-fixtur01/qbittorrent/" {'."\n}\n"
         );
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-deluge.conf',
-            '$HTTP["url"] =~ "^/user-alice/deluge/" {'."\n}\n"
+            '$HTTP["url"] =~ "^/user-fixtur01/deluge/" {'."\n}\n"
         );
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
@@ -356,51 +355,48 @@ class IndexSkeletonFrameDataTest extends TestCase
             $this->assertStringContainsString('<a href="#'.$frame.'"', $html);
             $this->assertStringContainsString("loadFrame('".$frame."', '".$frame."/')", $html);
         }
-        foreach (['title="qBittorrent - Torrent web UI"', '<div id="qbittorrent" class="tabs-container"></div>'] as $needle) {
-            $this->assertStringContainsString($needle, $html);
-        }
+        $this->assertStringContainsAllStrings(['title="qBittorrent - Torrent web UI"',
+            '<div id="qbittorrent" class="tabs-container"></div>'], $html);
     }
 
     public function testRemoteDisabledRenderSkipsToggleAppProxyFragmentsWithoutEnableFlags(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-disabled-proxy-root-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-disabled-proxy-root-', 'fixtur01');
         $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
-            '$HTTP["url"] =~ "^/user-alice/qbittorrent/" {'."\n}\n"
+            '$HTTP["url"] =~ "^/user-fixtur01/qbittorrent/" {'."\n}\n"
         );
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-rclone.conf',
-            '$HTTP["url"] =~ "^/user-alice/rclone/" {'."\n}\n"
+            '$HTTP["url"] =~ "^/user-fixtur01/rclone/" {'."\n}\n"
         );
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
-            $this->assertStringNotContainsString($needle, $html);
-        }
+        $this->assertStringContainsAndOmitsStrings([], ['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')",
+            '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"], $html);
     }
 
     public function testRemoteDisabledRenderAddsRcloneFrameFromProxyFragment(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-rclone-root-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-rclone-root-', 'fixtur01');
         $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
         touch($home.'/.rcloneEnable');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-rclone.conf',
-            '$HTTP["url"] =~ "^/user-alice/rclone/" {'."\n}\n"
+            '$HTTP["url"] =~ "^/user-fixtur01/rclone/" {'."\n}\n"
         );
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#rclone"', 'title="Rclone Web UI"', "loadFrame('rclone', 'rclone/')", '<div id="rclone" class="tabs-container"></div>'] as $needle) {
-            $this->assertStringContainsString($needle, $html);
-        }
+        $this->assertStringContainsAllStrings(['<a href="#rclone"', 'title="Rclone Web UI"',
+            "loadFrame('rclone', 'rclone/')", '<div id="rclone" class="tabs-container"></div>'], $html);
     }
 
     public function testRemoteEnabledRenderAddsTorrentFramesFromLocalConfigDirs(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-config-root-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-config-root-', 'fixtur01');
         $this->pmssEnsureDir($home.'/.config/qBittorrent');
         $this->pmssEnsureDir($home.'/.config/deluge');
         $this->pmssWriteFile($home.'/.rclonePort', "45678\n");
@@ -410,40 +406,36 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
-            $this->assertStringContainsString($needle, $html);
-        }
+        $this->assertStringContainsAllStrings(['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')",
+            '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"], $html);
     }
 
     public function testRemoteDisabledRenderSkipsAutobrrConfigDirWithoutProxyFragment(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-autobrr-config-root-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-autobrr-config-root-', 'fixtur01');
         $this->pmssEnsureDir($home.'/.config/autobrr');
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#autobrr"', "loadFrame('autobrr', '/public-alice/autobrr/')"] as $needle) {
-            $this->assertStringNotContainsString($needle, $html);
-        }
+        $this->assertStringContainsAndOmitsStrings([], ['<a href="#autobrr"', "loadFrame('autobrr', '/public-fixtur01/autobrr/')"], $html);
     }
 
     public function testRemoteDisabledRenderSkipsTorrentFramesFromLocalConfigDirsWithoutEnableFlags(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-disabled-config-root-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-disabled-config-root-', 'fixtur01');
         $this->pmssEnsureDir($home.'/.config/qBittorrent');
         $this->pmssEnsureDir($home.'/.config/deluge');
         $this->pmssWriteFile($home.'/.rclonePort', "45678\n");
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
-            $this->assertStringNotContainsString($needle, $html);
-        }
+        $this->assertStringContainsAndOmitsStrings([], ['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')",
+            '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"], $html);
     }
 
     public function testRemoteDisabledRenderAddsMediaStackFramesFromProxyFragment(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-media-root-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-media-root-', 'fixtur01');
         $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/media-stack.conf',
@@ -472,15 +464,15 @@ class IndexSkeletonFrameDataTest extends TestCase
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr', 'autobrr'] as $app) {
-            $this->assertStringContainsString("loadFrame('".$app."', '/public-alice/".$app."/')", $html);
+            $this->assertStringContainsString("loadFrame('".$app."', '/public-fixtur01/".$app."/')", $html);
         }
-        $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/')", $html);
+        $this->assertStringContainsString("loadFrame('jellyfin', '/public-fixtur01/jellyfin/web/')", $html);
         $this->assertStringNotContainsString('<a href="#notebook"', $html);
     }
 
     public function testCustomFrameParserIgnoresBlankLinesBeforeFieldAccess(): void
     {
-        $home = $this->pmssMakeUserWebHome('pmss-index-custom-home-');
+        $home = $this->pmssMakeUserWebHome('pmss-index-custom-home-', 'fixtur01');
         $this->pmssWriteFile($home.'/.customFrames', "custom|Custom tooltip|Custom|custom/\n\n");
 
         $output = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'), true);
@@ -653,7 +645,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             'welcome' => \pmssLocalFrameDefinition('welcome.php', 'welcome', 'Welcome'),
             'RuTorrent' => \pmssLocalFrameDefinition('somewhere/', 'ruTorrent', 'ruTorrent'),
             'torrents' => \pmssLocalFrameDefinition('rutorrent/', 'Torrents', 'Torrents'),
-            'absolute' => \pmssLocalFrameDefinition('/user-alice/ruTorrent', 'Absolute', 'Absolute'),
+            'absolute' => \pmssLocalFrameDefinition('/user-fixtur01/ruTorrent', 'Absolute', 'Absolute'),
             'lookalike' => \pmssLocalFrameDefinition('rutorrent-extra/', 'Lookalike', 'Lookalike'),
             'nourl' => array('linkText' => 'No URL', 'title' => 'No URL'),
         );
