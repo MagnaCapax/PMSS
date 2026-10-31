@@ -44,6 +44,12 @@ prefixes share `pmssBuildCommandEnvironmentPrefix()`. Keep redirections, working
 directories and environment removal at the caller. Run fixtures only on testing
 machines, never on the control host.
 
+Use `pmssExecShellCommand()` for shell fixtures that need an exit status, joined
+output, or output lines; use `pmssRunShellCommand()` when raw stdout bytes suffice.
+Pass an empty stderr redirect to preserve inherited stderr, or the original
+redirect when it is suppressed or saved separately. Keep asynchronous process
+ownership and pipe handling explicit in fixtures that exercise those lifetimes.
+
 Decode expected array payloads with `pmssDecodeJsonArray()` or read JSON fixture
 files with `pmssReadJsonArrayFile()`. These helpers retain the array assertion;
 keep payload checks and specific failure messages at the caller.

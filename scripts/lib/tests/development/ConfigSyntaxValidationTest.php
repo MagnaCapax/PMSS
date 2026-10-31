@@ -57,7 +57,7 @@ class ConfigSyntaxValidationTest extends TestCase
         }
 
         // Fall back to which
-        $which = trim((string)@shell_exec('which '.escapeshellarg($name).' 2>/dev/null'));
+        $which = trim($this->pmssRunShellCommand('which '.escapeshellarg($name), [], '2>/dev/null'));
         if ($which !== '' && is_executable($which)) {
             return $which;
         }
@@ -190,14 +190,7 @@ NGINX;
         // lighttpd -t -f <config> tests syntax without starting
         // Note: lighttpd -t may still fail due to missing modules/paths, so we
         // check specifically for syntax errors vs runtime errors
-        $output = array();
-        $rc = 0;
-        exec(
-            escapeshellcmd($this->lighttpdBinary).' -t -f '.escapeshellarg($configFile).' 2>&1',
-            $output,
-            $rc
-        );
-        $outputStr = implode("\n", $output);
+        $result = $this->pmssExecShellCommand(escapeshellcmd($this->lighttpdBinary).' -t -f '.escapeshellarg($configFile));
 
         // Syntax errors we care about (the bugs we're preventing)
         $syntaxErrors = array(
@@ -208,7 +201,7 @@ NGINX;
             'unexpected end of file',       // Unbalanced braces
         );
 
-        $this->assertOutputOmitsSyntaxErrors($outputStr, $syntaxErrors, 'lighttpd');
+        $this->assertOutputOmitsSyntaxErrors($result['output'], $syntaxErrors, 'lighttpd');
     }
 
     /** Preserve both per-user logs while moving their writes off the event loop. */
@@ -274,14 +267,7 @@ NGINX;
         file_put_contents($configFile, $config);
 
         // nginx -t -c <config> tests syntax without starting
-        $output = array();
-        $rc = 0;
-        exec(
-            escapeshellcmd($this->nginxBinary).' -t -c '.escapeshellarg($configFile).' 2>&1',
-            $output,
-            $rc
-        );
-        $outputStr = implode("\n", $output);
+        $result = $this->pmssExecShellCommand(escapeshellcmd($this->nginxBinary).' -t -c '.escapeshellarg($configFile));
 
         // Syntax errors we care about (the bugs we're preventing)
         $syntaxErrors = array(
@@ -292,7 +278,7 @@ NGINX;
             'invalid number of arguments',  // Wrong argument count
         );
 
-        $this->assertOutputOmitsSyntaxErrors($outputStr, $syntaxErrors, 'nginx');
+        $this->assertOutputOmitsSyntaxErrors($result['output'], $syntaxErrors, 'nginx');
     }
 
     /**

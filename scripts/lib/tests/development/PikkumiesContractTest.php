@@ -40,11 +40,9 @@ final class PikkumiesContractTest extends TestCase
     public function testNoEnabledMarkerIsTracked(): void
     {
         $root = dirname(__DIR__, 4);
-        $output = [];
-        $status = 0;
-        exec('git -C '.escapeshellarg($root).' ls-files -- '.escapeshellarg(':(glob)etc/seedbox/config/*.enabled').' 2>&1', $output, $status);
-        $this->assertSame(0, $status, implode("\n", $output));
-        $this->assertSame([], $output);
+        $result = $this->pmssExecShellCommand('git -C '.escapeshellarg($root).' ls-files -- '.escapeshellarg(':(glob)etc/seedbox/config/*.enabled'));
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertSame([], $result['lines']);
     }
 
     /** UI ports are fixed, distinct, privileged, and outside browser-denied ports. */

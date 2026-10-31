@@ -47,7 +47,7 @@ class RootCronIoPriorityScopeTest extends TestCase
         foreach (self::ACCOUNT_ONLY as $name) {
             foreach ($lines[$name] ?? [] as $line) {
                 $this->assertSame(1, preg_match("/\\| awk '([^']+)' \\|/", $line, $m), "no awk stage in: {$line}");
-                $this->assertSame("104\n105\n", shell_exec('printf '.$fixture.' | awk '.escapeshellarg($m[1])), "filter in: {$line}");
+                $this->assertSame("104\n105\n", $this->pmssRunShellCommand('printf '.$fixture.' | awk '.escapeshellarg($m[1]), [], ''), "filter in: {$line}");
                 ++$checked;
             }
         }

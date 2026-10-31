@@ -27,7 +27,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
     public function testBackwardsWallClockNeverProducesInvalidDurations(): void
     {
         // CI runners can step the wall clock back; durations used to go negative and fail the launch.
-        $realDate = trim((string) shell_exec('command -v date'));
+        $realDate = trim($this->pmssRunShellCommand('command -v date', [], ''));
         $state = $this->tempDir.'/clock-state';
         file_put_contents($this->tempDir.'/uptime', "100.25 50.00\n");
         // Monotonic case: the wall clock steps forward, so a duration of 0 proves the uptime file was read.

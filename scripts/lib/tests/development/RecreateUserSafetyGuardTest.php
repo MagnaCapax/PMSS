@@ -186,9 +186,8 @@ class RecreateUserSafetyGuardTest extends TestCase
     {
         [$home, $backup] = $this->fixture('repository-skeleton');
         $skel = dirname(__DIR__, 4).'/etc/skel';
-        $copyRc = 1;
-        exec('cp -Rp '.escapeshellarg($skel.'/.').' '.escapeshellarg($home), $copyOutput, $copyRc);
-        $this->assertSame(0, $copyRc, 'Unable to copy repository skeleton into test home');
+        $result = $this->pmssExecShellCommand('cp -Rp '.escapeshellarg($skel.'/.').' '.escapeshellarg($home), [], '');
+        $this->assertSame(0, $result['rc'], 'Unable to copy repository skeleton into test home');
         $this->assertTrue(is_file($home.'/data/.gitkeep'), 'Repository skeleton must exercise the data placeholder');
         $this->assertTrue(chmod($home, 0700));
 
@@ -402,8 +401,8 @@ class RecreateUserSafetyGuardTest extends TestCase
         $this->assertSame(0770, $stat['mode'] & 0777);
 
         // Shell changes do not invalidate PHP's cached lstat for this path.
-        exec('chmod 0700 '.escapeshellarg($home), $output, $rc);
-        $this->assertSame(0, $rc);
+        $result = $this->pmssExecShellCommand('chmod 0700 '.escapeshellarg($home), [], '');
+        $this->assertSame(0, $result['rc']);
         \pmssRecreateRequirePrivateDirectory($home, $stat['uid']);
     }
 

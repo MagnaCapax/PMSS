@@ -25,8 +25,8 @@ class LinuxserverInstallScriptTest extends TestCase
         $this->homeDir = $this->tempDir.'/home';
         $this->fakeBinDir = $this->tempDir.'/bin';
         $this->dockerLog = $this->tempDir.'/docker.log';
-        $this->phpBin = trim((string) shell_exec('command -v php 2>/dev/null'));
-        $this->bashBin = trim((string) shell_exec('command -v bash 2>/dev/null'));
+        $this->phpBin = trim($this->pmssRunShellCommand('command -v php', [], '2>/dev/null'));
+        $this->bashBin = trim($this->pmssRunShellCommand('command -v bash', [], '2>/dev/null'));
         $this->installerPath = __DIR__.'/../../../../etc/skel/bin/docker-install-lsio';
         $this->legacyInstallerPath = __DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh';
         $this->helperPath = __DIR__.'/../../../../etc/skel/bin/dockerInstallLsio.php';

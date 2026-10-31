@@ -219,7 +219,7 @@ PHP;
 
     public function testRegularReadersRejectLinkAndFifoWithoutBlocking(): void
     {
-        if (!function_exists('posix_mkfifo') || trim((string) shell_exec('command -v timeout')) === '') {
+        if (!function_exists('posix_mkfifo') || trim($this->pmssRunShellCommand('command -v timeout', [], '')) === '') {
             throw new SkipTest('FIFO or timeout unavailable');
         }
         $dir = $this->pmssMakeTempDir('pmss-read-fifo-');
@@ -232,10 +232,9 @@ PHP;
             .'echo json_encode([pmssReadRegularFileContents('.var_export($dir.'/linked', true).'),'
             .'pmssReadRegularFileContents('.var_export($dir.'/fifo', true).'),'
             .'pmssReadRegularFileContentsVerified('.var_export($dir.'/fifo', true).')]);';
-        $output = [];
-        exec('timeout --kill-after=2s 5s '.$this->pmssBuildInlinePhpCommand($code), $output, $rc);
-        $this->assertSame(0, $rc);
-        $this->assertSame('[null,null,null]', implode("\n", $output));
+        $result = $this->pmssExecShellCommand('timeout --kill-after=2s 5s '.$this->pmssBuildInlinePhpCommand($code), [], '');
+        $this->assertSame(0, $result['rc']);
+        $this->assertSame('[null,null,null]', $result['output']);
         $this->pmssAssertPathOwnerAndModeSame($before, $target);
         $this->assertSame('kept', file_get_contents($target));
     }
@@ -808,9 +807,9 @@ PHP;
             .'fwrite(STDOUT, "E-fwrite\n"); echo "F-echo\n"; '
             .'pmssCredentialProcessRun("/bin/echo G-credential", null); '
             .'fwrite(STDOUT, "H-fwrite\n");';
-        exec('timeout --kill-after=2s 10s '.$this->pmssBuildInlinePhpCommand($code)
-            .' > '.escapeshellarg($out).' 2>/dev/null', $ignored, $rc);
-        $this->assertSame(0, $rc);
+        $result = $this->pmssExecShellCommand('timeout --kill-after=2s 10s '.$this->pmssBuildInlinePhpCommand($code)
+            .' > '.escapeshellarg($out), [], '2>/dev/null');
+        $this->assertSame(0, $result['rc']);
         $this->assertSame("A-fwrite\nB-echo\nC-child\nD-inherited\nE-fwrite\nF-echo\nG-credential\nH-fwrite\n",
             file_get_contents($out));
     }

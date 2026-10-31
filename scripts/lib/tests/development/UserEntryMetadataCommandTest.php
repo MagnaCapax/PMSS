@@ -19,11 +19,8 @@ final class UserEntryMetadataCommandTest extends TestCase
         chmod($linked, 0600);
         chmod($outside, 0600);
 
-        $output = [];
-        $status = 1;
-        exec(\pmssUserEntryChmodCommand($tree, 0755, true), $output, $status);
-
-        $this->assertSame(0, $status);
+        $result = $this->pmssExecShellCommand(\pmssUserEntryChmodCommand($tree, 0755, true), [], '');
+        $this->assertSame(0, $result['rc']);
         clearstatcache(true);
         $this->assertSame(0755, fileperms($regular) & 0777);
         $this->assertSame(0600, fileperms($linked) & 0777);

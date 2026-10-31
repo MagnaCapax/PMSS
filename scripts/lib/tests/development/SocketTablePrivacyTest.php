@@ -137,7 +137,7 @@ class SocketTablePrivacyTest extends TestCase
     {
         $loader = dirname(__DIR__, 2).'/update/systemPrep/bpf/socket-privacy-load.sh';
         $this->assertTrue(is_file($loader), 'BPF loader script must be committed');
-        exec('sh -n '.escapeshellarg($loader).' 2>&1', $out, $rc);
-        $this->assertSame(0, $rc, 'loader must be valid sh: '.implode("\n", $out));
+        $result = $this->pmssExecShellCommand('sh -n '.escapeshellarg($loader));
+        $this->assertSame(0, $result['rc'], 'loader must be valid sh: '.$result['output']);
     }
 }

@@ -10,10 +10,10 @@ final class TerminateUserContractTest extends TestCase
 {
     public function testPublicCertificateLineageDeletionIsBoundToTheRetiredAccount(): void
     {
-        $this->assertSame(null, \pmssTerminateUserCertLineageDeleteCommand('../alice.node.example.com'));
+        $this->assertSame(null, \pmssTerminateUserCertLineageDeleteCommand('../fixtur01.node.example.com'));
         $this->assertSame(null, \pmssTerminateUserCertLineageDeleteCommand('localhost'));
-        $this->assertSame("certbot delete --non-interactive --cert-name 'alice.node.example.com'",
-            \pmssTerminateUserCertLineageDeleteCommand('alice.node.example.com'));
+        $this->assertSame("certbot delete --non-interactive --cert-name 'fixtur01.node.example.com'",
+            \pmssTerminateUserCertLineageDeleteCommand('fixtur01.node.example.com'));
         $source = $this->pmssReadRepoFile('scripts/terminateUser.php');
         $this->assertTrue(strpos($source, "'expire_account_before_kill'") < strpos($source, "'kill_processes_initial'"));
         $this->assertTrue(strpos($source, 'pmssTerminateUserCertLineageDeleteCommand') > strpos($source, 'kill_processes_final'));
@@ -95,17 +95,14 @@ SH
         $this->assertStringContainsString('env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin ', $command);
         $stubbed = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($bin.':/usr/sbin:/usr/bin:/sbin:/bin'), $command);
         file_put_contents($target, 'socket');
-        exec($stubbed, $output, $rc);
-        $this->assertSame(0, $rc);
+        $this->assertSame(0, $this->pmssExecShellCommand($stubbed, [], '')['rc']);
         $this->assertFalse(file_exists($target));
-        exec($stubbed, $output, $rc);
-        $this->assertSame(0, $rc, 'absent path is an idempotent no-op');
+        $this->assertSame(0, $this->pmssExecShellCommand($stubbed, [], '')['rc'], 'absent path is an idempotent no-op');
         mkdir($target);
         file_put_contents($target.'/child', 'keep');
         // A failing rm must surface through runuser and the outer timeout.
         $this->pmssWriteExecutableFile($bin.'/rm', "#!/bin/sh\nexit 1\n");
-        exec($stubbed, $output, $rc);
-        $this->assertSame(1, $rc, 'inner command failure must not be masked');
+        $this->assertSame(1, $this->pmssExecShellCommand($stubbed, [], '')['rc'], 'inner command failure must not be masked');
         $this->assertTrue(is_file($target.'/child'));
     }
 
@@ -118,9 +115,8 @@ SH
         $built = \pmssBuildUserShellNoPamCommand('user1234', '[ -z "$PMSS_TEST_SECRET" ] && touch '.escapeshellarg($effect));
         $this->assertSame(0, strpos($built, 'env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin '));
         $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($root.':/usr/sbin:/usr/bin:/sbin:/bin'), $built);
-        $output = [];
-        exec('PMSS_TEST_SECRET=leak timeout --kill-after=1s 5s script -qec '.escapeshellarg($command).' /dev/null', $output, $rc);
-        $this->assertSame(0, $rc, 'pseudo-terminal command must complete before timeout');
+        $result = $this->pmssExecShellCommand('PMSS_TEST_SECRET=leak timeout --kill-after=1s 5s script -qec '.escapeshellarg($command).' /dev/null', [], '');
+        $this->assertSame(0, $result['rc'], 'pseudo-terminal command must complete before timeout');
         $this->assertTrue(is_file($effect), 'inner command must run with a clean environment');
     }
 
@@ -151,16 +147,13 @@ SH
         foreach ([true, false] as $pty) {
             $effect = $root.'/effect-'.($pty ? 'pty' : 'setsid');
             $env = 'PATH='.escapeshellarg($bin.':'.getenv('PATH')).' PMSS_TEST_PTY='.($pty ? '1' : '0');
-            $output = [];
-            exec($env.' '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($builder).' '.escapeshellarg($effect), $output, $rc);
-            $this->assertSame(0, $rc);
-            $built = implode("\n", $output);
+            $result = $this->pmssExecShellCommand($env.' '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($builder).' '.escapeshellarg($effect), [], '');
+            $this->assertSame(0, $result['rc']);
+            $built = $result['output'];
             $this->assertStringContainsString($pty ? 'runuser --pty -u' : 'setsid runuser -u', $built);
             $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin',
                 'PATH='.escapeshellarg($bin.':/usr/sbin:/usr/bin:/sbin:/bin'), $built);
-            $output = [];
-            exec($command, $output, $rc);
-            $this->assertSame(0, $rc);
+            $this->assertSame(0, $this->pmssExecShellCommand($command, [], '')['rc']);
             $this->assertTrue(is_file($effect));
         }
     }
@@ -196,14 +189,13 @@ SH
         foreach (['timeout', 'sleep', 'systemctl'] as $stub) chmod($bin.'/'.$stub, 0755);
         $env = 'PATH='.escapeshellarg($bin.':'.getenv('PATH')).' PMSS_TEST_LOG='.escapeshellarg($log)
             .' PMSS_TEST_STATE='.escapeshellarg($state).' PMSS_TEST_RESET_RC=9';
-        $output = [];
-        exec($env.' sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), $output, $rc);
-        $this->assertSame(9, $rc);
+        $result = $this->pmssExecShellCommand($env.' sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), [], '');
+        $this->assertSame(9, $result['rc']);
         $this->assertSame(['is-active', 'is-active', 'is-active', 'is-failed', 'reset-failed'], file($log, FILE_IGNORE_NEW_LINES));
         file_put_contents($state, '0');
         file_put_contents($log, '');
-        exec($env.' PMSS_TEST_ALWAYS_ACTIVE=1 sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), $output, $rc);
-        $this->assertSame(1, $rc);
+        $result = $this->pmssExecShellCommand($env.' PMSS_TEST_ALWAYS_ACTIVE=1 sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), [], '');
+        $this->assertSame(1, $result['rc']);
         $this->assertSame(array_fill(0, 10, 'is-active'), file($log, FILE_IGNORE_NEW_LINES));
     }
 
@@ -400,8 +392,7 @@ PHP;
         file_put_contents($outside.'/sentinel', 'outside');
         symlink($outside, $home.'/nested/outside-link');
         foreach ([false, true, false] as $clear) {
-            exec(\pmssPinnedTreePurgeCommand($home, $clear), $output, $rc);
-            $this->assertSame(0, $rc);
+            $this->assertSame(0, $this->pmssExecShellCommand(\pmssPinnedTreePurgeCommand($home, $clear), [], '')['rc']);
         }
         $this->assertFalse(file_exists($home), 'the entire real tenant tree must be removed');
         $this->assertSame('outside', file_get_contents($outside.'/sentinel'));
@@ -418,8 +409,7 @@ PHP;
         file_put_contents($outside.'/sentinel', 'outside');
         rename($home, $base.'/saved-home');
         symlink($outside, $home);
-        exec(\pmssPinnedTreePurgeCommand($home, false), $output, $rc);
-        $this->assertSame(0, $rc);
+        $this->assertSame(0, $this->pmssExecShellCommand(\pmssPinnedTreePurgeCommand($home, false), [], '')['rc']);
         $this->assertSame('tenant', file_get_contents($base.'/saved-home/customer'));
         $this->assertSame('outside', file_get_contents($outside.'/sentinel'));
     }
@@ -514,8 +504,7 @@ PHP;
         $archive = $root.'/backup-user.superseded';
         $this->pmssWriteFile($archive.'/customer-data', 'fixture');
         foreach (array(false, true, false) as $clear) {
-            exec(\pmssPinnedTreePurgeCommand($archive, $clear), $output, $rc);
-            $this->assertSame(0, $rc);
+            $this->assertSame(0, $this->pmssExecShellCommand(\pmssPinnedTreePurgeCommand($archive, $clear), [], '')['rc']);
         }
         $this->assertFalse(file_exists($archive));
     }

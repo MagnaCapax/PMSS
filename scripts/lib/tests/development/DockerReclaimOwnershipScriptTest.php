@@ -22,7 +22,7 @@ class DockerReclaimOwnershipScriptTest extends TestCase
         $this->homeDir = $this->tempDir.'/home';
         $this->fakeBinDir = $this->tempDir.'/bin';
         $this->dockerLog = $this->tempDir.'/docker.log';
-        $this->bashBin = trim((string) shell_exec('command -v bash 2>/dev/null'));
+        $this->bashBin = trim($this->pmssRunShellCommand('command -v bash', [], '2>/dev/null'));
         $this->scriptPath = __DIR__.'/../../../../etc/skel/bin/docker-reclaim-ownership';
 
         @mkdir($this->homeDir, 0700, true);
