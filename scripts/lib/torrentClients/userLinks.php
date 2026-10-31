@@ -27,7 +27,7 @@ function pmssTorrentClientsUserLinksConverge(string $user, string $home, array $
     foreach (array_keys(pmssTorrentClientsBinaryNames()) as $client) {
         $storeClient = $root.'/'.$client;
         if (!pmssTorrentClientsStorePathChainSafe($root, $client) || !is_dir($storeClient)) continue;
-        $versions = @scandir($storeClient);
+        $versions = pmssDirectoryEntriesRead($storeClient);
         if (!is_array($versions)) continue;
         $bin = $home.'/bin';
         $clientBin = $bin.'/'.$client;

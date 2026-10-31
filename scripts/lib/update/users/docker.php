@@ -26,7 +26,7 @@ function pmssUserMaintenancePruneStaleLinger(string $directory = '/var/lib/syste
     if ($directoryStat === false || ($directoryStat['mode'] & 0170000) !== 0040000 || $directoryStat['uid'] !== $expectedOwner) {
         return 0;
     }
-    $names = @scandir($directory);
+    $names = pmssDirectoryEntriesRead($directory);
     if ($names === false) {
         logMessage('[WARN] Unable to scan systemd linger directory');
         return 0;

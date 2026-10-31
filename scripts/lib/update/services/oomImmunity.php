@@ -25,7 +25,7 @@ function pmssResetInheritedOomImmunity(string $procRoot = '/proc'): int
     }
 
     // The updater must lose inherited immunity before it launches tenant services.
-    foreach (@scandir($procRoot) ?: [] as $pid) {
+    foreach (pmssDirectoryEntriesRead($procRoot) ?: [] as $pid) {
         if (!ctype_digit($pid) || !is_dir($procRoot.'/'.$pid)) {
             continue;
         }

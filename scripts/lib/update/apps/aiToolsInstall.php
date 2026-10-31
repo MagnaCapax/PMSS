@@ -49,7 +49,7 @@ $installRoot = '/opt/pmss/ai-tools';
 $nodeDir = $installRoot.'/node-v22.23.4-linux-x64';
 
 if (!$dryRun && is_dir($installRoot)) {
-    foreach (@scandir($installRoot) ?: [] as $entry) {
+    foreach (pmssDirectoryEntriesRead($installRoot) ?: [] as $entry) {
         if (preg_match('/\A\.pmss-remove-[0-9a-f]{16}\z/', $entry) === 1) {
             $staleDir = $installRoot.'/'.$entry;
             $logger('[INFO] Removing staged AI tools Node.js runtime: '.$staleDir);

@@ -560,6 +560,9 @@ calling `scandir()`, retaining `false` for scan failures across PHP versions.
 Valid scans preserve ordering, numeric keys, literal names, and caller-owned
 symlink policy. `RuntimeDirectoryEntriesTest` covers these boundaries with
 temporary fixtures; an empty directory still returns an empty array.
+Operator archive, store, staging, installer, linger and process scans share this
+reader, retaining their failure policies and entry validation. The standalone
+bootstrap and warning-emitting restore scan keep their separate scan contracts.
 
 Web-root reconciliation treats a failed directory scan as a failed traversal,
 including during skeleton validation, copy, ownership application, and root

@@ -41,11 +41,10 @@ function pmssTorrentClientsTransmissionWebTreeNormalize(string $path): bool
         || ($stat['gid'] !== $gid && !@chgrp($path, $gid))
         || !@chmod($path, $type === 0040000 ? 0755 : 0644)) return false;
     if ($type === 0100000) return true;
-    $children = @scandir($path);
+    $children = pmssDirectoryEntriesRead($path);
     if ($children === false) return false;
     foreach ($children as $child) {
-        if ($child !== '.' && $child !== '..'
-            && !pmssTorrentClientsTransmissionWebTreeNormalize($path.'/'.$child)) return false;
+        if (!pmssTorrentClientsTransmissionWebTreeNormalize($path.'/'.$child)) return false;
     }
     return true;
 }
@@ -54,13 +53,11 @@ function pmssTorrentClientsTransmissionWebTreeNormalize(string $path): bool
 function pmssTorrentClientsTransmissionWebTreeRemove(string $path): bool
 {
     if (!is_dir($path) || is_link($path)) return @unlink($path);
-    $children = @scandir($path);
+    $children = pmssDirectoryEntriesRead($path);
     if ($children === false) return false;
     $ok = true;
     foreach ($children as $child) {
-        if ($child !== '.' && $child !== '..') {
-            $ok = pmssTorrentClientsTransmissionWebTreeRemove($path.'/'.$child) && $ok;
-        }
+        $ok = pmssTorrentClientsTransmissionWebTreeRemove($path.'/'.$child) && $ok;
     }
     return @rmdir($path) && $ok;
 }

@@ -26,6 +26,7 @@ function scandir(string $path): array
     $GLOBALS['trace'][] = ['scan', $path];
     return $GLOBALS['entries'];
 }
+function pmssDirectoryEntriesRead(string $path): array { return array_diff(scandir($path), ['.', '..']); }
 function is_dir(string $path): bool { return in_array($path, $GLOBALS['directories'], true); }
 function pmssSshdConfigWriteUpdated(string $path, string $original, string $updated, string $label): bool
 {

@@ -48,14 +48,13 @@ function pmssRootStageSweep(string $root): void
     $parent = @lstat($root);
     if (!is_array($parent) || ($parent['mode'] & 0170000) !== 0040000
         || $parent['uid'] !== 0 || ($parent['mode'] & 0022) !== 0) return;
-    foreach (@scandir($root) ?: [] as $entry) {
+    foreach (pmssDirectoryEntriesRead($root) ?: [] as $entry) {
         if (strpos($entry, '.pmss-root-stage-') !== 0) continue;
         $path = $root.'/'.$entry;
         $stat = @lstat($path);
         if (!is_array($stat) || ($stat['mode'] & 0177777) !== 0040700
             || $stat['uid'] !== 0 || $stat['mtime'] > time() - 3600) continue;
-        $children = @scandir($path);
-        if ($children === ['.', '..']) @rmdir($path);
+        if (pmssDirectoryEntriesRead($path) === []) @rmdir($path);
     }
 }
 

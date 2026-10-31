@@ -5,10 +5,8 @@ require_once dirname(__DIR__).'/runtime.php';
 /** @return int[] Real-UID processes, excluding the persistent user service manager. */
 function pmssRestartUserProcessPids(int $uid, string $procRoot = '/proc'): array
 {
-    $entries = @scandir($procRoot);
-    if (!is_array($entries)) return [];
     $pids = [];
-    foreach ($entries as $entry) {
+    foreach (pmssDirectoryEntriesRead($procRoot) ?: [] as $entry) {
         if (!ctype_digit($entry) || (int) $entry < 1) continue;
         $base = rtrim($procRoot, '/').'/'.$entry;
         $status = @file_get_contents($base.'/status');
