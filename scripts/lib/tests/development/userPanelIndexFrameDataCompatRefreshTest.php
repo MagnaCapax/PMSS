@@ -46,7 +46,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
 
     public function testRefreshReplacesLegacyPanelIndexFromSkeleton(): void
     {
-        $this->writeUserPanelIndex($this->legacyPanelIndexSource());
+        $this->pmssWriteRelativeFile($this->home, 'www/index.php', $this->legacyPanelIndexSource());
 
         \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
 
@@ -55,7 +55,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
 
     public function testSkeletonApplyFlowRefreshesLegacyPanelIndexFromSkeleton(): void
     {
-        $this->writeUserPanelIndex($this->legacyPanelIndexSource());
+        $this->pmssWriteRelativeFile($this->home, 'www/index.php', $this->legacyPanelIndexSource());
 
         \pmssUserApplySkeletonFiles($this->context());
 
@@ -78,7 +78,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
     public function testTargetedRefreshLeavesCustomInitializedPanelCopyAloneInIsolation(): void
     {
         $custom = $this->customInitializedPanelSource();
-        $this->writeUserPanelIndex($custom);
+        $this->pmssWriteRelativeFile($this->home, 'www/index.php', $custom);
 
         // The full skeleton apply flow may still refresh this file via updateUserFile().
         \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
@@ -89,7 +89,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
     public function testRefreshSkipsSymlinkTarget(): void
     {
         $outside = $this->pmssMakeTempFile('pmss-panel-outside-');
-        file_put_contents($outside, 'outside');
+        $this->pmssWriteFile($outside, 'outside');
         @unlink($this->home.'/www/index.php');
         $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/www/index.php');
 
@@ -102,7 +102,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
     public function testRefreshSkipsUnrelatedFileMissingFrameDataMerge(): void
     {
         $custom = "<?php\n// User-owned custom panel.\necho 'ok';\n";
-        $this->writeUserPanelIndex($custom);
+        $this->pmssWriteRelativeFile($this->home, 'www/index.php', $custom);
 
         \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
 
@@ -112,11 +112,6 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
     private function context(): array
     {
         return $this->pmssUserHomeContext($this->homeRoot, $this->user);
-    }
-
-    private function writeUserPanelIndex(string $content): void
-    {
-        file_put_contents($this->home.'/www/index.php', $content);
     }
 
     private function legacyPanelIndexSource(): string

@@ -16,7 +16,7 @@ class ResourceReportTest extends TestCase
 
     private function writeUserStats(string $user, array $values): void
     {
-        $this->writeUserData($user, $this->pmssBuildResourceStatsPayloadFromValues($values));
+        $this->pmssWriteSerializedFixture($this->statsDir.'/'.$user, $this->pmssBuildResourceStatsPayloadFromValues($values));
     }
 
     public function testBuildReportAggregatesRowsAndTotals(): void
@@ -63,7 +63,7 @@ class ResourceReportTest extends TestCase
             'memory_current' => 1, 'memory_avg_month' => 1, 'tasks_current' => 1,
         ]);
         unset($payload['cpu']);
-        $this->writeUserData('fixtur01', $payload);
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $payload);
 
         $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01']);
 
@@ -79,7 +79,7 @@ class ResourceReportTest extends TestCase
         ]);
         unset($payload['io_read_ops']);
         unset($payload['io_write_ops']);
-        $this->writeUserData('fixtur01', $payload);
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $payload);
 
         $report = \pmssResourceBuildReport($this->statsDir, ['fixtur01']);
 
@@ -133,11 +133,6 @@ class ResourceReportTest extends TestCase
             'missing' => [],
             'totals' => $expectedRow,
         ], \pmssResourceBuildReport($this->statsDir, ['fixtur01']));
-    }
-
-    private function writeUserData(string $user, array $data): void
-    {
-        $this->pmssWriteSerializedFixture($this->statsDir.'/'.$user, $data);
     }
 
     private function standardValues(): array

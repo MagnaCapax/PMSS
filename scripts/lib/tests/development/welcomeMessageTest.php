@@ -14,20 +14,6 @@ class WelcomeMessageTest extends TestCase
         return $home;
     }
 
-    /** Write the per-user PMSS config fixture for welcome-message resolution tests. */
-    private function writeUserConfig(string $home, array $config): void
-    {
-        @file_put_contents($home.'/.config/pmss-user.json', json_encode($config, JSON_UNESCAPED_SLASHES));
-    }
-
-    /** Write a product-message fixture and return its path. */
-    private function writeWelcomeMessages(array $messages, string $filename = 'welcomeMessages.json'): string
-    {
-        $path = $this->tempDir.'/'.$filename;
-        @file_put_contents($path, json_encode($messages, JSON_UNESCAPED_SLASHES));
-        return $path;
-    }
-
     /** Render the standard fixtur01 welcome fixture against the default message store. */
     private function renderWelcome(array $quotaInfo, string $home, string $messagesPath = ''): string
     {
@@ -42,9 +28,9 @@ class WelcomeMessageTest extends TestCase
     public function testUserMessageOverridesProductTemplate(): void
     {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['product' => 'free']);
-            @file_put_contents($home.'/.config/welcome-message.html', '<p>Hello {{username}} / {{quota}}</p>');
-            $this->writeWelcomeMessages(['free' => '<p>fallback</p>']);
+            $this->pmssWriteRelativeFile($home, '.config/pmss-user.json', json_encode(['product' => 'free'], JSON_UNESCAPED_SLASHES));
+            $this->pmssWriteFile($home.'/.config/welcome-message.html', '<p>Hello {{username}} / {{quota}}</p>');
+            $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages.json', json_encode(['free' => '<p>fallback</p>'], JSON_UNESCAPED_SLASHES));
 
             $message = $this->renderWelcome(['totalSpace' => 214748364800], $home);
             $this->assertEquals('<p>Hello fixtur01 / 200 GiB</p>', $message);
@@ -86,12 +72,12 @@ class WelcomeMessageTest extends TestCase
             ],
         ] as $label => $case) {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, $case[0]);
+            $this->pmssWriteRelativeFile($home, '.config/pmss-user.json', json_encode($case[0], JSON_UNESCAPED_SLASHES));
             if (isset($case[3])) {
-                @file_put_contents($home.'/.product', $case[3]."\n");
+                $this->pmssWriteFile($home.'/.product', $case[3]."\n");
             }
             if (is_array($case[1])) {
-                $this->writeWelcomeMessages($case[1]);
+                $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages.json', json_encode($case[1], JSON_UNESCAPED_SLASHES));
             }
 
             $messagePath = is_array($case[1]) ? '' : $this->tempDir.'/missing.json';
@@ -101,10 +87,10 @@ class WelcomeMessageTest extends TestCase
 
     public function testProductMessageSetPreservesNestedProductsMapShape(): void
     {
-            $messagesPath = $this->writeWelcomeMessages([
+            $messagesPath = $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages.json', json_encode([
                 'meta' => ['updatedBy' => 'test'],
                 'products' => ['free-tier' => '<p>old</p>'],
-            ]);
+            ], JSON_UNESCAPED_SLASHES));
 
             $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>new</p>', $messagesPath));
 
@@ -117,8 +103,8 @@ class WelcomeMessageTest extends TestCase
     public function testSubstitutionsAreEscaped(): void
     {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, []);
-            @file_put_contents($home.'/.config/welcome-message.html', 'user={{username}}');
+            $this->pmssWriteRelativeFile($home, '.config/pmss-user.json', json_encode([], JSON_UNESCAPED_SLASHES));
+            $this->pmssWriteFile($home.'/.config/welcome-message.html', 'user={{username}}');
 
             $message = \pmssWelcomeMessageForUser([], $home, '<script>alert(1)</script>', $this->tempDir.'/missing.json');
             $this->assertEquals('user=&lt;script&gt;alert(1)&lt;/script&gt;', $message);
@@ -127,7 +113,8 @@ class WelcomeMessageTest extends TestCase
     public function testLegacyEmbeddedMessageRemainsReadableForBackCompat(): void
     {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['welcomeMessage' => '<p>legacy {{username}}</p>']);
+            $this->pmssWriteRelativeFile($home, '.config/pmss-user.json',
+                json_encode(['welcomeMessage' => '<p>legacy {{username}}</p>'], JSON_UNESCAPED_SLASHES));
 
             $message = \pmssWelcomeMessageForUser([], $home, 'fixtur01', $this->tempDir.'/missing.json');
             $this->assertEquals('<p>legacy fixtur01</p>', $message);
@@ -162,11 +149,11 @@ class WelcomeMessageTest extends TestCase
     public function testProductMessageLookupRejectsSymlinkedJsonStore(): void
     {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['product' => 'free']);
+            $this->pmssWriteRelativeFile($home, '.config/pmss-user.json', json_encode(['product' => 'free'], JSON_UNESCAPED_SLASHES));
 
             $messagesTarget = $this->tempDir.'/welcomeMessages-target.json';
             $messagesLink = $this->tempDir.'/welcomeMessages-link.json';
-            @file_put_contents($messagesTarget, json_encode(['free' => '<p>fallback</p>'], JSON_UNESCAPED_SLASHES));
+            $this->pmssWriteFile($messagesTarget, json_encode(['free' => '<p>fallback</p>'], JSON_UNESCAPED_SLASHES));
             $this->pmssCreateSymlinkOrSkip($messagesTarget, $messagesLink);
 
             $this->assertEquals('', \pmssWelcomeMessageForUser([], $home, 'fixtur01', $messagesLink));
@@ -174,7 +161,8 @@ class WelcomeMessageTest extends TestCase
 
     public function testProductMessageSetWritesNestedProductsMap(): void
     {
-            $messagesPath = $this->writeWelcomeMessages(['products' => ['m1000' => '<p>legacy</p>']]);
+            $messagesPath = $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages.json',
+                json_encode(['products' => ['m1000' => '<p>legacy</p>']], JSON_UNESCAPED_SLASHES));
 
             $this->assertTrue(\pmssWelcomeProductMessageSet('free-tier', '<p>hello</p>', $messagesPath));
             $decoded = $this->pmssReadJsonArrayFile($messagesPath, null, 'Message map must decode as array');
@@ -185,7 +173,7 @@ class WelcomeMessageTest extends TestCase
 
     public function testProductMessageSetClearsMessageWhenTemplateIsEmpty(): void
     {
-            $messagesPath = $this->writeWelcomeMessages(['free-tier' => '<p>old</p>']);
+            $messagesPath = $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages.json', json_encode(['free-tier' => '<p>old</p>'], JSON_UNESCAPED_SLASHES));
 
             $this->assertTrue(\pmssWelcomeProductMessageSet('free-tier', '', $messagesPath));
             $decoded = $this->pmssReadJsonArrayFile($messagesPath, null, 'Message map must decode as array');
@@ -196,10 +184,12 @@ class WelcomeMessageTest extends TestCase
     public function testPlainAndNestedProductMapsRenderIdenticallyAfterRoundTrip(): void
     {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['product' => 'm1000']);
+            $this->pmssWriteRelativeFile($home, '.config/pmss-user.json', json_encode(['product' => 'm1000'], JSON_UNESCAPED_SLASHES));
 
-            $plainPath = $this->writeWelcomeMessages(['free-tier' => 'legacy'], 'welcomeMessages-plain.json');
-            $nestedPath = $this->writeWelcomeMessages(['meta' => ['updatedBy' => 'test'], 'products' => ['free-tier' => 'legacy']], 'welcomeMessages-nested.json');
+            $plainPath = $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages-plain.json',
+                json_encode(['free-tier' => 'legacy'], JSON_UNESCAPED_SLASHES));
+            $nestedPath = $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages-nested.json',
+                json_encode(['meta' => ['updatedBy' => 'test'], 'products' => ['free-tier' => 'legacy']], JSON_UNESCAPED_SLASHES));
 
             $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>{{product}}/{{username}}</p>', $plainPath));
             $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>{{product}}/{{username}}</p>', $nestedPath));
@@ -224,10 +214,12 @@ class WelcomeMessageTest extends TestCase
     public function testPlainAndNestedProductStoresRenderWithoutRewrite(): void
     {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['product' => 'm1000']);
+            $this->pmssWriteRelativeFile($home, '.config/pmss-user.json', json_encode(['product' => 'm1000'], JSON_UNESCAPED_SLASHES));
 
-            $plainPath = $this->writeWelcomeMessages(['m1000' => 'plain {{username}}'], 'welcomeMessages-direct-plain.json');
-            $nestedPath = $this->writeWelcomeMessages(['products' => ['m1000' => 'nested {{username}}']], 'welcomeMessages-direct-nested.json');
+            $plainPath = $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages-direct-plain.json',
+                json_encode(['m1000' => 'plain {{username}}'], JSON_UNESCAPED_SLASHES));
+            $nestedPath = $this->pmssWriteRelativeFile($this->tempDir, 'welcomeMessages-direct-nested.json',
+                json_encode(['products' => ['m1000' => 'nested {{username}}']], JSON_UNESCAPED_SLASHES));
 
             $this->assertEquals('plain fixtur01', \pmssWelcomeMessageForUser([], $home, 'fixtur01', $plainPath));
             $this->assertEquals('nested fixtur01', \pmssWelcomeMessageForUser([], $home, 'fixtur01', $nestedPath));

@@ -12,13 +12,11 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testPlanKeepsOnlyHealthyArrays(): void
     {
-        $mdstat = $this->writeMdstat(
-            "Personalities : [raid1]\n".
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "Personalities : [raid1]\n".
             "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n".
-            "md1 : active raid1 sdc1[0] sdd1[1] 1047552 blocks [2/1] [U_]\n"
-        );
-        $this->writeSysfsState('md0', '0');
-        $this->writeSysfsState('md1', '1');
+            "md1 : active raid1 sdc1[0] sdd1[1] 1047552 blocks [2/1] [U_]\n", 0700);
+        $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md0/md/degraded', "0\n", 0700);
+        $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md1/md/degraded', "1\n", 0700);
 
         $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
 
@@ -57,7 +55,7 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testMalformedSysfsRootsRetainMdstatFallbackAndDoNotWrite(): void
     {
-        $this->writeSysfsState('md0', '0');
+        $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md0/md/degraded', "0\n", 0700);
         $root = $this->fixtureRoot.'/sys/block';
         $sync = $this->pmssWriteRelativeFile($root, 'md0/md/sync_action', "check\n", 0700);
         foreach (["\0", $root."\0", "\0".$root, $root."\0ignored", $root."/\0/"] as $invalid) {
@@ -137,7 +135,7 @@ class MdadmCheckarrayTest extends TestCase
             [null, '[2/1] [UU]', true],
         ] as $index => [$sysfs, $detail, $expected]) {
             $array = 'md'.$index;
-            if ($sysfs !== null) $this->writeSysfsState($array, $sysfs);
+            if ($sysfs !== null) $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/'.$array.'/md/degraded', $sysfs."\n", 0700);
             $this->assertSame($expected, \pmssMdadmCheckarrayEntryDegradedState(
                 ['array' => $array, 'detail' => $detail], $this->fixtureRoot.'/sys/block/'
             ));
@@ -147,7 +145,7 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testPlanFallsBackWhenMdstatLooksUnsupported(): void
     {
-        $mdstat = $this->writeMdstat("md0 : unexpected format without raid level\n");
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : unexpected format without raid level\n", 0700);
 
         $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
 
@@ -157,7 +155,7 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testUnknownArrayStateIsSkippedByMain(): void
     {
-        $mdstat = $this->writeMdstat("md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks\n");
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks\n", 0700);
         $stub = $this->writeCheckarrayStub();
 
         $result = $this->runCommand($mdstat, $stub);
@@ -169,15 +167,12 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testMainChecksHealthyArraysAndSkipsDegradedOnes(): void
     {
-        $mdstat = $this->writeMdstat(
-            "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n".
-            "md1 : active raid1 sdc1[0] sdd1[1] 1047552 blocks [2/1] [U_]\n"
-        );
-        $this->writeSysfsState('md0', '0');
-        $this->writeSysfsState('md1', '1');
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n".
+            "md1 : active raid1 sdc1[0] sdd1[1] 1047552 blocks [2/1] [U_]\n", 0700);
+        $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md0/md/degraded', "0\n", 0700);
+        $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md1/md/degraded', "1\n", 0700);
         $syncTarget = $this->fixtureRoot.'/sys/block/md1/md/sync_action';
-        $this->pmssEnsureDir(dirname($syncTarget), 0700);
-        file_put_contents($syncTarget, "check\n");
+        $this->pmssWriteFile($syncTarget, "check\n", 0700);
         $stub = $this->writeCheckarrayStub();
 
         $result = $this->runCommand($mdstat, $stub);
@@ -213,11 +208,10 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testMainSkipsRecentCheckWithinHostMinimum(): void
     {
-        $mdstat = $this->writeMdstat("md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n");
-        file_put_contents($this->fixtureRoot.'/min-days', "365\n");
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n", 0700);
+        $this->pmssWriteFile($this->fixtureRoot.'/min-days', "365\n");
         $lastStarted = time() - 10;
-        $this->pmssEnsureDir($this->fixtureRoot.'/state', 0700);
-        file_put_contents($this->fixtureRoot.'/state/mdadm-checkarray-last', (string) $lastStarted."\n");
+        $this->pmssWriteFile($this->fixtureRoot.'/state/mdadm-checkarray-last', (string) $lastStarted."\n", 0700);
 
         $result = $this->runCommand($mdstat, $this->writeCheckarrayStub());
 
@@ -228,8 +222,8 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testMainRecordsFirstCheckWithHostMinimum(): void
     {
-        $mdstat = $this->writeMdstat("md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n");
-        file_put_contents($this->fixtureRoot.'/min-days', "365\n");
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n", 0700);
+        $this->pmssWriteFile($this->fixtureRoot.'/min-days', "365\n");
         $before = time();
 
         $result = $this->runCommand($mdstat, $this->writeCheckarrayStub());
@@ -242,10 +236,9 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testMalformedHostMinimumDoesNotSkip(): void
     {
-        $mdstat = $this->writeMdstat("md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n");
-        file_put_contents($this->fixtureRoot.'/min-days', "365 days\n");
-        $this->pmssEnsureDir($this->fixtureRoot.'/state', 0700);
-        file_put_contents($this->fixtureRoot.'/state/mdadm-checkarray-last', (string) time()."\n");
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n", 0700);
+        $this->pmssWriteFile($this->fixtureRoot.'/min-days', "365 days\n");
+        $this->pmssWriteFile($this->fixtureRoot.'/state/mdadm-checkarray-last', (string) time()."\n", 0700);
 
         $result = $this->runCommand($mdstat, $this->writeCheckarrayStub());
 
@@ -255,7 +248,7 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testFailedCheckDoesNotAdvanceState(): void
     {
-        $mdstat = $this->writeMdstat("md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n");
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n", 0700);
 
         $result = $this->runCommand($mdstat, $this->writeCheckarrayStub(7));
 
@@ -265,7 +258,7 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testStateWriteFailureKeepsSuccessfulExitCode(): void
     {
-        $mdstat = $this->writeMdstat("md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n");
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/2] [UU]\n", 0700);
         $this->pmssEnsureDir($this->fixtureRoot.'/state/mdadm-checkarray-last', 0700);
 
         $result = $this->runCommand($mdstat, $this->writeCheckarrayStub());
@@ -298,18 +291,6 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertStringContainsAllStrings(['/scripts/cron/mdadmCheckarray.php', '[ $(date +\%d) -le 7 ]',
             '$(($(date +\%-m) \% 3)) -eq $((H \% 3))'], $cron);
         $this->assertStringNotContainsString('/usr/share/mdadm/checkarray'.' --cron --all', $cron);
-    }
-
-    private function writeMdstat(string $contents): string
-    {
-        return $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', $contents, 0700);
-    }
-
-    private function writeSysfsState(string $array, string $degraded): void
-    {
-        $dir = $this->fixtureRoot.'/sys/block/'.$array.'/md';
-        $this->pmssEnsureDir($dir, 0700);
-        file_put_contents($dir.'/degraded', $degraded."\n");
     }
 
     private function writeCheckarrayStub(int $exitCode = 0): string

@@ -25,6 +25,11 @@ parent-directory creation that the writer already supplies. Keep empty directori
 explicit when they represent an absent counter, and pass the original directory
 mode. Single-use fixture/assertion wrappers can stay inline with their case table.
 
+File-only fixture adapters use `pmssWriteFile()`, `pmssWriteRelativeFile()`,
+`pmssWriteTempFile()` or `pmssWriteSerializedFixture()` directly. Keep JSON
+encoding flags, deliberate trailing newlines and non-default directory modes at
+the caller; the shared writer owns parent creation and write-failure assertions.
+
 Torrent-client store, launch, stopped-settings and throttle fixtures use
 `TestCase::pmssMakeCallbacks()` for fixed operation results, including empty
 arrays and null. Pass an event array only when calls must be recorded. Keep

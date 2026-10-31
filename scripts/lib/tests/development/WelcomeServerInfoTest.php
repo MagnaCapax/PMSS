@@ -36,14 +36,9 @@ final class WelcomeServerInfoTest extends TestCase
         return $this->pmssDecodeJsonArray($output);
     }
 
-    private function writeUptimeFile(string $uptime): string
-    {
-        return $this->pmssWriteFile($this->pmssMakeTempDir('pmss-welcome-server-info-data-').'/uptime', $uptime);
-    }
-
     public function testValidUptimeRendersSharedServerLabel(): void
     {
-        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("90061.25 1.00\n")));
+        list($html) = $this->renderServerMetrics(array($this->pmssWriteTempFile('uptime', "90061.25 1.00\n")));
 
         $this->assertStringContainsAllStrings(array(
             '<div class="h-metric-l">Server</div>',
@@ -54,14 +49,14 @@ final class WelcomeServerInfoTest extends TestCase
 
     public function testSubMinuteUptimeDoesNotRoundUp(): void
     {
-        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("59.99 10\n")));
+        list($html) = $this->renderServerMetrics(array($this->pmssWriteTempFile('uptime', "59.99 10\n")));
 
         $this->assertStringContainsString('<div class="h-metric-v">under 1 minute</div>', $html);
     }
 
     public function testMissingUptimeFailsSoft(): void
     {
-        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("1 1\n").'.missing'));
+        list($html) = $this->renderServerMetrics(array($this->pmssWriteTempFile('uptime', "1 1\n").'.missing'));
 
         $this->assertStringContainsAllStrings(array('<div class="h-metric-v">—</div>', 'uptime unavailable'), $html);
         $this->pmssAssertStringNotContainsString('shared server', $html);
@@ -71,7 +66,7 @@ final class WelcomeServerInfoTest extends TestCase
     {
         $paths = array();
         foreach (array('', '-1 1', 'nope 1', 'INF 1', 'NAN 1') as $uptime) {
-            $paths[] = $this->writeUptimeFile($uptime);
+            $paths[] = $this->pmssWriteTempFile('uptime', $uptime);
         }
 
         foreach ($this->renderServerMetrics($paths) as $index => $html) {
@@ -81,7 +76,7 @@ final class WelcomeServerInfoTest extends TestCase
 
     public function testSymlinkedUptimeFileIsRejected(): void
     {
-        $target = $this->writeUptimeFile("3600 1\n");
+        $target = $this->pmssWriteTempFile('uptime', "3600 1\n");
         $link = $target.'.link';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
@@ -92,7 +87,7 @@ final class WelcomeServerInfoTest extends TestCase
 
     public function testServerCardDropsHostLoadAverage(): void
     {
-        list($html) = $this->renderServerMetrics(array($this->writeUptimeFile("3600 1\n")));
+        list($html) = $this->renderServerMetrics(array($this->pmssWriteTempFile('uptime', "3600 1\n")));
 
         $this->pmssAssertStringNotContainsString('load', strtolower($html));
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', array(), array(

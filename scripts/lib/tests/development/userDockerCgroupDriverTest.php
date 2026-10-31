@@ -40,7 +40,7 @@ class UserDockerCgroupDriverTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'create_when_missing' => true,
         ]);
 
@@ -52,9 +52,9 @@ class UserDockerCgroupDriverTest extends TestCase
     public function testSharedRootlessDockerConfigPreservesCustomStorageDriver(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
-        $this->writeDaemonConfig($home, ['storage-driver' => 'overlay2']);
+        $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['storage-driver' => 'overlay2']));
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'storage_driver' => 'fuse-overlayfs',
             'create_when_missing' => true,
             'preserve_custom_storage_driver' => true,
@@ -69,7 +69,7 @@ class UserDockerCgroupDriverTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'storage_driver' => 'fuse-overlayfs',
             'create_when_missing' => true,
             'disable_containerd_snapshotter' => true,
@@ -84,9 +84,9 @@ class UserDockerCgroupDriverTest extends TestCase
     public function testSharedRootlessDockerConfigPreservesExistingFeatureKeys(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
-        $this->writeDaemonConfig($home, ['features' => ['buildkit' => true]]);
+        $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['features' => ['buildkit' => true]]));
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'disable_containerd_snapshotter' => true,
         ]);
 
@@ -99,9 +99,9 @@ class UserDockerCgroupDriverTest extends TestCase
     public function testSharedRootlessDockerConfigRemovesUnavailablePmssDriver(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
-        $this->writeDaemonConfig($home, ['storage-driver' => 'fuse-overlayfs']);
+        $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['storage-driver' => 'fuse-overlayfs']));
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'remove_pmss_storage_driver' => true,
             'invalid_json_as_empty' => true,
         ]);
@@ -114,14 +114,13 @@ class UserDockerCgroupDriverTest extends TestCase
     public function testPopulatedContainerdStorePreservesDaemonBackendConfig(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
-        @mkdir($home.'/.local/share/docker/containerd', 0755, true);
-        file_put_contents($home.'/.local/share/docker/containerd/metadata.db', 'data');
-        $this->writeDaemonConfig($home, ['exec-opts' => ['native.cgroupdriver=cgroupfs']]);
+        $this->pmssWriteFile($home.'/.local/share/docker/containerd/metadata.db', 'data');
+        $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['exec-opts' => ['native.cgroupdriver=cgroupfs']]));
         $configFile = $home.'/.config/docker/daemon.json';
         $before = file_get_contents($configFile);
 
         $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home))));
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'storage_driver' => null,
             'remove_pmss_storage_driver' => false,
             'disable_containerd_snapshotter' => false,
@@ -135,12 +134,11 @@ class UserDockerCgroupDriverTest extends TestCase
     public function testPopulatedGraphStoreKeepsUnavailableFuseDriver(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
-        @mkdir($home.'/.local/share/docker/overlay2', 0755, true);
-        file_put_contents($home.'/.local/share/docker/overlay2/layer', 'data');
-        $this->writeDaemonConfig($home, ['storage-driver' => 'fuse-overlayfs']);
+        $this->pmssWriteFile($home.'/.local/share/docker/overlay2/layer', 'data');
+        $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['storage-driver' => 'fuse-overlayfs']));
 
         $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home))));
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'storage_driver' => null,
             'remove_pmss_storage_driver' => false,
             'disable_containerd_snapshotter' => false,
@@ -214,7 +212,7 @@ PHP;
                 @mkdir($dataRoot.'/containerd', 0755, true);
             }
             $this->assertFalse(\pmssUserRootlessDockerStoreExists($dataRoot));
-            $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
                 'storage_driver' => 'fuse-overlayfs',
                 'create_when_missing' => true,
                 'disable_containerd_snapshotter' => true,
@@ -228,9 +226,8 @@ PHP;
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
         $custom = $home.'/custom-store';
-        @mkdir($custom.'/image', 0755, true);
-        file_put_contents($custom.'/image/index', 'data');
-        $this->writeDaemonConfig($home, ['data-root' => $custom]);
+        $this->pmssWriteFile($custom.'/image/index', 'data');
+        $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['data-root' => $custom]));
 
         $resolved = \pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home));
         $this->assertSame($custom, $resolved);
@@ -243,10 +240,9 @@ PHP;
     public function testSharedRootlessDockerConfigCanAbortOnInvalidJson(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
-        @mkdir($home.'/.config/docker', 0755, true);
-        file_put_contents($home.'/.config/docker/daemon.json', '{broken');
+        $this->pmssWriteFile($home.'/.config/docker/daemon.json', '{broken');
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'create_when_missing' => true,
         ]);
 
@@ -257,9 +253,8 @@ PHP;
     public function testUnreadableExistingConfigIsPreservedEvenWithInvalidJsonRecovery(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-read-failure-');
-        @mkdir($home.'/.config/docker', 0755, true);
         $path = $home.'/.config/docker/daemon.json';
-        file_put_contents($path, '{"keep":true}');
+        $this->pmssWriteFile($path, '{"keep":true}');
 
         // Inject a read failure independently of the runner's privileges.
         $script = <<<'PHP'
@@ -272,7 +267,7 @@ PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerConfigReadFixture');
         $script .= <<<'PHP'
 $path = getenv('PMSS_TEST_DOCKER_CONFIG_PATH');
-$result = pmssUserRootlessDockerConfigConverge('alice', dirname(dirname(dirname($path))), 0, 0, [
+$result = pmssUserRootlessDockerConfigConverge('fixtur01', dirname(dirname(dirname($path))), 0, 0, [
     'create_when_missing' => true, 'invalid_json_as_empty' => true,
 ]);
 echo json_encode(['result' => $result, 'bytes' => \file_get_contents($path),
@@ -289,10 +284,10 @@ PHP;
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
         @mkdir($home.'/.config/docker', 0755, true);
-        file_put_contents($home.'/outside.json', '{"keep":true}');
+        $this->pmssWriteFile($home.'/outside.json', '{"keep":true}');
         symlink($home.'/outside.json', $home.'/.config/docker/daemon.json');
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'create_when_missing' => true,
         ]);
 
@@ -305,7 +300,7 @@ PHP;
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
         @mkdir($home.'/.config/docker/daemon.json', 0755, true);
 
-        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+        $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'create_when_missing' => true,
         ]);
 
@@ -334,12 +329,12 @@ PHP;
         $script .= <<<'PHP'
 $results = [];
 foreach ([
-    [1001, 1002, ['/srv/pmss-test-home', 'alice', 1001], true],
+    [1001, 1002, ['/srv/pmss-test-home', 'fixtur01', 1001], true],
     [1001, 1002, null, true],
-    [1003, 1002, ['/srv/pmss-test-home', 'alice', 1001], true],
+    [1003, 1002, ['/srv/pmss-test-home', 'fixtur01', 1001], true],
     [0, 1002, ['/home/root', 'root', 0], true],
-    [1001, 1003, ['/srv/pmss-test-home', 'alice', 1001], true],
-    [1001, 1002, ['/srv/pmss-test-home', 'alice', 1001], false],
+    [1001, 1003, ['/srv/pmss-test-home', 'fixtur01', 1001], true],
+    [1001, 1002, ['/srv/pmss-test-home', 'fixtur01', 1001], false],
 ] as [$uid, $gid, $identity, $written]) {
     $GLOBALS['identity'] = $identity;
     $GLOBALS['written'] = $written;
@@ -351,7 +346,7 @@ foreach ([
 echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script);
-        $expectedCall = ['alice', '/srv/pmss-test-home', '/srv/pmss-test-home/.config/docker/daemon.json', '{}', 0600, true];
+        $expectedCall = ['fixtur01', '/srv/pmss-test-home', '/srv/pmss-test-home/.config/docker/daemon.json', '{}', 0600, true];
         $this->assertSame([true, null, [$expectedCall]], $results[0]);
         foreach ([1, 2, 3, 4] as $index) {
             $this->assertSame([false, 'write_failed', []], $results[$index]);
@@ -394,12 +389,6 @@ PHP;
         $payload = $this->readDaemonConfig($home);
         $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
         return $payload;
-    }
-
-    private function writeDaemonConfig(string $home, array $payload): void
-    {
-        @mkdir($home.'/.config/docker', 0755, true);
-        file_put_contents($home.'/.config/docker/daemon.json', json_encode($payload));
     }
 
     private function readDaemonConfig(string $home): array
