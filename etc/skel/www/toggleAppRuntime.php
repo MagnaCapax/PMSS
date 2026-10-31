@@ -39,8 +39,10 @@ function pmssToggleAppSlskdConfig(string $user, string $home, int $port, string 
 
 function pmssToggleAppCopypartyConfig(string $user, string $home, int $port, string $password, int $peerPort): array
 {
-    // Use the rightmost forwarded IP, away from client-prepended spoofed values.
-    return array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: {$port}\n  rp-loc: /user-{$user}/copyparty\n  xff-hdr: X-Forwarded-For\n  rproxy: -1\n\n[accounts]\n  {$user}: {$password}\n\n[/]\n  {$home}/data\n  accs:\n    A: {$user}\n");
+    // Trust only lighttpd's loopback hop and its overwritten scheme header (ADR 0153).
+    // Keep the rightmost forwarded IP, away from client-prepended spoofed values.
+    $forwardedProtoHeader = pmssToggleAppCustomerCatalog()['copyparty']['forwardedProtoHeader'];
+    return array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: {$port}\n  rp-loc: /user-{$user}/copyparty\n  xff-hdr: X-Forwarded-For\n  xff-src: 127.0.0.1\n  xf-proto: {$forwardedProtoHeader}\n  rproxy: -1\n\n[accounts]\n  {$user}: {$password}\n\n[/]\n  {$home}/data\n  accs:\n    A: {$user}\n");
 }
 
 /** qui serves its own URL prefix and stores its account database beside this file. */

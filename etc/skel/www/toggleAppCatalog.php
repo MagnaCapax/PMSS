@@ -23,6 +23,7 @@ return array(
         'processNeedle' => '/usr/local/bin/copyparty-sfx.py', 'processFull' => true,
         'launch' => array('python3', '/usr/local/bin/copyparty-sfx.py', '-c', '{config}'), 'workingDirectory' => '',
         'config' => '.config/copyparty/copyparty.conf', 'configRenderer' => 'pmssToggleAppCopypartyConfig',
+        'forwardedProtoHeader' => 'X-PMSS-Forwarded-Proto',
         'extraPortServices' => array(), 'dataDirectory' => 'data', 'credentialMode' => 'config',
         'watchdogLabel' => 'Copyparty', 'watchdogProcess' => 'python3',
     ),

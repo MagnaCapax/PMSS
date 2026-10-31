@@ -123,3 +123,32 @@ client headers as before, plus `Forwarded`; lighttpd's own entry in
 - lighttpd `src/mod_proxy.c` (`proxy_set_Forwarded`), `src/mod_extforward.c`,
   `src/mod_webdav.c`
 - `scripts/lib/tests/development/ForwardedSchemeConfigTest.php`
+
+## Copyparty on older lighttpd releases (2026-10-31, Refs #1090)
+
+Copyparty 1.20.26 reads the header named by `xf-proto` after accepting its
+forwarded client address. Unlike apps that read nginx's `Forwarded` header,
+it still sees `http` on Debian 10/11 through the default header described above.
+Its catalog row therefore names `X-PMSS-Forwarded-Proto`. The managed proxy
+overwrites this header for both HTTP and HTTPS from lighttpd's `$HTTP["scheme"]`,
+which `mod_extforward` has already updated from the trusted nginx hop. Direct
+HTTP requests to lighttpd receive `http` even if they supply spoofed scheme
+headers. This also works with the current Debian 12 path; no distro branch is
+needed. Copyparty explicitly trusts only `127.0.0.1` with `xff-src`, reads the
+catalog's scheme header with `xf-proto`, and retains `rproxy: -1` and its origin
+check. Other catalog apps keep their existing proxy fragments.
+
+Source review: lighttpd 1.4.53/1.4.59 `mod_extforward` sets the request scheme
+and invalidates scheme conditions in `handle_uri_raw`; `mod_setenv` overwrites
+request headers in `handle_uri_clean`, before `mod_proxy` sends them. Copyparty's
+[pinned request handler](https://github.com/9001/copyparty/blob/v1.20.26/copyparty/httpcli.py)
+checks the connecting proxy against `xff-src` before reading `xf-proto`.
+
+The normal skeleton refresh and toggle-app watchdog apply this change. The
+existing exact-config repair rotates the separate app login once, stops a
+stale process, and restarts it through the existing restart marker; users must
+use the refreshed login. Mode-0600 secret files, loopback binding, account-only
+volume access and credential redaction retain their existing behavior.
+`ToggleAppTest` covers proxy/config bytes, legacy-config convergence, private
+credentials and repeated bootstrap; runtime HTTPS login and spoofed-header
+probes remain testing-machine/deployment checks.

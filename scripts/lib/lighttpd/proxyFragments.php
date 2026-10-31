@@ -17,7 +17,8 @@ function pmssLighttpdProxyRuleFragment(
     bool $forwardForwardedHeaders = false,
     bool $injectZeroContentLengthOnEmptyPost = false,
     bool $preserveRequestHostHeader = false,
-    bool $stripAuthorization = false
+    bool $stripAuthorization = false,
+    string $forwardedProtoHeader = ''
 ): string {
     $hasPathMap = count($pathMap) > 0;
     $fragment = '$HTTP["url"] =~ "'.$pattern."\" {\n";
@@ -27,6 +28,14 @@ function pmssLighttpdProxyRuleFragment(
     if ($stripAuthorization) {
         // Keep panel Basic credentials out of the app's independent login.
         $fragment .= '  setenv.set-request-header = ( "Authorization" => "" )'."\n";
+    }
+    if ($forwardedProtoHeader !== '') {
+        // Older mod_proxy replaces X-Forwarded-Proto with the pre-extforward scheme.
+        // Overwrite client values using only the scheme accepted by mod_extforward.
+        foreach (['http', 'https'] as $scheme) {
+            $fragment .= '  $HTTP["scheme"] == "'.$scheme."\" {\n"
+                .'    setenv.set-request-header = ( "'.$forwardedProtoHeader.'" => "'.$scheme.'" )'."\n  }\n";
+        }
     }
     if ($injectZeroContentLengthOnEmptyPost) {
         $fragment .= '  $HTTP["request-method"] == "POST" {'."\n"
@@ -100,7 +109,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
         $fragment = "# PMSS-managed: {$catalog[$proxyName]['label']} reverse proxy.\n\n";
         $rules = [
             ['redirect', $base, $base.'/'],
-            ['^'.$base.'/', [], false, true],
+            ['^'.$base.'/', [], false, true, false, false, false, $catalog[$proxyName]['forwardedProtoHeader'] ?? ''],
         ];
     }
 
@@ -110,7 +119,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
                 .'  url.redirect = ( "" => "'.$rule[2]."\" )\n}\n\n";
             continue;
         }
-        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false, $rule[5] ?? false, $rule[6] ?? false)."\n\n";
+        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false, $rule[5] ?? false, $rule[6] ?? false, $rule[7] ?? '')."\n\n";
     }
 
     return $fragment;

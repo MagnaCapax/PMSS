@@ -16,10 +16,10 @@ class ToggleAppTest extends TestCase
         $runtime = $this->pmssMakeTempDir('pmss-toggle-timeout-');
         $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime, 'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1'], function (): void {
             $start = microtime(true);
-            $this->assertFalse(\pmssToggleAppBootstrapRun('sleep 30', 'alice', 'slskd'));
+            $this->assertFalse(\pmssToggleAppBootstrapRun('sleep 30', 'fixtur02', 'slskd'));
             $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
-            $this->assertTrue(\pmssUserWatchdogBackoffActive('alice', 'slskd'));
-            $this->assertTrue(\pmssToggleAppBootstrapRun('true', 'bob', 'slskd'));
+            $this->assertTrue(\pmssUserWatchdogBackoffActive('fixtur02', 'slskd'));
+            $this->assertTrue(\pmssToggleAppBootstrapRun('true', 'fixtur03', 'slskd'));
         });
     }
 
@@ -39,21 +39,21 @@ class ToggleAppTest extends TestCase
             array($catalog['copyparty']['enable'], $catalog['copyparty']['config'], $catalog['copyparty']['extraPortServices']));
         $this->assertSame('.config/slskd/slskd.env', $catalog['slskd']['ownerEnv']);
         $this->assertSame('Soulseek client. Set your Soulseek account and shared folders in Configure.', $catalog['slskd']['description']);
-        $this->assertSame("nohup 'python3' '/usr/local/bin/copyparty-sfx.py' '-c' '/home/bo/.config/copyparty/copyparty.conf'",
-            \pmssToggleAppLaunchCommand($catalog['copyparty'], '/home/bo/'.$catalog['copyparty']['config'], '/home/bo'));
-        $this->assertSame(array('.config/slskd/slskd.yml' => "web:\n  port: 23001\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-bo/slskd\n  authentication:\n    disabled: false\n    username: bo\n    password: secret\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: 23002\n"),
-            \pmssToggleAppConfigs('slskd', 'bo', '/home/bo', 23001, 'secret', 23002));
-        $this->assertSame(array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: 23001\n  rp-loc: /user-bo/copyparty\n  xff-hdr: X-Forwarded-For\n  rproxy: -1\n\n[accounts]\n  bo: secret\n\n[/]\n  /home/bo/data\n  accs:\n    A: bo\n"),
-            \pmssToggleAppConfigs('copyparty', 'bo', '/home/bo', 23001, 'secret', 0));
+        $this->assertSame("nohup 'python3' '/usr/local/bin/copyparty-sfx.py' '-c' '/home/fixtur01/.config/copyparty/copyparty.conf'",
+            \pmssToggleAppLaunchCommand($catalog['copyparty'], '/home/fixtur01/'.$catalog['copyparty']['config'], '/home/fixtur01'));
+        $this->assertSame(array('.config/slskd/slskd.yml' => "web:\n  port: 23001\n  ip_address: 127.0.0.1\n  https:\n    disabled: true\n  url_base: /user-fixtur01/slskd\n  authentication:\n    disabled: false\n    username: fixtur01\n    password: secret\nsoulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: 23002\n"),
+            \pmssToggleAppConfigs('slskd', 'fixtur01', '/home/fixtur01', 23001, 'secret', 23002));
+        $this->assertSame(array('.config/copyparty/copyparty.conf' => "[global]\n  i: 127.0.0.1\n  p: 23001\n  rp-loc: /user-fixtur01/copyparty\n  xff-hdr: X-Forwarded-For\n  xff-src: 127.0.0.1\n  xf-proto: X-PMSS-Forwarded-Proto\n  rproxy: -1\n\n[accounts]\n  fixtur01: secret\n\n[/]\n  /home/fixtur01/data\n  accs:\n    A: fixtur01\n"),
+            \pmssToggleAppConfigs('copyparty', 'fixtur01', '/home/fixtur01', 23001, 'secret', 0));
         $expectedProxy = <<<'PROXY'
 # PMSS-managed: {LABEL} reverse proxy.
 
-$HTTP["url"] == "/user-bo/{ID}" {
-  url.redirect = ( "" => "/user-bo/{ID}/" )
+$HTTP["url"] == "/user-fixtur01/{ID}" {
+  url.redirect = ( "" => "/user-fixtur01/{ID}/" )
 }
 
-$HTTP["url"] =~ "^/user-bo/{ID}/" {
-  proxy.server = ( "" => ( (
+$HTTP["url"] =~ "^/user-fixtur01/{ID}/" {
+{SCHEME_HEADERS}  proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => 23001
   ) ) ),
@@ -67,13 +67,52 @@ $HTTP["url"] =~ "^/user-bo/{ID}/" {
 }
 
 PROXY;
+        $schemeHeaders = <<<'SCHEME'
+  $HTTP["scheme"] == "http" {
+    setenv.set-request-header = ( "X-PMSS-Forwarded-Proto" => "http" )
+  }
+  $HTTP["scheme"] == "https" {
+    setenv.set-request-header = ( "X-PMSS-Forwarded-Proto" => "https" )
+  }
+SCHEME;
         foreach ($catalog as $app => $row) {
             $this->assertSame(array('.pmss/apps/'.$app.'.secured', '.pmss/apps/'.$app.'.state',
                 '.pmss/apps/'.$app.'.restart', '.pmss/apps/'.$app.'.login'),
                 array($row['securedMarker'], $row['stateFile'], $row['restartFile'], $row['loginFile']));
-            $this->assertSame(str_replace(array('{LABEL}', '{ID}'), array($row['label'], $app), $expectedProxy)."\n",
-                \pmssLighttpdManagedProxyFragment($app, 'bo', 23001));
+            $this->assertSame(str_replace(array('{LABEL}', '{ID}', '{SCHEME_HEADERS}'),
+                array($row['label'], $app, $app === 'copyparty' ? $schemeHeaders."\n" : ''), $expectedProxy)."\n",
+                \pmssLighttpdManagedProxyFragment($app, 'fixtur01', 23001));
         }
+    }
+
+    public function testCopypartyLegacySchemeConfigConvergesOnceWithPrivateCredentials(): void
+    {
+        $home = $this->pmssMakeTempDir('toggle-scheme-');
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($home): void {
+            $proxy = \pmssLighttpdManagedProxyFragment('copyparty', 'fixtur01', 23001);
+            $bootstrap = static function () use ($home, $proxy): bool {
+                return \pmssToggleAppBootstrap('copyparty', 'fixtur01', $home, 23001, $proxy);
+            };
+            $this->assertTrue($bootstrap());
+            $path = $home.'/.config/copyparty/copyparty.conf';
+            $login = $home.'/.pmss/apps/copyparty.login';
+            $oldLogin = file_get_contents($login);
+            // Model the prior generated config, keeping its existing service credential.
+            file_put_contents($path, str_replace("  xff-src: 127.0.0.1\n  xf-proto: X-PMSS-Forwarded-Proto\n", '', file_get_contents($path)));
+            $this->assertTrue($bootstrap());
+            $config = file_get_contents($path);
+            $this->assertStringContainsAllStrings(["  xff-src: 127.0.0.1\n", "  xf-proto: X-PMSS-Forwarded-Proto\n", "  rproxy: -1\n"], $config);
+            $this->assertStringNotContainsString('allow-csrf', $config);
+            $credentials = file_get_contents($login);
+            $this->assertTrue($oldLogin !== $credentials);
+            $this->assertStringNotContainsString(explode("\n", trim($credentials))[1], $proxy);
+            clearstatcache();
+            $this->assertSame(0600, fileperms($path) & 0777);
+            $this->assertSame(0600, fileperms($login) & 0777);
+            $this->assertTrue($bootstrap());
+            $this->assertSame($credentials, file_get_contents($login));
+            $this->assertSame($config, file_get_contents($path));
+        });
     }
 
     public function testSlskdOwnerEnvironmentLaunchPreservesQuotedValuesAndManagedPrecedence(): void
@@ -132,9 +171,9 @@ PROXY;
     {
         $home = $this->pmssMakeTempDir('toggle-owner-bootstrap-');
         $this->pmssWithEnv(array('PMSS_TEST_MODE' => '1'), function () use ($home): void {
-            $proxy = \pmssLighttpdManagedProxyFragment('slskd', 'alice', 23001);
+            $proxy = \pmssLighttpdManagedProxyFragment('slskd', 'fixtur02', 23001);
             $bootstrap = static function () use ($home, $proxy): bool {
-                return \pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy, 23002);
+                return \pmssToggleAppBootstrap('slskd', 'fixtur02', $home, 23001, $proxy, 23002);
             };
             $this->assertTrue($bootstrap());
             $owner = $home.'/.config/slskd/slskd.env';
@@ -161,7 +200,7 @@ PROXY;
             $this->assertTrue($bootstrap());
             $this->assertTrue($credentials !== file_get_contents($login));
             $this->assertSame($contents, file_get_contents($owner));
-            $this->assertSame(\pmssToggleAppConfigs('slskd', 'alice', $home, 23001,
+            $this->assertSame(\pmssToggleAppConfigs('slskd', 'fixtur02', $home, 23001,
                 explode("\n", trim(file_get_contents($login)))[1], 23002)['.config/slskd/slskd.yml'], file_get_contents($config));
         });
     }
@@ -295,9 +334,9 @@ PROXY;
         $dir = $this->pmssMakeTempDir('toggle-state-');
         $this->pmssWithEnv(['PMSS_TOGGLE_APP_STATE_DIR' => $dir], function () use ($dir): void {
             $state = ['failures' => 4, 'pending' => true, 'restart' => ''];
-            $this->assertSame($state, \pmssUserWatchdogCrashState('alice', 'slskd', $state));
-            $this->assertSame($state, \pmssUserWatchdogCrashState('alice', 'slskd'));
-            $this->assertTrue(is_file($dir.'/alice-slskd.json'));
+            $this->assertSame($state, \pmssUserWatchdogCrashState('fixtur02', 'slskd', $state));
+            $this->assertSame($state, \pmssUserWatchdogCrashState('fixtur02', 'slskd'));
+            $this->assertTrue(is_file($dir.'/fixtur02-slskd.json'));
             $this->assertTrue(!empty(\pmssUserWatchdogCrashState('bad-user', 'slskd')['storageError']));
         });
     }
@@ -317,8 +356,8 @@ PROXY;
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function (): void {
             foreach (['slskd', 'copyparty'] as $app) {
                 $home = $this->pmssMakeTempDir('toggle-'.$app.'-');
-                $proxy = \pmssLighttpdManagedProxyFragment($app, 'alice', 23001);
-                $this->assertTrue(\pmssToggleAppBootstrap($app, 'alice', $home, 23001, $proxy, $app === 'slskd' ? 23002 : 0));
+                $proxy = \pmssLighttpdManagedProxyFragment($app, 'fixtur02', 23001);
+                $this->assertTrue(\pmssToggleAppBootstrap($app, 'fixtur02', $home, 23001, $proxy, $app === 'slskd' ? 23002 : 0));
                 $config = $home.'/.config/'.$app.'/'.($app === 'slskd' ? 'slskd.yml' : 'copyparty.conf');
                 $login = $home.'/.pmss/apps/'.$app.'.login';
                 $body = (string) file_get_contents($config);
@@ -326,20 +365,20 @@ PROXY;
                 $this->assertSame(0600, fileperms($config) & 0777);
                 $this->assertSame(0600, fileperms($login) & 0777);
                 $this->assertStringContainsString('127.0.0.1', $body);
-                $this->assertStringContainsString('/user-alice/'.$app, $body);
-                $this->assertStringContainsString('alice', $credentials);
+                $this->assertStringContainsString('/user-fixtur02/'.$app, $body);
+                $this->assertStringContainsString('fixtur02', $credentials);
                 $this->assertStringNotContainsString('slskd\nslskd', $credentials);
-                $this->assertTrue((bool) preg_match('/alice\\n[a-f0-9]{48}\\n/', $credentials));
+                $this->assertTrue((bool) preg_match('/fixtur02\\n[a-f0-9]{48}\\n/', $credentials));
                 $this->assertTrue(is_file($home.'/.pmss/apps/'.$app.'.secured'));
-                $this->assertStringContainsString('^/user-alice/'.$app.'/', (string) file_get_contents($home.'/.lighttpd/custom.d/pmss-'.$app.'.conf'));
+                $this->assertStringContainsString('^/user-fixtur02/'.$app.'/', (string) file_get_contents($home.'/.lighttpd/custom.d/pmss-'.$app.'.conf'));
                 if ($app === 'slskd') {
                     $this->assertStringContainsString('disabled: true', $body);
                     $this->assertStringContainsString('authentication:', $body);
                     $this->assertStringContainsString("soulseek:\n  listen_ip_address: 0.0.0.0\n  listen_port: 23002\n", $body);
                     $this->assertStringNotContainsString('50300', $body);
                 } else {
-                    $this->assertStringContainsString('rp-loc: /user-alice/copyparty', $body);
-                    $this->assertStringContainsString("[/]\n  {$home}/data\n  accs:\n    A: alice", $body);
+                    $this->assertStringContainsString('rp-loc: /user-fixtur02/copyparty', $body);
+                    $this->assertStringContainsString("[/]\n  {$home}/data\n  accs:\n    A: fixtur02", $body);
                 }
             }
         });
@@ -458,9 +497,9 @@ PHP;
     {
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function (): void {
             $home = $this->pmssMakeTempDir('toggle-peer-');
-            $proxy = \pmssLighttpdManagedProxyFragment('slskd', 'alice', 23001);
-            $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy));
-            $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001, $proxy, 23001));
+            $proxy = \pmssLighttpdManagedProxyFragment('slskd', 'fixtur02', 23001);
+            $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'fixtur02', $home, 23001, $proxy));
+            $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'fixtur02', $home, 23001, $proxy, 23001));
             $this->assertFalse(is_file($home.'/.pmss/apps/slskd.secured'));
         });
     }
@@ -491,11 +530,11 @@ PHP
         putenv('PMSS_TEST_QUI_BINARY='.$fixture);
         putenv('PMSS_TEST_QUI_LOG='.$home.'/argv.log');
         putenv('PMSS_TEST_QUI_STDIN='.$home.'/stdin');
-        $proxy = \pmssLighttpdManagedProxyFragment('qui', 'bo', 23001);
+        $proxy = \pmssLighttpdManagedProxyFragment('qui', 'fixtur01', 23001);
         try {
-            $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
             $config = $home.'/.config/qui/config.toml';
-            $this->assertSame("host = \"127.0.0.1\"\nport = 23001\nbaseUrl = \"/user-bo/qui/\"\ncheckForUpdates = false\ndisableSelfUpdate = true\n", file_get_contents($config));
+            $this->assertSame("host = \"127.0.0.1\"\nport = 23001\nbaseUrl = \"/user-fixtur01/qui/\"\ncheckForUpdates = false\ndisableSelfUpdate = true\n", file_get_contents($config));
             $this->assertSame(0600, fileperms($config) & 0777);
             $login = $home.'/.pmss/apps/qui.login';
             $this->assertSame(0600, fileperms($login) & 0777);
@@ -506,7 +545,7 @@ PHP
                 chmod($config, 0644);
                 clearstatcache();
                 putenv('PMSS_TEST_QUI_MODE='.$mode);
-                $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+                $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
                 $credentials = file_get_contents($login);
                 $this->assertTrue($previousLogin !== $credentials);
                 $password = explode("\n", trim($credentials))[1]."\n";
@@ -517,13 +556,13 @@ PHP
                 foreach ($commands as $command) $this->assertFalse(in_array(trim($password), $command, true));
                 $this->assertSame(0600, fileperms($login) & 0777);
                 $this->assertSame(0600, fileperms($config) & 0777);
-                $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+                $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
                 $this->assertSame($credentials, file_get_contents($login));
                 $this->assertSame(count($commands), count(file($home.'/argv.log')));
             }
             unlink($home.'/.config/qui/qui.db');
             putenv('PMSS_TEST_QUI_MODE=exists');
-            $this->assertTrue(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
             $argv = file($home.'/argv.log', FILE_IGNORE_NEW_LINES);
             $this->assertSame(7, count($argv));
             $this->assertStringContainsString('change-password', $argv[6]);
@@ -533,13 +572,13 @@ PHP
             clearstatcache();
             $previousLogin = file_get_contents($login);
             $previousDb = file_get_contents($home.'/.config/qui/qui.db');
-            $this->assertFalse(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $this->assertFalse(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
             $this->assertSame($previousLogin, file_get_contents($login));
             $this->assertSame($previousDb, file_get_contents($home.'/.config/qui/qui.db'));
             $this->assertFalse(is_file($home.'/.pmss/apps/qui.secured'));
             unlink($login);
             putenv('PMSS_TEST_QUI_MODE=fail');
-            $this->assertFalse(\pmssToggleAppBootstrap('qui', 'bo', $home, 23001, $proxy));
+            $this->assertFalse(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
             $this->assertFalse(is_file($home.'/.pmss/apps/qui.secured'));
         } finally {
             $this->pmssRestoreEnvMap($previous);
@@ -551,21 +590,21 @@ PHP
     {
         $home = $this->pmssMakeTempDir('toggle-scryer-');
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($home): void {
-            $proxy = \pmssLighttpdManagedProxyFragment('scryer', 'bo', 23001);
-            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'bo', $home, 23001, $proxy));
+            $proxy = \pmssLighttpdManagedProxyFragment('scryer', 'fixtur01', 23001);
+            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'fixtur01', $home, 23001, $proxy));
             $env = $home.'/.config/scryer/scryer.env';
             $password = $home.'/.pmss/apps/scryer.pw';
-            $this->assertSame("SCRYER_BIND=127.0.0.1:23001\nSCRYER_BASE_PATH=/user-bo/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME=bo\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\nSCRYER_DISABLE_DEFAULT_ADMIN=true\n", file_get_contents($env));
+            $this->assertSame("SCRYER_BIND=127.0.0.1:23001\nSCRYER_BASE_PATH=/user-fixtur01/scryer\nSCRYER_AUTH_ENABLED=true\nSCRYER_ADMIN_USERNAME=fixtur01\nSCRYER_ADMIN_PASSWORD_FILE={$home}/.pmss/apps/scryer.pw\nSCRYER_DISABLE_DEFAULT_ADMIN=true\n", file_get_contents($env));
             $this->assertSame(0600, fileperms($env) & 0777);
             $this->assertSame(0600, fileperms($password) & 0777);
             $this->assertSame(explode("\n", trim(file_get_contents($home.'/.pmss/apps/scryer.login')))[1]."\n", file_get_contents($password));
             $row = (require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php'))['scryer'];
-            $launch = \pmssToggleAppLaunchCommand($row, "/home/bo/a'b/.config/scryer/scryer.env", "/home/bo/a'b");
-            $shell = 'set -a; . '.escapeshellarg("/home/bo/a'b/.config/scryer/scryer.env")
+            $launch = \pmssToggleAppLaunchCommand($row, "/home/fixtur01/a'b/.config/scryer/scryer.env", "/home/fixtur01/a'b");
+            $shell = 'set -a; . '.escapeshellarg("/home/fixtur01/a'b/.config/scryer/scryer.env")
                 .'; set +a; exec '.escapeshellarg('/opt/scryer/scryer').' '.escapeshellarg('--data-dir')
-                .' '.escapeshellarg("/home/bo/a'b/.local/share/scryer");
+                .' '.escapeshellarg("/home/fixtur01/a'b/.local/share/scryer");
             // Scryer reads a relative dotenv path, so it must start in the account home, not root's cwd.
-            $this->assertSame('cd '.escapeshellarg("/home/bo/a'b").' && nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell), $launch);
+            $this->assertSame('cd '.escapeshellarg("/home/fixtur01/a'b").' && nohup '.escapeshellarg('/bin/sh').' -c '.escapeshellarg($shell), $launch);
         });
     }
 
@@ -575,14 +614,14 @@ PHP
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function (): void {
             foreach (['slskd', 'copyparty'] as $app) {
                 $home = $this->pmssMakeTempDir('toggle-idem-'.$app.'-');
-                $proxy = \pmssLighttpdManagedProxyFragment($app, 'alice', 23001);
+                $proxy = \pmssLighttpdManagedProxyFragment($app, 'fixtur02', 23001);
                 $peer = $app === 'slskd' ? 23002 : 0;
-                $this->assertTrue(\pmssToggleAppBootstrap($app, 'alice', $home, 23001, $proxy, $peer));
+                $this->assertTrue(\pmssToggleAppBootstrap($app, 'fixtur02', $home, 23001, $proxy, $peer));
                 $paths = [$home.'/.lighttpd/custom.d/pmss-'.$app.'.conf', $home.'/.pmss/apps/'.$app.'.secured',
                     $home.'/.config/'.$app.'/'.($app === 'slskd' ? 'slskd.yml' : 'copyparty.conf')];
                 clearstatcache();
                 $before = array_map(static function (string $path): array { $s = stat($path); return [$s['ino'], $s['mtime']]; }, $paths);
-                $this->assertTrue(\pmssToggleAppBootstrap($app, 'alice', $home, 23001, $proxy, $peer));
+                $this->assertTrue(\pmssToggleAppBootstrap($app, 'fixtur02', $home, 23001, $proxy, $peer));
                 clearstatcache();
                 $after = array_map(static function (string $path): array { $s = stat($path); return [$s['ino'], $s['mtime']]; }, $paths);
                 $this->assertSame($before, $after);
@@ -615,8 +654,8 @@ PHP
     public function testProxyRetainsPrefixAndSkeletonShipsEndpoints(): void
     {
         foreach (['slskd', 'copyparty'] as $app) {
-            $proxy = \pmssLighttpdManagedProxyFragment($app, 'alice', 23001);
-            $this->assertStringContainsString('^/user-alice/'.$app.'/', $proxy);
+            $proxy = \pmssLighttpdManagedProxyFragment($app, 'fixtur02', 23001);
+            $this->assertStringContainsString('^/user-fixtur02/'.$app.'/', $proxy);
             $this->assertStringNotContainsString('map-urlpath', $proxy);
             $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/{$app}.php'");
             $this->pmssAssertRepoFileContainsString('etc/skel/www/scriptsIncAppProcess.php', "'endpoint' => 'toggleApp.php?app='");
@@ -631,10 +670,10 @@ PHP
         $home = $this->pmssMakeTempDir('toggle-proxy-conflict-');
         $dir = $home.'/.lighttpd/custom.d';
         $this->pmssEnsureDir($dir);
-        $this->pmssWriteFile($dir.'/custom.conf', '$HTTP["url"] =~ "^/user-alice/slskd/" {}');
+        $this->pmssWriteFile($dir.'/custom.conf', '$HTTP["url"] =~ "^/user-fixtur02/slskd/" {}');
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($home): void {
-            $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'alice', $home, 23001,
-                \pmssLighttpdManagedProxyFragment('slskd', 'alice', 23001)));
+            $this->assertFalse(\pmssToggleAppBootstrap('slskd', 'fixtur02', $home, 23001,
+                \pmssLighttpdManagedProxyFragment('slskd', 'fixtur02', 23001)));
             $this->assertFalse(is_file($home.'/.pmss/apps/slskd.secured'));
         });
     }
