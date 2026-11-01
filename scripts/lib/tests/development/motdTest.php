@@ -114,6 +114,38 @@ class MotdTest extends TestCase
         ]);
     }
 
+    public function testNetworkIpPrefersOnlyValidNonLoopbackRouteSources(): void
+    {
+        // Numeric fallback avoids DNS; PATH stubs avoid probing the host's routes.
+        foreach ([
+            ['203.0.113.1 via 192.0.2.1 dev eth0 src 192.0.2.10 uid 0', '192.0.2.10'],
+            ["203.0.113.1\tdev eth0\tsrc\t198.51.100.8\n    cache", '198.51.100.8'],
+            ['src 203.0.113.9 dev eth0', '203.0.113.9'],
+            ['203.0.113.1 dev eth0 src 127.0.1.1', '192.0.2.20'],
+            ['203.0.113.1 dev eth0 src 127.255.255.254', '192.0.2.20'],
+            ['203.0.113.1 dev eth0 src ::1', '192.0.2.20'],
+            ['203.0.113.1 dev eth0 src 2001:db8::1', '192.0.2.20'],
+            ['203.0.113.1 dev eth0 src 192.0.2.999', '192.0.2.20'],
+            ['203.0.113.1 dev eth0 src malformed', '192.0.2.20'],
+            ['203.0.113.1 dev eth0 src', '192.0.2.20'],
+            ['203.0.113.1 via 192.0.2.1 dev eth0', '192.0.2.20'],
+            ['', '192.0.2.20'],
+        ] as [$route, $expected]) {
+            $bin = $this->pmssMakeLineOutputStub('ip', [$route], 'pmss-motd-route-');
+            $this->pmssWithPathPrefixedEnv($bin, [], function () use ($expected): void {
+                $this->assertSame($expected, \pmssMotdNetworkIp('192.0.2.20'));
+            });
+        }
+    }
+
+    public function testNetworkIpRetainsResolverFallbackWhenRouteProbeFails(): void
+    {
+        $bin = $this->pmssMakeExecutableStub('ip', "#!/bin/sh\nexit 1\n", 'pmss-motd-route-');
+        $this->pmssWithPathPrefixedEnv($bin, [], function (): void {
+            $this->assertSame('192.0.2.20', \pmssMotdNetworkIp('192.0.2.20'));
+        });
+    }
+
     public function testLinkSpeedLabelRendersMbitAsHumanRate(): void
     {
         $this->assertSame('', \pmssMotdLinkSpeedLabel(0));

@@ -11,7 +11,7 @@ function pmssMotdModelCollect(): array
 {
     // Preserve probe order: basics, version, runtime, distro, services, health, apt.
     $model['host'] = pmssHostnameRead();
-    $model['ip']   = gethostbyname($model['host']);
+    $model['ip']   = pmssMotdNetworkIp($model['host']);
     $model['cpu']  = trim((string) shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'"));
     $model['ram']  = trim((string) shell_exec("free -h | awk '/^Mem:/ { print \$2 }'"));
     $model['storage'] = trim((string) shell_exec("df -h /home | awk 'NR==2 {print \$2}'"));

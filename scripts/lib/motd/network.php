@@ -1,8 +1,23 @@
 <?php
-/** MOTD network-speed probe; route-get and sysfs retain precedence over fallbacks. */
+/** MOTD network probes; routing and sysfs take precedence over fallbacks. */
 
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../network/config.php';
+
+/** Prefer the route's non-loopback IPv4 source, retaining hostname resolution as fallback. */
+function pmssMotdNetworkIp(string $host): string
+{
+    // Debian's hostname entry may resolve to 127.0.1.1 instead of the uplink.
+    $route = pmssConfigLineColumns((string) shell_exec('ip -o route get 1 2>/dev/null'), 0, []);
+    $sourceIndex = array_search('src', $route, true);
+    $source = ($sourceIndex !== false && isset($route[$sourceIndex + 1])) ? $route[$sourceIndex + 1] : '';
+    if (filter_var($source, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
+        && strpos($source, '127.') !== 0) {
+        return $source;
+    }
+
+    return gethostbyname($host);
+}
 
 /** Return the detected speed string, or Unknown when neither probe succeeds. */
 function pmssMotdNetworkSpeed(): string
