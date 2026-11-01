@@ -67,20 +67,17 @@ function pmssUsageAlertsConditionsRead(string $user, string $homeRoot = '/home',
     $home = rtrim($homeRoot, '/').'/'.$user;
     if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) return [];
 
+    // Usage and limits come from root copies (ADR 0213); the home files are display copies.
     $trafficPercent = null;
-    $traffic = pmssTrafficReadRootOwnedStatsPayload($home.'/.trafficData', $user);
+    $traffic = pmssTrafficReadRootOwnedStatsPayload(pmssTrafficStatsPath($user), $user);
     $limitPath = rtrim($runtimeRoot, '/').'/trafficLimits/'.$user;
     if ($traffic !== null && pmssUsageAlertsRootArtifactIsTrusted($limitPath)) {
-        $bonusPath = pmssUsageAlertsRootArtifactIsTrusted($home.'/.bonusTraffic') ? $home.'/.bonusTraffic' : '';
-        $limit = pmssTrafficLimitStateRead($limitPath, $bonusPath)['effectiveLimitGiB'];
+        $limit = pmssTrafficLimitRootStateRead($user, null, $runtimeRoot)['effectiveLimitGiB'];
         if ($limit > 0) $trafficPercent = (pmssTrafficRawMonthMiB($traffic) / ($limit * 1024.0)) * 100.0;
     }
 
-    $diskPercent = null;
-    if (pmssUsageAlertsRootArtifactIsTrusted($home.'/.quota')) {
-        $quota = pmssStatsReadQuotaSnapshot($home);
-        $diskPercent = pmssStatsPercent($quota['used_bytes'], $quota['soft_bytes']);
-    }
+    $quota = pmssStatsReadQuotaSnapshot($home, pmssQuotaRootCopyPath($user));
+    $diskPercent = pmssStatsPercent($quota['used_bytes'], $quota['soft_bytes']);
     $mediaStatus = pmssUsageAlertsRootArtifactIsTrusted($home.'/.media-stack-status.json')
         ? (pmssJsonFileReadAssoc($home.'/.media-stack-status.json', true) ?? [])
         : [];

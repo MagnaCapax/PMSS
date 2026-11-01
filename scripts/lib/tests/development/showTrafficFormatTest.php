@@ -186,8 +186,11 @@ class ShowTrafficFormatTest extends TestCase
         @mkdir($statsDir, 0755, true);
         @mkdir($homeDir.'/alice', 0755, true);
         @mkdir($homeDir.'/bob', 0755, true);
-        file_put_contents($homeDir.'/alice/.trafficLimit', "1\n");
-        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $homeDir]);
+        // The limit comes from the root runtime file; the home copy is display only (ADR 0213).
+        @mkdir($root.'/seedbox/trafficLimits', 0755, true);
+        file_put_contents($root.'/seedbox/trafficLimits/alice', "1\n");
+        file_put_contents($homeDir.'/bob/.trafficLimit', "1\n");
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $homeDir, 'PMSS_RUNTIME_DIR' => $root.'/seedbox']);
 
         $payload = static function (float $month): array {
             return ['raw' => ['month' => $month, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0], 'daily' => []];
@@ -238,8 +241,9 @@ class ShowTrafficFormatTest extends TestCase
         $statsDir = $root.'/stats';
         mkdir($statsDir);
         mkdir($root.'/alpha');
-        file_put_contents($root.'/alpha/.trafficLimit', "1\n");
-        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root]);
+        mkdir($root.'/seedbox/trafficLimits', 0755, true);
+        file_put_contents($root.'/seedbox/trafficLimits/alpha', "1\n");
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root, 'PMSS_RUNTIME_DIR' => $root.'/seedbox']);
         // Preserve raw numeric strings, extra fields, and their original insertion order.
         $raw = ['week' => '700', 'month' => '900.125', 'day' => 144, 'hour' => '36', '15min' => 15, 'extra' => 'kept'];
         file_put_contents($statsDir.'/alpha', serialize(['raw' => $raw]));

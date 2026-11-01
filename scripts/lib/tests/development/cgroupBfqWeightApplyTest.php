@@ -188,8 +188,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                 'required' => [
                     "require_once __DIR__.'/../lib/cgroup/directApply.php';",
                     'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
-                    'pmssUserBonusPercentRead($user)',
-                    'pmssBfqApplyBonusWeight($wRaw, $bonusPct',
+                    'pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json))',
                     'pmssCgroupDirectWritableFileTarget($cgPath)',
                     'pmssCgroupDirectIntegerFileWrite($cgPath, $w, 1, PMSS_BFQ_KERNEL_MAX)',
                 ],
@@ -206,15 +205,15 @@ class CgroupBfqWeightApplyTest extends TestCase
                     [
                         'needles' => [
                             'foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
-                            'list($user, $uid, $wRaw) = $entry;',
-                            'pmssUserBonusPercentRead($user)',
+                            'pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json))',
+                            'list($user, $uid, $w) = $entry;',
                         ],
                         'missingPrefix' => 'missing BFQ username boundary guard: ',
                         'orderPrefix' => 'BFQ username guard must run before user paths: ',
                     ],
                     [
                         'needles' => [
-                            'list($user, $uid, $wRaw) = $entry;',
+                            'list($user, $uid, $w) = $entry;',
                             "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
                         ],
                         'missingPrefix' => 'missing BFQ passwd UID guard: ',
@@ -242,15 +241,11 @@ class CgroupBfqWeightApplyTest extends TestCase
                     ],
                 ],
             ]);
-        // The marker reader now lives in policy.php, shared with the CPU-priority cron; same rules.
+        // The bonus comes from the per-user store record (ADR 0213), shared with the CPU-priority cron.
         $this->pmssAssertRepoFileContract('scripts/lib/cgroup/policy.php', [
             'required' => [
-                'function pmssUserBonusPercentRead(string $user, string $homeRoot = \'/home\'): int',
-                '$stat = @lstat($path);',
-                "((\$stat['mode'] ?? 0) & 0170000) !== 0100000",
-                "(int) (\$stat['size'] ?? 0) > 64",
-                'pmssReadRegularFileContentsVerified($path, null, 64)',
-                'min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, max(0, (int) trim($raw)))',
+                'function pmssUserBonusPercentFromConfig(array $config): int',
+                '$value <= PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT',
             ],
         ]);
     }

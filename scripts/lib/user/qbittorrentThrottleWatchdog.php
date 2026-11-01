@@ -6,14 +6,12 @@ require_once __DIR__.'/watchdog.php';
 /** Return the watchdog running/start-blocked state, leaving service launch to its existing flow. */
 function pmssQbittorrentThrottleWatchdog(string $user, string $home, bool $running, array $ops = []): bool
 {
-    $policy = $home.'/.torrentThrottle';
     $state = $home.'/.config/pmss/torrentClients/qbittorrent.throttleApplied';
-    clearstatcache(true, $policy);
     clearstatcache(true, $state);
-    // No-follow absence checks avoid an account subprocess for ordinary unthrottled users.
-    if (@lstat($policy) === false && @lstat($state) === false) return $running;
     $throttleRead = $ops['read'] ?? 'pmssReadTorrentThrottle';
     $throttle = $throttleRead($user);
+    // No cap stored and none applied: skip the account subprocess for ordinary unthrottled users.
+    if ($throttle === null && @lstat($state) === false) return $running;
     $account = $ops['account'] ?? 'pmssQbittorrentThrottleAsUser';
     $runningRead = $ops['running'] ?? static function (string $user): bool {
         return pmssTorrentClientLauncherLivenessPids($user, 'qbittorrent') !== [];

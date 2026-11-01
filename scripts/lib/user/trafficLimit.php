@@ -6,7 +6,7 @@
  *
  * Persistence paths (written by /scripts/util/userTrafficLimit.php):
  * - /etc/seedbox/runtime/trafficLimits/<user> (consumed by scripts/cron/trafficLimits.php)
- * - /home/<user>/.trafficLimit (user-visible; web UI reads this)
+ * - /home/<user>/.trafficLimit (display copy for the account's panel; root never reads it)
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -45,26 +45,30 @@ if (!function_exists('pmssTrafficLimitReadGiBFile')) {
 }
 
 if (!function_exists('pmssTrafficLimitStateRead')) {
-    /** @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int} */
+    /**
+     * Display state from two GiB files (the account's panel and own tools).
+     *
+     * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int}
+     */
     function pmssTrafficLimitStateRead(string $limitPath, string $bonusPath = ''): array
     {
         $limitGiB = pmssTrafficLimitReadGiBFile($limitPath);
         $bonusGiB = ($bonusPath !== '') ? pmssTrafficLimitReadGiBFile($bonusPath) : 0;
-
-        // #945 fairness clamp: the bonus path (~/.bonusTraffic) sits in the tenant's own
-        // 0770 home, so a tenant can delete the root-written file and recreate an inflated
-        // copy, lifting their effective monthly cap arbitrarily. The limit path is the
-        // root-owned sanctioned base. Bound the self-service bonus to that base so a tenant
-        // cannot inflate their effective cap beyond 2x their sanctioned limit; a legit
-        // grant within base is unchanged. Value-clamp against the co-present root-owned
-        // value — no ownership migration, no ordering dependency (same shape and blast
-        // radius as the .bonus BFQ-weight clamp in cgroupBfqWeightApply.php).
-        if ($limitGiB > 0 && $bonusGiB > $limitGiB) {
-            $bonusGiB = $limitGiB;
-        }
-
         return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0];
     }
+}
+
+/**
+ * The limit root enforces: the runtime limit file plus the stored bonus (ADR 0213).
+ *
+ * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int}
+ */
+function pmssTrafficLimitRootStateRead(string $user, ?UserConfigStore $store = null, ?string $runtimeDir = null): array
+{
+    require_once __DIR__.'/userConfigStore.php';
+    $limitGiB = pmssTrafficLimitReadGiBFile(pmssIntegerSettingRuntimeUserPath('trafficLimits', $user, $runtimeDir));
+    $bonusGiB = ($store ?? new UserConfigStore())->getInt($user, 'bonusTrafficGiB');
+    return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0];
 }
 
 function pmssTrafficLimitCliUsernameNormalize(string $rawUserName): ?string

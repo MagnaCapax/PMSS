@@ -15,9 +15,10 @@
  * target, clamped to [1, 1000] (the kernel BFQ range) for every user.
  * When JSON IOWeight is absent, the RAM fallback uses the shared BFQ
  * headroom curve so a 300% bonus can fit under the kernel cap. The Free
- * Bonus Disk Policy percent from /home/<user>/.bonus multiplies the
- * selected base before the final kernel clamp (pmssUserBonusPercentRead() in
- * lib/cgroup/policy.php, shared with cgroupBonusCpuWeightApply.php).
+ * Bonus Disk Policy percent (bonusPercent in the same per-user JSON)
+ * multiplies the selected base before the final kernel clamp
+ * (pmssUserBonusPercentFromConfig() in lib/cgroup/policy.php, shared with
+ * cgroupBonusCpuWeightApply.php).
  *
  * Idempotent: writes only when current kernel value differs from
  * desired. Hard fail on missing prerequisites (root, cgroup-v1, BFQ
@@ -84,15 +85,12 @@ $shadowConfigs = []; $shadowUsers = [];
 foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json) use ($shadowEnabled, &$shadowConfigs): int {
     if ($shadowEnabled) $shadowConfigs[$user] = $json;
     // Prefer explicit JSON IOWeight; fall back to ramMiB-derived formula.
-    if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) return (int) $json['IOWeight'];
-    $ramMiB = isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0;
-    return pmssBfqFormulaWeight($ramMiB);
+    if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) $base = (int) $json['IOWeight'];
+    else $base = pmssBfqFormulaWeight(isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0);
+    // Free Bonus Disk Policy: the stored tenure/spend bonus percent.
+    return pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json));
 }) as $entry) {
-    list($user, $uid, $wRaw) = $entry;
-
-    // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
-    $bonusPct = pmssUserBonusPercentRead($user);
-    $w        = pmssBfqApplyBonusWeight($wRaw, $bonusPct);
+    list($user, $uid, $w) = $entry;
     if ($shadowEnabled) $shadowUsers[$user] = ['source' => $shadowConfigs[$user], 'weight' => $w];
 
     $cgPath = pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.bfq.weight');

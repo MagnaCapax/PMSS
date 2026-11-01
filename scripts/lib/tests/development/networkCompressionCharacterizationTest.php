@@ -38,7 +38,6 @@ class NetworkCompressionCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/network/fireqos.php', [
             "pmssResolvePathFromEnv('PMSS_FIREQOS_TEMPLATE', '/etc/seedbox/config/template.fireqos')",
             "pmssResolvePathFromEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', '/var/run/pmss/trafficLimits')",
-            "pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')",
             "if (!pmssValidateUsername(\$username)) {",
             "@shell_exec('id -u '.escapeshellarg(\$username).' 2>/dev/null')",
         ]);

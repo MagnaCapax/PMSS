@@ -114,26 +114,11 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
 }
 
 /**
- * Resolve legacy Deluge web ports from root-owned, non-symlinked port files.
+ * The account's Deluge web port from the root port-manager reservation, or 1 when none exists.
  */
-function pmssCreateNginxConfigLegacyDelugeWebPort(string $homeDir, string $user): int
+function pmssCreateNginxConfigLegacyDelugeWebPort(string $runtimePortDir, string $user): int
 {
-    foreach (['/.delugeWebPort' => 0, '/.delugePort' => 1] as $portFile => $offset) {
-        $delugePortPath = $homeDir.$portFile;
-        $raw = pmssReadRegularFileContentsVerified($delugePortPath, 0, 32);
-        if ($raw === null) {
-            if (is_link($delugePortPath)) pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring symlinked '.$portFile.' while rendering nginx template');
-            continue;
-        }
-        $maxPort = $offset === 1 ? 65534 : 65535;
-        $delugePort = pmssNetworkPortParseDigits($raw, 1024, $maxPort);
-        if ($delugePort !== null) {
-            return $delugePort + $offset;
-        }
-        pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring invalid '.$portFile.' value while rendering nginx template');
-    }
-
-    return 1;
+    return pmssReadRegularFileNetworkPort($runtimePortDir.'/deluge-web-'.$user) ?? 1;
 }
 
 /**
@@ -237,7 +222,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         $replacements['##serverPort'] = (string) $serverPort;
         // Older templates may still request the legacy Deluge web port.
         if (strpos($template, '##delugeWebPort') !== false) {
-            $replacements['##delugeWebPort'] = (string) pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, $thisUser);
+            $replacements['##delugeWebPort'] = (string) pmssCreateNginxConfigLegacyDelugeWebPort($runtimePortDir, $thisUser);
         }
     }
     $userConfig = strtr($template, $replacements);

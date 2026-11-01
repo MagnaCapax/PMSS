@@ -67,6 +67,7 @@ function pmssUserBonusTrafficCli(array $argv): int
         'invalidOptionLabel'  => '--bonus',
         'setLogTemplate'      => 'bonus traffic set to %d GiB (monthly add-on)',
         'unsetLogMessage'     => 'bonus traffic unset (GiB add-on removed)',
+        'storeKey'            => 'bonusTrafficGiB',
         'targetModesResolver' => static function (string $userName, string $homeDir): array {
             return [$homeDir.'/.bonusTraffic' => 0664];
         },

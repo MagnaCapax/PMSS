@@ -8,7 +8,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     public function testTrafficStateReadersAvoidInlineParsing(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficLimitStateRead(']],
+            'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficLimitRootStateRead('], 'forbidden' => ['/.bonusTraffic']],
             'scripts/lib/stats/collect.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']],
             'scripts/lib/pmssStats.php' => [
                 'required' => ["require_once __DIR__.'/user/trafficLimit.php';"],
@@ -33,7 +33,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
                 'pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)',
                 'traffic throttle file write failed',
                 'pmssTrafficLimitThrottleFileRemove($throttleFile, $error)',
-                'function pmssTrafficLimitMarkerTouch(string $user, string $path): bool',
+                'function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool',
                 'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
                 "function pmssTrafficLimitThrottleFilePath(string \$user, string \$homeRoot = '/home'): ?string",
                 'pmssTrafficLimitCliUsernameNormalize($user)',
@@ -44,7 +44,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
             'scripts/cron/trafficLimits.php' => ['required' => [
                 'if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(\'/scripts/listUsers.php\'))) === null) {',
                 'exit(1);',
-                'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {',
+                'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile, $throttlePlan[\'effectiveCapMbit\'])) {',
                 'pmssTrafficLimitThrottleLiftAfterCooldown($thisUser, $userTrafficLimitEnabledFile, ',
                 'pmssTrafficLimitThrottleApply($thisUser, $throttlePlan[\'effectiveCapMbit\']);',
             ]],
@@ -88,14 +88,12 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     public function testUserResourcesTrafficStateReadingDelegatesToSharedHelpers(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/resourcesListModel.php', [
-            '"/home/{$user}/.trafficLimit"',
-            '"/home/{$user}/.trafficData"',
             "'traffic.php'",
             "'trafficLimit.php'",
-            'pmssTrafficLimitReadGiBFile("/home/{$user}/.trafficLimit")',
-            'pmssReadUserTrafficMonth("/home/{$user}/.trafficData")',
+            "pmssTrafficLimitReadGiBFile(pmssIntegerSettingRuntimeUserPath('trafficLimits', \$user))",
+            'pmssReadUserTrafficMonth(pmssTrafficStatsPath($user))',
             'max($diskQuotaGiB * 500, 15000)',
-        ], ['unserialize(']);
+        ], ['unserialize(', '/.trafficLimit', '/.trafficData']);
     }
 
     public function testTrafficScriptsUseSharedSerializedPayloadReader(): void
@@ -105,7 +103,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/traffic/reportModel.php' => [
-                'required' => ['pmssTrafficStatsPath($thisUser, $statsDir)', 'pmssReadSerializedArrayFile($statsPath)', 'pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)'],
+                'required' => ['pmssTrafficStatsPath($thisUser, $statsDir)', 'pmssReadSerializedArrayFile($statsPath)', 'pmssTrafficReadRootOwnedStatsPayload(pmssTrafficIngressStatsPath($thisUser), $baseUser)'],
                 'forbidden' => ['function '.$showTrafficReader, 'unserialize('],
             ],
             'scripts/lib/resources/show.php' => ['required' => ['pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")'], 'forbidden' => ['unserialize(']],

@@ -44,11 +44,10 @@ $defaultTrafficCapMbit = $throttlePolicy['defaultTrafficCapMbit'];
 $userConfigStore = new UserConfigStore();
 
 foreach($users AS $thisUser) {
-    $userTrafficLimitFile = "/etc/seedbox/runtime/trafficLimits/{$thisUser}";
     // Root's runtime copy (0600); the home copy sits in a directory the account can change.
     $trafficDataFile = pmssTrafficStatsPath($thisUser);
     $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
-    $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, "/home/{$thisUser}/.bonusTraffic");
+    $trafficLimitState = pmssTrafficLimitRootStateRead($thisUser, $userConfigStore);
     if ($trafficLimitState['effectiveLimitGiB'] <= 0) {
         pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile);
         continue;
@@ -94,7 +93,7 @@ foreach($users AS $thisUser) {
             $planCapSet
         );
 
-        if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {
+        if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile, $throttlePlan['effectiveCapMbit'])) {
             continue;
         }
         pmssTrafficLimitThrottleApply($thisUser, $throttlePlan['effectiveCapMbit']);

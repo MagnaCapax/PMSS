@@ -139,13 +139,14 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsAllStrings(["strpos(\$template, '##delugeWebPort')", "\$replacements['##delugeWebPort']"], $generator);
     }
 
-    public function testCreateNginxConfigDelugeWebPortPlaceholderTreatsPortFileAsUntrusted(): void
+    public function testCreateNginxConfigDelugeWebPortPlaceholderUsesThePortReservation(): void
     {
-        $script = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
+        $script = $this->pmssReadRepoExecutableSource('scripts/lib/nginxConfig/userConfigsGenerate.php');
 
-        // Regression guard: if we ever need to render a legacy template placeholder,
-        // never trust user-owned/symlinked port files.
-        $this->assertStringContainsAllStrings(["'/.delugePort'", 'pmssReadRegularFileContentsVerified($delugePortPath, 0, 32)', 'pmssNetworkPortParseDigits($raw, 1024, $maxPort)'], $script);
+        // The legacy placeholder takes the root port-manager reservation, never a file in the home (ADR 0213).
+        $this->assertStringContainsString("pmssReadRegularFileNetworkPort(\$runtimePortDir.'/deluge-web-'.\$user) ?? 1", $script);
+        $this->assertStringNotContainsString("'/.delugePort'", $script);
+        $this->assertStringNotContainsString("'/.delugeWebPort'", $script);
     }
 
     // =========================================================================

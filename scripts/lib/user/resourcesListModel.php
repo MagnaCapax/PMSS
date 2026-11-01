@@ -42,8 +42,8 @@ function pmssUserResourcesListEntryBuild(string $user, array $info, array $props
         'io_read_iops' => pmssSystemdPropertyTrailingInt($props['IOReadIOPSMax']),
         'io_write_iops' => pmssSystemdPropertyTrailingInt($props['IOWriteIOPSMax']),
     ] + array_diff_key($quotaState, ['suspended' => true]) + [
-        'network_limit_gib' => (($trafficLimitGiB = pmssTrafficLimitReadGiBFile("/home/{$user}/.trafficLimit")) > 0) ? $trafficLimitGiB : null,
-        'network_used_gib' => round(pmssReadUserTrafficMonth("/home/{$user}/.trafficData") / 1024, 1),
+        'network_limit_gib' => (($trafficLimitGiB = pmssTrafficLimitReadGiBFile(pmssIntegerSettingRuntimeUserPath('trafficLimits', $user))) > 0) ? $trafficLimitGiB : null,
+        'network_used_gib' => round(pmssReadUserTrafficMonth(pmssTrafficStatsPath($user)) / 1024, 1),
         'process_max' => pmssSystemdPropertyTrailingInt($props['TasksMax']),
         'suspended' => $quotaState['suspended'],
     ];

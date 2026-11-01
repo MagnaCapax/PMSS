@@ -48,6 +48,7 @@ PHP;
                 $this->assertEquals($expectedMode, $result['modes'][$key], $label.' '.$key.' mode');
             }
             $this->assertEquals($case['logs'], $result['logs'], $label);
+            if (array_key_exists('store', $case)) $this->assertSame($case['store'], $result['store'], $label.' store');
         }
     }
 
@@ -250,13 +251,21 @@ PHP;
     /** @param array<string,string> $definition @return array<string,array<string,mixed>> */
     private function bonusTrafficCliCases(array $definition): array
     {
-        return [
-            'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for alice: 15 GiB\n", ['home' => "15GiB\n"], ['home' => '15GiB']),
+        // The root store holds the bonus; the home file is its display copy and is never read (ADR 0213).
+        $cases = [
+            'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for alice: 15 GiB\n", ['home' => "900\n"], ['home' => '900']) + ['existingStore' => 15, 'store' => 15],
             'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
-            'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for alice set to 20 GiB\n", [], ['home' => '20'], [], [['alice', 'bonus traffic set to 20 GiB (monthly add-on)']]),
-            'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]),
-            'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]),
+            'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for alice set to 20 GiB\n", [], ['home' => '20'], [], [['alice', 'bonus traffic set to 20 GiB (monthly add-on)']]) + ['store' => 20],
+            'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
+            'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
         ];
+        foreach ($cases as &$case) {
+            $case['fixture']['storeKey'] = 'bonusTrafficGiB';
+            if (array_key_exists('existingStore', $case)) $case['fixture']['existingStore'] = $case['existingStore'];
+            unset($case['existingStore']);
+        }
+        unset($case);
+        return $cases;
     }
 
     /** Build one shared GiB-setting CLI fixture. */

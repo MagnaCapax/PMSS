@@ -14,7 +14,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userFileWrite.php', '../traffic/storage.php', 'integerSetting.php']);
+pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userFileWrite.php', '../traffic/storage.php', 'integerSetting.php', 'userConfigStore.php']);
 require_once __DIR__.'/../quotaSnapshot.php';
 
 /**
@@ -115,7 +115,9 @@ function pmssReadUserTrafficStates(string $username): array
     }
 
     $totals = [];
-    foreach (array_intersect_key(pmssTrafficDataPaths($username), ['normal' => true, 'local' => true, 'ingress' => true]) as $name => $path) {
+    // Root copies (ADR 0213); the files in the home are display copies.
+    $paths = ['normal' => pmssTrafficStatsPath($username), 'local' => pmssTrafficStatsPath($username.'-localnet'), 'ingress' => pmssTrafficIngressStatsPath($username)];
+    foreach ($paths as $name => $path) {
         $totals[$name] = pmssReadUserTrafficMonth($path);
     }
 
@@ -123,42 +125,21 @@ function pmssReadUserTrafficStates(string $username): array
 }
 
 /**
- * Read a root-owned torrent upload throttle (KiB/s) for the user.
- *
- * Returns:
- * - null when the file is missing or invalid
- * - 0 when the file explicitly requests unlimited
- * - >0 for the desired KiB/s cap
+ * The torrent upload cap (KiB/s) for the user from the root store (ADR 0213), or null when
+ * none is set. userConfig.php --upload-throttle-kib records it; ~/.torrentThrottle is its
+ * display copy.
  */
 function pmssReadTorrentThrottle(string $username): ?int
 {
     if (!pmssUsernameIsValid($username)) {
         return null;
     }
-
-    $path = pmssUserHomeFilePath($username, '.torrentThrottle');
-    $stats = null;
-    $raw = pmssReadRegularFileContentsVerified($path, pmssTestModeEnabled() ? null : 0, 64, $stats);
-    if ($raw === null || !is_array($stats) || ($stats['mode'] & 0022) !== 0) {
-        return null;
-    }
-
-    if (!pmssTestModeEnabled()) {
-        if (function_exists('posix_getgrgid')
-            && is_array($group = @posix_getgrgid((int) $stats['gid']))
-            && isset($group['name'])
-            && !in_array($group['name'], ['root', $username], true)
-        ) {
-            return null;
-        }
-    }
-
-    $value = pmssUnsignedDecimalIntParse(trim($raw, " \t\r\n"));
-    return $value;
+    $value = (new UserConfigStore())->getInt($username, 'uploadThrottleKib');
+    return $value > 0 ? $value : null;
 }
 
 /**
- * Write or remove a per-user torrent upload throttle (KiB/s).
+ * Write or remove the display copy of the torrent upload cap (KiB/s).
  */
 function pmssWriteTorrentThrottle(string $username, int $value): bool
 {

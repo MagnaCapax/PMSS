@@ -1339,7 +1339,21 @@ PHP;
             $globals .= '$GLOBALS['.var_export($runtimeGlobal, true).'] = '.var_export(dirname($paths['runtime']), true).";\n";
         }
 
+        // A fixture with storeKey gets a root user store record (ADR 0213) and reports that key after the run.
+        $storeKey = isset($fixture['storeKey']) ? (string) $fixture['storeKey'] : null;
+        $storePath = null;
+        if ($storeKey !== null) {
+            $configDir = $this->pmssMakeTempDir('pmss-gib-config-');
+            $storePath = $this->pmssEnsureDir($configDir.'/users').'/'.$user.'.json';
+            $record = ['ramMiB' => 1024, 'rtorrentPort' => 0, 'quota' => 10, 'quotaBurst' => 12];
+            if (array_key_exists('existingStore', $fixture)) $record[$storeKey] = $fixture['existingStore'];
+            file_put_contents($storePath, json_encode($record));
+            $globals .= 'putenv('.var_export('PMSS_CONFIG_DIR='.$configDir, true).");\n";
+        }
+
         $script = '$argv = '.var_export($fixture['argv'], true).";\n"
+            .'$storePath = '.var_export($storePath, true).";\n"
+            .'$storeKey = '.var_export($storeKey, true).";\n"
             .'$usage = '.(array_key_exists('usage', $fixture) ? var_export($fixture['usage'], true) : 'null').";\n"
             .'$function = '.var_export($function, true).";\n"
             .'$callWithUsage = '.(!empty($fixture['passUsage']) ? 'true' : 'false').";\n"
@@ -1360,12 +1374,14 @@ foreach ($paths as $key => $path) {
     $modes[$key] = is_file($path) ? (fileperms($path) & 0777) : null;
 }
 
+$store = $storePath === null ? null : (json_decode((string) file_get_contents($storePath), true)[$storeKey] ?? null);
 echo json_encode([
     'rc' => $rc,
     'stdout' => $stdout,
     'files' => $files,
     'modes' => $modes,
     'logs' => $GLOBALS[$logGlobal],
+    'store' => $store,
 ]);
 PHP
         ;

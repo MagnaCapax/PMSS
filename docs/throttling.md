@@ -49,11 +49,13 @@ The persisted `raw.month` total and `daily` chart series use the same rolling
 
 | Path | Owner | Format | Written by | Meaning |
 |---|---|---|---|---|
-| `/home/<user>/.trafficData` | user | PHP-serialize | `trafficStats.php` | Monthly + window aggregates of egress bytes |
+| `/var/run/pmss/trafficStats/<user>` | root | PHP-serialize | `trafficStats.php` | Monthly + window aggregates of egress bytes; root readers use this copy |
+| `/home/<user>/.trafficData` | root:user | PHP-serialize | `trafficStats.php` | Display copy of the same aggregates |
 | `/etc/seedbox/runtime/trafficLimits/<user>` | root | plain int | `userTrafficLimit.php` | Monthly traffic cap in **GiB** (0 = unlimited) |
-| `/home/<user>/.bonusTraffic` | account (lives in the tenant home — not a root-owned guarantee) | plain int | `userBonusTraffic.php` | Extra GiB added to the base limit, then **capped at the base limit** by `pmssTrafficLimitStateRead()` (so the self-service bonus cannot exceed the root-owned base). Written mode 0664; classed *enforced* in the ADR-0046 registry. The enforcement cron does not verify ownership — #945 settled on the value cap rather than a reader-side ownership check. |
-| `/var/run/pmss/trafficLimits/<user>.enabled` | root | empty marker | `trafficLimits.php` | Hard-cap state active; mtime drives cooldown |
-| `/home/<user>/.throttle` | root | plain int | `setRateLimit()` | Hard-cap ceiling in **Mbit/s** when limit is enforced; untrusted ownership falls back to the configured default |
+| `bonusTrafficGiB` in `/etc/seedbox/config/users/<user>.json` | root | int | `userBonusTraffic.php`, `writeHomeMarker.php .bonusTraffic` | Extra GiB added to the base limit by `pmssTrafficLimitRootStateRead()` |
+| `/home/<user>/.bonusTraffic` | root | plain int | same CLIs, after the store | Display copy of the bonus (ADR 0213) |
+| `/var/run/pmss/trafficLimits/<user>.enabled` | root | plain int | `trafficLimits.php` | Hard-cap state active; holds the cap in **Mbit/s** FireQOS applies (empty = configured default); mtime drives cooldown |
+| `/home/<user>/.throttle` | root | plain int | `trafficLimits.php` | Display copy of the hard-cap ceiling while the limit is enforced |
 
 ### System (per host)
 

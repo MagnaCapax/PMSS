@@ -38,12 +38,11 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
             continue;
         }
 
-        $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey(pmssTrafficUserKeyIsLocalnet($thisUser), 'ingress')];
-        $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
+        $ingressData = pmssTrafficReadRootOwnedStatsPayload(pmssTrafficIngressStatsPath($thisUser), $baseUser);
         $inboundMonth = $ingressData !== null ? pmssTrafficRawMonthMiB($ingressData) : null;
 
         if (!array_key_exists($baseUser, $limitCache)) {
-            $parsedLimit = pmssTrafficLimitReadGiBFile(pmssTrafficLimitPath($baseUser));
+            $parsedLimit = pmssTrafficLimitReadGiBFile(pmssIntegerSettingRuntimeUserPath('trafficLimits', $baseUser));
             $limitCache[$baseUser] = $parsedLimit > 0 ? $parsedLimit : null;
         }
 

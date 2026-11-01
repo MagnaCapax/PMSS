@@ -15,6 +15,15 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->pmssTrackEnvOverrides($this->pmssTestModeEnv(), true);
     }
 
+    /** Record the fixture account's upload cap in a root store fixture (ADR 0213: the home copy is display only). */
+    private function storeUploadCap(int $kib): void
+    {
+        $configDir = $this->pmssMakeTempDir('pmss-qbittorrent-config-');
+        $this->pmssEnsureDir($configDir.'/users');
+        file_put_contents($configDir.'/users/fixtur01.json', json_encode(['ramMiB' => 512, 'rtorrentPort' => 0, 'quota' => 5, 'quotaBurst' => 6, 'uploadThrottleKib' => $kib]));
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $configDir]);
+    }
+
     public function testConfigPathHonoursManagedHomeOverride(): void
     {
         $this->assertSame(
@@ -148,7 +157,7 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->pmssTrackEnvOverrides(['PATH' => $bin.':'.(string) getenv('PATH')]);
         $before = "[Meta]\nMigrationVersion=2\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=10\n[Preferences]\nLocale=en\n";
         $path = $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.config/qBittorrent/qBittorrent.conf', $before);
-        $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.torrentThrottle', "512\n");
+        $this->storeUploadCap(512);
         $this->assertTrue(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
         $this->assertSame($before, file_get_contents($path));
 
@@ -199,7 +208,7 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testThrottleComparisonSkipsMissingMalformedAndLinkedConfigs(): void
     {
-        $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.torrentThrottle', "500\n");
+        $this->storeUploadCap(500);
         $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
         $path = $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.config/qBittorrent/qBittorrent.conf', "[invalid\n");
         $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));

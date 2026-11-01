@@ -61,13 +61,17 @@ function pmssTrafficLimitMarkerPathIsSafe(string $path): bool
     return function_exists('pmssUserFilePathIsSafe') && pmssUserFilePathIsSafe($path);
 }
 
-function pmssTrafficLimitMarkerTouch(string $user, string $path): bool
+/**
+ * Refresh the root runtime throttle marker. With $capMbit the marker also records the cap
+ * FireQOS applies (networkFireqosUserCaps); ~/.throttle is only its display copy.
+ */
+function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool
 {
     if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
         pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$path})");
         return false;
     }
-    if (!@touch($path)) {
+    if ($capMbit !== null ? !pmssIntegerSettingFileWrite($path, $capMbit) : !@touch($path)) {
         pmssTrafficLimitLog($user, "traffic throttle marker touch failed ({$path})");
         return false;
     }

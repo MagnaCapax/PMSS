@@ -618,7 +618,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     Watchdog/launch convergence preserves stricter customer limits and removes
     only a recorded PMSS cap; saved unlimited zero never causes a restart loop.
     `userConfig.php` leaves a live client's settings untouched so the watchdog
-    can still detect drift from the persisted `.torrentThrottle` marker.
+    can still detect drift from the stored `uploadThrottleKib` value (root user
+    store; `.torrentThrottle` in the home is its display copy).
 - pmssCredentialProcessRun(string $command, ?string $credential, ?array &$output=null, bool $stderrOnly=false, ?float $timeout=null, array $ops=[]): int
   - Passes credentials only on stdin. Capture merges stdout/stderr by default;
     stderr-only capture leaves stdout inherited so generated credentials never
@@ -767,7 +768,7 @@ rule bytes, diagnostics, stdout, exit status, and validation are preserved.
 FireQOS helpers:
 - networkLoadConfig()/networkLoadLocalnets(): array → load active net config and localnets, with defaults and env overrides (`PMSS_NETWORK_CONFIG`, `PMSS_LOCALNET_FILE`).
 - networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string → render FireQOS template with per-user classes and localnets matches; optional per-user cap via `/var/run/pmss/trafficLimits/<user>.enabled`.
-- FireQOS UID output and root-owned `.throttle` values must fit a PHP integer before rendering. Invalid UIDs are skipped; invalid throttle values retain the configured fallback cap. An unrepresentable cap in the installed config returns an unknown rendered state so the existing convergence check can retry.
+- FireQOS UID output and the cap in the root `/var/run/pmss/trafficLimits/<user>.enabled` marker must fit a PHP integer before rendering. Invalid UIDs are skipped; an empty or invalid marker cap uses the configured fallback cap. An unrepresentable cap in the installed config returns an unknown rendered state so the existing convergence check can retry.
 - networkApplyFireqos(string $config): bool → writes `/etc/seedbox/config/fireqos.conf` and starts FireQOS; logs to `/var/log/pmss/fireqos.log`. On a failed start it moves the file to `fireqos.conf.failed` and returns false, so the hourly converge in `trafficLimits.php` retries; `setupNetwork.php` exits with the result.
 
 iptables helpers:
@@ -939,7 +940,7 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ## Per-user Notification Recipient - `scripts/lib/user/notificationEmail.php`
 
-- `pmssUserNotificationEmailRead()` reads `.notifyEmail` only from a root-owned `0600`/`0640` regular file in the expected account group, rejects symlinks, and returns a single syntactically valid email address or `null`.
+- `UserConfigStore::readNotificationEmail()` reads `notificationEmail` from the root user store (set by `writeHomeMarker.php .notifyEmail`) and returns a single syntactically valid email address or `null`; `~/.notifyEmail` is a display copy.
 - `UserConfigStore::readNotificationEmail()` accepts only a valid managed username and requires the artifact to be root-owned and non-writable by group/other. `PMSS_HOME_DIR` overrides `/home` for hermetic callers.
 - `scripts/util/userPermissions.php` converges a root-owned artifact to `root:<user> 0640` and leaves a non-root one unadopted; `scripts/recreateUser.php` preserves it across account reconstruction.
 
@@ -950,9 +951,9 @@ read-only probes used by baseline sanitization and source-build guards.
 - Alerts are off by default. The customer panel writes the customer-owned
   `~/.usageAlertsEnabled` marker as mode `0600`; root rejects symlinks, wrong
   ownership, and any other mode before treating the account as opted in.
-- The hourly root cron reads the existing root-produced traffic, quota, and
-  media-stack status artifacts. It alerts at 80% traffic, 90% disk, and the
-  watchdog's `failed` service state, using the verified `.notifyEmail` recipient.
+- The hourly root cron reads the root copies of traffic usage and quota and the
+  media-stack status artifact. It alerts at 80% traffic, 90% disk, and the
+  watchdog's `failed` service state, using the stored `notificationEmail` recipient.
 - Root-owned markers under `/var/lib/pmss/usageAlerts` suppress repeat mail while
   a condition remains active. A marker is written only after delivery succeeds
   and is removed when the condition clears or the customer opts out.
@@ -1236,7 +1237,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     This permission pass
     normalizes ownership and mode only for a root-owned regular file; it logs and
     leaves non-root-owned, symlinked, or other non-regular entries unchanged.
-  - Provisioned recipient: Converges a root-owned `.notifyEmail` to `root:<user> 0640`, preserving customer read access. A non-root `.notifyEmail` is logged and left unadopted, so a customer-written address never becomes the trusted recipient. Unlike `.quota` and the traffic files, it has no periodic root writer in PMSS, so this state persists: the "left unadopted" line is logged on every permission pass, and `pmssUserNotificationEmailRead()` rejects the file, so usage alerts for the account stay off. The remedy is for billing-system provisioning (or an operator, as root) to rewrite the file; the next pass then converges it.
+  - Provisioned recipient: Converges a root-owned `.notifyEmail` to `root:<user> 0640`, preserving customer read access. A non-root `.notifyEmail` is logged and left unadopted, so a customer-written address never becomes the trusted recipient. The file is a display copy: the alert recipient comes from the root user store (ADR 0213). Rewriting it with `writeHomeMarker.php .notifyEmail` updates both.
   - Root-produced measurements: `.quota` and the four `.trafficData*` files get the same gate. Their writers (`updateQuotas.php`, `trafficStats.php`, `trafficIngressStats.php`) publish fresh root-owned files, and usage alerts and the operator traffic report trust only a root owner. A non-root entry is left for the next writer run to replace. For a gated entry only the group is repaired, through the opened file after it is confirmed to be a single-link, root-owned regular file inside the home; the owner is never changed.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
@@ -1483,10 +1484,14 @@ and the unchanged successful results without reading live process state.
   only when PHP can represent them as an integer. Oversized decimal strings and
   floating values take the existing parse-failure path before persistence.
 
-- `scripts/util/writeHomeMarker.php <user> <marker> <intValue>` accepts unsigned
+- `scripts/util/writeHomeMarker.php <user> <marker> <value>` accepts unsigned
   decimal marker values, including zero and leading zeroes, only when they fit
-  a PHP integer. Invalid or oversized values retain exit code 4 and the
-  existing stderr error before any home-file write.
+  a PHP integer (`.bonus` at most 300), and an email address for `.notifyEmail`.
+  Invalid or oversized values retain exit code 4 and the existing stderr error
+  before any write. It records the value in the root store
+  (`/etc/seedbox/config/users/<user>.json`, key named in `homeMarkerRegistry.php`)
+  under a per-user lock first; if that fails it logs a line and exits 7 without
+  writing the home copy. The home file is a display copy (ADR 0213).
 
 - scripts/addUser.php USERNAME PASSWORD RAM_MiB QUOTA_GiB [trafficLimitGB]
   - Library loading: Includes resolve from the script directory, independent of the caller's working directory.

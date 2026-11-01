@@ -114,14 +114,19 @@ if ($welcomeMessage !== null) {
     unset($payload['welcomeMessage']);
 }
 
-if (!$store->persist($user['name'], $payload)) {
-    fwrite(STDERR, "Warning: failed to persist user config for {$user['name']}\n");
+// The root store holds the settings root jobs apply (ADR 0213); write it before any home copy.
+if ($uploadThrottleKib !== null) {
+    if ($uploadThrottleKib > 0) $payload['uploadThrottleKib'] = $uploadThrottleKib;
+    else unset($payload['uploadThrottleKib']);
 }
-// Write optional torrent upload throttle before touching heavyweight services so limits
-// persist even if later steps bail out.
+if (!$store->persist($user['name'], $payload)) {
+    if (function_exists('pmssUserLog')) pmssUserLog($user['name'], 'userConfig: user store write failed; no settings applied');
+    pmssCliExitWithStderr("Error: failed to persist user config for {$user['name']}\n", 1);
+}
+// Display copy of the upload cap for the account's panel and tools.
 if ($uploadThrottleKib !== null) {
     if (!pmssWriteTorrentThrottle($user['name'], $uploadThrottleKib)) {
-        fwrite(STDERR, "Warning: failed to write torrent upload throttle for {$user['name']}\n");
+        fwrite(STDERR, "Warning: failed to write torrent upload throttle display copy for {$user['name']}\n");
     }
 }
 

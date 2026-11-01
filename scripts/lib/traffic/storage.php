@@ -52,6 +52,12 @@ function pmssTrafficStatsPath(string $username, ?string $statsDir = null, ?strin
     return pmssDirPathNormalize($statsDir).'/'.$username;
 }
 
+/** Resolve the root ingress statistics copy for a user key (written by trafficIngressStats.php). */
+function pmssTrafficIngressStatsPath(string $username): string
+{
+    return pmssTrafficStatsPath($username, null, pmssDirPathResolve(null, 'PMSS_RUNTIME_DIR', '/var/run/pmss').'/trafficIngress');
+}
+
 /** Return a numeric monthly traffic total, or null for an invalid payload. */
 function pmssTrafficRawMonthMiB(array $data): ?float
 {

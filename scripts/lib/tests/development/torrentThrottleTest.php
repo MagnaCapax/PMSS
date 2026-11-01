@@ -27,27 +27,28 @@ class TorrentThrottleTest extends TestCase
         chmod($path, $mode);
     }
 
-    public function testReadHandlesContentAndModeCases(): void
+    /** The cap comes from uploadThrottleKib in the root store; ~/.torrentThrottle is a display copy (ADR 0213). */
+    public function testReadUsesTheStoredCapNotTheHomeCopy(): void
     {
-        foreach ([
-            'missing file' => [null, 0640, null],
-            'invalid content' => ['nope', 0640, null],
-            'zero value' => ['0', 0640, 0],
-            'positive value' => ['123', 0640, 123],
-            'group writable' => ['10', 0666, null],
-            'decimal value' => ['10.5', 0640, null],
-            'exponent value' => ['1e3', 0640, null],
-            'negative value' => ['-1', 0640, null],
-            'out of range' => [(string) PHP_INT_MAX.'0', 0640, null],
-            'embedded control' => ["10\0", 0640, null],
-        ] as $label => [$content, $mode, $expected]) {
-            @unlink($this->throttlePath());
-            if ($content !== null) {
-                $this->writeThrottleFile($content, $mode);
+        $configDir = $this->pmssMakeTempDir('pmss-throttle-config-');
+        $this->pmssEnsureDir($configDir.'/users');
+        $this->writeThrottleFile('999');
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($configDir): void {
+            foreach ([
+                'no record' => [null, null],
+                'no stored cap' => [[], null],
+                'zero' => [['uploadThrottleKib' => 0], null],
+                'positive' => [['uploadThrottleKib' => 123], 123],
+                'negative' => [['uploadThrottleKib' => -1], null],
+                'text' => [['uploadThrottleKib' => 'nope'], null],
+            ] as $label => [$extra, $expected]) {
+                @unlink($configDir.'/users/alice.json');
+                if ($extra !== null) {
+                    file_put_contents($configDir.'/users/alice.json', json_encode(['ramMiB' => 512, 'rtorrentPort' => 0, 'quota' => 5, 'quotaBurst' => 6] + $extra));
+                }
+                $this->assertSame($expected, pmssReadTorrentThrottle($this->user), $label);
             }
-
-            $this->assertEquals($expected, pmssReadTorrentThrottle($this->user), $label);
-        }
+        });
     }
 
     public function testReadRejectsInvalidUsernameBeforePathResolution(): void

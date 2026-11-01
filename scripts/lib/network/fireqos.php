@@ -10,10 +10,9 @@ require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /** Resolve managed users and trusted throttle caps in their input order. */
-function networkFireqosUserCaps(array $networkConfig, array $users, ?callable $fileStats = null): array
+function networkFireqosUserCaps(array $networkConfig, array $users): array
 {
     $limitStateDir = pmssResolvePathFromEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', '/var/run/pmss/trafficLimits');
-    $homeDir = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
     $configuredCapMbit = $networkConfig['throttle']['max'] ?? 100;
     $defaultCapMbit = is_numeric($configuredCapMbit) && (int) $configuredCapMbit > 0
         ? (int) $configuredCapMbit : 100;
@@ -30,34 +29,19 @@ function networkFireqosUserCaps(array $networkConfig, array $users, ?callable $f
         }
 
         $capMbit = null;
-        if (is_file($limitStateDir."/{$username}.enabled")) {
-            $capMbit = $defaultCapMbit;
-            $throttlePath = $homeDir."/{$username}/.throttle";
-            $stats = null;
-            // The production reader pins the opened inode; the optional stat seam is for hermetic tests.
-            if ($fileStats === null) {
-                $raw = pmssReadRegularFileContentsVerified($throttlePath, 0, 32, $stats);
-            } else {
-                $stats = @$fileStats($throttlePath);
-                $raw = pmssReadRegularFileDigits($throttlePath);
-            }
-            // Symlinks and tenant-owned or group/world-writable files cannot raise the cap.
-            if (is_array($stats) && isset($stats['mode'], $stats['uid']) && ($stats['mode'] & 0170000) === 0100000
-                && (int) $stats['uid'] === 0 && (($stats['mode'] & 0777) & 0022) === 0) {
-                $raw = is_string($raw) ? trim($raw) : '';
-                // Oversized file contents must not become a saturated cap.
-                $stored = pmssUnsignedDecimalIntParse($raw);
-                if ($stored !== null && $stored > 0) {
-                    $capMbit = $stored;
-                }
-            }
+        $markerPath = $limitStateDir."/{$username}.enabled";
+        if (is_file($markerPath)) {
+            // The root runtime marker carries the cap trafficLimits.php chose; an empty marker
+            // (written before the cap was recorded there) means the default cap.
+            $stored = pmssUnsignedDecimalIntParse(trim((string) pmssReadRegularFileContentsVerified($markerPath, pmssTestModeEnabled() ? null : 0, 32)));
+            $capMbit = ($stored !== null && $stored > 0) ? $stored : $defaultCapMbit;
         }
         $caps[$username] = ['uid' => $uid, 'cap' => $capMbit];
     }
     return $caps;
 }
 
-function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets, ?callable $fileStats = null): string
+function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string
 {
     $templatePath = pmssResolvePathFromEnv('PMSS_FIREQOS_TEMPLATE', '/etc/seedbox/config/template.fireqos');
     $template = is_file($templatePath) ? @file_get_contents($templatePath) : false;
@@ -70,7 +54,7 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
         $fireqosConfigLocal .= "    match dst {$localnet}\n";
     }
 
-    $userCaps = networkFireqosUserCaps($networkConfig, $users, $fileStats);
+    $userCaps = networkFireqosUserCaps($networkConfig, $users);
     $fireqosConfigUsers = '';
     foreach ($userCaps as $user) {
         $fireqosConfigUsers .= "      match rawmark {$user['uid']}\n";

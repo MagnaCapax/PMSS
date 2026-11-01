@@ -1,16 +1,16 @@
 <?php
 /**
- * Per-user notification email reader.
+ * Per-user notification email parsing.
  *
- * The billing system provisions this authoritative value. Consumers must
- * reject customer-writable files so alerts cannot be redirected locally.
+ * The billing system provisions the recipient through writeHomeMarker.php .notifyEmail; it is
+ * read from the root store (UserConfigStore::readNotificationEmail). ~/.notifyEmail is its
+ * display copy.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/../pathSafety.php';
 
 /** Normalize one syntactically valid email address from provisioned text. */
 function pmssUserNotificationEmailParse(string $raw): ?string
@@ -25,42 +25,4 @@ function pmssUserNotificationEmailParse(string $raw): ?string
     }
 
     return $email;
-}
-
-/** Read one trusted notification email without following symlinks. */
-function pmssUserNotificationEmailRead(string $home, int $expectedGroup): ?string
-{
-    $home = rtrim($home, '/');
-    $path = $home.'/.notifyEmail';
-    $pathStat = @lstat($path);
-    if ($home === ''
-        || $expectedGroup < 0
-        || !is_array($pathStat)
-        || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000
-    ) {
-        return null;
-    }
-
-    // Non-blocking: a FIFO swapped in after the lstat must not hang the root caller.
-    $handle = @fopen($path, 'rbn');
-    $handleStat = null;
-    $openedPathMatches = pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat);
-    $pathAfterOpen = @lstat($path);
-    $permissions = is_array($handleStat) ? ($handleStat['mode'] ?? 0) & 0777 : -1;
-    if (!$openedPathMatches
-        || !is_array($pathAfterOpen)
-        || !pmssFilesystemStatSameInode($pathAfterOpen, $handleStat)
-        || ($handleStat['uid'] ?? -1) !== 0
-        || ($handleStat['gid'] ?? -1) !== $expectedGroup
-        || !in_array($permissions, [0600, 0640], true)
-    ) {
-        if (is_resource($handle)) {
-            @fclose($handle);
-        }
-        return null;
-    }
-
-    $raw = @stream_get_contents($handle, 257);
-    @fclose($handle);
-    return !is_string($raw) || strlen($raw) > 256 ? null : pmssUserNotificationEmailParse($raw);
 }

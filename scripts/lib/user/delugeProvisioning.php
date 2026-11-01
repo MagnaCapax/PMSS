@@ -24,21 +24,23 @@ function pmssDelugeConfigFileWrite(string $path, string $content, string $label,
     return false;
 }
 
+/**
+ * The account's Deluge web port: the root port-manager reservation. The home copy is only a
+ * preference for a first reservation and is rewritten to the reserved port for display.
+ */
 function pmssDelugeWebPortEnsure(string $username, string $home, int $delugePort): ?int
 {
     $webPortFile = $home.'/.delugeWebPort';
-    $existingWebPort = pmssReadRegularFileNetworkPort($webPortFile, 1024, 65000);
-    if ($existingWebPort !== null) {
-        pmssPortManagerAssignServicePort($username, 'deluge-web', $existingWebPort);
-        return $existingWebPort;
-    }
-
-    $preferredWebPort = $delugePort + 1;
+    $preferredWebPort = pmssReadRegularFileNetworkPort($webPortFile, 1024, 65000) ?? $delugePort + 1;
     $preferredWebPort = pmssNetworkPortInRange($preferredWebPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)
         ? $preferredWebPort
         : null;
     $webPort = pmssPortManagerAssignServicePort($username, 'deluge-web', $preferredWebPort);
-    if ($webPort === null || !pmssWriteUserFile($webPortFile, (string) $webPort, $username, 0644)) {
+    if ($webPort === null) {
+        return null;
+    }
+    if (pmssReadRegularFileNetworkPort($webPortFile, 1024, 65000) !== $webPort
+        && !pmssWriteUserFile($webPortFile, (string) $webPort, $username, 0644)) {
         return null;
     }
 

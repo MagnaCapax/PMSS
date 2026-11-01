@@ -53,16 +53,20 @@ class UserBillingIdsSafetyTest extends TestCase
     {
         if (!defined('PMSS_TEST_MODE')) define('PMSS_TEST_MODE', true);
         require_once dirname(__DIR__, 3).'/util/writeHomeMarker.php';
-        $store = new class extends \UserConfigStore {
-            public $payload = ['billingServiceId' => 0, 'billingClientId' => 0];
-            public function get(string $user): ?array { return $this->payload; }
-            public function set(string $user, array $payload): bool { $this->payload = $payload; return true; }
-        };
-        $this->assertTrue(\pmssWriteHomeMarkerBillingStoreSet($store, 'alice', '.billingId', 123));
-        $this->assertTrue(\pmssWriteHomeMarkerBillingStoreSet($store, 'alice', '.billingClientId', 456));
-        $this->assertSame(123, $store->payload['billingServiceId']);
-        $this->assertSame(456, $store->payload['billingClientId']);
-        $this->assertTrue(\pmssHomeMarkerIsKnown('.billingClientId'));
+        $registry = \pmssHomeMarkerRegistry();
+        $this->assertSame('billingServiceId', $registry['.billingId']['store']);
+        $this->assertSame('billingServiceId', $registry['.billingServiceId']['store']);
+        $this->assertSame('billingClientId', $registry['.billingClientId']['store']);
+
+        $store = new \UserConfigStore($this->pmssMakeTempDir('pmss-billing-writer-').'/config');
+        // No record yet: the store write fails, so the CLI writes no display copy.
+        $this->assertFalse($store->setValue('alice', 'billingServiceId', 123));
+        $this->assertTrue($store->set('alice', ['ramMiB' => 512, 'rtorrentPort' => 5000, 'quota' => 5, 'quotaBurst' => 6]));
+        $this->assertTrue($store->setValue('alice', $registry['.billingId']['store'], 123));
+        $this->assertTrue($store->setValue('alice', $registry['.billingClientId']['store'], 456));
+        $this->assertSame(123, $store->get('alice')['billingServiceId']);
+        $this->assertSame(456, $store->get('alice')['billingClientId']);
+        $this->assertFalse($store->setValue('alice', 'quota', 1));
     }
 
     public function testMissingProvisionedIdsAreNotRecoveredFromAccountHome(): void

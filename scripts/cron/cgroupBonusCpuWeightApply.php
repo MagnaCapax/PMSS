@@ -2,12 +2,12 @@
 <?php
 /**
  * Raise each account's CPU priority (systemd CPUWeight on user-<uid>.slice) by its Free Bonus
- * Disk percent, read from the root-owned ~/.bonus marker the provisioning backend writes.
+ * Disk percent, read from bonusPercent in /etc/seedbox/config/users/<user>.json.
  *
  * Sibling of cgroupBfqWeightApply.php, which does the same for disk priority. The target is
  * max(base, min(10000, round(base * (1 + bonus/100)))), where base is the CPUWeight userConfig
  * applies (explicit CPUWeight in /etc/seedbox/config/users/<user>.json, else the RAM-derived
- * default). A missing or untrusted marker means bonus 0, which means the base weight: no account
+ * default). A missing or invalid bonus means 0, which means the base weight: no account
  * ever drops below what its plan gives it.
  *
  * Only `systemctl set-property` is used, and only when the slice is active and its CPUWeight
@@ -38,10 +38,10 @@ openlog('pmss-bonus-cpu', LOG_PID, LOG_DAEMON);
 $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
 
 foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json): ?int {
-    return pmssBonusCpuBaseWeight($json);
+    $base = pmssBonusCpuBaseWeight($json);
+    return $base === null ? null : pmssCpuApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json));
 }) as $entry) {
-    list($user, $uid, $base) = $entry;
-    $want  = pmssCpuApplyBonusWeight($base, pmssUserBonusPercentReadTrusted($user));
+    list($user, $uid, $want) = $entry;
     $slice = 'user-'.$uid.'.slice';
 
     $out = [];

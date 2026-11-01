@@ -151,7 +151,11 @@ $refreshUserQuota = static function (string $thisUser) use ($logger, $writeQuota
             }
         }
     } else {
-        // Success: exit 0 (normal) or exit 1 (over quota but valid output)
+        // Success: exit 0 (normal) or exit 1 (over quota but valid output).
+        // The root copy is what root readers use; ~/.quota is the display copy.
+        if (!pmssQuotaRootCopyWrite($thisUser, $content)) {
+            $logger->msg("quota root copy write failed for {$thisUser}");
+        }
         if (!pmssQuotaSnapshotWrite($quotaFile, $content)) {
             $logger->msg("quota snapshot write failed for {$thisUser}");
             $writeQuotaUserLogs(

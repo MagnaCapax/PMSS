@@ -1,24 +1,14 @@
 <?php
 /**
- * ADR-0046 registry for provisioned per-user home marker files: the single source of truth
- * mapping each managed marker to its ownership/enforcement class and its mode.
+ * Registry of the per-user home marker files writeHomeMarker.php writes (ADR 0046, ADR 0213).
  *
- * ADR-0046 ("Provisioned in-home file ownership and enforcement classes") defines three classes
- * and defers the concrete registry to "a separate implementation task". This is that registry,
- * scoped to the scalar-integer markers the provisioning backend writes into user homes:
+ * Every marker is a display copy: it exists so the account's panel and its own tools can show
+ * the value. Root jobs never read these files; they read the root store
+ * (/etc/seedbox/config/users/<user>.json) under the key named here. writeHomeMarker.php writes
+ * that key first and the display copy second. A marker without a store key is the display copy
+ * of a value root keeps elsewhere (disk quota via setquota, traffic limit via userTrafficLimit.php).
  *
- *   Enforced      root-owned, group=user read only, no user/other write. Value feeds a
- *                 tamper-sensitive control (traffic cap, BFQ I/O weight). Readers additionally
- *                 verify root ownership (scripts/lib/user/rootArtifactTrust.php).
- *   Authoritative root-owned; PMSS owns the value; user may read via group where required.
- *   Display       root-owned; panel-visible only; forging affects the tenant's own dashboard,
- *                 not enforcement.
- *
- * Owner is always root; group is the user (the read channel). Consumers:
- *   - scripts/util/writeHomeMarker.php (the authoritative writer) reads mode+class here.
- *   - future: userPermissions.php repair + setupPermissions.php may consult the class, but they
- *     MUST NOT convert a tenant-owned marker to root (that would bless forged content — #726);
- *     only the authoritative writer creates a marker root-owned.
+ * Owner is always root; group is the user (the read channel).
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -28,18 +18,19 @@ require_once dirname(__DIR__).'/runtime.php';
 
 if (!function_exists('pmssHomeMarkerRegistry')) {
     /**
-     * @return array<string,array{class:string,mode:int}> keyed by bare marker filename
+     * @return array<string,array{class:string,mode:int,store:?string,max?:int,type?:string}> keyed by bare marker filename
      */
     function pmssHomeMarkerRegistry(): array
     {
         return [
-            '.bonus'        => ['class' => 'enforced',      'mode' => 0640],
-            '.bonusTraffic' => ['class' => 'enforced',      'mode' => 0640],
-            '.billingId'    => ['class' => 'authoritative', 'mode' => 0640],
-            '.billingServiceId' => ['class' => 'authoritative', 'mode' => 0640],
-            '.billingClientId' => ['class' => 'authoritative', 'mode' => 0640],
-            '.bonusQuota'   => ['class' => 'display',        'mode' => 0644],
-            '.trafficLimit' => ['class' => 'display',        'mode' => 0644],
+            '.bonus'            => ['class' => 'display', 'mode' => 0640, 'store' => 'bonusPercent', 'max' => 300],
+            '.bonusTraffic'     => ['class' => 'display', 'mode' => 0640, 'store' => 'bonusTrafficGiB'],
+            '.billingId'        => ['class' => 'display', 'mode' => 0640, 'store' => 'billingServiceId'],
+            '.billingServiceId' => ['class' => 'display', 'mode' => 0640, 'store' => 'billingServiceId'],
+            '.billingClientId'  => ['class' => 'display', 'mode' => 0640, 'store' => 'billingClientId'],
+            '.notifyEmail'      => ['class' => 'display', 'mode' => 0640, 'store' => 'notificationEmail', 'type' => 'email'],
+            '.bonusQuota'       => ['class' => 'display', 'mode' => 0644, 'store' => null],
+            '.trafficLimit'     => ['class' => 'display', 'mode' => 0644, 'store' => null],
         ];
     }
 }
@@ -61,7 +52,7 @@ if (!function_exists('pmssHomeMarkerMode')) {
 }
 
 if (!function_exists('pmssHomeMarkerClass')) {
-    /** ADR-0046 class for a known marker, or null when not in the registry. */
+    /** Class for a known marker (always "display"), or null when not in the registry. */
     function pmssHomeMarkerClass(string $marker): ?string
     {
         $reg = pmssHomeMarkerRegistry();

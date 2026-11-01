@@ -44,10 +44,9 @@ class LighttpdWatchdogErrorPageTest extends TestCase
                 $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('alice', $binDir.'/config'.$invalid));
                 $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead($invalid, $binDir));
             }
-            // A rejected live probe must still use a valid saved quota snapshot.
+            // A rejected account name reads no snapshot, and a file in the home is never one.
             file_put_contents($binDir.'/.quota', "/dev/sda1 10G* 9G 10G 0 0 0\n");
-            $state = pmssLighttpdWatchdogQuotaStateRead("alice\0", $binDir);
-            $this->assertTrue($state['exceeded']);
+            $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead("alice\0", $binDir));
             $this->assertFalse(file_exists($marker));
         });
     }
@@ -156,17 +155,22 @@ class LighttpdWatchdogErrorPageTest extends TestCase
     public function testQuotaStateReaderPreservesLiveOutputAndSnapshotPrecedence(): void
     {
         $homeDir = $this->pmssMakeTempDir('pmss-watchdog-quota-');
+        $rootDir = $this->pmssMakeTempDir('pmss-watchdog-quota-root-');
         $healthy = "/dev/sda1 1G 9G 10G 0 0 0\n";
         $exhausted = "/dev/sda1 10G* 9G 10G 0 0 0\n";
-        // Nonempty live output wins even on failure; only empty output uses the snapshot.
+        // Nonempty live output wins even on failure; only empty output uses the root snapshot copy.
+        // The home copy holds the opposite value and is never read.
         foreach ([[$healthy, 0, $exhausted, false], [$exhausted, 1, $healthy, true],
             ['', 1, $exhausted, true], ['', 0, $healthy, false],
             ['unavailable', 1, $exhausted, null], ['', 1, '', null]] as [$output, $rc, $snapshot, $expected]) {
-            file_put_contents($homeDir.'/.quota', $snapshot);
+            file_put_contents($rootDir.'/alice', $snapshot);
+            file_put_contents($homeDir.'/.quota', $snapshot === $healthy ? $exhausted : $healthy);
             $this->pmssWriteExecutableFiles($homeDir, ['quota' => "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)."\nexit {$rc}\n"]);
-            $this->pmssWithPathPrefix($homeDir, function () use ($homeDir, $expected): void {
-                $state = pmssLighttpdWatchdogQuotaStateRead('alice', $homeDir);
-                $this->assertSame($expected, $state['exceeded'] ?? null);
+            $this->pmssWithEnv(['PMSS_QUOTA_RUNTIME_DIR' => $rootDir], function () use ($homeDir, $expected): void {
+                $this->pmssWithPathPrefix($homeDir, function () use ($homeDir, $expected): void {
+                    $state = pmssLighttpdWatchdogQuotaStateRead('alice', $homeDir);
+                    $this->assertSame($expected, $state['exceeded'] ?? null);
+                });
             });
         }
     }

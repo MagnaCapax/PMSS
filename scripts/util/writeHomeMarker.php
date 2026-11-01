@@ -1,24 +1,16 @@
 #!/usr/bin/env php
 <?php
 /**
- * Write a per-user home marker file safely, as root, without following symlinks.
+ * Record one per-user value: first in the root store, then as a display copy in the home.
  *
- * Provisioning/enforcement callers (including the off-repo hallinta backend) must
- * NOT write markers into a tenant home with raw shell (`echo > ~/.x; chown u.u; chmod`):
- * `chown`, the `>` redirect, and `chmod` all dereference symlinks by default, so a
- * tenant (whose home is 0770 user-owned) can plant `~/.marker -> /etc/shadow` and have
- * root chown/write the target — a local-root escalation. This CLI routes the write
- * through the symlink-safe managed-file primitive (tempnam-in-dir + atomic rename that
- * replaces a planted symlink, is_link guards, root-only owner/mode).
+ * Root jobs read the value only from the root store (/etc/seedbox/config/users/<user>.json,
+ * ADR 0213). The file in the home is written afterwards so the account's panel and tools can
+ * show it, through the managed-file primitive (atomic replace, root owner, user group).
+ * If the store write fails, nothing is written to the home and the exit code is non-zero.
  *
- * Usage: writeHomeMarker.php <user> <marker> <intValue>
- *   <marker> is a bare filename from the fixed allowlist below (no path, no leading dot
- *   choice — the allowlist carries the exact name). <intValue> is a non-negative integer;
- *   these markers only ever hold a single scalar integer.
- *
- * Owner/mode per marker follows ADR-0046 (Provisioned in-home file ownership classes):
- * enforcement/authoritative markers are root-owned, group=user for the required read
- * channel, no user/other write. Until the ADR-0046 registry lands, the table lives here.
+ * Usage: writeHomeMarker.php <user> <marker> <value>
+ *   <marker> is a bare filename from homeMarkerRegistry.php. <value> is a non-negative integer,
+ *   or an email address for .notifyEmail.
  *
  * Exit codes: 0 ok; 1 usage; 2 bad user; 3 unknown marker; 4 bad value; 5 unsafe home;
  *             6 not root; 7 write failed.
@@ -32,20 +24,21 @@ require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/homeMarkerRegistry.php';
 require_once __DIR__.'/../lib/runtime/cli.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
+require_once __DIR__.'/../lib/user/log.php';
 
-/** Record provisioned billing identity in the root store before writing a marker. */
-function pmssWriteHomeMarkerBillingStoreSet(UserConfigStore $store, string $user, string $marker, int $value): bool
+/** Parse a marker value by its registry entry; null when invalid. */
+function pmssWriteHomeMarkerValueParse(array $entry, string $raw)
 {
-    $key = $marker === '.billingClientId' ? 'billingClientId' : 'billingServiceId';
-    $payload = $store->get($user);
-    if (!is_array($payload)) return false;
-    $payload[$key] = $value;
-    return $store->set($user, $payload);
+    if (($entry['type'] ?? '') === 'email') {
+        return pmssUserNotificationEmailParse($raw);
+    }
+    $value = pmssHomeMarkerValueParse($raw);
+    return ($value !== null && $value <= ($entry['max'] ?? PHP_INT_MAX)) ? $value : null;
 }
 
-function pmssWriteHomeMarkerCli(array $argv): int
+function pmssWriteHomeMarkerCli(array $argv, ?UserConfigStore $store = null): int
 {
-    $usage = "Usage: writeHomeMarker.php <user> <marker> <intValue>\n";
+    $usage = "Usage: writeHomeMarker.php <user> <marker> <value>\n";
     if (count($argv) !== 4) {
         return pmssCliReturnWithStderr($usage, 1);
     }
@@ -63,11 +56,11 @@ function pmssWriteHomeMarkerCli(array $argv): int
     if (!pmssHomeMarkerIsKnown($marker)) {
         return pmssCliReturnWithStderr("Error: unknown marker '{$marker}'.\n", 3);
     }
-    $mode = pmssHomeMarkerMode($marker);
+    $entry = pmssHomeMarkerRegistry()[$marker];
 
-    $value = pmssHomeMarkerValueParse((string) $argv[3]);
+    $value = pmssWriteHomeMarkerValueParse($entry, (string) $argv[3]);
     if ($value === null) {
-        return pmssCliReturnWithStderr("Error: value must be a non-negative integer.\n", 4);
+        return pmssCliReturnWithStderr("Error: invalid value for {$marker}.\n", 4);
     }
 
     // The home must be a real directory whose path cannot redirect the root write.
@@ -76,24 +69,18 @@ function pmssWriteHomeMarkerCli(array $argv): int
         return pmssCliReturnWithStderr("Error: home for '{$user}' is missing or unsafe.\n", 5);
     }
 
-    // The public service identity comes from root-owned provisioning state.
-    // Record the public service identity in root-owned provisioning state.
-    if (in_array($marker, ['.billingId', '.billingServiceId', '.billingClientId'], true)) {
-        $store = new UserConfigStore();
-        if (!pmssWriteHomeMarkerBillingStoreSet($store, $user, $marker, $value)) {
-            return pmssCliReturnWithStderr("Error: failed to record billing identity.\n", 7);
-        }
+    if ($entry['store'] !== null && !($store ?? new UserConfigStore())->setValue($user, $entry['store'], $value)) {
+        pmssUserLog($user, sprintf('writeHomeMarker: store write for %s failed; display copy not written', $marker));
+        return pmssCliReturnWithStderr("Error: failed to record {$entry['store']} in the user store.\n", 7);
     }
 
-    // Symlink-safe atomic write with root:user ownership and the ADR-0046 mode.
     $path = $home.'/'.$marker;
-    if (!pmssWriteManagedFile($path, (string) $value, 'root', $user, $mode)) {
+    if (!pmssWriteManagedFile($path, (string) $value, 'root', $user, (int) $entry['mode'])) {
         return pmssCliReturnWithStderr("Error: failed to write {$path}.\n", 7);
     }
 
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, sprintf('writeHomeMarker: %s set to %d (root:%s %04o)', $marker, $value, $user, $mode));
-    }
+    $shown = ($entry['type'] ?? '') === 'email' ? 'an address' : (string) $value;
+    pmssUserLog($user, sprintf('writeHomeMarker: %s set to %s (root:%s %04o)', $marker, $shown, $user, $entry['mode']));
     return 0;
 }
 

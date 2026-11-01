@@ -19,10 +19,11 @@ function pmssResourceSnapshotRun(): int
             return 0;
         }
         $stats = new resourceStatistics();
-        $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
+        $runtimeDir = pmssDirPathResolve(null, 'PMSS_RUNTIME_DIR', '/var/run/pmss');
 
         foreach ($userUids as $user => $uid) {
-            $dataPath = $homeDir.'/'.$user.'/.resourceData';
+            // Root copy written by the resource stats processor; ~/.resourceData is its display copy.
+            $dataPath = $runtimeDir.'/resourceStats/'.$user;
             $metrics = is_array($data = pmssReadSerializedArrayFile($dataPath)) ? pmssResourceStoredPayloadWindowMetrics($data, 'day') : null;
 
             if ($metrics === null && ($dataLines = $stats->getData($user, 350)) !== '') {

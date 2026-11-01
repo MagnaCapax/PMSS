@@ -5,17 +5,6 @@ require_once dirname(__DIR__, 3).'/lib/user/userConfigStore.php';
 
 class UserNotificationEmailTest extends TestCase
 {
-    /** @var string */
-    private $home;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $root = $this->pmssMakeTempDir('pmss-notification-email-');
-        $this->home = $root.'/fixtur01';
-        $this->pmssEnsureDir($this->home);
-    }
-
     public function testValidNotificationEmailsAreReadAndTrimmed(): void
     {
         foreach (["user@example.com\n", 'alerts+seedbox@example.co.uk'] as $email) {
@@ -42,57 +31,21 @@ class UserNotificationEmailTest extends TestCase
         }
     }
 
-    public function testMissingDirectoryAndFileAreRejected(): void
+    /** The recipient comes from the root store only; ~/.notifyEmail is a display copy (ADR 0213). */
+    public function testRecipientComesFromTheStoreNotTheHome(): void
     {
-        $this->assertSame(null, \pmssUserNotificationEmailRead($this->home.'/missing', 0));
-        $this->assertSame(null, \pmssUserNotificationEmailRead($this->home, 0));
-    }
-
-    public function testSymlinkedNotificationEmailIsRejected(): void
-    {
-        $target = $this->home.'/target';
-        $this->pmssWriteFile($target, 'user@example.com');
-        symlink($target, $this->home.'/.notifyEmail');
-
-        $this->assertSame(null, \pmssUserNotificationEmailRead($this->home, (int) filegroup($target)));
-    }
-
-    public function testTrustedReadRejectsCustomerOwnedOrWritableFile(): void
-    {
-        $path = $this->pmssWriteRelativeFile($this->home, '.notifyEmail', 'user@example.com');
-        chmod($path, 0660);
-        clearstatcache(true, $path);
-        $group = (int) filegroup($path);
-        $this->assertSame(null, \pmssUserNotificationEmailRead($this->home, $group));
-
-        chmod($path, 0640);
-        clearstatcache(true, $path);
-        $expected = @fileowner($path) === 0 ? 'user@example.com' : null;
-        $this->assertSame($expected, \pmssUserNotificationEmailRead($this->home, $group));
-        $this->assertSame(null, \pmssUserNotificationEmailRead($this->home, $group + 1));
-
-        chmod($path, 0644);
-        clearstatcache(true, $path);
-        $this->assertSame(null, \pmssUserNotificationEmailRead($this->home, $group));
-    }
-
-    public function testReaderOpensWithoutBlocking(): void
-    {
-        // lstat has already refused a FIFO; the open itself must not block if one is swapped in after it.
-        $source = $this->pmssReadRepoFile('scripts/lib/user/notificationEmail.php');
-        $this->assertStringContainsString('fopen($path, \'rbn\')', $source);
-    }
-
-    public function testStoreReaderRejectsInvalidOrUnknownUsername(): void
-    {
-        $root = dirname($this->home);
-        $path = $this->pmssWriteRelativeFile($this->home, '.notifyEmail', 'user@example.com');
-        chmod($path, 0660);
-        clearstatcache(true, $path);
-        $this->pmssWithEnv(['PMSS_HOME_DIR' => $root], function (): void {
-            $store = new \UserConfigStore($this->home.'/config');
-            $this->assertSame(null, $store->readNotificationEmail('../fixtur01'));
-            $this->assertSame(null, $store->readNotificationEmail('fixtur01'));
+        $root = $this->pmssMakeTempDir('pmss-notification-email-');
+        $this->pmssEnsureDir($root.'/alice');
+        file_put_contents($root.'/alice/.notifyEmail', 'home@example.test');
+        $this->pmssWithEnv(['PMSS_HOME_DIR' => $root], function () use ($root): void {
+            $store = new \UserConfigStore($root.'/config');
+            $this->assertSame(null, $store->readNotificationEmail('alice'));
+            $this->assertTrue($store->set('alice', ['ramMiB' => 512, 'rtorrentPort' => 5000, 'quota' => 5, 'quotaBurst' => 6]));
+            $this->assertTrue($store->setValue('alice', 'notificationEmail', 'store@example.test'));
+            $this->assertSame('store@example.test', $store->readNotificationEmail('alice'));
+            $this->assertTrue($store->setValue('alice', 'notificationEmail', "bad\naddress"));
+            $this->assertSame(null, $store->readNotificationEmail('alice'));
+            $this->assertSame(null, $store->readNotificationEmail('../alice'));
         });
     }
 }

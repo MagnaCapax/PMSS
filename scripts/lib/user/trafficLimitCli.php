@@ -128,8 +128,12 @@ function pmssUserGiBSettingCli(array $argv, array $spec): int
 
     $targetModes = call_user_func($spec['targetModesResolver'], $userName, $homeDir);
 
+    $storeKey = $spec['storeKey'] ?? null;
+    if ($storeKey !== null) require_once __DIR__.'/userConfigStore.php';
     if ($show) {
-        printf("%s for %s: %d GiB\n", $spec['subjectLabel'], $userName, pmssTrafficLimitReadGiBFile((string) array_key_first($targetModes)));
+        $shown = $storeKey !== null ? (new UserConfigStore())->getInt($userName, $storeKey)
+            : pmssTrafficLimitReadGiBFile((string) array_key_first($targetModes));
+        printf("%s for %s: %d GiB\n", $spec['subjectLabel'], $userName, $shown);
         return 0;
     }
 
@@ -147,6 +151,11 @@ function pmssUserGiBSettingCli(array $argv, array $spec): int
     }
 
     $removingValue = ($value === 0);
+    // The root store holds the value root jobs use; the home copy is for display only (ADR 0213).
+    if ($storeKey !== null && !(new UserConfigStore())->setValue($userName, $storeKey, $removingValue ? null : $value)) {
+        if (function_exists('pmssUserLog')) pmssUserLog($userName, $spec['subjectLabel'].': store write failed; display copy not written');
+        return pmssCliReturnWithStderr("Error: failed to record {$storeKey} in the user store\n", 4);
+    }
     $persistError = null;
     if (!pmssTrafficLimitPersistTargetModes($targetModes, $value, $persistError)) {
         return pmssCliReturnWithStderr('Error: '.($persistError ?: 'failed to persist targets')."\n", 4);

@@ -14,9 +14,9 @@ require_once __DIR__.'/../traffic/storage.php';
  *
  * @return array<string, mixed>
  */
-function pmssStatsReadQuotaSnapshot(string $home): array
+function pmssStatsReadQuotaSnapshot(string $home, ?string $path = null): array
 {
-    $result = ['path' => rtrim($home, '/').'/.quota', 'raw' => '', 'used_text' => 'n/a', 'soft_text' => 'n/a', 'hard_text' => 'n/a', 'used_bytes' => null, 'soft_bytes' => null, 'hard_bytes' => null];
+    $result = ['path' => $path ?? rtrim($home, '/').'/.quota', 'raw' => '', 'used_text' => 'n/a', 'soft_text' => 'n/a', 'hard_text' => 'n/a', 'used_bytes' => null, 'soft_bytes' => null, 'hard_bytes' => null];
     $raw = pmssReadRegularFileContents($result['path']);
     if ($raw === null || trim($raw) === '') return $result;
     $result['raw'] = $raw;

@@ -5,18 +5,16 @@ require_once dirname(__DIR__, 2).'/network/fireqos.php';
 
 class NetworkFireqosTest extends TestCase
 {
+    /** The cap lives in the root runtime marker; the home display copy holds another value and is ignored. */
     private function fireqosThrottleFixture(bool $enabled, ?string $throttle = null): array
     {
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
         $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         $this->pmssEnsureDir($homeDir.'/root');
         if ($enabled) {
-            @file_put_contents($stateDir.'/root.enabled', '1');
+            @file_put_contents($stateDir.'/root.enabled', $throttle ?? '');
         }
-        if ($throttle !== null) {
-            @file_put_contents($homeDir.'/root/.throttle', $throttle);
-            @chmod($homeDir.'/root/.throttle', 0644);
-        }
+        @file_put_contents($homeDir.'/root/.throttle', '77');
         return [$stateDir, $homeDir];
     }
 
@@ -41,11 +39,7 @@ class NetworkFireqosTest extends TestCase
 
         $config = '';
         $this->pmssWithEnv($env, function () use (&$config, $networkConfig, $users, $localnets): void {
-            $config = \networkBuildFireqosConfig($networkConfig, $users, $localnets, static function (string $path): array {
-                $stats = lstat($path);
-                $stats['uid'] = 0;
-                return $stats;
-            });
+            $config = \networkBuildFireqosConfig($networkConfig, $users, $localnets);
         });
         return $config;
     }
@@ -238,17 +232,13 @@ class NetworkFireqosTest extends TestCase
         $this->assertEquals(null, \networkFireqosRenderedUserCaps('interface eth0'));
     }
 
-    public function testTenantOwnedThrottleFallsBackToDefaultCap(): void
+    public function testHomeThrottleCopyNeverSetsTheCap(): void
     {
-        [$stateDir, $homeDir] = $this->fireqosThrottleFixture(true, '99999');
-        $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir, 'PMSS_HOME_DIR' => $homeDir], function () use ($homeDir): void {
-            $tenantStats = static function (string $path): array {
-                $stats = lstat($path);
-                $stats['uid'] = 1001;
-                return $stats;
-            };
-            $caps = \networkFireqosUserCaps(['throttle' => ['max' => 100]], ['root'], $tenantStats);
-            $config = \networkBuildFireqosConfig(['throttle' => ['max' => 100]], ['root'], [], $tenantStats);
+        [$stateDir, $homeDir] = $this->fireqosThrottleFixture(true);
+        file_put_contents($homeDir.'/root/.throttle', '99999');
+        $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir, 'PMSS_HOME_DIR' => $homeDir], function (): void {
+            $caps = \networkFireqosUserCaps(['throttle' => ['max' => 100]], ['root']);
+            $config = \networkBuildFireqosConfig(['throttle' => ['max' => 100]], ['root'], []);
             $this->assertEquals(100, $caps['root']['cap']);
             $this->assertStringContainsString('class root ceil 100Mbit', $config);
             $this->assertStringNotContainsString('99999Mbit', $config);
