@@ -162,7 +162,7 @@ class UserTransferTest extends TestCase
             foreach (\pmssUserTransferScratchPayloads($cfg) as $key => $script) {
                 $this->assertStringNotContainsString('/etc/seedbox/config/users', $script, $key);
             }
-            $this->assertStringContainsString("-l 'deefbox'", \pmssUserTransferBuildRsyncMain($cfg));
+            $this->assertStringContainsString("-l 'deefbox'", \pmssUserTransferBuildAuthProbe($cfg));
         }
     }
 
