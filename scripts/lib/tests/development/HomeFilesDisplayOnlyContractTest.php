@@ -57,6 +57,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         'scripts/lib/user/deluge.php' => ['.delugePort', '.delugeEnable'],
         'scripts/lib/user/delugeManagedConfig.php' => ['.delugeEnable'],
         'scripts/lib/user/delugeProvisioning.php' => ['.delugeWebPort'],
+        'scripts/lib/user/qbittorrentPortCollision.php' => ['.qbittorrentPort'],
         'scripts/lib/user/qbittorrentPortRepair.php' => ['.qbittorrentPort'],
         'scripts/lib/user/restart.php' => ['.media-stack-status.json'],
         'scripts/lib/user/torrentPort.php' => ['.delugeWebPort', '.delugePort', '.qbittorrentPort'],
