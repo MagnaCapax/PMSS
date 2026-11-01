@@ -337,7 +337,7 @@ function pmssSafeRootCleanupMain(array $argv): int
     $rootFreeAfter = (int) @disk_free_space('/');
     $rootUsePctAfter = $rootTot > 0 ? (int) round((($rootTot - $rootFreeAfter) / $rootTot) * 100) : 0;
 
-    // Audit: JSONL + the operator server-op log.
+    // Audit: one JSONL row per run.
     $entry = [
         'ts' => date('c'),
         'tool' => 'safeRootCleanup',
@@ -356,18 +356,6 @@ function pmssSafeRootCleanupMain(array $argv): int
         && pmssLogWritePathIsSafe($jsonPath)) {
         pmssJsonLineAppend($jsonPath, $entry);
     }
-    pmssLogAppendTimestampedLine(
-        '/root/sysadmin.agentic.log',
-        sprintf(
-            'safeRootCleanup: freed %s (root %d%%->%d%%; apt=%s journald=%s rotated=%s/%df atop=%s/%df tmp=%s)',
-            pmssSafeRootCleanupHuman($freedTotal), $rootUsePct, $rootUsePctAfter,
-            pmssSafeRootCleanupHuman($freed['apt_cache']),
-            pmssSafeRootCleanupHuman($freed['journald']),
-            pmssSafeRootCleanupHuman($freed['rotated_logs']), count($rotated),
-            pmssSafeRootCleanupHuman($freed['atop_logs']), count($atop),
-            pmssSafeRootCleanupHuman($freed['distupgrade_tmp'])
-        )
-    );
 
     if (!$quiet) {
         echo "Reclaimed " . pmssSafeRootCleanupHuman($freedTotal)
