@@ -30,7 +30,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         'scripts/lib/traffic/storage.php' => ['.trafficLimit', '.trafficData', '.trafficDataLocal', '.trafficDataIngress'],
         'scripts/lib/user/add/artifactVerification.php' => ['.quota'],
         'scripts/lib/user/add/postProvision.php' => ['.bonusQuota'],
-        'scripts/lib/user/homeMarkerRegistry.php' => ['.bonus', '.bonusTraffic', '.bonusQuota', '.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail', '.trafficLimit'],
+        'scripts/lib/user/homeMarkerRegistry.php' => ['.bonus', '.bonusTraffic', '.bonusQuota', '.billingId', '.billingServiceId', '.billingClientId', '.trafficLimit'],
         'scripts/lib/user/iopsLimit.php' => ['.iopsLimit'],
         'scripts/lib/user/rootArtifactPermissions.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail', '.quota'],
         'scripts/lib/user/traffic.php' => ['.torrentThrottle', '.quota'],
@@ -109,14 +109,12 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         $this->assertTrue($store->set('alice', $base));
         $this->assertTrue($store->setValue('alice', 'bonusPercent', 100));
         $this->assertTrue($store->setValue('alice', 'bonusTrafficGiB', 50));
-        $this->assertTrue($store->setValue('alice', 'notificationEmail', 'alice@example.test'));
         // A whole-record write (userConfig.php) keeps the values the provisioning CLIs set.
-        $this->assertTrue($store->set('alice', $base + ['bonusPercent' => 0, 'notificationEmail' => 'other@example.test']));
+        $this->assertTrue($store->set('alice', $base + ['bonusPercent' => 0, 'bonusTrafficGiB' => 1]));
         $record = $store->get('alice');
         $this->assertSame(100, $record['bonusPercent']);
         $this->assertSame(100, \pmssUserBonusPercentFromConfig($record));
         $this->assertSame(50, $store->getInt('alice', 'bonusTrafficGiB'));
-        $this->assertSame('alice@example.test', $store->readNotificationEmail('alice'));
         $this->assertTrue($store->setValue('alice', 'bonusTrafficGiB', null));
         $this->assertSame(0, $store->getInt('alice', 'bonusTrafficGiB'));
         $this->assertSame(0, \pmssUserBonusPercentFromConfig(['bonusPercent' => 301]));

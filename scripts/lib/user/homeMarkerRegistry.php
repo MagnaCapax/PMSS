@@ -18,7 +18,7 @@ require_once dirname(__DIR__).'/runtime.php';
 
 if (!function_exists('pmssHomeMarkerRegistry')) {
     /**
-     * @return array<string,array{class:string,mode:int,store:?string,max?:int,type?:string}> keyed by bare marker filename
+     * @return array<string,array{class:string,mode:int,store:?string,max?:int}> keyed by bare marker filename
      */
     function pmssHomeMarkerRegistry(): array
     {
@@ -28,7 +28,6 @@ if (!function_exists('pmssHomeMarkerRegistry')) {
             '.billingId'        => ['class' => 'display', 'mode' => 0640, 'store' => 'billingServiceId'],
             '.billingServiceId' => ['class' => 'display', 'mode' => 0640, 'store' => 'billingServiceId'],
             '.billingClientId'  => ['class' => 'display', 'mode' => 0640, 'store' => 'billingClientId'],
-            '.notifyEmail'      => ['class' => 'display', 'mode' => 0640, 'store' => 'notificationEmail', 'type' => 'email'],
             '.bonusQuota'       => ['class' => 'display', 'mode' => 0644, 'store' => null],
             '.trafficLimit'     => ['class' => 'display', 'mode' => 0644, 'store' => null],
         ];

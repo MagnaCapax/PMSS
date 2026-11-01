@@ -2,9 +2,8 @@
 /**
  * Per-user notification email parsing.
  *
- * The billing system provisions the recipient through writeHomeMarker.php .notifyEmail; it is
- * read from the root store (UserConfigStore::readNotificationEmail). ~/.notifyEmail is its
- * display copy.
+ * The recipient is read only from the root store (UserConfigStore::readNotificationEmail,
+ * ADR 0213); no file under the home is read. No provisioning CLI records an address on the node.
  *
  * @license GPL-3.0-only
  * @author PMSS Team

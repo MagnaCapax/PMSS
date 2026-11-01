@@ -8,9 +8,8 @@
  * show it, through the managed-file primitive (atomic replace, root owner, user group).
  * If the store write fails, nothing is written to the home and the exit code is non-zero.
  *
- * Usage: writeHomeMarker.php <user> <marker> <value>
- *   <marker> is a bare filename from homeMarkerRegistry.php. <value> is a non-negative integer,
- *   or an email address for .notifyEmail.
+ * Usage: writeHomeMarker.php <user> <marker> <intValue>
+ *   <marker> is a bare filename from homeMarkerRegistry.php. <intValue> is a non-negative integer.
  *
  * Exit codes: 0 ok; 1 usage; 2 bad user; 3 unknown marker; 4 bad value; 5 unsafe home;
  *             6 not root; 7 write failed.
@@ -27,18 +26,15 @@ require_once __DIR__.'/../lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/log.php';
 
 /** Parse a marker value by its registry entry; null when invalid. */
-function pmssWriteHomeMarkerValueParse(array $entry, string $raw)
+function pmssWriteHomeMarkerValueParse(array $entry, string $raw): ?int
 {
-    if (($entry['type'] ?? '') === 'email') {
-        return pmssUserNotificationEmailParse($raw);
-    }
     $value = pmssHomeMarkerValueParse($raw);
     return ($value !== null && $value <= ($entry['max'] ?? PHP_INT_MAX)) ? $value : null;
 }
 
 function pmssWriteHomeMarkerCli(array $argv, ?UserConfigStore $store = null): int
 {
-    $usage = "Usage: writeHomeMarker.php <user> <marker> <value>\n";
+    $usage = "Usage: writeHomeMarker.php <user> <marker> <intValue>\n";
     if (count($argv) !== 4) {
         return pmssCliReturnWithStderr($usage, 1);
     }
@@ -79,8 +75,7 @@ function pmssWriteHomeMarkerCli(array $argv, ?UserConfigStore $store = null): in
         return pmssCliReturnWithStderr("Error: failed to write {$path}.\n", 7);
     }
 
-    $shown = ($entry['type'] ?? '') === 'email' ? 'an address' : (string) $value;
-    pmssUserLog($user, sprintf('writeHomeMarker: %s set to %s (root:%s %04o)', $marker, $shown, $user, $entry['mode']));
+    pmssUserLog($user, sprintf('writeHomeMarker: %s set to %d (root:%s %04o)', $marker, $value, $user, $entry['mode']));
     return 0;
 }
 

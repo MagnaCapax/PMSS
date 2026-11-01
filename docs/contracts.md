@@ -940,7 +940,7 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ## Per-user Notification Recipient - `scripts/lib/user/notificationEmail.php`
 
-- `UserConfigStore::readNotificationEmail()` reads `notificationEmail` from the root user store (set by `writeHomeMarker.php .notifyEmail`) and returns a single syntactically valid email address or `null`; `~/.notifyEmail` is a display copy.
+- `UserConfigStore::readNotificationEmail()` reads `notificationEmail` from the root user store and returns a single syntactically valid email address or `null`. No provisioning CLI records the key and `~/.notifyEmail` is never read, so without a stored address usage alerts report `recipient_missing`.
 - `UserConfigStore::readNotificationEmail()` accepts only a valid managed username and requires the artifact to be root-owned and non-writable by group/other. `PMSS_HOME_DIR` overrides `/home` for hermetic callers.
 - `scripts/util/userPermissions.php` converges a root-owned artifact to `root:<user> 0640` and leaves a non-root one unadopted; `scripts/recreateUser.php` preserves it across account reconstruction.
 
@@ -1237,7 +1237,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     This permission pass
     normalizes ownership and mode only for a root-owned regular file; it logs and
     leaves non-root-owned, symlinked, or other non-regular entries unchanged.
-  - Provisioned recipient: Converges a root-owned `.notifyEmail` to `root:<user> 0640`, preserving customer read access. A non-root `.notifyEmail` is logged and left unadopted, so a customer-written address never becomes the trusted recipient. The file is a display copy: the alert recipient comes from the root user store (ADR 0213). Rewriting it with `writeHomeMarker.php .notifyEmail` updates both.
+  - Provisioned recipient: Converges a root-owned `.notifyEmail` to `root:<user> 0640`, preserving customer read access. A non-root `.notifyEmail` is logged and left unadopted, so a customer-written address never becomes the trusted recipient. The file is not read by any root job: the alert recipient comes only from the root user store (ADR 0213).
   - Root-produced measurements: `.quota` and the four `.trafficData*` files get the same gate. Their writers (`updateQuotas.php`, `trafficStats.php`, `trafficIngressStats.php`) publish fresh root-owned files, and usage alerts and the operator traffic report trust only a root owner. A non-root entry is left for the next writer run to replace. For a gated entry only the group is repaired, through the opened file after it is confirmed to be a single-link, root-owned regular file inside the home; the owner is never changed.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
@@ -1486,7 +1486,7 @@ and the unchanged successful results without reading live process state.
 
 - `scripts/util/writeHomeMarker.php <user> <marker> <value>` accepts unsigned
   decimal marker values, including zero and leading zeroes, only when they fit
-  a PHP integer (`.bonus` at most 300), and an email address for `.notifyEmail`.
+  a PHP integer (`.bonus` at most 300).
   Invalid or oversized values retain exit code 4 and the existing stderr error
   before any write. It records the value in the root store
   (`/etc/seedbox/config/users/<user>.json`, key named in `homeMarkerRegistry.php`)

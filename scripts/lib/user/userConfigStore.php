@@ -33,7 +33,7 @@ pmssRequireRelativeFiles(__DIR__, [
 class UserConfigStore
 {
     /** Values the provisioning CLIs set one at a time (writeHomeMarker.php, userBonusTraffic.php). */
-    public const VALUE_KEYS = ['bonusPercent', 'bonusTrafficGiB', 'notificationEmail'];
+    public const VALUE_KEYS = ['bonusPercent', 'bonusTrafficGiB'];
 
     /** @var string */
     private $userDir;
