@@ -154,6 +154,18 @@ class UserTransferTest extends TestCase
         }
     }
 
+    /** The pull runs as the account; nothing in it reaches the source's root settings (ADR 0213). */
+    public function testTransferPayloadsNeverReadTheRootSettingsStore(): void
+    {
+        foreach ([false, true] as $namespaceRsync) {
+            $cfg = $this->baseConfig(['namespaceRsync' => $namespaceRsync]);
+            foreach (\pmssUserTransferScratchPayloads($cfg) as $key => $script) {
+                $this->assertStringNotContainsString('/etc/seedbox/config/users', $script, $key);
+            }
+            $this->assertStringContainsString("-l 'deefbox'", \pmssUserTransferBuildRsyncMain($cfg));
+        }
+    }
+
     public function testAllRsyncPassesKeepExactlyOneFilesystemBoundary(): void
     {
         foreach ([false, true] as $namespaceRsync) {

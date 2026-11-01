@@ -525,6 +525,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     rsync passes exclude `.billingId`, `.billingServiceId`, and
     `.billingClientId`; target provisioning records service identity in the
     target's root store (ADR 0152); the client ID is present once recorded there.
+  - The source's root user store (`/etc/seedbox/config/users/<user>.json`) is
+    not copied. The pull authenticates as the account and cannot read it, and
+    no value is taken from the account's files (ADR 0213). The target store
+    holds what the provisioning backend sends when the target account is
+    created and afterwards; a value recorded only on the source node (an upload
+    cap or bonus traffic set by hand) is set again on the target.
   - Main rsync excludes server-specific torrent client configs such as
     `~/.config/qBittorrent/qBittorrent.conf`. These and other home-level state
     exclusions are anchored to the transfer root, so nested customer files and

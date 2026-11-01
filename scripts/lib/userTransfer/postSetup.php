@@ -35,6 +35,9 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
         $scratchPaths['qbittorrentCategories']
     );
     pmssTrafficLimitHomeArtifactReconcile($localUser, dirname(rtrim($home, '/')), null, 'logMessage');
+    // The source's root user store is not carried over: the pull runs as the account's own login,
+    // which cannot read it, and a value delivered from the account's files is never adopted
+    // (ADR 0213). The target's store holds what the provisioning backend sends for the new account.
 
     runStep(
         'Normalising user permissions',
