@@ -50,6 +50,10 @@ function pmssUserTransferBuildRsyncCommand(
 ): string
 {
     $destination = '/home/'.$cfg['localUser'].'/';
+    if (isset($cfg['bwlimit'])) {
+        // rsync forwards the cap to the remote sender; on cgroup v1 nothing else bounds buffered target writes.
+        $rsyncOptions[] = '--bwlimit='.(int) $cfg['bwlimit'];
+    }
     if (isset($cfg['into'])) {
         $destination .= pmssUserTransferValidateInto($cfg['into']).'/';
         $rsyncOptions[] = '--ignore-existing';

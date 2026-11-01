@@ -91,6 +91,7 @@ class UserTransferTest extends TestCase
             ."  --sleep-min N       Minimum sleep seconds between passes (default 60)\n"
             ."  --sleep-max N       Maximum sleep seconds between passes (default 360)\n"
             ."  --verify-threshold N Warn if local size is below N% of remote (default 90)\n"
+            ."  --bwlimit KIBPS     Cap each rsync pass at KIBPS KiB/s (default: no cap)\n"
             ."  --no-sleep          Disable sleeping between passes\n"
             ."  --dry-run           Log planned steps without executing commands\n"
             ."  --print-password    Print the supplied password at the end (unsafe)\n"
@@ -173,6 +174,25 @@ class UserTransferTest extends TestCase
             foreach ([\pmssUserTransferBuildRsyncMain($cfg), \pmssUserTransferBuildRsyncFinal($cfg)] as $script) {
                 $this->assertSame(1, substr_count($script, '--one-file-system'));
                 $this->assertStringContainsString('rsync -aHAX --numeric-ids --stats --one-file-system', $script);
+            }
+        }
+    }
+
+    public function testBwlimitCapsEveryRsyncPassOnlyWhenRequested(): void
+    {
+        $this->assertSame(15360, \pmssUserTransferParseCli(['userTransfer.php', '--bwlimit=15360', 'deefbox', 'example.com'])['bwlimit']);
+        $this->assertSame(2048, \pmssUserTransferParseCli(['userTransfer.php', '--bwlimit', '2048', 'deefbox', 'example.com'])['bwlimit']);
+        $this->assertFalse(array_key_exists('bwlimit', \pmssUserTransferParseCli(['userTransfer.php', 'deefbox', 'example.com'])));
+        foreach (['--bwlimit=0', '--bwlimit=10000001', '--bwlimit=1.5m', '--bwlimit=-5', '--bwlimit=15m'] as $option) {
+            $this->assertThrowsRuntime(static function () use ($option): void {
+                \pmssUserTransferParseCli(['userTransfer.php', $option, 'deefbox', 'example.com']);
+            }, 'bwlimit');
+        }
+        foreach ([false, true] as $namespaceRsync) {
+            $cfg = $this->baseConfig(['namespaceRsync' => $namespaceRsync]);
+            foreach (['pmssUserTransferBuildRsyncMain', 'pmssUserTransferBuildRsyncFinal'] as $builder) {
+                $this->assertStringNotContainsString('--bwlimit', $builder($cfg));
+                $this->assertSame(1, substr_count($builder($cfg + ['bwlimit' => 15360]), '--bwlimit=15360'));
             }
         }
     }

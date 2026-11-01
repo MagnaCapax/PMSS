@@ -518,6 +518,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     and completeness checks) is skipped because the live account is already set
     up. Authentication, pass counts, logging, quota and the remaining hand-over
     flow retain their existing behavior. Omitting `--into` retains normal transfer.
+  - `--bwlimit KIBPS` (or `--bwlimit=KIBPS`) adds `--bwlimit=KIBPS` to every
+    rsync pass, an integer 1..10000000 in KiB/s; rsync forwards it to the source
+    sender. Omitted, rsync runs unlimited and the configuration shape is
+    unchanged. Invalid values are refused before network access (ADR 0225).
   - Receiver runs as the target account inside a user namespace and a private
     mount view with filesystem paths outside the target home read-only. Source
     subordinate IDs map to the target allocation; unmappable ownership fails

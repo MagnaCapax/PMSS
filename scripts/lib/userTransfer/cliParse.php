@@ -25,6 +25,7 @@ function pmssUserTransferParseCli(array $argv): array
         ['--sleep-min N', 'Minimum sleep seconds between passes (default 60)'],
         ['--sleep-max N', 'Maximum sleep seconds between passes (default 360)'],
         ['--verify-threshold N ', 'Warn if local size is below N% of remote (default 90)'],
+        ['--bwlimit KIBPS', 'Cap each rsync pass at KIBPS KiB/s (default: no cap)'],
         ['--no-sleep', 'Disable sleeping between passes'],
         ['--dry-run', 'Log planned steps without executing commands'],
         ['--print-password', 'Print the supplied password at the end (unsafe)'],
@@ -42,6 +43,7 @@ function pmssUserTransferParseCli(array $argv): array
         'sleep-min' => ['field' => 'sleepMin', 'default' => 60, 'expectsValue' => true],
         'sleep-max' => ['field' => 'sleepMax', 'default' => 360, 'expectsValue' => true],
         'verify-threshold' => ['field' => 'verifyThreshold', 'default' => 90, 'expectsValue' => true, 'range' => [1, 100]],
+        'bwlimit' => ['field' => 'bwlimit', 'default' => null, 'expectsValue' => true, 'range' => [1, 10000000]],
         'help' => ['field' => 'help', 'default' => false, 'expectsValue' => false],
         'no-sleep' => ['field' => 'noSleep', 'default' => false, 'expectsValue' => false],
         'dry-run' => ['field' => 'dryRun', 'default' => false, 'expectsValue' => false],
@@ -139,6 +141,8 @@ function pmssUserTransferParseCli(array $argv): array
         $cfg['into'] = $options['into'];
     }
     if ($options['force']) $cfg['force'] = true;
+    // Unset keeps the legacy shape and rsync's unlimited default.
+    if ($options['bwlimit'] !== null) $cfg['bwlimit'] = $options['bwlimit'];
 
     return $cfg;
 }
