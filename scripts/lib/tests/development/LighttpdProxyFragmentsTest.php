@@ -119,6 +119,38 @@ class LighttpdProxyFragmentsTest extends TestCase
         }
     }
 
+    public function testCatalogProxyAuthorizationPolicyPreservesPanelGate(): void
+    {
+        // Only opted-in catalog routes discard the panel credential after authentication.
+        foreach (['copyparty', 'slskd', 'scryer', 'qui'] as $app) {
+            $fragment = \pmssLighttpdManagedProxyFragment($app, 'fixtur01', 23001);
+            if ($app === 'qui') {
+                $this->assertStringNotContainsString('"Authorization"', $fragment);
+            } else {
+                $this->assertStringContainsString('setenv.set-request-header = ( "Authorization" => "" )', $fragment);
+            }
+            $this->assertStringNotContainsString('auth.require', $fragment);
+            $this->assertStringContainsAllStrings([
+                '$HTTP["url"] =~ "^/user-fixtur01/'.$app.'/" {',
+                'url.redirect = ( "" => "/user-fixtur01/'.$app.'/" )',
+                '"host" => "127.0.0.1"', '"port" => 23001', '"upgrade" => "enable"',
+            ], $fragment);
+        }
+        $this->assertSame('', \pmssLighttpdManagedProxyFragment('unknown', 'fixtur01', 23001));
+    }
+
+    public function testCopypartySchemeOverridesRetainAuthorizationStripping(): void
+    {
+        $fragment = \pmssLighttpdManagedProxyFragment('copyparty', 'fixtur01', 23001);
+        foreach (['http', 'https'] as $scheme) {
+            $this->assertStringContainsString(
+                '  $HTTP["scheme"] == "'.$scheme."\" {\n"
+                    .'    setenv.set-request-header = ( "X-PMSS-Forwarded-Proto" => "'.$scheme.'", "Authorization" => "" )',
+                $fragment
+            );
+        }
+    }
+
     public function testRcloneFragmentAddsZeroContentLengthOnlyForBodylessPosts(): void
     {
         $fragment = \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001);

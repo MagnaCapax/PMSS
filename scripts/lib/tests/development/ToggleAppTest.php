@@ -53,7 +53,7 @@ $HTTP["url"] == "/user-fixtur01/{ID}" {
 }
 
 $HTTP["url"] =~ "^/user-fixtur01/{ID}/" {
-{SCHEME_HEADERS}  proxy.server = ( "" => ( (
+{AUTH_HEADER}{SCHEME_HEADERS}  proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => 23001
   ) ) ),
@@ -69,18 +69,19 @@ $HTTP["url"] =~ "^/user-fixtur01/{ID}/" {
 PROXY;
         $schemeHeaders = <<<'SCHEME'
   $HTTP["scheme"] == "http" {
-    setenv.set-request-header = ( "X-PMSS-Forwarded-Proto" => "http" )
+    setenv.set-request-header = ( "X-PMSS-Forwarded-Proto" => "http", "Authorization" => "" )
   }
   $HTTP["scheme"] == "https" {
-    setenv.set-request-header = ( "X-PMSS-Forwarded-Proto" => "https" )
+    setenv.set-request-header = ( "X-PMSS-Forwarded-Proto" => "https", "Authorization" => "" )
   }
 SCHEME;
         foreach ($catalog as $app => $row) {
             $this->assertSame(array('.pmss/apps/'.$app.'.secured', '.pmss/apps/'.$app.'.state',
                 '.pmss/apps/'.$app.'.restart', '.pmss/apps/'.$app.'.login'),
                 array($row['securedMarker'], $row['stateFile'], $row['restartFile'], $row['loginFile']));
-            $this->assertSame(str_replace(array('{LABEL}', '{ID}', '{SCHEME_HEADERS}'),
-                array($row['label'], $app, $app === 'copyparty' ? $schemeHeaders."\n" : ''), $expectedProxy)."\n",
+            $authHeader = $app === 'qui' ? '' : '  setenv.set-request-header = ( "Authorization" => "" )'."\n";
+            $this->assertSame(str_replace(array('{LABEL}', '{ID}', '{AUTH_HEADER}', '{SCHEME_HEADERS}'),
+                array($row['label'], $app, $authHeader, $app === 'copyparty' ? $schemeHeaders."\n" : ''), $expectedProxy)."\n",
                 \pmssLighttpdManagedProxyFragment($app, 'fixtur01', 23001));
         }
     }

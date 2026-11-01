@@ -55,3 +55,40 @@ restores the old forwarding behavior; it also restores the credential exposure.
 - [qBittorrent security page](https://github.com/qbittorrent/qBittorrent/security)
 - [lighttpd mod_setenv](https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_setenv)
 - ADR 0009 (per-user proxy ownership) and ADR 0102 (native WebUI credentials)
+
+## Catalog proxy extension (2026-11-01, Refs #1089)
+
+Copyparty, slskd and Scryer also have independent service logins. Their catalog
+rows now opt into `stripAuthorization`; the generic proxy rule consumes that
+flag with a default of false. This applies the same credential boundary while
+retaining the inherited panel Basic-Auth gate. qui keeps its existing forwarding
+behavior. Forwarding the panel credential or disabling panel authentication was
+rejected: neither is necessary for the app's own login and session cookies.
+
+Copyparty's HTTP/HTTPS scheme conditionals repeat the removal in their header
+maps. Lighttpd's [mod_setenv configuration merge](https://github.com/lighttpd/lighttpd1.4/blob/lighttpd-1.4.69/src/mod_setenv.c)
+replaces the parent header map when a nested condition sets the same directive;
+setting only the scheme there would otherwise restore credential forwarding.
+The scheme header continues to come from the trusted-hop request scheme (ADR 0153).
+
+Security review rechecked Copyparty's [browser-session advisory](https://github.com/9001/copyparty/security/advisories/GHSA-rcp6-88mm-9vgf)
+and [file/dirkey advisory, CVE-2026-70657](https://github.com/9001/copyparty/security/advisories/GHSA-x5pq-m9p8-f4vx).
+These cover browser script execution and unintended file access. The upstream
+[slskd](https://github.com/slskd/slskd/security) and
+[Scryer](https://github.com/scryer-media/scryer/security) security pages showed no
+published advisories at review time; that does not establish absence of CVEs.
+Known exposure paths include app web/API actions, shared files, slskd's peer
+listener and Scryer's configured download/indexer integrations. A leaked app
+login exposes app data and actions under the account UID; leaking the forwarded
+primary credential could additionally expose the panel and account shell access.
+
+Source review confirms service passwords remain separately generated random
+values in mode-0600 account files outside the web root. This change adds no
+credential logging, secret storage, listener, DNS name or public route. Existing
+loopback web binds, URL prefixes, cookie handling and validation remain intact.
+Normal managed-fragment refresh applies the change without rotating app logins.
+Regression fixtures cover each catalog route and both Copyparty scheme maps.
+Before rollout, verify rejected requests without panel credentials and a
+panel-authenticated login with a distinct app password on a testing host; no
+runtime or dry-run probe was executed on the dev box. Rollback removes the three
+catalog flags, restoring the previous forwarding behavior and exposure.

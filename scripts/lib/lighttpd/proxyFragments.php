@@ -32,9 +32,11 @@ function pmssLighttpdProxyRuleFragment(
     if ($forwardedProtoHeader !== '') {
         // Older mod_proxy replaces X-Forwarded-Proto with the pre-extforward scheme.
         // Overwrite client values using only the scheme accepted by mod_extforward.
+        // A nested setenv map replaces its parent's map; retain credential stripping.
         foreach (['http', 'https'] as $scheme) {
             $fragment .= '  $HTTP["scheme"] == "'.$scheme."\" {\n"
-                .'    setenv.set-request-header = ( "'.$forwardedProtoHeader.'" => "'.$scheme.'" )'."\n  }\n";
+                .'    setenv.set-request-header = ( "'.$forwardedProtoHeader.'" => "'.$scheme.'"'
+                .($stripAuthorization ? ', "Authorization" => ""' : '').' )'."\n  }\n";
         }
     }
     if ($injectZeroContentLengthOnEmptyPost) {
@@ -109,7 +111,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
         $fragment = "# PMSS-managed: {$catalog[$proxyName]['label']} reverse proxy.\n\n";
         $rules = [
             ['redirect', $base, $base.'/'],
-            ['^'.$base.'/', [], false, true, false, false, false, $catalog[$proxyName]['forwardedProtoHeader'] ?? ''],
+            ['^'.$base.'/', [], false, true, false, false, $catalog[$proxyName]['stripAuthorization'] ?? false, $catalog[$proxyName]['forwardedProtoHeader'] ?? ''],
         ];
     }
 
