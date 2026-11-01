@@ -83,12 +83,24 @@ records billing identity there before it writes the home copy (ADR 0152).
    home itself (permissions, transfer, termination).
 7. **Rollout:** the reader change ships through the PMSS security-fix release
    process, not the rolling update. The backend re-asserts each account's
-   stored values on every reward cycle, so a node picks them up within one
-   cycle after it updates. A value is never imported from a home file: upload
-   caps come back from the backend's own userConfig values, and traffic
-   bonuses granted with the operator CLI are re-applied only from the CLI's own
-   root log entries. Until a node has the store values, its accounts have their
-   plan defaults (no priority bonus); disk bonus is unaffected.
+   bonus percent once a day: the reward cycle sends `writeHomeMarker.php .bonus`
+   for every account of a node in that node's daily slot, so a node has the
+   store value within a day after it updates. Only a re-assert that reaches a
+   node after its update counts, because the earlier writer records only the
+   home copy. The backend holds no upload caps and no bonus traffic: an upload
+   cap exists only where `userConfig.php --upload-throttle-kib` was run on the
+   node, and bonus traffic only where `userBonusTraffic.php` was. A value is
+   never taken from a home file. A one-time import on update was considered
+   for both, from root-only evidence: an upload cap from a regular, root-owned,
+   not group- or world-writable `~/.torrentThrottle`, and bonus traffic from
+   the last `bonus traffic set to N GiB` line of the root-only per-user log,
+   only while the home copy still holds the same N, so the home file could stop
+   an import but never create or raise one. A read-only count across the fleet
+   on 2026-10-30 (173 of 174 nodes) found no such upload cap and no such log
+   line, so no import ships. A value set by hand on a node is set again with
+   the same CLI after the update. Until a node has the store values, its
+   accounts have their plan defaults (no priority bonus); disk bonus is
+   unaffected.
 
 ## Consequences
 
@@ -97,9 +109,18 @@ records billing identity there before it writes the home copy (ADR 0152).
   readers.
 - Every root reader of a home file is moved or allowlisted in one change; the
   census lives with the implementation.
-- The backend gains one change: re-asserting stored values each reward cycle.
-- Priority bonus is absent for an account between its node's update and the
-  next reward cycle.
+- The backend gains one change: re-asserting the bonus percent once a day.
+- Priority bonus is absent for an account between its node's update and that
+  node's next daily re-assert, normally within a day.
+- Upload caps and bonus traffic have no backend source. They live in the node's
+  store only, set by the root CLIs; nothing re-sends them.
+- `userTransfer.php` does not carry the source node's store: the pull runs as
+  the account and cannot read it, and the account's files are not a source.
+  The target store holds what provisioning sends for the new account; a value
+  set by hand on the source node is set again on the target.
+- Customer email addresses are not stored on nodes. `writeHomeMarker.php`
+  accepts integer markers only, and usage alerts on a node report
+  `recipient_missing` unless an address is in the store.
 
 ## Alternatives considered
 
