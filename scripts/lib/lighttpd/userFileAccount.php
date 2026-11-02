@@ -24,6 +24,17 @@ function pmssReplaceAccountFile(
         return false;
     }
 
+    // Compare as the account before staging: even temporary entries change the
+    // watched custom.d directory's mtime and would restart unchanged lighttpd.
+    $target = escapeshellarg($path);
+    $metadata = escapeshellarg($account['uid'].':'.$account['gid'].':'.sprintf('%o', $mode).':1');
+    if (is_array($existing) && pmssAccountPathRun($username, $home, [$path],
+        'test ! -L '.$target.' && test -f '.$target
+        .' && test "$(stat -c %u:%g:%a:%h -- '.$target.')" = '.$metadata
+        .' && cmp -s -- '.$target.' -', $content)) {
+        return true;
+    }
+
     $directory = dirname($path);
     $temporary = $directory.'/'.basename($path).'.pmss-tmp-XXXXXXXX';
     $command = 'tmp=$(mktemp -- '.escapeshellarg($temporary).') || exit 1; '

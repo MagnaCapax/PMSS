@@ -241,6 +241,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   or failed metadata operations return `false`, leave the existing destination
   intact, and remove the temporary file. Valid writes keep their prior bytes,
   ownership, and mode.
+  Account-owned replacements compare bytes as the account before creating a
+  temporary entry. Identical content with the requested owner, primary group,
+  mode and single link returns success without changing the file or parent
+  directory mtime. Content or metadata differences retain atomic replacement;
+  path, identity and link checks still apply (Refs #1088).
 
 - Lock lifecycle helpers close streams when handle validation, lock acquisition,
   or explicit unlocking throws. The original throwable propagates; successful
