@@ -32,11 +32,15 @@ function pmssUserFileOpenVerified(string $path, string $mode)
     if (!pmssStreamHandleIsOpen($handle)) {
         return null;
     }
-    if (!pmssUserFileHandleMatchesEntry($handle, $path)) {
-        @fclose($handle);
-        return null;
+    $retained = false;
+    try {
+        if (!pmssUserFileHandleMatchesEntry($handle, $path)) return null;
+        $retained = true;
+        return $handle;
+    } finally {
+        // Verification can throw before the caller takes ownership of the stream.
+        if (!$retained) @fclose($handle);
     }
-    return $handle;
 }
 
 /**
@@ -99,13 +103,16 @@ function pmssUserFileTempCreate(string $path, ?string &$tmp)
             }
             return null;
         }
-        if (pmssUserFileHandleMatchesEntry($handle, $candidate)) {
+        $retained = false;
+        try {
+            if (!pmssUserFileHandleMatchesEntry($handle, $candidate)) return null;
             $tmp = $candidate;
+            $retained = true;
             return $handle;
+        } finally {
+            // Until identity is proven, close without removing an unverified entry.
+            if (!$retained) @fclose($handle);
         }
-        // The open did not land on the entry just named; that entry is not ours to remove.
-        @fclose($handle);
-        return null;
     }
     return null;
 }

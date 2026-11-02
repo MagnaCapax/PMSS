@@ -141,6 +141,14 @@ fallback precedence and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Managed-file acquisition owns each opened stream until inode verification
+succeeds. Both existing-file opens and exclusive staging creation close on
+verification exceptions or errors before propagating the original throwable.
+Unverified staging entries remain untouched, and successful calls still transfer
+the open stream to the caller (ADR 0142). `ManagedFileHandleSafetyTest` injects
+metadata failures and checks refusal, ownership transfer, open modes and umask
+restoration using only memory streams; execution stays on the testing machine.
+
 Passive I/O history opens logs non-blocking and checks the opened device/inode
 against its regular-file snapshot before seeking or reading. Failed metadata,
 substituted files and failed opens skip that log; the other rotation can still
