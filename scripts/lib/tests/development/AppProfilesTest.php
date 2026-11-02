@@ -33,6 +33,57 @@ final class AppProfilesTest extends TestCase
         $this->assertSame([], $result['markers']);
     }
 
+    public function testExistingDefinitionsRemainUnchangedAndHermesIsOptIn(): void
+    {
+        $profiles = \pmssUserAppProfiles();
+        $this->assertSame(['rtorrent' => true, 'pikkumies' => true, 'docker' => true], $profiles['default']);
+        $this->assertSame(['rtorrent' => false, 'pikkumies' => true, 'docker' => true, 'openclaw' => true], $profiles['openclaw']);
+        $this->assertSame(['rtorrent' => false, 'pikkumies' => true, 'docker' => false, 'rclone' => true, 'copyparty' => true], $profiles['storagebox']);
+        $this->assertSame(['rtorrent' => true, 'pikkumies' => true, 'docker' => true, 'openclaw' => true, 'hermes' => true], $profiles['aiappbox']);
+        $registry = \pmssUserAppSwitchRegistry();
+        $this->assertSame('late', $registry['hermes']['phase']);
+        $this->assertSame('pmssAddUserHermesSwitch', $registry['hermes']['apply']);
+        $this->assertSame('off; preinstall skipped', \pmssAddUserHermesSwitch(false, [], '/unused')['message']);
+    }
+
+    public function testAiappboxQueuesAllPreinstallsOnlyAfterEarlyPhase(): void
+    {
+        $result = $this->applyProfile('aiappbox');
+        $this->assertSame('Start rTorrent', $result['starts'][0][0]);
+        $this->assertSame([], $result['earlyQueues']);
+        $this->assertSame([], $result['markers']);
+        $this->assertFalse(isset($result['config']['dockerEnabled']));
+        $this->assertSame(['Queue Pikkumies preinstall', 'Queue OpenClaw preinstall', 'Queue Hermes preinstall'], array_column($result['queues'], 0));
+        $this->assertStringContainsAllStrings(['systemd-run', '--slice=user-4321.slice', 'install-hermes', 'install </dev/null'], $result['queues'][2][1]);
+    }
+
+    public function testHermesGateFailureLogsAndProfileContinues(): void
+    {
+        foreach ([[999, true, 'RAM below 1000 MiB'], [2048, false, 'file quota']] as $case) {
+            // The inline fatal handler throws: returning this result also proves creation was not aborted.
+            $result = $this->applyProfile('aiappbox', $case[0], $case[1]);
+            $this->assertSame('Start rTorrent', $result['starts'][0][0]);
+            $this->assertFalse(in_array('Queue Hermes preinstall', array_column($result['queues'], 0), true));
+            $this->assertStringContainsString('App profile hermes: preinstall skipped: '.$case[2], implode("\n", $result['logs']));
+        }
+    }
+
+    public function testHermesGateBoundariesAndExistingInstall(): void
+    {
+        $home = $this->tempDir.'/hermes';
+        $this->pmssEnsureDir($home.'/bin');
+        $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
+        $user = ['memory' => 1000];
+        $this->assertSame(null, \pmssAddUserHermesGate($user, $home, ['used' => 100, 'soft' => 65100]));
+        foreach ([null, ['used' => 101, 'soft' => 65100], ['used' => 0, 'soft' => 0]] as $files) {
+            $this->assertStringContainsString('file quota', \pmssAddUserHermesGate($user, $home, $files));
+        }
+        unlink($home.'/bin/install-hermes');
+        $this->assertSame('installer missing or unsafe', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 65000]));
+        symlink($home.'/absent', $home.'/.hermes');
+        $this->assertSame('existing Hermes install', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 65000]));
+    }
+
     public function testOpenClawDisablesRtorrentAndQueuesBothPreinstalls(): void
     {
         $result = $this->applyProfile('openclaw');
@@ -128,8 +179,9 @@ final class AppProfilesTest extends TestCase
         $this->pmssEnsureDir($home.'/bin');
         file_put_contents($home.'/bin/install-pikkumies.sh', "#!/bin/sh\n");
         file_put_contents($home.'/bin/install-openclaw', '<?php');
+        $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $this->pmssWriteExecutableFile($home.'/stubs/id', "#!/bin/sh\necho 4321\n", 0755, 0700);
-        $this->pmssWriteExecutableFile($home.'/stubs/quota', $quota ? "#!/bin/sh\necho '/dev/md4 123 1000 1250 100 60100 75125'\n" : "#!/bin/sh\nexit 1\n");
+        $this->pmssWriteExecutableFile($home.'/stubs/quota', $quota ? "#!/bin/sh\necho '/dev/md4 123 1000 1250 100 65100 81375'\n" : "#!/bin/sh\nexit 1\n");
         $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/user/appSwitch.php'), true).';'
             .'$home = '.var_export($home, true).'; $missingApp = '.var_export($missingApp, true).';'
             .'$user = '.var_export(['name' => posix_geteuid() === 0 ? 'root' : 'alice', 'memory' => $memory, 'appProfile' => $profile], true).';';

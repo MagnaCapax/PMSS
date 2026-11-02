@@ -38,6 +38,7 @@ account creation. Omission selects `default`, meaning seedbox behavior.
 | `default` | rTorrent, Pikkumies, rootless Docker | none |
 | `openclaw` | Pikkumies, rootless Docker, OpenClaw | rTorrent |
 | `storagebox` | Pikkumies, rclone, Copyparty | rTorrent, rootless Docker (#270) |
+| `aiappbox` | rTorrent, Pikkumies, rootless Docker, OpenClaw, Hermes | none |
 
 Omitted apps retain their current defaults. No qBittorrent, Deluge or
 Transmission enable marker is added by these profiles. PMSS knows apps and
@@ -93,6 +94,33 @@ declare their existing config-store key.
   symlink refusal. Tests are written here for execution on a testing machine;
   local verification is limited to changed-file PHP syntax checks and static
   review, as directed by the task brief.
+
+## Addendum: aiappbox and Hermes creation switch (2026-11-02)
+
+`aiappbox` adds Hermes to the existing rTorrent, Pikkumies, rootless Docker
+and OpenClaw switches. The three existing definitions remain unchanged;
+Hermes remains opt-in outside this profile. Profile lookup still rejects
+unknown names during CLI parsing, before account changes.
+
+Hermes runs in the late phase through the existing account-owned
+`~/bin/install-hermes install` wrapper and user resource slice. Its creation
+gate requires the existing 1000 MiB account RAM floor, measured quota with
+65000 free file entries, an executable non-symlink installer and no existing
+`~/.hermes` or Hermes launcher. The automatic quota margin is conservative:
+the existing installer itself requires 60000 entries and retains that check.
+Unavailable quota or any failed gate logs a skip without failing account
+creation. No new home files are written by the switch; the existing installer
+continues to own its state and credentials.
+
+Web UI selection stays with each existing app: OpenClaw configures its
+Control UI through its installer; Hermes defaults to Hermes web UI and starts
+the selected backend on demand. Pikkumies has no creation-time web UI selector;
+its existing installer and panel UI behavior are retained without new toggles.
+This profile does not force additional listeners or change authentication.
+
+Definition, registry, quota-boundary, gate-skip and existing-profile regression
+tests are supplied for the testing VM. Local verification is PHP syntax only;
+installer execution and web UI behavior require that separate environment.
 
 ## References
 

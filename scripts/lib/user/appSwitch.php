@@ -7,6 +7,7 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/userConfigStore.php';
 require_once __DIR__.'/add/pikkumies.php';
 require_once __DIR__.'/add/openclaw.php';
+require_once __DIR__.'/add/hermes.php';
 
 /** App IDs and marker paths are trusted definitions, never CLI-supplied paths. */
 function pmssUserAppSwitchRegistry(): array
@@ -27,6 +28,7 @@ function pmssUserAppSwitchRegistry(): array
             return ['message' => ($enabled ? 'on' : 'off').': applied through user configuration'];
         }],
         'openclaw' => ['phase' => 'late', 'apply' => 'pmssAddUserOpenClawSwitch'],
+        'hermes' => ['phase' => 'late', 'apply' => 'pmssAddUserHermesSwitch'],
     ];
     $markers = ['qbittorrent' => '.qbittorrentEnable', 'deluge' => '.delugeEnable', 'rclone' => '.rcloneEnable'];
     try {
