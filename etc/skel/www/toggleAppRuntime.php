@@ -48,7 +48,40 @@ function pmssToggleAppCopypartyConfig(string $user, string $home, int $port, str
 /** qui serves its own URL prefix and stores its account database beside this file. */
 function pmssToggleAppQuiConfig(string $user, string $home, int $port, string $password, int $peerPort): array
 {
-    return array('.config/qui/config.toml' => "host = \"127.0.0.1\"\nport = {$port}\nbaseUrl = \"/user-{$user}/qui/\"\ncheckForUpdates = false\ndisableSelfUpdate = true\n");
+    $secretFile = '.pmss/apps/qui.session-secret';
+    $configFile = '.config/qui/config.toml';
+    foreach (array('.pmss', '.config', dirname($secretFile), dirname($configFile), $secretFile, $configFile) as $relative) {
+        if (is_link($home.'/'.$relative)) return array();
+    }
+    $secret = null;
+    if (file_exists($home.'/'.$secretFile)) {
+        // Never replace an unreadable or damaged key: it protects existing instance credentials.
+        if (!is_file($home.'/'.$secretFile)) return array();
+        $secret = @file_get_contents($home.'/'.$secretFile);
+    } elseif (file_exists($home.'/'.$configFile)) {
+        if (!is_file($home.'/'.$configFile)) return array();
+        $config = @file_get_contents($home.'/'.$configFile);
+        if (!is_string($config)) return array();
+        // Import only the root key, before any TOML table; all managed config is still regenerated.
+        $root = preg_split('/^[ \t]*\[/m', $config, 2)[0];
+        $count = preg_match_all('/^[ \t]*sessionSecret[ \t]*=[ \t]*(.*)$/m', $root, $matches);
+        if ($count > 0) {
+            $pattern = <<<'REGEX'
+/^("(?:[^"\\\r\n]|\\.)*"|'[^'\r\n]*')[ \t]*(?:#[^\r\n]*)?$/D
+REGEX;
+            // Refuse unsupported/ambiguous values rather than silently rotating a migrated key.
+            if ($count !== 1 || preg_match($pattern, trim($matches[1][0]), $value) !== 1) return array();
+            $secret = $value[1][0] === "'" ? substr($value[1], 1, -1) : json_decode($value[1], true);
+            if (!is_string($secret)) return array();
+        }
+    }
+    if ($secret === null) $secret = bin2hex(random_bytes(32));
+    if (!is_string($secret) || trim($secret) === '') return array();
+    $encoded = json_encode($secret, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($encoded)) return array();
+    // Write the independent key before the config/CLI, using the existing private-file validation.
+    return array($secretFile => $secret,
+        $configFile => "host = \"127.0.0.1\"\nport = {$port}\nbaseUrl = \"/user-{$user}/qui/\"\nsessionSecret = {$encoded}\ncheckForUpdates = false\ndisableSelfUpdate = true\n");
 }
 
 /** Scryer reads its temporary admin password from a private file on every start. */

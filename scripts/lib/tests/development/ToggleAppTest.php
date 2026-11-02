@@ -535,11 +535,21 @@ PHP
         try {
             $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
             $config = $home.'/.config/qui/config.toml';
-            $this->assertSame("host = \"127.0.0.1\"\nport = 23001\nbaseUrl = \"/user-fixtur01/qui/\"\ncheckForUpdates = false\ndisableSelfUpdate = true\n", file_get_contents($config));
+            $secretFile = $home.'/.pmss/apps/qui.session-secret';
+            $secret = file_get_contents($secretFile);
+            $this->assertSame(1, preg_match('/^[a-f0-9]{64}$/D', $secret));
+            $this->assertSame(0600, fileperms($secretFile) & 0777);
+            $this->assertSame("host = \"127.0.0.1\"\nport = 23001\nbaseUrl = \"/user-fixtur01/qui/\"\nsessionSecret = \"{$secret}\"\ncheckForUpdates = false\ndisableSelfUpdate = true\n", file_get_contents($config));
             $this->assertSame(0600, fileperms($config) & 0777);
             $login = $home.'/.pmss/apps/qui.login';
             $this->assertSame(0600, fileperms($login) & 0777);
             $this->assertSame(explode("\n", trim(file_get_contents($login)))[1]."\n", file_get_contents($home.'/stdin'));
+            $initialLogin = file_get_contents($login);
+            $this->assertStringNotContainsString($secret, $initialLogin);
+            $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
+            $this->assertSame($secret, file_get_contents($secretFile));
+            $this->assertSame($initialLogin, file_get_contents($login));
+            $this->assertSame(1, count(file($home.'/argv.log')));
             // A config mode repair keeps the existing database and must rotate its password too.
             foreach (array('exists-zero', 'exists') as $cycle => $mode) {
                 $previousLogin = file_get_contents($login);
@@ -559,14 +569,22 @@ PHP
                 $this->assertSame(0600, fileperms($config) & 0777);
                 $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
                 $this->assertSame($credentials, file_get_contents($login));
+                $this->assertSame($secret, file_get_contents($secretFile));
+                $this->assertStringContainsString('sessionSecret = "'.$secret.'"', file_get_contents($config));
                 $this->assertSame(count($commands), count(file($home.'/argv.log')));
             }
+            // Missing sidecar imports the current config's key even while the database is repaired.
+            unlink($secretFile);
             unlink($home.'/.config/qui/qui.db');
+            clearstatcache();
             putenv('PMSS_TEST_QUI_MODE=exists');
             $this->assertTrue(\pmssToggleAppBootstrap('qui', 'fixtur01', $home, 23001, $proxy));
             $argv = file($home.'/argv.log', FILE_IGNORE_NEW_LINES);
             $this->assertSame(7, count($argv));
             $this->assertStringContainsString('change-password', $argv[6]);
+            $this->assertSame($secret, file_get_contents($secretFile));
+            $this->assertSame(0600, fileperms($secretFile) & 0777);
+            $this->assertStringNotContainsString($secret, implode("\n", $argv));
             foreach ($argv as $line) $this->assertStringNotContainsString(explode("\n", trim(file_get_contents($login)))[1], $line);
             putenv('PMSS_TEST_QUI_MODE=change-fail');
             chmod($config, 0644);
@@ -584,6 +602,48 @@ PHP
         } finally {
             $this->pmssRestoreEnvMap($previous);
             foreach (array('PMSS_TEST_QUI_BINARY', 'PMSS_TEST_QUI_LOG', 'PMSS_TEST_QUI_STDIN', 'PMSS_TEST_QUI_MODE') as $key) putenv($key);
+        }
+    }
+
+    public function testQuiImportsExistingSessionSecretAndKeepsItDuringConfigRepair(): void
+    {
+        $secretFile = '.pmss/apps/qui.session-secret';
+        $configFile = '.config/qui/config.toml';
+        foreach (array('"migrated-key"' => 'migrated-key', "'literal-key'" => 'literal-key',
+            '"  keep spaces  "' => '  keep spaces  ', json_encode('escaped"quote\\key') => 'escaped"quote\\key',
+            '"key#with-comment" # comment' => 'key#with-comment') as $token => $secret) {
+            $home = $this->pmssMakeTempDir('toggle-qui-import-');
+            $this->pmssWriteFile($home.'/'.$configFile, "host = \"127.0.0.1\"\nsessionSecret = {$token}\n[other]\nsessionSecret = \"decoy\"\n");
+            $configs = \pmssToggleAppConfigs('qui', 'fixtur01', $home, 23001, '', 0);
+            $this->assertSame($secret, $configs[$secretFile]);
+            foreach ($configs as $relative => $contents) $this->assertTrue(\pmssToggleAppPrivateWrite($home.'/'.$relative, $contents));
+            $this->assertSame($configs, \pmssToggleAppConfigs('qui', 'fixtur01', $home, 23001, '', 0));
+            // Saved key remains authoritative if the managed config is subsequently damaged.
+            file_put_contents($home.'/'.$configFile, 'mismatch');
+            $this->assertSame($configs, \pmssToggleAppConfigs('qui', 'fixtur01', $home, 23001, 'new-login', 0));
+            $this->assertSame(0600, fileperms($home.'/'.$secretFile) & 0777);
+        }
+    }
+
+    public function testQuiRefusesDamagedOrSymlinkedSessionSecretsWithoutReplacingThem(): void
+    {
+        foreach (array('', " \n", 'sessionSecret = ""', 'sessionSecret = 123',
+            'sessionSecret = "unterminated', "sessionSecret = \"one\"\nsessionSecret = \"two\"") as $contents) {
+            $home = $this->pmssMakeTempDir('toggle-qui-refuse-');
+            $path = $home.'/'.(strpos($contents, 'sessionSecret') === 0 ? '.config/qui/config.toml' : '.pmss/apps/qui.session-secret');
+            $this->pmssWriteFile($path, $contents);
+            $this->assertSame(array(), \pmssToggleAppConfigs('qui', 'fixtur01', $home, 23001, '', 0));
+            $this->assertSame($contents, file_get_contents($path));
+        }
+        foreach (array('.pmss/apps/qui.session-secret', '.config/qui/config.toml',
+            '.pmss/apps', '.config/qui', '.pmss', '.config') as $relative) {
+            $home = $this->pmssMakeTempDir('toggle-qui-symlink-');
+            $target = $home.'/target';
+            $this->pmssWriteFile($target, 'untouched');
+            $this->pmssEnsureDir(dirname($home.'/'.$relative));
+            symlink($target, $home.'/'.$relative);
+            $this->assertSame(array(), \pmssToggleAppConfigs('qui', 'fixtur01', $home, 23001, '', 0));
+            $this->assertSame('untouched', file_get_contents($target));
         }
     }
 

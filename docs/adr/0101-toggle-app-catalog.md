@@ -156,3 +156,35 @@ the documented attack surfaces are authenticated browser actions and shared-file
 access. A leaked service login exposes the account's app data and actions, not
 its primary PMSS password. Reusing the account-side stop avoids a new root
 process-signalling path. Rollback removes the watchdog's opt-in flag.
+
+## Persistent qui session secret (2026-11-02, Refs #1227)
+
+qui derives stored instance-credential encryption keys from `sessionSecret`.
+The managed config must supply it: upstream's default generates a new value
+per process, making credentials saved by a previous process unreadable.
+Account-UID bootstrap now keeps a separate 32-byte random secret, hex encoded,
+in `~/.pmss/apps/qui.session-secret` beside `qui.login`, and renders it into
+the generated config. Both files remain mode 0600 outside the web root. Login
+rotation, config repair and database repair keep the same encryption secret;
+the existing exact-byte, mode and secured-marker checks still apply.
+
+When the sidecar is absent, bootstrap imports the root `sessionSecret` from
+the current or migrated config before regenerating managed content. Single-line
+literal strings and JSON-compatible TOML basic strings are supported, preserving
+their decoded bytes, including surrounding whitespace. Unsupported, duplicate,
+empty or unreadable secrets and symlinked inputs refuse bootstrap rather than
+rotating the key. Once saved, the sidecar is authoritative. Credentials whose
+previous process-only secret is already lost still need re-entry in qui.
+Removing this change on rollback would restore the missing-secret defect;
+retain the secret in config and preserve the sidecar with account backups.
+
+Security review rechecked qui's [CORS advisory, CVE-2026-30924](https://github.com/autobrr/qui/security/advisories/GHSA-h8vw-ph9r-xpch),
+fixed since 1.15.0 (the installer pins 1.32.0), and its
+[pinned config/encryption implementation](https://github.com/autobrr/qui/blob/v1.32.0/internal/config/config.go).
+Browser/API access and external-program execution remain attack surfaces.
+A leaked secret plus database exposes saved instance credentials and their
+downstream access; this secret is independent of the service login and primary
+PMSS credential. No secret is logged, returned to the panel or placed on argv;
+loopback binds, proxy routes and authentication gates retain their behavior.
+Hermetic coverage checks repeated bootstrap, repair, migration and refusal
+cases; runtime and host restart verification remain on the testing machine.
