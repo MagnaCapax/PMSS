@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/systemStats.php** retains host snapshot collection, while
+  `systemStats/observe.php` owns host probes and `systemStats/log.php` owns
+  legacy line rendering and checked append. `diskIostat/observe.php` appends
+  supplemental observations to the pure iostat fields; its facade retains
+  checked publication and one runner invocation path (ADRs 0162 and 0226).
 - **scripts/lib/userTransfer/** keeps metadata interpretation behind the existing
   transfer includes. `sessionBencode.php` owns pure session decoding,
   `qbittorrentCategoryPreservation.php` owns category probes and preservation

@@ -12,66 +12,12 @@
 
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/systemStats.php';   // for pmssSystemStatsIopingMs() — reused, not re-implemented (DRY)
-require_once __DIR__.'/diskIostat/devices.php';
-require_once __DIR__.'/diskIostat/sample.php';
+pmssRequireRelativeFiles(__DIR__.'/diskIostat', ['devices.php', 'sample.php', 'observe.php']);
 
 const PMSS_DISK_IOSTAT_HISTORY_LOG = '/var/log/pmss/iostat-history.log';
 const PMSS_DISK_IOSTAT_HISTORY_RAW_LOG = '/var/log/pmss/iostat-history-raw.log';
 // Leave startup and parser time while bounding the 120-second iostat interval.
 const PMSS_DISK_IOSTAT_TIMEOUT_SECONDS = 180;
-
-/**
- * Read node-level I/O pressure (PSI) full avg300 from /proc/pressure/io.
- *
- * full_avg300 = percentage of the last 300s that ALL non-idle tasks were stalled
- * on I/O — the sustained saturation signal consumed by hallinta's oversale gate.
- * Returns null when PSI is unavailable (kernel <4.20 / CONFIG_PSI=n) so the brain
- * treats it as "no signal" and falls back to its other gates (fail-safe: a missing
- * value must never gate provisioning closed).
- *
- * @return float|null
- */
-function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'): ?float
-{
-    if (!is_readable($psiPath)) {
-        return null;
-    }
-    $raw = @file_get_contents($psiPath);
-    // Share validation while retaining this consumer's unrounded scalar result.
-    return is_string($raw) ? pmssSystemStatsPsiMetricFromRaw($raw, 'full', 'avg300') : null;
-}
-
-/**
- * Read median ioping latency to /home in milliseconds for hallinta's I/O-health gate.
- *
- * Reuses the canonical pmssSystemStatsIopingMs() probe (DRY) rather than parsing it
- * positionally out of system-stats.log (which would reintroduce the column-shift
- * fragility class). Returns null when ioping is unavailable or the probe yields 'na'
- * so the brain treats a missing measurement as no-signal (fail-safe — never gates
- * provisioning on an absent value, in EITHER direction).
- *
- * @return float|null
- */
-function pmssDiskIostatReadIopingHomeMs(): ?float
-{
-    $raw = pmssSystemStatsIopingMs('/home');           // e.g. "0.2ms" or "na"
-    if (!is_string($raw) || !preg_match('/\A([0-9]+(?:\.[0-9]+)?)ms\z/', $raw, $matches)) {
-        return null;
-    }
-    return pmssFiniteFloat($matches[1]);
-}
-
-/** Append host probes and metadata to the parsed fields in legacy serialization order. */
-function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null): array
-{
-    return pmssDiskIostatParseSampleFields($iostatRaw) + [
-        'psiFullAvg300' => pmssDiskIostatReadPsiFullAvg300(),
-        'psiMemFullAvg300' => pmssDiskIostatReadPsiFullAvg300('/proc/pressure/memory'),
-        'psiCpuFullAvg300' => pmssDiskIostatReadPsiFullAvg300('/proc/pressure/cpu'),
-        'iopingHomeMs' => pmssDiskIostatReadIopingHomeMs(),
-        'diskQuantity' => $deviceCount, 'time' => $timestamp ?? time(),
-    ];
-}
 
 /**
  * Persist the runtime snapshot and append the historical audit files.
@@ -118,30 +64,27 @@ function pmssDiskIostatMain(?callable $runner = null): int
     $iostatLogFile = '/var/run/pmss/iostat';
     $devices = pmssDiskIostatDiscoverDevices();
 
+    $runner = $runner ?? static function (string $command): string {
+        $result = pmssCommandCapture($command, PMSS_DISK_IOSTAT_TIMEOUT_SECONDS);
+        // Failed probes can leave a parseable first sample; never publish it as fresh.
+        $rc = (int) ($result['rc'] ?? 1);
+        if ($rc !== 0) {
+            throw new RuntimeException('Unable to collect iostat sample (rc='.$rc.')');
+        }
+        return (string) ($result['stdout'] ?? '');
+    };
+
     try {
         $devices = pmssDiskIostatSampleDevices($devices);
-        $command = pmssDiskIostatBuildCommand($devices);
-        if ($runner === null) {
-            $result = pmssCommandCapture($command, PMSS_DISK_IOSTAT_TIMEOUT_SECONDS);
-            // Failed probes can leave a parseable first sample; never publish it as fresh.
-            $rc = (int) ($result['rc'] ?? 1);
-            if ($rc !== 0) {
-                throw new RuntimeException('Unable to collect iostat sample (rc='.$rc.')');
-            }
-            $iostatRaw = (string) ($result['stdout'] ?? '');
-        } else {
-            $iostatRaw = (string) $runner($command);
-        }
+        $iostatRaw = (string) $runner(pmssDiskIostatBuildCommand($devices));
         $iostat = pmssDiskIostatParseLatestSample($iostatRaw, max(1, count($devices)));
     } catch (RuntimeException $exception) {
         echo $exception->getMessage()."\n";
         return 0;
     }
 
-    if (pmssDiskIostatWriteSnapshotFiles($iostatLogFile, $iostat, $iostatRaw)) {
-        if (!@copy($iostatLogFile, '/var/www/iostat')) {
-            fwrite(STDERR, "Unable to copy iostat snapshot to /var/www/iostat\n");
-        }
+    if (pmssDiskIostatWriteSnapshotFiles($iostatLogFile, $iostat, $iostatRaw) && !@copy($iostatLogFile, '/var/www/iostat')) {
+        fwrite(STDERR, "Unable to copy iostat snapshot to /var/www/iostat\n");
     }
     return 0;
 }

@@ -27,7 +27,7 @@ class DiskIostatTest extends TestCase
 namespace DiskIostatIopingFixture;
 function pmssSystemStatsIopingMs($path) { return $GLOBALS['latency']; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatIopingFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat/observe.php', 'DiskIostatIopingFixture');
         $script .= <<<'PHP'
 $GLOBALS['latency'] = getenv('PMSS_TEST_IOPING_LATENCY');
 echo json_encode(['value' => pmssDiskIostatReadIopingHomeMs()], JSON_PRESERVE_ZERO_FRACTION);
@@ -228,7 +228,7 @@ PHP;
             [
                 'const PMSS_DISK_IOSTAT_TIMEOUT_SECONDS = 180;',
                 '$result = pmssCommandCapture($command, PMSS_DISK_IOSTAT_TIMEOUT_SECONDS);',
-                '$iostatRaw = (string) ($result[\'stdout\'] ?? \'\');',
+                'return (string) ($result[\'stdout\'] ?? \'\');',
             ],
             ['@shell'.'_exec($command)']
         );
@@ -266,7 +266,7 @@ function pmssFileWriteComplete($path, $content, $flags = 0) {
 }
 function copy($source, $destination) { $GLOBALS['copies']++; return true; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatCaptureFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatCaptureFixture', ['diskIostat/observe.php']);
         $script .= <<<'PHP'
 $GLOBALS['captureResult'] = json_decode(getenv('PMSS_TEST_IOSTAT_CAPTURE'), true);
 $GLOBALS['captures'] = $GLOBALS['parsed'] = $GLOBALS['writes'] = [];

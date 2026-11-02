@@ -9,10 +9,10 @@ class SystemStatsCollectTest extends TestCase
     public function testCounterValidationPreservesExactIntegerBoundaries(): void
     {
         foreach (['0', '000', '00123', (string) PHP_INT_MAX, '000'.PHP_INT_MAX] as $value) {
-            $this->assertTrue(\pmssSystemStatsCounterIsValid($value), $value);
+            $this->assertTrue(\pmssUnsignedDecimalIntParse($value) !== null, $value);
         }
         foreach (['', '-1', '+1', '1.0', '1e3', "1\0", ' 1', PHP_INT_MAX.'0', str_repeat('9', 100)] as $value) {
-            $this->assertFalse(\pmssSystemStatsCounterIsValid($value), $value);
+            $this->assertFalse(\pmssUnsignedDecimalIntParse($value) !== null, $value);
         }
     }
 
@@ -287,7 +287,7 @@ class SystemStatsCollectTest extends TestCase
     {
         // Inject only the write result; keep path checks and append bytes real.
         $script = 'namespace SystemStatsAppendFixture;'.$this->pmssInlinePhpLimitedWriteShims().$this->pmssInlinePhpFileWriteCompleteShim();
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats.php', 'SystemStatsAppendFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats/log.php', 'SystemStatsAppendFixture');
         $script .= <<<'PHP'
 [$path, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_STATS_APPEND'), true);
 $result = pmssSystemStatsAppendLogLine($path, "ready\r\n");
@@ -342,7 +342,7 @@ function pmssDirEnsureExists($path, $mode) {
     return rename($path, $path.'-old') && symlink($GLOBALS['redirect'], $path);
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats.php', 'SystemStatsParentSwapFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats/log.php', 'SystemStatsParentSwapFixture');
         $script .= <<<'PHP'
 [$path, $GLOBALS['redirect']] = json_decode(getenv('PMSS_TEST_STATS_PARENT_SWAP'), true);
 echo json_encode([pmssSystemStatsAppendLogLine($path, 'blocked'), file_get_contents($GLOBALS['redirect'].'/stats.log')]);

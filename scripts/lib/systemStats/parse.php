@@ -1,12 +1,6 @@
 <?php
-/** Pure host-statistics parsing and legacy log projection. @license GPL-3.0-only */
+/** Pure host-statistics parsing and metric formatting. @license GPL-3.0-only */
 require_once dirname(__DIR__).'/runtime.php';
-
-/** Accept digit counters only when PHP can represent their exact value. */
-function pmssSystemStatsCounterIsValid(string $value): bool
-{
-    return pmssUnsignedDecimalIntParse($value) !== null;
-}
 
 /** Convert KiB counters to the compact legacy units used by stats logs. */
 function pmssSystemStatsKbToHuman(int $kb): string

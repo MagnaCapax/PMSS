@@ -8,6 +8,128 @@ require_once dirname(__DIR__, 2).'/diskIostat.php';
 /** Lock the host-statistics projections before separating parsers from I/O. */
 class HostStatsCharacterizationTest extends TestCase
 {
+    public function testCollectionKeepsProbeOrderMemoryDefaultsAndIopingGate(): void
+    {
+        $script = <<<'PHP'
+namespace HostStatsCollectionFixture;
+function pmssTestModeEnabled() { return true; }
+function pmssReadRegularFileContents($path) {
+    $GLOBALS['events'][] = $path;
+    if ($path === '/proc/stat') return 'cpu 1 2 3 4 5';
+    if ($path === '/proc/diskstats') return '8 0 sda 0 0 0 0 0 0 0 0 0 123';
+    return '1.00 2.50 0 1/2 3';
+}
+function usleep($usec) { $GLOBALS['events'][] = $usec; }
+function pmssProcMeminfoFieldsRead() { $GLOBALS['events'][] = 'memory'; return $GLOBALS['memory']; }
+function pmssCommandPath($name) { $GLOBALS['events'][] = $name; return $GLOBALS['ioping'] ? '/fixture/ioping' : ''; }
+function pmssSystemStatsIopingMs($path) { $GLOBALS['events'][] = $path; return '1.2ms'; }
+function pmssSystemStatsTopMemoryProcesses() { $GLOBALS['events'][] = 'ps'; return 'cron:1K'; }
+function pmssSystemStatsPsiRead($path) { $GLOBALS['events'][] = $path; return 'na'; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats.php', 'HostStatsCollectionFixture');
+        $script .= <<<'PHP'
+[$GLOBALS['memory'], $GLOBALS['ioping']] = json_decode(getenv('PMSS_TEST_HOST_COLLECTION'), true);
+$GLOBALS['events'] = [];
+echo json_encode([pmssSystemStatsCollect(), $GLOBALS['events']]);
+PHP;
+        foreach ([
+            [[], false, ['0K', '0K', '0K', '0K', '0K', '0K']],
+            [[], true, ['0K', '0K', '0K', '0K', '0K', '0K']],
+            [['MemTotal' => 1023, 'MemFree' => 1024, 'Cached' => 1048575, 'Buffers' => 1048576], true, ['1023K', '1.0M', '1024.0M', '1.0G', '0K', '0K']],
+            [['SwapTotal' => 2048, 'SwapFree' => 1, 'Ignored' => 9], false, ['0K', '0K', '0K', '0K', '2.0M', '1K']],
+            [['MemTotal' => 0, 'Cached' => 0, 'Buffers' => 0, 'SwapFree' => 0], true, ['0K', '0K', '0K', '0K', '0K', '0K']],
+        ] as [$memory, $ioping, $values]) {
+            $expected = ['load' => '1.00,2.50,0', 'cpuIowait' => '0.0']
+                + array_combine(['memTotal', 'memFree', 'memCache', 'memBuffers', 'swapTotal', 'swapFree'], $values)
+                + ['diskBusy' => '0.0', 'iopingRoot' => $ioping ? '1.2ms' : 'na', 'iopingHome' => $ioping ? '1.2ms' : 'na',
+                    'topMem' => 'cron:1K', 'psiIo' => 'na', 'psiMem' => 'na'];
+            $events = array_merge(['/proc/stat', '/proc/diskstats', 50000, '/proc/stat', '/proc/diskstats', 'memory', 'ioping', '/proc/loadavg'],
+                $ioping ? ['/', '/home'] : [], ['ps', '/proc/pressure/io', '/proc/pressure/memory']);
+            $this->assertSame([$expected, $events], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_HOST_COLLECTION' => json_encode([$memory, $ioping]),
+            ]));
+        }
+    }
+
+    public function testObservationKeepsProcessFailuresAndThrowableFallbacks(): void
+    {
+        foreach ([
+            [['cron 1024'], 0, '', 'cron:1.0M'],
+            [[], 0, '', 'na'],
+            [['bad:name 1', 'cron 0'], 0, '', 'cron:0K'],
+            [['cron 1024'], 1, '', 'na'],
+            [['cron 1024'], 0, 'exception', 'na'],
+            [['cron 1024'], 0, 'error', 'na'],
+        ] as [$rows, $status, $throw, $expected]) {
+            $this->assertSame($expected, \pmssSystemStatsTopMemoryProcesses(static function (array &$output, int &$rc) use ($rows, $status, $throw): void {
+                $output = $rows;
+                $rc = $status;
+                if ($throw === 'exception') throw new \RuntimeException('fixture');
+                if ($throw === 'error') throw new \Error('fixture');
+            }));
+        }
+    }
+
+    public function testInjectedIostatRunnerKeepsPublicationAndExceptionBoundaries(): void
+    {
+        $script = <<<'PHP'
+namespace HostStatsRunnerFixture;
+class RuntimeException extends \RuntimeException {}
+function pmssDiskIostatDiscoverDevices() { $GLOBALS['events'][] = 'discover'; return []; }
+function pmssDiskIostatSampleDevices($devices) { $GLOBALS['events'][] = 'sample'; return $devices; }
+function pmssDiskIostatBuildCommand($devices) { $GLOBALS['events'][] = 'command'; return 'fixture-iostat'; }
+function pmssDiskIostatParseLatestSample($raw, $count) {
+    $GLOBALS['events'][] = ['parse', $raw, $count];
+    if ($raw === '') throw new RuntimeException('empty sample');
+    return ['time' => 123];
+}
+function pmssPathTargetIsSafe($path, $directory, $missing) { return true; }
+function date($format) { return 'fixture-time'; }
+function pmssFileWriteComplete($path, $content, $flags) {
+    $GLOBALS['events'][] = ['write', $path, $content, $flags];
+    return $GLOBALS['writeOk'];
+}
+function copy($source, $target) { $GLOBALS['events'][] = ['copy', $source, $target]; return true; }
+PHP;
+        // Every observation and write is intercepted; no host probe or managed file is touched.
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'HostStatsRunnerFixture');
+        $script .= <<<'PHP'
+[$mode, $GLOBALS['writeOk']] = json_decode(getenv('PMSS_TEST_HOST_RUNNER'), true);
+$GLOBALS['events'] = [];
+ob_start();
+try {
+    $result = pmssDiskIostatMain(static function ($command) use ($mode) {
+        $GLOBALS['events'][] = ['run', $command];
+        if ($mode === 'exception') throw new RuntimeException('runner failed');
+        if ($mode === 'error') throw new \Error('runner error');
+        return $mode === 'empty' ? '' : 'fixture-raw';
+    });
+} catch (\Error $error) {
+    $result = $error->getMessage();
+}
+$output = ob_get_clean();
+echo json_encode([$result, $output, $GLOBALS['events']]);
+PHP;
+        $initial = ['discover', 'sample', 'command', ['run', 'fixture-iostat']];
+        $parsed = array_merge($initial, [['parse', 'fixture-raw', 1]]);
+        $writes = [
+            ['write', '/var/run/pmss/iostat', 'a:1:{s:4:"time";i:123;}', 0],
+            ['write', PMSS_DISK_IOSTAT_HISTORY_LOG, 'fixture-time || a:1:{s:4:"time";i:123;}'."\n", FILE_APPEND],
+            ['write', PMSS_DISK_IOSTAT_HISTORY_RAW_LOG, "fixture-time || fixture-raw\n---\n", FILE_APPEND],
+        ];
+        foreach ([
+            ['ok', true, 0, '', array_merge($parsed, $writes, [['copy', '/var/run/pmss/iostat', '/var/www/iostat']])],
+            ['ok', false, 0, '', array_merge($parsed, [$writes[0]])],
+            ['empty', true, 0, "empty sample\n", array_merge($initial, [['parse', '', 1]])],
+            ['exception', true, 0, "runner failed\n", $initial],
+            ['error', true, 'runner error', '', $initial],
+        ] as [$mode, $writeOk, $result, $output, $events]) {
+            $this->assertSame([$result, $output, $events], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_HOST_RUNNER' => json_encode([$mode, $writeOk]),
+            ]));
+        }
+    }
+
     public function testPressureConsumersKeepTheirDistinctMissingFieldPolicies(): void
     {
         $path = $this->pmssMakeTempFile('pmss-host-psi-');
@@ -95,7 +217,7 @@ function is_readable($path) { return true; }
 function file_get_contents($path) { return "full avg300=1.25\n"; }
 function pmssSystemStatsIopingMs($path) { return '0.2ms'; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'HostStatsAssemblyFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat/observe.php', 'HostStatsAssemblyFixture');
         $script .= 'echo json_encode(pmssDiskIostatParseLatestSample("Device r/s w/s rMB/s wMB/s r_await w_await %util aqu-sz\ngrp1 1 2 3 4 5 6 7 8\n", 2, 123), JSON_PRESERVE_ZERO_FRACTION);';
         $this->assertSame([
             'iopsRead' => '1', 'iopsWrite' => '2', 'throughputRead' => '3', 'throughputWrite' => '4',
