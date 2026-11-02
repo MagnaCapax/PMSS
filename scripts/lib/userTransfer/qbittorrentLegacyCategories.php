@@ -16,9 +16,8 @@ function pmssUserTransferQbittorrentLegacyCategoriesFromConfig(string $contents,
         return [];
     }
 
-    $raw = pmssUserTransferQtVariantStringMap(pmssUserTransferQtSettingsBytesDecode(substr($encoded, 9, -1)));
     $categories = [];
-    foreach ($raw as $name => $savePath) {
+    foreach (pmssUserTransferQtVariantStringMap(pmssUserTransferQtSettingsBytesDecode(substr($encoded, 9, -1))) as $name => $savePath) {
         if ($name === '' || strpos($name, "\0") !== false) {
             continue;
         }
@@ -39,13 +38,9 @@ function pmssUserTransferQbittorrentConfigValue(string $contents, string $target
             continue;
         }
 
-        $eq = strpos($trimmed, '=');
-        if ($eq === false) {
-            continue;
-        }
-        $key = trim(substr($trimmed, 0, $eq));
-        if ($key === $targetKey && ($section === '' || $section === 'BitTorrent')) {
-            return trim(substr($trimmed, $eq + 1));
+        $pair = explode('=', $trimmed, 2);
+        if (count($pair) === 2 && trim($pair[0]) === $targetKey && ($section === '' || $section === 'BitTorrent')) {
+            return trim($pair[1]);
         }
     }
     return null;

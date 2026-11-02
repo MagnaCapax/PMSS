@@ -14,9 +14,9 @@ function pmssUserTransferQbittorrentCategoriesJsonRead(string $path): ?array
     if (!is_file($path)) {
         return [];
     }
-    $contents = pmssReadRegularFileContents($path);
-    if ($contents === null) return null;
-    $raw = trim($contents);
+    $raw = pmssReadRegularFileContents($path);
+    if ($raw === null) return null;
+    $raw = trim($raw);
     if ($raw === '') {
         return [];
     }
@@ -72,13 +72,13 @@ function pmssUserTransferQbittorrentCategoriesMerge(string $targetPath, array $e
 /** Normalize category option payloads to the qBittorrent categories.json schema. */
 function pmssUserTransferQbittorrentCategoryOptionsNormalize($options): array
 {
-    $normalized = is_array($options) ? $options : [];
-    if (isset($normalized['savePath']) && !isset($normalized['save_path'])) {
-        $normalized['save_path'] = $normalized['savePath'];
-        unset($normalized['savePath']);
+    $options = is_array($options) ? $options : [];
+    if (isset($options['savePath']) && !isset($options['save_path'])) {
+        $options['save_path'] = $options['savePath'];
+        unset($options['savePath']);
     }
-    if (!isset($normalized['save_path']) || !is_string($normalized['save_path'])) {
-        $normalized['save_path'] = '';
+    if (!isset($options['save_path']) || !is_string($options['save_path'])) {
+        $options['save_path'] = '';
     }
-    return $normalized;
+    return $options;
 }
