@@ -124,6 +124,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssConfigAssignments(iterable $lines)` yields `name => value` assignments
+  split at the first `=`. Missing separators are skipped; empty fields,
+  whitespace, control bytes and duplicate assignments are preserved. Systemd,
+  cgroup CLI and rTorrent callers retain their own filtering and value policy.
+
 - `pmssSerializedArrayDecode()` decodes legacy serialized payloads with class
   instantiation disabled and returns only arrays, or `null` for malformed and
   non-array payloads. Regular-file reads and both serialized I/O history readers

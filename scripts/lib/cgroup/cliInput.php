@@ -17,13 +17,12 @@ function pmssCgroupCliParseFlagInputs(SystemInterface $sys, array $flags, ?strin
 {
     $error = null;
     $options = $ioSpecs = $ioPairs = [];
-    foreach ($flags as $flag) {
-        if (strpos($flag, '--') !== 0 || ($separator = strpos($flag, '=')) === false) {
+    foreach (\pmssConfigAssignments($flags) as $flag => $value) {
+        if (strpos($flag, '--') !== 0) {
             continue;
         }
 
-        $name = substr($flag, 2, $separator - 2);
-        $value = substr($flag, $separator + 1);
+        $name = substr($flag, 2);
         if (isset(PMSS_CGROUP_IO_FLAGS[$name])) {
             $ioSpecs[$name][] = $value;
             continue;

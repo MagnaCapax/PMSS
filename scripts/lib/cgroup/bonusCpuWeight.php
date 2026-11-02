@@ -45,15 +45,9 @@ function pmssCpuApplyBonusWeight(int $baseWeight, int $bonusPct, int $max = PMSS
  */
 function pmssBonusCpuSliceStateParse(string $output): ?array
 {
-    $active = null;
-    $weight = null;
-    foreach (preg_split('/\r?\n/', $output) ?: [] as $line) {
-        if (strpos($line, 'ActiveState=') === 0) {
-            $active = substr($line, 12) === 'active';
-        } elseif (strpos($line, 'CPUWeight=') === 0) {
-            $value = substr($line, 10);
-            $weight = preg_match('/^[0-9]{1,5}$/', $value) === 1 ? (int) $value : null;
-        }
-    }
-    return $active === null ? null : ['active' => $active, 'weight' => $weight];
+    $props = iterator_to_array(pmssConfigAssignments(pmssTextLines($output)));
+    if (!array_key_exists('ActiveState', $props)) return null;
+    $weight = $props['CPUWeight'] ?? '';
+    return ['active' => $props['ActiveState'] === 'active',
+        'weight' => preg_match('/^[0-9]{1,5}$/', $weight) === 1 ? (int) $weight : null];
 }

@@ -6,6 +6,20 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeEnvValueTest extends TestCase
 {
+    public function testAssignmentsPreserveRawFieldsAndDuplicateNames(): void
+    {
+        foreach ([
+            [[], []], [['', 'missing', '# comment'], []],
+            [[2 => '=', 5 => 'name=', 8 => '=value'], [['', ''], ['name', ''], ['', 'value']]],
+            [new \ArrayIterator([' first = a=b ', 'first=0', 'first=last']), [[' first ', ' a=b '], ['first', '0'], ['first', 'last']]],
+            [["key\0= value\r\n", '#key=0'], [["key\0", " value\r\n"], ['#key', '0']]],
+        ] as [$lines, $expected]) {
+            $actual = [];
+            foreach (\pmssConfigAssignments($lines) as $name => $value) $actual[] = [$name, $value];
+            $this->assertSame($expected, $actual);
+        }
+    }
+
     public function testTextLinesPreserveRawFieldsAndBoundedRemainder(): void
     {
         foreach ([['', [''], -1], ["a\r\nb\nc", ['a', 'b', 'c'], -1], ["a\n\n", ['a', '', ''], -1], [" \t#0\n0\na\rb\0", [" \t#0", '0', "a\rb\0"], -1], ["cpu 1\r\ncpu0 2\r\ncpu1 3\n", ['cpu 1', "cpu0 2\r\ncpu1 3\n"], 2]] as [$raw, $expected, $limit]) { $this->assertSame($expected, \pmssTextLines($raw, $limit)); }

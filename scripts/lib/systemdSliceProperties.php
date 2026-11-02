@@ -16,17 +16,8 @@ function pmssParseSystemdPropertyOutput(array $propertyNames, string $output): a
     if (strpos($output, "\0") !== false) {
         return $properties;
     }
-    foreach (pmssTextLines(trim($output)) as $line) {
-        $separatorPos = is_string($line) ? strpos($line, '=') : false;
-        if ($separatorPos === false) {
-            continue;
-        }
-        $propertyName = substr($line, 0, $separatorPos);
-        if (array_key_exists($propertyName, $properties)) {
-            $properties[$propertyName] = trim(substr($line, $separatorPos + 1));
-        }
-    }
-    return $properties;
+    $parsed = array_map('trim', iterator_to_array(pmssConfigAssignments(pmssTextLines(trim($output)))));
+    return array_replace($properties, array_intersect_key($parsed, $properties));
 }
 
 /**

@@ -47,6 +47,15 @@ function pmssConfigRows(array $lines, int $minColumns = 0, array $commentPrefixe
     }
 }
 
+/** Yield raw name/value pairs split at the first equals sign, including duplicate names. */
+function pmssConfigAssignments(iterable $lines): \Generator
+{
+    foreach ($lines as $line) {
+        $pair = explode('=', $line, 2);
+        if (count($pair) === 2) yield $pair[0] => $pair[1];
+    }
+}
+
 function pmssConfigOptionsUpdatePlan(string $optionList, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false): array
 {
     $options = pmssNonEmptyStrings(explode(',', $optionList));

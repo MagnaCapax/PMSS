@@ -10,11 +10,7 @@
  */
 function pmssUnboundShowIndicatesFailure(string $show): bool
 {
-    $props = [];
-    foreach (explode("\n", $show) as $line) {
-        $parts = explode('=', $line, 2);
-        if (count($parts) === 2) $props[$parts[0]] = trim($parts[1]);
-    }
+    $props = array_map('trim', iterator_to_array(pmssConfigAssignments(explode("\n", $show))));
     $state = $props['ActiveState'] ?? '';
     return $state === 'failed' || (in_array($state, ['activating', 'inactive'], true)
         && (int) ($props['NRestarts'] ?? '0') > 0

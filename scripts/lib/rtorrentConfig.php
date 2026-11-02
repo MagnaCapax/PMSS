@@ -158,12 +158,10 @@ class rtorrentConfig
             return false;
         }
         $config = array();
-        foreach (pmssConfigTextLines($configRaw, ['#', '/']) as $thisLine) {
-            $elements = explode('=', $thisLine);
-            if (count($elements) != 2) {
-                continue;
-            }
-            $config[trim($elements[0])] = trim($elements[1]);
+        foreach (pmssConfigAssignments(pmssConfigTextLines($configRaw, ['#', '/'])) as $name => $value) {
+            // This legacy format accepts exactly one equals sign per assignment.
+            if (strpos($value, '=') !== false) continue;
+            $config[trim($name)] = trim($value);
         }
         return $config;
     }

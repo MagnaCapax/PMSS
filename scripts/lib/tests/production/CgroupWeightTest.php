@@ -101,14 +101,7 @@ class CgroupWeightTest extends \PMSS\Tests\TestCase
     {
         $cmd = 'systemctl show ' . escapeshellarg($unit) . ' -p ' . implode(',', $keys);
         exec($cmd, $output, $rc);
-        $data = [];
-        foreach ($output as $row) {
-            if (strpos($row, '=') !== false) {
-                [$k, $v] = explode('=', $row, 2);
-                $data[$k] = trim($v);
-            }
-        }
-        return $data;
+        return array_map('trim', iterator_to_array(\pmssConfigAssignments($output)));
     }
 }
 
