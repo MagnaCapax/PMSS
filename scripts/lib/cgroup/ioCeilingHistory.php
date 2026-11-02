@@ -18,15 +18,19 @@ function pmssIoCeilingHistorySamples(string $path): iterable
     // delaycompress keeps .1 readable. Older compressed rotations are not scanned.
     // Bound both bytes and line length even when a collector/log is malformed.
     foreach ([$path.'.1', $path] as $file) {
-        if (!pmssPathTargetIsSafe($file, false, true) || !is_file($file)) {
+        if (!pmssPathTargetIsSafe($file, false, true)
+            || !is_array($entry = @lstat($file)) || (($entry['mode'] ?? 0) & 0170000) !== 0100000) {
             continue;
         }
-        $handle = @fopen($file, 'rb');
+        // A replacement FIFO must not block the reader before inode validation.
+        $handle = @fopen($file, 'rbn');
         if ($handle === false) {
             continue;
         }
         try {
-            $stat = fstat($handle);
+            if (!pmssLockFileHandleMatchesPath($handle, $file, $entry, $stat)) {
+                continue;
+            }
             $size = $stat['size'] ?? 0;
             $offset = max(0, $size - 16 * 1024 * 1024);
             if (fseek($handle, $offset) !== 0) {

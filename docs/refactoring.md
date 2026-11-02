@@ -141,6 +141,14 @@ fallback precedence and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Passive I/O history opens logs non-blocking and checks the opened device/inode
+against its regular-file snapshot before seeking or reading. Failed metadata,
+substituted files and failed opens skip that log; the other rotation can still
+supply samples. Hard-linked regular logs, rotation order, byte/line budgets and
+record parsing retain their existing behavior (ADR 0063). The existing `finally`
+closes acquired streams on refusals and throwables. `IoCeilingHistorySafetyTest`
+injects these boundary failures; execution stays on the testing machine.
+
 Managed-path backups own their source and destination streams through nested
 `finally` blocks. Inode checks, target opens, metadata reads and copy failures
 release acquired handles before propagating the original throwable; the source
