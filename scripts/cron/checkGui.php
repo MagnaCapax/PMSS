@@ -249,8 +249,8 @@ function pmssCheckGuiMain(array $argv): int
         }
         pmssCheckGuiEnsureUserDirectory($dataDir, $thisUser, 'data', $log, $homeDir);
 
-        // Restore the loader and each delivered part after partial filesystem writes.
-        foreach (['index.php', 'scriptsInc.php', 'scriptsIncFormat.php', 'scriptsIncFiles.php',
+        // Restore the catalog before the split helpers that require it.
+        foreach (['toggleAppCatalog.php', 'index.php', 'scriptsInc.php', 'scriptsIncFormat.php', 'scriptsIncFiles.php',
             'scriptsIncFrontend.php', 'scriptsIncBonus.php', 'scriptsIncCgroup.php',
             'scriptsIncBackup.php', 'scriptsIncRestoreTar.php', 'scriptsIncRestore.php',
             'scriptsIncAppProcess.php',

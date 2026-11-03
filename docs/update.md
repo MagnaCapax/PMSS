@@ -417,6 +417,12 @@ among them. `updateUserFile()` (`scripts/lib/update.php`) SHA1-compares the tena
 against the skeleton and overwrites it when they differ; a symlinked target is skipped. A
 tenant's hand-edit to `~/.bashrc` therefore does not persist — it is restored on the next run.
 
+The panel delivery set places `toggleAppCatalog.php` before all twelve ADR 0099
+`scriptsInc` parts, followed by the loader and then `welcome.php`. The GUI watchdog
+also restores the catalog before those parts, so a missing catalog can recover
+without waiting for a full per-user update (#1076). These ordered writes do not
+make the remote guiv heal atomic; affected-host verification remains necessary.
+
 Two `[ -f ]`-guarded hooks sourced at the END of `etc/skel/.bashrc` are NOT in the force-sync
 set and survive updates: `~/.bashrc.custom` (installer-managed — `install-media-stack.sh` writes
 its PATH/alias blocks here) and `~/.bashrc.user` (tenant-owned; permissions reserved by

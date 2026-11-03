@@ -392,6 +392,29 @@ PHP;
         $this->assertSame($sourceContent, file_get_contents($targetFile));
     }
 
+    public function testRestoreMissingCatalogMakesDeliveredAppProcessUsable(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'fixtur01');
+        $catalog = 'toggleAppCatalog.php';
+        $sourceContent = $this->pmssReadRepoFile('etc/skel/www/'.$catalog);
+        $sourceFile = $this->pmssWriteFile($this->tempDir.'/skel/'.$catalog, $sourceContent);
+        $part = $this->pmssWriteFile($homeDir.'/www/scriptsIncAppProcess.php',
+            $this->pmssReadRepoFile('etc/skel/www/scriptsIncAppProcess.php'));
+        $messages = array();
+
+        // Reproduce the mixed delivery: the new app part exists but its catalog does not.
+        $this->assertFalse(file_exists($homeDir.'/www/'.$catalog));
+        $this->assertTrue(\pmssCheckGuiRestoreUserFile(
+            $homeDir.'/www/'.$catalog, $sourceFile, $this->pmssCurrentOwner(), $catalog,
+            $this->pmssMakeArrayLogger($messages), $homeDir
+        ));
+        $this->assertSame($sourceContent, file_get_contents($homeDir.'/www/'.$catalog));
+        $result = $this->pmssExecInlinePhp('require '.var_export($part, true).';'
+            .'echo is_array(pmssCustomerManagedAppDefinitions()) ? "ok" : "invalid";');
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertSame('ok', $result['output']);
+    }
+
     public function testRestoreUserFileReplacesLargerDivergentPanelFile(): void
     {
         $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');

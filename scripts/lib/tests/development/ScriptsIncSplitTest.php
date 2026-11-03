@@ -174,13 +174,25 @@ class ScriptsIncSplitTest extends TestCase
     public function testManifestListsPartsImmediatelyBeforeMonolith(): void
     {
         $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-        $entries = array();
+        // A current AppProcess/AppsStatus part cannot run without its catalog (#1076).
+        $entries = array(preg_quote("'www/toggleAppCatalog.php',", '/'));
+        $this->assertSame(1, substr_count($manifest, "'www/toggleAppCatalog.php',"));
         foreach (self::PARTS as $part) {
             $entry = "'www/scriptsInc".$part.".php',";
             $this->assertSame(1, substr_count($manifest, $entry), 'Manifest entry must occur once: '.$entry);
             $entries[] = preg_quote($entry, '/');
         }
         $this->assertTrue(preg_match('/'.implode('\s*', $entries).'\s*'.preg_quote("'www/scriptsInc.php',", '/').'/', $manifest) === 1,
-            'Parts must appear in order immediately before scriptsInc.php.');
+            'Catalog and parts must appear in order immediately before scriptsInc.php.');
+        $this->assertOrderedStrings(array("'www/scriptsInc.php',", "'www/welcome.php',"), $manifest);
+    }
+
+    public function testWatchdogRestoresCatalogBeforeAllTwelveParts(): void
+    {
+        $entries = array("'toggleAppCatalog.php'");
+        foreach (self::PARTS as $part) {
+            $entries[] = "'scriptsInc".$part.".php'";
+        }
+        $this->assertOrderedStrings($entries, $this->pmssReadRepoFile('scripts/cron/checkGui.php'));
     }
 }

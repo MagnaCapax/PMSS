@@ -248,6 +248,8 @@ PHP;
         'bin/support',
         'bin/createWebPublicCerts',
         'bin/userShowLimits',
+        // The split panel helpers require the catalog as soon as they arrive.
+        'www/toggleAppCatalog.php',
         'www/scriptsIncFormat.php',
         'www/scriptsIncFiles.php',
         'www/scriptsIncFrontend.php',
@@ -322,7 +324,6 @@ PHP;
         'www/transmissionLaunch.php',
         'www/slskd.php',
         'www/copyparty.php',
-        'www/toggleAppCatalog.php',
         'www/toggleApp.php',
         'www/toggleAppRuntime.php',
         'www/rclone.php',
