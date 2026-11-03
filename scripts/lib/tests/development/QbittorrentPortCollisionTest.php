@@ -94,7 +94,7 @@ final class QbittorrentPortCollisionTest extends TestCase
             'portCollision' => static function () use (&$events): bool { $events[] = 'collision'; return true; },
             'port' => static function (): void { throw new \RuntimeException('Collision authorized a stopped write'); },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ] + self::pmssMakeCallbacks(['running' => true, 'portRepairNeeded' => false,
+        ] + self::pmssMakeCallbacks(['portResolve' => 45678, 'proxy' => true, 'running' => true, 'portRepairNeeded' => false,
             'account' => true, 'auth' => false, 'managed' => null])));
         $this->assertSame(['collision'], $events);
     }
@@ -104,7 +104,7 @@ final class QbittorrentPortCollisionTest extends TestCase
         $this->assertFalse(\pmssQbittorrentWatchdogRunning('fixtur01', '/fixture/fixtur01', [
             'portCollision' => static function (): void { throw new \RuntimeException('Stopped account was observed twice'); },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ] + self::pmssMakeCallbacks(['running' => false, 'account' => true,
+        ] + self::pmssMakeCallbacks(['portResolve' => 45678, 'proxy' => true, 'running' => false, 'account' => true,
             'port' => true, 'auth' => false, 'managed' => null])));
     }
 }

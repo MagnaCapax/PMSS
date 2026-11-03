@@ -98,15 +98,36 @@ function pmssQbittorrentPortEnsureCurrentUser(): bool
     return is_array($ctx = pmssTorrentPortCurrentUserContext()) && pmssQbittorrentPortEnsure($ctx['user'], $ctx['home']);
 }
 
+/** Resolve the account's request through root reservations before any client or route writes. */
+function pmssQbittorrentWatchdogPortResolve(string $user, string $home, array $ops = []): ?int
+{
+    if (!pmssTorrentPortUserHomeContextIsSafe($user, $home)) return null;
+    $path = $home.'/.qbittorrentPort';
+    if (!pmssUserFilePathIsSafe($path)) return null;
+    $preferred = pmssTorrentPortExpectedRead($path);
+    $assign = $ops['assign'] ?? 'pmssPortManagerRequestServicePort';
+    $assigned = $assign($user, 'qbittorrent', $preferred);
+    if ($assigned === null) return null;
+    $write = $ops['write'] ?? static function (string $path, int $port) use ($user): bool {
+        return pmssWriteUserFile($path, (string) $port, $user, 0640);
+    };
+    return $preferred === $assigned || $write($path, $assigned) ? $assigned : null;
+}
+
 /**
  * Ensure a user's qBittorrent.conf uses the expected WebUI port.
  */
-function pmssQbittorrentPortEnsure(string $user, string $home): bool
+function pmssQbittorrentPortEnsure(string $user, string $home, ?int $assignedPort = null): bool
 {
     if (!pmssTorrentPortUserHomeContextIsSafe($user, $home)) {
         return false;
     }
     $expectedPort = pmssTorrentPortExpectedRead($home.'/.qbittorrentPort');
+    // Root watchdog callers pin the validated reservation across account-side edits.
+    if ($assignedPort !== null) {
+        if (!pmssNetworkPortInRange($assignedPort, 1024)) return false;
+        $expectedPort = $assignedPort;
+    }
     $configPath = $home.'/.config/qBittorrent/qBittorrent.conf';
     if (!pmssUserFilePathIsSafe($configPath)) {
         return false;

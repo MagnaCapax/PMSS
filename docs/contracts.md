@@ -607,6 +607,15 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Starts missing service specs after applying the exported lock-fd close prefix;
     the watchdog parent retains its lock while long-lived daemons cannot inherit it.
 - qBittorrent toggle and watchdog diagnostics
+  - Native watchdog port convergence treats `~/.qbittorrentPort` as a request to
+    the root port manager (ADR 0213). A free, unreserved preference within
+    2000–38000 replaces the reservation under the allocator lock; rejected
+    preferences restore the home copy from the reservation. Allocation or managed
+    write failure defers launch. Running config drift uses SIGTERM and waits for
+    exit before restoration and the existing strict config writer. The managed
+    proxy fragment follows the assigned port and is written only when its bytes
+    differ; lighttpd's existing freshness check activates changed routes. Docker
+    watchdog exclusion and customer fragment precedence remain in force (#1226).
   - Native watchdog passes report a foreign IPv4 UID listening on the assigned
     WebUI port, including while the torrent daemon remains running. Matching
     file/config ports also perform this observation in `pmssQbittorrentPortEnsure()`.

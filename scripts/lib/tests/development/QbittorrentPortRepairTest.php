@@ -13,7 +13,7 @@ final class QbittorrentPortRepairTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-port-repair-').'/alice';
+        $this->home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-port-repair-').'/fixtur01';
         $this->path = $this->pmssWriteFile($this->home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nLocale=en\n");
         $this->pmssWriteFile($this->home.'/.qbittorrentPort', "45678\n");
     }
@@ -25,13 +25,13 @@ final class QbittorrentPortRepairTest extends TestCase
 
     public function testRepairFeedsTheUnchangedStrictReconcilerAndIsIdempotent(): void
     {
-        $this->assertFalse(\pmssQbittorrentPortEnsure('alice', $this->home));
+        $this->assertFalse(\pmssQbittorrentPortEnsure('fixtur01', $this->home));
         chmod($this->path, 0600);
         $this->assertTrue(\pmssQbittorrentAccountWatchdog($this->home, false, $this->ops()));
         $updated = file_get_contents($this->path);
         $this->assertStringContainsAllStrings(["Locale=en\n", "WebUI\\Port=45678\n", 'WebUI\\Address=127.0.0.1'], $updated);
         $this->assertSame(0600, fileperms($this->path) & 0777);
-        $this->assertTrue(\pmssQbittorrentPortEnsure('alice', $this->home));
+        $this->assertTrue(\pmssQbittorrentPortEnsure('fixtur01', $this->home));
         $this->assertTrue(\pmssQbittorrentAccountWatchdog($this->home, false, $this->ops()));
         $this->assertSame($updated, file_get_contents($this->path));
     }
@@ -41,7 +41,7 @@ final class QbittorrentPortRepairTest extends TestCase
         foreach (['5.3.0', '4.3.9'] as $build) {
             $config = "[Meta]\nMigrationVersion=12\n[Preferences]\nLocale=en\nWebUI\\Password_PBKDF2=hash\n[WebUI]\nPassword_PBKDF2=hash\n";
             $this->pmssWriteFile($this->path, $config);
-            $this->assertTrue(\pmssQbittorrentPortRepairMissing('alice', $this->home, $this->ops(['build' => $build])));
+            $this->assertTrue(\pmssQbittorrentPortRepairMissing('fixtur01', $this->home, $this->ops(['build' => $build])));
             $updated = file_get_contents($this->path);
             $this->assertSame('45678', \pmssQbittorrentWebUiValue($updated, 'Port', $build));
             $this->assertSame('127.0.0.1', \pmssQbittorrentWebUiValue($updated, 'Address', $build));
@@ -55,8 +55,8 @@ final class QbittorrentPortRepairTest extends TestCase
         foreach (['45678', '12345', 'invalid'] as $port) {
             $config = "[Preferences]\nWebUI\\Port=".$port."\nWebUI\\Address=*\n";
             $this->pmssWriteFile($this->path, $config);
-            $this->assertFalse(\pmssQbittorrentPortRepairNeeded('alice', $this->home, '5.2.4'));
-            $this->assertTrue(\pmssQbittorrentPortRepairMissing('alice', $this->home, $this->ops()));
+            $this->assertFalse(\pmssQbittorrentPortRepairNeeded('fixtur01', $this->home, '5.2.4'));
+            $this->assertTrue(\pmssQbittorrentPortRepairMissing('fixtur01', $this->home, $this->ops()));
             $this->assertSame($config, file_get_contents($this->path));
         }
     }
@@ -65,15 +65,15 @@ final class QbittorrentPortRepairTest extends TestCase
     {
         foreach (['', 'abc', '80', '65536'] as $port) {
             $this->pmssWriteFile($this->home.'/.qbittorrentPort', $port);
-            $this->assertFalse(\pmssQbittorrentPortRepairNeeded('alice', $this->home, '5.2.4'));
+            $this->assertFalse(\pmssQbittorrentPortRepairNeeded('fixtur01', $this->home, '5.2.4'));
         }
         $this->pmssWriteFile($this->home.'/.qbittorrentPort', '45678');
         foreach (['', "; incomplete config\n"] as $config) {
             $this->pmssWriteFile($this->path, $config);
-            $this->assertFalse(\pmssQbittorrentPortRepairNeeded('alice', $this->home, '5.2.4'));
+            $this->assertFalse(\pmssQbittorrentPortRepairNeeded('fixtur01', $this->home, '5.2.4'));
         }
         unlink($this->path);
-        $this->assertFalse(\pmssQbittorrentPortRepairNeeded('alice', $this->home, '5.2.4'));
+        $this->assertFalse(\pmssQbittorrentPortRepairNeeded('fixtur01', $this->home, '5.2.4'));
     }
 
     public function testUnsafeAccountAndLinkedConfigCannotRequestRepair(): void
@@ -83,14 +83,14 @@ final class QbittorrentPortRepairTest extends TestCase
         $target = $this->pmssWriteFile($this->home.'/unmanaged.conf', "[Preferences]\nLocale=en\n");
         unlink($this->path);
         symlink($target, $this->path);
-        $this->assertFalse(\pmssQbittorrentPortRepairNeeded('alice', $this->home, '5.2.4'));
+        $this->assertFalse(\pmssQbittorrentPortRepairNeeded('fixtur01', $this->home, '5.2.4'));
         $this->assertSame("[Preferences]\nLocale=en\n", file_get_contents($target));
     }
 
     public function testLiveAccountAndBusySwitchLockDeferTheWrite(): void
     {
         $before = file_get_contents($this->path);
-        $this->assertFalse(\pmssQbittorrentPortRepairMissing('alice', $this->home,
+        $this->assertFalse(\pmssQbittorrentPortRepairMissing('fixtur01', $this->home,
             $this->ops(self::pmssMakeCallbacks(['accountPids' => [101]]))));
         $lockPath = $this->pmssWriteFile($this->home.'/.config/pmss/torrentClients/qbittorrent.lock', '');
         $lock = fopen($lockPath, 'c');
@@ -123,10 +123,10 @@ final class QbittorrentPortRepairTest extends TestCase
     public function testRunningMissingPortStopsBeforeObservationAndDefersWhileLive(): void
     {
         $events = [];
-        $this->assertTrue(\pmssQbittorrentWatchdogRunning('alice', $this->home, [
+        $this->assertTrue(\pmssQbittorrentWatchdogRunning('fixtur01', $this->home, [
             'portRepairStop' => static function () use (&$events): void { $events[] = 'term'; },
             'account' => static function (): void { throw new \RuntimeException('Live process reached account repair'); },
-        ] + self::pmssMakeCallbacks(['running' => true])));
+        ] + self::pmssMakeCallbacks(['portResolve' => 45678, 'proxy' => true, 'running' => true])));
         $this->assertSame(['term'], $events);
         $this->assertSame("[Preferences]\nLocale=en\n", file_get_contents($this->path));
     }
@@ -135,7 +135,7 @@ final class QbittorrentPortRepairTest extends TestCase
     {
         $live = true;
         $events = [];
-        $this->assertFalse(\pmssQbittorrentWatchdogRunning('alice', $this->home, [
+        $this->assertFalse(\pmssQbittorrentWatchdogRunning('fixtur01', $this->home, [
             'running' => static function () use (&$live): bool { return $live; },
             'portRepairStop' => static function () use (&$live, &$events): void { $events[] = 'term'; $live = false; },
             'account' => function ($user, $home, $observe = false, $release = false) use (&$events): bool {
@@ -146,7 +146,7 @@ final class QbittorrentPortRepairTest extends TestCase
                 $events[] = 'port'; return \pmssQbittorrentPortEnsure($user, $home);
             },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ] + self::pmssMakeCallbacks(['auth' => false, 'managed' => null])));
+        ] + self::pmssMakeCallbacks(['portResolve' => 45678, 'proxy' => true, 'auth' => false, 'managed' => null])));
         $this->assertSame(['term', 'restore', 'port', 'release'], $events);
         $this->assertStringContainsString('WebUI\\Port=45678', file_get_contents($this->path));
     }

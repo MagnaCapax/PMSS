@@ -16,7 +16,7 @@ final class QbittorrentWatchdogRecoveryTest extends TemporaryHomeRootTestCase
             },
             'throttle' => static function ($user, $running): bool { return $running; },
         ]
-            + self::pmssMakeCallbacks(['running' => false])
+            + self::pmssMakeCallbacks(['portResolve' => 45678, 'proxy' => true, 'running' => false])
             + self::pmssMakeCallbacks(['port' => true, 'auth' => false, 'managed' => null], $events)));
         $this->assertSame(['restore', 'port', 'auth', 'managed', 'release'], $events);
     }
@@ -31,7 +31,7 @@ final class QbittorrentWatchdogRecoveryTest extends TemporaryHomeRootTestCase
             'port' => static function (): void { throw new \RuntimeException('Running customer port was reconciled'); },
             'managed' => static function ($user, $running) use (&$events): void { $events[] = $running ? 'running' : 'stopped'; },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ] + self::pmssMakeCallbacks(['running' => true, 'auth' => false])));
+        ] + self::pmssMakeCallbacks(['portResolve' => 45678, 'proxy' => true, 'running' => true, 'auth' => false])));
         $this->assertSame(['observe', 'running'], $events);
     }
 
@@ -57,7 +57,7 @@ final class QbittorrentWatchdogRecoveryTest extends TemporaryHomeRootTestCase
                 ] + self::pmssMakeCallbacks(['accountPids' => []]));
             },
             'throttle' => static function ($user, $running): bool { return $running; },
-        ] + self::pmssMakeCallbacks(['port' => false, 'auth' => false, 'managed' => null]);
+        ] + self::pmssMakeCallbacks(['portResolve' => 45678, 'proxy' => true, 'port' => true, 'auth' => false, 'managed' => null]);
         for ($cycle = 0; $cycle < 2; $cycle++)
             $this->assertTrue(\pmssQbittorrentWatchdogRunning('t', $home, $watchdog));
         $this->assertSame(1, $stops);

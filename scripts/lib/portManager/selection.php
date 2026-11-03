@@ -85,3 +85,23 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
         return $port;
     }, $status);
 }
+
+/** Honour an account preference only after validating a replacement under the shared lock. */
+function pmssPortManagerRequestServicePort(string $user, string $service, ?int $preferredPort = null): ?int
+{
+    $assigned = pmssPortManagerAssignServicePort($user, $service, $preferredPort);
+    if ($assigned === null || $preferredPort === null || $assigned === $preferredPort
+        || !pmssNetworkPortInRange($preferredPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)) return $assigned;
+
+    return pmssPortManagerAssignmentWithLock($user, $service, static function (?array $context, &$status) use ($preferredPort): ?int {
+        if ($context === null || !$context['present']) return null;
+        $assigned = pmssPortManagerReadAssignedPort($context['file']);
+        if ($assigned === null || $assigned === $preferredPort) return $assigned;
+        $legacyDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_LEGACY_DIR', pmssPortManagerDefaultPath('legacy-rtorrent-ports', '/var/lib/pmss/ports')), '/');
+        $used = pmssPortManagerUsedPorts($context['dir'], $legacyDir, $scanComplete);
+        if (!$scanComplete) return null;
+        // A rejected request retains the current reservation; never release it first.
+        if (isset($used[$preferredPort]) || !pmssPortManagerPortIsAvailable($preferredPort)) return $assigned;
+        return pmssPortManagerWriteAssignedPort($context['dir'], $context['file'], $preferredPort) ? $preferredPort : null;
+    }, $status);
+}

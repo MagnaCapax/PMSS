@@ -2,6 +2,7 @@
 /** Watchdog convergence keeps refusal recovery and observations independent of launch commands. */
 require_once __DIR__.'/qbittorrentRestoreAccount.php';
 require_once __DIR__.'/qbittorrentThrottleWatchdog.php';
+require_once __DIR__.'/qbittorrentWatchdogPorts.php';
 
 /** Observe once while running; while stopped repair even a previously refused config. */
 function pmssQbittorrentWatchdogRunning(string $user, string $home, array $ops = []): bool
@@ -16,8 +17,11 @@ function pmssQbittorrentWatchdogRunning(string $user, string $home, array $ops =
         pmssUserWatchdogApplyManagedConfigWhenStopped($user, $running, 'pmssQbittorrentApplyManagedConfig');
     };
     $running = $runningRead($user);
+    $resolve = $ops['portResolve'] ?? 'pmssQbittorrentWatchdogPortResolve';
+    $assigned = $resolve($user, $home);
+    if ($assigned === null) return true;
     $repairNeeded = $ops['portRepairNeeded'] ?? 'pmssQbittorrentPortRepairNeeded';
-    if ($running && $repairNeeded($user, $home)) {
+    if ($running && ($repairNeeded($user, $home) || pmssQbittorrentWatchdogPortDiffers($user, $home, $assigned))) {
         $stop = $ops['portRepairStop'] ?? static function (string $user): void { pmssTorrentClientNativeStop($user, 'qbittorrent', 15); };
         $stop($user);
         // Qt saves on exit: defer restoration, writes and start until all daemons stop.
@@ -31,10 +35,12 @@ function pmssQbittorrentWatchdogRunning(string $user, string $home, array $ops =
     if ($running && !$account($user, $home, true)) return true;
     if (!$running) {
         if (!$account($user, $home)) return true;
-        $port($user, $home);
+        if (!$port($user, $home, $assigned)) return true;
     }
     if ($auth($user, $home)) $running = false;
     $managed($user, $running);
+    $proxy = $ops['proxy'] ?? 'pmssQbittorrentWatchdogProxyEnsure';
+    if (!$proxy($user, $home, $assigned)) return true;
     // Release the marker only after the account checks what the next binary will actually read.
     if (!$running && !$account($user, $home, false, true)) return true;
     $throttle = $ops['throttle'] ?? static function (string $user, bool $running) use ($home): bool {
