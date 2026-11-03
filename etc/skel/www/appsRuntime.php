@@ -133,9 +133,11 @@ $('#pmss-apps-search').on('input', function() {
         var row = $(this), search = (row.find('.name, .desc').text() + ' ' + row.attr('data-category') + ' ' + (row.attr('data-search') || '')).toLowerCase();
         row.toggle(search.indexOf(query) !== -1 || search.replace(/[\s-]/g, '').indexOf(compactQuery) !== -1);
     });
-    $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow:visible').length > 0); });
+    /* Count rows by their own display, not :visible: rows inside a hidden group or a closed list are never :visible. */
+    $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow').filter(function() { return this.style.display !== 'none'; }).length > 0); });
 JS;
-    if ($expandCatalog) $script .= "\n    $('details.catalog').prop('open', query !== '');"; return $script."\n});";
+    /* The lists are open by default (ADR 0088 amendment 4); a search opens a list the person folded, clearing it never folds one. */
+    if ($expandCatalog) $script .= "\n    if (query !== '') $('details.catalog').prop('open', true);"; return $script."\n});";
 }
 /** Guard every helper supplied by another customer file before the page runs. */
 function pmssAppsRuntimeReady(): bool

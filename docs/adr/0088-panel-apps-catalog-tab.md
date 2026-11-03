@@ -162,3 +162,14 @@ their retry behavior.
 ADR 0103 supersedes the Apps-tab navigation decision. Configure consolidates
 app controls and account settings after both new customer files are delivered;
 the Apps page remains available for older accounts during migration.
+
+## Amendment 2026-11-03
+
+The Configure move (b1784bc5) rendered both "Find more apps" lists as closed
+`<details>` and its search script closed them again when the query was cleared,
+undoing amendment 4 (the operator asked on 2026-10-08 that the section not be
+collapsed by default). Both lists render `open` again; a search opens a list the
+person folded and clearing it never folds one. LinuxServer.io groups count rows
+by their own display, because a row inside a hidden group or a closed list is
+never `:visible`, which kept a group (and its privacy notes) hidden after one
+non-matching search.

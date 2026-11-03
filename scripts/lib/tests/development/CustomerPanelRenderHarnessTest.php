@@ -23,8 +23,12 @@ class CustomerPanelRenderHarnessTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('configure.php', [], [
             'minBytes' => 4000,
         ]);
-        $this->assertStringContainsAllStrings(['Find more apps', 'Media Stack is not installed',
-            "$('details.catalog').prop('open', query !== '')"], $html);
+        // Both lists render open (ADR 0088 amendment 4); a search opens a folded list and clearing it never folds one;
+        // LinuxServer.io groups count rows by their own display, so a group hidden by one search comes back.
+        $this->assertStringContainsAndOmitsStrings(['Find more apps', 'Media Stack is not installed',
+            '<details class="catalog" id="pmss-more-apps-box" open>', '<details class="catalog" id="pmss-lsio-box" open>',
+            "if (query !== '') $('details.catalog').prop('open', true);", "return this.style.display !== 'none';"],
+            ["$('details.catalog').prop('open', query !== '')", ".mrow:visible"], $html);
     }
 
     public function testAppsStatusEndpointSurvivesConfigureDelivery(): void
