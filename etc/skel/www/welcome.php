@@ -1822,6 +1822,10 @@ function pmssWelcomeHomeOverCapSpeedText($bandwidthState)
         .' Datacenter internal and inbound bandwidth is unrestricted.';
 }/* AI credits (operator 2026-10-22: "the dashboard should show Virsilipas tokens and credits if key is there"; the ask bar
  * shows only with credits, with roughly how many questions they buy, a customer suggestion the operator endorsed).
+ * Credits only (operator 2026-11-03: "... reporting token usage (probably including cached) misleading people. Should be
+ * credits only"; ADR 0148 amendment 2026-11-03): the card states balance and usage in credits, the unit customers are
+ * charged, never in tokens. Virsilipas prices fresh input, cached input and output at different rates and counts cached
+ * input inside prompt_tokens, so a token total cannot be reconciled with the balance beside it. Only daily[].credits is read.
  * The account's own key (~/.virsilipasKey, ADR 0090) is sent only to the PM credit service named in it; the page
  * gets numbers back, never the key. OpenClaw-profile accounts have no Pikkumies, so this does not depend on it. */
 
@@ -1842,18 +1846,18 @@ function pmssWelcomeHomeCreditsKeyRead($home)
     return array('key' => $key, 'endpoint' => $endpoint);
 }
 
-/** The figures from GET /usage: balance, tokens used in 30 days, share left of the newest grant. null on any failure. */
-function pmssWelcomeHomeCreditsFetch(array $credentials)
+/** The figures out of a decoded GET /usage answer, in credits only: balance, credits charged in the 30 days (settled charges,
+ *  the sum of daily[].credits; null when the answer has no daily list, so unknown is never shown as zero), share left of the
+ *  newest grant. Token fields are never read. null when the answer has no numeric balance. */
+function pmssWelcomeHomeCreditsFigures(array $data)
 {
-    $context = stream_context_create(array('http' => array('method' => 'GET', 'timeout' => 4, 'ignore_errors' => true,
-        'header' => "Authorization: Bearer ".$credentials['key']."\r\nAccept: application/json\r\n")));
-    $raw = @file_get_contents($credentials['endpoint'].'/usage?days=30&grants=10', false, $context, 0, 1048576);
-    $status = isset($http_response_header[0]) && preg_match('#^HTTP/\S+\s+(\d{3})#', $http_response_header[0], $m) ? (int) $m[1] : 0;
-    $data = is_string($raw) && $status === 200 ? json_decode($raw, true) : null;
-    if (!is_array($data) || !is_numeric($data['balance'] ?? null)) return null;
-    $tokens = 0;
-    foreach (is_array($data['daily'] ?? null) ? $data['daily'] : array() as $day) {
-        if (is_array($day)) $tokens += (int) ($day['prompt_tokens'] ?? 0) + (int) ($day['completion_tokens'] ?? 0);
+    if (!is_numeric($data['balance'] ?? null)) return null;
+    $used = null;
+    if (is_array($data['daily'] ?? null)) {
+        $used = 0;
+        foreach ($data['daily'] as $day) {
+            if (is_array($day) && is_numeric($day['credits'] ?? null)) $used += (int) $day['credits'];
+        }
     }
     $grant = 0;
     foreach (is_array($data['grants'] ?? null) ? $data['grants'] : array() as $row) {
@@ -1861,15 +1865,28 @@ function pmssWelcomeHomeCreditsFetch(array $credentials)
         if ($amount > 0) { $grant = $amount; break; }
     }
     $balance = (int) $data['balance'];
-    return array('balance' => $balance, 'tokens_30d' => $tokens,
+    return array('balance' => $balance, 'credits_30d' => $used,
         'pct_left' => $grant > 0 ? max(0.0, min(100.0, $balance / $grant * 100)) : null);
 }
 
-/** @return array{state:string,balance:int,pct_left:?float,tokens_30d:?int,questions:?int,text:string,value:string,meta:string}
- *  state: none (no usable key), unknown (could not read), ok. Cached per account for 60 s, a stale copy kept for an hour. */
+/** The figures from GET /usage (see pmssWelcomeHomeCreditsFigures). null on any failure. */
+function pmssWelcomeHomeCreditsFetch(array $credentials)
+{
+    $context = stream_context_create(array('http' => array('method' => 'GET', 'timeout' => 4, 'ignore_errors' => true,
+        'header' => "Authorization: Bearer ".$credentials['key']."\r\nAccept: application/json\r\n")));
+    $raw = @file_get_contents($credentials['endpoint'].'/usage?days=30&grants=10', false, $context, 0, 1048576);
+    $status = isset($http_response_header[0]) && preg_match('#^HTTP/\S+\s+(\d{3})#', $http_response_header[0], $m) ? (int) $m[1] : 0;
+    $data = is_string($raw) && $status === 200 ? json_decode($raw, true) : null;
+    return is_array($data) ? pmssWelcomeHomeCreditsFigures($data) : null;
+}
+
+/** @return array{state:string,balance:int,pct_left:?float,credits_30d:?int,questions:?int,text:string,value:string,meta:string}
+ *  state: none (no usable key), unknown (could not read), ok. Cached per account for 60 s, a stale copy kept for an hour.
+ *  A cached copy from before the credits-only change (no credits_30d key) is never served as fresh; as a stale fallback it
+ *  is served without a usage figure. */
 function pmssWelcomeHomeCreditsRead($home)
 {
-    $result = array('state' => 'unknown', 'balance' => 0, 'pct_left' => null, 'tokens_30d' => null, 'questions' => null, 'text' => '', 'value' => '', 'meta' => '');
+    $result = array('state' => 'unknown', 'balance' => 0, 'pct_left' => null, 'credits_30d' => null, 'questions' => null, 'text' => '', 'value' => '', 'meta' => '');
     $credentials = pmssWelcomeHomeCreditsKeyRead($home);
     if ($credentials === null) { $result['state'] = 'none'; return $result; }
     $dir = rtrim((string) $home, '/').'/.cache/pmss-welcome';
@@ -1877,7 +1894,8 @@ function pmssWelcomeHomeCreditsRead($home)
     $cached = is_file($cache) && !is_link($cache) ? json_decode((string) @file_get_contents($cache, false, null, 0, 65536), true) : null;
     $age = is_array($cached) ? time() - (int) ($cached['at'] ?? 0) : PHP_INT_MAX;
     $keyTag = substr(hash('sha256', $credentials['key']), 0, 12);
-    $figures = is_array($cached) && ($cached['key'] ?? '') === $keyTag && $age >= 0 && $age < 60 ? $cached['figures'] : null;
+    $cachedFigures = is_array($cached) && is_array($cached['figures'] ?? null) ? $cached['figures'] : null;
+    $figures = $cachedFigures !== null && ($cached['key'] ?? '') === $keyTag && $age >= 0 && $age < 60 && array_key_exists('credits_30d', $cachedFigures) ? $cachedFigures : null;
     if ($figures === null) {
         $figures = pmssWelcomeHomeCreditsFetch($credentials);
         if ($figures !== null && (is_dir($dir) || @mkdir($dir, 0700, true)) && !is_link($dir)) {
@@ -1888,26 +1906,32 @@ function pmssWelcomeHomeCreditsRead($home)
             } elseif ($tmp !== false) {
                 @unlink($tmp);
             }
-        } elseif ($figures === null && is_array($cached) && ($cached['key'] ?? '') === $keyTag && $age < 3600) {
-            $figures = $cached['figures'];
+        } elseif ($figures === null && $cachedFigures !== null && ($cached['key'] ?? '') === $keyTag && $age < 3600) {
+            $figures = $cachedFigures;
         }
     }
-    if (!is_array($figures)) return $result;
+    if (!is_array($figures) || !isset($figures['balance'])) return $result;
     $balance = (int) $figures['balance'];
     $result['state'] = 'ok';
     $result['balance'] = $balance;
-    $result['pct_left'] = $figures['pct_left'];
-    $result['tokens_30d'] = (int) $figures['tokens_30d'];
+    $result['pct_left'] = $figures['pct_left'] ?? null;
+    $result['credits_30d'] = isset($figures['credits_30d']) ? (int) $figures['credits_30d'] : null;
     $result['value'] = $balance > 0 ? pmssWelcomeHomeCreditsCompact($balance) : '0';
-    $used = $result['tokens_30d'] > 0 ? pmssWelcomeHomeCreditsCompact($result['tokens_30d']).' tokens used in 30 days' : 'no tokens used in 30 days';
-    if ($balance <= 0) { $result['meta'] = $used.' · more are added with each paid invoice'; return $result; }
-    // Average credits per Pikkumies question on the default model (wiki "Pikkumies on PMSS", What it costs).
-    $questions = intdiv($balance, 18000);
-    $result['questions'] = $questions;
-    $result['text'] = $questions >= 1
-        ? 'About '.number_format($questions).' Pikkumies question'.($questions === 1 ? '' : 's').' left on the default model'
-        : 'Less than one typical question left';
-    $result['meta'] = ($questions >= 1 ? '≈'.number_format($questions).' question'.($questions === 1 ? '' : 's') : 'under one question').' · '.$used;
+    $parts = array();
+    if ($balance > 0) {
+        // Average credits per Pikkumies question on the default model (wiki "Pikkumies on PMSS", What it costs).
+        $questions = intdiv($balance, 18000);
+        $result['questions'] = $questions;
+        $result['text'] = $questions >= 1
+            ? 'About '.number_format($questions).' Pikkumies question'.($questions === 1 ? '' : 's').' left on the default model'
+            : 'Less than one typical question left';
+        $parts[] = $questions >= 1 ? '≈'.number_format($questions).' question'.($questions === 1 ? '' : 's') : 'under one question';
+    }
+    if ($result['credits_30d'] !== null) {
+        $parts[] = $result['credits_30d'] > 0 ? pmssWelcomeHomeCreditsCompact($result['credits_30d']).' credits used in 30 days' : 'no credits used in 30 days';
+    }
+    if ($balance <= 0) $parts[] = 'more are added with each paid invoice';
+    $result['meta'] = implode(' · ', $parts);
     return $result;
 }
 

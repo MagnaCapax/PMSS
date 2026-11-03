@@ -93,7 +93,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $this->assertTrue(chmod($keyFile, 0600));
             $this->pmssWriteFile($home.'/.cache/pmss-welcome/credits.json', (string) json_encode(array(
                 'at' => time(), 'key' => substr(hash('sha256', $key), 0, 12),
-                'figures' => array('balance' => 900000, 'tokens_30d' => 1234567, 'pct_left' => 45.5))), 0700);
+                'figures' => array('balance' => 900000, 'credits_30d' => 1234567, 'pct_left' => 45.5))), 0700);
             // Helpers the page loads and runs before building its state: one that prints text and one that never returns quickly.
             $this->pmssWriteFile($home.'/www/welcomeAnnouncements.php', '<?php echo "STRAY OUTPUT";');
             $this->pmssWriteFile($home.'/www/userTrafficLimit.php', '<?php sleep(30);');
@@ -104,6 +104,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $credits = $this->pmssDecodeJsonArray($result['stdout'], 'The credits response must be JSON alone: '.substr($result['stdout'], 0, 120));
             $this->assertSame('ok', $credits['state']);
             $this->assertSame('900k', $credits['value']);
+            $this->assertSame(1234567, $credits['credits_30d']);
+            $this->assertStringNotContainsString('token', strtolower($result['stdout']), 'The credits JSON speaks credits, never tokens');
             $this->assertStringNotContainsString($key, $result['stdout']);
 
             $this->assertTrue(unlink($keyFile));

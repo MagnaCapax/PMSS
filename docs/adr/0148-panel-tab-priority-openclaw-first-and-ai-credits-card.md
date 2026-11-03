@@ -84,3 +84,25 @@ gates still apply, and the explicit Docker option takes precedence over its
 profile default. The omitted profile remains the seedbox `default`.
 The tab priority and credit-card decisions still depend on account state and
 keep their existing behavior; profiles add no product-specific panel logic.
+
+## Amendment 2026-11-03: credits only
+
+Decision 3 listed "the tokens used in 30 days" on the AI credits card. The operator wrote on 2026-11-03: "AI Credits
+then proceeds to muddy and confabulate by reporting token usage (probably including cached) misleading people.
+Should be credits only". Reason: tokens are not the unit customers are charged. The credit service prices fresh
+input, cached input and output at different rates, and its `GET /v1/usage` counts cached input inside
+`prompt_tokens`, so a token total cannot be reconciled with the credit balance shown beside it.
+
+Decision: the card states balance and usage in credits and never in tokens. It keeps the same single request to
+`GET /v1/usage`; the usage part now reads "<N> credits used in 30 days" (or "no credits used in 30 days"), summed from
+`daily[].credits` of that answer, and no token field is read. Interpretation, stated once: "credits only" is read as
+the unit of the usage figure, not as a request to drop the usage figure; the figure stays because it is in credits and
+the same answer already carries it. `credits_30d` is settled charges only (not credits reserved by requests still in
+flight) over 30 UTC days including today. When the answer has no `daily` list the usage part is left out rather than
+shown as zero. The question estimate, the bar and the Get help gate are unchanged. The `?credits=1` JSON carries
+`credits_30d` instead of `tokens_30d`.
+
+Consequence for existing accounts: a cached figure set from before this change has `tokens_30d` and no
+`credits_30d`. It is not served as fresh (one extra request on the first Welcome load after the update reaches the
+account); if the service cannot answer, the stale copy (under an hour old) is served without any usage figure. It
+never shows tokens.

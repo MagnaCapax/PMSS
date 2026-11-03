@@ -288,9 +288,9 @@ final class WelcomeHomeTest extends TestCase
     {
         $file = "endpoint=https://virsilipas.mcx.fi/v1\nkey=".self::CREDITS_KEY."\n";
         $funded = $this->creditsHome($file);
-        $this->creditsCacheWrite($funded, self::CREDITS_KEY, 0, array('balance' => 900000, 'tokens_30d' => 1234567, 'pct_left' => 45.5));
+        $this->creditsCacheWrite($funded, self::CREDITS_KEY, 0, array('balance' => 900000, 'credits_30d' => 1234567, 'pct_left' => 45.5));
         $empty = $this->creditsHome($file);
-        $this->creditsCacheWrite($empty, self::CREDITS_KEY, 0, array('balance' => 0, 'tokens_30d' => 1234567, 'pct_left' => 0));
+        $this->creditsCacheWrite($empty, self::CREDITS_KEY, 0, array('balance' => 0, 'credits_30d' => 1234567, 'pct_left' => 0));
 
         $result = $this->creditsCall('pmssWelcomeHomeCreditsRead', array('funded' => $funded, 'empty' => $empty, 'none' => $this->creditsHome(null)));
 
@@ -300,16 +300,18 @@ final class WelcomeHomeTest extends TestCase
         $this->assertSame('900k', $ok['value']);
         $this->assertSame(50, $ok['questions']);
         $this->assertSame(45.5, $ok['pct_left']);
-        $this->assertSame(1234567, $ok['tokens_30d']);
+        $this->assertSame(1234567, $ok['credits_30d']);
+        $this->assertArrayNotHasKey('tokens_30d', $ok);
         $this->assertSame(0, strpos($ok['text'], 'About 50 Pikkumies questions'), $ok['text']);
-        $this->assertStringContainsAllStrings(array('≈50 questions', '1.2M tokens used in 30 days'), $ok['meta']);
+        $this->assertStringContainsAllStrings(array('≈50 questions', '1.2M credits used in 30 days'), $ok['meta']);
+        $this->pmssAssertStringNotContainsString('token', strtolower(json_encode($ok)), 'The card speaks credits, never tokens');
         $this->pmssAssertStringNotContainsString(self::CREDITS_KEY, json_encode($result), 'The key never leaves the server in the figures');
 
         $this->assertSame('ok', $result['empty']['state']);
         $this->assertSame('0', $result['empty']['value']);
         $this->assertSame(null, $result['empty']['questions']);
         $this->assertSame('', $result['empty']['text']);
-        $this->assertStringContainsAllStrings(array('1.2M tokens used in 30 days', 'more are added with each paid invoice'), $result['empty']['meta']);
+        $this->assertStringContainsAllStrings(array('1.2M credits used in 30 days', 'more are added with each paid invoice'), $result['empty']['meta']);
 
         $this->assertSame('none', $result['none']['state']);
         $this->assertSame(null, $result['none']['questions']);
@@ -318,7 +320,7 @@ final class WelcomeHomeTest extends TestCase
     public function testCreditsReadIgnoresCacheOfAnotherKeyAndExpiredCopies(): void
     {
         $file = "endpoint=https://virsilipas.mcx.fi/v1\nkey=".self::CREDITS_KEY."\n";
-        $figures = array('balance' => 777000, 'tokens_30d' => 5, 'pct_left' => 12.5);
+        $figures = array('balance' => 777000, 'credits_30d' => 5, 'pct_left' => 12.5);
         $otherKey = $this->creditsHome($file);
         $this->creditsCacheWrite($otherKey, 'vsk-zyxwvutsrqponmlkjihgfedc', 0, $figures);
         $stale = $this->creditsHome($file);
@@ -339,6 +341,77 @@ final class WelcomeHomeTest extends TestCase
         $this->assertSame('777k', $result['stale']['value']);
     }
 
+    /** The figures are credits charged, summed from daily[].credits; token fields are never read (ADR 0148 amendment 2026-11-03). */
+    public function testCreditsFiguresSumChargedCreditsNeverTokens(): void
+    {
+        $day = static function (int $credits, int $prompt, int $cached, int $completion): array {
+            return array('day' => '2026-11-01', 'credits' => $credits, 'prompt_tokens' => $prompt, 'cached_tokens' => $cached, 'completion_tokens' => $completion);
+        };
+        $base = array('balance' => 500000, 'grants' => array(array('credits' => 1000000)));
+        $cases = array(
+            // A day that read 9M cached prompt tokens but was charged 120 credits: the figure is the charge, not the tokens.
+            'heavyCached' => $base + array('daily' => array($day(120, 9000000, 8900000, 4000), $day(30, 1000, 0, 500))),
+            'tokensChanged' => $base + array('daily' => array($day(120, 1, 0, 1), $day(30, 7, 7, 7))),
+            'emptyDaily' => $base + array('daily' => array()),
+            'noDaily' => $base,
+            'dailyNotArray' => $base + array('daily' => 'oops'),
+            'rowsWithoutCredits' => $base + array('daily' => array(array('prompt_tokens' => 99999), 'x', array('credits' => 'n/a'), array('credits' => 7))),
+            'noBalance' => array('daily' => array($day(1, 1, 1, 1))),
+        );
+        $result = $this->runWelcomeHome('echo json_encode(array_map("pmssWelcomeHomeCreditsFigures", '.var_export($cases, true).'));', true);
+
+        $this->assertSame(150, $result['heavyCached']['credits_30d']);
+        $this->assertSame(150, $result['tokensChanged']['credits_30d'], 'Changing only token fields must never change the credits figure');
+        $this->assertSame(0, $result['emptyDaily']['credits_30d'], 'A real empty daily list is zero credits used');
+        $this->assertSame(null, $result['noDaily']['credits_30d'], 'No daily list is unknown, never a false zero');
+        $this->assertSame(null, $result['dailyNotArray']['credits_30d']);
+        $this->assertSame(7, $result['rowsWithoutCredits']['credits_30d']);
+        $this->assertSame(500000, $result['heavyCached']['balance']);
+        $this->assertSame(50.0, $result['heavyCached']['pct_left']);
+        $this->assertSame(null, $result['noBalance'], 'An answer without a balance is no answer');
+        $this->assertSame(array('balance', 'credits_30d', 'pct_left'), array_keys($result['heavyCached']));
+        $this->pmssAssertStringNotContainsString('token', strtolower(json_encode($result)));
+    }
+
+    /** A cache written before the credits-only change holds tokens_30d and no credits_30d; it must not put tokens on the card. */
+    public function testCreditsReadNeverShowsTokensFromAnOldShapeCache(): void
+    {
+        $file = "endpoint=https://virsilipas.mcx.fi/v1\nkey=".self::CREDITS_KEY."\n";
+        $old = array('balance' => 900000, 'tokens_30d' => 1234567, 'pct_left' => 45.5);
+        $fresh = $this->creditsHome($file);
+        $this->creditsCacheWrite($fresh, self::CREDITS_KEY, 0, $old);
+        $stale = $this->creditsHome($file);
+        $this->creditsCacheWrite($stale, self::CREDITS_KEY, 600, $old);
+        $unknown = $this->creditsHome($file);
+        $this->creditsCacheWrite($unknown, self::CREDITS_KEY, 0, array('balance' => 0, 'credits_30d' => null, 'pct_left' => null));
+
+        // URL streams are off, so the refetch an old-shape copy triggers fails and the stale fallback stands in.
+        $result = $this->creditsCall('pmssWelcomeHomeCreditsRead', array('fresh' => $fresh, 'stale' => $stale, 'unknown' => $unknown));
+
+        foreach (array('fresh', 'stale') as $name) {
+            $this->assertSame('ok', $result[$name]['state'], $name);
+            $this->assertSame(900000, $result[$name]['balance'], $name);
+            $this->assertSame(null, $result[$name]['credits_30d'], $name);
+            $this->assertSame('≈50 questions', $result[$name]['meta'], $name.': no used figure, no separator, no tokens');
+            $this->pmssAssertStringNotContainsString('token', strtolower(json_encode($result[$name])), $name);
+        }
+        $this->assertSame('more are added with each paid invoice', $result['unknown']['meta'], 'Unknown usage at balance 0 leaves no leading separator');
+    }
+
+    /** The used figure reads "no credits used" at zero and says nothing when the usage is unknown. */
+    public function testCreditsReadWordsUsageInCredits(): void
+    {
+        $file = "endpoint=https://virsilipas.mcx.fi/v1\nkey=".self::CREDITS_KEY."\n";
+        $homes = array();
+        foreach (array('zero' => 0, 'some' => 4960000, 'small' => 120) as $name => $used) {
+            $homes[$name] = $this->creditsHome($file);
+            $this->creditsCacheWrite($homes[$name], self::CREDITS_KEY, 0, array('balance' => 20000, 'credits_30d' => $used, 'pct_left' => null));
+        }
+        $result = $this->creditsCall('pmssWelcomeHomeCreditsRead', $homes);
+        $this->assertSame('≈1 question · no credits used in 30 days', $result['zero']['meta']);
+        $this->assertSame('≈1 question · 4.9M credits used in 30 days', $result['some']['meta']);
+        $this->assertSame('≈1 question · 120 credits used in 30 days', $result['small']['meta']);
+    }
     public function testCreditsCompactRoundsDown(): void
     {
         $this->assertSame(
@@ -608,7 +681,7 @@ final class WelcomeHomeTest extends TestCase
             $home = $this->supportPikkumiesHome("touch \"\$0.ran\"\nexit 0\n");
             $this->pmssWriteFile($home.'/.virsilipasKey', 'key='.self::CREDITS_KEY."\n");
             chmod($home.'/.virsilipasKey', 0600);
-            $this->creditsCacheWrite($home, self::CREDITS_KEY, 5, array('balance' => $balance, 'tokens_30d' => 0, 'pct_left' => null));
+            $this->creditsCacheWrite($home, self::CREDITS_KEY, 5, array('balance' => $balance, 'credits_30d' => 0, 'pct_left' => null));
             $homes[$name] = $home;
         }
         $result = $this->runWelcomeHome('function pmssWelcomePikkumiesStateRead($home, $name) { return array("visible" => true); }'
