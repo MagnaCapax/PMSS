@@ -40,4 +40,21 @@ class ProftpdModulesTest extends TestCase
         $source = "LoadModule mod_auth.c\n  #  LoadModule mod_tls.c\n";
         $this->assertSame("LoadModule mod_auth.c\n  LoadModule mod_tls.c\n", \pmssProftpdTlsModuleContent($source));
     }
+
+    public function testCrLfModuleRepairPreservesLinesAndIsIdempotent(): void
+    {
+        $active = "LoadModule mod_tls.c\r\n";
+        // Cover both recognition paths without normalizing Debian's other lines.
+        foreach ([
+            ["#LoadModule mod_tls.c\r\n", $active],
+            [$active, $active],
+            ["LoadModule mod_auth.c\r\n  #  LoadModule mod_tls.c\r\n", "LoadModule mod_auth.c\r\n  ".$active],
+            [$active."#LoadModule mod_tls.c\r\n", $active."#LoadModule mod_tls.c\r\n"],
+            ["LoadModule mod_tls.c_extra\r\n", "LoadModule mod_tls.c_extra\r\n".$active],
+        ] as list($source, $expected)) {
+            $updated = \pmssProftpdTlsModuleContent($source);
+            $this->assertSame($expected, $updated);
+            $this->assertSame($updated, \pmssProftpdTlsModuleContent($updated));
+        }
+    }
 }
