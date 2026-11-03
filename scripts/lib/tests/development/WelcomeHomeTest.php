@@ -301,7 +301,7 @@ final class WelcomeHomeTest extends TestCase
         $this->assertSame(50, $ok['questions']);
         $this->assertSame(45.5, $ok['pct_left']);
         $this->assertSame(1234567, $ok['credits_30d']);
-        $this->assertArrayNotHasKey('tokens_30d', $ok);
+        $this->assertFalse(array_key_exists('tokens_30d', $ok), 'The figures carry no token field');
         $this->assertSame(0, strpos($ok['text'], 'About 50 Pikkumies questions'), $ok['text']);
         $this->assertStringContainsAllStrings(array('≈50 questions', '1.2M credits used in 30 days'), $ok['meta']);
         $this->pmssAssertStringNotContainsString('token', strtolower(json_encode($ok)), 'The card speaks credits, never tokens');
@@ -367,10 +367,11 @@ final class WelcomeHomeTest extends TestCase
         $this->assertSame(null, $result['dailyNotArray']['credits_30d']);
         $this->assertSame(7, $result['rowsWithoutCredits']['credits_30d']);
         $this->assertSame(500000, $result['heavyCached']['balance']);
-        $this->assertSame(50.0, $result['heavyCached']['pct_left']);
+        $this->assertEquals(50.0, $result['heavyCached']['pct_left']);
         $this->assertSame(null, $result['noBalance'], 'An answer without a balance is no answer');
         $this->assertSame(array('balance', 'credits_30d', 'pct_left'), array_keys($result['heavyCached']));
-        $this->pmssAssertStringNotContainsString('token', strtolower(json_encode($result)));
+        // The figures themselves, not the case labels above (one of which names tokens on purpose).
+        $this->pmssAssertStringNotContainsString('token', strtolower(json_encode(array_values($result))));
     }
 
     /** A cache written before the credits-only change holds tokens_30d and no credits_30d; it must not put tokens on the card. */
