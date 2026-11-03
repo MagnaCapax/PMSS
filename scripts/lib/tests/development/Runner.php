@@ -122,6 +122,24 @@ if ($listed !== '' && ($tracked = array_values(array_filter(array_map(static fun
     $testFiles = $tracked;
 }
 
+// Optional words on the command line keep only the test files whose name contains one of them, so a change can be
+// checked by its own tests without the whole suite; the full suite stays the default and still runs in CI.
+$testWords = array_values(array_filter(array_slice($argv ?? [], 1), static function ($word) {
+    return is_string($word) && preg_match('/^[A-Za-z0-9_]+$/D', $word) === 1;
+}));
+if ($testWords !== []) {
+    $testFiles = array_values(array_filter($testFiles, static function (string $file) use ($testWords): bool {
+        foreach ($testWords as $word) {
+            if (strpos(basename($file, '.php'), $word) !== false) return true;
+        }
+        return false;
+    }));
+    if ($testFiles === []) {
+        fwrite(STDERR, 'No test file matches: '.implode(', ', $testWords)."\n");
+        exit(2);
+    }
+}
+
 foreach ($testFiles as $testFile) {
     require_once $testFile;
 }
