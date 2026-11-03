@@ -56,11 +56,7 @@ function pmssConfigureTorrentClientOtherStop($home, $client)
             || !@posix_kill($pid, 15)) return false;
     }
     // Saving resume data for many torrents takes far longer than a few seconds.
-    for ($attempt = 0; $attempt < 600; $attempt++) {
-        if (pmssConfigureTorrentClientOtherPids($home, $client) === array()) return true;
-        usleep(100000);
-    }
-    return false;
+    return pmssCustomerNativeWaitForExit('pmssConfigureTorrentClientOtherPids', array($home, $client), 600);
 }
 
 /** Atomically choose a checked directory and both venv entrypoints for Deluge. */

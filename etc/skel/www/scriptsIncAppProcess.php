@@ -151,23 +151,27 @@ function pmssCustomerAppsMediaIdsRead(): array
         ? array_merge(array_keys(pmssMediaStackPanelAppDefinitionsRead()), array('cloudplow')) : array();
 }
 }
+if (!function_exists('pmssCustomerNativeWaitForExit')) {
+/** Poll only for an empty native PID list; retain the final failed probe's pause. */
+function pmssCustomerNativeWaitForExit(callable $pids, array $arguments, int $attempts, $pause = null): bool {
+ $pause = $pause ?? static function (): void { usleep(100000); };
+ for ($attempt = 0; $attempt < $attempts; $attempt++) {
+  if ($pids(...$arguments) === array()) return true;
+  $pause();
+ }
+ return false;
+}
+}
 if (!function_exists('pmssCustomerNativeStop')) {
 /** Give native frontends a brief graceful exit before a scoped force stop. */
 function pmssCustomerNativeStop(array $binaries, array $ops = array()): void {
  $signal = $ops['signal'] ?? 'pmssCustomerNativeSignal';
  $pids = $ops['pids'] ?? 'pmssCustomerNativePidsRead';
- $pause = $ops['pause'] ?? static function (): void { usleep(100000); };
  if ($signal($binaries, 15) === 0) return;
- for ($attempt = 0; $attempt < 30; $attempt++) {
-  if ($pids($binaries) === array()) return;
-  $pause();
- }
+ if (pmssCustomerNativeWaitForExit($pids, array($binaries), 30, $ops['pause'] ?? null)) return;
  $signal($binaries, 9);
  // Do not hand the next start an exiting daemon's still-open config.
- for ($attempt = 0; $attempt < 50; $attempt++) {
-  if ($pids($binaries) === array()) return;
-  $pause();
- }
+ pmssCustomerNativeWaitForExit($pids, array($binaries), 50, $ops['pause'] ?? null);
 }
 }
 if (!function_exists('pmssCustomerTorrentClientToggleStart')) {

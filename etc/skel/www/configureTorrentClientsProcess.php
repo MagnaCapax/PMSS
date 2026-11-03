@@ -62,14 +62,9 @@ function pmssConfigureTorrentClientStop($home, array $ops = [])
 {
     $pids = $ops['pids'] ?? 'pmssConfigureTorrentClientNativePids';
     $signal = $ops['signal'] ?? static function ($pid, $signal): bool { return @posix_kill($pid, $signal); };
-    $pause = $ops['pause'] ?? static function (): void { usleep(100000); };
     foreach ($pids($home) as $pid) {
         if (!in_array($pid, $pids($home), true) || !$signal($pid, 15)) return false;
     }
     // Saving resume data for many torrents takes far longer than a few seconds; starting early hands off to the exiting daemon.
-    for ($attempt = 0; $attempt < 600; $attempt++) {
-        if ($pids($home) === array()) return true;
-        $pause();
-    }
-    return false;
+    return pmssCustomerNativeWaitForExit($pids, array($home), 600, $ops['pause'] ?? null);
 }

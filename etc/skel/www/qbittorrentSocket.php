@@ -7,15 +7,10 @@ function pmssQbittorrentFrontendSocketStop(string $home, array $ops = []): bool
     if (pmssConfigureTorrentClientStop($home, $ops)) return true;
     $pids = $ops['pids'] ?? 'pmssConfigureTorrentClientNativePids';
     $signal = $ops['signal'] ?? static function ($pid, $signal): bool { return @posix_kill($pid, $signal); };
-    $pause = $ops['pause'] ?? static function (): void { usleep(100000); };
     foreach ($pids($home) as $pid) {
         if (in_array($pid, $pids($home), true)) $signal($pid, 9);
     }
-    for ($attempt = 0; $attempt < 50; $attempt++) {
-        if ($pids($home) === []) return true;
-        $pause();
-    }
-    return false;
+    return pmssCustomerNativeWaitForExit($pids, array($home), 50, $ops['pause'] ?? null);
 }
 
 /** Collect listening socket addresses from account-owned process descriptors. */

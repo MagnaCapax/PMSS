@@ -471,6 +471,12 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Customer native shutdown polling shares `pmssCustomerNativeWaitForExit()` in the
+existing AppProcess part. Apps, Configure and qBittorrent containment retain
+their PID selectors, signal checks, budgets and return values. Only an empty
+PID array proves exit; every failed probe retains its pause, including the last
+one. Boundary and fault fixtures use injected observations and pauses only.
+
 Operator CLI, anchored permission paths and pinned archive validators reuse
 `pmssPathRelativeStringIsSafe()` for lexical components. Absolute-path framing,
 control-byte rules, archive types, prefixes and empty-component policies stay
