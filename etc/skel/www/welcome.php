@@ -110,7 +110,7 @@ $homeMetricsHtml = pmssWelcomeHomeQuotaMetricHtmlBuild($homeQuotaState, $billing
     .pmssWelcomeHomeTrafficMetricHtmlBuild($homeTrafficState, $billingServiceId)
     .pmssWelcomeHomeMemoryMetricHtmlBuild($homeMemoryState)
     .pmssWelcomeHomeServerMetricHtmlBuild();
-$homeFleetMetricHtml = pmssWelcomeHomeFleetMetricHtmlBuild(dirname(__DIR__));
+$homeFleetMetricHtml = pmssWelcomeHomeFleetMetricHtmlBuild(dirname(__DIR__), '/var/lib/pmss/public/fleetCompare.json', null, $billingServiceId);
 $homeMetricsHtml .= $homeFleetMetricHtml;
 $homeCreditsKey = pmssWelcomeHomeCreditsKeyRead(dirname(__DIR__)) !== null;
 if ($homeCreditsKey) $homeMetricsHtml .= pmssWelcomeHomeCreditsMetricHtmlBuild();
@@ -1563,7 +1563,7 @@ function pmssWelcomeHomePlainFileRead($path)
  * The bar is the own value on a scale of twice that average, so the mark sits at the middle. Numbers only. The feed is read
  * from the account cache only; the News refresh (welcome.php?news=1) fills it.
  */
-function pmssWelcomeHomeFleetMetricHtmlBuild($home, $ownPath = '/var/lib/pmss/public/fleetCompare.json', $now = null)
+function pmssWelcomeHomeFleetMetricHtmlBuild($home, $ownPath = '/var/lib/pmss/public/fleetCompare.json', $now = null, $billingServiceId = 0)
 {
     $own = pmssWelcomeHomePlainFileRead($ownPath);
     $feed = $own === false ? false : pmssWelcomeHomeCachedFetch($home, 'https://pulsedmedia.com/data/v1/fleet-performance.json', 900, false);
@@ -1572,6 +1572,11 @@ function pmssWelcomeHomeFleetMetricHtmlBuild($home, $ownPath = '/var/lib/pmss/pu
     $bar = min(100, $state['psi'] / (2 * $state['psiFleet']) * 100);
     $meta = 'Fleet: '.number_format($state['psiFleet'], 1, '.', '').'% · response '.pmssWelcomeHomeMillisecondsText($state['svcMs'])
         .', fleet '.pmssWelcomeHomeMillisecondsText($state['svcMsFleet']);
+    // The client-area service page shows the bonus % now and on a new server, and the move options; the panel itself states no amounts.
+    if ((int) $billingServiceId > 0) {
+        $meta .= '<br><a href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id='.(int) $billingServiceId
+            .'" target="_blank" rel="noopener">Want a different server? See the options on your service page</a>';
+    }
     $title = 'Your server\'s average share of time waiting on disk over the past week, against the average server '
         .($state['tier'] ? 'on the same plan family' : 'across the fleet').'. Lower is better.';
     return pmssWelcomeHomeMetricHtmlBuild('Waiting on disk', number_format($state['psi'], 1, '.', '').'%', '',

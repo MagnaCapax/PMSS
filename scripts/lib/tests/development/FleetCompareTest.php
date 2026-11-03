@@ -44,7 +44,7 @@ final class FleetCompareTest extends TestCase
     }
 
     /** Render the card through the real helper tail of welcome.php, with the feed in an account cache file. */
-    private function cardFor($own, ?string $feed, bool $ownRaw = false): string
+    private function cardFor($own, ?string $feed, bool $ownRaw = false, int $serviceId = 0): string
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
         $start = strpos($source, 'function pmssWelcomeTrafficUpgradeUrlBuild');
@@ -57,10 +57,19 @@ final class FleetCompareTest extends TestCase
         if ($feed !== null) {
             $this->pmssWriteFile($dir.'/home/.cache/pmss-welcome/'.substr(sha1('https://pulsedmedia.com/data/v1/fleet-performance.json'), 0, 16).'.cache', $feed);
         }
-        $out = $this->pmssRunInlinePhpRequire($fixture, 'echo json_encode(pmssWelcomeHomeFleetMetricHtmlBuild('.var_export($dir.'/home', true).', '.var_export($ownFile, true).', '.self::NOW.'));', [], '2>&1');
+        $out = $this->pmssRunInlinePhpRequire($fixture, 'echo json_encode(pmssWelcomeHomeFleetMetricHtmlBuild('.var_export($dir.'/home', true).', '.var_export($ownFile, true).', '.self::NOW.', '.$serviceId.'));', [], '2>&1');
         $this->assertStringNotContainsString('Warning', $out);
         $this->assertStringNotContainsString('Notice', $out);
         return (string) json_decode($out, true);
+    }
+
+    public function testCardLinksTheClientAreaServicePageAndStatesNoAmounts(): void
+    {
+        $card = $this->cardFor($this->own(), $this->goodFeed(), false, 4242);
+        $this->assertStringContainsString('href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id=4242"', $card);
+        $this->assertStringContainsString('Want a different server? See the options on your service page', $card);
+        $this->assertSame(0, preg_match('/\b\d+ days?\b|bonus|free/i', strip_tags($card)));
+        $this->assertStringNotContainsString('clientarea.php', $this->cardFor($this->own(), $this->goodFeed()));
     }
 
     private function own(array $over = []): array
