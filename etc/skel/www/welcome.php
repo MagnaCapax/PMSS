@@ -110,8 +110,13 @@ $homeMetricsHtml = pmssWelcomeHomeQuotaMetricHtmlBuild($homeQuotaState, $billing
     .pmssWelcomeHomeTrafficMetricHtmlBuild($homeTrafficState, $billingServiceId)
     .pmssWelcomeHomeMemoryMetricHtmlBuild($homeMemoryState)
     .pmssWelcomeHomeServerMetricHtmlBuild();
+$homeFleetMetricHtml = pmssWelcomeHomeFleetMetricHtmlBuild(dirname(__DIR__));
+$homeMetricsHtml .= $homeFleetMetricHtml;
 $homeCreditsKey = pmssWelcomeHomeCreditsKeyRead(dirname(__DIR__)) !== null;
 if ($homeCreditsKey) $homeMetricsHtml .= pmssWelcomeHomeCreditsMetricHtmlBuild();
+// Card count picks the grid: 4 cards fit the base grid, 5 and 6 get their own column counts.
+$homeMetricCount = 4 + ($homeFleetMetricHtml !== '' ? 1 : 0) + ($homeCreditsKey ? 1 : 0);
+$homeMetricsClass = $homeMetricCount === 5 ? ' h-m5' : ($homeMetricCount === 6 ? ' h-m6' : '');
 $homeApps = pmssWelcomeHomeAppsBuild($appsStatus, $homeAgentFirst);
 $homeAppsHtml = pmssWelcomeHomeAppsHtmlBuild($homeApps);
 
@@ -146,7 +151,7 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
                 <h1 id="h-status-title" class="h-label">Your account</h1>
                 <div class="h-chips"><?= $homeStatusChipsHtml ?></div>
             </div>
-            <div class="h-metrics<?= $homeCreditsKey ? ' h-m5' : '' ?>"><?= $homeMetricsHtml ?></div>
+            <div class="h-metrics<?= $homeMetricsClass ?>"><?= $homeMetricsHtml ?></div>
         </section>
 <?php if ($pmssPikkumiesState['visible']): ?>
         <div class="h-ask">
@@ -556,7 +561,7 @@ if (file_exists('openvpn-config.tgz')) {
             var strip = card.parentNode;
             if (!strip) return;
             strip.removeChild(card);
-            strip.className = strip.className.replace(/\s*h-m5\b/, '');
+            strip.className = strip.className.replace(/\s*h-m[56]\b/, '') + (strip.children.length === 5 ? ' h-m5' : '');
         }
         var watchdog = setTimeout(pmssCreditsCardDrop, 20000);
         fetch('welcome.php?credits=1', {credentials: 'same-origin', cache: 'no-store'})
@@ -1062,6 +1067,7 @@ function pmssWelcomeRemoteFetch($url) {
         '/clients/announcementsrss.php',
         '/remote/welcomeHeadingText.php',
         '/data/v1/panel-feed.xml',
+        '/data/v1/fleet-performance.json',
     );
 
     // Customer-panel remote fetches are pinned to expected PMSS HTTPS endpoints.
@@ -1188,7 +1194,8 @@ function pmssWelcomeHomeCss()
 .h .h-chip{display:inline-flex;align-items:center;gap:5px;min-height:26px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);color:var(--text);font-size:12px}
 .h .h-chip:hover{border-color:#35506a;text-decoration:none}
 .h-chip b{font-weight:600}.h-chip-bonus b{color:var(--accent)}
-.h-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.h-metrics.h-m5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.h-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.h-metrics.h-m5{grid-template-columns:repeat(5,minmax(0,1fr))}.h-metrics.h-m6{grid-template-columns:repeat(3,minmax(0,1fr))}
+.h-bar-wrap{position:relative}.h-tick{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:1px;background:var(--bad)}
 .h-metric{min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
 .h-metric-l{color:var(--muted);font-size:12px}
 .h-metric-v{margin:1px 0 7px;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1269,7 +1276,7 @@ function pmssWelcomeHomeCss()
 .pmss-media-stack-auth-badge-protected{color:var(--ok)}.pmss-media-stack-auth-badge-exposed{color:var(--bad)}
 .pmss-media-stack-box pre{margin-top:10px;max-height:220px;overflow:auto;padding:10px;white-space:pre-wrap;word-break:break-word}
 .pmss-feed-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media (max-width:1099px){.h-main{grid-template-columns:minmax(0,1fr)}.h-metrics,.h-metrics.h-m5{grid-template-columns:repeat(2,minmax(0,1fr))}.h-m5 .h-metric:last-child{grid-column:1/-1}}
+@media (max-width:1099px){.h-main{grid-template-columns:minmax(0,1fr)}.h-metrics,.h-metrics.h-m5,.h-metrics.h-m6{grid-template-columns:repeat(2,minmax(0,1fr))}.h-m5 .h-metric:last-child{grid-column:1/-1}}
 @media (max-width:599px){.h{padding:10px 10px 22px}.h-metrics{gap:8px}.h-metric{padding:9px 10px}.h-metric-v{font-size:16px}
 .h-app-hero{flex-direction:column;align-items:flex-start}.h-app-hero .h-app-top{min-width:0}.h-kv{grid-template-columns:max-content minmax(0,1fr)}.h-kv .h-copy{display:none}.h-kv dd{white-space:normal;word-break:break-all}.h-metric-v{white-space:normal}.h-metric-v span{display:block;margin:2px 0 0}}
 @media (max-width:599px){.h-apps{grid-template-columns:minmax(0,1fr)}}
@@ -1369,6 +1376,8 @@ function pmssWelcomeHomeNewsEmit($home)
 {
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
+    // The Waiting-on-disk card reads the public fleet feed from this cache on the next page load.
+    pmssWelcomeHomeCachedFetch($home, 'https://pulsedmedia.com/data/v1/fleet-performance.json', 900, true);
     echo pmssWelcomeHomeNewsHtmlRead($home, true);
 }
 
@@ -1410,18 +1419,26 @@ function pmssWelcomeHomeTrafficStateBuild($trafficData, $trafficIngress, $traffi
     return $state;
 }
 
-/** One status card: label, value, a bar made of segments, and one meta line. */
-function pmssWelcomeHomeMetricHtmlBuild($label, $valueHtml, $ofText, array $segments, $metaHtml, $title = '')
+/**
+ * One status card: label, value, a bar made of segments, and one meta line.
+ * $tickPercent (0..100, optional) adds a red mark across the bar at that position.
+ */
+function pmssWelcomeHomeMetricHtmlBuild($label, $valueHtml, $ofText, array $segments, $metaHtml, $title = '', $tickPercent = null)
 {
     $bar = '';
     foreach ($segments as $segment) {
         $width = max(0, min(100, (float) $segment[1]));
         if ($width > 0) $bar .= '<i class="'.$segment[0].'" style="width:'.round($width, 2).'%"></i>';
     }
+    $barHtml = '<div class="h-bar'.($bar === '' ? ' h-bar-none' : '').'" role="presentation">'.$bar.'</div>';
+    if ($tickPercent !== null) {
+        $barHtml = '<div class="h-bar-wrap">'.$barHtml
+            .'<b class="h-tick" style="left:'.round(max(0, min(100, (float) $tickPercent)), 2).'%"></b></div>';
+    }
     return '<div class="h-metric"'.($title !== '' ? ' title="'.pmssWelcomeHtmlAttr($title).'"' : '').'>'
         .'<div class="h-metric-l">'.$label.'</div>'
         .'<div class="h-metric-v">'.$valueHtml.($ofText !== '' ? '<span>'.$ofText.'</span>' : '').'</div>'
-        .'<div class="h-bar'.($bar === '' ? ' h-bar-none' : '').'" role="presentation">'.$bar.'</div>'
+        .$barHtml
         .'<div class="h-metric-m">'.$metaHtml.'</div></div>';
 }
 
@@ -1492,6 +1509,73 @@ function pmssWelcomeHomeServerMetricHtmlBuild($uptimePath = '/proc/uptime')
     $uptime = isset($fields[0]) ? pmssWelcomeServerUptimeTextBuild($fields[0]) : null;
     return pmssWelcomeHomeMetricHtmlBuild('Server', is_string($uptime) && $uptime !== '' ? pmssWelcomeHtmlAttr($uptime) : '—', '', array(),
         is_string($uptime) && $uptime !== '' ? 'uptime · shared server' : 'uptime unavailable');
+}
+
+/**
+ * Where this server stands (ADR 0227). Own figures: the brain's daily push (tier, psi, svcMs, ts) in $ownJson. Reference average: the
+ * public fleet-performance feed in $feedJson, the server's tier row, or the fleet-wide row when the tier is unknown or not reporting.
+ * Null (no card) unless both are well formed and at most 48 hours old.
+ * @return array{psi:float,svcMs:float,psiFleet:float,svcMsFleet:float,tier:bool}|null
+ */
+function pmssWelcomeHomeFleetCompareState($ownJson, $feedJson, $now)
+{
+    $own = is_string($ownJson) ? json_decode($ownJson, true) : null;
+    $feed = is_string($feedJson) ? json_decode($feedJson, true) : null;
+    if (!is_array($own) || !is_array($feed)) return null;
+    foreach (array('psi', 'svcMs', 'ts') as $key) {
+        if (!isset($own[$key]) || (!is_int($own[$key]) && !is_float($own[$key])) || !is_finite((float) $own[$key]) || $own[$key] < 0) return null;
+    }
+    $generated = isset($feed['generated_at']) && is_string($feed['generated_at']) ? strtotime($feed['generated_at']) : false;
+    if ($own['ts'] < $now - 48 * 3600 || $own['ts'] > $now + 3600) return null;
+    if ($generated === false || $generated < $now - 48 * 3600 || $generated > $now + 3600) return null;
+    $rows = array();
+    $tier = isset($own['tier']) && is_string($own['tier']) && preg_match('/\A[A-Za-z0-9-]{1,16}\z/', $own['tier']) === 1 ? $own['tier'] : '';
+    if ($tier !== '' && isset($feed['tiers'][$tier]) && is_array($feed['tiers'][$tier])) $rows[] = array(true, $feed['tiers'][$tier]);
+    if (isset($feed['fleet']) && is_array($feed['fleet'])) $rows[] = array(false, $feed['fleet']);
+    foreach ($rows as $candidate) {
+        $row = $candidate[1];
+        $psi = isset($row['avg_psi_io_full']) ? $row['avg_psi_io_full'] : null;
+        $svc = isset($row['avg_service_time_ms']) ? $row['avg_service_time_ms'] : null;
+        if (!isset($row['status']) || $row['status'] !== 'reporting' || (!is_int($psi) && !is_float($psi)) || (!is_int($svc) && !is_float($svc))) continue;
+        // The bar scale is twice the average, so an average of zero has no scale.
+        if (!is_finite((float) $psi) || !is_finite((float) $svc) || $psi <= 0 || $svc < 0) continue;
+        return array('psi' => (float) $own['psi'], 'svcMs' => (float) $own['svcMs'], 'psiFleet' => (float) $psi, 'svcMsFleet' => (float) $svc, 'tier' => $candidate[0]);
+    }
+    return null;
+}
+
+/** Milliseconds with at most 2 decimals, without trailing zeros. */
+function pmssWelcomeHomeMillisecondsText($value)
+{
+    return rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.').' ms';
+}
+
+/** Plain file, at most 4 KiB, read without following a symlink; false otherwise. */
+function pmssWelcomeHomePlainFileRead($path)
+{
+    $stat = @lstat($path);
+    if (!is_array($stat) || ($stat['mode'] & 0170000) !== 0100000 || $stat['size'] < 2 || $stat['size'] > 4096) return false;
+    return @file_get_contents($path);
+}
+
+/**
+ * Share of time this server's disks left work waiting (PSI full, past week), with a red mark at the reference average.
+ * The bar is the own value on a scale of twice that average, so the mark sits at the middle. Numbers only. The feed is read
+ * from the account cache only; the News refresh (welcome.php?news=1) fills it.
+ */
+function pmssWelcomeHomeFleetMetricHtmlBuild($home, $ownPath = '/var/lib/pmss/public/fleetCompare.json', $now = null)
+{
+    $own = pmssWelcomeHomePlainFileRead($ownPath);
+    $feed = $own === false ? false : pmssWelcomeHomeCachedFetch($home, 'https://pulsedmedia.com/data/v1/fleet-performance.json', 900, false);
+    $state = pmssWelcomeHomeFleetCompareState($own, $feed, $now === null ? time() : (int) $now);
+    if ($state === null) return '';
+    $bar = min(100, $state['psi'] / (2 * $state['psiFleet']) * 100);
+    $meta = 'Fleet: '.number_format($state['psiFleet'], 1, '.', '').'% · response '.pmssWelcomeHomeMillisecondsText($state['svcMs'])
+        .', fleet '.pmssWelcomeHomeMillisecondsText($state['svcMsFleet']);
+    $title = 'Your server\'s average share of time waiting on disk over the past week, against the average server '
+        .($state['tier'] ? 'on the same plan family' : 'across the fleet').'. Lower is better.';
+    return pmssWelcomeHomeMetricHtmlBuild('Waiting on disk', number_format($state['psi'], 1, '.', '').'%', '',
+        array(array('s-base', $bar)), $meta, $title, 50);
 }
 
 /** Alerts appear only when something needs the customer's attention, each with what it means and what to do. */
