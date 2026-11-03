@@ -40,9 +40,9 @@ port (ADR 0150).
 `pmssWelcomeRemoteFetch` (https, host pulsedmedia.com, 1 MB cap) and caches it with
 `pmssWelcomeHomeCachedFetch`. The page render reads the cache only; the News refresh
 (`welcome.php?news=1`) refills it, so there is no new endpoint. The page adds one card
-to the metric row, "Waiting on disk": the server's own value, a bar on a scale of
-twice the reference average, a red tick at the average, and
-`Fleet: <average>% · response <ms> ms, fleet <ms> ms`. The reference is the tier row
+to the metric row, "Disk wait" ("lower is better" beside the value): the server's own value, a bar on a scale of
+twice the reference average, a red tick at the average, and two short lines, `Fleet: <average>%` and
+`Response <ms> ms · fleet <ms> ms` (one decimal each; label and layout simplified on 2026-11-03 after review of the live card). The reference is the tier row
 of the feed, or the fleet-wide row when the tier is unknown or not reporting. The
 card is absent when the own-figures file or the feed is missing, not plain numbers,
 or older than 48 hours. It states numbers only and never grades the server.

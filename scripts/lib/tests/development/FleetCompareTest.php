@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Welcome "Waiting on disk" card and the fleetCompare.php queue script (ADR 0227). */
+/** Welcome "Disk wait" card and the fleetCompare.php queue script (ADR 0227). */
 final class FleetCompareTest extends TestCase
 {
     private const NOW = 1793700000;
@@ -67,7 +67,7 @@ final class FleetCompareTest extends TestCase
     {
         $card = $this->cardFor($this->own(), $this->goodFeed(), false, 4242);
         $this->assertStringContainsString('href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id=4242"', $card);
-        $this->assertStringContainsString('Want a different server? See the options on your service page', $card);
+        $this->assertStringContainsString('Want another server? See your options', $card);
         $this->assertSame(0, preg_match('/\b\d+ days?\b|bonus|free/i', strip_tags($card)));
         $this->assertStringNotContainsString('clientarea.php', $this->cardFor($this->own(), $this->goodFeed()));
     }
@@ -85,15 +85,16 @@ final class FleetCompareTest extends TestCase
     public function testCardShowsExactNumbersAndATickAtTheTierAverage(): void
     {
         $below = $this->cardFor($this->own(), $this->goodFeed());
-        $this->assertStringContainsString('Waiting on disk', $below);
+        $this->assertStringContainsString('Disk wait', $below);
+        $this->assertStringContainsString('lower is better', $below);
         $this->assertStringContainsString('14.2%', $below);
-        $this->assertStringContainsString('Fleet: 22.8% · response 31 ms, fleet 43 ms', $below);
+        $this->assertStringContainsString('Fleet: 22.8%<br>Response 31.0 ms · fleet 43.0 ms', $below);
         $this->assertStringContainsString('class="h-tick" style="left:50%"', $below);
         $this->assertStringContainsString('class="s-base" style="width:31.14%"', $below);
         $this->assertStringContainsString('on the same plan family', $below);
         $this->assertStringContainsString('width:65.79%', $this->cardFor($this->own(['psi' => 30.0]), $this->goodFeed()));
         $this->assertStringContainsString('width:100%', $this->cardFor($this->own(['psi' => 90.0]), $this->goodFeed()));
-        $this->assertStringContainsString('response 30.64 ms', $this->cardFor($this->own(['svcMs' => 30.64]), $this->goodFeed()));
+        $this->assertStringContainsString('Response 30.6 ms', $this->cardFor($this->own(['svcMs' => 30.64]), $this->goodFeed()));
         foreach (['worse', 'overloaded', 'slow', 'bad'] as $word) $this->assertStringNotContainsString($word, strtolower($below));
     }
 
@@ -102,7 +103,7 @@ final class FleetCompareTest extends TestCase
         foreach ([$this->own(['tier' => null]), $this->own(['tier' => 'Unknown-Tier']), $this->own(['tier' => 'Dragon-R']), $this->own(['tier' => '../x'])] as $own) {
             $feed = $this->feed(['Dragon-R' => $this->row(1.0, 1.0, 'no_recent_data')], ['status' => 'reporting', 'avg_psi_io_full' => 10.0, 'avg_service_time_ms' => 20.0], self::NOW - 600);
             $html = $this->cardFor($own, $feed);
-            $this->assertStringContainsString('Fleet: 10.0% · response 31 ms, fleet 20 ms', $html);
+            $this->assertStringContainsString('Fleet: 10.0%<br>Response 31.0 ms · fleet 20.0 ms', $html);
             $this->assertStringContainsString('across the fleet', $html);
         }
         $nullPsi = $this->feed(['M1000' => ['status' => 'reporting', 'avg_psi_io_full' => null, 'avg_service_time_ms' => 43.0]], ['status' => 'reporting', 'avg_psi_io_full' => 10.0, 'avg_service_time_ms' => 20.0], self::NOW - 600);
@@ -112,7 +113,7 @@ final class FleetCompareTest extends TestCase
     public function testCardIsAbsentWhenAnyInputIsMissingStaleOrInvalid(): void
     {
         $feed = $this->goodFeed();
-        $this->assertStringContainsString('Waiting on disk', $this->cardFor($this->own(['ts' => self::NOW - 48 * 3600]), $feed));
+        $this->assertStringContainsString('Disk wait', $this->cardFor($this->own(['ts' => self::NOW - 48 * 3600]), $feed));
         foreach ([
             [null, $feed], [$this->own(['ts' => self::NOW - 48 * 3600 - 1]), $feed], [$this->own(['ts' => self::NOW + 7200]), $feed],
             [$this->own(['psi' => 'abc']), $feed], [$this->own(['psi' => '14.2']), $feed], [$this->own(['svcMs' => -1]), $feed],

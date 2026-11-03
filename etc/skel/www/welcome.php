@@ -1544,12 +1544,6 @@ function pmssWelcomeHomeFleetCompareState($ownJson, $feedJson, $now)
     return null;
 }
 
-/** Milliseconds with at most 2 decimals, without trailing zeros. */
-function pmssWelcomeHomeMillisecondsText($value)
-{
-    return rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.').' ms';
-}
-
 /** Plain file, at most 4 KiB, read without following a symlink; false otherwise. */
 function pmssWelcomeHomePlainFileRead($path)
 {
@@ -1570,16 +1564,17 @@ function pmssWelcomeHomeFleetMetricHtmlBuild($home, $ownPath = '/var/lib/pmss/pu
     $state = pmssWelcomeHomeFleetCompareState($own, $feed, $now === null ? time() : (int) $now);
     if ($state === null) return '';
     $bar = min(100, $state['psi'] / (2 * $state['psiFleet']) * 100);
-    $meta = 'Fleet: '.number_format($state['psiFleet'], 1, '.', '').'% · response '.pmssWelcomeHomeMillisecondsText($state['svcMs'])
-        .', fleet '.pmssWelcomeHomeMillisecondsText($state['svcMsFleet']);
+    // Two short lines: the average the red mark shows, then the response times, both to one decimal so they compare at a glance.
+    $meta = 'Fleet: '.number_format($state['psiFleet'], 1, '.', '').'%'
+        .'<br>Response '.number_format($state['svcMs'], 1, '.', '').' ms · fleet '.number_format($state['svcMsFleet'], 1, '.', '').' ms';
     // The client-area service page shows the bonus % now and on a new server, and the move options; the panel itself states no amounts.
     if ((int) $billingServiceId > 0) {
         $meta .= '<br><a href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id='.(int) $billingServiceId
-            .'" target="_blank" rel="noopener">Want a different server? See the options on your service page</a>';
+            .'" target="_blank" rel="noopener">Want another server? See your options</a>';
     }
     $title = 'Your server\'s average share of time waiting on disk over the past week, against the average server '
         .($state['tier'] ? 'on the same plan family' : 'across the fleet').'. Lower is better.';
-    return pmssWelcomeHomeMetricHtmlBuild('Waiting on disk', number_format($state['psi'], 1, '.', '').'%', '',
+    return pmssWelcomeHomeMetricHtmlBuild('Disk wait', number_format($state['psi'], 1, '.', '').'%', 'lower is better',
         array(array('s-base', $bar)), $meta, $title, 50);
 }
 
