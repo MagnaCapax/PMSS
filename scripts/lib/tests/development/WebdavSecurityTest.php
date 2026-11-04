@@ -239,6 +239,33 @@ class WebdavSecurityTest extends TestCase
         ]);
     }
 
+    /** Root recursion must not remove dot entries through their parent (Refs #1233). */
+    public function testAccountRootRefusesDeleteAndMove(): void
+    {
+        foreach ([false, true] as $wwwWritable) {
+            $block = $this->webdavBlock($this->renderUserConfig($wwwWritable));
+            $matched = preg_match('/\$HTTP\["url"\] =~ "([^"]+)" \{\s*'
+                .'\$HTTP\["request-method"\] =~ "([^"]+)" \{\s*'
+                .'url\.access-deny = \( "" \)\s*\}\s*\}/', $block, $matches);
+            $this->assertSame(1, $matched, 'root method deny is nested inside the WebDAV URL condition');
+            $this->assertOrderedStrings(['url.access-deny = ( )', $matches[0]], $block,
+                '', 'root guard follows the WebDAV deny-list reset: ');
+
+            // Conditions see decoded URLs without query strings; children remain usable.
+            $this->assertDenies(['#'.$matches[1].'#'], [
+                '/webdav-testuser', '/webdav-testuser/',
+            ], [
+                '/webdav-testuser/data/', '/webdav-testuser/data/sub/',
+                '/webdav-testuser/www/public/file.txt', '/webdav-testuserother/',
+                '/webdav-fixtur01/', '/user-testuser/',
+            ]);
+            $this->assertDenies(['#'.$matches[2].'#'], ['DELETE', 'MOVE'], [
+                'GET', 'HEAD', 'OPTIONS', 'PROPFIND', 'PUT', 'COPY', 'LOCK', 'UNLOCK',
+                'XDELETE', 'MOVEX',
+            ]);
+        }
+    }
+
     /**
      * TEST 7b: WebDAV keeps the global deny list out of its scope
      *

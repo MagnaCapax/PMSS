@@ -106,6 +106,14 @@ $HTTP["url"] =~ "^/webdav-##username($|/)" {
     webdav.sqlite-db-name = "/home/##username/.lighttpd/webdav.lock.db"
     dir-listing.activate = "disable"
 
+    # A root DELETE or MOVE recurses into dot entries without naming them.
+    # Preserve the home and runtime config even for sync-with-delete clients.
+    $HTTP["url"] =~ "^/webdav-##username/?$" {
+        $HTTP["request-method"] =~ "^(DELETE|MOVE)$" {
+            url.access-deny = ( "" )
+        }
+    }
+
     # Defense-in-depth: do not expose dotfiles via WebDAV (prevents users from
     # breaking runtimes by editing internal config/state). url.access-deny only
     # matches the end of the path, so the dot segment is matched by condition.
