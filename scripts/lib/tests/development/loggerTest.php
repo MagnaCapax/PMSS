@@ -21,9 +21,14 @@ class LoggerTest extends TestCase
     {
         // Attempt writing to a path we cannot write; should fall back to /tmp/<base>.log
         $logger = new \Logger('/no/perm/logger-fallback-test.php', '/');
-        $logger->msg('fallback line');
         $path = '/tmp/'.basename('/no/perm/logger-fallback-test.php', '.php').'.log';
+        @unlink($path);
+        $logger->msg('fallback line');
         $this->pmssAssertFileContainsAllStrings($path, ['fallback line']);
+        // The shared fallback directory must not expose the log to other accounts.
+        clearstatcache(true, $path);
+        $this->assertSame(0600, fileperms($path) & 0777);
+        @unlink($path);
     }
 
     public function testLogMsgWrapperFallbackToTmp(): void

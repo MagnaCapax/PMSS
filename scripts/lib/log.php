@@ -199,8 +199,11 @@ function pmssLogAppendTimestampedLine(string $path, string $message, string $tim
     if (!pmssLogWritePathIsSafe($path)) {
         return false;
     }
+    // A requested mode applies at creation too, so a new file never exists with wider permissions.
+    $umask = $mode !== null ? umask(0777 & ~$mode) : null;
     // Keep incomplete writes on the existing failure/fallback path.
     $written = pmssFileWriteComplete($path, pmssLogFormatTimestampedLine($message, $timestampFormat, $prefix), FILE_APPEND | LOCK_EX);
+    $umask !== null && umask($umask);
     $written && $mode !== null && @chmod($path, $mode);
     return $written;
 }
@@ -209,7 +212,8 @@ function pmssLogAppendTimestampedLine(string $path, string $message, string $tim
 function pmssLogWriteMessage(string $primary, string $fallback, string $message, bool $writeToStderr = false): void
 {
     $written = pmssLogAppendTimestampedLine($primary, $message);
-    $written || pmssLogAppendTimestampedLine($fallback, $message);
+    // The fallback lives in a shared directory such as /tmp: keep it owner-only.
+    $written || pmssLogAppendTimestampedLine($fallback, $message, '[Y-m-d H:i:s] ', '', 0600);
     // Cron appends a job's output to the same file (">> log 2>&1"); echoing there would write each line twice.
     if ($written && pmssLogStreamIsFile($writeToStderr ? 'STDERR' : 'STDOUT', $primary)) return;
     $writeToStderr ? fwrite(STDERR, $message.PHP_EOL) : print($message.PHP_EOL);

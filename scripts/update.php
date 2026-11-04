@@ -94,8 +94,12 @@ if (!function_exists('logmsg')) {
         }
 
         $timestamp = date('[Y-m-d H:i:s] ');
-        @file_put_contents($logFiles['primary'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX)
-     || @file_put_contents($logFiles['fallback'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        if (!@file_put_contents($logFiles['primary'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX)) {
+            // The fallback lives in shared /tmp: create it owner-only and keep it that way.
+            $umask = umask(0077);
+            @file_put_contents($logFiles['fallback'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX) && @chmod($logFiles['fallback'], 0600);
+            umask($umask);
+        }
         fwrite(STDOUT, $message.PHP_EOL);
     }
 }

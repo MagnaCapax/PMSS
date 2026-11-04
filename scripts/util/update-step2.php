@@ -254,7 +254,7 @@ putenv('PMSS_DISTRO_CODENAME='.$lsbCodename);
 
 $effectiveRepoVersion = $repoVersion > 0 ? $repoVersion : $reportedVersion;
 
-logmsg('Update-step2 log: /var/log/pmss-update.log (fallback /tmp/pmss-update.log)');
+logmsg('Update-step2 log: '.(defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : '/var/log/pmss/update.log'));
 $jsonPath = pmssJsonLogPath();
 $pmssCorrelationId = pmssCorrelationId();
 if ($jsonPath !== '') {
