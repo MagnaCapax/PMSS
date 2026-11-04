@@ -450,6 +450,28 @@ class RecreateUserSafetyGuardTest extends TestCase
         ], $handoff);
     }
 
+    public function testAddAndRecreateRunOneEnvironmentPassAfterConfiguration(): void
+    {
+        // Both entry points must load the shared pass and run it after account configuration.
+        foreach ([
+            'scripts/addUser.php' => [
+                'pmssAddUserUserConfigApply($userDb, $user, $homePath);',
+                "if (!pmssUpdateUserEnvironment(\$user['name'])) {",
+            ],
+            'scripts/recreateUser.php' => [
+                "'/scripts/util/userConfig.php %s %d %d'",
+                "pmssRun('/scripts/util/userPermissions.php ' . escapeshellarg(\$userName));",
+                "if (!pmssUpdateUserEnvironment(\$userName, '', \$environmentReason)) {",
+            ],
+        ] as $path => $steps) {
+            $this->pmssAssertRepoFileContainsOrderedStrings($path, array_merge([
+                "require_once __DIR__.'/lib/update.php';",
+                "require_once __DIR__.'/lib/update/users.php';",
+            ], $steps));
+            $this->pmssAssertRepoFileSubstringCount($path, 'pmssUpdateUserEnvironment(', 1);
+        }
+    }
+
     public function testEnvironmentPassFollowsPasswordAndBackupHandoffWithoutAborting(): void
     {
         $script = $this->pmssReadRepoFile('scripts/recreateUser.php');
@@ -459,6 +481,11 @@ class RecreateUserSafetyGuardTest extends TestCase
             '$pwCommand = \'php \'.escapeshellarg(__DIR__.\'/changePw.php\')',
             "pmssRunOrExit('chown -h ' . escapeshellarg(\$userName.':'.\$userName)",
             $environmentCall,
+            // Advisory convergence failures remain visible in both diagnostic channels (ADR 0089).
+            "\$environmentReason : 'unknown reason'",
+            'Non-fatal: user environment pass failed',
+            'fwrite(STDERR, $message."\\n");',
+            'pmssUserLog($userName, $message);',
             $reclaimHeading,
         ], $script);
         $environmentPosition = strpos($script, $environmentCall);
