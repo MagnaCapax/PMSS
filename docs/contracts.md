@@ -1187,6 +1187,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Custom-config recovery: Counts observed startup/survival failures toward the existing four-failure quarantine limit. Launch-command errors or timeouts, screen ownership/directory errors, failed legacy session cleanup, and attempts where no rTorrent PID is observed leave `.rtorrent.rc.custom` and its counter untouched. Diagnostics retain the launch error or report that no rTorrent process appeared (Refs #1130).
   - Observation limit: A process that exits between PID probes cannot establish a custom-config failure; this includes very fast config errors. A stable launch still clears the counter. Quarantine path, ownership and symlink guards are unchanged (ADR 0219).
 
+- scripts/util/rtorrentSessionReset.php USERNAME
+  - Root-invoked, single-account recovery for a session crash loop, including when the executor remains alive (Refs #1058). Loads trusted helpers, validates the account, then drops supplementary groups, GID and UID before calling `rtorrentProcessResetSessionDirectory()` (ADR 0121).
+  - Preserves existing path/symlink guards and ownership restoration. Renames the old session to `session.broken-<timestamp>-<pid>` and creates an empty session; torrent data and quarantined state remain intact. Backup-path diagnostics go to stderr; success prints `Session reset complete` and exits 0, refusals/failures exit 1.
+  - Does not stop or start processes: operators must arrange a quiescent recovery window and restart separately. No automatic-watchdog thresholds, environmental preflight gates, or markers change.
+
 - scripts/cron/checkRtorrent.php
   - Behavior: Keeps per-user rTorrent/executor processes healthy and recovers missing `.rtorrent.rc` files from canonical templates when enough user config data exists.
   - Process facade: `rtorrent/process.php` loads inspection and lifecycle helpers. Snapshot headings and rows keep their callback order, and the SCGI decision retains the same queue and process-state gates.
