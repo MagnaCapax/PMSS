@@ -193,10 +193,53 @@ function pmssLogFormatTimestampedLine(string $message, string $timestampFormat =
     return date($timestampFormat).$prefix.$message.PHP_EOL;
 }
 
+/**
+ * A log in a shared directory such as /tmp is written only when it is our own regular file with one name.
+ * A missing file is created exclusively (O_EXCL), so a name another account placed first is never written to.
+ * The directory must stop other accounts from renaming or removing our file (sticky, or ours and not
+ * group/other-writable), so the by-path write after this check still reaches the file that was checked.
+ */
+function pmssLogSharedFileIsOwn(string $path, int $mode): bool
+{
+    if (!function_exists('posix_geteuid')) {
+        return false;
+    }
+    $directory = @stat(dirname($path));
+    if (!is_array($directory) || (($directory['mode'] & 01000) === 0
+        && ($directory['uid'] !== posix_geteuid() || ($directory['mode'] & 0022) !== 0))) {
+        return false;
+    }
+    clearstatcache(true, $path);
+    if (!pmssPathExistsOrLink($path)) {
+        $umask = umask(0777 & ~$mode);
+        $handle = @fopen($path, 'x');
+        umask($umask);
+        $handle !== false && fclose($handle);
+        clearstatcache(true, $path);
+    }
+    $stat = @lstat($path);
+    if (!pmssLogStatIsOwnSingleRegular($stat)) {
+        return false;
+    }
+    // Narrow an older, wider-mode copy of our own file before anything new is written to it; never widen here.
+    $current = $stat['mode'] & 0777;
+    return ($current & ~$mode) === 0 || @chmod($path, $current & $mode);
+}
+
+/** lstat data of a regular file with one name, owned by the effective uid of this process. */
+function pmssLogStatIsOwnSingleRegular($stat): bool
+{
+    return function_exists('posix_geteuid') && pmssUserFileStatIsSingleRegular($stat) && ($stat['uid'] ?? null) === posix_geteuid();
+}
+
 /** Append one timestamped line to a log file. */
 function pmssLogAppendTimestampedLine(string $path, string $message, string $timestampFormat = '[Y-m-d H:i:s] ', string $prefix = '', ?int $mode = null): bool
 {
     if (!pmssLogWritePathIsSafe($path)) {
+        return false;
+    }
+    // A requested mode marks a shared-directory log: the file must be ours before anything is written to it.
+    if ($mode !== null && !pmssLogSharedFileIsOwn($path, $mode)) {
         return false;
     }
     // A requested mode applies at creation too, so a new file never exists with wider permissions.

@@ -95,10 +95,25 @@ if (!function_exists('logmsg')) {
 
         $timestamp = date('[Y-m-d H:i:s] ');
         if (!@file_put_contents($logFiles['primary'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX)) {
-            // The fallback lives in shared /tmp: create it owner-only and keep it that way.
+            // The fallback lives in shared /tmp: write it only when it is our own regular file with one name,
+            // created exclusively when missing, so a file another account placed under that name is never used.
+            // /tmp must be sticky (or ours, not group/other-writable) so nobody can swap the checked file.
+            $fallback = $logFiles['fallback'];
+            $dirStat = @stat(dirname($fallback));
+            $dirSafe = is_array($dirStat) && function_exists('posix_geteuid') && (($dirStat['mode'] & 01000) !== 0
+                || ($dirStat['uid'] === posix_geteuid() && ($dirStat['mode'] & 0022) === 0));
+            clearstatcache(true, $fallback);
             $umask = umask(0077);
-            @file_put_contents($logFiles['fallback'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX) && @chmod($logFiles['fallback'], 0600);
+            if ($dirSafe && !file_exists($fallback) && !is_link($fallback) && ($handle = @fopen($fallback, 'x')) !== false) {
+                fclose($handle);
+            }
             umask($umask);
+            clearstatcache(true, $fallback);
+            $stat = @lstat($fallback);
+            if ($dirSafe && is_array($stat) && ($stat['mode'] & 0170000) === 0100000 && $stat['nlink'] === 1
+                && $stat['uid'] === posix_geteuid() && @chmod($fallback, 0600)) {
+                @file_put_contents($fallback, $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+            }
         }
         fwrite(STDOUT, $message.PHP_EOL);
     }
