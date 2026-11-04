@@ -190,6 +190,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   quota probe before changing links. Repairs run as the account and never touch
   link targets. A failed repair stops before service startup; a successful run
   calls `startLighttpd`. `PMSS_DRY_RUN=1` reports the link names without changes.
+  `LighttpdSymlinkRepairCliTest` retains the real CLI includes and command runner
+  while isolating account probes, repairs and the service executable. It covers
+  startup status propagation, dry runs, quota/repair refusals and repeat runs.
 
 - `killProcess()` rejects NUL bytes in the original process name before trimming,
   so malformed names cannot select a process for `pkill -x`. Ordinary surrounding
