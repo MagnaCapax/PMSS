@@ -274,6 +274,7 @@ PHP;
         'www/configureSettings.php',
         'www/configureAppOwnerSettings.php',
         'www/hermesAgent.php',
+        'www/hermesLogin.php',
         'www/configureTorrentClientsProcess.php',
         'www/configureTorrentClientsStart.php',
         'www/configureTorrentClients.php',

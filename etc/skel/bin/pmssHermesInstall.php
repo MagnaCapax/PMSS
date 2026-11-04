@@ -3,11 +3,13 @@
 require_once __DIR__.'/pmssHermesRuntime.php';
 
 // Immutable upstream release and two executable supply-chain inputs.
-const HERMES_TAG = 'v2026.9.24';
-const HERMES_COMMIT = 'f97608f178d1ffeca59860195ab7da295f7c8e5f';
-const HERMES_INSTALL_SH_SHA256 = '2017ddf0cc7bc6cfb70d40dc9fba1d916f47dbcccf5fe73bdee2cf93a11262af';
-const HERMES_LOCK_JSON_SHA256 = '193a3a3703499eb7c4b4ce48d3ba1e9dae2be62a48315c1e7ea9545e8be4a067';
+const HERMES_TAG = 'v0.22.7';
+const HERMES_COMMIT = 'b200f5bc60e31588ba2cb60e288029c4a54ba5fa';
+const HERMES_INSTALL_SH_SHA256 = 'abf338605dae6dd28d101673ac6aed7995c955745db46d47676bc591a7957209';
+const HERMES_LOCK_JSON_SHA256 = 'cc006a0c37d86fa906164a5158207f8ad56aef4d4cd4b2aed7a6c58700070b8d';
 class PmssHermesCustomerTreeChanged extends RuntimeException {}
+/** Short code for the Configure card: files (gate refused) or quota (ran out during the install). */
+class PmssHermesQuotaShort extends RuntimeException {}
 
 function pmssHermesPinMatches(string $head, string $installerHash, string $lockHash): bool
 {
@@ -146,19 +148,13 @@ function pmssHermesUpstreamInstall(array $paths): void
         $output = '';
         // The repository stage can update the checkout; this path deliberately omits it.
         // The prerequisites stage may install system packages; this installer owns only account state.
-        foreach (array('venv', 'python-deps', 'node-deps', 'config', 'path', 'complete') as $stage) {
+        // v0.22.7's products stage publishes the launcher and builds the dashboard via upstream PM.
+        foreach (array('venv', 'python-deps', 'config', 'products', 'complete') as $stage) {
             list($rc, $output) = pmssAgentRun(array('bash', $paths['tree'].'/scripts/install.sh', '--stage', $stage,
                 '--commit', HERMES_COMMIT, '--dir', $paths['tree'], '--hermes-home', $paths['base'],
                 '--non-interactive', '--skip-browser', '--skip-computer-use'), $env);
             $complete = is_file($paths['exe']) && is_file($paths['tree'].'/hermes_cli/web_dist/index.html');
             if (!pmssHermesInstallStageAccepted($stage, $rc, $output, $complete)) break;
-        }
-        if ($rc === 0) {
-            $npm = is_file($paths['base'].'/node/bin/npm') ? $paths['base'].'/node/bin/npm' : 'npm';
-            $env['PATH'] = $paths['base'].'/node/bin:'.(getenv('PATH') ?: '/usr/bin:/bin');
-            list($buildRc, $buildOutput) = pmssAgentRun(array($npm, 'run', 'build', '--workspace', 'web',
-                '--prefix', $paths['tree']), $env);
-            if ($buildRc !== 0) { $rc = $buildRc; $output = $buildOutput; $stage = 'web-build'; }
         }
     } finally {
         foreach ($saved as $path => $bytes) {
@@ -167,10 +163,42 @@ function pmssHermesUpstreamInstall(array $paths): void
         }
     }
     $complete = is_file($paths['exe']) && is_file($paths['tree'].'/hermes_cli/web_dist/index.html');
-    if (!pmssHermesInstallStageAccepted($stage, $rc, $output, $complete)) throw new RuntimeException('Upstream Hermes install failed at '.$stage);
+    if (!pmssHermesInstallStageAccepted($stage, $rc, $output, $complete)) {
+        if (preg_match('/EDQUOT|Disk quota exceeded|system error -122/', $output) === 1)
+            throw new PmssHermesQuotaShort('Disk or file quota ran out during the Hermes install', 2);
+        throw new RuntimeException('Upstream Hermes install failed at '.$stage);
+    }
     if (!$complete) throw new RuntimeException('Hermes dashboard build is incomplete');
 }
 
+/**
+ * v0.22.7 is built for the site root: Vite's preload helper turns each lazy page's dependency into "/"+path.
+ * Under the panel prefix those requests 404 and the page stays blank (QA VM, 2026-11-04). The dashboard
+ * already injects its prefix as window.__HERMES_BASE_PATH__, so the helper prepends it at run time. An
+ * unrecognised build is refused rather than guessed at. web_dist is untracked, so the checkout stays clean.
+ */
+function pmssHermesDashboardPreloadPrefix(string $dist): void
+{
+    $helper = '/function\(([A-Za-z_$][\w$]*)\)\{return["`]\/["`]\+\1\}/';
+    $prefixed = 'return(window.__HERMES_BASE_PATH__||"")+"/"+';
+    $found = array();
+    foreach (glob($dist.'/assets/*.js') ?: array() as $file) {
+        if (is_link($file) || !is_file($file)) continue;
+        $js = (string) file_get_contents($file);
+        $count = preg_match_all($helper, $js) + substr_count($js, $prefixed);
+        if ($count > 0) $found[$file] = array($count, $js);
+    }
+    if (count($found) !== 1 || reset($found)[0] !== 1)
+        throw new RuntimeException('Hermes dashboard build has an unexpected asset loader');
+    $file = key($found);
+    $js = preg_replace($helper, 'function($1){'.$prefixed.'$1}', reset($found)[1], 1);
+    $temp = substr_count($js, $prefixed) === 1 ? tempnam(dirname($file), '.pmss-') : false;
+    if ($temp === false || file_put_contents($temp, $js) !== strlen($js)
+        || !chmod($temp, fileperms($file) & 0777) || !rename($temp, $file)) {
+        if ($temp !== false && is_file($temp)) unlink($temp);
+        throw new RuntimeException('Could not prefix the Hermes dashboard asset loader');
+    }
+}
 /** Configure the vanilla CLI through its supported config command. */
 function pmssHermesConfigSet(array $paths, string $key, string $value): void
 {
@@ -180,18 +208,22 @@ function pmssHermesConfigSet(array $paths, string $key, string $value): void
 
 function pmssHermesInstall(array $paths, string $origin): void
 {
-    if (!preg_match('#^https://[0-9a-f]{16}\.mcx\.fi:846/$#D', $origin)) throw new RuntimeException('A valid service origin is required');
+    if ($origin !== pmssHermesPublicUrl($paths['home'])) throw new RuntimeException('The account panel URL is required');
     $port = pmssAgentReservedPort($paths['home'].'/.media-stack-port-hermes');
-    if ($port === null) throw new RuntimeException('No reserved Hermes port; run a PMSS user update first');
+    if ($port === null || $port < 1024) throw new RuntimeException('No reserved Hermes port; run a PMSS user update first');
     list($quotaRc, $quotaOutput) = pmssAgentRun(array('quota', '-w', '-p', '-u'));
     $files = $quotaRc === 0 ? pmssAgentQuotaHeadroom($quotaOutput) : null;
-    if ($files !== null && $files['used'] > $files['soft'] - 60000) throw new RuntimeException('Hermes needs 60,000 free file quota entries');
+    if ($files !== null && $files['used'] > $files['soft'] - HERMES_REQUIRED_FILES)
+        throw new PmssHermesQuotaShort('Hermes needs '.number_format(HERMES_REQUIRED_FILES).' free file quota entries', 1);
     if (is_link($paths['base']) || is_link($paths['tree'])) throw new RuntimeException('Hermes state is unsafe');
     $existingConfig = is_file($paths['base'].'/config.yaml');
     $provider = pmssHermesProviderSeed(pmssAgentVirsilipasCredentials($paths['home']), $existingConfig);
     if (!is_dir($paths['base'])) mkdir($paths['base'], 0700);
     pmssHermesCheckoutPin($paths);
+    // A previous dashboard still has its old public URL and imported code until restarted.
+    pmssHermesStop($paths);
     pmssHermesUpstreamInstall($paths);
+    pmssHermesDashboardPreloadPrefix($paths['tree'].'/hermes_cli/web_dist');
     pmssHermesCredentialsEnsure($paths);
     $user = basename($paths['home']);
     pmssHermesConfigSet($paths, 'dashboard.public_url', $origin);

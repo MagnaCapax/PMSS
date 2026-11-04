@@ -3,6 +3,9 @@
 require_once __DIR__.'/pmssAccountAgent.php';
 require_once __DIR__.'/pmssHermesRelay.php';
 
+// v0.22.7 measured 93,036 new files on a QA VM (2026-11-04), peak equal to final; about 7% headroom.
+const HERMES_REQUIRED_FILES = 100000;
+
 function pmssHermesPaths(string $home): array
 {
     $base = $home.'/.hermes';
@@ -61,15 +64,19 @@ function pmssHermesGateProbe(int $port): bool
     return $body !== false && preg_match('/^HTTP\/1\.[01] 401(?: |$)/', $status) === 1;
 }
 
-/** Match the core permalink derivation using only the root-owned identity. */
+/** Only the existing server origin and this account's panel path are valid (ADR 0150). */
+function pmssHermesPanelUrl(string $user, string $host): string
+{
+    if (!preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user)
+        || !preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/D', $host))
+        throw new RuntimeException('A valid panel hostname and account are required');
+    return 'https://'.$host.'/user-'.$user.'/hermes/';
+}
+
+/** Resolve the host locally; neither request headers nor billing identities select it. */
 function pmssHermesPublicUrl(string $home): string
 {
-    $path = '/var/lib/pmss/public/billing/'.basename($home);
-    $stat = @lstat($path);
-    $id = is_array($stat) && ($stat['mode'] & 0170000) === 0100000
-        && $stat['uid'] === 0 && $stat['nlink'] === 1 ? trim((string) @file_get_contents($path)) : '';
-    if (!preg_match('/^[1-9][0-9]*$/D', $id)) throw new RuntimeException('Trusted service identity is unavailable');
-    return 'https://'.substr(hash('sha256', 'mcx.fi:service:'.ltrim($id, '0')), 0, 16).'.mcx.fi:846/';
+    return pmssHermesPanelUrl(basename($home), strtolower(trim((string) @shell_exec('/bin/hostname -f'))));
 }
 
 /** The listener's PID and HTTP gate are checked on every open. */
@@ -90,7 +97,7 @@ function pmssHermesListenerReady(array $paths, int $port): bool
 function pmssHermesStartCommand(array $paths, string $url, int $port, string $log): string
 {
     $script = '. "$1"; export HERMES_DASHBOARD_BASIC_AUTH_PASSWORD HERMES_DASHBOARD_BASIC_AUTH_SECRET; '
-        .'exec "$2" dashboard --host 127.0.0.1 --port "$3" --no-open --skip-build';
+        .'exec "$2" dashboard --isolated --host 127.0.0.1 --port "$3" --no-open --skip-build';
     // Its own session: a process left in php-cgi's group dies when php-cgi recycles (live QA 2026-10-21).
     return '/usr/bin/setsid nohup /usr/bin/env -i HOME='.escapeshellarg($paths['home'])
         .' PATH=/usr/local/bin:/usr/bin:/bin HERMES_HOME='.escapeshellarg($paths['base'])

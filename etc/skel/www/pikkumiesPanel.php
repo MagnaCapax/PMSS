@@ -36,12 +36,9 @@ function pmssPikkumiesPanelStateRead($home, $name, $marker = '/etc/seedbox/confi
         'mode' => $mode, 'off' => $off);
 }
 
-/**
- * Configure shows the AI agents section only where it can work: Pikkumies is eligible, or the host carries the
- * Eternals marker that Hermes needs. Without the marker the Hermes install has no service address and always fails.
- */
-function pmssAgentsSectionVisible(array $pikkumiesState, $home, $marker = '/etc/seedbox/config/pikkumiesEternals.enabled')
+/** Hermes uses the ordinary panel; Pikkumies keeps its separate eligibility policy. */
+function pmssAgentsSectionVisible(array $pikkumiesState, $home)
 {
     if (($pikkumiesState['origin'] ?? '') !== '') return true;
-    return is_file($marker) && !is_link($marker) && is_file($home.'/bin/install-hermes');
+    return is_file($home.'/bin/install-hermes') && !is_link($home.'/bin/install-hermes');
 }

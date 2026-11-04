@@ -12,6 +12,7 @@ function pmssNginxUserSubdomainTemplates(): array
 {
     $suspendedLocations = "    location = /error-suspended.html {\n        root /var/www;\n    }\n    location ^~ /suspended_images/ {\n        root /var/www;\n    }\n    location / {\n        return 302 /error-suspended.html;\n    }";
     $publicProxyDefaults = <<<'NGINX'
+        proxy_hide_header WWW-Authenticate;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         include /etc/nginx/proxy_params;

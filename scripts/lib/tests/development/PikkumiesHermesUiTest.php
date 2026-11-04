@@ -49,7 +49,7 @@ final class PikkumiesHermesUiTest extends TestCase
             '0123456789abcdef.mcx.fi', 12345, $live);
         $this->assertStringContainsAllStrings(['listen 845 ssl;', 'server_name 0123456789abcdef.mcx.fi;',
             'auth_request /__pmss-b-auth;', 'location = /api/cron/fire { return 404; }',
-            'same-origin|none', "frame-ancestors 'none'",
+            '(cross-site|same-site)', "frame-ancestors 'none'",
             'pmss_ui_b_noargs', 'proxy_set_header X-Forwarded-Proto https;'], $block);
         $this->assertFalse(strpos($block, '$args') !== false);
         $this->assertFalse(strpos($block, 'server_name uitester') !== false);
@@ -162,10 +162,11 @@ final class PikkumiesHermesUiTest extends TestCase
     }
 
     /** A loopback Hermes stand-in: logs each request and answers the password login with $status. */
-    private function fakeHermes(string $log, int $status): array
+    private function fakeHermes(string $log, int $status, string $prefix = ''): array
     {
         $cookies = $status === 200 ? '"set-cookie: __Host-hermes_session_at=\"at=\"; HttpOnly; Max-Age=43200; Path=/; SameSite=lax; Secure\r\n'
             .'set-cookie: __Host-hermes_session_rt=rt; HttpOnly; Max-Age=2592000; Path=/; SameSite=lax; Secure\r\n"' : '""';
+        if ($prefix !== '') $cookies = str_replace(['__Host-', 'Path=/;'], ['__Secure-', 'Path='.$prefix.';'], $cookies);
         $script = '$s = stream_socket_server("tcp://127.0.0.1:0"); echo substr(strrchr(stream_socket_get_name($s, false), ":"), 1), "\n"; fflush(STDOUT);'
             .' while ($c = @stream_socket_accept($s, 30)) { $r = "";'
             .' while (($l = fgets($c)) !== false) { $r .= $l; if ($l === "\r\n") break; }'
@@ -264,6 +265,32 @@ final class PikkumiesHermesUiTest extends TestCase
                 $this->assertSame("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nplain", $answer);
                 $this->assertSame(1, substr_count((string) file_get_contents($log), $request."\n--END--\n"), $request);
             }
+        } finally {
+            $this->stopAll([[$relay, $relayPipes], [$backend, $backendPipes]]);
+        }
+    }
+
+    public function testNativeHermesHandoffUsesThePanelPrefixAndPrivateCookies(): void
+    {
+        $home = $this->pmssMakeTempDir('hermes-login-', 0700);
+        $paths = ['base' => $home.'/.hermes', 'credentials' => $home.'/.hermes/credentials', 'socket' => $home.'/.hermes/ui.sock'];
+        $this->assertTrue(\pmssPikkumiesHermesWrite($paths, str_repeat('a', 64), str_repeat('b', 64)));
+        $prefix = '/user-exampleuser/hermes';
+        $log = $home.'/requests';
+        [$backend, $backendPipes, $port] = $this->fakeHermes($log, 200, $prefix);
+        [$relay, $relayPipes] = $this->startRelay($paths['socket'], $port, $paths['credentials']);
+        try {
+            $token = $this->loginToken($paths['base'].'/login-tokens');
+            $answer = $this->relayRequest($paths['socket'], self::signInRequest($token));
+            $this->assertSame(0, strpos($answer, "HTTP/1.1 204 No Content\r\n"), $answer);
+            $this->assertStringContainsAllStrings(['__Secure-hermes_session_at=', 'Path='.$prefix.';', 'HttpOnly', 'Secure'], $answer);
+            $this->assertStringNotContainsString(str_repeat('a', 64), $answer);
+            $request = (string) file_get_contents($log);
+            $this->assertStringContainsString("X-Forwarded-Prefix: ".$prefix."\r\n", $request);
+            $this->assertStringContainsString('"next":'.json_encode($prefix.'/'), $request);
+            $this->assertStringNotContainsString('Authorization:', $request);
+            $this->assertFalse(file_exists($paths['base'].'/login-tokens/'.$token));
+            $this->assertSame(0, strpos($this->relayRequest($paths['socket'], self::signInRequest($token)), "HTTP/1.1 403 Forbidden\r\n"));
         } finally {
             $this->stopAll([[$relay, $relayPipes], [$backend, $backendPipes]]);
         }
@@ -418,6 +445,11 @@ final class PikkumiesHermesUiTest extends TestCase
             '0123456789abcdef.mcx.fi', 12345, $root);
         $block .= "\n".\pmssHermesUiNginxBlock('uitester', 'node.example.com',
             '0123456789abcdef.mcx.fi', 12345, $root);
+        // Validate the live panel mount as well as the retained legacy renderers.
+        $panel = strstr($this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user'), 'location /user-##username/', true);
+        $panel = str_replace(['##username', '##serverPort', '##PMSS_HERMES_RELAY_HEADERS##'],
+            ['uitester', '12345', \pmssPikkumiesUiRelayHeaders()], $panel);
+        $block .= "\nserver { listen 20847; server_name node.example.com;\n".$panel."\n}\n";
         $block = preg_replace('/^    (?:include|ssl_dhparam) \/etc\/letsencrypt\/[^;]+;\n/m', '', $block);
         $block = str_replace('/var/log/nginx/access.log', $root.'/access.log', $block);
         // Every path nginx -t opens stays under $root, so the check also runs as an unprivileged user.

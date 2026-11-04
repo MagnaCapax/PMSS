@@ -89,7 +89,7 @@ function pmssHermesRelayPassword(string $file): ?string
 }
 
 /** Hermes' own Set-Cookie values from a 200 password-login answer that carries a secure session cookie. */
-function pmssHermesRelayLoginCookies(string $raw): ?array
+function pmssHermesRelayLoginCookies(string $raw, string $prefix = ''): ?array
 {
     $end = strpos($raw, "\r\n\r\n");
     if ($end === false) return null;
@@ -102,7 +102,11 @@ function pmssHermesRelayLoginCookies(string $raw): ?array
         $cookie = trim(substr($line, 11));
         if ($cookie === '' || strpbrk($cookie, "\r\n\0") !== false) return null;
         $cookies[] = $cookie;
-        if (preg_match('/^__Host-hermes_session_at=[^;\s]+;/', $cookie) === 1) $session = true;
+        $name = $prefix === '' ? '__Host-hermes_session_at' : '__Secure-hermes_session_at';
+        if (preg_match('/^'.preg_quote($name, '/').'=[^;\s]+;/', $cookie) === 1
+            && preg_match('/;\s*Secure(?:;|$)/i', $cookie)
+            && preg_match('/;\s*HttpOnly(?:;|$)/i', $cookie)
+            && preg_match('#;\s*Path='.preg_quote($prefix === '' ? '/' : $prefix, '#').'(?:;|$)#i', $cookie)) $session = true;
     }
     return $session ? $cookies : null;
 }
@@ -116,9 +120,11 @@ function pmssHermesRelayLogin(string $token, string $credentials, string $user, 
     $password = pmssHermesRelayPassword($credentials);
     $backend = $password === null ? false : pmssHermesRelayConnect($port, $owner);
     if ($backend === false) return $deny;
-    $body = (string) json_encode(array('provider' => 'basic', 'username' => $user, 'password' => $password, 'next' => '/'));
-    // Hermes names its cookies __Host- only for an https request; it trusts this header from loopback alone.
+    $prefix = basename(dirname($credentials)) === '.hermes' ? '/user-'.$user.'/hermes' : '';
+    $body = (string) json_encode(array('provider' => 'basic', 'username' => $user, 'password' => $password, 'next' => $prefix.'/'));
+    // Native Hermes scopes __Secure- cookies to the panel mount; the Pikkumies relay retains its root cookie.
     $request = "POST /auth/password-login HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Forwarded-Proto: https\r\n"
+        .($prefix === '' ? '' : 'X-Forwarded-Prefix: '.$prefix."\r\n")
         ."Content-Type: application/json\r\nContent-Length: ".strlen($body)."\r\nConnection: close\r\n\r\n".$body;
     stream_set_timeout($backend, 5);
     $deadline = time() + 5;
@@ -130,7 +136,7 @@ function pmssHermesRelayLogin(string $token, string $credentials, string $user, 
         $raw .= $chunk;
     }
     fclose($backend);
-    $cookies = pmssHermesRelayLoginCookies($raw);
+    $cookies = pmssHermesRelayLoginCookies($raw, $prefix);
     if ($cookies === null) return $deny;
     $response = "HTTP/1.1 204 No Content\r\n";
     foreach ($cookies as $cookie) $response .= 'Set-Cookie: '.$cookie."\r\n";

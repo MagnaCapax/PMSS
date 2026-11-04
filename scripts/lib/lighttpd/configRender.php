@@ -105,15 +105,10 @@ function pmssLighttpdRenderUserConfig(
             ? pmssReadRegularFileNetworkPort('/etc/seedbox/runtime/ports/media-stack-pikkumies-hermes-'.$user) : null;
         if ($bPort !== null) $config .= pmssLighttpdPikkumiesHermesBlock($user, $bPort);
     }
-    // Root reads only the root-owned reservation; the account status merely opts in.
-    $status = '/home/'.$user.'/.hermes/pmss-install.status';
+    // Route before installation, so account creation and Configure can verify host readiness.
     $reservation = '/etc/seedbox/runtime/ports/media-stack-hermes-'.$user;
     $port = function_exists('pmssReadRegularFileNetworkPort') ? pmssReadRegularFileNetworkPort($reservation) : null;
-    if ($port !== null && is_file($status) && !is_link($status) && @filesize($status) <= 32
-        && trim((string) @file_get_contents($status)) === 'ready') {
-        $config .= pmssLighttpdHermesUiBlock($user, $port)
-            .pmssLighttpdHermesUiBlock($user, $port, 'vanilla-agentboard');
-    }
+    if ($port !== null && $port >= 1024) $config .= pmssLighttpdHermesUiBlock($user, $port);
     return $config;
 }
 

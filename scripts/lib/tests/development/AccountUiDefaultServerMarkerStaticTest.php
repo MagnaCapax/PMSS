@@ -5,7 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 /**
  * ADR 0150: no new public listener on a host that has not turned the account UIs on. Each account-UI default server
- * written by the nginx setup (ports 844, 845, 846) sits behind the host marker check.
+ * written by the nginx setup (ports 844, 845) sits behind the host marker check. Port 846 is retired.
  */
 final class AccountUiDefaultServerMarkerStaticTest extends TestCase
 {
@@ -14,7 +14,9 @@ final class AccountUiDefaultServerMarkerStaticTest extends TestCase
     public function testEveryAccountUiDefaultServerNeedsTheHostMarker(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/nginxConfig/setup.php');
-        foreach (['pmssPikkumiesUiDefaultNginxBlock', 'pmssPikkumiesHermesDefaultNginxBlock', 'pmssHermesUiDefaultNginxBlock'] as $builder) {
+        $this->assertStringNotContainsString('pmssHermesUiDefaultNginxBlock(', $source);
+        $this->assertStringContainsString('pmssCreateNginxConfigSetupRemoveDefault($hermesDefault)', $source);
+        foreach (['pmssPikkumiesUiDefaultNginxBlock', 'pmssPikkumiesHermesDefaultNginxBlock'] as $builder) {
             $at = strpos($source, $builder.'(');
             $this->assertTrue($at !== false, 'default server builder not found: '.$builder);
             $ifAt = strrpos(substr($source, 0, (int) $at), "\n    if (");

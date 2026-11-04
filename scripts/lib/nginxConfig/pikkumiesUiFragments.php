@@ -13,8 +13,7 @@ map "\$request_method:\$http_upgrade:\$http_origin" \${$variable}_origin_ok {
 }
 map "\$request_method:\$uri:\$http_sec_fetch_site" \${$variable}_api_ok {
     default 1;
-    ~^GET:/api/.*:(same-origin|none)\$ 1;
-    ~^GET:/api/ 0;
+    ~(?s)^GET:/api/.*:(cross-site|same-site)\$ 0;
 }
 
 NGINX;

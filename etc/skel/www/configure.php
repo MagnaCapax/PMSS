@@ -62,12 +62,16 @@ $pmssPikkumiesState = function_exists('pmssPikkumiesPanelStateRead')
 $pmssHermesState = function_exists('pmssHermesPanelStatusRead') ? pmssHermesPanelStatusRead($home)
     : array('installed' => false, 'state' => '', 'url' => '');
 $pmssHermesChoice = trim(pmssConfigureFileRead($home.'/.config/pmss/ui/hermes-interface', 64));
-if (!in_array($pmssHermesChoice, array('vanilla-hermes-web', 'vanilla-agentboard', 'agentboard-pikkumies'), true))
+if (!in_array($pmssHermesChoice, array('vanilla-hermes-web', 'agentboard-pikkumies'), true))
     $pmssHermesChoice = 'vanilla-hermes-web';
 // Hermes install state => pill text, pill colour class, hover hint. The status poll uses the same map.
 $pmssHermesPills = array('' => array('Not installed', 'p-off', ''), 'installing' => array('Installing…', 'p-warn', ''),
+    'update-required' => array('Update needed', 'p-warn', 'Install the current Hermes release to use its panel address.'),
     'failed' => array('Install failed', 'p-stop', ''),
     'customer-updated' => array('Left unchanged', 'p-warn', 'Your Hermes copy has your own changes, so it was left as it is.'));
+$pmssHermesReasons = array('files' => 'Hermes needs 100,000 free files in your file quota. quota -s over SSH shows how many you have.',
+    'quota' => 'Your disk or file quota ran out during the install. Free some space, then click Install again.',
+    'error' => 'The install log is ~/.hermes-panel.log.');
 $customRows = $settingsState['customRows'];
 $rtorrentCustom = $settingsState['rtorrentCustom'];
 $certMode = $settingsState['certMode'];
@@ -135,6 +139,7 @@ if (function_exists('ob_gzhandler')) ob_start('ob_gzhandler');
 <div class="row" id="pmss-hermes-card" data-state="<?= pmssCustomerHtmlAttr($pmssHermesState['state']) ?>"><div class="main"><div class="name">Hermes</div><div class="desc">Your own Hermes agent, separate from Pikkumies.</div></div>
 <?php if (!$pmssHermesState['installed']): $pmssHermesPill = $pmssHermesPills[$pmssHermesState['state']] ?? $pmssHermesPills['']; ?>
 <span class="pill <?= $pmssHermesPill[1] ?>" id="pmss-hermes-pill" title="<?= pmssCustomerHtmlAttr($pmssHermesPill[2]) ?>"><?= $pmssHermesPill[0] ?></span>
+<div class="desc" id="pmss-hermes-reason"><?= pmssCustomerHtmlAttr($pmssHermesReasons[$pmssHermesState['reason'] ?? ''] ?? '') ?></div>
 <div class="acts"><button type="button" class="b b-pri" id="pmss-hermes-install" onclick="pmssHermesInstall()">Install</button></div>
 <?php else: ?>
 <div class="acts"><a class="b b-pri" href="pikkumiesOpen.php?ui=<?= pmssCustomerHtmlAttr($pmssHermesChoice) ?>" target="_blank" rel="noopener">Open</a></div>
@@ -148,7 +153,6 @@ if (function_exists('ob_gzhandler')) ob_start('ob_gzhandler');
 <?php if ($pmssHermesState['installed']): ?><div class="row"><div class="main"><label class="name" for="pmss-hermes-interface">Hermes opens in</label><div class="desc">Only one Hermes window works at a time: opening one closes the other.</div></div>
 <div class="acts"><select id="pmss-hermes-interface" onchange="pmssHermesInterface(this.value)">
 <option value="vanilla-hermes-web"<?= $pmssHermesChoice === 'vanilla-hermes-web' ? ' selected' : '' ?>>Hermes web UI (default)</option>
-<option value="vanilla-agentboard"<?= $pmssHermesChoice === 'vanilla-agentboard' ? ' selected' : '' ?>>Agentboard</option>
 <?php if ($pmssPikkumiesState['visible']): ?><option value="agentboard-pikkumies"<?= $pmssHermesChoice === 'agentboard-pikkumies' ? ' selected' : '' ?>>Agentboard Pikkumies</option><?php endif; ?></select></div></div><?php endif; ?>
 </div><?php endif; ?>
 <?php if ($pmssPikkumiesSignIn || $pmssHermesState['installed']): ?><details class="pmss-agents-signin"><summary>Sign in to Hermes yourself</summary>
@@ -233,7 +237,7 @@ function pmssPikkumiesHermesShowLogin() {
         error:function(){pmssConfigureNotice('The password you entered was not accepted.', true); field.value='';}});
 }
 // Poll only while an install runs: reload once when it finishes, never on an already installed Hermes.
-var pmssHermesPills = <?= json_encode($pmssHermesPills) ?>, pmssHermesPollTimer = null;
+var pmssHermesPills = <?= json_encode($pmssHermesPills) ?>, pmssHermesReasons = <?= json_encode($pmssHermesReasons) ?>, pmssHermesPollTimer = null;
 function pmssHermesPollLater() { clearTimeout(pmssHermesPollTimer); pmssHermesPollTimer = setTimeout(pmssHermesStatusPoll, 5000); }
 function pmssHermesStatusPoll() {
     var card=document.getElementById('pmss-hermes-card');
@@ -245,6 +249,7 @@ function pmssHermesStatusPoll() {
             card.setAttribute('data-state',state.state);
             var pill=document.getElementById('pmss-hermes-pill'), shown=pmssHermesPills[state.state] || pmssHermesPills[''];
             if (pill) { pill.textContent=shown[0]; pill.className='pill '+shown[1]; pill.title=shown[2]; }
+            var reason=document.getElementById('pmss-hermes-reason'); if (reason) reason.textContent=pmssHermesReasons[state.reason] || '';
             if (state.state === 'installing') pmssHermesPollLater();
         }).catch(pmssHermesPollLater);
 }

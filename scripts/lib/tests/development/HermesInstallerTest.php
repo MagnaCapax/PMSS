@@ -22,7 +22,7 @@ final class HermesInstallerTest extends TestCase
 
     public function testPinnedReleaseAndHashesMustAllMatch(): void
     {
-        $this->assertSame('v2026.9.24', \HERMES_TAG);
+        $this->assertSame('v0.22.7', \HERMES_TAG);
         $this->assertTrue(\pmssHermesPinMatches(\HERMES_COMMIT,
             \HERMES_INSTALL_SH_SHA256, \HERMES_LOCK_JSON_SHA256));
         $this->assertFalse(\pmssHermesPinMatches(str_repeat('0', 40), \HERMES_INSTALL_SH_SHA256, \HERMES_LOCK_JSON_SHA256));
@@ -39,6 +39,59 @@ final class HermesInstallerTest extends TestCase
         $this->assertFalse(\pmssHermesInstallStageAccepted('products', 1, 'dependency failed', true));
     }
 
+    public function testPinnedInstallerStagesBuildTheDashboardAndRestoreShellFiles(): void
+    {
+        $home = $this->pmssMakeTempDir('hermes-stages-');
+        $paths = \pmssHermesPaths($home);
+        $this->pmssWriteFile($paths['exe'], 'launcher');
+        $this->pmssWriteFile($paths['tree'].'/hermes_cli/web_dist/index.html', 'built');
+        $this->pmssWriteFile($home.'/.bashrc', "original\n");
+        $script = 'namespace HermesInstallFixture; class RuntimeException extends \\RuntimeException {} '
+            .'$GLOBALS["paths"] = '.var_export($paths, true).';';
+        $script .= <<<'PHP'
+function pmssAgentRun(array $args, $env = null): array {
+    $GLOBALS['calls'][] = $args;
+    file_put_contents($GLOBALS['paths']['home'].'/.bashrc', "changed by upstream\n");
+    return [0, ''];
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssHermesInstall.php', 'HermesInstallFixture');
+        $script .= 'pmssHermesUpstreamInstall($GLOBALS["paths"]); echo json_encode($GLOBALS["calls"]);';
+        $calls = $this->pmssRunInlinePhpJson($script);
+        $this->assertSame(['venv', 'python-deps', 'config', 'products', 'complete'], array_column($calls, 3));
+        foreach ($calls as $args) {
+            $this->assertSame('bash', $args[0]);
+            $this->assertTrue(in_array(\HERMES_COMMIT, $args, true));
+            $this->assertTrue(in_array('--non-interactive', $args, true));
+            $this->assertTrue(in_array('--skip-browser', $args, true));
+            $this->assertTrue(in_array('--skip-computer-use', $args, true));
+        }
+        $this->assertSame("original\n", file_get_contents($home.'/.bashrc'));
+    }
+
+    public function testDashboardPreloadHelperGetsTheRuntimePrefixOnceAndRefusesOtherBuilds(): void
+    {
+        $dist = $this->pmssMakeTempDir('pmss-hermes-dist-');
+        // Verbatim from the v0.22.7 react-vendor chunk (QA VM build, 2026-11-04).
+        $loader = 'var nn=`modulepreload`,rn=function(e){return`/`+e},an={};';
+        $this->pmssWriteFile($dist.'/assets/index-abc.js', $loader.'import("./ChatPage-x.js");');
+        $this->pmssWriteFile($dist.'/assets/ChatPage-x.js', 'export const c="/api/ws";');
+        \pmssHermesDashboardPreloadPrefix($dist);
+        $patched = file_get_contents($dist.'/assets/index-abc.js');
+        $this->assertStringContainsString('rn=function(e){return(window.__HERMES_BASE_PATH__||"")+"/"+e}', $patched);
+        $this->assertStringContainsString('import("./ChatPage-x.js")', $patched);
+        $this->assertSame('export const c="/api/ws";', file_get_contents($dist.'/assets/ChatPage-x.js'));
+        \pmssHermesDashboardPreloadPrefix($dist);
+        $this->assertSame($patched, file_get_contents($dist.'/assets/index-abc.js'), 'a second run changes nothing');
+        foreach (array('', $loader) as $second) {
+            $other = $this->pmssMakeTempDir('pmss-hermes-dist-');
+            $this->pmssWriteFile($other.'/assets/index-abc.js', $second === '' ? 'const x=1;' : $loader);
+            if ($second !== '') $this->pmssWriteFile($other.'/assets/vendor-y.js', $loader);
+            $this->assertThrowsRuntime(static function () use ($other): void {
+                \pmssHermesDashboardPreloadPrefix($other);
+            }, 'unexpected asset loader');
+        }
+    }
     public function testProviderEndpointAndEnvironmentWiring(): void
     {
         $endpoint = 'https://models.example.test/v1';
@@ -82,13 +135,14 @@ final class HermesInstallerTest extends TestCase
             'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD='.str_repeat('a', 64)."\n"
             .'HERMES_DASHBOARD_BASIC_AUTH_SECRET='.str_repeat('b', 64)."\n");
         chmod($paths['env'], 0600);
-        $env = \pmssHermesEnv($paths, 'https://0123456789abcdef.mcx.fi:846/');
+        $env = \pmssHermesEnv($paths, 'https://node.example.com/user-alice/hermes/');
         $this->assertSame($paths['base'].'/locks', $env['HERMES_GATEWAY_LOCK_DIR']);
-        $this->assertSame('https://0123456789abcdef.mcx.fi:846/', $env['HERMES_DASHBOARD_PUBLIC_URL']);
+        $this->assertSame('https://node.example.com/user-alice/hermes/', $env['HERMES_DASHBOARD_PUBLIC_URL']);
         $source = $this->pmssReadRepoFile('etc/skel/bin/pmssHermesRuntime.php');
         $this->assertStringContainsAllStrings(['proc_open($command,', '$pipes, null, array())'], $source);
         $command = \pmssHermesStartCommand($paths, $env['HERMES_DASHBOARD_PUBLIC_URL'], 24000, $paths['base'].'/dashboard.log');
         $this->assertStringContainsString('/usr/bin/env -i', $command);
+        $this->assertStringContainsString('dashboard --isolated --host 127.0.0.1', $command);
         // Its own session: php-cgi signals its whole process group when it recycles (live QA 2026-10-21).
         $this->assertSame(0, strpos($command, '/usr/bin/setsid nohup '), $command);
         $this->assertFalse(strpos($command, str_repeat('a', 64)) !== false);

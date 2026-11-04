@@ -49,6 +49,10 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertSame(1, $this->mapResult($maps[1][0], 'GET:websocket:https://0123456789abcdef.mcx.fi:844'));
         $this->assertSame(0, $this->mapResult($maps[1][1], 'GET:/api/sessions:cross-site'));
         $this->assertSame(1, $this->mapResult($maps[1][1], 'GET:/api/sessions:same-origin'));
+        // Chromium sends no Sec-Fetch-Site on WebSocket handshakes; Origin guards those.
+        $this->assertSame(1, $this->mapResult($maps[1][1], 'GET:/api/ws:'));
+        $this->assertSame(0, $this->mapResult($maps[1][1], 'GET:/api/sessions:same-site'));
+        $this->assertSame(0, $this->mapResult($maps[1][1], "GET:/api/a\nb:cross-site"));
     }
     public function testPortCollisionRefusesForeignListener(): void
     {
@@ -94,7 +98,7 @@ final class PikkumiesUiRoutesTest extends TestCase
             'alias /var/www/pikkumies/bar.html;', 'location / {',
             'proxy_pass http://127.0.0.1:12345/__pmss-ui-a/;',
             'frame-ancestors https://node.example.com', 'limit_conn addr 32',
-            'proxy_read_timeout 3600s', 'default 0;', 'same-origin|none',
+            'proxy_read_timeout 3600s', 'default 0;', '(cross-site|same-site)',
         ], $block);
         $this->assertFalse(strpos($block, 'server_name uitester') !== false);
         $this->assertStringContainsString($live.'/uitester.node.example.com/fullchain.pem', $block);
@@ -127,7 +131,7 @@ final class PikkumiesUiRoutesTest extends TestCase
             '0123456789abcdef.mcx.fi', 12345, $live);
         $this->assertStringContainsAllStrings([
             'listen 846 ssl;', 'server_name 0123456789abcdef.mcx.fi;',
-            'location = /api/cron/fire { return 404; }', 'same-origin|none',
+            'location = /api/cron/fire { return 404; }', '(cross-site|same-site)',
             'auth_request /__pmss-auth;', 'proxy_set_header Authorization "";',
             'agentboard $http_authorization;',
             'proxy_set_header X-Forwarded-Proto https;', 'pmss_ui_noargs',
@@ -140,7 +144,8 @@ final class PikkumiesUiRoutesTest extends TestCase
             \pmssHermesUiDefaultNginxBlock("    ssl_certificate /safe/fullchain.pem;\n"));
         $hermes = \pmssLighttpdHermesUiBlock('uitester', 24000);
         $agentboard = \pmssLighttpdHermesUiBlock('uitester', 24000, 'vanilla-agentboard');
-        $this->assertStringContainsAllStrings(['^/__pmss-ui-c/', '"Authorization" => ""'], $hermes);
+        $this->assertStringContainsAllStrings(['^/user-uitester/hermes/', '"Authorization" => ""',
+            '"X-Forwarded-Prefix" => "/user-uitester/hermes"'], $hermes);
         $this->assertStringContainsString('/home/uitester/.hermes/pmss-dashboard.sock', $hermes);
         $this->assertStringContainsString('/home/uitester/.config/pmss/ui/agentboard.sock', $agentboard);
         $this->assertFalse(strpos($agentboard, '"Authorization" => ""') !== false);
@@ -204,7 +209,7 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertFalse(strpos($html, '?token') !== false, 'the token never travels in a query string');
         $this->assertStringContainsString("'hermes-login.html'", $this->pmssReadRepoFile('scripts/lib/nginxConfig/pikkumiesUi.php'));
         $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
-        $this->assertSame(3, substr_count($setup, 'pmssPikkumiesUiPagesInstall()'), 'ports A, B and C each install the pages');
+        $this->assertSame(2, substr_count($setup, 'pmssPikkumiesUiPagesInstall()'), 'only legacy ports A and B install shared pages');
     }
 
     public function testPortBSendsLoggedOutPagesToTheLoginFormAndKeepsHermesCookiesOnRoot(): void

@@ -59,7 +59,10 @@ final class AppProfilesTest extends TestCase
 
     public function testHermesGateFailureLogsAndProfileContinues(): void
     {
-        foreach ([[999, true, 'RAM below 1000 MiB'], [2048, false, 'file quota']] as $case) {
+        $missing = $this->applyProfile('aiappbox', 2048, true, false, false);
+        $this->assertSame(['Queue Pikkumies preinstall', 'Queue OpenClaw preinstall'], array_column($missing['queues'], 0));
+        $this->assertStringContainsString('App profile hermes: preinstall skipped: Hermes panel route unavailable', implode("\n", $missing['logs']));
+        foreach ([[767, true, 'RAM below 768 MiB'], [2048, false, 'file quota']] as $case) {
             // The inline fatal handler throws: returning this result also proves creation was not aborted.
             $result = $this->applyProfile('aiappbox', $case[0], $case[1]);
             $this->assertSame('Start rTorrent', $result['starts'][0][0]);
@@ -74,14 +77,40 @@ final class AppProfilesTest extends TestCase
         $this->pmssEnsureDir($home.'/bin');
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $user = ['memory' => 1000];
-        $this->assertSame(null, \pmssAddUserHermesGate($user, $home, ['used' => 100, 'soft' => 65100]));
-        foreach ([null, ['used' => 101, 'soft' => 65100], ['used' => 0, 'soft' => 0]] as $files) {
+        $ops = ['host' => 'node.example.com', 'port' => static function () { return 24000; },
+            'read' => static function () { return '^/user-hermes/hermes/'; }];
+        $this->assertSame(null, \pmssAddUserHermesGate($user, $home, ['used' => 100, 'soft' => 100100], $ops));
+        foreach ([null, ['used' => 101, 'soft' => 100100], ['used' => 0, 'soft' => 0]] as $files) {
             $this->assertStringContainsString('file quota', \pmssAddUserHermesGate($user, $home, $files));
         }
         unlink($home.'/bin/install-hermes');
-        $this->assertSame('installer missing or unsafe', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 65000]));
+        $this->assertSame('installer missing or unsafe', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 100000]));
         symlink($home.'/absent', $home.'/.hermes');
-        $this->assertSame('existing Hermes install', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 65000]));
+        $this->assertSame('existing Hermes install', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 100000]));
+    }
+
+    public function testHermesHostGateRejectsMissingRoutesPortsAndHostname(): void
+    {
+        $home = $this->tempDir.'/alice';
+        $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
+        $ops = ['host' => 'node.example.com', 'port' => static function () { return 24000; },
+            'read' => static function () { return '^/user-alice/hermes/'; }];
+        $files = ['used' => 0, 'soft' => 100000];
+        $this->assertSame(null, \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $ops));
+        foreach ([null, 0, 443, 1023] as $port) {
+            $bad = array_replace($ops, ['port' => static function () use ($port) { return $port; }]);
+            $this->assertSame('reserved Hermes port unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
+        }
+        foreach (['', 'localhost', 'user@node.example.com', 'node.example.com:846', "node.example.com\n"] as $host) {
+            $bad = array_replace($ops, ['host' => $host]);
+            $this->assertSame('panel hostname or account unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
+        }
+        foreach (['.lighttpd.conf', '/etc/nginx/users/alice'] as $missing) {
+            $bad = array_replace($ops, ['read' => static function ($path) use ($missing) {
+                return strpos($path, $missing) !== false ? null : '^/user-alice/hermes/';
+            }]);
+            $this->assertStringContainsString('Hermes panel route unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
+        }
     }
 
     public function testOpenClawDisablesRtorrentAndQueuesBothPreinstalls(): void
@@ -173,7 +202,7 @@ final class AppProfilesTest extends TestCase
     }
 
     /** Capture the real registry's decisions; only queued commands are recorded rather than executed. */
-    private function applyProfile(string $profile, int $memory = 2048, bool $quota = true, bool $missingApp = false): array
+    private function applyProfile(string $profile, int $memory = 2048, bool $quota = true, bool $missingApp = false, bool $hermesRoute = true): array
     {
         $home = $this->pmssMakeTempDir('pmss-app-home-');
         $this->pmssEnsureDir($home.'/bin');
@@ -181,9 +210,9 @@ final class AppProfilesTest extends TestCase
         file_put_contents($home.'/bin/install-openclaw', '<?php');
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $this->pmssWriteExecutableFile($home.'/stubs/id', "#!/bin/sh\necho 4321\n", 0755, 0700);
-        $this->pmssWriteExecutableFile($home.'/stubs/quota', $quota ? "#!/bin/sh\necho '/dev/md4 123 1000 1250 100 65100 81375'\n" : "#!/bin/sh\nexit 1\n");
+        $this->pmssWriteExecutableFile($home.'/stubs/quota', $quota ? "#!/bin/sh\necho '/dev/md4 123 1000 1250 100 100100 125125'\n" : "#!/bin/sh\nexit 1\n");
         $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/user/appSwitch.php'), true).';'
-            .'$home = '.var_export($home, true).'; $missingApp = '.var_export($missingApp, true).';'
+            .'$home = '.var_export($home, true).'; $missingApp = '.var_export($missingApp, true).'; $hermesRoute = '.var_export($hermesRoute, true).';'
             .'$user = '.var_export(['name' => posix_geteuid() === 0 ? 'root' : 'alice', 'memory' => $memory, 'appProfile' => $profile], true).';';
         $script .= <<<'PHP'
 function logProvisionMessage(string $message): void { $GLOBALS['logs'][] = $message; }
@@ -193,6 +222,11 @@ $GLOBALS['logs'] = $GLOBALS['queues'] = [];
 $registry = pmssUserAppSwitchRegistry();
 $registry['pikkumies']['apply'] = static function ($enabled, $user, $home) {
     return pmssAddUserPikkumiesSwitch($enabled, $user, $home, $home.'/state');
+};
+$registry['hermes']['apply'] = static function ($enabled, $user, $home) use ($hermesRoute) {
+    return pmssAddUserHermesSwitch($enabled, $user, $home, ['host' => 'node.example.com',
+        'port' => static function () { return 24000; },
+        'read' => static function () use ($user, $hermesRoute) { return $hermesRoute ? '^/user-'.$user['name'].'/hermes/' : ''; }]);
 };
 if ($missingApp) unset($registry['rtorrent']);
 $starts = pmssUserAppProfileApply($user, $home, $registry);

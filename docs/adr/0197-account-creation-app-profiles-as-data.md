@@ -104,13 +104,19 @@ unknown names during CLI parsing, before account changes.
 
 Hermes runs in the late phase through the existing account-owned
 `~/bin/install-hermes install` wrapper and user resource slice. Its creation
-gate requires the existing 1000 MiB account RAM floor, measured quota with
-65000 free file entries, an executable non-symlink installer and no existing
-`~/.hermes` or Hermes launcher. The automatic quota margin is conservative:
-the existing installer itself requires 60000 entries and retains that check.
+gate requires the Hermes account RAM floor (768 MiB since 2026-11-04, ADR 0125), measured quota with
+100000 free file entries, an executable non-symlink installer and no existing
+`~/.hermes` or Hermes launcher. Both this gate and the installer use
+`HERMES_REQUIRED_FILES`: v0.22.7 added 93,036 files on a QA VM on 2026-11-04
+(its peak equalled the final count), plus about 7% headroom.
 Unavailable quota or any failed gate logs a skip without failing account
 creation. No new home files are written by the switch; the existing installer
 continues to own its state and credentials.
+
+As of the ADR 0125 panel-route amendment (2026-11-04), the gate also requires
+a usable panel hostname, reserved Hermes port, and both generated panel
+routes. It logs the missing prerequisite and skips the queue when unavailable;
+no Eternals marker or billing publication is required.
 
 Web UI selection stays with each existing app: OpenClaw configures its
 Control UI through its installer; Hermes defaults to Hermes web UI and starts

@@ -1,5 +1,40 @@
 # Private area: keep /user-##username/ locked behind auth and do not
 # expose it via public subdomain routing.
+location = /user-##username/hermes {
+        return 308 /user-##username/hermes/;
+}
+location ^~ /user-##username/hermes/ {
+        # lighttpd keeps panel authentication, then clears Authorization before the account relay.
+        proxy_pass http://127.0.0.1:##serverPort/user-##username/hermes/;
+##PMSS_HERMES_RELAY_HEADERS##
+        # Panel auth must reach lighttpd; client forwarding metadata must not reach Hermes.
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_http_version 1.1;
+        proxy_read_timeout 3600s;
+        proxy_buffering off;
+        limit_conn addr 32;
+        proxy_hide_header Service-Worker-Allowed;
+        # mod_proxy reverses its / mapping even on already-prefixed upstream redirects and cookies.
+        proxy_redirect ~^(?:https?://[^/]+)?(/user-##username/hermes)/user-##username/hermes(.*)$ $1$2;
+        proxy_cookie_path ~^/user-##username/hermes/user-##username/hermes(.*)$ /user-##username/hermes$1;
+        # Keep query strings and launcher tokens out of the dashboard access log.
+        access_log off;
+        if ($scheme != https) { return 403; }
+        set $pmss_hermes_request "$request_method:$http_upgrade:$http_origin";
+        set $pmss_hermes_origin_required 1;
+        if ($pmss_hermes_request = "GET::") { set $pmss_hermes_origin_required 0; }
+        if ($http_origin = "https://$host") { set $pmss_hermes_origin_required 0; }
+        if ($pmss_hermes_origin_required = 1) { return 403; }
+        set $pmss_hermes_api "$request_method:$uri:$http_sec_fetch_site";
+        # Fetch Metadata: refuse only what the browser marks cross-site or same-site; an absent header
+        # (Chromium WebSocket handshakes, older browsers) passes, and upgrades already need the exact Origin.
+        if ($pmss_hermes_api ~ "(?s)^GET:/user-##username/hermes/api/.*:(cross-site|same-site)$") { return 403; }
+        if ($uri = /user-##username/hermes/api/cron/fire) { return 404; }
+}
+
 location /user-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/user-##username/;
         # A page here may not widen a service worker's scope over other paths on this host.
@@ -22,6 +57,8 @@ location ^~ /public-##username/__pmss-ui- { return 404; }
 location ^~ /~##username/__pmss-ui- { return 404; }
 
 location /public-##username/ {
+        # A tenant's challenge must never replace the shared panel's cached Basic realm.
+        proxy_hide_header WWW-Authenticate;
         proxy_pass http://127.0.0.1:##serverPort/;
         # A page here may not widen a service worker's scope over other paths on this host.
         proxy_hide_header Service-Worker-Allowed;
@@ -58,6 +95,7 @@ location /public-##username/ {
 # never triggered. An alias/root-based implementation would send the literal "~"
 # to lighttpd and 403 every request.
 location /~##username/ {
+        proxy_hide_header WWW-Authenticate;
         proxy_pass http://127.0.0.1:##serverPort/;
         # A page here may not widen a service worker's scope over other paths on this host.
         proxy_hide_header Service-Worker-Allowed;
@@ -113,6 +151,8 @@ location = /deluge-##username {
 location /deluge-##username/ {
     # Legacy Deluge URL path: proxy to lighttpd so POST clients don't trip on redirects.
     proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;
+    # A tenant's challenge must never replace the shared panel's cached Basic realm.
+    proxy_hide_header WWW-Authenticate;
     # A page here may not widen a service worker's scope over other paths on this host.
     proxy_hide_header Service-Worker-Allowed;
     proxy_cookie_path /deluge-##username/ /deluge-##username/;

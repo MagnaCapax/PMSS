@@ -183,7 +183,8 @@ NGINX;
             throw new \PMSS\Tests\SkipTest('lighttpd binary not found - skipping binary validation');
         }
 
-        $config = $this->renderLighttpdTemplate();
+        require_once dirname(__DIR__, 2).'/lighttpd/pikkumiesUi.php';
+        $config = $this->renderLighttpdTemplate().\pmssLighttpdHermesUiBlock('testuser', 24000);
         $configFile = $this->tempDir.'/lighttpd-test.conf';
         file_put_contents($configFile, $config);
 

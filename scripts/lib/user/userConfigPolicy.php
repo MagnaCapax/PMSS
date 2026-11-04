@@ -15,6 +15,9 @@ function pmssUserDockerMinRamMiB(): int { return 245; }
 /** Minimum RAM for preinstalling Pikkumies on an account: the build measured to fit a 400 MiB plan (ADR 0090, 2026-10-20). */
 function pmssUserPikkumiesPreinstallMinRamMiB(): int { return 400; }
 
+/** Minimum RAM for installing vanilla Hermes: its local dashboard build did not finish within 21 minutes at 400 MiB and finished at 768 MiB (QA VM, 2026-11-04, ADR 0125). */
+function pmssUserHermesMinRamMiB(): int { return 768; }
+
 /** Convert stored feature-toggle values to a stable boolean. */
 function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $default = true): bool
 {

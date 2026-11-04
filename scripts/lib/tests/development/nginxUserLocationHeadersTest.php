@@ -28,7 +28,7 @@ class nginxUserLocationHeadersTest extends TestCase
             $proxied++;
             $this->assertStringContainsString('proxy_hide_header Service-Worker-Allowed;', $body, "$name must drop Service-Worker-Allowed");
         }
-        $this->assertSame(5, $proxied, 'user, public, ~, webdav and deluge locations proxy to the account web server');
+        $this->assertSame(6, $proxied, 'Hermes, user, public, ~, webdav and deluge locations proxy to the account web server');
     }
 
     public function testWebdavRefusesScriptAndFrameRequestsBeforeProxying(): void

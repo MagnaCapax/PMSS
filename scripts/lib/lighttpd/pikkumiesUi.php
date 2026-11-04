@@ -34,20 +34,21 @@ function pmssLighttpdPikkumiesHermesBlock(string $user, int $port): string
 LIGHTTPD;
 }
 
-/** Generated port-C mount; no customer custom.d fragment controls this route. */
+/** Panel auth runs before mod_proxy; the upstream only receives its separate Hermes session. */
 function pmssLighttpdHermesUiBlock(string $user, int $port, string $mode = 'vanilla-hermes-web'): string
 {
     if (preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1 || $port < 1024 || $port > 65535) return '';
     $upstream = $mode === 'vanilla-agentboard'
         ? '"socket" => "/home/'.$user.'/.config/pmss/ui/agentboard.sock"'
         : '"socket" => "/home/'.$user.'/.hermes/pmss-dashboard.sock"';
-    $prefix = $mode === 'vanilla-agentboard' ? '/__pmss-ui-c-agentboard/' : '/__pmss-ui-c/';
+    $prefix = $mode === 'vanilla-agentboard' ? '/__pmss-ui-c-agentboard/' : '/user-'.$user.'/hermes/';
     $authHeader = $mode === 'vanilla-agentboard' ? '' : "    setenv.set-request-header = ( \"Authorization\" => \"\" )\n";
     return <<<LIGHTTPD
 
-# Port C has a private upstream selected by the account's Configure setting.
+# Hermes stays inside the existing authenticated panel zone (ADR 0150).
 \$HTTP["url"] =~ "^{$prefix}" {
 {$authHeader}    proxy.server = ( "" => (( {$upstream} )) )
+    setenv.set-request-header += ( "X-Forwarded-Prefix" => "/user-{$user}/hermes" )
     proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "{$prefix}" => "/" ) )
     server.max-read-idle = 3600
     server.max-write-idle = 3600

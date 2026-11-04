@@ -52,7 +52,7 @@ function pmssPikkumiesOpenMemoryLow($cgroupFile = '/proc/self/cgroup', $root = '
                 $path = rtrim($root, '/').$relative.'/'.$file;
                 $raw = @file_get_contents($path, false, null, 0, 32);
                 if (is_string($raw) && preg_match('/^[1-9][0-9]*\s*$/D', $raw)
-                    && (int) $raw < 1000 * 1048576) return true;
+                    && (int) $raw < 400 * 1048576) return true;
             }
             if ($relative === '/') break;
             $relative = dirname($relative);
@@ -318,14 +318,13 @@ if (!is_string($ui) || !in_array($ui, ['simplified', 'hermes', 'vanilla-hermes-w
     return;
 }
 if ($ui === 'vanilla-hermes-web' || $ui === 'vanilla-agentboard') {
-    $billing = '/var/lib/pmss/public/billing/'.$name;
-    $stat = @lstat($billing);
-    $billingId = is_array($stat) && ($stat['mode'] & 0170000) === 0100000
-        && $stat['uid'] === 0 && $stat['nlink'] === 1 ? trim((string) @file_get_contents($billing)) : '';
     $install = $home.'/.hermes/pmss-install.status';
     $choice = $home.'/.config/pmss/ui/hermes-interface';
     $chosen = is_file($choice) && !is_link($choice) ? trim((string) @file_get_contents($choice)) : 'vanilla-hermes-web';
-    if ($home === '' || $name === '' || !preg_match('/^[1-9][0-9]*$/D', $billingId)
+    // Old Agentboard selections converge to the native dashboard; port C is retired (ADR 0150).
+    if ($chosen === 'vanilla-agentboard') $chosen = 'vanilla-hermes-web';
+    $ui = 'vanilla-hermes-web';
+    if ($home === '' || !preg_match('/^[a-z][a-z0-9]{0,7}$/D', $name)
         || is_link($install) || trim((string) @file_get_contents($install)) !== 'ready' || $chosen !== $ui) {
         if ($statusView) { pmssPikkumiesOpenStatusEmit(false, false); return; }
         pmssPikkumiesOpenPage('error', 0);
@@ -335,38 +334,23 @@ if ($ui === 'vanilla-hermes-web' || $ui === 'vanilla-agentboard') {
     if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/D', $host) !== 1) {
         pmssPikkumiesOpenPage('error', 0); return;
     }
-    $permalink = substr(hash('sha256', 'mcx.fi:service:'.ltrim($billingId, '0')), 0, 16).'.mcx.fi';
-    $origin = 'https://'.$permalink.':846';
     $panelOrigin = 'https://'.$host;
-    $launcherUrl = $panelOrigin.'/user-'.$name.'/pikkumiesOpen.php?ui='.$ui;
+    $origin = $panelOrigin.'/user-'.$name.'/hermes/';
     $started = isset($_GET['started']) && ctype_digit((string) $_GET['started']) ? (int) $_GET['started'] : time();
-    $cert = pmssPikkumiesOpenCertificateState($home, $home.'/.config/pmss/ui', $name, $host, $permalink, 846);
-    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, $cert === 'valid', $origin); return; }
-    if ($cert !== 'valid') { pmssPikkumiesOpenPage($cert === 'error' ? 'error' : 'ready', $started); return; }
+    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, true, $origin); return; }
     $installer = $home.'/bin/install-hermes';
     if (!is_file($installer) || is_link($installer) || !is_executable($installer)) {
         pmssPikkumiesOpenPage('error', $started); return;
     }
     exec(escapeshellarg($installer).' reconcile-key >/dev/null 2>&1', $keyLines, $keyRc);
     if ($keyRc !== 0) { pmssPikkumiesOpenPage('error', $started); return; }
-    if ($ui === 'vanilla-hermes-web') {
-        pmssHermesAgentboardStop($home);
-        exec(escapeshellarg($installer).' start >/dev/null 2>&1', $lines, $rc);
-        if ($rc !== 0) { pmssPikkumiesOpenPage('error', $started); return; }
-        // Single-use sign-in; the fragment reaches no server log. Without a token Hermes asks for its password.
-        $token = pmssPikkumiesOpenTokenMint($home.'/.hermes/login-tokens');
-        header('Cache-Control: no-store');
-        header('Location: '.$origin.'/__pmss-select-web'.($token !== '' ? '#token='.$token : ''), true, 302);
-        return;
-    }
-    exec(escapeshellarg($installer).' stop >/dev/null 2>&1');
-    if (!pmssHermesAgentboardStart($home, $origin, $panelOrigin, $launcherUrl)) {
-        pmssPikkumiesOpenPage('error', $started); return;
-    }
-    $token = pmssPikkumiesOpenTokenMint($home.PMSS_PIKKUMIES_UI_TOKEN_DIR);
-    if ($token === '') { pmssPikkumiesOpenPage('error', $started); return; }
+    pmssHermesAgentboardStop($home);
+    exec(escapeshellarg($installer).' start >/dev/null 2>&1', $lines, $rc);
+    if ($rc !== 0) { pmssPikkumiesOpenPage('error', $started); return; }
+    // Single-use sign-in; only the browser fragment carries the token.
+    $token = pmssPikkumiesOpenTokenMint($home.'/.hermes/login-tokens');
     header('Cache-Control: no-store');
-    header('Location: '.$origin.'/__pmss-select-agentboard#token='.$token, true, 302);
+    header('Location: '.$panelOrigin.'/user-'.$name.'/hermesLogin.php'.($token !== '' ? '#token='.$token : ''), true, 302);
     return;
 }
 if (($ui !== 'simplified' && $ui !== 'hermes') || $home === '' || $name === ''

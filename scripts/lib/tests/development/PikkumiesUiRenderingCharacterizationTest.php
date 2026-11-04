@@ -32,12 +32,12 @@ final class PikkumiesUiRenderingCharacterizationTest extends TestCase
             $snapshots['login:'.$case] = hash('sha256', \pmssPikkumiesHermesLoginLocations($arguments[0], 12345, $arguments[1], $arguments[2]));
         }
         $this->assertSame([
-            '0:pmssPikkumiesUiNginxBlock' => '96ee74768fdd97a6b58a69f69abdd753e688b57ee9febd8a864fb647d9e9960f',
-            '0:pmssPikkumiesHermesNginxBlock' => '307608b940c92265050f0b68e1aed5c9c4c46e37bceef296e8d106951fd37a56',
-            '0:pmssHermesUiNginxBlock' => '94e39d85737475913e1f2bf6286b3db6b6a4a0ba081a946b3de84b1e639f4dee',
-            '1:pmssPikkumiesUiNginxBlock' => 'cb7261a24eff6dd6f370a285286716135913150fa1e5422c8db6b715173f4220',
-            '1:pmssPikkumiesHermesNginxBlock' => '32641f9321dd936aa4bf2b80da6c4a3781801584e70229dbf07abf40a2bec8df',
-            '1:pmssHermesUiNginxBlock' => 'b5995e01b2e148c452e1d6a4fccace5fb22c039db76773e9fd05123b993d1024',
+            '0:pmssPikkumiesUiNginxBlock' => '2966ccbef1997bb33a26150790853960c2466826792041f5a17e179cbf4797aa',
+            '0:pmssPikkumiesHermesNginxBlock' => 'd1eae7ef4d07689f4375a7c63cbd1664db1b4f8bc24ab3f5e138b5b702f86790',
+            '0:pmssHermesUiNginxBlock' => '627cf56c1aa4ef1db9294344f4da5c2db7fc9fe99cda97ad0010654f9c56aa0a',
+            '1:pmssPikkumiesUiNginxBlock' => '51400341250eba31af5db5a875d2c16959c71871b68eb68cf8239e0416f4361f',
+            '1:pmssPikkumiesHermesNginxBlock' => '1cb31d6ff1a8738113dcf1fb905c4365090296eb0798d074959b1b6a94c72d5d',
+            '1:pmssHermesUiNginxBlock' => '027e445af69b7801373520ff22d90ce8e0094c43f76eb347b96ee5e25f15cabe',
             'pmssPikkumiesUiDefaultNginxBlock' => '7fadf2e46af7fffd71c83d06f8a4975b8bc59f3634fb26afb33d69fc5c175b12',
             'pmssPikkumiesHermesDefaultNginxBlock' => 'f3c91ef9285939390d82ec29bf0d1084aa9b8c900c24ac90337a1e81312daa73',
             'pmssHermesUiDefaultNginxBlock' => '2e1ed059ba0468170e6965ff932b6ec738161026582b39fbd831e5eb11fd639d',

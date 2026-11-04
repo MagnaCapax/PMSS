@@ -32,10 +32,14 @@ function pmssHermesMain(array $args): int
         try {
             pmssHermesInstall($paths, pmssHermesPublicUrl($paths['home']));
             file_put_contents($paths['base'].'/pmss-install.status', "ready\n", LOCK_EX);
+            @unlink($paths['base'].'/pmss-install.reason');
         } catch (Throwable $error) {
-            if (is_dir($paths['base']) && !is_link($paths['base']))
+            if (is_dir($paths['base']) && !is_link($paths['base'])) {
                 file_put_contents($paths['base'].'/pmss-install.status',
                     $error instanceof PmssHermesCustomerTreeChanged ? "customer-updated\n" : "failed\n", LOCK_EX);
+                $reason = $error instanceof PmssHermesQuotaShort ? ($error->getCode() === 1 ? 'files' : 'quota') : 'error';
+                file_put_contents($paths['base'].'/pmss-install.reason', $reason."\n", LOCK_EX);
+            }
             throw $error;
         }
     } elseif ($verb === 'rotate-session') {

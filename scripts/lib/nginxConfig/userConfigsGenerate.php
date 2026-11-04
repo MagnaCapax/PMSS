@@ -97,19 +97,6 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
             pmssCreateNginxConfigUserLog($user, '[WARN] Account UI port 845 is owned by another service');
         }
     }
-    // Port C follows only the account's own completed install, never the host marker.
-    $status = '/home/'.$user.'/.hermes/pmss-install.status';
-    if (!$suspended && !$moved && $mcxHosts !== null && $mcxHosts !== '' && is_file($status)
-        && !is_link($status) && @filesize($status) <= 32
-        && trim((string) @file_get_contents($status)) === 'ready') {
-        if (pmssPikkumiesUiPortAvailable(846)) {
-            $serviceHost = explode(' ', $mcxHosts, 2)[0];
-            if (pmssPikkumiesUiCertificateReady($user, $subdomainBase))
-                $config .= "\n".pmssHermesUiNginxBlock($user, $subdomainBase, $serviceHost, (int) $serverPort);
-        } else {
-            pmssCreateNginxConfigUserLog($user, '[WARN] Account UI port 846 is owned by another service');
-        }
-    }
     return pmssCreateNginxConfigWriteFile((string) ($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d').'/pmss-user-'.$user.'.conf', $config, $user, 'public'.$label.' subdomain config');
 }
 
@@ -220,6 +207,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     if ($isMoved) $replacements['##movedPage'] = $ctx['movedPage'];
     if (!$isSuspended && !$isMoved) {
         $replacements['##serverPort'] = (string) $serverPort;
+        $replacements['##PMSS_HERMES_RELAY_HEADERS##'] = pmssPikkumiesUiRelayHeaders();
         // Older templates may still request the legacy Deluge web port.
         if (strpos($template, '##delugeWebPort') !== false) {
             $replacements['##delugeWebPort'] = (string) pmssCreateNginxConfigLegacyDelugeWebPort($runtimePortDir, $thisUser);
