@@ -35,6 +35,7 @@
  * - External access is HTTPS-only (nginx redirects HTTP)
  *
  * @see docs/contracts.md for WebDAV contract documentation
+ * @see scripts/lib/lighttpd/configRender.php for the generated WebDAV policy
  * @see ADR 0004 for shell command guardrails
  * @see ADR 0005 for trust boundary requirements
  */
@@ -563,6 +564,49 @@ LIGHTTPD;
         ]);
     }
 
+    /** LOCK must not create empty resources inside the read-only web root. */
+    public function testReadOnlyWwwRefusesLockCreation(): void
+    {
+        $rendered = $this->renderUserConfig();
+        $matched = preg_match('/\$HTTP\["url"\] =~ "([^"]+)" \{\s*'
+            .'\$HTTP\["request-method"\] == "LOCK" \{\s*url\.access-deny = \( "" \)\s*\}\s*\}/',
+            $rendered, $matches);
+        $this->assertSame(1, $matched, 'LOCK deny is nested inside a URL condition');
+
+        // URL conditions see decoded paths, without the query string.
+        $this->assertDenies(['#'.$matches[1].'#'], [
+            '/webdav-testuser/www',
+            '/webdav-testuser/www/',
+            '/webdav-testuser/www/new.html',
+            '/webdav-testuser/www/dir/new.html',
+            '/webdav-testuser/www/publicity.html',
+            '/webdav-testuser/www/public-other/new.html',
+            '/webdav-testuser/www/dir/public/new.html',
+        ], [
+            '/webdav-testuser/www/public',
+            '/webdav-testuser/www/public/',
+            '/webdav-testuser/www/public/new.html',
+            '/webdav-testuser/data/new.html',
+            '/webdav-testuser/wwwroot/new.html',
+            '/webdav-fixtur01/www/new.html',
+        ]);
+    }
+
+    /** The writable opt-in must retain LOCK support throughout www. */
+    public function testWritableWwwAllowsLockCreation(): void
+    {
+        $rendered = $this->renderUserConfig(true);
+        $this->assertStringNotContainsString('$HTTP["request-method"] == "LOCK"', $rendered);
+        $this->assertDenies($this->denyPatterns($rendered, 'HTTP["url"]'), [
+            '/webdav-testuser/.lighttpd/webdav.www-writable',
+            '/webdav-testuser/www/.hidden',
+        ], [
+            '/webdav-testuser/www/new.html',
+            '/webdav-testuser/www/public/new.html',
+            '/webdav-testuser/data/new.html',
+        ]);
+    }
+
     /**
      * TEST 19c: A writable www gets no Destination rule for www
      *
@@ -593,11 +637,11 @@ LIGHTTPD;
      */
     public function testDifferentUsersGetDifferentConfigs(): void
     {
-        $alicePolicy = pmssWebdavWwwPolicyBlock('alice');
-        $bobPolicy = pmssWebdavWwwPolicyBlock('bob');
+        $firstPolicy = pmssWebdavWwwPolicyBlock('fixtur01');
+        $secondPolicy = pmssWebdavWwwPolicyBlock('fixtur02');
 
-        $this->assertStringContainsAndOmitsStrings(['/webdav-alice/'], ['/webdav-bob/'], $alicePolicy);
-        $this->assertStringContainsAndOmitsStrings(['/webdav-bob/'], ['/webdav-alice/'], $bobPolicy);
+        $this->assertStringContainsAndOmitsStrings(['/webdav-fixtur01/'], ['/webdav-fixtur02/'], $firstPolicy);
+        $this->assertStringContainsAndOmitsStrings(['/webdav-fixtur02/'], ['/webdav-fixtur01/'], $secondPolicy);
     }
 
     /**

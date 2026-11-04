@@ -48,6 +48,12 @@ LIGHTTPD;
 \$HTTP["url"] =~ "^/webdav-{$user}/www/public(\$|/)" {
     webdav.is-readonly = "disable"
 }
+# LOCK bypasses is-readonly and can create an empty resource at an unmapped URL.
+\$HTTP["url"] =~ "^/webdav-{$user}/www(\$|/(?!public(\$|/)))" {
+    \$HTTP["request-method"] == "LOCK" {
+        url.access-deny = ( "" )
+    }
+}
 \$REQUEST_HEADER["Destination"] =~ "/webdav-{$user}/www(\$|[?]|/(?!public(\$|[?/])))" {
     url.access-deny = ( "" )
 }
