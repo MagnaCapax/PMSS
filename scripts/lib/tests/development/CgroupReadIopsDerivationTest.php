@@ -224,7 +224,7 @@ class CgroupReadIopsDerivationTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/cgroupIopsLimitApply.php', [
             '$readIops  = pmssIopsParseSpec($json[\'IOReadIOPS\']  ?? null);',
-            'if ($readIops === null) {',
+            'if (!$dynamicEnforce && $readIops === null) {',
             '$readIops = pmssCgroupPolicyDerivedReadIopsCap(',
             '$limits = [$readIops, $writeIops];',
             "['read', \$limits[0], pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.throttle.read_iops_device')]",

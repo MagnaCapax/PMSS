@@ -1,5 +1,6 @@
 <?php
-/** Pure quota variants projected from one shadow account cohort. Loaded by dynamicIopsPolicy.php. @license GPL-3.0-only */
+/** Pure quota variants projected from one account cohort. Loaded by dynamicIopsPolicy.php. @license GPL-3.0-only */
+require_once __DIR__.'/directApply.php';
 
 /** Keep identical floor, two-significant-figure rounding and ceiling for both projections. */
 function pmssDynamicIopsProposal(array $row, float $chargedPool): int
@@ -21,9 +22,17 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $multiplier = $settings['idleMultiplier'] + $fraction * ($settings['busyMultiplier'] - $settings['idleMultiplier']);
     $passive = pmssFiniteNonNegativeFloat($passive);
     $benchmark = pmssFiniteNonNegativeFloat($benchmark);
-    $host = max($passive ?? 0.0, $benchmark ?? 0.0);
+    // A cached fio figure can exceed real disk IOPS a thousandfold; a cap needs the measured ceiling.
+    $host = $settings['mode'] === 'enforce' ? ($passive ?? 0.0) : max($passive ?? 0.0, $benchmark ?? 0.0);
     $pool = $host * $multiplier;
     if (!is_finite($pool) || $pool >= PHP_INT_MAX) return null;
+    $iowait = pmssFiniteNonNegativeFloat($pressure['iowait_blend'] ?? null);
+    if ($iowait !== null && $iowait > 100) $iowait = null;
+    $curb = $iowait === null ? 1.0 : 1 - $settings['curbMaxCut'] * max(0.0, min(1.0,
+        ($iowait - $settings['curbStartIowait']) / ($settings['curbFullIowait'] - $settings['curbStartIowait'])));
+    $uncurbed = $pool;
+    // Off/shadow projections keep their existing pool; the curb is observational there.
+    if ($settings['mode'] === 'enforce') $pool *= $curb;
     $weightSum = pmssCgroupPolicyUserIoWeightSum(array_column($users, 'source'), $policy);
     $cohort = [];
     foreach ($users as $user => $entry) {
@@ -76,5 +85,23 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lift, 'charged_pool' => $chargedPool, 'users' => $rows];
         $result['variants'][$label] += ['would_be_floor_lift' => $wouldLift, 'would_be_charged_pool' => $wouldPool];
     }
+    $result += ['iowait_blend' => $iowait, 'curb_factor' => $curb, 'pool_uncurbed' => $uncurbed];
     return $result;
+}
+
+/** Return one complete enforced read-cap map, never legacy caps on failed evidence. */
+function pmssDynamicIopsReadCaps(array $users, array $policy, ?array $result): ?array
+{
+    $settings = pmssDynamicIopsSettings($policy);
+    if ($settings === null || $settings['mode'] !== 'enforce' || $result === null
+        || !array_key_exists('fallback', $result) || $result['fallback'] !== null) return null;
+    $rows = $result['variants'][$settings['quotaExponent'] === 1.0 ? '1.0' : '0.5']['users'] ?? [];
+    $caps = [];
+    foreach ($users as $user => $entry) {
+        $cap = $rows[$user]['would_be'] ?? null;
+        if (!is_int($cap) || $cap <= 0) return null;
+        $explicit = pmssIopsParseSpec($entry['source']['IOReadIOPS'] ?? null);
+        $caps[$user] = $explicit === null ? $cap : min($explicit, $cap);
+    }
+    return $caps;
 }

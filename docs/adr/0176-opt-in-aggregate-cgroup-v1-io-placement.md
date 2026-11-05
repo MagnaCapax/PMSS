@@ -58,6 +58,10 @@ membership check. Explicit host-local unit I/O properties can still create
 child groups; activation requires checking those overrides.
 
 ## Consequences
+- [ADR 0230](0230-enforced-read-iops-with-iowait-pool-curb.md) adds a separate
+  host opt-in for pressure/quota read-cap enforcement, including md-backed
+  storage. This placement opt-in and live membership checks remain prerequisites
+  for proving an effective aggregate cap; neither switch enables the other.
 - The slice remains the single aggregate enforcement point; its path validator,
   numeric constraints, root-account exclusion and BFQ writer are unchanged.
 - Default updates retain current behavior. Activation also makes the slice's

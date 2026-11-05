@@ -94,6 +94,18 @@ class CgroupBfqWeightApplyTest extends TestCase
         }
     }
 
+    public function testSharedAccountWeightPreservesExplicitRamAndBonusSelection(): void
+    {
+        foreach ([[[], 1], [['IOWeight' => 100, 'ramMiB' => 32768], 100],
+            [['ramMiB' => 32768], 125], [['IOWeight' => 'invalid', 'ramMiB' => 32768], 125],
+            [['IOWeight' => 250, 'bonusPercent' => 300], 1000],
+            [['IOWeight' => 100, 'bonusPercent' => 301], 100],
+            [['IOWeight' => 100, 'bonusPercent' => '300'], 100],
+            [['IOWeight' => -1], 1], [['IOWeight' => 5000], 1000]] as [$source, $expected]) {
+            $this->assertSame($expected, \pmssBfqUserWeight($source));
+        }
+    }
+
     public function testSharedWritableTargetGuardRejectsUnsafeShapes(): void
     {
         $file = $this->pmssMakeTempFile('pmss-bfq-target-');
@@ -188,7 +200,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                 'required' => [
                     "require_once __DIR__.'/../lib/cgroup/directApply.php';",
                     'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
-                    'pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json))',
+                    'pmssBfqUserWeight($json)',
                     'pmssCgroupDirectWritableFileTarget($cgPath)',
                     'pmssCgroupDirectIntegerFileWrite($cgPath, $w, 1, PMSS_BFQ_KERNEL_MAX)',
                 ],
@@ -205,7 +217,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                     [
                         'needles' => [
                             'foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
-                            'pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json))',
+                            'pmssBfqUserWeight($json)',
                             'list($user, $uid, $w) = $entry;',
                         ],
                         'missingPrefix' => 'missing BFQ username boundary guard: ',
@@ -246,6 +258,7 @@ class CgroupBfqWeightApplyTest extends TestCase
             'required' => [
                 'function pmssUserBonusPercentFromConfig(array $config): int',
                 '$value <= PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT',
+                'return pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json));',
             ],
         ]);
     }

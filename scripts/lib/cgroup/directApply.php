@@ -160,3 +160,56 @@ function pmssCgroupDirectFinishCycle(bool $dryRun, int $total, int $written, int
     closelog();
     return $errors > 0 ? 1 : 0;
 }
+
+/**
+ * Parse an IOReadIOPS/IOWriteIOPS spec into its positive-integer value.
+ * "/home:2000" -> 2000. "/dev/md0:2000" -> 2000. Empty/malformed -> null.
+ */
+function pmssIopsParseSpec($raw): ?int
+{
+    if (!is_string($raw) || $raw === '' || $raw === '0') {
+        return null;
+    }
+
+    // Do not let an arbitrary "label:number" string trigger a /home throttle.
+    if (preg_match('#^(?:/home|/dev/[^:\r\n\x00]+):([0-9]+)$#', $raw, $m) !== 1) {
+        return null;
+    }
+
+    $n = (int) $m[1];
+    return $n > 0 ? $n : null;
+}
+
+/**
+ * Write "MAJ:MIN VALUE" to the cgroup blkio.throttle file IF current state differs.
+ * Returns true if written or already correct; false on error.
+ */
+function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array
+{
+    if (!pmssCgroupPolicyMajorMinorIsValid($majMin)
+        || $iops <= 0
+        || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
+    ) {
+        return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
+    }
+    if (!is_file($cgPath) || !is_writable($cgPath)) {
+        return ['ok' => false, 'reason' => 'unwritable', 'cur' => null];
+    }
+    $cur = trim((string) @file_get_contents($cgPath));
+    $desired = $majMin.' '.$iops;
+    // Current may contain other-device entries; check whether OUR device line matches.
+    $hasMatch = false;
+    foreach (pmssTextLines($cur) as $line) {
+        if (trim($line) === $desired) { $hasMatch = true; break; }
+    }
+    if ($hasMatch) {
+        return ['ok' => true, 'reason' => 'already-set', 'cur' => $cur];
+    }
+    if ($dryRun) {
+        return ['ok' => true, 'reason' => 'dry-run', 'cur' => $cur];
+    }
+    if (@file_put_contents($cgPath, $desired) === false) {
+        return ['ok' => false, 'reason' => 'write-failed', 'cur' => $cur];
+    }
+    return ['ok' => true, 'reason' => 'written', 'cur' => $cur];
+}

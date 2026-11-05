@@ -231,7 +231,9 @@ The existing BFQ cycle optionally logs shadow allocations when
 using a separate all-account floor-charge pass as if IOReadIOPS were unset.
 `proposed` retains its existing explicit/legacy behavior. Missing inputs make
 `would_be` null; missing iowait alone never changes fallback or the 12/4/1 PSI
-blend. Neither projection reaches a writer, and no iowait pool curb is enabled.
+blend. Shadow projections never reach a writer. The logged `iowait_blend`,
+`curb_factor` and `pool_uncurbed` describe the curb without changing shadow's
+pool or proposals. Enforce mode is a separate host opt-in described below.
 
 Successful changed direct IOPS/BFQ writes append old/new values to the private
 `/var/log/pmss/cgroup-apply.jsonl`. Dry runs, unchanged values, failed writes and
@@ -253,6 +255,50 @@ PIDs. They complement the census: child-directory counts do not establish task
 placement. Manager configuration and hybrid PSI likewise do not prove effective
 blkio placement or safe cap values. See [ADR 0229](adr/0229-io-sharing-observation-and-audit-history.md)
 and the [logging field map/read commands](observability/logging.md#io-sharing-observations).
+
+## Enforced read IOPS rollout
+
+[ADR 0230](adr/0230-enforced-read-iops-with-iowait-pool-curb.md) enables read
+caps in the existing IOPS cron; shipped mode remains `off`. Complete the
+ADR 0176 placement procedure and verify actual account process membership
+before measuring aggregate enforcement. Test a sustained heavy read workload
+on QA, including md storage, and check observed IOPS against the cap.
+
+Opt in through the existing operator-owned `cgroup.policy.local.php`:
+
+```php
+<?php
+return ['cgroup' => ['dynamicIops' => ['mode' => 'enforce',
+    'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25,
+    'quotaExponent' => 1.0]]];
+```
+
+The pool comes from the published read ceiling only; enforce ignores benchmark
+figures. The existing pressure pool is cut linearly from 0% at 50% blended iowait to
+25% at 80% iowait. Missing iowait leaves the pool uncurbed. Each read cap is
+the selected variant's `would_be`, bounded by a lower valid explicit cap.
+Quota exponents 1.0 and 0.5 are supported; floor/ceiling/rounding stay shared.
+This applies to md-backed `/home` too. Write caps retain legacy behavior;
+v1 buffered-write throttling is outside this feature.
+
+Preview with `/scripts/cron/cgroupIopsLimitApply.php --dry-run`; `--census`
+also uses the selected enforce map without writing. `PMSS_DRY_RUN=1` suppresses
+enforce writes and JSONL output. Inspect the actual device's
+`blkio.throttle.read_iops_device`, the mode-0600 dynamic IOPS log's `read_caps`,
+`pool_uncurbed`, `pool`, `curb_factor`, and the applied-change audit's
+`source=dynamic-iops`. A cycle's `read_action=apply` records selected targets;
+successful changed writes are recorded separately in the audit.
+
+Fallback records `read_action=keep-kernel` and warns in syslog: no read caps
+are written that cycle. Invalid settings, incomplete configs, exceptions and
+failed cycle logging also keep kernel read caps; write-cap handling continues.
+No fallback releases a cap by writing a large explicit placeholder.
+
+Rollback sets mode to `off` or `shadow`. The next IOPS cycle restores available
+legacy read limits, and successful changed writes have the legacy script
+source in the audit. The legacy no-op when no limit can be derived remains;
+rollback does not clear those accounts' previous caps. Placement has its own
+rollback procedure above. No account configurations are rewritten.
 
 ## Integration Hooks
 

@@ -32,7 +32,9 @@ See `docs/runbooks/update-failures.md` for quick diagnosis steps.
 [ADR 0229](../adr/0229-io-sharing-observation-and-audit-history.md) defines these
 additive observations. Collection keeps the existing cron cadence. Shadow mode
 is still opt-in through the operator-owned local policy; shipping these fields
-does not enable it. No observed value changes an enforced limit.
+does not enable it. [ADR 0230](../adr/0230-enforced-read-iops-with-iowait-pool-curb.md)
+adds a separate `enforce` mode using these inputs in the existing IOPS writer.
+The shipped default remains off; shadow observations do not change limits.
 
 | File | Figures / keys | Retention | Who can read |
 | --- | --- | --- | --- |
@@ -47,7 +49,7 @@ does not enable it. No observed value changes an enforced limit.
 | `/var/run/pmss/io-ceiling.json` | `published.read_iops`, daily qualifying samples, `computed_at` and estimator settings | Current derived cache; source history retained above | Host aggregate, published 0644 |
 | `/var/log/pmss/benchmark-storage.jsonl` | Successful matching-device random-read `metrics.read_iops`, `run_ts`, device and test | Existing file; no stanza for this path in the PMSS logrotate template | Operator; existing file and parent permissions apply |
 | `/etc/systemd/system.conf` and `/etc/systemd/system.conf.d/*.conf` | Manager configuration bytes and uncommented `DefaultIOAccounting=` assignments | Current configuration only | Existing host configuration permissions |
-| `/etc/seedbox/config/cgroup.policy.local.php` | Operator-owned shadow/placement opt-ins; diagnostics reports presence only | Current local configuration, preserved by updates | Operator-controlled executable policy; never expose its contents to customers |
+| `/etc/seedbox/config/cgroup.policy.local.php` | Operator-owned shadow/enforce/placement opt-ins; diagnostics reports presence only | Current local configuration, preserved by updates | Operator-controlled executable policy; never expose its contents to customers |
 
 Rotation counts are finite and size splits can reduce the nominal ten-year
 window. The active file and `.1` remain plain text; older rotations are gzipped.
@@ -89,7 +91,17 @@ microseconds, parsed numerically and returned as floats by the shared parser.
 Shadow records without `schema_version` are version 1. `would_be` ignores
 explicit IOReadIOPS for the entire account cohort and has an independent
 floor-charge pool; `proposed` retains its existing explicit/legacy behavior.
-Fallback makes `would_be` null. Neither value is applied.
+Fallback makes `would_be` null. Neither shadow value is applied.
+
+Both active modes also log `pressure.iowait_blend`, top-level `iowait_blend`,
+`curb_factor` and `pool_uncurbed`. Only enforce mode curbs `pool`; shadow's
+factor records what the cut would be without changing proposals. Enforce uses
+event `dynamic_iops_enforce`, `mode=enforce`, and adds `read_caps` (the selected
+variant bounded by lower explicit caps) and `read_action=apply|keep-kernel`.
+These are allocation decisions; successful changed writes separately audit
+`source=dynamic-iops`. Missing required inputs or incomplete configs record
+keep-kernel with a fallback reason and warn in syslog; failed cycles/logging
+also retain kernel read caps. See the [rollout procedure](../cgroup.md#enforced-read-iops-rollout).
 
 The audit records successful write calls, not readback or effective placement.
 IOPS `old` selects only the target device line (null if absent or malformed).

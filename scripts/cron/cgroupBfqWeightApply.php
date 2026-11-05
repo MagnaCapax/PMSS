@@ -84,11 +84,7 @@ $shadowEnabled = ($shadowPolicy['cgroup']['dynamicIops']['mode'] ?? null) === 's
 $shadowConfigs = []; $shadowUsers = [];
 foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json) use ($shadowEnabled, &$shadowConfigs): int {
     if ($shadowEnabled) $shadowConfigs[$user] = $json;
-    // Prefer explicit JSON IOWeight; fall back to ramMiB-derived formula.
-    if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) $base = (int) $json['IOWeight'];
-    else $base = pmssBfqFormulaWeight(isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0);
-    // Free Bonus Disk Policy: the stored tenure/spend bonus percent.
-    return pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json));
+    return pmssBfqUserWeight($json);
 }) as $entry) {
     list($user, $uid, $w) = $entry;
     if ($shadowEnabled) $shadowUsers[$user] = ['source' => $shadowConfigs[$user], 'weight' => $w];

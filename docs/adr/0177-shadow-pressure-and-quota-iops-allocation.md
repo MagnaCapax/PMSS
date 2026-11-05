@@ -6,6 +6,10 @@ Category: architecture
 ## Status
 Accepted for shadow measurement only; enforcement remains separate work.
 
+[ADR 0230](0230-enforced-read-iops-with-iowait-pool-curb.md) adds host-opt-in
+`enforce` mode. It supersedes this ADR's no-writer, explicit-cap preservation
+and md exclusion decisions only in that mode; off/shadow retain these rules.
+
 ## Context
 Issue #1154 describes pressure-sensitive, quota-proportional I/O allocation.
 Its reviewed algorithm can be measured independently of cgroup-v1 placement

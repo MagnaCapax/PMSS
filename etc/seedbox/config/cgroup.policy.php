@@ -13,12 +13,14 @@ return [
         // 2.0 means PMSS assigns up to 200% of the passive host read-IOPS estimate.
         'assignMax' => ['iops' => 2.0],
 
-        // Opt-in shadow only (ADR 0177): proposals never reach the throttle writer.
+        // Host-local shadow observation or read-cap enforcement (ADRs 0177, 0230).
         'dynamicIops' => [
-            'mode' => 'off', // 'shadow' records one private JSONL row per BFQ cycle.
+            'mode' => 'off', // 'enforce' applies reads in the existing IOPS cycle.
             'idlePressure' => 5.0, 'busyPressure' => 15.0,
             'idleMultiplier' => 10.0, 'busyMultiplier' => 2.0,
             'floor' => 15, 'floorCharge' => 0.25,
+            'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25,
+            'quotaExponent' => 1.0,
         ],
 
         // Read-dimension safety floors for derived per-user caps. NVMe is not

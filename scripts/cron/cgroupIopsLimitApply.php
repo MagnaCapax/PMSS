@@ -40,59 +40,6 @@ $CENSUS = in_array('--census', $argv ?? [], true);
 
 pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here');
 
-/**
- * Parse an IOReadIOPS/IOWriteIOPS spec into its positive-integer value.
- * "/home:2000" -> 2000. "/dev/md0:2000" -> 2000. Empty/malformed -> null.
- */
-function pmssIopsParseSpec($raw): ?int
-{
-    if (!is_string($raw) || $raw === '' || $raw === '0') {
-        return null;
-    }
-
-    // Do not let an arbitrary "label:number" string trigger a /home throttle.
-    if (preg_match('#^(?:/home|/dev/[^:\r\n\x00]+):([0-9]+)$#', $raw, $m) !== 1) {
-        return null;
-    }
-
-    $n = (int) $m[1];
-    return $n > 0 ? $n : null;
-}
-
-/**
- * Write "MAJ:MIN VALUE" to the cgroup blkio.throttle file IF current state differs.
- * Returns true if written or already correct; false on error.
- */
-function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array
-{
-    if (!pmssCgroupPolicyMajorMinorIsValid($majMin)
-        || $iops <= 0
-        || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
-    ) {
-        return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
-    }
-    if (!is_file($cgPath) || !is_writable($cgPath)) {
-        return ['ok' => false, 'reason' => 'unwritable', 'cur' => null];
-    }
-    $cur = trim((string) @file_get_contents($cgPath));
-    $desired = $majMin.' '.$iops;
-    // Current may contain other-device entries; check whether OUR device line matches.
-    $hasMatch = false;
-    foreach (pmssTextLines($cur) as $line) {
-        if (trim($line) === $desired) { $hasMatch = true; break; }
-    }
-    if ($hasMatch) {
-        return ['ok' => true, 'reason' => 'already-set', 'cur' => $cur];
-    }
-    if ($dryRun) {
-        return ['ok' => true, 'reason' => 'dry-run', 'cur' => $cur];
-    }
-    if (@file_put_contents($cgPath, $desired) === false) {
-        return ['ok' => false, 'reason' => 'write-failed', 'cur' => $cur];
-    }
-    return ['ok' => true, 'reason' => 'written', 'cur' => $cur];
-}
-
 $homeDevice = pmssCgroupPolicyMountSourceResolve('/home');
 $majMin = $homeDevice !== '' ? pmssCgroupPolicyDeviceMajorMinorResolve($homeDevice) : null;
 if ($majMin === null) {
@@ -121,6 +68,31 @@ $derivationAllowed = !$homeMdBacked && pmssCgroupPolicyReadIopsDerivationAllowed
     static function (string $message): void { syslog(LOG_WARNING, $message); }
 );
 
+// Only this cron owns dynamic throttle writes; BFQ continues to own shadow cycles.
+$dynamicEnforce = ($policy['cgroup']['dynamicIops']['mode'] ?? null) === 'enforce';
+$dynamicCaps = null;
+if ($dynamicEnforce) {
+    $DRY_RUN = $DRY_RUN || pmssEnvFlagEnabled('PMSS_DRY_RUN');
+    $allocation = null;
+    try {
+        require_once __DIR__.'/../lib/cgroup/dynamicIopsShadow.php';
+        $users = [];
+        foreach ($userConfigs as $user => $json) $users[$user] = ['source' => $json, 'weight' => pmssBfqUserWeight($json)];
+        if (pmssDynamicIopsShadowCycle($users, $policy, $allocation, $DRY_RUN || $CENSUS, $errors === 0)) {
+            $dynamicCaps = $allocation['read_caps'] ?? null;
+        } else {
+            $errors++;
+            syslog(LOG_WARNING, 'dynamic-iops enforce allocation or log failed; keeping kernel read caps');
+        }
+    } catch (Throwable $error) {
+        $errors++;
+        syslog(LOG_WARNING, 'dynamic-iops enforce cycle failed; keeping kernel read caps');
+    }
+    if ($dynamicCaps === null) {
+        syslog(LOG_WARNING, 'dynamic-iops enforce read_action=keep-kernel fallback='.($allocation['fallback'] ?? 'cycle-failed'));
+    }
+}
+
 if ($CENSUS) {
     fwrite(STDERR, "Census uses slice-local telemetry: child I/O may be missing; low P95 values do not prove rollout safety.\n");
     echo "user\tuid\tread_cap\twrite_cap\tread_p95_24h\tintervals\tblkio_children\n";
@@ -128,7 +100,8 @@ if ($CENSUS) {
 foreach ($userConfigs as $user => $json) {
     $readIops  = pmssIopsParseSpec($json['IOReadIOPS']  ?? null);
     $writeIops = pmssIopsParseSpec($json['IOWriteIOPS'] ?? null);
-    if ($readIops === null) {
+    if ($dynamicEnforce) $readIops = $dynamicCaps[$user] ?? null;
+    if (!$dynamicEnforce && $readIops === null) {
         $readIops = pmssCgroupPolicyDerivedReadIopsCap(
             $json,
             $policy,
@@ -176,7 +149,8 @@ foreach ($userConfigs as $user => $json) {
             $written++;
             syslog(LOG_INFO, "$dir-iops $user uid=$uid: $majMin $iops");
             pmssCgroupDirectAudit($user, $uid, $dir.'_iops',
-                pmssCgroupDirectDeviceValueParse($res['cur'], $majMin), $iops, __FILE__);
+                pmssCgroupDirectDeviceValueParse($res['cur'], $majMin), $iops,
+                $dynamicEnforce && $dir === 'read' ? 'dynamic-iops' : __FILE__);
         } elseif ($res['reason'] === 'dry-run' && $DRY_RUN) {
             printf("[DRY-RUN] %-20s uid=%d %s: %s %d\n", $user, $uid, $dir, $majMin, $iops);
         }

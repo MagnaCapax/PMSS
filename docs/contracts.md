@@ -1339,7 +1339,40 @@ Automation often invokes these utilities; below are expected inputs and effects.
     validation. Missing/malformed fields are omitted independently. Root
     injection for tests and billing's existing schema remain unchanged.
 
+- scripts/lib/cgroup/dynamicIopsPolicy.php / dynamicIopsAllocation.php / dynamicIopsShadow.php
+  - `pmssDynamicIopsSettings()` accepts `off` (shipped default), `shadow`, and
+    host-opt-in `enforce`. Invalid knobs return null. Curb defaults are 50/80%
+    iowait, maximum cut 0.25; start must be below full, both within 0..100,
+    cut within 0..1. Quota exponent is only 1.0 (default) or 0.5.
+  - Pressure adds `iowait_blend` from complete 5/15/60-minute windows, weighted
+    12/4/1; missing iowait returns null without changing PSI or fallback.
+  - Allocation adds `iowait_blend`, `curb_factor`, `pool_uncurbed` and uses the
+    curbed `pool` only in enforce. Off/shadow pool and variants retain their
+    prior values. Floors, ceilings, floor charging and rounding remain shared.
+  - `pmssDynamicIopsReadCaps(users, policy, result)` returns the selected
+    `would_be` map bounded by valid lower `pmssIopsParseSpec` explicit caps.
+    Invalid policy, missing rows or allocator fallback returns null, never
+    legacy caps. The writer consumes the map without recomputing it.
+  - `pmssBfqUserWeight()` shares the direct BFQ cron's exact explicit/RAM/bonus
+    calculation with the enforce cohort. The IOPS cron allocates once; BFQ's
+    shadow cycle runs only in shadow mode. Enforce permits md-backed `/home`.
+  - `pmssDynamicIopsShadowCycle(users, policy, &result, readOnly, cohortComplete)`
+    serves both modes through the existing root-only log. Enforce records
+    `read_caps` and `read_action=apply|keep-kernel`; apply describes available
+    targets, not proof of kernel success. Incomplete configs also select fallback.
+    Off returns without collection; shadow retains diagnostic-only behavior.
+  - Enforce fallback, exceptions, invalid settings and failed cycle logs keep
+    kernel read values and warn in syslog; fallback records its reason and
+    `read_action=keep-kernel`. Write-cap handling is unchanged. Successful changed
+    dynamic reads audit with source `dynamic-iops`. `--dry-run`, enforce's
+    `PMSS_DRY_RUN=1`, and census write neither caps nor JSONL rows.
+  - Switching to off/shadow restores legacy calculation and audit source on the
+    next IOPS cycle. Legacy no-op-on-empty still applies; no cap-clear operation
+    is introduced. See ADR 0230 and docs/cgroup.md for rollout prerequisites.
+
 - scripts/lib/cgroup/directApply.php / direct IOPS and BFQ cron writers
+  - `pmssIopsParseSpec()` and `pmssIopsWriteThrottle()` retain their parser,
+    target, positive-limit, idempotence and dry-run guards in this shared library.
   - `pmssCgroupDirectAudit()` appends a private JSONL row with UTC `ts`, user,
     uid, control, old/new integers (old nullable) and source basename through
     `pmssRunSnapshotLogTask`. `PMSS_CGROUP_APPLY_LOG` overrides the default

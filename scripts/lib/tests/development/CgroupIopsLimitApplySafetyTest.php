@@ -54,6 +54,11 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
                         'missingPrefix' => 'missing IOPS passwd UID guard: ',
                         'orderPrefix' => 'IOPS UID guard must run before sysfs path assembly: ',
                     ],
+                ],
+            ]);
+        // The unchanged parser/writer live in the shared direct-apply library now.
+        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directApply.php', [
+                'ordered' => [
                     [
                         'needles' => [
                             'function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array',

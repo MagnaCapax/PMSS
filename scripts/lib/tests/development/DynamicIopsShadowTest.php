@@ -53,6 +53,7 @@ class DynamicIopsShadowTest extends TestCase
                     'charged_pool' => $case['charged'] ?? $pool, 'users' => ['account' => $expectedRow],
                     'would_be_floor_lift' => $case['lift'] ?? 0.0, 'would_be_charged_pool' => $case['charged'] ?? $pool];
             }
+            $expected += ['iowait_blend' => null, 'curb_factor' => 1.0, 'pool_uncurbed' => $pool];
             $actual = \pmssDynamicIopsAllocate(['account' => [
                 'source' => array_replace($source, $case['source'] ?? []), 'weight' => $case['weight'] ?? 100,
             ]], [], $pressure, $passive, null, 'hdd', $case['allowed'] ?? true, $case['legacyPassive'] ?? null);
@@ -61,17 +62,17 @@ class DynamicIopsShadowTest extends TestCase
         }
     }
 
-    public function testSettingsRejectUnsafeTypesRangesAndEnforcementMode(): void
+    public function testSettingsRejectUnsafeTypesAndRanges(): void
     {
         $this->assertSame('off', \pmssDynamicIopsSettings([])['mode']);
-        foreach ([['mode' => 'enforce'], ['mode' => true], ['floor' => 0], ['floorCharge' => 1.1],
+        foreach ([['mode' => 'invalid'], ['mode' => true], ['floor' => 0], ['floorCharge' => 1.1],
             ['idlePressure' => 15], ['busyPressure' => 101], ['busyMultiplier' => 1], ['idleMultiplier' => INF],
             ['floor' => []], ['idleMultiplier' => 1], ['idleMultiplier' => 101]] as $settings) {
             $this->assertSame(null, \pmssDynamicIopsSettings(['cgroup' => ['dynamicIops' => $settings]]));
         }
         $this->assertSame(null, \pmssDynamicIopsSettings(['cgroup' => ['dynamicIops' => 'shadow']]));
         $this->assertTrue(\pmssDynamicIopsShadowCycle([], []));
-        $this->assertTrue(\pmssDynamicIopsShadowCycle([], ['cgroup' => ['dynamicIops' => ['mode' => 'enforce']]]));
+        $this->assertSame('enforce', \pmssDynamicIopsSettings(['cgroup' => ['dynamicIops' => ['mode' => 'enforce']]])['mode']);
     }
 
     public function testPressureUsesWeightedWindowsAndRejectsIncompleteEvidence(): void

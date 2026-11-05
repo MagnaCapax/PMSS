@@ -23,6 +23,7 @@ function pmssCgroupDirectUserConfigs($dir, &$errors) {
 function pmssCgroupDirectPlannedUsers($dir, &$total, &$errors, $planner) { $total = 1; return [['fixture', 1000, 125]]; }
 function pmssCgroupDirectUserUidOrError($user, &$errors) { return 1000; }
 function pmssCgroupDirectWritableFileTarget($path) { return true; }
+function pmssCgroupDirectUserBlkioPathAllowed($path, $names) { return true; }
 function is_dir($path) { return true; }
 function is_file($path) { return true; }
 function is_writable($path) { return true; }
@@ -60,6 +61,9 @@ register_shutdown_function(static function () {
     echo json_encode([$GLOBALS['audits'], $GLOBALS['writes'], $GLOBALS['summary']]);
 });
 PHP;
+        // The real writer lives in the library; run it in this namespace so its I/O stays in the fixture.
+        $library = file_get_contents($this->pmssRepoPath('scripts/lib/cgroup/directApply.php'));
+        $script .= 'eval('.var_export('namespace CgroupAuditCronFixture;'.substr($library, (int) strpos($library, 'function pmssIopsWriteThrottle')), true).');';
         $path = $this->pmssRepoPath('scripts/cron/'.$cron.'.php');
         $source = file_get_contents($path);
         // Preserve the cron body and exit paths; eval needs the file prologue removed.

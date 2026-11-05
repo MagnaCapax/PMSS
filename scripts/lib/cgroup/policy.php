@@ -158,6 +158,14 @@ function pmssBfqApplyBonusWeight(int $baseWeight, int $bonusPct, int $kernelMax 
     return max(1, min(max(1, $kernelMax), (int) round($baseWeight * (1 + max(0, $bonusPct) / 100))));
 }
 
+/** Share the direct BFQ cron's explicit/RAM fallback and bonus calculation. */
+function pmssBfqUserWeight(array $json): int
+{
+    if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) $base = (int) $json['IOWeight'];
+    else $base = pmssBfqFormulaWeight(isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0);
+    return pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json));
+}
+
 /** Parse one kernel bfq.weight sysfs payload without silently coercing errors. */
 function pmssBfqKernelWeightParse($raw): ?int
 {

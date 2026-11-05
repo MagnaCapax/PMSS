@@ -29,5 +29,7 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
     }
     $io = $pressure['io'];
     $pressure['blend'] = in_array(null, $io, true) ? null : (12 * $io[5] + 4 * $io[15] + $io[60]) / 17;
+    $iowait = $pressure['iowait'];
+    $pressure['iowait_blend'] = in_array(null, $iowait, true) ? null : (12 * $iowait[5] + 4 * $iowait[15] + $iowait[60]) / 17;
     return $pressure;
 }
