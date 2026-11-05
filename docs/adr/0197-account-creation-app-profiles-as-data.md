@@ -5,7 +5,8 @@ Category: architecture
 
 ## Status
 
-Accepted (operator-directed, 2026-10-28)
+Accepted (operator-directed, 2026-10-28). Products no longer select a profile
+since 2026-11-05; see the update below.
 
 ## Context
 
@@ -127,6 +128,17 @@ This profile does not force additional listeners or change authentication.
 Definition, registry, quota-boundary, gate-skip and existing-profile regression
 tests are supplied for the testing VM. Local verification is PHP syntax only;
 installer execution and web UI behavior require that separate environment.
+
+## Update 2026-11-05
+
+Product setup moved out of PMSS. The provisioning system now carries it on the
+service type (home markers, Docker policy, and hooks before and after user
+creation) and sends it inside the addUser row, so a product behaves the same on
+every node whatever its PMSS version. A profile only worked on nodes that
+already had it, and rolling updates left most AI AppBox hosts without one.
+
+No product selects a profile any more. `--app-profile` stays for existing callers
+and manual use. Hermes still needs a node with its panel route.
 
 ## References
 
