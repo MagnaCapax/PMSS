@@ -175,6 +175,8 @@ foreach ($userConfigs as $user => $json) {
         if ($res['reason'] === 'written') {
             $written++;
             syslog(LOG_INFO, "$dir-iops $user uid=$uid: $majMin $iops");
+            pmssCgroupDirectAudit($user, $uid, $dir.'_iops',
+                pmssCgroupDirectDeviceValueParse($res['cur'], $majMin), $iops, __FILE__);
         } elseif ($res['reason'] === 'dry-run' && $DRY_RUN) {
             printf("[DRY-RUN] %-20s uid=%d %s: %s %d\n", $user, $uid, $dir, $majMin, $iops);
         }

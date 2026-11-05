@@ -351,6 +351,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   remain unchanged, and exceptions continue to propagate.
 
 - Iostat input boundaries (`scripts/lib/diskIostat.php`):
+  - `pmssDiskIostatParseCpuFields()` reads the last avg-cpu report by header
+    name and returns nullable CPU percentages separately from the eight disk
+    fields. Malformed CPU data never discards the disk sample.
+  - Assembly appends CPU iowait/busy/steal/idle, some-I/O PSI avg300, blocked
+    tasks, dirty/writeback KiB and md-sync activity strictly after `time`.
+    The original fourteen keys retain order, values and types. These are host
+    observations only; the public record contains no per-account data.
   - `/home` leaf selection uses the shared block-device walk. An incomplete
     topology falls back to the discovered-device list; BFQ policy may still
     report active when a readable leaf proves BFQ despite another failed branch.
@@ -1319,7 +1326,36 @@ Automation often invokes these utilities; below are expected inputs and effects.
     runs create no shadow output. Proposals never change applied limits.
   - `/var/log/pmss/dynamic-iops.jsonl` is root-only (0600); it records both quota
     exponents, legacy caps, pressure windows and separate capacity sources.
-    See ADR 0177 for defaults, missing-input behavior and measurement scope.
+    New records have integer `schema_version=2`; absent means version 1.
+    Iowait windows never affect the 12/4/1 full-I/O-PSI blend or fallbacks.
+    Per-account `would_be` uses an independent all-account floor charge as if
+    IOReadIOPS were unset; it is null on fallback and equals `proposed` with no
+    explicit accounts. Existing proposals and all writer inputs are unchanged.
+    See ADRs 0177 and 0229 for defaults, missing inputs and measurement scope.
+
+- scripts/lib/resources/metrics.php
+  - Optional UID-built hybrid `unified/user.slice/user-N.slice/io.pressure`
+    supplies some/full avg300 and total fields through shared numeric PSI
+    validation. Missing/malformed fields are omitted independently. Root
+    injection for tests and billing's existing schema remain unchanged.
+
+- scripts/lib/cgroup/directApply.php / direct IOPS and BFQ cron writers
+  - `pmssCgroupDirectAudit()` appends a private JSONL row with UTC `ts`, user,
+    uid, control, old/new integers (old nullable) and source basename through
+    `pmssRunSnapshotLogTask`. `PMSS_CGROUP_APPLY_LOG` overrides the default
+    `/var/log/pmss/cgroup-apply.jsonl`; new files are 0600.
+  - Called only on IOPS `written` and successful BFQ writes. No-op, failed
+    write, dry-run and IOPS census paths never audit. Failure warns in syslog
+    without changing counters, exit codes, cap values or path validators.
+  - Shadow and apply logs use daily/3650/50M compressed rotation with
+    delaycompress and create 0600, per ADR 0044's September amendment.
+
+- scripts/lib/agentDiagnostics/catalog.php
+  - Static `io_sharing` commands report mode, local-policy presence, log age,
+    published read ceiling, system.conf size, accounting assignments and two
+    aggregate cgroup.procs line counts (slice-only and inclusive descendants).
+    Every probe has an unavailable fallback; no account input or names enter
+    these commands or their outputs. No configuration is changed (ADR 0229).
 
 - scripts/productConfig.php <product> --welcome-message=<HTML>
   - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.

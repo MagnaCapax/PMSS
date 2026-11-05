@@ -134,6 +134,7 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
     }
     $written++;
     syslog(LOG_INFO, "bfq $user uid=$uid: $cur -> $w");
+    pmssCgroupDirectAudit($user, $uid, 'bfq_weight', $cur, $w, __FILE__);
 }
 
 // Shadow output is diagnostic only: failures cannot interrupt existing enforcement.

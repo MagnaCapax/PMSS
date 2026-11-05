@@ -173,12 +173,24 @@
 # Shadow allocations contain per-account resource figures; keep them root-only.
 /var/log/pmss/dynamic-iops.jsonl {
     daily
-    rotate 14
-    maxsize 16M
+    rotate 3650
+    maxsize 50M
     missingok
     notifempty
     compress
     delaycompress
+    create 0600 root root
+}
+
+# Applied IOPS/BFQ changes are private observability data, including old values.
+/var/log/pmss/cgroup-apply.jsonl {
+    daily
+    rotate 3650
+    missingok
+    notifempty
+    compress
+    delaycompress
+    maxsize 50M
     create 0600 root root
 }
 

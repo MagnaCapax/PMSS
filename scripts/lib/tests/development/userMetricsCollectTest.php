@@ -115,6 +115,26 @@ class UserMetricsCollectTest extends TestCase
         return $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), $files);
     }
 
+    public function testHybridIoPressureIsNumericOptionalAndUidScoped(): void
+    {
+        $path = 'unified/user.slice/user-1000.slice/io.pressure';
+        foreach ([
+            ["some avg300=1.25 total=123\nfull avg300=0 total=456\n", [
+                'io_pressure_some_avg300' => 1.25, 'io_pressure_full_avg300' => 0.0,
+                'io_pressure_some_total' => 123.0, 'io_pressure_full_total' => 456.0]],
+            ["some avg300=100 total=0\n", ['io_pressure_some_avg300' => 100.0, 'io_pressure_some_total' => 0.0]],
+            ["some avg300=101 total=-1\nfull avg300=bad total=1.2\n", []],
+            ["some avg300=1e1 total=".str_repeat('9', 30)."\n", []],
+            ["other avg300=2 total=3\n", []],
+            ['', []],
+        ] as [$raw, $expected]) {
+            $root = $this->tree([$path => $raw]);
+            $this->assertSame($expected, \pmssUserMetricsCollect(1000, $root));
+            $this->assertSame([], \pmssUserMetricsCollect(1001, $root));
+            $this->assertSame(null, \pmssResourceLogReadCountersV1(1000, $root));
+        }
+    }
+
     public function testCollectsFullV1MetricSet(): void
     {
         $slice = 'user.slice/user-1000.slice';

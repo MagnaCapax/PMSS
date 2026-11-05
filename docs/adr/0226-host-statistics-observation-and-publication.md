@@ -56,4 +56,7 @@ is weakened, and no replacement implementation or alias is introduced.
 
 ## References
 
+- [ADR 0229: I/O sharing observation and audit history](0229-io-sharing-observation-and-audit-history.md)
+  deliberately extends iostat serialized bytes with nine host fields after
+  `time`; the original fourteen keys, their order and values remain unchanged.
 - [ADR 0162: Host statistics parsing boundaries](0162-host-statistics-parsing-boundaries.md)

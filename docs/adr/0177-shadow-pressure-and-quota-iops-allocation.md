@@ -34,8 +34,10 @@ Explicit IOPS settings are never replaced. Missing capacity, complete pressure
 windows or any account quota/weight produces the legacy proposal instead.
 
 One root-only JSONL record per cycle contains settings, input metrics, legacy
-caps and proposed shares/caps, with daily rotation, 14 generations and a 16 MiB
-split. Dry runs and disabled mode create no shadow log. Logging failures warn
+caps and proposed shares/caps. ADR 0229 extends records to schema version 2,
+adds observational iowait and independent `would_be` shares, and supersedes the
+initial 14-generation/16 MiB policy with 3650 daily generations and 50M splits.
+Dry runs and disabled mode create no shadow log. Logging failures warn
 without changing the existing BFQ exit result. No proposal reaches a writer.
 
 ## Consequences
@@ -43,3 +45,6 @@ This implements the read-only measurement phase. Enforcing proposals, removing
 the md exclusion, bandwidth/write allocation and customer at-limit notices remain
 out of scope pending measurements and their enforcement/counter prerequisites.
 Rollback is `mode=off`; no account configuration or throttle state needs repair.
+
+See [ADR 0229](0229-io-sharing-observation-and-audit-history.md) for the
+observation schema, private applied-change audit and retention decision.

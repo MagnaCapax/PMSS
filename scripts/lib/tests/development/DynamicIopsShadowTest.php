@@ -47,8 +47,11 @@ class DynamicIopsShadowTest extends TestCase
                 'benchmark_read_iops' => null, 'host_read_iops' => $passive ?? 0.0,
                 'multiplier' => 2.0, 'pool' => $pool, 'fallback' => $case['fallback'] ?? null, 'variants' => []];
             foreach (['1.0' => 1.0, '0.5' => 0.5] as $variant => $alpha) {
+                $expectedRow = array_replace($row, $case['row'] ?? []);
+                $expectedRow['would_be'] = isset($case['fallback']) ? null : 2000;
                 $expected['variants'][$variant] = ['alpha' => $alpha, 'floor_lift' => $case['lift'] ?? 0.0,
-                    'charged_pool' => $case['charged'] ?? $pool, 'users' => ['account' => array_replace($row, $case['row'] ?? [])]];
+                    'charged_pool' => $case['charged'] ?? $pool, 'users' => ['account' => $expectedRow],
+                    'would_be_floor_lift' => $case['lift'] ?? 0.0, 'would_be_charged_pool' => $case['charged'] ?? $pool];
             }
             $actual = \pmssDynamicIopsAllocate(['account' => [
                 'source' => array_replace($source, $case['source'] ?? []), 'weight' => $case['weight'] ?? 100,

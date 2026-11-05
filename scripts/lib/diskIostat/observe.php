@@ -41,6 +41,22 @@ function pmssDiskIostatReadIopingHomeMs(): ?float
     return pmssFiniteFloat($matches[1]);
 }
 
+/** Read host-only contention evidence; missing kernel interfaces stay nullable. */
+function pmssDiskIostatReadContention(string $procRoot = '/proc'): array
+{
+    $psi = pmssReadRegularFileContents($procRoot.'/pressure/io');
+    $stat = pmssReadRegularFileContents($procRoot.'/stat');
+    $md = pmssReadRegularFileContents($procRoot.'/mdstat');
+    $memory = pmssProcMeminfoFieldsRead($procRoot.'/meminfo');
+    $blocked = null;
+    if ($stat !== null && preg_match('/^procs_blocked[ \t]+([0-9]+)[ \t]*\r?$/m', $stat, $match)) {
+        $blocked = pmssUnsignedDecimalIntParse($match[1]);
+    }
+    return ['psiSomeAvg300' => $psi === null ? null : pmssSystemStatsPsiMetricFromRaw($psi, 'some', 'avg300'),
+        'procsBlocked' => $blocked, 'dirtyKb' => $memory['Dirty'] ?? null, 'writebackKb' => $memory['Writeback'] ?? null,
+        'mdSyncActive' => $md === null ? null : preg_match('/\b(?:resync|recovery|check|reshape)\s*=/', $md) === 1];
+}
+
 /** Append host probes and metadata to the parsed fields in legacy serialization order. */
 function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null): array
 {
@@ -50,5 +66,5 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         'psiCpuFullAvg300' => pmssDiskIostatReadPsiFullAvg300('/proc/pressure/cpu'),
         'iopingHomeMs' => pmssDiskIostatReadIopingHomeMs(),
         'diskQuantity' => $deviceCount, 'time' => $timestamp ?? time(),
-    ];
+    ] + pmssDiskIostatParseCpuFields($iostatRaw) + pmssDiskIostatReadContention();
 }

@@ -41,3 +41,30 @@ function pmssDiskIostatParseSampleFields(string $iostatRaw): array
     ]);
 }
 
+/** Parse the last avg-cpu report by name; an incomplete final report is no signal. */
+function pmssDiskIostatParseCpuFields(string $iostatRaw): array
+{
+    $columns = $values = null;
+    foreach (explode("\n", $iostatRaw) as $line) {
+        if (preg_match('/^avg-cpu:/', trim($line))) {
+            $header = pmssConfigLineColumns($line, 1, []);
+            array_shift($header);
+            $columns = strpos($line, "\0") === false ? array_flip($header) : [];
+            $values = null;
+        } elseif ($columns !== null && $values === null && trim($line) !== '') {
+            $values = strpos($line, "\0") === false ? pmssConfigLineColumns($line, 1, []) : [];
+        }
+    }
+    $result = ['cpuIowaitPct' => null, 'cpuBusyPct' => null, 'cpuStealPct' => null, 'cpuIdlePct' => null];
+    $cpu = [];
+    foreach (['%user', '%nice', '%system', '%iowait', '%steal', '%idle'] as $name) {
+        $raw = isset($columns[$name]) ? ($values[$columns[$name]] ?? '') : '';
+        if (!preg_match('/\A[0-9]+(?:\.[0-9]+)?\z/', $raw)
+            || ($value = pmssFiniteNonNegativeFloat($raw)) === null || $value > 100) return $result;
+        $cpu[$name] = $value;
+    }
+    $busy = $cpu['%user'] + $cpu['%nice'] + $cpu['%system'];
+    return ['cpuIowaitPct' => $cpu['%iowait'], 'cpuBusyPct' => $busy <= 100 ? $busy : null,
+        'cpuStealPct' => $cpu['%steal'], 'cpuIdlePct' => $cpu['%idle']];
+}
+

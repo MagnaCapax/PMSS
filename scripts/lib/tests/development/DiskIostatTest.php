@@ -113,7 +113,7 @@ PHP;
             'diskUtil', 'avgQueueSize', 'diskQuantity', 'time',
         ])));
         foreach (['psiFullAvg300', 'psiMemFullAvg300', 'psiCpuFullAvg300', 'iopingHomeMs'] as $key) $this->assertTrue(array_key_exists($key, $stored));
-        $this->assertSame(14, count($stored));
+        $this->assertSame(23, count($stored));
     }
 
     public function testMdRaidSamplesOnlySixMemberDisks(): void
@@ -258,6 +258,8 @@ function pmssDiskIostatParseSampleFields($raw) {
     return ['diskAwait' => '1'];
 }
 function is_readable($path) { return false; }
+function pmssReadRegularFileContents($path) { return null; }
+function pmssProcMeminfoFieldsRead($path) { return []; }
 function pmssSystemStatsIopingMs($path) { return 'na'; }
 function pmssPathTargetIsSafe($path, $directory, $missing) { return true; }
 function pmssFileWriteComplete($path, $content, $flags = 0) {

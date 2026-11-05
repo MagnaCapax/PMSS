@@ -215,6 +215,8 @@ PHP;
 namespace HostStatsAssemblyFixture;
 function is_readable($path) { return true; }
 function file_get_contents($path) { return "full avg300=1.25\n"; }
+function pmssReadRegularFileContents($path) { return null; }
+function pmssProcMeminfoFieldsRead($path) { return []; }
 function pmssSystemStatsIopingMs($path) { return '0.2ms'; }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat/observe.php', 'HostStatsAssemblyFixture');
@@ -224,6 +226,8 @@ PHP;
             'diskAwait' => '5', 'diskServiceTime' => '6', 'diskUtil' => '7', 'avgQueueSize' => '8',
             'psiFullAvg300' => 1.25, 'psiMemFullAvg300' => 1.25, 'psiCpuFullAvg300' => 1.25,
             'iopingHomeMs' => 0.2, 'diskQuantity' => 2, 'time' => 123,
+            'cpuIowaitPct' => null, 'cpuBusyPct' => null, 'cpuStealPct' => null, 'cpuIdlePct' => null,
+            'psiSomeAvg300' => null, 'procsBlocked' => null, 'dirtyKb' => null, 'writebackKb' => null, 'mdSyncActive' => null,
         ], $this->pmssRunInlinePhpJson($script));
     }
 }

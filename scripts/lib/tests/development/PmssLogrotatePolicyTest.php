@@ -69,6 +69,8 @@ class PmssLogrotatePolicyTest extends TestCase
     public function testAllPerformanceMetricLogsUseCompressedBoundedRetention(): void
     {
         $stanzas = [
+            '/var/log/pmss/dynamic-iops.jsonl' => ['daily', 'rotate 3650', 'maxsize 50M', 'missingok', 'notifempty', 'create 0600 root root'],
+            '/var/log/pmss/cgroup-apply.jsonl' => ['daily', 'rotate 3650', 'maxsize 50M', 'missingok', 'notifempty', 'create 0600 root root'],
             '/var/log/pmss/metrics/*' => ['daily', 'rotate 3650', 'maxsize 50M', 'nocreate'],
             '/var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log' => ['daily', 'rotate 3650', 'create 0600 root root'],
             '/var/log/pmss/resource-daily.log' => ['monthly', 'rotate 120', 'create 0600 root root'],

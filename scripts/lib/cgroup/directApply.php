@@ -124,6 +124,32 @@ function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum
         && pmssFileWriteComplete($path, (string) $value);
 }
 
+/** Read only this device's old integer from the writer's already captured state. */
+function pmssCgroupDirectDeviceValueParse(string $raw, string $device): ?int
+{
+    if (strpos($raw, "\0") !== false) return null;
+    foreach (pmssConfigTextRows($raw, 2, []) as $columns) {
+        if ($columns[0] === $device) return count($columns) === 2 ? pmssUnsignedDecimalIntParse($columns[1]) : null;
+    }
+    return null;
+}
+
+/** Audit successful direct writes privately; failures warn without affecting enforcement. */
+function pmssCgroupDirectAudit(string $user, int $uid, string $control, ?int $old, int $new, string $source): bool
+{
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) return true;
+    try {
+        $payload = pmssJsonEncodeSafe(['ts' => gmdate('c'), 'user' => $user, 'uid' => $uid,
+            'control' => $control, 'old' => $old, 'new' => $new, 'source' => basename($source)]);
+        if ($payload !== null && pmssRunSnapshotLogTask(__FILE__, 'PMSS_CGROUP_APPLY_LOG', '/var/log/pmss/cgroup-apply.jsonl',
+            static function ($handle) use ($payload): int { return pmssStreamWriteAll($handle, $payload."\n") ? 0 : 1; }) === 0) return true;
+    } catch (\Throwable $error) {
+        // The cap is already applied. Do not turn an audit failure into a failed cycle.
+    }
+    syslog(LOG_WARNING, 'cgroup-apply audit log failed');
+    return false;
+}
+
 /** Log and optionally print the legacy cycle summary, then return process rc. */
 function pmssCgroupDirectFinishCycle(bool $dryRun, int $total, int $written, int $skippedNoSlice, int $errors): int
 {

@@ -223,6 +223,37 @@ removes only the PMSS placement drop-in before reexec, restoring the shipped
 manager default. Unknown/v2 mode also removes that drop-in. Dry runs do not
 create or remove it. No sysfs path guard or throttle validator is widened.
 
+## I/O sharing observation and change history
+
+The existing BFQ cycle optionally logs shadow allocations when
+`cgroup.dynamicIops.mode` is `shadow` in the local policy; shipped defaults stay
+`off`. Schema version 2 adds iowait windows and each account's `would_be` cap
+using a separate all-account floor-charge pass as if IOReadIOPS were unset.
+`proposed` retains its existing explicit/legacy behavior. Missing inputs make
+`would_be` null; missing iowait alone never changes fallback or the 12/4/1 PSI
+blend. Neither projection reaches a writer, and no iowait pool curb is enabled.
+
+Successful changed direct IOPS/BFQ writes append old/new values to the private
+`/var/log/pmss/cgroup-apply.jsonl`. Dry runs, unchanged values, failed writes and
+IOPS census produce no rows. Audit failures warn in syslog without changing
+the cap or cycle outcome. Both audit and shadow logs are 0600 with daily/3650
+compressed rotations and 50M splits. Setting shadow mode off stops shadow
+output; successful existing writes continue to audit independently.
+
+Per-account metrics retain v1 counters and optionally read numeric some/full
+I/O PSI avg300/totals from a UID-built hybrid unified path when present. This
+does not add v2 enforcement or change billing. Missing interfaces omit keys.
+Host iostat adds CPU and kernel contention observations after the legacy `time`
+key, and never contains per-account rows.
+
+`agentDiagnostics.php --json` includes static `io_sharing` probes for shadow
+mode/policy/log freshness, capacity and manager configuration, plus direct-slice
+and all-descendant account task totals. Counts contain no account names or
+PIDs. They complement the census: child-directory counts do not establish task
+placement. Manager configuration and hybrid PSI likewise do not prove effective
+blkio placement or safe cap values. See [ADR 0229](adr/0229-io-sharing-observation-and-audit-history.md)
+and the [logging field map/read commands](observability/logging.md#io-sharing-observations).
+
 ## Integration Hooks
 
 - User creation applies defaults automatically:

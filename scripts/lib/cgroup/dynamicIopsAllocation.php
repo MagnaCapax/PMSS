@@ -1,6 +1,14 @@
 <?php
 /** Pure quota variants projected from one shadow account cohort. Loaded by dynamicIopsPolicy.php. @license GPL-3.0-only */
 
+/** Keep identical floor, two-significant-figure rounding and ceiling for both projections. */
+function pmssDynamicIopsProposal(array $row, float $chargedPool): int
+{
+    $value = max($row['floor'], $chargedPool * $row['share']);
+    $rounded = round($value, 1 - (int) floor(log10(max(1.0, $value))));
+    return min($row['ceiling'] ?? PHP_INT_MAX, max($row['floor'], (int) min($rounded, PHP_INT_MAX - 1024)));
+}
+
 /** Compare quota exponents using already bonus-adjusted BFQ weights. */
 function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?float $passive, ?float $benchmark, ?string $storageClass, bool $legacyAllowed, ?float $legacyPassive = null): ?array
 {
@@ -44,7 +52,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $result = ['pressure' => $pressure, 'passive_read_iops' => $passive, 'benchmark_read_iops' => $benchmark,
         'host_read_iops' => $host, 'multiplier' => $multiplier, 'pool' => $pool, 'fallback' => $fallback, 'variants' => []];
     foreach (['1.0' => 1.0, '0.5' => 0.5] as $label => $alpha) {
-        $rows = $cohort; $lift = 0.0;
+        $rows = $cohort; $lift = 0.0; $wouldLift = 0.0;
         foreach ($rows as $user => $row) {
             $rows[$user]['share'] = (pmssFiniteNonNegativeFloat($row['weight']) ?? 0) * pow(($row['quota'] ?? $median) / $median, $alpha);
         }
@@ -53,17 +61,20 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         foreach ($rows as &$row) {
             $row['share'] = $sum > 0 ? $row['share'] / $sum : 0.0;
             if (!$row['explicit']) $lift += max(0.0, $row['floor'] - $pool * $row['share']);
+            // Counterfactual floor charging includes every account, including explicit caps.
+            $wouldLift += max(0.0, $row['floor'] - $pool * $row['share']);
         }
         unset($row);
         $chargedPool = max(0.0, $pool - $settings['floorCharge'] * $lift);
+        $wouldPool = max(0.0, $pool - $settings['floorCharge'] * $wouldLift);
         foreach ($rows as &$row) {
-            $value = max($row['floor'], $chargedPool * $row['share']);
-            $rounded = round($value, 1 - (int) floor(log10(max(1.0, $value))));
             $row['proposed'] = $fallback !== null || $row['explicit'] ? $row['legacy'] :
-                min($row['ceiling'] ?? PHP_INT_MAX, max($row['floor'], (int) min($rounded, PHP_INT_MAX - 1024)));
+                pmssDynamicIopsProposal($row, $chargedPool);
+            $row['would_be'] = $fallback !== null ? null : pmssDynamicIopsProposal($row, $wouldPool);
         }
         unset($row);
         $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lift, 'charged_pool' => $chargedPool, 'users' => $rows];
+        $result['variants'][$label] += ['would_be_floor_lift' => $wouldLift, 'would_be_charged_pool' => $wouldPool];
     }
     return $result;
 }

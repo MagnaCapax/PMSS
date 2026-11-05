@@ -13,7 +13,8 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
         if (!isset($rows[$bucket]) || $sample['time'] > $rows[$bucket]['time']) $rows[$bucket] = $sample;
     }
     $pressure = [];
-    foreach (['io' => 'psiFullAvg300', 'memory' => 'psiMemFullAvg300', 'cpu' => 'psiCpuFullAvg300'] as $kind => $field) {
+    foreach (['io' => 'psiFullAvg300', 'memory' => 'psiMemFullAvg300', 'cpu' => 'psiCpuFullAvg300',
+        'iowait' => 'cpuIowaitPct'] as $kind => $field) {
         // One contiguous prefix supplies every window; a gap leaves later windows unavailable.
         $pressure[$kind] = [5 => null, 15 => null, 60 => null];
         $sum = 0.0; $n = 0;

@@ -153,6 +153,9 @@ safety invariant is stronger: drop the oldest compressed history before a server
 fails.
 
 ## References
+- [ADR 0229](0229-io-sharing-observation-and-audit-history.md) applies the
+  2026-09-05 policy to shadow IOPS and applied cgroup-change history: daily,
+  rotate 3650, compress/delaycompress, maxsize 50M, private mode 0600.
 - Operator directive 2026-08-14 (verbatim): "7 day retention is premature ejaculation
   ... should be for ever"; "compression is another premature ejaculation ... no
   compression initially"; "all the performance metrics should be collected as long as

@@ -78,7 +78,7 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy): bool
     $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive,
         pmssDynamicIopsBenchmark('/var/log/pmss/benchmark-storage.jsonl', $device), $class, $allowed, $legacyPassive);
     if ($result === null) return false;
-    $payload = pmssJsonEncodeSafe(['timestamp' => gmdate('c', $now), 'event' => 'dynamic_iops_shadow',
+    $payload = pmssJsonEncodeSafe(['schema_version' => 2, 'timestamp' => gmdate('c', $now), 'event' => 'dynamic_iops_shadow',
         'mode' => 'shadow', 'md_enforcement_excluded' => $md, 'settings' => $settings] + $result);
     if ($payload === null) return false;
     return pmssRunSnapshotLogTask(__FILE__, 'PMSS_DYNAMIC_IOPS_LOG', '/var/log/pmss/dynamic-iops.jsonl',
