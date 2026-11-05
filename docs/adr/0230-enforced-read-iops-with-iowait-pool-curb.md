@@ -87,6 +87,15 @@ existing mode-0600 snapshot/audit logs with ADR 0229's retention and guards.
 - Hermetic tests cover selection, curb boundaries, fallback, md, real writer
   calls against memory-only I/O, audit source, dry run, idempotence and rollback.
   Testing-machine regression checks and load acceptance remain required.
+- Tasks waiting in the throttle count as host I/O wait and PSI, so an account at
+  its cap raises both while the disk stays idle. The pool and curb then read
+  their own effect: a saturated cap holds the pool at the busy multiplier and
+  can reach the full curb. Validators bound this at the busy multiplier times
+  the curb and at each floor, so it settles rather than runs away. Host
+  pressure notices read the same signal.
+- An account at its cap queues its own panel and client reads behind its own
+  load in the same throttle group. Cold pages can take minutes at low caps;
+  cached pages stay fast.
 
 ## References
 - [Shadow allocation](0177-shadow-pressure-and-quota-iops-allocation.md)

@@ -294,6 +294,10 @@ are written that cycle. Invalid settings, incomplete configs, exceptions and
 failed cycle logging also keep kernel read caps; write-cap handling continues.
 No fallback releases a cap by writing a large explicit placeholder.
 
+Judge enforcement by device latency such as ioping or await. Host iowait and
+PSI count tasks waiting in the throttle, so they rise under a cap with the disk
+idle.
+
 Rollback sets mode to `off` or `shadow`. The next IOPS cycle restores available
 legacy read limits, and successful changed writes have the legacy script
 source in the audit. The legacy no-op when no limit can be derived remains;
