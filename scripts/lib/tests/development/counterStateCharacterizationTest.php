@@ -145,6 +145,37 @@ class CounterStateCharacterizationTest extends TestCase
         $this->assertSame(50, $next['delta']['io_write_ops']);
     }
 
+    public function testResourceLogReseedsIoOnScopeChangesAndResumesNormalDeltas(): void
+    {
+        foreach (['bfq', 'throttle'] as $source) {
+            // Also cover scope loss, an unchanged scope, and an unchanged legacy scope.
+            foreach ([[null, 'recursive'], ['recursive', null], ['recursive', 'recursive'], [null, null]] as [$before, $after]) {
+                $path = $this->makeRoot().'/state.json';
+                $previous = ['io_read' => 1, 'io_write' => 2, 'io_read_ops' => 3, 'io_write_ops' => 4,
+                    'cpu_nsec' => 100, 'io_source' => $source];
+                $current = ['io_read' => 9001, 'io_write' => 8002, 'io_read_ops' => 7003, 'io_write_ops' => 6004,
+                    'cpu_nsec' => 150, 'io_source' => $source];
+                if ($before !== null) $previous['io_scope'] = $before;
+                if ($after !== null) $current['io_scope'] = $after;
+                $this->pmssWriteFile($path, json_encode($previous));
+
+                $migration = \pmssResourceLogUpdateState($path, $current);
+                foreach (['io_read' => 9000, 'io_write' => 8000, 'io_read_ops' => 7000, 'io_write_ops' => 6000] as $field => $delta) {
+                    $this->assertSame($before === $after ? $delta : 0, $migration['delta'][$field]);
+                    $this->assertSame($current[$field], $migration['state'][$field]);
+                }
+                $this->assertSame(50, $migration['delta']['cpu_nsec']);
+                $stored = $this->pmssReadJsonArrayFile($path, []);
+                $this->assertSame($after, $stored['io_scope'] ?? null);
+
+                // The newly stored baseline must produce ordinary deltas on the next sample.
+                foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) $current[$field] += 5;
+                $next = \pmssResourceLogUpdateState($path, $current);
+                $this->assertSame(['io_read' => 5, 'io_write' => 5, 'io_read_ops' => 5, 'io_write_ops' => 5, 'cpu_nsec' => 5], $next['delta']);
+            }
+        }
+    }
+
     public function testSharedStateAcceptsOnlyNonNegativePersistedIntegerCounters(): void
     {
         $path = $this->makeRoot().'/state.json';

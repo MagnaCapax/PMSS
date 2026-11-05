@@ -48,11 +48,12 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
  * policy is applied (#467/#707). "Whichever is non-null" is WRONG — the throttle file is
  * present-but-zero under BFQ and would win, reproducing the zero-metering bug. Prefer bfq
  * when it carries data; fall back to throttle for non-BFQ hosts (SSD/nvme) where the bfq
- * file is absent. Returns the read source label so the delta path can guard a source switch.
+ * file is absent. Recursive counters include processes in nested systemd user services.
+ * Returns the read source label so the delta path can guard a source switch.
  *
  * @return array{read:int,write:int,source:string}|null
  */
-function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile = 'blkio.bfq.io_service_bytes', string $throttleFile = 'blkio.throttle.io_service_bytes'): ?array
+function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile = 'blkio.bfq.io_service_bytes_recursive', string $throttleFile = 'blkio.throttle.io_service_bytes_recursive'): ?array
 {
     $bfq = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$bfqFile);
     if ($bfq !== null && ($bfq['read'] > 0 || $bfq['write'] > 0)) return $bfq + ['source' => 'bfq'];
@@ -126,7 +127,7 @@ function pmssResourceV1ReadMetrics(int $uid, ?string $cgroupRoot = null, ?array 
     $bytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice);
     if ($bytes !== null) {
         $metrics += ['io_bytes_read' => $bytes['read'], 'io_bytes_write' => $bytes['write'], 'io_source' => $bytes['source']];
-        $ops = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.'.$bytes['source'].'.io_serviced');
+        $ops = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.'.$bytes['source'].'.io_serviced_recursive');
         if ($ops !== null) $metrics += ['io_ops_read' => $ops['read'], 'io_ops_write' => $ops['write']];
     }
     return $metrics;

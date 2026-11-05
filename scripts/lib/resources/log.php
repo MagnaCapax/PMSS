@@ -82,9 +82,10 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         $state[$field] = (int) ($counters[$field] ?? 0);
     }
     foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { array_key_exists($field, $counters) && $state[$field] = (int) $counters[$field]; }
-    // Persist which blkio accounting source the io_* counters came from (bfq/throttle), so the
-    // next interval can detect a source switch and reseed the baseline (phantom-delta guard).
-    if (array_key_exists('io_source', $counters)) { $state['io_source'] = (string) $counters['io_source']; }
+    // Persist accounting family and scope; either change invalidates the previous IO baseline.
+    foreach (['io_source', 'io_scope'] as $field) {
+        if (array_key_exists($field, $counters)) { $state[$field] = (string) $counters[$field]; }
+    }
 
     $result = pmssCounterStateUpdate(
         $statePath,
@@ -103,10 +104,11 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     // SOURCE changes — throttle->bfq on this fix, or a cgroup-mode flip changing systemd<->v1 —
     // the stored baseline belonged to a different counter, so the raw delta would be the full
     // cumulative and inflate the month total, risking a spurious /home IOPS throttle. On a
-    // source change, emit zero io_* deltas for this one sample; the new baseline is now stored,
+    // source or scope change, emit zero io_* deltas for this sample; the new baseline is stored,
     // so subsequent intervals delta normally.
     $previousSource = $result['previous_state']['io_source'] ?? null;
-    if ($previousSource !== ($state['io_source'] ?? null)) {
+    if ($previousSource !== ($state['io_source'] ?? null)
+        || ($result['previous_state']['io_scope'] ?? null) !== ($state['io_scope'] ?? null)) {
         foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops'] as $field) { $result['delta'][$field] = 0; }
     }
 

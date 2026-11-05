@@ -64,10 +64,11 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
         if (isset($sample[$field])) $values[$key] = $sample[$field];
     }
     // Billing must not persist a partial IO baseline: recovered ops would become a phantom delta.
-    // The source label travels with bytes AND ops so a family switch can reseed the baseline (#707).
+    // Source and scope travel with bytes AND ops so either switch reseeds (#707/#1022).
     if (isset($sample['io_ops_read'], $sample['io_ops_write'])) {
         $values += ['io_read' => $sample['io_bytes_read'], 'io_write' => $sample['io_bytes_write'],
-            'io_read_ops' => $sample['io_ops_read'], 'io_write_ops' => $sample['io_ops_write'], 'io_source' => $sample['io_source']];
+            'io_read_ops' => $sample['io_ops_read'], 'io_write_ops' => $sample['io_ops_write'],
+            'io_source' => $sample['io_source'], 'io_scope' => 'recursive'];
     }
     // User processes live in child cgroups: prefer hierarchical totals, even when they are zero.
     foreach (['memory_anon' => ['mem_total_rss', 'mem_rss'], 'memory_file' => ['mem_total_cache', 'mem_cache']] as $key => $fields) {

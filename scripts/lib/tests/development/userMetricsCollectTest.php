@@ -149,8 +149,8 @@ class UserMetricsCollectTest extends TestCase
             'memory/'.$slice.'/memory.stat' => "cache 4444\nrss 3333\npgmajfault 11\nswap 0\n",
             'pids/'.$slice.'/pids.current' => "21\n",
             'pids/'.$slice.'/pids.events' => "max 5\n",
-            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' => "8:0 Read 1000\n8:0 Write 2000\nTotal 3000\n",
-            'blkio/'.$slice.'/blkio.throttle.io_serviced' => "8:0 Read 10\n8:0 Write 20\nTotal 30\n",
+            'blkio/'.$slice.'/blkio.throttle.io_service_bytes_recursive' => "8:0 Read 1000\n8:0 Write 2000\nTotal 3000\n",
+            'blkio/'.$slice.'/blkio.throttle.io_serviced_recursive' => "8:0 Read 10\n8:0 Write 20\nTotal 30\n",
         ]);
 
         $m = \pmssUserMetricsCollect(1000, $root);
@@ -184,9 +184,9 @@ class UserMetricsCollectTest extends TestCase
     {
         $slice = 'user.slice/user-1000.slice';
         $root = $this->tree([
-            'blkio/'.$slice.'/blkio.bfq.io_service_bytes' =>
+            'blkio/'.$slice.'/blkio.bfq.io_service_bytes_recursive' =>
                 "8:0 Read 1000\n8:0 Write 2000\n8:16 Read 500\n8:16 Write 250\nTotal 3750\n",
-            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' => "8:0 Read 1\n8:0 Write 2\n",
+            'blkio/'.$slice.'/blkio.throttle.io_service_bytes_recursive' => "8:0 Read 1\n8:0 Write 2\n",
         ]);
         $m = \pmssUserMetricsCollect(1000, $root);
         $this->assertEquals(1500, $m['io_bytes_read']);
@@ -211,12 +211,13 @@ class UserMetricsCollectTest extends TestCase
             'memory/'.$slice.'memory.stat' => "total_rss 300\ntotal_cache 400\nrss 0\ncache 10\nswap 0\n",
             'pids/'.$slice.'pids.current' => "21\n",
             'pids/'.$slice.'pids.events' => "max 0\n",
-            'blkio/'.$slice.'blkio.bfq.io_service_bytes' => "8:0 Read 100\n8:0 Write 200\n",
-            'blkio/'.$slice.'blkio.bfq.io_serviced' => "8:0 Read 1\n8:0 Write 2\n",
+            'blkio/'.$slice.'blkio.bfq.io_service_bytes_recursive' => "8:0 Read 100\n8:0 Write 200\n",
+            'blkio/'.$slice.'blkio.bfq.io_serviced_recursive' => "8:0 Read 1\n8:0 Write 2\n",
         ]);
         $this->assertSame([
             'cpu_nsec' => 900, 'memory' => 5000, 'tasks' => 21,
             'io_read' => 100, 'io_write' => 200, 'io_read_ops' => 1, 'io_write_ops' => 2, 'io_source' => 'bfq',
+            'io_scope' => 'recursive',
             'memory_anon' => 300, 'memory_file' => 400,
         ], \pmssResourceLogReadCountersV1(1234, $root.'/'));
         $this->assertSame([
@@ -246,9 +247,9 @@ class UserMetricsCollectTest extends TestCase
     {
         $slice = 'blkio/user.slice/user-1000.slice/';
         $root = $this->tree([
-            $slice.'blkio.bfq.io_service_bytes' => "8:0 Read 100\n8:0 Write 0\n",
+            $slice.'blkio.bfq.io_service_bytes_recursive' => "8:0 Read 100\n8:0 Write 0\n",
             // A different family's ops cannot complete a BFQ billing sample.
-            $slice.'blkio.throttle.io_serviced' => "8:0 Read 99\n8:0 Write 99\n",
+            $slice.'blkio.throttle.io_serviced_recursive' => "8:0 Read 99\n8:0 Write 99\n",
         ]);
         $this->assertSame(null, \pmssResourceLogReadCountersV1(1000, $root));
         $this->assertSame(['io_bytes_read' => 100, 'io_bytes_write' => 0], \pmssUserMetricsCollect(1000, $root));
@@ -259,14 +260,15 @@ class UserMetricsCollectTest extends TestCase
         $slice = 'blkio/user.slice/user-1000.slice/';
         foreach ([0, 10] as $bytes) {
             $root = $this->tree([
-                $slice.'blkio.bfq.io_service_bytes' => "8:0 Read 0\n8:0 Write 0\n",
-                $slice.'blkio.bfq.io_serviced' => "8:0 Read 0\n8:0 Write 0\n",
-                $slice.'blkio.throttle.io_service_bytes' => "8:0 Read {$bytes}\n8:0 Write 0\n",
-                $slice.'blkio.throttle.io_serviced' => "8:0 Read {$bytes}\n8:0 Write 0\n",
+                $slice.'blkio.bfq.io_service_bytes_recursive' => "8:0 Read 0\n8:0 Write 0\n",
+                $slice.'blkio.bfq.io_serviced_recursive' => "8:0 Read 0\n8:0 Write 0\n",
+                $slice.'blkio.throttle.io_service_bytes_recursive' => "8:0 Read {$bytes}\n8:0 Write 0\n",
+                $slice.'blkio.throttle.io_serviced_recursive' => "8:0 Read {$bytes}\n8:0 Write 0\n",
             ]);
             $this->assertSame([
                 'io_read' => $bytes, 'io_write' => 0, 'io_read_ops' => $bytes, 'io_write_ops' => 0,
                 'io_source' => $bytes === 0 ? 'bfq' : 'throttle',
+                'io_scope' => 'recursive',
             ], \pmssResourceLogReadCountersV1(1000, $root));
             $this->assertSame(['io_bytes_read' => $bytes, 'io_bytes_write' => 0, 'io_ops_read' => $bytes, 'io_ops_write' => 0],
                 \pmssUserMetricsCollect(1000, $root));

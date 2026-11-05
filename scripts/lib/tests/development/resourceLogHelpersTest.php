@@ -146,9 +146,9 @@ PHP
             'memory/'.$slice.'/memory.usage_in_bytes' => "66000\n",
             'pids/'.$slice.'/pids.current' => "77\n",
             // Two device rows must sum; Total/Sync/Async rows must be ignored.
-            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' =>
+            'blkio/'.$slice.'/blkio.throttle.io_service_bytes_recursive' =>
                 "8:0 Read 1000\n8:0 Write 2000\n8:16 Read 500\n8:16 Write 250\nTotal 3750\n",
-            'blkio/'.$slice.'/blkio.throttle.io_serviced' =>
+            'blkio/'.$slice.'/blkio.throttle.io_serviced_recursive' =>
                 "8:0 Read 10\n8:0 Write 20\n8:16 Read 5\n8:16 Write 2\nTotal 37\n",
             // User processes live below user-<uid>.slice; local counters may therefore be zero.
             'memory/'.$slice.'/memory.stat' => "cache 0\nrss 0\ntotal_cache 4444\ntotal_rss 3333\nrss_huge 0\n",
@@ -163,6 +163,7 @@ PHP
                 'io_read' => 1500,
                 'io_write' => 2250,
                 'io_source' => 'throttle',
+                'io_scope' => 'recursive',
                 'io_read_ops' => 15,
                 'io_write_ops' => 22,
                 'memory_anon' => 3333,
@@ -194,10 +195,10 @@ PHP
         $slice = 'user.slice/user-1000.slice';
         $root = $this->makeV1CgroupTree(1000, [
             'cpuacct/'.$slice.'/cpuacct.usage' => "550000\n",
-            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
-            'blkio/'.$slice.'/blkio.throttle.io_serviced' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
-            'blkio/'.$slice.'/blkio.bfq.io_service_bytes' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
-            'blkio/'.$slice.'/blkio.bfq.io_serviced' => "8:0 Read 90\n8:0 Write 80\nTotal 170\n",
+            'blkio/'.$slice.'/blkio.throttle.io_service_bytes_recursive' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
+            'blkio/'.$slice.'/blkio.throttle.io_serviced_recursive' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
+            'blkio/'.$slice.'/blkio.bfq.io_service_bytes_recursive' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
+            'blkio/'.$slice.'/blkio.bfq.io_serviced_recursive' => "8:0 Read 90\n8:0 Write 80\nTotal 170\n",
         ]);
 
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
@@ -212,15 +213,15 @@ PHP
 
     public function testReadCountersV1OmitsIoGroupWhenOpsCounterMissing(): void
     {
-        // #707 §0 completeness: if the bytes file reads but the ops (io_serviced) file is ABSENT,
+        // #707 §0 completeness: if the bytes file reads but the ops (io_serviced_recursive) file is ABSENT,
         // the whole io group (bytes + ops + io_source) must be OMITTED — never a partial baseline.
         // A partial baseline (io_source set, io_*_ops=0) would let the ops cumulative phantom-delta
         // through the source-keyed reseed guard on recovery, risking a spurious IOPS throttle.
         $slice = 'user.slice/user-1000.slice';
         $root = $this->makeV1CgroupTree(1000, [
             'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
-            'blkio/'.$slice.'/blkio.bfq.io_service_bytes' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
-            // NO blkio.bfq.io_serviced -> ops read fails -> whole io group omitted.
+            'blkio/'.$slice.'/blkio.bfq.io_service_bytes_recursive' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
+            // NO blkio.bfq.io_serviced_recursive -> ops read fails -> whole io group omitted.
         ]);
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
             $counters = \pmssResourceLogReadCounters(1000, $root);
@@ -228,6 +229,31 @@ PHP
             $this->assertTrue(!array_key_exists('io_read', $counters));
             $this->assertTrue(!array_key_exists('io_source', $counters));
         });
+    }
+
+    public function testReadCountersV1UsesSubtreeTotalsForBytesAndOps(): void
+    {
+        $slice = 'blkio/user.slice/user-1000.slice/';
+        foreach (['bfq', 'throttle'] as $source) {
+            $files = [];
+            foreach (['io_service_bytes' => [100, 200], 'io_serviced' => [10, 20]] as $counter => $totals) {
+                // Parent-only values stay static while a nested service does the real IO.
+                $file = 'blkio.'.$source.'.'.$counter;
+                $files[$slice.$file] = "8:0 Read 1\n8:0 Write 2\n";
+                $files[$slice.'user@1000.service/'.$file] = '8:0 Read '.($totals[0] - 1)."\n8:0 Write ".($totals[1] - 2)."\n";
+                $files[$slice.$file.'_recursive'] = "8:0 Read {$totals[0]}\n8:0 Write {$totals[1]}\n";
+            }
+            $root = $this->makeV1CgroupTree(1000, $files);
+            $this->assertSame([
+                'io_read' => 100, 'io_write' => 200, 'io_read_ops' => 10, 'io_write_ops' => 20,
+                'io_source' => $source, 'io_scope' => 'recursive',
+            ], \pmssResourceLogReadCountersV1(1000, $root));
+            // Missing recursive ops must not silently fall back to a parent-only baseline.
+            unlink($root.'/'.$slice.'blkio.'.$source.'.io_serviced_recursive');
+            $this->assertSame(null, \pmssResourceLogReadCountersV1(1000, $root));
+            unlink($root.'/'.$slice.'blkio.'.$source.'.io_service_bytes_recursive');
+            $this->assertSame(null, \pmssResourceLogReadCountersV1(1000, $root));
+        }
     }
 
     public function testReadCountersV1OmitsMissingFieldsWithoutGarbage(): void
@@ -311,11 +337,11 @@ PHP
     {
         $slice = 'user.slice/user-1000.slice';
         foreach (['bfq', 'throttle'] as $source) {
-            foreach (['io_service_bytes', 'io_serviced'] as $counter) {
+            foreach (['io_service_bytes_recursive', 'io_serviced_recursive'] as $counter) {
                 $files = [
                     'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
-                    'blkio/'.$slice.'/blkio.'.$source.'.io_service_bytes' => "8:0 Read 100\n8:0 Write 200\n",
-                    'blkio/'.$slice.'/blkio.'.$source.'.io_serviced' => "8:0 Read 10\n8:0 Write 20\n",
+                    'blkio/'.$slice.'/blkio.'.$source.'.io_service_bytes_recursive' => "8:0 Read 100\n8:0 Write 200\n",
+                    'blkio/'.$slice.'/blkio.'.$source.'.io_serviced_recursive' => "8:0 Read 10\n8:0 Write 20\n",
                 ];
                 $files['blkio/'.$slice.'/blkio.'.$source.'.'.$counter] = "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n";
                 $root = $this->makeV1CgroupTree(1000, $files);
@@ -329,14 +355,18 @@ PHP
     public function testReadBlkioBytesFallsBackWhenBfqTotalIsUnrepresentable(): void
     {
         $root = $this->makeRoot().'/';
-        $this->pmssWriteFile($root.'blkio.bfq.io_service_bytes', "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n");
-        $this->pmssWriteFile($root.'blkio.throttle.io_service_bytes', "8:0 Read 12\n8:0 Write 34\n");
+        $this->pmssWriteFile($root.'blkio.bfq.io_service_bytes_recursive', "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n");
+        $this->pmssWriteFile($root.'blkio.throttle.io_service_bytes_recursive', "8:0 Read 12\n8:0 Write 34\n");
 
         $this->assertSame(
             ['read' => 12, 'write' => 34, 'source' => 'throttle'],
-            \pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes')
+            \pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes_recursive', 'blkio.throttle.io_service_bytes_recursive')
         );
-        $this->assertSame(\pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes'), \pmssResourceLogReadBlkioBytesWithSource($root));
+        $this->assertSame(\pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes_recursive', 'blkio.throttle.io_service_bytes_recursive'), \pmssResourceLogReadBlkioBytesWithSource($root));
+        // Explicit filenames remain supported for callers supplying their own sources.
+        $this->pmssWriteFile($root.'blkio.bfq.io_service_bytes', "8:0 Read 7\n8:0 Write 8\n");
+        $this->assertSame(['read' => 7, 'write' => 8, 'source' => 'bfq'],
+            \pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes'));
     }
 
     private function makeStatePath($previousPayload = null): string

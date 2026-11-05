@@ -856,6 +856,13 @@ iptables helpers:
   Telemetry retains local memory counters and available IO bytes even when ops
   are absent. Both choose ops from the bytes accounting family; a valid zero
   hierarchical total takes precedence over a nonzero local value.
+- Cgroup-v1 IO bytes and operations use the matching family's `_recursive`
+  counters at the account slice, including nested systemd services. Billing
+  records `io_scope=recursive` with the complete IO group and reseeds all four
+  IO deltas for one sample when source or scope changes (including an absent
+  legacy scope). CPU deltas and existing runaway ceilings remain unchanged.
+  Missing recursive counters retain omission behavior; parent-only counters
+  cannot substitute for a recursive billing baseline (Refs #1022).
 - Passive I/O ceiling samples, persisted ceiling reads, and derived read-IOPS oversell settings use the shared finite, non-negative numeric parser.
 - Read-IOPS storage observations reject NUL bytes in the original device path
   before trimming or basename extraction, and reject `.` and `..` device names.

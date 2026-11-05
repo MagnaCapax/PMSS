@@ -62,6 +62,27 @@ Choose Option C.
   (source-switch reseed then normal delta), plus the existing throttle-fallback path updated for
   the new `io_source` key. Full dev suite 2635 / 0.
 
+## Amendment: recursive account IO counters (2026-11-05, #1022)
+
+The parent slice's plain counters exclude IO performed in child cgroups such as
+`user@<uid>.service`. Both billing and telemetry now read
+`blkio.{bfq,throttle}.io_service_bytes_recursive` and the matching family's
+`io_serviced_recursive`. Reading only the service leaf would miss sibling scopes;
+falling back to plain counters would mix incompatible baselines.
+
+Keep BFQ-first selection and atomic billing IO acquisition. Add `io_scope=recursive`
+to complete billing samples and their persisted state; extend the existing reseed
+guard to compare scope as well as source. A legacy state without the scope marker
+therefore emits zero IO deltas once, even when the family stays unchanged. The next
+sample uses the new recursive baseline. CPU deltas, counter validation, runaway
+ceilings and resource-log payloads retain their existing contracts. No fleet-wide
+state deletion or coordinated reset is required; each account migrates on sampling.
+The migration interval's IO is intentionally uncharged rather than counting past
+subtree activity as new usage. Missing recursive sources remain unavailable.
+
+Regression coverage lives in `resourceLogHelpersTest`, `userMetricsCollectTest`
+and `counterStateCharacterizationTest`; execution belongs on the testing machine.
+
 ## References
 - GH PMSS #707 (per-user I/O dashboard blank; converged IMPLEMENT + §0 guard across 11 comments),
   GH #467 (prior throttle-only fix), ADR 0019 (production cgroup-v1 pin), ADR 0003 (dual-path detection).
