@@ -245,8 +245,91 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         require_once dirname(__DIR__, 2).'/lighttpd/proxyFragments.php';
         foreach (array('fixtur01' => 12345, 'fixtur02' => 65500, 'abc123' => 20000) as $user => $port) {
             $base = '/user-'.$user.'/openclaw';
-            $this->assertSame(\pmssLighttpdProxyRuleFragment('^'.$base.'($|/)', $port), \ocProxyFragment($base, $port));
+            $fragment = \ocProxyFragment($base, $port);
+            $auth = <<<'LIGHTTPD'
+  $REQUEST_HEADER["Authorization"] =~ "^Basic " {
+    setenv.set-request-header = ( "Authorization" => "" )
+  }
+  $REQUEST_HEADER["Authorization"] =~ "^Bearer " {
+    $REQUEST_HEADER["Cookie"] !~ "(^|; *)pmss_panel_session=" {
+      url.access-deny = ( "" )
+    }
+  }
+LIGHTTPD;
+            $this->assertStringContainsString($auth."\n", $fragment);
+            $this->assertSame(1, substr_count($fragment, 'url.access-deny'));
+            $this->assertStringNotContainsString('auth.require', $fragment);
+            // Removing only the asserted auth block must leave the original keep-prefix proxy intact.
+            $this->assertSame(\pmssLighttpdProxyRuleFragment('^'.$base.'($|/)', $port), str_replace($auth."\n", '', $fragment));
         }
+        $gate = $this->pmssReadRepoFile('scripts/lib/lighttpd/panelSessionGate.lua');
+        $this->assertStringContainsString('local COOKIE_NAME = "pmss_panel_session"', $gate);
+    }
+
+    public function testProxyRefreshOnlyReplacesTheExactLegacyFragmentOnce(): void
+    {
+        require_once dirname(__DIR__, 2).'/lighttpd/proxyFragments.php';
+        $root = $this->pmssMakeTempDir('pmss-oc-refresh-');
+        $home = $root.'/fixtur01';
+        mkdir($home.'/.lighttpd/custom.d', 0700, true);
+        $paths = array('home' => $home);
+        $file = $home.'/.lighttpd/custom.d/openclaw.conf';
+        $legacy = \pmssLighttpdProxyRuleFragment('^/user-fixtur01/openclaw($|/)', 23000);
+        $current = \ocProxyFragment('/user-fixtur01/openclaw', 23000);
+        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $restarts = 0;
+        $restart = function () use (&$restarts, $file, $current): bool {
+            ++$restarts;
+            $this->assertSame($current, file_get_contents($file));
+            return true;
+        };
+        foreach (array(null, '', $legacy."\n# customer edit\n", $current) as $contents) {
+            if ($contents !== null) file_put_contents($file, $contents);
+            \ocProxyRefresh($paths, $restart);
+            $this->assertSame($contents, is_file($file) ? file_get_contents($file) : null);
+        }
+        $this->assertSame(0, $restarts);
+        // Invalid or changed reservations must not repoint an existing route.
+        file_put_contents($file, $legacy);
+        foreach (array('invalid', '23001') as $marker) {
+            file_put_contents($home.'/.media-stack-port-openclaw', $marker."\n");
+            \ocProxyRefresh($paths, $restart);
+            $this->assertSame($legacy, file_get_contents($file));
+        }
+        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        // A linked legacy file belongs to the customer, even when its bytes match.
+        unlink($file);
+        $outside = $this->pmssMakeTempFile('pmss-oc-proxy-link-');
+        file_put_contents($outside, $legacy);
+        symlink($outside, $file);
+        \ocProxyRefresh($paths, $restart);
+        $this->assertSame($legacy, file_get_contents($outside));
+        $this->assertSame(0, $restarts);
+        unlink($file);
+        // The old generated file converges in one restart; later checks do nothing.
+        file_put_contents($file, $legacy);
+        \ocProxyRefresh($paths, $restart);
+        \ocProxyRefresh($paths, $restart);
+        $this->assertSame($current, file_get_contents($file));
+        $this->assertSame(1, $restarts);
+    }
+
+    public function testProxyRefreshFailureUsesExistingPanelRecovery(): void
+    {
+        require_once dirname(__DIR__, 2).'/lighttpd/proxyFragments.php';
+        $root = $this->pmssMakeTempDir('pmss-oc-refresh-fail-');
+        $home = $root.'/fixtur01';
+        mkdir($home.'/.lighttpd/custom.d', 0700, true);
+        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $file = $home.'/.lighttpd/custom.d/openclaw.conf';
+        file_put_contents($file, \pmssLighttpdProxyRuleFragment('^/user-fixtur01/openclaw($|/)', 23000));
+        $restarts = 0;
+        // The failed new route is removed before retrying the account panel.
+        $this->assertThrowsRuntime(static function () use ($home, &$restarts): void {
+            \ocProxyRefresh(array('home' => $home), static function () use (&$restarts): bool { return ++$restarts > 1; });
+        }, 'Account panel recovered.');
+        $this->assertFalse(file_exists($file));
+        $this->assertSame(2, $restarts);
     }
 
     public function testDashboardRewritePreservesBootstrapAndUsesCanonicalWebsocket(): void

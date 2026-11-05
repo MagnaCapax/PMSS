@@ -503,6 +503,7 @@ function ocCheck(array $paths): void
     if ($lock === null) {
         return;
     }
+    ocProxyRefresh($paths);
     $adopted = ocPendingProviderApply($paths);
     if ($adopted) {
         ocStop($paths);
@@ -547,12 +548,36 @@ function ocBasePath(array $paths): string
     return '/user-'.$user.'/openclaw';
 }
 
-/** Embed the shared keep-prefix rule: the customer cannot include /scripts. */
+/** Keep the realm, but avoid Basic challenges on Bearer requests and leaking panel credentials. */
+function ocProxyAuthFragment(): string
+{
+    return '  $REQUEST_HEADER["Authorization"] =~ "^Basic " {'."\n"
+        .'    setenv.set-request-header = ( "Authorization" => "" )'."\n  }\n"
+        .'  $REQUEST_HEADER["Authorization"] =~ "^Bearer " {'."\n"
+        // Cookie presence only skips this deny; mod_auth still requires a verified session or Basic login.
+        .'    $REQUEST_HEADER["Cookie"] !~ "(^|; *)pmss_panel_session=" {'."\n"
+        .'      url.access-deny = ( "" )'."\n    }\n  }\n";
+}
+
+/** Embed the keep-prefix proxy with local auth handling: the customer cannot include /scripts. */
 function ocProxyFragment(string $base, int $port): string
 {
     return '$HTTP["url"] =~ "^'.$base.'($|/)" {'."\n"
+        .ocProxyAuthFragment()
         ."  proxy.server = ( \"\" => ( (\n    \"host\" => \"127.0.0.1\",\n    \"port\" => {$port}\n  ) ) ),\n"
         ."  proxy.header = (\n      \"upgrade\" => \"enable\"\n  )\n}";
+}
+
+/** Under the action lock, refresh only the exact old render; preserve customer edits and absent routes. */
+function ocProxyRefresh(array $paths, ?callable $restart = null): void
+{
+    $file = $paths['home'].'/.lighttpd/custom.d/openclaw.conf';
+    $port = ocReservedPort($paths['home'].'/.media-stack-port-openclaw');
+    if ($port === null || !is_file($file) || is_link($file)) return;
+    $legacy = str_replace(ocProxyAuthFragment(), '', ocProxyFragment(ocBasePath($paths), $port));
+    if (@file_get_contents($file) === $legacy) {
+        ocProxyApply($paths, $port, $restart);
+    }
 }
 
 /** Resolve a binary from PATH, then the sbin dirs an account login PATH omits (lighttpd lives in /usr/sbin). */

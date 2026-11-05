@@ -111,9 +111,10 @@ Basic-auth prompt at the canonical hostname.
 
 The Control UI's X-Frame-Options DENY and CSP frame-ancestors none prevent iframe
 embedding. The panel's OpenClaw tab stays in-page at `configure.php#apps`
-(ADR 0021); the row's Open button opens the UI separately. Cosmetic
-Bearer-authenticated UI requests may receive 401 from Basic auth; the realm
-must remain intact.
+(ADR 0021); the row's Open button opens the UI separately. Bearer-authenticated
+UI requests originally received 401 from Basic auth; the 2026-11-05 amendment
+below changes the rejection to avoid repeated browser challenges while keeping
+the realm intact.
 
 `addUser.php --app-profile=openclaw` writes `.rtorrentDisable` as the account,
 skips rTorrent startup and Pikkumies preinstall, and queues the account-owned
@@ -230,3 +231,47 @@ The flag accepts the keys of `scripts/lib/user/appProfiles.php`, defaulting to
 the seedbox `default` profile when omitted. Creation applies those definitions
 through the shared app-switch registry; PMSS knows apps and profiles, never
 products. No existing account is migrated by this creation-only policy.
+
+## Amendment 2026-11-05: challenge-free Bearer rejection (Refs #1229)
+
+The issue's browser/lighttpd reproduction reports that a Bearer request answered
+with a Basic challenge repeats password prompts and disrupts Chromium's cached
+Basic login for later websocket upgrades. Stripping Basic alone does not address
+that challenge. Removing the realm is rejected: gateway access grants the agent
+shell authority over the account.
+
+The OpenClaw fragment now denies Bearer requests lacking `pmss_panel_session`
+with 403 through `mod_access`, which precedes `mod_auth`. Cookie presence skips
+only this additional deny; the existing session gate must still verify it, and
+an invalid cookie falls back to Basic authentication. No `auth.require` override
+is added. Basic headers are removed after authentication before proxying, as in
+ADR 0111; Bearer headers remain available to authenticated session users.
+Changing module order can restore the challenge but cannot open the route.
+
+The watchdog refreshes only the byte-identical previous fragment under its
+action lock, using the existing reserved port and rollback/restart path. Current,
+edited, missing and symlinked fragments are untouched. Stopped accounts wait
+until checks resume. No new service, public name, port or route is introduced.
+
+Security review rechecked upstream's
+[gateway SSRF advisory, CVE-2026-26322](https://github.com/openclaw/openclaw/security/advisories/GHSA-g6q9-8fvw-f7rf)
+and [trusted-proxy pairing bypass](https://github.com/openclaw/openclaw/security/advisories/GHSA-vvgp-4c28-m3jm).
+These describe tool-driven outbound connections and an authenticated node's
+pairing bypass. The integration retains token mode, device checks and loopback
+binds. Gateway secrets remain independent random service credentials in private
+mode-0600 files; no credential storage, logging or URL handoff changes are made.
+A leaked gateway credential can exercise account shell authority, while a leaked
+primary credential additionally exposes account login; stripping Basic reduces
+the primary credential's exposure to gateway HTTP handling.
+
+Bearer-based Control UI configuration, avatars, media and browser screenshots
+remain unavailable without panel session login or an SSH tunnel. Hermetic
+regressions pin the scoped header rules, unchanged proxy transport, retained
+realm and one-time refresh. Only PHP syntax checks run on the dev box. Before
+rollout, verify Chromium and Safari with the real UI over HTTPS: one login
+challenge, a stable websocket for ten minutes, a challenge-free 403 for Bearer
+without a cookie, 401 for wrong Basic or forged session credentials, and valid
+session plus Bearer reaching the gateway. The issue's reproduction used a mock
+gateway and did not cover Safari; this change does not establish those results.
+Recheck at OpenClaw upgrades. Rollback requires restoring the prior fragment
+on refreshed accounts and restores the old challenge and credential forwarding.

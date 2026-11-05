@@ -37,8 +37,14 @@ the other app rows available. Installer-first delivery retains normal status.
 Browser access uses `https://<server>/user-<user>/openclaw/`, protected by your
 panel login and gateway token. The canonical server hostname may ask for your
 panel login once when you entered through another hostname. The OpenClaw panel
-tab links to Configure because the UI cannot be embedded. Some cosmetic
-avatar/icon requests can show 401; chat still works. Keep the account realm.
+tab links to Configure because the UI cannot be embedded. Bearer requests without
+a panel session cookie receive 403 without a Basic challenge, avoiding repeated
+password prompts and websocket reconnects. Control UI configuration, avatars,
+media and browser-panel screenshots using Bearer remain unavailable through this
+path without panel session login; the SSH tunnel also supports them. The account
+realm remains enforced, and panel Basic credentials are removed before proxying.
+The minute check refreshes an active account's unmodified old proxy once; customer
+edits and missing fragments are preserved. Repeat install explicitly rewrites it.
 
 After a full PMSS update has reserved your port, run:
 
