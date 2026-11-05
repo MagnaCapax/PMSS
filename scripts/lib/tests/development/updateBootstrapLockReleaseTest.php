@@ -140,7 +140,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/runtime/shutdown.php', [
             'if ($description === null) passthru(pmssLockChildClosePrefix().$command, $rc);',
             "pmssUpdateStep2RunRescueCommand('post_update_nginx_start_fallback', \$reason,",
-            "'systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null');",
+            "'nginx -t && '.pmssNginxServiceCommand('start'));",
             "pmssUpdateStep2RunRescueCommand('post_update_web_refresh_rescue', \$reason,",
             "'/scripts/util/createNginxConfig.php --reload');",
         ]);

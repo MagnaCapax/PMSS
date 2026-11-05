@@ -39,4 +39,16 @@ class AddUserNginxConfigVerificationTest extends TestCase
             "finalizeProvision('SUCCESS', 'completed', 0);",
         ], '', 'artifact verification must happen before SUCCESS is reported: ');
     }
+
+    public function testManagedNginxRestartMustSucceedBeforeSuccess(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/addUser.php', [
+            'pmssAddUserRunRequiredProvisionStep(',
+            "'Restart nginx'",
+            '/scripts/util/createNginxConfig.php --user %s --restart',
+            "'nginx_restart_failed'",
+            "finalizeProvision('SUCCESS', 'completed', 0);",
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/addUser.php', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
+    }
 }

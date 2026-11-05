@@ -1219,6 +1219,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
+  - Activation: After `nginx -t` passes, default `--restart` and `--reload` commands use systemd exclusively when `/run/systemd/system` exists. Reload uses `reload-or-restart` to start inactive units. Success requires an active nginx unit and a successful positive MainPID lookup; failures return nonzero without an init-script fallback. Hosts without systemd retain init-script handling (ADR 0231).
   - Command overrides: Config-test, restart and reload commands reject NUL, CR and LF bytes before trimming and use their existing default commands. Missing or blank values also use the defaults; valid commands retain whitespace normalization, shell syntax and execution order.
   - Default self-signed TLS site: Inherits TLSv1.2 and TLSv1.3 from the global template and lists only its existing AEAD cipher suites. A complete Let's Encrypt set uses its separate include.
   - Global template copy, default-site write, directory preparation, and guarded obsolete account UI default removal failures emit stderr warnings; setup still reaches the existing nginx config test and restart decision. Directory modes and stale-default path guards are unchanged.
@@ -1629,6 +1630,7 @@ and the unchanged successful results without reading live process state.
   - Recovery gate: When `/etc/passwd` already contains the username, addUser may self-heal only if the latest `###ADDUSER_JSON` summary for that user is a recent internal `FAIL` and both per-user `rtorrent` and `lighttpd` are inactive; the stale account is cleaned before retry. All other existing-user cases still abort.
   - Recovery gate: When the current run fails after `useradd` but before `userConfig.php` completes, addUser reuses the stale-account cleanup path on shutdown so `/etc/passwd`, `/home/<user>`, ports, lock files, and the per-user config store do not linger half-created.
   - Fail-fast: Aborts on existing user, orphaned home directory, failed cleanup of stale failed-provision state, failed `useradd`, failed `changePw.php`, or failed `userConfig.php` to avoid unsafe overwrites.
+  - Nginx readiness: Before reporting success, requires single-user config regeneration, `nginx -t`, and the checked shared nginx restart. Failure emits `nginx_restart_failed`, exits 1, and retains the configured account for repair; it does not roll back the account after user configuration has completed (ADR 0231).
   - Logs: `/var/log/pmss/addUser.log`, shared user logs (`/var/log/pmss/users.log`,
     `/var/log/pmss/users.jsonl`), and per-user logs under `/var/log/pmss/users/<user>.log`.
     Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep plus

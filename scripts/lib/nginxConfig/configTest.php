@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../nginxService.php';
 
 /**
  * Read an nginx helper command override without accepting blank or multiline values.
@@ -65,11 +66,11 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx, bool $relo
         return 0;
     }
 
-    // A fresh install may have no running master yet; reload also tries start.
+    // A successful action must leave a managed master on systemd hosts.
     $operation = $reloadNginx ? 'reload/start' : 'restart';
     $command = $reloadNginx
-        ? pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RELOAD_COMMAND', 'systemctl reload nginx || /etc/init.d/nginx reload || systemctl start nginx || /etc/init.d/nginx start')
-        : pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', 'systemctl restart nginx || /etc/init.d/nginx restart');
+        ? pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RELOAD_COMMAND', pmssNginxServiceCommand('reload'))
+        : pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', pmssNginxServiceCommand('restart'));
     $actionRc = 0;
     passthru($command, $actionRc);
     if ($actionRc !== 0) {

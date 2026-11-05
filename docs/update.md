@@ -375,6 +375,11 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    test, starting nginx if it is stopped; an explicit `--restart` remains
    available for callers that need a full restart. The certificate setup step
    also reloads nginx after rebuilding and validating its configuration.
+   On systemd hosts, activation and shutdown recovery use systemd exclusively
+   and verify an active unit with a positive MainPID (ADR 0231). A failed action
+   never falls back to an init-script start or reload. An existing unmanaged
+   master or port conflict is reported for operator repair; recovery does not
+   terminate processes automatically. Hosts without systemd retain init handling.
 9. Update every user environment via `pmssUpdateAllUsers()`, which first removes
    root-owned linger flags for valid names absent from passwd, then owns
    linger/rootless-Docker wiring and the optional post-refresh checks

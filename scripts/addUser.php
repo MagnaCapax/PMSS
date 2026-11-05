@@ -127,9 +127,15 @@ if (file_exists('/etc/seedbox/modules/basic/addUser.php')) {
 // Finally start per-user services, refresh shared network state, and persist the optional traffic cap.
 foreach (array_merge($appStartSteps, [
     ['Start lighttpd', sprintf('/scripts/startLighttpd %s', escapeshellarg($user['name']))],
-    ['Restart nginx', 'systemctl restart nginx || /etc/init.d/nginx restart || true'],
-    ['Refresh network rules', '/scripts/util/setupNetwork.php'],
 ]) as $step) runProvisionStep($step[0], $step[1]);
+// A written vhost is not usable until the shared front-end accepts it.
+pmssAddUserRunRequiredProvisionStep(
+    'Restart nginx',
+    sprintf('/scripts/util/createNginxConfig.php --user %s --restart', escapeshellarg($user['name'])),
+    'nginx configuration validation or managed restart failed; account retained for repair',
+    'nginx_restart_failed'
+);
+runProvisionStep('Refresh network rules', '/scripts/util/setupNetwork.php');
 if (!empty($user['trafficLimit']) && $user['trafficLimit'] > 0) {
     $targetModes = pmssTrafficLimitCliTargetModes($user['name'], $homePath);
     $persistError = null;

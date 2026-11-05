@@ -9,6 +9,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../../nginxService.php';
+
 /** Return a stable abnormal-exit reason for shutdown rescue logs. */
 function pmssUpdateStep2ShutdownReason(): string
 {
@@ -34,8 +36,11 @@ function pmssUpdateStep2StartNginxShutdownFallback(string $reason): void
 {
     logmsg('[WARN] update-step2 exited with nginx still pending final refresh; attempting direct start (reason: '.$reason.')');
     $rc = pmssUpdateStep2RunRescueCommand('post_update_nginx_start_fallback', $reason,
-        'systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null');
+        'nginx -t && '.pmssNginxServiceCommand('start'));
     logmsg(sprintf('[WARN] Direct nginx start fallback completed with rc=%d', $rc));
+    if ($rc !== 0) {
+        logmsg('[CRITICAL] nginx recovery failed; inspect service status and listener ownership before retrying');
+    }
 }
 
 /** Restore the web stack and tenant-visible permissions after an early exit. */

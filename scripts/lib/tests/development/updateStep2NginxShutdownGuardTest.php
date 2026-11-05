@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/nginxService.php';
 
 class UpdateStep2NginxShutdownGuardTest extends TestCase
 {
@@ -22,7 +23,7 @@ class UpdateStep2NginxShutdownGuardTest extends TestCase
         $fallback = [
             ['log', '[WARN] update-step2 exited with nginx still pending final refresh; attempting direct start (reason: create_nginx_config_missing)'],
             ['json', ['event' => 'post_update_nginx_start_fallback', 'status' => 'start', 'reason' => 'create_nginx_config_missing']],
-            ['passthru', 'close-lock-fds systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null'],
+            ['passthru', 'close-lock-fds nginx -t && '.\pmssNginxServiceCommand('start')],
             ['json', ['event' => 'post_update_nginx_start_fallback', 'status' => 'ok', 'rc' => 0]],
             ['log', '[WARN] Direct nginx start fallback completed with rc=0'],
         ];
@@ -35,6 +36,7 @@ class UpdateStep2NginxShutdownGuardTest extends TestCase
         $failedFallback[1][1]['reason'] = 'web_refresh_rescue_failed';
         $failedFallback[3][1] = ['event' => 'post_update_nginx_start_fallback', 'status' => 'error', 'rc' => 7];
         $failedFallback[4][1] = '[WARN] Direct nginx start fallback completed with rc=7';
+        $failedFallback[] = ['log', '[CRITICAL] nginx recovery failed; inspect service status and listener ownership before retrying'];
         $failedPermissions = [$permissionLog, $permissionStart, $permissionStep,
             ['json', ['event' => 'permission_refresh_rescue', 'status' => 'error', 'rc' => 4]]];
         // A captured shutdown error is read independently for both recovery stages.
@@ -54,8 +56,12 @@ class UpdateStep2NginxShutdownGuardTest extends TestCase
             'throw_web' => [$reloadLog, $reloadStart, $reloadCommand, ['throw', 'RuntimeException', 'web failure']],
             'throw_permissions' => [$permissionLog, $permissionStart, $permissionStep, ['throw', 'RuntimeException', 'permission failure']],
         ];
-        $result = $this->pmssRunRepoPhpScript('scripts/lib/tests/fixtures/updateStep2ShutdownTrace.php');
-        $this->assertSame($expected, json_decode($result, true));
+        // The fixture extracts shutdown definitions; preload their shared command builder.
+        $result = $this->pmssRunRepoInlinePhpRequireJson(
+            'scripts/lib/nginxService.php',
+            'require '.var_export($this->pmssRepoPath('scripts/lib/tests/fixtures/updateStep2ShutdownTrace.php'), true).';'
+        );
+        $this->assertSame($expected, $result);
     }
 
     public function testUpdateStep2ShutdownGuardKeepsDirectNginxStartFallback(): void
@@ -63,7 +69,7 @@ class UpdateStep2NginxShutdownGuardTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/runtime/shutdown.php', [
             'function pmssUpdateStep2StartNginxShutdownFallback(string $reason): void',
             'function pmssUpdateStep2RunRescueCommand(',
-            "'systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null'",
+            "'nginx -t && '.pmssNginxServiceCommand('start')",
             'passthru(pmssLockChildClosePrefix().$command, $rc)',
             "pmssUpdateStep2StartNginxShutdownFallback('create_nginx_config_missing');",
             "pmssUpdateStep2StartNginxShutdownFallback('web_refresh_rescue_failed');",
