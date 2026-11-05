@@ -582,6 +582,8 @@ pmssRunProfiledCallable('Ensuring weekly TRIM timer', 'pmssEnsureFstrimTimer');
 runStep('Restoring direct BFQ weights before root cron restore', '/scripts/cron/cgroupBfqWeightApply.php');
 runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
 $pmssRootCronRestored = true;
+// Cron setup can reload systemd too, overwriting the direct weights restored above.
+runStep('Restoring direct BFQ weights after root cron restore', '/scripts/cron/cgroupBfqWeightApply.php');
 
 // Record successful completion for MOTD/monitoring.
 pmssWriteManagedPathFile('/var/run/pmss/updated', date('Y-m-d H:i:s'), 'update completion marker', 'logmsg');

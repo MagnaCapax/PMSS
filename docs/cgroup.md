@@ -309,8 +309,9 @@ open until the next run.
 - Cgroup-v1 BFQ hosts get a direct kernel weight refresh:
   - `/scripts/cron/cgroupBfqWeightApply.php` runs at boot and every 5 minutes from `root.cron`.
   - Policy refresh and update-step2 also run this writer after their per-user
-    batches; update-step2 repeats it after later service setup, before restoring
-    root cron. This restores bonus-adjusted weights overwritten by systemd
+    batches; update-step2 repeats it after later service setup, before and after
+    restoring root cron, whose setup can also reload systemd. This restores
+    bonus-adjusted weights overwritten by systemd
     without waiting for cron. Writer failures are logged and remain fail-soft; its
     existing runtime and BFQ guards still apply.
   - It keeps the systemd slice settings as the operator-facing source of truth, then writes
