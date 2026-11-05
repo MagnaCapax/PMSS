@@ -2149,5 +2149,7 @@ function bootstrapMain(array $argv): void
 }
 
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
+    // A caller's tight umask would reach the clone, whose var tree is copied over /var with its modes.
+    umask(0022);
     bootstrapMain($argv);
 }

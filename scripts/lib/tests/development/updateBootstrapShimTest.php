@@ -5,6 +5,15 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateBootstrapShimTest extends TestCase
 {
+    public function testEntryPointSetsItsOwnUmaskBeforeRunning(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 3).'/update.php');
+        $entry = strrpos($source, 'bootstrapMain($argv);');
+        $this->assertTrue($entry !== false, 'update.php should call bootstrapMain');
+        $umask = strrpos(substr($source, 0, (int) $entry), 'umask(0022);');
+        $this->assertTrue($umask !== false && $entry - $umask < 40, 'update.php should set umask 022 right before bootstrapMain');
+    }
+
     public function testShimLoadsUpdaterBootstrapWithoutStrictTypesFatal(): void
     {
         $shimPath = dirname(__DIR__).'/common/updateBootstrapShim.php';
