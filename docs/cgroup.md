@@ -298,6 +298,10 @@ Judge enforcement by device latency such as ioping or await. Host iowait and
 PSI count tasks waiting in the throttle, so they rise under a cap with the disk
 idle.
 
+The kernel delivers `10 * floor(cap / 10)` reads per second, so a cap of 15
+gives 10. Set `floor` in tens. A share does not grow when other accounts are
+quiet, so a lone reader stays at its own share on an idle host.
+
 Rollback sets mode to `off` or `shadow`. The next IOPS cycle restores available
 legacy read limits, and successful changed writes have the legacy script
 source in the audit. The legacy no-op when no limit can be derived remains;

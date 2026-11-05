@@ -96,6 +96,13 @@ existing mode-0600 snapshot/audit logs with ADR 0229's retention and guards.
 - An account at its cap queues its own panel and client reads behind its own
   load in the same throttle group. Cold pages can take minutes at low caps;
   cached pages stay fast.
+- blk-throttle truncates each 100 ms slice to whole I/Os, so the delivered rate
+  is `10 * floor(cap / 10)`. Measured on kernel 6.1: cap 15 read 10.0/s, cap 32
+  read 30.0/s, cap 100 read 100.0/s. The default floor of 15 therefore delivers
+  10; a host that needs at least 15 delivered must set a floor of 20.
+- Shares come from weight and quota alone, with no term for activity, so a
+  quiet neighbour's share is not passed on. A lone reader on an idle host stays
+  at its own share however large the pool is.
 
 ## References
 - [Shadow allocation](0177-shadow-pressure-and-quota-iops-allocation.md)
