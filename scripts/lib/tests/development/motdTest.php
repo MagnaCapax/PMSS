@@ -114,6 +114,15 @@ class MotdTest extends TestCase
         ]);
     }
 
+    public function testRootCronRefreshesMotdHourlyAndAtBoot(): void
+    {
+        // Periodic refresh must survive independently of a completed updater run.
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/root.cron', [
+            '0 * * * *   root    /scripts/util/motdGenerate.php >> /var/log/pmss/motdGenerate.log 2>&1',
+            '@reboot root    sleep 15; /scripts/util/motdGenerate.php >> /var/log/pmss/motdGenerate.log 2>&1',
+        ]);
+    }
+
     public function testNetworkIpPrefersOnlyValidNonLoopbackRouteSources(): void
     {
         // Numeric fallback avoids DNS; PATH stubs avoid probing the host's routes.

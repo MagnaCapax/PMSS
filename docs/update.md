@@ -42,6 +42,11 @@ Responsibilities:
   `setupPermissions.php` pass before surfacing the failure so
   `/etc/seedbox` remains traversable.
 
+Once the root cron template is deployed, it refreshes MOTD at boot and hourly
+using `/scripts/util/motdGenerate.php`, logging to `/var/log/pmss/motdGenerate.log`.
+Successful hourly refreshes keep the banner aligned with the staged version even
+if phase 2 did not finish; they do not mark that version as completed.
+
 Immediately before phase-2 handoff, the bootstrap requires 3 GiB free on `/`
 and `/home`. It always checks `/` using space available to ordinary users.
 When running as root, it also reads `/home` free blocks including the filesystem
