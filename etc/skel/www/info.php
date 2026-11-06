@@ -13,6 +13,7 @@
 
 $pmssStorageHealthNoticeHtml = '';
 $pmssStorageStatusHtml = '';
+$pmssReadLimitHtml = '';
 // Customer-side storage-health notice: see storageHealthNotice.php for rationale.
 // The full /scripts/lib/storageHealth.php (with SMART/NVMe paths) remains
 // operator-side; customer PHP reads only world-readable kernel state and the
@@ -30,6 +31,11 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
             pmssStorageHealthHostPressureStateRead()
         );
     }
+}
+// Current disk read limit and a notice while the account reads at it (ADR 0232).
+if (is_file(__DIR__.'/readLimitNotice.php')) {
+    require_once __DIR__.'/readLimitNotice.php';
+    if (function_exists('pmssReadLimitHtmlBuild')) $pmssReadLimitHtml = pmssReadLimitHtmlBuild(pmssReadLimitStatusRead());
 }
 ?>
 <!doctype html>
@@ -99,6 +105,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
             <div class="portfoliobox">
 <?php if ($pmssStorageHealthNoticeHtml !== '') echo $pmssStorageHealthNoticeHtml; ?>
 <?php if ($pmssStorageStatusHtml !== '') echo $pmssStorageStatusHtml; ?>
+<?php if ($pmssReadLimitHtml !== '') echo $pmssReadLimitHtml; ?>
 
 <div id="stats">
  <?php

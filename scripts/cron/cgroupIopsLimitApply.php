@@ -100,6 +100,13 @@ if ($CENSUS) {
     fwrite(STDERR, "Census uses slice-local telemetry: child I/O may be missing; low P95 values do not prove rollout safety.\n");
     echo "user\tuid\tread_cap\twrite_cap\tread_p95_24h\tintervals\tblkio_children\n";
 }
+// Other accounts can neither list nor read an account's slice (ADR 0232); a failure only warns.
+if (!$CENSUS) foreach (array_keys($userConfigs) as $user) {
+    $pwd = function_exists('posix_getpwnam') ? @posix_getpwnam((string) $user) : false;
+    if (is_array($pwd) && !pmssCgroupDirectSlicePrivacyApply((int) ($pwd['uid'] ?? 0), (int) ($pwd['gid'] ?? 0), $DRY_RUN)) {
+        syslog(LOG_WARNING, "slice privacy $user: modes not applied");
+    }
+}
 foreach ($userConfigs as $user => $json) {
     $readIops  = pmssIopsParseSpec($json['IOReadIOPS']  ?? null);
     $writeIops = pmssIopsParseSpec($json['IOWriteIOPS'] ?? null);

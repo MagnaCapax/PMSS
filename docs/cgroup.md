@@ -310,6 +310,17 @@ account with no configured or derived limit (`MAJ:MIN 0`, audit source
 `dynamic-iops-off`). Placement has its own
 rollback procedure above. No account configurations are rewritten.
 
+## Read limit in the panel and private slices
+
+[ADR 0232](adr/0232-account-read-limit-status-and-private-slice-directories.md):
+each enforce cycle writes `~/.readLimit` (root-owned 0640, account group) with the
+delivered read rate, whether the account read at it during the last cycle, and the
+time. The Info tab shows the limit and, while held, why reads wait; a status older
+than 15 minutes shows nothing. Each IOPS cron run makes every `user-UID.slice`
+directory root:<account group> 0750 and `user.slice` 0711 in every hierarchy, so
+an account reads only its own counters and limits. A slice systemd recreates is
+open until the next run.
+
 ## Integration Hooks
 
 - User creation applies defaults automatically:

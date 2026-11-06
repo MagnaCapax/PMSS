@@ -60,9 +60,9 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     $rows = array_values(array_filter(is_array($state['rows'] ?? null) ? $state['rows'] : [],
         static function ($row) use ($now): bool { return is_array($row) && is_int($row['time'] ?? null) && $row['time'] > $now - 3600 && $row['time'] <= $now; }));
     $host = pmssPsiFullAvg300($hostPressure);
-    if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null];
+    if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => []];
     $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
-    $counts = []; $slices = [];
+    $counts = []; $slices = []; $heldUsers = [];
     foreach (array_keys($users) as $user) {
         $errors = 0;
         if (($uid = pmssCgroupDirectUserUidOrError((string) $user, $errors)) === null) continue;
@@ -70,8 +70,8 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
         $counts[$uid] = pmssBlkioReadCount($dir.'/blkio.throttle.io_serviced', $majMin);
         $cap = pmssCgroupDirectDeviceValueParse((string) @file_get_contents($dir.'/blkio.throttle.read_iops_device'), $majMin);
         $before = is_int($state['counts'][$uid] ?? null) ? $state['counts'][$uid] : null;
-        $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"),
-            'held' => $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then)];
+        $heldUsers[$user] = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then);
+        $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"), 'held' => $heldUsers[$user]];
     }
     $current = ['time' => $now, 'host' => $host, 'held' => count(array_filter(array_column($slices, 'held'))),
         'contention' => pmssDynamicIopsContention($host, pmssPsiFullAvg300("$unifiedRoot/system.slice/io.pressure"), $slices)];
@@ -79,7 +79,7 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     if (!$readOnly && pmssEnsureSafeDir(dirname($statePath), 0755)) {
         pmssAtomicJsonFileWrite($statePath, ['time' => $now, 'counts' => $counts, 'rows' => $rows], 0600);
     }
-    return ['rows' => $rows, 'current' => $current];
+    return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers];
 }
 
 /** Scale each five-minute host sample by the contention share measured within half a bucket of it. */

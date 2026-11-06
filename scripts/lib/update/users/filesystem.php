@@ -356,6 +356,7 @@ PHP;
         'www/storageHealthPressure.php',
         'www/storageHealthDisplay.php',
         'www/storageHealthNotice.php',
+        'www/readLimitNotice.php',
         'www/welcomeMessage.php',
         'www/userMediaStackPanel.php',
         'www/userOpenClaw.php',

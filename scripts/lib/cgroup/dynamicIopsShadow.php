@@ -8,6 +8,7 @@
 require_once __DIR__.'/dynamicIopsPolicy.php';
 require_once __DIR__.'/ioCeilingHistory.php';
 require_once __DIR__.'/dynamicIopsContention.php';
+require_once __DIR__.'/readLimitStatus.php';
 
 /** Tail complete records only, rejecting redirected paths and substituted inodes. */
 function pmssDynamicIopsTailLines(string $path): array
@@ -78,7 +79,7 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $legacyPassive = pmssIoCeilingPublishedReadIops($statePath);
     $passive = $stamp !== false && $stamp <= $now && $stamp >= $now - 86400 ? $legacyPassive : null;
     $majMin = $device !== '' ? pmssCgroupPolicyDeviceMajorMinorResolve($device) : null;
-    $contention = $majMin === null ? ['rows' => [], 'current' => null]
+    $contention = $majMin === null ? ['rows' => [], 'current' => null, 'held' => []]
         : pmssDynamicIopsContentionObserve($users, $majMin, $now, $readOnly);
     // Stall of accounts held at their own cap is not contention; scale host samples to what remains.
     $pressure = pmssDynamicIopsPressure(pmssDynamicIopsContentionScale(
@@ -94,6 +95,8 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $result['read_action'] = $result['read_caps'] === null ? 'keep-kernel' : 'apply';
     $result['contention'] = $contention['current'];
     if ($readOnly) return true;
+    // The panel shows the delivered limit and a notice while held (ADR 0232).
+    if ($result['read_caps'] !== null) pmssReadLimitStatusPublish($result['read_caps'], $contention['held'], $now);
     $payload = pmssJsonEncodeSafe(['schema_version' => 2, 'timestamp' => gmdate('c', $now),
         'event' => 'dynamic_iops_enforce', 'mode' => $settings['mode'], 'md_enforcement_excluded' => false,
         'settings' => $settings] + $result);
