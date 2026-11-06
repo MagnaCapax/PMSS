@@ -57,7 +57,22 @@ $default_timezone = 'Europe/Helsinki';
 // Root path for file manager
 // use absolute path of directory i.e: '/var/www/folder' or $_SERVER['DOCUMENT_ROOT'].'/folder'
 //$root_path = $_SERVER['DOCUMENT_ROOT'];
-$root_path = "/home/{$_SERVER['USER']}/";
+// PMSS runs this page under lighttpd's php-cgi. When lighttpd was started without
+// USER in its environment the key is absent and the root collapsed to /home, so
+// derive the account's own home from the effective uid; USER stays the first choice.
+$fm_account_home = '';
+if (!empty($_SERVER['USER'])) {
+    $fm_account_home = '/home/' . $_SERVER['USER'];
+} elseif (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+    $fm_pw = @posix_getpwuid(posix_geteuid());
+    if (!empty($fm_pw['dir'])) {
+        $fm_account_home = $fm_pw['dir'];
+    }
+}
+if ($fm_account_home === '') {
+    $fm_account_home = !empty($_SERVER['HOME']) ? $_SERVER['HOME'] : getenv('HOME');
+}
+$root_path = rtrim($fm_account_home, '/') . '/';
 
 // Root url for links in file manager.Relative to $http_host. Variants: '', 'path/to/subfolder'
 // Will not working if $root_path will be outside of server document root
