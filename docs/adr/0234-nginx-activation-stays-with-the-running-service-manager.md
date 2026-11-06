@@ -1,7 +1,7 @@
-# ADR 0231: Nginx activation stays with the running service manager
+# ADR 0234: Nginx activation stays with the running service manager
 
 Date: 2026-11-05
-Category: reliability
+Category: architecture
 
 ## Status
 Accepted

@@ -376,7 +376,7 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    available for callers that need a full restart. The certificate setup step
    also reloads nginx after rebuilding and validating its configuration.
    On systemd hosts, activation and shutdown recovery use systemd exclusively
-   and verify an active unit with a positive MainPID (ADR 0231). A failed action
+   and verify an active unit with a positive MainPID (ADR 0234). A failed action
    never falls back to an init-script start or reload. An existing unmanaged
    master or port conflict is reported for operator repair; recovery does not
    terminate processes automatically. Hosts without systemd retain init handling.
