@@ -4,14 +4,15 @@ Date: 2026-11-05
 Category: architecture
 
 ## Status
-Accepted by operator decision 2026-11-05; host opt-in only. The opt-in and shadow mode
-are superseded by ADR 0231 (enforced by default).
+Accepted 2026-11-05: read caps are enforced in production. Enabling them host by host
+was an implementation choice, superseded by ADR 0231 (enforced by default) and ADR 0233
+(no host-local policy).
 
 ## Context
 ADRs 0177 and 0229 measure quota/pressure allocation independently of the
 throttle writer. Large explicit read limits can hide the computed allocation.
-The operator decision 2026-11-05 requires real read-cap enforcement on opted-in
-hosts and a conservative iowait curb, with private evidence for later review.
+Read caps must be enforced in production (2026-11-05), with a conservative iowait
+curb, with private evidence for later review.
 Production uses cgroup v1; effective aggregate caps require the placement
 and membership checks from ADR 0176.
 

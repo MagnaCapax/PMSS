@@ -36,8 +36,8 @@ it before daemon-reexec. Slice accounting remains explicit; default per-unit
 accounting is disabled. Disabled policy or non-v1 mode removes only this drop-in.
 The template and managed-file writer follow ADR 0036.
 
-Host opt-ins live in the operator-owned `cgroup.policy.local.php`, which the
-repository never ships. The shared policy loader recursively replaces shipped
+Host opt-ins lived in a host-local `cgroup.policy.local.php`, which the
+repository never shipped; ADR 0233 removed it. The shared policy loader recursively replaces shipped
 defaults with this array; unspecified defaults remain current. The seedbox
 overlay preserves files absent from the snapshot, so updates retain the opt-in
 and the managed placement drop-in. Non-array returns and symlinked local files

@@ -48,7 +48,7 @@ makes that the shipped default and removes shadow mode.
 | `/var/run/pmss/io-ceiling.json` | `published.read_iops`, daily qualifying samples, `computed_at` and estimator settings | Current derived cache; source history retained above | Host aggregate, published 0644 |
 | `/var/log/pmss/benchmark-storage.jsonl` | Successful matching-device random-read `metrics.read_iops`, `run_ts`, device and test | Existing file; no stanza for this path in the PMSS logrotate template | Operator; existing file and parent permissions apply |
 | `/etc/systemd/system.conf` and `/etc/systemd/system.conf.d/*.conf` | Manager configuration bytes and uncommented `DefaultIOAccounting=` assignments | Current configuration only | Existing host configuration permissions |
-| `/etc/seedbox/config/cgroup.policy.local.php` | Operator-owned dynamic IOPS mode, floor and placement overrides; diagnostics reports presence only | Current local configuration, preserved by updates | Operator-controlled executable policy; never expose its contents to customers |
+| `/etc/seedbox/config/cgroup.policy.local.php` | Leftover host-local policy; ignored since ADR 0233; diagnostics reports presence so it can be removed | Not read by PMSS | Never expose its contents to customers |
 
 Rotation counts are finite and size splits can reduce the nominal ten-year
 window. The active file and `.1` remain plain text; older rotations are gzipped.
