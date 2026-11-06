@@ -80,9 +80,6 @@ function pmssPanelSessionLogoutMain(): int
     }
 
     pmssPanelSessionDelete($paths);
-    $pikkumies = $paths['home'].'/.mcxPikkumies/pikkumies/bin/pikkumies';
-    if (is_file($pikkumies) && !is_link($pikkumies) && is_executable($pikkumies))
-        exec(escapeshellarg($pikkumies).' ui stop >/dev/null 2>&1');
     $hermes = $paths['home'].'/bin/install-hermes';
     if (is_file($hermes) && !is_link($hermes) && is_executable($hermes))
         exec(escapeshellarg($hermes).' rotate-session >/dev/null 2>&1');

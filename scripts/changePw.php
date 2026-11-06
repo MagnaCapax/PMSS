@@ -125,11 +125,6 @@ if ($htpasswdReturnCode !== 0) {
 }
 
 // A panel password change also invalidates vanilla Hermes browser sessions.
-$pikkumies = $homeDir.'/.mcxPikkumies/pikkumies/bin/pikkumies';
-if (is_file($pikkumies) && !is_link($pikkumies) && is_executable($pikkumies)) {
-    exec(pmssBuildUserShellNoPamCommand($username,
-        'HOME='.escapeshellarg($homeDir).' '.escapeshellarg($pikkumies).' ui stop').' >/dev/null 2>&1');
-}
 $hermesInstaller = $homeDir.'/bin/install-hermes';
 if (is_file($hermesInstaller) && !is_link($hermesInstaller) && is_executable($hermesInstaller)) {
     exec(pmssBuildUserShellCommand($username, escapeshellarg($hermesInstaller).' rotate-session').' >/dev/null 2>&1');
