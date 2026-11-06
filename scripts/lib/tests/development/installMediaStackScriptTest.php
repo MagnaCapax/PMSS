@@ -353,6 +353,76 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
+    public function testJellyfinAliasUsesSelectedLoopbackPortWithoutBootstrapConfig(): void
+    {
+        foreach (array(
+            array('', "22100\n", '22100'),
+            array('<InternalHttpPort>8096</InternalHttpPort>', "22101\n", '22101'),
+            array('<InternalHttpPort>22102</InternalHttpPort>', '', '22102'),
+            array('<PublicHttpPort>22103</PublicHttpPort>', '', '22103'),
+        ) as $case) {
+            $home = $this->pmssMakeTempDir('pmss-jellyfin-alias-');
+            if ($case[0] !== '') {
+                $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', $case[0]);
+            }
+            if ($case[1] !== '') {
+                $this->pmssWriteRelativeFile($home, '.media-stack-port-jellyfin', $case[1]);
+            }
+            $output = $this->pmssRunShellHarness($this->jellyfinAliasHarness($home)."\n"
+                .'jellyfin_alias_write; source "$HOME/.bashrc.custom"; eval jellyfin'."\n");
+            $this->assertStringContainsString('url=http://127.0.0.1:'.$case[2], $output);
+        }
+    }
+
+    public function testJellyfinAliasUpgradeIsExactIdempotentAndHonorsDryRun(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-jellyfin-alias-upgrade-');
+        $this->pmssWriteRelativeFile($home, '.media-stack-port-jellyfin', "22104\n");
+        $output = $this->pmssRunShellHarness($this->jellyfinAliasHarness($home)."\n".<<<'BASH'
+jellyfin_alias_write
+printf '%s\n' "$jellyfin_alias_legacy" 'alias fixtur01="printf preserved"' >"$HOME/.bashrc.custom"
+cp "$HOME/.bashrc.custom" "$HOME/before"
+DRY_RUN=1; jellyfin_alias_write; cmp "$HOME/before" "$HOME/.bashrc.custom"
+DRY_RUN=0; JELLYFIN_INSTALL_ENABLED=0; jellyfin_alias_write; cmp "$HOME/before" "$HOME/.bashrc.custom"
+JELLYFIN_INSTALL_ENABLED=1; jellyfin_alias_write; jellyfin_alias_write
+[[ $(grep -c '^alias jellyfin=' "$HOME/.bashrc.custom") -eq 1 ]]
+[[ $(grep '^alias jellyfin=' "$HOME/.bashrc.custom") == "$jellyfin_alias" ]]
+source "$HOME/.bashrc.custom"; eval jellyfin; eval fixtur01
+printf '%s\n' "${jellyfin_alias_legacy/ionice -c 2 -n 4/ionice -c 3}" >"$HOME/.bashrc.custom"
+jellyfin_alias_write
+grep -Fq 'ASPNETCORE_URLS=\"http://127.0.0.1:22104\"' "$HOME/.bashrc.custom"
+printf '%s\n' "alias jellyfin='printf custom'" >"$HOME/.bashrc.custom"
+jellyfin_alias_write; source "$HOME/.bashrc.custom"; eval jellyfin
+BASH
+        );
+        $this->assertStringContainsAllStrings(array('url=http://127.0.0.1:22104', 'preserved', 'custom'), $output);
+    }
+
+    /** Build only the alias/port slice; tmux and priority commands are harmless stubs. */
+    private function jellyfinAliasHarness(string $home): string
+    {
+        $this->pmssWriteExecutableFile($home.'/.bin/dotnet/dotnet', "#!/bin/bash\nprintf 'url=%s\\n' \"\$ASPNETCORE_URLS\"\n");
+        $start = strpos($this->script, '# Aliases (Sonarr fix, PATH added above)');
+        $end = strpos($this->script, "# shellcheck disable=SC2016\nappend_to_bashrc_custom_if_missing", $start);
+        $portsStart = strpos($this->script, 'JELLYFIN_PORT="$(existing_port_from_xml_tag');
+        $portsEnd = strpos($this->script, 'USERNAME=$(whoami)', $portsStart);
+        return implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail; shopt -s expand_aliases',
+            'HOME='.escapeshellarg($home),
+            'DRY_RUN=0; JELLYFIN_INSTALL_ENABLED=1; JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"',
+            'log_info() { :; }; log_warn() { :; }; log_err() { echo "$*" >&2; }',
+            'tmux() { /bin/bash -c "${@: -1}"; }; ionice() { shift 4; "$@"; }; nice() { shift 2; "$@"; }',
+            'export -f tmux ionice nice',
+            $this->pmssExtractShellFunctions($this->script, array(
+                'append_to_bashrc_custom_if_missing', 'existing_port_from_xml_tag',
+                'media_stack_port_is_valid', 'media_stack_reserved_port_read', 'pick_existing_or_reserved_port',
+            )),
+            substr($this->script, $portsStart, $portsEnd - $portsStart),
+            "jellyfin_alias_write() {\n".substr($this->script, $start, $end - $start)."\n}",
+        ));
+    }
+
     public function testJellyfinFfmpegFallbackUsesExistingOverridePath(): void
     {
         $this->assertStringContainsAllStrings([

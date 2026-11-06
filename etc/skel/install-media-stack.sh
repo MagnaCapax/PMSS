@@ -2853,9 +2853,19 @@ echo ""
 # Aliases (Sonarr fix, PATH added above)
 # shellcheck disable=SC2016
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-	append_to_bashrc_custom_if_missing '# PMSS Jellyfin alias (updated Nov 2025)
-alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; ionice -c 2 -n 4 nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\''
-' 'alias jellyfin='
+	jellyfin_alias_legacy='alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; ionice -c 2 -n 4 nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\'''
+	# Capture the same validated port as installation, even before network.xml exists.
+	jellyfin_alias_bind='; export ASPNETCORE_URLS=\"http://127.0.0.1:'"$JELLYFIN_PORT"'\"'
+	jellyfin_alias="${jellyfin_alias_legacy/; ionice/${jellyfin_alias_bind}; ionice}"
+	# Upgrade only the exact shipped aliases; customer-written launch commands stay intact.
+	if [[ $DRY_RUN -eq 0 && -f "$HOME/.bashrc.custom" && ! -L "$HOME/.bashrc.custom" ]]; then
+		while IFS=: read -r line_number _; do
+			sed -i "${line_number}s|; ionice|${jellyfin_alias_bind//\\/\\\\}; ionice|" "$HOME/.bashrc.custom"
+		done < <(grep -nFx -e "$jellyfin_alias_legacy" -e "${jellyfin_alias_legacy/ionice -c 2 -n 4/ionice -c 3}" "$HOME/.bashrc.custom" || true)
+	fi
+	append_to_bashrc_custom_if_missing "# PMSS Jellyfin alias (updated Nov 2025)
+${jellyfin_alias}
+" 'alias jellyfin='
 fi
 
 # shellcheck disable=SC2016
