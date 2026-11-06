@@ -283,7 +283,9 @@ final class PikkumiesHermesUiTest extends TestCase
             $token = $this->loginToken($paths['base'].'/login-tokens');
             $answer = $this->relayRequest($paths['socket'], self::signInRequest($token));
             $this->assertSame(0, strpos($answer, "HTTP/1.1 204 No Content\r\n"), $answer);
-            $this->assertStringContainsAllStrings(['__Secure-hermes_session_at=', 'Path='.$prefix.';', 'HttpOnly', 'Secure'], $answer);
+            // The relay answers lighttpd with Path=/; lighttpd's map-urlpath turns it into the panel mount exactly once.
+            $this->assertStringContainsAllStrings(['__Secure-hermes_session_at=', 'Path=/;', 'HttpOnly', 'Secure'], $answer);
+            $this->assertStringNotContainsString('Path='.$prefix, $answer);
             $this->assertStringNotContainsString(str_repeat('a', 64), $answer);
             $request = (string) file_get_contents($log);
             $this->assertStringContainsString("X-Forwarded-Prefix: ".$prefix."\r\n", $request);

@@ -144,8 +144,23 @@ function pmssHermesRelayLogin(string $token, string $credentials, string $user, 
 }
 
 /**
+ * lighttpd's map-urlpath maps "/" back to the panel mount on every response, so a Location or cookie Path that Hermes
+ * already prefixed comes out doubled. Before 2026-11-04 nginx did not undo that, so strip the prefix here: lighttpd
+ * then adds it exactly once on every server, with or without the nginx fix.
+ */
+function pmssHermesRelayUnprefixHead(string $head, string $prefix): string
+{
+    if ($prefix === '') return $head;
+    $p = preg_quote($prefix, '#');
+    $head = (string) preg_replace('#^(Set-Cookie:[^\r\n]*?;\s*Path=)'.$p.'(?=/|;|\s|$)/?#mi', '$1/', $head);
+    return (string) preg_replace('#^(Location:\s*)(?:https?://[^/\s]+)?'.$p.'(?=/|\?|\s|$)/?#mi', '$1/', $head);
+}
+
+/**
  * Forward both directions; bytes a non-blocking write could not take wait in that stream's queue. With a
  * credentials file, a connection whose first request is the sign-in exchange is answered here, never forwarded.
+ * Each backend response's header block passes through pmssHermesRelayUnprefixHead (lighttpd sends one request per
+ * backend connection).
  */
 function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null, string $credentials = '', string $user = ''): int
 {
@@ -162,14 +177,18 @@ function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null
     $peers = array(); $streams = array(); $queue = array(); $ended = array();
     // Sign-in exchange: first bytes not yet classified, answers to close once sent, and both their time limits.
     $pending = array(); $finish = array(); $deadline = array();
-    $close = static function (int $id) use (&$peers, &$streams, &$queue, &$ended, &$pending, &$finish, &$deadline): void {
+    // Backend response header blocks not yet complete, and the panel mount they are scoped to (vanilla Hermes only).
+    $head = array();
+    $prefix = basename(dirname($socket)) === '.hermes' && preg_match('/^[a-z][a-z0-9]{0,31}$/D', $user) === 1 ? '/user-'.$user.'/hermes' : '';
+    $close = static function (int $id) use (&$peers, &$streams, &$queue, &$ended, &$pending, &$finish, &$deadline, &$head): void {
         foreach (array($id, $peers[$id] ?? null) as $side) {
             if ($side === null || !isset($streams[$side])) continue;
             fclose($streams[$side]);
-            unset($streams[$side], $peers[$side], $queue[$side], $ended[$side], $pending[$side], $finish[$side], $deadline[$side]);
+            unset($streams[$side], $peers[$side], $queue[$side], $ended[$side], $pending[$side], $finish[$side], $deadline[$side], $head[$side]);
         }
     };
-    $pair = static function ($client, $backend) use (&$streams, &$peers): void {
+    $pair = static function ($client, $backend) use (&$streams, &$peers, &$head, $prefix): void {
+        if ($prefix !== '') $head[(int) $backend] = '';
         stream_set_blocking($client, false);
         stream_set_blocking($backend, false);
         $streams[(int) $client] = $client; $streams[(int) $backend] = $backend;
@@ -216,9 +235,18 @@ function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null
             if ($data === false || $data === '') {
                 if (!feof($source)) continue;
                 if (isset($pending[$id])) { $close($id); continue; }
+                if (isset($head[$id])) { $queue[$peers[$id]] = ($queue[$peers[$id]] ?? '').$head[$id]; unset($head[$id]); }
                 $ended[$id] = true;
                 if (($queue[$peers[$id]] ?? '') === '') $close($id);
                 continue;
+            }
+            if (isset($head[$id])) {
+                $head[$id] .= $data;
+                $end = strpos($head[$id], "\r\n\r\n");
+                if ($end === false && strlen($head[$id]) < 65536) continue;
+                $data = $end === false ? $head[$id]
+                    : pmssHermesRelayUnprefixHead(substr($head[$id], 0, $end), $prefix).substr($head[$id], $end);
+                unset($head[$id]);
             }
             if (!isset($pending[$id])) {
                 $queue[$peers[$id]] = ($queue[$peers[$id]] ?? '').$data;
@@ -236,7 +264,7 @@ function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null
                 $queue[(int) $backend] = $buffered;
                 continue;
             }
-            $queue[$id] = pmssHermesRelayLogin($step, $credentials, $user, $port, $owner);
+            $queue[$id] = pmssHermesRelayUnprefixHead(pmssHermesRelayLogin($step, $credentials, $user, $port, $owner), $prefix);
             $finish[$id] = true;
             $deadline[$id] = time() + 10;
         }

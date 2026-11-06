@@ -22,6 +22,25 @@ final class HermesPanelRouteTest extends TestCase
         }
     }
 
+    public function testRelayLeavesThePanelPrefixToLighttpdSoItIsNeverDoubled(): void
+    {
+        require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssHermesRelay.php';
+        $p = '/user-qafix01/hermes';
+        $head = "HTTP/1.1 302 Found\r\nLocation: /user-qafix01/hermes/login?next=%2F\r\n"
+            ."Set-Cookie: __Secure-hermes_session_at=abc; Path=/user-qafix01/hermes; HttpOnly; Secure; SameSite=Strict\r\n"
+            ."Set-Cookie: other=1; Path=/user-qafix01/hermes/api\r\nContent-Type: text/html";
+        $this->assertSame("HTTP/1.1 302 Found\r\nLocation: /login?next=%2F\r\n"
+            ."Set-Cookie: __Secure-hermes_session_at=abc; Path=/; HttpOnly; Secure; SameSite=Strict\r\n"
+            ."Set-Cookie: other=1; Path=/api\r\nContent-Type: text/html", \pmssHermesRelayUnprefixHead($head, $p));
+        $this->assertSame("Location: /\r\n", \pmssHermesRelayUnprefixHead("Location: https://node.example.com/user-qafix01/hermes\r\n", $p));
+        // Another account's mount, a longer name sharing the prefix, a foreign site and the Pikkumies relay stay as they are.
+        foreach (["Location: /user-qafix02/hermes/x", "Location: /user-qafix01/hermesx/", "Location: https://evil.example/",
+            "Set-Cookie: a=1; Path=/user-qafix01/hermes2", "X-Note: Path=/user-qafix01/hermes"] as $keep) {
+            $this->assertSame($keep, \pmssHermesRelayUnprefixHead($keep, $p));
+        }
+        $this->assertSame($head, \pmssHermesRelayUnprefixHead($head, ''));
+    }
+
     public function testLighttpdKeepsThePanelZoneAndStripsOnlyTheHermesPrefix(): void
     {
         $route = \pmssLighttpdHermesUiBlock('qafix01', 24000);
