@@ -21,34 +21,11 @@ Defaults are computed conservatively with guardrails:
 - CPUWeight=200, IOWeight=200, TasksMax=4096.
 - CPUQuota = 85% of Total Logical Cores (e.g., 1020% on a 12-thread system). Falls back to 600% if detection fails.
 
-Shipped defaults live in `/etc/seedbox/config/cgroup.policy.php` and are replaced
-on updates. Put persistent host/SKU overrides in this operator-owned PHP array file:
-
-`/etc/seedbox/config/cgroup.policy.local.php`
-```php
-<?php
-return [
-  'cpuWeight'     => 100,
-  'ioWeight'      => 100,
-  'tasksMax'      => 2048,
-  'memoryHighMiB' => 500,
-  'memoryMaxMiB'  => 750,
-  'limitNoFileSoft' => 8192,
-  'limitNoFileHard' => 16384,
-  'profiles' => [
-    'cpu' => ['balanced' => 180],
-    'mem' => ['streaming' => 1536],
-    'tasks' => ['service' => 12000],
-  ],
-  // Remaining TODOs: scheduler-aware IO auto-policy, burst allowances +
-  // policy-level net shaping hints.
-];
-```
-
-The local file is not shipped by PMSS, so updates preserve it. The shared loader
-recursively replaces matching keys while retaining unspecified shipped defaults.
-It ignores non-array returns and symlinked local files. Keep this executable PHP
-configuration root-owned and non-writable by customers, like the shipped policy.
+The policy lives in `/etc/seedbox/config/cgroup.policy.php` and comes from the
+repository on every update. Every host runs the same policy: a setting changes in
+this file in the repository and reaches hosts through the rolling update. Hosts
+carry no local policy file, and a leftover `cgroup.policy.local.php` is ignored
+([ADR 0233](adr/0233-no-host-local-cgroup-policy.md)).
 
 Guardrails always apply: MemoryHigh ≥ 250 MiB; MemoryMax ≤ 95% of RAM.
 
@@ -195,12 +172,7 @@ include empty remnants and do not prove where processes run. Check actual
 process membership and obtain representative uncapped measurements on testing
 machines before planning rollout; the census does not authorize activation.
 
-`cgroup.ioSlicePlacement` defaults to `true` ([ADR 0231](adr/0231-read-caps-enforced-by-default-and-contention-without-cap-stall.md)). Set it to `false` in `cgroup.policy.local.php` to opt out:
-
-```php
-<?php
-return ['cgroup' => ['ioSlicePlacement' => false]];
-```
+`cgroup.ioSlicePlacement` defaults to `true` ([ADR 0231](adr/0231-read-caps-enforced-by-default-and-contention-without-cap-stall.md)). There is no per-host opt-out ([ADR 0233](adr/0233-no-host-local-cgroup-policy.md)).
 
 During runtime-template convergence on v1, PMSS installs
 `/etc/systemd/system.conf.d/90-pmss-io-placement.conf` with
@@ -354,7 +326,7 @@ open until the next run.
 
 - CPU
   - `CPUWeight=1..10000` (relative CPU priority)
-  - `CPUQuota=` (hard cap; the PMSS default sets 85% of total logical cores — see the defaults above and ADR 0003 — and is configurable per host/SKU)
+  - `CPUQuota=` (hard cap; the PMSS default sets 85% of total logical cores — see the defaults above and ADR 0003)
 - Memory
   - `MemoryHigh=` (soft throttle)
   - `MemoryMax=` (hard cap)

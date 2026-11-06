@@ -1,7 +1,7 @@
 <?php
 // PMSS cgroup policy (defaults). Return a PHP array.
 // Minimalistic defaults for seedboxes: low CPU/IO weights, modest process cap, small memory limits.
-// Values here may be overridden per host/SKU as needed.
+// Every host runs these values; there is no per-host override (ADR 0233).
 // Guardrails still apply in code: MemoryHigh >= 250MiB; MemoryMax <= 95% of system RAM.
 return [
     'cgroup' => [

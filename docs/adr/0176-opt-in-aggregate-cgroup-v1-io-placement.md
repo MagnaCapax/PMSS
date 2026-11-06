@@ -4,7 +4,7 @@ Date: 2026-10-25
 Category: architecture
 
 ## Status
-Accepted. ADR 0231 makes placement the default.
+Accepted. ADR 0231 makes placement the default; ADR 0233 removes the host-local policy file.
 
 ## Context
 Production uses cgroup v1 (ADR 0019). The direct IOPS writer validates and writes
