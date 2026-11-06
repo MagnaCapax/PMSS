@@ -76,3 +76,22 @@ production that left three problems:
 - The panel pressure banner and host-level iowait figures still include
   throttle waits; they are unchanged here.
 - Write caps and buffered-write behaviour are unchanged.
+
+## Amendment 2026-11-06: held at the rate the throttle actually delivers (#1249)
+- Measured in production on two hosts: readers the throttle keeps waiting do
+  not get their whole cap; per cycle they read 76-90% of it. The 90% test
+  missed them in most cycles, so with no account held contention fell back to
+  the host value and the multiplier stayed at its busy floor while the disk was
+  about 14% busy.
+- An account is now held at 75% of what its cap delivers. The panel notice
+  (ADR 0232) follows the same test.
+- An account held in the previous cycle (within 15 minutes) stays out of
+  contention one cycle more, because full avg300 still carries about a third
+  of that cycle after a cap rise or release. Cycle state records the held
+  UIDs (`held`); cycle log rows add `excluded`, the slices left out of
+  contention, beside `held`.
+- Not changed: stall that is not an account's own cap still counts. On one
+  measured host, account tasks also waited on page locks, ext4 metadata reads
+  and journal access, and system services on root-disk journal commits, with
+  reads far under their caps. PSI does not attribute stall to a device, so
+  that host keeps a busy-level multiplier until that stall is explained.

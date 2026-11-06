@@ -266,13 +266,15 @@ No fallback releases a cap by writing a large explicit placeholder.
 
 Host iowait and PSI count tasks waiting in the throttle, so they rise under a
 cap with the disk idle. The cycle therefore measures contention per account
-slice in the hybrid unified hierarchy: an account that read at 90% or more of
-what its cap delivers during the last cycle is held, and while any account is
-held the pressure used is the largest full-I/O PSI outside held accounts,
+slice in the hybrid unified hierarchy: an account that read at 75% or more of
+what its cap delivers during the last cycle is held (a reader the throttle keeps
+waiting gets 76-90% of its cap, #1249). An account held in the previous cycle
+stays out one cycle more, since avg300 still carries that cycle. While any account
+is left out the pressure used is the largest full-I/O PSI outside them,
 bounded by the host value. Each five-minute PSI and iowait sample is scaled by
 that share before the 12/4/1 blends and the curb. With no account held the
 host value is used unchanged. Records carry `contention` (`host`,
-`contention`, `held`); state is the 0600
+`contention`, `held`, `excluded`); state is the 0600
 `/var/run/pmss/dynamic-iops-contention.json`. Judge enforcement by device
 latency such as ioping or await, not by host iowait.
 

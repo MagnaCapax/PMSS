@@ -15,6 +15,8 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 const PMSS_DYNAMIC_IOPS_CONTENTION_STATE_DEFAULT = '/var/run/pmss/dynamic-iops-contention.json';
 const PMSS_CGROUP_UNIFIED_ROOT = '/sys/fs/cgroup/unified';
+/** Readers the throttle keeps waiting were measured getting 76-90% of their cap per cycle, not the full cap (#1249). */
+const PMSS_DYNAMIC_IOPS_HELD_RATIO = 0.75;
 
 /** Full-stall 300-second average from a PSI file; null when absent or malformed. */
 function pmssPsiFullAvg300(string $path): ?float
@@ -33,11 +35,22 @@ function pmssBlkioReadCount(string $path, string $majMin): ?int
     return pmssUnsignedDecimalIntParse($m[1]);
 }
 
-/** An account is held when it read at 90% or more of the rate its cap delivers. */
+/** An account is held when it read at 75% or more of the rate its cap delivers. */
 function pmssDynamicIopsSliceHeld(?int $cap, ?int $before, ?int $after, int $seconds): bool
 {
     if ($cap === null || $cap <= 0 || $before === null || $after === null || $after < $before || $seconds < 60) return false;
-    return ($after - $before) / $seconds >= 0.9 * max(1, 10 * intdiv($cap, 10));
+    return ($after - $before) / $seconds >= PMSS_DYNAMIC_IOPS_HELD_RATIO * max(1, 10 * intdiv($cap, 10));
+}
+
+/**
+ * UIDs held in the previous cycle, as a set. Full avg300 still carries about a third of
+ * that cycle, so they stay out of contention one cycle more; a cycle older than 15 minutes counts for nothing.
+ */
+function pmssDynamicIopsHeldLastCycle(array $state, int $now): array
+{
+    $then = $state['time'] ?? null;
+    if (!is_int($then) || $then >= $now || $now - $then > 900 || !is_array($state['held'] ?? null)) return [];
+    return array_fill_keys(array_filter($state['held'], static function ($uid): bool { return is_int($uid) && $uid > 0; }), true);
 }
 
 /** Host full stall, or with any account held, the worst stall outside held accounts. */
@@ -62,7 +75,8 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     $host = pmssPsiFullAvg300($hostPressure);
     if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => []];
     $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
-    $counts = []; $slices = []; $heldUsers = [];
+    $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
+    $counts = []; $slices = []; $heldUsers = []; $heldUids = [];
     foreach (array_keys($users) as $user) {
         $errors = 0;
         if (($uid = pmssCgroupDirectUserUidOrError((string) $user, $errors)) === null) continue;
@@ -71,13 +85,14 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
         $cap = pmssCgroupDirectDeviceValueParse((string) @file_get_contents($dir.'/blkio.throttle.read_iops_device'), $majMin);
         $before = is_int($state['counts'][$uid] ?? null) ? $state['counts'][$uid] : null;
         $heldUsers[$user] = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then);
-        $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"), 'held' => $heldUsers[$user]];
+        if ($heldUsers[$user]) $heldUids[] = $uid;
+        $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"), 'held' => $heldUsers[$user] || isset($wasHeld[$uid])];
     }
-    $current = ['time' => $now, 'host' => $host, 'held' => count(array_filter(array_column($slices, 'held'))),
+    $current = ['time' => $now, 'host' => $host, 'held' => count($heldUids), 'excluded' => count(array_filter(array_column($slices, 'held'))),
         'contention' => pmssDynamicIopsContention($host, pmssPsiFullAvg300("$unifiedRoot/system.slice/io.pressure"), $slices)];
     $rows[] = $current;
     if (!$readOnly && pmssEnsureSafeDir(dirname($statePath), 0755)) {
-        pmssAtomicJsonFileWrite($statePath, ['time' => $now, 'counts' => $counts, 'rows' => $rows], 0600);
+        pmssAtomicJsonFileWrite($statePath, ['time' => $now, 'counts' => $counts, 'held' => $heldUids, 'rows' => $rows], 0600);
     }
     return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers];
 }
