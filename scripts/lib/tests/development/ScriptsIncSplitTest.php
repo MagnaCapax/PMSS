@@ -134,7 +134,7 @@ class ScriptsIncSplitTest extends TestCase
             'pmssCustomerBackupRestore', 'pmssWelcomeMessageCustomerPathIsSafe', 'pmssWelcomeRequireLocalHelpers', 'pmssWelcomeRequireLocalHelper', 'pmssCustomerManagedAppDefinitions', 'pmssWelcomeServiceAvailable',
             'pmssCustomerNativePidsRead', 'pmssCustomerNativeSignal', 'pmssCustomerNativeWaitForExit', 'pmssCustomerNativeStop', 'pmssCustomerDelugeSystemCommand', 'pmssCustomerTorrentClientToggleStart', 'pmssCustomerTorrentClientSelectedBinary', 'pmssCustomerRtorrentBinaries', 'pmssWelcomeHttpContextCreate', 'pmssCustomerAppsMediaIdsRead',
             'pmssCustomerAppsTmuxSessionsParse', 'pmssCustomerAppsTmuxSessionsRead', 'pmssCustomerAppsStatusRead', 'pmssCustomerAppsDescriptionsRead', 'pmssCustomerAppRowStart',
-            'pmssCustomerAppButton', 'pmssCustomerAppRowHtmlBuild', 'pmssCustomerAppsMediaRowsBuild', 'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsCss',
+            'pmssCustomerAppButton', 'pmssCustomerAppOpenRoute', 'pmssCustomerAppRowHtmlBuild', 'pmssCustomerAppsMediaRowsBuild', 'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsCss',
             'pmssCustomerAppsStatusJsonEmit', 'pmssCustomerAppsLogJsonEmit', 'pmssActionScriptJs', 'pmssFrontendToggleAction',
         );
         $loader = $this->namedFunctions($this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
@@ -147,7 +147,7 @@ class ScriptsIncSplitTest extends TestCase
                 $functions[$name] = $body;
             }
         }
-        $this->assertSame(98, count($functions));
+        $this->assertSame(99, count($functions));
         $actual = array_keys($functions);
         sort($actual);
         sort($expected);

@@ -456,6 +456,13 @@ final class WelcomeHomeTest extends TestCase
         $html = $this->runWelcomeHome('echo json_encode(array("html" => pmssWelcomeHomeAppTileHtml('.var_export($byId['rtorrent'], true).')));')['html'];
         $this->assertStringContainsAllStrings(array('>Open<span class="h-sr"> ruTorrent</span></a>', 'data-tile-action="start">Start'), $html);
         $this->pmssAssertStringNotContainsString('data-tile-action="restart"', $html);
+        // A running app whose route may lag its process shows Open disabled until the browser reaches the route (Refs #1247).
+        foreach (array('openclaw' => array('apps.php?managed=openclaw&action=open', 'openclaw/'), 'copyparty' => array('copyparty/', 'copyparty/')) as $id => list($url, $route)) {
+            $tile = array('id' => $id, 'name' => $id, 'desc' => '', 'state' => 'running', 'url' => $url, 'open' => true, 'action' => 'open', 'restart' => true, 'start' => false, 'hero' => false, 'more' => false);
+            $html = $this->runWelcomeHome('echo json_encode(array("html" => pmssWelcomeHomeAppTileHtml('.var_export($tile, true).')));')['html'];
+            $this->assertStringContainsAllStrings(array('<button type="button" class="h-btn" disabled data-app-route="'.$route.'"', 'data-app-href="'.htmlspecialchars($url, ENT_QUOTES).'"', '>Open<span class="h-sr"> '.$id.'</span></button>'), $html);
+            $this->pmssAssertStringNotContainsString('<a class="h-btn" href=', $html);
+        }
     }
 
     public function testSupportRedactRemovesPasswordsAndKeysButKeepsOrdinaryText(): void

@@ -35,6 +35,20 @@ function pmssCustomerAppButton(string $label, string $action, string $class = ''
 }
 }
 
+if (!function_exists('pmssCustomerAppOpenRoute')) {
+/**
+ * The route the browser must reach before Open is offered, or null to open at once. A running process can precede
+ * lighttpd loading the app's new proxy fragment (404) or the app listening behind it (503), Refs #1247. OpenClaw opens
+ * through apps.php, which redirects to the gateway's base path: that path is the one to wait for.
+ */
+function pmssCustomerAppOpenRoute(string $id, string $url): ?string
+{
+    if ($id === 'openclaw') return 'openclaw/';
+    $toggleCatalog = require __DIR__.'/toggleAppCatalog.php';
+    return isset($toggleCatalog[$id]) ? $url : null;
+}
+}
+
 if (!function_exists('pmssCustomerAppRowHtmlBuild')) {
 /** Render one row from the current live state. The browser replaces this row after polling. */
 function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppControl = true): string
@@ -61,9 +75,9 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
     if (!empty($app['login'])) $html .= '<span class="desc">'.pmssCustomerHtmlAttr($app['loginLabel'] ?? 'Login').': <code>'.pmssCustomerHtmlAttr($app['login']).'</code></span>';
     $html .= '<div class="acts">';
     if (($state === 'running' || $app['kind'] === 'media') && !empty($app['url'])) {
-        // A running toggle process can precede lighttpd loading its new proxy fragment.
-        $html .= isset($toggleCatalog[$id])
-            ? '<button type="button" class="b b-pri" disabled data-app-route="'.pmssCustomerHtmlAttr($app['url']).'" title="Waiting for the app route">Open</button>'
+        $route = pmssCustomerAppOpenRoute($id, $app['url']);
+        $html .= $route !== null
+            ? '<button type="button" class="b b-pri" disabled data-app-route="'.pmssCustomerHtmlAttr($route).'" data-app-href="'.pmssCustomerHtmlAttr($app['url']).'" title="Waiting for the app route">Open</button>'
             : '<a class="b b-pri" href="'.pmssCustomerHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open</a>';
     }
     if ($app['kind'] === 'media') {

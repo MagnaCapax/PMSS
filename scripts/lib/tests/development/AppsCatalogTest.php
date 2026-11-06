@@ -16,9 +16,9 @@ class AppsCatalogTest extends TestCase
         foreach ($catalog as $id => $definition) {
             $app = array('state' => 'running', 'kind' => 'managed', 'url' => $id.'/');
             $html = \pmssCustomerAppRowHtmlBuild($id, $app);
-            $this->assertStringContainsAllStrings(array('disabled data-app-route="'.$id.'/"',
+            $this->assertStringContainsAllStrings(array('disabled data-app-route="'.$id.'/"', 'data-app-href="'.$id.'/"',
                 'Waiting for the app route', '>Open</button>', '>Restart</button>', '>Turn off</button>'), $html);
-            $this->assertStringNotContainsString('href=', $html);
+            $this->assertStringNotContainsString(' href=', $html);
             foreach (array('off', 'stopped', 'not secured', 'gave up') as $state) {
                 $app['state'] = $state;
                 $this->assertStringNotContainsString('data-app-route=', \pmssCustomerAppRowHtmlBuild($id, $app));
@@ -28,6 +28,11 @@ class AppsCatalogTest extends TestCase
         $html = \pmssCustomerAppRowHtmlBuild('rclone', array('state' => 'running', 'kind' => 'managed', 'url' => 'rclone/'));
         $this->assertStringContainsString('href="rclone/"', $html);
         $this->assertStringNotContainsString('data-app-route=', $html);
+        // OpenClaw opens through apps.php, which redirects to its gateway: Open waits for the gateway's path (Refs #1247).
+        $html = \pmssCustomerAppRowHtmlBuild('openclaw', array('state' => 'running', 'kind' => 'managed', 'url' => 'apps.php?managed=openclaw&action=open'));
+        $this->assertStringContainsAllStrings(array('disabled data-app-route="openclaw/"', 'data-app-href="apps.php?managed=openclaw&amp;action=open"'), $html);
+        $this->assertStringNotContainsString(' href="apps.php', $html);
+        $this->assertSame(null, \pmssCustomerAppOpenRoute('rclone', 'rclone/'));
     }
 
     public function testToggleRouteProbeEnablesOpenOnlyOnSuccessAndRetriesFailures(): void
@@ -36,9 +41,10 @@ class AppsCatalogTest extends TestCase
         $start = strpos($js, 'function pmssAppsRoutesCheck()');
         $end = strpos($js, 'function pmssAppsUpdatingResponse(', $start);
         $probe = substr($js, $start, $end - $start);
-        $failure = substr($probe, strpos($probe, '}).fail(function()'));
+        $failure = substr($probe, strpos($probe, '.fail(function(xhr)'));
         $this->assertStringContainsAllStrings(array("type: 'GET'", "dataType: 'text'", 'cache: false',
-            'timeout: 5000', ").done(function() {\n            button.replaceWith(", ".attr('href', url)"), $probe);
+            'timeout: 5000', ").done(enable).fail(function(xhr)", "$('button[data-app-route]')", ".attr('class', button.attr('class')).html(button.html()).attr('href', button.attr('data-app-href') || url)",
+            'xhr.status >= 400 && xhr.status < 500 && xhr.status !== 404) { enable(); return; }'), $probe);
         $this->assertStringContainsAllStrings(array("button.data('checking', false)",
             '$.contains(document, button[0])', 'pmssAppsRoutesCheck(); }, 2000)'), $failure);
         $this->assertStringNotContainsString(".attr('href'", $failure);
@@ -87,7 +93,7 @@ class AppsCatalogTest extends TestCase
         $this->assertSame('off', $read()['apps']['openclaw']['state']);
         $app['state'] = 'running';
         $html = \pmssCustomerAppRowHtmlBuild('openclaw', $app);
-        $this->assertStringContainsAllStrings(array('Restart', 'Turn off', 'Show log', 'action=open', 'target="_blank"'), $html);
+        $this->assertStringContainsAllStrings(array('Restart', 'Turn off', 'Show log', 'data-app-href="apps.php?managed=openclaw&amp;action=open"', 'disabled data-app-route="openclaw/"'), $html);
     }
 
     public function testOpenClawRefusesOlderSharedLauncherHelpers(): void

@@ -230,13 +230,17 @@ function pmssAppsStatusUrl() { return $('.pmss-apps-section').attr('data-status-
 var pmssAppsRefreshTimer;
 /* Enable Open only after the browser can reach the same route the customer will use. */
 function pmssAppsRoutesCheck() {
-    $('.pmss-apps-section button[data-app-route]').each(function() {
+    $('button[data-app-route]').each(function() {
         var button = $(this), url = button.attr('data-app-route');
         if (button.data('checking')) return;
         button.data('checking', true);
-        $.ajax({url: url, type: 'GET', dataType: 'text', cache: false, timeout: 5000}).done(function() {
-            button.replaceWith($('<a class="b b-pri" target="_blank" rel="noopener">Open</a>').attr('href', url));
-        }).fail(function() {
+        var enable = function() {
+            button.replaceWith($('<a target="_blank" rel="noopener"></a>').attr('class', button.attr('class')).html(button.html()).attr('href', button.attr('data-app-href') || url));
+        };
+        $.ajax({url: url, type: 'GET', dataType: 'text', cache: false, timeout: 5000}).done(enable).fail(function(xhr) {
+            /* The app answered with its own refusal (its login): the route works. A missing route (404), an app not
+               listening (5xx) or no answer at all keeps Open waiting. */
+            if (xhr && xhr.status >= 400 && xhr.status < 500 && xhr.status !== 404) { enable(); return; }
             button.data('checking', false);
             window.setTimeout(function() { if ($.contains(document, button[0])) pmssAppsRoutesCheck(); }, 2000);
         });
