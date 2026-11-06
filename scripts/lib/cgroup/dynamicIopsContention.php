@@ -17,6 +17,11 @@ const PMSS_DYNAMIC_IOPS_CONTENTION_STATE_DEFAULT = '/var/run/pmss/dynamic-iops-c
 const PMSS_CGROUP_UNIFIED_ROOT = '/sys/fs/cgroup/unified';
 /** Readers the throttle keeps waiting were measured getting 76-90% of their cap per cycle, not the full cap (#1249). */
 const PMSS_DYNAMIC_IOPS_HELD_RATIO = 0.75;
+/**
+ * Contention leaves out accounts reading at half their cap or more: the throttle delivers whole tens
+ * per 100 ms, so a bursty reader waits on its own cap well below its average limit (#1249).
+ */
+const PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO = 0.5;
 
 /** Full-stall 300-second average from a PSI file; null when absent or malformed. */
 function pmssPsiFullAvg300(string $path): ?float
@@ -35,11 +40,11 @@ function pmssBlkioReadCount(string $path, string $majMin): ?int
     return pmssUnsignedDecimalIntParse($m[1]);
 }
 
-/** An account is held when it read at 75% or more of the rate its cap delivers. */
-function pmssDynamicIopsSliceHeld(?int $cap, ?int $before, ?int $after, int $seconds): bool
+/** An account is held when it read at 75% (or $ratio) or more of the rate its cap delivers. */
+function pmssDynamicIopsSliceHeld(?int $cap, ?int $before, ?int $after, int $seconds, float $ratio = PMSS_DYNAMIC_IOPS_HELD_RATIO): bool
 {
     if ($cap === null || $cap <= 0 || $before === null || $after === null || $after < $before || $seconds < 60) return false;
-    return ($after - $before) / $seconds >= PMSS_DYNAMIC_IOPS_HELD_RATIO * max(1, 10 * intdiv($cap, 10));
+    return ($after - $before) / $seconds >= $ratio * max(1, 10 * intdiv($cap, 10));
 }
 
 /**
@@ -76,7 +81,7 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => []];
     $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
     $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
-    $counts = []; $slices = []; $heldUsers = []; $heldUids = [];
+    $counts = []; $slices = []; $heldUsers = []; $heldUids = []; $heldCount = 0;
     foreach (array_keys($users) as $user) {
         $errors = 0;
         if (($uid = pmssCgroupDirectUserUidOrError((string) $user, $errors)) === null) continue;
@@ -85,10 +90,12 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
         $cap = pmssCgroupDirectDeviceValueParse((string) @file_get_contents($dir.'/blkio.throttle.read_iops_device'), $majMin);
         $before = is_int($state['counts'][$uid] ?? null) ? $state['counts'][$uid] : null;
         $heldUsers[$user] = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then);
-        if ($heldUsers[$user]) $heldUids[] = $uid;
-        $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"), 'held' => $heldUsers[$user] || isset($wasHeld[$uid])];
+        if ($heldUsers[$user]) $heldCount++;
+        $exclude = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then, PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO);
+        if ($exclude) $heldUids[] = $uid;
+        $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"), 'held' => $exclude || isset($wasHeld[$uid])];
     }
-    $current = ['time' => $now, 'host' => $host, 'held' => count($heldUids), 'excluded' => count(array_filter(array_column($slices, 'held'))),
+    $current = ['time' => $now, 'host' => $host, 'held' => $heldCount, 'excluded' => count(array_filter(array_column($slices, 'held'))),
         'contention' => pmssDynamicIopsContention($host, pmssPsiFullAvg300("$unifiedRoot/system.slice/io.pressure"), $slices)];
     $rows[] = $current;
     if (!$readOnly && pmssEnsureSafeDir(dirname($statePath), 0755)) {

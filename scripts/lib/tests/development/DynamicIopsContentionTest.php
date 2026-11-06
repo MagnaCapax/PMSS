@@ -43,6 +43,17 @@ class DynamicIopsContentionTest extends TestCase
         $this->assertFalse(\pmssDynamicIopsSliceHeld(20, 0, 480, 300));
     }
 
+    public function testContentionLeavesOutReadersAtHalfTheirCapButThePanelDoesNot(): void
+    {
+        // Readers at 60-76% of their cap stalled 35-75% on three hosts; readers at 36% or less stalled 23% or less (#1249).
+        $this->assertTrue(\pmssDynamicIopsSliceHeld(100, 0, 18000, 300, \PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO));
+        $this->assertFalse(\pmssDynamicIopsSliceHeld(100, 0, 18000, 300));
+        // Cap 25 delivers 20 per second: half of it over 300 s is left out, just under it is not.
+        $this->assertTrue(\pmssDynamicIopsSliceHeld(25, 0, 3000, 300, \PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO));
+        $this->assertFalse(\pmssDynamicIopsSliceHeld(25, 0, 2999, 300, \PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO));
+        $this->assertFalse(\pmssDynamicIopsSliceHeld(100, 0, 10800, 300, \PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO));
+    }
+
     public function testHeldLastCycleIsASetOfRecentPositiveUids(): void
     {
         $this->assertSame([1001 => true, 1004 => true], \pmssDynamicIopsHeldLastCycle(['time' => 700, 'held' => [1001, 1004]], 1000));

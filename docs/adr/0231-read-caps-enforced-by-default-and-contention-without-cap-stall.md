@@ -95,3 +95,25 @@ production that left three problems:
   and journal access, and system services on root-disk journal commits, with
   reads far under their caps. PSI does not attribute stall to a device, so
   that host keeps a busy-level multiplier until that stall is explained.
+
+## Amendment 2026-11-06 (2): contention leaves out readers at half their cap (#1249)
+- Measured on three busy hosts after the first amendment, pairing each capped
+  account's share of its cap over a cycle with its own full avg300: every
+  account at 60-100% of its cap stalled 35-92%; every account at 36% or less
+  stalled 23% or less. On one host the only account near its cap read at 60% of
+  it and carried the whole host stall, so the 75% test never left it out and
+  its own cap stall pinned the pool at the busy floor, shrinking every cap
+  including its own. The throttle delivers whole tens per 100 ms, so a bursty
+  reader waits on its cap well below its average limit.
+- Contention now leaves out accounts that read at half or more of what their
+  cap delivers (and, as before, accounts left out in the previous cycle).
+  Cycle state `held` lists those UIDs; cycle rows keep `held` (the 75% test)
+  and `excluded` (slices left out).
+- The panel notice (ADR 0232) keeps the 75% test: its text says the account
+  is reading at its limit now, which a reader at half its cap is not.
+- Stall of accounts below half their cap and of system services still counts.
+  The light readers on the measured hosts kept contention at about 10-23, so
+  disk stall that is not an account's own cap still reaches the pool. The
+  system term stays: when left-out readers saturate the disk themselves, it is
+  the only remaining brake, and different block devices for / and /home do not
+  prove different disks (md members, VM backing storage).
