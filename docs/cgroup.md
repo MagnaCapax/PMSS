@@ -27,6 +27,9 @@ this file in the repository and reaches hosts through the rolling update. Hosts
 carry no local policy file, and a leftover `cgroup.policy.local.php` is ignored
 ([ADR 0233](adr/0233-no-host-local-cgroup-policy.md)).
 
+Remaining TODOs: scheduler-aware IO auto-policy, burst allowances +
+policy-level net shaping hints.
+
 Guardrails always apply: MemoryHigh ≥ 250 MiB; MemoryMax ≤ 95% of RAM.
 
 ## Extension Status Matrix (#121)
