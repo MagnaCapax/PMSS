@@ -10,6 +10,42 @@ ob_end_clean();
 /** Customer Apps tab contract: live controls and a closed wiki catalog. */
 class AppsCatalogTest extends TestCase
 {
+    public function testRunningToggleAppCannotOpenBeforeItsRouteAnswers(): void
+    {
+        $catalog = require $this->pmssRepoPath('etc/skel/www/toggleAppCatalog.php');
+        foreach ($catalog as $id => $definition) {
+            $app = array('state' => 'running', 'kind' => 'managed', 'url' => $id.'/');
+            $html = \pmssCustomerAppRowHtmlBuild($id, $app);
+            $this->assertStringContainsAllStrings(array('disabled data-app-route="'.$id.'/"',
+                'Waiting for the app route', '>Open</button>', '>Restart</button>', '>Turn off</button>'), $html);
+            $this->assertStringNotContainsString('href=', $html);
+            foreach (array('off', 'stopped', 'not secured', 'gave up') as $state) {
+                $app['state'] = $state;
+                $this->assertStringNotContainsString('data-app-route=', \pmssCustomerAppRowHtmlBuild($id, $app));
+            }
+        }
+        // Other apps keep their existing link contract.
+        $html = \pmssCustomerAppRowHtmlBuild('rclone', array('state' => 'running', 'kind' => 'managed', 'url' => 'rclone/'));
+        $this->assertStringContainsString('href="rclone/"', $html);
+        $this->assertStringNotContainsString('data-app-route=', $html);
+    }
+
+    public function testToggleRouteProbeEnablesOpenOnlyOnSuccessAndRetriesFailures(): void
+    {
+        $js = \pmssActionScriptJs();
+        $start = strpos($js, 'function pmssAppsRoutesCheck()');
+        $end = strpos($js, 'function pmssAppsUpdatingResponse(', $start);
+        $probe = substr($js, $start, $end - $start);
+        $failure = substr($probe, strpos($probe, '}).fail(function()'));
+        $this->assertStringContainsAllStrings(array("type: 'GET'", "dataType: 'text'", 'cache: false',
+            'timeout: 5000', ").done(function() {\n            button.replaceWith(", ".attr('href', url)"), $probe);
+        $this->assertStringContainsAllStrings(array("button.data('checking', false)",
+            '$.contains(document, button[0])', 'pmssAppsRoutesCheck(); }, 2000)'), $failure);
+        $this->assertStringNotContainsString(".attr('href'", $failure);
+        // Initial render, status refresh, and action completion each check newly rendered buttons.
+        $this->assertSame(5, substr_count($js, 'pmssAppsRoutesCheck()'));
+    }
+
     public function testOpenClawManagedDefinitionPreservesExistingRowsAndBuildsJavascriptMap(): void
     {
         $definitions = \pmssCustomerManagedAppDefinitions();

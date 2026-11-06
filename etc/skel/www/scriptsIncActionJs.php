@@ -228,6 +228,20 @@ function pmssMediaStackSecureApp(button, app) {
 var pmssAppsBusy = {};
 function pmssAppsStatusUrl() { return $('.pmss-apps-section').attr('data-status-url'); }
 var pmssAppsRefreshTimer;
+/* Enable Open only after the browser can reach the same route the customer will use. */
+function pmssAppsRoutesCheck() {
+    $('.pmss-apps-section button[data-app-route]').each(function() {
+        var button = $(this), url = button.attr('data-app-route');
+        if (button.data('checking')) return;
+        button.data('checking', true);
+        $.ajax({url: url, type: 'GET', dataType: 'text', cache: false, timeout: 5000}).done(function() {
+            button.replaceWith($('<a class="b b-pri" target="_blank" rel="noopener">Open</a>').attr('href', url));
+        }).fail(function() {
+            button.data('checking', false);
+            window.setTimeout(function() { if ($.contains(document, button[0])) pmssAppsRoutesCheck(); }, 2000);
+        });
+    });
+}
 function pmssAppsUpdatingResponse(xhr) {
     if (!xhr || xhr.status !== 503 || !xhr.responseJSON || xhr.responseJSON.updating !== true) return false;
     window.clearTimeout(pmssAppsRefreshTimer);
@@ -257,6 +271,7 @@ function pmssAppsRefresh(callback) {
                 oldRow.replaceWith(replacement);
             }
         });
+        pmssAppsRoutesCheck();
         if (callback) callback(payload);
         pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, payload.poll ? 5000 : 10000);
     }).fail(function(xhr) {
@@ -271,6 +286,7 @@ function pmssAppsWait(id, desired, deadline) {
             if (state === desired || Date.now() >= deadline) {
                 pmssAppsBusy[id] = false;
                 if (payload.rows && payload.rows[id]) row.replaceWith(payload.rows[id]);
+                pmssAppsRoutesCheck();
                 if (state !== desired) $('[data-app="' + id + '"] .row-error').text('Status did not settle in time. Check the app log.');
             } else {
                 pmssAppsWait(id, desired, deadline);
@@ -330,7 +346,7 @@ function pmssAppsRestartAll(button) {
     }).fail(function() { $(button).prop('disabled', false); pmssShowActionNotice('Could not read current app status.', true); });
 }
 window.pmssAppsActionComplete = function() { pmssAppsRefresh(); };
-$(function() { if ($('.pmss-apps-section').length) pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000); });
+$(function() { pmssAppsRoutesCheck(); if ($('.pmss-apps-section').length) pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000); });
 JS;
  $maps = array('pmssManagedAppEndpoints' => array(), 'pmssManagedAppWaitSeconds' => array(), 'pmssManagedAppConsent' => array());
  $catalog = require __DIR__.'/toggleAppCatalog.php';

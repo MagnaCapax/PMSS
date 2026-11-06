@@ -44,7 +44,8 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
         'cloudplow' => 'Cloudplow', 'rtorrent' => 'rTorrent + ruTorrent',
         'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone',
         'lighttpd' => 'Web server', 'openclaw' => 'OpenClaw');
-    foreach (require __DIR__.'/toggleAppCatalog.php' as $appId => $row) $names[$appId] = $row['label'];
+    $toggleCatalog = require __DIR__.'/toggleAppCatalog.php';
+    foreach ($toggleCatalog as $appId => $row) $names[$appId] = $row['label'];
     $name = $names[$id] ?? $id;
     $description = pmssCustomerAppsDescriptionsRead()[$name] ?? ($id === 'lighttpd' ? 'Your account web server' : '');
     $state = $app['state'];
@@ -60,7 +61,10 @@ function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppContr
     if (!empty($app['login'])) $html .= '<span class="desc">'.pmssCustomerHtmlAttr($app['loginLabel'] ?? 'Login').': <code>'.pmssCustomerHtmlAttr($app['login']).'</code></span>';
     $html .= '<div class="acts">';
     if (($state === 'running' || $app['kind'] === 'media') && !empty($app['url'])) {
-        $html .= '<a class="b b-pri" href="'.pmssCustomerHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open</a>';
+        // A running toggle process can precede lighttpd loading its new proxy fragment.
+        $html .= isset($toggleCatalog[$id])
+            ? '<button type="button" class="b b-pri" disabled data-app-route="'.pmssCustomerHtmlAttr($app['url']).'" title="Waiting for the app route">Open</button>'
+            : '<a class="b b-pri" href="'.pmssCustomerHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open</a>';
     }
     if ($app['kind'] === 'media') {
         if ($mediaAppControl) {
