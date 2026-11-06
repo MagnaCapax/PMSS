@@ -1280,6 +1280,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userPermissions.php <user>
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
+  - Web executables: After stripping executable bits from web files, restores mode `0750` on the exact shell helpers launched directly by ruTorrent's create, erasedata and unpack plugins (#1011). Ordinary web data stays non-executable; symlink and hard-link guards remain in force.
   - Billing identity: `.billingServiceId`, legacy `.billingId`, and `.billingClientId`
     have `root:<user> 0640` as their managed state. `writeHomeMarker.php` creates
     registered billing markers as root (`.billingId`, `.billingServiceId`, and

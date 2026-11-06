@@ -80,6 +80,55 @@ class UserPermissionsApplyTest extends TestCase
         $this->assertSame(0, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
     }
 
+    public function testPluginLaunchersRecoverAfterWebExecStrip(): void
+    {
+        $home = $this->home();
+        $thisUser = 'fixtur01';
+        $prefix = "/home/{$thisUser}";
+        $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
+        $start = strpos($source, '$chmodItems = [');
+        $this->assertTrue($start !== false);
+        $end = strpos($source, "\n];", $start);
+        $this->assertTrue($end !== false);
+        // Load only the trusted declarative mode list, never the root-run utility.
+        $chmodItems = [];
+        eval(substr($source, $start, $end + 3 - $start));
+
+        $helpers = [];
+        foreach (['create', 'erasedata', 'unpack'] as $plugin) {
+            $paths = glob($this->pmssRepoPath('etc/skel/www/rutorrent/plugins/'.$plugin.'/*.sh'));
+            $this->assertTrue(is_array($paths) && count($paths) > 0);
+            foreach ($paths as $path) {
+                $helpers[] = $this->file($home.'/www/rutorrent/plugins/'.$plugin.'/'.basename($path), 0640);
+            }
+        }
+        $data = $this->file($home.'/www/rutorrent/plugins/create/data.js', 0640);
+        $custom = $this->file($home.'/www/rutorrent/plugins/create/custom.sh', 0640);
+        // Starting at stripped modes also covers already-affected homes; repeat for convergence.
+        for ($pass = 0; $pass < 2; ++$pass) {
+            foreach ($chmodItems as $item) {
+                if (strpos($item[0], $prefix.'/www/') !== 0) {
+                    continue;
+                }
+                \pmssUserPermissionsModeApply(
+                    $this->pmssCurrentOwner(),
+                    $home,
+                    posix_geteuid(),
+                    $home.substr($item[0], strlen($prefix)),
+                    $item[1],
+                    $item[2] ?? false,
+                    $item[3] ?? false
+                );
+            }
+            foreach ($helpers as $helper) {
+                $this->assertSame(0750, $this->mode($helper), basename($helper).' must be executable');
+            }
+            $this->assertSame(0640, $this->mode($data));
+            $this->assertSame(0640, $this->mode($custom), 'unlisted shell files stay non-executable');
+        }
+        $this->assertSame(0, $GLOBALS['PMSS_USER_PERMISSIONS_FAILED_COUNT'] ?? 0);
+    }
+
     public function testStripSymbolicNamesExactlyTheClearedBits(): void
     {
         $this->assertSame('u-s,g-s,o-rwx', \pmssUserPermissionsModeStripSymbolic(06007));
