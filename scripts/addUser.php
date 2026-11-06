@@ -96,11 +96,12 @@ if ($usernameValidationError !== null) {
 $lockPath = pmssRuntimeLockPath('pmss-addUser-'.$user['name'].'.lock');
 $lockBusy = false;
 $lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, true, $lockBusy);
-if ($lockHandle === false) {
-    pmssAddUserFatalExit('ERROR', "Unable to open lock file: {$lockPath}", 'lock_open_failed');
-}
+// Busy first: pmssLockFileAcquire() closes the handle on contention and returns false with $lockBusy set.
 if ($lockBusy) {
     pmssAddUserFatalExit('ERROR', 'Another addUser is already running for this user', 'lock_busy');
+}
+if ($lockHandle === false) {
+    pmssAddUserFatalExit('ERROR', "Unable to open lock file: {$lockPath}", 'lock_open_failed');
 }
 $homePath = "/home/{$user['name']}";
 pmssAddUserEnsurePreflightState($userDb, $user, $homePath);
