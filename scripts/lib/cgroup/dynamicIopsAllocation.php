@@ -6,8 +6,9 @@ require_once __DIR__.'/directApply.php';
 function pmssDynamicIopsProposal(array $row, float $chargedPool): int
 {
     $value = max($row['floor'], $chargedPool * $row['share']);
-    $rounded = round($value, 1 - (int) floor(log10(max(1.0, $value))));
-    return min($row['ceiling'] ?? PHP_INT_MAX, max($row['floor'], (int) min($rounded, PHP_INT_MAX - 1024)));
+    $rounded = max($row['floor'], round($value, 1 - (int) floor(log10(max(1.0, $value)))));
+    // The kernel throttle delivers whole tens per second, so round up to the next ten it delivers.
+    return min($row['ceiling'] ?? PHP_INT_MAX, (int) min(ceil($rounded / 10) * 10, PHP_INT_MAX - 1024));
 }
 
 /** Compare quota exponents using already bonus-adjusted BFQ weights. */
@@ -23,7 +24,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $passive = pmssFiniteNonNegativeFloat($passive);
     $benchmark = pmssFiniteNonNegativeFloat($benchmark);
     // A cached fio figure can exceed real disk IOPS a thousandfold; a cap needs the measured ceiling.
-    $host = $settings['mode'] === 'enforce' ? ($passive ?? 0.0) : max($passive ?? 0.0, $benchmark ?? 0.0);
+    $host = $passive ?? 0.0;
     $pool = $host * $multiplier;
     if (!is_finite($pool) || $pool >= PHP_INT_MAX) return null;
     $iowait = pmssFiniteNonNegativeFloat($pressure['iowait_blend'] ?? null);
@@ -31,8 +32,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $curb = $iowait === null ? 1.0 : 1 - $settings['curbMaxCut'] * max(0.0, min(1.0,
         ($iowait - $settings['curbStartIowait']) / ($settings['curbFullIowait'] - $settings['curbStartIowait'])));
     $uncurbed = $pool;
-    // Off/shadow projections keep their existing pool; the curb is observational there.
-    if ($settings['mode'] === 'enforce') $pool *= $curb;
+    $pool *= $curb;
     $weightSum = pmssCgroupPolicyUserIoWeightSum(array_column($users, 'source'), $policy);
     $cohort = [];
     foreach ($users as $user => $entry) {

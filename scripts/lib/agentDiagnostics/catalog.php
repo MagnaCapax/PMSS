@@ -54,7 +54,7 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
         ],
         'io_sharing' => [
             // Static host probes only: no account input, names, PIDs or per-account output.
-            'shadow_mode' => ['type' => 'command', 'command' => 'php -r \'require "/scripts/lib/cgroup/policy.php"; echo pmssCgroupPolicyLoad()["cgroup"]["dynamicIops"]["mode"] ?? "off";\' 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
+            'shadow_mode' => ['type' => 'command', 'command' => 'php -r \'require "/scripts/lib/cgroup/policy.php"; echo pmssCgroupPolicyLoad()["cgroup"]["dynamicIops"]["mode"] ?? "enforce";\' 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
             'local_policy_present' => ['type' => 'command', 'command' => 'if [ -f /etc/seedbox/config/cgroup.policy.local.php ]; then echo yes; else echo no; fi', 'format' => 'text', 'fallback' => 'unknown'],
             'shadow_log_age_seconds' => ['type' => 'command', 'command' => 'php -r \'$t=@filemtime("/var/log/pmss/dynamic-iops.jsonl"); if ($t !== false) echo max(0, time()-$t);\' 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
             'published_read_iops' => ['type' => 'command', 'command' => 'php -r \'$d=json_decode(@file_get_contents("/var/run/pmss/io-ceiling.json"),true); $v=$d["published"]["read_iops"] ?? null; if (is_numeric($v)) echo $v;\' 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],

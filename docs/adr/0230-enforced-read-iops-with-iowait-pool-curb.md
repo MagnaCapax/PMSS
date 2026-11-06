@@ -4,7 +4,8 @@ Date: 2026-11-05
 Category: architecture
 
 ## Status
-Accepted by operator decision 2026-11-05; host opt-in only.
+Accepted by operator decision 2026-11-05; host opt-in only. The opt-in and shadow mode
+are superseded by ADR 0231 (enforced by default).
 
 ## Context
 ADRs 0177 and 0229 measure quota/pressure allocation independently of the

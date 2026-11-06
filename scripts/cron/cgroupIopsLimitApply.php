@@ -32,6 +32,7 @@ require_once __DIR__.'/../lib/cgroup/directApply.php';
 require_once __DIR__.'/../lib/cgroup/policy.php';
 require_once __DIR__.'/../lib/cgroup/ioCeilingHistory.php';
 require_once __DIR__.'/../lib/cgroup/iopsCensus.php';
+require_once __DIR__.'/../lib/cgroup/dynamicIopsPolicy.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
@@ -68,8 +69,10 @@ $derivationAllowed = !$homeMdBacked && pmssCgroupPolicyReadIopsDerivationAllowed
     static function (string $message): void { syslog(LOG_WARNING, $message); }
 );
 
-// Only this cron owns dynamic throttle writes; BFQ continues to own shadow cycles.
-$dynamicEnforce = ($policy['cgroup']['dynamicIops']['mode'] ?? null) === 'enforce';
+// Only this cron owns dynamic throttle writes. Enforce is the default; malformed knobs keep kernel caps.
+$dynamicSettings = pmssDynamicIopsSettings($policy);
+$dynamicEnforce = $dynamicSettings === null ? ($policy['cgroup']['dynamicIops']['mode'] ?? null) !== 'off'
+    : $dynamicSettings['mode'] === 'enforce';
 $dynamicCaps = null;
 if ($dynamicEnforce) {
     $DRY_RUN = $DRY_RUN || pmssEnvFlagEnabled('PMSS_DRY_RUN');
@@ -111,6 +114,19 @@ foreach ($userConfigs as $user => $json) {
             $homeClass,
             $derivationAllowed
         );
+    }
+    // Off leaves no dynamic read cap behind: a slice without a configured or derived cap is cleared.
+    if (!$dynamicEnforce && $readIops === null && !$CENSUS && $dynamicSettings !== null) {
+        $clearUid = pmssCgroupDirectUserUidOrError($user, $errors);
+        if ($clearUid !== null) {
+            $clearPath = pmssCgroupDirectUserBlkioFilePath($clearUid, 'blkio.throttle.read_iops_device');
+            $res = pmssIopsClearThrottle($clearPath, $majMin, $DRY_RUN);
+            if (!$res['ok']) { $errors++; syslog(LOG_WARNING, "read-iops clear $user uid=$clearUid: ".$res['reason']); }
+            elseif ($res['reason'] === 'written') {
+                $written++;
+                pmssCgroupDirectAudit($user, $clearUid, 'read_iops', pmssCgroupDirectDeviceValueParse($res['cur'], $majMin), 0, 'dynamic-iops-off');
+            }
+        }
     }
     if ($readIops === null && $writeIops === null && !$CENSUS) {
         continue; // no caps configured or derived for this user

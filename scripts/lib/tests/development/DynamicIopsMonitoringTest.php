@@ -56,11 +56,12 @@ class DynamicIopsMonitoringTest extends TestCase
         }
     }
 
-    public function testShadowRecordHasExplicitSchemaVersion(): void
+    public function testCycleRecordHasExplicitSchemaVersion(): void
     {
         $script = <<<'PHP'
 namespace DynamicIopsSchemaFixture;
 function pmssCgroupPolicyMountSourceResolve($mount) { return '/dev/fixture'; }
+function pmssCgroupPolicyDeviceMajorMinorResolve($device) { return null; }
 function pmssCgroupPolicyHomeDeviceIsMdBacked($device) { return false; }
 function pmssCgroupPolicyHomeStorageClassResolve($device) { return 'hdd'; }
 function pmssJsonFileReadAssoc($path, $safe) { return []; }
@@ -73,7 +74,7 @@ function pmssRunSnapshotLogTask($script, $env, $path, $callback) {
 }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/dynamicIopsShadow.php', 'DynamicIopsSchemaFixture');
-        $script .= 'echo json_encode([pmssDynamicIopsShadowCycle([], ["cgroup" => ["dynamicIops" => ["mode" => "shadow"]]]), $GLOBALS["row"]["schema_version"]]);';
+        $script .= 'echo json_encode([pmssDynamicIopsShadowCycle([], ["cgroup" => ["dynamicIops" => ["mode" => "enforce"]]]), $GLOBALS["row"]["schema_version"]]);';
         $this->assertSame([true, 2], $this->pmssRunInlinePhpJson($script, ['PMSS_DRY_RUN' => '0']));
     }
 }

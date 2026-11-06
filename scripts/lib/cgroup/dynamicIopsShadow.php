@@ -1,12 +1,13 @@
 <?php
 /**
- * Bounded allocation inputs and private cycle output, with no throttle writer.
+ * Bounded allocation inputs and the private enforce-cycle log; the apply cron writes the caps.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 require_once __DIR__.'/dynamicIopsPolicy.php';
 require_once __DIR__.'/ioCeilingHistory.php';
+require_once __DIR__.'/dynamicIopsContention.php';
 
 /** Tail complete records only, rejecting redirected paths and substituted inodes. */
 function pmssDynamicIopsTailLines(string $path): array
@@ -59,15 +60,14 @@ function pmssDynamicIopsBenchmark(string $path, string $homeDevice): ?float
     return $latest;
 }
 
-/** Collect once for shadow/enforce; read-only previews never publish or write caps. */
+/** Collect once per enforce cycle; read-only previews never publish, record or write caps. */
 function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result = null, bool $readOnly = false, bool $cohortComplete = true): bool
 {
     $result = null;
     $settings = pmssDynamicIopsSettings($policy);
-    if ($settings === null) return ($policy['cgroup']['dynamicIops']['mode'] ?? null) !== 'enforce';
+    if ($settings === null) return ($policy['cgroup']['dynamicIops']['mode'] ?? null) === 'off';
     if ($settings['mode'] === 'off') return true;
     $readOnly = $readOnly || pmssEnvFlagEnabled('PMSS_DRY_RUN');
-    if ($settings['mode'] === 'shadow' && $readOnly) return true;
     $now = time();
     $device = pmssCgroupPolicyMountSourceResolve('/home');
     $md = pmssCgroupPolicyHomeDeviceIsMdBacked($device);
@@ -77,25 +77,26 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $stamp = is_string($state['computed_at'] ?? null) ? strtotime($state['computed_at']) : false;
     $legacyPassive = pmssIoCeilingPublishedReadIops($statePath);
     $passive = $stamp !== false && $stamp <= $now && $stamp >= $now - 86400 ? $legacyPassive : null;
-    $pressure = pmssDynamicIopsPressure(pmssDynamicIopsHistory('/var/log/pmss/iostat-history.log'), $now);
+    $majMin = $device !== '' ? pmssCgroupPolicyDeviceMajorMinorResolve($device) : null;
+    $contention = $majMin === null ? ['rows' => [], 'current' => null]
+        : pmssDynamicIopsContentionObserve($users, $majMin, $now, $readOnly);
+    // Stall of accounts held at their own cap is not contention; scale host samples to what remains.
+    $pressure = pmssDynamicIopsPressure(pmssDynamicIopsContentionScale(
+        pmssDynamicIopsHistory('/var/log/pmss/iostat-history.log'), $contention['rows']), $now);
     $allowed = !$md && pmssCgroupPolicyReadIopsDerivationAllowed($legacyPassive, pmssCgroupPolicyReadIopsClassFloor($class, $policy), count($users));
     $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive,
         pmssDynamicIopsBenchmark('/var/log/pmss/benchmark-storage.jsonl', $device), $class, $allowed, $legacyPassive);
-    if ($result === null) {
-        if ($settings['mode'] !== 'enforce') return false;
-        $result = ['fallback' => 'allocation-failed'];
-    }
-    if ($settings['mode'] === 'enforce') {
-        // A partial config scan cannot safely redistribute the full host pool.
-        if (!$cohortComplete) $result['fallback'] = 'incomplete-account-configs';
-        $result['read_caps'] = pmssDynamicIopsReadCaps($users, $policy, $result);
-        if ($result['read_caps'] === null && $result['fallback'] === null) $result['fallback'] = 'invalid-read-cap-map';
-        $result['read_action'] = $result['read_caps'] === null ? 'keep-kernel' : 'apply';
-    }
+    if ($result === null) $result = ['fallback' => 'allocation-failed'];
+    // A partial config scan cannot safely redistribute the full host pool.
+    if (!$cohortComplete) $result['fallback'] = 'incomplete-account-configs';
+    $result['read_caps'] = pmssDynamicIopsReadCaps($users, $policy, $result);
+    if ($result['read_caps'] === null && $result['fallback'] === null) $result['fallback'] = 'invalid-read-cap-map';
+    $result['read_action'] = $result['read_caps'] === null ? 'keep-kernel' : 'apply';
+    $result['contention'] = $contention['current'];
     if ($readOnly) return true;
     $payload = pmssJsonEncodeSafe(['schema_version' => 2, 'timestamp' => gmdate('c', $now),
-        'event' => $settings['mode'] === 'shadow' ? 'dynamic_iops_shadow' : 'dynamic_iops_enforce',
-        'mode' => $settings['mode'], 'md_enforcement_excluded' => $md && $settings['mode'] !== 'enforce', 'settings' => $settings] + $result);
+        'event' => 'dynamic_iops_enforce', 'mode' => $settings['mode'], 'md_enforcement_excluded' => false,
+        'settings' => $settings] + $result);
     if ($payload === null) return false;
     return pmssRunSnapshotLogTask(__FILE__, 'PMSS_DYNAMIC_IOPS_LOG', '/var/log/pmss/dynamic-iops.jsonl',
         static function ($handle) use ($payload): int { return pmssStreamWriteAll($handle, $payload."\n") ? 0 : 1; }) === 0;

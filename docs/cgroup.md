@@ -170,7 +170,7 @@ Inspect and apply limits per user:
 - Root slice (user‑0.slice) is never limited. PMSS installs an override and a repair job to enforce this:
   - At boot (after 20 seconds) and every 2 hours: `/scripts/cron/cgroupRootCheck.php` fixes limits if misconfigured.
 
-## Opt-in aggregate I/O placement (v1)
+## Aggregate I/O placement (v1)
 
 On v1, blk-throttle does not propagate slice limits to child blkio groups.
 The shipped `DefaultIOAccounting=yes` creates those groups for account scopes
@@ -195,14 +195,14 @@ include empty remnants and do not prove where processes run. Check actual
 process membership and obtain representative uncapped measurements on testing
 machines before planning rollout; the census does not authorize activation.
 
-Set `cgroup.ioSlicePlacement` to boolean `true` in `cgroup.policy.local.php` to opt in:
+`cgroup.ioSlicePlacement` defaults to `true` ([ADR 0231](adr/0231-read-caps-enforced-by-default-and-contention-without-cap-stall.md)). Set it to `false` in `cgroup.policy.local.php` to opt out:
 
 ```php
 <?php
-return ['cgroup' => ['ioSlicePlacement' => true]];
+return ['cgroup' => ['ioSlicePlacement' => false]];
 ```
 
-The default is `false`. During runtime-template convergence on v1, PMSS installs
+During runtime-template convergence on v1, PMSS installs
 `/etc/systemd/system.conf.d/90-pmss-io-placement.conf` with
 `DefaultIOAccounting=no` before its existing systemd reexec. Account slices keep
 their explicit accounting and weights, while new scopes use the slice's blkio
@@ -218,29 +218,26 @@ local unit drop-ins can still create child groups and require inspection.
 Buffered-write limitations and the separate monthly-clamp persistence defect
 are unchanged.
 
-Setting the switch back to `false` and running runtime-template convergence
+Setting the switch to `false` and running runtime-template convergence
 removes only the PMSS placement drop-in before reexec, restoring the shipped
 manager default. Unknown/v2 mode also removes that drop-in. Dry runs do not
 create or remove it. No sysfs path guard or throttle validator is widened.
 
 ## I/O sharing observation and change history
 
-The existing BFQ cycle optionally logs shadow allocations when
-`cgroup.dynamicIops.mode` is `shadow` in the local policy; shipped defaults stay
-`off`. Schema version 2 adds iowait windows and each account's `would_be` cap
+Each enforce cycle in the IOPS cron logs its allocation. Schema version 2 adds iowait windows and each account's `would_be` cap
 using a separate all-account floor-charge pass as if IOReadIOPS were unset.
 `proposed` retains its existing explicit/legacy behavior. Missing inputs make
 `would_be` null; missing iowait alone never changes fallback or the 12/4/1 PSI
-blend. Shadow projections never reach a writer. The logged `iowait_blend`,
-`curb_factor` and `pool_uncurbed` describe the curb without changing shadow's
-pool or proposals. Enforce mode is a separate host opt-in described below.
+blend. The logged `iowait_blend`, `curb_factor` and `pool_uncurbed` describe
+the curb applied to the pool.
 
 Successful changed direct IOPS/BFQ writes append old/new values to the private
 `/var/log/pmss/cgroup-apply.jsonl`. Dry runs, unchanged values, failed writes and
 IOPS census produce no rows. Audit failures warn in syslog without changing
-the cap or cycle outcome. Both audit and shadow logs are 0600 with daily/3650
-compressed rotations and 50M splits. Setting shadow mode off stops shadow
-output; successful existing writes continue to audit independently.
+the cap or cycle outcome. Both audit and cycle logs are 0600 with daily/3650
+compressed rotations and 50M splits. Mode `off` stops cycle output; successful
+writes continue to audit independently.
 
 Per-account metrics retain v1 counters and optionally read numeric some/full
 I/O PSI avg300/totals from a UID-built hybrid unified path when present. This
@@ -248,7 +245,7 @@ does not add v2 enforcement or change billing. Missing interfaces omit keys.
 Host iostat adds CPU and kernel contention observations after the legacy `time`
 key, and never contains per-account rows.
 
-`agentDiagnostics.php --json` includes static `io_sharing` probes for shadow
+`agentDiagnostics.php --json` includes static `io_sharing` probes for dynamic IOPS
 mode/policy/log freshness, capacity and manager configuration, plus direct-slice
 and all-descendant account task totals. Counts contain no account names or
 PIDs. They complement the census: child-directory counts do not establish task
@@ -258,20 +255,18 @@ and the [logging field map/read commands](observability/logging.md#io-sharing-ob
 
 ## Enforced read IOPS rollout
 
-[ADR 0230](adr/0230-enforced-read-iops-with-iowait-pool-curb.md) enables read
-caps in the existing IOPS cron; shipped mode remains `off`. Complete the
-ADR 0176 placement procedure and verify actual account process membership
-before measuring aggregate enforcement. Test a sustained heavy read workload
-on QA, including md storage, and check observed IOPS against the cap.
-
-Opt in through the existing operator-owned `cgroup.policy.local.php`:
+[ADR 0230](adr/0230-enforced-read-iops-with-iowait-pool-curb.md) enforces read
+caps in the existing IOPS cron; since [ADR 0231](adr/0231-read-caps-enforced-by-default-and-contention-without-cap-stall.md)
+that is the shipped default on every host, with placement on. Running account
+tasks reach the capped slice at the next user-manager restart or reboot; verify
+membership before judging a host. The local policy can tune or stop it:
 
 ```php
 <?php
-return ['cgroup' => ['dynamicIops' => ['mode' => 'enforce',
-    'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25,
-    'quotaExponent' => 1.0]]];
+return ['cgroup' => ['dynamicIops' => ['mode' => 'off']]];
 ```
+
+A host still set to the removed `shadow` mode enforces.
 
 The pool comes from the published read ceiling only; enforce ignores benchmark
 figures. The existing pressure pool is cut linearly from 0% at 50% blended iowait to
@@ -294,18 +289,25 @@ are written that cycle. Invalid settings, incomplete configs, exceptions and
 failed cycle logging also keep kernel read caps; write-cap handling continues.
 No fallback releases a cap by writing a large explicit placeholder.
 
-Judge enforcement by device latency such as ioping or await. Host iowait and
-PSI count tasks waiting in the throttle, so they rise under a cap with the disk
-idle.
+Host iowait and PSI count tasks waiting in the throttle, so they rise under a
+cap with the disk idle. The cycle therefore measures contention per account
+slice in the hybrid unified hierarchy: an account that read at 90% or more of
+what its cap delivers during the last cycle is held, and while any account is
+held the pressure used is the largest full-I/O PSI outside held accounts,
+bounded by the host value. Each five-minute PSI and iowait sample is scaled by
+that share before the 12/4/1 blends and the curb. With no account held the
+host value is used unchanged. Records carry `contention` (`host`,
+`contention`, `held`); state is the 0600
+`/var/run/pmss/dynamic-iops-contention.json`. Judge enforcement by device
+latency such as ioping or await, not by host iowait.
 
-The kernel delivers `10 * floor(cap / 10)` reads per second, so a cap of 15
-gives 10. Set `floor` in tens. A share does not grow when other accounts are
-quiet, so a lone reader stays at its own share on an idle host.
+The kernel delivers `10 * floor(cap / 10)` reads per second, so every cap is
+rounded up to the next multiple of ten: the default floor of 15 is applied as 20.
 
-Rollback sets mode to `off` or `shadow`. The next IOPS cycle restores available
-legacy read limits, and successful changed writes have the legacy script
-source in the audit. The legacy no-op when no limit can be derived remains;
-rollback does not clear those accounts' previous caps. Placement has its own
+Mode `off` stops enforcement. The next IOPS cycle restores available legacy
+read limits (audit source: the legacy script) and clears the read cap of every
+account with no configured or derived limit (`MAJ:MIN 0`, audit source
+`dynamic-iops-off`). Placement has its own
 rollback procedure above. No account configurations are rewritten.
 
 ## Integration Hooks

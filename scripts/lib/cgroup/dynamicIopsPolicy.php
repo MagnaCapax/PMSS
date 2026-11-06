@@ -1,21 +1,23 @@
 <?php
 /**
- * Validated opt-in read-IOPS allocation policy.
+ * Validated read-IOPS allocation policy.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 require_once __DIR__.'/policy.php';
 
-/** Reject malformed knobs rather than silently changing the experiment. */
+/** Enforce by default; reject malformed knobs rather than silently changing the allocation. */
 function pmssDynamicIopsSettings(array $policy): ?array
 {
     $settings = $policy['cgroup']['dynamicIops'] ?? [];
     if (!is_array($settings)) return null;
-    $settings += ['mode' => 'off', 'idlePressure' => 5.0, 'busyPressure' => 15.0,
+    $settings += ['mode' => 'enforce', 'idlePressure' => 5.0, 'busyPressure' => 15.0,
         'idleMultiplier' => 10.0, 'busyMultiplier' => 2.0, 'floor' => 15, 'floorCharge' => 0.25,
         'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25, 'quotaExponent' => 1.0];
-    if (!in_array($settings['mode'], ['off', 'shadow', 'enforce'], true)) return null;
+    // Shadow mode was removed; a host still set to it enforces.
+    if ($settings['mode'] === 'shadow') $settings['mode'] = 'enforce';
+    if (!in_array($settings['mode'], ['off', 'enforce'], true)) return null;
     foreach (['idlePressure', 'busyPressure', 'idleMultiplier', 'busyMultiplier', 'floor', 'floorCharge',
         'curbStartIowait', 'curbFullIowait', 'curbMaxCut', 'quotaExponent'] as $key) {
         $settings[$key] = pmssFiniteNonNegativeFloat($settings[$key]);

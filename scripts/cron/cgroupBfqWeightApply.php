@@ -72,22 +72,10 @@ $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
 // root.slice unmanaged. cgroupRootCheck.php enforces root's memory/tasks
 // policy separately.
 
-$shadowPolicy = [];
-if (!$DRY_RUN) {
-    try {
-        $shadowPolicy = pmssCgroupPolicyLoad();
-    } catch (Throwable $error) {
-        syslog(LOG_WARNING, 'dynamic-iops shadow policy load failed');
-    }
-}
-$shadowEnabled = ($shadowPolicy['cgroup']['dynamicIops']['mode'] ?? null) === 'shadow' && !pmssEnvFlagEnabled('PMSS_DRY_RUN');
-$shadowConfigs = []; $shadowUsers = [];
-foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json) use ($shadowEnabled, &$shadowConfigs): int {
-    if ($shadowEnabled) $shadowConfigs[$user] = $json;
+foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json): int {
     return pmssBfqUserWeight($json);
 }) as $entry) {
     list($user, $uid, $w) = $entry;
-    if ($shadowEnabled) $shadowUsers[$user] = ['source' => $shadowConfigs[$user], 'weight' => $w];
 
     $cgPath = pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.bfq.weight');
     if (!pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.bfq.weight'])) {
@@ -133,13 +121,4 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
     pmssCgroupDirectAudit($user, $uid, 'bfq_weight', $cur, $w, __FILE__);
 }
 
-// Shadow output is diagnostic only: failures cannot interrupt existing enforcement.
-if ($shadowEnabled) {
-    try {
-        require_once __DIR__.'/../lib/cgroup/dynamicIopsShadow.php';
-        if (!pmssDynamicIopsShadowCycle($shadowUsers, $shadowPolicy)) syslog(LOG_WARNING, 'dynamic-iops shadow log failed');
-    } catch (Throwable $error) {
-        syslog(LOG_WARNING, 'dynamic-iops shadow cycle failed');
-    }
-}
 exit(pmssCgroupDirectFinishCycle($DRY_RUN, $total, $written, $skippedNoSlice, $errors));

@@ -213,3 +213,29 @@ function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $
     }
     return ['ok' => true, 'reason' => 'written', 'cur' => $cur];
 }
+
+/**
+ * Remove OUR device's read or write throttle line ("MAJ:MIN 0" in cgroup v1); absent is already clear.
+ */
+function pmssIopsClearThrottle(string $cgPath, string $majMin, bool $dryRun): array
+{
+    if (!pmssCgroupPolicyMajorMinorIsValid($majMin)
+        || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
+    ) {
+        return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
+    }
+    if (!is_file($cgPath)) {
+        return ['ok' => true, 'reason' => 'no-slice', 'cur' => null];
+    }
+    $cur = trim((string) @file_get_contents($cgPath));
+    if (pmssCgroupDirectDeviceValueParse($cur, $majMin) === null) {
+        return ['ok' => true, 'reason' => 'already-clear', 'cur' => $cur];
+    }
+    if ($dryRun) {
+        return ['ok' => true, 'reason' => 'dry-run', 'cur' => $cur];
+    }
+    if (!is_writable($cgPath) || @file_put_contents($cgPath, $majMin.' 0') === false) {
+        return ['ok' => false, 'reason' => 'write-failed', 'cur' => $cur];
+    }
+    return ['ok' => true, 'reason' => 'written', 'cur' => $cur];
+}

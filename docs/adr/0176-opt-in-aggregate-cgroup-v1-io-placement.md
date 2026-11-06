@@ -4,7 +4,7 @@ Date: 2026-10-25
 Category: architecture
 
 ## Status
-Accepted
+Accepted. ADR 0231 makes placement the default.
 
 ## Context
 Production uses cgroup v1 (ADR 0019). The direct IOPS writer validates and writes

@@ -5,17 +5,17 @@
 // Guardrails still apply in code: MemoryHigh >= 250MiB; MemoryMax <= 95% of system RAM.
 return [
     'cgroup' => [
-        // Opt in only after the IOPS census and a planned user-manager restart/reboot.
-        // false preserves per-unit accounting and today's effective cap placement.
-        'ioSlicePlacement' => false,
+        // Keep account tasks in the user slice where cgroup-v1 read caps act (ADR 0231).
+        // Running tasks move at the next user-manager restart or reboot.
+        'ioSlicePlacement' => true,
 
         // Per-user derived read-IOPS caps may oversell the measured host ceiling.
         // 2.0 means PMSS assigns up to 200% of the passive host read-IOPS estimate.
         'assignMax' => ['iops' => 2.0],
 
-        // Host-local shadow observation or read-cap enforcement (ADRs 0177, 0230).
+        // Enforced read caps with an iowait pool curb (ADRs 0230, 0231); 'off' clears them.
         'dynamicIops' => [
-            'mode' => 'off', // 'enforce' applies reads in the existing IOPS cycle.
+            'mode' => 'enforce',
             'idlePressure' => 5.0, 'busyPressure' => 15.0,
             'idleMultiplier' => 10.0, 'busyMultiplier' => 2.0,
             'floor' => 15, 'floorCharge' => 0.25,

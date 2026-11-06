@@ -65,16 +65,37 @@ class DynamicIopsEnforceCycleTest extends TestCase
         }
     }
 
-    public function testRollbackModesRestoreLegacyValueAndAuditSource(): void
+    public function testOffRestoresLegacyValueAndAuditSource(): void
     {
         $enforced = $this->enforceCycle();
-        foreach (['off', 'shadow'] as $mode) {
-            $rolledBack = $this->enforceCycle(['mode' => $mode, 'kernel' => $enforced['kernel']]);
-            $this->assertSame(1, count($rolledBack['writes']));
-            $this->assertSame('8:0 1000000', $rolledBack['writes'][0][1]);
-            $this->assertSame('cgroupIopsLimitApply.php', $rolledBack['logs']['PMSS_CGROUP_APPLY_LOG'][0]['source']);
-            $this->assertFalse(isset($rolledBack['logs']['PMSS_DYNAMIC_IOPS_LOG']));
-        }
+        $rolledBack = $this->enforceCycle(['mode' => 'off', 'kernel' => $enforced['kernel']]);
+        $this->assertSame(1, count($rolledBack['writes']));
+        $this->assertSame('8:0 1000000', $rolledBack['writes'][0][1]);
+        $this->assertSame('cgroupIopsLimitApply.php', $rolledBack['logs']['PMSS_CGROUP_APPLY_LOG'][0]['source']);
+        $this->assertFalse(isset($rolledBack['logs']['PMSS_DYNAMIC_IOPS_LOG']));
+    }
+
+    public function testOffClearsDynamicCapWhereNoLegacyCapApplies(): void
+    {
+        $source = ['quota' => 1000, 'IOWeight' => 100, 'IOWriteIOPS' => '/home:90'];
+        $enforced = $this->enforceCycle(['md' => true, 'source' => $source]);
+        $readPath = '/sys/fs/cgroup/blkio/user.slice/user-1001.slice/blkio.throttle.read_iops_device';
+        $this->assertSame('8:0 750', $enforced['kernel'][$readPath]);
+        $off = $this->enforceCycle(['md' => true, 'source' => $source, 'mode' => 'off', 'kernel' => $enforced['kernel']]);
+        $this->assertSame([[$readPath, '8:0 0']], $off['writes']);
+        $audit = $off['logs']['PMSS_CGROUP_APPLY_LOG'][0];
+        $this->assertSame('dynamic-iops-off', $audit['source']);
+        $this->assertSame(750, $audit['old']);
+        $this->assertSame(0, $audit['new']);
+        $again = $this->enforceCycle(['md' => true, 'source' => $source, 'mode' => 'off', 'kernel' => [$readPath => '']]);
+        $this->assertSame([], $again['writes']);
+    }
+
+    public function testRemovedShadowModeEnforces(): void
+    {
+        $row = $this->enforceCycle(['mode' => 'shadow']);
+        $this->assertSame('8:0 750', $row['writes'][0][1]);
+        $this->assertSame('enforce', $row['logs']['PMSS_DYNAMIC_IOPS_LOG'][0]['mode']);
     }
 
     public function testRepeatedEnforcementIsIdempotent(): void

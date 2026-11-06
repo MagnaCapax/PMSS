@@ -64,14 +64,18 @@ class DynamicIopsShadowTest extends TestCase
 
     public function testSettingsRejectUnsafeTypesAndRanges(): void
     {
-        $this->assertSame('off', \pmssDynamicIopsSettings([])['mode']);
+        $this->assertSame('enforce', \pmssDynamicIopsSettings([])['mode']);
+        $this->assertEquals(15, \pmssDynamicIopsSettings([])['floor']);
+        // Shadow mode was removed: a stale host setting enforces.
+        $this->assertSame('enforce', \pmssDynamicIopsSettings(['cgroup' => ['dynamicIops' => ['mode' => 'shadow']]])['mode']);
         foreach ([['mode' => 'invalid'], ['mode' => true], ['floor' => 0], ['floorCharge' => 1.1],
             ['idlePressure' => 15], ['busyPressure' => 101], ['busyMultiplier' => 1], ['idleMultiplier' => INF],
             ['floor' => []], ['idleMultiplier' => 1], ['idleMultiplier' => 101]] as $settings) {
             $this->assertSame(null, \pmssDynamicIopsSettings(['cgroup' => ['dynamicIops' => $settings]]));
         }
         $this->assertSame(null, \pmssDynamicIopsSettings(['cgroup' => ['dynamicIops' => 'shadow']]));
-        $this->assertTrue(\pmssDynamicIopsShadowCycle([], []));
+        $this->assertTrue(\pmssDynamicIopsShadowCycle([], ['cgroup' => ['dynamicIops' => ['mode' => 'off']]]));
+        $this->assertFalse(\pmssDynamicIopsShadowCycle([], ['cgroup' => ['dynamicIops' => ['floor' => 0]]]));
         $this->assertSame('enforce', \pmssDynamicIopsSettings(['cgroup' => ['dynamicIops' => ['mode' => 'enforce']]])['mode']);
     }
 
@@ -119,6 +123,15 @@ class DynamicIopsShadowTest extends TestCase
         $this->assertTrue($this->allocate($users)['variants']['1.0']['users']['small']['share'] > $rows['small']['share']);
     }
 
+    public function testCapsRoundUpToTheTensTheKernelDelivers(): void
+    {
+        foreach ([[15, 20], [20, 20], [21, 30], [22, 30], [99, 100], [155, 160], [1234, 1200]] as [$value, $expected]) {
+            $row = ['floor' => 15, 'share' => 1.0, 'ceiling' => null];
+            $this->assertSame($expected, \pmssDynamicIopsProposal($row, (float) $value), (string) $value);
+        }
+        $this->assertSame(25, \pmssDynamicIopsProposal(['floor' => 20, 'share' => 1.0, 'ceiling' => 25], 22.0));
+    }
+
     public function testFloorsCeilingsExplicitLimitsAndFractionalFloorCharge(): void
     {
         $users = $this->users(); $users['small']['source']['resourceIOPSReadMin'] = 1000;
@@ -152,7 +165,8 @@ class DynamicIopsShadowTest extends TestCase
         }
         $this->assertSame(null, \pmssDynamicIopsAllocate($this->users(), [], [], PHP_FLOAT_MAX, null, null, true));
         $result = \pmssDynamicIopsAllocate($this->users(), [], ['blend' => 15], 100.0, 3300.0, null, false);
-        $this->assertEquals(3300, $result['host_read_iops']);
+        // Caps never size the pool from a benchmark figure.
+        $this->assertEquals(100, $result['host_read_iops']);
         $this->assertSame(null, $result['variants']['1.0']['users']['small']['legacy']);
         $stale = \pmssDynamicIopsAllocate($this->users(), [], ['blend' => 15], null, null, 'hdd', true, 3300.0);
         $this->assertSame('missing-ceiling', $stale['fallback']);

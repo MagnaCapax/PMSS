@@ -11,7 +11,7 @@ class CgroupApplyAuditCronTest extends TestCase
         $script = <<<'PHP'
 namespace CgroupAuditCronFixture;
 function pmssCgroupDirectRequireRuntime($message) {}
-function pmssCgroupPolicyLoad() { return []; }
+function pmssCgroupPolicyLoad() { return ['cgroup' => ['dynamicIops' => ['mode' => 'off']]]; }
 function pmssCgroupPolicyMountBfqActive($mount) { return true; }
 function pmssCgroupPolicyMountSourceResolve($mount) { return '/dev/fixture'; }
 function pmssCgroupPolicyDeviceMajorMinorResolve($device) { return '8:0'; }
@@ -100,6 +100,8 @@ PHP;
             $this->assertSame([], $result[0]);
             $this->assertSame([], $result[1]);
         }
-        $this->assertSame([['fixture', 1000, 'write_iops', 100, 300]], $this->cycle('cgroupIopsLimitApply', 'write-only')[0]);
+        // Off clears a read cap that no configuration or derivation supplies (md /home derives none).
+        $this->assertSame([['fixture', 1000, 'read_iops', 100, 0], ['fixture', 1000, 'write_iops', 100, 300]],
+            $this->cycle('cgroupIopsLimitApply', 'write-only')[0]);
     }
 }

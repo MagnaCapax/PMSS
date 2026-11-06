@@ -42,8 +42,6 @@ class DynamicIopsEnforceTest extends TestCase
         $this->assertSame(1000.0, $enforce['pool']);
         $missing = \pmssDynamicIopsAllocate($this->users(), $this->policy(), $pressure, null, 900000.0, null, false);
         $this->assertSame('missing-ceiling', $missing['fallback']);
-        $shadow = \pmssDynamicIopsAllocate($this->users(), $this->policy(['mode' => 'shadow']), $pressure, 500.0, 900000.0, null, false);
-        $this->assertSame(1800000.0, $shadow['pool']);
     }
 
     public function testMissingOrInvalidIowaitDoesNotSelectFallback(): void
@@ -71,16 +69,11 @@ class DynamicIopsEnforceTest extends TestCase
         }
     }
 
-    public function testOffAndShadowKeepEveryLegacyProjectionDespiteCurb(): void
+    public function testOffNeverProducesReadCaps(): void
     {
-        foreach (['off', 'shadow'] as $mode) foreach ([[], ['IOReadIOPS' => '/home:1000000']] as $source) {
-            $users = $this->users($source); $policy = $this->policy(['mode' => $mode]);
-            $before = $this->allocate($users, $policy, null);
-            $after = $this->allocate($users, $policy, 95);
-            $this->assertSame($before['pool'], $after['pool']);
-            $this->assertSame($before['variants'], $after['variants']);
-            $this->assertSame(0.75, $after['curb_factor']);
-            $this->assertSame(null, \pmssDynamicIopsReadCaps($users, $policy, $after));
+        foreach ([[], ['IOReadIOPS' => '/home:1000000']] as $source) {
+            $users = $this->users($source); $policy = $this->policy(['mode' => 'off']);
+            $this->assertSame(null, \pmssDynamicIopsReadCaps($users, $policy, $this->allocate($users, $policy, 95)));
         }
     }
 
@@ -95,7 +88,7 @@ class DynamicIopsEnforceTest extends TestCase
 
     public function testFloorAndTierCeilingAreAppliedBeforeExplicitMinimum(): void
     {
-        foreach ([[[], 1.0, 15], [['resourceIOPSReadMin' => 30], 1.0, 30],
+        foreach ([[[], 1.0, 20], [['resourceIOPSReadMin' => 30], 1.0, 30],
             [['resourceIOPSReadMax' => 20], 500.0, 20],
             [['resourceIOPSReadMax' => 8], 1.0, 8], [['IOReadIOPS' => '/home:5'], 1.0, 5]] as [$source, $capacity, $expected]) {
             $users = $this->users($source); $policy = $this->policy();

@@ -64,7 +64,7 @@ PHP;
             '/sys/fs/cgroup/blkio/user.slice/user-1001.slice/blkio.throttle.write_iops_device' => '8:0 90'];
         $script .= '$GLOBALS["kernel"] = '.var_export($kernel, true).';';
         // Libraries execute in a namespace so every OS interaction above is intercepted.
-        foreach (['directApply.php', 'dynamicIopsPolicy.php', 'dynamicIopsAllocation.php', 'dynamicIopsShadow.php'] as $file) {
+        foreach (['directApply.php', 'dynamicIopsPolicy.php', 'dynamicIopsAllocation.php', 'dynamicIopsContention.php', 'dynamicIopsShadow.php'] as $file) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/'.$file, 'DynamicIopsEnforceFixture');
         }
         $path = $this->pmssRepoPath('scripts/cron/cgroupIopsLimitApply.php');

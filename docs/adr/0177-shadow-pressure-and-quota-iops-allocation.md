@@ -5,6 +5,7 @@ Category: architecture
 
 ## Status
 Accepted for shadow measurement only; enforcement remains separate work.
+Shadow mode was removed by ADR 0231.
 
 [ADR 0230](0230-enforced-read-iops-with-iowait-pool-curb.md) adds host-opt-in
 `enforce` mode. It supersedes this ADR's no-writer, explicit-cap preservation

@@ -30,11 +30,10 @@ See `docs/runbooks/update-failures.md` for quick diagnosis steps.
 ## I/O sharing observations
 
 [ADR 0229](../adr/0229-io-sharing-observation-and-audit-history.md) defines these
-additive observations. Collection keeps the existing cron cadence. Shadow mode
-is still opt-in through the operator-owned local policy; shipping these fields
-does not enable it. [ADR 0230](../adr/0230-enforced-read-iops-with-iowait-pool-curb.md)
-adds a separate `enforce` mode using these inputs in the existing IOPS writer.
-The shipped default remains off; shadow observations do not change limits.
+additive observations. Collection keeps the existing cron cadence.
+[ADR 0230](../adr/0230-enforced-read-iops-with-iowait-pool-curb.md) enforces
+read caps from these inputs in the existing IOPS writer; [ADR 0231](../adr/0231-read-caps-enforced-by-default-and-contention-without-cap-stall.md)
+makes that the shipped default and removes shadow mode.
 
 | File | Figures / keys | Retention | Who can read |
 | --- | --- | --- | --- |
@@ -49,7 +48,7 @@ The shipped default remains off; shadow observations do not change limits.
 | `/var/run/pmss/io-ceiling.json` | `published.read_iops`, daily qualifying samples, `computed_at` and estimator settings | Current derived cache; source history retained above | Host aggregate, published 0644 |
 | `/var/log/pmss/benchmark-storage.jsonl` | Successful matching-device random-read `metrics.read_iops`, `run_ts`, device and test | Existing file; no stanza for this path in the PMSS logrotate template | Operator; existing file and parent permissions apply |
 | `/etc/systemd/system.conf` and `/etc/systemd/system.conf.d/*.conf` | Manager configuration bytes and uncommented `DefaultIOAccounting=` assignments | Current configuration only | Existing host configuration permissions |
-| `/etc/seedbox/config/cgroup.policy.local.php` | Operator-owned shadow/enforce/placement opt-ins; diagnostics reports presence only | Current local configuration, preserved by updates | Operator-controlled executable policy; never expose its contents to customers |
+| `/etc/seedbox/config/cgroup.policy.local.php` | Operator-owned dynamic IOPS mode, floor and placement overrides; diagnostics reports presence only | Current local configuration, preserved by updates | Operator-controlled executable policy; never expose its contents to customers |
 
 Rotation counts are finite and size splits can reduce the nominal ten-year
 window. The active file and `.1` remain plain text; older rotations are gzipped.
@@ -76,26 +75,25 @@ test -f /etc/seedbox/config/cgroup.policy.local.php && echo present
 /scripts/util/agentDiagnostics.php --json
 ```
 
-Use `zcat` to inspect an older `.gz` rotation. History readers used by shadow
+Use `zcat` to inspect an older `.gz` rotation. History readers used by dynamic IOPS
 and the ceiling estimator still bound their reads to the live file and newest
 plain rotation; retained older files are for operator analysis.
 
 CPU percentages come from the final iostat report's 120-second window; busy
 is user+nice+system, separate from steal and iowait. Host PSI avg300 is a kernel
-rolling five-minute percentage. Shadow windows average distinct recent
+rolling five-minute percentage. Pressure windows average distinct recent
 five-minute buckets. Missing iowait yields null windows without changing the
 12/4/1 full-I/O-PSI blend or fallback. Missing host kernel fields yield null;
 unavailable per-account PSI keys are absent. PSI totals are cumulative
 microseconds, parsed numerically and returned as floats by the shared parser.
 
-Shadow records without `schema_version` are version 1. `would_be` ignores
+Records without `schema_version` are version 1. `would_be` ignores
 explicit IOReadIOPS for the entire account cohort and has an independent
 floor-charge pool; `proposed` retains its existing explicit/legacy behavior.
-Fallback makes `would_be` null. Neither shadow value is applied.
+Fallback makes `would_be` null.
 
-Both active modes also log `pressure.iowait_blend`, top-level `iowait_blend`,
-`curb_factor` and `pool_uncurbed`. Only enforce mode curbs `pool`; shadow's
-factor records what the cut would be without changing proposals. Enforce uses
+Cycles also log `pressure.iowait_blend`, top-level `iowait_blend`,
+`curb_factor`, `pool_uncurbed` and `contention`. Enforce uses
 event `dynamic_iops_enforce`, `mode=enforce`, and adds `read_caps` (the selected
 variant bounded by lower explicit caps) and `read_action=apply|keep-kernel`.
 These are allocation decisions; successful changed writes separately audit
@@ -110,7 +108,7 @@ Audit failures emit `cgroup-apply audit log failed` to syslog and do not change
 the applied value, counters or cron status. Existing syslog messages remain.
 
 Diagnostics' `io_sharing` section returns static host observations with
-`unknown` for unavailable evidence: mode, local policy presence, shadow log age
+`unknown` for unavailable evidence: mode, local policy presence, cycle log age
 in seconds, published ceiling, system.conf byte count, accounting assignments,
 direct slice task count and all descendant account task count. The two counts
 are totals of cgroup.procs lines, never names or PID lists. Configuration lines
