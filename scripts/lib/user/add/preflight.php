@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/orphanCleanup.php';
+require_once dirname(__DIR__).'/cronSpool.php';
 
 /**
  * Remove only a regular cron spool whose owning UID has no current account.
@@ -18,25 +19,7 @@ function pmssAddUserCronSpoolPreflight(string $userName, string $spoolDir = '/va
         return 'unsafe';
     }
 
-    $path = $spoolDir.'/'.$userName;
-    $stat = @lstat($path);
-    if ($stat === false) {
-        return 'absent';
-    }
-    if (($stat['mode'] & 0170000) !== 0100000) {
-        return 'unsafe';
-    }
-
-    $uidLookup = $uidLookup ?? 'posix_getpwuid';
-    if (!is_callable($uidLookup) || $uidLookup((int) $stat['uid']) !== false) {
-        return 'claimed';
-    }
-
-    if (!@unlink($path)) {
-        return 'remove_failed';
-    }
-    clearstatcache(true, $path);
-    return @lstat($path) === false ? 'removed' : 'remove_failed';
+    return pmssUserCronSpoolRemoveOrphan($spoolDir.'/'.$userName, $uidLookup)['status'];
 }
 
 /**

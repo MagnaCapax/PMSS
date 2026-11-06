@@ -204,6 +204,7 @@
 /var/log/pmss/cgroupPolicyRefresh.log
 /var/log/pmss/cgroupRootCheck.log
 /var/log/pmss/cpuStat.log
+/var/log/pmss/cronSpoolCleanup.log
 /var/log/pmss/iopsLimits.log
 /var/log/pmss/iostatLog.log
 /var/log/pmss/lighttpdAccessLogTrim.log

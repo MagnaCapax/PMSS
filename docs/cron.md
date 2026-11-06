@@ -158,6 +158,15 @@ monitoring hooks are missed.
 PMSS does not overwrite per-user crontabs. Users can manage their own schedules
 with `crontab -e` / `crontab -l`.
 
+At minute 23 each hour, after a 35-second offset, root runs
+`scripts/cron/cronSpoolCleanup.php`. It removes only regular spool files whose
+owning UID has no account, including stale files left before the addUser guard.
+Files owned by any live account stay untouched, even if the filename differs.
+Symlinks, directories and entries changed during inspection are refused.
+Each removal records the username, path and old UID, never cron contents, in
+`/var/log/pmss/cronSpoolCleanup.log`. Use `--dry-run` or `PMSS_DRY_RUN=1` to
+report candidates without deleting them. See ADR 0235.
+
 `scripts/util/setupRootCron.php` also keeps a PMSS-owned `cron.service` drop-in
 under `/etc/systemd/system/cron.service.d/`. The drop-in restarts cron when it
 exits and sets `TasksMax=8192` on the service as an aggregate guard: Debian cron
