@@ -115,6 +115,10 @@ foreach ([
 
 define('PMSS_TEST_MODE', true);
 require_once __DIR__.'/../common/updateBootstrapShim.php';
+// Root helpers first, as in the full suite (ArrInstallerNoExecPolicyTest loads them early): the customer panel's
+// function_exists-guarded copies (scriptsIncFormat.php, scriptsIncFiles.php) then skip, whichever test files the
+// words select. A selection that loaded the panel first ended in "Cannot redeclare pmssJsonDecodeAssoc()".
+require_once $repoRoot.'/scripts/lib/log.php';
 
 $testFiles = glob(__DIR__.'/*Test.php') ?: [];
 $listed = trim((string) @shell_exec('git -C '.escapeshellarg($repoRoot).' ls-files -- '.escapeshellarg(':(glob)scripts/lib/tests/development/*Test.php').' 2>/dev/null'));
