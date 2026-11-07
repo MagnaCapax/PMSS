@@ -389,6 +389,11 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    root-owned linger flags for valid names absent from passwd, then owns
    linger/rootless-Docker wiring and the optional post-refresh checks
    (user crontabs are user-owned and not rewritten).
+   After the loop, run one all-account lighttpd and qBittorrent watchdog sweep
+   before the remaining phase-2 work, retrying transient start failures while
+   root cron is still disabled. Both sweeps use `runStep()` (dry-run aware and
+   fail-soft) and retain the watchdogs' locks, suspension/enable checks and
+   backoff policies; they also cover accounts skipped by same-version resume.
    A failed `userPermissions.php` repair reports the failed-command count and
    first command to stderr and returns 1. The updater warns and continues;
    only its timeout (rc 124) stops the user refresh.

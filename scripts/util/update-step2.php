@@ -498,6 +498,10 @@ $userMaintenanceSummary = pmssRunProfiledCallable('Updating all user environment
 // User maintenance can reload systemd or set slice properties, overwriting direct BFQ weights.
 runStep('Restoring direct BFQ weights after user maintenance', '/scripts/cron/cgroupBfqWeightApply.php');
 pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);
+// Root cron stays disabled through phase 2; retry account services now rather
+// than leaving a transient per-user start failure until cron resumes.
+runStep('Recovering lighttpd instances after user maintenance', '/scripts/cron/checkLighttpdInstances.php');
+runStep('Recovering qBittorrent instances after user maintenance', '/scripts/cron/checkQbittorrentInstances.php');
 // Ensure the standard download speed test file exists
 $testfilePath = '/var/www/testfile';
 if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
