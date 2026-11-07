@@ -21,20 +21,22 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $fraction = $blend === null ? 1.0 : max(0.0, min(1.0,
         ($blend - $settings['idlePressure']) / ($settings['busyPressure'] - $settings['idlePressure'])));
     $multiplier = $settings['idleMultiplier'] + $fraction * ($settings['busyMultiplier'] - $settings['idleMultiplier']);
-    // Step last cycle's multiplier toward a read-latency band instead: fixed milliseconds on rotational /home
-    // (ADR 0236), a multiple of the reference latency on solid state (ADR 0237).
+    // Only solid state uses a latency band (ADR 0237); HDDs use paired work blocks (ADR 0238).
     $latency = pmssFiniteNonNegativeFloat($pressure['latency_ms'] ?? null);
     $media = $pressure['media'] ?? null;
     $reference = pmssFiniteNonNegativeFloat($pressure['latency_reference_ms'] ?? null);
-    $band = $media === 'hdd' ? [$settings['latencyLowMs'], $settings['latencyHighMs']]
-        : (in_array($media, ['ssd', 'nvme'], true) && $reference !== null && $reference > 0
-            ? [$settings['ssdLatencyLowX'] * $reference, $settings['ssdLatencyHighX'] * $reference] : null);
+    $band = in_array($media, ['ssd', 'nvme'], true) && $reference !== null && $reference > 0
+        ? [$settings['ssdLatencyLowX'] * $reference, $settings['ssdLatencyHighX'] * $reference] : null;
     $steer = $latency !== null && $band !== null ? 'latency' : 'pressure';
     if ($steer === 'latency') {
         $previous = pmssFiniteNonNegativeFloat($pressure['previous_multiplier'] ?? null) ?? $multiplier;
         $next = $latency < $band[0] ? $previous * $settings['latencyStep']
             : ($latency > $band[1] ? $previous / $settings['latencyStep'] : $previous);
         $multiplier = max($settings['busyMultiplier'], min($settings['idleMultiplier'], $next));
+    }
+    if ($media === 'hdd') {
+        $steer = 'probe';
+        $multiplier = $pressure['probe_multiplier'] ?? $settings['probeStartLo'];
     }
     $passive = pmssFiniteNonNegativeFloat($passive);
     $benchmark = pmssFiniteNonNegativeFloat($benchmark);

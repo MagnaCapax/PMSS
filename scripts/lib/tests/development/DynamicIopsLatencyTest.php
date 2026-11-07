@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../cgroup/dynamicIopsShadow.php';
 
-/** ADR 0236: on rotational /home the pool multiplier steps toward a read-latency band; ADR 0237: on solid state toward a multiple of the reference latency. */
+/** ADR 0237: solid state steps toward a multiple of the reference latency; HDDs use ADR 0238. */
 class DynamicIopsLatencyTest extends TestCase
 {
     private function policy(array $settings = []): array
@@ -18,7 +18,7 @@ class DynamicIopsLatencyTest extends TestCase
     }
 
     /** One cycle: PSI blend 15 alone would give the busy multiplier 2. */
-    private function cycle(?float $latency, ?float $previous, ?string $media = 'hdd', float $psi = 15, ?float $reference = null): array
+    private function cycle(?float $latency, ?float $previous, ?string $media = 'ssd', float $psi = 15, ?float $reference = 2.0): array
     {
         return \pmssDynamicIopsAllocate($this->users(), $this->policy(), ['blend' => $psi, 'iowait_blend' => 10,
             'latency_ms' => $latency, 'previous_multiplier' => $previous, 'media' => $media,
@@ -67,8 +67,8 @@ class DynamicIopsLatencyTest extends TestCase
 
     public function testInsideTheBandHoldsAndAboveItLowers(): void
     {
+        $this->assertSame(6.0, $this->cycle(10.0, 6.0)['multiplier']);
         $this->assertSame(6.0, $this->cycle(20.0, 6.0)['multiplier']);
-        $this->assertSame(6.0, $this->cycle(25.0, 6.0)['multiplier']);
         $this->assertTrue(abs($this->cycle(30.0, 5.5)['multiplier'] - 5.0) < 1e-9);
     }
 
@@ -80,8 +80,8 @@ class DynamicIopsLatencyTest extends TestCase
 
     public function testFirstCycleStartsFromThePressureMultiplier(): void
     {
-        $this->assertSame(2.2, $this->cycle(5.0, null, 'hdd', 15)['multiplier']);
-        $this->assertTrue(abs($this->cycle(40.0, null, 'hdd', 0)['multiplier'] - 10 / 1.1) < 1e-9);
+        $this->assertSame(2.2, $this->cycle(5.0, null, 'ssd', 15, 2.0)['multiplier']);
+        $this->assertTrue(abs($this->cycle(40.0, null, 'ssd', 0, 2.0)['multiplier'] - 10 / 1.1) < 1e-9);
     }
 
     public function testSolidStateWithoutAReferenceAndUnknownMediaKeepThePressureMultiplier(): void
@@ -99,7 +99,7 @@ class DynamicIopsLatencyTest extends TestCase
     /** Closed loop with the real 15-minute lag (mean of the last three samples): settles in the band and stays. */
     public function testClosedLoopSettlesInTheBand(): void
     {
-        foreach ([[3.0, 20.0, 25.0], [3.6, 20.0, 25.0], [5.0, 20.0, 25.0], [1.0, 10.0, 10.0], [40.0, 80.0, 80.0]] as [$msPerMultiplier, $low, $high]) {
+        foreach ([[3.0, 10.0, 20.0], [3.6, 10.0, 20.0], [5.0, 10.0, 20.0], [1.0, 10.0, 10.0], [40.0, 80.0, 80.0]] as [$msPerMultiplier, $low, $high]) {
             $multiplier = 2.0; $seen = []; $samples = [];
             for ($i = 0; $i < 80; $i++) {
                 array_unshift($samples, min(80.0, $msPerMultiplier * $multiplier));
@@ -115,14 +115,13 @@ class DynamicIopsLatencyTest extends TestCase
 
     public function testInvalidBandSettingsAreRejected(): void
     {
-        foreach ([['latencyLowMs' => 25, 'latencyHighMs' => 20], ['latencyStep' => 1.0], ['latencyStep' => 3.0],
-            ['latencyHighMs' => 5000], ['latencyLowMs' => -1], ['ssdLatencyLowX' => 10, 'ssdLatencyHighX' => 5],
+        foreach ([['latencyStep' => 1.0], ['latencyStep' => 3.0],
+            ['ssdLatencyLowX' => 10, 'ssdLatencyHighX' => 5],
             ['ssdLatencyLowX' => 0.5], ['ssdLatencyHighX' => 2000], ['ssdLatencyLowX' => 'x']] as $bad) {
             $this->assertSame(null, \pmssDynamicIopsSettings($this->policy($bad)));
         }
         $settings = \pmssDynamicIopsSettings($this->policy());
-        $this->assertSame([20.0, 25.0, 1.1, 5.0, 10.0], [$settings['latencyLowMs'], $settings['latencyHighMs'],
-            $settings['latencyStep'], $settings['ssdLatencyLowX'], $settings['ssdLatencyHighX']]);
+        $this->assertSame([1.1, 5.0, 10.0], [$settings['latencyStep'], $settings['ssdLatencyLowX'], $settings['ssdLatencyHighX']]);
     }
 
     /** Solid state, group median 0.24 ms: the band is 1.2-2.4 ms (5x-10x the reference). */
@@ -135,8 +134,8 @@ class DynamicIopsLatencyTest extends TestCase
             $this->assertSame(6.0, $this->cycle(2.0, 6.0, $media, 30, 0.24)['multiplier']);
             $this->assertTrue(abs($this->cycle(3.0, 5.5, $media, 30, 0.24)['multiplier'] - 5.0) < 1e-9);
         }
-        // The hard-disk band ignores the reference: 2 ms is far below 20 ms whatever the group does.
-        $this->assertSame(2.2, $this->cycle(2.0, 2.0, 'hdd', 30, 0.24)['multiplier']);
+        // HDDs ignore latency and use the initial probe arm until supplied with probe state.
+        $this->assertSame(5.0, $this->cycle(2.0, 2.0, 'hdd', 30, 0.24)['multiplier']);
     }
 
     /** Group median from fleetCompare.json for three days; the disk's own quiet floor when that is higher. */

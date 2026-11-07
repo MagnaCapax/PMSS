@@ -8,6 +8,7 @@
 require_once __DIR__.'/dynamicIopsPolicy.php';
 require_once __DIR__.'/ioCeilingHistory.php';
 require_once __DIR__.'/dynamicIopsContention.php';
+require_once __DIR__.'/dynamicIopsProbe.php';
 require_once __DIR__.'/readLimitStatus.php';
 
 /** Tail complete records only, rejecting redirected paths and substituted inodes. */
@@ -84,20 +85,31 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     // Stall of accounts held at their own cap is not contention; scale host samples to what remains.
     $pressure = pmssDynamicIopsPressure(pmssDynamicIopsContentionScale(
         pmssDynamicIopsHistory('/var/log/pmss/iostat-history.log'), $contention['rows']), $now);
-    // The latency band steers from last cycle's multiplier; md members decide the media (ADR 0236).
+    // Solid state retains its previous multiplier; md members decide the media.
     $steerPath = pmssResolvePathFromEnv('PMSS_DYNAMIC_IOPS_STEER_STATE', '/var/run/pmss/dynamic-iops-steer.json');
     $steer = pmssJsonFileReadAssoc($steerPath, true) ?? [];
     $then = $steer['time'] ?? null;
     $pressure['previous_multiplier'] = is_int($then) && $then < $now && $now - $then <= 900
         ? pmssFiniteNonNegativeFloat($steer['multiplier'] ?? null) : null;
-    $pressure['media'] = $class ?? pmssCgroupPolicyHomeStorageClassResolve($device);
+    $pressure['media'] = $class ?? pmssCgroupPolicyHomeStorageClassResolve($device) ?? 'hdd';
     // Solid state steers against the group median or its own quiet floor (ADR 0237); a stale floor does not count.
     $fleetCompare = pmssJsonFileReadAssoc(pmssResolvePathFromEnv('PMSS_FLEET_COMPARE_PATH', '/var/lib/pmss/public/fleetCompare.json'), true);
     $ownFloor = $passive !== null ? pmssFiniteNonNegativeFloat($state['ioping_floor_ms'] ?? null) : null;
     $pressure['latency_reference_ms'] = pmssDynamicIopsLatencyReference($fleetCompare, $ownFloor, $now);
     $allowed = !$md && pmssCgroupPolicyReadIopsDerivationAllowed($legacyPassive, pmssCgroupPolicyReadIopsClassFloor($class, $policy), count($users));
-    $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive,
-        pmssDynamicIopsBenchmark('/var/log/pmss/benchmark-storage.jsonl', $device), $class, $allowed, $legacyPassive);
+    $benchmark = pmssDynamicIopsBenchmark('/var/log/pmss/benchmark-storage.jsonl', $device);
+    $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive, $benchmark, $class, $allowed, $legacyPassive);
+    $probe = null;
+    $probePath = pmssResolvePathFromEnv('PMSS_DYNAMIC_IOPS_PROBE_STATE', '/var/lib/pmss/dynamic-iops-probe.json');
+    if ($pressure['media'] === 'hdd') {
+        // Check the existing allocation guards before accepting work; fallback cycles cannot form pairs.
+        $probe = pmssDynamicIopsProbeCycle(pmssJsonFileReadAssoc($probePath, true), $settings,
+            $contention['counts'] ?? [], $now, (string) gethostname(), ($pressure['md_sync'] ?? false) === true,
+            $cohortComplete && pmssDynamicIopsReadCaps($users, $policy, $result) !== null);
+        $pressure['probe_multiplier'] = $probe['multiplier'];
+        $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive, $benchmark, $class, $allowed, $legacyPassive);
+        if ($result !== null) $result['probe'] = $probe['probe'];
+    }
     if ($result === null) $result = ['fallback' => 'allocation-failed'];
     // A partial config scan cannot safely redistribute the full host pool.
     if (!$cohortComplete) $result['fallback'] = 'incomplete-account-configs';
@@ -106,6 +118,9 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $result['read_action'] = $result['read_caps'] === null ? 'keep-kernel' : 'apply';
     $result['contention'] = $contention['current'];
     if ($readOnly) return true;
+    if ($probe !== null && pmssEnsureSafeDir(dirname($probePath), 0755)) {
+        pmssAtomicJsonFileWrite($probePath, $probe['state'], 0600);
+    }
     // Only a multiplier that reached the kernel is the next cycle's starting point.
     if ($result['read_action'] === 'apply' && ($result['steer'] ?? null) === 'latency' && pmssEnsureSafeDir(dirname($steerPath), 0755)) {
         pmssAtomicJsonFileWrite($steerPath, ['time' => $now, 'multiplier' => $result['multiplier']], 0600);

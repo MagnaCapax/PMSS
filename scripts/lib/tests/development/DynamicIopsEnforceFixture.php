@@ -14,7 +14,7 @@ function syslog($level, $message) { $GLOBALS['messages'][] = $message; return tr
 function closelog() {
     $output = ob_get_clean();
     echo json_encode(['kernel' => $GLOBALS['kernel'], 'writes' => $GLOBALS['writes'],
-        'logs' => $GLOBALS['logs'], 'messages' => $GLOBALS['messages'], 'output' => $output]);
+        'logs' => $GLOBALS['logs'], 'stateWrites' => $GLOBALS['stateWrites'], 'messages' => $GLOBALS['messages'], 'output' => $output]);
     return true;
 }
 function posix_geteuid() { return 0; }
@@ -32,11 +32,13 @@ function file_put_contents($path, $data) {
     $GLOBALS['writes'][] = [$path, $data]; $GLOBALS['kernel'][$path] = $data; return strlen($data);
 }
 function pmssPathTargetIsSafe(...$args) { return false; }
+function pmssEnsureSafeDir(...$args) { return true; }
+function pmssAtomicJsonFileWrite($path, $state, $mode) { $GLOBALS['stateWrites'][] = [$path, $state, $mode]; return true; }
 function pmssCgroupPolicyLoad() { return $GLOBALS['policy']; }
 function pmssCgroupPolicyMountSourceResolve($mount) { return $GLOBALS['options']['md'] ? '/dev/md0' : '/dev/sda'; }
 function pmssCgroupPolicyDeviceMajorMinorResolve($device) { return '8:0'; }
 function pmssCgroupPolicyHomeDeviceIsMdBacked($device) { return $GLOBALS['options']['md']; }
-function pmssCgroupPolicyHomeStorageClassResolve($device) { return 'hdd'; }
+function pmssCgroupPolicyHomeStorageClassResolve($device) { return $GLOBALS['options']['media'] ?? 'hdd'; }
 function pmssIoCeilingPublishedReadIops($path) { return $GLOBALS['options']['capacity']; }
 function pmssJsonFileReadAssoc($path, $safe = false) {
     if (substr($path, -11) === 'broken.json') return null;
@@ -58,13 +60,13 @@ PHP;
             'source' => ['quota' => 1000, 'IOWeight' => 100, 'IOReadIOPS' => '/home:1000000', 'IOWriteIOPS' => '/home:90']];
         $script .= '$GLOBALS["options"] = '.var_export($options, true).';';
         $script .= '$GLOBALS["policy"] = ["cgroup" => ["dynamicIops" => $GLOBALS["options"]["settings"] + ["mode" => $GLOBALS["options"]["mode"]]]];';
-        $script .= '$GLOBALS["writes"] = $GLOBALS["logs"] = $GLOBALS["messages"] = [];';
+        $script .= '$GLOBALS["writes"] = $GLOBALS["logs"] = $GLOBALS["stateWrites"] = $GLOBALS["messages"] = [];';
         $kernel = $options['kernel'] ?? [
             '/sys/fs/cgroup/blkio/user.slice/user-1001.slice/blkio.throttle.read_iops_device' => '8:0 123',
             '/sys/fs/cgroup/blkio/user.slice/user-1001.slice/blkio.throttle.write_iops_device' => '8:0 90'];
         $script .= '$GLOBALS["kernel"] = '.var_export($kernel, true).';';
         // Libraries execute in a namespace so every OS interaction above is intercepted.
-        foreach (['directApply.php', 'dynamicIopsPolicy.php', 'dynamicIopsAllocation.php', 'dynamicIopsContention.php', 'dynamicIopsShadow.php'] as $file) {
+        foreach (['directApply.php', 'dynamicIopsPolicy.php', 'dynamicIopsAllocation.php', 'dynamicIopsContention.php', 'dynamicIopsProbe.php', 'dynamicIopsShadow.php'] as $file) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/'.$file, 'DynamicIopsEnforceFixture');
         }
         $path = $this->pmssRepoPath('scripts/cron/cgroupIopsLimitApply.php');

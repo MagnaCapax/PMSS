@@ -69,7 +69,7 @@ function pmssDynamicIopsContention(float $host, ?float $system, array $slices): 
     return $held ? min($host, $free) : $host;
 }
 
-/** Measure this cycle and keep one hour of rows; nothing is recorded without the unified hierarchy. */
+/** Read v1 counters once; keep contention rows only when unified pressure is available. */
 function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now, bool $readOnly,
     string $statePath = PMSS_DYNAMIC_IOPS_CONTENTION_STATE_DEFAULT, string $unifiedRoot = PMSS_CGROUP_UNIFIED_ROOT,
     string $hostPressure = '/proc/pressure/io'): array
@@ -78,15 +78,20 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     $rows = array_values(array_filter(is_array($state['rows'] ?? null) ? $state['rows'] : [],
         static function ($row) use ($now): bool { return is_array($row) && is_int($row['time'] ?? null) && $row['time'] > $now - 3600 && $row['time'] <= $now; }));
     $host = pmssPsiFullAvg300($hostPressure);
-    if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => []];
-    $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
-    $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
-    $counts = []; $slices = []; $heldUsers = []; $heldUids = []; $heldCount = 0;
+    // Read once even without unified PSI: the HDD probe needs only v1 service counters.
+    $counts = []; $uids = [];
     foreach (array_keys($users) as $user) {
         $errors = 0;
         if (($uid = pmssCgroupDirectUserUidOrError((string) $user, $errors)) === null) continue;
+        $uids[$user] = $uid;
+        $counts[$uid] = pmssBlkioReadCount(pmssCgroupDirectUserSliceDir($uid).'/blkio.throttle.io_serviced', $majMin);
+    }
+    if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => [], 'counts' => $counts];
+    $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
+    $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
+    $slices = []; $heldUsers = []; $heldUids = []; $heldCount = 0;
+    foreach ($uids as $user => $uid) {
         $dir = pmssCgroupDirectUserSliceDir($uid);
-        $counts[$uid] = pmssBlkioReadCount($dir.'/blkio.throttle.io_serviced', $majMin);
         $cap = pmssCgroupDirectDeviceValueParse((string) @file_get_contents($dir.'/blkio.throttle.read_iops_device'), $majMin);
         $before = is_int($state['counts'][$uid] ?? null) ? $state['counts'][$uid] : null;
         $heldUsers[$user] = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then);
@@ -101,7 +106,7 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     if (!$readOnly && pmssEnsureSafeDir(dirname($statePath), 0755)) {
         pmssAtomicJsonFileWrite($statePath, ['time' => $now, 'counts' => $counts, 'held' => $heldUids, 'rows' => $rows], 0600);
     }
-    return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers];
+    return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers, 'counts' => $counts];
 }
 
 /** Scale each five-minute host sample by the contention share measured within half a bucket of it. */

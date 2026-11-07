@@ -276,20 +276,26 @@ bounded by the host value. Each five-minute PSI and iowait sample is scaled by
 that share before the 12/4/1 blends and the curb. With no account held the
 host value is used unchanged. Records carry `contention` (`host`,
 `contention`, `held`, `excluded`); state is the 0600
-`/var/run/pmss/dynamic-iops-contention.json`. Judge enforcement by device
-latency such as ioping or await, not by host iowait.
+`/var/run/pmss/dynamic-iops-contention.json`. Judge HDD enforcement by delivered
+reads; throttle wait contaminates host iowait and PSI.
 
-On rotational `/home` (md arrays by their members) the multiplier follows a
-read-latency band instead of PSI (ADR 0236). Latency is the mean of the valid
-`iopingHomeMs` probes in the last three five-minute samples. Below `latencyLowMs` (20) the previous
-cycle's multiplier rises by `latencyStep` (1.1), above `latencyHighMs` (25) it
-falls by it, inside the band it holds; it stays between the busy and idle
-multipliers. The previous multiplier is the 0600
-`/var/run/pmss/dynamic-iops-steer.json`, written only when caps were applied;
-without one from the last 15 minutes the cycle starts from the PSI multiplier.
-Records carry `steer` (`latency` or `pressure`) and `pressure.latency_ms`.
+On rotational or unknown non-solid `/home` (md arrays by their members), a
+per-host A/B probe selects the multiplier (ADR 0238). Starting at `probeStartLo`
+(5), it alternates hourly between L and 2L, within the busy/idle bounds. Each
+block has `probeBlockCycles` (12) five-minute cycles and skips its first delta
+for lag. The work is delivered read IO count from the existing slice observer.
+Invalid counters, timing gaps, md sync or keep-kernel
+cycles discard the block. Eleven (`probePairs`) adjacent valid pairs, in both
+orders so a steady demand trend cancels, provide the
+mean log work ratio: a gain above `probeGain` (0.10) raises L by sqrt(2), otherwise
+L falls by sqrt(2). L stays between busy and idle/2. Boundaries have a stable
+hostname hash offset. This is active enforcement on every HDD host with usable
+inputs, with no host overrides. State survives reboot in the 0600
+`/var/lib/pmss/dynamic-iops-probe.json` (`PMSS_DYNAMIC_IOPS_PROBE_STATE`). Records
+carry `steer=probe` and `probe` with lo, hi, arm, block_cycle (zero based),
+pairs_n, last_ratio (log ratio) and decision. Read-only previews never write it.
 
-On solid-state `/home` (`ssd`, `nvme`) the same steps follow a band of
+On solid-state `/home` (`ssd`, `nvme`) multiplier steps follow a band of
 `ssdLatencyLowX` (5) to `ssdLatencyHighX` (10) times a reference latency
 (ADR 0237). The reference is the higher of the service group's median weekly
 `/home` latency, which the brain sends once a day as the fifth argument of
@@ -297,8 +303,14 @@ On solid-state `/home` (`ssd`, `nvme`) the same steps follow a band of
 `/var/lib/pmss/public/fleetCompare.json`, used for three days), and the disk's
 own quiet floor, `ioping_floor_ms` in `/var/run/pmss/io-ceiling.json` (the
 median of each day's 10th-percentile latency over the ceiling window). Records
-carry `pressure.latency_reference_ms`. Solid state without a reference,
-unknown media and cycles without latency keep the PSI multiplier.
+carry `pressure.latency_reference_ms`. Latency is the mean of valid
+`iopingHomeMs` probes in the last three five-minute samples. Below the band the
+previous multiplier rises by `latencyStep` (1.1), above it falls by that factor,
+and inside it holds. The previous multiplier is the 0600
+`/var/run/pmss/dynamic-iops-steer.json`, written only when caps apply; without
+one from the last 15 minutes the cycle starts from the PSI multiplier. Solid
+state without a reference or latency keeps the PSI multiplier. Its records
+carry `steer=latency` or `steer=pressure` and `pressure.latency_ms`.
 
 The kernel delivers `10 * floor(cap / 10)` reads per second, so every cap is
 rounded up to the next multiple of ten: the default floor of 15 is applied as 20.

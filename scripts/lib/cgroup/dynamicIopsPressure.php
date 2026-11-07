@@ -40,6 +40,7 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
         $sum += $value; $count++;
     }
     $pressure['latency_ms'] = $count > 0 ? $sum / $count : null;
+    $pressure['md_sync'] = $rows[0]['mdSyncActive'] ?? null;
     return $pressure;
 }
 
