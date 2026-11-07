@@ -11,7 +11,7 @@ function pmssDynamicIopsProbePhase(string $hostname, int $cycles): int
 function pmssDynamicIopsProbeState(?array $state, array $settings, int $start): array
 {
     $valid = $state !== null && is_numeric($state['lo'] ?? null) && is_finite((float) $state['lo'])
-        && $state['lo'] >= $settings['busyMultiplier'] && $state['lo'] <= $settings['idleMultiplier'] / 2
+        && $state['lo'] >= $settings['busyMultiplier'] && $state['lo'] <= $settings['idleMultiplier']
         && in_array($state['arm'] ?? null, ['lo', 'hi'], true)
         && is_int($state['block_start'] ?? null) && $state['block_start'] <= $start
         && ($start - $state['block_start']) % ($settings['probeBlockCycles'] * 300) === 0
@@ -64,7 +64,7 @@ function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts
     $elapsed = $now - $state['last_time'];
     $work = pmssDynamicIopsProbeWork($state['last_counts'], $counts);
     $valid = $eligible && !$mdSync && $elapsed >= 240 && $elapsed <= 420 && $work !== null;
-    $ratio = $state['pairs'] === [] ? null : end($state['pairs']); $decision = null;
+    $ratio = $state['pairs'] === [] ? null : end($state['pairs']); $decision = null; $gate = null;
     if ($start !== $state['block_start']) {
         $blocks = intdiv($start - $state['block_start'], $seconds);
         // A missing cycle, restart or backwards clock cannot finish a valid pair.
@@ -76,14 +76,17 @@ function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts
                 / ($hiBlock ? $state['pending_work'] : $state['block_work']));
             $state['pairs'][] = $ratio;
             if (count($state['pairs']) >= $settings['probePairs']) {
-                $mean = array_sum($state['pairs']) / count($state['pairs']);
-                $gain = log(1 + $settings['probeGain']);
+                $n = count($state['pairs']); $mean = array_sum($state['pairs']) / $n;
+                // The gain must also beat this host's own hour-to-hour noise: two standard errors of its pairs.
+                $var = array_sum(array_map(static fn($r): float => ($r - $mean) ** 2, $state['pairs'])) / ($n - 1);
+                $gain = max(log(1 + $settings['probeGain']), 2 * sqrt($var / $n));
                 // Lower only on evidence: the tighter arm delivered more, or its caps bound most of the
                 // time and loosening gained nothing. Caps that never bound tested nothing, so L holds.
                 $bound = 2 * $state['lo_held'] > $state['lo_cycles'];
+                $gate = $gain;
                 $decision = $mean > $gain ? 'raise' : ($mean < -$gain || $bound ? 'lower' : 'hold');
                 $step = ['raise' => sqrt(2), 'lower' => 1 / sqrt(2), 'hold' => 1.0][$decision];
-                $state['lo'] = max($settings['busyMultiplier'], min($settings['idleMultiplier'] / 2, $state['lo'] * $step));
+                $state['lo'] = max($settings['busyMultiplier'], min($settings['idleMultiplier'], $state['lo'] * $step));
                 $state['pairs'] = [];
                 $state['lo_cycles'] = 0; $state['lo_held'] = 0;
             }
@@ -108,6 +111,6 @@ function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts
     $hi = min($settings['idleMultiplier'], 2 * $state['lo']);
     return ['state' => $state, 'multiplier' => $state['arm'] === 'lo' ? $state['lo'] : $hi,
         'probe' => ['lo' => $state['lo'], 'hi' => $hi, 'arm' => $state['arm'], 'block_cycle' => $cycle,
-            'pairs_n' => count($state['pairs']), 'last_ratio' => $ratio, 'decision' => $decision,
+            'pairs_n' => count($state['pairs']), 'last_ratio' => $ratio, 'decision' => $decision, 'gate' => $gate,
             'lo_cycles' => $state['lo_cycles'], 'lo_held' => $state['lo_held']]];
 }

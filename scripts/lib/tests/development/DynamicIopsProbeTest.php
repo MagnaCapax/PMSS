@@ -20,13 +20,15 @@ class DynamicIopsProbeTest extends TestCase
     /**
      * Eleven adjacent pairs (twelve blocks) at constant per-arm work, each first cycle omitted.
      * Without a gain L lowers only when the low arm's caps bound most of the time or the low arm
-     * delivered over 10% more; caps that never bound tested nothing, so L holds.
+     * delivered over 10% more; caps that never bound tested nothing, so L holds. L rises as far as
+     * idle, where both arms are idle and only binding caps send it back down to re-test.
      */
     public function testDecisionsFollowMeasuredGainAndRespectBounds(): void
     {
         foreach ([[3.0, 130, false, 3 * sqrt(2), 'raise'], [3.0, 100, false, 3.0, 'hold'],
             [3.0, 105, false, 3.0, 'hold'], [3.0, 100, true, 3 / sqrt(2), 'lower'], [3.0, 105, true, 3 / sqrt(2), 'lower'],
-            [3.0, 85, false, 3 / sqrt(2), 'lower'], [5.0, 130, false, 5.0, 'raise'], [2.0, 100, true, 2.0, 'lower']] as [$lo, $hiWork, $held, $expected, $decision]) {
+            [3.0, 85, false, 3 / sqrt(2), 'lower'], [5.0, 130, false, 5 * sqrt(2), 'raise'], [2.0, 100, true, 2.0, 'lower'],
+            [10.0, 130, false, 10.0, 'raise'], [10.0, 100, false, 10.0, 'hold'], [10.0, 100, true, 10 / sqrt(2), 'lower']] as [$lo, $hiWork, $held, $expected, $decision]) {
             $state = $this->state($lo); $count = 0;
             for ($cycle = 0; $cycle <= 144; $cycle++) {
                 $count += $state['arm'] === 'lo' ? 100 : $hiWork;
@@ -42,6 +44,28 @@ class DynamicIopsProbeTest extends TestCase
             $this->assertSame($decision, $result['probe']['decision']);
             $this->assertSame([], $state['pairs']);
             $this->assertSame('lo', $state['arm']);
+        }
+    }
+
+    /**
+     * A mean gain above 10% that the host's own pair-to-pair noise explains is not evidence: the high
+     * arm alternates 2.0x and 0.7x the low arm, so the mean (about +0.21) sits inside two standard
+     * errors (about 0.33) and L holds. The same mean with steady blocks raises.
+     */
+    public function testNoisyGainWithinTwoStandardErrorsHolds(): void
+    {
+        foreach ([[[200, 70], 'hold', 3.0], [[123, 123], 'raise', 3 * sqrt(2)]] as [$his, $decision, $lo]) {
+            $state = $this->state(); $count = 0;
+            for ($cycle = 0; $cycle <= 144; $cycle++) {
+                $block = intdiv($cycle, 12);
+                $count += $state['arm'] === 'lo' ? 100 : $his[intdiv($block, 2) % 2];
+                $result = \pmssDynamicIopsProbeCycle($state, \pmssDynamicIopsSettings([]), [1 => $count],
+                    1800000000 + $cycle * 300, '', false, true, false);
+                $state = $result['state'];
+            }
+            $this->assertSame($decision, $result['probe']['decision']);
+            $this->assertTrue(abs($state['lo'] - $lo) < 1e-9);
+            $this->assertTrue($result['probe']['gate'] >= log(1.1));
         }
     }
 

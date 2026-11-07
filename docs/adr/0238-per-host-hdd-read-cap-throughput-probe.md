@@ -40,7 +40,9 @@ than ten percent more delivered reads, with continued adaptation to demand.
 `scripts/lib/cgroup/dynamicIopsProbe.php` contains pure transitions, wired through
 the existing enforce cycle. For `hdd`, including unknown non-solid storage,
 alternate low L and high min(idleMultiplier, 2L). Start L at `probeStartLo` (5),
-bounded by busyMultiplier and idleMultiplier/2.
+bounded by busyMultiplier and idleMultiplier. At idle both arms are idle, so a host
+whose caps do not bind runs at the loosest setting with no hours spent at a worse
+one; only binding caps (below) send L back down to re-test.
 
 Each block spans `probeBlockCycles` (12, validated 4–48) five-minute cycles.
 Clock-aligned boundaries are offset by crc32(gethostname()) modulo that cycle
@@ -62,10 +64,10 @@ When a valid block immediately follows a valid block of the other arm, append
 ln(work_hi/work_lo), provided both are positive. Pairs run in both orders (low
 then high, high then low), so a steady rise or fall in demand over the hours
 cancels instead of reading as a gain. At `probePairs` (11, validated 2–24)
-pairs, twelve blocks, compare their mean with ln(1 + `probeGain`) (0.10,
-validated 0.01–1). Above it, multiply L by sqrt(2). Divide L by sqrt(2) only on
-evidence that the tighter arm costs nothing: the mean is below -ln(1 +
-`probeGain`) (the low arm delivered more, as a thrashing array does), or an
+pairs, twelve blocks, compare their mean with a gate: the larger of ln(1 + `probeGain`)
+(0.10, validated 0.01–1) and two standard errors of those pairs, so a gain must also
+exceed the host's own hour-to-hour demand noise. Above it, multiply L by sqrt(2). Divide L by sqrt(2) only on
+evidence that the tighter arm costs nothing: the mean is below minus the gate (the low arm delivered more, as a thrashing array does), or an
 account was held at its cap (the contention rule of ADR 0231) in more than half
 of the counted low-arm cycles since the last decision, so the low caps were
 binding and loosening them gained nothing. Otherwise hold L: caps that did not
@@ -83,7 +85,7 @@ discarded block. Missing, corrupt or incompatible state starts fresh at 5.
 Read-only and PMSS_DRY_RUN previews never write state.
 
 The dynamic-iops JSONL record carries `steer=probe` and probe fields lo, hi, arm,
-block_cycle (zero based), pairs_n, last_ratio (log ratio), decision (raise/lower
+block_cycle (zero based), pairs_n, last_ratio (log ratio), gate (on a decision cycle), decision (raise/lower
 or null). Retire latencyLowMs and latencyHighMs; latencyStep remains in use by
 the unchanged solid-state band of ADR 0237.
 
