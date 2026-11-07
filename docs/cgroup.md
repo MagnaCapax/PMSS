@@ -288,7 +288,17 @@ multipliers. The previous multiplier is the 0600
 `/var/run/pmss/dynamic-iops-steer.json`, written only when caps were applied;
 without one from the last 15 minutes the cycle starts from the PSI multiplier.
 Records carry `steer` (`latency` or `pressure`) and `pressure.latency_ms`.
-Solid-state, unknown media and cycles without latency keep the PSI multiplier.
+
+On solid-state `/home` (`ssd`, `nvme`) the same steps follow a band of
+`ssdLatencyLowX` (5) to `ssdLatencyHighX` (10) times a reference latency
+(ADR 0237). The reference is the higher of the service group's median weekly
+`/home` latency, which the brain sends once a day as the fifth argument of
+`/scripts/util/remote/fleetCompare.php` (`groupIopingMs` in
+`/var/lib/pmss/public/fleetCompare.json`, used for three days), and the disk's
+own quiet floor, `ioping_floor_ms` in `/var/run/pmss/io-ceiling.json` (the
+median of each day's 10th-percentile latency over the ceiling window). Records
+carry `pressure.latency_reference_ms`. Solid state without a reference,
+unknown media and cycles without latency keep the PSI multiplier.
 
 The kernel delivers `10 * floor(cap / 10)` reads per second, so every cap is
 rounded up to the next multiple of ten: the default floor of 15 is applied as 20.

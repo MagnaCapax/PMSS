@@ -39,11 +39,15 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
     $end = intdiv($now, 86400) * 86400;
     $start = $end - $settings['windowDays'] * 86400;
     $days = [];
+    $pings = [];
     foreach ($samples as $sample) {
         if (!is_array($sample) || !isset($sample['time']) || !is_int($sample['time'])
             || $sample['time'] < $start || $sample['time'] >= $end) {
             continue;
         }
+        // The /home read latency is kept apart: a missed probe must not drop the row from the ceiling.
+        $ping = pmssFiniteNonNegativeFloat($sample['iopingHomeMs'] ?? null);
+        if ($ping !== null && $ping <= 60000) $pings[gmdate('Y-m-d', $sample['time'])][$sample['time']] = $ping;
         $values = [];
         foreach (PMSS_IO_CEILING_DIMENSIONS as $field) {
             if (($values[$field] = pmssFiniteNonNegativeFloat($sample[$field] ?? null)) === null) {
@@ -79,11 +83,22 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
     if (count($days) < $settings['minDays']) {
         return null;
     }
+    // Quiet floor of the disk (ADR 0237): the median over accepted days of each day's 10th-percentile latency.
+    $floors = [];
+    foreach (array_keys($days) as $day) {
+        $values = array_values($pings[$day] ?? []);
+        if (count($values) < $settings['minSamplesPerDay']) continue;
+        sort($values, SORT_NUMERIC);
+        $floors[] = $values[(int) ceil(10 * count($values) / 100) - 1];
+    }
+    sort($floors, SORT_NUMERIC);
+    $n = count($floors);
+    $floor = $n === 0 ? null : ($n % 2 === 1 ? $floors[intdiv($n, 2)] : ($floors[$n / 2 - 1] + $floors[$n / 2]) / 2);
     return [
         'computed_at' => gmdate('c', $now), 'percentile' => $settings['percentile'],
         'window_days' => $settings['windowDays'], 'min_samples_per_day' => $settings['minSamplesPerDay'],
         'min_days' => $settings['minDays'], 'excluded_current_day' => gmdate('Y-m-d', $end),
         'aggregation_frame' => 'grp1 aggregate across diskIostat.php matched physical devices; 120s averages every 5 minutes',
-        'days' => $days, 'published' => $published,
+        'days' => $days, 'published' => $published, 'ioping_floor_ms' => $floor,
     ];
 }

@@ -162,4 +162,26 @@ class IoCeilingTest extends TestCase
             date_default_timezone_set($timezone);
         }
     }
+
+    /** ADR 0237: the disk's quiet floor is the median of each accepted day's 10th-percentile /home read latency. */
+    public function testQuietLatencyFloorIsTheMedianOfDailyTenthPercentiles(): void
+    {
+        $day = function (int $ago, float $low, int $missed = 0): array {
+            $rows = $this->samples($ago, array_fill(0, 20, 50));
+            foreach ($rows as $i => $row) $rows[$i]['iopingHomeMs'] = $i < $missed ? null : ($i < $missed + 2 ? $low : 9.0);
+            return $rows;
+        };
+        $result = \pmssIoCeilingCompute(array_merge($day(1, 0.2), $day(2, 0.3), $day(3, 5.0)), $this->policy(), self::NOW);
+        $this->assertSame(0.3, $result['ioping_floor_ms']);
+        // A day short of probes keeps its ceiling row but gives no floor; a missed probe never drops the row.
+        $result = \pmssIoCeilingCompute(array_merge($day(1, 0.2), $day(2, 0.3), $day(3, 5.0), $day(4, 0.1, 1)), $this->policy(), self::NOW);
+        $this->assertSame(4, count($result['days']));
+        $this->assertSame(50.0, $result['published']['read_iops']);
+        $this->assertSame(0.3, $result['ioping_floor_ms']);
+        $this->assertSame(0.25, \pmssIoCeilingCompute(array_merge($day(1, 0.2), $day(2, 0.3)), $this->policy(), self::NOW)['ioping_floor_ms']);
+        // Without any probe the read ceiling still publishes and the floor is absent.
+        $result = \pmssIoCeilingCompute($this->samples(1, array_fill(0, 20, 50)), $this->policy(), self::NOW);
+        $this->assertSame(50.0, $result['published']['read_iops']);
+        $this->assertSame(null, $result['ioping_floor_ms']);
+    }
 }

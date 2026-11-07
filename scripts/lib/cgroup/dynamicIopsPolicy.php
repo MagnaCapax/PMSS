@@ -15,13 +15,14 @@ function pmssDynamicIopsSettings(array $policy): ?array
     $settings += ['mode' => 'enforce', 'idlePressure' => 5.0, 'busyPressure' => 15.0,
         'idleMultiplier' => 10.0, 'busyMultiplier' => 2.0, 'floor' => 15, 'floorCharge' => 0.25,
         'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25, 'quotaExponent' => 1.0,
-        'latencyLowMs' => 20.0, 'latencyHighMs' => 25.0, 'latencyStep' => 1.1];
+        'latencyLowMs' => 20.0, 'latencyHighMs' => 25.0, 'latencyStep' => 1.1,
+        'ssdLatencyLowX' => 5.0, 'ssdLatencyHighX' => 10.0];
     // Shadow mode was removed; a host still set to it enforces.
     if ($settings['mode'] === 'shadow') $settings['mode'] = 'enforce';
     if (!in_array($settings['mode'], ['off', 'enforce'], true)) return null;
     foreach (['idlePressure', 'busyPressure', 'idleMultiplier', 'busyMultiplier', 'floor', 'floorCharge',
         'curbStartIowait', 'curbFullIowait', 'curbMaxCut', 'quotaExponent', 'latencyLowMs', 'latencyHighMs',
-        'latencyStep'] as $key) {
+        'latencyStep', 'ssdLatencyLowX', 'ssdLatencyHighX'] as $key) {
         $settings[$key] = pmssFiniteNonNegativeFloat($settings[$key]);
         if ($settings[$key] === null) return null;
     }
@@ -32,6 +33,8 @@ function pmssDynamicIopsSettings(array $policy): ?array
         && $settings['curbFullIowait'] <= 100 && $settings['curbMaxCut'] <= 1
         && $settings['latencyLowMs'] < $settings['latencyHighMs'] && $settings['latencyHighMs'] <= 1000
         && $settings['latencyStep'] > 1 && $settings['latencyStep'] <= 2
+        && $settings['ssdLatencyLowX'] >= 1 && $settings['ssdLatencyLowX'] < $settings['ssdLatencyHighX']
+        && $settings['ssdLatencyHighX'] <= 1000
         && in_array($settings['quotaExponent'], [1.0, 0.5], true) ? $settings : null;
 }
 

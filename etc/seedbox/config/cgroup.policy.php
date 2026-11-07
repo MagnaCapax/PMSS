@@ -22,6 +22,7 @@ return [
             'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25,
             'quotaExponent' => 1.0,
             'latencyLowMs' => 20.0, 'latencyHighMs' => 25.0, 'latencyStep' => 1.1,
+            'ssdLatencyLowX' => 5.0, 'ssdLatencyHighX' => 10.0,
         ],
 
         // Read-dimension safety floors for derived per-user caps. NVMe is not

@@ -91,6 +91,10 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $pressure['previous_multiplier'] = is_int($then) && $then < $now && $now - $then <= 900
         ? pmssFiniteNonNegativeFloat($steer['multiplier'] ?? null) : null;
     $pressure['media'] = $class ?? pmssCgroupPolicyHomeStorageClassResolve($device);
+    // Solid state steers against the group median or its own quiet floor (ADR 0237); a stale floor does not count.
+    $fleetCompare = pmssJsonFileReadAssoc(pmssResolvePathFromEnv('PMSS_FLEET_COMPARE_PATH', '/var/lib/pmss/public/fleetCompare.json'), true);
+    $ownFloor = $passive !== null ? pmssFiniteNonNegativeFloat($state['ioping_floor_ms'] ?? null) : null;
+    $pressure['latency_reference_ms'] = pmssDynamicIopsLatencyReference($fleetCompare, $ownFloor, $now);
     $allowed = !$md && pmssCgroupPolicyReadIopsDerivationAllowed($legacyPassive, pmssCgroupPolicyReadIopsClassFloor($class, $policy), count($users));
     $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive,
         pmssDynamicIopsBenchmark('/var/log/pmss/benchmark-storage.jsonl', $device), $class, $allowed, $legacyPassive);

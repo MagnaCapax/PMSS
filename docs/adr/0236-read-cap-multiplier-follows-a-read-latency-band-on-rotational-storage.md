@@ -6,7 +6,8 @@ Category: architecture
 ## Status
 Accepted. Replaces the pressure-to-multiplier mapping of ADR 0230 and ADR 0231 on
 rotational `/home`; reverses ADR 0231's rejection of "replace PSI with device
-latency". Solid-state and unknown storage keep the pressure mapping.
+latency". Unknown storage keeps the pressure mapping; solid state follows
+ADR 0237.
 
 ## Context
 With read caps enforced (ADR 0231), four hosts whose caps bind were compared

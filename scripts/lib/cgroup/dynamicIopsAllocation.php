@@ -21,13 +21,19 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $fraction = $blend === null ? 1.0 : max(0.0, min(1.0,
         ($blend - $settings['idlePressure']) / ($settings['busyPressure'] - $settings['idlePressure'])));
     $multiplier = $settings['idleMultiplier'] + $fraction * ($settings['busyMultiplier'] - $settings['idleMultiplier']);
-    // Rotational /home: step last cycle's multiplier toward the read-latency band instead (ADR 0236).
+    // Step last cycle's multiplier toward a read-latency band instead: fixed milliseconds on rotational /home
+    // (ADR 0236), a multiple of the reference latency on solid state (ADR 0237).
     $latency = pmssFiniteNonNegativeFloat($pressure['latency_ms'] ?? null);
-    $steer = $latency !== null && ($pressure['media'] ?? null) === 'hdd' ? 'latency' : 'pressure';
+    $media = $pressure['media'] ?? null;
+    $reference = pmssFiniteNonNegativeFloat($pressure['latency_reference_ms'] ?? null);
+    $band = $media === 'hdd' ? [$settings['latencyLowMs'], $settings['latencyHighMs']]
+        : (in_array($media, ['ssd', 'nvme'], true) && $reference !== null && $reference > 0
+            ? [$settings['ssdLatencyLowX'] * $reference, $settings['ssdLatencyHighX'] * $reference] : null);
+    $steer = $latency !== null && $band !== null ? 'latency' : 'pressure';
     if ($steer === 'latency') {
         $previous = pmssFiniteNonNegativeFloat($pressure['previous_multiplier'] ?? null) ?? $multiplier;
-        $next = $latency < $settings['latencyLowMs'] ? $previous * $settings['latencyStep']
-            : ($latency > $settings['latencyHighMs'] ? $previous / $settings['latencyStep'] : $previous);
+        $next = $latency < $band[0] ? $previous * $settings['latencyStep']
+            : ($latency > $band[1] ? $previous / $settings['latencyStep'] : $previous);
         $multiplier = max($settings['busyMultiplier'], min($settings['idleMultiplier'], $next));
     }
     $passive = pmssFiniteNonNegativeFloat($passive);
