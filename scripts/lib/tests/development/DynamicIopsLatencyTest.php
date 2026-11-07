@@ -21,16 +21,16 @@ class DynamicIopsLatencyTest extends TestCase
     private function cycle(?float $latency, ?float $previous, ?string $media = 'hdd', float $psi = 15, ?float $reference = null): array
     {
         return \pmssDynamicIopsAllocate($this->users(), $this->policy(), ['blend' => $psi, 'iowait_blend' => 10,
-            'latency_ms' => $latency, 'previous_multiplier' => $previous, 'media' => $media,
+            'latency_ms' => $latency, 'ioping_ms' => $latency, 'previous_multiplier' => $previous, 'media' => $media,
             'latency_reference_ms' => $reference], 500.0, null, null, false);
     }
 
-    public function testLatencyIsTheMeanOfTheValidProbesInTheLastThreeBuckets(): void
+    public function testLatencyIsTheMeanOfTheValidReadWaitsInTheLastThreeBuckets(): void
     {
         $now = 1800000000;
         $rows = function (array $pings) use ($now): array {
             $out = [];
-            foreach ($pings as $i => $ms) $out[] = ['time' => $now - 300 * $i - 10, 'psiFullAvg300' => 1, 'iopingHomeMs' => $ms];
+            foreach ($pings as $i => $ms) $out[] = ['time' => $now - 300 * $i - 10, 'psiFullAvg300' => 1, 'diskAwait' => $ms, 'iopingHomeMs' => 0.2];
             return $out;
         };
         $this->assertSame(20.0, \pmssDynamicIopsPressure($rows([18, 20, 22, 90]), $now)['latency_ms']);
@@ -43,6 +43,27 @@ class DynamicIopsLatencyTest extends TestCase
         // Older than the last three buckets does not count; no valid probe means no latency.
         $this->assertSame(null, \pmssDynamicIopsPressure($rows([null, null, null, 22]), $now)['latency_ms']);
         $this->assertSame(null, \pmssDynamicIopsPressure([], $now)['latency_ms']);
+        // The ioping median is carried apart for the solid-state band; it never becomes the rotational input.
+        $this->assertTrue(abs(\pmssDynamicIopsPressure($rows([18, 20, 22]), $now)['ioping_ms'] - 0.2) < 1e-9);
+        $this->assertSame(null, \pmssDynamicIopsPressure([], $now)['ioping_ms']);
+    }
+
+    /**
+     * ADR 0238: a busy rotational array whose ioping median reads cache (0.2 ms) while its disks serve reads at
+     * 40 ms is tightened, and an array whose disks wait 8 ms is loosened whatever ioping says.
+     */
+    public function testRotationalSteersOnTheDiskReadWaitNotTheIopingMedian(): void
+    {
+        $cycle = function (float $await, float $ioping, string $media): array {
+            return \pmssDynamicIopsAllocate($this->users(), $this->policy(), ['blend' => 15, 'iowait_blend' => 10,
+                'latency_ms' => $await, 'ioping_ms' => $ioping, 'previous_multiplier' => 5.5, 'media' => $media,
+                'latency_reference_ms' => 0.24], 500.0, null, null, false);
+        };
+        $this->assertTrue(abs($cycle(40.0, 0.2, 'hdd')['multiplier'] - 5.0) < 1e-9);
+        $this->assertTrue(abs($cycle(8.0, 60.0, 'hdd')['multiplier'] - 6.05) < 1e-9);
+        // Solid state still steers on the ioping median against its reference band (1.2-2.4 ms here).
+        $this->assertTrue(abs($cycle(40.0, 0.2, 'ssd')['multiplier'] - 6.05) < 1e-9);
+        $this->assertTrue(abs($cycle(0.5, 3.0, 'nvme')['multiplier'] - 5.0) < 1e-9);
     }
 
     /** One missed probe (the production pattern, about 1-3% of probes) keeps steering from the previous multiplier. */
@@ -50,7 +71,7 @@ class DynamicIopsLatencyTest extends TestCase
     {
         $now = 1800000000;
         $rows = [];
-        foreach ([null, 5.0, 6.0] as $i => $ms) $rows[] = ['time' => $now - 300 * $i - 10, 'psiFullAvg300' => 90, 'iopingHomeMs' => $ms];
+        foreach ([null, 5.0, 6.0] as $i => $ms) $rows[] = ['time' => $now - 300 * $i - 10, 'psiFullAvg300' => 90, 'diskAwait' => $ms];
         $pressure = \pmssDynamicIopsPressure($rows, $now);
         $result = $this->cycle($pressure['latency_ms'], 6.0);
         $this->assertSame('latency', $result['steer']);
