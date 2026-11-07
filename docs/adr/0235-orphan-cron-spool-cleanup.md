@@ -1,7 +1,7 @@
 # ADR 0235: Periodic deletion of orphan-owned cron spools
 
 Date: 2026-11-06
-Category: operations
+Category: security
 
 ## Status
 Accepted
