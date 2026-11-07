@@ -78,7 +78,9 @@ function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts
             if (count($state['pairs']) >= $settings['probePairs']) {
                 $n = count($state['pairs']); $mean = array_sum($state['pairs']) / $n;
                 // The gain must also beat this host's own hour-to-hour noise: two standard errors of its pairs.
-                $var = array_sum(array_map(static fn($r): float => ($r - $mean) ** 2, $state['pairs'])) / ($n - 1);
+                $var = 0.0;
+                foreach ($state['pairs'] as $r) $var += ($r - $mean) ** 2;
+                $var /= $n - 1;
                 $gain = max(log(1 + $settings['probeGain']), 2 * sqrt($var / $n));
                 // Lower only on evidence: the tighter arm delivered more, or its caps bound most of the
                 // time and loosening gained nothing. Caps that never bound tested nothing, so L holds.
