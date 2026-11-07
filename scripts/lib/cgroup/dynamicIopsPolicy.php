@@ -15,7 +15,7 @@ function pmssDynamicIopsSettings(array $policy): ?array
     $settings += ['mode' => 'enforce', 'idlePressure' => 5.0, 'busyPressure' => 15.0,
         'idleMultiplier' => 10.0, 'busyMultiplier' => 2.0, 'floor' => 15, 'floorCharge' => 0.25,
         'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25, 'quotaExponent' => 1.0,
-        'latencyLowMs' => 20.0, 'latencyHighMs' => 25.0, 'latencyStep' => 1.25];
+        'latencyLowMs' => 20.0, 'latencyHighMs' => 25.0, 'latencyStep' => 1.1];
     // Shadow mode was removed; a host still set to it enforces.
     if ($settings['mode'] === 'shadow') $settings['mode'] = 'enforce';
     if (!in_array($settings['mode'], ['off', 'enforce'], true)) return null;

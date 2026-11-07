@@ -9,15 +9,16 @@ rotational `/home`; reverses ADR 0231's rejection of "replace PSI with device
 latency". Solid-state and unknown storage keep the pressure mapping.
 
 ## Context
-With read caps enforced (ADR 0231), hosts whose caps bind were measured against
-seven hosts without caps over the same clock hours. Where caps bind, total read
-throughput fell 40-70%, `/home` small-read latency fell from about 11-25 ms to
-1-8 ms and disk utilization fell, while host full-I/O PSI did not fall. Tasks
-waiting in the throttle count as stall, so PSI stays high and keeps the
-multiplier at its busy value even when the disk has spare capacity. Hard disks
-without caps run at about 20-25 ms small-read latency at about half
-utilization; that band is where they deliver the most work at an acceptable
-wait.
+With read caps enforced (ADR 0231), four hosts whose caps bind were compared
+with seven hosts without caps over the same clock hours (each host's change
+divided by the controls' change). Read throughput fell 50-77%, `/home`
+small-read latency fell 93-96% (on three; the fourth was already at 0.5 ms)
+and disk utilization fell 25-52%, while host full-I/O PSI did not fall. Tasks waiting in the throttle count as stall, so PSI
+stays high and keeps the multiplier at its busy value with spare disk capacity.
+The `/home` ioping probe mostly reads drive cache, so its latency tracks queue
+depth. Over 28 days before caps, hard-disk-backed virtual machines delivered
+more read throughput as that latency rose to about 15-20 ms and no more beyond
+it up to 35 ms; 20-25 ms sits at the start of that plateau.
 
 ## Options Considered
 - Keep PSI and refine which stall counts (ADR 0231, #1249): each refinement
@@ -27,14 +28,17 @@ wait.
   oscillates; rejected.
 - Step the previous multiplier toward a latency band: chosen. Below the band
   the multiplier rises by a fixed factor each cycle, above it falls by the same
-  factor, inside it holds. It settles where the disk's own latency sits in the
-  band, and a saturated or degraded disk still pushes it to the busy value.
+  factor, inside it holds. The latency it reads lags the multiplier by up to 15
+  minutes; a factor of 1.25 is as wide as the band and cycled 18-29 ms in a
+  model of that lag, a factor of 1.1 settled inside it. A saturated or degraded
+  disk still pushes the multiplier to the busy value.
 - A solid-state target from the service group's median latency: the node has
-  no group data today; solid-state keeps the pressure mapping until a group
-  target is delivered.
+  no group latency data, and the fleet's solid-state hosts show no
+  throughput-against-latency curve to place a band on; solid-state keeps the
+  pressure mapping.
 
 ## Decision
-- Settings `latencyLowMs` (20), `latencyHighMs` (25) and `latencyStep` (1.25)
+- Settings `latencyLowMs` (20), `latencyHighMs` (25) and `latencyStep` (1.1)
   in `cgroup.dynamicIops`. Low below high, high at most 1000, step above 1 and
   at most 2; anything else rejects the settings as before.
 - Latency is the mean of the last three five-minute `iopingHomeMs` samples in
@@ -53,7 +57,7 @@ wait.
 
 ## Consequences
 - On a hard disk with spare capacity the multiplier rises from busy to idle in
-  about 40 minutes (eight cycles); under real saturation it falls as fast.
+  about 85 minutes (17 cycles); under real saturation it falls as fast.
 - A virtual disk that reports itself rotational while backed by solid state
   is steered as a hard disk: its latency stays below the band, so its caps sit
   at the idle multiplier, which is the pre-cap idle behaviour.

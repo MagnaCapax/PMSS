@@ -43,27 +43,27 @@ class DynamicIopsLatencyTest extends TestCase
     {
         $result = $this->cycle(7.5, 2.0);
         $this->assertSame('latency', $result['steer']);
-        $this->assertSame(2.5, $result['multiplier']);
-        $this->assertSame(1250.0, $result['pool']);
+        $this->assertSame(2.2, $result['multiplier']);
+        $this->assertSame(1100.0, $result['pool']);
     }
 
     public function testInsideTheBandHoldsAndAboveItLowers(): void
     {
         $this->assertSame(6.0, $this->cycle(20.0, 6.0)['multiplier']);
         $this->assertSame(6.0, $this->cycle(25.0, 6.0)['multiplier']);
-        $this->assertSame(4.8, $this->cycle(30.0, 6.0)['multiplier']);
+        $this->assertTrue(abs($this->cycle(30.0, 5.5)['multiplier'] - 5.0) < 1e-9);
     }
 
     public function testMultiplierStaysBetweenBusyAndIdle(): void
     {
         $this->assertSame(10.0, $this->cycle(1.0, 9.5)['multiplier']);
-        $this->assertSame(2.0, $this->cycle(80.0, 2.2)['multiplier']);
+        $this->assertSame(2.0, $this->cycle(80.0, 2.1)['multiplier']);
     }
 
     public function testFirstCycleStartsFromThePressureMultiplier(): void
     {
-        $this->assertSame(2.5, $this->cycle(5.0, null, 'hdd', 15)['multiplier']);
-        $this->assertSame(8.0, $this->cycle(40.0, null, 'hdd', 0)['multiplier']);
+        $this->assertSame(2.2, $this->cycle(5.0, null, 'hdd', 15)['multiplier']);
+        $this->assertTrue(abs($this->cycle(40.0, null, 'hdd', 0)['multiplier'] - 10 / 1.1) < 1e-9);
     }
 
     public function testSolidStateAndUnknownMediaKeepThePressureMultiplier(): void
@@ -78,15 +78,16 @@ class DynamicIopsLatencyTest extends TestCase
         $this->assertSame(2.0, $missing['multiplier']);
     }
 
-    /** Closed loop: a disk whose latency grows with the pool settles inside the band and stays. */
+    /** Closed loop with the real 15-minute lag (mean of the last three samples): settles in the band and stays. */
     public function testClosedLoopSettlesInTheBand(): void
     {
-        foreach ([[3.0, 20.0, 25.0], [1.0, 10.0, 10.0], [40.0, 80.0, 80.0]] as [$msPerMultiplier, $low, $high]) {
-            $multiplier = 2.0; $seen = [];
-            for ($i = 0; $i < 40; $i++) {
-                $latency = min(80.0, $msPerMultiplier * $multiplier);
-                $multiplier = $this->cycle($latency, $multiplier)['multiplier'];
-                if ($i >= 30) $seen[] = min(80.0, $msPerMultiplier * $multiplier);
+        foreach ([[3.0, 20.0, 25.0], [3.6, 20.0, 25.0], [5.0, 20.0, 25.0], [1.0, 10.0, 10.0], [40.0, 80.0, 80.0]] as [$msPerMultiplier, $low, $high]) {
+            $multiplier = 2.0; $seen = []; $samples = [];
+            for ($i = 0; $i < 80; $i++) {
+                array_unshift($samples, min(80.0, $msPerMultiplier * $multiplier));
+                $samples = array_slice($samples, 0, 3);
+                if (count($samples) === 3) $multiplier = $this->cycle(array_sum($samples) / 3, $multiplier)['multiplier'];
+                if ($i >= 60) $seen[] = min(80.0, $msPerMultiplier * $multiplier);
             }
             $this->assertTrue(min($seen) >= $low && max($seen) <= $high,
                 "ms/x {$msPerMultiplier}: settled latency ".min($seen).'..'.max($seen)." outside {$low}..{$high}");
@@ -101,6 +102,6 @@ class DynamicIopsLatencyTest extends TestCase
             $this->assertSame(null, \pmssDynamicIopsSettings($this->policy($bad)));
         }
         $settings = \pmssDynamicIopsSettings($this->policy());
-        $this->assertSame([20.0, 25.0, 1.25], [$settings['latencyLowMs'], $settings['latencyHighMs'], $settings['latencyStep']]);
+        $this->assertSame([20.0, 25.0, 1.1], [$settings['latencyLowMs'], $settings['latencyHighMs'], $settings['latencyStep']]);
     }
 }
