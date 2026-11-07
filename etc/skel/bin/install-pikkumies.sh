@@ -5,7 +5,7 @@
 # neither ~/bin nor ~/.local/bin is on your PATH (one marked block in ~/.bashrc and ~/.profile).
 # Re-run to update; Pikkumies also updates itself daily from your crontab (the line tagged # pikkumies-update).
 # This installer first fetches its own newest copy from PMSS and runs that; --no-self-update keeps this copy.
-# Remove: rm -rf ~/.mcxPikkumies ~/pikkumies, then delete that crontab line; ~/.virsilipasKey holds your AI key (ADR 0090).
+# ~/.virsilipasKey holds your AI key (ADR 0090).
 [ -n "${PIKKUMIES_SELF_TMP:-}" ] && [ "$PIKKUMIES_SELF_TMP" = "$0" ] && rm -f "$0"
 if [[ " $* " != *" --no-self-update "* && " $* " != *" --skip-update "* ]] && tmp=$(mktemp 2>/dev/null); then
     url="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/bin/install-pikkumies.sh"
