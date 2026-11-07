@@ -42,7 +42,7 @@ the existing enforce cycle. For `hdd`, including unknown non-solid storage,
 alternate low L and high min(idleMultiplier, 2L). Start L at `probeStartLo` (5),
 bounded by busyMultiplier and idleMultiplier. At idle both arms are idle, so a host
 whose caps do not bind runs at the loosest setting with no hours spent at a worse
-one; only binding caps (below) send L back down to re-test.
+one; at idle nothing is tested, so L holds there (below).
 
 Each block spans `probeBlockCycles` (12, validated 4–48) five-minute cycles.
 Clock-aligned boundaries are offset by crc32(gethostname()) modulo that cycle
@@ -69,8 +69,13 @@ pairs, twelve blocks, compare their mean with a gate: the larger of ln(1 + `prob
 exceed the host's own hour-to-hour demand noise. Above it, multiply L by sqrt(2). Divide L by sqrt(2) only on
 evidence that the tighter arm costs nothing: the mean is below minus the gate (the low arm delivered more, as a thrashing array does), or an
 account was held at its cap (the contention rule of ADR 0231) in more than half
-of the counted low-arm cycles since the last decision, so the low caps were
-binding and loosening them gained nothing. Otherwise hold L: caps that did not
+of the counted low-arm cycles since the last decision and the mean is at or
+below zero, so the low caps were binding and loosening them delivered no more.
+A positive mean below the gate is a gain too small to prove, not evidence that
+tighter is free. A host whose caps bind most of the time would otherwise lower
+L on every gain it could not yet prove. At idle both arms
+are equal and nothing is tested, so binding caps there hold L instead of sending
+it down and back up every day. Otherwise hold L: caps that did not
 bind tested nothing, and lowering on that would walk a lightly used host to the
 tightest multiplier, where the next busy period stays capped until twelve more
 hours of pairs raise it. Clear pairs and the held counters after each decision;

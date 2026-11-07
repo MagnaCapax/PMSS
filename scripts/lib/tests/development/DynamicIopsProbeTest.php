@@ -19,16 +19,18 @@ class DynamicIopsProbeTest extends TestCase
 
     /**
      * Eleven adjacent pairs (twelve blocks) at constant per-arm work, each first cycle omitted.
-     * Without a gain L lowers only when the low arm's caps bound most of the time or the low arm
-     * delivered over 10% more; caps that never bound tested nothing, so L holds. L rises as far as
-     * idle, where both arms are idle and only binding caps send it back down to re-test.
+     * Without a gain L lowers only when the low arm delivered over 10% more, or when the low arm's
+     * caps bound most of the time and the high arm delivered no more. A held low arm whose high arm
+     * delivered 5% more holds: that gain is too small to prove, not evidence that tighter is free.
+     * Caps that never bound tested nothing, so L holds. L rises as far as idle, where both arms are
+     * equal, nothing is tested and L holds even with binding caps.
      */
     public function testDecisionsFollowMeasuredGainAndRespectBounds(): void
     {
         foreach ([[3.0, 130, false, 3 * sqrt(2), 'raise'], [3.0, 100, false, 3.0, 'hold'],
-            [3.0, 105, false, 3.0, 'hold'], [3.0, 100, true, 3 / sqrt(2), 'lower'], [3.0, 105, true, 3 / sqrt(2), 'lower'],
+            [3.0, 105, false, 3.0, 'hold'], [3.0, 100, true, 3 / sqrt(2), 'lower'], [3.0, 105, true, 3.0, 'hold'],
             [3.0, 85, false, 3 / sqrt(2), 'lower'], [5.0, 130, false, 5 * sqrt(2), 'raise'], [2.0, 100, true, 2.0, 'lower'],
-            [10.0, 130, false, 10.0, 'raise'], [10.0, 100, false, 10.0, 'hold'], [10.0, 100, true, 10 / sqrt(2), 'lower']] as [$lo, $hiWork, $held, $expected, $decision]) {
+            [10.0, 130, false, 10.0, 'raise'], [10.0, 100, false, 10.0, 'hold'], [10.0, 100, true, 10.0, 'hold']] as [$lo, $hiWork, $held, $expected, $decision]) {
             $state = $this->state($lo); $count = 0;
             for ($cycle = 0; $cycle <= 144; $cycle++) {
                 $count += $state['arm'] === 'lo' ? 100 : $hiWork;
@@ -69,10 +71,13 @@ class DynamicIopsProbeTest extends TestCase
         }
     }
 
-    /** Demand rising 15% an hour under both arms is not a gain: adjacent pairs cancel the trend. */
+    /**
+     * Demand rising 15% an hour under both arms is not a gain: adjacent pairs cancel the trend. The odd
+     * pair left over keeps a small positive mean, so binding caps hold L rather than lower it.
+     */
     public function testSteadyDemandTrendDoesNotRaise(): void
     {
-        foreach ([[false, 'hold', 3.0], [true, 'lower', 3 / sqrt(2)]] as [$held, $decision, $lo]) {
+        foreach ([[false, 'hold', 3.0], [true, 'hold', 3.0]] as [$held, $decision, $lo]) {
             $state = $this->state(); $count = 0;
             for ($cycle = 0; $cycle <= 144; $cycle++) {
                 $count += (int) round(1000 * pow(1.15, $cycle / 12));

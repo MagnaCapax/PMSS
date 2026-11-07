@@ -296,9 +296,10 @@ orders so a steady demand trend cancels, provide the
 mean log work ratio. A gain above the gate, the larger of `probeGain` (0.10, as a
 log ratio ln 1.1) and two standard errors of the pairs, raises L by sqrt(2). L falls
 by sqrt(2) only on evidence: the low arm delivered more by the same gate, or an account
-was held at its cap (ADR 0231) in more than half of the counted low-arm cycles.
-Otherwise L holds, since caps that did not bind tested nothing. L stays between
-busy and idle; at idle both arms are idle. Boundaries have a stable
+was held at its cap (ADR 0231) in more than half of the counted low-arm cycles and
+the high arm delivered no more (mean at or below zero). Otherwise L holds: caps that
+did not bind tested nothing, and a positive mean below the gate is an unproven gain.
+L stays between busy and idle; at idle both arms are equal, nothing is tested and L holds. Boundaries have a stable
 hostname hash offset. This is active enforcement on every HDD host with usable
 inputs, with no host overrides. State survives reboot in the 0600
 `/var/lib/pmss/dynamic-iops-probe.json` (`PMSS_DYNAMIC_IOPS_PROBE_STATE`). Records
