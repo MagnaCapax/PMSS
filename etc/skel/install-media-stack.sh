@@ -2860,7 +2860,7 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	# Upgrade only the exact shipped aliases; customer-written launch commands stay intact.
 	if [[ $DRY_RUN -eq 0 && -f "$HOME/.bashrc.custom" && ! -L "$HOME/.bashrc.custom" ]]; then
 		while IFS=: read -r line_number _; do
-			sed -i "${line_number}s|; ionice|${jellyfin_alias_bind//\\/\\\\}; ionice|" "$HOME/.bashrc.custom"
+			sed -i -e "${line_number}s|; ionice|${jellyfin_alias_bind//\\/\\\\}; ionice|" -e "${line_number}s|ionice -c 3|ionice -c 2 -n 4|" "$HOME/.bashrc.custom"
 		done < <(grep -nFx -e "$jellyfin_alias_legacy" -e "${jellyfin_alias_legacy/ionice -c 2 -n 4/ionice -c 3}" "$HOME/.bashrc.custom" || true)
 	fi
 	append_to_bashrc_custom_if_missing "# PMSS Jellyfin alias (updated Nov 2025)

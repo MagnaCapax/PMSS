@@ -391,6 +391,8 @@ source "$HOME/.bashrc.custom"; eval jellyfin; eval fixtur01
 printf '%s\n' "${jellyfin_alias_legacy/ionice -c 2 -n 4/ionice -c 3}" >"$HOME/.bashrc.custom"
 jellyfin_alias_write
 grep -Fq 'ASPNETCORE_URLS=\"http://127.0.0.1:22104\"' "$HOME/.bashrc.custom"
+grep -Fq 'ionice -c 2 -n 4' "$HOME/.bashrc.custom"
+if grep -Fq 'ionice -c 3' "$HOME/.bashrc.custom"; then exit 1; fi
 printf '%s\n' "alias jellyfin='printf custom'" >"$HOME/.bashrc.custom"
 jellyfin_alias_write; source "$HOME/.bashrc.custom"; eval jellyfin
 BASH
