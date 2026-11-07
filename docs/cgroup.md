@@ -279,6 +279,17 @@ host value is used unchanged. Records carry `contention` (`host`,
 `/var/run/pmss/dynamic-iops-contention.json`. Judge enforcement by device
 latency such as ioping or await, not by host iowait.
 
+On rotational `/home` (md arrays by their members) the multiplier follows a
+read-latency band instead of PSI (ADR 0236). Latency is the mean of the last
+three five-minute `iopingHomeMs` samples. Below `latencyLowMs` (20) the previous
+cycle's multiplier rises by `latencyStep` (1.25), above `latencyHighMs` (25) it
+falls by it, inside the band it holds; it stays between the busy and idle
+multipliers. The previous multiplier is the 0600
+`/var/run/pmss/dynamic-iops-steer.json`, written only when caps were applied;
+without one from the last 15 minutes the cycle starts from the PSI multiplier.
+Records carry `steer` (`latency` or `pressure`) and `pressure.latency_ms`.
+Solid-state, unknown media and cycles without latency keep the PSI multiplier.
+
 The kernel delivers `10 * floor(cap / 10)` reads per second, so every cap is
 rounded up to the next multiple of ten: the default floor of 15 is applied as 20.
 

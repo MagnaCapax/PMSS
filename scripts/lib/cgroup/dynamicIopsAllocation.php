@@ -21,6 +21,15 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $fraction = $blend === null ? 1.0 : max(0.0, min(1.0,
         ($blend - $settings['idlePressure']) / ($settings['busyPressure'] - $settings['idlePressure'])));
     $multiplier = $settings['idleMultiplier'] + $fraction * ($settings['busyMultiplier'] - $settings['idleMultiplier']);
+    // Rotational /home: step last cycle's multiplier toward the read-latency band instead (ADR 0236).
+    $latency = pmssFiniteNonNegativeFloat($pressure['latency_ms'] ?? null);
+    $steer = $latency !== null && ($pressure['media'] ?? null) === 'hdd' ? 'latency' : 'pressure';
+    if ($steer === 'latency') {
+        $previous = pmssFiniteNonNegativeFloat($pressure['previous_multiplier'] ?? null) ?? $multiplier;
+        $next = $latency < $settings['latencyLowMs'] ? $previous * $settings['latencyStep']
+            : ($latency > $settings['latencyHighMs'] ? $previous / $settings['latencyStep'] : $previous);
+        $multiplier = max($settings['busyMultiplier'], min($settings['idleMultiplier'], $next));
+    }
     $passive = pmssFiniteNonNegativeFloat($passive);
     $benchmark = pmssFiniteNonNegativeFloat($benchmark);
     // A cached fio figure can exceed real disk IOPS a thousandfold; a cap needs the measured ceiling.
@@ -59,7 +68,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $low = $count === 0 ? 1.0 : $sorted[intdiv($count - 1, 2)];
     $median = $count === 0 ? 1.0 : $low + ($sorted[intdiv($count, 2)] - $low) / 2;
     $result = ['pressure' => $pressure, 'passive_read_iops' => $passive, 'benchmark_read_iops' => $benchmark,
-        'host_read_iops' => $host, 'multiplier' => $multiplier, 'pool' => $pool, 'fallback' => $fallback, 'variants' => []];
+        'host_read_iops' => $host, 'multiplier' => $multiplier, 'steer' => $steer, 'pool' => $pool, 'fallback' => $fallback, 'variants' => []];
     foreach (['1.0' => 1.0, '0.5' => 0.5] as $label => $alpha) {
         $rows = $cohort; $lift = 0.0; $wouldLift = 0.0;
         foreach ($rows as $user => $row) {

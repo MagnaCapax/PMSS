@@ -21,6 +21,7 @@ return [
             'floor' => 15, 'floorCharge' => 0.25,
             'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25,
             'quotaExponent' => 1.0,
+            'latencyLowMs' => 20.0, 'latencyHighMs' => 25.0, 'latencyStep' => 1.25,
         ],
 
         // Read-dimension safety floors for derived per-user caps. NVMe is not

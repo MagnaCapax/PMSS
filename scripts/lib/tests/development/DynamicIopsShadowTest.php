@@ -45,7 +45,7 @@ class DynamicIopsShadowTest extends TestCase
             $pool = $passive === null ? 0.0 : 2000.0;
             $expected = ['pressure' => $pressure, 'passive_read_iops' => $passive,
                 'benchmark_read_iops' => null, 'host_read_iops' => $passive ?? 0.0,
-                'multiplier' => 2.0, 'pool' => $pool, 'fallback' => $case['fallback'] ?? null, 'variants' => []];
+                'multiplier' => 2.0, 'steer' => 'pressure', 'pool' => $pool, 'fallback' => $case['fallback'] ?? null, 'variants' => []];
             foreach (['1.0' => 1.0, '0.5' => 0.5] as $variant => $alpha) {
                 $expectedRow = array_replace($row, $case['row'] ?? []);
                 $expectedRow['would_be'] = isset($case['fallback']) ? null : 2000;

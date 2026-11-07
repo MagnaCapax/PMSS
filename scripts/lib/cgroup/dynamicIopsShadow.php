@@ -84,6 +84,13 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     // Stall of accounts held at their own cap is not contention; scale host samples to what remains.
     $pressure = pmssDynamicIopsPressure(pmssDynamicIopsContentionScale(
         pmssDynamicIopsHistory('/var/log/pmss/iostat-history.log'), $contention['rows']), $now);
+    // The latency band steers from last cycle's multiplier; md members decide the media (ADR 0236).
+    $steerPath = pmssResolvePathFromEnv('PMSS_DYNAMIC_IOPS_STEER_STATE', '/var/run/pmss/dynamic-iops-steer.json');
+    $steer = pmssJsonFileReadAssoc($steerPath, true) ?? [];
+    $then = $steer['time'] ?? null;
+    $pressure['previous_multiplier'] = is_int($then) && $then < $now && $now - $then <= 900
+        ? pmssFiniteNonNegativeFloat($steer['multiplier'] ?? null) : null;
+    $pressure['media'] = $class ?? pmssCgroupPolicyHomeStorageClassResolve($device);
     $allowed = !$md && pmssCgroupPolicyReadIopsDerivationAllowed($legacyPassive, pmssCgroupPolicyReadIopsClassFloor($class, $policy), count($users));
     $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive,
         pmssDynamicIopsBenchmark('/var/log/pmss/benchmark-storage.jsonl', $device), $class, $allowed, $legacyPassive);
@@ -95,6 +102,10 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $result['read_action'] = $result['read_caps'] === null ? 'keep-kernel' : 'apply';
     $result['contention'] = $contention['current'];
     if ($readOnly) return true;
+    // Only a multiplier that reached the kernel is the next cycle's starting point.
+    if ($result['read_action'] === 'apply' && ($result['steer'] ?? null) === 'latency' && pmssEnsureSafeDir(dirname($steerPath), 0755)) {
+        pmssAtomicJsonFileWrite($steerPath, ['time' => $now, 'multiplier' => $result['multiplier']], 0600);
+    }
     // The panel shows the delivered limit and a notice while held (ADR 0232).
     if ($result['read_caps'] !== null) pmssReadLimitStatusPublish($result['read_caps'], $contention['held'], $now);
     $payload = pmssJsonEncodeSafe(['schema_version' => 2, 'timestamp' => gmdate('c', $now),

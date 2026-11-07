@@ -4,7 +4,7 @@ Date: 2026-11-06
 Category: architecture
 
 ## Status
-Accepted. Supersedes ADR 0230's host opt-in and the shadow mode of ADR 0177;
+Accepted; on rotational storage the multiplier follows ADR 0236. Supersedes ADR 0230's host opt-in and the shadow mode of ADR 0177;
 changes ADR 0176's placement default.
 
 ## Context

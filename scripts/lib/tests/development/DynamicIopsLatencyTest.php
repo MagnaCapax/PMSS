@@ -1,0 +1,106 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../cgroup/dynamicIopsShadow.php';
+
+/** ADR 0236: on rotational /home the pool multiplier steps toward a read-latency band. */
+class DynamicIopsLatencyTest extends TestCase
+{
+    private function policy(array $settings = []): array
+    {
+        return ['cgroup' => ['dynamicIops' => $settings + ['mode' => 'enforce']]];
+    }
+
+    private function users(): array
+    {
+        return ['fixture' => ['source' => ['quota' => 1000, 'IOWeight' => 100, 'resourceIOPSReadMax' => 100000], 'weight' => 100]];
+    }
+
+    /** One cycle: PSI blend 15 alone would give the busy multiplier 2. */
+    private function cycle(?float $latency, ?float $previous, ?string $media = 'hdd', float $psi = 15): array
+    {
+        return \pmssDynamicIopsAllocate($this->users(), $this->policy(), ['blend' => $psi, 'iowait_blend' => 10,
+            'latency_ms' => $latency, 'previous_multiplier' => $previous, 'media' => $media], 500.0, null, null, false);
+    }
+
+    public function testLatencyIsTheMeanOfTheLastThreeBucketsAndNeedsAllThree(): void
+    {
+        $now = 1800000000;
+        $rows = function (array $pings) use ($now): array {
+            $out = [];
+            foreach ($pings as $i => $ms) $out[] = ['time' => $now - 300 * $i - 10, 'psiFullAvg300' => 1, 'iopingHomeMs' => $ms];
+            return $out;
+        };
+        $this->assertSame(20.0, \pmssDynamicIopsPressure($rows([18, 20, 22, 90]), $now)['latency_ms']);
+        $this->assertSame(null, \pmssDynamicIopsPressure($rows([18, null, 22]), $now)['latency_ms']);
+        $this->assertSame(null, \pmssDynamicIopsPressure($rows([18, 20]), $now)['latency_ms']);
+        $this->assertSame(null, \pmssDynamicIopsPressure($rows([18, 70000, 22]), $now)['latency_ms']);
+        $this->assertSame(150.0, \pmssDynamicIopsPressure($rows([150, 150, 150]), $now)['latency_ms']);
+    }
+
+    public function testQuietDiskRaisesTheMultiplierOneStepPerCycle(): void
+    {
+        $result = $this->cycle(7.5, 2.0);
+        $this->assertSame('latency', $result['steer']);
+        $this->assertSame(2.5, $result['multiplier']);
+        $this->assertSame(1250.0, $result['pool']);
+    }
+
+    public function testInsideTheBandHoldsAndAboveItLowers(): void
+    {
+        $this->assertSame(6.0, $this->cycle(20.0, 6.0)['multiplier']);
+        $this->assertSame(6.0, $this->cycle(25.0, 6.0)['multiplier']);
+        $this->assertSame(4.8, $this->cycle(30.0, 6.0)['multiplier']);
+    }
+
+    public function testMultiplierStaysBetweenBusyAndIdle(): void
+    {
+        $this->assertSame(10.0, $this->cycle(1.0, 9.5)['multiplier']);
+        $this->assertSame(2.0, $this->cycle(80.0, 2.2)['multiplier']);
+    }
+
+    public function testFirstCycleStartsFromThePressureMultiplier(): void
+    {
+        $this->assertSame(2.5, $this->cycle(5.0, null, 'hdd', 15)['multiplier']);
+        $this->assertSame(8.0, $this->cycle(40.0, null, 'hdd', 0)['multiplier']);
+    }
+
+    public function testSolidStateAndUnknownMediaKeepThePressureMultiplier(): void
+    {
+        foreach (['ssd', 'nvme', null] as $media) {
+            $result = $this->cycle(0.2, 5.0, $media);
+            $this->assertSame('pressure', $result['steer']);
+            $this->assertSame(2.0, $result['multiplier']);
+        }
+        $missing = $this->cycle(null, 5.0);
+        $this->assertSame('pressure', $missing['steer']);
+        $this->assertSame(2.0, $missing['multiplier']);
+    }
+
+    /** Closed loop: a disk whose latency grows with the pool settles inside the band and stays. */
+    public function testClosedLoopSettlesInTheBand(): void
+    {
+        foreach ([[3.0, 20.0, 25.0], [1.0, 10.0, 10.0], [40.0, 80.0, 80.0]] as [$msPerMultiplier, $low, $high]) {
+            $multiplier = 2.0; $seen = [];
+            for ($i = 0; $i < 40; $i++) {
+                $latency = min(80.0, $msPerMultiplier * $multiplier);
+                $multiplier = $this->cycle($latency, $multiplier)['multiplier'];
+                if ($i >= 30) $seen[] = min(80.0, $msPerMultiplier * $multiplier);
+            }
+            $this->assertTrue(min($seen) >= $low && max($seen) <= $high,
+                "ms/x {$msPerMultiplier}: settled latency ".min($seen).'..'.max($seen)." outside {$low}..{$high}");
+            $this->assertSame(1, count(array_unique(array_map('strval', $seen))));
+        }
+    }
+
+    public function testInvalidBandSettingsAreRejected(): void
+    {
+        foreach ([['latencyLowMs' => 25, 'latencyHighMs' => 20], ['latencyStep' => 1.0], ['latencyStep' => 3.0],
+            ['latencyHighMs' => 5000], ['latencyLowMs' => -1]] as $bad) {
+            $this->assertSame(null, \pmssDynamicIopsSettings($this->policy($bad)));
+        }
+        $settings = \pmssDynamicIopsSettings($this->policy());
+        $this->assertSame([20.0, 25.0, 1.25], [$settings['latencyLowMs'], $settings['latencyHighMs'], $settings['latencyStep']]);
+    }
+}
