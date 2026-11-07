@@ -31,13 +31,14 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
     $pressure['blend'] = in_array(null, $io, true) ? null : (12 * $io[5] + 4 * $io[15] + $io[60]) / 17;
     $iowait = $pressure['iowait'];
     $pressure['iowait_blend'] = in_array(null, $iowait, true) ? null : (12 * $iowait[5] + 4 * $iowait[15] + $iowait[60]) / 17;
-    // /home small-read latency (O_DIRECT ioping) over the last three buckets; one probe is noisy (ADR 0236).
-    $sum = 0.0;
+    // /home small-read latency (O_DIRECT ioping): mean of the valid probes in the last three buckets.
+    // One probe is noisy; one missed probe must not drop the input for three cycles (ADR 0236).
+    $sum = 0.0; $count = 0;
     for ($n = 0; $n < 3; $n++) {
         $value = pmssFiniteNonNegativeFloat($rows[$n]['iopingHomeMs'] ?? null);
-        if ($value === null || $value > 60000) break;
-        $sum += $value;
+        if ($value === null || $value > 60000) continue;
+        $sum += $value; $count++;
     }
-    $pressure['latency_ms'] = $n === 3 ? $sum / 3 : null;
+    $pressure['latency_ms'] = $count > 0 ? $sum / $count : null;
     return $pressure;
 }

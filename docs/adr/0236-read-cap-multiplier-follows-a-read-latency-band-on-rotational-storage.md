@@ -41,9 +41,10 @@ it up to 35 ms; 20-25 ms sits at the start of that plateau.
 - Settings `latencyLowMs` (20), `latencyHighMs` (25) and `latencyStep` (1.1)
   in `cgroup.dynamicIops`. Low below high, high at most 1000, step above 1 and
   at most 2; anything else rejects the settings as before.
-- Latency is the mean of the last three five-minute `iopingHomeMs` samples in
-  `iostat-history.log` (the O_DIRECT probe); fewer than three contiguous
-  samples gives no latency.
+- Latency is the mean of the valid `iopingHomeMs` probes in the last three
+  five-minute samples of `iostat-history.log` (the O_DIRECT probe); a missed
+  probe is skipped (about 1-3% of probes on two capped hosts over a day), and
+  none in all three gives no latency.
 - When `/home` resolves to `hdd` (md arrays by their members) and latency is
   present, the multiplier is the previous cycle's multiplier times the step
   below the band, divided by it above the band, unchanged inside, bounded by

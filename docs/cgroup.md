@@ -280,8 +280,8 @@ host value is used unchanged. Records carry `contention` (`host`,
 latency such as ioping or await, not by host iowait.
 
 On rotational `/home` (md arrays by their members) the multiplier follows a
-read-latency band instead of PSI (ADR 0236). Latency is the mean of the last
-three five-minute `iopingHomeMs` samples. Below `latencyLowMs` (20) the previous
+read-latency band instead of PSI (ADR 0236). Latency is the mean of the valid
+`iopingHomeMs` probes in the last three five-minute samples. Below `latencyLowMs` (20) the previous
 cycle's multiplier rises by `latencyStep` (1.1), above `latencyHighMs` (25) it
 falls by it, inside the band it holds; it stays between the busy and idle
 multipliers. The previous multiplier is the 0600

@@ -24,7 +24,7 @@ class DynamicIopsLatencyTest extends TestCase
             'latency_ms' => $latency, 'previous_multiplier' => $previous, 'media' => $media], 500.0, null, null, false);
     }
 
-    public function testLatencyIsTheMeanOfTheLastThreeBucketsAndNeedsAllThree(): void
+    public function testLatencyIsTheMeanOfTheValidProbesInTheLastThreeBuckets(): void
     {
         $now = 1800000000;
         $rows = function (array $pings) use ($now): array {
@@ -33,10 +33,27 @@ class DynamicIopsLatencyTest extends TestCase
             return $out;
         };
         $this->assertSame(20.0, \pmssDynamicIopsPressure($rows([18, 20, 22, 90]), $now)['latency_ms']);
-        $this->assertSame(null, \pmssDynamicIopsPressure($rows([18, null, 22]), $now)['latency_ms']);
-        $this->assertSame(null, \pmssDynamicIopsPressure($rows([18, 20]), $now)['latency_ms']);
-        $this->assertSame(null, \pmssDynamicIopsPressure($rows([18, 70000, 22]), $now)['latency_ms']);
+        // A missed or absurd probe is skipped, not a reason to drop latency for three cycles.
+        $this->assertSame(20.0, \pmssDynamicIopsPressure($rows([18, null, 22]), $now)['latency_ms']);
+        $this->assertSame(20.0, \pmssDynamicIopsPressure($rows([null, 18, 22]), $now)['latency_ms']);
+        $this->assertSame(19.0, \pmssDynamicIopsPressure($rows([18, 20]), $now)['latency_ms']);
+        $this->assertSame(20.0, \pmssDynamicIopsPressure($rows([18, 70000, 22]), $now)['latency_ms']);
         $this->assertSame(150.0, \pmssDynamicIopsPressure($rows([150, 150, 150]), $now)['latency_ms']);
+        // Older than the last three buckets does not count; no valid probe means no latency.
+        $this->assertSame(null, \pmssDynamicIopsPressure($rows([null, null, null, 22]), $now)['latency_ms']);
+        $this->assertSame(null, \pmssDynamicIopsPressure([], $now)['latency_ms']);
+    }
+
+    /** One missed probe (the production pattern, about 1-3% of probes) keeps steering from the previous multiplier. */
+    public function testOneMissedProbeKeepsLatencySteering(): void
+    {
+        $now = 1800000000;
+        $rows = [];
+        foreach ([null, 5.0, 6.0] as $i => $ms) $rows[] = ['time' => $now - 300 * $i - 10, 'psiFullAvg300' => 90, 'iopingHomeMs' => $ms];
+        $pressure = \pmssDynamicIopsPressure($rows, $now);
+        $result = $this->cycle($pressure['latency_ms'], 6.0);
+        $this->assertSame('latency', $result['steer']);
+        $this->assertTrue(abs($result['multiplier'] - 6.6) < 1e-9);
     }
 
     public function testQuietDiskRaisesTheMultiplierOneStepPerCycle(): void
