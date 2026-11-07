@@ -8,9 +8,12 @@
 
 require_once __DIR__.'/ioCeiling.php';
 require_once __DIR__.'/policy.php';
+require_once __DIR__.'/dynamicIopsPolicy.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 const PMSS_IO_CEILING_STATE_PATH_DEFAULT = '/var/run/pmss/io-ceiling.json';
+// Survives reboot, unlike the derived cache under /var/run.
+const PMSS_IO_CEILING_ANCHOR_PATH_DEFAULT = '/var/lib/pmss/io-ceiling-anchor.json';
 
 /** Read the live log and newest uncompressed rotation without scanning years. */
 function pmssIoCeilingHistorySamples(string $path): iterable
@@ -72,17 +75,35 @@ function pmssIoCeilingRefresh(
     array $policy,
     string $historyPath = '/var/log/pmss/iostat-history.log',
     string $statePath = PMSS_IO_CEILING_STATE_PATH_DEFAULT,
-    ?int $now = null
+    ?int $now = null,
+    string $anchorPath = PMSS_IO_CEILING_ANCHOR_PATH_DEFAULT
 ): bool {
-    $result = pmssIoCeilingCompute(pmssIoCeilingHistorySamples($historyPath), $policy, $now ?? time());
+    $now = $now ?? time();
+    $result = pmssIoCeilingCompute(pmssIoCeilingHistorySamples($historyPath), $policy, $now);
     if (!pmssPathTargetIsSafe($statePath, false, true)) {
         return false;
     }
     if ($result === null) {
         return !file_exists($statePath) || @unlink($statePath);
     }
-    return pmssEnsureSafeDir(dirname($statePath), 0755)
-        && pmssAtomicJsonFileWrite($statePath, $result, 0644);
+    // Enforced read caps cut the reads this ceiling measures, so while they apply it may rise but never fall (ADR 0239).
+    if (($settings = pmssDynamicIopsSettings($policy)) !== null && $settings['mode'] === 'enforce') {
+        // The first run anchors today's value, so an update changes no cap; it only stops later falls.
+        $anchor = pmssJsonFileReadAssoc($anchorPath, true);
+        $kept = pmssFiniteNonNegativeFloat($anchor['read_iops'] ?? null);
+        if ($kept !== null && is_string($anchor['from_day'] ?? null) && $kept > ($result['published']['read_iops'] ?? INF)) {
+            $result['published']['read_iops'] = $kept;
+            $result['published']['from_day']['read_iops'] = $anchor['from_day'];
+            $result['read_iops_anchored'] = true;
+        }
+    }
+    if (!pmssEnsureSafeDir(dirname($statePath), 0755) || !pmssAtomicJsonFileWrite($statePath, $result, 0644)) {
+        return false;
+    }
+    return !isset($result['published']['read_iops'])
+        || (pmssPathTargetIsSafe($anchorPath, false, true) && pmssEnsureSafeDir(dirname($anchorPath), 0755)
+        && pmssAtomicJsonFileWrite($anchorPath, ['read_iops' => $result['published']['read_iops'],
+            'from_day' => $result['published']['from_day']['read_iops']], 0600));
 }
 
 /** Read the persisted published host read-IOPS ceiling, failing closed on thin caches. */
