@@ -31,18 +31,15 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
     $pressure['blend'] = in_array(null, $io, true) ? null : (12 * $io[5] + 4 * $io[15] + $io[60]) / 17;
     $iowait = $pressure['iowait'];
     $pressure['iowait_blend'] = in_array(null, $iowait, true) ? null : (12 * $iowait[5] + 4 * $iowait[15] + $iowait[60]) / 17;
-    // Mean of the valid values in the last three buckets; one missed sample must not drop the input for three cycles.
-    // latency_ms is the read wait the /home disks served (iostat r_await, ADR 0238). The O_DIRECT ioping median reads
-    // a 1 MiB working set, mostly from cache on a busy array, so it is kept only for the solid-state band (ADR 0237).
-    foreach (['latency_ms' => 'diskAwait', 'ioping_ms' => 'iopingHomeMs'] as $key => $field) {
-        $sum = 0.0; $count = 0;
-        for ($n = 0; $n < 3; $n++) {
-            $value = pmssFiniteNonNegativeFloat($rows[$n][$field] ?? null);
-            if ($value === null || $value > 60000) continue;
-            $sum += $value; $count++;
-        }
-        $pressure[$key] = $count > 0 ? $sum / $count : null;
+    // /home small-read latency (O_DIRECT ioping): mean of the valid probes in the last three buckets.
+    // One probe is noisy; one missed probe must not drop the input for three cycles (ADR 0236).
+    $sum = 0.0; $count = 0;
+    for ($n = 0; $n < 3; $n++) {
+        $value = pmssFiniteNonNegativeFloat($rows[$n]['iopingHomeMs'] ?? null);
+        if ($value === null || $value > 60000) continue;
+        $sum += $value; $count++;
     }
+    $pressure['latency_ms'] = $count > 0 ? $sum / $count : null;
     return $pressure;
 }
 

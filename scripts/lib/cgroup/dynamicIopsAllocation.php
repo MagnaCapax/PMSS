@@ -21,14 +21,13 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $fraction = $blend === null ? 1.0 : max(0.0, min(1.0,
         ($blend - $settings['idlePressure']) / ($settings['busyPressure'] - $settings['idlePressure'])));
     $multiplier = $settings['idleMultiplier'] + $fraction * ($settings['busyMultiplier'] - $settings['idleMultiplier']);
-    // Step last cycle's multiplier toward a read-latency band instead: fixed milliseconds of the read wait the
-    // rotational /home disks served (ADRs 0236, 0238), a multiple of the ioping reference on solid state (ADR 0237).
+    // Step last cycle's multiplier toward a read-latency band instead: fixed milliseconds on rotational /home
+    // (ADR 0236), a multiple of the reference latency on solid state (ADR 0237).
+    $latency = pmssFiniteNonNegativeFloat($pressure['latency_ms'] ?? null);
     $media = $pressure['media'] ?? null;
-    $solid = in_array($media, ['ssd', 'nvme'], true);
-    $latency = pmssFiniteNonNegativeFloat($pressure[$solid ? 'ioping_ms' : 'latency_ms'] ?? null);
     $reference = pmssFiniteNonNegativeFloat($pressure['latency_reference_ms'] ?? null);
     $band = $media === 'hdd' ? [$settings['latencyLowMs'], $settings['latencyHighMs']]
-        : ($solid && $reference !== null && $reference > 0
+        : (in_array($media, ['ssd', 'nvme'], true) && $reference !== null && $reference > 0
             ? [$settings['ssdLatencyLowX'] * $reference, $settings['ssdLatencyHighX'] * $reference] : null);
     $steer = $latency !== null && $band !== null ? 'latency' : 'pressure';
     if ($steer === 'latency') {
