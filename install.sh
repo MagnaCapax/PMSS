@@ -197,9 +197,9 @@ while [[ $# -gt 0 ]]; do
 	--help)
 		log_info "Usage: bash install.sh [update-source] [options...]"
 		log_info "  --hostname=<name>      set system hostname non-interactively"
-		log_info "  --skip-hostname        skip hostname confirmation"
+		log_info "  --skip-hostname        skip hostname configuration unless --hostname is set"
 		log_info "  --quota-mount=<path>   add quota options to specified fstab mount"
-		log_info "  --skip-quota           skip quota guidance section"
+		log_info "  --skip-quota           skip quota configuration unless --quota-mount is set"
 		log_info "  --non-interactive      skip hostname/quota prompts even on a TTY"
 		log_info "  --skip-upgrade         skip initial apt full-upgrade"
 		log_info "  --dry-run              parse and report plan without changing the system"
@@ -240,14 +240,12 @@ export_update_bootstrap_env() {
 	unset PMSS_HOSTNAME PMSS_SKIP_HOSTNAME PMSS_QUOTA_MOUNT PMSS_SKIP_QUOTA
 	if [ -n "$hostname_override" ]; then
 		export PMSS_HOSTNAME="$hostname_override"
-	fi
-	if [ "$skip_hostname_edit" = true ]; then
+	elif [ "$skip_hostname_edit" = true ]; then
 		export PMSS_SKIP_HOSTNAME=1
 	fi
 	if [ -n "$quota_mountpoint" ]; then
 		export PMSS_QUOTA_MOUNT="$quota_mountpoint"
-	fi
-	if [ "$skip_quota_edit" = true ]; then
+	elif [ "$skip_quota_edit" = true ]; then
 		export PMSS_SKIP_QUOTA=1
 	fi
 }
@@ -281,6 +279,12 @@ fi
 run_editor() {
 	local target="$1"
 
+	# Unattended installs still pass hostname/quota configuration to update-step2.
+	if [ "$FORCE_NONINTERACTIVE" = true ]; then
+		log_info "Non-interactive mode requested; skipping editor for ${target}"
+		return 0
+	fi
+
 	if [ -t 0 ]; then
 		nano "$target"
 		return $?
@@ -300,12 +304,6 @@ run_editor() {
 	log_warn "Run inside an interactive SSH session (or use ssh -t) or pass --non-interactive / --hostname / --quota-mount."
 	return 1
 }
-
-if [ "$FORCE_NONINTERACTIVE" = true ]; then
-	log_info "Non-interactive mode requested; skipping hostname and quota editors"
-	skip_hostname_edit=true
-	skip_quota_edit=true
-fi
 
 parse_version_string() {
 	local input_string="$1"
@@ -519,8 +517,8 @@ print_summary() {
 
 	log_step "Install summary"
 	log_info "Spec: ${spec_display}"
-	log_info "Hostname prompt: $([[ "$skip_hostname_edit" == true ]] && echo skipped || echo enabled)"
-	log_info "Quota prompt: $([[ "$skip_quota_edit" == true ]] && echo skipped || echo enabled)"
+	log_info "Hostname prompt: $([[ "$FORCE_NONINTERACTIVE" == true || "$skip_hostname_edit" == true ]] && echo skipped || echo enabled)"
+	log_info "Quota prompt: $([[ "$FORCE_NONINTERACTIVE" == true || "$skip_quota_edit" == true ]] && echo skipped || echo enabled)"
 	log_info "Apt full-upgrade: $([[ "$SKIP_UPGRADE" == true ]] && echo skipped || echo enabled)"
 	log_info "Run update.php: $([[ "$RUN_UPDATE" == true ]] && echo yes || echo no)"
 	log_info "Scripts-only flag: $([[ "$SCRIPTS_ONLY" == true ]] && echo yes || echo no)"

@@ -15,7 +15,8 @@ Responsibilities are intentionally limited to:
 Interactivity contract:
 - The documented pipe installer (`wget -qO- .../install.sh | bash -s -- ...`) must still be able to prompt in SSH/console sessions by using the controlling TTY (`/dev/tty`) when present.
 - When running the installer via an `ssh host "..."` remote command, force a pseudo-TTY with `ssh -t` (otherwise no prompts are possible).
-- For unattended runs, use `--non-interactive` (or `--skip-hostname` / `--skip-quota`) to suppress prompts.
+- For unattended runs, use `--non-interactive` to suppress editors while retaining quota configuration (default `/home`) and any explicit `--hostname` / `--quota-mount` settings.
+- Only `--skip-hostname` / `--skip-quota` skip the corresponding configuration step. Explicit `--hostname` / `--quota-mount` values take precedence over skip options regardless of argument order.
 
 ## Filesystem provisioning
 

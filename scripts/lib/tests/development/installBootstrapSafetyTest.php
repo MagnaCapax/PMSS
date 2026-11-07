@@ -62,6 +62,50 @@ class installBootstrapSafetyTest extends TestCase
         ], $this->script);
     }
 
+    public function testNonInteractivePreservesBootstrapConfiguration(): void
+    {
+        // Execute only argument parsing, editor selection and environment export, never provisioning.
+        $flagsStart = strpos($this->script, '# Installer runtime flags,');
+        $flagsEnd = strpos($this->script, "\nexisting_install=false");
+        $editorStart = strpos($this->script, "\nrun_editor() {");
+        $editorEnd = strpos($this->script, "\nparse_version_string() {");
+        foreach ([$flagsStart, $flagsEnd, $editorStart, $editorEnd] as $offset) {
+            $this->assertTrue($offset !== false, 'Installer probe boundary missing');
+        }
+        $probe = 'FORCE_NONINTERACTIVE=false; SCRIPTS_ONLY=false'."\n"
+            .'log_info() { :; }; log_warn() { :; }; nano() { echo editor-opened; }'."\n"
+            // Stale inherited intent must not disable default quota convergence.
+            .'export PMSS_HOSTNAME=stale PMSS_SKIP_HOSTNAME=1 PMSS_QUOTA_MOUNT=/stale PMSS_SKIP_QUOTA=1'."\n"
+            .substr($this->script, $flagsStart, $flagsEnd - $flagsStart)
+            .substr($this->script, $editorStart, $editorEnd - $editorStart)
+            ."\nexport_update_bootstrap_env\n"
+            .'printf "hostname=%s skip-hostname=%s quota=%s skip-quota=%s\n" '
+            .'"${PMSS_HOSTNAME-unset}" "${PMSS_SKIP_HOSTNAME-unset}" '
+            .'"${PMSS_QUOTA_MOUNT-unset}" "${PMSS_SKIP_QUOTA-unset}"'."\n"
+            .'run_editor /fixture; printf "editor-rc=%s\n" "$?"';
+
+        foreach ([
+            [[], 'unset', 'unset', 'unset', 'unset'],
+            [['--hostname=fixture.example.invalid', '--quota-mount=/home'], 'fixture.example.invalid', 'unset', '/home', 'unset'],
+            [['--hostname', 'fixture.example.invalid', '--quota-mount', '/home'], 'fixture.example.invalid', 'unset', '/home', 'unset'],
+            [['--skip-hostname', '--skip-quota'], 'unset', '1', 'unset', '1'],
+            [['--skip-hostname', '--hostname=fixture.example.invalid', '--skip-quota', '--quota-mount=/home'], 'fixture.example.invalid', 'unset', '/home', 'unset'],
+            [['--hostname=fixture.example.invalid', '--skip-hostname', '--quota-mount=/home', '--skip-quota'], 'fixture.example.invalid', 'unset', '/home', 'unset'],
+            [['--hostname=fixture.example.invalid', '--skip-quota'], 'fixture.example.invalid', 'unset', 'unset', '1'],
+            [['--skip-hostname', '--quota-mount=/home'], 'unset', '1', '/home', 'unset'],
+        ] as $case) {
+            // Non-interactive must work before or after the other options.
+            foreach ([array_merge(['--non-interactive'], $case[0]), array_merge($case[0], ['--non-interactive'])] as $arguments) {
+                $result = $this->pmssExecArgvCommand(array_merge(['bash', '-c', $probe, '--'], $arguments));
+                $this->assertSame(0, $result['rc'], $result['output']);
+                $this->assertSame(sprintf(
+                    "hostname=%s skip-hostname=%s quota=%s skip-quota=%s\neditor-rc=0",
+                    $case[1], $case[2], $case[3], $case[4]
+                ), $result['output'], implode(' ', $arguments));
+            }
+        }
+    }
+
     public function testFreshInstallStopsWhenUpdateFails(): void
     {
         $this->assertStringContainsString(implode("\n\t", [
