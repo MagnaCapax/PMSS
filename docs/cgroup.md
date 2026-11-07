@@ -288,13 +288,17 @@ Invalid counters, timing gaps, md sync or keep-kernel (missing ceiling or quota;
 a missing PSI blend does not stop the probe, which does not use it)
 cycles discard the block. Eleven (`probePairs`) adjacent valid pairs, in both
 orders so a steady demand trend cancels, provide the
-mean log work ratio: a gain above `probeGain` (0.10) raises L by sqrt(2), otherwise
-L falls by sqrt(2). L stays between busy and idle/2. Boundaries have a stable
+mean log work ratio: a gain above `probeGain` (0.10) raises L by sqrt(2). L falls
+by sqrt(2) only on evidence: the low arm delivered over 10% more, or an account
+was held at its cap (ADR 0231) in more than half of the counted low-arm cycles.
+Otherwise L holds, since caps that did not bind tested nothing. L stays between
+busy and idle/2. Boundaries have a stable
 hostname hash offset. This is active enforcement on every HDD host with usable
 inputs, with no host overrides. State survives reboot in the 0600
 `/var/lib/pmss/dynamic-iops-probe.json` (`PMSS_DYNAMIC_IOPS_PROBE_STATE`). Records
 carry `steer=probe` and `probe` with lo, hi, arm, block_cycle (zero based),
-pairs_n, last_ratio (log ratio) and decision. Read-only previews never write it.
+pairs_n, last_ratio (log ratio), decision, lo_cycles and lo_held. Read-only
+previews never write it.
 
 On solid-state `/home` (`ssd`, `nvme`) multiplier steps follow a band of
 `ssdLatencyLowX` (5) to `ssdLatencyHighX` (10) times a reference latency
