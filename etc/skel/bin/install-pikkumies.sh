@@ -20,6 +20,8 @@ dir="$HOME/.mcxPikkumies"
 if [ -d "$dir/.git" ]; then
     "$dir/pikkumies/bin/pikkumies" update
 else
+    # A folder left without its git checkout would make the clone fail: keep it under a new name, then clone fresh.
+    if [ -e "$dir" ] || [ -L "$dir" ]; then mv "$dir" "$dir.kept-$(date -u +%Y%m%dT%H%M%SZ)"; fi
     GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 https://github.com/MagnaCapax/mcxPikkumies "$dir" \
         || { echo "Could not download Pikkumies from GitHub; it may not be released yet." >&2; exit 1; }
 fi
