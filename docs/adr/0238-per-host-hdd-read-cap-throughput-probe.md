@@ -63,10 +63,17 @@ ln(work_hi/work_lo), provided both are positive. Pairs run in both orders (low
 then high, high then low), so a steady rise or fall in demand over the hours
 cancels instead of reading as a gain. At `probePairs` (11, validated 2–24)
 pairs, twelve blocks, compare their mean with ln(1 + `probeGain`) (0.10,
-validated 0.01–1). Above it, multiply L by sqrt(2); otherwise divide L by
-sqrt(2), within the bounds. Clear pairs after each decision; the block measured
-at the old L does not pair with the next. Partial blocks at first startup
-cannot contribute a pair.
+validated 0.01–1). Above it, multiply L by sqrt(2). Divide L by sqrt(2) only on
+evidence that the tighter arm costs nothing: the mean is below -ln(1 +
+`probeGain`) (the low arm delivered more, as a thrashing array does), or an
+account was held at its cap (the contention rule of ADR 0231) in more than half
+of the counted low-arm cycles since the last decision, so the low caps were
+binding and loosening them gained nothing. Otherwise hold L: caps that did not
+bind tested nothing, and lowering on that would walk a lightly used host to the
+tightest multiplier, where the next busy period stays capped until twelve more
+hours of pairs raise it. Clear pairs and the held counters after each decision;
+the block measured at the old L does not pair with the next. Partial blocks at
+first startup cannot contribute a pair.
 
 Persist lo, arm, block_start, block_work, block_samples, last_counts, pairs and
 pending_work in `/var/lib/pmss/dynamic-iops-probe.json`, mode 0600; the env

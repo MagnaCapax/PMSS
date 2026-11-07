@@ -17,16 +17,21 @@ class DynamicIopsProbeTest extends TestCase
             'pending_work' => null, 'last_time' => 1799999700];
     }
 
-    /** Eleven adjacent pairs (twelve blocks) at constant per-arm work, each first cycle omitted. */
+    /**
+     * Eleven adjacent pairs (twelve blocks) at constant per-arm work, each first cycle omitted.
+     * Without a gain L lowers only when the low arm's caps bound most of the time or the low arm
+     * delivered over 10% more; caps that never bound tested nothing, so L holds.
+     */
     public function testDecisionsFollowMeasuredGainAndRespectBounds(): void
     {
-        foreach ([[3.0, 130, 3 * sqrt(2), 'raise'], [3.0, 100, 3 / sqrt(2), 'lower'],
-            [3.0, 105, 3 / sqrt(2), 'lower'], [5.0, 130, 5.0, 'raise'], [2.0, 100, 2.0, 'lower']] as [$lo, $hiWork, $expected, $decision]) {
+        foreach ([[3.0, 130, false, 3 * sqrt(2), 'raise'], [3.0, 100, false, 3.0, 'hold'],
+            [3.0, 105, false, 3.0, 'hold'], [3.0, 100, true, 3 / sqrt(2), 'lower'], [3.0, 105, true, 3 / sqrt(2), 'lower'],
+            [3.0, 85, false, 3 / sqrt(2), 'lower'], [5.0, 130, false, 5.0, 'raise'], [2.0, 100, true, 2.0, 'lower']] as [$lo, $hiWork, $held, $expected, $decision]) {
             $state = $this->state($lo); $count = 0;
             for ($cycle = 0; $cycle <= 144; $cycle++) {
                 $count += $state['arm'] === 'lo' ? 100 : $hiWork;
                 $result = \pmssDynamicIopsProbeCycle($state, \pmssDynamicIopsSettings([]), [1 => $count],
-                    1800000000 + $cycle * 300, '', false);
+                    1800000000 + $cycle * 300, '', false, true, $held && $state['arm'] === 'lo');
                 $state = $result['state'];
                 if ($cycle === 24) {
                     $this->assertSame(1, $result['probe']['pairs_n']);
@@ -43,15 +48,43 @@ class DynamicIopsProbeTest extends TestCase
     /** Demand rising 15% an hour under both arms is not a gain: adjacent pairs cancel the trend. */
     public function testSteadyDemandTrendDoesNotRaise(): void
     {
-        $state = $this->state(); $count = 0;
+        foreach ([[false, 'hold', 3.0], [true, 'lower', 3 / sqrt(2)]] as [$held, $decision, $lo]) {
+            $state = $this->state(); $count = 0;
+            for ($cycle = 0; $cycle <= 144; $cycle++) {
+                $count += (int) round(1000 * pow(1.15, $cycle / 12));
+                $result = \pmssDynamicIopsProbeCycle($state, \pmssDynamicIopsSettings([]), [1 => $count],
+                    1800000000 + $cycle * 300, '', false, true, $held);
+                $state = $result['state'];
+            }
+            $this->assertSame($decision, $result['probe']['decision']);
+            $this->assertTrue(abs($state['lo'] - $lo) < 1e-9);
+        }
+    }
+
+    /** Held in fewer than half of the low cycles is not binding; the counters reset after a decision. */
+    public function testMinorityHeldLowCyclesHold(): void
+    {
+        $state = $this->state(); $count = 0; $low = 0;
         for ($cycle = 0; $cycle <= 144; $cycle++) {
-            $count += (int) round(1000 * pow(1.15, $cycle / 12));
+            $count += 100;
+            if ($state['arm'] === 'lo') $low++;
             $result = \pmssDynamicIopsProbeCycle($state, \pmssDynamicIopsSettings([]), [1 => $count],
-                1800000000 + $cycle * 300, '', false);
+                1800000000 + $cycle * 300, '', false, true, $state['arm'] === 'lo' && $low % 3 === 0);
             $state = $result['state'];
         }
-        $this->assertSame('lower', $result['probe']['decision']);
-        $this->assertTrue(abs($state['lo'] - 3 / sqrt(2)) < 1e-9);
+        $this->assertSame('hold', $result['probe']['decision']);
+        $this->assertSame(0, $state['lo_cycles']);
+        $this->assertSame(0, $state['lo_held']);
+    }
+
+    /** A state file from before the held counters keeps its experiment instead of restarting. */
+    public function testStateWithoutHeldCountersIsKept(): void
+    {
+        $saved = $this->state(4.0); $saved['pairs'] = [0.1];
+        $row = \pmssDynamicIopsProbeCycle($saved, \pmssDynamicIopsSettings([]), [1 => 100], 1800000000, '', false);
+        $this->assertSame(4.0, $row['state']['lo']);
+        $this->assertSame([0.1], $row['state']['pairs']);
+        $this->assertSame(0, $row['state']['lo_cycles']);
     }
 
     public function testInvalidCyclesDiscardBlocksWithoutRecordingPairs(): void

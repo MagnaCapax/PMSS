@@ -25,9 +25,13 @@ function pmssDynamicIopsProbeState(?array $state, array $settings, int $start): 
     }
     foreach (is_array($state['pairs'] ?? null) ? $state['pairs'] : [] as $ratio) $valid = $valid && is_numeric($ratio) && is_finite((float) $ratio);
     foreach (is_array($state['last_counts'] ?? null) ? $state['last_counts'] : [] as $count) $valid = $valid && ($count === null || (is_int($count) && $count >= 0));
-    return $valid ? $state : ['lo' => $settings['probeStartLo'], 'arm' => 'lo', 'block_start' => $start,
+    if (!$valid) return ['lo' => $settings['probeStartLo'], 'arm' => 'lo', 'block_start' => $start,
         'block_work' => null, 'block_samples' => 0, 'last_counts' => [], 'pairs' => [],
-        'pending_work' => null, 'last_time' => 0];
+        'pending_work' => null, 'last_time' => 0, 'lo_cycles' => 0, 'lo_held' => 0];
+    // State written before the held counters existed keeps its experiment and starts counting now.
+    $cycles = is_int($state['lo_cycles'] ?? null) && $state['lo_cycles'] >= 0 ? $state['lo_cycles'] : 0;
+    $held = is_int($state['lo_held'] ?? null) && $state['lo_held'] >= 0 ? $state['lo_held'] : 0;
+    return ['lo_cycles' => $cycles, 'lo_held' => min($held, $cycles)] + $state;
 }
 
 /** Sum only counters present at both ends; resets or no comparable slices invalidate the cycle. */
@@ -47,10 +51,11 @@ function pmssDynamicIopsProbeWork(array $before, array $after): ?float
  * Consume one observation and return the next arm's multiplier, state and log fields.
  * Null block_work marks a discarded block. last_time detects real elapsed gaps;
  * block_samples counts observations including the skipped first (lag) cycle.
- * Callers own I/O and must pass eligible=false whenever caps cannot apply.
+ * Callers own I/O and must pass eligible=false whenever caps cannot apply, and held=true when
+ * any account read at its cap this cycle.
  */
 function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts, int $now,
-    string $hostname, bool $mdSync, bool $eligible = true): array
+    string $hostname, bool $mdSync, bool $eligible = true, bool $held = false): array
 {
     $cycles = $settings['probeBlockCycles']; $seconds = $cycles * 300;
     $phase = pmssDynamicIopsProbePhase($hostname, $cycles) * 300;
@@ -71,11 +76,16 @@ function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts
                 / ($hiBlock ? $state['pending_work'] : $state['block_work']));
             $state['pairs'][] = $ratio;
             if (count($state['pairs']) >= $settings['probePairs']) {
-                $up = array_sum($state['pairs']) / count($state['pairs']) > log(1 + $settings['probeGain']);
-                $state['lo'] = max($settings['busyMultiplier'], min($settings['idleMultiplier'] / 2,
-                    $state['lo'] * ($up ? sqrt(2) : 1 / sqrt(2))));
-                $decision = $up ? 'raise' : 'lower';
+                $mean = array_sum($state['pairs']) / count($state['pairs']);
+                $gain = log(1 + $settings['probeGain']);
+                // Lower only on evidence: the tighter arm delivered more, or its caps bound most of the
+                // time and loosening gained nothing. Caps that never bound tested nothing, so L holds.
+                $bound = 2 * $state['lo_held'] > $state['lo_cycles'];
+                $decision = $mean > $gain ? 'raise' : ($mean < -$gain || $bound ? 'lower' : 'hold');
+                $step = ['raise' => sqrt(2), 'lower' => 1 / sqrt(2), 'hold' => 1.0][$decision];
+                $state['lo'] = max($settings['busyMultiplier'], min($settings['idleMultiplier'] / 2, $state['lo'] * $step));
                 $state['pairs'] = [];
+                $state['lo_cycles'] = 0; $state['lo_held'] = 0;
             }
         }
         // A block measured before a decision ran at the old L and cannot pair with the next one.
@@ -88,12 +98,16 @@ function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts
     $cycle = intdiv($now - $start, 300);
     // The first observation belongs to the previous arm; discard its delta for lag.
     if (!$valid || $cycle !== $state['block_samples']) $state['block_work'] = null;
-    elseif ($cycle > 0 && $state['block_work'] !== null) $state['block_work'] += $work;
+    elseif ($cycle > 0 && $state['block_work'] !== null) {
+        $state['block_work'] += $work;
+        if ($state['arm'] === 'lo') { $state['lo_cycles']++; if ($held) $state['lo_held']++; }
+    }
     $state['block_samples'] = $cycle + 1;
     $state['last_counts'] = $counts;
     $state['last_time'] = $now;
     $hi = min($settings['idleMultiplier'], 2 * $state['lo']);
     return ['state' => $state, 'multiplier' => $state['arm'] === 'lo' ? $state['lo'] : $hi,
         'probe' => ['lo' => $state['lo'], 'hi' => $hi, 'arm' => $state['arm'], 'block_cycle' => $cycle,
-            'pairs_n' => count($state['pairs']), 'last_ratio' => $ratio, 'decision' => $decision]];
+            'pairs_n' => count($state['pairs']), 'last_ratio' => $ratio, 'decision' => $decision,
+            'lo_cycles' => $state['lo_cycles'], 'lo_held' => $state['lo_held']]];
 }
