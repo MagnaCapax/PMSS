@@ -52,7 +52,11 @@ appearing partway through a block contributes only after two observations.
 Missing previous counts, a reset, md sync, elapsed time
 outside 240–420 seconds, skipped cycles or an allocation fallback discard the
 block. Alternation continues. The existing iostat history supplies md-sync
-evidence. Pressure, ceiling and quota guards still keep kernel caps unchanged.
+evidence. Ceiling and quota guards still keep kernel caps unchanged. The
+missing-pressure guard stays only where the multiplier comes from the PSI blend
+(pressure and solid-state steering): one late iostat sample empties a bucket and
+voids the blend for an hour, which on a stalled array kept kernel caps on 20–45
+percent of cycles, so it no longer stops a probe host.
 
 When a valid block immediately follows a valid block of the other arm, append
 ln(work_hi/work_lo), provided both are positive. Pairs run in both orders (low
@@ -84,7 +88,8 @@ the unchanged solid-state band of ADR 0237.
   pairs. Eleven pairs over twelve hours reduce noise; continuous retesting follows
   demand changes.
 - The first partial/invalid block is discarded, and zero-work blocks cannot
-  claim a gain. Missing evidence cannot relax the existing keep-kernel guards.
+  claim a gain. Missing ceiling or quota evidence still keeps kernel caps; a
+  missing PSI blend does not, since the probe does not use it.
 - No new packages, host configuration overrides or active disk reads are added.
 - Fixture coverage includes gain/bounds, invalid blocks, account arrivals,
   offsets, a steady demand trend, corrupt state, previews and unchanged

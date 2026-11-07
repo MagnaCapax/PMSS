@@ -70,8 +70,9 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $sorted = array_filter(array_column($cohort, 'quota'));
     sort($sorted, SORT_NUMERIC);
     $count = count($sorted);
-    // Incomplete cohort data must not redistribute other accounts' shares.
-    $fallback = $host <= 0 ? 'missing-ceiling' : ($blend === null ? 'missing-pressure' :
+    // Incomplete cohort data must not redistribute other accounts' shares. The probe's multiplier does
+    // not come from the blend, so a late iostat sample cannot stop it (ADR 0238).
+    $fallback = $host <= 0 ? 'missing-ceiling' : ($blend === null && $steer !== 'probe' ? 'missing-pressure' :
         ($count !== count($users) ? 'missing-quota-or-weight' : null));
     $low = $count === 0 ? 1.0 : $sorted[intdiv($count - 1, 2)];
     $median = $count === 0 ? 1.0 : $low + ($sorted[intdiv($count, 2)] - $low) / 2;

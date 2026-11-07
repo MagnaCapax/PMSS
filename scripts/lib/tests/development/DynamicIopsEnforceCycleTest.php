@@ -31,7 +31,7 @@ class DynamicIopsEnforceCycleTest extends TestCase
     public function testFallbackKeepsKernelReadCapsAndContinuesLegacyWriteCaps(): void
     {
         foreach ([['capacity' => null], ['capacity' => 0.0], ['capacity' => PHP_FLOAT_MAX],
-            ['badConfig' => true], ['pressure' => ['blend' => null]],
+            ['badConfig' => true], ['media' => 'ssd', 'pressure' => ['blend' => null]],
             ['source' => ['quota' => null, 'IOReadIOPS' => '/home:1000000', 'IOWriteIOPS' => '/home:60']]] as $options) {
             $row = $this->enforceCycle($options);
             $readPath = '/sys/fs/cgroup/blkio/user.slice/user-1001.slice/blkio.throttle.read_iops_device';

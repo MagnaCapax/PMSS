@@ -284,7 +284,8 @@ per-host A/B probe selects the multiplier (ADR 0238). Starting at `probeStartLo`
 (5), it alternates hourly between L and 2L, within the busy/idle bounds. Each
 block has `probeBlockCycles` (12) five-minute cycles and skips its first delta
 for lag. The work is delivered read IO count from the existing slice observer.
-Invalid counters, timing gaps, md sync or keep-kernel
+Invalid counters, timing gaps, md sync or keep-kernel (missing ceiling or quota;
+a missing PSI blend does not stop the probe, which does not use it)
 cycles discard the block. Eleven (`probePairs`) adjacent valid pairs, in both
 orders so a steady demand trend cancels, provide the
 mean log work ratio: a gain above `probeGain` (0.10) raises L by sqrt(2), otherwise

@@ -116,6 +116,22 @@ class DynamicIopsProbeTest extends TestCase
         $this->assertSame(11, \pmssDynamicIopsSettings([])['probePairs']);
     }
 
+    /** A late iostat sample leaves no PSI blend; the probe does not use it, so HDD caps still apply. */
+    public function testMissingPressureStopsOnlyBlendSteeredHosts(): void
+    {
+        $hdd = $this->enforceCycle(['pressure' => ['blend' => null, 'iowait_blend' => null]]);
+        $row = $hdd['logs']['PMSS_DYNAMIC_IOPS_LOG'][0];
+        $this->assertSame('probe', $row['steer']);
+        $this->assertSame(null, $row['fallback']);
+        $this->assertSame('apply', $row['read_action']);
+        $this->assertTrue($hdd['writes'] !== []);
+        foreach (['ssd', 'nvme'] as $media) {
+            $row = $this->enforceCycle(['media' => $media, 'pressure' => ['blend' => null, 'iowait_blend' => null]])['logs']['PMSS_DYNAMIC_IOPS_LOG'][0];
+            $this->assertSame('missing-pressure', $row['fallback']);
+            $this->assertSame('keep-kernel', $row['read_action']);
+        }
+    }
+
     public function testPreviewWritesNoProbeStateAndSolidStateKeepsItsBand(): void
     {
         foreach ([[[], ['--dry-run']], [['envDryRun' => '1'], []]] as [$options, $args]) {
