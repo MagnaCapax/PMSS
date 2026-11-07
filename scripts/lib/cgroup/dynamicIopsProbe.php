@@ -10,7 +10,8 @@ function pmssDynamicIopsProbePhase(string $hostname, int $cycles): int
 /** Accept complete state only; a corrupt or incompatible record starts a fresh experiment. */
 function pmssDynamicIopsProbeState(?array $state, array $settings, int $start): array
 {
-    $valid = $state !== null && is_numeric($state['lo'] ?? null) && is_finite((float) $state['lo'])
+    // Work is delivered read bytes; a state that counted read operations cannot pair with bytes.
+    $valid = $state !== null && ($state['metric'] ?? null) === 'bytes' && is_numeric($state['lo'] ?? null) && is_finite((float) $state['lo'])
         && $state['lo'] >= $settings['busyMultiplier'] && $state['lo'] <= $settings['idleMultiplier']
         && in_array($state['arm'] ?? null, ['lo', 'hi'], true)
         && is_int($state['block_start'] ?? null) && $state['block_start'] <= $start
@@ -25,7 +26,7 @@ function pmssDynamicIopsProbeState(?array $state, array $settings, int $start): 
     }
     foreach (is_array($state['pairs'] ?? null) ? $state['pairs'] : [] as $ratio) $valid = $valid && is_numeric($ratio) && is_finite((float) $ratio);
     foreach (is_array($state['last_counts'] ?? null) ? $state['last_counts'] : [] as $count) $valid = $valid && ($count === null || (is_int($count) && $count >= 0));
-    if (!$valid) return ['lo' => $settings['probeStartLo'], 'arm' => 'lo', 'block_start' => $start,
+    if (!$valid) return ['metric' => 'bytes', 'lo' => $settings['probeStartLo'], 'arm' => 'lo', 'block_start' => $start,
         'block_work' => null, 'block_samples' => 0, 'last_counts' => [], 'pairs' => [],
         'pending_work' => null, 'last_time' => 0, 'lo_cycles' => 0, 'lo_held' => 0];
     // State written before the held counters existed keeps its experiment and starts counting now.

@@ -32,7 +32,7 @@ function pmssPsiFullAvg300(string $path): ?float
     return $value <= 100 ? $value : null;
 }
 
-/** Cumulative read count of one device from a cgroup-v1 io_serviced file. */
+/** Cumulative reads (io_serviced) or read bytes (io_service_bytes) of one device from a cgroup-v1 file. */
 function pmssBlkioReadCount(string $path, string $majMin): ?int
 {
     $raw = @file_get_contents($path);
@@ -79,14 +79,16 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
         static function ($row) use ($now): bool { return is_array($row) && is_int($row['time'] ?? null) && $row['time'] > $now - 3600 && $row['time'] <= $now; }));
     $host = pmssPsiFullAvg300($hostPressure);
     // Read once even without unified PSI: the HDD probe needs only v1 service counters.
-    $counts = []; $uids = [];
+    // The HDD probe weighs delivered bytes, the throughput an account sees (ADR 0238); held compares operations with the IOPS cap.
+    $counts = []; $bytes = []; $uids = [];
     foreach (array_keys($users) as $user) {
         $errors = 0;
         if (($uid = pmssCgroupDirectUserUidOrError((string) $user, $errors)) === null) continue;
         $uids[$user] = $uid;
         $counts[$uid] = pmssBlkioReadCount(pmssCgroupDirectUserSliceDir($uid).'/blkio.throttle.io_serviced', $majMin);
+        $bytes[$uid] = pmssBlkioReadCount(pmssCgroupDirectUserSliceDir($uid).'/blkio.throttle.io_service_bytes', $majMin);
     }
-    if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => [], 'counts' => $counts];
+    if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => [], 'counts' => $counts, 'bytes' => $bytes];
     $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
     $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
     $slices = []; $heldUsers = []; $heldUids = []; $heldCount = 0;
@@ -106,7 +108,7 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     if (!$readOnly && pmssEnsureSafeDir(dirname($statePath), 0755)) {
         pmssAtomicJsonFileWrite($statePath, ['time' => $now, 'counts' => $counts, 'held' => $heldUids, 'rows' => $rows], 0600);
     }
-    return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers, 'counts' => $counts];
+    return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers, 'counts' => $counts, 'bytes' => $bytes];
 }
 
 /** Scale each five-minute host sample by the contention share measured within half a bucket of it. */

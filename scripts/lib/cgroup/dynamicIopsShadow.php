@@ -104,7 +104,7 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     if ($pressure['media'] === 'hdd') {
         // Check the existing allocation guards before accepting work; fallback cycles cannot form pairs.
         $probe = pmssDynamicIopsProbeCycle(pmssJsonFileReadAssoc($probePath, true), $settings,
-            $contention['counts'] ?? [], $now, (string) gethostname(), ($pressure['md_sync'] ?? false) === true,
+            $contention['bytes'] ?? [], $now, (string) gethostname(), ($pressure['md_sync'] ?? false) === true,
             $cohortComplete && pmssDynamicIopsReadCaps($users, $policy, $result) !== null,
             in_array(true, $contention['held'] ?? [], true));
         $pressure['probe_multiplier'] = $probe['multiplier'];

@@ -288,7 +288,7 @@ On rotational or unknown non-solid `/home` (md arrays by their members), a
 per-host A/B probe selects the multiplier (ADR 0238). Starting at `probeStartLo`
 (5), it alternates hourly between L and 2L, within the busy/idle bounds. Each
 block has `probeBlockCycles` (12) five-minute cycles and skips its first delta
-for lag. The work is delivered read IO count from the existing slice observer.
+for lag. The work is delivered read bytes per account slice (`blkio.throttle.io_service_bytes`).
 Invalid counters, timing gaps, md sync or keep-kernel (missing ceiling or quota;
 a missing PSI blend does not stop the probe, which does not use it)
 cycles discard the block. Eleven (`probePairs`) adjacent valid pairs, in both

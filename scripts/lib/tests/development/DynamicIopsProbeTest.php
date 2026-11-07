@@ -12,7 +12,7 @@ class DynamicIopsProbeTest extends TestCase
 
     private function state(float $lo = 3.0): array
     {
-        return ['lo' => $lo, 'arm' => 'lo', 'block_start' => 1800000000, 'block_work' => 0.0,
+        return ['metric' => 'bytes', 'lo' => $lo, 'arm' => 'lo', 'block_start' => 1800000000, 'block_work' => 0.0,
             'block_samples' => 0, 'last_counts' => [1 => 0], 'pairs' => [],
             'pending_work' => null, 'last_time' => 1799999700];
     }
@@ -159,11 +159,15 @@ class DynamicIopsProbeTest extends TestCase
     public function testMissingAndCorruptStateStartAtFive(): void
     {
         foreach ([null, \pmssJsonDecodeAssoc('{broken'), [], ['lo' => INF], ['pairs' => 'broken'],
-            ['block_work' => -1] + $this->state(), ['lo' => 100] + $this->state()] as $saved) {
+            ['block_work' => -1] + $this->state(), ['lo' => 100] + $this->state(),
+            // A state from the read-count probe cannot pair with bytes, so it starts a fresh experiment.
+            ['pairs' => [0.1], 'lo' => 4.0] + array_diff_key($this->state(), ['metric' => true]),
+            ['metric' => 'count'] + $this->state(4.0)] as $saved) {
             $row = \pmssDynamicIopsProbeCycle($saved, \pmssDynamicIopsSettings([]), [1 => 100], 1800000000, '', false);
             $this->assertSame(5.0, $row['state']['lo']);
             $this->assertSame([], $row['state']['pairs']);
             $this->assertSame('lo', $row['state']['arm']);
+            $this->assertSame('bytes', $row['state']['metric']);
         }
     }
 

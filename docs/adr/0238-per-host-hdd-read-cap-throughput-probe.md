@@ -47,8 +47,13 @@ one; at idle nothing is tested, so L holds there (below).
 Each block spans `probeBlockCycles` (12, validated 4–48) five-minute cycles.
 Clock-aligned boundaries are offset by crc32(gethostname()) modulo that cycle
 count, so neighboring guests need not switch together. The first cycle's delta
-is omitted for lag. Sum read IO count deltas for account slices present at both
-endpoints, reusing `pmssBlkioReadCount` from the contention observer. An account
+is omitted for lag. Sum delivered read byte deltas (`blkio.throttle.io_service_bytes`)
+for account slices present at both endpoints, read by `pmssBlkioReadCount` in the
+contention observer. Bytes are the throughput an account sees. Counting read
+operations was tried first: on the first production pairs it disagreed with bytes
+by more than the gate on three of five hosts, and on one host where loosening gave
+33 percent more read MB/s it counted 6 percent more reads, so the probe would have
+kept the tighter setting. A saved state without `metric: bytes` starts a fresh experiment. An account
 appearing partway through a block contributes only after two observations.
 
 Missing previous counts, a reset, md sync, elapsed time
@@ -98,8 +103,8 @@ the unchanged solid-state band of ADR 0237.
 - HDD caps alternate by twofold each hour by design. Under uninterrupted valid
   evidence a decision occurs about every twelve hours; discarded blocks and
   reboot gaps extend convergence. Learned L and completed pairs survive reboot.
-- Work uses read IOs, so changes in request size or demand can still affect
-  pairs. Eleven pairs over twelve hours reduce noise; continuous retesting follows
+- Work uses read bytes at the block layer, so readahead an application never
+  uses still counts, and demand changes can still affect pairs. Eleven pairs over twelve hours reduce noise; continuous retesting follows
   demand changes.
 - The first partial/invalid block is discarded, and zero-work blocks cannot
   claim a gain. Missing ceiling or quota evidence still keeps kernel caps; a
