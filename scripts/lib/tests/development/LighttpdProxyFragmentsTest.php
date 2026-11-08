@@ -121,7 +121,7 @@ class LighttpdProxyFragmentsTest extends TestCase
 
     public function testCatalogProxyAuthorizationPolicyPreservesPanelGate(): void
     {
-        // Only opted-in catalog routes discard the panel credential after authentication.
+        // Only opted-in catalog routes discard the panel credential; only Bearer rows drop the gate.
         foreach (['copyparty', 'slskd', 'scryer', 'qui'] as $app) {
             $fragment = \pmssLighttpdManagedProxyFragment($app, 'fixtur01', 23001);
             if ($app === 'qui') {
@@ -129,7 +129,11 @@ class LighttpdProxyFragmentsTest extends TestCase
             } else {
                 $this->assertStringContainsString('setenv.set-request-header = ( "Authorization" => "" )', $fragment);
             }
-            $this->assertStringNotContainsString('auth.require', $fragment);
+            if ($app === 'scryer') {
+                $this->assertSame(1, substr_count($fragment, 'auth.require = ()'));
+            } else {
+                $this->assertStringNotContainsString('auth.require', $fragment);
+            }
             $this->assertStringContainsAllStrings([
                 '$HTTP["url"] =~ "^/user-fixtur01/'.$app.'/" {',
                 'url.redirect = ( "" => "/user-fixtur01/'.$app.'/" )',
@@ -137,6 +141,44 @@ class LighttpdProxyFragmentsTest extends TestCase
             ], $fragment);
         }
         $this->assertSame('', \pmssLighttpdManagedProxyFragment('unknown', 'fixtur01', 23001));
+    }
+
+    public function testScryerBearerRouteStripsOnlyPanelBasic(): void
+    {
+        // Scryer authenticates with its own Bearer token, so only the panel Basic header is removed (ADR 0111).
+        $fragment = \pmssLighttpdManagedProxyFragment('scryer', 'fixtur01', 23001);
+        $rule = substr($fragment, (int)strpos($fragment, '$HTTP["url"] =~ "^/user-fixtur01/scryer/" {'));
+        $this->assertStringContainsString(
+            "  auth.require = ()\n"
+                .'  $REQUEST_HEADER["Authorization"] =~ "^Basic " {'."\n"
+                .'    setenv.set-request-header = ( "Authorization" => "" )'."\n  }\n",
+            $rule
+        );
+        // No unconditional blank remains, so the Bearer token reaches Scryer.
+        $this->assertSame(0, preg_match('/^  setenv\.set-request-header = \( "Authorization" => "" \)$/m', $fragment));
+        $this->assertStringNotContainsString('^Bearer', $fragment);
+        // The trailing-slash redirect stays behind the panel gate.
+        $redirect = substr($fragment, 0, (int)strpos($fragment, '$HTTP["url"] =~'));
+        $this->assertStringContainsString('url.redirect = ( "" => "/user-fixtur01/scryer/" )', $redirect);
+        $this->assertStringNotContainsString('auth.require', $redirect);
+    }
+
+    public function testGatedCatalogRowsKeepUnconditionalAuthorizationStrip(): void
+    {
+        // Rows that keep the panel gate render exactly as before the Bearer flag existed.
+        foreach (['copyparty', 'slskd'] as $app) {
+            $fragment = \pmssLighttpdManagedProxyFragment($app, 'fixtur01', 23001);
+            $this->assertStringNotContainsString('$REQUEST_HEADER["Authorization"]', $fragment);
+            $this->assertSame(1, preg_match('/^  setenv\.set-request-header = \( "Authorization" => "" \)$/m', $fragment));
+        }
+    }
+
+    public function testDisabledGateWithoutStripLeavesAuthorizationUntouched(): void
+    {
+        // Deluge/rclone-style rules keep their output: no header handling unless the row asks for it.
+        $rule = \pmssLighttpdProxyRuleFragment('^/user-demo/x/', 4100, [], true);
+        $this->assertStringContainsString('auth.require = ()', $rule);
+        $this->assertStringNotContainsString('Authorization', $rule);
     }
 
     public function testCopypartySchemeOverridesRetainAuthorizationStripping(): void

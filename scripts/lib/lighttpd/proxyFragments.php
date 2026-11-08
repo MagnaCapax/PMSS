@@ -25,7 +25,12 @@ function pmssLighttpdProxyRuleFragment(
     if ($disableAuth) {
         $fragment .= "  auth.require = ()\n";
     }
-    if ($stripAuthorization) {
+    if ($stripAuthorization && $disableAuth) {
+        // Ungated Bearer route (ADR 0111, 2026-11-08): the app's own token passes; only the
+        // browser's cached panel Basic credential is removed before the proxy.
+        $fragment .= '  $REQUEST_HEADER["Authorization"] =~ "^Basic " {'."\n"
+            .'    setenv.set-request-header = ( "Authorization" => "" )'."\n  }\n";
+    } elseif ($stripAuthorization) {
         // Keep panel Basic credentials out of the app's independent login.
         $fragment .= '  setenv.set-request-header = ( "Authorization" => "" )'."\n";
     }
@@ -111,7 +116,9 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
         $fragment = "# PMSS-managed: {$catalog[$proxyName]['label']} reverse proxy.\n\n";
         $rules = [
             ['redirect', $base, $base.'/'],
-            ['^'.$base.'/', [], false, true, false, false, $catalog[$proxyName]['stripAuthorization'] ?? false, $catalog[$proxyName]['forwardedProtoHeader'] ?? ''],
+            // bearerAuthorization: the app authenticates its calls with its own Bearer token,
+            // which one Authorization header cannot carry beside panel Basic (ADR 0111).
+            ['^'.$base.'/', [], $catalog[$proxyName]['bearerAuthorization'] ?? false, true, false, false, $catalog[$proxyName]['stripAuthorization'] ?? false, $catalog[$proxyName]['forwardedProtoHeader'] ?? ''],
         ];
     }
 

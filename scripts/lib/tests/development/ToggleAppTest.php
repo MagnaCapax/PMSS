@@ -80,6 +80,11 @@ SCHEME;
                 '.pmss/apps/'.$app.'.restart', '.pmss/apps/'.$app.'.login'),
                 array($row['securedMarker'], $row['stateFile'], $row['restartFile'], $row['loginFile']));
             $authHeader = $app === 'qui' ? '' : '  setenv.set-request-header = ( "Authorization" => "" )'."\n";
+            if ($app === 'scryer') {
+                // Bearer row (ADR 0111, #1241): no panel gate, only a Basic header is removed.
+                $authHeader = "  auth.require = ()\n".'  $REQUEST_HEADER["Authorization"] =~ "^Basic " {'."\n"
+                    .'    setenv.set-request-header = ( "Authorization" => "" )'."\n  }\n";
+            }
             $this->assertSame(str_replace(array('{LABEL}', '{ID}', '{AUTH_HEADER}', '{SCHEME_HEADERS}'),
                 array($row['label'], $app, $authHeader, $app === 'copyparty' ? $schemeHeaders."\n" : ''), $expectedProxy)."\n",
                 \pmssLighttpdManagedProxyFragment($app, 'fixtur01', 23001));
