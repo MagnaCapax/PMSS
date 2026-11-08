@@ -1,12 +1,28 @@
 <?php
 /** Verified artifact lifetime; loaded by the remoteBinary.php installer facade. */
 
-/** Return an empty checksum for malformed paths before invoking the filesystem. */
+require_once __DIR__.'/../../../runtime/filesystem.php';
+
+/** Hash only a complete regular-file read, retaining artifact symlink support. */
 function pmssPinnedRemoteChecksum(string $path): string
 {
     if ($path === '' || strpos($path, "\0") !== false) return '';
-    $checksum = @hash_file('sha256', $path);
-    return is_string($checksum) ? strtolower($checksum) : '';
+    clearstatcache(true, $path);
+    // Follow installed binary symlinks, but never open a known device or FIFO.
+    $entry = @stat($path);
+    if (!is_array($entry) || (($entry['mode'] ?? 0) & 0170000) !== 0100000) return '';
+    $handle = @fopen($path, 'rbn');
+    if ($handle === false) return '';
+    try {
+        // A FIFO substituted after stat must not block; a replacement inode is not evidence.
+        if (!pmssLockFileHandleMatchesPath($handle, $path, $entry, $opened)
+            || (($opened['mode'] ?? 0) & 0170000) !== 0100000) return '';
+        $hash = hash_init('sha256');
+        if (@hash_update_stream($hash, $handle) !== ($opened['size'] ?? null)) return '';
+        return hash_final($hash);
+    } finally {
+        @fclose($handle);
+    }
 }
 
 /** Keep failed artifacts visible after later steps and the ordinary status summary. */

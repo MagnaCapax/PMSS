@@ -1114,6 +1114,12 @@ Pinned artifact checksum and installed-version readers reject empty or
 NUL-containing paths before filesystem calls, returning their existing empty
 checksum or non-matching-version result. Valid paths retain checksum bytes,
 marker whitespace trimming, and their existing symlink policies.
+Checksum reads open regular files non-blocking and verify the opened device/inode
+against the followed path snapshot before hashing. Failed metadata, substituted
+inodes and incomplete reads return the empty checksum; acquired streams close
+on refusals and exceptions. Regular hard links, symlinks and empty files retain
+their SHA-256 results. `PinnedArtifactChecksumSafetyTest` covers these boundaries
+with isolated faults; tests run only on the testing machine.
 
 Tar member discovery shares `pmssPinnedRemoteArchiveMembersRead()`: failed, empty
 or count-mismatched listings return `[]`. Callers retain command bytes, warning
