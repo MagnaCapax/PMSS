@@ -11,7 +11,6 @@ function pmssAiToolsClaudeStub(): string
 /** Compare content even when an older installer left a command symlink. */
 function pmssAiToolsClaudeInstallNeeded(string $launcher, string $stub, string $source, int $owner = 0, int $group = 0): bool
 {
-    $expected = @file_get_contents($source);
-    return pmssAiToolsFileDiffers($launcher, is_string($expected) ? $expected : null, 0644, $owner, $group)
-        || pmssAiToolsFileDiffers($stub, pmssAiToolsClaudeStub(), 0755, $owner, $group);
+    return pmssAiToolsFilesDiffer([[$launcher, @file_get_contents($source), 0644],
+        [$stub, pmssAiToolsClaudeStub(), 0755]], $owner, $group);
 }

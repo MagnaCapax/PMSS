@@ -89,17 +89,14 @@ if ($nodeBinary === '') {
         $nodeBinary   = $nodeDir.'/bin/node';
         $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
 
-        $nodeTreeReady = true;
         if (!$dryRun && pmssRootOwnedTreeNeedsRefresh($nodeDir)) {
             $logger('[INFO] Refreshing AI tools Node.js runtime with non-root-owned entries: '.$nodeDir);
-            $nodeTreeReady = pmssRootOwnedTreeRemove($nodeDir);
-            if (!$nodeTreeReady) {
+            if (!pmssRootOwnedTreeRemove($nodeDir)) {
                 $logger('[WARN] Unable to remove AI tools Node.js runtime; skipping its installation');
+                $nodeBinary = '';
             }
         }
-        if (!$nodeTreeReady) {
-            $nodeBinary = '';
-        } elseif (!is_executable($nodeBinary)) {
+        if ($nodeBinary !== '' && !is_executable($nodeBinary)) {
             runStep('Ensuring AI tools install root exists', pmssBuildCommand('mkdir', ['-p', $installRoot]));
             $resolvedNodeBinary = pmssPinnedRemoteArtifactTempFileUse(
                 'Node.js runtime for AI CLI tools',
@@ -144,13 +141,11 @@ if ($nodeBinary !== '') {
         $prefixDir = '/opt/pmss/ai-tools/npm/'.$toolSpec[3];
         $binaryPath = $prefixDir.'/bin/'.$toolSpec[3];
         $installNeeded = !is_file($binaryPath) || $force;
-        if (!$installNeeded) {
-            if ($toolSpec[2] !== '') {
-                // Versioned npm tools must converge after upstream publishes a bad latest.
-                $packageJsonPath = $prefixDir.'/lib/node_modules/'.$toolSpec[1].'/package.json';
-                $packageJson = pmssJsonDecodeAssoc((string) @file_get_contents($packageJsonPath));
-                $installNeeded = !is_array($packageJson) || (string) ($packageJson['version'] ?? '') !== $toolSpec[2];
-            }
+        if (!$installNeeded && $toolSpec[2] !== '') {
+            // Versioned npm tools must converge after upstream publishes a bad latest.
+            $packageJsonPath = $prefixDir.'/lib/node_modules/'.$toolSpec[1].'/package.json';
+            $packageJson = pmssJsonDecodeAssoc((string) @file_get_contents($packageJsonPath));
+            $installNeeded = !is_array($packageJson) || (string) ($packageJson['version'] ?? '') !== $toolSpec[2];
         }
 
         if ($installNeeded) {
@@ -171,23 +166,17 @@ if ($nodeBinary !== '') {
         $gemini = $toolSpec[3] === 'gemini';
         $stub = '/usr/local/bin/'.$toolSpec[3];
         $defaults = '/opt/pmss/ai-tools/gemini-virsilipas-defaults.json';
-        $needed = $gemini
-            ? pmssAiToolsGeminiInstallNeeded($launcher, $stub, $launcherSource, $defaults)
-            : pmssAiToolsClaudeInstallNeeded($launcher, $stub, $launcherSource);
-        if ($needed) {
+        if ($gemini ? pmssAiToolsGeminiInstallNeeded($launcher, $stub, $launcherSource, $defaults)
+            : pmssAiToolsClaudeInstallNeeded($launcher, $stub, $launcherSource)) {
             if ($gemini && runStep('Ensuring Gemini defaults directory is root-owned',
                 pmssBuildCommand('install', ['-d', '-o', 'root', '-g', 'root', '-m', '0755', '/opt/pmss/ai-tools'])) !== 0) {
                 $logger('[WARN] Unable to prepare Gemini defaults directory; keeping existing command');
                 continue;
             }
-            $content = @file_get_contents($launcherSource);
-            if (!is_string($content) || !pmssAiToolsCodexAtomicWrite($launcher, $content, 0644)) {
-                $logger('[WARN] Unable to install '.$toolSpec[0].' launcher; keeping existing command');
-            } elseif ($gemini && !pmssAiToolsCodexAtomicWrite($defaults, pmssAiToolsGeminiDefaults(), 0644)) {
-                $logger('[WARN] Unable to install Gemini defaults; keeping existing command');
-            } elseif (!pmssAiToolsCodexAtomicWrite($stub, $gemini ? pmssAiToolsGeminiStub() : pmssAiToolsClaudeStub(), 0755)) {
-                $logger('[WARN] Unable to install '.$toolSpec[0].' command stub; keeping existing command');
-            }
+            $files = [[$launcher, @file_get_contents($launcherSource), 0644, 'Unable to install '.$toolSpec[0].' launcher']];
+            if ($gemini) $files[] = [$defaults, pmssAiToolsGeminiDefaults(), 0644, 'Unable to install Gemini defaults'];
+            $files[] = [$stub, $gemini ? pmssAiToolsGeminiStub() : pmssAiToolsClaudeStub(), 0755, 'Unable to install '.$toolSpec[0].' command stub'];
+            pmssAiToolsFilesPublish($files, $logger);
         }
     }
 }
@@ -250,12 +239,10 @@ if (pmssAiToolsCodexInstallNeeded($destination, $launcher, $stub, $launcherSourc
             }
         }
         if ($binaryReady && !$dryRun) {
-            $content = @file_get_contents($launcherSource);
-            if (!is_string($content) || !pmssAiToolsCodexAtomicWrite($launcher, $content, 0644)) {
-                $logger('[WARN] Unable to install Codex launcher; keeping existing command');
-            } elseif (!pmssAiToolsCodexAtomicWrite($stub, pmssAiToolsCodexStub(), 0755)) {
-                $logger('[WARN] Unable to install Codex command stub; keeping existing command');
-            }
+            pmssAiToolsFilesPublish([
+                [$launcher, @file_get_contents($launcherSource), 0644, 'Unable to install Codex launcher'],
+                [$stub, pmssAiToolsCodexStub(), 0755, 'Unable to install Codex command stub'],
+            ], $logger);
         }
         // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
         if ($binaryReady && preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {

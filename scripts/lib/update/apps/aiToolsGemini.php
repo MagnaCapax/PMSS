@@ -30,13 +30,11 @@ function pmssAiToolsGeminiInstallNeeded(string $launcher, string $stub, string $
         || @filegroup($directory) !== $group || (@fileperms($directory) & 0777) !== 0755) {
         return true;
     }
-    foreach ([$launcher => [is_string($expected) ? $expected : null, 0644],
+    $files = [$launcher => [is_string($expected) ? $expected : null, 0644],
         $stub => [pmssAiToolsGeminiStub(), 0755],
-        $defaults => [pmssAiToolsGeminiDefaults(), 0644]] as $path => $spec) {
-        clearstatcache(true, $path);
-        if (pmssAiToolsFileDiffers($path, $spec[0], $spec[1], $owner, $group)) {
-            return true;
-        }
-    }
-    return false;
+        $defaults => [pmssAiToolsGeminiDefaults(), 0644]];
+    // Keep the legacy path-keyed overwrite/order semantics, even for coincident paths.
+    return pmssAiToolsFilesDiffer(array_map(static function (string $path, array $spec): array {
+        return [$path, $spec[0], $spec[1]];
+    }, array_keys($files), array_values($files)), $owner, $group, true);
 }

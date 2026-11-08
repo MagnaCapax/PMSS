@@ -21,7 +21,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     "\$launcherSource = __DIR__.'/templates/pmss-ai-launch.php';",
                     "\$launcher = '/opt/pmss/ai-tools/pmss-ai-launch.php';",
                     'pmssAiToolsCodexInstallNeeded(',
-                    'pmssAiToolsCodexAtomicWrite(',
+                    'pmssAiToolsFilesPublish(',
                     'PMSS_AI_CODEX_CHAT_TAGS',
                     'node-v22.23.4-linux-x64.tar.xz',
                     'codex-x86_64-unknown-linux-musl.tar.gz',
@@ -39,6 +39,9 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'function pmssAiTools'.'InstallNpmCli(' => 'NPM CLI installation should stay inline in the only installer',
                 ],
                 'matches' => ['/[0-9a-f]{64}/'],
+            ],
+            'aiTools/publication.php' => [
+                'required' => ['pmssAiToolsCodexAtomicWrite(', 'keeping existing command'],
             ],
             'btsync.php' => [
                 'required' => [

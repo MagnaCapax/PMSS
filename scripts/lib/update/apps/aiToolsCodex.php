@@ -1,6 +1,7 @@
 <?php
 /** Pinned Codex layout and atomic publication helpers for aiToolsInstall.php. */
 require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
+require_once __DIR__.'/aiTools/publication.php';
 
 const PMSS_AI_CODEX_TAG = 'rust-v0.93.0';
 // A pin bump requires a live Virsilipas check before adding another chat-capable tag.
@@ -14,31 +15,17 @@ function pmssAiToolsStub(string $tool, string $fallback): string
         ."fi\nexec {$fallback} \"\$@\"\n";
 }
 
-/** Compare one published file without following a replacement symlink. */
-function pmssAiToolsFileDiffers(string $path, ?string $expected, ?int $mode = null, ?int $owner = null, ?int $group = null): bool
-{
-    return $expected === null || is_link($path) || @file_get_contents($path) !== $expected
-        || ($owner !== null && @fileowner($path) !== $owner)
-        || ($group !== null && @filegroup($path) !== $group)
-        || ($mode !== null && (@fileperms($path) & 0777) !== $mode);
-}
-
 /** Exact system stub; use the pinned binary if PHP or the launcher is unavailable. */
 function pmssAiToolsCodexStub(): string
 {
-    $binary = '/opt/pmss/ai-tools/codex/codex-'.PMSS_AI_CODEX_TAG;
-    return pmssAiToolsStub('codex', $binary);
+    return pmssAiToolsStub('codex', '/opt/pmss/ai-tools/codex/codex-'.PMSS_AI_CODEX_TAG);
 }
 
 /** Compare managed content, so the pre-launcher binary layout converges. */
 function pmssAiToolsCodexInstallNeeded(string $binary, string $launcher, string $stub, string $source, bool $force): bool
 {
-    if ($force || !is_file($binary) || !is_executable($binary) || is_link($binary)) {
-        return true;
-    }
-    $expectedLauncher = @file_get_contents($source);
-    return pmssAiToolsFileDiffers($launcher, is_string($expectedLauncher) ? $expectedLauncher : null)
-        || pmssAiToolsFileDiffers($stub, pmssAiToolsCodexStub());
+    return $force || !is_file($binary) || !is_executable($binary) || is_link($binary)
+        || pmssAiToolsFilesDiffer([[$launcher, @file_get_contents($source), null], [$stub, pmssAiToolsCodexStub(), null]]);
 }
 
 /** Publish a small root-owned file from a same-directory temporary path. */
