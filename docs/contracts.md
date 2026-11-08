@@ -617,6 +617,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Starts missing service specs after applying the exported lock-fd close prefix;
     the watchdog parent retains its lock while long-lived daemons cannot inherit it.
 - qBittorrent toggle and watchdog diagnostics
+  - Native stops in password sync, port repair, upload-throttle reconciliation
+    and the panel use executable identity rather than process-name kills.
+    Operator stops admit managed install/store/account paths and exclude unreadable
+    executable links; both operator and panel selectors accept the kernel's
+    ` (deleted)` suffix. Launcher liveness retains UID/name/mount-namespace checks
+    for user-built clients (ADR 0106), so an unlabelled rootless Docker guest alone
+    cannot satisfy native liveness. Suspension still stops all matching clients.
+    `QbittorrentNativeIsolationTest` covers these #984 regression boundaries.
   - Native watchdog port convergence treats `~/.qbittorrentPort` as a request to
     the root port manager (ADR 0213). A free, unreserved preference within
     2000–38000 replaces the reservation under the allocator lock; rejected
