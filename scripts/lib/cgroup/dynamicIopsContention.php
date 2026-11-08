@@ -43,7 +43,9 @@ function pmssBlkioReadCount(string $path, string $majMin): ?int
 /** An account is held when it read at 75% (or $ratio) or more of the rate its cap delivers. */
 function pmssDynamicIopsSliceHeld(?int $cap, ?int $before, ?int $after, int $seconds, float $ratio = PMSS_DYNAMIC_IOPS_HELD_RATIO): bool
 {
-    if ($cap === null || $cap <= 0 || $before === null || $after === null || $after < $before || $seconds < 60) return false;
+    // Reject corrupt signed baselines before subtraction can overflow or invent reads.
+    if ($cap === null || $cap <= 0 || $before === null || $before < 0
+        || $after === null || $after < $before || $seconds < 60) return false;
     return ($after - $before) / $seconds >= $ratio * max(1, 10 * intdiv($cap, 10));
 }
 
@@ -54,7 +56,7 @@ function pmssDynamicIopsSliceHeld(?int $cap, ?int $before, ?int $after, int $sec
 function pmssDynamicIopsHeldLastCycle(array $state, int $now): array
 {
     $then = $state['time'] ?? null;
-    if (!is_int($then) || $then >= $now || $now - $then > 900 || !is_array($state['held'] ?? null)) return [];
+    if (!is_int($then) || $then < 0 || $then >= $now || $now - $then > 900 || !is_array($state['held'] ?? null)) return [];
     return array_fill_keys(array_filter($state['held'], static function ($uid): bool { return is_int($uid) && $uid > 0; }), true);
 }
 
@@ -89,7 +91,8 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
         $bytes[$uid] = pmssBlkioReadCount(pmssCgroupDirectUserSliceDir($uid).'/blkio.throttle.io_service_bytes', $majMin);
     }
     if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => [], 'counts' => $counts, 'bytes' => $bytes];
-    $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
+    // A corrupt negative epoch must not become a floating elapsed argument to the held predicate.
+    $then = is_int($state['time'] ?? null) && $state['time'] >= 0 && $state['time'] < $now ? $state['time'] : null;
     $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
     $slices = []; $heldUsers = []; $heldUids = [];
     foreach ($uids as $user => $uid) {

@@ -14,12 +14,14 @@ function pmssDynamicIopsProbeState(?array $state, array $settings, int $start): 
     $valid = $state !== null && ($state['metric'] ?? null) === 'bytes' && is_numeric($state['lo'] ?? null) && is_finite((float) $state['lo'])
         && $state['lo'] >= $settings['busyMultiplier'] && $state['lo'] <= $settings['idleMultiplier']
         && in_array($state['arm'] ?? null, ['lo', 'hi'], true)
-        && is_int($state['block_start'] ?? null) && $state['block_start'] <= $start
+        // Persisted epochs must not overflow subtraction into a float before modulo/intdiv.
+        && is_int($state['block_start'] ?? null) && $state['block_start'] >= 0 && $state['block_start'] <= $start
         && ($start - $state['block_start']) % ($settings['probeBlockCycles'] * 300) === 0
         && is_int($state['block_samples'] ?? null)
         && $state['block_samples'] >= 0 && $state['block_samples'] <= $settings['probeBlockCycles']
         && is_array($state['last_counts'] ?? null) && is_array($state['pairs'] ?? null)
-        && count($state['pairs']) < $settings['probePairs'] && is_int($state['last_time'] ?? null);
+        && count($state['pairs']) < $settings['probePairs']
+        && is_int($state['last_time'] ?? null) && $state['last_time'] >= 0;
     foreach (['block_work', 'pending_work'] as $key) {
         $valid = $valid && array_key_exists($key, $state ?? [])
             && ($state[$key] === null || (is_numeric($state[$key]) && is_finite((float) $state[$key]) && $state[$key] >= 0));
@@ -41,7 +43,8 @@ function pmssDynamicIopsProbeWork(array $before, array $after): ?float
     $work = null;
     foreach ($after as $uid => $count) {
         if (!is_int($count) || !is_int($before[$uid] ?? null)) continue;
-        if ($count < $before[$uid]) return null;
+        // Kernel counters are unsigned; corrupt endpoints cannot establish delivered work.
+        if ($count < 0 || $before[$uid] < 0 || $count < $before[$uid]) return null;
         $work = ($work ?? 0.0) + ($count - $before[$uid]);
     }
     return $work !== null && is_finite($work) ? $work : null;

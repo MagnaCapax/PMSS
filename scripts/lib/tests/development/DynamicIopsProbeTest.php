@@ -145,6 +145,33 @@ class DynamicIopsProbeTest extends TestCase
         $this->assertSame(null, \pmssDynamicIopsProbeWork([1 => 120, 2 => 1000], [1 => 119, 2 => 1010]));
     }
 
+    /** scripts/lib/cgroup/dynamicIopsProbe.php must reject signed state before arithmetic. */
+    public function testNegativeEpochsRestartTheProbeWithoutOverflow(): void
+    {
+        foreach (['block_start', 'last_time'] as $field) {
+            foreach ([-1, -3600, PHP_INT_MIN] as $value) {
+                $saved = $this->state(4.0);
+                $saved[$field] = $value;
+                $saved['pairs'] = [0.1];
+                $row = \pmssDynamicIopsProbeCycle($saved, \pmssDynamicIopsSettings([]), [1 => 100], 1800000000, '', false);
+                $this->assertSame(5.0, $row['state']['lo']);
+                $this->assertSame([], $row['state']['pairs']);
+                $this->assertSame(null, $row['state']['block_work']);
+                $this->assertSame(1800000000, $row['state']['last_time']);
+            }
+        }
+    }
+
+    public function testWorkRejectsNegativeEndpointsAndKeepsUnsignedBoundaries(): void
+    {
+        foreach ([[-1, 100], [PHP_INT_MIN, PHP_INT_MAX], [-100, -1], [-1, -1], [0, -1]] as [$before, $after]) {
+            $this->assertSame(null, \pmssDynamicIopsProbeWork([1 => $before], [1 => $after]));
+        }
+        $this->assertSame(0.0, \pmssDynamicIopsProbeWork([1 => 0], [1 => 0]));
+        $this->assertSame(1.0, \pmssDynamicIopsProbeWork([1 => PHP_INT_MAX - 1], [1 => PHP_INT_MAX]));
+        $this->assertSame((float) PHP_INT_MAX, \pmssDynamicIopsProbeWork([1 => 0], [1 => PHP_INT_MAX]));
+    }
+
     public function testFirstCycleIsSkippedAndPhaseIsStablePerIdentity(): void
     {
         $row = \pmssDynamicIopsProbeCycle($this->state(), \pmssDynamicIopsSettings([]), [1 => 10000], 1800000000, '', false);

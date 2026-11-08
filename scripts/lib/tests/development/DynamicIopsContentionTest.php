@@ -43,6 +43,45 @@ class DynamicIopsContentionTest extends TestCase
         $this->assertFalse(\pmssDynamicIopsSliceHeld(20, 0, 480, 300));
     }
 
+    /** scripts/lib/cgroup/dynamicIopsContention.php accepts only unsigned counter baselines. */
+    public function testNegativeCountersCannotEstablishHeldReads(): void
+    {
+        foreach ([[-1, 4500], [PHP_INT_MIN, PHP_INT_MAX], [-100, -1], [-1, -1], [0, -1]] as [$before, $after]) {
+            $this->assertFalse(\pmssDynamicIopsSliceHeld(25, $before, $after, 300));
+        }
+        $this->assertFalse(\pmssDynamicIopsSliceHeld(25, PHP_INT_MAX - 1, PHP_INT_MAX, 300));
+        $this->assertTrue(\pmssDynamicIopsSliceHeld(25, 0, PHP_INT_MAX, 300));
+        foreach ([-1, -900, PHP_INT_MIN] as $then) {
+            $this->assertSame([], \pmssDynamicIopsHeldLastCycle(['time' => $then, 'held' => [1001]], 100));
+        }
+    }
+
+    public function testObserverDiscardsNegativeEpochsBeforeComputingElapsedTime(): void
+    {
+        $script = <<<'PHP'
+namespace ContentionEpochFixture;
+function pmssJsonFileReadAssoc($path, $safe) { return ['time' => $GLOBALS['then'], 'counts' => [1001 => 0]]; }
+function file_get_contents($path) { return "full avg300=1.00\n8:0 Read 6000\n"; }
+function is_dir($path) { return true; }
+function pmssCgroupDirectUserUidOrError($user, &$errors) { return 1001; }
+function pmssCgroupDirectUserSliceDir($uid) { return '/fixture/slice'; }
+function pmssCgroupDirectDeviceValueParse($raw, $device) { return 25; }
+function pmssUnsignedDecimalIntParse($raw) { return (int) $raw; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/dynamicIopsContention.php', 'ContentionEpochFixture');
+        // Only acquisition helpers are replaced; the observer and held predicate run unchanged.
+        $script .= <<<'PHP'
+$rows = [];
+foreach ([-1, -900, PHP_INT_MIN, 0, 100] as $then) {
+    $GLOBALS['then'] = $then;
+    $row = pmssDynamicIopsContentionObserve(['fixtur01' => []], '8:0', 400, true);
+    $rows[] = $row['held']['fixtur01'];
+}
+echo json_encode($rows);
+PHP;
+        $this->assertSame([false, false, false, true, true], $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testContentionLeavesOutReadersAtHalfTheirCapButThePanelDoesNot(): void
     {
         // Readers at 60-76% of their cap stalled 35-75% on three hosts; readers at 36% or less stalled 23% or less (#1249).

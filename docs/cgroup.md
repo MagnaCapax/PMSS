@@ -308,6 +308,13 @@ pairs_n, last_ratio (log ratio), decision, gate (set on a decision cycle), lo_cy
 and lo_held. Read-only
 previews never write it.
 
+Persisted probe block/observation epochs and contention observation epochs must
+be non-negative before elapsed-time arithmetic. Negative probe epochs restart
+the experiment; negative contention epochs supply no held baseline. Negative
+read counters cannot establish delivered work or held reads. These guards keep
+corrupt signed values, including the minimum integer, out of subtraction while
+preserving zero and valid positive counters and epochs.
+
 On solid-state `/home` (`ssd`, `nvme`) multiplier steps follow a band of
 `ssdLatencyLowX` (5) to `ssdLatencyHighX` (10) times a reference latency
 (ADR 0237). The reference is the higher of the service group's median weekly
