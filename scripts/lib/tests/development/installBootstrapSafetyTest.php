@@ -119,6 +119,41 @@ class installBootstrapSafetyTest extends TestCase
         ]), $this->script);
     }
 
+    public function testFreshInstallHandoffExitStatusAndHelperExecution(): void
+    {
+        // Run only the final hand-off block, with every system command replaced by a recorder.
+        $start = strrpos($this->script, "\n".'if [ "$RUN_UPDATE" = true ]; then');
+        $this->assertTrue($start !== false, 'Fresh-install hand-off boundary missing');
+        $probe = <<<'BASH'
+fixture_rc="$1"; RUN_UPDATE="$2"; UPDATE_ARGS=(release)
+log_step() { :; }
+log_info() { :; }
+log_error() { printf '%s\n' "$*"; }
+export_update_bootstrap_env() { :; }
+run_cmd() {
+    printf 'command:%s\n' "$1"
+    if [ "$1" = /scripts/update.php ]; then return "$fixture_rc"; fi
+    return 0
+}
+BASH;
+        $probe .= substr($this->script, $start);
+        $update = 'command:/scripts/update.php';
+        $success = $update."\n".implode("\n", [
+            'command:/scripts/util/setupRootCron.php',
+            'command:/scripts/util/setupPermissions.php',
+            'command:/scripts/util/quotaFix.php',
+            'command:/scripts/util/ftpConfig.php',
+        ]);
+        foreach ([[0, 'true'], [1, 'true'], [42, 'true'], [127, 'true'], [255, 'true'], [42, 'false']] as $case) {
+            $result = $this->pmssExecArgvCommand(['bash', '-c', $probe, '--', (string) $case[0], $case[1]]);
+            $expectedRc = $case[1] === 'true' ? $case[0] : 0;
+            $expected = $case[1] === 'false' ? '' : ($expectedRc === 0 ? $success : $update."\n"
+                .'Update failed (rc='.$expectedRc.'); see /var/log/pmss/update.log');
+            $this->assertSame($expectedRc, $result['rc'], $result['output']);
+            $this->assertSame($expected, $result['output']);
+        }
+    }
+
     public function testHomeMountPreflightPrecedesProvisioning(): void
     {
         $this->assertOrderedStrings([

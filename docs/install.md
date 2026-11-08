@@ -12,6 +12,10 @@ Responsibilities are intentionally limited to:
 5. Pull the repository into `/scripts`, `/etc`, and `/var`, then hand off to `/scripts/update.php`.
 6. On Debian 11 only, point `bullseye-security` lines in `/etc/apt/sources.list` and `sources.list.d/*.list` at `http://archive.debian.org/debian-security` before the first `apt update`, so the core tooling can install before `update.php` applies the bullseye template. Each changed file is backed up once as `<file>.pmss-bootstrap.save`; symlinked lists are skipped with a warning. Other sources and releases stay untouched. Remove this step when Debian 11 support ends.
 
+If the fresh-install `update.php` hand-off fails, `install.sh` prints
+`/var/log/pmss/update.log`, skips the post-install helpers, and exits with the
+updater's non-zero status. Helpers run only after a successful hand-off.
+
 Interactivity contract:
 - The documented pipe installer (`wget -qO- .../install.sh | bash -s -- ...`) must still be able to prompt in SSH/console sessions by using the controlling TTY (`/dev/tty`) when present.
 - When running the installer via an `ssh host "..."` remote command, force a pseudo-TTY with `ssh -t` (otherwise no prompts are possible).
