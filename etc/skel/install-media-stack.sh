@@ -1260,6 +1260,8 @@ media_stack_managed_path_remove() {
 
 bashrc_custom_media_stack_blocks_strip() {
 	local target="$HOME/.bashrc.custom" backup="" temp=""
+	# Uninstall strips all blocks; full installs select only blocks they regenerate.
+	local blocks="${1:-dotnet jellyfin media}"
 
 	[[ -f "$target" ]] || {
 		log_info "No ~/.bashrc.custom found; alias cleanup not needed."
@@ -1270,14 +1272,19 @@ bashrc_custom_media_stack_blocks_strip() {
 		return 0
 	fi
 
-	backup="$target.pmss-media-stack.$(date +%Y%m%d%H%M%S).bak"
+	# Rapid reruns must not overwrite the backup containing customer edits.
+	backup=$(mktemp "$target.pmss-media-stack.$(date +%Y%m%d%H%M%S).XXXXXX.bak") || {
+		log_err "Failed to create ~/.bashrc.custom backup"
+		return 1
+	}
 	temp="$target.pmss.$$"
 	if ! cp "$target" "$backup"; then
+		rm -f "$backup"
 		log_err "Failed to backup ~/.bashrc.custom"
 		return 1
 	fi
 
-	if ! awk '
+	if ! awk -v blocks=" $blocks " '
     function flush_pending(i) {
       for (i = 1; i <= pending_count; i++) print pending[i]
       pending_count = 0
@@ -1296,19 +1303,19 @@ bashrc_custom_media_stack_blocks_strip() {
         }
         next
       }
-      if ($0 == "# Added by PMSS media stack installer (.NET 8)") {
+      if (index(blocks, " dotnet ") && $0 == "# Added by PMSS media stack installer (.NET 8)") {
         skip = "dotnet"
         pending_count = 1
         pending[1] = $0
         next
       }
-      if ($0 == "# PMSS Jellyfin alias (updated Nov 2025)") {
+      if (index(blocks, " jellyfin ") && $0 == "# PMSS Jellyfin alias (updated Nov 2025)") {
         skip = "jellyfin"
         pending_count = 1
         pending[1] = $0
         next
       }
-      if ($0 == "# PMSS Media stack aliases (updated Nov 2025)") {
+      if (index(blocks, " media ") && $0 == "# PMSS Media stack aliases (updated Nov 2025)") {
         skip = "media"
         pending_count = 1
         pending[1] = $0
@@ -2850,6 +2857,12 @@ fi
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
+# Refresh only the managed blocks this run re-appends, keeping skipped Jellyfin intact.
+media_stack_alias_blocks="media"
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+	media_stack_alias_blocks+=" jellyfin"
+fi
+bashrc_custom_media_stack_blocks_strip "$media_stack_alias_blocks"
 # shellcheck disable=SC2016
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	jellyfin_alias_legacy='alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; ionice -c 2 -n 4 nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\'''
@@ -2859,7 +2872,7 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	# .NET uses TMPDIR for trickplay and child processes; keep scratch inside the account quota.
 	jellyfin_alias_tmp='; export TMPDIR=\"$HOME/.config/jellyfin/data/tmp\"; mkdir -p \"$HOME/.config/jellyfin/data/tmp\" && ionice'
 	jellyfin_alias="${jellyfin_alias_previous/; ionice/"$jellyfin_alias_tmp"}"
-	# Upgrade only the exact shipped aliases; customer-written launch commands stay intact.
+	# Also upgrade exact shipped aliases outside marked blocks; unmarked custom aliases stay intact.
 	if [[ $DRY_RUN -eq 0 && -f "$HOME/.bashrc.custom" && ! -L "$HOME/.bashrc.custom" ]]; then
 		while IFS=: read -r line_number _; do
 			sed -i "${line_number}c\\${jellyfin_alias//\\/\\\\}" "$HOME/.bashrc.custom"

@@ -436,6 +436,92 @@ BASH
         $this->assertStringContainsAllStrings(array('url=http://127.0.0.1:22104', 'preserved', 'custom'), $output);
     }
 
+    public function testManagedAliasBlocksRefreshOnlyWhenReappended(): void
+    {
+        $dotnet = "# Added by PMSS media stack installer (.NET 8)\nexport DOTNET_ROOT=preserved\nexport PATH\n";
+        $jellyfin = "# PMSS Jellyfin alias (updated Nov 2025)\nalias jellyfin='printf old-jellyfin'\n";
+        $media = "# PMSS Media stack aliases (updated Nov 2025)\nalias sonarr='printf obsolete'\nalias sabnzbd='printf obsolete'\n";
+        $user = "# Customer shell settings\nalias fixtur01='printf preserved'\n";
+        $start = strpos($this->script, '# Aliases (Sonarr fix, PATH added above)');
+        $end = strpos($this->script, '# Lighttpd config (use $HOSTNAME)', $start);
+        $aliases = substr($this->script, $start, $end - $start);
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'bashrc_custom_media_stack_blocks_strip', 'append_to_bashrc_custom_if_missing',
+        ));
+
+        // Exercise the real full-run alias slice with old, duplicate, missing and custom blocks.
+        foreach (array(
+            array(0, 0, $dotnet.$jellyfin.$media.$user),
+            array(1, 0, $dotnet.$jellyfin.$media.$user),
+            array(0, 1, $dotnet.$jellyfin.$media.$user),
+            array(1, 1, $dotnet.$jellyfin.$media.$user),
+            array(0, 0, $dotnet.$jellyfin.$media.$media.$user),
+            array(1, 0, $user."alias jellyfin='printf custom'\n"),
+            array(0, 0, ''),
+        ) as $case) {
+            $home = $this->pmssMakeTempDir('pmss-media-alias-refresh-');
+            $target = $home.'/.bashrc.custom';
+            if ($case[2] !== '') {
+                $this->pmssWriteFile($target, $case[2]);
+            }
+            $harness = "#!/usr/bin/env bash\nset -euo pipefail\nHOME=".escapeshellarg($home)."\n"
+                .'JELLYFIN_PORT=22104; JELLYFIN_INSTALL_ENABLED='.$case[0].'; DRY_RUN='.$case[1]."\n"
+                .'log_info() { :; }; log_warn() { :; }; log_err() { echo "$*" >&2; }'."\n"
+                .$functions."\n".$aliases;
+            $this->pmssRunShellHarness($harness);
+            $content = (string) file_get_contents($target);
+            $backups = glob($target.'.pmss-media-stack.*.bak');
+            if ($case[1]) {
+                $this->assertSame($case[2], $content);
+                $this->assertSame(array(), $backups);
+                continue;
+            }
+            $this->assertSame(1, substr_count($content, '# PMSS Media stack aliases (updated Nov 2025)'));
+            $this->assertStringContainsString('alias autobrr=', $content);
+            $this->assertStringNotContainsString('printf obsolete', $content);
+            if ($case[2] !== '') {
+                $this->assertEquals(1, count($backups));
+                $this->assertSame($case[2], (string) file_get_contents($backups[0]));
+                $this->assertStringContainsString($user, $content);
+            }
+            if (strpos($case[2], $dotnet) !== false) {
+                $this->assertStringContainsString($dotnet, $content);
+                if ($case[0]) {
+                    $this->assertStringNotContainsString('printf old-jellyfin', $content);
+                    $this->assertStringContainsString('ASPNETCORE_URLS=', $content);
+                } else {
+                    $this->assertStringContainsString($jellyfin, $content);
+                }
+            }
+            if (strpos($case[2], 'printf custom') !== false) {
+                $this->assertStringContainsString("alias jellyfin='printf custom'", $content);
+            }
+            $this->pmssRunShellHarness($harness);
+            $refreshed = (string) file_get_contents($target);
+            $this->assertSame(1, substr_count($refreshed, '# PMSS Media stack aliases (updated Nov 2025)'));
+            $this->assertSame(substr_count($content, 'alias jellyfin='), substr_count($refreshed, 'alias jellyfin='));
+            if ($case[2] !== '') {
+                $this->assertSame($case[2], (string) file_get_contents($backups[0]));
+            }
+        }
+    }
+
+    public function testManagedBlockStripDefaultsToAllAndPreservesIncompleteBlocks(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-alias-strip-');
+        $user = "alias fixtur01='printf preserved'\n";
+        $incomplete = "# PMSS Media stack aliases (updated Nov 2025)\nalias sonarr='printf incomplete'\n";
+        $this->pmssWriteFile($home.'/.bashrc.custom', $user
+            ."# Added by PMSS media stack installer (.NET 8)\nexport PATH\n"
+            ."# PMSS Jellyfin alias (updated Nov 2025)\nalias jellyfin='printf old'\n"
+            ."# PMSS Media stack aliases (updated Nov 2025)\nalias sabnzbd='printf old'\n".$incomplete);
+        $this->pmssRunShellHarness("#!/usr/bin/env bash\nset -euo pipefail\nHOME=".escapeshellarg($home)."\n"
+            ."DRY_RUN=0; log_info() { :; }; log_err() { echo \"\$*\" >&2; }\n"
+            .$this->pmssExtractShellFunction($this->script, 'bashrc_custom_media_stack_blocks_strip')
+            ."\nbashrc_custom_media_stack_blocks_strip\n");
+        $this->assertSame($user.$incomplete, (string) file_get_contents($home.'/.bashrc.custom'));
+    }
+
     /** Build only the alias/port slice; tmux and priority commands are harmless stubs. */
     private function jellyfinAliasHarness(string $home): string
     {
@@ -455,7 +541,7 @@ BASH
             'tmux() { /bin/bash -c "${@: -1}"; }; ionice() { shift 4; "$@"; }; nice() { shift 2; "$@"; }',
             'export -f tmux ionice nice',
             $this->pmssExtractShellFunctions($this->script, array(
-                'append_to_bashrc_custom_if_missing', 'existing_port_from_xml_tag',
+                'append_to_bashrc_custom_if_missing', 'bashrc_custom_media_stack_blocks_strip', 'existing_port_from_xml_tag',
                 'media_stack_port_is_valid', 'media_stack_reserved_port_read', 'pick_existing_or_reserved_port',
             )),
             substr($this->script, $portsStart, $portsEnd - $portsStart),

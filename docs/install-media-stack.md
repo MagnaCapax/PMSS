@@ -21,7 +21,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Servarr update policy: Radarr, Sonarr, and Prowlarr select `Script` updates without supplying an update script and disable automatic updates. Manual updates report an undefined-script error before launching the built-in updater; rerun this installer to update safely.
 - App-level authentication: the installer generates per-app passwords, configures auth before the public proxy is restarted, and writes credentials to `~/.media-stack-credentials.txt` with mode `600`.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
-- Jellyfin temporary files: every managed launch and the generated `jellyfin` alias create `~/.config/jellyfin/data/tmp` and export it as `TMPDIR`, keeping trickplay scratch inside the account's home quota instead of sharing `/tmp/jellyfin`. Directory creation must succeed before Jellyfin starts. Reruns upgrade exact previously shipped aliases while preserving custom aliases. Already-running sessions need a restart through the updated installer; this does not clean the shared `/tmp/jellyfin` directory.
+- Jellyfin temporary files: every managed launch and the generated `jellyfin` alias create `~/.config/jellyfin/data/tmp` and export it as `TMPDIR`, keeping trickplay scratch inside the account's home quota instead of sharing `/tmp/jellyfin`. Directory creation must succeed before Jellyfin starts. Reruns refresh the marked alias block and upgrade exact previously shipped aliases outside it while preserving unmarked custom aliases. Already-running sessions need a restart through the updated installer; this does not clean the shared `/tmp/jellyfin` directory.
 
 Jellyfin's [startup options](https://github.com/jellyfin/jellyfin/blob/v10.10.7/Jellyfin.Server/StartupOptions.cs) do not include `--tempdir`; [.NET on Unix reads `TMPDIR` for `Path.GetTempPath()`](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/IO/Path.Unix.cs).
 
@@ -175,7 +175,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Credentials are written to `~/.media-stack-credentials.txt` with mode `600` and echoed in the final summary.
 
 7) Aliases
-- Appends tmux aliases to `~/.bashrc.custom` that export `DOTNET_ROOT` and execute `<app>.dll` via `dotnet` (or Python venv for SABnzbd/Cloudplow).
+- Regenerates the marked media-stack tmux alias block in `~/.bashrc.custom` on every full run, so existing accounts receive current launch commands, including Autobrr. Regenerates the Jellyfin block only when Jellyfin installation is enabled; a skipped Jellyfin keeps its existing alias. The .NET/PATH block and lines outside the selected blocks are preserved. Edits inside replaced blocks survive in a unique adjacent `.pmss-media-stack.*.bak` backup, including across rapid reruns. Dry runs leave the file untouched.
 - Sources `~/.bashrc` with `set +u` so `~/.bashrc.custom` takes effect (and to avoid aborts when nounset is active in a user’s shell configs).
 
 8) Reverse proxy
