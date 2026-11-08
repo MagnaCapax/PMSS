@@ -164,6 +164,11 @@ also closes if destination close throws. Normal destination-before-source close
 order, collision retries, short-copy refusal, modes, return values and warnings
 remain unchanged. `ManagedPathBackupSafetyTest` injects exceptions and errors
 without opening managed files; execution stays on the testing machine.
+Backup acquisition also pins a regular-file snapshot before opening the source
+non-blocking. Missing metadata, non-regular entries and substituted device/inode
+values use the existing open-failure warning before any destination is created.
+The current-path guard, complete-copy check, metadata and close order remain;
+the same fixture covers acquisition refusals and snapshot exceptions.
 
 Quota recovery header inspection closes its stream in `finally` when the read
 throws an exception or error, preserving the original throwable. Normal header

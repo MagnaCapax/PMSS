@@ -129,7 +129,9 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
     if (!pmssManagedPathIsSafe($path, $label, $logger)) {
         return '';
     }
-    if (!pmssRegularFilePathIsReadable($path)) {
+    clearstatcache(true, $path);
+    if (!pmssRegularFilePathIsReadable($path) || !is_array($entry = @lstat($path))
+        || (($entry['mode'] ?? 0) & 0170000) !== 0100000) {
         $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
         return '';
     }
@@ -142,14 +144,17 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
             return '';
         }
 
-        $source = @fopen($path, 'rb');
+        // A substituted FIFO must not block before the opened inode is checked.
+        $source = @fopen($path, 'rbn');
         if (!is_resource($source)) {
             $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
             return '';
         }
         $target = false;
         try {
-            $sourceMatches = pmssLockFileHandleMatchesPath($source, $path);
+            $sourceMatches = pmssLockFileHandleMatchesPath($source, $path, null, $opened)
+                && pmssFilesystemStatSameInode($entry, $opened)
+                && (($opened['mode'] ?? 0) & 0170000) === 0100000;
             if ($sourceMatches) {
                 $target = @fopen($backup, 'xb');
                 if (is_resource($target)) {

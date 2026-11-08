@@ -21,14 +21,26 @@ function is_link($path) { return false; }
 function pmssUserFilePathIsSafe($path) { return true; }
 function pmssRegularFilePathIsReadable($path) { return true; }
 function pmssPathExistsOrLink($path) { return false; }
+function lstat($path) {
+    $stat = ['dev' => 1, 'ino' => 2, 'mode' => 0100640];
+    if ($GLOBALS['case'] === 'entry-missing') $stat = false;
+    foreach (['entry-fifo' => 0010640, 'entry-symlink' => 0120640, 'entry-directory' => 0040755] as $case => $mode) {
+        if ($GLOBALS['case'] === $case) $stat['mode'] = $mode;
+    }
+    return observe('entry-stat', $stat);
+}
 function fopen($path, $mode) {
-    $role = $mode === 'rb' ? 'source' : 'target';
+    $role = $mode === 'rbn' ? 'source' : 'target';
     observe('open-'.$role, null);
     $GLOBALS['opens'][] = [$path, $mode];
     return $GLOBALS['handles'][$role] = $GLOBALS['case'] === $role.'-unavailable'
         ? false : \fopen('php://memory', 'w+');
 }
-function pmssLockFileHandleMatchesPath($handle, $path) {
+function pmssLockFileHandleMatchesPath($handle, $path, $pathStat = null, &$handleStat = null) {
+    $handleStat = ['dev' => 1, 'ino' => 2, 'mode' => 0100640];
+    if ($GLOBALS['case'] === 'inode-changed') $handleStat['ino'] = 3;
+    if ($GLOBALS['case'] === 'device-changed') $handleStat['dev'] = 3;
+    if ($GLOBALS['case'] === 'fifo-substituted') $handleStat['mode'] = 0010640;
     return observe('match', $GLOBALS['case'] !== 'mismatch');
 }
 function fstat($handle) {
@@ -52,8 +64,9 @@ PHP;
         $script .= <<<'PHP'
 $results = [];
 $cases = ['success', 'source-unavailable', 'mismatch', 'target-unavailable', 'stat-failed',
-    'copy-failed', 'short-copy', 'close-failed', 'mode-failed'];
-$phases = ['open-source', 'match', 'open-target', 'stat', 'copy', 'close-target', 'close-source', 'chmod'];
+    'copy-failed', 'short-copy', 'close-failed', 'mode-failed', 'entry-missing', 'entry-fifo',
+    'entry-symlink', 'entry-directory', 'inode-changed', 'device-changed', 'fifo-substituted'];
+$phases = ['entry-stat', 'open-source', 'match', 'open-target', 'stat', 'copy', 'close-target', 'close-source', 'chmod'];
 foreach (array_merge($cases, $phases) as $case) {
     $phase = in_array($case, $phases, true) ? $case : null;
     foreach ($phase === null ? [null] : [new \RuntimeException($case), new \Error($case)] as $failure) {
@@ -74,18 +87,24 @@ foreach (array_merge($cases, $phases) as $case) {
 echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script);
-        $trace = ['open-source', 'match', 'open-target', 'stat', 'copy', 'close-target', 'close-source', 'chmod'];
+        $trace = ['entry-stat', 'open-source', 'match', 'open-target', 'stat', 'copy', 'close-target', 'close-source', 'chmod'];
         $backup = '/fixture/managed.conf.pmss-backup-stamp';
         $openWarning = '[WARN] Unable to open fixture config for backup at /fixture/managed.conf';
         $writeWarning = '[WARN] Unable to create fixture config backup at '.$backup;
         $cases = [
             'success' => [$backup, $trace, []],
-            'source-unavailable' => ['', ['open-source'], [$openWarning]],
-            'mismatch' => ['', ['open-source', 'match', 'close-source'], [$openWarning]],
-            'target-unavailable' => ['', ['open-source', 'match', 'open-target', 'close-source'], [$writeWarning]],
+            'source-unavailable' => ['', ['entry-stat', 'open-source'], [$openWarning]],
+            'mismatch' => ['', ['entry-stat', 'open-source', 'match', 'close-source'], [$openWarning]],
+            'target-unavailable' => ['', ['entry-stat', 'open-source', 'match', 'open-target', 'close-source'], [$writeWarning]],
         ];
         foreach (['stat-failed', 'copy-failed', 'short-copy', 'close-failed', 'mode-failed'] as $case) {
-            $cases[$case] = ['', array_merge(array_slice($trace, 0, $case === 'mode-failed' ? 8 : 7), ['unlink']), [$writeWarning]];
+            $cases[$case] = ['', array_merge(array_slice($trace, 0, $case === 'mode-failed' ? 9 : 8), ['unlink']), [$writeWarning]];
+        }
+        foreach (['entry-missing', 'entry-fifo', 'entry-symlink', 'entry-directory'] as $case) {
+            $cases[$case] = ['', ['entry-stat'], [$openWarning]];
+        }
+        foreach (['inode-changed', 'device-changed', 'fifo-substituted'] as $case) {
+            $cases[$case] = $cases['mismatch'];
         }
         foreach ($trace as $phase) {
             $events = array_slice($trace, 0, array_search($phase, $trace, true) + 1);
@@ -96,7 +115,7 @@ PHP;
         $index = 0;
         foreach ($cases as $case => [$expected, $events, $logs]) {
             $opens = [];
-            foreach (['source' => ['/fixture/managed.conf', 'rb'], 'target' => [$backup, 'xb']] as $role => $args) {
+            foreach (['source' => ['/fixture/managed.conf', 'rbn'], 'target' => [$backup, 'xb']] as $role => $args) {
                 if (in_array('open-'.$role, $events, true) && $case !== 'open-'.$role) $opens[] = $args;
             }
             $mode = in_array('chmod', $events, true) ? 0640 : null;
