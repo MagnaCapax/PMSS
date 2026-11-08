@@ -12,16 +12,15 @@ final class TorrentClientsP1LaunchTest extends TestCase
     public function testCronShellRoutesBothStartsUnderTheAccountLock(): void
     {
         // The cron entry point has no ops seam; keep only this shell-routing structural check.
-        $source = $this->pmssReadRepoFile('scripts/cron/checkQbittorrentInstances.php');
-        $this->assertStringContainsString('torrentClientsResolve.php qbittorrent --launch --held', $source);
-        $this->assertStringContainsString('mkdir -m 700 -p ~/.config/pmss/torrentClients', $source);
-        $this->assertStringContainsString('flock -n 9 || exit 0', $source);
-        $this->assertOrderedStrings(['--launch --held --system 9>&-;',
-            'else qbittorrent-nox -d 9>&-; fi;', 'pmssQbtStartRc=$?;'], $source);
-        $this->assertStringContainsString('pmssQbittorrentWatchdogRunning($thisUser, $home)', $source);
-        $this->assertStringContainsString("return pmssTorrentClientLauncherLivenessPids(\$user, 'qbittorrent') !== [];",
-            $this->pmssReadRepoFile('scripts/lib/user/qbittorrentWatchdog.php'));
-        $this->assertStringNotContainsString('nohup qbittorrent-nox', $source);
+        $this->pmssAssertRepoFileContract('scripts/cron/checkQbittorrentInstances.php', [
+            'required' => ['torrentClientsResolve.php qbittorrent --launch --held',
+                'mkdir -m 700 -p ~/.config/pmss/torrentClients', 'flock -n 9 || exit 0',
+                'pmssQbittorrentWatchdogRunning($thisUser, $home)'],
+            'ordered' => [['--launch --held --system 9>&-;', 'else qbittorrent-nox -d 9>&-; fi;', 'pmssQbtStartRc=$?;']],
+            'forbidden' => ['nohup qbittorrent-nox'],
+        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/qbittorrentWatchdog.php',
+            "return pmssTorrentClientLauncherLivenessPids(\$user, 'qbittorrent') !== [];");
     }
 
     public function testSystemAndSelectedResolverLaunchesRestoreBeforeLaunchAndCheck(): void
@@ -100,10 +99,9 @@ final class TorrentClientsP1LaunchTest extends TestCase
 
     public function testWebUiStopUsesSharedNativeIdentityForSelectedBuilds(): void
     {
-        $root = dirname(__DIR__, 2).'/user/';
-        $this->assertStringContainsString("pmssTorrentClientNativeStopPids(\$user, 'qbittorrent')",
-            (string) file_get_contents($root.'qbittorrentWebUiAuth.php'));
-        $this->assertStringContainsString("pmssTorrentClientNativeStopPids(\$user, 'qbittorrent')",
-            (string) file_get_contents($root.'qbittorrentWebUiAuthState.php'));
+        foreach (['qbittorrentWebUiAuth.php', 'qbittorrentWebUiAuthState.php'] as $file) {
+            $this->pmssAssertRepoFileContainsString('scripts/lib/user/'.$file,
+                "pmssTorrentClientNativeStopPids(\$user, 'qbittorrent')");
+        }
     }
 }

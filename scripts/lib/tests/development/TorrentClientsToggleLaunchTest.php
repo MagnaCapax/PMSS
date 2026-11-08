@@ -86,13 +86,13 @@ final class TorrentClientsToggleLaunchTest extends TestCase
 
     public function testEndpointsKeepLegacyShellCallsAndDisableHandlers(): void
     {
-        $qb = $this->pmssReadRepoFile('etc/skel/www/qbittorrent.php');
-        $deluge = $this->pmssReadRepoFile('etc/skel/www/deluge.php');
-        $this->assertStringContainsAllStrings(["pmssCustomerTorrentClientToggleStart('qbittorrent'",
-            "passthru('zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');"], $qb);
-        $this->assertStringContainsAllStrings(["pmssCustomerTorrentClientToggleStart('deluge'",
-            'pmssFrontendShellExec(pmssCustomerDelugeSystemCommand());'], $deluge);
-        $this->assertStringContainsString("pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['qBittorrent']['binaries']);", $qb);
-        $this->assertStringContainsString("pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['Deluge']['binaries']);", $deluge);
+        $this->pmssAssertRepoFileContractCases([
+            'qbittorrent.php' => ['required' => ["pmssCustomerTorrentClientToggleStart('qbittorrent'",
+                "passthru('zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');",
+                "pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['qBittorrent']['binaries']);"]],
+            'deluge.php' => ['required' => ["pmssCustomerTorrentClientToggleStart('deluge'",
+                'pmssFrontendShellExec(pmssCustomerDelugeSystemCommand());',
+                "pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['Deluge']['binaries']);"]],
+        ], 'etc/skel/www/');
     }
 }

@@ -72,9 +72,8 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame(1, count($events->logs));
         $this->assertSame(['t', '[WARN] '.$message], $events->logs[0]);
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'qbittorrent'));
-        $launcher = (string) file_get_contents(dirname(__DIR__, 3).'/cron/checkQbittorrentInstances.php');
-        $this->assertStringContainsString('torrentClientsResolve.php qbittorrent --launch --held', $launcher);
-        $this->assertStringContainsString('flock -n 9 || exit 0;', $launcher);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkQbittorrentInstances.php', [
+            'torrentClientsResolve.php qbittorrent --launch --held', 'flock -n 9 || exit 0;']);
     }
 
     public function testInstalledDelugeVenvSelectionSurvivesTheUpdatePass(): void
@@ -140,10 +139,10 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame('custom', readlink($home.'/bin/qbittorrent/default'));
         $this->assertSame('fresh skeleton', file_get_contents($backup.'/.pmss-recreate-bin-skel/support'));
         $this->assertTrue(in_array($backup.'/.pmss-recreate-bin-skel', $left, true));
-        $this->assertStringContainsString('pmssUpdateUserEnvironment($userName',
-            (string) file_get_contents(dirname(__DIR__, 3).'/recreateUser.php'));
-        $this->assertStringContainsString('pmssTorrentClientsPostSetupConverge($user',
-            (string) file_get_contents(dirname(__DIR__, 2).'/update/users.php'));
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/recreateUser.php' => ['required' => ['pmssUpdateUserEnvironment($userName']],
+            'scripts/lib/update/users.php' => ['required' => ['pmssTorrentClientsPostSetupConverge($user']],
+        ]);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertSame([], $events->logs);
     }

@@ -20,9 +20,8 @@ final class TorrentClientsP4R0Test extends TestCase
         [$home, $store, $projection] = $this->fixture();
         $this->assertSame('/usr/local/bin/rtorrent',
             \pmssRtorrentExecutorCommand($home, $projection, $store));
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
-        $this->assertStringContainsAllStrings(["\$rtorrentCommand = '/usr/local/bin/rtorrent';",
-            'passthru($rtorrentCommand, $rtorrentRc);'], $source);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentExecute.php', [
+            "\$rtorrentCommand = '/usr/local/bin/rtorrent';", 'passthru($rtorrentCommand, $rtorrentRc);']);
     }
 
     public function testPublishedStoreSelectionResolvesBinary(): void
@@ -38,7 +37,7 @@ final class TorrentClientsP4R0Test extends TestCase
             .'"network.http.cacert.set=/etc/ssl/certs/ca-certificates.crt"';
         $this->assertSame(escapeshellarg($binary).' -O '.escapeshellarg($caDefault),
             \pmssRtorrentExecutorCommand($home, $projection, $store));
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
+        $source = $this->pmssReadRepoFile('etc/skel/.rtorrentExecute.php');
         $loop = substr($source, strpos($source, 'while (true) {'));
         $this->assertStringContainsString('pmssRtorrentExecutorCommand(__DIR__)', $loop);
     }
@@ -51,10 +50,10 @@ final class TorrentClientsP4R0Test extends TestCase
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
         $this->assertSame('/usr/local/bin/rtorrent',
             \pmssRtorrentExecutorCommand($home, $projection, $store));
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
+        $source = $this->pmssReadRepoFile('etc/skel/.rtorrentExecute.php');
         $loop = substr($source, strpos($source, 'while (true) {'));
-        $this->assertStringContainsAllStrings(['catch (Throwable $error)', "\$rtorrentCommand = '/usr/local/bin/rtorrent';"], $loop);
-        $this->assertFalse(strpos($loop, 'exit(') !== false);
+        $this->assertStringContainsAndOmitsStrings(['catch (Throwable $error)',
+            "\$rtorrentCommand = '/usr/local/bin/rtorrent';"], ['exit('], $loop);
     }
 
     public function testAccountLocalSelectionDoesNotChangeSystemCommand(): void
@@ -68,8 +67,7 @@ final class TorrentClientsP4R0Test extends TestCase
 
     public function testDeadPgrepGuardIsGoneAndFlockRemains(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
-        $this->assertFalse(strpos($source, 'pgrep -u') !== false);
-        $this->assertStringContainsString('@flock($lockHandle, LOCK_EX | LOCK_NB)', $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/.rtorrentExecute.php',
+            ['@flock($lockHandle, LOCK_EX | LOCK_NB)'], ['pgrep -u']);
     }
 }

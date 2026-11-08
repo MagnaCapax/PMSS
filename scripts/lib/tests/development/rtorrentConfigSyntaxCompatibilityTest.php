@@ -39,12 +39,9 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     {
         $expectedRssHook = 'schedule2 = rss,0,1800,"execute.nothrow=sh,-c,php ~/www/rutorrent/plugins/rss/update.php& exit 0"';
 
-        $templateContent = $this->pmssReadRepoFile('etc/seedbox/config/template.rtorrent.rc');
-        $this->assertStringContainsString($expectedRssHook, $templateContent);
-
-        $skeletonContent = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc');
-        $this->assertStringContainsAllStrings(['schedule2 = watch_directory,1,1,"load.start_verbose=~/watch/*.torrent"',
-            $expectedRssHook], $skeletonContent);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.rtorrent.rc', $expectedRssHook);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrent.rc', [
+            'schedule2 = watch_directory,1,1,"load.start_verbose=~/watch/*.torrent"', $expectedRssHook]);
     }
 
     /**
@@ -89,9 +86,8 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
      */
     public function testSkeletonRtorrentCustomConfigKeepsTrackerDebugDisabledByDefault(): void
     {
-        $content = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom');
-
-        $this->assertStringContainsString('#log.add_output = "tracker_debug", "rtorrent.log"', $content);
+        $content = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/.rtorrent.rc.custom', [
+            '#log.add_output = "tracker_debug", "rtorrent.log"']);
         $this->assertTrue(
             preg_match('/^\s*log\.add_output\s*=\s*"tracker_debug"/m', $content) !== 1,
             'Skeleton custom config should not enable tracker_debug logging by default'
@@ -101,9 +97,8 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     /** Removed cascading groups must never prevent a 0.16.26 startup. */
     public function testSkeletonRtorrentCustomConfigGuardsEveryCriticalLogGroup(): void
     {
-        $content = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom');
-        $this->assertStringContainsAllStrings(['catch = {"log.add_output=storage_critical,rtorrent.log"}',
-            'catch = {"log.add_output=socket_critical,rtorrent.log"}'], $content);
+        $content = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/.rtorrent.rc.custom', [
+            'catch = {"log.add_output=storage_critical,rtorrent.log"}', 'catch = {"log.add_output=socket_critical,rtorrent.log"}']);
         $this->assertSame(0, preg_match('/^\s*log\.add_output\s*=\s*["\']?[a-z0-9_]+_critical\b/im', $content));
     }
 

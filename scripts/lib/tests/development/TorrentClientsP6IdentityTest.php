@@ -75,10 +75,9 @@ final class TorrentClientsP6IdentityTest extends TestCase
             'user/delugeManagedConfig.php' => ['$username', 15],
             'user/torrentPort.php' => ['$user', 9],
         ] as $file => $case) {
-            $source = (string) file_get_contents(dirname(__DIR__, 2).'/'.$file);
+            $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/'.$file, [], ['killall']);
             $call = "pmssTorrentClientNativeStop({$case[0]}, 'deluge', {$case[1]}, ['processName' => 'deluge-web']);";
             $this->assertSame(1, substr_count($source, $call));
-            $this->assertStringNotContainsString('killall', $source);
         }
     }
 }

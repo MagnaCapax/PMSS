@@ -485,8 +485,9 @@ with each caller; the shared check performs no filesystem access.
 Source-contract fixtures use the existing repository assertion helpers for
 required and forbidden fragments. Keep each file's checks together so shared
 contract tables avoid duplicate reads and local assertion loops.
-Template defaults, panel-session decisions, crontab ownership, installer
-self-update and watchdog lock handoff use these same helpers. Keep test methods,
+Template defaults, torrent-client launch/configuration, package-change signals,
+panel-session decisions, crontab ownership, installer self-update and watchdog
+lock handoff use these same helpers. Keep test methods,
 fragment bytes, ordering checks and per-fragment diagnostics at the callers;
 the protected common harness needs no change for additional adopters.
 

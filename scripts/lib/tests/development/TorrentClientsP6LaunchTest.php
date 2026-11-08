@@ -8,7 +8,8 @@ final class TorrentClientsP6LaunchTest extends TestCase
 {
     public function testNoSelectionContainsByteIdenticalLegacyCommands(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/cron/checkDelugeInstances.php');
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkDelugeInstances.php', [
+            '[ -L ~/bin/deluge/default ] && (cd ~; php', 'flock -n 9 || exit 0;']);
         foreach (['deluged' => '.delugeLog', 'deluge-web' => '.delugeWebLog'] as $daemon => $log) {
             $expected = 'cd ~; '.$daemon.' -l /home/{$thisUser}/'.$log.' -L info';
             $start = strpos($source, '|| (cd ~; '.$daemon);
@@ -17,8 +18,6 @@ final class TorrentClientsP6LaunchTest extends TestCase
             $this->assertSame($expected, substr($tail, 0, strpos($tail, ')')));
             $this->assertStringContainsString('php ~/www/torrentClientsResolve.php deluge --launch '.$daemon, $source);
         }
-        $this->assertStringContainsString('[ -L ~/bin/deluge/default ] && (cd ~; php', $source);
-        $this->assertStringContainsString('flock -n 9 || exit 0;', $source);
     }
 
     public function testSelectedVenvLaunchesBothScriptsWithExistingLogOptions(): void
