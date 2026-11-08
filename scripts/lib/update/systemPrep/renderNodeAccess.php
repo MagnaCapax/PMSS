@@ -15,9 +15,7 @@ function pmssEnsureIntelRenderNodeAccess(?callable $logger = null, ?string $targ
     $commandPath = $commandPath ?: 'pmssCommandPath';
     $content = "# PMSS-managed: allow all local accounts to use Intel render nodes.\n"
         ."SUBSYSTEM==\"drm\", KERNEL==\"renderD*\", DRIVERS==\"i915|xe\", MODE=\"0666\"\n";
-    $label = 'Intel render-node access rule';
-    $options = pmssManagedPathInstallOptions($target, $label, ['mode' => 0644]);
-    if (!pmssRefreshManagedPathFile($target, $content, $label, $log, $options)) {
+    if (!pmssInstallManagedPathFile($target, $content, 'Intel render-node access rule', $log, ['mode' => 0644])) {
         return;
     }
 

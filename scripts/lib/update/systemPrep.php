@@ -86,7 +86,7 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
         [$serviceTarget, $serviceRaw, 0644, 'Boot tuning service'],
     ] as $targetSpec) {
         [$path, $content, $mode, $label] = $targetSpec;
-        pmssRefreshManagedPathFile($path, $content, $label, $log, pmssManagedPathInstallOptions($path, $label, ['mode' => $mode]));
+        pmssInstallManagedPathFile($path, $content, $label, $log, ['mode' => $mode]);
     }
 
     if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(null, true, true), 'Enabling PMSS boot tuning service')) return;

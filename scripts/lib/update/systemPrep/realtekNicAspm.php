@@ -16,9 +16,7 @@ function pmssEnsureRealtekNicAspmOff(?callable $logger = null, ?string $target =
     $content = "# PMSS-managed: keep PCIe ASPM off on Realtek Ethernet controllers (RTL8111/8168 transmit queue stalls).\n"
         .$match.', TEST=="link/l1_aspm", ATTR{link/l1_aspm}="0"'."\n"
         .$match.', TEST=="link/l0s_aspm", ATTR{link/l0s_aspm}="0"'."\n";
-    $label = 'Realtek NIC ASPM rule';
-    $options = pmssManagedPathInstallOptions($target, $label, ['mode' => 0644]);
-    if (!pmssRefreshManagedPathFile($target, $content, $label, $log, $options)) {
+    if (!pmssInstallManagedPathFile($target, $content, 'Realtek NIC ASPM rule', $log, ['mode' => 0644])) {
         return;
     }
 

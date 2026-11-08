@@ -158,6 +158,10 @@ scripts/lib/update/runtime/*           # shared runStep/logging/profile helpers
 The lighttpd/nginx lifecycle step stays inline in `scripts/util/update-step2.php`
 because phase 2 is its only caller.
 
+Standard managed-file installers share `pmssInstallManagedPathFile()` in
+`managedPath.php`, including message overrides and separate changed/converged
+results. Callers retain their own activation and reload decisions.
+
 Fixed updater policy stays with its consumer: Chromium selects its Debian package
 list in the installer, the post-install benchmark checks skip conditions and builds
 its command in the trigger, and locale preparation handles the single shared

@@ -105,13 +105,13 @@ function pmssRefreshManagedPathFile(string $path, string $contents, string $labe
     return true;
 }
 
-/** Build the standard install/refresh messages for managed file writes. */
-function pmssManagedPathInstallOptions(string $path, string $label, array $overrides = []): array
+/** Install with standard messages; return changed separately from successful convergence. */
+function pmssInstallManagedPathFile(string $path, string $contents, string $label, callable $logger, array $overrides = [], ?bool &$succeeded = null): bool
 {
-    return array_replace([
+    return pmssRefreshManagedPathFile($path, $contents, $label, $logger, array_replace([
         'skipMessage' => '[SKIP] '.$label.' already present and up to date', 'directoryFailureMessage' => '[WARN] Unable to create '.$label.' directory: '.dirname($path),
         'writeFailureMessage' => '[WARN] Unable to install '.$label.' at '.$path, 'successMessage' => 'Installed '.$label.' at '.$path,
-    ], $overrides);
+    ], $overrides), $succeeded);
 }
 
 /** Build the timestamped backup path, adding a suffix after collisions. */

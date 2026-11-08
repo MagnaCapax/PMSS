@@ -131,10 +131,9 @@ function pmssEnsureSystemdDbusDisclosureHardening(?callable $logger = null): voi
         }
 
         $target = $dir.'/'.$artifact['basename'];
-        $options = pmssManagedPathInstallOptions($target, $artifact['label'], [
+        if (!pmssInstallManagedPathFile($target, $artifact['content'], $artifact['label'], $log, [
             'directoryFailureMessage' => $directoryFailure,
-        ]);
-        if (!pmssRefreshManagedPathFile($target, $artifact['content'], $artifact['label'], $log, $options)) {
+        ])) {
             continue;
         }
 

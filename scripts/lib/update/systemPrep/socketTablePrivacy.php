@@ -176,7 +176,7 @@ function pmssSocketTablePrivacyApply(?callable $logger = null, ?string $markerPa
     $hidden = pmssSocketTablePrivacyChmodProcNet(0440, $procNetRoot);
     $content = "# PMSS opt-in socket-table privacy: stop persisting the per-peer TCP metrics cache.\n# Managed by scripts/lib/update/systemPrep/socketTablePrivacy.php; remove the marker to revert.\nnet.ipv4.tcp_no_metrics_save = 1\n";
     $metrics = 'unchanged';
-    if (pmssRefreshManagedPathFile($sysctlDropin, $content, 'Socket-table privacy sysctl drop-in', $log, pmssManagedPathInstallOptions($sysctlDropin, 'Socket-table privacy sysctl drop-in', ['mode' => 0644]))) {
+    if (pmssInstallManagedPathFile($sysctlDropin, $content, 'Socket-table privacy sysctl drop-in', $log, ['mode' => 0644])) {
         $metrics = 'written';
     }
     if ($metrics === 'written' && function_exists('runStep')) {

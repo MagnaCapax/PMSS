@@ -27,8 +27,7 @@ function pmssCgroupIoPlacementConfigure(array $policy, string $mode, string $dir
         return false;
     }
     $succeeded = false;
-    pmssRefreshManagedPathFile($path, $template, 'aggregate I/O placement default', $log,
-        pmssManagedPathInstallOptions($path, 'aggregate I/O placement default'), $succeeded);
+    pmssInstallManagedPathFile($path, $template, 'aggregate I/O placement default', $log, [], $succeeded);
     if ($succeeded) {
         $log('[WARN] Aggregate I/O placement enabled: existing user managers may retain child blkio groups until a planned restart or reboot; no account services restarted');
     }
