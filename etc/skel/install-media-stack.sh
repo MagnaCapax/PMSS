@@ -2120,7 +2120,7 @@ jellyfin_auth_seed() {
 
 	media_stack_session_kill_owned "$session"
 	tmux new-session -d -s "$session" \
-		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${seed_port}\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log\"" 2>/dev/null || true
+		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export TMPDIR=\"$JELLYFIN_DATA_DIR/tmp\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${seed_port}\"; mkdir -p \"$JELLYFIN_DATA_DIR/tmp\" && cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log\"" 2>/dev/null || true
 
 	log_info "Waiting up to ${MEDIA_STACK_APP_START_WAIT}s for Jellyfin first start and startup API"
 	if ! media_stack_wait_http_ok "${base_url}/Startup/Configuration" "$MEDIA_STACK_APP_START_WAIT" "$session"; then
@@ -2265,7 +2265,7 @@ media_stack_start_apps() {
 	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 		mkdir -p "$JELLYFIN_DATA_DIR/log"
 		media_stack_start_tmux_app "jellyfin" "$HOME/.bin/jellyfin/jellyfin.dll" \
-			"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 2 -n 4 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" \
+			"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export TMPDIR=\"$JELLYFIN_DATA_DIR/tmp\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; mkdir -p \"$JELLYFIN_DATA_DIR/tmp\" && cd \"$HOME/.bin/jellyfin\" && ionice -c 2 -n 4 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" \
 			"Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
 	else
 		log_warn "Skipping Jellyfin start; FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured"
@@ -2496,7 +2496,7 @@ media_stack_secure_jellyfin() {
 	fi
 	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$JELLYFIN_PASSWORD"
 	media_stack_start_tmux_app "$app" "$HOME/.bin/jellyfin/jellyfin.dll" \
-		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${jellyfin_port}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 2 -n 4 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" \
+		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export TMPDIR=\"$JELLYFIN_DATA_DIR/tmp\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${jellyfin_port}\"; mkdir -p \"$JELLYFIN_DATA_DIR/tmp\" && cd \"$HOME/.bin/jellyfin\" && ionice -c 2 -n 4 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" \
 		"Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
 	media_stack_secure_marker_print "$app"
 }
@@ -2855,12 +2855,15 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	jellyfin_alias_legacy='alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; ionice -c 2 -n 4 nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\'''
 	# Capture the same validated port as installation, even before network.xml exists.
 	jellyfin_alias_bind='; export ASPNETCORE_URLS=\"http://127.0.0.1:'"$JELLYFIN_PORT"'\"'
-	jellyfin_alias="${jellyfin_alias_legacy/; ionice/${jellyfin_alias_bind}; ionice}"
+	jellyfin_alias_previous="${jellyfin_alias_legacy/; ionice/${jellyfin_alias_bind}; ionice}"
+	# .NET uses TMPDIR for trickplay and child processes; keep scratch inside the account quota.
+	jellyfin_alias_tmp='; export TMPDIR=\"$HOME/.config/jellyfin/data/tmp\"; mkdir -p \"$HOME/.config/jellyfin/data/tmp\" && ionice'
+	jellyfin_alias="${jellyfin_alias_previous/; ionice/"$jellyfin_alias_tmp"}"
 	# Upgrade only the exact shipped aliases; customer-written launch commands stay intact.
 	if [[ $DRY_RUN -eq 0 && -f "$HOME/.bashrc.custom" && ! -L "$HOME/.bashrc.custom" ]]; then
 		while IFS=: read -r line_number _; do
-			sed -i -e "${line_number}s|; ionice|${jellyfin_alias_bind//\\/\\\\}; ionice|" -e "${line_number}s|ionice -c 3|ionice -c 2 -n 4|" "$HOME/.bashrc.custom"
-		done < <(grep -nFx -e "$jellyfin_alias_legacy" -e "${jellyfin_alias_legacy/ionice -c 2 -n 4/ionice -c 3}" "$HOME/.bashrc.custom" || true)
+			sed -i "${line_number}c\\${jellyfin_alias//\\/\\\\}" "$HOME/.bashrc.custom"
+		done < <(grep -nFx -e "$jellyfin_alias_legacy" -e "${jellyfin_alias_legacy/ionice -c 2 -n 4/ionice -c 3}" -e "$jellyfin_alias_previous" "$HOME/.bashrc.custom" || true)
 	fi
 	append_to_bashrc_custom_if_missing "# PMSS Jellyfin alias (updated Nov 2025)
 ${jellyfin_alias}

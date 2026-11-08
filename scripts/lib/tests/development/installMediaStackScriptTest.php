@@ -361,7 +361,7 @@ class installMediaStackScriptTest extends TestCase
             array('<InternalHttpPort>22102</InternalHttpPort>', '', '22102'),
             array('<PublicHttpPort>22103</PublicHttpPort>', '', '22103'),
         ) as $case) {
-            $home = $this->pmssMakeTempDir('pmss-jellyfin-alias-');
+            $home = $this->pmssMakeTempDir('pmss-jellyfin alias-');
             if ($case[0] !== '') {
                 $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', $case[0]);
             }
@@ -371,7 +371,39 @@ class installMediaStackScriptTest extends TestCase
             $output = $this->pmssRunShellHarness($this->jellyfinAliasHarness($home)."\n"
                 .'jellyfin_alias_write; source "$HOME/.bashrc.custom"; eval jellyfin'."\n");
             $this->assertStringContainsString('url=http://127.0.0.1:'.$case[2], $output);
+            $this->assertStringContainsString('tmp='.$home.'/.config/jellyfin/data/tmp', $output);
         }
+    }
+
+    public function testJellyfinLaunchesCreateAccountTempBeforeStarting(): void
+    {
+        // Cover startup, private login setup and post-setup restart commands.
+        $launches = array_filter(explode("\n", $this->script), function ($line) {
+            return strpos($line, ' jellyfin.dll 2>&1') !== false;
+        });
+        $this->assertEquals(3, count($launches));
+        foreach ($launches as $launch) {
+            $this->assertOrderedStrings(array(
+                'export TMPDIR=\"$JELLYFIN_DATA_DIR/tmp\";',
+                'mkdir -p \"$JELLYFIN_DATA_DIR/tmp\" && cd ',
+                ' jellyfin.dll 2>&1',
+            ), $launch);
+        }
+    }
+
+    public function testJellyfinAliasDoesNotLaunchWhenTempPathIsBlocked(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-jellyfin-temp-blocked-');
+        $this->pmssWriteRelativeFile($home, '.media-stack-port-jellyfin', "22105\n");
+        $this->pmssWriteRelativeFile($home, '.config/jellyfin/data/tmp', 'blocked');
+        $output = $this->pmssRunShellHarness($this->jellyfinAliasHarness($home)."\n".<<<'BASH'
+jellyfin_alias_write; source "$HOME/.bashrc.custom"
+if eval jellyfin; then exit 1; fi
+printf 'launch-blocked\n'
+BASH
+        );
+        $this->assertStringContainsString('launch-blocked', $output);
+        $this->assertStringNotContainsString('url=', $output);
     }
 
     public function testJellyfinAliasUpgradeIsExactIdempotentAndHonorsDryRun(): void
@@ -393,6 +425,10 @@ jellyfin_alias_write
 grep -Fq 'ASPNETCORE_URLS=\"http://127.0.0.1:22104\"' "$HOME/.bashrc.custom"
 grep -Fq 'ionice -c 2 -n 4' "$HOME/.bashrc.custom"
 if grep -Fq 'ionice -c 3' "$HOME/.bashrc.custom"; then exit 1; fi
+printf '%s\n' "$jellyfin_alias_previous" >"$HOME/.bashrc.custom"
+jellyfin_alias_write; jellyfin_alias_write
+[[ $(grep '^alias jellyfin=' "$HOME/.bashrc.custom") == "$jellyfin_alias" ]]
+source "$HOME/.bashrc.custom"; eval jellyfin
 printf '%s\n' "alias jellyfin='printf custom'" >"$HOME/.bashrc.custom"
 jellyfin_alias_write; source "$HOME/.bashrc.custom"; eval jellyfin
 BASH
@@ -403,7 +439,9 @@ BASH
     /** Build only the alias/port slice; tmux and priority commands are harmless stubs. */
     private function jellyfinAliasHarness(string $home): string
     {
-        $this->pmssWriteExecutableFile($home.'/.bin/dotnet/dotnet', "#!/bin/bash\nprintf 'url=%s\\n' \"\$ASPNETCORE_URLS\"\n");
+        $this->pmssWriteExecutableFile($home.'/.bin/dotnet/dotnet', "#!/bin/bash\n"
+            .'[[ -d "$TMPDIR" ]] || exit 1'."\n"
+            .'printf \'url=%s\\ntmp=%s\\n\' "$ASPNETCORE_URLS" "$TMPDIR"'."\n");
         $start = strpos($this->script, '# Aliases (Sonarr fix, PATH added above)');
         $end = strpos($this->script, "# shellcheck disable=SC2016\nappend_to_bashrc_custom_if_missing", $start);
         $portsStart = strpos($this->script, 'JELLYFIN_PORT="$(existing_port_from_xml_tag');
