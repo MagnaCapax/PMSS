@@ -109,9 +109,7 @@ class AgentDiagnosticsCharacterizationTest extends TestCase
             .'function file_get_contents($path) { $GLOBALS["trace"][] = ["file", $path]; return $GLOBALS["raw"]; }';
         foreach (get_defined_functions()['user'] as $name) {
             if (strpos(strtolower($name), 'pmssagentdiagnostics') !== 0 || strtolower($name) === 'pmssagentdiagnosticsphpscript') continue;
-            $function = new \ReflectionFunction($name);
-            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1, $function->getEndLine() - $function->getStartLine() + 1));
-            $script .= 'eval('.var_export('declare(strict_types=1); namespace DiagnosticsCharacterization; '.$source, true).');';
+            $script .= \pmssTestingFunctionExport($name, 'DiagnosticsCharacterization', [], true);
         }
         $script .= '$GLOBALS["trace"] = []; $GLOBALS["result"] = '.var_export($result, true).'; $GLOBALS["raw"] = '.var_export($raw, true).';';
         return $this->pmssRunInlinePhpJson($script.'echo json_encode(["value" => pmssAgentDiagnosticsSpecCollect('.var_export($spec, true).'), "trace" => $GLOBALS["trace"]]);');

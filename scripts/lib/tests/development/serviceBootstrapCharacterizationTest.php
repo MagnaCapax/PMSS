@@ -88,11 +88,8 @@ class ServiceBootstrapCharacterizationTest extends TestCase
         $namespace = 'ServiceBootstrapCharacterization';
         $script = 'namespace '.$namespace.'; require '.var_export($this->pmssRepoPath('scripts/lib/tests/fixtures/serviceBootstrapCharacterization.php'), true).';';
         foreach ($functions as $name) {
-            $function = new \ReflectionFunction($name);
-            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1, $function->getEndLine() - $function->getStartLine() + 1));
             // String log callbacks need the same namespace as ordinary direct calls.
-            $source = str_replace("'logMessage'", var_export($namespace.'\\logMessage', true), $source);
-            $script .= 'eval('.var_export('namespace '.$namespace.'; '.$source, true).');';
+            $script .= \pmssTestingFunctionExport($name, $namespace, ["'logMessage'" => var_export($namespace.'\\logMessage', true)]);
         }
         $state += ['trace' => [], 'dryRun' => false];
         foreach ($state as $key => $value) $script .= '$GLOBALS['.var_export($key, true).'] = '.var_export($value, true).';';

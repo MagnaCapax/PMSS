@@ -77,9 +77,7 @@ class SystemdSlicesCharacterizationTest extends TestCase
             if (strpos(basename($function->getFileName()), 'systemdSlice') === 0) $functions[] = $name;
         }
         foreach ($functions as $name) {
-            $function = new \ReflectionFunction($name);
-            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1, $function->getEndLine() - $function->getStartLine() + 1));
-            $script .= 'eval('.var_export('namespace SystemdSlicesCharacterization; '.$source, true).');';
+            $script .= \pmssTestingFunctionExport($name, 'SystemdSlicesCharacterization');
         }
         $script .= '$GLOBALS["sliceCase"] = '.var_export($options, true).'; $GLOBALS["sliceTrace"] = [];';
         $script .= 'pmssEnsureSystemdSlices(static function ($message) { record(["log", $message]); });';

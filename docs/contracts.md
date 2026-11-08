@@ -1863,6 +1863,10 @@ This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
   panel routes, public names, DNS records or certificates.
 
 ## Notes for Agentic Coding
+
+Reflected characterization fixtures share `pmssTestingFunctionExport()` in
+`scripts/lib/testing/filesystem.php`; selection, substitutions and strict mode stay with callers.
+
 - Test environment scopes use `TestCase::pmssWithEnv()` and
   `pmssWithPathPrefixedEnv()` for override/restoration lifetimes. Use
   `pmssWithTrackedEnv()` when the callback changes additional keys. These helpers

@@ -44,13 +44,10 @@ class ArrActivationCharacterizationTest extends TestCase
     private function activationTrace(string $scenario): array
     {
         $script = 'namespace ArrActivationCharacterization; require '.var_export($this->pmssRepoPath('scripts/lib/tests/fixtures/arrActivationCharacterization.php'), true).';';
-        foreach (['pmssArrReleaseActivate'] as $name) {
-            $function = new \ReflectionFunction($name);
-            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1, $function->getEndLine() - $function->getStartLine() + 1));
-            // Legacy string callbacks bypass namespace resolution; bind only those predicates to the same stubs.
-            $source = str_replace(["'is_file'", "'is_dir'"], [var_export('ArrActivationCharacterization\\is_file', true), var_export('ArrActivationCharacterization\\is_dir', true)], $source);
-            $script .= 'eval('.var_export('namespace ArrActivationCharacterization; '.$source, true).');';
-        }
+        // Legacy string callbacks bypass namespace resolution; bind only those predicates to the same stubs.
+        $script .= \pmssTestingFunctionExport('pmssArrReleaseActivate', 'ArrActivationCharacterization', [
+            "'is_file'" => var_export('ArrActivationCharacterization\\is_file', true), "'is_dir'" => var_export('ArrActivationCharacterization\\is_dir', true),
+        ]);
         $script .= '$GLOBALS["scenario"] = '.var_export($scenario, true).';';
         $script .= '$result = pmssArrReleaseActivate(["extract_dir" => "Package", "install_path" => "/fixture/install"], "Radarr", "https://example.invalid/bundle", "bundle.tar.gz", static function ($message) { $GLOBALS["trace"][] = ["log", $message]; });';
         return $this->pmssRunInlinePhpJson($script.'echo json_encode(["result" => $result, "trace" => $GLOBALS["trace"]]);');

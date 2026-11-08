@@ -5,6 +5,16 @@
  * @license GPL-3.0-only
  */
 
+/** Export a real function into a child fixture, retaining caller-owned substitutions and declarations. */
+function pmssTestingFunctionExport(string $name, string $namespace, array $replacements = [], bool $strict = false): string
+{
+    $function = new ReflectionFunction($name);
+    $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1,
+        $function->getEndLine() - $function->getStartLine() + 1));
+    return 'eval('.var_export(($strict ? 'declare(strict_types=1); ' : '').'namespace '.$namespace.'; '
+        .str_replace(array_keys($replacements), array_values($replacements), $source), true).');';
+}
+
 /** Ensure a fixture directory exists with the requested mode. */
 function pmssTestingEnsureDirectory(string $path, int $mode = 0700): bool
 {

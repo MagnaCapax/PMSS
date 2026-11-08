@@ -177,10 +177,7 @@ class RootCleanupCharacterizationTest extends TestCase
         $script .= 'require '.var_export($this->pmssRepoPath('scripts/lib/cli/optionParser.php'), true).';';
         foreach (get_defined_functions()['user'] as $name) {
             if (strpos($name, 'pmsssaferootcleanup') !== 0) continue;
-            $function = new \ReflectionFunction($name);
-            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1,
-                $function->getEndLine() - $function->getStartLine() + 1));
-            $script .= 'eval('.var_export('namespace RootCleanupCharacterization; '.$source, true).');';
+            $script .= \pmssTestingFunctionExport($name, 'RootCleanupCharacterization');
         }
         $script .= '$GLOBALS["cleanupOptions"] = '.var_export($options, true).';'
             .'$GLOBALS["cleanupTrace"] = []; $GLOBALS["cleanupApplying"] = false;'
