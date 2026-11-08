@@ -84,7 +84,7 @@ REGEX;
         $configFile => "host = \"127.0.0.1\"\nport = {$port}\nbaseUrl = \"/user-{$user}/qui/\"\nsessionSecret = {$encoded}\ncheckForUpdates = false\ndisableSelfUpdate = true\n");
 }
 
-/** Scryer reads its temporary admin password from a private file on every start. */
+/** Scryer seeds its admin from the private password file only when it creates its database. */
 function pmssToggleAppScryerConfig(string $user, string $home, int $port, string $password, int $peerPort): array
 {
     return array(
@@ -162,7 +162,9 @@ function pmssToggleAppBootstrap(string $app, string $user, string $home, int $po
             require_once __DIR__.'/scriptsInc.php';
             pmssCustomerNativeStop($row['binaries']);
         }
-        $password = bin2hex(random_bytes(24));
+        // A seed-only store keeps its first password, so a new one would never sign in (#1242).
+        $store = isset($row['credentialStore']) ? $home.'/'.$row['credentialStore'] : '';
+        if ($password === '' || $store === '' || is_link($store) || !is_file($store)) $password = bin2hex(random_bytes(24));
         foreach (pmssToggleAppConfigs($app, $user, $home, $port, $password, $peerPort) as $relative => $contents) {
             if (!pmssToggleAppPrivateWrite($home.'/'.$relative, $contents)) return false;
         }

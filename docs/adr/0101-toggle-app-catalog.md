@@ -188,3 +188,20 @@ PMSS credential. No secret is logged, returned to the panel or placed on argv;
 loopback binds, proxy routes and authentication gates retain their behavior.
 Hermetic coverage checks repeated bootstrap, repair, migration and refusal
 cases; runtime and host restart verification remain on the testing machine.
+
+## Keep a seed-only password once its store exists (2026-11-08, Refs #1242)
+
+Scryer reads `SCRYER_ADMIN_PASSWORD_FILE` only when it creates `scryer.db`.
+A repair that rotated the password therefore left the panel showing a value
+the app never accepted. Its catalog row now names that database as
+`credentialStore`. When the store is a regular file and the saved Login is
+valid, a repair keeps the saved password and still rewrites every drifted
+file, mode and marker. Without a store, without a valid Login, or with a
+symlinked store, repair generates a new password as before. Rows without
+`credentialStore` are unchanged, so qui still rotates on every repair.
+
+A forced reset at each repair was rejected: Scryer's reset replaces a
+password the owner chose and requires the change screen again. Keeping the
+password does not widen exposure, because a rotated value never reached the
+store and the old one kept working. Accounts whose Login already diverged
+from the store are not repaired by this change. Rollback removes the key.

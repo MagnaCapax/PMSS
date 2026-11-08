@@ -49,6 +49,7 @@ return array(
         'launch' => array('/opt/scryer/scryer', '--data-dir', '{home}/.local/share/scryer'), 'workingDirectory' => '{home}',
         'config' => '.config/scryer/scryer.env', 'configRenderer' => 'pmssToggleAppScryerConfig', 'stripAuthorization' => true, 'bearerAuthorization' => true,
         'extraPortServices' => array(), 'credentialMode' => 'config', 'sourceEnv' => true,
+        'credentialStore' => '.local/share/scryer/scryer.db',
         'loginLabel' => 'Login (initial password)', 'watchdogLabel' => 'Scryer', 'watchdogProcess' => 'scryer',
     ),
 );

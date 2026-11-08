@@ -674,6 +674,62 @@ PHP
         });
     }
 
+    public function testScryerRepairKeepsTheSeededPasswordOnceItsDatabaseExists(): void
+    {
+        // Scryer seeds its admin only when it creates scryer.db; a rotated password would never sign in (#1242).
+        $home = $this->pmssMakeTempDir('toggle-scryer-keep-');
+        $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($home): void {
+            $proxy = \pmssLighttpdManagedProxyFragment('scryer', 'fixtur01', 23001);
+            $env = $home.'/.config/scryer/scryer.env';
+            $pw = $home.'/.pmss/apps/scryer.pw';
+            $login = $home.'/.pmss/apps/scryer.login';
+            $secured = $home.'/.pmss/apps/scryer.secured';
+            $store = $home.'/.local/share/scryer/scryer.db';
+            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'fixtur01', $home, 23001, $proxy));
+            // Before the first start there is no database: a repair may still pick a new seed.
+            $fresh = file_get_contents($login);
+            file_put_contents($env, "SCRYER_BIND=127.0.0.1:23001\n");
+            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'fixtur01', $home, 23001, $proxy));
+            $this->assertTrue($fresh !== file_get_contents($login));
+            mkdir(dirname($store), 0700, true);
+            file_put_contents($store, 'seeded');
+            $seeded = file_get_contents($login);
+            $repairs = array(
+                'env bytes changed' => function () use ($env): void { file_put_contents($env, "SCRYER_BIND=127.0.0.1:23001\n"); },
+                'password file mode' => function () use ($pw): void { chmod($pw, 0644); },
+                'password file removed' => function () use ($pw): void { unlink($pw); },
+                'secured marker removed' => function () use ($secured): void { unlink($secured); },
+            );
+            foreach ($repairs as $label => $drift) {
+                $drift();
+                clearstatcache();
+                $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'fixtur01', $home, 23001, $proxy), $label);
+                clearstatcache();
+                $this->assertSame($seeded, file_get_contents($login), $label);
+                $this->assertSame(explode("\n", trim($seeded))[1]."\n", file_get_contents($pw), $label);
+                $this->assertStringContainsString('SCRYER_DISABLE_DEFAULT_ADMIN=true', file_get_contents($env), $label);
+                foreach (array($env, $pw, $login) as $path) $this->assertSame(0600, fileperms($path) & 0777, $label);
+                $this->assertTrue(is_file($secured), $label);
+            }
+            // A new port rewrites the config and keeps the password.
+            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'fixtur01', $home, 23005, \pmssLighttpdManagedProxyFragment('scryer', 'fixtur01', 23005)));
+            $this->assertStringContainsString('SCRYER_BIND=127.0.0.1:23005', file_get_contents($env));
+            $this->assertSame($seeded, file_get_contents($login));
+            // Without a valid saved login there is nothing to keep; a symlinked store is not trusted.
+            file_put_contents($login, "fixtur01\nnot-a-generated-password\n");
+            chmod($login, 0600);
+            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'fixtur01', $home, 23005, \pmssLighttpdManagedProxyFragment('scryer', 'fixtur01', 23005)));
+            $rotated = file_get_contents($login);
+            $this->assertSame(1, preg_match('/^fixtur01\n[a-f0-9]{48}\n$/D', $rotated));
+            rename($store, $store.'.real');
+            symlink($store.'.real', $store);
+            chmod($pw, 0644);
+            clearstatcache();
+            $this->assertTrue(\pmssToggleAppBootstrap('scryer', 'fixtur01', $home, 23005, \pmssLighttpdManagedProxyFragment('scryer', 'fixtur01', 23005)));
+            $this->assertTrue($rotated !== file_get_contents($login));
+        });
+    }
+
     public function testRepeatedBootstrapLeavesProxyAndMarkerUntouched(): void
     {
         // The watchdog bootstraps every cycle; a rewrite would make the lighttpd watchdog restart the account.
