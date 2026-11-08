@@ -340,7 +340,9 @@ user list must contain exactly the expected administrator. A mismatch stops
 installation and asks the customer to reinstall; user databases and config are
 retained. Jellyfin records pending verification before completing its wizard,
 so a failed count/login check cannot become an already-configured skip on a
-later run. Its pending marker remains on failure. See ADR 0144 for the process
+later run. Its pending marker remains on failure. The login response is captured
+in an owner-only temporary file for token verification; failures report the last
+HTTP status received (000 when no response arrives). See ADR 0144 for the process
 boundary and verification basis.
 
 The welcome-page media stack panel also reads each installed app's local auth config and shows it as **Protected** or **Exposed**. For exposed PMSS-managed apps, the panel's **Secure this app** action delegates to `install-media-stack.sh --secure-app=<app>` as the customer user and writes any generated app credential to `~/.media-stack-credentials.txt`.

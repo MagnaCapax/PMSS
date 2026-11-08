@@ -2172,14 +2172,13 @@ jellyfin_auth_seed() {
 		media_stack_json_escape "$password"
 		printf '}'
 	} >"$auth_json"
-	code=$(media_stack_http_code "${base_url}/Users/AuthenticateByName" -X POST -H 'Content-Type: application/json' -H 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1"' --data-binary "@${auth_json}" -o "$payload_json")
-	if [[ "$code" != "200" ]]; then
-		log_err "Jellyfin admin login verification failed (HTTP ${code})"
+	# Capture the token response directly; the status-only helper discards response bodies.
+	if ! code=$(curl -sS --max-time 10 "${base_url}/Users/AuthenticateByName" -X POST -H 'Content-Type: application/json' -H 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1"' --data-binary "@${auth_json}" -o "$payload_json" -w '%{http_code}' 2>/dev/null) || [[ "$code" != "200" ]]; then
+		log_err "Jellyfin admin login verification failed (HTTP ${code:-000})"
 		media_stack_auth_seed_cleanup "$session" "$payload_json" "$auth_json" "$curl_config"
 		return 1
 	fi
 	# Use MediaBrowser auth even when legacy headers are disabled; keep the token out of argv.
-	code="000"
 	# shellcheck disable=SC2016
 	if ! php -r '$data = json_decode(file_get_contents($argv[1]), true); $token = $data["AccessToken"] ?? null; if (!is_string($token) || !preg_match("/^[a-zA-Z0-9]+$/", $token)) { exit(1); } echo "header = ".json_encode("Authorization: MediaBrowser Client=\"PMSS\", Device=\"media-stack-installer\", DeviceId=\"pmss-media-stack\", Version=\"1\", Token=\"".$token."\"")."\n";' "$payload_json" >"$curl_config" ||
 		! code=$(curl -fsS --max-time 10 --config "$curl_config" "${base_url}/Users" -o "$payload_json" -w '%{http_code}') || [[ "$code" != "200" ]] ||

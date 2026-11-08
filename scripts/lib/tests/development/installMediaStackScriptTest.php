@@ -956,7 +956,14 @@ BASH
         foreach (['', 'bad-token', 'bad"token', null, 123] as $token) {
             $cases[] = [$expectedUser, '200', 0, $token];
         }
-        foreach ($cases as [$users, $status, $curlExit, $token]) {
+        foreach (['000', '302', '401', '403', '500'] as $loginStatus) {
+            $cases[] = [$expectedUser, '200', 0, 'testtoken', $loginStatus];
+        }
+        $cases[] = [$expectedUser, '200', 0, 'testtoken', '200', 18];
+        foreach ($cases as $case) {
+            [$users, $status, $curlExit, $token] = $case;
+            $loginStatus = $case[4] ?? '200';
+            $loginExit = $case[5] ?? 0;
             $home = $this->pmssMakeTempDir('pmss-jellyfin-count-');
             $this->pmssEnsureDir($home.'/config');
             $this->pmssEnsureDir($home.'/tmp');
@@ -965,6 +972,7 @@ BASH
                 .'export HOME='.escapeshellarg($home)."\nexport TMPDIR=\"\$HOME/tmp\"\n"
                 .'USERS='.escapeshellarg($users)."\n"
                 .'HTTP_STATUS='.escapeshellarg($status).'; CURL_EXIT='.$curlExit."\n"
+                .'LOGIN_STATUS='.escapeshellarg($loginStatus).'; LOGIN_EXIT='.$loginExit."\n"
                 .'AUTH_RESPONSE='.escapeshellarg(json_encode(['AccessToken' => $token]))."\n"
                 .'JELLYFIN_CONFIG_DIR="$HOME/config"; JELLYFIN_LOG_DIR="$HOME"; JELLYFIN_DATA_DIR="$HOME/data"' ."\n"
                 .'DOTNET_ROOT_PATH=/opt/dotnet; MEDIA_STACK_APP_START_WAIT=1; MEDIA_STACK_AUTH_USERNAME=expected; PMSS_MEDIA_STACK_SEED_PRIVATE=1' ."\n"
@@ -972,20 +980,28 @@ BASH
                 .'media_stack_session_kill_owned() { :; }; tmux() { :; }' ."\n"
                 .'media_stack_wait_http_ok() { return 0; }; jellyfin_startup_base_url() { echo "$1"; }' ."\n"
                 .'jellyfin_auth_payload_write() { printf "{}" >"$1"; }; media_stack_json_escape() { printf \'"%s"\' "$1"; }' ."\n"
-                .'media_stack_http_code() { local url="$1"; shift; if [[ "$url" == */Users/AuthenticateByName ]]; then while (($#)); do if [[ "$1" == -o ]]; then printf "%s" "$AUTH_RESPONSE" >"$2"; break; fi; shift; done; printf 200; else printf 204; fi; }' ."\n"
                 .<<<'SH'
 curl() {
-    if [[ "$*" != *"/Users"* ]]; then return 0; fi
+    if [[ "$*" != *"/Users"* ]]; then printf 204; return 0; fi
     [[ "$*" != *testtoken* ]] || return 1
-    local target="" header=""
+    local target="" header="" login=0
+    [[ "$*" != *"/Users/AuthenticateByName"* ]] || login=1
     while (($#)); do
         if [[ "$1" == --config ]]; then
             [[ "$(stat -c %a "$2")" == 600 ]] || return 1
             header=$(php -r 'echo json_decode(substr(file_get_contents($argv[1]), 9), true);' "$2")
         fi
-        if [[ "$1" == -o ]]; then target="$2"; fi
+        # curl assigns repeated output options to successive URLs; the first wins here.
+        if [[ "$1" == -o && -z "$target" ]]; then target="$2"; fi
         shift
     done
+    [[ "$(stat -c %a "$target")" == 600 ]] || return 1
+    if [[ "$login" == 1 ]]; then
+        printf '%s' "$AUTH_RESPONSE" >"$target"
+        printf '%s' "$LOGIN_STATUS"
+        return "$LOGIN_EXIT"
+    fi
+    touch "$HOME/users-requested"
     [[ "$header" == 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1", Token="testtoken"' ]] || return 1
     printf '%s' "$USERS" >"$target"
     printf '%s' "$HTTP_STATUS"
@@ -993,17 +1009,19 @@ curl() {
 }
 
 SH
-                .$this->pmssExtractShellFunctions($this->script, ['media_stack_auth_seed_cleanup', 'jellyfin_auth_seed'])."\n"
+                .$this->pmssExtractShellFunctions($this->script, ['media_stack_http_code', 'media_stack_auth_seed_cleanup', 'jellyfin_auth_seed'])."\n"
                 .'jellyfin_auth_seed secret 8096 || echo refused' ."\n"
                 .'if [[ -e "$JELLYFIN_CONFIG_DIR/.pmss-auth-seed-pending" ]]; then jellyfin_auth_seed secret 8096 || echo pending-refused; fi' ."\n";
             $output = trim($this->pmssRunShellHarness($script));
-            if ($users === $expectedUser && $status === '200' && $curlExit === 0 && $token === 'testtoken') {
+            $loginOk = $loginStatus === '200' && $loginExit === 0;
+            if ($users === $expectedUser && $status === '200' && $curlExit === 0 && $token === 'testtoken' && $loginOk) {
                 $this->assertSame('ok', $output);
             } else {
                 $this->assertStringContainsAllStrings(['stop and reinstall', 'refused', 'pending-refused',
-                    'HTTP '.($token === 'testtoken' ? $status : '000')], $output);
+                    'HTTP '.(!$loginOk ? $loginStatus : ($token === 'testtoken' ? $status : '200'))], $output);
                 $this->assertSame(0600, fileperms($home.'/config/.pmss-auth-seed-pending') & 0777);
             }
+            $this->assertSame($loginOk && $token === 'testtoken', is_file($home.'/users-requested'));
             $this->assertStringNotContainsString('testtoken', $output);
             $this->assertSame('<ServerConfiguration/>', file_get_contents($home.'/config/system.xml'));
             $this->assertSame([], glob($home.'/tmp/*'));
