@@ -538,4 +538,25 @@ PHP;
             $this->assertSame(null, pmssNetworkPortParseDigits($raw));
         }
     }
+
+    /** The kernel start time wins over a /proc/<pid> inode time that was created later (Refs #1241). */
+    public function testProcStartTimeReadsKernelStartNotInodeTime(): void
+    {
+        $proc = $this->pmssMakeTempDir('watchdog-proc-');
+        file_put_contents($proc.'/stat', "cpu  1 2 3\nbtime 1794000000\nprocesses 9\n");
+        mkdir($proc.'/1403');
+        // A command name with spaces and a ')' must not shift the fields; 12345 ticks = 123 s after boot.
+        $tail = 'S 1 1403 1403 0 -1 4194560 100 0 0 0 1 1 0 0 20 0 1 0 12345 1000 50';
+        file_put_contents($proc.'/1403/stat', "1403 (light tpd) x) {$tail} 0\n");
+        touch($proc.'/1403', 1794128578);
+        $this->assertSame(1794000123, pmssUserWatchdogProcStartTime($proc, '1403'));
+
+        // Unparseable stat keeps the old inode-time reading; a missing process or a non-numeric pid is unknown.
+        mkdir($proc.'/77');
+        file_put_contents($proc.'/77/stat', 'garbage');
+        touch($proc.'/77', 1794000500);
+        $this->assertSame(1794000500, pmssUserWatchdogProcStartTime($proc, '77'));
+        $this->assertSame(null, pmssUserWatchdogProcStartTime($proc, '999'));
+        $this->assertSame(null, pmssUserWatchdogProcStartTime($proc, '../1403'));
+    }
 }

@@ -64,7 +64,7 @@ function pmssUserWatchdogLockAcquire(string $path)
     return $handle;
 }
 
-/** Return the oldest /proc start marker for exact process-name matches. */
+/** Return the oldest start time (Unix seconds) among exact process-name matches. */
 function pmssUserWatchdogProcessStartTime(string $username, string $processName, string $procRoot = '/proc'): ?int
 {
     $pids = pmssUserWatchdogProcessPids($username, $processName, array('exact' => true), $exitCode);
@@ -75,11 +75,33 @@ function pmssUserWatchdogProcessStartTime(string $username, string $processName,
     $oldest = null;
     $procRoot = rtrim($procRoot, '/');
     foreach ($pids as $pid) {
-        $mtime = @filemtime($procRoot.'/'.$pid);
-        if (is_int($mtime)) $oldest = $oldest === null ? $mtime : min($oldest, $mtime);
+        $start = pmssUserWatchdogProcStartTime($procRoot, (string) $pid);
+        if ($start !== null) $oldest = $oldest === null ? $start : min($oldest, $start);
     }
 
     return $oldest;
+}
+
+/**
+ * Kernel start time of one process: boot time plus /proc/<pid>/stat field 22 (clock ticks, USER_HZ 100).
+ * The /proc/<pid> inode time is set when the inode is created, which can be long after the process
+ * started and equal to the mtime of a config written in the same second, so a changed proxy fragment
+ * never read as newer and lighttpd kept the old rule (Refs #1241). Falls back to that inode time only
+ * when the stat files cannot be parsed.
+ */
+function pmssUserWatchdogProcStartTime(string $procRoot, string $pid): ?int
+{
+    if (!ctype_digit($pid)) return null;
+    $boot = preg_match('/^btime\s+(\d+)$/m', (string) @file_get_contents($procRoot.'/stat'), $m) === 1 ? (int) $m[1] : null;
+    $stat = (string) @file_get_contents($procRoot.'/'.$pid.'/stat');
+    $close = strrpos($stat, ')');
+    // Fields after the parenthesised command name start at field 3, so field 22 is index 19.
+    $fields = $close === false ? array() : preg_split('/\s+/', trim(substr($stat, $close + 1)));
+    if ($boot !== null && isset($fields[19]) && ctype_digit($fields[19])) {
+        return $boot + intdiv((int) $fields[19], 100);
+    }
+    $mtime = @filemtime($procRoot.'/'.$pid);
+    return is_int($mtime) ? $mtime : null;
 }
 
 /** @param array<int,string> $processNames */
