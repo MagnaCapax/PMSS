@@ -60,7 +60,13 @@ function pmssUserWatchdogLockAcquire(string $path)
 {
     $handle = pmssLockFileAcquire($path, true);
     if ($handle !== false) {
-        pmssLockHandleExportChildCloseFds($handle);
+        try {
+            pmssLockHandleExportChildCloseFds($handle);
+        } catch (\Throwable $error) {
+            // Ownership transfers only after descriptor export succeeds.
+            @fclose($handle);
+            throw $error;
+        }
     }
     return $handle;
 }

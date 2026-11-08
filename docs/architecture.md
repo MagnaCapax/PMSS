@@ -33,6 +33,9 @@ Keep the canonical installer/update details under `docs/install.md` and
   selectors use the invalid-request result before pgrep runs; valid command bytes
   stay unchanged. Proc start-time reads reject NUL paths and invalid PIDs, and
   unrepresentable kernel fields or timestamp sums retain the inode-time fallback.
+  Lock acquisition closes its stream if child-descriptor export throws, then
+  propagates the original throwable. Successful exports still transfer the open
+  lock to the caller; `WatchdogLockSafetyTest` covers both ownership paths.
 - **scripts/lib/systemStats.php** retains host snapshot collection, while
   `systemStats/observe.php` owns host probes and `systemStats/log.php` owns
   legacy line rendering and checked append. `diskIostat/observe.php` appends
