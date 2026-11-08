@@ -47,7 +47,7 @@ function pmssUserAccountLookup($user) { return ['uid' => getmyuid(), 'gid' => ge
 function pmssPackageVersion($package) { return $package === 'docker-ce' ? getenv('PMSS_TEST_DOCKER_CE') : ''; }
 function is_executable($path) { return false; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/users/docker.php', 'RootlessDockerDependenciesFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/users/docker.php', 'RootlessDockerDependenciesFixture', ['dockerCommands.php', 'dockerDependencies.php']);
         $script .= <<<'PHP'
 $GLOBALS['logs'] = [];
 pmssEnsureDockerDependencies('fixtur01');

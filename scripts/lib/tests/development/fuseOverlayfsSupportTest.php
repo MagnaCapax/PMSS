@@ -17,13 +17,13 @@ class FuseOverlayfsSupportTest extends TestCase
                 'fuse-overlayfs',
             ]],
             'scripts/lib/update/userMaintenance.php' => ['required' => ["'users/docker.php'"]],
-            'scripts/lib/update/users/docker.php' => [
+            'scripts/lib/update/users/dockerDependencies.php' => [
                 'required' => ['fuse-overlayfs', 'disable_containerd_snapshotter'],
                 'forbidden' => [
                     'if ($distroVersion >= 12)' => 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available',
                 ],
             ],
-            'scripts/lib/user/rootlessDockerConfig.php' => ['required' => ['containerd-snapshotter']],
+            'scripts/lib/user/rootlessDockerPolicy.php' => ['required' => ['containerd-snapshotter']],
         ]);
     }
 }

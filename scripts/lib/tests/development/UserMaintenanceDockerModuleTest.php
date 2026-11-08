@@ -10,33 +10,33 @@ class UserMaintenanceDockerModuleTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-linger-');
         $outside = $this->pmssMakeTempFile('pmss-linger-outside-');
-        foreach (['alice', 'bob', 'charlie', 'backup-alice'] as $name) file_put_contents($dir.'/'.$name, '');
-        mkdir($dir.'/david');
-        symlink($outside, $dir.'/edward');
+        foreach (['fixtur01', 'fixtur02', 'fixtur03', 'backup-fixtur01'] as $name) file_put_contents($dir.'/'.$name, '');
+        mkdir($dir.'/fixtur04');
+        symlink($outside, $dir.'/fixtur05');
         $seen = [];
         $lookup = static function (string $name) use (&$seen) {
             $seen[] = $name;
-            return $name === 'bob' ? ['uid' => 1234] : false;
+            return $name === 'fixtur02' ? ['uid' => 1234] : false;
         };
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '0'], function () use ($dir, $lookup): void {
             $this->assertSame(0, \pmssUserMaintenancePruneStaleLinger($dir, $lookup, true, posix_getuid()));
-            $this->assertTrue(is_file($dir.'/alice'));
+            $this->assertTrue(is_file($dir.'/fixtur01'));
             $this->assertSame(3, \pmssUserMaintenancePruneStaleLinger($dir, $lookup, false, posix_getuid()));
         });
-        $this->assertFalse(file_exists($dir.'/alice'));
-        $this->assertTrue(is_file($dir.'/bob'));
-        $this->assertFalse(file_exists($dir.'/charlie'));
-        $this->assertFalse(is_link($dir.'/edward'));
+        $this->assertFalse(file_exists($dir.'/fixtur01'));
+        $this->assertTrue(is_file($dir.'/fixtur02'));
+        $this->assertFalse(file_exists($dir.'/fixtur03'));
+        $this->assertFalse(is_link($dir.'/fixtur05'));
         $this->assertTrue(is_file($outside), 'symlink target must remain');
-        $this->assertTrue(is_dir($dir.'/david'));
-        $this->assertTrue(is_file($dir.'/backup-alice'));
-        $this->assertFalse(in_array('backup-alice', $seen, true));
+        $this->assertTrue(is_dir($dir.'/fixtur04'));
+        $this->assertTrue(is_file($dir.'/backup-fixtur01'));
+        $this->assertFalse(in_array('backup-fixtur01', $seen, true));
     }
 
     public function testStaleLingerPruneSkipsTestModeAndLinkedDirectory(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-linger-');
-        file_put_contents($dir.'/alice', '');
+        file_put_contents($dir.'/fixtur01', '');
         $lookup = static function (string $name) { return false; };
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($dir, $lookup): void {
             $this->assertSame(0, \pmssUserMaintenancePruneStaleLinger($dir, $lookup, false, posix_getuid()));
@@ -46,7 +46,7 @@ class UserMaintenanceDockerModuleTest extends TestCase
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '0'], function () use ($link, $lookup): void {
             $this->assertSame(0, \pmssUserMaintenancePruneStaleLinger($link, $lookup, false, posix_getuid()));
         });
-        $this->assertTrue(is_file($dir.'/alice'));
+        $this->assertTrue(is_file($dir.'/fixtur01'));
     }
 
     public function testDockerUnitExecBinaryParsingStaysStable(): void
@@ -75,7 +75,9 @@ class UserMaintenanceDockerModuleTest extends TestCase
                 'required' => ["'users/docker.php'"],
                 'forbidden' => $dockerFunctions,
             ],
-            'scripts/lib/update/users/docker.php' => ['required' => $dockerFunctions],
+            'scripts/lib/update/users/docker.php' => ['required' => [$dockerFunctions[0], "'dockerInstall.php'", "'dockerDependencies.php'"]],
+            'scripts/lib/update/users/dockerInstall.php' => ['required' => [$dockerFunctions[1]]],
+            'scripts/lib/update/users/dockerDependencies.php' => ['required' => [$dockerFunctions[2]]],
         ]);
     }
 
@@ -87,7 +89,7 @@ class UserMaintenanceDockerModuleTest extends TestCase
         // NOT masked. A unit a prior release masked (symlink -> /dev/null) is un-masked so the
         // real customer-usable unit is restored.
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/users/docker.php' => [
+            'scripts/lib/update/users/dockerInstall.php' => [
                 'required' => ["=== '/dev/null'", 'unit present and valid'],
                 'forbidden' => ['pmssNeutralizeUserDockerServiceUnit', 'neutralised (masked)'],
             ],

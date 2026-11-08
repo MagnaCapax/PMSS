@@ -185,11 +185,11 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $symbol = 'pmssReadSystemd'.'UnitExecStartBinary';
 
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "'users/docker.php'");
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/docker.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/dockerInstall.php', [
             'function pmssUserDockerUnitExecBinary(',
             "if (\$trim === '' || strpos(\$trim, 'ExecStart=') !== 0)",
             "return \$parts && \$parts[0] !== '' ? trim(\$parts[0], \"\\\"'\") : null;",
-        ], ['function '.$symbol.'(' => 'docker.php should own rootless Docker unit parsing directly']);
+        ], ['function '.$symbol.'(' => 'dockerInstall.php should own rootless Docker unit parsing directly']);
         $this->pmssAssertRepoFileNotContainsString(
             'scripts/lib/update/userMaintenance.php',
             "ExecStart=",
@@ -406,13 +406,18 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'scripts/lib/update/users/docker.php' => [
                 'required' => [
                     "require_once dirname(__DIR__, 2).'/user/rootlessDockerConfig.php';",
-                    "pmssUserRootlessDockerConfigConverge(\$user, \$home, (int) \$uinfo['uid'], (int) \$uinfo['gid']",
+                    "'dockerDependencies.php'",
                 ],
                 'forbidden' => [
                     'function pmssWrite'.'DockerDaemonConfig(' => 'daemon.json convergence should not grow a second local writer',
                     'pmssJsonEncodePretty($payload)' => 'docker.php should use the shared rootless Docker config writer',
                 ],
             ],
+            'scripts/lib/update/users/dockerDependencies.php' => ['required' => [
+                "pmssUserRootlessDockerConfigConverge(\$user, \$home, (int) \$uinfo['uid'], (int) \$uinfo['gid']",
+            ], 'forbidden' => [
+                'function pmssWrite'.'DockerDaemonConfig(', 'pmssJsonEncodePretty($payload)',
+            ]],
             'scripts/lib/update/repositories.php' => [
                 'required' => [
                     "preg_match('/^[ \\t]*#/', \$line) === 1",

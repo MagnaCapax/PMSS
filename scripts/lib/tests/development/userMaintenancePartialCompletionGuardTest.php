@@ -65,12 +65,18 @@ PHP,
             ],
             'scripts/lib/update/users/docker.php' => [
                 'required' => [
-                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssRunAndLog')",
                     "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureLingerAndDocker')",
-                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureRootlessDockerInstalled')",
-                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureDockerDependencies')",
                 ],
             ],
+            'scripts/lib/update/users/dockerCommands.php' => ['required' => [
+                "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssRunAndLog')",
+            ]],
+            'scripts/lib/update/users/dockerInstall.php' => ['required' => [
+                "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureRootlessDockerInstalled')",
+            ]],
+            'scripts/lib/update/users/dockerDependencies.php' => ['required' => [
+                "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureDockerDependencies')",
+            ]],
             'scripts/util/update-step2.php' => [
                 'required' => [
                     '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',

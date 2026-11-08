@@ -182,7 +182,7 @@ function pmssDirectoryEntriesRead(string $path) {
     return \pmssDirectoryEntriesRead($path);
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerStoreScanFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerStoreScanFixture', ['rootlessDockerStore.php']);
         $script .= <<<'PHP'
 echo json_encode(['exists' => pmssUserRootlessDockerStoreExists(getenv('PMSS_TEST_DOCKER_STORE'))]);
 PHP;
