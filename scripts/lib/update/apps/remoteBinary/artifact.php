@@ -9,12 +9,26 @@ function pmssPinnedRemoteChecksum(string $path): string
     return is_string($checksum) ? strtolower($checksum) : '';
 }
 
+/** Keep failed artifacts visible after later steps and the ordinary status summary. */
+function pmssPinnedRemoteArtifactFailureRecord(string $label, string $reason): void
+{
+    static $failures = [];
+    if ($failures === []) {
+        // Report at shutdown without interrupting permission repair or service recovery.
+        register_shutdown_function(static function () use (&$failures): void {
+            logMessage('[ERROR] UPDATE INCOMPLETE: pinned artifact failures: '.implode('; ', $failures));
+        });
+    }
+    $failures[] = $label.' ('.$reason.')';
+}
+
 /** Download, verify, and consume one private artifact; options retain caller-specific diagnostics. */
 function pmssPinnedRemoteArtifactTempFileUse(string $label, string $url, string $expectedSha256, callable $callback, bool $runCallbackInDryRun = false, array $options = [])
 {
     $expectedSha256 = strtolower($expectedSha256);
     if (preg_match('/\A[a-f0-9]{64}\z/', $expectedSha256) !== 1) {
         logmsg("[WARN] Refusing invalid SHA-256 pin for {$label}");
+        pmssPinnedRemoteArtifactFailureRecord($label, 'invalid SHA-256 pin');
         return null;
     }
 
@@ -25,18 +39,22 @@ function pmssPinnedRemoteArtifactTempFileUse(string $label, string $url, string 
         || $host === ''
     ) {
         logmsg("[WARN] Refusing unsafe remote URL for {$label}");
+        pmssPinnedRemoteArtifactFailureRecord($label, 'unsafe remote URL');
         return null;
     }
 
     $tmp = pmssCreatePrivateTempFile($options['tempPrefix'] ?? 'pmss-remote-bin-');
     if ($tmp === null) {
         logmsg("[WARN] Unable to create temp file for {$label} download");
+        pmssPinnedRemoteArtifactFailureRecord($label, 'download temp file unavailable');
         return null;
     }
 
     // One owner covers failed downloads, rejected pins, dry runs, and callback exceptions.
     try {
-        if (runStep($options['downloadDescription'] ?? 'Downloading '.$label, pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
+        $rc = runStep($options['downloadDescription'] ?? 'Downloading '.$label, pmssBuildCommand('wget', ['-q', '-O', $tmp, $url]));
+        if ($rc !== 0) {
+            pmssPinnedRemoteArtifactFailureRecord($label, 'download failed, rc='.$rc);
             return null;
         }
         if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
@@ -44,6 +62,7 @@ function pmssPinnedRemoteArtifactTempFileUse(string $label, string $url, string 
             if ($actualSha !== $expectedSha256) {
                 $artifactLabel = $options['artifactLabel'] ?? '';
                 logMessage("[WARN] {$label}{$artifactLabel} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
+                pmssPinnedRemoteArtifactFailureRecord($label, 'SHA-256 verification failed');
                 return null;
             }
         }

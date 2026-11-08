@@ -249,6 +249,14 @@ Post-package orchestration uses explicit step classes:
 Current `must_succeed` annotations cover runtime template deployment (including
 the sshd AuthorizedKeysFile convergence), and web stack configuration.
 
+Pinned-artifact helpers retain fail-soft returns and exit status, but collect
+download and SHA-256 verification failures (including invalid pins, unsafe URLs
+and unavailable temporary files). At process shutdown they emit one prominent
+`[ERROR] UPDATE INCOMPLETE: pinned artifact failures:` line naming every failed
+artifact and its reason, after the ordinary step summary. This covers binary,
+Debian-package and source-archive callers even when an installer returns early
+(Refs #988). Successful downloads and normal dry runs add no failure summary.
+
 `pmssRefreshRepositories()` ensures external repo prerequisites (currently the
 Docker deb822+keyring and Sonarr scoped keyring) exist before it runs `apt update`.
 ProFTPD remains a notorious dpkg failure mode when hostnames or TLS assets are
