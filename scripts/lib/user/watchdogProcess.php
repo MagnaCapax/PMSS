@@ -20,8 +20,9 @@ function pmssUserWatchdogTerminateProcesses(string $username, array $processName
 /** @return int[] Normalized positive PIDs; malformed patterns use the invalid-request result. */
 function pmssUserWatchdogProcessPids(string $username, string $processPattern, array $options = array(), ?int &$exitCode = null, ?array &$output = null): array
 {
-    // Reject NUL before shell quoting can throw or truncate the process selector.
-    if (!pmssValidateUsername($username) || $processPattern === '' || strpos($processPattern, "\0") !== false) {
+    // Reject options and NUL before pgrep can reinterpret the selector or shell quoting can throw.
+    if (!pmssValidateUsername($username) || $processPattern === '' || $processPattern[0] === '-'
+        || strpos($processPattern, "\0") !== false) {
         $exitCode = 1;
         $output = array();
         return array();
@@ -91,14 +92,19 @@ function pmssUserWatchdogProcessStartTime(string $username, string $processName,
  */
 function pmssUserWatchdogProcStartTime(string $procRoot, string $pid): ?int
 {
-    if (!ctype_digit($pid)) return null;
-    $boot = preg_match('/^btime\s+(\d+)$/m', (string) @file_get_contents($procRoot.'/stat'), $m) === 1 ? (int) $m[1] : null;
+    // Reject malformed paths and non-process identifiers before touching the filesystem.
+    if (strpos($procRoot, "\0") !== false || (pmssUnsignedDecimalIntParse($pid) ?? 0) < 1) return null;
+    $boot = preg_match('/^btime\s+(\d+)$/m', (string) @file_get_contents($procRoot.'/stat'), $m) === 1
+        ? pmssUnsignedDecimalIntParse($m[1]) : null;
     $stat = (string) @file_get_contents($procRoot.'/'.$pid.'/stat');
     $close = strrpos($stat, ')');
     // Fields after the parenthesised command name start at field 3, so field 22 is index 19.
     $fields = $close === false ? array() : preg_split('/\s+/', trim(substr($stat, $close + 1)));
-    if ($boot !== null && isset($fields[19]) && ctype_digit($fields[19])) {
-        return $boot + intdiv((int) $fields[19], 100);
+    $ticks = isset($fields[19]) ? pmssUnsignedDecimalIntParse($fields[19]) : null;
+    $seconds = $ticks === null ? null : intdiv($ticks, 100);
+    // Unrepresentable kernel fields or sums retain the existing inode-time fallback.
+    if ($boot !== null && $seconds !== null && $boot <= PHP_INT_MAX - $seconds) {
+        return $boot + $seconds;
     }
     $mtime = @filemtime($procRoot.'/'.$pid);
     return is_int($mtime) ? $mtime : null;

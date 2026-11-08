@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/user/watchdogProcess.php** keeps watchdog process observations and
+  guarded actions behind the existing include (ADR 0211). Option-shaped process
+  selectors use the invalid-request result before pgrep runs; valid command bytes
+  stay unchanged. Proc start-time reads reject NUL paths and invalid PIDs, and
+  unrepresentable kernel fields or timestamp sums retain the inode-time fallback.
 - **scripts/lib/systemStats.php** retains host snapshot collection, while
   `systemStats/observe.php` owns host probes and `systemStats/log.php` owns
   legacy line rendering and checked append. `diskIostat/observe.php` appends
