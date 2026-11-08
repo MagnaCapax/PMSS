@@ -232,6 +232,9 @@ class IoCeilingTest extends TestCase
         $this->assertSame(50.0, $result['published']['read_iops']);
         $this->assertSame(0.3, $result['ioping_floor_ms']);
         $this->assertSame(0.25, \pmssIoCeilingCompute(array_merge($day(1, 0.2), $day(2, 0.3)), $this->policy(), self::NOW)['ioping_floor_ms']);
+        // Complete probes on a rejected ceiling day cannot enter the latency floor.
+        $rejected = $day(3, 0.01); $rejected[0]['throughputRead'] = null;
+        $this->assertSame(0.25, \pmssIoCeilingCompute(array_merge($day(1, 0.2), $day(2, 0.3), $rejected), $this->policy(), self::NOW)['ioping_floor_ms']);
         // Without any probe the read ceiling still publishes and the floor is absent.
         $result = \pmssIoCeilingCompute($this->samples(1, array_fill(0, 20, 50)), $this->policy(), self::NOW);
         $this->assertSame(50.0, $result['published']['read_iops']);

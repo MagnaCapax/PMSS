@@ -91,18 +91,17 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
     if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => [], 'counts' => $counts, 'bytes' => $bytes];
     $then = is_int($state['time'] ?? null) && $state['time'] < $now ? $state['time'] : null;
     $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
-    $slices = []; $heldUsers = []; $heldUids = []; $heldCount = 0;
+    $slices = []; $heldUsers = []; $heldUids = [];
     foreach ($uids as $user => $uid) {
         $dir = pmssCgroupDirectUserSliceDir($uid);
         $cap = pmssCgroupDirectDeviceValueParse((string) @file_get_contents($dir.'/blkio.throttle.read_iops_device'), $majMin);
         $before = is_int($state['counts'][$uid] ?? null) ? $state['counts'][$uid] : null;
         $heldUsers[$user] = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then);
-        if ($heldUsers[$user]) $heldCount++;
         $exclude = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then, PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO);
         if ($exclude) $heldUids[] = $uid;
         $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"), 'held' => $exclude || isset($wasHeld[$uid])];
     }
-    $current = ['time' => $now, 'host' => $host, 'held' => $heldCount, 'excluded' => count(array_filter(array_column($slices, 'held'))),
+    $current = ['time' => $now, 'host' => $host, 'held' => count(array_filter($heldUsers)), 'excluded' => count(array_filter(array_column($slices, 'held'))),
         'contention' => pmssDynamicIopsContention($host, pmssPsiFullAvg300("$unifiedRoot/system.slice/io.pressure"), $slices)];
     $rows[] = $current;
     if (!$readOnly && pmssEnsureSafeDir(dirname($statePath), 0755)) {

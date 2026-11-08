@@ -27,10 +27,10 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
             $pressure[$kind][$minutes] = $sum / $count;
         }
     }
-    $io = $pressure['io'];
-    $pressure['blend'] = in_array(null, $io, true) ? null : (12 * $io[5] + 4 * $io[15] + $io[60]) / 17;
-    $iowait = $pressure['iowait'];
-    $pressure['iowait_blend'] = in_array(null, $iowait, true) ? null : (12 * $iowait[5] + 4 * $iowait[15] + $iowait[60]) / 17;
+    foreach (['blend' => 'io', 'iowait_blend' => 'iowait'] as $field => $kind) {
+        $windows = $pressure[$kind];
+        $pressure[$field] = in_array(null, $windows, true) ? null : (12 * $windows[5] + 4 * $windows[15] + $windows[60]) / 17;
+    }
     // /home small-read latency (O_DIRECT ioping): mean of the valid probes in the last three buckets.
     // One probe is noisy; one missed probe must not drop the input for three cycles (ADR 0236).
     $sum = 0.0; $count = 0;

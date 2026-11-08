@@ -87,9 +87,10 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         if (!is_finite($sum)) return null;
         foreach ($rows as &$row) {
             $row['share'] = $sum > 0 ? $row['share'] / $sum : 0.0;
-            if (!$row['explicit']) $lift += max(0.0, $row['floor'] - $pool * $row['share']);
+            $shortfall = max(0.0, $row['floor'] - $pool * $row['share']);
+            if (!$row['explicit']) $lift += $shortfall;
             // Counterfactual floor charging includes every account, including explicit caps.
-            $wouldLift += max(0.0, $row['floor'] - $pool * $row['share']);
+            $wouldLift += $shortfall;
         }
         unset($row);
         $chargedPool = max(0.0, $pool - $settings['floorCharge'] * $lift);
@@ -100,8 +101,8 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
             $row['would_be'] = $fallback !== null ? null : pmssDynamicIopsProposal($row, $wouldPool);
         }
         unset($row);
-        $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lift, 'charged_pool' => $chargedPool, 'users' => $rows];
-        $result['variants'][$label] += ['would_be_floor_lift' => $wouldLift, 'would_be_charged_pool' => $wouldPool];
+        $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lift, 'charged_pool' => $chargedPool,
+            'users' => $rows, 'would_be_floor_lift' => $wouldLift, 'would_be_charged_pool' => $wouldPool];
     }
     $result += ['iowait_blend' => $iowait, 'curb_factor' => $curb, 'pool_uncurbed' => $uncurbed];
     return $result;

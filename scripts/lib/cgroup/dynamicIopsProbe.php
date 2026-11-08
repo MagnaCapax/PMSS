@@ -38,14 +38,13 @@ function pmssDynamicIopsProbeState(?array $state, array $settings, int $start): 
 /** Sum only counters present at both ends; resets or no comparable slices invalidate the cycle. */
 function pmssDynamicIopsProbeWork(array $before, array $after): ?float
 {
-    $work = 0.0; $matched = false;
+    $work = null;
     foreach ($after as $uid => $count) {
         if (!is_int($count) || !is_int($before[$uid] ?? null)) continue;
         if ($count < $before[$uid]) return null;
-        $matched = true;
-        $work += $count - $before[$uid];
+        $work = ($work ?? 0.0) + ($count - $before[$uid]);
     }
-    return $matched && is_finite($work) ? $work : null;
+    return $work !== null && is_finite($work) ? $work : null;
 }
 
 /**

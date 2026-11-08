@@ -132,12 +132,12 @@ only present latency samples count, including zero. Shadow shares reuse their
 rows for normalization, and saved-run selection retains one latest entry.
 Pressure windows share prefix sums; iostat reads raw rows; blkio/day gates carry their own state.
 
-Cgroup shadow allocation also uses its cohort rows as the quota lookup instead
-of maintaining a second account map. Positive cohort quotas supply the same
-median and completeness count; missing entries still use the median for share
-arithmetic and select the legacy proposal. BFQ weights and read-IOPS caps apply
-their existing scalar clamps directly. Quota/weight validation, rounding order,
-fallback precedence and serialized field order retain their contracts.
+Cgroup allocation uses cohort rows for quota lookup, median and completeness;
+missing quotas retain median share arithmetic and legacy proposals. Floor charging
+shares one shortfall; pressure blends share one formula. Held counts and probe work
+derive from their existing aggregates; ceiling summaries collect daily latency in
+one traversal. BFQ/read-IOPS clamps, validation, rounding order, fallback precedence
+and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 

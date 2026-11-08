@@ -60,6 +60,7 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
     }
     ksort($days);
     $published = ['from_day' => []];
+    $floors = [];
     // Replace accepted buckets with their published summary in the same day order.
     foreach ($days as $day => $rows) {
         $count = count($rows);
@@ -79,17 +80,14 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
                 $published['from_day'][$dimension] = $day;
             }
         }
-    }
-    if (count($days) < $settings['minDays']) {
-        return null;
-    }
-    // Quiet floor of the disk (ADR 0237): the median over accepted days of each day's 10th-percentile latency.
-    $floors = [];
-    foreach (array_keys($days) as $day) {
-        $values = array_values($pings[$day] ?? []);
+        // Quiet floor (ADR 0237): median of accepted days' 10th-percentile latencies; require enough probes.
+        $values = $pings[$day] ?? [];
         if (count($values) < $settings['minSamplesPerDay']) continue;
         sort($values, SORT_NUMERIC);
         $floors[] = $values[(int) ceil(10 * count($values) / 100) - 1];
+    }
+    if (count($days) < $settings['minDays']) {
+        return null;
     }
     sort($floors, SORT_NUMERIC);
     $n = count($floors);
