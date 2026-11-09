@@ -53,7 +53,7 @@ final class TorrentClientsCardsAvailabilityRenderTest extends TestCase
                 $this->assertSame(array('torrent-client-versions'), array_keys($cards));
                 $this->assertStringNotContainsString('Other versions', implode('', $cards));
                 // Also exercise an older projection with no notInstalled map at all.
-                $data = json_decode(file_get_contents($path), true);
+                $data = $this->pmssReadJsonArrayFile($path);
                 unset($data['notInstalled']);
                 $this->pmssWriteFile($path, json_encode($data));
                 $this->assertSame($cards, $page());

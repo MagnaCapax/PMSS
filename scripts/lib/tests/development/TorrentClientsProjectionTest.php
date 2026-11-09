@@ -58,7 +58,7 @@ final class TorrentClientsProjectionTest extends TestCase
         $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_STORE_ROOT' => $store], function () use ($catalog, $path): void {
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($catalog, $path));
         });
-        $data = json_decode(file_get_contents($path), true);
+        $data = $this->pmssReadJsonArrayFile($path);
         $counts = ['qbittorrent' => 2, 'rtorrent' => 2, 'deluge' => 3, 'transmission' => 3];
         $this->assertSame($expected, $data['versions']);
         $this->assertSame($counts, $data['notInstalled']);

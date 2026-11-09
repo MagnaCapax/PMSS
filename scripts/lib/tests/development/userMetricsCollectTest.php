@@ -98,7 +98,7 @@ class UserMetricsCollectTest extends TestCase
         $projected = unserialize((string) file_get_contents($homePath));
         $this->assertSame(5, $projected['count']);
         $this->assertSame(300, $projected['last_increase']);
-        $this->assertSame(5, json_decode((string) file_get_contents($stateRoot.'/www-data.json'), true)['count']);
+        $this->assertSame(5, $this->pmssReadJsonArrayFile($stateRoot.'/www-data.json')['count']);
     }
     /** Metrics alone must load the counter reader without the persistence writer. */
     public function testMetricsEntrypointLoadsOnlyCounterBoundary(): void

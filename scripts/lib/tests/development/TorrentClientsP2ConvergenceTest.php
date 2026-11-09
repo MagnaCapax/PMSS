@@ -108,7 +108,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     public function testUnavailableSelectionUsesInstalledNonSystemDefault(): void
     {
         [$root, $home, $ops, $events] = $this->fixture('static-default');
-        $catalog = json_decode((string) file_get_contents($root.'/catalog.json'), true);
+        $catalog = $this->pmssReadJsonArrayFile($root.'/catalog.json');
         $catalog[0]['isDefault'] = false;
         $catalog[] = [
             'client' => 'qbittorrent', 'version' => '5.2.0', 'kind' => 'static',

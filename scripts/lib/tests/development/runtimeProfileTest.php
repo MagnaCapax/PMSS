@@ -33,7 +33,7 @@ class RuntimeProfileTest extends TestCase
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame(1, substr_count($result['output'], 'Command failed (rc=75)'));
         $this->assertStringContainsString('Step status summary: 1 OK, 1 ERR, 1 SKIP', $result['output']);
-        $profile = json_decode((string) file_get_contents($profilePath), true);
+        $profile = $this->pmssReadJsonArrayFile($profilePath);
         $statuses = array_column($profile, 'status');
         sort($statuses);
         $this->assertSame(['ERR', 'OK', 'SKIP'], $statuses);

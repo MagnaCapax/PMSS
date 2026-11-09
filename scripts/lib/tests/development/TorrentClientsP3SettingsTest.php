@@ -27,7 +27,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
     {
         [$home, $path, $ops] = $this->fixture('{}');
         $this->assertTrue(\pmssTransmissionSettingsApply('t', $home, $ops));
-        $settings = json_decode((string) file_get_contents($path), true);
+        $settings = $this->pmssReadJsonArrayFile($path);
         $this->pmssAssertArraySubsetSame([
             'rpc-bind-address' => 'unix:'.$home.'/.lighttpd/transmission.sock', 'rpc-socket-mode' => '0700',
             'rpc-whitelist-enabled' => true, 'rpc-whitelist' => '', 'rpc-authentication-required' => false,
@@ -40,7 +40,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
         [$home, $path, $ops] = $this->fixture('{"rpc-bind-address":"old","rpc_bind_address":"other","rpc-password":"old","download-dir":"/data"}');
         $ops['snakeCase'] = false;
         $this->assertTrue(\pmssTransmissionSettingsApply('t', $home, $ops));
-        $settings = json_decode((string) file_get_contents($path), true);
+        $settings = $this->pmssReadJsonArrayFile($path);
         $this->assertSame('unix:'.$home.'/.lighttpd/transmission.sock', $settings['rpc-bind-address']);
         $this->assertFalse(array_key_exists('rpc_bind_address', $settings));
         $this->assertFalse(array_key_exists('rpc-password', $settings));
@@ -51,7 +51,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
     {
         [$home, $path, $ops] = $this->fixture('{"rpc_bind_address":"old","rpc-bind-address":"other"}');
         $this->assertTrue(\pmssTransmissionSettingsApply('t', $home, $ops));
-        $settings = json_decode((string) file_get_contents($path), true);
+        $settings = $this->pmssReadJsonArrayFile($path);
         $this->assertSame('unix:'.$home.'/.lighttpd/transmission.sock', $settings['rpc_bind_address']);
         $this->assertFalse(array_key_exists('rpc-bind-address', $settings));
     }

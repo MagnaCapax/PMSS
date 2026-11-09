@@ -156,7 +156,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
     public function testSystemCatalogDefaultCreatesOnlyVersionLinks(): void
     {
         [$home, $store, $ops] = $this->fixture();
-        $catalog = json_decode(file_get_contents($ops['catalog']), true);
+        $catalog = $this->pmssReadJsonArrayFile($ops['catalog']);
         foreach ($catalog as &$entry) {
             if ($entry['client'] === 'rtorrent') $entry['isDefault'] = $entry['kind'] === 'system';
         }
@@ -198,7 +198,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
     {
         [$home, $store, $ops] = $this->fixture();
         // The shipped catalog marks a Transmission store build as default; a link would mark it selected.
-        $default = array_values(array_filter(json_decode(file_get_contents($ops['catalog']), true),
+        $default = array_values(array_filter($this->pmssReadJsonArrayFile($ops['catalog']),
             static function ($entry) { return $entry['client'] === 'transmission' && $entry['isDefault']; }));
         $this->assertSame(1, count($default));
         $this->pmssEnsureDir($store.'/transmission/'.$default[0]['version']);

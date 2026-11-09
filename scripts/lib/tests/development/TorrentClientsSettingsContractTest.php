@@ -19,12 +19,12 @@ final class TorrentClientsSettingsContractTest extends TestCase
         $rpc = '/user-t/transmission/';
 
         // The key set and values come from the two loaded production sources.
-        $root = json_decode(\pmssTransmissionSettingsContent('{}', $socket, $rpc), true);
+        $root = $this->pmssDecodeJsonArray(\pmssTransmissionSettingsContent('{}', $socket, $rpc));
         $customer = \pmssTransmissionManagedSettings($home);
         $this->assertSame($root, $customer);
-        $this->assertSame($root, json_decode(\pmssTransmissionSettingsContent('{}', $socket, $rpc, false), true));
+        $this->assertSame($root, $this->pmssDecodeJsonArray(\pmssTransmissionSettingsContent('{}', $socket, $rpc, false)));
         $this->assertTrue(\pmssTransmissionSettingsPrepare($home));
-        $this->assertSame($root, json_decode((string) file_get_contents($path), true));
+        $this->assertSame($root, $this->pmssReadJsonArrayFile($path));
         $this->assertTrue(\pmssTransmissionSettingsReady($home));
 
         // Every managed key must be enforced by the launch readiness check.
@@ -44,10 +44,10 @@ final class TorrentClientsSettingsContractTest extends TestCase
         $path = $home.'/.config/transmission-daemon/settings.json';
         $raw = '{"rpc_bind_address":"old","download-dir":"/keep"}';
         file_put_contents($path, $raw);
-        $root = json_decode(\pmssTransmissionSettingsContent($raw,
-            $home.'/.lighttpd/transmission.sock', '/user-t/transmission/'), true);
+        $root = $this->pmssDecodeJsonArray(\pmssTransmissionSettingsContent($raw,
+            $home.'/.lighttpd/transmission.sock', '/user-t/transmission/'));
         $this->assertTrue(\pmssTransmissionSettingsPrepare($home));
-        $this->assertSame($root, json_decode((string) file_get_contents($path), true));
+        $this->assertSame($root, $this->pmssReadJsonArrayFile($path));
         $this->assertTrue(\pmssTransmissionSettingsReady($home));
     }
 }
