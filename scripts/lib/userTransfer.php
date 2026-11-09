@@ -172,34 +172,42 @@ function pmssUserTransferMain(array $argv): int
             $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
 
             $dockerIds = [];
+            $dockerQuiesceRc = 0;
             if (!$recovery) {
                 $dockerQuiesceRc = runStep('Quiescing source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerQuiesceScript']]));
-                if ($dockerQuiesceRc !== 0) {
-                    logMessage(sprintf('[WARN] Docker quiesce probe returned rc=%d', $dockerQuiesceRc));
-                }
                 $dockerIds = pmssUserTransferValidDockerIds((string) @file_get_contents($scratchPaths['dockerIds']));
-                logMessage(sprintf('[INFO] Docker hand-over: %d running container(s) stopped on source', count($dockerIds)));
+                if ($dockerQuiesceRc === 0) {
+                    logMessage(sprintf('[INFO] Docker hand-over: %d running container(s) stopped on source', count($dockerIds)));
+                }
             }
             $dockerCount = count($dockerIds);
             $dockerFinalRc = 0;
-            if ($dockerCount > 0) {
+            if ($dockerCount > 0 && $dockerQuiesceRc === 0) {
                 $dockerFinalRc = pmssUserTransferRunPasses('Pulling volatile data (containers stopped)', $scratchPaths['expect'], $scratchPaths['finalScript'], 1, 0, 0);
+            }
+
+            // Never promote a live or failed copy. A partial stop may need source recovery.
+            if ($dockerQuiesceRc !== 0 || !pmssUserTransferDockerRcTransferred($dockerFinalRc)) {
+                if ($dockerCount > 0) {
+                    pmssUserTransferWriteFile($scratchPaths['dockerStartScript'], pmssUserTransferBuildDockerStartScript($cfg, $dockerIds), 0700);
+                    runStep('Restarting source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerStartScript']]));
+                }
+                logMessage(sprintf('[ERR] Docker hand-over failed (quiesce rc=%d, final rc=%d); target containers not started', $dockerQuiesceRc, $dockerFinalRc));
+                return 1;
             }
 
             pmssUserTransferPostSetup($cfg, $home, $scratchPaths);
 
             if ($dockerCount > 0) {
-                if (pmssUserTransferDockerRcTransferred($dockerFinalRc)) {
-                    $dockerUtility = dirname(__DIR__).'/util/userDocker.php';
-                    runStep('Starting rootless Docker for '.$cfg['localUser'], pmssBuildCommand('php', [$dockerUtility, $cfg['localUser'], 'start']));
-                    // runStep records its command; keep container IDs in private scratch.
-                    $dockerStartCommand = pmssBuildCommand('php', array_merge([$dockerUtility, $cfg['localUser'], 'start-containers'], $dockerIds));
-                    pmssUserTransferWriteFile($scratchPaths['dockerStartScript'], "#!/bin/bash\nset -e\n".$dockerStartCommand."\n", 0700);
-                    runStep('Starting transferred containers', pmssBuildCommand($scratchPaths['dockerStartScript']));
-                } else {
-                    pmssUserTransferWriteFile($scratchPaths['dockerStartScript'], pmssUserTransferBuildDockerStartScript($cfg, $dockerIds), 0700);
-                    runStep('Restarting source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerStartScript']]));
-                    logMessage(sprintf('[WARN] Docker hand-over: final pass failed (rc=%d); restarted %d container(s) on source; target containers not started', $dockerFinalRc, $dockerCount));
+                $dockerUtility = dirname(__DIR__).'/util/userDocker.php';
+                if (runStep('Starting rootless Docker for '.$cfg['localUser'], pmssBuildCommand('php', [$dockerUtility, $cfg['localUser'], 'start'])) !== 0) {
+                    throw new RuntimeException('Target rootless Docker start failed', 1);
+                }
+                // runStep records its command; keep container IDs in private scratch.
+                $dockerStartCommand = pmssBuildCommand('php', array_merge([$dockerUtility, $cfg['localUser'], 'start-containers'], $dockerIds));
+                pmssUserTransferWriteFile($scratchPaths['dockerStartScript'], "#!/bin/bash\nset -e\n".$dockerStartCommand."\n", 0700);
+                if (runStep('Starting transferred containers', pmssBuildCommand($scratchPaths['dockerStartScript'])) !== 0) {
+                    throw new RuntimeException('Target Docker container start failed', 1);
                 }
             }
 
@@ -209,10 +217,6 @@ function pmssUserTransferMain(array $argv): int
 
             if ($lastMainRc !== 0 || $lastFinalRc !== 0) {
                 logMessage(sprintf('[WARN] User transfer finished with errors (main rc=%d, final rc=%d)', $lastMainRc, $lastFinalRc));
-                return 1;
-            }
-
-            if ($dockerCount > 0 && !pmssUserTransferDockerRcTransferred($dockerFinalRc)) {
                 return 1;
             }
 

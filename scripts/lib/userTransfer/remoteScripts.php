@@ -163,9 +163,11 @@ function pmssUserTransferBuildDockerQuiesce(array $cfg, string $localIdsPath): s
         .'[ -n "$ids" ] || exit 0; printf "\n"; printf "%s\n" "$ids"; '
         .'DOCKER_HOST=unix://$S docker stop -t 30 $ids >/dev/null';
 
+    // The cap must not hide SSH/docker-stop failure behind head's successful exit.
     return "#!/bin/bash\nset -e\numask 077\n"
         .pmssUserTransferBuildSshProbeCommand($cfg, $remote)
-        .' | head -c 65536 > '.escapeshellarg($localIdsPath)."\n";
+        .' | head -c 65536 > '.escapeshellarg($localIdsPath)."\n"
+        .'[ "${PIPESTATUS[*]}" = "0 0" ]'."\n";
 }
 
 /** Restart only a caller-validated set on the source account's daemon. */

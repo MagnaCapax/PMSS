@@ -32,3 +32,13 @@ Accounts without a reachable rootless Docker socket continue through the
 existing transfer flow. An account with running containers gets one additional
 volatile pass and a bounded wait for the target daemon to become ready. A
 failed extra pass returns failure after attempting to restore source service.
+
+### Failure handling (2026-11-09)
+
+The bounded source-output pipeline checks both command statuses: a successful
+`head` must not conceal a failed SSH session or container stop. A failed
+quiesce or extra pass attempts to restart the captured source set, then returns
+failure before target post-setup or startup. Target daemon/container startup
+failures also return failure without recording transfer completion. Source
+containers remain stopped after a target startup failure because some target
+containers may already have started; recovery needs operator inspection.
