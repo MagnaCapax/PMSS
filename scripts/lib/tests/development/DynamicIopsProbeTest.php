@@ -44,8 +44,7 @@ class DynamicIopsProbeTest extends TestCase
             }
             $this->assertTrue(abs($state['lo'] - $expected) < 1e-9);
             $this->assertSame($decision, $result['probe']['decision']);
-            $this->assertSame([], $state['pairs']);
-            $this->assertSame('lo', $state['arm']);
+            $this->pmssAssertArraySubsetSame(['pairs' => [], 'arm' => 'lo'], $state);
         }
     }
 
@@ -102,8 +101,7 @@ class DynamicIopsProbeTest extends TestCase
             $state = $result['state'];
         }
         $this->assertSame('hold', $result['probe']['decision']);
-        $this->assertSame(0, $state['lo_cycles']);
-        $this->assertSame(0, $state['lo_held']);
+        $this->pmssAssertArraySubsetSame(['lo_cycles' => 0, 'lo_held' => 0], $state);
     }
 
     /** A state file from before the held counters keeps its experiment instead of restarting. */
@@ -111,9 +109,7 @@ class DynamicIopsProbeTest extends TestCase
     {
         $saved = $this->state(4.0); $saved['pairs'] = [0.1];
         $row = \pmssDynamicIopsProbeCycle($saved, \pmssDynamicIopsSettings([]), [1 => 100], 1800000000, '', false);
-        $this->assertSame(4.0, $row['state']['lo']);
-        $this->assertSame([0.1], $row['state']['pairs']);
-        $this->assertSame(0, $row['state']['lo_cycles']);
+        $this->pmssAssertArraySubsetSame(['lo' => 4.0, 'pairs' => [0.1], 'lo_cycles' => 0], $row['state']);
     }
 
     public function testInvalidCyclesDiscardBlocksWithoutRecordingPairs(): void
@@ -130,9 +126,7 @@ class DynamicIopsProbeTest extends TestCase
             // Even a completed high block cannot pair with this discarded low block.
             $state = $row['state']; $state['block_samples'] = 12; $state['last_time'] = 1800003300;
             $next = \pmssDynamicIopsProbeCycle($state, \pmssDynamicIopsSettings([]), [1 => 1000], 1800003600, '', false);
-            $this->assertSame('hi', $next['state']['arm']);
-            $this->assertSame(null, $next['state']['pending_work']);
-            $this->assertSame([], $next['state']['pairs']);
+            $this->pmssAssertArraySubsetSame(['arm' => 'hi', 'pending_work' => null, 'pairs' => []], $next['state']);
         }
     }
 
@@ -154,10 +148,8 @@ class DynamicIopsProbeTest extends TestCase
                 $saved[$field] = $value;
                 $saved['pairs'] = [0.1];
                 $row = \pmssDynamicIopsProbeCycle($saved, \pmssDynamicIopsSettings([]), [1 => 100], 1800000000, '', false);
-                $this->assertSame(5.0, $row['state']['lo']);
-                $this->assertSame([], $row['state']['pairs']);
-                $this->assertSame(null, $row['state']['block_work']);
-                $this->assertSame(1800000000, $row['state']['last_time']);
+                $this->pmssAssertArraySubsetSame(['lo' => 5.0, 'pairs' => [],
+                    'block_work' => null, 'last_time' => 1800000000], $row['state']);
             }
         }
     }
@@ -191,10 +183,7 @@ class DynamicIopsProbeTest extends TestCase
             ['pairs' => [0.1], 'lo' => 4.0] + array_diff_key($this->state(), ['metric' => true]),
             ['metric' => 'count'] + $this->state(4.0)] as $saved) {
             $row = \pmssDynamicIopsProbeCycle($saved, \pmssDynamicIopsSettings([]), [1 => 100], 1800000000, '', false);
-            $this->assertSame(5.0, $row['state']['lo']);
-            $this->assertSame([], $row['state']['pairs']);
-            $this->assertSame('lo', $row['state']['arm']);
-            $this->assertSame('bytes', $row['state']['metric']);
+            $this->pmssAssertArraySubsetSame(['lo' => 5.0, 'pairs' => [], 'arm' => 'lo', 'metric' => 'bytes'], $row['state']);
         }
     }
 
@@ -214,14 +203,11 @@ class DynamicIopsProbeTest extends TestCase
     {
         $hdd = $this->enforceCycle(['pressure' => ['blend' => null, 'iowait_blend' => null]]);
         $row = $hdd['logs']['PMSS_DYNAMIC_IOPS_LOG'][0];
-        $this->assertSame('probe', $row['steer']);
-        $this->assertSame(null, $row['fallback']);
-        $this->assertSame('apply', $row['read_action']);
+        $this->pmssAssertArraySubsetSame(['steer' => 'probe', 'fallback' => null, 'read_action' => 'apply'], $row);
         $this->assertTrue($hdd['writes'] !== []);
         foreach (['ssd', 'nvme'] as $media) {
             $row = $this->enforceCycle(['media' => $media, 'pressure' => ['blend' => null, 'iowait_blend' => null]])['logs']['PMSS_DYNAMIC_IOPS_LOG'][0];
-            $this->assertSame('missing-pressure', $row['fallback']);
-            $this->assertSame('keep-kernel', $row['read_action']);
+            $this->pmssAssertArraySubsetSame(['fallback' => 'missing-pressure', 'read_action' => 'keep-kernel'], $row);
         }
     }
 
@@ -229,8 +215,7 @@ class DynamicIopsProbeTest extends TestCase
     {
         foreach ([[[], ['--dry-run']], [['envDryRun' => '1'], []]] as [$options, $args]) {
             $row = $this->enforceCycle($options, $args);
-            $this->assertSame([], $row['stateWrites']);
-            $this->assertSame([], $row['writes']);
+            $this->pmssAssertArraySubsetSame(['stateWrites' => [], 'writes' => []], $row);
         }
         $normal = $this->enforceCycle();
         $this->assertSame('probe', $normal['logs']['PMSS_DYNAMIC_IOPS_LOG'][0]['steer']);

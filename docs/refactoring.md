@@ -503,6 +503,11 @@ lock handoff use these same helpers. Keep test methods,
 fragment bytes, ordering checks and per-fragment diagnostics at the callers;
 the protected common harness needs no change for additional adopters.
 
+Dynamic IOPS policy, cycle, latency, monitoring and probe fixtures group strict
+field checks with `TestCase::pmssAssertArraySubsetSame()`. Expected values and
+field order stay at the callers; exact-shape checks, numeric tolerances and
+scenario loops remain explicit.
+
 Process and monitoring fixtures use `TestCase::pmssWriteFiles()` for ordered
 file trees and `pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared
 fixture trait creates parents once; callers retain field bytes, absent entries,

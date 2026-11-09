@@ -60,9 +60,7 @@ class DynamicIopsLatencyTest extends TestCase
     public function testQuietDiskRaisesTheMultiplierOneStepPerCycle(): void
     {
         $result = $this->cycle(7.5, 2.0);
-        $this->assertSame('latency', $result['steer']);
-        $this->assertSame(2.2, $result['multiplier']);
-        $this->assertSame(1100.0, $result['pool']);
+        $this->pmssAssertArraySubsetSame(['steer' => 'latency', 'multiplier' => 2.2, 'pool' => 1100.0], $result);
     }
 
     public function testInsideTheBandHoldsAndAboveItLowers(): void
@@ -88,12 +86,10 @@ class DynamicIopsLatencyTest extends TestCase
     {
         foreach ([['ssd', null], ['nvme', null], [null, 0.24], ['ssd', 0.0]] as [$media, $reference]) {
             $result = $this->cycle(0.2, 5.0, $media, 15, $reference);
-            $this->assertSame('pressure', $result['steer']);
-            $this->assertSame(2.0, $result['multiplier']);
+            $this->pmssAssertArraySubsetSame(['steer' => 'pressure', 'multiplier' => 2.0], $result);
         }
         $missing = $this->cycle(null, 5.0);
-        $this->assertSame('pressure', $missing['steer']);
-        $this->assertSame(2.0, $missing['multiplier']);
+        $this->pmssAssertArraySubsetSame(['steer' => 'pressure', 'multiplier' => 2.0], $missing);
     }
 
     /** Closed loop with the real 15-minute lag (mean of the last three samples): settles in the band and stays. */
@@ -129,8 +125,7 @@ class DynamicIopsLatencyTest extends TestCase
     {
         foreach (['ssd', 'nvme'] as $media) {
             $quiet = $this->cycle(0.2, 2.0, $media, 30, 0.24);
-            $this->assertSame('latency', $quiet['steer']);
-            $this->assertSame(2.2, $quiet['multiplier']);
+            $this->pmssAssertArraySubsetSame(['steer' => 'latency', 'multiplier' => 2.2], $quiet);
             $this->assertSame(6.0, $this->cycle(2.0, 6.0, $media, 30, 0.24)['multiplier']);
             $this->assertTrue(abs($this->cycle(3.0, 5.5, $media, 30, 0.24)['multiplier'] - 5.0) < 1e-9);
         }

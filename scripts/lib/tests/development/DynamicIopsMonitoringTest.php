@@ -12,13 +12,11 @@ class DynamicIopsMonitoringTest extends TestCase
         $now = 1800000000; $samples = [];
         for ($n = 0; $n < 12; $n++) $samples[] = ['time' => $now - 300 * $n, 'psiFullAvg300' => 10];
         $old = \pmssDynamicIopsPressure($samples, $now);
-        $this->assertSame(10.0, $old['blend']);
-        $this->assertSame([5 => null, 15 => null, 60 => null], $old['iowait']);
+        $this->pmssAssertArraySubsetSame(['blend' => 10.0, 'iowait' => [5 => null, 15 => null, 60 => null]], $old);
         foreach ($samples as $n => &$sample) $sample['cpuIowaitPct'] = $n === 0 ? 12 : 0;
         unset($sample);
         $new = \pmssDynamicIopsPressure($samples, $now);
-        $this->assertSame([5 => 12.0, 15 => 4.0, 60 => 1.0], $new['iowait']);
-        $this->assertSame($old['blend'], $new['blend']);
+        $this->pmssAssertArraySubsetSame(['iowait' => [5 => 12.0, 15 => 4.0, 60 => 1.0], 'blend' => $old['blend']], $new);
         foreach ([null, -1, 101, INF, [], 'bad'] as $bad) {
             $samples[0]['cpuIowaitPct'] = $bad;
             $result = \pmssDynamicIopsPressure($samples, $now);
@@ -44,10 +42,8 @@ class DynamicIopsMonitoringTest extends TestCase
                 $this->assertSame($unset['variants'][$variant]['users'][$user]['proposed'], $row['would_be']);
             }
         }
-        $this->assertSame(0.0, $explicit['variants']['1.0']['floor_lift']);
-        $this->assertSame(800.0, $explicit['variants']['1.0']['would_be_floor_lift']);
-        $this->assertSame(6400, $explicit['variants']['1.0']['users']['large']['proposed']);
-        $this->assertSame(6200, $explicit['variants']['1.0']['users']['large']['would_be']);
+        $this->pmssAssertArraySubsetSame(['floor_lift' => 0.0, 'would_be_floor_lift' => 800.0], $explicit['variants']['1.0']);
+        $this->pmssAssertArraySubsetSame(['proposed' => 6400, 'would_be' => 6200], $explicit['variants']['1.0']['users']['large']);
         foreach ($unset['variants'] as $facts) foreach ($facts['users'] as $row) $this->assertSame($row['proposed'], $row['would_be']);
         foreach ([[$users, null, 3300], [$users, 15, null], [array_replace($users, ['missing' => ['source' => [], 'weight' => 100]]), 15, 3300]] as [$accounts, $blend, $capacity]) {
             $result = $allocate($accounts, $blend, $capacity);

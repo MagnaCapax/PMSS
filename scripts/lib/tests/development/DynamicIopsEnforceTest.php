@@ -28,10 +28,8 @@ class DynamicIopsEnforceTest extends TestCase
     {
         foreach ([[49, 1.0], [50, 1.0], [65, 0.875], [80, 0.75], [95, 0.75]] as [$wait, $factor]) {
             $result = $this->allocate($this->users(), $this->policy(), $wait);
-            $this->assertSame((float) $wait, $result['iowait_blend']);
-            $this->assertSame($factor, $result['curb_factor']);
-            $this->assertSame(1000.0, $result['pool_uncurbed']);
-            $this->assertSame(1000.0 * $factor, $result['pool']);
+            $this->pmssAssertArraySubsetSame(['iowait_blend' => (float) $wait, 'curb_factor' => $factor,
+                'pool_uncurbed' => 1000.0, 'pool' => 1000.0 * $factor], $result);
         }
     }
 
@@ -48,10 +46,8 @@ class DynamicIopsEnforceTest extends TestCase
     {
         foreach ([null, -1, 101, INF, NAN, [], 'bad'] as $wait) {
             $result = $this->allocate($this->users(), $this->policy(), $wait);
-            $this->assertSame(null, $result['iowait_blend']);
-            $this->assertSame(1.0, $result['curb_factor']);
-            $this->assertSame(1000.0, $result['pool']);
-            $this->assertSame(null, $result['fallback']);
+            $this->pmssAssertArraySubsetSame(['iowait_blend' => null, 'curb_factor' => 1.0,
+                'pool' => 1000.0, 'fallback' => null], $result);
         }
     }
 
@@ -64,8 +60,7 @@ class DynamicIopsEnforceTest extends TestCase
         foreach ([0, 1, 2, 3, 11] as $missing) {
             $bad = $samples; unset($bad[$missing]['cpuIowaitPct']);
             $result = \pmssDynamicIopsPressure($bad, $now);
-            $this->assertSame(null, $result['iowait_blend']);
-            $this->assertSame(15.0, $result['blend']);
+            $this->pmssAssertArraySubsetSame(['iowait_blend' => null, 'blend' => 15.0], $result);
         }
     }
 
