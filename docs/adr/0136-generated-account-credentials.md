@@ -2,7 +2,7 @@
 
 Date: 2026-10-19
 Category: domain
-Status: Accepted
+Status: Accepted (length superseded by ADR 0245)
 
 ## Context
 

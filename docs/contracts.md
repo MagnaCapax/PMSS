@@ -1674,7 +1674,7 @@ and the unchanged successful results without reading live process state.
 
 - scripts/changePw.php [--jsonl] [--password-stdin] USERNAME [PASSWORD]
   - Behavior: Sets the Unix password (generated if omitted), writes the per-user htpasswd and any existing qBittorrent config with the account's privileges, and prints the password.
-    Generated credentials are 16 characters drawn entirely from the CSPRNG, with alphanumeric first and last characters.
+    Generated credentials are 10 characters drawn entirely from the CSPRNG (ADR 0245), with alphanumeric first and last characters.
     `--password-stdin` reads one line in place of the positional value; an empty line generates a random password and EOF without a line fails. The positional form remains available for existing callers.
     On Debian 11 and newer, shadow and htpasswd receive the same `$2y$` bcrypt hash. Debian 10 and unreadable or nonnumeric Debian versions retain the `passwd` and `htpasswd -B` path. Both shadow paths feed credentials through stdin.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).

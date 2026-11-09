@@ -51,8 +51,8 @@ class changePwPasswdFailureGuardTest extends TestCase
         }
         for ($i = 0; $i < 1000; $i++) {
             $password = \pmssAccountPasswordGenerate();
-            $this->assertSame(16, strlen($password));
-            $this->assertMatches('/^[A-Za-z0-9][A-Za-z0-9_-]{14}[A-Za-z0-9]$/', $password);
+            $this->assertSame(10, strlen($password));
+            $this->assertMatches('/^[A-Za-z0-9][A-Za-z0-9_-]{8}[A-Za-z0-9]$/', $password);
             foreach (['!', '@', '#', '$', '%', '&', ':'] as $forbidden) {
                 $this->assertTrue(strpos($password, $forbidden) === false);
             }

@@ -20,7 +20,7 @@ function pmssCredentialGenerate(int $length, bool $alphanumericEdges = false): s
 }
 
 /** Generate a fixed-length account credential for the reset path. */
-function pmssAccountPasswordGenerate(int $length = 16): string
+function pmssAccountPasswordGenerate(int $length = 10): string
 {
     if ($length < 2) {
         throw new InvalidArgumentException('Account credential length must be at least two');

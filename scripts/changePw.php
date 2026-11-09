@@ -3,7 +3,7 @@
 /**
  * Update a tenant's system and HTTP credentials.
  *
- * - Accepts an optional password argument; otherwise generates a 16-character
+ * - Accepts an optional password argument; otherwise generates a 10-character
  *   credential from the shared character set and random_int().
  * - Shares one bcrypt hash between shadow and htpasswd on Debian 11+;
  *   older or unknown releases retain the legacy password update.
