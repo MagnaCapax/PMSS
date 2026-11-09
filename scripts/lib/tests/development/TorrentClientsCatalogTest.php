@@ -19,8 +19,7 @@ final class TorrentClientsCatalogTest extends TestCase
     private function load(array $entries): array
     {
         $dir = $this->pmssMakeTempDir('pmss-clients-catalog-');
-        $path = $dir.'/catalog.json';
-        file_put_contents($path, json_encode($entries));
+        $path = $this->pmssWriteRelativeFile($dir, 'catalog.json', json_encode($entries));
         return \pmssTorrentClientsCatalogLoad($path);
     }
 

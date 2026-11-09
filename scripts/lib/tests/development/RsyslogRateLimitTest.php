@@ -36,7 +36,7 @@ class RsyslogRateLimitTest extends TestCase
         $target = $root.'/rsyslog.conf';
         $messages = [];
         $commands = [];
-        file_put_contents($target, $this->stockConfig());
+        $this->pmssWriteFile($target, $this->stockConfig());
         chmod($target, 0640);
 
         $this->pmssWithEnv([
@@ -74,7 +74,7 @@ class RsyslogRateLimitTest extends TestCase
         $target = $root.'/rsyslog.conf';
         $original = $this->stockConfig();
         $messages = [];
-        file_put_contents($target, $original);
+        $this->pmssWriteFile($target, $original);
 
         $this->pmssWithEnv([
             'PMSS_RSYSLOG_CONFIG_PATH' => $target,
@@ -98,7 +98,7 @@ class RsyslogRateLimitTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-rsyslog-exception-');
         $target = $root.'/rsyslog.conf';
         $original = $this->stockConfig();
-        file_put_contents($target, $original);
+        $this->pmssWriteFile($target, $original);
 
         try {
             $this->pmssWithEnv([
@@ -128,7 +128,7 @@ class RsyslogRateLimitTest extends TestCase
         $target = $root.'/rsyslog.conf';
         $custom = "module(load=\"imklog\" ParseKernelTimestamp=\"on\")\n";
         $messages = [];
-        file_put_contents($target, $custom);
+        $this->pmssWriteFile($target, $custom);
 
         $this->pmssWithEnv(['PMSS_RSYSLOG_CONFIG_PATH' => $target], function () use (&$messages): void {
             \pmssApplyRsyslogKernelInputRateLimit($this->pmssMakeArrayLogger($messages));

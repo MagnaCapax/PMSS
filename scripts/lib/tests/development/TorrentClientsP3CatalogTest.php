@@ -21,8 +21,7 @@ final class TorrentClientsP3CatalogTest extends TestCase
     private function load(array $entry): array
     {
         $root = $this->pmssMakeTempDir('pmss-p3-catalog-');
-        $path = $root.'/catalog.json';
-        file_put_contents($path, json_encode([$entry]));
+        $path = $this->pmssWriteRelativeFile($root, 'catalog.json', json_encode([$entry]));
         return \pmssTorrentClientsCatalogLoad($path);
     }
 
@@ -117,10 +116,10 @@ final class TorrentClientsP3CatalogTest extends TestCase
         symlink($store.'/transmission/4.1.3', $home.'/bin/transmission/default');
         $projection = $root.'/projection.json';
         $version = ['client' => 'transmission', 'version' => '4.1.3', 'kind' => 'static'];
-        file_put_contents($projection, json_encode(['versions' => [$version]]));
+        $this->pmssWriteFile($projection, json_encode(['versions' => [$version]]));
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'transmission', $projection, $store));
         $version['rpcUnixSocket'] = true;
-        file_put_contents($projection, json_encode(['versions' => [$version]]));
+        $this->pmssWriteFile($projection, json_encode(['versions' => [$version]]));
         $this->assertSame($store.'/transmission/4.1.3/transmission-daemon',
             \pmssTorrentClientResolve($home, 'transmission', $projection, $store));
     }

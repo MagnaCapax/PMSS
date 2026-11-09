@@ -30,16 +30,11 @@ final class agentDiagnosticsCliTest extends TestCase
     public function testJsonCollectsServerAndUserSections(): void
     {
         $scriptRoot = $this->makeScriptRoot();
-        $motdPath = $this->pmssMakeTempFile('pmss-agent-motd-');
-        $mdstatPath = $this->pmssMakeTempFile('pmss-agent-mdstat-');
-        $fstabPath = $this->pmssMakeTempFile('pmss-agent-fstab-');
-        $versionPath = $this->pmssMakeTempFile('pmss-agent-version-');
-        $completedPath = $this->pmssMakeTempFile('pmss-agent-completed-');
-        file_put_contents($motdPath, "hello host\n");
-        file_put_contents($mdstatPath, "md0 : active raid1\n");
-        file_put_contents($fstabPath, "/dev/md0 /home ext4 defaults 0 0\n");
-        file_put_contents($versionPath, "git/main@2026-03-28\n");
-        file_put_contents($completedPath, "git/main@2026-03-28\n");
+        $motdPath = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-agent-motd-'), "hello host\n");
+        $mdstatPath = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-agent-mdstat-'), "md0 : active raid1\n");
+        $fstabPath = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-agent-fstab-'), "/dev/md0 /home ext4 defaults 0 0\n");
+        $versionPath = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-agent-version-'), "git/main@2026-03-28\n");
+        $completedPath = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-agent-completed-'), "git/main@2026-03-28\n");
 
         $binDir = $this->makeCommandStubs();
         $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json', '--pretty', '--user=fixtur01'], $this->pmssPathPrefixedEnvironment($binDir, $this->pmssTestModeEnv([
@@ -124,8 +119,8 @@ final class agentDiagnosticsCliTest extends TestCase
             $rotated[] = json_encode(['ts' => 'archive-'.$line]);
             $live[] = json_encode(['ts' => 'live-'.$line]);
         }
-        file_put_contents($rotatedPath, implode("\n", $rotated)."\n");
-        file_put_contents($livePath, implode("\n", $live)."\n");
+        $this->pmssWriteFile($rotatedPath, implode("\n", $rotated)."\n");
+        $this->pmssWriteFile($livePath, implode("\n", $live)."\n");
 
         $this->assertSame(['ts' => 'archive-12'], \pmssAgentDiagnosticsSpecCollect($spec));
         unlink($rotatedPath);
@@ -241,8 +236,7 @@ final class agentDiagnosticsCliTest extends TestCase
     public function testSpecCollectRecursesMixedNestedSectionsInStableOrder(): void
     {
         $scriptRoot = $this->makeScriptRoot();
-        $motdPath = $this->pmssMakeTempFile('pmss-agent-motd-');
-        file_put_contents($motdPath, "hello host\n");
+        $motdPath = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-agent-motd-'), "hello host\n");
 
         $this->pmssWithEnv([
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,

@@ -75,9 +75,8 @@ class CertbotRenewalLogTest extends TestCase
 
     public function testFileSummaryKeepsWholeAndTailReadResults(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-renewal-log-').'/renewal.log';
         $log = "All renewals failed.\nold detail\nNo renewals were attempted.\n";
-        file_put_contents($path, $log);
+        $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-renewal-log-'), 'renewal.log', $log);
         foreach ([strlen($log) + 1, strlen($log), strlen($log) - 1, 30, 1] as $maxBytes) {
             $expected = \pmssCertbotRenewalSummaryFromLog(substr($log, -$maxBytes));
             $this->assertSame($expected, \pmssCertbotRenewalSummaryFromFile($path, $maxBytes));
@@ -134,7 +133,7 @@ PHP;
         $path = $this->pmssMakeTempFile('pmss-certbot-bound-');
         $log = "No renewals were attempted.\n";
         foreach (['normal', 'growth', 'stat-false', 'read-false', 'read-exception', 'read-error'] as $mode) {
-            file_put_contents($path, $log.($mode === 'growth' ? '' : "All renewals failed.\n"));
+            $this->pmssWriteFile($path, $log.($mode === 'growth' ? '' : "All renewals failed.\n"));
             $throws = in_array($mode, ['read-exception', 'read-error'], true);
             $expected = $throws ? null : \pmssCertbotRenewalSummaryFromLog($mode === 'read-false' ? '' : $log);
             $this->assertSame([$expected, $throws, 1, [[false, null, 0, strlen($log)]]],
@@ -190,7 +189,7 @@ PHP;
         $log = str_repeat("old log line\n", 10)."No renewals were attempted.\n";
         foreach (['normal', 'growth', 'seek-false', 'seek-exception', 'seek-error',
             'read-false', 'read-exception', 'read-error'] as $mode) {
-            file_put_contents($path, $log);
+            $this->pmssWriteFile($path, $log);
             $throws = strpos($mode, 'exception') !== false || strpos($mode, 'error') !== false;
             $expected = $throws ? null : \pmssCertbotRenewalSummaryFromLog(
                 $mode === 'seek-false' || $mode === 'read-false' ? '' : substr($log, -30)

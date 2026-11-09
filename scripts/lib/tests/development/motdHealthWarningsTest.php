@@ -25,7 +25,7 @@ class MotdHealthWarningsTest extends TestCase
             ['kind' => 'raid', 'severity' => 'fail', 'flags' => ['value' => ['degraded']]],
         ];
         foreach ($malformed as $entry) {
-            file_put_contents($log, '');
+            $this->pmssWriteFile($log, '');
             $this->pmssAppendFixtureLines($log, [
                 ['kind' => 'raid', 'array' => 'md0', 'severity' => 'fail', 'flags' => ['degraded']],
                 ['kind' => 'nvme', 'device' => '/dev/nvme0n1', 'metrics' => ['critical_warnings' => 1]],
@@ -72,8 +72,7 @@ class MotdHealthWarningsTest extends TestCase
     public function testMotdShowsStorageWarningsFromHealthLog(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-health-', 0700);
-        $this->pmssWriteRelativeFile($dir, 'template.motd', "Host: %HOSTNAME%\n", 0700);
-        $tpl = $dir.'/template.motd';
+        $tpl = $this->pmssWriteRelativeFile($dir, 'template.motd', "Host: %HOSTNAME%\n", 0700);
         $out = $dir.'/motd.txt';
         $log = $this->pmssMakeJsonLogPath('pmss-motd-health-log-', 'health.jsonl');
 
@@ -99,11 +98,9 @@ class MotdHealthWarningsTest extends TestCase
     public function testMotdHandlesMalformedHealthLogGracefully(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-health-bad-', 0700);
-        $this->pmssWriteRelativeFile($dir, 'template.motd', "Hello %HOSTNAME%\n", 0700);
-        $tpl = $dir.'/template.motd';
+        $tpl = $this->pmssWriteRelativeFile($dir, 'template.motd', "Hello %HOSTNAME%\n", 0700);
         $out = $dir.'/motd.txt';
-        $log = $dir.'/health.jsonl';
-        file_put_contents($log, "{this is not json}\n{\"kind\":\"nvme\",\"metrics\":{}}\nBROKEN\n");
+        $log = $this->pmssWriteRelativeFile($dir, 'health.jsonl', "{this is not json}\n{\"kind\":\"nvme\",\"metrics\":{}}\nBROKEN\n");
         $this->pmssWithEnv([
             'PMSS_MOTD_TEMPLATE_PATH' => $tpl,
             'PMSS_MOTD_OUTPUT_PATH' => $out,
@@ -117,8 +114,7 @@ class MotdHealthWarningsTest extends TestCase
     public function testMotdWithoutHealthLogHasNoStorageWarn(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-nohealth-', 0700);
-        $this->pmssWriteRelativeFile($dir, 'template.motd', "Hello %HOSTNAME%\n", 0700);
-        $tpl = $dir.'/template.motd';
+        $tpl = $this->pmssWriteRelativeFile($dir, 'template.motd', "Hello %HOSTNAME%\n", 0700);
         $out = $dir.'/motd.txt';
         $this->pmssWithEnv([
             'PMSS_MOTD_TEMPLATE_PATH' => $tpl,

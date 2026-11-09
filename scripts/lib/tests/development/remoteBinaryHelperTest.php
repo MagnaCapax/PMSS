@@ -9,8 +9,7 @@ class RemoteBinaryHelperTest extends TestCase
     public function testChecksumRejectsMalformedPathsAndPreservesValidReads(): void
     {
         $root = $this->pmssMakeTempDir('pmss-checksum-path-');
-        $path = $root.'/artifact with spaces';
-        file_put_contents($path, 'payload');
+        $path = $this->pmssWriteRelativeFile($root, 'artifact with spaces', 'payload');
         // Existing prefixes must not be hashed after dropping malformed bytes.
         foreach (['', "\0", "\0".$path, $path."\0", $path."\0suffix", $root."\0/other"] as $invalid) {
             $this->assertSame('', \pmssPinnedRemoteChecksum($invalid));
@@ -20,17 +19,15 @@ class RemoteBinaryHelperTest extends TestCase
         $this->assertSame(hash('sha256', 'payload'), \pmssPinnedRemoteChecksum($path));
         symlink($path, $root.'/link');
         $this->assertSame(hash('sha256', 'payload'), \pmssPinnedRemoteChecksum($root.'/link'));
-        file_put_contents($path, '');
+        $this->pmssWriteFile($path, '');
         $this->assertSame(hash('sha256', ''), \pmssPinnedRemoteChecksum($path));
     }
 
     public function testPinnedVersionMatchRejectsMalformedPathsBeforeReadingMarker(): void
     {
         $root = $this->pmssMakeTempDir('pmss-version-path-');
-        $binary = $root.'/app with spaces';
-        $marker = $root.'/version with spaces';
-        file_put_contents($binary, 'binary');
-        file_put_contents($marker, " 1.2.3\n");
+        $binary = $this->pmssWriteRelativeFile($root, 'app with spaces', 'binary');
+        $marker = $this->pmssWriteRelativeFile($root, 'version with spaces', " 1.2.3\n");
         foreach (['', "\0", "\0".$marker, $marker."\0", $marker."\0suffix", $root."\0/other"] as $invalid) {
             $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $invalid, '1.2.3'));
             $this->assertFalse(\pmssPinnedRemoteVersionMatches($invalid, $marker, '1.2.3'));
@@ -47,7 +44,7 @@ class RemoteBinaryHelperTest extends TestCase
         $marker = $root.'/pmss-version';
         $link = $root.'/linked-marker';
         $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
-        file_put_contents($binary, 'binary');
+        $this->pmssWriteFile($binary, 'binary');
         $this->assertFalse(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
         $this->assertTrue(\pmssPinnedRemoteVersionMarkerWrite($marker, '1.2.3'));
         $this->assertTrue(\pmssPinnedRemoteVersionMatches($binary, $marker, '1.2.3'));
@@ -64,7 +61,7 @@ class RemoteBinaryHelperTest extends TestCase
         $target = $root.'/binary';
         $link = $root.'/link';
         $directory = $root.'/directory';
-        file_put_contents($target, 'old binary');
+        $this->pmssWriteFile($target, 'old binary');
         symlink($target, $link);
         mkdir($directory);
 
@@ -76,7 +73,7 @@ class RemoteBinaryHelperTest extends TestCase
         $this->assertTrue(\pmssPinnedRemoteStaleBinaryRemove($target, 'test'));
         $this->assertFalse(file_exists($target));
         $this->assertTrue(\pmssPinnedRemoteStaleBinaryRemove($target, 'test'));
-        file_put_contents($target, 'old binary');
+        $this->pmssWriteFile($target, 'old binary');
         $this->assertFalse(\pmssPinnedRemoteBinaryPrepareInstall($target, ['/usr/bin/printf %s current'], '/current/', 'test'));
         $this->assertTrue(file_exists($target));
         $this->assertTrue(\pmssPinnedRemoteBinaryPrepareInstall($target, ['/usr/bin/printf %s old'], '/current/', 'test'));
@@ -223,8 +220,7 @@ SH
     {
         $archiveRoot = $root.'/archive-root';
         $sourceDir = $archiveRoot.'/source';
-        @mkdir($sourceDir, 0755, true);
-        @file_put_contents($sourceDir.'/payload.txt', 'archive-ok');
+        $this->pmssWriteFile($sourceDir.'/payload.txt', 'archive-ok');
 
         $archivePath = $root.'/archive.tar.gz';
         $this->pmssCreateTarGzArchive($archivePath, $archiveRoot, ['source'], '', '2>&1');
@@ -426,8 +422,7 @@ SH
     public function testInstallPinnedRemoteBinarySkipsDownloadWhenChecksumAlreadyMatches(): void
     {
         $this->withFakeDownloadBody('new-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
-            $destination = $root.'/binary';
-            @file_put_contents($destination, $body);
+            $destination = $this->pmssWriteRelativeFile($root, 'binary', $body);
 
             \pmssInstallPinnedRemoteBinary('demo binary', 'https://example.invalid/binary', $expectedSha256, $destination, true);
 
@@ -481,9 +476,8 @@ SH
     public function testInstallPinnedRemoteBinaryRejectsUnsafeDestinationsBeforeDownload(): void
     {
         $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
-            $realDestination = $root.'/real-binary';
+            $realDestination = $this->pmssWriteRelativeFile($root, 'real-binary', 'original');
             $linkDestination = $root.'/link-binary';
-            file_put_contents($realDestination, 'original');
             $this->pmssCreateSymlinkOrSkip($realDestination, $linkDestination);
 
             foreach ([$root.'/missing-parent/binary', $root.'/safe/../binary', $linkDestination] as $destination) {
