@@ -249,7 +249,7 @@ figures. Caps cut the reads that ceiling measures, so while the mode is
 in the 0600 `/var/lib/pmss/io-ceiling-anchor.json`. The cache then records
 `read_iops_anchored: true` and the anchor's original day. The first run anchors
 the value already published. With the mode `off`,
-the anchor follows measured demand (ADR 0239). The existing pressure pool is cut linearly from 0% at 50% blended iowait to
+the anchor follows measured demand. While enforced, an anchor older than 14 days decays 10% a day to half of its highest value, and measured demand above it replaces it (ADR 0239 update). The existing pressure pool is cut linearly from 0% at 50% blended iowait to
 25% at 80% iowait. Missing iowait leaves the pool uncurbed. Each read cap is
 the selected variant's `would_be`, bounded by a lower valid explicit cap.
 Quota exponents 1.0 and 0.5 are supported; floor/ceiling/rounding stay shared.

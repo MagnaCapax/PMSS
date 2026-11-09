@@ -216,6 +216,62 @@ class IoCeilingTest extends TestCase
         $this->assertSame(80.0, (float) $this->pmssReadJsonArrayFile($dir.'/anchor.json')['read_iops']);
     }
 
+    /** ADR 0239 update: the enforced anchor holds 14 days, then falls 10% a day to half its highest value; measured demand above it wins. */
+    public function testEnforcedAnchorDecaysAfterItsHoldToAFloor(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-io-ceiling-');
+        $history = $dir.'/history';
+        $state = $dir.'/state.json';
+        $anchor = $dir.'/anchor.json';
+        // 2024-01-03 at 600 (uncapped), then every day through 2024-02-19 at 80, except 2024-01-20 at 400.
+        $rows = $this->samples(7, array_fill(0, 20, 600));
+        for ($ago = 6; $ago >= -40; --$ago) {
+            $rows = array_merge($rows, $this->samples($ago, array_fill(0, 20, $ago === -10 ? 400 : 80)));
+        }
+        $this->pmssWriteFile($history, $this->history($rows));
+        $refresh = function (int $days, ?array $policy = null) use ($history, $state, $anchor): array {
+            $this->assertTrue(\pmssIoCeilingRefresh($policy ?? $this->policy(), $history, $state, self::NOW + $days * self::DAY, $anchor));
+            return $this->pmssReadJsonArrayFile($state);
+        };
+        $kept = function () use ($anchor): array {
+            return $this->pmssReadJsonArrayFile($anchor);
+        };
+        // 2024-01-10: the first run anchors 600 (measured 2024-01-03).
+        $this->assertSame(600.0, (float) $refresh(0)['published']['read_iops']);
+        $this->assertSame(600.0, (float) $kept()['peak_read_iops']);
+        // 2024-01-17, 14 days old: still held in full.
+        $result = $refresh(7);
+        $this->assertSame(600.0, (float) $result['published']['read_iops']);
+        $this->assertTrue($result['read_iops_anchored']);
+        // 2024-01-18, day 15: one 10% step; the anchor file keeps its value and day so its age keeps counting.
+        $result = $refresh(8);
+        $this->assertTrue(abs(540.0 - (float) $result['published']['read_iops']) < 0.001);
+        $this->assertTrue($result['read_iops_anchored']);
+        $this->assertSame('2024-01-03', $result['published']['from_day']['read_iops']);
+        $this->assertSame([600.0, '2024-01-03'], [(float) $kept()['read_iops'], $kept()['from_day']]);
+        $this->assertTrue(abs(540.0 - (float) \pmssIoCeilingPublishedReadIops($state)) < 0.001);
+        // 2024-01-23: the 400 day (2024-01-20) beats the decayed 318.9, so the anchor moves to the measurement.
+        $result = $refresh(13);
+        $this->assertSame(400.0, (float) $result['published']['read_iops']);
+        $this->assertFalse(isset($result['read_iops_anchored']));
+        $this->assertSame([400.0, '2024-01-20', 600.0], [(float) $kept()['read_iops'], $kept()['from_day'], (float) $kept()['peak_read_iops']]);
+        // 2024-02-20, quiet for weeks: the floor is half of the highest value ever held, not of the current anchor.
+        $result = $refresh(41);
+        $this->assertSame(300.0, (float) $result['published']['read_iops']);
+        $this->assertTrue($result['read_iops_anchored']);
+        $this->assertSame(300.0, (float) $refresh(41)['published']['read_iops']);
+        // Without enforcement the anchor and the highest value both follow measured demand.
+        $off = $this->policy() + ['cgroup' => ['dynamicIops' => ['mode' => 'off']]];
+        $this->assertSame(80.0, (float) $refresh(41, $off)['published']['read_iops']);
+        $this->assertSame([80.0, 80.0], [(float) $kept()['read_iops'], (float) $kept()['peak_read_iops']]);
+        // An anchor written before ADR 0244 has no highest value: it counts as its own.
+        $this->pmssWriteFile($anchor, json_encode(['read_iops' => 1000, 'from_day' => '2024-01-03']));
+        $this->assertSame(500.0, (float) $refresh(41)['published']['read_iops']);
+        // An unreadable day keeps the value held in full.
+        $this->assertSame(1000.0, \pmssIoCeilingAnchorEffective(1000.0, 1000.0, 'last week', self::NOW));
+        $this->assertSame(1000.0, \pmssIoCeilingAnchorEffective(1000.0, 1000.0, '2099-01-01', self::NOW));
+    }
+
     /** ADR 0237: the disk's quiet floor is the median of each accepted day's 10th-percentile /home read latency. */
     public function testQuietLatencyFloorIsTheMedianOfDailyTenthPercentiles(): void
     {

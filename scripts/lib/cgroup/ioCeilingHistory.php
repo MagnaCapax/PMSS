@@ -14,6 +14,11 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 const PMSS_IO_CEILING_STATE_PATH_DEFAULT = '/var/run/pmss/io-ceiling.json';
 // Survives reboot, unlike the derived cache under /var/run.
 const PMSS_IO_CEILING_ANCHOR_PATH_DEFAULT = '/var/lib/pmss/io-ceiling-anchor.json';
+// ADR 0239 (update 2026-11-09): the anchor holds for this many days, then decays by this factor per day, never below this share of the
+// highest value it ever held. A cap-cut measurement can lower the ceiling by at most that share.
+const PMSS_IO_CEILING_ANCHOR_HOLD_DAYS = 14;
+const PMSS_IO_CEILING_ANCHOR_DECAY_PER_DAY = 0.9;
+const PMSS_IO_CEILING_ANCHOR_FLOOR_SHARE = 0.5;
 
 /** Read the live log and newest uncompressed rotation without scanning years. */
 function pmssIoCeilingHistorySamples(string $path): iterable
@@ -70,6 +75,25 @@ function pmssIoCeilingHistorySamples(string $path): iterable
     }
 }
 
+/**
+ * The anchor's value after its hold: it falls 10% a day from day 15 of its age, never below half the highest value it
+ * held and never above $kept. The age counts from the day the anchored value was measured. A day in the future (clock
+ * step) or an unreadable day keeps the value.
+ */
+function pmssIoCeilingAnchorEffective(float $kept, float $peak, string $fromDay, int $now): float
+{
+    $start = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDay) === 1 ? strtotime($fromDay.' 00:00:00 UTC') : false;
+    if ($start === false) {
+        return $kept;
+    }
+    $decayDays = intdiv($now, 86400) - intdiv($start, 86400) - PMSS_IO_CEILING_ANCHOR_HOLD_DAYS;
+    if ($decayDays <= 0) {
+        return $kept;
+    }
+    $decayed = $kept * pow(PMSS_IO_CEILING_ANCHOR_DECAY_PER_DAY, $decayDays);
+    return min($kept, max($decayed, $peak * PMSS_IO_CEILING_ANCHOR_FLOOR_SHARE));
+}
+
 /** Refresh a derived cache only; missing/thin history removes stale publication. */
 function pmssIoCeilingRefresh(
     array $policy,
@@ -86,15 +110,27 @@ function pmssIoCeilingRefresh(
     if ($result === null) {
         return !file_exists($statePath) || @unlink($statePath);
     }
-    // Enforced read caps cut the reads this ceiling measures, so while they apply it may rise but never fall (ADR 0239).
+    // Enforced read caps cut the reads this ceiling measures, so while they apply it may rise at once but falls only
+    // slowly and to a floor (ADR 0239, bounded way down in the ADR 0239 update). Only measured host reads move it; no account's cap
+    // enters it, so lowering it never lifts anyone's cap.
+    $anchorKeep = null;
+    $anchorPeak = pmssFiniteNonNegativeFloat($result['published']['read_iops'] ?? null);
     if (($settings = pmssDynamicIopsSettings($policy)) !== null && $settings['mode'] === 'enforce') {
         // The first run anchors today's value, so an update changes no cap; it only stops later falls.
         $anchor = pmssJsonFileReadAssoc($anchorPath, true);
         $kept = pmssFiniteNonNegativeFloat($anchor['read_iops'] ?? null);
-        if ($kept !== null && is_string($anchor['from_day'] ?? null) && $kept > ($result['published']['read_iops'] ?? INF)) {
-            $result['published']['read_iops'] = $kept;
-            $result['published']['from_day']['read_iops'] = $anchor['from_day'];
-            $result['read_iops_anchored'] = true;
+        $day = $anchor['from_day'] ?? null;
+        if ($kept !== null && is_string($day)) {
+            $peak = max($kept, pmssFiniteNonNegativeFloat($anchor['peak_read_iops'] ?? null) ?? 0.0);
+            $anchorPeak = max($peak, $anchorPeak ?? 0.0);
+            $effective = pmssIoCeilingAnchorEffective($kept, $peak, $day, $now);
+            if ($effective > ($result['published']['read_iops'] ?? INF)) {
+                $result['published']['read_iops'] = $effective;
+                $result['published']['from_day']['read_iops'] = $day;
+                $result['read_iops_anchored'] = true;
+                // Measured demand below the anchor's hold keeps the anchor itself, so its age keeps counting.
+                $anchorKeep = ['read_iops' => $kept, 'from_day' => $day];
+            }
         }
     }
     if (!pmssEnsureSafeDir(dirname($statePath), 0755) || !pmssAtomicJsonFileWrite($statePath, $result, 0644)) {
@@ -102,8 +138,8 @@ function pmssIoCeilingRefresh(
     }
     return !isset($result['published']['read_iops'])
         || (pmssPathTargetIsSafe($anchorPath, false, true) && pmssEnsureSafeDir(dirname($anchorPath), 0755)
-        && pmssAtomicJsonFileWrite($anchorPath, ['read_iops' => $result['published']['read_iops'],
-            'from_day' => $result['published']['from_day']['read_iops']], 0600));
+        && pmssAtomicJsonFileWrite($anchorPath, ($anchorKeep ?? ['read_iops' => $result['published']['read_iops'],
+            'from_day' => $result['published']['from_day']['read_iops']]) + ['peak_read_iops' => $anchorPeak], 0600));
 }
 
 /** Read the persisted published host read-IOPS ceiling, failing closed on thin caches. */

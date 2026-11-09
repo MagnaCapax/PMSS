@@ -68,3 +68,28 @@ MB/s estimates, the sample gates and the quiet latency floor are unchanged.
 - One unusually busy day raises the anchor for good. The highest daily 95th
   percentile, not the daily maximum, limits how far one burst can move it.
 - Turning enforcement off lets the anchor return to measured demand.
+
+## Update 2026-11-09: a bounded way down
+Read caps are off by default again (ADR 0243), so nothing here runs until the mode
+returns to `enforce`. The rule as first written had no way down at all: a host that
+lost accounts, or one unusually busy day, left the pool scaled to a demand that no
+longer existed. When enforcement returns, the anchor holds and then decays, within
+a floor:
+
+- The anchor holds in full for 14 days from the day its value was measured.
+- From day 15 it falls 10 percent a day, never below half of the highest value the
+  anchor ever held (`peak_read_iops` in the anchor file; an anchor written before
+  this update counts as its own highest value).
+- Measured demand above the decayed value wins at once and becomes the anchor, so
+  the decay is toward recent measured demand. The highest value is kept.
+- With the mode `off` the anchor and the highest value both follow measured demand.
+
+The floor is what keeps the original ratchet shut. Caps still cut the reads the
+ceiling measures, so a long capped stretch can lower the ceiling, but only to half
+of what the host once proved, not geometrically toward zero. Only measured host
+reads move the ceiling, and no account's own cap or usage enters it, so lowering it
+never lifts a cap for the account that holds a heavy read queue. That keeps ADR
+0243's rule: one user cannot block the whole server, and the offender's cap is
+never what gets relaxed. The 14 days, 10 percent and half are constants in
+`scripts/lib/cgroup/ioCeilingHistory.php`, chosen by judgement, not measured on a
+capped host; validate them on a few hosts when enforcement returns.
