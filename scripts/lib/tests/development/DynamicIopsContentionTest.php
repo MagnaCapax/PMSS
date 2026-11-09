@@ -24,6 +24,47 @@ class DynamicIopsContentionTest extends TestCase
         $this->assertSame(null, \pmssBlkioReadCount($root.'/served', '9:0'));
     }
 
+    public function testObservationPathsFailSoftBeforeReadingAndPreserveValidBytes(): void
+    {
+        // Record reads without touching procfs or sysfs; malformed paths must never reach I/O.
+        $script = <<<'PHP'
+namespace ContentionPathFixture;
+function file_get_contents($path) {
+    $GLOBALS['reads'][] = $path;
+    return $GLOBALS['raw'];
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/dynamicIopsContention.php', 'ContentionPathFixture');
+        $script .= <<<'PHP'
+[$path, $GLOBALS['raw']] = json_decode(getenv('PMSS_TEST_CONTENTION_READ'), true);
+$GLOBALS['reads'] = [];
+echo json_encode([pmssPsiFullAvg300($path), pmssBlkioReadCount($path, '8:0'), $GLOBALS['reads']], JSON_PRESERVE_ZERO_FRACTION);
+PHP;
+        $raw = "full avg10=0.00 avg60=0.00 avg300=42.50 total=1\n8:0 Read 1200\n";
+        foreach (['', "\0", "\0/fixture/pressure", "/fixture/pressure\0", "/fixture/pressure\0suffix",
+            "/fixture/dir\0/pressure", " \0 "] as $path) {
+            $this->assertSame([null, null, []], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_CONTENTION_READ' => json_encode([$path, $raw]),
+            ]));
+        }
+        // Accepted filenames are passed verbatim, including relative paths and whitespace.
+        foreach (['/fixture/pressure', 'relative-pressure', ' /fixture/pressure ', '/fixture/path with spaces', ' '] as $path) {
+            foreach ([
+                [$raw, 42.5, 1200],
+                ["full avg300=0.00\n8:0 Read 0\n", 0.0, 0],
+                ["full avg300=100.00\n8:0 Read ".PHP_INT_MAX."\n", 100.0, PHP_INT_MAX],
+                [false, null, null],
+                ['', null, null],
+                ["some avg300=5.00\n8:0 Write 9\n", null, null],
+                ["full avg300=150.00\n8:0 Read ".PHP_INT_MAX."0\n", null, null],
+            ] as [$contents, $psi, $count]) {
+                $this->assertSame([$psi, $count, [$path, $path]], $this->pmssRunInlinePhpJson($script, [
+                    'PMSS_TEST_CONTENTION_READ' => json_encode([$path, $contents]),
+                ]));
+            }
+        }
+    }
+
     public function testHeldMeansReadingAtTheRateTheCapDelivers(): void
     {
         // Cap 25 delivers 20 per second: 15 per second over 300 s is held, just under it is not.

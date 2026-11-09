@@ -26,6 +26,8 @@ const PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO = 0.5;
 /** Full-stall 300-second average from a PSI file; null when absent or malformed. */
 function pmssPsiFullAvg300(string $path): ?float
 {
+    // Keep malformed paths on the unavailable-reading path before PHP filesystem calls.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return null;
     $raw = @file_get_contents($path);
     if (!is_string($raw) || preg_match('/^full .*\bavg300=([0-9]+(?:\.[0-9]+)?)\b/m', $raw, $m) !== 1) return null;
     $value = (float) $m[1];
@@ -35,6 +37,8 @@ function pmssPsiFullAvg300(string $path): ?float
 /** Cumulative reads (io_serviced) or read bytes (io_service_bytes) of one device from a cgroup-v1 file. */
 function pmssBlkioReadCount(string $path, string $majMin): ?int
 {
+    // Empty and NUL-containing paths must not turn a missing counter into an exception.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return null;
     $raw = @file_get_contents($path);
     if (!is_string($raw) || preg_match('/^'.preg_quote($majMin, '/').' Read ([0-9]+)$/m', $raw, $m) !== 1) return null;
     return pmssUnsignedDecimalIntParse($m[1]);

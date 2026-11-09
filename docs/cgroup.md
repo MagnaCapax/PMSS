@@ -284,6 +284,11 @@ host value is used unchanged. Records carry `contention` (`host`,
 `/var/run/pmss/dynamic-iops-contention.json`. Judge HDD enforcement by delivered
 reads; throttle wait contaminates host iowait and PSI.
 
+PSI and blkio counter readers treat empty or NUL-containing paths as unavailable
+(`null`) before attempting a filesystem read. Valid path bytes, parsed values
+and read-failure fallbacks remain unchanged; `DynamicIopsContentionTest` records
+the read boundary without accessing live kernel files.
+
 On rotational or unknown non-solid `/home` (md arrays by their members), a
 per-host A/B probe selects the multiplier (ADR 0238). Starting at `probeStartLo`
 (5), it alternates hourly between L and 2L, within the busy/idle bounds. Each
