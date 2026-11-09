@@ -23,8 +23,7 @@ class PathShellTargetSafetyTest extends TestCase
 
     public function testShellTargetAcceptsExistingRegularFile(): void
     {
-        $path = $this->tempDir.'/state.dat';
-        file_put_contents($path, 'ok');
+        $path = $this->pmssWriteFile($this->tempDir.'/state.dat', 'ok');
 
         $this->assertSame(escapeshellarg($path), \pmssPathShellTarget($path));
     }
@@ -36,8 +35,7 @@ class PathShellTargetSafetyTest extends TestCase
 
     public function testShellTargetRejectsNulBeforeFilesystemAccess(): void
     {
-        $path = $this->tempDir.'/state.dat';
-        file_put_contents($path, 'unchanged');
+        $path = $this->pmssWriteFile($this->tempDir.'/state.dat', 'unchanged');
 
         // Cover literal paths and every character that selects the glob branch.
         foreach (["\0", "\0".$path, $path."\0", $path."\0ignored",
@@ -53,7 +51,7 @@ class PathShellTargetSafetyTest extends TestCase
     public function testShellTargetPreservesGlobOrderAndLiteralShellCharacters(): void
     {
         $paths = [$this->tempDir."/a 'quoted'.dat", $this->tempDir.'/b file.dat'];
-        foreach ($paths as $path) file_put_contents($path, 'ok');
+        foreach ($paths as $path) $this->pmssWriteFile($path, 'ok');
 
         $this->assertSame($paths, \pmssPathShellTargetPaths($this->tempDir.'/*.dat'));
         $this->assertSame(implode(' ', array_map('escapeshellarg', $paths)), \pmssPathShellTarget($this->tempDir.'/*.dat'));
@@ -73,7 +71,7 @@ class PathShellTargetSafetyTest extends TestCase
     public function testShellTargetRejectsSymlinkedAncestor(): void
     {
         [$realDir, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($this->tempDir.'/real', $this->tempDir.'/link');
-        file_put_contents($realDir.'/state.dat', 'target');
+        $this->pmssWriteFile($realDir.'/state.dat', 'target');
 
         $this->assertSame(null, \pmssPathShellTarget($linkDir.'/state.dat'));
     }
@@ -82,8 +80,8 @@ class PathShellTargetSafetyTest extends TestCase
     {
         $safeA = $this->tempDir.'/a.php';
         $safeB = $this->tempDir.'/b.php';
-        file_put_contents($safeA, 'a');
-        file_put_contents($safeB, 'b');
+        $this->pmssWriteFile($safeA, 'a');
+        $this->pmssWriteFile($safeB, 'b');
         $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/target.dat', $this->tempDir.'/c.php', 'target');
 
         $target = \pmssPathShellTarget($this->tempDir.'/*.php');

@@ -89,8 +89,7 @@ class TrackerCleanerLibraryTest extends TestCase
     public function testCleanedTorrentWriteReplacesSessionFileAndPreservesMode(): void
     {
         $sessionDir = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-');
-        $torrentPath = $sessionDir.'/sample.torrent';
-        file_put_contents($torrentPath, 'old');
+        $torrentPath = $this->pmssWriteFile($sessionDir.'/sample.torrent', 'old');
         chmod($torrentPath, 0640);
 
         $this->assertSame(7, pmssTrackerCleanerWriteCleanedTorrent($torrentPath, 'cleaned', $sessionDir));
@@ -101,8 +100,7 @@ class TrackerCleanerLibraryTest extends TestCase
     public function testCleanedTorrentWriteRejectsUnsafeTargets(): void
     {
         $sessionDir = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-');
-        $outsidePath = $this->pmssMakeTempFile('pmss-tracker-cleaner-outside-');
-        file_put_contents($outsidePath, 'outside');
+        $outsidePath = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-tracker-cleaner-outside-'), 'outside');
         $linkPath = $sessionDir.'/sample.torrent';
         symlink($outsidePath, $linkPath);
 
@@ -116,13 +114,12 @@ class TrackerCleanerLibraryTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-tracker-cleaner-backups-');
         $backupDir = $root.'/'.date('Y-m-d_Hi');
-        $torrentPath = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-').'/sample.torrent';
-        file_put_contents($torrentPath, 'torrent payload');
+        $torrentPath = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-tracker-cleaner-session-').'/sample.torrent', 'torrent payload');
 
         foreach ([
             'bad_user' => ['bad-user', $torrentPath, $backupDir, $root, 'invalid_username'],
-            'bad_source' => ['validusr', $this->pmssMakeTempFile('pmss-tracker-cleaner-source-'), $backupDir, $root, 'torrent_path_unsafe'],
-            'bad_destination' => ['validusr', $torrentPath, $this->pmssMakeTempDir('pmss-tracker-cleaner-outside-').'/backup', $root, 'backup_path_unsafe'],
+            'bad_source' => ['fixtur01', $this->pmssMakeTempFile('pmss-tracker-cleaner-source-'), $backupDir, $root, 'torrent_path_unsafe'],
+            'bad_destination' => ['fixtur01', $torrentPath, $this->pmssMakeTempDir('pmss-tracker-cleaner-outside-').'/backup', $root, 'backup_path_unsafe'],
         ] as $label => [$user, $sourcePath, $backupPath, $rootPath, $expectedReason]) {
             [$result, $output] = $this->pmssCaptureStdout(static function () use ($user, $sourcePath, $backupPath, $rootPath): array {
                 return pmssTrackerCleanerBackupTorrent($user, $sourcePath, $backupPath, $rootPath, 'tracker');
@@ -149,16 +146,14 @@ class TrackerCleanerLibraryTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-tracker-cleaner-backups-');
         $backupDir = $root.'/2026-09-28';
         mkdir($backupDir);
-        $torrentPath = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-').'/sample.torrent';
-        file_put_contents($torrentPath, 'torrent payload');
+        $torrentPath = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-tracker-cleaner-session-').'/sample.torrent', 'torrent payload');
         $target = $backupDir.'/sample.torrent';
-        $outside = $this->pmssMakeTempFile('pmss-tracker-cleaner-outside-');
-        file_put_contents($outside, 'outside');
+        $outside = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-tracker-cleaner-outside-'), 'outside');
 
         foreach (['symlink' => $outside, 'dangling_symlink' => $root.'/missing'] as $label => $linkTarget) {
             symlink($linkTarget, $target);
             [$result, $output] = $this->pmssCaptureStdout(static function () use ($torrentPath, $backupDir, $root): array {
-                return pmssTrackerCleanerBackupTorrent('validusr', $torrentPath, $backupDir, $root, 'tracker');
+                return pmssTrackerCleanerBackupTorrent('fixtur01', $torrentPath, $backupDir, $root, 'tracker');
             });
             $this->assertFalse($result['ok'], $label);
             $this->assertStringContainsString('reason=backup_path_unsafe', $result['verbose_log'], $label);
@@ -169,7 +164,7 @@ class TrackerCleanerLibraryTest extends TestCase
 
         mkdir($target);
         [$result] = $this->pmssCaptureStdout(static function () use ($torrentPath, $backupDir, $root): array {
-            return pmssTrackerCleanerBackupTorrent('validusr', $torrentPath, $backupDir, $root, 'tracker');
+            return pmssTrackerCleanerBackupTorrent('fixtur01', $torrentPath, $backupDir, $root, 'tracker');
         });
         $this->assertFalse($result['ok']);
         $this->assertStringContainsString('reason=backup_path_unsafe', $result['verbose_log']);

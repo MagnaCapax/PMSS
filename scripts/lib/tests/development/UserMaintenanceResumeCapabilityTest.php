@@ -19,26 +19,25 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-urefresh-', 0700);
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $dir], function (): void {
             $sig = pmssUserRefreshSignature('skel-sha-A');
-            $this->assertTrue(!pmssUserRefreshAlreadyDone('alice', $sig), 'fresh user must not be marked done');
-            pmssUserRefreshMarkDone('alice', $sig);
-            $this->assertTrue(pmssUserRefreshAlreadyDone('alice', $sig), 'same-signature re-run must skip the user');
+            $this->assertTrue(!pmssUserRefreshAlreadyDone('fixtur01', $sig), 'fresh user must not be marked done');
+            pmssUserRefreshMarkDone('fixtur01', $sig);
+            $this->assertTrue(pmssUserRefreshAlreadyDone('fixtur01', $sig), 'same-signature re-run must skip the user');
             $sig2 = pmssUserRefreshSignature('skel-sha-B');
-            $this->assertTrue(!pmssUserRefreshAlreadyDone('alice', $sig2), 'version/skel change must invalidate → full refresh');
+            $this->assertTrue(!pmssUserRefreshAlreadyDone('fixtur01', $sig2), 'version/skel change must invalidate → full refresh');
         });
     }
 
     public function testTorrentClientProjectionChangeInvalidatesTheMarker(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-urefresh-proj-', 0700);
-        $projection = $dir.'/torrentClients.json';
-        file_put_contents($projection, '{"versions":[{"client":"rtorrent","version":"system"}]}');
+        $projection = $this->pmssWriteFile($dir.'/torrentClients.json', '{"versions":[{"client":"rtorrent","version":"system"}]}');
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $dir], function () use ($projection): void {
             $sig = pmssUserRefreshSignature('skel-sha-A', $projection);
-            pmssUserRefreshMarkDone('alice', $sig);
-            $this->assertTrue(pmssUserRefreshAlreadyDone('alice', pmssUserRefreshSignature('skel-sha-A', $projection)),
+            pmssUserRefreshMarkDone('fixtur01', $sig);
+            $this->assertTrue(pmssUserRefreshAlreadyDone('fixtur01', pmssUserRefreshSignature('skel-sha-A', $projection)),
                 'unchanged projection keeps the same-version skip');
-            file_put_contents($projection, '{"versions":[{"client":"rtorrent","version":"system"},{"client":"rtorrent","version":"0.16.25"}]}');
-            $this->assertTrue(!pmssUserRefreshAlreadyDone('alice', pmssUserRefreshSignature('skel-sha-A', $projection)),
+            $this->pmssWriteFile($projection, '{"versions":[{"client":"rtorrent","version":"system"},{"client":"rtorrent","version":"0.16.25"}]}');
+            $this->assertTrue(!pmssUserRefreshAlreadyDone('fixtur01', pmssUserRefreshSignature('skel-sha-A', $projection)),
                 'newly installed client builds must refresh every account once');
             $this->assertTrue(pmssUserRefreshSignature('skel-sha-A', $projection.'.missing') !== $sig,
                 'a missing projection is a distinct state');
@@ -70,11 +69,11 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
 
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $unsafeDir], function () use ($root): void {
             [, $output] = $this->pmssCaptureStdout(static function (): void {
-                pmssUserRefreshMarkDone('alice', 'sig');
+                pmssUserRefreshMarkDone('fixtur01', 'sig');
             });
 
-            $this->assertSame('', pmssUserRefreshMarkerPath('alice'));
-            $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'sig'));
+            $this->assertSame('', pmssUserRefreshMarkerPath('fixtur01'));
+            $this->assertFalse(pmssUserRefreshAlreadyDone('fixtur01', 'sig'));
             $this->assertFalse(is_dir($root.'/escape'), 'unsafe state dirs must not be materialized');
             $this->assertStringContainsString('Refusing to write unsafe user refresh marker', $output);
         });
@@ -85,11 +84,11 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-urefresh-links-', 0700);
         $stateDir = $root.'/state';
         mkdir($stateDir, 0700);
-        file_put_contents($root.'/target', "old-signature\n");
+        $this->pmssWriteFile($root.'/target', "old-signature\n");
         mkdir($root.'/directory', 0700);
 
         foreach (['target', 'missing', 'directory'] as $target) {
-            $marker = $stateDir.'/alice';
+            $marker = $stateDir.'/fixtur01';
             $this->assertTrue(symlink($root.'/'.$target, $marker));
             $this->assertUnsafeMarkerRejected($stateDir);
             $this->assertTrue(is_link($marker));
@@ -104,11 +103,11 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
     public function testMarkerRejectsDirectoryLeafWithoutRemovingContents(): void
     {
         $stateDir = $this->pmssMakeTempDir('pmss-urefresh-directory-', 0700);
-        mkdir($stateDir.'/alice', 0700);
-        file_put_contents($stateDir.'/alice/sentinel', 'keep');
+        mkdir($stateDir.'/fixtur01', 0700);
+        $this->pmssWriteFile($stateDir.'/fixtur01/sentinel', 'keep');
 
         $this->assertUnsafeMarkerRejected($stateDir);
-        $this->assertSame('keep', file_get_contents($stateDir.'/alice/sentinel'));
+        $this->assertSame('keep', file_get_contents($stateDir.'/fixtur01/sentinel'));
     }
 
     public function testMarkerRejectsFifoLeafBeforeOpeningIt(): void
@@ -117,11 +116,11 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
             throw new SkipTest('posix_mkfifo unavailable');
         }
         $stateDir = $this->pmssMakeTempDir('pmss-urefresh-fifo-', 0700);
-        $this->assertTrue(posix_mkfifo($stateDir.'/alice', 0600));
+        $this->assertTrue(posix_mkfifo($stateDir.'/fixtur01', 0600));
 
         // The path assertion runs first so a regression fails before a FIFO open can block.
         $this->assertUnsafeMarkerRejected($stateDir);
-        $this->assertSame('fifo', filetype($stateDir.'/alice'));
+        $this->assertSame('fifo', filetype($stateDir.'/fixtur01'));
     }
 
     public function testMarkerCreatesMissingStateDirectoryAndReplacesRegularFileSilently(): void
@@ -130,15 +129,15 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $stateDir = $root.'/state';
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $stateDir], function () use ($stateDir): void {
             [, $output] = $this->pmssCaptureStdout(static function (): void {
-                pmssUserRefreshMarkDone('alice', 'old-signature');
-                pmssUserRefreshMarkDone('alice', 'new-signature');
+                pmssUserRefreshMarkDone('fixtur01', 'old-signature');
+                pmssUserRefreshMarkDone('fixtur01', 'new-signature');
             });
 
             $this->assertSame('', $output);
-            $this->assertSame($stateDir.'/alice', pmssUserRefreshMarkerPath('alice'));
-            $this->assertSame("new-signature\n", file_get_contents($stateDir.'/alice'));
-            $this->assertTrue(pmssUserRefreshAlreadyDone('alice', 'new-signature'));
-            $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'old-signature'));
+            $this->assertSame($stateDir.'/fixtur01', pmssUserRefreshMarkerPath('fixtur01'));
+            $this->assertSame("new-signature\n", file_get_contents($stateDir.'/fixtur01'));
+            $this->assertTrue(pmssUserRefreshAlreadyDone('fixtur01', 'new-signature'));
+            $this->assertFalse(pmssUserRefreshAlreadyDone('fixtur01', 'old-signature'));
         });
     }
 
@@ -148,19 +147,19 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $stateDir], function () use ($stateDir): void {
             foreach ([false, 0, 2] as $written) {
                 [, $output] = $this->pmssCaptureStdout(static function () use ($written): void {
-                    pmssUserRefreshMarkDone('alice', 'new-signature', static function () use ($written) { return $written; });
+                    pmssUserRefreshMarkDone('fixtur01', 'new-signature', static function () use ($written) { return $written; });
                 });
                 $this->assertStringContainsString('Unable to write user refresh marker', $output);
-                $this->assertFalse(file_exists($stateDir.'/alice'));
+                $this->assertFalse(file_exists($stateDir.'/fixtur01'));
             }
 
             [, $output] = $this->pmssCaptureStdout(static function (): void {
-                pmssUserRefreshMarkDone('alice', 'new-signature', static function (string $path, string $payload): int {
+                pmssUserRefreshMarkDone('fixtur01', 'new-signature', static function (string $path, string $payload): int {
                     return file_put_contents($path, $payload);
                 });
             });
             $this->assertSame('', $output);
-            $this->assertSame("new-signature\n", file_get_contents($stateDir.'/alice'));
+            $this->assertSame("new-signature\n", file_get_contents($stateDir.'/fixtur01'));
         });
     }
 
@@ -170,10 +169,10 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
             'PMSS_USER_REFRESH_STATE_DIR' => $stateDir,
             'PMSS_LOG_FILE' => $stateDir.'/test.log',
         ], function (): void {
-            $this->assertSame('', pmssUserRefreshMarkerPath('alice'));
-            $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'old-signature'));
+            $this->assertSame('', pmssUserRefreshMarkerPath('fixtur01'));
+            $this->assertFalse(pmssUserRefreshAlreadyDone('fixtur01', 'old-signature'));
             [, $output] = $this->pmssCaptureStdout(static function (): void {
-                pmssUserRefreshMarkDone('alice', 'new-signature');
+                pmssUserRefreshMarkDone('fixtur01', 'new-signature');
             });
             $this->assertStringContainsString('Refusing to write unsafe user refresh marker', $output);
         });

@@ -130,7 +130,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $badPath = $this->tempDir.'/traffic-data-link-for-writer';
         $payload = ['raw' => ['month' => 42.0], 'daily' => []];
         $failures = [];
-        file_put_contents($badTarget, 'seed');
+        $this->pmssWriteFile($badTarget, 'seed');
         $this->pmssCreateSymlinkOrSkip($badTarget, $badPath);
 
         $result = \pmssManagedSerializedTargetsWrite(serialize($payload), [
@@ -168,8 +168,7 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testReadUserTrafficStatesRejectsInvalidUsernameBeforePathResolution(): void
     {
-        $this->pmssEnsureDir($this->tempDir.'/home/fixtur01/evil');
-        file_put_contents(
+        $this->pmssWriteFile(
             $this->tempDir.'/home/fixtur01/evil/.trafficData',
             serialize(['raw' => ['month' => 4096]])
         );
@@ -200,8 +199,7 @@ class UserTrafficStateHelpersTest extends TestCase
         ]);
         $storage->ensureRuntime();
 
-        $target = $this->tempDir.'/runtime-target';
-        file_put_contents($target, 'keep-me');
+        $target = $this->pmssWriteFile($this->tempDir.'/runtime-target', 'keep-me');
         $statsPath = \pmssTrafficStatsPath('fixtur01', null, $this->tempDir.'/runtime');
         $this->pmssCreateSymlinkOrSkip($target, $statsPath);
 
@@ -246,8 +244,7 @@ class UserTrafficStateHelpersTest extends TestCase
         ]);
         $storage->ensureRuntime();
 
-        $target = $this->tempDir.'/home-target';
-        file_put_contents($target, 'keep-home');
+        $target = $this->pmssWriteFile($this->tempDir.'/home-target', 'keep-home');
         $homeTrafficPath = \pmssTrafficDataPaths('fixtur01', $homeDir)['normal'];
         $this->pmssCreateSymlinkOrSkip($target, $homeTrafficPath);
 
@@ -304,8 +301,7 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testTrafficLimitReadGiBFileRejectsSymlinkedFile(): void
     {
-        $target = $this->tempDir.'/limit-target';
-        file_put_contents($target, "500\n");
+        $target = $this->pmssWriteFile($this->tempDir.'/limit-target', "500\n");
         $link = $this->tempDir.'/limit-link';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
@@ -318,14 +314,14 @@ class UserTrafficStateHelpersTest extends TestCase
         $parser = static function ($raw, ?string &$error): ?int {
             return \pmssIntegerSettingParseNonNegative($raw, 'GiB', $error);
         };
-        file_put_contents($path, "500\n");
+        $this->pmssWriteFile($path, "500\n");
         $this->assertTrue(link($path, $this->tempDir.'/limit-second-name'));
         $this->assertSame(0, \pmssIntegerSettingFileRead($path, $parser));
 
         unlink($this->tempDir.'/limit-second-name');
-        file_put_contents($path, str_repeat('5', 257));
+        $this->pmssWriteFile($path, str_repeat('5', 257));
         $this->assertSame(0, \pmssIntegerSettingFileRead($path, $parser));
-        file_put_contents($path, "500\0");
+        $this->pmssWriteFile($path, "500\0");
         $this->assertSame(0, \pmssIntegerSettingFileRead($path, $parser));
     }
 
@@ -388,7 +384,7 @@ class UserTrafficStateHelpersTest extends TestCase
             $limitPath = $this->tempDir.'/traffic-limit-'.$name;
             $bonusPath = $this->tempDir.'/bonus-traffic-'.$name;
             $this->writeOptionalFixture($limitPath, $limitPayload);
-            file_put_contents($bonusPath, $bonusPayload);
+            $this->pmssWriteFile($bonusPath, $bonusPayload);
 
             $this->assertEquals($expected, \pmssTrafficLimitStateRead($limitPath, $bonusPath), 'case '.$name);
         }
@@ -397,7 +393,7 @@ class UserTrafficStateHelpersTest extends TestCase
     private function writeOptionalFixture(string $path, ?string $payload): void
     {
         if ($payload !== null) {
-            file_put_contents($path, $payload);
+            $this->pmssWriteFile($path, $payload);
         }
     }
 }

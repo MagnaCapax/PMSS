@@ -6,7 +6,7 @@ require_once dirname(__DIR__, 2).'/update/users/filesystem.php';
 
 final class UserLegacyOpenClawInstallerCleanupTest extends TestCase
 {
-    private $user = 'sample';
+    private $user = 'fixtur01';
     private $home;
     private $spoolDir;
     private $legacy;
@@ -17,12 +17,12 @@ final class UserLegacyOpenClawInstallerCleanupTest extends TestCase
         $this->home = $this->pmssEnsureDir($root.'/'.$this->user);
         $this->spoolDir = $this->pmssMakeTempDir('pmss-openclaw-spool-');
         $this->legacy = $this->home.'/install-openclaw.php';
-        file_put_contents($this->legacy, "legacy installer\n");
+        $this->pmssWriteFile($this->legacy, "legacy installer\n");
     }
 
     public function testReferencedInstallerIsKeptByteIdentical(): void
     {
-        file_put_contents($this->spoolDir.'/'.$this->user, "@reboot php \$HOME/install-openclaw.php check # pmss-openclaw\n");
+        $this->pmssWriteFile($this->spoolDir.'/'.$this->user, "@reboot php \$HOME/install-openclaw.php check # pmss-openclaw\n");
         \pmssUserRemoveLegacyOpenClawInstaller($this->user, $this->home, $this->spoolDir);
         $this->assertSame("legacy installer\n", file_get_contents($this->legacy));
     }
@@ -35,7 +35,7 @@ final class UserLegacyOpenClawInstallerCleanupTest extends TestCase
 
     public function testSpoolWithoutReferenceRemovesInstaller(): void
     {
-        file_put_contents($this->spoolDir.'/'.$this->user, "* * * * * echo keep\n");
+        $this->pmssWriteFile($this->spoolDir.'/'.$this->user, "* * * * * echo keep\n");
         \pmssUserRemoveLegacyOpenClawInstaller($this->user, $this->home, $this->spoolDir);
         $this->assertFalse(file_exists($this->legacy));
     }
@@ -49,8 +49,7 @@ final class UserLegacyOpenClawInstallerCleanupTest extends TestCase
 
     public function testUnreadableRegularSpoolKeepsInstaller(): void
     {
-        $path = $this->spoolDir.'/'.$this->user;
-        file_put_contents($path, "@reboot php install-openclaw.php\n");
+        $path = $this->pmssWriteFile($this->spoolDir.'/'.$this->user, "@reboot php install-openclaw.php\n");
         chmod($path, 0000);
         try {
             if (is_readable($path)) {
@@ -72,8 +71,7 @@ final class UserLegacyOpenClawInstallerCleanupTest extends TestCase
 
     public function testOutsideSymlinkTargetIsUntouched(): void
     {
-        $outside = $this->pmssMakeTempFile('pmss-openclaw-outside-');
-        file_put_contents($outside, "outside\n");
+        $outside = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-openclaw-outside-'), "outside\n");
         unlink($this->legacy);
         $this->pmssCreateSymlinkOrSkip($outside, $this->legacy);
 

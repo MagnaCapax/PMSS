@@ -13,7 +13,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         mkdir($home.'/.lighttpd/custom.d', 0700, true);
         $dir = $home.'/.lighttpd/custom.d';
         $this->assertFalse(isset(\pmssLocalFrameProxyAppFramesRead($dir, $home)['openclaw']));
-        file_put_contents($dir.'/openclaw.conf', '$HTTP["url"] =~ "^/user-fixtur01/openclaw($|/)" { }');
+        $this->pmssWriteFile($dir.'/openclaw.conf', '$HTTP["url"] =~ "^/user-fixtur01/openclaw($|/)" { }');
         $frames = \pmssLocalFrameProxyAppFramesRead($dir, $home);
         $this->assertTrue(isset($frames['openclaw']));
         $this->assertSame('configure.php#apps', $frames['openclaw']['url']);
@@ -727,15 +727,13 @@ class IndexSkeletonFrameDataTest extends TestCase
         $end = strpos($source, '// Remote frames can be disabled explicitly for debugging or fully offline');
         $this->assertTrue($start !== false && $end !== false && $end > $start, 'index.php helper extraction markers changed');
 
-        $fixture = $this->pmssMakeTempPath('pmss-index-frame-helpers-', '.php');
-        file_put_contents($fixture, "<?php\n".substr($source, $start, $end - $start));
+        $fixture = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-frame-helpers-', '.php'), "<?php\n".substr($source, $start, $end - $start));
         require_once $fixture;
     }
 
     private function writeQuotaSnapshotContent(string $content): string
     {
-        $path = $this->pmssMakeTempPath('pmss-index-quota-', '.txt');
-        file_put_contents($path, $content);
+        $path = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-quota-', '.txt'), $content);
         return $path;
     }
 

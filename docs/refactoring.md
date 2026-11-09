@@ -537,6 +537,9 @@ permission transitions remain separate from file publication.
 Traffic, resource-limit, filesystem-reader and watchdog setup writes use these
 checked writers too. `pmssWriteSerializedFixture()` retains object and scalar
 rejection payloads; simulated runtime writes remain explicit operation callbacks.
+Tracker backups, refresh markers, legacy-installer spools, journald templates,
+Deluge patch inputs and panel-frame fixtures share this same publication path.
+Keep deliberate file-type changes, permission transitions and injected writers explicit.
 
 Executable test fixtures use `pmssWriteExecutableFile()` for the shared write
 and mode application. Keep stub bytes and paths at each test, passing the

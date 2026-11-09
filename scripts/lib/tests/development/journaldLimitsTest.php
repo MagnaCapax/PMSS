@@ -71,7 +71,7 @@ class JournaldLimitsTest extends TestCase
             ."RuntimeMaxUse=%%PMSS_JOURNALD_RUNTIME_MAX_USE%%\n"
             ."RateLimitIntervalSec=%%PMSS_JOURNALD_RATE_LIMIT_INTERVAL%%\n"
             ."RateLimitBurst=%%PMSS_JOURNALD_RATE_LIMIT_BURST%%\n";
-        file_put_contents($template, $tplBody);
+        $this->pmssWriteFile($template, $tplBody);
 
         $this->pmssWithEnv([
             'PMSS_CONFIG_DIR' => $cfgDir,
@@ -94,7 +94,7 @@ class JournaldLimitsTest extends TestCase
 
         $cfgDir = $this->pmssMakeTempDir('pmss-journald-cfg-');
         $targetDir = $this->pmssMakeTempDir('pmss-journald-journald-');
-        file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
+        $this->pmssWriteFile($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
 
         $this->pmssWithEnv([
             'PMSS_CONFIG_DIR' => $cfgDir,
@@ -122,7 +122,7 @@ class JournaldLimitsTest extends TestCase
         $this->pmssEnsureDir($realTargetDir, 0755);
         $linkTargetDir = $root.'/journald-conf';
         $this->pmssCreateSymlinkOrSkip($realTargetDir, $linkTargetDir);
-        file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
+        $this->pmssWriteFile($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
 
         $messages = [];
         $this->pmssWithEnv([
@@ -143,9 +143,8 @@ class JournaldLimitsTest extends TestCase
     {
         $cfgDir = $this->pmssMakeTempDir('pmss-journald-cfg-');
         $targetDir = $this->pmssMakeTempDir('pmss-journald-journald-');
-        $foreign = $this->pmssMakeTempFile('pmss-journald-foreign-');
-        file_put_contents($foreign, 'foreign');
-        file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
+        $foreign = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-journald-foreign-'), 'foreign');
+        $this->pmssWriteFile($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
         $this->pmssCreateSymlinkOrSkip($foreign, $targetDir.'/pmss-limits.conf');
 
         $this->pmssWithEnv([

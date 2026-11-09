@@ -81,8 +81,7 @@ PHP
 
     public function testMemoryStatBatchPreservesFirstNumericRowAndSingleFieldContract(): void
     {
-        $path = $this->makeRoot().'/memory.stat';
-        file_put_contents($path, "rss invalid\nrss 00012\nrss 34\ncache 9223372036854775807\ncache 5\nswap 0\nhuge ".PHP_INT_MAX."0\nhuge 7\n");
+        $path = $this->pmssWriteFile($this->makeRoot().'/memory.stat', "rss invalid\nrss 00012\nrss 34\ncache 9223372036854775807\ncache 5\nswap 0\nhuge ".PHP_INT_MAX."0\nhuge 7\n");
         $this->assertSame(['rss' => 12, 'swap' => 0], \pmssResourceLogReadMemoryStatFields($path, ['rss', 'cache', 'swap', 'huge']));
         $this->assertSame(12, \pmssResourceLogReadMemoryStatField($path, 'rss'));
         $this->assertSame(null, \pmssResourceLogReadMemoryStatField($path, 'cache'));
@@ -373,7 +372,7 @@ PHP
     {
         $statePath = $this->makeRoot().'/state.json';
         if ($previousPayload !== null) {
-            file_put_contents($statePath, is_array($previousPayload) ? (string) json_encode($previousPayload) : (string) $previousPayload);
+            $this->pmssWriteFile($statePath, is_array($previousPayload) ? (string) json_encode($previousPayload) : (string) $previousPayload);
         }
 
         return $statePath;
@@ -833,8 +832,7 @@ PHP
     public function testUpdateStateRejectsSymlinkStatePath(): void
     {
         $root = $this->makeRoot();
-        $target = $root.'/target.json';
-        file_put_contents($target, json_encode(['io_read' => 1]));
+        $target = $this->pmssWriteFile($root.'/target.json', json_encode(['io_read' => 1]));
         $statePath = $root.'/state.json';
         $this->pmssCreateSymlinkOrSkip($target, $statePath);
 
