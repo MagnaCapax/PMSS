@@ -54,9 +54,9 @@ function pmssDynamicIopsLatencyReference(?array $fleetCompare, ?float $ownFloor,
     $ts = $fleetCompare['ts'] ?? null;
     $group = is_int($ts) && $ts <= $now && $now - $ts <= 3 * 86400
         ? pmssFiniteNonNegativeFloat($fleetCompare['groupIopingMs'] ?? null) : null;
-    $candidates = [];
+    $reference = null;
     foreach ([$group, pmssFiniteNonNegativeFloat($ownFloor)] as $value) {
-        if ($value !== null && $value > 0 && $value <= 60000) $candidates[] = $value;
+        if ($value !== null && $value > 0 && $value <= 60000) $reference = $reference === null ? $value : max($reference, $value);
     }
-    return $candidates === [] ? null : max($candidates);
+    return $reference;
 }

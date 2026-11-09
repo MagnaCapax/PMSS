@@ -84,15 +84,14 @@ function pmssDynamicIopsProbeCycle(?array $saved, array $settings, array $counts
                 $var = 0.0;
                 foreach ($state['pairs'] as $r) $var += ($r - $mean) ** 2;
                 $var /= $n - 1;
-                $gain = max(log(1 + $settings['probeGain']), 2 * sqrt($var / $n));
+                $gate = max(log(1 + $settings['probeGain']), 2 * sqrt($var / $n));
                 // Lower only on evidence: the tighter arm delivered more, or its caps bound most of the
                 // time and loosening delivered no more (mean at or below zero). A positive mean under the
                 // gate is a gain too small to prove, not a sign that tighter is free, so L holds. Caps that
                 // never bound tested nothing, and at idle both arms are equal, so neither can lower L.
                 $tested = min($settings['idleMultiplier'], 2 * $state['lo']) > $state['lo'];
                 $bound = $tested && $mean <= 0 && 2 * $state['lo_held'] > $state['lo_cycles'];
-                $gate = $gain;
-                $decision = $mean > $gain ? 'raise' : ($mean < -$gain || $bound ? 'lower' : 'hold');
+                $decision = $mean > $gate ? 'raise' : ($mean < -$gate || $bound ? 'lower' : 'hold');
                 $step = ['raise' => sqrt(2), 'lower' => 1 / sqrt(2), 'hold' => 1.0][$decision];
                 $state['lo'] = max($settings['busyMultiplier'], min($settings['idleMultiplier'], $state['lo'] * $step));
                 $state['pairs'] = [];

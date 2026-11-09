@@ -104,8 +104,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lift, 'charged_pool' => $chargedPool,
             'users' => $rows, 'would_be_floor_lift' => $wouldLift, 'would_be_charged_pool' => $wouldPool];
     }
-    $result += ['iowait_blend' => $iowait, 'curb_factor' => $curb, 'pool_uncurbed' => $uncurbed];
-    return $result;
+    return $result + ['iowait_blend' => $iowait, 'curb_factor' => $curb, 'pool_uncurbed' => $uncurbed];
 }
 
 /** Return one complete enforced read-cap map, never legacy caps on failed evidence. */

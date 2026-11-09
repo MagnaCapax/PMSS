@@ -46,8 +46,9 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
             continue;
         }
         // The /home read latency is kept apart: a missed probe must not drop the row from the ceiling.
+        $day = gmdate('Y-m-d', $sample['time']);
         $ping = pmssFiniteNonNegativeFloat($sample['iopingHomeMs'] ?? null);
-        if ($ping !== null && $ping <= 60000) $pings[gmdate('Y-m-d', $sample['time'])][$sample['time']] = $ping;
+        if ($ping !== null && $ping <= 60000) $pings[$day][$sample['time']] = $ping;
         $values = [];
         foreach (PMSS_IO_CEILING_DIMENSIONS as $field) {
             if (($values[$field] = pmssFiniteNonNegativeFloat($sample[$field] ?? null)) === null) {
@@ -56,7 +57,7 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
         }
         // Epoch time, not the collector's local-time prefix, defines the UTC day.
         // Deduplicate overlapping rotations; repeated rows cannot satisfy the gate.
-        $days[gmdate('Y-m-d', $sample['time'])][$sample['time']] = $values;
+        $days[$day][$sample['time']] = $values;
     }
     ksort($days);
     $published = ['from_day' => []];
@@ -89,14 +90,11 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
     if (count($days) < $settings['minDays']) {
         return null;
     }
-    sort($floors, SORT_NUMERIC);
-    $n = count($floors);
-    $floor = $n === 0 ? null : ($n % 2 === 1 ? $floors[intdiv($n, 2)] : ($floors[$n / 2 - 1] + $floors[$n / 2]) / 2);
     return [
         'computed_at' => gmdate('c', $now), 'percentile' => $settings['percentile'],
         'window_days' => $settings['windowDays'], 'min_samples_per_day' => $settings['minSamplesPerDay'],
         'min_days' => $settings['minDays'], 'excluded_current_day' => gmdate('Y-m-d', $end),
         'aggregation_frame' => 'grp1 aggregate across diskIostat.php matched physical devices; 120s averages every 5 minutes',
-        'days' => $days, 'published' => $published, 'ioping_floor_ms' => $floor,
+        'days' => $days, 'published' => $published, 'ioping_floor_ms' => pmssIopingMedianMsFromSamples($floors),
     ];
 }

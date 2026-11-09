@@ -40,6 +40,9 @@ and delaycompression. Older compressed rotations are deliberately not scanned:
 if the remaining data misses the gates, no estimate is published. Deduplicate
 timestamps across the active log and rotation.
 
+Quiet-floor latency aggregation reuses the runtime ioping median helper on
+validated daily values, retaining the null, odd-count and even-count results.
+
 ## Consequences
 - Quiet days cannot lower a ceiling while its winning completed day remains
   available inside the window. Window expiry can lower it.

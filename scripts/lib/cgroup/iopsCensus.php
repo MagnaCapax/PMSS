@@ -35,13 +35,13 @@ function pmssCgroupIopsCensusReadP95(iterable $samples, int $uid, int $now): arr
         if ($time >= $now - 86400 && $time <= $now) $rows[$time] = $sample['io_ops_read'];
     }
     ksort($rows, SORT_NUMERIC);
-    $rates = []; $previousTime = null; $previousOps = null;
+    $rates = []; $previousTime = null;
     foreach ($rows as $time => $ops) {
         // Resets and gaps over three collector periods cannot provide a valid rate.
-        if ($previousTime !== null && $time > $previousTime && $time - $previousTime <= 900 && $ops >= $previousOps) {
-            $rates[] = ($ops - $previousOps) / ($time - $previousTime);
+        if ($previousTime !== null && $time > $previousTime && $time - $previousTime <= 900 && $ops >= $rows[$previousTime]) {
+            $rates[] = ($ops - $rows[$previousTime]) / ($time - $previousTime);
         }
-        $previousTime = $time; $previousOps = $ops;
+        $previousTime = $time;
     }
     sort($rates, SORT_NUMERIC);
     return ['p95' => $rates === [] ? null : $rates[(int) ceil(0.95 * count($rates)) - 1], 'intervals' => count($rates)];
