@@ -27,6 +27,7 @@ require_once __DIR__.'/../runtime.php';
 
 pmssRequireRelativeFiles(__DIR__, [
     'UserValidator.php', 'billingIds.php', 'notificationEmail.php',
+    'userConfigPayload.php', 'userConfigPersistence.php',
     '../lighttpd/userFileWrite.php', '../systemdSliceProperties.php',
 ]);
 
@@ -55,7 +56,7 @@ class UserConfigStore
         }
 
         $payload = pmssJsonFileReadAssoc($this->userConfigPath($username));
-        return is_array($payload) ? $this->normalise($payload) : ($this->loadLegacyUsers()[$username] ?? null);
+        return is_array($payload) ? pmssUserConfigPayloadNormalise($payload) : (pmssUserConfigLegacyUsersRead($this->legacyAggregatePath)[$username] ?? null);
     }
 
     public function set(string $username, array $payload): bool
@@ -99,14 +100,14 @@ class UserConfigStore
         try {
             $payload = $mutate($this->get($username));
             if (!is_array($payload)) return false;
-            $payload = $this->normalise($payload);
+            $payload = pmssUserConfigPayloadNormalise($payload);
             foreach (UserValidator::REQUIRED_FIELDS as $key) {
                 if (!array_key_exists($key, $payload) || !is_numeric($payload[$key])) {
                     error_log('UserConfigStore: refusing to write invalid payload for '.$username);
                     return false;
                 }
             }
-            return $this->writeJsonFileAtomic($this->userConfigPath($username), $payload, 0640, 'root', 'root');
+            return pmssUserConfigJsonWrite($this->userConfigPath($username), $payload, 0640, 'root', 'root');
         } finally {
             pmssLockHandleRelease($lock);
         }
@@ -123,7 +124,7 @@ class UserConfigStore
 
     public function loadAll(): array
     {
-        $users = array_replace($this->loadLegacyUsers(), $this->loadCanonicalUsers());
+        $users = array_replace(pmssUserConfigLegacyUsersRead($this->legacyAggregatePath), pmssUserConfigCanonicalUsersRead($this->userDir));
 
         ksort($users, SORT_STRING);
         return $users;
@@ -166,14 +167,12 @@ class UserConfigStore
     public function applyFallbacks(string $username, array $payload): array
     {
         $username = $this->validatedUsername($username);
-        $payload = $this->normalise($payload);
-        if ($username !== null) {
-            if (empty($payload['ramMiB'])) {
-                $payload['ramMiB'] = $this->resolveRamMiB($username);
-            }
-            // Billing IDs come only from provisioning state.
+        $payload = pmssUserConfigPayloadNormalise($payload);
+        if ($username !== null && empty($payload['ramMiB'])) {
+            $payload['ramMiB'] = $this->resolveRamMiB($username);
         }
-        return $this->normalise($payload);
+        // Billing IDs come only from provisioning state.
+        return pmssUserConfigPayloadNormalise($payload);
     }
 
     private function writeUserCache(string $username, array $payload): void
@@ -192,10 +191,9 @@ class UserConfigStore
         require_once __DIR__.'/directories.php';
         if (!is_dir($configDir) && !pmssEnsureUserHomeDir($username, $home, '.config', 0755)) return;
 
-        $payload = $this->normalise($payload);
         $path = $configDir.'/pmss-user.json';
         // Root-owned, user-readable (group): cache for local tooling.
-        $this->writeJsonFileAtomic($path, $payload, 0640, 'root', $username);
+        pmssUserConfigJsonWrite($path, pmssUserConfigPayloadNormalise($payload), 0640, 'root', $username);
     }
 
     /**
@@ -237,121 +235,6 @@ class UserConfigStore
     {
         return $this->userDir.'/'.$username.'.json';
     }
-
-    private function loadCanonicalUsers(): array
-    {
-        if (!is_dir($this->userDir) || empty($files = glob($this->userDir.'/*.json'))) {
-            return [];
-        }
-
-        $users = [];
-        foreach ($files as $file) {
-            $users[basename($file, '.json')] = pmssJsonFileReadAssoc($file);
-        }
-        return $this->normaliseUserMap($users);
-    }
-
-    private function normalise(array $payload): array
-    {
-        // Additive back-compat: map legacy rtorrentRam -> ramMiB but keep rtorrentRam if present.
-        if (!isset($payload['ramMiB']) && is_numeric($payload['rtorrentRam'] ?? null)) {
-            $payload['ramMiB'] = (int)$payload['rtorrentRam'];
-        }
-
-        $intKeys = [
-            'ramMiB', 'rtorrentPort', 'quota', 'quotaBurst', 'billingServiceId', 'billingClientId', 'trafficLimit',
-            'trafficCapMbit', 'bonusPercent', 'bonusTrafficGiB', 'uploadThrottleKib',
-            'CPUWeight', 'IOWeight', 'IOReadIOPS', 'IOWriteIOPS', 'ioLatencyMs',
-        ];
-
-        if ((!isset($payload['billingServiceId']) || !is_numeric($payload['billingServiceId']) || (int) $payload['billingServiceId'] <= 0)
-            && isset($payload['billingId'])
-            && is_numeric($payload['billingId'])
-        ) {
-            $payload['billingServiceId'] = (int) $payload['billingId'];
-        }
-        unset($payload['billingId']);
-
-        foreach ($intKeys as $key) {
-            if (array_key_exists($key, $payload) && $payload[$key] !== null && $payload[$key] !== '' && is_numeric($payload[$key])) {
-                $payload[$key] = (int)$payload[$key];
-            }
-        }
-
-        if (!isset($payload['billingServiceId']) || !is_numeric($payload['billingServiceId'])) {
-            $payload['billingServiceId'] = 0;
-        }
-        if (!isset($payload['billingClientId']) || !is_numeric($payload['billingClientId'])) {
-            $payload['billingClientId'] = 0;
-        }
-
-        $payload['suspended'] = array_key_exists('suspended', $payload) && (bool)$payload['suspended'];
-
-        // Invalid dates must never reach nginx's static response or its config syntax.
-        if (!pmssUserMovedDateIsValid($payload['movedUntil'] ?? null)) unset($payload['movedUntil']);
-
-        $payload['dockerEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled');
-        $payload['lighttpdEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');
-        $payload['panelSessionLogin'] = pmssUserConfigNormaliseToggleValue($payload, 'panelSessionLogin', false);
-        $payload['scheduledConfigBackup'] = pmssUserConfigNormaliseToggleValue($payload, 'scheduledConfigBackup', false);
-
-        // Safety gate: keep rootless Docker disabled for low-memory accounts.
-        if (is_numeric($payload['ramMiB'] ?? null) && (int)$payload['ramMiB'] > 0
-            && (int)$payload['ramMiB'] < pmssUserDockerMinRamMiB()) {
-            $payload['dockerEnabled'] = false;
-        }
-
-        // Invariant: always write trafficLimit as 0.
-        $payload['trafficLimit'] = 0;
-
-        ksort($payload, SORT_STRING);
-        return $payload;
-    }
-
-    private function loadLegacyUsers(): array
-    {
-        $data = pmssJsonFileReadAssoc($this->legacyAggregatePath);
-        if (!is_array($data)) {
-            return [];
-        }
-
-        return $this->normaliseUserMap(
-            is_array($data['users'] ?? null) ? $data['users'] : $data
-        );
-    }
-
-    private function normaliseUserMap(array $users): array
-    {
-        $normalised = [];
-        foreach ($users as $name => $payload) {
-            $name = (string) $name;
-            if (!UserValidator::isValidUsername($name) || !is_array($payload)) {
-                continue;
-            }
-            $normalised[$name] = $this->normalise($payload);
-        }
-        return $normalised;
-    }
-
-    private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
-    {
-        $dir = dirname($path);
-        if (pmssManagedAccountHomePath($dir)) {
-            $context = pmssRootStageContext($dir.'/.pmss-check');
-            $identity = pmssAccountHomeIdentity($dir.'/.pmss-check');
-            if ($identity === null || ($context === null && @posix_geteuid() !== $identity[2])
-                || (!is_dir($dir) && !pmssAccountDirectoryEnsure($identity[1], $identity[0], $dir, 0750, 0755))) return false;
-        } elseif (!pmssDirEnsureExists($dir, 0750)) {
-            return false;
-        }
-        $encoded = pmssJsonEncodePretty($payload);
-        if ($encoded === null) {
-            return false;
-        }
-
-        return pmssWriteManagedFile($path, $encoded, $owner, $group, $mode);
-    }
-
 }
 
 require_once __DIR__.'/userConfigPolicy.php';

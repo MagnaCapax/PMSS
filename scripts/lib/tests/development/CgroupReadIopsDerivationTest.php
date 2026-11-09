@@ -232,7 +232,7 @@ class CgroupReadIopsDerivationTest extends TestCase
         $this->pmssAssertRepoFileNotContainsStrings('scripts/cron/cgroupIopsLimitApply.php', [
             'UserConfigStore',
             'pmssAtomicWriteFile',
-            'writeJsonFileAtomic',
+            'pmssUserConfigJsonWrite',
             '$writeIops = pmssCgroupPolicyDerivedReadIopsCap(',
         ]);
     }

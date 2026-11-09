@@ -1634,6 +1634,15 @@ and the unchanged successful results without reading live process state.
 
 ## User Management (CLI)
 
+- `scripts/lib/user/userConfigStore.php` retains the durable store API, per-user
+  locking, required-field checks and display-cache orchestration. Pure payload
+  and user-map normalization live in `userConfigPayload.php`; canonical/legacy
+  reads and guarded JSON publication live in `userConfigPersistence.php`
+  (ADR 0246). Billing defaults share one traversal, and feature toggles share
+  one ordered default table. Legacy aliases, numeric coercion, sorted keys,
+  canonical precedence, low-memory Docker policy, ownership and modes retain
+  their existing contracts. Helpers are internal to the store's include.
+
 - `scripts/lib/userLifecycle.php` remains the shared lifecycle load point.
   Its audit, web-root, and service modules retain the existing function API
   (ADR 0187). Audit callers share one context-and-write entrypoint, preserving
