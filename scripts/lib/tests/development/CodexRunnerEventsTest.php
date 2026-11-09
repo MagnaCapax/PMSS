@@ -10,7 +10,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $tracked = $this->launcherRoot.'/development/README.md';
         $new = $this->launcherRoot.'/development/operator-note.txt';
         file_put_contents($tracked, "\nOperator fixture edit\n", FILE_APPEND);
-        file_put_contents($new, 'operator fixture');
+        $this->pmssWriteFile($new, 'operator fixture');
         $before = file_get_contents($tracked);
         $git = 'git -C '.escapeshellarg($this->launcherRoot);
         $this->assertSame(0, $this->pmssExecShellCommand($git.' add development/README.md')['rc']);
@@ -29,7 +29,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         // CI runners can step the wall clock back; durations used to go negative and fail the launch.
         $realDate = trim($this->pmssRunShellCommand('command -v date', [], ''));
         $state = $this->tempDir.'/clock-state';
-        file_put_contents($this->tempDir.'/uptime', "100.25 50.00\n");
+        $this->pmssWriteFile($this->tempDir.'/uptime', "100.25 50.00\n");
         // Monotonic case: the wall clock steps forward, so a duration of 0 proves the uptime file was read.
         foreach ([$this->tempDir.'/uptime' => 7000, $this->tempDir.'/absent-uptime' => -5000] as $uptime => $step) {
             $monotonic = $step > 0;
@@ -82,7 +82,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
 
     public function testUnwritableLogRefusesUnobservedAssistantLaunch(): void
     {
-        file_put_contents($this->tempDir.'/not-directory', 'fixture');
+        $this->pmssWriteFile($this->tempDir.'/not-directory', 'fixture');
         $result = $this->launch('codex-run.sh', ['run', '--prompt', 'fixture', '--event-log', $this->tempDir.'/not-directory/events.jsonl']);
         $this->assertSame(1, $result['rc'], $result['output']);
         $this->assertStringContainsString('cannot append JSONL event', $result['output']);

@@ -53,13 +53,13 @@ class LighttpdSymlinkRepairTest extends TestCase
             'quota' => '#!/bin/sh' . "\n" . 'cat '.escapeshellarg($output)."\n",
         ]);
         $this->pmssWithEnv(['PATH' => $bin.':'.getenv('PATH')], function () use ($output): void {
-            file_put_contents($output, "/dev/sda1 1G 9G 10G 0 0 0\n");
+            $this->pmssWriteFile($output, "/dev/sda1 1G 9G 10G 0 0 0\n");
             $this->assertTrue(\pmssLighttpdSymlinkRepairQuotaAllows('account'));
-            file_put_contents($output, "/dev/sda1 10G* 9G 10G 0 0 0\n");
+            $this->pmssWriteFile($output, "/dev/sda1 10G* 9G 10G 0 0 0\n");
             $this->assertFalse(\pmssLighttpdSymlinkRepairQuotaAllows('account'));
-            file_put_contents($output, "/dev/sda1 10G 9G 10G 0 0 0\n");
+            $this->pmssWriteFile($output, "/dev/sda1 10G 9G 10G 0 0 0\n");
             $this->assertFalse(\pmssLighttpdSymlinkRepairQuotaAllows('account'));
-            file_put_contents($output, "quota unavailable\n");
+            $this->pmssWriteFile($output, "quota unavailable\n");
             $this->assertFalse(\pmssLighttpdSymlinkRepairQuotaAllows('account'));
         });
     }

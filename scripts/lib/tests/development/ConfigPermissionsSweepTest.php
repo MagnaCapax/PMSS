@@ -11,12 +11,9 @@ class ConfigPermissionsSweepTest extends TestCase
         $configDir = $this->pmssMakeTempDir('pmss-config-permissions-', 0700);
         $usersDir = $configDir.'/users';
         $otherDir = $configDir.'/other';
-        mkdir($usersDir, 0700);
-        mkdir($otherDir, 0700);
-        file_put_contents($usersDir.'/alice.json', '{}');
-        file_put_contents($usersDir.'/notes', 'private');
-        file_put_contents($otherDir.'/template', 'public');
-        chmod($usersDir.'/alice.json', 0600);
+        $this->pmssWriteFiles($configDir,
+            ['users/fixtur01.json' => '{}', 'users/notes' => 'private', 'other/template' => 'public'], 0700);
+        chmod($usersDir.'/fixtur01.json', 0600);
         chmod($usersDir.'/notes', 0600);
         $calls = [];
 
@@ -29,14 +26,14 @@ class ConfigPermissionsSweepTest extends TestCase
             if ($path === $usersDir) {
                 $this->assertSame(0, $mode & ~0750);
             }
-            if ($path === $usersDir.'/alice.json') {
+            if ($path === $usersDir.'/fixtur01.json') {
                 $this->assertSame(0, $mode & ~0640);
             }
             $this->assertFalse($path === $usersDir.'/notes');
         }
         clearstatcache();
         $this->assertSame(0750, fileperms($usersDir) & 0777);
-        $this->assertSame(0640, fileperms($usersDir.'/alice.json') & 0777);
+        $this->assertSame(0640, fileperms($usersDir.'/fixtur01.json') & 0777);
         $this->assertSame(0600, fileperms($usersDir.'/notes') & 0777);
         $this->assertSame(0775, fileperms($otherDir) & 0777);
         $this->assertSame(0664, fileperms($otherDir.'/template') & 0777);
@@ -46,11 +43,11 @@ class ConfigPermissionsSweepTest extends TestCase
     {
         $configDir = $this->pmssMakeTempDir('pmss-config-permissions-', 0700);
         $outside = $this->pmssMakeTempDir('pmss-config-outside-', 0700);
-        file_put_contents($outside.'/alice.json', '{}');
-        chmod($outside.'/alice.json', 0600);
+        $this->pmssWriteFile($outside.'/fixtur01.json', '{}');
+        chmod($outside.'/fixtur01.json', 0600);
         symlink($outside, $configDir.'/users');
         \pmssConfigPermissionsSweep($configDir);
         clearstatcache();
-        $this->assertSame(0600, fileperms($outside.'/alice.json') & 0777);
+        $this->assertSame(0600, fileperms($outside.'/fixtur01.json') & 0777);
     }
 }

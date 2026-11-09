@@ -62,8 +62,8 @@ PHP;
             $rows[] = ['number' => $number, 'title' => 'Fixture '.$number,
                 'labels' => $labels[$number] ?? ['bug'], 'updatedAt' => $updatedAt];
         }
-        file_put_contents($this->launcherEnv['PMSS_TEST_ISSUES'], json_encode($rows));
-        file_put_contents($this->launcherEnv['PMSS_TEST_INTENT_RESPONSES'], json_encode($responses));
+        $this->pmssWriteFile($this->launcherEnv['PMSS_TEST_ISSUES'], json_encode($rows));
+        $this->pmssWriteFile($this->launcherEnv['PMSS_TEST_INTENT_RESPONSES'], json_encode($responses));
         @unlink($this->launcherEnv['PMSS_TEST_INTENT_CALLS']);
     }
 

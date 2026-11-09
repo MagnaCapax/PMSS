@@ -23,14 +23,14 @@ class SupportCommandTest extends TestCase
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
         $this->pmssEnsureDir($this->configDir);
         $this->pmssEnsureDir($this->skelDir.'/bin');
-        file_put_contents($this->configDir.'/support.php', "<?php\nreturn ".var_export([
+        $this->pmssWriteFile($this->configDir.'/support.php', "<?php\nreturn ".var_export([
             'targetEmail' => 'support@example.com',
             'snapshotDirectory' => '.support/requests',
             'smtpPort' => 25,
             'connectTimeout' => 5,
             'relayHost' => 'mx.example.com',
         ], true).";\n");
-        file_put_contents($this->configDir.'/version', "main@test\n");
+        $this->pmssWriteFile($this->configDir.'/version', "main@test\n");
 
         $this->pmssTrackEnvKeys(['PMSS_SUPPORT_CONFIG_PATH']);
         $this->pmssTrackEnvOverrides([
@@ -53,7 +53,7 @@ class SupportCommandTest extends TestCase
     public function testConfigReadHonorsExplicitConfigPathOverride(): void
     {
         $customPath = $this->configDir.'/support-custom.php';
-        file_put_contents($customPath, "<?php\nreturn ".var_export([
+        $this->pmssWriteFile($customPath, "<?php\nreturn ".var_export([
             'targetEmail' => 'override@example.com',
             'snapshotDirectory' => '.support/requests',
             'smtpPort' => 26,
@@ -71,7 +71,7 @@ class SupportCommandTest extends TestCase
     public function testConfigReadRejectsUnreadableOverridePath(): void
     {
         $customPath = $this->configDir.'/support-unreadable.php';
-        file_put_contents($customPath, "<?php\nreturn ".var_export([
+        $this->pmssWriteFile($customPath, "<?php\nreturn ".var_export([
             'targetEmail' => 'override@example.com',
             'snapshotDirectory' => '.support/requests',
             'smtpPort' => 26,
@@ -123,8 +123,7 @@ class SupportCommandTest extends TestCase
         // Identity comes from the root-owned store record; home markers are ignored.
         $record = $this->pmssWriteFile($this->configDir.'/users/'.$this->user.'.json',
             json_encode(['billingServiceId' => 42, 'billingClientId' => 99]));
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingServiceId', "7\n");
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingClientId', "8\n");
+        $this->pmssWriteFiles($this->homeRoot.'/'.$this->user, ['.billingServiceId' => "7\n", '.billingClientId' => "8\n"]);
 
         $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner());
 
@@ -138,12 +137,9 @@ class SupportCommandTest extends TestCase
     public function testDiagnosticsBuildUsesOwnMarkersWhenStoreHasNoValue(): void
     {
         // The account cannot read the store; its own root-owned marker copy is reported.
-        $servicePath = $this->homeRoot.'/'.$this->user.'/.billingId';
-        $clientPath = $this->homeRoot.'/'.$this->user.'/.billingClientId';
-        file_put_contents($servicePath, "42\n");
-        file_put_contents($clientPath, "99\n");
-        $linkTarget = $this->homeRoot.'/'.$this->user.'/billing-id-target';
-        file_put_contents($linkTarget, "41\n");
+        $servicePath = $this->pmssWriteFile($this->homeRoot.'/'.$this->user.'/.billingId', "42\n");
+        $clientPath = $this->pmssWriteFile($this->homeRoot.'/'.$this->user.'/.billingClientId', "99\n");
+        $linkTarget = $this->pmssWriteFile($this->homeRoot.'/'.$this->user.'/billing-id-target', "41\n");
         symlink($linkTarget, $this->homeRoot.'/'.$this->user.'/.billingServiceId');
 
         $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner());
@@ -222,7 +218,7 @@ class SupportCommandTest extends TestCase
 
     public function testApplySkeletonFilesCopiesSupportCommandForExistingUsers(): void
     {
-        file_put_contents($this->skelDir.'/bin/support', "#!/usr/bin/env bash\necho support\n");
+        $this->pmssWriteFile($this->skelDir.'/bin/support', "#!/usr/bin/env bash\necho support\n");
 
         \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 

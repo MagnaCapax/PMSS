@@ -224,7 +224,7 @@ BASH;
             foreach ([null, '', "0\n", "65536\n", "12\n13\n", " 23001\n", "23001\n\n", str_repeat('1', 33)] as $invalid) {
                 $this->reserveTorrentPorts($app);
                 unlink($marker);
-                if ($invalid !== null) file_put_contents($marker, $invalid);
+                if ($invalid !== null) $this->pmssWriteFile($marker, $invalid);
                 $before = scandir($this->homeDir);
                 foreach ([[$app], [$app, '--dry-run']] as $args) {
                     $result = $this->runHelper($args);
@@ -237,7 +237,7 @@ BASH;
             $this->reserveTorrentPorts($app);
             unlink($marker.'-peer');
             $this->assertSame(1, $this->runHelper([$app])['rc']);
-            file_put_contents($marker.'-peer', "70000\n");
+            $this->pmssWriteFile($marker.'-peer', "70000\n");
             $this->assertSame(1, $this->runHelper([$app])['rc']);
             unlink($marker.'-peer');
             $this->pmssCreateSymlinkOrSkip($marker, $marker.'-peer');
@@ -269,7 +269,7 @@ BASH;
         $marker = $this->homeDir.'/port';
         foreach (["1" => 1, "65535\n" => 65535, "23001\r\n" => 23001, '00001' => 1,
             '+23001' => null, "23001\r" => 23001, "23001\0" => null, '999999' => null] as $line => $expected) {
-            file_put_contents($marker, (string) $line);
+            $this->pmssWriteFile($marker, (string) $line);
             clearstatcache();
             $this->assertSame($expected, \pmssDockerInstallLsioReservedPort($marker));
         }
@@ -398,10 +398,9 @@ BASH;
     public function testFirstRunPreservesPriorConfigAndCredentialBytes(): void
     {
         $config = $this->homeDir.'/docker/sonarr/config';
-        $this->pmssEnsureDir($config);
-        file_put_contents($config.'/config.xml', 'prior-config');
+        $this->pmssWriteFile($config.'/config.xml', 'prior-config');
         $file = dirname($config).'/pmss-credentials.env';
-        file_put_contents($file, 'prior-credentials');
+        $this->pmssWriteFile($file, 'prior-credentials');
         $result = $this->runHelper(['sonarr']);
         $this->assertSame(1, $result['rc']);
         $this->assertStringNotContainsString('run -d', $result['dockerLog']);

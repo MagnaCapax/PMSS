@@ -153,8 +153,8 @@ class installMediaStackScriptTest extends TestCase
         }
         $this->pmssWriteFile($home.'/empty/config.xml', '');
         $truncated = "<Config>\n  <Port>7878</Port>\n  <Original>keep these bytes";
-        $this->pmssWriteFile($home.'/truncated/config.xml', $truncated);
-        $this->pmssWriteFile($home.'/valid/config.xml', "<Config>\n  <Custom>preserved</Custom>\n  <Port>7878</Port>\n  <UrlBase></UrlBase>\n  <BindAddress>127.0.0.1</BindAddress>\n</Config>\n");
+        $this->pmssWriteFiles($home, ['truncated/config.xml' => $truncated,
+            'valid/config.xml' => "<Config>\n  <Custom>preserved</Custom>\n  <Port>7878</Port>\n  <UrlBase></UrlBase>\n  <BindAddress>127.0.0.1</BindAddress>\n</Config>\n"]);
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'servarr_config_xml_tag_converge', 'servarr_config_xml_converge',
@@ -1000,10 +1000,8 @@ BASH
     public function testSeedDispatchPreservesConfiguredAppsBeforeCheckingNamespaces(): void
     {
         $home = $this->pmssMakeTempDir('pmss-seed-dispatch-');
-        $this->pmssEnsureDir($home.'/jellyfin');
-        $this->pmssEnsureDir($home.'/autobrr');
-        file_put_contents($home.'/jellyfin/system.xml', '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>');
-        file_put_contents($home.'/autobrr/autobrr.db', 'prior-database');
+        $this->pmssWriteFiles($home, ['jellyfin/system.xml' => '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>',
+            'autobrr/autobrr.db' => 'prior-database']);
         $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
             .'HOME='.escapeshellarg($home)."\nJELLYFIN_CONFIG_DIR=\"\$HOME/jellyfin\"\n"
             .'log_info() { :; }; log_warn() { :; }; log_err() { echo "$*"; }' ."\n"
@@ -1032,8 +1030,7 @@ BASH
         foreach (['0', '1', '2', 'unknown'] as $count) {
             $home = $this->pmssMakeTempDir('pmss-autobrr-count-');
             $this->pmssEnsureDir($home.'/.bin/autobrr');
-            $this->pmssEnsureDir($home.'/config');
-            file_put_contents($home.'/config/autobrr.db', 'preserve-me');
+            $this->pmssWriteFile($home.'/config/autobrr.db', 'preserve-me');
             $this->pmssWriteExecutableFile($home.'/.bin/autobrr/autobrrctl', "#!/usr/bin/env bash\ncat >/dev/null\n");
             $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
                 .'HOME='.escapeshellarg($home)."\nPMSS_MEDIA_STACK_SEED_PRIVATE=1\nMEDIA_STACK_AUTH_USERNAME=expected\n"
@@ -1088,9 +1085,8 @@ BASH
             $loginStatus = $case[4] ?? '200';
             $loginExit = $case[5] ?? 0;
             $home = $this->pmssMakeTempDir('pmss-jellyfin-count-');
-            $this->pmssEnsureDir($home.'/config');
             $this->pmssEnsureDir($home.'/tmp');
-            file_put_contents($home.'/config/system.xml', '<ServerConfiguration/>');
+            $this->pmssWriteFile($home.'/config/system.xml', '<ServerConfiguration/>');
             $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
                 .'export HOME='.escapeshellarg($home)."\nexport TMPDIR=\"\$HOME/tmp\"\n"
                 .'USERS='.escapeshellarg($users)."\n"
@@ -1329,8 +1325,7 @@ LIGHTTPD;
     public function testManagedInstallPathResetRefusesUnsafeTargets(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-reset-home-');
-        $this->pmssWriteFile($home.'/.bin/Radarr/file', 'managed');
-        $this->pmssWriteFile($home.'/.bin/keep/file', 'preserve');
+        $this->pmssWriteFiles($home, ['.bin/Radarr/file' => 'managed', '.bin/keep/file' => 'preserve']);
         $this->pmssEnsureDir($home.'/.config/sabnzbd');
         $this->pmssEnsureDir($home.'/.config/unmanaged');
 
@@ -1382,9 +1377,8 @@ LIGHTTPD;
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-home-');
         $bin = $this->pmssMakeTempDir('pmss-media-stack-uninstall-bin-');
-        $this->pmssWriteFile($home.'/.install-media-stack.log', "old installer output\n");
-        $this->pmssWriteFile($home.'/.media-stack-status.json', "{\"state\":\"failed\"}\n");
-        $this->pmssWriteFile($home.'/.media-stack-credentials.txt', "preserve\n");
+        $this->pmssWriteFiles($home, ['.install-media-stack.log' => "old installer output\n",
+            '.media-stack-status.json' => "{\"state\":\"failed\"}\n", '.media-stack-credentials.txt' => "preserve\n"]);
         $this->pmssWriteExecutableFile($bin.'/tmux', "#!/usr/bin/env bash\nexit 0\n");
         $this->pmssWriteExecutableFile($bin.'/pgrep', "#!/usr/bin/env bash\nexit 1\n");
         $this->pmssWriteExecutableFile($bin.'/ps', "#!/usr/bin/env bash\nexit 1\n");
@@ -1850,8 +1844,7 @@ BASH
     public function testPortSelectionPrefersReservationAndPreservesLegacyExistingPort(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-port-selection-');
-        $this->pmssWriteFile($home.'/.media-stack-port-sabnzbd', "21000\n");
-        $this->pmssWriteFile($home.'/.media-stack-port-sonarr', "22000\n");
+        $this->pmssWriteFiles($home, ['.media-stack-port-sabnzbd' => "21000\n", '.media-stack-port-sonarr' => "22000\n"]);
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'media_stack_port_is_valid',
             'media_stack_reserved_port_read',

@@ -235,6 +235,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   AI-launcher, Apps-catalog and private-UI fixtures use the same writers for
   account state, launcher copies and certificate stubs, retaining directory
   creation modes and explicit permission transitions at their callers.
+  Support, configuration-permission, memory-panel and installer fixture data
+  share those writers too; append operations and injected runtime writes stay explicit.
 - Generated text and repository source contracts share `TestCase::pmssAssertStringContract()`
   for required/forbidden fragments, regexes and ordered fragments. Required and
   forbidden maps retain per-fragment diagnostic messages.

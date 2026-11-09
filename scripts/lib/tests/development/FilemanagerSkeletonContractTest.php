@@ -73,7 +73,7 @@ class FilemanagerSkeletonContractTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-filemanager-action-');
         $source = $this->pmssRepoPath('etc/skel/www/filemanager.php');
         foreach (['GET', 'POST-invalid', 'POST-valid'] as $case) {
-            file_put_contents($home.'/victim', 'keep');
+            $this->pmssWriteFile($home.'/victim', 'keep');
             $method = $case === 'GET' ? 'GET' : 'POST';
             $token = $case === 'POST-valid' ? str_repeat('a', 64) : 'invalid';
             $script = <<<'PHP'
@@ -103,7 +103,7 @@ PHP;
     public function testChangingRoutesRequireTokenAndReadOnlyAjaxRemainsAvailable(): void
     {
         $home = $this->pmssMakeTempDir('pmss-filemanager-routes-');
-        file_put_contents($home.'/victim', 'keep');
+        $this->pmssWriteFile($home.'/victim', 'keep');
         $source = $this->pmssRepoPath('etc/skel/www/filemanager.php');
         $actions = [
             'logout' => ['logout' => '1'],

@@ -14,12 +14,11 @@ class MotdTest extends TestCase
     public function testGenerateMotdWritesToOutputWithTemplate(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-', 0700);
-        $template = $dir.'/template.motd';
         $output   = $dir.'/motd.txt';
         $runtime  = $dir.'/run';
         @mkdir($runtime, 0700, true);
 
-        file_put_contents($template, "Host: %HOSTNAME%\nVersion: %PMSS_VERSION%\n");
+        $template = $this->pmssWriteFile($dir.'/template.motd', "Host: %HOSTNAME%\nVersion: %PMSS_VERSION%\n");
 
         $this->pmssWithEnv([
             'PMSS_MOTD_TEMPLATE_PATH' => $template,
@@ -38,12 +37,11 @@ class MotdTest extends TestCase
     public function testGenerateMotdHonorsColorOptOutEnv(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-', 0700);
-        $template = $dir.'/template.motd';
         $output   = $dir.'/motd.txt';
         $runtime  = $dir.'/run';
         @mkdir($runtime, 0700, true);
 
-        file_put_contents($template, "Host: %HOSTNAME%\nKernel: %KERNEL_VERSION%\nNet: %NETWORK_SPEED%\n");
+        $template = $this->pmssWriteFile($dir.'/template.motd', "Host: %HOSTNAME%\nKernel: %KERNEL_VERSION%\nNet: %NETWORK_SPEED%\n");
 
         $this->pmssWithEnv([
             'PMSS_MOTD_TEMPLATE_PATH' => $template,
@@ -179,8 +177,7 @@ class MotdTest extends TestCase
     public function testConfiguredLinkSpeedLabelReadsTheNetworkConfig(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-net-', 0700);
-        $config = $dir.'/network';
-        file_put_contents($config, "<?php return array('speed' => '20000');");
+        $config = $this->pmssWriteFile($dir.'/network', "<?php return array('speed' => '20000');");
 
         $label = '';
         $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $config], function () use (&$label): void {
@@ -193,8 +190,7 @@ class MotdTest extends TestCase
     public function testConfiguredLinkSpeedLabelEmptyWhenUnset(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-net-', 0700);
-        $config = $dir.'/network';
-        file_put_contents($config, "<?php return array();");
+        $config = $this->pmssWriteFile($dir.'/network', "<?php return array();");
 
         $label = '';
         $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $config], function () use (&$label): void {

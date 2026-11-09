@@ -73,9 +73,8 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testReadFallsBackToCurrentWhenV1AnonymousCounterOverflows(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-overflow-');
-        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "100\n");
-        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "400\n");
-        $this->pmssWriteFile($dir.'/memory.stat', 'total_rss '.str_repeat('9', 400)."\ntotal_cache 50\n");
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "100\n", 'memory.limit_in_bytes' => "400\n",
+            'memory.stat' => 'total_rss '.str_repeat('9', 400)."\ntotal_cache 50\n"]);
 
         // Disable UID fallback so the fixture never reads the host's account counters.
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => -1]);
@@ -90,9 +89,8 @@ class WebCgroupMemoryStatusTest extends TestCase
     {
         $unifiedDir = $this->pmssMakeTempDir('pmss-web-cgroup-unified-');
         $v1Dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-');
-        $this->pmssWriteFile($unifiedDir.'/cgroup.controllers', "\n");
-        $this->pmssWriteFile($unifiedDir.'/memory.stat', "anon 99\n");
-        $this->pmssWriteFile($unifiedDir.'/memory.pressure', "some avg10=2.00\n");
+        $this->pmssWriteFiles($unifiedDir, ['cgroup.controllers' => "\n", 'memory.stat' => "anon 99\n",
+            'memory.pressure' => "some avg10=2.00\n"]);
         $this->pmssWriteFile($v1Dir.'/memory.stat', "total_rss 42\n");
 
         $this->assertSame($v1Dir, \pmssWebCgroupMemoryStatusDetectDir([
@@ -106,11 +104,10 @@ class WebCgroupMemoryStatusTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
         $integerPath = $dir.'/memory.current';
         $integerLink = $dir.'/memory.link';
-        file_put_contents($integerPath, "42\n");
-        file_put_contents($dir.'/memory.zero', "0\n");
+        $this->pmssWriteFiles($dir, ['memory.current' => "42\n", 'memory.zero' => "0\n"]);
         $this->pmssCreateSymlinkOrSkip($integerPath, $integerLink);
-        file_put_contents($dir.'/memory.events', "high 7\nfull avg10=0.25 avg60=0.00\nbadline\n");
-        file_put_contents($dir.'/resource.data', serialize(['memory' => ['current' => 42]]));
+        $this->pmssWriteFiles($dir, ['memory.events' => "high 7\nfull avg10=0.25 avg60=0.00\nbadline\n",
+            'resource.data' => serialize(['memory' => ['current' => 42]])]);
 
         $this->assertSame(42, \pmssCustomerUnsignedIntegerFileRead($integerPath));
         $this->assertSame(null, \pmssCustomerPositiveIntegerFileRead($dir.'/memory.zero'));
@@ -199,11 +196,9 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testReadUsesCgroupV1MemoryCountersWithoutSystemctlFallback(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-');
-        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "2147483648\n");
-        $this->pmssWriteFile($dir.'/memory.soft_limit_in_bytes', "3221225472\n");
-        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "9223372036854771712\n");
-        $this->pmssWriteFile($dir.'/memory.events', "high 0\n");
-        $this->pmssWriteFile($dir.'/memory.pressure', "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "2147483648\n", 'memory.soft_limit_in_bytes' => "3221225472\n",
+            'memory.limit_in_bytes' => "9223372036854771712\n", 'memory.events' => "high 0\n",
+            'memory.pressure' => "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"]);
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
 
@@ -221,13 +216,11 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testReadSurfacesV1OomKillFromMemoryOomControlWithUpgradeCta(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-oom-');
-        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "104857600\n");
-        $this->pmssWriteFile($dir.'/memory.soft_limit_in_bytes', "327155712\n");
-        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "327155712\n");
-        $this->pmssWriteFile($dir.'/memory.events', "high 0\n");
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "104857600\n", 'memory.soft_limit_in_bytes' => "327155712\n",
+            'memory.limit_in_bytes' => "327155712\n", 'memory.events' => "high 0\n"]);
         // Real OOM kills on the account's own slice — the ONLY sound v1 pressure signal.
-        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 4\n");
-        $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 4, 'last_increase' => 100, 'sampled_at' => 100]));
+        $this->pmssWriteFiles($dir, ['memory.oom_control' => "oom_kill_disable 0\nunder_oom 0\noom_kill 4\n",
+            'oom.state' => serialize(['count' => 4, 'last_increase' => 100, 'sampled_at' => 100])]);
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
 
@@ -240,9 +233,8 @@ class WebCgroupMemoryStatusTest extends TestCase
         // systemd can record the memcg OOM kills on the child user@<uid>.service slice while the
         // parent user-<uid>.slice reads 0 — the reader must include the child counter.
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-oomchild-');
-        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "104857600\n");
-        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "327155712\n");
-        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 0\n");
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "104857600\n", 'memory.limit_in_bytes' => "327155712\n",
+            'memory.oom_control' => "oom_kill_disable 0\nunder_oom 0\noom_kill 0\n"]);
         $childDir = $dir.'/user@1234.service';
         @mkdir($childDir, 0777, true);
         $this->pmssWriteFile($childDir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 3\n");
@@ -256,11 +248,9 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testReadSurfacesNestedSessionOomKills(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-scopes-');
-        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "100\n");
-        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "400\n");
-        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill 0\n");
-        $this->pmssWriteFile($dir.'/session-1.scope/run-1.scope/memory.oom_control', "oom_kill 2\n");
-        $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 0, 'last_increase' => null, 'sampled_at' => 100]));
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "100\n", 'memory.limit_in_bytes' => "400\n",
+            'memory.oom_control' => "oom_kill 0\n", 'session-1.scope/run-1.scope/memory.oom_control' => "oom_kill 2\n",
+            'oom.state' => serialize(['count' => 0, 'last_increase' => null, 'sampled_at' => 100])]);
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
         $this->pmssAssertArraySubsetSame([
             'oom_kill_events' => 2, 'oom_kill_recent' => true, 'status' => 'HIGH',
@@ -280,10 +270,8 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testHistoricalOomDoesNotAdvertiseRamUpgrade(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-stale-oom-');
-        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "100\n");
-        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "400\n");
-        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill 4\n");
-        $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 4, 'last_increase' => 100, 'sampled_at' => 86500]));
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "100\n", 'memory.limit_in_bytes' => "400\n",
+            'memory.oom_control' => "oom_kill 4\n", 'oom.state' => serialize(['count' => 4, 'last_increase' => 100, 'sampled_at' => 86500])]);
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 86500]);
         $this->pmssAssertArraySubsetSame(['oom_kill_events' => 4, 'status' => 'LOW', 'message' => ''], $status);
@@ -312,12 +300,10 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testReadDoesNotExposeCgroupV1FailcntAsThrottleEvents(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-');
-        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "1073741824\n");
-        $this->pmssWriteFile($dir.'/memory.soft_limit_in_bytes', "1073741824\n");
-        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "2147483648\n");
-        $this->pmssWriteFile($dir.'/memory.failcnt', "1270090200\n");
-        $this->pmssWriteFile($dir.'/memory.pressure', "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
-        $this->pmssWriteFile($dir.'/memory.stat', "total_rss 1073741824\ntotal_cache 0\n");
+        $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "1073741824\n", 'memory.soft_limit_in_bytes' => "1073741824\n",
+            'memory.limit_in_bytes' => "2147483648\n", 'memory.failcnt' => "1270090200\n",
+            'memory.pressure' => "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+            'memory.stat' => "total_rss 1073741824\ntotal_cache 0\n"]);
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
 
