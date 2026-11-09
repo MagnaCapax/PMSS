@@ -22,8 +22,12 @@ function pmssRootStagePublishRun(string $command, ?string &$failure = null): boo
         return $status === 0;
     } finally {
         // Account-influenced paths may appear here: bound and sanitize before logging.
-        $excerpt = @rewind($stderr) ? trim(pmssLogControlCharactersReplace((string) @fread($stderr, 300))) : '';
-        @fclose($stderr);
+        try {
+            $excerpt = @rewind($stderr) ? trim(pmssLogControlCharactersReplace((string) @fread($stderr, 300))) : '';
+        } finally {
+            // Diagnostic failures must release the private capture before propagating.
+            @fclose($stderr);
+        }
         if ($failure !== '' && $excerpt !== '') $failure .= ' stderr='.$excerpt;
     }
 }

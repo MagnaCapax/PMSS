@@ -125,8 +125,12 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
         return $ok;
     } finally {
         // Read only the first 300 bytes; never retain or log the full account tree errors.
-        $excerpt = @rewind($stderr) ? trim(pmssLogControlCharactersReplace((string) @fread($stderr, 300))) : '';
-        @fclose($stderr);
+        try {
+            $excerpt = @rewind($stderr) ? trim(pmssLogControlCharactersReplace((string) @fread($stderr, 300))) : '';
+        } finally {
+            // Diagnostic failures must release the private capture before propagating.
+            @fclose($stderr);
+        }
         if ($failure !== '' && $excerpt !== '') $failure .= ' stderr='.$excerpt;
     }
 }

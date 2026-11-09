@@ -141,6 +141,13 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Managed-file publication and account-command stderr captures close in `finally`
+even when diagnostic rewind, read or sanitization throws an exception or error.
+The original diagnostic throwable propagates after close; ordinary command
+results, failure stages, the 300-byte bound and sanitization order stay intact.
+`StderrCaptureSafetyTest` exercises both helpers with memory streams and fake
+process operations; execution stays on the testing machine (ADR 0164).
+
 Managed-file acquisition owns each opened stream until inode verification
 succeeds. Both existing-file opens and exclusive staging creation close on
 verification exceptions or errors before propagating the original throwable.
