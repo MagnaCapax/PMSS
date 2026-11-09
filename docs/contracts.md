@@ -1319,6 +1319,22 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Provisioned recipient: Converges a root-owned `.notifyEmail` to `root:<user> 0640`, preserving customer read access. A non-root `.notifyEmail` is logged and left unadopted, so a customer-written address never becomes the trusted recipient. The file is not read by any root job: the alert recipient comes only from the root user store (ADR 0213).
   - Root-produced measurements: `.quota` and the four `.trafficData*` files get the same gate. Their writers (`updateQuotas.php`, `trafficStats.php`, `trafficIngressStats.php`) publish fresh root-owned files, and usage alerts and the operator traffic report trust only a root owner. A non-root entry is left for the next writer run to replace. For a gated entry only the group is repaired, through the opened file after it is confirmed to be a single-link, root-owned regular file inside the home; the owner is never changed.
 
+- scripts/util/userDataOwnershipRepair.php <user>
+  - Explicit root-only repair for pre-existing payload ownership drift, including
+    same-username migrations (#973). Routine `userPermissions.php` still prunes
+    `~/data`; this utility walks only that subtree on the home's filesystem.
+  - Requires a valid non-reserved account, its account-owned `/home/<user>` home,
+    and a real, non-symlink `data` directory. Changes only entries outside the
+    primary/subordinate UID set to the account's primary UID:GID (ADR 0071).
+    Group-only drift, symlinks and multiply linked regular files are left alone.
+    Uses the anchored permission walk and `-execdir chown -h` with a fixed PATH;
+    it does not invoke chmod or restart services.
+  - Shares the account's permission lock. `PMSS_DRY_RUN=1` logs the planned command
+    through `runStep()` without acquiring the lock or changing ownership; preview
+    with `PMSS_DRY_RUN=1 /scripts/util/userDataOwnershipRepair.php fixtur01`.
+    Refusals return 1; execution returns the repair command's status. Re-running
+    on a healthy tree makes no ownership changes.
+
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
   - rTorrent ports: a reconfigure keeps the stored `rtorrentPort` when its scgi reservation marker under `/var/lib/pmss/ports/scgi/<port>` still exists (`pmssRtorrentPortReservationReusable()`); only a missing, invalid or unreserved scgi port is reserved anew. Existing `rtorrentDhtPort` and `rtorrentListenPort` payload keys and markers are left untouched; the reconciler covers only scgi.
