@@ -9,9 +9,9 @@ class UserSystemdWatchdogTest extends TestCase
     public function testUnitNamesOnlyReturnsAccountAuthoredServices(): void
     {
         $home = $this->pmssMakeTempDir('user-systemd-watchdog-units-');
-        $this->pmssWriteRelativeFile($home, '.config/systemd/user/custom.service', '[Unit]');
-        $this->pmssWriteRelativeFile($home, '.config/systemd/user/docker.service', '[Unit]');
-        $this->pmssWriteRelativeFile($home, '.config/systemd/user/custom.timer', '[Unit]');
+        $this->pmssWriteFiles($home.'/.config/systemd/user', [
+            'custom.service' => '[Unit]', 'docker.service' => '[Unit]', 'custom.timer' => '[Unit]',
+        ]);
 
         $this->assertSame(['custom.service'], \pmssUserSystemdWatchdogUnitNames($home));
     }

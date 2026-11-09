@@ -17,11 +17,6 @@ class PythonVenvHelperTest extends TestCase
         return $this->pmssPathPrefixedEnvironment($stubPath)['PATH'];
     }
 
-    private function makeVenvPython(string $venvDir): void
-    {
-        $this->pmssWriteExecutableFiles($venvDir.'/bin', ['python' => "#!/bin/sh\nexit 0\n"]);
-    }
-
     public function testCustomMissingPythonWarningOverridesDefaultLabelMessage(): void
     {
         $messages = [];
@@ -78,7 +73,7 @@ class PythonVenvHelperTest extends TestCase
     {
         $messages = [];
         $venvDir = $this->pmssMakeTempDir('pmss-python-venv-missing-cli-');
-        $this->makeVenvPython($venvDir);
+        $this->pmssWriteExecutableFile($venvDir.'/bin/python', "#!/bin/sh\nexit 0\n");
         $pythonPath = $this->makePythonPath();
         $linkPath = $this->pmssMakeTempFile('pmss-flexget-link-');
 
@@ -102,7 +97,7 @@ class PythonVenvHelperTest extends TestCase
     {
         $messages = [];
         $venvDir = $this->pmssMakeTempDir('pmss-python-venv-link-cli-');
-        $this->makeVenvPython($venvDir);
+        $this->pmssWriteExecutableFile($venvDir.'/bin/python', "#!/bin/sh\nexit 0\n");
         $pythonPath = $this->makePythonPath();
         $cliBin = $venvDir.'/bin/pyload';
         $linkPath = $this->pmssMakeTempDir('pmss-python-link-dir-').'/pyload';
@@ -135,7 +130,7 @@ class PythonVenvHelperTest extends TestCase
     {
         $messages = [];
         $venvDir = $this->pmssMakeTempDir('pmss-python-venv-link-fail-');
-        $this->makeVenvPython($venvDir);
+        $this->pmssWriteExecutableFile($venvDir.'/bin/python', "#!/bin/sh\nexit 0\n");
         $cliBin = $venvDir.'/bin/pyload';
         $this->pmssWriteExecutableFile($cliBin, "#!/bin/sh\nexit 0\n");
         $linkPath = $venvDir.'/missing-parent/pyload';

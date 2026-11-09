@@ -131,16 +131,10 @@ PHP
         });
     }
 
-    /** Build a fake cgroup v1 sysfs tree for one UID under a temp root. */
-    private function makeV1CgroupTree(int $uid, array $files): string
-    {
-        return $this->pmssWriteFiles($this->makeRoot(), $files);
-    }
-
     public function testReadCountersV1ReadsRealCountersFromSysfs(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->makeV1CgroupTree(1000, [
+        $root = $this->pmssWriteFiles($this->makeRoot(), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "550000\n",
             'memory/'.$slice.'/memory.usage_in_bytes' => "66000\n",
             'pids/'.$slice.'/pids.current' => "77\n",
@@ -174,7 +168,7 @@ PHP
     public function testReadCountersV1FallsBackToLocalMemoryStatFields(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->makeV1CgroupTree(1000, [
+        $root = $this->pmssWriteFiles($this->makeRoot(), [
             'memory/'.$slice.'/memory.stat' => "cache\ncache 999 extra\ncache\t4444\nrss 888\t999\nrss 3333\n",
         ]);
 
@@ -192,7 +186,7 @@ PHP
         // blkio.throttle.* exists but reads all-zero. The selector MUST take bfq, not the
         // present-but-zero throttle file (the bug where throttle-zero won).
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->makeV1CgroupTree(1000, [
+        $root = $this->pmssWriteFiles($this->makeRoot(), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "550000\n",
             'blkio/'.$slice.'/blkio.throttle.io_service_bytes_recursive' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
             'blkio/'.$slice.'/blkio.throttle.io_serviced_recursive' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
@@ -217,7 +211,7 @@ PHP
         // A partial baseline (io_source set, io_*_ops=0) would let the ops cumulative phantom-delta
         // through the source-keyed reseed guard on recovery, risking a spurious IOPS throttle.
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->makeV1CgroupTree(1000, [
+        $root = $this->pmssWriteFiles($this->makeRoot(), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
             'blkio/'.$slice.'/blkio.bfq.io_service_bytes_recursive' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
             // NO blkio.bfq.io_serviced_recursive -> ops read fails -> whole io group omitted.
@@ -242,7 +236,7 @@ PHP
                 $files[$slice.'user@1000.service/'.$file] = '8:0 Read '.($totals[0] - 1)."\n8:0 Write ".($totals[1] - 2)."\n";
                 $files[$slice.$file.'_recursive'] = "8:0 Read {$totals[0]}\n8:0 Write {$totals[1]}\n";
             }
-            $root = $this->makeV1CgroupTree(1000, $files);
+            $root = $this->pmssWriteFiles($this->makeRoot(), $files);
             $this->assertSame([
                 'io_read' => 100, 'io_write' => 200, 'io_read_ops' => 10, 'io_write_ops' => 20,
                 'io_source' => $source, 'io_scope' => 'recursive',
@@ -259,7 +253,7 @@ PHP
     {
         $slice = 'user.slice/user-1000.slice';
         // Only CPU present; every other source absent.
-        $root = $this->makeV1CgroupTree(1000, [
+        $root = $this->pmssWriteFiles($this->makeRoot(), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
         ]);
 
@@ -283,7 +277,7 @@ PHP
     public function testReadCountersV1RejectsUint64Sentinel(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->makeV1CgroupTree(1000, [
+        $root = $this->pmssWriteFiles($this->makeRoot(), [
             'memory/'.$slice.'/memory.usage_in_bytes' => "9223372036854775807\n", // PHP_INT_MAX sentinel
             'pids/'.$slice.'/pids.current' => "5\n",
         ]);
@@ -343,7 +337,7 @@ PHP
                     'blkio/'.$slice.'/blkio.'.$source.'.io_serviced_recursive' => "8:0 Read 10\n8:0 Write 20\n",
                 ];
                 $files['blkio/'.$slice.'/blkio.'.$source.'.'.$counter] = "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n";
-                $root = $this->makeV1CgroupTree(1000, $files);
+                $root = $this->pmssWriteFiles($this->makeRoot(), $files);
                 $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
                     $this->assertSame(['cpu_nsec' => 42], \pmssResourceLogReadCounters(1000, $root));
                 });

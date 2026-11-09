@@ -533,6 +533,8 @@ the same checked writers for parent creation and payload writes. Keep simulated
 installer return values and staged missing-file cases explicit; these exercise
 runtime failure boundaries rather than fixture setup. Empty directories and
 permission transitions remain separate from file publication.
+Resource-counter trees and virtualenv executables call the checked writers directly;
+avoid local forwarding helpers that add unused parameters or another publication name.
 
 Traffic, resource-limit, filesystem-reader and watchdog setup writes use these
 checked writers too. `pmssWriteSerializedFixture()` retains object and scalar

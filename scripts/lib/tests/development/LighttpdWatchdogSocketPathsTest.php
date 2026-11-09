@@ -24,9 +24,9 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
     public function testStartLighttpdFifoDeflateProbeKeepsCompressionOff(): void
     {
         $root = $this->pmssMakeTempDir('pmss-lighttpd-start-fifo-');
-        $user = 'alice';
+        $user = 'fixtur01';
         $home = $root.'/homes/'.$user;
-        mkdir($home, 0755, true);
+        $this->pmssEnsureDir($home);
         $this->assertTrue(posix_mkfifo($home.'/.lighttpd.conf', 0600));
         $this->pmssWriteExecutableFiles($root, [
             'pgrep' => "#!/bin/sh\nexit 1\n",
@@ -153,9 +153,6 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     private function writeConfig(string $body): string
     {
-        $configPath = $this->tempDir.'/lighttpd.conf';
-        file_put_contents($configPath, $body."\n");
-
-        return $configPath;
+        return $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', $body."\n");
     }
 }

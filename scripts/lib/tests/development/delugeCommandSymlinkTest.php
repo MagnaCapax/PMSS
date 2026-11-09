@@ -55,8 +55,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
     {
         $systemPath = $this->makeExecutable('usr/bin/deluged');
         $localPath = $this->tempDir.'/usr/local/bin/deluged';
-        @mkdir(dirname($localPath), 0755, true);
-        @symlink($systemPath, $localPath);
+        $this->pmssWriteSymlinks(dirname($localPath), [basename($localPath) => $systemPath]);
 
         $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, $this->logger);
 
@@ -102,7 +101,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
     {
         $systemPath = $this->makeExecutable('usr/bin/deluge-web');
         $localPath = $this->tempDir.'/usr/local/bin/deluge-web';
-        @mkdir($localPath, 0755, true);
+        $this->pmssEnsureDir($localPath);
 
         $result = \pmssEnsureDelugeCommandSymlink('deluge-web', $systemPath, $localPath, false, $this->logger);
 
