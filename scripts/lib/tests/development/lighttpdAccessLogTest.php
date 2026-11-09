@@ -18,7 +18,7 @@ class LighttpdAccessLogTest extends TestCase
             [128, 64, ['status' => 'trimmed', 'sizeBefore' => 128], 0],
             [16, 64, ['status' => 'skip', 'reason' => 'below_threshold'], 16],
         ] as [$bytes, $threshold, $expected, $finalSize]) {
-            $path = $this->tempDir.'/alice/.lighttpd/access.log';
+            $path = $this->tempDir.'/fixtur01/.lighttpd/access.log';
             $this->pmssWriteFile($path, str_repeat('x', $bytes));
 
             $this->pmssAssertArraySubsetSame($expected, \pmssLighttpdAccessLogTrimFile($path, $threshold));
@@ -28,11 +28,9 @@ class LighttpdAccessLogTest extends TestCase
 
     public function testTrimFileRejectsSymlinkTarget(): void
     {
-        $realPath = $this->tempDir.'/real-access.log';
-        $linkPath = $this->tempDir.'/alice/.lighttpd/access.log';
-        @mkdir(dirname($linkPath), 0755, true);
-        file_put_contents($realPath, str_repeat('x', 128));
-        symlink($realPath, $linkPath);
+        $realPath = $this->pmssWriteFile($this->tempDir.'/real-access.log', str_repeat('x', 128));
+        $linkPath = $this->tempDir.'/fixtur01/.lighttpd/access.log';
+        $this->pmssWriteSymlinks($this->tempDir, ['fixtur01/.lighttpd/access.log' => $realPath]);
 
         $result = \pmssLighttpdAccessLogTrimFile($linkPath, 64);
 
@@ -42,7 +40,7 @@ class LighttpdAccessLogTest extends TestCase
 
     public function testTrimFileRejectsMultipleLinks(): void
     {
-        $path = $this->tempDir.'/alice/.lighttpd/access.log';
+        $path = $this->tempDir.'/fixtur01/.lighttpd/access.log';
         $linkedPath = $this->tempDir.'/linked-access.log';
         $this->pmssWriteFile($path, str_repeat('x', 128));
         link($path, $linkedPath);
@@ -56,7 +54,7 @@ class LighttpdAccessLogTest extends TestCase
 
     public function testTrimFileSkipsBusyLog(): void
     {
-        $path = $this->tempDir.'/alice/.lighttpd/access.log';
+        $path = $this->tempDir.'/fixtur01/.lighttpd/access.log';
         $this->pmssWriteFile($path, str_repeat('x', 128));
 
         $lockHandle = fopen($path, 'c+');

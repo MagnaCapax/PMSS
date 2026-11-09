@@ -174,7 +174,7 @@ class RuntimeProfileTest extends TestCase
                 $root = $this->pmssMakeTempDir('pmss-profile-encoding-');
                 $path = $existing ? $root.'/report.json' : $root.'/missing/report.json';
                 if ($existing) {
-                    file_put_contents($path, "prior report\n");
+                    $this->pmssWriteFile($path, "prior report\n");
                 }
                 $this->pmssTrackEnvOverrides(['PMSS_PROFILE_OUTPUT' => $path]);
                 $GLOBALS['PMSS_PROFILE'] = [[$field => $field === 'duration' ? INF : "invalid\xFF"]];
@@ -216,8 +216,7 @@ class RuntimeProfileTest extends TestCase
     public function testProfileSummaryRefusesUnsafeReportPaths(): void
     {
         $root = $this->pmssMakeTempDir('pmss-profile-path-');
-        $outside = $root.'/outside.json';
-        file_put_contents($outside, 'prior report');
+        $outside = $this->pmssWriteFile($root.'/outside.json', 'prior report');
         symlink($outside, $root.'/linked.json');
         symlink($root, $root.'/linked-dir');
 

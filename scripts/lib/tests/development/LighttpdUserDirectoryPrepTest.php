@@ -36,10 +36,9 @@ class LighttpdUserDirectoryPrepTest extends TestCase
     public function testExistingCustomFileModeConvergesWithoutRewritingContent(): void
     {
         $home = $this->pmssEnsureUserWebHome($this->base, 'home');
-        $this->pmssEnsureDir($home.'/.lighttpd');
         $path = $home.'/.lighttpd/custom';
         $content = "# Customer configuration\nserver.tag = \"custom\"\n";
-        file_put_contents($path, $content);
+        $this->pmssWriteFile($path, $content);
         touch($path, 1234567890);
         $inode = fileinode($path);
 
@@ -56,8 +55,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
 
     public function testRejectsUnsafeCustomFilesWithoutChangingTargets(): void
     {
-        $target = $this->base.'/target';
-        file_put_contents($target, 'untouched');
+        $target = $this->pmssWriteFile($this->base.'/target', 'untouched');
         chmod($target, 0600);
         foreach (['symlink', 'dangling', 'directory'] as $kind) {
             $home = $this->pmssEnsureUserWebHome($this->base, $kind);
@@ -68,7 +66,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
             } else {
                 $this->pmssCreateSymlinkOrSkip($target.($kind === 'dangling' ? '-missing' : ''), $path);
             }
-            $this->assertSame(false, \pmssPrepareLighttpdUserDirectories('testuser', $home, false));
+            $this->assertSame(false, \pmssPrepareLighttpdUserDirectories('fixtur01', $home, false));
             clearstatcache(true, $target);
             $this->assertSame(0600, fileperms($target) & 0777);
             $this->assertSame('untouched', file_get_contents($target));
@@ -86,7 +84,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
 
     public function testRejectsSymlinkedLighttpdDir(): void
     {
-        $user = 'testuser';
+        $user = 'fixtur01';
         $home = $this->pmssEnsureUserWebHome($this->base, 'home');
 
         $elsewhere = $this->base.'/elsewhere';
@@ -120,7 +118,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
             if ($kind === 'unexpected') mkdir($target, 0700);
             symlink($target, $home.'/www/public');
             $reason = null;
-            $this->assertFalse(\pmssPrepareLighttpdUserDirectories('testuser', $home, false, $reason));
+            $this->assertFalse(\pmssPrepareLighttpdUserDirectories('fixtur01', $home, false, $reason));
             $this->assertSame('Refusing unexpected symlink at www/public', $reason);
             $this->assertSame($target, readlink($home.'/www/public'));
             if ($kind === 'unexpected') $this->assertSame(['.', '..'], scandir($target));

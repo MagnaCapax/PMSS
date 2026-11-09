@@ -17,8 +17,7 @@ class RootShellDefaultsSafetyTest extends TestCase
 
     public function testAppendsOnlyMissingDefaultsAndPreservesMode(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-root-shell-append-').'/.bashrc';
-        file_put_contents($path, "alias ls='ls --color=auto'\ncustom=value\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-root-shell-append-').'/.bashrc', "alias ls='ls --color=auto'\ncustom=value\n");
         chmod($path, 0600);
 
         $this->runDefaults($path);
@@ -31,7 +30,7 @@ class RootShellDefaultsSafetyTest extends TestCase
     {
         $path = $this->pmssMakeTempDir('pmss-root-shell-skip-').'/.bashrc';
         $contents = "custom=value\nalias ls='ls --color=auto'\nPATH=\$PATH:/scripts\n";
-        file_put_contents($path, $contents);
+        $this->pmssWriteFile($path, $contents);
         $inode = fileinode($path);
 
         $messages = $this->runDefaults($path);

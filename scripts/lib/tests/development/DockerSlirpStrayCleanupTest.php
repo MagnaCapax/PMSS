@@ -13,7 +13,7 @@ class DockerSlirpStrayCleanupTest extends TestCase
     private function pmssSlirpStrayFixture(): array
     {
         $dir = $this->pmssMakeTempDir('pmss-slirp-stray-');
-        file_put_contents($dir.'/target', 'helper');
+        $this->pmssWriteFile($dir.'/target', 'helper');
         $paths = [
             'stray' => $dir.'/pmss-slirp4netns-AbC123',
             'link' => $dir.'/pmss-slirp4netns-Link00',
@@ -24,7 +24,7 @@ class DockerSlirpStrayCleanupTest extends TestCase
         ];
         foreach ($paths as $name => $path) {
             if ($name !== 'link') {
-                file_put_contents($path, 'binary');
+                $this->pmssWriteFile($path, 'binary');
             }
         }
         $this->assertTrue(symlink($dir.'/target', $paths['link']), 'Expected symlink fixture');
@@ -58,7 +58,7 @@ class DockerSlirpStrayCleanupTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-slirp-gate-');
         $helper = $dir.'/slirp4netns';
         $link = $dir.'/slirp4netns-link';
-        file_put_contents($helper, 'pinned build');
+        $this->pmssWriteFile($helper, 'pinned build');
         symlink($helper, $link);
         $sha = hash('sha256', 'pinned build');
 

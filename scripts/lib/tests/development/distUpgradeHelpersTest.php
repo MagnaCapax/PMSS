@@ -167,10 +167,10 @@ class DistUpgradeHelpersTest extends TestCase
                 ],
             ],
         ] as [$mdstat, $grub, $mdadmConfig, $initramfsMdadm, $needles]) {
-            file_put_contents($mdstatPath, $mdstat);
-            file_put_contents($grubPath, $grub);
-            file_put_contents($mdadmConfigPath, $mdadmConfig);
-            file_put_contents($initramfsMdadmPath, $initramfsMdadm);
+            $this->pmssWriteFiles($this->tmpDir, [
+                'mdstat' => $mdstat, 'grub.cfg' => $grub,
+                'mdadm.conf' => $mdadmConfig, 'initramfs-mdadm' => $initramfsMdadm,
+            ]);
 
             list(, $output) = $this->pmssCaptureStdout(function () use ($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath): void {
                 \pmssVerifyDistUpgradeBootReadiness($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath);

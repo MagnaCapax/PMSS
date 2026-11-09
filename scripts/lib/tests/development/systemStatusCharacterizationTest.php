@@ -19,10 +19,8 @@ final class SystemStatusCharacterizationTest extends TestCase
     public function setUp(): void
     {
         $tempDir = $this->pmssMakeTempDir('system-status-');
-        $this->osReleasePath = $tempDir.'/os-release';
-        $this->sourcesPath = $tempDir.'/sources.list';
-        file_put_contents($this->osReleasePath, "ID=debian\nVERSION_ID=12\nVERSION_CODENAME=bookworm\n");
-        file_put_contents($this->sourcesPath, "deb http://example.invalid/debian bookworm main\n");
+        $this->osReleasePath = $this->pmssWriteFile($tempDir.'/os-release', "ID=debian\nVERSION_ID=12\nVERSION_CODENAME=bookworm\n");
+        $this->sourcesPath = $this->pmssWriteFile($tempDir.'/sources.list', "deb http://example.invalid/debian bookworm main\n");
         $this->pmssTrackEnvOverrides([
             'PMSS_OS_RELEASE_PATH' => $this->osReleasePath,
             'PMSS_APT_SOURCES_PATH' => $this->sourcesPath,
@@ -138,7 +136,7 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testComponentChecksWarnWhenCodenameIsMissing(): void
     {
-        file_put_contents($this->osReleasePath, "ID=debian\nVERSION_ID=12\n");
+        $this->pmssWriteFile($this->osReleasePath, "ID=debian\nVERSION_ID=12\n");
         pmssResetOsReleaseCache();
 
         $checks = pmssComponentStatusChecks();
@@ -151,7 +149,7 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testComponentChecksWarnWhenSourcesMismatch(): void
     {
-        file_put_contents($this->sourcesPath, "deb http://example.invalid/debian bullseye main\n");
+        $this->pmssWriteFile($this->sourcesPath, "deb http://example.invalid/debian bullseye main\n");
 
         $checks = pmssComponentStatusChecks();
 

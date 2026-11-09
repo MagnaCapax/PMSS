@@ -14,7 +14,6 @@ class ConfigBackupsRetentionCharacterizationTest extends TestCase
         $source = $sourceRoot.'/etc/nginx/nginx.conf';
         $key = \pmssConfigBackupsPathKey($source);
         $directory = $backupRoot.'/nginx';
-        mkdir($directory, 0700);
         $names = [
             'manual__'.$key.'.bak',
             '20260103120000__'.$key.'.bak',
@@ -35,9 +34,8 @@ class ConfigBackupsRetentionCharacterizationTest extends TestCase
             [1, 1, [0]],
         ];
         foreach ($cases as [$maxCount, $ttlSeconds, $indices]) {
-            foreach (array_merge($names, [$other]) as $name) {
-                file_put_contents($directory.'/'.$name, $name);
-            }
+            $files = array_merge($names, [$other]);
+            $this->pmssWriteFiles($directory, array_combine($files, $files), 0700);
             \pmssPruneCriticalConfigBackups('nginx', $source, [
                 'backupRoot' => $backupRoot, 'maxCount' => $maxCount,
                 'ttlSeconds' => $ttlSeconds, 'nowTs' => $now,
@@ -60,11 +58,10 @@ class ConfigBackupsRetentionCharacterizationTest extends TestCase
         $source = $sourceRoot.'/etc/nginx/nginx.conf';
         $key = \pmssConfigBackupsPathKey($source);
         $directory = $backupRoot.'/nginx';
-        mkdir($directory, 0700);
         // The historical glob matches key suffixes too; malformed dates do not age out.
         $suffix = '20200101000000__'.$key.'_extra.bak';
         $undated = 'not-a-date__'.$key.'.bak';
-        foreach ([$suffix, $undated] as $name) file_put_contents($directory.'/'.$name, $name);
+        $this->pmssWriteFiles($directory, [$suffix => $suffix, $undated => $undated], 0700);
         \pmssPruneCriticalConfigBackups('nginx', $source, [
             'backupRoot' => $backupRoot, 'maxCount' => 0,
             'ttlSeconds' => 1, 'nowTs' => mktime(12, 0, 0, 1, 3, 2026),

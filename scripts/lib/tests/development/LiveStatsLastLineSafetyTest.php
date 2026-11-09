@@ -18,7 +18,7 @@ class LiveStatsLastLineSafetyTest extends TestCase
             "first\n last \n\n" => ' last ',
             str_repeat("old line\n", 200)."latest\npartial" => 'latest',
         ] as $content => $expected) {
-            file_put_contents($root.'/log', $content);
+            $this->pmssWriteFile($root.'/log', $content);
             clearstatcache();
             $this->assertSame($expected, \pmssLiveStatsLastLine($root.'/log'));
         }
@@ -27,7 +27,7 @@ class LiveStatsLastLineSafetyTest extends TestCase
     public function testInvalidPathsRetainUnavailableResult(): void
     {
         $root = $this->pmssMakeTempDir('pmss-live-tail-');
-        file_put_contents($root.'/log', "latest\n");
+        $this->pmssWriteFile($root.'/log', "latest\n");
         symlink($root.'/log', $root.'/link');
         foreach (['', $root, $root.'/missing', $root.'/link', "\0".$root.'/log', $root.'/log'."\0"] as $path) {
             $this->assertSame(null, \pmssLiveStatsLastLine($path));
@@ -64,7 +64,7 @@ PHP;
             ["first\n", str_repeat('x', 1018)."\nnew\n", 'first'],
             ["first\n", str_repeat('x', 1017)."\nnew\n", str_repeat('x', 1017)],
         ] as [$content, $append, $expected]) {
-            file_put_contents($path, $content);
+            $this->pmssWriteFile($path, $content);
             $this->assertSame([$expected, 1024, true], $this->pmssRunInlinePhpJson($script, [
                 'PMSS_TEST_LIVE_TAIL_GROWTH' => json_encode([$path, $append]),
             ]));

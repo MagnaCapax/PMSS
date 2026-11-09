@@ -21,7 +21,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
             $rc = \pmssStorageBenchmarkPostInstallRun(
                 $this->pmssMakeArrayLogger($logs),
                 static function () use (&$calls): int { $calls[] = true; return 0; },
-                self::pmssMakeCallbacks(['users' => ['alice']])['users']
+                self::pmssMakeCallbacks(['users' => ['fixtur01']])['users']
             );
             $this->assertSame(0, $rc);
         });
@@ -34,7 +34,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
     public function testSkipsWhenSuccessMarkerExists(): void
     {
         $marker = $this->markerPath();
-        file_put_contents($marker, "{}\n");
+        $this->pmssWriteFile($marker, "{}\n");
         $calls = [];
         $logs = [];
 
