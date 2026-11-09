@@ -64,11 +64,10 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         mkdir($keyFile);
         $this->assertFalse(\pmssAiCodexState($env)['keyFileValid']);
         rmdir($keyFile);
-        file_put_contents($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=private-test-key\n");
+        $this->pmssWriteFile($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=private-test-key\n");
         chmod($keyFile, 0600);
         $this->assertTrue(\pmssAiCodexState($env)['keyFileValid']);
-        mkdir($this->tempDir.'/.codex');
-        file_put_contents($this->tempDir.'/.codex/auth.json', '{}');
+        $this->pmssWriteFile($this->tempDir.'/.codex/auth.json', '{}', 0777);
         $this->assertTrue(\pmssAiCodexState($env)['authExists']);
         $source = file_get_contents(__DIR__.'/../../update/apps/templates/pmss-ai-launch.php');
         $this->assertStringContainsString('@fileowner($file) !== $uid', $source);
@@ -80,7 +79,7 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         $launcher = $this->tempDir.'/pmss-ai-launch.php';
         $stub = $this->tempDir.'/codex';
         $source = __DIR__.'/../../update/apps/templates/pmss-ai-launch.php';
-        file_put_contents($stub, 'old binary');
+        $this->pmssWriteFile($stub, 'old binary');
         $this->assertTrue(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, false));
         $this->pmssWriteExecutableFile($binary, 'pinned binary fixture');
         $uid = posix_geteuid();
@@ -101,7 +100,7 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         $this->assertStringContainsString("['-o', 'root', '-g', 'root', '-m', '0755'", $installer);
         $this->assertFalse(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, false));
         $this->assertTrue(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, true));
-        file_put_contents($launcher, 'stale');
+        $this->pmssWriteFile($launcher, 'stale');
         $this->assertTrue(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, false));
     }
 

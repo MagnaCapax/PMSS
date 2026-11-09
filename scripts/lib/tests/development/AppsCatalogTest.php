@@ -78,7 +78,7 @@ class AppsCatalogTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-oc-row-');
         $read = static function () use ($home): array { return \pmssCustomerAppsStatusRead($home, 'fixtur01', 'server.example'); };
         $this->assertFalse(isset($read()['apps']['openclaw']));
-        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
         $app = $read()['apps']['openclaw'];
         $this->assertSame('off', $app['state']);
         $html = \pmssCustomerAppRowHtmlBuild('openclaw', $app);
@@ -86,7 +86,7 @@ class AppsCatalogTest extends TestCase
         mkdir($home.'/.openclaw');
         touch($home.'/.openclaw/gateway.env');
         foreach (array('healthy 0 1' => 'not-running', 'failed 1 1' => 'failed', 'gave_up 1' => 'gave up') as $state => $expected) {
-            file_put_contents($home.'/.openclaw/check.state', $state);
+            $this->pmssWriteFile($home.'/.openclaw/check.state', $state);
             $this->assertSame($expected, $read()['apps']['openclaw']['state']);
         }
         touch($home.'/.openclaw/pmss-stopped');
@@ -220,7 +220,7 @@ class AppsCatalogTest extends TestCase
     {
         $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             $path = $home.'/www/scriptsIncAppProcess.php';
-            file_put_contents($path, str_replace('/home/.pmss/clients/', $home.'/store/', file_get_contents($path)));
+            $this->pmssWriteFile($path, str_replace('/home/.pmss/clients/', $home.'/store/', file_get_contents($path)));
             $this->pmssWriteFile($home.'/www/qaBinaries.php', "<?php require __DIR__.'/scriptsInc.php';"
                 ." \$d = pmssCustomerManagedAppDefinitions(); echo json_encode([\$d['qBittorrent']['binaries'], \$d['Deluge']['binaries']]);");
             $store = $this->pmssWriteFile($home.'/store/qbittorrent/5.2.4-lt2.0/qbittorrent-nox', 'fixture');
@@ -240,7 +240,7 @@ class AppsCatalogTest extends TestCase
         $this->pmssWithLegacyAppsRender(function (string $home, callable $render): void {
             // Keep the real selection validator, replacing only its fixed store root in the copied tree.
             $path = $home.'/www/scriptsIncAppProcess.php';
-            file_put_contents($path, str_replace('/home/.pmss/clients/', $home.'/store/', file_get_contents($path)));
+            $this->pmssWriteFile($path, str_replace('/home/.pmss/clients/', $home.'/store/', file_get_contents($path)));
             $read = function () use ($render): array {
                 return $this->pmssDecodeJsonArray($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'])['apps'];
             };
@@ -375,7 +375,7 @@ class AppsCatalogTest extends TestCase
     {
         $directory = $this->pmssMakeTempDir('pmss-lsio-write-');
         $target = $directory.'/catalog.php';
-        file_put_contents($target, 'previous');
+        $this->pmssWriteFile($target, 'previous');
 
         $this->assertTrue(\pmssLsioCatalogWrite($target, '<?php return [];'));
         $this->assertSame('<?php return [];', file_get_contents($target));
@@ -651,7 +651,7 @@ class AppsCatalogTest extends TestCase
     {
         $this->pmssWithLegacyAppsRender(function (string $home): void {
             // Stand-in consumer: proves the panel ran it from the account home and saw the marker.
-            file_put_contents($home.'/.rtorrentRestart.php', '<?php if (is_file("www/.rtorrentRestart")) { unlink("www/.rtorrentRestart"); file_put_contents("restart-ran", "ok"); }');
+            $this->pmssWriteFile($home.'/.rtorrentRestart.php', '<?php if (is_file("www/.rtorrentRestart")) { unlink("www/.rtorrentRestart"); file_put_contents("restart-ran", "ok"); }');
             foreach (array('restart', 'start') as $action) {
                 @unlink($home.'/restart-ran');
                 $post = $this->pmssAppsEndpointProbe($home, 'rtorrentRestart.php', $action, 'POST', true);

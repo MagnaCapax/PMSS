@@ -60,7 +60,7 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         mkdir($key);
         $this->assertFalse(\pmssAiClaudeState($env)['keyFileValid']);
         rmdir($key);
-        file_put_contents($key, "endpoint=https://virsilipas.mcx.fi/v1\nkey=private-test-key\n");
+        $this->pmssWriteFile($key, "endpoint=https://virsilipas.mcx.fi/v1\nkey=private-test-key\n");
         $this->assertTrue(\pmssAiClaudeState($env)['keyFileValid']);
         $configDir = $home.'/.claude';
         mkdir($configDir);
@@ -70,14 +70,14 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         unlink($credentials);
         $state = $home.'/.claude.json';
         foreach (['{"oauthAccount":null}', '{"primaryApiKey":null}', '{bad'] as $json) {
-            file_put_contents($state, $json);
+            $this->pmssWriteFile($state, $json);
             $this->assertTrue(\pmssAiClaudeState($env)['configChoice']);
         }
-        file_put_contents($state, '{}');
+        $this->pmssWriteFile($state, '{}');
         $this->assertFalse(\pmssAiClaudeState($env)['configChoice']);
         $settings = $configDir.'/settings.json';
         foreach (['{"apiKeyHelper":null}', '{"env":{"ANTHROPIC_MODEL":"own"}}', '{bad'] as $json) {
-            file_put_contents($settings, $json);
+            $this->pmssWriteFile($settings, $json);
             $this->assertTrue(\pmssAiClaudeState($env)['configChoice']);
         }
         unlink($settings);
@@ -85,9 +85,8 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         $this->assertTrue(\pmssAiClaudeState($env)['configChoice']);
         rmdir($settings);
         $custom = $home.'/custom';
-        mkdir($custom);
         $env['CLAUDE_CONFIG_DIR'] = $custom;
-        file_put_contents($custom.'/.claude.json', '{"oauthAccount":{}}');
+        $this->pmssWriteFile($custom.'/.claude.json', '{"oauthAccount":{}}', 0777);
         $this->assertTrue(\pmssAiClaudeState($env)['configChoice']);
         $this->assertFalse(file_exists($custom.'/settings.json'));
         $source = file_get_contents(__DIR__.'/../../update/apps/templates/pmss-ai-launch.php');
@@ -115,7 +114,7 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         chmod($stub, 0700);
         $this->assertTrue(\pmssAiToolsClaudeInstallNeeded($launcher, $stub, $source, $uid, $gid));
         chmod($stub, 0755);
-        file_put_contents($stub, 'outdated');
+        $this->pmssWriteFile($stub, 'outdated');
         $this->assertTrue(\pmssAiToolsClaudeInstallNeeded($launcher, $stub, $source));
     }
 
@@ -125,7 +124,6 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         $this->assertSame($env, \pmssAiNodeRuntimePath($env, $this->tempDir));
         foreach (['22.9.0', '22.23.4'] as $version) {
             $bin = $this->tempDir.'/node-v'.$version.'-linux-x64/bin';
-            mkdir($bin, 0755, true);
             $this->pmssWriteExecutableFile($bin.'/node', "#!/bin/sh\n");
         }
         $out = \pmssAiNodeRuntimePath($env, $this->tempDir);

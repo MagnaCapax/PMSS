@@ -42,9 +42,9 @@ final class PikkumiesHermesUiTest extends TestCase
     public function testPortBUsesPrivateOriginAndAuthGate(): void
     {
         $live = $this->pmssMakeTempDir('pmss-pikkumies-b-cert-', 0700);
-        mkdir($live.'/uitester.node.example.com');
-        file_put_contents($live.'/uitester.node.example.com/fullchain.pem', 'fixture');
-        file_put_contents($live.'/uitester.node.example.com/privkey.pem', 'fixture');
+        $this->pmssWriteFiles($live.'/uitester.node.example.com', [
+            'fullchain.pem' => 'fixture', 'privkey.pem' => 'fixture',
+        ], 0777);
         $block = \pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com',
             '0123456789abcdef.mcx.fi', 12345, $live);
         $this->assertStringContainsAllStrings(['listen 845 ssl;', 'server_name 0123456789abcdef.mcx.fi;',
@@ -73,7 +73,7 @@ final class PikkumiesHermesUiTest extends TestCase
         $this->assertTrue(is_resource($process));
         $pid = proc_get_status($process)['pid'];
         fclose($pipes[0]); fclose($pipes[1]); fclose($pipes[2]);
-        file_put_contents($paths['pid'], $pid."\n");
+        $this->pmssWriteFile($paths['pid'], $pid."\n");
         usleep(100000);
         chmod($paths['credentials'], 0644);
         try {
@@ -152,9 +152,8 @@ final class PikkumiesHermesUiTest extends TestCase
     /** One private launcher token as pikkumiesOpen.php writes it. */
     private function loginToken(string $directory, int $age = 0): string
     {
-        if (!is_dir($directory)) mkdir($directory, 0700, true);
         $token = bin2hex(random_bytes(32));
-        file_put_contents($directory.'/'.$token, $token."\n");
+        $this->pmssWriteFile($directory.'/'.$token, $token."\n", 0700);
         chmod($directory.'/'.$token, 0600);
         if ($age > 0) touch($directory.'/'.$token, time() - $age);
         clearstatcache();
@@ -329,7 +328,7 @@ final class PikkumiesHermesUiTest extends TestCase
         $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $expired), 'expired');
         $outside = $this->pmssMakeTempDir('pmss-relay-outside-', 0700);
         $linked = bin2hex(random_bytes(32));
-        file_put_contents($outside.'/'.$linked, $linked."\n");
+        $this->pmssWriteFile($outside.'/'.$linked, $linked."\n");
         chmod($outside.'/'.$linked, 0600);
         symlink($outside.'/'.$linked, $directory.'/'.$linked);
         $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $linked), 'symlinked');
@@ -341,7 +340,7 @@ final class PikkumiesHermesUiTest extends TestCase
         chmod($directory.'/'.$readable, 0644);
         $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $readable), 'group or world readable');
         $mismatch = $this->loginToken($directory);
-        file_put_contents($directory.'/'.$mismatch, str_repeat('0', 64)."\n");
+        $this->pmssWriteFile($directory.'/'.$mismatch, str_repeat('0', 64)."\n");
         $this->assertFalse(\pmssHermesRelayTokenClaim($directory, $mismatch), 'content mismatch');
         $open = $this->loginToken($directory);
         chmod($directory, 0755);
@@ -373,7 +372,7 @@ final class PikkumiesHermesUiTest extends TestCase
             .escapeshellarg($directory.'/credentials'), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
         $pid = proc_get_status($process)['pid'];
-        file_put_contents($directory.'/relay.pid', $pid."\n");
+        $this->pmssWriteFile($directory.'/relay.pid', $pid."\n");
         usleep(200000);
         try {
             $this->assertTrue(\pmssHermesRelayCurrent($directory.'/relay.pid', $directory.'/ui.sock', $directory.'/credentials'));
@@ -392,14 +391,13 @@ final class PikkumiesHermesUiTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-b-tool-', 0700);
         $paths = \pmssPikkumiesHermesPaths($home);
-        mkdir($paths['base'], 0700, true);
-        file_put_contents($paths['port'], "24000\n");
+        $this->pmssWriteFile($paths['port'], "24000\n", 0700);
         $process = proc_open('exec '.$this->pmssBuildInlinePhpCommand('sleep(30);')
             .' dashboard hermes', [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $this->assertTrue(is_resource($process));
         $pid = proc_get_status($process)['pid'];
         fclose($pipes[0]); fclose($pipes[1]); fclose($pipes[2]);
-        file_put_contents($paths['pid'], $pid."\n");
+        $this->pmssWriteFile($paths['pid'], $pid."\n");
         usleep(100000);
         $this->pmssWithEnv(['PATH' => '/does-not-exist'], function () use ($paths): void {
             $this->assertFalse(\pmssPikkumiesHermesEnsure($paths));
@@ -468,7 +466,7 @@ final class PikkumiesHermesUiTest extends TestCase
         $config = preg_replace_callback('/\blisten (84[4-6])\b/', static function (array $m): string {
             return 'listen '.((int) $m[1] + 20000);
         }, $config);
-        file_put_contents($root.'/nginx.conf', $config);
+        $this->pmssWriteFile($root.'/nginx.conf', $config);
         exec(escapeshellarg($nginx).' -t -p '.escapeshellarg($root.'/').' -c '.escapeshellarg($root.'/nginx.conf').' 2>&1', $rows, $rc);
         $this->assertSame(0, $rc, implode("\n", $rows));
     }

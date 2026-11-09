@@ -232,6 +232,9 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Process, HTTP, plugin, logging, resource, transfer and path-guard fixtures use `TestCase::pmssWriteFiles()`
   and `pmssWriteFile()` for checked publication and parent creation. Keep deliberately
   empty directories, append operations and injected runtime writes explicit.
+  AI-launcher, Apps-catalog and private-UI fixtures use the same writers for
+  account state, launcher copies and certificate stubs, retaining directory
+  creation modes and explicit permission transitions at their callers.
 - Generated text and repository source contracts share `TestCase::pmssAssertStringContract()`
   for required/forbidden fragments, regexes and ordered fragments. Required and
   forbidden maps retain per-fragment diagnostic messages.

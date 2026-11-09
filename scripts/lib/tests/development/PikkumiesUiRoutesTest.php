@@ -78,7 +78,7 @@ final class PikkumiesUiRoutesTest extends TestCase
         $this->assertSame([$directory.'/uitester', "123\n", 'root', 'uitester', 0640], $write);
         $this->assertTrue(\pmssPikkumiesUiIdentityPublish('uitester', '123', $directory, $marker));
         $this->assertFalse(is_dir($directory));
-        file_put_contents($marker, '');
+        $this->pmssWriteFile($marker, '');
         $this->assertFalse(\pmssPikkumiesUiIdentityPublish('uitester', '123', $directory, $marker));
         $this->assertTrue(is_dir($directory));
     }
@@ -87,9 +87,9 @@ final class PikkumiesUiRoutesTest extends TestCase
     {
         $host = '0123456789abcdef.mcx.fi';
         $live = $this->pmssMakeTempDir('pmss-ui-cert-', 0700);
-        mkdir($live.'/uitester.node.example.com');
-        file_put_contents($live.'/uitester.node.example.com/fullchain.pem', 'fixture');
-        file_put_contents($live.'/uitester.node.example.com/privkey.pem', 'fixture');
+        $this->pmssWriteFiles($live.'/uitester.node.example.com', [
+            'fullchain.pem' => 'fixture', 'privkey.pem' => 'fixture',
+        ], 0777);
         $this->assertTrue(\pmssPikkumiesUiCertificateReady('uitester', 'node.example.com', $live));
         $this->assertFalse(\pmssPikkumiesUiCertificateReady('fixtur02', 'node.example.com', $live));
         $block = \pmssPikkumiesUiNginxBlock('uitester', 'node.example.com', $host, 12345, $live);
@@ -123,9 +123,9 @@ final class PikkumiesUiRoutesTest extends TestCase
     public function testPortCUsesPrivateServiceOriginAndSeparateBackendPaths(): void
     {
         $live = $this->pmssMakeTempDir('pmss-hermes-ui-cert-', 0700);
-        mkdir($live.'/uitester.node.example.com');
-        file_put_contents($live.'/uitester.node.example.com/fullchain.pem', 'fixture');
-        file_put_contents($live.'/uitester.node.example.com/privkey.pem', 'fixture');
+        $this->pmssWriteFiles($live.'/uitester.node.example.com', [
+            'fullchain.pem' => 'fixture', 'privkey.pem' => 'fixture',
+        ], 0777);
         $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com',
             '0123456789abcdef.mcx.fi', 12345, $live);
         $this->assertStringContainsAllStrings([

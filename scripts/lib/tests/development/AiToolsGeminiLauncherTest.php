@@ -50,7 +50,7 @@ class AiToolsGeminiLauncherTest extends AiToolsLauncherTestCase
         symlink($home.'/missing', $key);
         $this->assertFalse(\pmssAiGeminiState($env)['keyFileValid']);
         unlink($key);
-        file_put_contents($key, "endpoint=https://virsilipas.mcx.fi/v1\nkey=private-test-key\n");
+        $this->pmssWriteFile($key, "endpoint=https://virsilipas.mcx.fi/v1\nkey=private-test-key\n");
         $this->assertTrue(\pmssAiGeminiState($env)['keyFileValid']);
         mkdir($config);
         foreach (['oauth_creds.json', 'google_accounts.json'] as $name) {
@@ -61,16 +61,14 @@ class AiToolsGeminiLauncherTest extends AiToolsLauncherTestCase
         $settings = $config.'/settings.json';
         foreach (['{"security":{"auth":{"selectedType":"gemini-api-key"}}}',
             '{"security":{"auth":{"selectedType":null}}}', '{bad'] as $json) {
-            file_put_contents($settings, $json);
+            $this->pmssWriteFile($settings, $json);
             $this->assertTrue(\pmssAiGeminiState($env)['configChoice']);
         }
-        file_put_contents($settings, '{}');
+        $this->pmssWriteFile($settings, '{}');
         $this->assertFalse(\pmssAiGeminiState($env)['configChoice']);
         unlink($settings);
         $custom = $home.'/custom';
-        mkdir($custom);
-        mkdir($custom.'/'.$configName);
-        file_put_contents($custom.'/'.$configName.'/settings.json', '{bad');
+        $this->pmssWriteFile($custom.'/'.$configName.'/settings.json', '{bad', 0777);
         $env['GEMINI_CLI_HOME'] = $custom;
         $this->assertTrue(\pmssAiGeminiState($env)['configChoice']);
         $this->assertFalse(file_exists($config.'/settings.json'));
@@ -84,23 +82,23 @@ class AiToolsGeminiLauncherTest extends AiToolsLauncherTestCase
         mkdir($workspace);
         mkdir($home.'/'.$configName);
         mkdir($workspace.'/'.$configName);
-        file_put_contents($home.'/.env', 'GEMINI_API_KEY=home');
+        $this->pmssWriteFile($home.'/.env', 'GEMINI_API_KEY=home');
         $this->assertTrue(\pmssAiGeminiEnvChoice($workspace, $home));
         $state = $this->launcherState(['configChoice' => \pmssAiGeminiEnvChoice($workspace, $home)]);
         $this->assertFalse(\pmssAiGeminiDecision([], ['HOME' => $home], $state)['notice']);
         unlink($home.'/.env');
-        file_put_contents($workspace.'/.env', 'GOOGLE_CLOUD_PROJECT=project');
+        $this->pmssWriteFile($workspace.'/.env', 'GOOGLE_CLOUD_PROJECT=project');
         $this->assertTrue(\pmssAiGeminiEnvChoice($workspace, $home));
-        file_put_contents($workspace.'/'.$configName.'/.env', 'GOOGLE_API_KEY=own');
+        $this->pmssWriteFile($workspace.'/'.$configName.'/.env', 'GOOGLE_API_KEY=own');
         $this->assertSame($workspace.'/'.$configName.'/.env', \pmssAiGeminiEnvFile($workspace, $home, true, false));
         $this->assertSame($workspace.'/.env', \pmssAiGeminiEnvFile($workspace, $home, false, false));
         $this->assertTrue(\pmssAiGeminiEnvChoice($workspace, $home));
         unlink($workspace.'/.env');
         unlink($workspace.'/'.$configName.'/.env');
-        file_put_contents($home.'/'.$configName.'/.env', 'GOOGLE_GENAI_USE_VERTEXAI=true');
+        $this->pmssWriteFile($home.'/'.$configName.'/.env', 'GOOGLE_GENAI_USE_VERTEXAI=true');
         $this->assertTrue(\pmssAiGeminiEnvChoice($workspace, $home));
         unlink($home.'/'.$configName.'/.env');
-        file_put_contents($workspace.'/.env', 'UNRELATED=1');
+        $this->pmssWriteFile($workspace.'/.env', 'UNRELATED=1');
         $this->assertFalse(\pmssAiGeminiEnvChoice($workspace, $home));
     }
 
@@ -135,7 +133,7 @@ class AiToolsGeminiLauncherTest extends AiToolsLauncherTestCase
         chmod($stub, 0700);
         $this->assertTrue(\pmssAiToolsGeminiInstallNeeded($launcher, $stub, $source, $defaults, $uid, $gid));
         chmod($stub, 0755);
-        file_put_contents($defaults, '{}');
+        $this->pmssWriteFile($defaults, '{}');
         $this->assertTrue(\pmssAiToolsGeminiInstallNeeded($launcher, $stub, $source, $defaults, $uid, $gid));
     }
 }
