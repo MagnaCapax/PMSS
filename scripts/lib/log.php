@@ -212,8 +212,12 @@ function pmssLogSharedFileIsOwn(string $path, int $mode): bool
     clearstatcache(true, $path);
     if (!pmssPathExistsOrLink($path)) {
         $umask = umask(0777 & ~$mode);
-        $handle = @fopen($path, 'x');
-        umask($umask);
+        try {
+            $handle = @fopen($path, 'x');
+        } finally {
+            // File creation must not leave a temporary process-wide mask behind.
+            umask($umask);
+        }
         $handle !== false && fclose($handle);
         clearstatcache(true, $path);
     }
@@ -244,9 +248,13 @@ function pmssLogAppendTimestampedLine(string $path, string $message, string $tim
     }
     // A requested mode applies at creation too, so a new file never exists with wider permissions.
     $umask = $mode !== null ? umask(0777 & ~$mode) : null;
-    // Keep incomplete writes on the existing failure/fallback path.
-    $written = pmssFileWriteComplete($path, pmssLogFormatTimestampedLine($message, $timestampFormat, $prefix), FILE_APPEND | LOCK_EX);
-    $umask !== null && umask($umask);
+    try {
+        // Keep incomplete writes on the existing failure/fallback path.
+        $written = pmssFileWriteComplete($path, pmssLogFormatTimestampedLine($message, $timestampFormat, $prefix), FILE_APPEND | LOCK_EX);
+    } finally {
+        // Formatting and I/O throwables propagate only after restoring caller state.
+        if ($umask !== null) umask($umask);
+    }
     $written && $mode !== null && @chmod($path, $mode);
     return $written;
 }

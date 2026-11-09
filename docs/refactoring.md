@@ -141,6 +141,13 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Shared-log creation and timestamped appends restore the caller's umask in
+`finally`, including when exclusive open, line formatting or writing throws.
+Original exceptions and errors propagate unchanged; no-mode appends leave the
+mask alone. File guards, requested modes, write flags, bytes, close ordering and
+boolean results retain their contracts. `LogUmaskSafetyTest` injects these
+failures with memory streams; execution stays on the testing machine.
+
 Managed-file publication and account-command stderr captures close in `finally`
 even when diagnostic rewind, read or sanitization throws an exception or error.
 The original diagnostic throwable propagates after close; ordinary command
