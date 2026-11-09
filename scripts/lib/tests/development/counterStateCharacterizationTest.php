@@ -8,14 +8,9 @@ require_once dirname(__DIR__, 2).'/traffic/ingress.php';
 
 class CounterStateCharacterizationTest extends TestCase
 {
-    private function makeRoot(): string
-    {
-        return $this->pmssMakeTempDir('pmss-counter-state-', 0700);
-    }
-
     public function testPayloadWriterReplacesLongerStateAndRetainsCallerLock(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $this->pmssWriteFile($path, '{"ingress":123456789}');
         $handle = \pmssCounterStateLockAcquire($path);
         try {
@@ -75,7 +70,7 @@ class CounterStateCharacterizationTest extends TestCase
 
     public function testUnencodableStatePreservesBaselineAndReleasesLock(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $this->pmssWriteFile($path, '{"ingress":100}');
         $result = \pmssCounterStateUpdate($path, ['ingress' => 160, 'invalid' => NAN], ['ingress']);
         $this->pmssAssertArraySubsetSame([
@@ -92,7 +87,7 @@ class CounterStateCharacterizationTest extends TestCase
 
     public function testSharedStateCreatesMissingFileWithSelectedDeltaFields(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $state = ['ingress' => 123, 'egress' => 456, 'ts' => 1];
 
         $result = \pmssCounterStateUpdate($path, $state, ['ingress']);
@@ -105,7 +100,7 @@ class CounterStateCharacterizationTest extends TestCase
 
     public function testSharedStateComputesDeltaAgainstPreviousValues(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $this->pmssWriteFile($path, json_encode(['ingress' => 100, 'egress' => 200, 'ts' => 1]));
 
         $result = \pmssCounterStateUpdate($path, ['ingress' => 160, 'egress' => 260, 'ts' => 2], ['ingress', 'egress']);
@@ -120,7 +115,7 @@ class CounterStateCharacterizationTest extends TestCase
         // no io_source. After the fix reads bfq (a large cumulative), the naive delta would be
         // the FULL cumulative and could trip live monthly-IOPS enforcement. On the source switch
         // the io_* deltas MUST be zeroed for one sample (baseline reseed), then delta normally.
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $this->pmssWriteFile($path, json_encode([
             'io_read' => 0, 'io_write' => 0, 'io_read_ops' => 0, 'io_write_ops' => 0,
             'cpu_nsec' => 1000, 'memory' => 500, 'tasks' => 3, 'ts' => 1,
@@ -151,7 +146,7 @@ class CounterStateCharacterizationTest extends TestCase
         foreach (['bfq', 'throttle'] as $source) {
             // Also cover scope loss, an unchanged scope, and an unchanged legacy scope.
             foreach ([[null, 'recursive'], ['recursive', null], ['recursive', 'recursive'], [null, null]] as [$before, $after]) {
-                $path = $this->makeRoot().'/state.json';
+                $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
                 $previous = ['io_read' => 1, 'io_write' => 2, 'io_read_ops' => 3, 'io_write_ops' => 4,
                     'cpu_nsec' => 100, 'io_source' => $source];
                 $current = ['io_read' => 9001, 'io_write' => 8002, 'io_read_ops' => 7003, 'io_write_ops' => 6004,
@@ -179,7 +174,7 @@ class CounterStateCharacterizationTest extends TestCase
 
     public function testSharedStateAcceptsOnlyNonNegativePersistedIntegerCounters(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $this->pmssWriteFile($path, json_encode(['ingress' => '100', 'egress' => -1, 'cpu_nsec' => true, 'ts' => 1]));
 
         $result = \pmssCounterStateUpdate($path, ['ingress' => 160, 'egress' => 50, 'cpu_nsec' => 20, 'ts' => 2], ['ingress', 'egress', 'cpu_nsec']);
@@ -190,7 +185,7 @@ class CounterStateCharacterizationTest extends TestCase
 
     public function testSharedStateTreatsCounterResetAsCurrentValue(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $this->pmssWriteFile($path, json_encode(['ingress' => 500, 'egress' => 200, 'ts' => 1]));
 
         $result = \pmssCounterStateUpdate($path, ['ingress' => 40, 'egress' => 80, 'ts' => 2], ['ingress']);
@@ -201,7 +196,7 @@ class CounterStateCharacterizationTest extends TestCase
 
     public function testSharedStateIgnoresInvalidJsonSeed(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
         $this->pmssWriteFile($path, 'not-json');
 
         $result = \pmssCounterStateUpdate($path, ['ingress' => 77, 'egress' => 88, 'ts' => 2], ['ingress']);
@@ -218,7 +213,7 @@ class CounterStateCharacterizationTest extends TestCase
         $this->assertEquals([], $relativeResult['previous_state']);
         $this->assertTrue(!is_file($relativePath));
 
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-counter-state-', 0700);
         $target = $root.'/target.json';
         $this->pmssWriteFile($target, json_encode(['ingress' => 5, 'egress' => 6]));
         $path = $root.'/state.json';
@@ -233,7 +228,7 @@ class CounterStateCharacterizationTest extends TestCase
 
     public function testIngressStateUsesSharedCounterWriterSnapshot(): void
     {
-        $path = $this->makeRoot().'/state.json';
+        $path = $this->pmssMakeTempDir('pmss-counter-state-', 0700).'/state.json';
 
         $result = \pmssTrafficIngressUpdateState($path, ['ingress' => 123, 'egress' => 456]);
 

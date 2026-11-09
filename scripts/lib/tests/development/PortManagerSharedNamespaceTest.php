@@ -35,15 +35,10 @@ final class PortManagerSharedNamespaceTest extends TestCase
         return ['rc' => $rc, 'output' => $output];
     }
 
-    private function makePortDir(): string
-    {
-        return $this->pmssMakeTempDir('pmss-port-shared-', 0755);
-    }
-
     private function trackPortNamespace(): array
     {
-        $portDir = $this->makePortDir();
-        $legacyDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
+        $legacyDir = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
         $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $legacyDir]);
 
         return [$portDir, $legacyDir];
@@ -52,7 +47,7 @@ final class PortManagerSharedNamespaceTest extends TestCase
     /** Simulate a reservation change between preflight and lock acquisition. */
     private function runLockRace(string $action, string $mutation): array
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
         $assignment = $portDir.'/rclone-fixtur01';
         if ($mutation === 'remove') $this->pmssWriteFile($assignment, "25000\n");
         $script = 'namespace PortManagerLockRaceFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/portManager.php'), true).';';
@@ -96,8 +91,8 @@ PHP;
 
     public function testUsedPortsIncludeAllManagedServices(): void
     {
-        $portDir = $this->makePortDir();
-        $legacyDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
+        $legacyDir = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
         $this->pmssWriteFiles($portDir, [
             'lighttpd-fixtur01' => "24000\n", 'rclone-fixtur02' => "25000\n", 'qbittorrent-fixtur03' => "not-a-port\n",
         ]);
@@ -126,8 +121,8 @@ PHP;
 
     public function testFailedReservationGlobIsDistinguishedFromEmptyNamespace(): void
     {
-        $managed = $this->makePortDir();
-        $legacy = $this->makePortDir();
+        $managed = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
+        $legacy = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
         $script = 'namespace PortManagerScanFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/portManager.php'), true).';';
         $script .= <<<'PHP'
 function glob($pattern) {

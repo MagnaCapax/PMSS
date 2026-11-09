@@ -535,6 +535,9 @@ runtime failure boundaries rather than fixture setup. Empty directories and
 permission transitions remain separate from file publication.
 Resource-counter trees and virtualenv executables call the checked writers directly;
 avoid local forwarding helpers that add unused parameters or another publication name.
+Resource-state, port-namespace and user-file fixtures call `pmssMakeTempDir()` and
+`pmssEnsureDir()` directly instead of private directory-forwarding methods. Keep
+prefixes, modes, per-call allocation and missing-home scenarios at their callers.
 
 Traffic, resource-limit, filesystem-reader and watchdog setup writes use these
 checked writers too. `pmssWriteSerializedFixture()` retains object and scalar

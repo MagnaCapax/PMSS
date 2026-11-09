@@ -10,11 +10,6 @@ final class PortManagerCliTest extends TestCase
         return $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', $arguments, $environment);
     }
 
-    private function makePortDir(): string
-    {
-        return $this->pmssMakeTempDir('pmss-port-dir-', 0755);
-    }
-
     private function runPortManagerInDir(array $arguments, string $portDir): array
     {
         return $this->runPortManager($arguments, ['PMSS_PORT_MANAGER_DIR' => $portDir]);
@@ -22,7 +17,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignPersistsPortInsideOverrideDirectory(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
 
         $this->assertSame(0, $result['rc']);
@@ -32,7 +27,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testDefaultServiceLifecycleKeepsStableCliOutputs(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
 
         $assign = $this->runPortManagerInDir(['assign', 'fixtur01'], $portDir);
         $assignedPort = trim($assign['output']);
@@ -52,7 +47,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignReusesExistingPort(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "24567\n");
 
         $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
@@ -63,7 +58,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignDoesNotWriteWhenLockCannotBeAcquired(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $lockDir = $this->pmssMakeTempDir('pmss-port-lock-');
         $this->pmssCreateSymlinkOrSkip($this->pmssMakeTempFile('pmss-port-lock-target-'), $lockDir.'/pmss-portManager.lock');
 
@@ -79,7 +74,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testReleaseDoesNotRemoveAssignmentWhenLockCannotBeAcquired(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "24567\n");
         $lockDir = $this->pmssMakeTempDir('pmss-port-lock-');
         $this->pmssCreateSymlinkOrSkip($this->pmssMakeTempFile('pmss-port-lock-target-'), $lockDir.'/pmss-portManager.lock');
@@ -96,7 +91,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignFailsWhenExistingPortFileIsMalformed(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "not-a-port\n");
 
         $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
@@ -107,7 +102,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignIgnoresMalformedSiblingAssignments(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur02', "not-a-port\n");
 
         $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
@@ -119,7 +114,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testReleaseRemovesAssignedPort(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "24567\n");
 
         $result = $this->runPortManagerInDir(['release', 'fixtur01', 'lighttpd'], $portDir);
@@ -131,7 +126,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testViewFailsWhenStoredAssignmentIsMalformed(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "not-a-port\n");
 
         $result = $this->runPortManagerInDir(['view', 'fixtur01', 'lighttpd'], $portDir);
@@ -142,7 +137,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testRejectsInvalidUsernameBeforeTouchingFilesystem(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $result = $this->runPortManagerInDir(['assign', '../fixtur01', 'lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
@@ -152,7 +147,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testRejectsInvalidServiceBeforeTouchingFilesystem(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $result = $this->runPortManagerInDir(['assign', 'fixtur01', '../lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
@@ -184,7 +179,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignRejectsBrokenSymlinkAssignment(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $outsideTarget = $this->pmssMakeTempPath('pmss-port-outside-');
         $portFile = $portDir.'/lighttpd-fixtur01';
         $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);
@@ -199,7 +194,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testReleaseRejectsSymlinkAssignmentWithoutRemovingTarget(): void
     {
-        $portDir = $this->makePortDir();
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $outsideTarget = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-port-outside-'), "24567\n");
         $portFile = $portDir.'/lighttpd-fixtur01';
         $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);

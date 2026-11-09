@@ -74,14 +74,9 @@ PHP
         }
     }
 
-    private function makeRoot(): string
-    {
-        return $this->pmssMakeTempDir('pmss-resource-', 0700);
-    }
-
     public function testMemoryStatBatchPreservesFirstNumericRowAndSingleFieldContract(): void
     {
-        $path = $this->pmssWriteFile($this->makeRoot().'/memory.stat', "rss invalid\nrss 00012\nrss 34\ncache 9223372036854775807\ncache 5\nswap 0\nhuge ".PHP_INT_MAX."0\nhuge 7\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-resource-', 0700).'/memory.stat', "rss invalid\nrss 00012\nrss 34\ncache 9223372036854775807\ncache 5\nswap 0\nhuge ".PHP_INT_MAX."0\nhuge 7\n");
         $this->assertSame(['rss' => 12, 'swap' => 0], \pmssResourceLogReadMemoryStatFields($path, ['rss', 'cache', 'swap', 'huge']));
         $this->assertSame(12, \pmssResourceLogReadMemoryStatField($path, 'rss'));
         $this->assertSame(null, \pmssResourceLogReadMemoryStatField($path, 'cache'));
@@ -134,7 +129,7 @@ PHP
     public function testReadCountersV1ReadsRealCountersFromSysfs(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->pmssWriteFiles($this->makeRoot(), [
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "550000\n",
             'memory/'.$slice.'/memory.usage_in_bytes' => "66000\n",
             'pids/'.$slice.'/pids.current' => "77\n",
@@ -168,7 +163,7 @@ PHP
     public function testReadCountersV1FallsBackToLocalMemoryStatFields(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->pmssWriteFiles($this->makeRoot(), [
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), [
             'memory/'.$slice.'/memory.stat' => "cache\ncache 999 extra\ncache\t4444\nrss 888\t999\nrss 3333\n",
         ]);
 
@@ -186,7 +181,7 @@ PHP
         // blkio.throttle.* exists but reads all-zero. The selector MUST take bfq, not the
         // present-but-zero throttle file (the bug where throttle-zero won).
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->pmssWriteFiles($this->makeRoot(), [
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "550000\n",
             'blkio/'.$slice.'/blkio.throttle.io_service_bytes_recursive' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
             'blkio/'.$slice.'/blkio.throttle.io_serviced_recursive' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
@@ -211,7 +206,7 @@ PHP
         // A partial baseline (io_source set, io_*_ops=0) would let the ops cumulative phantom-delta
         // through the source-keyed reseed guard on recovery, risking a spurious IOPS throttle.
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->pmssWriteFiles($this->makeRoot(), [
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
             'blkio/'.$slice.'/blkio.bfq.io_service_bytes_recursive' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
             // NO blkio.bfq.io_serviced_recursive -> ops read fails -> whole io group omitted.
@@ -236,7 +231,7 @@ PHP
                 $files[$slice.'user@1000.service/'.$file] = '8:0 Read '.($totals[0] - 1)."\n8:0 Write ".($totals[1] - 2)."\n";
                 $files[$slice.$file.'_recursive'] = "8:0 Read {$totals[0]}\n8:0 Write {$totals[1]}\n";
             }
-            $root = $this->pmssWriteFiles($this->makeRoot(), $files);
+            $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), $files);
             $this->assertSame([
                 'io_read' => 100, 'io_write' => 200, 'io_read_ops' => 10, 'io_write_ops' => 20,
                 'io_source' => $source, 'io_scope' => 'recursive',
@@ -253,7 +248,7 @@ PHP
     {
         $slice = 'user.slice/user-1000.slice';
         // Only CPU present; every other source absent.
-        $root = $this->pmssWriteFiles($this->makeRoot(), [
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
         ]);
 
@@ -268,7 +263,7 @@ PHP
 
     public function testReadCountersV1ReturnsNullForUnreadableSlice(): void
     {
-        $root = $this->makeRoot(); // empty tree, no slice files at all
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700); // empty tree, no slice files at all
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
             $this->assertSame(null, \pmssResourceLogReadCounters(1000, $root));
         });
@@ -277,7 +272,7 @@ PHP
     public function testReadCountersV1RejectsUint64Sentinel(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->pmssWriteFiles($this->makeRoot(), [
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), [
             'memory/'.$slice.'/memory.usage_in_bytes' => "9223372036854775807\n", // PHP_INT_MAX sentinel
             'pids/'.$slice.'/pids.current' => "5\n",
         ]);
@@ -290,7 +285,7 @@ PHP
 
     public function testReadBlkioReadWritePreservesValidTotalsAndIgnoredRows(): void
     {
-        $path = $this->makeRoot().'/blkio';
+        $path = $this->pmssMakeTempDir('pmss-resource-', 0700).'/blkio';
         $max = PHP_INT_MAX - 1;
         foreach ([
             ['', null],
@@ -309,7 +304,7 @@ PHP
 
     public function testReadBlkioReadWriteRejectsSentinelAndOverflowingTotals(): void
     {
-        $path = $this->makeRoot().'/blkio';
+        $path = $this->pmssMakeTempDir('pmss-resource-', 0700).'/blkio';
         $max = PHP_INT_MAX - 1;
         foreach (['Read', 'Write'] as $direction) {
             // Cover the sentinel, overflow, order reversal, and a multi-row boundary crossing.
@@ -337,7 +332,7 @@ PHP
                     'blkio/'.$slice.'/blkio.'.$source.'.io_serviced_recursive' => "8:0 Read 10\n8:0 Write 20\n",
                 ];
                 $files['blkio/'.$slice.'/blkio.'.$source.'.'.$counter] = "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n";
-                $root = $this->pmssWriteFiles($this->makeRoot(), $files);
+                $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-resource-', 0700), $files);
                 $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
                     $this->assertSame(['cpu_nsec' => 42], \pmssResourceLogReadCounters(1000, $root));
                 });
@@ -347,7 +342,7 @@ PHP
 
     public function testReadBlkioBytesFallsBackWhenBfqTotalIsUnrepresentable(): void
     {
-        $root = $this->makeRoot().'/';
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700).'/';
         $this->pmssWriteFile($root.'blkio.bfq.io_service_bytes_recursive', "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n");
         $this->pmssWriteFile($root.'blkio.throttle.io_service_bytes_recursive', "8:0 Read 12\n8:0 Write 34\n");
 
@@ -364,7 +359,7 @@ PHP
 
     private function makeStatePath($previousPayload = null): string
     {
-        $statePath = $this->makeRoot().'/state.json';
+        $statePath = $this->pmssMakeTempDir('pmss-resource-', 0700).'/state.json';
         if ($previousPayload !== null) {
             $this->pmssWriteFile($statePath, is_array($previousPayload) ? (string) json_encode($previousPayload) : (string) $previousPayload);
         }
@@ -379,7 +374,7 @@ PHP
 
     public function testEnsureDirCreatesDirectory(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $path = $root.'/state';
         $this->assertTrue(\pmssEnsureSafeDir($path, 0700));
         $this->assertTrue(is_dir($path));
@@ -387,14 +382,14 @@ PHP
 
     public function testEnsureDirRejectsSymlink(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $link = $this->pmssCreateSymlinkedDirectoryOrSkip($root.'/target', $root.'/link', 0700)[1];
         $this->assertTrue(!\pmssEnsureSafeDir($link, 0700));
     }
 
     public function testEnsureDirRejectsSymlinkedParentDirectory(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         [$target, $symlinkedParent] = $this->pmssCreateSymlinkedDirectoryOrSkip($root.'/target', $root.'/state', 0700);
 
         $this->assertTrue(!\pmssEnsureSafeDir($symlinkedParent.'/daily', 0700));
@@ -403,7 +398,7 @@ PHP
 
     public function testTimestampedAppendHelperAndCronConsumers(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $path = $root.'/resource.log';
         $this->assertTrue(\pmssAppendRootTimestampedLogEntry($path, ": 123\n"));
         $this->assertTrue((bool) preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}: 123\n$/', (string) file_get_contents($path)));
@@ -629,7 +624,7 @@ PHP
 
     public function testReadMemoryBreakdownParsesMemoryStat(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $path = $root.'/user.slice/user-1000.slice';
         $this->pmssWriteFiles($path, ['memory.stat' => "anon\t123\nslab 999\nfile 456\nanon 777 extra\nfile 888\t999\nfile\n"]);
 
@@ -640,7 +635,7 @@ PHP
 
     public function testReadMemoryBreakdownReturnsNullWhenFieldsMissing(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $path = $root.'/user.slice/user-1000.slice';
         $this->pmssWriteFiles($path, ['memory.stat' => "anon 123\nslab 456\n"]);
 
@@ -815,7 +810,7 @@ PHP
 
     public function testUpdateStateRejectsUnwritableStatePaths(): void
     {
-        foreach ([$this->makeRoot().'/missing/state.json', 'relative/state.json'] as $statePath) {
+        foreach ([$this->pmssMakeTempDir('pmss-resource-', 0700).'/missing/state.json', 'relative/state.json'] as $statePath) {
             $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
 
             $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
@@ -825,7 +820,7 @@ PHP
 
     public function testUpdateStateRejectsSymlinkStatePath(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $target = $this->pmssWriteFile($root.'/target.json', json_encode(['io_read' => 1]));
         $statePath = $root.'/state.json';
         $this->pmssCreateSymlinkOrSkip($target, $statePath);
@@ -838,7 +833,7 @@ PHP
 
     public function testUpdateStateRejectsSymlinkedParentDirectory(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $targetDir = $root.'/target';
         $this->pmssEnsureDir($targetDir, 0700);
 
