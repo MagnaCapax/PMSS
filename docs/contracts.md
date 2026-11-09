@@ -566,6 +566,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     target's generated proxy paired with its retained qBittorrent config and
     port. Other `custom` and `custom.d` fragments still copy; the exclusion
     is anchored to the home root.
+  - Both rsync passes use `-H` (in `-aHAX`) to preserve hardlinks among the files
+    copied in each pass, including across final-pass source roots. Rsync tracks
+    hardlinks in memory; large file counts can increase memory and CPU use.
+    Links split across separate passes are outside this guarantee (Refs #977).
   - Both rsync passes use one `--one-file-system`: recursion leaves separate
     filesystems as empty mount directories; same-device bind mounts still copy.
     Explicit source roots retain rsync's normal per-source filesystem boundary.
