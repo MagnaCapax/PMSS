@@ -64,7 +64,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-unsafe-');
         $outside = $dir.'/outside.conf';
         $content = "kernel.kptr_restrict = 1\n";
-        file_put_contents($outside, $content);
+        $this->pmssWriteFile($outside, $content);
         $target = $dir.'/managed.conf';
         $this->pmssCreateSymlinkOrSkip($outside, $target);
         $messages = [];
@@ -96,7 +96,7 @@ class SysctlBaselineTest extends TestCase
     {
         $fixture = $this->makeBaselineFixture('pmss-sysctl-update-');
         $target = $fixture['target'];
-        file_put_contents($target, "kernel.kptr_restrict = 0\n");
+        $this->pmssWriteFile($target, "kernel.kptr_restrict = 0\n");
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -114,7 +114,7 @@ class SysctlBaselineTest extends TestCase
         $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
         $messages = [];
 
-        file_put_contents($blocked, "not a directory\n");
+        $this->pmssWriteFile($blocked, "not a directory\n");
 
         $this->runBaseline($target, $messages, false);
 
@@ -198,8 +198,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-nic-samples-', 0700);
         $routePath = $dir.'/route';
         $speedPath = $dir.'/net/eno1/speed';
-        @mkdir(dirname($speedPath), 0755, true);
-        file_put_contents($routePath, "Iface\tDestination\n"."eno1\t00000000\n");
+        $this->pmssWriteFile($routePath, "Iface\tDestination\n"."eno1\t00000000\n");
         $this->pmssTrackEnvOverrides([
             'PMSS_SYSCTL_NIC_SPEED_MBPS' => null,
             'PMSS_SYSCTL_PROC_NET_ROUTE_PATH' => $routePath,
@@ -207,11 +206,11 @@ class SysctlBaselineTest extends TestCase
         ]);
 
         foreach (['', '-1', '1000.5', '18446744073709551616', "10\0G"] as $sample) {
-            file_put_contents($speedPath, $sample);
+            $this->pmssWriteFile($speedPath, $sample);
             $this->assertSame(1000, \pmssSysctlNicSpeedMbps(), 'unexpected speed for '.bin2hex($sample));
         }
         foreach (['0' => 0, '00025000' => 25000, (string) PHP_INT_MAX => PHP_INT_MAX] as $sample => $expected) {
-            file_put_contents($speedPath, $sample."\n");
+            $this->pmssWriteFile($speedPath, $sample."\n");
             $this->assertSame($expected, \pmssSysctlNicSpeedMbps(), 'unexpected speed for '.$sample);
         }
     }
@@ -268,7 +267,7 @@ class SysctlBaselineTest extends TestCase
             'PMSS_CONFIG_DIR' => $configDir,
             'PMSS_SYSCTL_OVERRIDES_PATH' => $overridePath,
         ]);
-        file_put_contents($overridePath, "vm.swappiness = 70\nnet.core.somaxconn = 9000\n");
+        $this->pmssWriteFile($overridePath, "vm.swappiness = 70\nnet.core.somaxconn = 9000\n");
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -289,7 +288,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-parser-', 0700);
         $path = $dir.'/sysctl.conf';
-        file_put_contents($path, implode("\n", [
+        $this->pmssWriteFile($path, implode("\n", [
             '# operator notes',
             'vm.swappiness = 70 # override comment',
             'net.core.somaxconn = 9000',
@@ -355,7 +354,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-summary-map-', 0700);
         $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir]);
-        file_put_contents($dir.'/hardware.json', "{\"peer\":\"kept\"}\n");
+        $this->pmssWriteFile($dir.'/hardware.json', "{\"peer\":\"kept\"}\n");
         $messages = [];
 
         \pmssSysctlSummaryWrite($this->pmssMakeArrayLogger($messages), [], [

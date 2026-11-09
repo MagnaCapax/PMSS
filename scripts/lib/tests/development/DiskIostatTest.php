@@ -10,14 +10,14 @@ class DiskIostatTest extends TestCase
     {
         $path = $this->pmssMakeTempFile('pmss-iostat-psi-');
         foreach (['0.00' => 0.0, '12.34' => 12.34, '100' => 100.0] as $raw => $expected) {
-            file_put_contents($path, "some avg300=99.00\nfull avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
+            $this->pmssWriteFile($path, "some avg300=99.00\nfull avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
             $this->assertSame($expected, \pmssDiskIostatReadPsiFullAvg300($path));
         }
         foreach (['...', '1..2', '.5', '12bad', '', '100.01', '101'] as $raw) {
-            file_put_contents($path, "full avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
+            $this->pmssWriteFile($path, "full avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
             $this->assertSame(null, \pmssDiskIostatReadPsiFullAvg300($path));
         }
-        file_put_contents($path, 'full avg300='.str_repeat('9', 400)." total=123\n");
+        $this->pmssWriteFile($path, 'full avg300='.str_repeat('9', 400)." total=123\n");
         $this->assertSame(null, \pmssDiskIostatReadPsiFullAvg300($path));
     }
 
@@ -47,15 +47,17 @@ PHP;
         $class = $root.'/class/block';
         $devices = $root.'/devices';
         $this->pmssEnsureDir($class, 0755);
+        $links = [];
         foreach ($chains as $parent => $children) {
             $this->pmssEnsureDir($devices.'/'.$parent.'/slaves', 0755);
-            @symlink($devices.'/'.$parent, $class.'/'.$parent);
+            $links['class/block/'.$parent] = $devices.'/'.$parent;
             foreach ($children as $child) {
                 $this->pmssEnsureDir($devices.'/'.$child, 0755);
-                @symlink($devices.'/'.$child, $class.'/'.$child);
-                @symlink($devices.'/'.$child, $devices.'/'.$parent.'/slaves/'.$child);
+                $links['class/block/'.$child] = $links['devices/'.$parent.'/slaves/'.$child] = $devices.'/'.$child;
             }
         }
+        // Shared leaves need one class link even when several parents name them.
+        $this->pmssWriteSymlinks($root, $links);
         return [$root, $class, $devices];
     }
 
@@ -124,9 +126,8 @@ PHP;
             $disk = 'sd'.$letter;
             $part = $disk.'1';
             $this->pmssWriteFiles($devices, [$disk.'/'.$part.'/partition' => '1']);
-            @symlink($devices.'/'.$disk, $class.'/'.$disk);
-            @symlink($devices.'/'.$disk.'/'.$part, $class.'/'.$part);
-            @symlink($devices.'/'.$disk.'/'.$part, $devices.'/md0/slaves/'.$part);
+            $this->pmssWriteSymlinks($class, [$disk => $devices.'/'.$disk, $part => $devices.'/'.$disk.'/'.$part]);
+            $this->pmssWriteSymlinks($devices, ['md0/slaves/'.$part => $devices.'/'.$disk.'/'.$part]);
             $sampled[] = $disk;
         }
         $sampled[] = 'nvme0n1';
@@ -141,20 +142,15 @@ PHP;
     {
         list($root, $class, $devices) = $this->homeTree(['bcache0' => ['md1'], 'md1' => []]);
         $this->pmssWriteFiles($devices, ['sda/sda1/partition' => '1']);
-        @symlink($devices.'/sda', $class.'/sda');
-        @symlink($devices.'/sda/sda1', $class.'/sda1');
-        @symlink($devices.'/sda/sda1', $devices.'/md1/slaves/sda1');
+        $this->pmssWriteSymlinks($class, ['sda' => $devices.'/sda', 'sda1' => $devices.'/sda/sda1']);
+        $this->pmssWriteSymlinks($devices, ['md1/slaves/sda1' => $devices.'/sda/sda1']);
         $this->assertSame(['sda'], $this->homeDevices(['sda'], $root.'/dev/bcache0', $class, $root.'/dev'));
 
-        $this->pmssEnsureDir($devices.'/dm-0/slaves', 0755);
         $this->pmssWriteFiles($devices, ['sdb/sdb2/partition' => '2']);
-        @symlink($devices.'/dm-0', $class.'/dm-0');
-        @symlink($devices.'/sdb', $class.'/sdb');
-        @symlink($devices.'/sdb/sdb2', $class.'/sdb2');
-        @symlink($devices.'/sdb/sdb2', $devices.'/dm-0/slaves/sdb2');
-        $this->pmssEnsureDir($root.'/dev/mapper', 0755);
-        @symlink($root.'/dev/dm-0', $root.'/dev/mapper/vg-home');
-        file_put_contents($root.'/dev/dm-0', '');
+        $this->pmssWriteSymlinks($class, ['dm-0' => $devices.'/dm-0', 'sdb' => $devices.'/sdb', 'sdb2' => $devices.'/sdb/sdb2']);
+        $this->pmssWriteSymlinks($devices, ['dm-0/slaves/sdb2' => $devices.'/sdb/sdb2']);
+        $this->pmssWriteSymlinks($root, ['dev/mapper/vg-home' => $root.'/dev/dm-0']);
+        $this->pmssWriteFile($root.'/dev/dm-0', '');
         $this->assertSame(['sdb'], $this->homeDevices(['sdb'], $root.'/dev/mapper/vg-home', $class, $root.'/dev'));
     }
 

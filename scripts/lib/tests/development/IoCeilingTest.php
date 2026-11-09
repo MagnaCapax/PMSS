@@ -117,16 +117,16 @@ class IoCeilingTest extends TestCase
         $history = $dir.'/history';
         $state = $dir.'/state.json';
         $rows = $this->samples(1, range(1, 20));
-        file_put_contents($history.'.1', $this->history(array_slice($rows, 0, 10)));
-        file_put_contents($history, "bad\n".$this->history(array_slice($rows, 10)).'partial');
+        $this->pmssWriteFile($history.'.1', $this->history(array_slice($rows, 0, 10)));
+        $this->pmssWriteFile($history, "bad\n".$this->history(array_slice($rows, 10)).'partial');
         $this->assertTrue(\pmssIoCeilingRefresh($this->policy(), $history, $state, self::NOW, $dir.'/anchor.json'));
-        $result = json_decode(file_get_contents($state), true);
+        $result = $this->pmssReadJsonArrayFile($state);
         $this->assertEquals(19, $result['published']['read_iops']);
         $this->assertSame(19.0, \pmssIoCeilingPublishedReadIops($state));
         $this->assertSame(20, $result['days']['2024-01-09']['samples']);
         unlink($history.'.1');
         // A compressed-only remainder fails the sample gate; stale values disappear.
-        file_put_contents($history.'.2.gz', gzencode($this->history($rows)));
+        $this->pmssWriteFile($history.'.2.gz', gzencode($this->history($rows)));
         $this->assertTrue(\pmssIoCeilingRefresh($this->policy(), $history, $state, self::NOW, $dir.'/anchor.json'));
         $this->assertFalse(file_exists($state));
         unlink($history);
@@ -139,9 +139,9 @@ class IoCeilingTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-io-ceiling-');
         $path = $dir.'/history';
         $valid = $this->history($this->samples(1, [1]));
-        file_put_contents($path, str_repeat('x', 9000).$valid."bad\n1999-01-01 00:00:00 || O:8:\"stdClass\":0:{}\n".$valid.substr($valid, 0, -1));
+        $this->pmssWriteFile($path, str_repeat('x', 9000).$valid."bad\n1999-01-01 00:00:00 || O:8:\"stdClass\":0:{}\n".$valid.substr($valid, 0, -1));
         $this->assertSame(1, count(iterator_to_array(\pmssIoCeilingHistorySamples($path))));
-        symlink($path, $dir.'/link');
+        $this->pmssWriteSymlinks($dir, ['link' => $path]);
         $this->assertSame([], iterator_to_array(\pmssIoCeilingHistorySamples($dir.'/link')));
         $this->assertFalse(\pmssIoCeilingRefresh([], $path, $dir.'/link', self::NOW, $dir.'/anchor.json'));
     }
@@ -150,7 +150,7 @@ class IoCeilingTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-io-ceiling-');
         $path = $dir.'/history';
-        file_put_contents($path, str_repeat('x', 16 * 1024 * 1024)."\n"
+        $this->pmssWriteFile($path, str_repeat('x', 16 * 1024 * 1024)."\n"
             .$this->history($this->samples(2, [999])).$this->history($this->samples(1, range(1, 20))));
         $timezone = date_default_timezone_get();
         try {
@@ -173,9 +173,9 @@ class IoCeilingTest extends TestCase
         $off = $this->policy() + ['cgroup' => ['dynamicIops' => ['mode' => 'off']]];
         $refresh = function (array $policy, int $now) use ($history, $state, $anchor): array {
             $this->assertTrue(\pmssIoCeilingRefresh($policy, $history, $state, $now, $anchor));
-            return json_decode(file_get_contents($state), true);
+            return $this->pmssReadJsonArrayFile($state);
         };
-        file_put_contents($history, $this->history(array_merge($this->samples(7, array_fill(0, 20, 600)), $this->samples(1, array_fill(0, 20, 80)))));
+        $this->pmssWriteFile($history, $this->history(array_merge($this->samples(7, array_fill(0, 20, 600)), $this->samples(1, array_fill(0, 20, 80)))));
         $this->assertSame(600.0, (float) $refresh($this->policy(), self::NOW)['published']['read_iops']);
         // The uncapped 600 day leaves the window; the capped 80 day alone would publish 80.
         $result = $refresh($this->policy(), self::NOW + self::DAY);
@@ -191,16 +191,16 @@ class IoCeilingTest extends TestCase
         // A higher day raises it and the anchor keeps the new value.
         file_put_contents($history, $this->history($this->samples(0, array_fill(0, 20, 900))), FILE_APPEND);
         $this->assertSame(900.0, (float) $refresh($this->policy(), self::NOW + self::DAY)['published']['read_iops']);
-        $this->assertSame(900.0, (float) json_decode(file_get_contents($anchor), true)['read_iops']);
+        $this->assertSame(900.0, (float) $this->pmssReadJsonArrayFile($anchor)['read_iops']);
         // A malformed anchor is ignored and rewritten.
-        file_put_contents($anchor, json_encode(['read_iops' => 5000]));
+        $this->pmssWriteFile($anchor, json_encode(['read_iops' => 5000]));
         $this->assertSame(900.0, (float) $refresh($this->policy(), self::NOW + self::DAY)['published']['read_iops']);
-        $this->assertSame('2024-01-10', json_decode(file_get_contents($anchor), true)['from_day']);
+        $this->assertSame('2024-01-10', $this->pmssReadJsonArrayFile($anchor)['from_day']);
         // Thin history removes the publication and leaves the anchor alone.
         unlink($history);
         $this->assertTrue(\pmssIoCeilingRefresh($this->policy(), $history, $state, self::NOW + self::DAY, $anchor));
         $this->assertFalse(file_exists($state));
-        $this->assertSame(900.0, (float) json_decode(file_get_contents($anchor), true)['read_iops']);
+        $this->assertSame(900.0, (float) $this->pmssReadJsonArrayFile($anchor)['read_iops']);
     }
 
     /** ADR 0239: the first run anchors the value already published, so an update itself changes no cap. */
@@ -208,12 +208,12 @@ class IoCeilingTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-io-ceiling-');
         $history = $dir.'/history';
-        file_put_contents($history, $this->history(array_merge($this->samples(7, array_fill(0, 20, 600)), $this->samples(1, array_fill(0, 20, 80)))));
+        $this->pmssWriteFile($history, $this->history(array_merge($this->samples(7, array_fill(0, 20, 600)), $this->samples(1, array_fill(0, 20, 80)))));
         $this->assertTrue(\pmssIoCeilingRefresh($this->policy(), $history, $dir.'/state.json', self::NOW + self::DAY, $dir.'/anchor.json'));
-        $result = json_decode(file_get_contents($dir.'/state.json'), true);
+        $result = $this->pmssReadJsonArrayFile($dir.'/state.json');
         $this->assertSame((float) \pmssIoCeilingCompute(\pmssIoCeilingHistorySamples($history), $this->policy(), self::NOW + self::DAY)['published']['read_iops'], (float) $result['published']['read_iops']);
         $this->assertFalse(isset($result['read_iops_anchored']));
-        $this->assertSame(80.0, (float) json_decode(file_get_contents($dir.'/anchor.json'), true)['read_iops']);
+        $this->assertSame(80.0, (float) $this->pmssReadJsonArrayFile($dir.'/anchor.json')['read_iops']);
     }
 
     /** ADR 0237: the disk's quiet floor is the median of each accepted day's 10th-percentile /home read latency. */

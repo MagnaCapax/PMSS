@@ -32,10 +32,7 @@ class IntelGpuFirmwareSelectionTest extends TestCase
             ['0x060000', '0x8086', false],
             ['0x030000', '0x8086', true],
         ] as $index => $device) {
-            $path = $root.'/0000:00:0'.$index.'.0';
-            mkdir($path);
-            file_put_contents($path.'/class', $device[0]."\n");
-            file_put_contents($path.'/vendor', $device[1]."\n");
+            $this->pmssWriteFiles($root.'/0000:00:0'.$index.'.0', ['class' => $device[0]."\n", 'vendor' => $device[1]."\n"]);
             $this->assertSame($device[2], \pmssHostHasIntelDisplayPciDevice($root));
         }
     }
@@ -43,9 +40,7 @@ class IntelGpuFirmwareSelectionTest extends TestCase
     public function testIntelDisplayPciDetectorRejectsMissingVendor(): void
     {
         $root = $this->pmssMakeTempDir('pmss-pci-missing-vendor-', 0700);
-        $device = $root.'/0000:00:02.0';
-        mkdir($device);
-        file_put_contents($device.'/class', "0x030000\n");
+        $this->pmssWriteFile($root.'/0000:00:02.0/class', "0x030000\n");
         $this->assertFalse(\pmssHostHasIntelDisplayPciDevice($root));
     }
 }

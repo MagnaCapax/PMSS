@@ -34,7 +34,7 @@ class DiskIostatContentionTest extends TestCase
         $this->pmssWriteFiles($root, ['pressure/io' => "some avg300=4.25\nfull avg300=1\n",
             'stat' => "cpu 1 2 3\nprocs_blocked 0\n", 'meminfo' => "Dirty: 128 kB\nWriteback: 0 kB\n"]);
         foreach (['resync', 'recovery', 'check', 'reshape', 'idle'] as $kind) {
-            file_put_contents($root.'/mdstat', $kind === 'idle' ? "md0 : active raid1\n" : " [=>...] $kind = 2.5%\n");
+            $this->pmssWriteFile($root.'/mdstat', $kind === 'idle' ? "md0 : active raid1\n" : " [=>...] $kind = 2.5%\n");
             $this->assertSame(['psiSomeAvg300' => 4.25, 'procsBlocked' => 0, 'dirtyKb' => 128,
                 'writebackKb' => 0, 'mdSyncActive' => $kind !== 'idle'], \pmssDiskIostatReadContention($root));
         }
@@ -46,7 +46,7 @@ class DiskIostatContentionTest extends TestCase
         $nulls = array_fill_keys(['psiSomeAvg300', 'procsBlocked', 'dirtyKb', 'writebackKb', 'mdSyncActive'], null);
         $this->assertSame($nulls, \pmssDiskIostatReadContention($root));
         foreach (['-1', 'bad', '1 extra', str_repeat('9', 30), "1\0"] as $value) {
-            file_put_contents($root.'/stat', 'procs_blocked '.$value."\n");
+            $this->pmssWriteFile($root.'/stat', 'procs_blocked '.$value."\n");
             $this->assertSame(null, \pmssDiskIostatReadContention($root)['procsBlocked']);
         }
         $this->pmssWriteFiles($root, ['pressure/io' => "some avg300=101\n", 'meminfo' => 'Dirty: '.str_repeat('9', 30)." kB\nWriteback: invalid\n"]);
