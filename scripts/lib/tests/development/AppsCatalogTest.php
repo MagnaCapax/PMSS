@@ -64,8 +64,7 @@ class AppsCatalogTest extends TestCase
             'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')), $definitions['Deluge']);
         $row = $definitions['openclaw'];
         $this->assertTrue($row['installable']);
-        $this->assertSame(180, $row['waitSeconds']);
-        $this->assertSame('.openclaw/check.state', $row['stateFile']);
+        $this->pmssAssertArraySubsetSame(['waitSeconds' => 180, 'stateFile' => '.openclaw/check.state'], $row);
         $js = \pmssActionScriptJs();
         $this->assertStringContainsAllStrings(array('var pmssManagedAppEndpoints = ', '"openclaw":"apps.php?managed=openclaw"',
             '"openclaw":180', 'pmssManagedAppEndpoints[id]'), $js);
@@ -252,9 +251,7 @@ class AppsCatalogTest extends TestCase
             $link = $home.'/bin/transmission/default';
             $this->pmssCreateSymlinkOrSkip($store, $link);
             $app = $read()['Transmission'];
-            $this->assertSame('not-running', $app['state']);
-            $this->assertSame('transmission/web/', $app['url']);
-            $this->assertSame('transmission.php', $app['endpoint']);
+            $this->pmssAssertArraySubsetSame(['state' => 'not-running', 'url' => 'transmission/web/', 'endpoint' => 'transmission.php'], $app);
             $this->pmssWriteFile($home.'/.transmissionDisable', '');
             $this->assertSame('off', $read()['Transmission']['state']);
             $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
@@ -290,8 +287,7 @@ class AppsCatalogTest extends TestCase
             $html = $render('welcome.php', ['minBytes' => 10000])['stdout'];
             $this->assertStringContainsAndOmitsStrings(['Your apps', 'Jellyfin'], ['data-action="stop"', 'data-action="log"'], $html);
             $status = $this->pmssDecodeJsonArray($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout']);
-            $this->assertSame(false, $status['mediaAppControl']);
-            $this->assertSame(false, $status['canRestart']);
+            $this->pmssAssertArraySubsetSame(['mediaAppControl' => false, 'canRestart' => false], $status);
         });
     }
 
@@ -723,8 +719,7 @@ class AppsCatalogTest extends TestCase
             file_put_contents($runRoot.'/php-cli-bootstrap.php',
                 "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);
             $result = $render('stats.php', array('minBytes' => 80));
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame('', $result['stderr']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'stderr' => ''], $result);
             $this->assertSame('The Info page is being updated on this server. Reload it in a few minutes. HTTP=200',
                 $result['stdout']);
         });
@@ -738,8 +733,7 @@ class AppsCatalogTest extends TestCase
                 "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);
             foreach (array('status=1', 'log=sonarr') as $query) {
                 $result = $render('apps.php', array('query' => $query, 'minBytes' => 100));
-                $this->assertSame(0, $result['rc']);
-                $this->assertSame('', $result['stderr']);
+                $this->pmssAssertArraySubsetSame(['rc' => 0, 'stderr' => ''], $result);
                 $this->assertSame('{"updating":true,"message":"The Apps page is being updated on this server. Reload it in a few minutes."} HTTP=503',
                     $result['stdout']);
             }

@@ -70,8 +70,7 @@ class IoCeilingTest extends TestCase
         }
         unset($row);
         $result = \pmssIoCeilingCompute(array_merge($rows, $other), $this->policy(), self::NOW);
-        $this->assertSame(19.0, $result['published']['read_iops']);
-        $this->assertSame(99.5, $result['published']['write_iops']);
+        $this->pmssAssertArraySubsetSame(['read_iops' => 19.0, 'write_iops' => 99.5], $result['published']);
         $this->assertSame('2024-01-09', $result['published']['from_day']['write_iops']);
         $this->assertSame(1.0, \pmssIoCeilingCompute($rows, $this->policy(['percentile' => 1]), self::NOW)['published']['read_mbs']);
         $this->assertSame(20.0, \pmssIoCeilingCompute($rows, $this->policy(['percentile' => 100]), self::NOW)['published']['write_mbs']);

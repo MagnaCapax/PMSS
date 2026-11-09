@@ -27,8 +27,7 @@ class UpdateNetworkingTemplateTest extends TestCase
         $this->assertSame(str_replace('##INTERFACE##', 'ens3', $template), (string) file_get_contents($target));
         $config = include $target;
         $this->assertTrue(is_array($config), 'Expected generated network config to return an array');
-        $this->assertSame('ens3', $config['interface']);
-        $this->assertSame('1000', $config['speed']);
+        $this->pmssAssertArraySubsetSame(['interface' => 'ens3', 'speed' => '1000'], $config);
         $this->assertSame(false, $config['throttle']['progressiveThrottleEnabled']);
         $this->assertSame(array('overagePercent' => 0, 'capMbit' => 100), $config['throttle']['overageStages'][0]);
         $this->assertSame(80, $config['throttle']['limitSoft']);

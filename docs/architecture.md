@@ -236,6 +236,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   required fields and strict values. Keep expected field order and fixture cases
   at callers; custom diagnostics, transformed values and exact-shape assertions
   remain explicit.
+  Panel, worker-pool, terminal-resource, storage and runtime fixtures also batch
+  sibling fields this way; nested records remain separate assertion targets.
 - CLI probes: `/scripts/util/systemTest.php`, `/scripts/util/componentStatus.php`, `/scripts/util/agentDiagnostics.php`
 
 Development tests must avoid network/system changes; production tests and the CLI probe are intended for curated post-provision runs.

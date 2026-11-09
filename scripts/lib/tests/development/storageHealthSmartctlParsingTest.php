@@ -36,8 +36,7 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $entry = \pmssStorageHealthParseSmartctlOutput(
             "SMART Health Status: OK\nUDMA_CRC_Error_Count 7\nUDMA_CRC_Error_Count ".PHP_INT_MAX.'0',
             [], ['link_errors' => 2], 'fixture');
-        $this->assertSame(null, $entry['metrics']['udma_crc']);
-        $this->assertSame(null, $entry['metrics']['link_errors']);
+        $this->pmssAssertArraySubsetSame(['udma_crc' => null, 'link_errors' => null], $entry['metrics']);
         $this->assertSame([], $entry['flags']);
     }
 

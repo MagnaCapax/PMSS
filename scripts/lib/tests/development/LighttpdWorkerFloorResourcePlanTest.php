@@ -45,8 +45,7 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
             ['lighttpdMinThreads' => 999]
         );
 
-        $this->assertSame(8, $resources['maxProcs']);
-        $this->assertSame(48, $resources['totalThreads']);
+        $this->pmssAssertArraySubsetSame(['maxProcs' => 8, 'totalThreads' => 48], $resources);
     }
 
     public function testWorkerFloorIgnoresInvalidValues(): void
@@ -58,8 +57,7 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
                 ['lighttpdMinThreads' => $value]
             );
 
-            $this->assertSame(1, $resources['maxProcs']);
-            $this->assertSame(6, $resources['totalThreads']);
+            $this->pmssAssertArraySubsetSame(['maxProcs' => 1, 'totalThreads' => 6], $resources);
         }
     }
 
@@ -67,7 +65,7 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
     {
         $configDir = $this->pmssMakeTempDir('pmss-lighttpd-worker-floor-config-');
         $store = new \UserConfigStore($configDir);
-        $this->assertTrue($store->set('alice', [
+        $this->assertTrue($store->set('fixtur01', [
             'ramMiB' => 512,
             'rtorrentPort' => 5000,
             'quota' => 10,
@@ -75,11 +73,10 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
             'lighttpdMinThreads' => '18',
         ]));
 
-        $payload = \pmssLighttpdUserConfigLoad('alice', $store);
+        $payload = \pmssLighttpdUserConfigLoad('fixtur01', $store);
         $resources = \pmssLighttpdResourcePlan([], ['cpuQuotaPercent' => 100], $payload);
 
         $this->assertSame('18', $payload['lighttpdMinThreads']);
-        $this->assertSame(3, $resources['maxProcs']);
-        $this->assertSame(18, $resources['totalThreads']);
+        $this->pmssAssertArraySubsetSame(['maxProcs' => 3, 'totalThreads' => 18], $resources);
     }
 }

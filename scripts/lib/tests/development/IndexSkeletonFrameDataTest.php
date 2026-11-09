@@ -272,9 +272,9 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $quotaInfo = \pmssLocalFrameQuotaInfoRead($quotaPath);
 
-        $this->assertSame((int) round(1.5 * $tib), $quotaInfo['usedBytes']);
-        $this->assertSame((int) round(2 * $tib), $quotaInfo['totalSpace']);
-        $this->assertSame((int) round(3 * $tib), $quotaInfo['hardLimit']);
+        $this->pmssAssertArraySubsetSame([
+            'usedBytes' => (int) round(1.5 * $tib), 'totalSpace' => (int) round(2 * $tib), 'hardLimit' => (int) round(3 * $tib),
+        ], $quotaInfo);
     }
 
     public function testLocalFallbackQuotaParserMarksOverHardLimit(): void

@@ -25,11 +25,9 @@ class PmssStatsResourceSafetyTest extends TestCase
     {
         foreach ([new \stdClass(), (object) ['current' => 512], '', '512', 512, 1.5, false, true, null] as $memory) {
             $stats = $this->collect(['memory' => $memory]);
-            $this->assertSame(256.0, $stats['memory']['current_bytes']);
-            $this->assertSame(1048576.0, $stats['memory']['limit_bytes']);
+            $this->pmssAssertArraySubsetSame(['current_bytes' => 256.0, 'limit_bytes' => 1048576.0], $stats['memory']);
             $this->assertSame('fixture', $stats['product']);
-            $this->assertSame(12.5, $stats['traffic']['upload_month_mib']);
-            $this->assertSame(25.0, $stats['traffic']['download_month_mib']);
+            $this->pmssAssertArraySubsetSame(['upload_month_mib' => 12.5, 'download_month_mib' => 25.0], $stats['traffic']);
             $this->assertTrue($stats['rtorrent']['ok']);
         }
     }
@@ -39,8 +37,7 @@ class PmssStatsResourceSafetyTest extends TestCase
         unlink($this->root.'/cgroup/memory.current');
         foreach ([new \stdClass(), (object) ['current' => 512], '', 512, false, null] as $memory) {
             $stats = $this->collect(['memory' => $memory]);
-            $this->assertSame(null, $stats['memory']['current_bytes']);
-            $this->assertSame(null, $stats['memory']['percent']);
+            $this->pmssAssertArraySubsetSame(['current_bytes' => null, 'percent' => null], $stats['memory']);
             $this->assertSame(12.5, $stats['traffic']['upload_month_mib']);
         }
     }

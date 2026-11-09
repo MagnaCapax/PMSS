@@ -55,8 +55,7 @@ class MediaStackWatchdogTest extends TestCase
         $status = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, $previous, self::pmssMakeCallbacks(['probe' => true])['probe']);
 
         $this->assertSame('healthy', $status['state']);
-        $this->assertSame('running', $status['apps']['sonarr']['state']);
-        $this->assertSame(0, $status['apps']['sonarr']['consecutiveFailures']);
+        $this->pmssAssertArraySubsetSame(['state' => 'running', 'consecutiveFailures' => 0], $status['apps']['sonarr']);
     }
 
     public function testOverallStateFollowsMixedAppStatesInEitherOrder(): void
@@ -84,8 +83,7 @@ class MediaStackWatchdogTest extends TestCase
             $probes++;
             return false;
         }, $home);
-        $this->assertSame('off', $status['apps']['sonarr']['state']);
-        $this->assertSame(0, $status['apps']['sonarr']['consecutiveFailures']);
+        $this->pmssAssertArraySubsetSame(['state' => 'off', 'consecutiveFailures' => 0], $status['apps']['sonarr']);
         $this->assertSame('healthy', $status['state']);
         $this->assertSame(0, $probes);
     }

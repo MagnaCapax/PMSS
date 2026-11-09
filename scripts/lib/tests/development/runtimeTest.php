@@ -233,8 +233,7 @@ PHP;
             .'pmssReadRegularFileContents('.var_export($dir.'/fifo', true).'),'
             .'pmssReadRegularFileContentsVerified('.var_export($dir.'/fifo', true).')]);';
         $result = $this->pmssExecShellCommand('timeout --kill-after=2s 5s '.$this->pmssBuildInlinePhpCommand($code), [], '');
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame('[null,null,null]', $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => '[null,null,null]'], $result);
         $this->pmssAssertPathOwnerAndModeSame($before, $target);
         $this->assertSame('kept', file_get_contents($target));
     }
@@ -245,8 +244,7 @@ PHP;
             $code = 'require '.var_export(dirname(__DIR__, 2).'/runtime/cli.php', true).'; '
                 .'echo pmssCliReturnWithStderr('.var_export($message, true).', 7); echo " continued";';
             $capture = $this->pmssExecInlinePhpWithTempStderr($code);
-            $this->assertSame(0, $capture['result']['rc']);
-            $this->assertSame('7 continued', $capture['result']['output']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => '7 continued'], $capture['result']);
             $this->assertSame($message, file_get_contents($capture['stderrPath']));
         }
     }
@@ -258,8 +256,7 @@ PHP;
                 $code = 'require '.var_export(dirname(__DIR__, 2).'/runtime/cli.php', true).'; '
                     .'exit(pmssCliReturnWithStderr('.var_export($message, true).', '.$exitCode.')); echo "unexpected return";';
                 $capture = $this->pmssExecInlinePhpWithTempStderr($code);
-                $this->assertSame($exitCode, $capture['result']['rc']);
-                $this->assertSame('', $capture['result']['output']);
+                $this->pmssAssertArraySubsetSame(['rc' => $exitCode, 'output' => ''], $capture['result']);
                 $this->assertSame($message, file_get_contents($capture['stderrPath']));
             }
         }
@@ -727,9 +724,7 @@ PHP;
         $bash = '/bin/bash -lc '.escapeshellarg($this->pmssBuildInlinePhpCommand($code));
         $result = \pmssCommandPipedCapture($bash, 'pipe-env-test', 0, 0, false, 'proc_open failed', 1, false, 'stream_select failed', $cwd, ['PMSS_PIPE_ENV' => 'ok']);
 
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame(basename($cwd).':ok', $result['stdout']);
-        $this->assertSame('', $result['stderr']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'stdout' => basename($cwd).':ok', 'stderr' => ''], $result);
     }
 
     public function testPipedCaptureRejectsUnsafeCwdBeforeLaunch(): void

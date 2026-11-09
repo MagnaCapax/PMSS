@@ -365,9 +365,10 @@ class SysctlBaselineTest extends TestCase
 
         $summary = $this->pmssReadJsonArrayFile($dir.'/hardware.json');
         $this->assertSame('kept', $summary['peer']);
-        $this->assertSame(['net.core.somaxconn' => '2000', 'vm.swappiness' => '10'], $summary['sysctl']['applied']);
-        $this->assertSame(['vm.dirty_ratio'], $summary['sysctl']['overrides_respected']);
-        $this->assertSame(['vm.swappiness: 60 -> 10'], $summary['sysctl']['changes_made']);
+        $this->pmssAssertArraySubsetSame([
+            'applied' => ['net.core.somaxconn' => '2000', 'vm.swappiness' => '10'], 'overrides_respected' => ['vm.dirty_ratio'],
+            'changes_made' => ['vm.swappiness: 60 -> 10'],
+        ], $summary['sysctl']);
     }
 
     /**

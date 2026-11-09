@@ -32,8 +32,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
         $entry = \pmssStorageHealthParseNvmeOutput(
             'media_errors : '.PHP_INT_MAX."0\nmedia_errors : 7\ntemperature : ".PHP_INT_MAX."0 K\ntemperature : 343 K",
             [], ['media_errors' => 2], 'fixture');
-        $this->assertSame(null, $entry['metrics']['media_errors']);
-        $this->assertSame(null, $entry['metrics']['temperature']);
+        $this->pmssAssertArraySubsetSame(['media_errors' => null, 'temperature' => null], $entry['metrics']);
         $this->assertSame([], $entry['flags']);
     }
 

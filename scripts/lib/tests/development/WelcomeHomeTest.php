@@ -64,13 +64,10 @@ final class WelcomeHomeTest extends TestCase
             $byId = array_column($tiles, null, 'id');
             $tile = $byId['qBittorrent'];
             $this->assertSame(['id', 'name', 'desc', 'state', 'url', 'open', 'action', 'restart', 'start', 'hero', 'more'], array_keys($tile));
-            $this->assertSame('Custom torrent label', $tile['name']);
-            $this->assertSame('A second torrent client with a modern web UI', $tile['desc']);
+            $this->pmssAssertArraySubsetSame(['name' => 'Custom torrent label', 'desc' => 'A second torrent client with a modern web UI'], $tile);
             $this->assertSame($action, $tile['action'], $state);
-            $this->assertSame($state === 'running', $tile['restart']);
-            $this->assertSame(false, $tile['start']);
-            $this->assertSame('open', $byId['rtorrent']['action']);
-            $this->assertSame(true, $byId['rtorrent']['start']);
+            $this->pmssAssertArraySubsetSame(['restart' => $state === 'running', 'start' => false], $tile);
+            $this->pmssAssertArraySubsetSame(['action' => 'open', 'start' => true], $byId['rtorrent']);
             $this->assertSame('manage', $byId['custom']['action']);
             $this->assertFalse(isset($byId['lighttpd']));
         }
@@ -188,8 +185,8 @@ final class WelcomeHomeTest extends TestCase
     public function testAppsBuildDropsLighttpdAndAppsSwitchedOff(): void
     {
         $status = ['apps' => [
-            'lighttpd' => ['state' => 'running', 'url' => 'https://render.test/user-alice/'],
-            'rtorrent' => ['state' => 'running', 'url' => 'https://render.test/user-alice/rutorrent/'],
+            'lighttpd' => ['state' => 'running', 'url' => 'https://render.test/user-fixtur01/'],
+            'rtorrent' => ['state' => 'running', 'url' => 'https://render.test/user-fixtur01/rutorrent/'],
             'jellyfin' => ['state' => 'off', 'url' => 'https://render.test/jellyfin/'],
             'sonarr' => ['state' => 'running', 'url' => 'https://render.test/sonarr/'],
             'qBittorrent' => ['state' => 'stopped', 'url' => 'https://render.test/qbittorrent/'],
@@ -209,8 +206,7 @@ final class WelcomeHomeTest extends TestCase
         $this->assertFalse(in_array('lighttpd', array_column($result['plain'], 'id'), true), 'lighttpd is not an app tile');
 
         $plain = array_column($result['plain'], null, 'id');
-        $this->assertSame('ruTorrent', $plain['rtorrent']['name']);
-        $this->assertSame('Your main torrent client', $plain['rtorrent']['desc']);
+        $this->pmssAssertArraySubsetSame(['name' => 'ruTorrent', 'desc' => 'Your main torrent client'], $plain['rtorrent']);
         $this->assertSame(['open', true], [$plain['rtorrent']['action'], $plain['rtorrent']['restart']]);
         $this->assertSame(['start', false], [$plain['qBittorrent']['action'], $plain['qBittorrent']['open']], 'A stopped app starts with one click');
         $this->assertSame('start', $plain['Deluge']['action'], 'An app switched off starts with one click');
@@ -295,26 +291,19 @@ final class WelcomeHomeTest extends TestCase
         $result = $this->creditsCall('pmssWelcomeHomeCreditsRead', array('funded' => $funded, 'empty' => $empty, 'none' => $this->creditsHome(null)));
 
         $ok = $result['funded'];
-        $this->assertSame('ok', $ok['state']);
-        $this->assertSame(900000, $ok['balance']);
-        $this->assertSame('900k', $ok['value']);
-        $this->assertSame(50, $ok['questions']);
-        $this->assertSame(45.5, $ok['pct_left']);
-        $this->assertSame(1234567, $ok['credits_30d']);
+        $this->pmssAssertArraySubsetSame([
+            'state' => 'ok', 'balance' => 900000, 'value' => '900k', 'questions' => 50, 'pct_left' => 45.5, 'credits_30d' => 1234567,
+        ], $ok);
         $this->assertFalse(array_key_exists('tokens_30d', $ok), 'The figures carry no token field');
         $this->assertSame(0, strpos($ok['text'], 'About 50 Pikkumies questions'), $ok['text']);
         $this->assertStringContainsAllStrings(array('≈50 questions', '1.2M credits used in 30 days'), $ok['meta']);
         $this->pmssAssertStringNotContainsString('token', strtolower(json_encode($ok)), 'The card speaks credits, never tokens');
         $this->pmssAssertStringNotContainsString(self::CREDITS_KEY, json_encode($result), 'The key never leaves the server in the figures');
 
-        $this->assertSame('ok', $result['empty']['state']);
-        $this->assertSame('0', $result['empty']['value']);
-        $this->assertSame(null, $result['empty']['questions']);
-        $this->assertSame('', $result['empty']['text']);
+        $this->pmssAssertArraySubsetSame(['state' => 'ok', 'value' => '0', 'questions' => null, 'text' => ''], $result['empty']);
         $this->assertStringContainsAllStrings(array('1.2M credits used in 30 days', 'more are added with each paid invoice'), $result['empty']['meta']);
 
-        $this->assertSame('none', $result['none']['state']);
-        $this->assertSame(null, $result['none']['questions']);
+        $this->pmssAssertArraySubsetSame(['state' => 'none', 'questions' => null], $result['none']);
     }
 
     public function testCreditsReadIgnoresCacheOfAnotherKeyAndExpiredCopies(): void
@@ -337,8 +326,7 @@ final class WelcomeHomeTest extends TestCase
             $this->assertSame('', $result[$name]['value'], $name);
         }
         $this->assertSame('ok', $result['stale']['state'], 'A same-key copy under an hour old stands in while the service is unreachable');
-        $this->assertSame(777000, $result['stale']['balance']);
-        $this->assertSame('777k', $result['stale']['value']);
+        $this->pmssAssertArraySubsetSame(['balance' => 777000, 'value' => '777k'], $result['stale']);
     }
 
     /** The figures are credits charged, summed from daily[].credits; token fields are never read (ADR 0148 amendment 2026-11-03). */
@@ -423,7 +411,7 @@ final class WelcomeHomeTest extends TestCase
 
     public function testAppsGridFillsThreeRowsAndKeepsTheRestUnderMoreApps(): void
     {
-        $status = ['apps' => ['rtorrent' => ['state' => 'running', 'url' => 'https://render.test/user-alice/rutorrent/'],
+        $status = ['apps' => ['rtorrent' => ['state' => 'running', 'url' => 'https://render.test/user-fixtur01/rutorrent/'],
             'qBittorrent' => ['state' => 'off'], 'Deluge' => ['state' => 'off'], 'rclone' => ['state' => 'off'], 'openclaw' => ['state' => 'off'],
             'slskd' => ['state' => 'off'], 'sabnzbd' => ['state' => 'running', 'url' => 'https://render.test/sabnzbd/']]];
         $tiles = $this->runWelcomeHome('echo json_encode(pmssWelcomeHomeAppsBuild('.var_export($status, true).', false));');
@@ -441,7 +429,7 @@ final class WelcomeHomeTest extends TestCase
     public function testAppsBuildOpensRtorrentWhileItIsNotRunning(): void
     {
         $apps = $this->runWelcomeHome('echo json_encode(pmssWelcomeHomeAppsBuild('.var_export(['apps' => [
-            'rtorrent' => ['state' => 'not-running', 'url' => 'https://render.test/user-alice/rutorrent/'],
+            'rtorrent' => ['state' => 'not-running', 'url' => 'https://render.test/user-fixtur01/rutorrent/'],
             'sonarr' => ['state' => 'not-running', 'url' => 'https://render.test/sonarr/'],
             'radarr' => ['state' => 'running', 'url' => ''],
         ]], true).', false));');
@@ -475,10 +463,9 @@ final class WelcomeHomeTest extends TestCase
             'ordinary' => $ordinary,
         ), true).'));');
 
-        $this->assertSame('password: [removed]', $result['password']);
-        $this->assertSame('my pwd is [removed]', $result['pwd']);
-        $this->assertSame('see [removed key] here', $result['key']);
-        $this->assertSame($ordinary, $result['ordinary']);
+        $this->pmssAssertArraySubsetSame([
+            'password' => 'password: [removed]', 'pwd' => 'my pwd is [removed]', 'key' => 'see [removed key] here', 'ordinary' => $ordinary,
+        ], $result);
         $this->pmssAssertStringNotContainsString('hunter2', json_encode($result));
         $this->pmssAssertStringNotContainsString('vsk-', json_encode($result));
     }
@@ -493,9 +480,9 @@ final class WelcomeHomeTest extends TestCase
             .'));');
 
         $down = $result['down'];
-        $this->assertSame('Server down: rTorrent stopped', $down['subject']);
-        $this->assertSame('user@example.test', $down['email']);
-        $this->assertSame('Medium', $down['priority']);
+        $this->pmssAssertArraySubsetSame([
+            'subject' => 'Server down: rTorrent stopped', 'email' => 'user@example.test', 'priority' => 'Medium',
+        ], $down);
         $this->assertStringContainsAllStrings(array("rTorrent stopped\nmore", "(Sent from the panel's Get help form, topic: Server down)"), $down['message']);
 
         $this->assertSame('Not working: '.str_repeat('x', 79).'…', $result['long']['subject'], 'A long first line is cut to 80 characters');
@@ -520,12 +507,10 @@ final class WelcomeHomeTest extends TestCase
         $result = $this->runWelcomeHome('$result = array(); foreach ('.var_export($cases, true).' as $name => $case) {'
             .' $result[$name] = pmssWelcomeHomeSupportAnswer($case[0], $case[1]); } echo json_encode($result);');
 
-        $this->assertSame(true, $result['opened']['ok']);
-        $this->assertSame('123456', $result['opened']['ticket']);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'ticket' => '123456'], $result['opened']);
         $this->assertStringContainsString('Ticket #123456 opened', $result['opened']['message']);
 
-        $this->assertSame(true, $result['malformedTicket']['ok']);
-        $this->assertSame('', $result['malformedTicket']['ticket']);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'ticket' => ''], $result['malformedTicket']);
         $this->pmssAssertStringNotContainsString('<b>', $result['malformedTicket']['message']);
 
         $failures = array('unauthorized', 'rateLimited', 'tooLong', 'badRequest');
@@ -610,8 +595,7 @@ final class WelcomeHomeTest extends TestCase
         $result = $this->runWelcomeHome('$result = array(); foreach (array(0, 2, 3, 4, 5, 6, 1, 127, 124, -1) as $code) {'
             .' $result["c".$code] = pmssWelcomeHomeSupportPikkumiesAnswer($code); } echo json_encode($result);');
 
-        $this->assertSame(true, $result['c0']['ok']);
-        $this->assertSame(true, $result['c0']['pikkumies']);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'pikkumies' => true], $result['c0']);
         $this->assertStringContainsString('Pikkumies is checking it now', $result['c0']['message']);
 
         $known = array();
@@ -738,8 +722,7 @@ final class WelcomeHomeTest extends TestCase
             $result[$name] = $this->pmssDecodeJsonArray($body, $name.' answers JSON');
         }
 
-        $this->assertSame('busy', $result['busy']['state']);
-        $this->assertSame(1760000005, $result['busy']['at']);
+        $this->pmssAssertArraySubsetSame(['state' => 'busy', 'at' => 1760000005], $result['busy']);
         $this->assertStringContainsString('Checking rTorrent now', $result['busy']['said'], 'Control characters become spaces');
         $this->assertSame(0, preg_match('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', $result['busy']['said']), 'No control characters reach the page');
         $length = function_exists('mb_strlen') ? mb_strlen($result['busy']['said'], 'UTF-8') : strlen($result['busy']['said']);
@@ -775,9 +758,9 @@ final class WelcomeHomeTest extends TestCase
     public function testConnectShowsThePermanentAddressOnlyWithAServiceId(): void
     {
         $html = $this->runWelcomeHome('$_SERVER["HTTP_HOST"] = "host.example.test"; $apps = array("apps" => array());'
-            .'echo json_encode(array("with" => pmssWelcomeHomeConnectHtmlBuild("alice", $apps, false, 12345),'
-            .' "none" => pmssWelcomeHomeConnectHtmlBuild("alice", $apps, false, 0),'
-            .' "omitted" => pmssWelcomeHomeConnectHtmlBuild("alice", $apps, false)));');
+            .'echo json_encode(array("with" => pmssWelcomeHomeConnectHtmlBuild("fixtur01", $apps, false, 12345),'
+            .' "none" => pmssWelcomeHomeConnectHtmlBuild("fixtur01", $apps, false, 0),'
+            .' "omitted" => pmssWelcomeHomeConnectHtmlBuild("fixtur01", $apps, false)));');
         // The same name nginx serves and createWebPublicCerts prints (ADR 0040).
         $name = \pmssMcxLabel('service', '12345').'.mcx.fi';
         $this->assertStringContainsAllStrings(['<dt>Permanent address</dt><dd>'.$name.'</dd>', 'data-copy="'.$name.'"',
@@ -785,7 +768,7 @@ final class WelcomeHomeTest extends TestCase
         foreach (['none', 'omitted'] as $case) {
             $this->pmssAssertStringNotContainsString('Permanent address', $html[$case], $case);
             $this->pmssAssertStringNotContainsString('mcx.fi', $html[$case], $case);
-            $this->assertStringContainsString('<dt>Username</dt><dd>alice</dd>', $html[$case], $case);
+            $this->assertStringContainsString('<dt>Username</dt><dd>fixtur01</dd>', $html[$case], $case);
         }
     }
 }
