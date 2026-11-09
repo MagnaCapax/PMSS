@@ -46,6 +46,12 @@ creates a timestamped backup. Rsyslog restarts only after validation and replace
   2000 messages per window retain evidence while protecting root filesystem availability.
 - Negative: nonstandard imklog declarations require explicit operator reconciliation and are
   warned rather than rewritten heuristically.
+- Candidate cleanup covers preparation as well as validation: write or mode-setting
+  exceptions and errors release the temporary full-config copy before propagating.
+  Ordinary failures still remove it before logging their warning, exactly once;
+  successful validation still removes it before backup and publication. The isolated
+  `RsyslogCandidateSafetyTest` checks operation order, warning bytes and throwable
+  identity without creating files or executing rsyslog. Tests run on testing machines.
 
 ## References
 - PMSS #795

@@ -48,31 +48,35 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
     }
 
     $candidatePath = @tempnam(dirname($target), '.pmss-rsyslog-');
-    if (
-        !is_string($candidatePath)
-        || $candidatePath === ''
-        || !pmssFileWriteComplete($candidatePath, $candidateBody)
-    ) {
-        if (is_string($candidatePath)) {
-            @unlink($candidatePath);
-        }
-        $log('[WARN] Unable to prepare rsyslog configuration candidate');
-        return;
-    }
-    // Never pass a full host configuration to validation if its private mode failed.
-    if (!@chmod($candidatePath, 0600)) {
-        @unlink($candidatePath);
-        $log('[WARN] Unable to secure rsyslog configuration candidate');
-        return;
-    }
     try {
+        if (
+            !is_string($candidatePath)
+            || $candidatePath === ''
+            || !pmssFileWriteComplete($candidatePath, $candidateBody)
+        ) {
+            if (is_string($candidatePath)) {
+                @unlink($candidatePath);
+            }
+            $candidatePath = null; // Cleanup precedes the warning; finally must not repeat it.
+            $log('[WARN] Unable to prepare rsyslog configuration candidate');
+            return;
+        }
+        // Never pass a full host configuration to validation if its private mode failed.
+        if (!@chmod($candidatePath, 0600)) {
+            @unlink($candidatePath);
+            $candidatePath = null;
+            $log('[WARN] Unable to secure rsyslog configuration candidate');
+            return;
+        }
         $validationRc = $run(
             'Validating rsyslog kernel input rate limit',
             sprintf('rsyslogd -N1 -f %s', escapeshellarg($candidatePath))
         );
     } finally {
-        // Validation failures must not leave a copy of the full configuration behind.
-        @unlink($candidatePath);
+        // Preparation and validation throwables must not leave a full-config copy behind.
+        if (is_string($candidatePath)) {
+            @unlink($candidatePath);
+        }
     }
     if ($validationRc !== 0) {
         $log('[WARN] Rsyslog kernel input rate limit candidate failed validation; existing configuration preserved');
