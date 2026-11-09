@@ -18,9 +18,8 @@ class WelcomeLegacyActionGuardTest extends TestCase
 
     public function testLegacyFormsSendRequestedWithHeader(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $this->assertStringContainsString("headers: {'X-Requested-With': 'XMLHttpRequest'}", $source);
-        $this->assertStringContainsString('name="delugePasswordRotate"', $source);
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php',
+            ["headers: {'X-Requested-With': 'XMLHttpRequest'}", 'name="delugePasswordRotate"']);
         $this->assertSame(2, substr_count($source, 'onsubmit="return pmssWelcomeActionSubmit(this)"'));
     }
 

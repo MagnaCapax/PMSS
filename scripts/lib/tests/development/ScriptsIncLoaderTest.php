@@ -27,8 +27,7 @@ final class ScriptsIncLoaderTest extends TestCase
     {
         $home = $this->makeHome(array());
         foreach (array('.rtorrentExecute.php', '.rtorrentRestart.php') as $script) {
-            $source = $this->pmssReadRepoFile('etc/skel/'.$script);
-            $this->assertStringContainsString("require_once '.scriptsInc.php'", $source);
+            $this->pmssAssertRepoFileContainsString('etc/skel/'.$script, "require_once '.scriptsInc.php'");
         }
         $result = $this->pmssRunInlinePhpRequire($home.'/.scriptsInc.php',
             'echo function_exists("writeLog") ? "ok" : "missing";', array(), '2>&1');

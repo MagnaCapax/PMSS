@@ -45,10 +45,8 @@ final class TorrentClientsP6VenvTest extends TestCase
         $this->assertStringContainsString('--no-index --no-deps', $calls[2][0][1]);
         $this->assertStringContainsString($root.'/wheels/'.$entry['wheels'][0]['file'], $calls[2][0][1]);
         $this->assertFalse(is_link($calls[4]));
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/torrentClients/delugeVenv.php');
-        $this->assertStringContainsString("'pmssPythonVenvInstallCli'", $source);
-        $helper = (string) file_get_contents(dirname(__DIR__, 2).'/update/apps/pythonVenv.php');
-        $this->assertStringContainsString('pmssPythonVenvEnsure($venvDir', $helper);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/torrentClients/delugeVenv.php', "'pmssPythonVenvInstallCli'");
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/pythonVenv.php', 'pmssPythonVenvEnsure($venvDir');
     }
 
     public function testMissingOrChangedWheelStopsBeforeInstaller(): void

@@ -73,10 +73,9 @@ final class TorrentClientsExecutorFallbackTest extends TestCase
 
     public function testPanelSaysPendingRestartUnlessTheExecutorFellBack(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/configureTorrentClientsOther.php');
-        $this->assertStringContainsString("pmssRtorrentExecutorFallbackVersion(\$home) === basename(\$target)", $source);
-        $this->assertStringContainsString("' starts at the next rTorrent restart'", $source);
-        $executor = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrentExecute.php');
-        $this->assertStringContainsString('pmssRtorrentExecutorFallbackMark(__DIR__', $executor);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/configureTorrentClientsOther.php', [
+            "pmssRtorrentExecutorFallbackVersion(\$home) === basename(\$target)", "' starts at the next rTorrent restart'",
+        ]);
+        $this->pmssAssertRepoFileContainsString('etc/skel/.rtorrentExecute.php', 'pmssRtorrentExecutorFallbackMark(__DIR__');
     }
 }

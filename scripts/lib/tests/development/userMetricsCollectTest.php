@@ -81,10 +81,8 @@ class UserMetricsCollectTest extends TestCase
     public function testOomProjectionReadsOnlyRootState(): void
     {
         // Keep the root entrypoint free of reads from the tenant-controlled home.
-        $projectorSource = (string) file_get_contents(dirname(__DIR__, 2).'/resources/oomStatus.php');
-        foreach (['file_get_contents(', 'fopen(', 'readfile(', 'pmssReadSerializedArrayFile('] as $reader) {
-            $this->assertSame(false, strpos($projectorSource, $reader) !== false);
-        }
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/resources/oomStatus.php', [],
+            ['file_get_contents(', 'fopen(', 'readfile(', 'pmssReadSerializedArrayFile(']);
         $root = $this->pmssMakeTempDir('pmss-oom-project-', 0700);
         $homeRoot = $root.'/home';
         $stateRoot = $root.'/state';

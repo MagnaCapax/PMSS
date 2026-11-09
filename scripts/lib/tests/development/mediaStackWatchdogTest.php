@@ -106,10 +106,9 @@ class MediaStackWatchdogTest extends TestCase
 
     public function testRootCronSchedulesTheContextFirstWatchdogEntrypoint(): void
     {
-        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
-
-        $this->assertStringContainsString('/scripts/cron/mediaStackInstancesCheck.php', $cron);
-        $this->assertStringContainsString('/var/log/pmss/mediaStackInstancesCheck.log', $cron);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/root.cron', [
+            '/scripts/cron/mediaStackInstancesCheck.php', '/var/log/pmss/mediaStackInstancesCheck.log',
+        ]);
     }
 
     public function testStatusWriteIsReadableAndUsesCustomerMode(): void

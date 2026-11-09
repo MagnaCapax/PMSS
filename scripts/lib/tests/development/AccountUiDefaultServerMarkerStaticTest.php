@@ -13,9 +13,8 @@ final class AccountUiDefaultServerMarkerStaticTest extends TestCase
 
     public function testEveryAccountUiDefaultServerNeedsTheHostMarker(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/nginxConfig/setup.php');
-        $this->assertStringNotContainsString('pmssHermesUiDefaultNginxBlock(', $source);
-        $this->assertStringContainsString('pmssCreateNginxConfigSetupRemoveDefault($hermesDefault)', $source);
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/nginxConfig/setup.php',
+            ['pmssCreateNginxConfigSetupRemoveDefault($hermesDefault)'], ['pmssHermesUiDefaultNginxBlock(']);
         foreach (['pmssPikkumiesUiDefaultNginxBlock', 'pmssPikkumiesHermesDefaultNginxBlock'] as $builder) {
             $at = strpos($source, $builder.'(');
             $this->assertTrue($at !== false, 'default server builder not found: '.$builder);

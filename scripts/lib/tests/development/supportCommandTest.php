@@ -182,13 +182,10 @@ class SupportCommandTest extends TestCase
 
     public function testSnapshotWriteUsesSharedFullWriteGuard(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/support/diagnostics.php');
-
-        $this->assertStringContainsString(
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/support/diagnostics.php', [
             "pmssSupportStreamWriteAll(\$handle, (string) (\$diagnostics['body'] ?? ''), 'support snapshot file');",
-            $source
-        );
-        $this->assertStringContainsAllStrings(["@fflush(\$handle) !== true", "@chmod(\$snapshotDir, 0700);", "@chmod(\$path, 0600);"], $source);
+            "@fflush(\$handle) !== true", "@chmod(\$snapshotDir, 0700);", "@chmod(\$path, 0600);",
+        ]);
     }
 
     public function testSnapshotWriteRejectsSymlinkedSupportPathAncestor(): void
@@ -234,8 +231,6 @@ class SupportCommandTest extends TestCase
 
     public function testShippedSkeletonSupportWrapperTargetsUtility(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/bin/support');
-
-        $this->assertStringContainsString('php /scripts/util/supportCommand.php', $source);
+        $this->pmssAssertRepoFileContainsString('etc/skel/bin/support', 'php /scripts/util/supportCommand.php');
     }
 }

@@ -100,9 +100,8 @@ class AiDockerInstallerSafetyTest extends TestCase
             "} elseif (\$version >= 12) {\n    pmssDockerRemoveStraySlirpCopies('/usr/local/bin', \$dryRun);",
         ]);
         $source = $this->pmssReadRepoFile('scripts/lib/update/apps/docker.php');
-        foreach (["'/usr/local/bin/']", '@tempnam(', 'download/v1.3.2/', '--version'] as $forbidden) {
-            $this->assertTrue(strpos($source, $forbidden) === false, 'docker.php must not contain '.$forbidden);
-        }
+        $this->assertStringContainsAndOmitsStrings([], ["'/usr/local/bin/']", '@tempnam(', 'download/v1.3.2/', '--version'],
+            $source, 'docker.php must not contain ');
         foreach (['x86_64', 'aarch64', 'armv7l', 'ppc64le', 'riscv64', 's390x'] as $arch) {
             $this->assertSame(1, preg_match("/'".$arch."' => '[a-f0-9]{64}',/", $source), $arch);
         }

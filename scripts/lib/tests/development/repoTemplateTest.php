@@ -33,33 +33,21 @@ class RepoTemplateTest extends TestCase
         $path = $this->pmssRepoPath(self::TRIXIE_TEMPLATE);
         $this->assertTrue(is_file($path), 'Expected template.sources.trixie to exist');
 
-        $data = $this->pmssReadRepoFile(self::TRIXIE_TEMPLATE);
-        foreach ([
+        $this->pmssAssertRepoFileContainsAllStrings(self::TRIXIE_TEMPLATE, [
             'non-free-firmware' => 'Expected trixie repo template to include non-free-firmware',
             'trixie-security' => 'Expected trixie template to include security pocket',
             'trixie-updates' => 'Expected trixie template to include updates pocket',
             'trixie-backports' => 'Expected trixie template to include backports pocket',
             ' trixie ' => 'Expected trixie template to reference the trixie suite',
-        ] as $needle => $message) {
-            $this->assertTrue(strpos($data, $needle) !== false, $message);
-        }
+        ]);
     }
 
     public function testShippedBullseyeTemplateUsesArchivedSecurityPocket(): void
     {
         // The live security mirror keeps a frozen bullseye-security index but no longer serves its packages.
-        $data = $this->pmssReadRepoFile(self::BULLSEYE_TEMPLATE);
-        $this->assertTrue(
-            strpos($data, 'deb http://archive.debian.org/debian-security bullseye-security ') !== false,
-            'Expected bullseye template to take the security pocket from archive.debian.org'
-        );
-        $this->assertTrue(
-            strpos($data, 'deb-src http://archive.debian.org/debian-security bullseye-security ') !== false,
-            'Expected bullseye template to take the security sources from archive.debian.org'
-        );
-        $this->assertTrue(
-            strpos($data, 'security.debian.org/debian-security bullseye-security') === false,
-            'Expected bullseye template not to reference the live security mirror'
-        );
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(self::BULLSEYE_TEMPLATE, [
+            'deb http://archive.debian.org/debian-security bullseye-security ' => 'Expected bullseye template to take the security pocket from archive.debian.org',
+            'deb-src http://archive.debian.org/debian-security bullseye-security ' => 'Expected bullseye template to take the security sources from archive.debian.org',
+        ], ['security.debian.org/debian-security bullseye-security' => 'Expected bullseye template not to reference the live security mirror']);
     }
 }
