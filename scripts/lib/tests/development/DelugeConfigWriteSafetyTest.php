@@ -64,7 +64,7 @@ final class DelugeConfigWriteSafetyTest extends TestCase
     {
         list($username, $home) = $this->accountFixture();
         $target = $this->pmssMakeTempDir('pmss-deluge-target-');
-        file_put_contents($target.'/sentinel', 'unchanged');
+        $this->pmssWriteFile($target.'/sentinel', 'unchanged');
         $owner = fileowner($target);
         $fileOwner = fileowner($target.'/sentinel');
         if ($nested) {
@@ -99,7 +99,7 @@ final class DelugeConfigWriteSafetyTest extends TestCase
         list($username, $home) = $this->accountFixture();
         $configDir = $home.'/.config/deluge';
         mkdir($configDir, 0755, true);
-        file_put_contents($home.'/.delugeWebPort', '6201');
+        $this->pmssWriteFile($home.'/.delugeWebPort', '6201');
 
         \userConfigureDeluge(['name' => $username, 'memory' => 4], ['config' => ['scgiPort' => 6200]]);
 
@@ -133,7 +133,7 @@ final class DelugeConfigWriteSafetyTest extends TestCase
             [$username, $home] = $this->accountFixture();
             $configDir = $this->pmssEnsureDir($home.'/.config/deluge');
             $auth = $this->pmssWriteFile($configDir.'/auth', $content);
-            file_put_contents($home.'/.delugeWebPort', '6201');
+            $this->pmssWriteFile($home.'/.delugeWebPort', '6201');
 
             \userConfigureDeluge(['name' => $username, 'memory' => 4], ['config' => ['scgiPort' => 6200]]);
 
@@ -154,7 +154,7 @@ final class DelugeConfigWriteSafetyTest extends TestCase
             $content = "extra:thin-client-secret:5\n".($case === 'oversized' ? str_repeat('# padding\n', 9000) : '');
             $auth = $this->pmssWriteFile($configDir.'/auth', $content);
             if ($case === 'hardlinked') $this->assertTrue(link($auth, $configDir.'/auth-copy'));
-            file_put_contents($home.'/.delugeWebPort', '6201');
+            $this->pmssWriteFile($home.'/.delugeWebPort', '6201');
 
             \userConfigureDeluge(['name' => $username, 'memory' => 4], ['config' => ['scgiPort' => 6200]]);
 

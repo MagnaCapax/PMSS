@@ -204,7 +204,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $path = $this->tempDir.'/web.conf';
         $meta = '{"file":2,"format":1}';
         $config = '{"base":"/user-testuser/deluge/","port":8112,"x":1}';
-        file_put_contents($path, $meta.$config);
+        $this->pmssWriteFile($path, $meta.$config);
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue(is_array($parsed), 'Expected parsed array');
@@ -219,7 +219,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $path = $this->tempDir.'/web-ws.conf';
         $meta = "  \n\t {\"file\":2,\"format\":1}\n";
         $config = "  \n{\"base\":\"/user-testuser/deluge/\",\"port\":8112}\n";
-        file_put_contents($path, $meta.$config);
+        $this->pmssWriteFile($path, $meta.$config);
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue(is_array($parsed));
@@ -263,7 +263,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $path = $this->tempDir.'/web-braces.conf';
         $meta = "{\"file\":2,\"format\":1,\"note\":\"a}b{c\"}";
         $config = "{\"base\":\"/user-testuser/deluge/\",\"port\":8112,\"banner\":\"{hello}\"}";
-        file_put_contents($path, $meta.$config);
+        $this->pmssWriteFile($path, $meta.$config);
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue(is_array($parsed));
@@ -273,8 +273,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsNonObjectStart(): void
     {
-        $path = $this->tempDir.'/web-bad-start.conf';
-        file_put_contents($path, "[]{}");
+        $path = $this->pmssWriteFile($this->tempDir.'/web-bad-start.conf', "[]{}");
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null for invalid config');
@@ -282,8 +281,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsSingleObjectOnly(): void
     {
-        $path = $this->tempDir.'/web-one.conf';
-        file_put_contents($path, '{"file":2,"format":1}');
+        $path = $this->pmssWriteFile($this->tempDir.'/web-one.conf', '{"file":2,"format":1}');
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null when second JSON object is missing');
@@ -291,8 +289,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsUnterminatedFirstObject(): void
     {
-        $path = $this->tempDir.'/web-unterminated-first.conf';
-        file_put_contents($path, "{\"file\":2,\"format\":1,\"x\":\"unterminated}{}");
+        $path = $this->pmssWriteFile($this->tempDir.'/web-unterminated-first.conf', "{\"file\":2,\"format\":1,\"x\":\"unterminated}{}");
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null for unterminated first JSON object');
@@ -300,8 +297,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsSecondObjectWhenNotAnObject(): void
     {
-        $path = $this->tempDir.'/web-second-not-object.conf';
-        file_put_contents($path, '{"file":2,"format":1}null');
+        $path = $this->pmssWriteFile($this->tempDir.'/web-second-not-object.conf', '{"file":2,"format":1}null');
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null when second JSON is not an object');
@@ -309,8 +305,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsMetaWhenNotAnObject(): void
     {
-        $path = $this->tempDir.'/web-meta-not-object.conf';
-        file_put_contents($path, '[]{}');
+        $path = $this->pmssWriteFile($this->tempDir.'/web-meta-not-object.conf', '[]{}');
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null when meta JSON is not an object');
@@ -318,8 +313,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsTruncatedJson(): void
     {
-        $path = $this->tempDir.'/web-trunc.conf';
-        file_put_contents($path, '{"file":2,"format":1}{"base":"/user-testuser/deluge/","port":');
+        $path = $this->pmssWriteFile($this->tempDir.'/web-trunc.conf', '{"file":2,"format":1}{"base":"/user-testuser/deluge/","port":');
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null for truncated JSON');
@@ -329,7 +323,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     {
         $path = $this->tempDir.'/web-nullbyte.conf';
         // Raw NUL byte is not valid JSON and should fail parsing.
-        file_put_contents($path, "{\"file\":2,\"format\":1}\0{\"base\":\"/user-testuser/deluge/\",\"port\":8112}");
+        $this->pmssWriteFile($path, "{\"file\":2,\"format\":1}\0{\"base\":\"/user-testuser/deluge/\",\"port\":8112}");
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null for invalid JSON containing NUL byte');
@@ -337,8 +331,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsUnterminatedString(): void
     {
-        $path = $this->tempDir.'/web-unterminated-string.conf';
-        file_put_contents($path, "{\"file\":2,\"format\":1,\"x\":\"unterminated}{}");
+        $path = $this->pmssWriteFile($this->tempDir.'/web-unterminated-string.conf', "{\"file\":2,\"format\":1,\"x\":\"unterminated}{}");
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null for unterminated JSON string');
@@ -346,8 +339,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeReadWebConfRejectsMissingClosingBrace(): void
     {
-        $path = $this->tempDir.'/web-missing-brace.conf';
-        file_put_contents($path, "{\"file\":2,\"format\":1{\"base\":\"/user-testuser/deluge/\"}");
+        $path = $this->pmssWriteFile($this->tempDir.'/web-missing-brace.conf', "{\"file\":2,\"format\":1{\"base\":\"/user-testuser/deluge/\"}");
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null for missing closing brace');
@@ -365,8 +357,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     public function testDelugeReadWebConfFailsSoftOnUtf8Bom(): void
     {
         $bom = "\xEF\xBB\xBF";
-        $path = $this->tempDir.'/web-bom.conf';
-        file_put_contents($path, $bom.'{"file":2,"format":1}{"base":"/user-testuser/deluge/","port":8112}');
+        $path = $this->pmssWriteFile($this->tempDir.'/web-bom.conf', $bom.'{"file":2,"format":1}{"base":"/user-testuser/deluge/","port":8112}');
 
         $parsed = \pmssDelugeReadWebConf($path);
         $this->assertTrue($parsed === null, 'Expected null for BOM-prefixed config (fail-soft)');
@@ -377,7 +368,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $path = $this->tempDir.'/web-roundtrip.conf';
         $meta = '{"file":2,"format":1}';
         $config = '{"base":"/deluge-testuser/","port":8112}';
-        file_put_contents($path, $meta.$config);
+        $this->pmssWriteFile($path, $meta.$config);
         @chmod($path, 0640);
 
         $parsed = \pmssDelugeReadWebConf($path);

@@ -13,12 +13,12 @@ class SetupLetsEncryptTest extends TestCase
         $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.example.com', $config));
         $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com.evil.test', $config));
 
-        file_put_contents($config, "owner@example.com\n");
+        $this->pmssWriteFile($config, "owner@example.com\n");
         $this->assertSame('owner@example.com', \pmssSetupLetsEncryptEmailResolve('box.example.com', $config));
 
-        file_put_contents($config, "bad address\n");
+        $this->pmssWriteFile($config, "bad address\n");
         $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
-        file_put_contents($config, '');
+        $this->pmssWriteFile($config, '');
         $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
     }
 
@@ -112,8 +112,7 @@ class SetupLetsEncryptTest extends TestCase
     public function testSharedSetupSkipsCertRequestWhenLiveCertificateExists(): void
     {
         $commands = [];
-        $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-existing-').'/certbot';
-        file_put_contents($cronPath, "existing\n");
+        $cronPath = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-certbot-cron-existing-').'/certbot', "existing\n");
 
         list($ignored, $stdout) = $this->pmssCaptureStdout(function () use (&$commands, $cronPath): void {
             \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([

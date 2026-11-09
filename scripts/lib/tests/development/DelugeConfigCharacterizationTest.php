@@ -50,11 +50,11 @@ final class DelugeConfigCharacterizationTest extends TestCase
     {
         $path = $this->pmssMakeTempDir('pmss-deluge-characterization-').'/core.conf';
         $raw = ' {"file":1} {"user":"kept"} ';
-        file_put_contents($path, $raw);
+        $this->pmssWriteFile($path, $raw);
         foreach ([static function (array $config) { return $config; },
             static function () { return null; }, static function () { return false; },
             static function () { return ['invalid' => INF]; }] as $mutator) {
-            $this->assertFalse(\pmssDelugeConfigMutate('alice', $mutator, $path));
+            $this->assertFalse(\pmssDelugeConfigMutate('fixtur01', $mutator, $path));
             $this->assertSame($raw, file_get_contents($path));
         }
     }
@@ -64,13 +64,13 @@ final class DelugeConfigCharacterizationTest extends TestCase
         $path = $this->pmssMakeTempDir('pmss-deluge-characterization-bad-').'/core.conf';
         $calls = 0;
         $mutator = static function () use (&$calls) { $calls++; return []; };
-        $this->assertFalse(\pmssDelugeConfigMutate('alice', $mutator, $path));
-        file_put_contents($path, '{}broken');
-        $this->assertFalse(\pmssDelugeConfigMutate('alice', $mutator, $path));
+        $this->assertFalse(\pmssDelugeConfigMutate('fixtur01', $mutator, $path));
+        $this->pmssWriteFile($path, '{}broken');
+        $this->assertFalse(\pmssDelugeConfigMutate('fixtur01', $mutator, $path));
         $this->assertSame(0, $calls);
-        file_put_contents($path, '{}{}');
+        $this->pmssWriteFile($path, '{}{}');
         try {
-            \pmssDelugeConfigMutate('alice', static function () { throw new \RuntimeException('mutation rejected'); }, $path);
+            \pmssDelugeConfigMutate('fixtur01', static function () { throw new \RuntimeException('mutation rejected'); }, $path);
             $this->assertTrue(false, 'Mutator exception must propagate');
         } catch (\RuntimeException $exception) {
             $this->assertSame('mutation rejected', $exception->getMessage());
@@ -93,7 +93,7 @@ final class DelugeConfigCharacterizationTest extends TestCase
         $config = ['hosts' => $hosts, 'unrelated' => ['keep' => true]];
         $path = $this->pmssWriteFile($root.'/hostlist.conf', json_encode($meta).json_encode($config));
         chmod($path, 0640);
-        $this->assertTrue(\pmssDelugeHostlistSyncLocalclientPassword('alice', $path, $auth));
+        $this->assertTrue(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $path, $auth));
         $hosts[0][4] = 'fixture-token';
         $hosts[1][4] = 'fixture-token';
         $this->assertSame(['meta' => $meta, 'config' => ['hosts' => $hosts, 'unrelated' => ['keep' => true]]],
@@ -101,7 +101,7 @@ final class DelugeConfigCharacterizationTest extends TestCase
         $this->assertSame(0640, fileperms($path) & 0777);
         $this->assertSame("localclient:fixture-token:10\nother:unchanged:5\n", file_get_contents($auth));
         $bytes = file_get_contents($path);
-        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('alice', $path, $auth));
+        $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $path, $auth));
         $this->assertSame($bytes, file_get_contents($path));
     }
 
@@ -111,7 +111,7 @@ final class DelugeConfigCharacterizationTest extends TestCase
         $auth = $this->pmssWriteFile($root.'/auth', "localclient:fixture-token:10\n");
         foreach (['{}{}', '{}{"hosts":null}', '{}{"hosts":false}', '{}{"hosts":"bad"}', '{}{"hosts":[]}'] as $raw) {
             $path = $this->pmssWriteFile($root.'/hostlist.conf', $raw);
-            $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('alice', $path, $auth));
+            $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $path, $auth));
             $this->assertSame($raw, file_get_contents($path));
         }
     }

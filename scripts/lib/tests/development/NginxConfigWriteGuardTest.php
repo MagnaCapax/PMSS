@@ -173,8 +173,7 @@ PHP;
         $homeBase = $this->tempDir.'/home';
         $runtimePortDir = $this->tempDir.'/ports';
         $nginxUsersDir = $this->tempDir.'/users';
-        $this->pmssWriteFile($homeBase.'/fixtur01/.rtorrent.rc', "schedule = test\n");
-        $this->pmssWriteFile($homeBase.'/fixtur01/.lighttpd.conf', "server.port = 12345\n");
+        $this->pmssWriteFiles($homeBase.'/fixtur01', ['.rtorrent.rc' => "schedule = test\n", '.lighttpd.conf' => "server.port = 12345\n"]);
         $this->pmssWriteFile($runtimePortDir.'/lighttpd-fixtur01', "12345\n");
         $priorRoute = $this->pmssWriteFile($this->tempDir.'/prior-route', "old route\n");
         @mkdir($nginxUsersDir, 0755, true);
@@ -193,8 +192,7 @@ PHP;
         $users = $this->tempDir.'/users';
         $conf = $this->tempDir.'/conf.d';
         $ports = $this->tempDir.'/ports';
-        $this->pmssWriteFile($home.'/.rtorrent.rc', "schedule = test\n");
-        $this->pmssWriteFile($home.'/.lighttpd.conf', "server.port = 12345\n");
+        $this->pmssWriteFiles($home, ['.rtorrent.rc' => "schedule = test\n", '.lighttpd.conf' => "server.port = 12345\n"]);
         $this->pmssWriteFile($ports.'/lighttpd-fixtur01', "12345\n");
         @mkdir($users, 0755, true);
         @mkdir($conf, 0755, true);
@@ -236,8 +234,7 @@ PHP;
     public function testPrimaryTemplateRenderingPreservesRepeatedAndUnknownTokens(): void
     {
         $home = $this->tempDir.'/home/fixtur01';
-        $this->pmssWriteFile($home.'/.rtorrent.rc', "schedule = test\n");
-        $this->pmssWriteFile($home.'/.lighttpd.conf', "server.port = 12345\n");
+        $this->pmssWriteFiles($home, ['.rtorrent.rc' => "schedule = test\n", '.lighttpd.conf' => "server.port = 12345\n"]);
         $this->pmssWriteFile($this->tempDir.'/ports/lighttpd-fixtur01', "12345\n");
         @mkdir($this->tempDir.'/users', 0755, true);
         $ctx = [
@@ -319,7 +316,6 @@ PHP;
     public function testLegacyDelugePortReaderRequiresOpenedRegularEntry(): void
     {
         $homeDir = $this->tempDir.'/home/fixtur01';
-        @mkdir($homeDir, 0755, true);
         $port = $this->pmssWriteFile($homeDir.'/.delugeWebPort', "23000\n");
         $owner = (int) fileowner($port);
         $this->assertSame("23000\n", \pmssReadRegularFileContentsVerified($port, $owner, 32));

@@ -352,7 +352,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     {
         $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-regular-');
         $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir);
-        file_put_contents($statePath, '8');
+        $this->pmssWriteFile($statePath, '8');
         chmod($statePath, 0640);
 
         $this->assertSame(
@@ -377,7 +377,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
             $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('fixtur01', $runtimeDir);
             $target = $runtimeDir.'/foreign';
             if ($targetExists) {
-                file_put_contents($target, 'sentinel');
+                $this->pmssWriteFile($target, 'sentinel');
             }
             $this->assertTrue(symlink($target, $statePath));
 
