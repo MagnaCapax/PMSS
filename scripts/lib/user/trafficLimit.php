@@ -60,15 +60,19 @@ if (!function_exists('pmssTrafficLimitStateRead')) {
 
 /**
  * The limit root enforces: the runtime limit file plus the stored bonus (ADR 0213).
+ * limitUnreadable: the limit file exists but cannot be read or parsed; limitGiB then reads 0 as before, and the
+ * enforcer keeps the account's current throttle state instead of treating it as unlimited.
  *
- * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int}
+ * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int,limitUnreadable:bool}
  */
 function pmssTrafficLimitRootStateRead(string $user, ?UserConfigStore $store = null, ?string $runtimeDir = null): array
 {
     require_once __DIR__.'/userConfigStore.php';
-    $limitGiB = pmssTrafficLimitReadGiBFile(pmssIntegerSettingRuntimeUserPath('trafficLimits', $user, $runtimeDir));
+    $read = pmssIntegerSettingFileReadOrNull(pmssIntegerSettingRuntimeUserPath('trafficLimits', $user, $runtimeDir), 'pmssTrafficLimitParseGiB');
+    $limitGiB = $read ?? 0;
     $bonusGiB = ($store ?? new UserConfigStore())->getInt($user, 'bonusTrafficGiB');
-    return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0];
+    return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0,
+        'limitUnreadable' => $read === null];
 }
 
 function pmssTrafficLimitCliUsernameNormalize(string $rawUserName): ?string

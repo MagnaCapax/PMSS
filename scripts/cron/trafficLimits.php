@@ -48,6 +48,11 @@ foreach($users AS $thisUser) {
     $trafficDataFile = pmssTrafficStatsPath($thisUser);
     $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
     $trafficLimitState = pmssTrafficLimitRootStateRead($thisUser, $userConfigStore);
+    if ($trafficLimitState['limitUnreadable']) {
+        // An unreadable limit is not "unlimited": leave any throttle in place and change nothing.
+        echo pmssLogFormatTimestampedLine("Keeping {$thisUser}'s throttle state, traffic limit file unreadable");
+        continue;
+    }
     if ($trafficLimitState['effectiveLimitGiB'] <= 0) {
         pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile);
         continue;

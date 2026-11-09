@@ -81,6 +81,24 @@ function pmssIntegerSettingFileRead(string $path, callable $parser, int $default
     return $value !== null ? (int) $value : $default;
 }
 
+/**
+ * Like pmssIntegerSettingFileRead, but tells an absent file ($default) apart from a present file that cannot be
+ * read or parsed (null), so a caller that enforces a limit can keep its current state instead of reading "0".
+ */
+function pmssIntegerSettingFileReadOrNull(string $path, callable $parser, int $default = 0): ?int
+{
+    clearstatcache(true, $path);
+    if (@lstat($path) === false) return $default;
+    $contents = pmssReadRegularFileContentsVerified($path, null, 256);
+    if ($contents === null) return null;
+    $raw = trim($contents, " \t\r\n");
+    if ($raw === '') return null;
+
+    $error = null;
+    $value = $parser($raw, $error);
+    return $value !== null ? (int) $value : null;
+}
+
 function pmssIntegerSettingFileWrite(string $path, int $value): bool
 {
     if ($value < 0 || !function_exists('pmssAtomicWriteFile')) return false;

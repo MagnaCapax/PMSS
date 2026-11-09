@@ -344,6 +344,36 @@ class UserTrafficStateHelpersTest extends TestCase
         }
     }
 
+    public function testIntegerSettingFileReadOrNullTellsAbsentFromUnreadable(): void
+    {
+        foreach ([
+            ['missing', null, 0],
+            ['plain', "500\n", 500],
+            ['suffixed', "750GiB\n", 750],
+            ['zero', "0\n", 0],
+            ['invalid', "five hundred\n", null],
+            ['empty', '', null],
+        ] as [$name, $payload, $expected]) {
+            $path = $this->tempDir.'/limit-or-null-'.$name;
+            $this->writeOptionalFixture($path, $payload);
+
+            $this->assertSame($expected, \pmssIntegerSettingFileReadOrNull($path, 'pmssTrafficLimitParseGiB'), 'case '.$name);
+        }
+        $dir = $this->tempDir.'/limit-or-null-dir';
+        mkdir($dir);
+        $this->assertSame(null, \pmssIntegerSettingFileReadOrNull($dir, 'pmssTrafficLimitParseGiB'), 'a directory is present but unreadable');
+    }
+
+    public function testTrafficLimitsCronKeepsThrottleWhenLimitUnreadable(): void
+    {
+        $cron = (string) file_get_contents(dirname(__DIR__, 3).'/cron/trafficLimits.php');
+        $keep = strpos($cron, "if (\$trafficLimitState['limitUnreadable'])");
+        $clear = strpos($cron, 'pmssTrafficLimitThrottleClearUnlimited(');
+        $this->assertTrue($keep !== false, 'cron checks limitUnreadable');
+        $this->assertTrue($clear !== false, 'cron clears unlimited');
+        $this->assertTrue($keep < $clear, 'the unreadable check runs before the unlimited clear');
+    }
+
     public function testTrafficLimitStateReadHandlesBaseAndBonusCases(): void
     {
         foreach ([
