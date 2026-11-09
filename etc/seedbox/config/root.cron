@@ -99,6 +99,8 @@ MAILTO=""
 20 */2 * * *   root    /scripts/cron/cgroupPolicyRefresh.php >> /var/log/pmss/cgroupPolicyRefresh.log 2>&1
 */5 * * * *   root    sleep 40; /scripts/cron/cgroupBfqWeightApply.php >> /var/log/pmss/cgroupBfqWeightApply.log 2>&1
 */5 * * * *   root    sleep 50; /scripts/cron/cgroupIopsLimitApply.php >> /var/log/pmss/cgroupIopsLimitApply.log 2>&1
+# Finish by second 25, away from the five-minute cap writer at second 50 (ADR 0242).
+* * * * *   root    sleep 5; timeout --signal=KILL 20s /scripts/cron/cgroupJournalHolderRelease.php >> /var/log/pmss/cgroupJournalHolderRelease.log 2>&1
 */5 * * * *   root    sleep 55; /scripts/cron/cgroupBonusCpuWeightApply.php >> /var/log/pmss/cgroupBonusCpuWeightApply.log 2>&1
 
 # MD array integrity check — quarterly, staggered by hostname

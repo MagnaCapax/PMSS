@@ -88,22 +88,22 @@ function pmssCgroupDirectUserUidOrError(string $user, int &$errors): ?int
     return $uid;
 }
 
-/** Build the cgroup-v1 user.slice directory for one positive UID. */
-function pmssCgroupDirectUserSliceDir(int $uid): string { return PMSS_CGROUP_DIRECT_BLKIO_ROOT.'/user.slice/user-'.$uid.'.slice'; }
+/** Build the cgroup-v1 user.slice directory; an explicit root supports hermetic fixtures only. */
+function pmssCgroupDirectUserSliceDir(int $uid, string $blkioRoot = PMSS_CGROUP_DIRECT_BLKIO_ROOT): string { return $blkioRoot.'/user.slice/user-'.$uid.'.slice'; }
 
 /** Build one direct blkio target path below a managed user's cgroup-v1 slice. */
-function pmssCgroupDirectUserBlkioFilePath(int $uid, string $fileName): string { return pmssCgroupDirectUserSliceDir($uid).'/'.$fileName; }
+function pmssCgroupDirectUserBlkioFilePath(int $uid, string $fileName, string $blkioRoot = PMSS_CGROUP_DIRECT_BLKIO_ROOT): string { return pmssCgroupDirectUserSliceDir($uid, $blkioRoot).'/'.$fileName; }
 
 /** Allow only explicitly pinned files below positive-UID per-user blkio slices. */
-function pmssCgroupDirectUserBlkioPathAllowed(string $cgPath, array $allowedFiles): bool
+function pmssCgroupDirectUserBlkioPathAllowed(string $cgPath, array $allowedFiles, string $blkioRoot = PMSS_CGROUP_DIRECT_BLKIO_ROOT): bool
 {
     $patterns = [];
     foreach ($allowedFiles as $fileName) {
         if (is_string($fileName) && $fileName !== '' && strpos($fileName, '/') === false && strpos($fileName, "\0") === false) $patterns[] = preg_quote($fileName, '#');
     }
 
-    return $patterns !== []
-        && preg_match('#^'.preg_quote(PMSS_CGROUP_DIRECT_BLKIO_ROOT, '#').'/user\.slice/user-[1-9][0-9]*\.slice/(?:'.implode('|', $patterns).')$#', $cgPath) === 1;
+    return $patterns !== [] && pmssPathAbsoluteStringIsSafe($blkioRoot, ['allowTrailingSlash' => false, 'allowWhitespace' => false])
+        && preg_match('#^'.preg_quote($blkioRoot, '#').'/user\.slice/user-[1-9][0-9]*\.slice/(?:'.implode('|', $patterns).')$#', $cgPath) === 1;
 }
 
 /** Refuse links, directories, and missing targets before direct cgroup writes. */
@@ -217,16 +217,17 @@ function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $
 /**
  * Remove OUR device's read or write throttle line ("MAJ:MIN 0" in cgroup v1); absent is already clear.
  */
-function pmssIopsClearThrottle(string $cgPath, string $majMin, bool $dryRun): array
+function pmssIopsClearThrottle(string $cgPath, string $majMin, bool $dryRun, string $blkioRoot = PMSS_CGROUP_DIRECT_BLKIO_ROOT): array
 {
     if (!pmssCgroupPolicyMajorMinorIsValid($majMin)
-        || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
+        || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'], $blkioRoot)
     ) {
         return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
     }
     if (!is_file($cgPath)) {
         return ['ok' => true, 'reason' => 'no-slice', 'cur' => null];
     }
+    if (is_link($cgPath)) return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
     $cur = trim((string) @file_get_contents($cgPath));
     if (pmssCgroupDirectDeviceValueParse($cur, $majMin) === null) {
         return ['ok' => true, 'reason' => 'already-clear', 'cur' => $cur];
@@ -234,7 +235,8 @@ function pmssIopsClearThrottle(string $cgPath, string $majMin, bool $dryRun): ar
     if ($dryRun) {
         return ['ok' => true, 'reason' => 'dry-run', 'cur' => $cur];
     }
-    if (!is_writable($cgPath) || @file_put_contents($cgPath, $majMin.' 0') === false) {
+    $clear = $majMin.' 0';
+    if (!is_writable($cgPath) || @file_put_contents($cgPath, $clear) !== strlen($clear)) {
         return ['ok' => false, 'reason' => 'write-failed', 'cur' => $cur];
     }
     return ['ok' => true, 'reason' => 'written', 'cur' => $cur];

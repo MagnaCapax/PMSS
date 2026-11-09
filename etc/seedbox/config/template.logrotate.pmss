@@ -201,6 +201,7 @@
 /var/log/pmss/cgroupBfqWeightApply.log
 /var/log/pmss/cgroupBonusCpuWeightApply.log
 /var/log/pmss/cgroupIopsLimitApply.log
+/var/log/pmss/cgroupJournalHolderRelease.log
 /var/log/pmss/cgroupPolicyRefresh.log
 /var/log/pmss/cgroupRootCheck.log
 /var/log/pmss/cpuStat.log

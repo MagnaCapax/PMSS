@@ -17,7 +17,9 @@ function pmssDynamicIopsSettings(array $policy): ?array
         'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25, 'quotaExponent' => 1.0,
         'probeStartLo' => 5.0, 'probeBlockCycles' => 12, 'probePairs' => 11, 'probeGain' => 0.10,
         'latencyStep' => 1.1,
-        'ssdLatencyLowX' => 5.0, 'ssdLatencyHighX' => 10.0];
+        'ssdLatencyLowX' => 5.0, 'ssdLatencyHighX' => 10.0, 'journalHolderRelease' => true];
+    // A malformed release flag keeps the default; it must never null the settings and drop every cap.
+    if (!is_bool($settings['journalHolderRelease'])) $settings['journalHolderRelease'] = true;
     // Shadow mode was removed; a host still set to it enforces.
     if ($settings['mode'] === 'shadow') $settings['mode'] = 'enforce';
     if (!in_array($settings['mode'], ['off', 'enforce'], true)) return null;

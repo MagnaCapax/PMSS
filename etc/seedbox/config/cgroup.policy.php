@@ -16,6 +16,8 @@ return [
         // Enforced read caps with an iowait pool curb (ADRs 0230, 0231); 'off' clears them.
         'dynamicIops' => [
             'mode' => 'enforce',
+            // Release metadata holders blocking the ext4 journal on kernels before 6.12 (ADR 0242).
+            'journalHolderRelease' => true,
             'idlePressure' => 5.0, 'busyPressure' => 15.0,
             'idleMultiplier' => 10.0, 'busyMultiplier' => 2.0,
             'floor' => 15, 'floorCharge' => 0.25,
