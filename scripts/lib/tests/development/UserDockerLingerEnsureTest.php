@@ -13,17 +13,17 @@ class UserDockerLingerEnsureTest extends TestCase
 {
     public function testLingerEnsureCommandsEnableLingerThenStartUserManager(): void
     {
-        $cmds = \pmssUserDockerLingerEnsureCommands('alice', 1057);
+        $cmds = \pmssUserDockerLingerEnsureCommands('fixtur01', 1057);
         $this->assertSame([
-            "loginctl enable-linger 'alice'",
+            "loginctl enable-linger 'fixtur01'",
             'systemctl start user@1057.service',
         ], $cmds);
     }
 
     public function testLingerEnsureCommandsShellEscapeUsername(): void
     {
-        $cmds = \pmssUserDockerLingerEnsureCommands('alice; rm -rf /', 42);
-        $this->assertSame("loginctl enable-linger 'alice; rm -rf /'", $cmds[0]);
+        $cmds = \pmssUserDockerLingerEnsureCommands('fixtur01; rm -rf /', 42);
+        $this->assertSame("loginctl enable-linger 'fixtur01; rm -rf /'", $cmds[0]);
         $this->assertSame('systemctl start user@42.service', $cmds[1]);
     }
 
@@ -57,10 +57,11 @@ class UserDockerLingerEnsureTest extends TestCase
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/user/docker/stop.php');
         $src .= file_get_contents(dirname(__DIR__, 2).'/user/docker/cli.php');
-        $this->assertStringContainsString('XDG_RUNTIME_DIR=%s systemctl --user %s docker.service', $src);
-        $this->assertStringContainsString('$systemdAction = !$dockerEnabled ? \'disable --now\' : \'stop\';', $src);
-        $this->assertStringContainsString('step=systemctl-stop rc=%d count=1', $src);
-        $this->assertStringContainsString('if ($remainingPids !== []) {', $src);
+        $this->assertStringContainsAllStrings([
+            'XDG_RUNTIME_DIR=%s systemctl --user %s docker.service',
+            '$systemdAction = !$dockerEnabled ? \'disable --now\' : \'stop\';',
+            'step=systemctl-stop rc=%d count=1', 'if ($remainingPids !== []) {',
+        ], $src);
         $this->assertOrderedStrings([
             'step=verify rc=%d count=%d',
             'echo "Docker stop requested',

@@ -502,6 +502,9 @@ panel-session decisions, crontab ownership, installer self-update and watchdog
 lock handoff use these same helpers. Keep test methods,
 fragment bytes, ordering checks and per-fragment diagnostics at the callers;
 the protected common harness needs no change for additional adopters.
+Generated panel, route, quota, launch, preflight and PHP-ini text checks use
+`assertStringContainsAllStrings()` and `assertStringContainsAndOmitsStrings()`
+for repeated fragments, retaining caller-owned bytes and assertion order.
 
 Dynamic IOPS policy, cycle, latency, monitoring and probe fixtures group strict
 field checks with `TestCase::pmssAssertArraySubsetSame()`. Expected values and

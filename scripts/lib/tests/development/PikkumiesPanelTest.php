@@ -14,13 +14,13 @@ final class PikkumiesPanelTest extends TestCase
         mkdir($home.'/.mcxPikkumies/pikkumies/bin', 0700, true);
         mkdir($home.'/.mcxPikkumies/pikkumies/local');
         file_put_contents($home.'/marker', '');
-        file_put_contents($home.'/billing/alice', "123\n");
+        file_put_contents($home.'/billing/fixtur01', "123\n");
         $binary = $home.'/.mcxPikkumies/pikkumies/bin/pikkumies';
         $this->pmssWriteExecutableFile($binary, "#!/bin/sh\n", 0755, 0700);
         return $home;
     }
 
-    private function state($home, $name = 'alice')
+    private function state($home, $name = 'fixtur01')
     {
         return \pmssPikkumiesPanelStateRead($home, $name, $home.'/marker', $home.'/billing', posix_geteuid());
     }
@@ -40,18 +40,18 @@ final class PikkumiesPanelTest extends TestCase
         unlink($home.'/marker');
         $this->assertFalse($this->state($home)['visible']);
         file_put_contents($home.'/marker', '');
-        unlink($home.'/billing/alice');
+        unlink($home.'/billing/fixtur01');
         $this->assertSame('', $this->state($home)['origin']);
     }
 
     public function testInvalidBillingAndIdentityAreRejected(): void
     {
         $home = $this->fixture();
-        file_put_contents($home.'/billing/alice', "0\n");
+        file_put_contents($home.'/billing/fixtur01', "0\n");
         $this->assertFalse($this->state($home)['visible']);
-        file_put_contents($home.'/billing/alice', "123\n");
-        $this->assertFalse($this->state($home, '../alice')['visible']);
-        $this->assertSame('', \pmssPikkumiesPanelStateRead($home, 'alice', $home.'/marker', $home.'/billing', -1)['origin']);
+        file_put_contents($home.'/billing/fixtur01', "123\n");
+        $this->assertFalse($this->state($home, '../fixtur01')['visible']);
+        $this->assertSame('', \pmssPikkumiesPanelStateRead($home, 'fixtur01', $home.'/marker', $home.'/billing', -1)['origin']);
     }
 
     public function testHermesSectionWorksWithoutMarkerOrBillingButNeedsSafeInstaller(): void
@@ -63,7 +63,7 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertTrue(\pmssAgentsSectionVisible($none, $home));
         unlink($home.'/marker');
         $this->assertTrue(\pmssAgentsSectionVisible($none, $home));
-        symlink($home.'/billing/alice', $home.'/marker');
+        symlink($home.'/billing/fixtur01', $home.'/marker');
         $this->assertTrue(\pmssAgentsSectionVisible($none, $home));
         unlink($home.'/marker');
         file_put_contents($home.'/marker', '');
@@ -111,27 +111,29 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertStringContainsString('}, 12000)', $index);
         // The network hint waits for the Pikkumies tab to be open (a frame loaded behind another tab cannot report ready)
         // and is never armed for the panel's own launcher page, which is this origin.
-        $this->assertStringContainsString("try { launcher = this.contentWindow.location.origin === location.origin; } catch (e) {}", $index);
-        $this->assertStringContainsString("if (!launcher) pmssPikkumiesHintTimer = setTimeout(function () {", $index);
-        $this->assertStringContainsString("if (!pmssPikkumiesReady && document.getElementById('pikkumies').offsetParent !== null) document.getElementById('pmss-pikkumies-hint').hidden = false;", $index);
-        $this->assertStringContainsString('}, 30000)', $index);
-        $this->assertStringContainsString('if (!state.visible) location.reload()', $index);
-        $this->assertStringContainsString('pikkumies:switch', $welcome);
-        $this->assertStringContainsString('title = \'Ask Pikkumies\'', $welcome);
+        $this->assertStringContainsAllStrings([
+            "try { launcher = this.contentWindow.location.origin === location.origin; } catch (e) {}",
+            "if (!launcher) pmssPikkumiesHintTimer = setTimeout(function () {",
+            "if (!pmssPikkumiesReady && document.getElementById('pikkumies').offsetParent !== null) document.getElementById('pmss-pikkumies-hint').hidden = false;",
+            '}, 30000)', 'if (!state.visible) location.reload()',
+        ], $index);
+        $this->assertStringContainsAllStrings(['pikkumies:switch', 'title = \'Ask Pikkumies\''], $welcome);
         $this->assertStringContainsString('Your network may be blocking Pikkumies.', $index);
-        $this->assertStringContainsString('>Full Hermes, in its own tab</option>', $configure);
-        $this->assertStringContainsString('Only one Hermes window works at a time: opening one closes the other.', $configure);
+        $this->assertStringContainsAllStrings(['>Full Hermes, in its own tab</option>',
+            'Only one Hermes window works at a time: opening one closes the other.'], $configure);
         // Both Hermes password reveals sit in one fallback sign-in box that shows the account name once.
         $this->assertStringContainsString('<summary>Sign in to Hermes yourself</summary>', $configure);
         $this->assertSame(1, substr_count($configure, '<span class="pmss-hermes-user">User name: <b><?= pmssCustomerHtmlAttr($username) ?></b></span>'));
-        $this->assertStringContainsString('onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button>', $configure);
-        $this->assertStringContainsString('onclick="pmssHermesShowLogin()">Show Hermes password</button>', $configure);
+        $this->assertStringContainsAllStrings([
+            'onclick="pmssPikkumiesHermesShowLogin()">Show Pikkumies Hermes password</button>',
+            'onclick="pmssHermesShowLogin()">Show Hermes password</button>',
+        ], $configure);
         // The Hermes status poll runs only during an install; an installed Hermes must not reload Configure.
         $this->assertStringNotContainsString('setInterval(pmssHermesStatusPoll', $configure);
         $this->assertStringContainsString("if (state.state === 'installing') pmssHermesPollLater();", $configure);
         $this->assertStringContainsString('pmssPikkumiesOpenStatusEmit(true, $certificateState', $launcher);
-        foreach (array('Retrying in N min', 'Turn it on to use it', 'Your browser cannot reach Pikkumies') as $removed) {
-            $this->assertFalse(strpos($index.$welcome.$configure.$launcher, $removed) !== false);
-        }
+        $this->assertStringContainsAndOmitsStrings([], [
+            'Retrying in N min', 'Turn it on to use it', 'Your browser cannot reach Pikkumies',
+        ], $index.$welcome.$configure.$launcher);
     }
 }

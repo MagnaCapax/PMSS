@@ -92,10 +92,10 @@ final class TorrentClientsP3LaunchTest extends TestCase
             'run' => static function (string $shell) use (&$command): void { $command = $shell; }]
             + self::pmssMakeCallbacks(['native' => []]);
         $this->assertTrue(\pmssTransmissionLaunch($home, $ops));
-        $this->assertStringContainsString('nohup /usr/bin/setsid flock -n', $command);
-        $this->assertStringContainsString('.pmss-launch.lock', $command);
-        $this->assertStringContainsString('CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt', $command);
-        $this->assertStringContainsString(' -f -g ', $command);
+        $this->assertStringContainsAllStrings([
+            'nohup /usr/bin/setsid flock -n', '.pmss-launch.lock',
+            'CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt', ' -f -g ',
+        ], $command);
     }
 
     public function testUnreadySettingsPreventLaunch(): void

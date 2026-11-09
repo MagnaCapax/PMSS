@@ -91,7 +91,7 @@ final class PikkumiesUiRoutesTest extends TestCase
         file_put_contents($live.'/uitester.node.example.com/fullchain.pem', 'fixture');
         file_put_contents($live.'/uitester.node.example.com/privkey.pem', 'fixture');
         $this->assertTrue(\pmssPikkumiesUiCertificateReady('uitester', 'node.example.com', $live));
-        $this->assertFalse(\pmssPikkumiesUiCertificateReady('bob', 'node.example.com', $live));
+        $this->assertFalse(\pmssPikkumiesUiCertificateReady('fixtur02', 'node.example.com', $live));
         $block = \pmssPikkumiesUiNginxBlock('uitester', 'node.example.com', $host, 12345, $live);
         $this->assertStringContainsAllStrings([
             'listen 844 ssl;', 'server_name '.$host.';', 'location = /bar',
@@ -102,8 +102,7 @@ final class PikkumiesUiRoutesTest extends TestCase
         ], $block);
         $this->assertFalse(strpos($block, 'server_name uitester') !== false);
         $this->assertStringContainsString($live.'/uitester.node.example.com/fullchain.pem', $block);
-        $this->assertFalse(strpos($block, $live.'/'.$host.'/') !== false);
-        $this->assertFalse(strpos($block, 'alias /home/') !== false);
+        $this->assertStringContainsAndOmitsStrings([], [$live.'/'.$host.'/', 'alias /home/'], $block);
         $this->assertSame(1, substr_count($block, 'location / {'));
         $this->assertSame(1, substr_count($block, 'location = /bar'));
     }
@@ -138,8 +137,7 @@ final class PikkumiesUiRoutesTest extends TestCase
             '/__pmss-select-web', '/__pmss-select-agentboard',
             '__Host-pmss_ui_c=web', 'proxy_cookie_domain ~.+ "";',
         ], $block);
-        $this->assertFalse(strpos($block, 'X-Forwarded-Prefix') !== false);
-        $this->assertFalse(strpos($block, '$args') !== false);
+        $this->assertStringContainsAndOmitsStrings([], ['X-Forwarded-Prefix', '$args'], $block);
         $this->assertStringContainsString('listen 846 ssl default_server;',
             \pmssHermesUiDefaultNginxBlock("    ssl_certificate /safe/fullchain.pem;\n"));
         $hermes = \pmssLighttpdHermesUiBlock('uitester', 24000);
@@ -215,9 +213,8 @@ final class PikkumiesUiRoutesTest extends TestCase
     public function testPortBSendsLoggedOutPagesToTheLoginFormAndKeepsHermesCookiesOnRoot(): void
     {
         $block = \pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
-        $this->assertStringContainsString('proxy_redirect /__pmss-ui-b/ /;', $block);
-        $this->assertStringContainsString('proxy_cookie_path /__pmss-ui-b/ /;', $block);
-        $this->assertStringContainsString('error_page 401 = @pikkumies_b_login;', $block);
+        $this->assertStringContainsAllStrings(['proxy_redirect /__pmss-ui-b/ /;',
+            'proxy_cookie_path /__pmss-ui-b/ /;', 'error_page 401 = @pikkumies_b_login;'], $block);
         $this->assertTrue(preg_match('#location @pikkumies_b_login \{\s+if \(\$uri ~ \^/api/\) \{ return 401; \}\s+if \(\$http_upgrade != ""\) \{ return 401; \}\s+return 302 /login;\s+\}#', $block) === 1);
     }
 
@@ -237,8 +234,7 @@ final class PikkumiesUiRoutesTest extends TestCase
     public function testPortCChoiceReadsOnlyTheHostPrefixedCookieOrTheAgentboardApiSignals(): void
     {
         $block = \pmssHermesUiNginxBlock('uitester', 'node.example.com', '0123456789abcdef.mcx.fi', 12345);
-        $this->assertStringContainsString('proxy_redirect /__pmss-ui-c/ /;', $block);
-        $this->assertStringContainsString('proxy_cookie_path /__pmss-ui-c/ /;', $block);
+        $this->assertStringContainsAllStrings(['proxy_redirect /__pmss-ui-c/ /;', 'proxy_cookie_path /__pmss-ui-c/ /;'], $block);
         $this->assertTrue(preg_match('/map "\$request_method:\$request_uri:\$http_authorization:\$http_cookie" \$[a-z0-9_]+_choice \{\s*default "";\s*((?:"~[^"]+" [^;]+;\s*)+)\}/s',
             $block, $map) === 1);
         $this->assertTrue(preg_match_all('/"~([^"]+)" ([^;]+);/', $map[1], $rules, PREG_SET_ORDER) === 3);
@@ -283,7 +279,6 @@ final class PikkumiesUiRoutesTest extends TestCase
             'title="Enter to send, Shift+Enter for a new line"',
         ], $bar);
         $this->assertSame(1, (int) round((50 - 28) / 22));
-        $this->assertFalse(strpos($bar, 'class="hint"') !== false);
-        $this->assertFalse(strpos($bar, 'min-height:16px') !== false);
+        $this->assertStringContainsAndOmitsStrings([], ['class="hint"', 'min-height:16px'], $bar);
     }
 }

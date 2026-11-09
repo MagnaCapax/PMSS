@@ -21,9 +21,9 @@ final class TorrentClientsRcPreflightTest extends TestCase
                     if ($group === 'storage_critical' && $version === '0.16.25') {
                         $this->assertSame(null, $message);
                     } else {
-                        $this->assertStringContainsString('line 3', $message);
-                        $this->assertStringContainsString('unavailable log group '.$group, $message);
-                        $this->assertStringContainsString('Wrap this log.add_output command in catch', $message);
+                        $this->assertStringContainsAllStrings([
+                            'line 3', 'unavailable log group '.$group, 'Wrap this log.add_output command in catch',
+                        ], $message);
                     }
                     $this->assertSame($raw, file_get_contents($home.'/.rtorrent.rc.custom'));
                 }

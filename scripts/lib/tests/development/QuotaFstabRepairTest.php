@@ -37,8 +37,6 @@ class QuotaFstabRepairTest extends TestCase
         $this->assertEquals(1, substr_count($updated, 'usrjquota='));
         $this->assertEquals(1, substr_count($updated, 'grpjquota='));
         $this->assertEquals(1, substr_count($updated, 'jqfmt='));
-        $this->assertStringContainsString('usrjquota=aquota.user', $updated);
-        $this->assertStringContainsString('grpjquota=aquota.group', $updated);
-        $this->assertStringContainsString('jqfmt=vfsv1', $updated);
+        $this->assertStringContainsAllStrings(['usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1'], $updated);
     }
 }

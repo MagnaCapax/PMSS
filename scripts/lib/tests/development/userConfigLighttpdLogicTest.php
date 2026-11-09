@@ -154,8 +154,7 @@ $HTTP["url"] =~ "^/webdav-user($|/)" {
 LIGHTTPD;
 
         $stripped = \pmssStripLighttpdWebdavConfig($template);
-        $this->pmssAssertStringNotContainsString('webdav.activate', $stripped);
-        $this->pmssAssertStringNotContainsString('PMSS_WEBDAV_BEGIN', $stripped);
+        $this->assertStringContainsAndOmitsStrings([], ['webdav.activate', 'PMSS_WEBDAV_BEGIN'], $stripped);
         $this->assertStringContainsAllStrings(['mod_webdav', '#"mod_webdav",'], $stripped);
     }
 
@@ -193,9 +192,9 @@ LIGHTTPD;
 
         $this->assertTrue(\pmssLighttpdSyncPhpIni($path, $owner, 256, $reason));
         $updated = file_get_contents($path);
-        $this->assertStringContainsString("memory_limit = 256M\n", $updated);
-        $this->assertStringContainsString('; keep this line', $updated);
-        $this->assertStringContainsString('upload_tmp_dir = /home/'.$owner.'/.lighttpd/upload', $updated);
+        $this->assertStringContainsAllStrings([
+            "memory_limit = 256M\n", '; keep this line', 'upload_tmp_dir = /home/'.$owner.'/.lighttpd/upload',
+        ], $updated);
         $this->assertSame('', $reason);
         $this->assertSame(0640, fileperms($path) & 0777);
         $this->assertSame(posix_geteuid(), fileowner($path));
@@ -247,18 +246,15 @@ LIGHTTPD;
     {
         $src = $this->pmssReadRepoFile('scripts/util/userConfigLighttpd.php');
 
-        $this->assertStringContainsAllStrings([
+        $this->assertStringContainsAndOmitsStrings([
             "require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';",
-        ], $src);
-        foreach ([
+        ], [
             "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';",
             "require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';",
             "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';",
             "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';",
             "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';",
-        ] as $forbidden) {
-            $this->pmssAssertStringNotContainsString($forbidden, $src);
-        }
+        ], $src);
     }
 
     public function testPhpIniContentRendererKeepsExistingDirectivesStable(): void

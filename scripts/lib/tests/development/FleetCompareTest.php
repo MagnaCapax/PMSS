@@ -61,16 +61,17 @@ final class FleetCompareTest extends TestCase
             $this->pmssWriteFile($dir.'/home/.cache/pmss-welcome/'.substr(sha1('https://pulsedmedia.com/data/v1/fleet-performance.json'), 0, 16).'.cache', $feed);
         }
         $out = $this->pmssRunInlinePhpRequire($fixture, 'echo json_encode(pmssWelcomeHomeFleetMetricHtmlBuild('.var_export($dir.'/home', true).', '.var_export($ownFile, true).', '.self::NOW.', '.$serviceId.'));', [], '2>&1');
-        $this->assertStringNotContainsString('Warning', $out);
-        $this->assertStringNotContainsString('Notice', $out);
+        $this->assertStringContainsAndOmitsStrings([], ['Warning', 'Notice'], $out);
         return (string) json_decode($out, true);
     }
 
     public function testCardLinksTheClientAreaServicePageAndStatesNoAmounts(): void
     {
         $card = $this->cardFor($this->own(), $this->goodFeed(), false, 4242);
-        $this->assertStringContainsString('href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id=4242"', $card);
-        $this->assertStringContainsString('Want another server? See your options', $card);
+        $this->assertStringContainsAllStrings([
+            'href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id=4242"',
+            'Want another server? See your options',
+        ], $card);
         $this->assertSame(0, preg_match('/\b\d+ days?\b|bonus|free/i', strip_tags($card)));
         $this->assertStringNotContainsString('clientarea.php', $this->cardFor($this->own(), $this->goodFeed()));
     }
@@ -88,17 +89,15 @@ final class FleetCompareTest extends TestCase
     public function testCardShowsExactNumbersAndATickAtTheTierAverage(): void
     {
         $below = $this->cardFor($this->own(), $this->goodFeed());
-        $this->assertStringContainsString('Disk wait', $below);
-        $this->assertStringContainsString('lower is better', $below);
-        $this->assertStringContainsString('14.2%', $below);
-        $this->assertStringContainsString('Fleet: 22.8%<br>Response 31.0 ms · fleet 43.0 ms', $below);
-        $this->assertStringContainsString('class="h-tick" style="left:50%"', $below);
-        $this->assertStringContainsString('class="s-base" style="width:31.14%"', $below);
-        $this->assertStringContainsString('on the same plan family', $below);
+        $this->assertStringContainsAllStrings([
+            'Disk wait', 'lower is better', '14.2%',
+            'Fleet: 22.8%<br>Response 31.0 ms · fleet 43.0 ms',
+            'class="h-tick" style="left:50%"', 'class="s-base" style="width:31.14%"', 'on the same plan family',
+        ], $below);
         $this->assertStringContainsString('width:65.79%', $this->cardFor($this->own(['psi' => 30.0]), $this->goodFeed()));
         $this->assertStringContainsString('width:100%', $this->cardFor($this->own(['psi' => 90.0]), $this->goodFeed()));
         $this->assertStringContainsString('Response 30.6 ms', $this->cardFor($this->own(['svcMs' => 30.64]), $this->goodFeed()));
-        foreach (['worse', 'overloaded', 'slow', 'bad'] as $word) $this->assertStringNotContainsString($word, strtolower($below));
+        $this->assertStringContainsAndOmitsStrings([], ['worse', 'overloaded', 'slow', 'bad'], strtolower($below));
     }
 
     public function testNoPublicTierOrANonReportingTierUsesTheFleetWideAverage(): void
@@ -106,8 +105,9 @@ final class FleetCompareTest extends TestCase
         foreach ([$this->own(['tier' => null]), $this->own(['tier' => 'Unknown-Tier']), $this->own(['tier' => 'Dragon-R']), $this->own(['tier' => '../x'])] as $own) {
             $feed = $this->feed(['Dragon-R' => $this->row(1.0, 1.0, 'no_recent_data')], ['status' => 'reporting', 'avg_psi_io_full' => 10.0, 'avg_service_time_ms' => 20.0], self::NOW - 600);
             $html = $this->cardFor($own, $feed);
-            $this->assertStringContainsString('Fleet: 10.0%<br>Response 31.0 ms · fleet 20.0 ms', $html);
-            $this->assertStringContainsString('across the fleet', $html);
+            $this->assertStringContainsAllStrings([
+                'Fleet: 10.0%<br>Response 31.0 ms · fleet 20.0 ms', 'across the fleet',
+            ], $html);
         }
         $nullPsi = $this->feed(['M1000' => ['status' => 'reporting', 'avg_psi_io_full' => null, 'avg_service_time_ms' => 43.0]], ['status' => 'reporting', 'avg_psi_io_full' => 10.0, 'avg_service_time_ms' => 20.0], self::NOW - 600);
         $this->assertStringContainsString('Fleet: 10.0%', $this->cardFor($this->own(), $nullPsi));
