@@ -46,57 +46,31 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
         array_pop($lines);
     }
 
-    $remove = [];
-    $replace = [];
+    $catalog = pmssRtorrentLegacyDirectiveCatalog();
     $inline = [];
-    foreach (pmssRtorrentLegacyDirectiveCatalog() as $legacy => $rule) {
-        if ($rule['replacement'] === null) {
-            $remove[] = $legacy;
-            continue;
-        }
-        $replace[$legacy] = $rule['replacement'];
+    foreach ($catalog as $legacy => $rule) {
         if (isset($rule['inline'])) {
             $inline['/(?<![A-Za-z0-9_.])'.preg_quote($legacy, '/').'(?==)/'] = $rule['inline'];
         }
     }
 
-    $normalizeInlineAliases = static function (string $line) use ($inline): string {
-        return $inline === [] ? $line : (string) preg_replace(array_keys($inline), $inline, $line);
-    };
-
     $normalizedLines = [];
     $seenManagedLines = [];
     foreach ($lines as $line) {
-        foreach ($remove as $legacy) {
-            if (preg_match('/^\s*'.preg_quote($legacy, '/').'\s*=\s*.+?\s*$/', $line) === 1) {
-                continue 2;
-            }
+        $managed = false;
+        // Dispatch legacy assignments directly; whitespace-only values still count as values.
+        if (preg_match('/^\s*([a-z_]+)\s*=\s*(.+?)\s*$/', $line, $matches) === 1 && isset($catalog[$matches[1]])) {
+            if ($catalog[$matches[1]]['replacement'] === null) continue;
+            $line = $catalog[$matches[1]]['replacement'].' = '.$matches[2];
+            $managed = true;
         }
-
-        foreach ($replace as $legacy => $modern) {
-            $matches = [];
-            if (preg_match('/^\s*'.preg_quote($legacy, '/').'\s*=\s*(.+?)\s*$/', $line, $matches) === 1) {
-                $line = $normalizeInlineAliases($modern.' = '.$matches[1]);
-                $trimmed = trim($line);
-                if (!isset($seenManagedLines[$trimmed])) {
-                    $normalizedLines[] = $line;
-                    $seenManagedLines[$trimmed] = true;
-                }
-                continue 2;
-            }
-        }
-
-        $line = $normalizeInlineAliases($line);
+        $line = (string) preg_replace(array_keys($inline), $inline, $line);
         $trimmed = trim($line);
-        foreach ($replace as $modern) {
-            if (strpos($trimmed, $modern.' = ') !== 0) {
-                continue;
-            }
-            if (isset($seenManagedLines[$trimmed])) {
-                continue 2;
-            }
+        $assignment = explode(' = ', $trimmed, 2);
+        // Rewritten and already-modern directives share one duplicate gate.
+        if ($managed || (count($assignment) === 2 && in_array($assignment[0], array_column($catalog, 'replacement'), true))) {
+            if (isset($seenManagedLines[$trimmed])) continue;
             $seenManagedLines[$trimmed] = true;
-            break;
         }
         $normalizedLines[] = $line;
     }

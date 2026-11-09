@@ -3,8 +3,8 @@
  * rTorrent configuration generator and idempotency helper.
  *
  * The legacy class name is a compatibility contract for provisioning scripts.
- * The class owns defaults, locked SCGI reservation, and configuration IO;
- * template rendering and exclusive port allocation live in focused modules.
+ * The class owns locked SCGI reservation and guarded configuration IO;
+ * source acquisition, text transforms, rendering and allocation are separate.
  *
  * @author Aleksi Ursin
  * @copyright NuCode 2010-2014 - All Rights reserved.
@@ -17,21 +17,13 @@ require_once __DIR__.'/log.php';
 require_once __DIR__.'/runtime/filesystem.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/rtorrentPortReservations.php';
+require_once __DIR__.'/rtorrent/configDefaults.php';
+require_once __DIR__.'/rtorrent/configText.php';
 require_once __DIR__.'/rtorrent/configRender.php';
 require_once __DIR__.'/rtorrent/portReservation.php';
 
 class rtorrentConfig
 {
-    private const RESOURCE_CONFIG_PATH = '/etc/seedbox/config/rtorrent.resources.json';
-    private const TEMPLATE_PATH = '/etc/seedbox/config/template.rtorrent.rc';
-    private const TEMPLATE_OVERRIDE_PATH = '/etc/seedbox/config/template.rtorrentrc';
-    private const DEFAULT_RESOURCE_CONFIG = ['ramBlock' => 250, 'peers' => ['minimum' => 6, 'maximum' => 32], 'uploadSlots' => 7];
-    // catch: builds without ipv4_filter.load (curated store builds) start instead of exiting at parse.
-    private const LOCALNET_LINE = "catch = {\"ipv4_filter.load=/etc/seedbox/config/localnet,preferred\"}";
-    private const LEGACY_LOCALNET_LINE = "ipv4_filter.load = /etc/seedbox/config/localnet, preferred";
-    // ADR 0141: retain legacy UTF-8 handling on 0.9.8 and force IPv4 on 0.16.
-    private const ENCODING_LINE = 'branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
-        .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))';
     protected $_resourceConfig;
     protected $_template;
     /**
@@ -42,14 +34,8 @@ class rtorrentConfig
      */
     public function __construct($resourceConfig = array(), $template = null)
     {
-        $this->_resourceConfig = count($resourceConfig) === 0
-            ? $this->loadDefaultResourceConfig()
-            : $resourceConfig;
-        $this->_template = is_string($template) && trim($template) !== ''
-            ? $template
-            : $this->loadDefaultTemplate();
-
-        $this->_resourceConfig += self::DEFAULT_RESOURCE_CONFIG;
+        $this->_resourceConfig = pmssRtorrentConfigResources($resourceConfig);
+        $this->_template = pmssRtorrentConfigTemplate($template);
     }
     /**
      * Create rendered rTorrent config text and return normalized inputs.
@@ -70,7 +56,7 @@ class rtorrentConfig
         // Localnet publication remains host IO, outside the pure token renderer.
         if (is_readable('/etc/seedbox/config/localnet')) {
             @chmod('/etc/seedbox/config/localnet', 0664);
-            $configFile .= "\n".self::LOCALNET_LINE;
+            $configFile .= "\n".PMSS_RTORRENT_LOCALNET;
         }
         return array('configFile' => $configFile, 'config' => $config);
     }
@@ -81,12 +67,7 @@ class rtorrentConfig
      */
     public function migrateLegacyLocalnetLine($user)
     {
-        $data = pmssReadRegularFileContents($this->userConfigFilePath($user));
-        $legacy = "\n".self::LEGACY_LOCALNET_LINE;
-        $body = is_string($data) ? rtrim($data, "\n") : '';
-        if ($body === '' || substr($body, -strlen($legacy)) !== $legacy) return null;
-        return $this->writeConfig($user, substr($body, 0, -strlen($legacy))."\n".self::LOCALNET_LINE
-            .substr($data, strlen($body)));
+        return $this->migrateConfig($user, 'pmssRtorrentConfigLocalnetReplace');
     }
     /**
      * Repair only the exact legacy encoding directive in an existing managed config.
@@ -95,11 +76,7 @@ class rtorrentConfig
      */
     public function migrateLegacyEncodingLine($user)
     {
-        $data = pmssReadRegularFileContents($this->userConfigFilePath($user));
-        if (!is_string($data)) return null;
-        // Match complete physical lines only; preserve comments, overrides and newline bytes.
-        $updated = preg_replace('/^encoding\.add = utf8(?=\r?$)/m', self::ENCODING_LINE, $data);
-        return $updated !== $data ? $this->writeConfig($user, $updated) : null;
+        return $this->migrateConfig($user, 'pmssRtorrentConfigEncodingReplace');
     }
     /**
      * Persist rendered configuration text to the user's `.rtorrent.rc` file.
@@ -116,10 +93,12 @@ class rtorrentConfig
             throw new Exception('rtorrentConfig->writeConfig: User cannot be empty!');
         }
         $file = $this->userConfigFilePath($user);
-        if (!$this->userConfigFileTargetIsSafe($file)) {
-            return false;
-        }
-        return (!file_exists($file) || is_writable($file))
+        $homeDir = dirname($file);
+        return is_dir($homeDir)
+            && !is_link($homeDir)
+            && pmssPathTargetIsSafe($homeDir, true)
+            && pmssPathTargetIsSafe($file, false, true)
+            && (!file_exists($file) || is_writable($file))
             && pmssReplaceUserFilePreservingMetadata($file, $config, 0644);
     }
     /**
@@ -157,13 +136,7 @@ class rtorrentConfig
         if ($configRaw === null || $configRaw === '') {
             return false;
         }
-        $config = array();
-        foreach (pmssConfigAssignments(pmssConfigTextLines($configRaw, ['#', '/'])) as $name => $value) {
-            // This legacy format accepts exactly one equals sign per assignment.
-            if (strpos($value, '=') !== false) continue;
-            $config[trim($name)] = trim($value);
-        }
-        return $config;
+        return pmssRtorrentConfigParse($configRaw);
     }
     /** Preserve the subclass allocation hook while sharing one exclusive writer. */
     protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000)
@@ -204,31 +177,13 @@ class rtorrentConfig
         }
     }
 
-    private function loadDefaultResourceConfig(): array
+    /** Share read/compare/write ownership across exact managed-line migrations. */
+    private function migrateConfig($user, callable $transform)
     {
-        $path = self::RESOURCE_CONFIG_PATH;
-        $contents = @file_get_contents($path);
-        if ($contents === false) {
-            throw new RuntimeException('Unable to read rTorrent resource config: '.$path);
-        }
-        if (($data = pmssJsonDecodeAssoc($contents)) === null) {
-            throw new RuntimeException('Invalid rTorrent resource config JSON in '.$path);
-        }
-        return $data;
-    }
-    private function loadDefaultTemplate(): string
-    {
-        foreach ([self::TEMPLATE_OVERRIDE_PATH, self::TEMPLATE_PATH] as $path) {
-            if (!is_file($path)) {
-                continue;
-            }
-
-            $contents = @file_get_contents($path);
-            if ($contents !== false && trim($contents) !== '') {
-                return $contents;
-            }
-        }
-        throw new RuntimeException('Unable to read rTorrent template: '.self::TEMPLATE_PATH);
+        $data = pmssReadRegularFileContents($this->userConfigFilePath($user));
+        if ($data === null) return null;
+        $updated = $transform($data);
+        return $updated !== $data ? $this->writeConfig($user, $updated) : null;
     }
 
     private function userConfigFilePath($user): string
@@ -239,20 +194,6 @@ class rtorrentConfig
 
         $homeRoot = getenv('PMSS_HOME_DIR');
         $homeRoot = is_string($homeRoot) && trim($homeRoot) !== '' ? rtrim($homeRoot, '/') : '/home';
-        if ($homeRoot === '') {
-            $homeRoot = '/';
-        }
-        $prefix = $homeRoot === '/' ? '' : $homeRoot;
-        return $prefix.'/'.$user.'/.rtorrent.rc';
+        return $homeRoot.'/'.$user.'/.rtorrent.rc';
     }
-
-    private function userConfigFileTargetIsSafe(string $file): bool
-    {
-        $homeDir = dirname($file);
-        return is_dir($homeDir)
-            && !is_link($homeDir)
-            && pmssPathTargetIsSafe($homeDir, true)
-            && pmssPathTargetIsSafe($file, false, true);
-    }
-
 }

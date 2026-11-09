@@ -176,6 +176,13 @@ Keep the canonical installer/update details under `docs/install.md` and
   and release; `cli.php` owns dispatch and one failure projection. Release
   reporting stays inside the lock, while assign reports after unlocking
   (ADR 0183).
+- **scripts/lib/rtorrentConfig.php** retains configuration I/O and locked SCGI
+  allocation. `rtorrent/configDefaults.php` resolves sources and shallow defaults;
+  `configText.php` owns parsing and exact managed-line repairs. Both migrations
+  share read/compare/write handling. `rtorrent/portSources.php` decodes ownership
+  behind the existing reservation facade; reconciliation unions those sets.
+  Template normalization dispatches directly from the legacy catalog and shares
+  one duplicate gate (ADR 0247).
 - **scripts/lib/blockDeviceLeaves.php** – One bounded sysfs topology walk supplies backing leaf disks to BFQ policy and `/home` iostat selection, and visits backing nodes for cgroup storage-class detection. Callers retain their own response to incomplete topology.
 - **scripts/lib/cgroup/readIopsPolicy.php** – Derived read-IOPS policy loads the runtime value helpers directly; passive ceiling computation remains in `cgroup/ioCeiling.php`.
 - **scripts/lib/cgroup/plan.php** – Finalizes the CLI's single plan after input

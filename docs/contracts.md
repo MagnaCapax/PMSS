@@ -1062,7 +1062,7 @@ read-only probes used by baseline sanitization and source-build guards.
 
 Class `rtorrentConfig`
 - __construct(array $resourceConfig=[], ?string $template=null)
-  - Loads default resource JSON (`/etc/seedbox/config/rtorrent.resources.json`) and template (`/etc/seedbox/config/template.rtorrent.rc`) when not provided; validates and fills defaults via `_checkResourceConfig()`.
+  - Resolves resource JSON (`/etc/seedbox/config/rtorrent.resources.json`) and templates through `rtorrent/configDefaults.php`. Nonempty injected resources win; missing top-level keys receive shallow defaults for ramBlock, peers and uploadSlots. Nested peers are not merged. A nonblank injected template wins; otherwise the nonblank `template.rtorrentrc` override precedes `template.rtorrent.rc`. Source bytes and exception messages are preserved (ADR 0247).
 
 - createConfig(array $config): array
   - Inputs: requires `'ram'` MiB. Optional: `'scgiPort'`, `'dht'` ('no|yes|auto'), `'pex'` ('no|yes|auto'). Only scgi is reserved; `dhtPort` and `listenPort` are neither reserved nor rendered.
@@ -1079,19 +1079,22 @@ Class `rtorrentConfig`
 - migrateLegacyEncodingLine(string $user): ?bool
   - During non-dry-run user maintenance, replaces only complete, exact `encoding.add = utf8` lines with the ADR 0141 template branch (legacy UTF-8 on 0.9.8, IPv4 bind on newer builds). Preserves all other bytes, newline style, ownership and mode through the existing guarded writer; absent/non-regular files and already converged configs are left alone. Returns the write result or null when no repair applies. Does not edit `.rtorrent.rc.custom`, restart rTorrent or clear its fallback marker.
 
+- migrateLegacyLocalnetLine(string $user): ?bool
+  - Repairs only the exact legacy localnet line at the end, preceded by LF and followed only by zero or more LF bytes. A standalone first line, CRLF suffix, trailing spaces and customer edits remain unchanged. Both migrations share one guarded read/compare/write path; pure replacements live in `rtorrent/configText.php`.
+
 - readUserConfig(string $user): array|false → wrapper for readConfig on `/home/<user>/.rtorrent.rc`.
-- readConfig(string $file): array|false → parses key=value pairs from `~/.rtorrent.rc` file (skipping comments and blanks).
+- readConfig(string $file): array|false → returns false for missing or empty files; otherwise delegates to `pmssRtorrentConfigParse()` for single-equals assignments, skipping comments and blanks. Duplicate keys keep their first position and last value; whitespace-only or comment-only files yield an empty array.
 - _configPortPrivate(string $type, int $rangeStart=2000, int $rangeEnd=65000): int
   - Reserves a random port using files under `/var/lib/pmss/ports/<type>/<port>`; idempotent by presence.
   - Rejects relative, dot-segment, NUL-containing, symlinked, or non-directory reservation paths before creating directories; valid reservations retain the existing range and exception behavior.
-  - Default scgi/dht/listen acquisition is transactional: if a later type cannot be reserved, markers created earlier in the same call are removed before the exception is re-thrown.
+  - Missing SCGI allocation holds the reconciler's shared lock. DHT/listen ports are not allocated (ADR 0081).
 
 - `scripts/cron/rtorrentPortReservationsReconcile.php`
   - Runs hourly under a single shared reservation lock and removes only old marker files absent from the union of every live user's stored rTorrent ports and readable `.rtorrent.rc` references.
   - Keeps recent markers for a one-hour publication grace and skips the whole pass whenever a live user's ownership cannot be determined from the available sources.
-- loadDefaultResourceConfig(): array → reads and JSON-decodes resources file; throws on failure.
-- loadDefaultTemplate(): string → reads template; throws on failure.
-- _checkResourceConfig(): void → fills defaults for missing fields (ramBlock, peers, uploadSlots).
+  - Pure ownership decoding lives in `rtorrent/portSources.php`; existing facade functions retain guarded acquisition. Source results preserve `ports` then `uncertain`, integer-keyed true-valued SCGI sets and malformed-reference evidence. The locked reconciler unions stored and configured sets without changing refusal or grace rules.
+
+- `pmssRtorrentNormalizeLegacyTemplate()` retains the ordered catalog, inline alias boundaries, newline selection and exact whitespace-dependent duplicate policy. Removed and rewritten assignments dispatch from the catalog directly; rewritten and already-modern lines share one duplicate gate. Unrelated duplicates remain intact.
 
 ---
 

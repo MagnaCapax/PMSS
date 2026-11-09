@@ -10,6 +10,7 @@ require_once __DIR__.'/log.php';
 require_once __DIR__.'/runtime/filesystem.php';
 require_once __DIR__.'/runtime/environment.php';
 require_once __DIR__.'/runtime/locks.php';
+require_once __DIR__.'/rtorrent/portSources.php';
 
 const PMSS_RTORRENT_PORT_RESERVATION_GRACE_SECONDS = 3600;
 
@@ -26,17 +27,6 @@ function pmssRtorrentPortReservationUsernameIsValid($user): bool
     return $user !== '' && $normalized === $user && preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) === 1;
 }
 
-/**
- * Reserve only scgi: dht/listen had no template consumer and full pools blocked
- * provisioning (ADR 0081). Their old markers are inert.
- */
-function pmssRtorrentPortReservationSpecs(): array
-{
-    return array(
-        'scgi' => array('key' => 'rtorrentPort', 'min' => 4000, 'max' => 24000, 'pattern' => '/^(?:scgi_port|network\.scgi\.open_port)\s*=\s*(?:[^:\s]+:)?([^\s#]+)/i'),
-    );
-}
-
 /** Keep reservation acquisition and reconciliation on one lock namespace. */
 function pmssRtorrentPortReservationLockPath(): string
 {
@@ -48,31 +38,6 @@ function pmssRtorrentPortReservationLockPath(): string
         }
     }
     return pmssRuntimeLockPath('pmss-rtorrentPortReservations.lock');
-}
-
-/** Build an empty source result, optionally uncertain for every port type. */
-function pmssRtorrentPortReservationSourceEmpty(bool $uncertain = false): array
-{
-    return array(
-        'ports' => array(),
-        'uncertain' => $uncertain ? array('scgi' => true) : array(),
-    );
-}
-
-/** Parse reservation fields from one stored user payload. */
-function pmssRtorrentPortReservationPayloadSource(array $payload): array
-{
-    $source = pmssRtorrentPortReservationSourceEmpty();
-    $spec = pmssRtorrentPortReservationSpecs()['scgi'];
-    if (array_key_exists($spec['key'], $payload)) {
-        $port = pmssNetworkPortParseDigits($payload[$spec['key']], $spec['min'], $spec['max']);
-        if ($port === null) {
-            $source['uncertain']['scgi'] = true;
-        } else {
-            $source['ports']['scgi'][$port] = true;
-        }
-    }
-    return $source;
 }
 
 /**
@@ -134,15 +99,7 @@ function pmssRtorrentPortReservationConfigSource(string $path): array
         return pmssRtorrentPortReservationSourceEmpty(true);
     }
 
-    $source = pmssRtorrentPortReservationSourceEmpty();
-    $spec = pmssRtorrentPortReservationSpecs()['scgi'];
-    foreach (pmssConfigLines($lines) as $line) {
-        if (preg_match($spec['pattern'], $line, $matches) === 1) {
-            $port = pmssNetworkPortParseDigits($matches[1], $spec['min'], $spec['max']);
-            $port === null ? $source['uncertain']['scgi'] = true : $source['ports']['scgi'][$port] = true;
-        }
-    }
-    return $source;
+    return pmssRtorrentPortReservationConfigParse($lines);
 }
 
 /** Remove one exact marker while refusing links, malformed types, and ranges. */

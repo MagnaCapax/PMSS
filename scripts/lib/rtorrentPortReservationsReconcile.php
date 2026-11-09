@@ -50,11 +50,8 @@ function pmssRtorrentPortReservationsReconcile(
                 || (!isset($stored['ports']['scgi']) && !empty($configured['uncertain']['scgi']))) {
                 return array_replace($result, array('status' => 'skipped', 'reason' => 'uncertain_scgi_ownership'));
             }
-            foreach (array($stored, $configured) as $source) {
-                foreach ($source['ports']['scgi'] ?? array() as $port => $present) {
-                    if ($present) $references[(int) $port] = true;
-                }
-            }
+            // Both decoders yield integer-keyed sets containing only true values.
+            $references += ($stored['ports']['scgi'] ?? []) + ($configured['ports']['scgi'] ?? []);
         }
 
         $directory = $portsBase.'/scgi';

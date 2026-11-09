@@ -66,4 +66,24 @@ class RtorrentTemplateMigrationTest extends TestCase
 
         $this->assertEquals($expected, \pmssRtorrentNormalizeLegacyTemplate($input));
     }
+
+    public function testNormalizerRetainsWhitespaceAliasBoundariesAndDuplicatePolicy(): void
+    {
+        foreach ([
+            ['', ''],
+            ["\n\n", "\n\n"],
+            ["umask =\nhash_interval=\nhash_max_tries = \n", "umask =\nhash_interval=\n"],
+            ["tracker_numwant=\ntracker_numwant = \ntracker_numwant = \n", "tracker_numwant=\ntrackers.numwant.set =  \n"],
+            ["trackers.numwant.set = \ntrackers.numwant.set = \n", "trackers.numwant.set = \ntrackers.numwant.set = \n"],
+            [" trackers.numwant.set = 42 \ntracker_numwant = 42\n", " trackers.numwant.set = 42 \n"],
+            ["tracker_numwant = 42\ntrackers.numwant.set=42\ntrackers.numwant.set=42\n", "trackers.numwant.set = 42\ntrackers.numwant.set=42\ntrackers.numwant.set=42\n"],
+            ["# execute=ok xexecute=no .execute=no _execute=no /execute=yes\n", "# execute2=ok xexecute=no .execute=no _execute=no /execute2=yes\n"],
+            ["execute = load_start=one\nexecute2 = load.start=one\n", "execute2 = load.start=one\n"],
+            ["custom = same\ncustom = same\n", "custom = same\ncustom = same\n"],
+            ["tracker_numwant = 1\rcheck_hash = yes\r", "trackers.numwant.set = 1\rpieces.hash.on_completion.set = yes\r"],
+            ["tracker_numwant = 1\ncheck_hash = yes\r\n", "trackers.numwant.set = 1\r\npieces.hash.on_completion.set = yes\r\n"],
+        ] as [$input, $expected]) {
+            $this->assertSame($expected, \pmssRtorrentNormalizeLegacyTemplate($input));
+        }
+    }
 }
