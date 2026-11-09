@@ -249,8 +249,19 @@ function pmssStatsChartOptions() {
             tooltip: { mode: 'index', intersect: false }
         },
         scales: {
-            x: { ticks: { maxTicksLimit: 6 } },
-            y: { beginAtZero: true }
+            x: { ticks: { maxTicksLimit: 6, align: 'inner' } },
+            y: {
+                beginAtZero: true,
+                afterFit: function (axis) {
+                    // Reserve label space even when privacy tools report zero text widths.
+                    var longestLabel = 0;
+                    axis.ticks.forEach(function (tick) {
+                        longestLabel = Math.max(longestLabel, String(tick.label).length);
+                    });
+                    // Estimate the default 12px font plus tick padding; keep wider measured axes.
+                    axis.width = Math.max(axis.width, longestLabel * 7 + 14);
+                }
+            }
         }
     };
 }

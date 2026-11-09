@@ -11,9 +11,20 @@ final class CustomerStatsLayoutTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsString(
             'etc/skel/www/stats.php',
-            "scales: {\n            x: { ticks: { maxTicksLimit: 6 } },\n            y: { beginAtZero: true }\n        }",
-            'The shared chart options must cap x-axis date ticks.'
+            "scales: {\n            x: { ticks: { maxTicksLimit: 6, align: 'inner' } },",
+            'The shared chart options must cap x-axis date ticks and keep edge dates inside the canvas.'
         );
+    }
+
+    public function testChartOptionsReserveYAxisLabelSpaceWithoutTextMetrics(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', [
+            "y: {\n                beginAtZero: true,\n                afterFit: function (axis) {",
+            'var longestLabel = 0;',
+            'axis.ticks.forEach(function (tick) {',
+            'longestLabel = Math.max(longestLabel, String(tick.label).length);',
+            'axis.width = Math.max(axis.width, longestLabel * 7 + 14);',
+        ]);
     }
 
     public function testInfoRaidNoticeOccupiesFullFlexRow(): void
