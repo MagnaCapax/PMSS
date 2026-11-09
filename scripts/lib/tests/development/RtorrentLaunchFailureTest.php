@@ -120,8 +120,7 @@ PHP;
         $count = 0;
         for ($attempt = 1; $attempt <= 4; $attempt++) {
             $result = $this->observe(['count' => $count, 'polls' => [[], [1234], []]]);
-            $this->assertSame($attempt < 4, $result['custom']);
-            $this->assertSame($attempt === 4 ? 1 : 0, $result['quarantines']);
+            $this->pmssAssertArraySubsetSame(['custom' => $attempt < 4, 'quarantines' => $attempt === 4 ? 1 : 0], $result);
             $count = $result['count'];
         }
         $this->assertSame(0, $count);
@@ -140,8 +139,7 @@ PHP;
     public function testLegacyCleanupFailureDoesNotCountAsConfigFailure(): void
     {
         $result = $this->observe(['executor' => false, 'cleanup' => false, 'count' => 3]);
-        $this->assertSame(0, $result['launches']);
-        $this->assertSame(3, $result['count']);
+        $this->pmssAssertArraySubsetSame(['launches' => 0, 'count' => 3], $result);
         $this->assertTrue($result['custom']);
     }
 }

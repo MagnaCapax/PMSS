@@ -33,9 +33,7 @@ PHP;
         $states = $this->pmssDecodeJsonArray($result['output'], $result['output']);
 
         $empty = ['commands' => [], 'descriptions' => [], 'logs' => []];
-        $this->assertSame($empty, $states['enabled']);
-        $this->assertSame($empty, $states['null']);
-        $this->assertSame([
+        $this->pmssAssertArraySubsetSame(['enabled' => $empty, 'null' => $empty, 'disabled' => [
             'commands' => [
                 'systemctl enable --now fstrim.timer || true',
                 'systemctl start --no-block fstrim.service || true',
@@ -45,10 +43,8 @@ PHP;
                 'Starting first TRIM run in the background (test)',
             ],
             'logs' => [],
-        ], $states['disabled']);
-        $this->assertSame(['commands' => [], 'descriptions' => [], 'logs' => ['[INFO] fstrim.timer is masked by the operator; left as is']], $states['masked']);
+        ], 'masked' => ['commands' => [], 'descriptions' => [], 'logs' => ['[INFO] fstrim.timer is masked by the operator; left as is']]], $states);
         $notShipped = ['commands' => [], 'descriptions' => [], 'logs' => ['[INFO] fstrim.timer is not shipped on this release; weekly TRIM skipped']];
-        $this->assertSame($notShipped, $states['']);
-        $this->assertSame($notShipped, $states['not-found']);
+        $this->pmssAssertArraySubsetSame(['' => $notShipped, 'not-found' => $notShipped], $states);
     }
 }

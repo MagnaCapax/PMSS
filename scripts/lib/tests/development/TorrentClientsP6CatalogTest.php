@@ -68,8 +68,7 @@ final class TorrentClientsP6CatalogTest extends TestCase
         $entries = \pmssTorrentClientsCatalogLoad(dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json');
         foreach ($entries as $entry) {
             if ($entry['client'] === 'deluge' && $entry['isDefault']) {
-                $this->assertSame('system', $entry['kind']);
-                $this->assertSame('/usr/bin/deluged', $entry['binary']);
+                $this->pmssAssertArraySubsetSame(['kind' => 'system', 'binary' => '/usr/bin/deluged'], $entry);
             }
         }
     }

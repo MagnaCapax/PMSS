@@ -11,16 +11,14 @@ class IntelGpuFirmwareSelectionTest extends TestCase
     {
         $ops = self::pmssMakeCallbacks(['available' => true, 'intelDisplay' => false]);
         $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'firmware-misc-nonfree install', 'beta hold'], 12, $ops['available'], $ops['intelDisplay']);
-        $this->assertSame(["alpha\tinstall", "beta\thold"], $plan['sanitised']);
-        $this->assertSame(['firmware-misc-nonfree'], $plan['dropped_hardware']);
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall", "beta\thold"], 'dropped_hardware' => ['firmware-misc-nonfree']], $plan);
     }
 
     public function testFirmwareIsSelectedWithIntelDisplay(): void
     {
         $ops = self::pmssMakeCallbacks(['available' => true, 'intelDisplay' => true]);
         $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'firmware-misc-nonfree install'], 12, $ops['available'], $ops['intelDisplay']);
-        $this->assertSame(["alpha\tinstall", "firmware-misc-nonfree\tinstall"], $plan['sanitised']);
-        $this->assertSame([], $plan['dropped_hardware']);
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall", "firmware-misc-nonfree\tinstall"], 'dropped_hardware' => []], $plan);
     }
 
     public function testIntelDisplayPciDetectorAcceptsOnlyMatchingClassAndVendor(): void

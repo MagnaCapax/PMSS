@@ -60,8 +60,7 @@ PHP;
     public function testEmptyListingWithReloadActivatesConfig(): void
     {
         $result = $this->runSelection(['exitCode' => 0, 'username' => '', 'users' => []], ['--reload']);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame([[false, true]], $result['configTestCalls']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'configTestCalls' => [[false, true]]], $result);
     }
 
     public function testMissingRequestedUserSkipsSetup(): void

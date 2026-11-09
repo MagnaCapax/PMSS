@@ -19,8 +19,9 @@ final class QbittorrentLegacyEnumTest extends TestCase
                     ."Proxy\\HostnameLookupEnabled=true\n[BitTorrent]\nSession\\ShareLimitAction=".$ratioNew."\n";
                 $old = $restore($config, '4.3.9', '5.3.0');
                 $values = \pmssQbittorrentConfigValues($old);
-                $this->assertSame((string) $proxyOld, $values['Preferences']['Connection\\ProxyType']);
-                $this->assertSame((string) $ratioOld, $values['Preferences']['Bittorrent\\MaxRatioAction']);
+                $this->pmssAssertArraySubsetSame([
+                    'Connection\\ProxyType' => (string) $proxyOld, 'Bittorrent\\MaxRatioAction' => (string) $ratioOld,
+                ], $values['Preferences']);
                 // The customer changes both choices while using 4.3.9, then returns to 5.x.
                 $old = \pmssQbittorrentConfigSet($old, 'Preferences', 'Connection\\ProxyType', '2', true);
                 $old = \pmssQbittorrentConfigSet($old, 'Preferences', 'Bittorrent\\MaxRatioAction', '3', true);
@@ -28,10 +29,10 @@ final class QbittorrentLegacyEnumTest extends TestCase
                 $values = \pmssQbittorrentConfigValues($modern);
                 $this->assertSame('SOCKS5', $values['Network']['Proxy\\Type']);
                 $this->assertSame('RemoveWithContent', $values['BitTorrent']['Session\\ShareLimitAction']);
-                $this->assertSame('true', $values['Network']['Proxy\\Profiles\\BitTorrent']);
-                $this->assertSame('false', $values['Network']['Proxy\\Profiles\\RSS']);
-                $this->assertSame('false', $values['Network']['Proxy\\Profiles\\Misc']);
-                $this->assertSame('true', $values['Network']['Proxy\\HostnameLookupEnabled']);
+                $this->pmssAssertArraySubsetSame([
+                    'Proxy\\Profiles\\BitTorrent' => 'true', 'Proxy\\Profiles\\RSS' => 'false',
+                    'Proxy\\Profiles\\Misc' => 'false', 'Proxy\\HostnameLookupEnabled' => 'true',
+                ], $values['Network']);
                 $this->assertSame('12', $values['Meta']['MigrationVersion']);
                 $this->assertSame($modern, $restore($modern, '5.3.0', '5.3.0'));
             }

@@ -13,8 +13,7 @@ class QuotaFixGuardTest extends TestCase
         });
 
         $this->assertFalse($result['ok']);
-        $this->assertSame(5, $result['rc']);
-        $this->assertSame("stdout\nstderr\n", $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 5, 'output' => "stdout\nstderr\n"], $result);
     }
 
     public function testQuotaCommandRunRejectsEmptyCommands(): void
@@ -24,8 +23,7 @@ class QuotaFixGuardTest extends TestCase
         });
 
         $this->assertFalse($result['ok']);
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame('', $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 1, 'output' => ''], $result);
     }
 
     public function testQuotaCommandRunRejectsNulBeforeRunner(): void
@@ -285,8 +283,7 @@ class QuotaFixGuardTest extends TestCase
         }
 
         $none = $this->quotaFixCheckCommandsRun(false, 'defaults', ['rc' => 0, 'stdout' => '', 'stderr' => ''], $zero);
-        $this->assertSame([], $none['checks']);
-        $this->assertSame([], $none['commands']);
+        $this->pmssAssertArraySubsetSame(['checks' => [], 'commands' => []], $none);
 
         ['dir' => $dir] = $this->pmssMountFixtureCreate('pmss-quota-check-', '');
         $commands = [];

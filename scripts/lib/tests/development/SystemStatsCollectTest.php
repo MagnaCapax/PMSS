@@ -380,8 +380,7 @@ PHP;
             ['psiIo' => '1/2/3/4/5/INF/7/8', 'iopingHome' => '10'],
         ] as $stats) {
             $payload = \pmssSystemStatsHostPressurePayloadBuild($stats, 1);
-            $this->assertSame(null, $payload['psi_io_full_avg300']);
-            $this->assertSame(null, $payload['ioping_home_ms']);
+            $this->pmssAssertArraySubsetSame(['psi_io_full_avg300' => null, 'ioping_home_ms' => null], $payload);
         }
     }
 

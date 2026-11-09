@@ -26,8 +26,10 @@ class AgentDiagnosticsCharacterizationTest extends TestCase
                     if ($wrap) $spec['wrap'] = 'raw';
                     $wrapped = $wrap && !in_array($format, ['int', 'lines', 'json'], true);
                     $actual = $this->collect($spec, ['rc' => $rc, 'stdout' => $stdout, 'stderr' => " error\n"]);
-                    $this->assertSame($wrapped ? ['raw' => $expected] : $expected, $actual['value']);
-                    $this->assertSame([['command', 'probe', 60, false, 'Failed to launch command']], $actual['trace']);
+                    $this->pmssAssertArraySubsetSame([
+                        'value' => $wrapped ? ['raw' => $expected] : $expected,
+                        'trace' => [['command', 'probe', 60, false, 'Failed to launch command']],
+                    ], $actual);
                 }
             }
         }
@@ -50,12 +52,11 @@ class AgentDiagnosticsCharacterizationTest extends TestCase
             'shell' => ['type' => 'command', 'command' => 'probe', 'timeout' => 99],
         ]];
         $actual = $this->collect($spec, ['rc' => 0, 'stdout' => '{"ok":true}'], " file\n");
-        $this->assertSame(['file' => " file\n", 'nested' => ['php' => ['ok' => true], 'shell' => '{"ok":true}']], $actual['value']);
-        $this->assertSame([
+        $this->pmssAssertArraySubsetSame(['value' => ['file' => " file\n", 'nested' => ['php' => ['ok' => true], 'shell' => '{"ok":true}']], 'trace' => [
             ['file', '/fixture'],
             ['php', 'util/probe.php', ['--json'], 2],
             ['command', 'probe', 60, false, 'Failed to launch command'],
-        ], $actual['trace']);
+        ]], $actual);
     }
 
     /** Text sections retain exact framing, field order and trailing newline handling. */

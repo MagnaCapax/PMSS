@@ -17,8 +17,7 @@ class RootCleanupCharacterizationTest extends TestCase
             ."Run with --apply to reclaim (whitelist-only).\n", $result['output']);
         $this->assertSame($this->discoveryTrace(), $result['trace']);
         $quiet = $this->cleanupRun(['--quiet']);
-        $this->assertSame('', $quiet['output']);
-        $this->assertSame($result['trace'], $quiet['trace']);
+        $this->pmssAssertArraySubsetSame(['output' => '', 'trace' => $result['trace']], $quiet);
     }
 
     /** Apply preserves command bytes/order, audit key order, measured totals and human output. */
@@ -47,8 +46,7 @@ class RootCleanupCharacterizationTest extends TestCase
             ['json', '/var/log/pmss/safe-root-cleanup.jsonl', $entry],
         ]), $result['trace']);
         $quiet = $this->cleanupRun(['--apply', '--quiet']);
-        $this->assertSame('', $quiet['output']);
-        $this->assertSame($result['trace'], $quiet['trace']);
+        $this->pmssAssertArraySubsetSame(['output' => '', 'trace' => $result['trace']], $quiet);
     }
 
     /** A low-use refusal happens before scans; force and unknown capacity retain their gates. */
@@ -56,14 +54,14 @@ class RootCleanupCharacterizationTest extends TestCase
     {
         foreach ([[], ['--quiet']] as $args) {
             $result = $this->cleanupRun(array_merge(['--apply'], $args), ['free' => 5000]);
-            $this->assertSame([], $result['trace']);
-            $this->assertSame($args === [] ? "Root use 50% < --min-pct 90%: nothing to do (use --force to override).\n" : '', $result['output']);
+            $this->pmssAssertArraySubsetSame([
+                'trace' => [], 'output' => $args === [] ? "Root use 50% < --min-pct 90%: nothing to do (use --force to override).\n" : '',
+            ], $result);
         }
         $forced = $this->cleanupRun(['--apply', '--force', '--quiet'], ['free' => 5000]);
         $this->assertSame(50, $this->jsonEntry($forced)['root_use_pct_before']);
         $unknown = $this->cleanupRun(['--apply'], ['total' => 0]);
-        $this->assertSame([], $unknown['trace']);
-        $this->assertSame("Root use 0% < --min-pct 90%: nothing to do (use --force to override).\n", $unknown['output']);
+        $this->pmssAssertArraySubsetSame(['trace' => [], 'output' => "Root use 0% < --min-pct 90%: nothing to do (use --force to override).\n"], $unknown);
     }
 
     /** Failed removals and post-scan redirects earn no bytes; candidate counts remain legacy counts. */
@@ -79,8 +77,7 @@ class RootCleanupCharacterizationTest extends TestCase
             $entry = $this->jsonEntry($result);
             $this->assertSame(['apt_cache' => 1024, 'journald' => 104857600, 'rotated_logs' => 0,
                 'atop_logs' => 0, 'distupgrade_tmp' => 0], $entry['freed_bytes']);
-            $this->assertSame(1, $entry['rotated_files_removed']);
-            $this->assertSame(1, $entry['atop_files_removed']);
+            $this->pmssAssertArraySubsetSame(['rotated_files_removed' => 1, 'atop_files_removed' => 1], $entry);
             if (isset($options['redirectAfterScan'])) {
                 $this->assertSame([], array_values(array_filter($result['trace'], static function ($event): bool {
                     return $event[0] === 'unlink' || ($event[0] === 'command' && strpos($event[1], 'rm -rf ') === 0);
@@ -88,8 +85,7 @@ class RootCleanupCharacterizationTest extends TestCase
             }
         }
         $growth = $this->jsonEntry($this->cleanupRun(['--apply', '--quiet'], ['aptAfter' => 2048, 'journalAfter' => 419430400]));
-        $this->assertSame(0, $growth['freed_bytes']['apt_cache']);
-        $this->assertSame(0, $growth['freed_bytes']['journald']);
+        $this->pmssAssertArraySubsetSame(['apt_cache' => 0, 'journald' => 0], $growth['freed_bytes']);
     }
 
     /** Audit guards short-circuit only JSONL; the guard that refused is the last audit step recorded. */
@@ -105,8 +101,7 @@ class RootCleanupCharacterizationTest extends TestCase
         }
         $result = $this->cleanupRun(['--apply', '--quiet', '--log-days=0', '--journal-mb=0', '--json=/fixture/audit.jsonl']);
         $entry = $this->jsonEntry($result);
-        $this->assertSame(1, $entry['log_days']);
-        $this->assertSame(50, $entry['journal_mb']);
+        $this->pmssAssertArraySubsetSame(['log_days' => 1, 'journal_mb' => 50], $entry);
         $this->assertTrue(in_array(['command', "journalctl --vacuum-size='50M' 2>/dev/null"], $result['trace'], true));
         $this->assertTrue(in_array(['audit-path', '/fixture/audit.jsonl'], $result['trace'], true));
     }
@@ -119,13 +114,11 @@ class RootCleanupCharacterizationTest extends TestCase
                 '/var/tmp/mkinitramfs_fixture'], '/home/fixtur01/data')],
         ] as $options) {
             $entry = $this->jsonEntry($this->cleanupRun(['--apply', '--quiet'], $options));
-            $this->assertSame(0, $entry['rotated_files_removed']);
-            $this->assertSame(0, $entry['atop_files_removed']);
+            $this->pmssAssertArraySubsetSame(['rotated_files_removed' => 0, 'atop_files_removed' => 0], $entry);
         }
         foreach ([740800 => 1, 740801 => 0] as $mtime => $count) {
             $entry = $this->jsonEntry($this->cleanupRun(['--apply', '--quiet'], ['mtime' => $mtime, 'rotatedMtime' => $mtime]));
-            $this->assertSame($count, $entry['rotated_files_removed']);
-            $this->assertSame($count, $entry['atop_files_removed']);
+            $this->pmssAssertArraySubsetSame(['rotated_files_removed' => $count, 'atop_files_removed' => $count], $entry);
         }
     }
 

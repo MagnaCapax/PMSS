@@ -60,8 +60,7 @@ final class TorrentClientsProjectionTest extends TestCase
         });
         $data = $this->pmssReadJsonArrayFile($path);
         $counts = ['qbittorrent' => 2, 'rtorrent' => 2, 'deluge' => 3, 'transmission' => 3];
-        $this->assertSame($expected, $data['versions']);
-        $this->assertSame($counts, $data['notInstalled']);
+        $this->pmssAssertArraySubsetSame(['versions' => $expected, 'notInstalled' => $counts], $data);
         $this->assertSame($counts, \pmssConfigureTorrentClientNotInstalledRead($path));
         $this->assertSame($expected, \pmssTorrentClientsProjectionVersionsRead($path));
     }

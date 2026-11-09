@@ -16,13 +16,12 @@ final class QbittorrentRestoreTest extends TemporaryHomeRootTestCase
         $values = \pmssQbittorrentConfigValues($root);
         $this->assertSame(27, count($before['WebUI']));
         foreach ($before['WebUI'] as $key => $value) $this->assertSame($value, $values['Preferences']['WebUI\\'.$key]);
-        $this->assertSame($before['WebUI'], $values['WebUI']);
-        $this->assertSame($before['Meta'], $values['Meta']);
-        $this->assertSame('/home/qafix081/export', $values['BitTorrent']['Session\\TorrentExportDirectory']);
-        $this->assertSame('', $values['BitTorrent']['Session\\FinishedTorrentExportDirectory']);
+        $this->pmssAssertArraySubsetSame(['WebUI' => $before['WebUI'], 'Meta' => $before['Meta']], $values);
+        $this->pmssAssertArraySubsetSame([
+            'Session\\TorrentExportDirectory' => '/home/qafix081/export', 'Session\\FinishedTorrentExportDirectory' => '',
+        ], $values['BitTorrent']);
         $this->assertSame('true', $values['Preferences']['MailNotification\\req_ssl']);
-        $this->assertSame('true', $values['Search']['StoreOpenedSearchTabs']);
-        $this->assertSame('false', $values['Search']['StoreOpenedSearchTabResults']);
+        $this->pmssAssertArraySubsetSame(['StoreOpenedSearchTabs' => 'true', 'StoreOpenedSearchTabResults' => 'false'], $values['Search']);
         $this->assertSame($root, \pmssQbittorrentRestoreContent($root));
         foreach (['None', 'STARTTLS', 'SMTPS'] as $encryption) {
             $source = str_replace('SMTPEncryptionType=SMTPS', 'SMTPEncryptionType='.$encryption, $config);

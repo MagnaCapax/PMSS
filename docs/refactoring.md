@@ -510,6 +510,9 @@ Dynamic IOPS policy, cycle, latency, monitoring and probe fixtures group strict
 field checks with `TestCase::pmssAssertArraySubsetSame()`. Expected values and
 field order stay at the callers; exact-shape checks, numeric tolerances and
 scenario loops remain explicit.
+Package recovery, cleanup, diagnostics, quota, firmware, timer, nginx and
+torrent-client result fixtures use that same helper for adjacent field checks.
+Null expectations still require a present key; nested arrays keep strict equality.
 
 Process and monitoring fixtures use `TestCase::pmssWriteFiles()` for ordered
 file trees and `pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared

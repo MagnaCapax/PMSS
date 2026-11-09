@@ -11,8 +11,7 @@ class DpkgBaselineRecoveryTest extends TestCase
         foreach ([124, 100, 137] as $rc) {
             $result = $this->fixture(['install' => [$rc, 0]]);
             $this->assertTrue($result['ok']);
-            $this->assertSame(['install', 'configure', 'fix', 'install'], $result['actions']);
-            $this->assertSame(2, $result['time']);
+            $this->pmssAssertArraySubsetSame(['actions' => ['install', 'configure', 'fix', 'install'], 'time' => 2], $result);
             $this->assertStringContainsString('dpkg lock cleared', implode('\n', $result['logs']));
         }
     }
@@ -21,8 +20,7 @@ class DpkgBaselineRecoveryTest extends TestCase
     {
         $result = $this->fixture(['install' => [0]]);
         $this->assertTrue($result['ok']);
-        $this->assertSame(['install'], $result['actions']);
-        $this->assertSame([], $result['sleeps']);
+        $this->pmssAssertArraySubsetSame(['actions' => ['install'], 'sleeps' => []], $result);
     }
 
     public function testFailedFixBrokenCompletesDpkgAgainBeforeRetry(): void
@@ -30,8 +28,7 @@ class DpkgBaselineRecoveryTest extends TestCase
         foreach ([100, 124] as $rc) {
             $result = $this->fixture(['fix' => [$rc]]);
             $this->assertTrue($result['ok']);
-            $this->assertSame(['install', 'configure', 'fix', 'configure', 'install'], $result['actions']);
-            $this->assertSame(4, $result['time']);
+            $this->pmssAssertArraySubsetSame(['actions' => ['install', 'configure', 'fix', 'configure', 'install'], 'time' => 4], $result);
         }
     }
 
@@ -39,8 +36,7 @@ class DpkgBaselineRecoveryTest extends TestCase
     {
         $result = $this->fixture(['release' => 1000]);
         $this->assertFalse($result['ok']);
-        $this->assertSame(['install'], $result['actions']);
-        $this->assertSame(60, $result['time']);
+        $this->pmssAssertArraySubsetSame(['actions' => ['install'], 'time' => 60], $result);
         $this->assertStringContainsString('did not clear within 60 seconds', implode('\n', $result['logs']));
         $this->assertTrue($result['cleaned'], 'staged selections must be cleaned even when locks stay busy');
     }
@@ -49,16 +45,14 @@ class DpkgBaselineRecoveryTest extends TestCase
     {
         $result = $this->fixture(['configure' => [124]]);
         $this->assertTrue($result['ok']);
-        $this->assertSame(['install', 'configure', 'proftpd', 'fix', 'install'], $result['actions']);
-        $this->assertSame(4, $result['time']);
+        $this->pmssAssertArraySubsetSame(['actions' => ['install', 'configure', 'proftpd', 'fix', 'install'], 'time' => 4], $result);
     }
 
     public function testBusyLockAfterFixBrokenPreventsBaselineRetry(): void
     {
         $result = $this->fixture(['fix' => [124], 'fixRelease' => 1000]);
         $this->assertFalse($result['ok']);
-        $this->assertSame(['install', 'configure', 'fix'], $result['actions']);
-        $this->assertSame(62, $result['time']);
+        $this->pmssAssertArraySubsetSame(['actions' => ['install', 'configure', 'fix'], 'time' => 62], $result);
     }
 
     public function testFailedRetryReturnsFalseAndLogsReason(): void
@@ -72,16 +66,14 @@ class DpkgBaselineRecoveryTest extends TestCase
     {
         $result = $this->fixture(['entry' => 'step2', 'install' => [0], 'busy' => 2]);
         $this->assertTrue($result['ok']);
-        $this->assertSame(['configure', 'fix', 'reapply', 'install'], $result['actions']);
-        $this->assertSame(2, $result['time']);
+        $this->pmssAssertArraySubsetSame(['actions' => ['configure', 'fix', 'reapply', 'install'], 'time' => 2], $result);
     }
 
     public function testStep2BusyLockSkipsFixBrokenAndReapplyAndReportsFailure(): void
     {
         $result = $this->fixture(['entry' => 'step2', 'busy' => 1000]);
         $this->assertFalse($result['ok']);
-        $this->assertSame([], $result['actions']);
-        $this->assertSame(60, $result['time']);
+        $this->pmssAssertArraySubsetSame(['actions' => [], 'time' => 60], $result);
         $this->assertSame('dpkg_baseline', $result['json'][0]['reason']);
     }
 
@@ -103,8 +95,7 @@ class DpkgBaselineRecoveryTest extends TestCase
     {
         $result = $this->fixture(['entry' => 'wait', 'fuser' => false]);
         $this->assertTrue($result['ok']);
-        $this->assertSame([], $result['sleeps']);
-        $this->assertSame(['[WARN] dist-upgrade: fuser not available; skipping dpkg lock checks'], $result['logs']);
+        $this->pmssAssertArraySubsetSame(['sleeps' => [], 'logs' => ['[WARN] dist-upgrade: fuser not available; skipping dpkg lock checks']], $result);
     }
 
     private function fixture(array $options): array

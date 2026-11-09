@@ -70,8 +70,7 @@ PHP;
     public function testDeletedBinaryYieldsOnlyAfterChildReturns(): void
     {
         $result = $this->runExecutor('deleted');
-        $this->assertSame(1, $result['children']);
-        $this->assertSame([true], $result['childLocks']);
+        $this->pmssAssertArraySubsetSame(['children' => 1, 'childLocks' => [true]], $result);
         $this->assertTrue($result['lockFree']);
         $this->assertSame('0', $result['marker']);
         $this->assertTrue(in_array('executor stale; exiting for watchdog restart', $result['logs'], true));
@@ -80,8 +79,7 @@ PHP;
     public function testChangedScriptYieldsAndReleasesLock(): void
     {
         $result = $this->runExecutor('changed');
-        $this->assertSame(1, $result['children']);
-        $this->assertSame([true], $result['childLocks']);
+        $this->pmssAssertArraySubsetSame(['children' => 1, 'childLocks' => [true]], $result);
         $this->assertTrue($result['lockFree']);
         $this->assertSame('0', $result['marker']);
     }
@@ -110,7 +108,6 @@ PHP;
         $result = $this->runExecutor('locked');
         $this->assertSame(0, $result['children']);
         $this->assertFalse($result['lockFree']);
-        $this->assertSame(null, $result['marker']);
-        $this->assertSame(['executor already running; exiting'], $result['logs']);
+        $this->pmssAssertArraySubsetSame(['marker' => null, 'logs' => ['executor already running; exiting']], $result);
     }
 }
