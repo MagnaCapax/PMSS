@@ -19,9 +19,12 @@ function pmssCredentialGenerate(int $length, bool $alphanumericEdges = false): s
     return $credential;
 }
 
-/** Generate a fixed-length account credential for the reset path. */
-function pmssAccountPasswordGenerate(int $length = 10): string
+/** Generate an account credential for the reset path; without a length, 9 to 14 characters at random (ADR 0245). */
+function pmssAccountPasswordGenerate(?int $length = null): string
 {
+    if ($length === null) {
+        $length = random_int(9, 14);
+    }
     if ($length < 2) {
         throw new InvalidArgumentException('Account credential length must be at least two');
     }

@@ -106,7 +106,7 @@ class CredentialProcessTransportTest extends TestCase
             $this->assertSame('', $user['password']);
             $this->assertSame(0, \pmssCredentialProcessRun($command, $user['password'], $output));
             $this->assertSame(1, count($output));
-            $this->assertMatches('/^[A-Za-z0-9][A-Za-z0-9_-]{14}[A-Za-z0-9]$/', $output[0]);
+            $this->assertMatches('/^[A-Za-z0-9][A-Za-z0-9_-]{7,12}[A-Za-z0-9]$/', $output[0]);
         }
         $this->assertSame(0, \pmssCredentialProcessRun($command, 'provided-value', $output));
         $this->assertSame(['provided-value'], $output);

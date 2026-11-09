@@ -49,14 +49,20 @@ class changePwPasswdFailureGuardTest extends TestCase
         foreach (['legacyPasswordSeed', 'rand(', 'mt_rand('] as $legacyCall) {
             $this->assertTrue(strpos($source, $legacyCall) === false);
         }
+        $lengths = [];
         for ($i = 0; $i < 1000; $i++) {
             $password = \pmssAccountPasswordGenerate();
-            $this->assertSame(10, strlen($password));
-            $this->assertMatches('/^[A-Za-z0-9][A-Za-z0-9_-]{8}[A-Za-z0-9]$/', $password);
+            $length = strlen($password);
+            $lengths[$length] = true;
+            $this->assertTrue($length >= 9 && $length <= 14);
+            $this->assertMatches('/^[A-Za-z0-9][A-Za-z0-9_-]{7,12}[A-Za-z0-9]$/', $password);
             foreach (['!', '@', '#', '$', '%', '&', ':'] as $forbidden) {
                 $this->assertTrue(strpos($password, $forbidden) === false);
             }
         }
+        // 1000 draws over 6 lengths: every length appears (a miss has probability below 1e-75).
+        $this->assertSame(6, count($lengths));
+        $this->assertSame(12, strlen(\pmssAccountPasswordGenerate(12)));
     }
 
     public function testPasswdFailureExitsBeforeHttpCredentialSync(): void
