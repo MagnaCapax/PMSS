@@ -6,10 +6,12 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/logCodec.php';
+
 class ResourceStatsAccumulator
 {
     public const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
-    public const AVERAGE_METRICS = ['memory', 'tasks'];
+    public const AVERAGE_METRICS = PMSS_RESOURCE_LOG_CURRENT_FIELDS;
     private $compareTimes;
     private $windowTotals;
     private $dailyTotals = [];
@@ -30,21 +32,17 @@ class ResourceStatsAccumulator
     {
         $timestamp = (int) $sample['timestamp'];
         foreach (self::AVERAGE_METRICS as $metric) $this->currentValues[$metric]['current'] = (float) $sample[$metric];
-        foreach (['anon', 'file'] as $field) if (isset($sample['memory_'.$field]) && is_numeric($sample['memory_'.$field])) $this->currentValues['memory'][$field] = (float) $sample['memory_'.$field];
+        foreach (pmssResourceMemoryBreakdownFieldMap() as $field => $sampleField) if (isset($sample[$sampleField]) && is_numeric($sample[$sampleField])) $this->currentValues['memory'][$field] = (float) $sample[$sampleField];
 
         $delta = ($this->prevTimestamp === null) ? 300 : ($timestamp - $this->prevTimestamp);
         $intervalHours = (($delta > 0 && $delta <= 3600) ? $delta : 300) / 3600;
         $this->prevTimestamp = $timestamp;
-        $sampleMetrics = [
-            'io_read' => (float) $sample['io_read'],
-            'io_write' => (float) $sample['io_write'],
-            'io_read_ops' => (float) ($sample['io_read_ops'] ?? 0.0),
-            'io_write_ops' => (float) ($sample['io_write_ops'] ?? 0.0),
-            'cpu' => (float) $sample['cpu'],
-            'ram_hours' => ($this->currentValues['memory']['current'] / 1024 / 1024 / 1024) * $intervalHours,
-            'memory' => $this->currentValues['memory']['current'],
-            'tasks' => $this->currentValues['tasks']['current'],
-        ];
+        $sampleMetrics = [];
+        foreach (pmssResourceLogPayloadFields(7) as $metric) {
+            // Operation counts are optional in legacy samples; every other field is required.
+            $sampleMetrics[$metric] = (float) (substr($metric, -4) === '_ops' ? ($sample[$metric] ?? 0.0) : $sample[$metric]);
+        }
+        $sampleMetrics['ram_hours'] = ($this->currentValues['memory']['current'] / 1024 / 1024 / 1024) * $intervalHours;
 
         foreach ($this->compareTimes as $label => $threshold) {
             if ($timestamp < $threshold) {

@@ -10,7 +10,8 @@
  * @author  PMSS Team
  */
 
-require_once __DIR__.'/resources.php';
+require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/resources/logCodec.php';
 
 const PMSS_LIVESTATS_SLOTS = 288;     // 24 h at one sample per five minutes
 const PMSS_LIVESTATS_MAX_LINE_AGE = 420;

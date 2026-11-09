@@ -7,13 +7,10 @@
  */
 
 require_once __DIR__.'/runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'resources/payload.php']);
+pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'resources/payload.php', 'resources/logCodec.php']);
 
 const PMSS_RESOURCE_LOG_TAIL_LINES_MAX = 10080;
 const PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS = 5;
-
-/** @return array<string, string> */
-function pmssResourceMemoryBreakdownFieldMap(string $prefix = 'memory_'): array { return ['anon' => $prefix.'anon', 'file' => $prefix.'file']; }
 
 /** Keep resource log file lookups on validated usernames only. */
 function pmssResourceUserIsValid(string $user): bool
@@ -38,43 +35,6 @@ function pmssResourceLogFilePath(string $resourceDir, string $user): ?string
 
 /** Keep resource tail calls bounded before they reach the shell. */
 function pmssResourceTailLineCount($timePeriod): int { return max(1, min((int) $timePeriod, PMSS_RESOURCE_LOG_TAIL_LINES_MAX)); }
-
-/** Compose the stable resource cron text-record payload after the timestamp. */
-function pmssResourceLogLineParts(array $delta, array $state): array
-{
-    $parts = [];
-    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) $parts[] = (string) ($delta[$field] ?? 0);
-    foreach (['memory', 'tasks'] as $field) $parts[] = (string) ($state[$field] ?? 0);
-    if (isset($state['memory_anon'], $state['memory_file'])) array_push($parts, (string) $state['memory_anon'], (string) $state['memory_file']);
-    return $parts;
-}
-
-/** Return the payload fields accepted by each historical resource-log line shape. */
-function pmssResourceLogPayloadFields(int $payloadCount): ?array
-{
-    if ($payloadCount < 5 || $payloadCount === 8) return null;
-    // Historical extensions retain the same shared prefix and metric order.
-    return array_merge(['io_read', 'io_write'],
-        $payloadCount >= 7 ? ['io_read_ops', 'io_write_ops'] : [],
-        ['cpu', 'memory', 'tasks'],
-        $payloadCount >= 9 ? ['memory_anon', 'memory_file'] : []);
-}
-
-/** Parse one resource cron text record into the accumulator sample schema. */
-function pmssResourceLogLineParse($line)
-{
-    $tokens = pmssConfigLineColumns((string) $line, 0, []);
-    $fields = pmssResourceLogPayloadFields(count($tokens) - 2);
-    if ($fields === null || ($timestamp = strtotime($tokens[0].' '.$tokens[1])) === false) return false;
-
-    $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'], 0.0);
-    foreach ($fields as $offset => $field) {
-        $value = $tokens[$offset + 2] ?? '';
-        // Digit-only input can still overflow a float; use the existing parse-failure path.
-        if (!ctype_digit($value) || !is_finite($parsed[$field] = (float) $value)) return false;
-    }
-    return $parsed;
-}
 
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
@@ -103,10 +63,9 @@ class resourceStatistics
             return '';
         }
 
-        $lines = pmssResourceTailLineCount($timePeriod);
         $tail = pmssCommandPath('tail');
         if ($tail === '') return '';
-        $result = pmssCommandCapture(pmssCommandArgvShellQuote([$tail, '-n', (string) $lines, $path]), PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS);
+        $result = pmssCommandCapture(pmssCommandArgvShellQuote([$tail, '-n', (string) pmssResourceTailLineCount($timePeriod), $path]), PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS);
         return $result['rc'] === 0 ? trim($result['stdout']) : '';
     }
 

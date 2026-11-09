@@ -72,13 +72,10 @@ function pmssResourceLogExceedsFiveMinuteLinkBudget(int $bytes, ?float $linkSpee
  */
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
-    $state = [
-        'memory' => (int) ($counters['memory'] ?? 0),
-        'tasks' => (int) ($counters['tasks'] ?? 0),
-        'ts' => time(),
-    ];
-    $deltaFields = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'];
-    foreach ($deltaFields as $field) {
+    $state = [];
+    foreach (PMSS_RESOURCE_LOG_CURRENT_FIELDS as $field) $state[$field] = (int) ($counters[$field] ?? 0);
+    $state['ts'] = time();
+    foreach (PMSS_RESOURCE_LOG_DELTA_FIELDS as $field) {
         $state[$field] = (int) ($counters[$field] ?? 0);
     }
     foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { array_key_exists($field, $counters) && $state[$field] = (int) $counters[$field]; }
@@ -90,7 +87,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     $result = pmssCounterStateUpdate(
         $statePath,
         $state,
-        $deltaFields,
+        PMSS_RESOURCE_LOG_DELTA_FIELDS,
         [
             'io_read' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
             'io_write' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
@@ -106,10 +103,9 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     // cumulative and inflate the month total, risking a spurious /home IOPS throttle. On a
     // source or scope change, emit zero io_* deltas for this sample; the new baseline is stored,
     // so subsequent intervals delta normally.
-    $previousSource = $result['previous_state']['io_source'] ?? null;
-    if ($previousSource !== ($state['io_source'] ?? null)
+    if (($result['previous_state']['io_source'] ?? null) !== ($state['io_source'] ?? null)
         || ($result['previous_state']['io_scope'] ?? null) !== ($state['io_scope'] ?? null)) {
-        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops'] as $field) { $result['delta'][$field] = 0; }
+        foreach (array_slice(PMSS_RESOURCE_LOG_DELTA_FIELDS, 0, 4) as $field) { $result['delta'][$field] = 0; }
     }
 
     return ['delta' => $result['delta'], 'state' => $state];
