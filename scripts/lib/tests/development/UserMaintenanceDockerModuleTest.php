@@ -10,7 +10,7 @@ class UserMaintenanceDockerModuleTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-linger-');
         $outside = $this->pmssMakeTempFile('pmss-linger-outside-');
-        foreach (['fixtur01', 'fixtur02', 'fixtur03', 'backup-fixtur01'] as $name) file_put_contents($dir.'/'.$name, '');
+        $this->pmssWriteFiles($dir, array_fill_keys(['fixtur01', 'fixtur02', 'fixtur03', 'backup-fixtur01'], ''));
         mkdir($dir.'/fixtur04');
         symlink($outside, $dir.'/fixtur05');
         $seen = [];
@@ -36,7 +36,7 @@ class UserMaintenanceDockerModuleTest extends TestCase
     public function testStaleLingerPruneSkipsTestModeAndLinkedDirectory(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-linger-');
-        file_put_contents($dir.'/fixtur01', '');
+        $this->pmssWriteFile($dir.'/fixtur01', '');
         $lookup = static function (string $name) { return false; };
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($dir, $lookup): void {
             $this->assertSame(0, \pmssUserMaintenancePruneStaleLinger($dir, $lookup, false, posix_getuid()));
@@ -58,8 +58,7 @@ class UserMaintenanceDockerModuleTest extends TestCase
             ["[Service]\nExecStart=\n", null, 'empty ExecStart'],
             ["[Service]\nExecStart=-\n", null, 'dash-only ExecStart'],
         ] as $case) {
-            $unit = $this->pmssMakeTempPath('pmss-docker-unit-');
-            file_put_contents($unit, $case[0]);
+            $unit = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-docker-unit-'), $case[0]);
             $this->assertSame($case[1], \pmssUserDockerUnitExecBinary($unit), $case[2]);
         }
     }

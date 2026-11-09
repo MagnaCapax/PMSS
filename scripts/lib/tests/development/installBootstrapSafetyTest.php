@@ -195,7 +195,6 @@ BASH;
     public function testBullseyeSecurityRewriteTouchesOnlyBullseyeSecurityLines(): void
     {
         $root = $this->pmssMakeTempDir('pmss-install-bullseye-');
-        mkdir($root.'/apt/sources.list.d', 0755, true);
         $original = implode("\n", [
             'deb http://deb.debian.org/debian bullseye main',
             'deb http://security.debian.org/debian-security bullseye-security main',
@@ -204,15 +203,16 @@ BASH;
             '# deb http://security.debian.org/debian-security bullseye-security main',
             'deb http://deb.debian.org/debian bullseye-updates main',
         ])."\n";
-        file_put_contents($root.'/apt/sources.list', $original);
-        file_put_contents($root.'/apt/sources.list.d/extra.list', "deb http://security.debian.org/debian-security bullseye-security main\n");
-        file_put_contents($root.'/target.list', "deb http://security.debian.org/debian-security bullseye-security main\n");
+        $this->pmssWriteFiles($root, [
+            'apt/sources.list' => $original,
+            'apt/sources.list.d/extra.list' => "deb http://security.debian.org/debian-security bullseye-security main\n",
+            'target.list' => "deb http://security.debian.org/debian-security bullseye-security main\n",
+            'bookworm' => "VERSION_CODENAME=bookworm\n",
+            'bullseye' => "PRETTY_NAME=\"Debian GNU/Linux 11 (bullseye)\"\nVERSION_CODENAME=\"bullseye\"\n",
+        ]);
         symlink($root.'/target.list', $root.'/apt/sources.list.d/link.list');
-        file_put_contents($root.'/bookworm', "VERSION_CODENAME=bookworm\n");
-        file_put_contents($root.'/bullseye', "PRETTY_NAME=\"Debian GNU/Linux 11 (bullseye)\"\nVERSION_CODENAME=\"bullseye\"\n");
 
-        $script = $root.'/run.sh';
-        file_put_contents($script, "log_info() { echo \"INFO \$*\"; }\nlog_warn() { echo \"WARN \$*\"; }\n"
+        $script = $this->pmssWriteFile($root.'/run.sh', "log_info() { echo \"INFO \$*\"; }\nlog_warn() { echo \"WARN \$*\"; }\n"
             .$this->pmssExtractShellFunction($this->script, 'bootstrap_bullseye_security_archive')."\n"
             .'bootstrap_bullseye_security_archive "$1" "$2"'."\n");
 
@@ -257,7 +257,6 @@ BASH;
     public function testBusterRewriteMovesOnlyBusterDebianLinesToTheArchive(): void
     {
         $root = $this->pmssMakeTempDir('pmss-install-buster-');
-        mkdir($root.'/apt/sources.list.d', 0755, true);
         $original = implode("\n", [
             'deb http://deb.debian.org/debian buster main',
             'deb-src http://deb.debian.org/debian/ buster main contrib',
@@ -268,14 +267,16 @@ BASH;
             'deb https://mediaarea.net/repo/deb/debian buster main',
             'deb http://deb.debian.org/debian bullseye main',
         ])."\n";
-        file_put_contents($root.'/apt/sources.list', $original);
-        file_put_contents($root.'/target.list', "deb http://deb.debian.org/debian buster main\n");
+        $this->pmssWriteFiles($root, [
+            'apt/sources.list' => $original,
+            'target.list' => "deb http://deb.debian.org/debian buster main\n",
+            'bookworm' => "VERSION_CODENAME=bookworm\n",
+            'buster' => "PRETTY_NAME=\"Debian GNU/Linux 10 (buster)\"\nVERSION_CODENAME=buster\n",
+        ]);
+        $this->pmssEnsureDir($root.'/apt/sources.list.d');
         symlink($root.'/target.list', $root.'/apt/sources.list.d/link.list');
-        file_put_contents($root.'/bookworm', "VERSION_CODENAME=bookworm\n");
-        file_put_contents($root.'/buster', "PRETTY_NAME=\"Debian GNU/Linux 10 (buster)\"\nVERSION_CODENAME=buster\n");
 
-        $script = $root.'/run.sh';
-        file_put_contents($script, "log_info() { echo \"INFO \$*\"; }\nlog_warn() { echo \"WARN \$*\"; }\n"
+        $script = $this->pmssWriteFile($root.'/run.sh', "log_info() { echo \"INFO \$*\"; }\nlog_warn() { echo \"WARN \$*\"; }\n"
             .$this->pmssExtractShellFunction($this->script, 'bootstrap_buster_archive')."\n"
             .'bootstrap_buster_archive "$1" "$2"'."\n");
 

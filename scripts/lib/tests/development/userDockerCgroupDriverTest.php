@@ -91,7 +91,7 @@ class UserDockerCgroupDriverTest extends TestCase
         ]);
 
         $this->assertTrue($result['ok']);
-        $payload = $this->readDaemonConfig($home);
+        $payload = $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []);
         $this->assertFalse($payload['features']['containerd-snapshotter']);
         $this->assertTrue($payload['features']['buildkit']);
     }
@@ -119,7 +119,7 @@ class UserDockerCgroupDriverTest extends TestCase
         $configFile = $home.'/.config/docker/daemon.json';
         $before = file_get_contents($configFile);
 
-        $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home))));
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []))));
         $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'storage_driver' => null,
             'remove_pmss_storage_driver' => false,
@@ -137,7 +137,7 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->pmssWriteFile($home.'/.local/share/docker/overlay2/layer', 'data');
         $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['storage-driver' => 'fuse-overlayfs']));
 
-        $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home))));
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []))));
         $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, [
             'storage_driver' => null,
             'remove_pmss_storage_driver' => false,
@@ -146,7 +146,7 @@ class UserDockerCgroupDriverTest extends TestCase
         ]);
 
         $this->pmssAssertArraySubsetSame(['ok' => true, 'removed_storage_driver' => false], $result);
-        $this->assertSame('fuse-overlayfs', $this->readDaemonConfig($home)['storage-driver']);
+        $this->assertSame('fuse-overlayfs', $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', [])['storage-driver']);
     }
 
     public function testSymlinkedDataRootCountsAsExistingStore(): void
@@ -218,7 +218,7 @@ PHP;
                 'disable_containerd_snapshotter' => true,
             ]);
             $this->pmssAssertArraySubsetSame(['ok' => true, 'configured_storage_driver' => true], $result);
-            $this->assertSame('fuse-overlayfs', $this->readDaemonConfig($home)['storage-driver']);
+            $this->assertSame('fuse-overlayfs', $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', [])['storage-driver']);
         }
     }
 
@@ -229,7 +229,7 @@ PHP;
         $this->pmssWriteFile($custom.'/image/index', 'data');
         $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['data-root' => $custom]));
 
-        $resolved = \pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home));
+        $resolved = \pmssUserRootlessDockerDataRoot($home, $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []));
         $this->assertSame($custom, $resolved);
         $this->assertTrue(\pmssUserRootlessDockerStoreExists($resolved));
         foreach (['', 'relative/path', 42] as $invalid) {
@@ -386,14 +386,8 @@ PHP;
 
     private function assertDaemonConfigContainsCgroupfs(string $home): array
     {
-        $payload = $this->readDaemonConfig($home);
+        $payload = $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []);
         $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
         return $payload;
-    }
-
-    private function readDaemonConfig(string $home): array
-    {
-        $payload = json_decode((string) file_get_contents($home.'/.config/docker/daemon.json'), true);
-        return is_array($payload) ? $payload : [];
     }
 }

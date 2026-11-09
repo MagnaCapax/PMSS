@@ -98,10 +98,11 @@ class WatchdogProcessBoundaryTest extends TestCase
     private function procFixture(string $boot, string $ticks): string
     {
         $proc = $this->pmssMakeTempDir('watchdog-proc-boundary-');
-        mkdir($proc.'/77');
-        file_put_contents($proc.'/stat', "cpu 1 2 3\nbtime ".$boot."\n");
         $fields = array_merge(['S'], array_fill(0, 18, '0'), [$ticks]);
-        file_put_contents($proc.'/77/stat', '77 (demo worker) x) '.implode(' ', $fields)."\n");
+        $this->pmssWriteFiles($proc, [
+            'stat' => "cpu 1 2 3\nbtime ".$boot."\n",
+            '77/stat' => '77 (demo worker) x) '.implode(' ', $fields)."\n",
+        ]);
         touch($proc.'/77', 1234567890);
         return $proc;
     }

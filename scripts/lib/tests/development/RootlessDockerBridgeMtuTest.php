@@ -34,7 +34,7 @@ PHP;
         $this->pmssWriteFile($path, "{}\n");
         $logs = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_HOME' => $home]);
         $this->assertSame(['userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker'], $logs);
-        $this->assertSame(['native.cgroupdriver=cgroupfs'], $this->readDaemonConfig($home)['exec-opts']);
+        $this->assertSame(['native.cgroupdriver=cgroupfs'], $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', [])['exec-opts']);
     }
 
     public function testDockerDependenciesGateMtuOnEngineAndLogLossyJson(): void
@@ -67,7 +67,7 @@ PHP;
         foreach (['5:23.0.6-1~debian.12~bookworm' => false, '' => false, '5:24.0.0-1~debian.12~bookworm' => true, '29.0.1' => true] as $version => $applies) {
             $this->pmssWriteFile($path, $complete);
             $logs = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_DOCKER_CE' => $version] + $env);
-            $this->assertSame($applies, isset($this->readDaemonConfig($home)['default-network-opts']), 'docker-ce '.$version);
+            $this->assertSame($applies, isset($this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', [])['default-network-opts']), 'docker-ce '.$version);
             $this->assertSame($applies ? ['[INFO] Configured Docker MTU 65520 for new networks (next daemon start; existing networks and the default bridge keep theirs)'] : [],
                 $logs, 'docker-ce '.$version);
             if (!$applies) {
@@ -89,7 +89,6 @@ PHP;
     public function testWireguardInstallerUsesA1500NetworkAndStopsOnFailures(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-wireguard-installer-');
-        @mkdir($dir.'/bin', 0755, true);
         @mkdir($dir.'/home', 0755, true);
         // Stub docker: PMSS_TEST_NETWORK is missing, an MTU, create-fails or inspect-fails.
         $stub = <<<'SH'
@@ -221,7 +220,7 @@ SH;
         $policy = ['bridge_mtu' => 65520, 'create_when_missing' => true];
         $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, $policy);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'created' => true, 'configured_bridge_mtu' => true], $result);
-        $payload = $this->readDaemonConfig($home);
+        $payload = $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []);
         $this->assertTrue(!array_key_exists('mtu', $payload), 'The default bridge stays at 1500');
         $this->assertSame('65520', $payload['default-network-opts']['bridge']['com.docker.network.driver.mtu']);
         $this->assertSame(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
@@ -246,7 +245,7 @@ SH;
         $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode(['exec-opts' => ['native.cgroupdriver=cgroupfs']]));
         $refilled = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, ['bridge_mtu' => 65520]);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'configured_bridge_mtu' => true], $refilled);
-        $this->assertSame('65520', $this->readDaemonConfig($home)['default-network-opts']['bridge']['com.docker.network.driver.mtu'],
+        $this->assertSame('65520', $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', [])['default-network-opts']['bridge']['com.docker.network.driver.mtu'],
             'A deleted key is filled again');
 
         $optOut = ['exec-opts' => ['native.cgroupdriver=cgroupfs'],
@@ -254,7 +253,7 @@ SH;
         $this->pmssWriteRelativeFile($home, '.config/docker/daemon.json', json_encode($optOut));
         $kept = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, ['bridge_mtu' => 65520]);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => false, 'configured_bridge_mtu' => false], $kept);
-        $this->assertSame($optOut, $this->readDaemonConfig($home));
+        $this->assertSame($optOut, $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []));
     }
 
     public function testConvergeLeavesFileWithEmptyObjectUntouched(): void
@@ -287,7 +286,7 @@ SH;
             $this->pmssWriteFile($home.'/.config/docker/daemon.json', "{}\n");
             $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, $policy);
             $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true], $result);
-            $payload = $this->readDaemonConfig($home);
+            $payload = $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []);
             $this->assertSame(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
             $this->assertSame(isset($policy['bridge_mtu']), isset($payload['default-network-opts']));
         }
@@ -302,7 +301,7 @@ SH;
             'preserve_custom_storage_driver' => true,
         ]);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'configured_bridge_mtu' => true], $result);
-        $payload = $this->readDaemonConfig($home);
+        $payload = $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []);
         $this->assertSame('overlay2', $payload['storage-driver']);
         $this->assertSame(1500, $payload['mtu']);
         $this->assertSame(['192.0.2.53'], $payload['dns']);
@@ -314,7 +313,7 @@ SH;
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-mtu-');
         $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, ['create_when_missing' => true]);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'configured_bridge_mtu' => false], $result);
-        $payload = $this->readDaemonConfig($home);
+        $payload = $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []);
         $this->assertTrue(!array_key_exists('mtu', $payload));
         $this->assertTrue(!array_key_exists('default-network-opts', $payload));
     }
@@ -326,11 +325,5 @@ SH;
         $result = \pmssUserRootlessDockerConfigConverge('fixtur01', $home, 0, 0, ['bridge_mtu' => 65520]);
         $this->pmssAssertArraySubsetSame(['ok' => false, 'reason' => 'invalid_json', 'configured_bridge_mtu' => false], $result);
         $this->assertSame('{not json', file_get_contents($home.'/.config/docker/daemon.json'));
-    }
-
-    private function readDaemonConfig(string $home): array
-    {
-        $payload = json_decode((string) file_get_contents($home.'/.config/docker/daemon.json'), true);
-        return is_array($payload) ? $payload : [];
     }
 }
