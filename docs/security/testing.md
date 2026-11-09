@@ -5,6 +5,11 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
 ## Negative Tests
 - Invalid/edge inputs for parsers (spec parsing, config readers) must return safe defaults or explicit errors.
 - File writes must fail safely (temp files, backups, atomic replace) and restore on error.
+- Directory and support snapshot creation restore the caller's umask in `finally`,
+  including when `mkdir` or exclusive `fopen` throws. `CreationUmaskSafetyTest`
+  injects exceptions, errors and false returns without creating host files;
+  successful modes, diagnostics and return values retain their contracts.
+  Run these fixtures only on testing machines.
 - Network-affecting helpers (iptables rendering, FireQOS config) must degrade to no-op rather than partial application.
 - Boot-default activation follows successful managed writes: failed fstab writes
   must not trigger a `/proc` remount, and failed GRUB defaults writes must not

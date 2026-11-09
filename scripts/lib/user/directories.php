@@ -168,8 +168,12 @@ if (!function_exists('pmssEnsureDir')) {
             $modeForThis = ($i === $lastIndex) ? $mode : $parentMode;
             if ($isRoot && $wantUid !== null && $wantUid !== 0) return false;
             $oldUmask = umask(0);
-            $made = @mkdir($current, $modeForThis);
-            umask($oldUmask);
+            try {
+                $made = @mkdir($current, $modeForThis);
+            } finally {
+                // A creation throwable must not leave later writes unmasked.
+                umask($oldUmask);
+            }
             if (!$made) {
                 $log('[WARN] Failed to create directory: '.$current);
                 return false;

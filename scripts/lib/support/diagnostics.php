@@ -208,8 +208,12 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
 
     $path = sprintf('%s/request-%s-%d.txt', $snapshotDir, gmdate('Ymd-His'), getmypid());
     $previousUmask = umask(0077);
-    $handle = @fopen($path, 'x');
-    umask($previousUmask);
+    try {
+        $handle = @fopen($path, 'x');
+    } finally {
+        // Snapshot creation owns the temporary mask even when opening throws.
+        umask($previousUmask);
+    }
     if ($handle === false) {
         throw new RuntimeException('Unable to create support snapshot file.');
     }
