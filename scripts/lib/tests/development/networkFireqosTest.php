@@ -10,11 +10,10 @@ class NetworkFireqosTest extends TestCase
     {
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
         $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        $this->pmssEnsureDir($homeDir.'/root');
         if ($enabled) {
-            @file_put_contents($stateDir.'/root.enabled', $throttle ?? '');
+            $this->pmssWriteRelativeFile($stateDir, 'root.enabled', $throttle ?? '');
         }
-        @file_put_contents($homeDir.'/root/.throttle', '77');
+        $this->pmssWriteRelativeFile($homeDir, 'root/.throttle', '77');
         return [$stateDir, $homeDir];
     }
 
@@ -32,9 +31,8 @@ class NetworkFireqosTest extends TestCase
             'PMSS_HOME_DIR' => $homeDir,
         ];
         if ($templateContent !== '') {
-            $templatePath = $this->pmssMakeTempPath('pmss-fireqos-template-', '.conf');
-            @file_put_contents($templatePath, $templateContent);
-            $env['PMSS_FIREQOS_TEMPLATE'] = $templatePath;
+            $env['PMSS_FIREQOS_TEMPLATE'] = $this->pmssWriteFile(
+                $this->pmssMakeTempPath('pmss-fireqos-template-', '.conf'), $templateContent);
         }
 
         $config = '';
@@ -58,7 +56,7 @@ class NetworkFireqosTest extends TestCase
             'PMSS_FIREQOS_LOG_PATH' => $logPath,
         ], function () use ($configPath, $logPath, $markerPath): void {
             // A rejected policy from an earlier failed start is cleared once a start succeeds.
-            file_put_contents($configPath.'.failed', "stale\n");
+            $this->pmssWriteFile($configPath.'.failed', "stale\n");
             $this->assertTrue(\networkApplyFireqos("interface eth0\nrate 1000\n"));
 
             $this->assertEquals("interface eth0\nrate 1000\n", (string) @file_get_contents($configPath));
@@ -106,8 +104,7 @@ class NetworkFireqosTest extends TestCase
     public function testBuildFireqosConfigRendersPlaceholders(): void
     {
         $template = "iface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n";
-        $path = $this->pmssMakeTempPath('fireqos-template-', '.conf');
-        file_put_contents($path, $template);
+        $path = $this->pmssWriteFile($this->pmssMakeTempPath('fireqos-template-', '.conf'), $template);
 
         $this->pmssWithEnv(['PMSS_FIREQOS_TEMPLATE' => $path], function (): void {
             $config = \networkBuildFireqosConfig(
@@ -235,7 +232,7 @@ class NetworkFireqosTest extends TestCase
     public function testHomeThrottleCopyNeverSetsTheCap(): void
     {
         [$stateDir, $homeDir] = $this->fireqosThrottleFixture(true);
-        file_put_contents($homeDir.'/root/.throttle', '99999');
+        $this->pmssWriteRelativeFile($homeDir, 'root/.throttle', '99999');
         $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir, 'PMSS_HOME_DIR' => $homeDir], function (): void {
             $caps = \networkFireqosUserCaps(['throttle' => ['max' => 100]], ['root']);
             $config = \networkBuildFireqosConfig(['throttle' => ['max' => 100]], ['root'], []);

@@ -44,8 +44,7 @@ class NetworkConfigTest extends TestCase
 
     public function testLoadLocalnetsReturnsConfiguredEntries(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-localnets-');
-        file_put_contents($tmp, "10.0.0.0/8\n192.168.0.0/16\n");
+        $tmp = $this->pmssWriteTempFile('localnets', "10.0.0.0/8\n192.168.0.0/16\n");
 
         $this->pmssWithEnv(['PMSS_LOCALNET_FILE' => $tmp], function (): void {
             $this->assertEquals(['10.0.0.0/8', '192.168.0.0/16'], \networkLoadLocalnets());
@@ -54,9 +53,8 @@ class NetworkConfigTest extends TestCase
 
     public function testLoadLocalnetsSkipsMalformedEntries(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-localnets-');
-        file_put_contents(
-            $tmp,
+        $tmp = $this->pmssWriteTempFile(
+            'localnets',
             "10.0.0.0/8\n192.168.0.0/16; touch /tmp/bad\n999.1.1.1/33\n127.0.0.1\n"
         );
 
@@ -76,8 +74,7 @@ class NetworkConfigTest extends TestCase
 
     public function testLoadLocalnetsRepopulatesBlankPmConfigFileWithDefault(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-localnets-');
-        file_put_contents($tmp, "\n");
+        $tmp = $this->pmssWriteTempFile('localnets', "\n");
 
         $this->pmssWithEnv([
             'PMSS_LOCALNET_FILE' => $tmp,
@@ -90,8 +87,7 @@ class NetworkConfigTest extends TestCase
 
     public function testLoadLocalnetsKeepsBlankNonPmConfigFileEmpty(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-localnets-');
-        file_put_contents($tmp, "\n");
+        $tmp = $this->pmssWriteTempFile('localnets', "\n");
 
         $this->pmssWithEnv([
             'PMSS_LOCALNET_FILE' => $tmp,

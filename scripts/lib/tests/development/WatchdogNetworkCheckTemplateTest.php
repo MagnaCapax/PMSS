@@ -135,16 +135,16 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
     {
         $root = $this->networkFixture();
         // A stale sustained marker must not suppress the next window's evidence.
-        file_put_contents($root.'/pmss-watchdog-net-sustained', 'stale');
+        $this->pmssWriteRelativeFile($root, 'pmss-watchdog-net-sustained', 'stale');
         $this->assertNetworkRun($root, 245, 6);
         $this->assertFalse(file_exists($root.'/pmss-watchdog-net-sustained'));
-        file_put_contents($root.'/pmss-watchdog-net-fail', (string) (time() - 1900));
+        $this->pmssWriteRelativeFile($root, 'pmss-watchdog-net-fail', (string) (time() - 1900));
         foreach ([6, 3, 3] as $calls) {
             $this->assertNetworkRun($root, 1, $calls);
         }
         $log = file_get_contents($root.'/checkNetworkWatchdog.log');
         $this->assertSame(1, substr_count($log, 'SUSTAINED FAILURE'));
-        file_put_contents($root.'/ping-exit', '0');
+        $this->pmssWriteRelativeFile($root, 'ping-exit', '0');
         $this->assertNetworkRun($root, 0, 1);
         foreach (['fail', 'lastlog', 'sustained'] as $marker) {
             $this->assertFalse(file_exists($root.'/pmss-watchdog-net-'.$marker));
@@ -161,8 +161,7 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
     {
         $root = $this->networkFixture();
         // The probe crosses the budget; only the original three pings may run.
-        file_put_contents($root.'/stop-after', '3');
-        file_put_contents($root.'/pmss-watchdog-net-fail', (string) (time() - 1900));
+        $this->pmssWriteFiles($root, ['stop-after' => '3', 'pmss-watchdog-net-fail' => (string) (time() - 1900)]);
         $this->assertNetworkRun($root, 1, 3);
         $log = file_get_contents($root.'/checkNetworkWatchdog.log');
         $this->assertStringContainsString('snapshot=skipped runtime=20s probe=20s', $log);
@@ -174,7 +173,7 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
     public function testNetworkCheckChecksBudgetBetweenDiagnosticTargets(): void
     {
         $root = $this->networkFixture();
-        file_put_contents($root.'/stop-after', '4');
+        $this->pmssWriteRelativeFile($root, 'stop-after', '4');
         $this->assertNetworkRun($root, 245, 4);
         $log = file_get_contents($root.'/checkNetworkWatchdog.log');
         $this->assertSame(1, substr_count($log, 'budget-exhausted'));
@@ -184,11 +183,11 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
     {
         foreach (['invalid', ''] as $uptime) {
             $root = $this->networkFixture();
-            file_put_contents($root.'/uptime', $uptime);
+            $this->pmssWriteRelativeFile($root, 'uptime', $uptime);
             if ($uptime === '') {
                 unlink($root.'/uptime');
             }
-            file_put_contents($root.'/pmss-watchdog-net-fail', 'invalid');
+            $this->pmssWriteRelativeFile($root, 'pmss-watchdog-net-fail', 'invalid');
             $this->assertNetworkRun($root, 245, 3);
             $log = file_get_contents($root.'/checkNetworkWatchdog.log');
             $this->assertStringContainsString('snapshot=skipped runtime=?s probe=?s', $log);
@@ -200,14 +199,11 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
     private function networkFixture(): string
     {
         $root = $this->pmssMakeTempDir('pmss-watchdog-network-');
-        mkdir($root.'/bin');
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-        file_put_contents($root.'/check.sh', str_replace(
-            ['/run/', '/var/log/pmss', '/proc/uptime'], [$root.'/', $root, $root.'/uptime'], $template
-        ));
-        foreach (['uptime' => "100.00 0\n", 'ping-exit' => '1', 'stop-after' => '0'] as $file => $value) {
-            file_put_contents($root.'/'.$file, $value);
-        }
+        $this->pmssWriteFiles($root, [
+            'check.sh' => str_replace(['/run/', '/var/log/pmss', '/proc/uptime'], [$root.'/', $root, $root.'/uptime'], $template),
+            'uptime' => "100.00 0\n", 'ping-exit' => '1', 'stop-after' => '0',
+        ]);
         $prefix = "#!/bin/sh\nroot=".escapeshellarg($root)."\n";
         $this->pmssWriteExecutableFile($root.'/bin/ping', $prefix.<<<'SH'
 read -r count <"$root/ping-calls"
@@ -231,7 +227,7 @@ SH
     /** Run the real template under sh, preserving its watchdog exit status. */
     private function assertNetworkRun(string $root, int $expectedExit, int $expectedPings): void
     {
-        file_put_contents($root.'/ping-calls', '0');
+        $this->pmssWriteRelativeFile($root, 'ping-calls', '0');
         $command = 'PATH='.escapeshellarg($root.'/bin:/usr/bin:/bin').' sh '.escapeshellarg($root.'/check.sh').' 2>&1';
         $result = $this->pmssExecShellCommand($command, [], '');
         $this->assertSame($expectedExit, $result['rc'], $result['output']);

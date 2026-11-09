@@ -8,8 +8,8 @@ class VnstatConfigSafetyTest extends TestCase
 {
     public function testRefreshKeepsSettingsAndMetadata(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-vnstat-config-').'/vnstat.conf';
-        file_put_contents($path, "RateUnit 1\nMaxBandwidth 1000\nBandwidthDetection 1\nForeign yes\n");
+        $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-vnstat-config-'), 'vnstat.conf',
+            "RateUnit 1\nMaxBandwidth 1000\nBandwidthDetection 1\nForeign yes\n");
         chmod($path, 0640);
         $messages = [];
         $log = $this->pmssMakeArrayLogger($messages);
@@ -25,8 +25,7 @@ class VnstatConfigSafetyTest extends TestCase
 
     public function testAbsentSettingsUseLegacyAppendShape(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-vnstat-append-').'/vnstat.conf';
-        file_put_contents($path, "Foreign yes\n");
+        $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-vnstat-append-'), 'vnstat.conf', "Foreign yes\n");
         $this->assertTrue(\pmssVnstatConfigRefresh($path, static function (string $message): void {}));
         $this->assertSame("Foreign yes\n\nMaxBandwidth 50000\n\nBandwidthDetection 0\n", file_get_contents($path));
     }
@@ -34,9 +33,8 @@ class VnstatConfigSafetyTest extends TestCase
     public function testSymlinkAndMissingTargetsAreRejected(): void
     {
         $root = $this->pmssMakeTempDir('pmss-vnstat-target-');
-        $real = $root.'/real.conf';
+        $real = $this->pmssWriteRelativeFile($root, 'real.conf', "RateUnit 1\n");
         $link = $root.'/vnstat.conf';
-        file_put_contents($real, "RateUnit 1\n");
         symlink($real, $link);
         $messages = [];
         $log = $this->pmssMakeArrayLogger($messages);
@@ -48,9 +46,8 @@ class VnstatConfigSafetyTest extends TestCase
 
     public function testFailedReplacementPreservesExistingConfig(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-vnstat-write-').'/vnstat.conf';
         $original = "RateUnit 1\n";
-        file_put_contents($path, $original);
+        $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-vnstat-write-'), 'vnstat.conf', $original);
         $messages = [];
         $this->assertFalse(\pmssVnstatConfigRefresh($path, $this->pmssMakeArrayLogger($messages), static function (): bool { return false; }));
         $this->assertSame($original, file_get_contents($path));

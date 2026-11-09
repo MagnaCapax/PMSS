@@ -10,12 +10,8 @@ class ArpKeepaliveTest extends TestCase
 
     private function marker(?string $content): string
     {
-        $dir = $this->pmssMakeTempDir('pmss-arp-keepalive-');
-        $path = $dir.'/arp-keepalive';
-        if ($content !== null) {
-            file_put_contents($path, $content);
-        }
-        return $path;
+        $path = $this->pmssMakeTempDir('pmss-arp-keepalive-').'/arp-keepalive';
+        return $content === null ? $path : $this->pmssWriteFile($path, $content);
     }
 
     private function runKeepalive(string $marker, string $route, string $arp, bool &$sent = null): string
