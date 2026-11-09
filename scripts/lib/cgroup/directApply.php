@@ -7,8 +7,8 @@
 
 require_once dirname(__DIR__).'/log.php';
 require_once dirname(__DIR__).'/user/identity.php';
-
-const PMSS_CGROUP_DIRECT_BLKIO_ROOT = '/sys/fs/cgroup/blkio';
+require_once __DIR__.'/directPolicy.php';
+require_once __DIR__.'/directFiles.php';
 
 /** Inspect the runtime boundary in a form unit tests can exercise. */
 function pmssCgroupDirectRuntimeCheck(string $skipMessage, ?int $euid = null, string $blkioRoot = PMSS_CGROUP_DIRECT_BLKIO_ROOT): array
@@ -61,8 +61,7 @@ function pmssCgroupDirectUserConfigs(string $usersDir, int &$errors): iterable
 function pmssCgroupDirectPlannedUsers(string $usersDir, int &$total, int &$errors, callable $planner, ?callable $uidResolver = null): iterable
 {
     $uidResolver = $uidResolver ?: 'pmssCgroupDirectUserUidOrError';
-    foreach (pmssCgroupDirectUserConfigs($usersDir, $errors) as $entry) {
-        list($user, $json) = $entry;
+    foreach (pmssCgroupDirectUserConfigs($usersDir, $errors) as [$user, $json]) {
         if (($plan = $planner($user, $json)) === null) continue;
         $total++;
         if (($uid = $uidResolver($user, $errors)) === null) continue;
@@ -73,65 +72,13 @@ function pmssCgroupDirectPlannedUsers(string $usersDir, int &$total, int &$error
 /** Resolve a managed user's positive UID, logging legacy-compatible failures. */
 function pmssCgroupDirectUserUidOrError(string $user, int &$errors): ?int
 {
-    if (($pwd = posix_getpwnam($user)) === false) {
+    $pwd = posix_getpwnam($user);
+    $uid = $pwd === false ? null : pmssPasswdEntryPositiveUid($pwd);
+    if ($uid === null) {
         $errors++;
-        syslog(LOG_WARNING, "no passwd entry $user");
-        return null;
+        syslog(LOG_WARNING, ($pwd === false ? 'no passwd entry ' : 'unsafe passwd uid ').$user);
     }
-
-    if (($uid = pmssPasswdEntryPositiveUid($pwd)) === null) {
-        $errors++;
-        syslog(LOG_WARNING, "unsafe passwd uid $user");
-        return null;
-    }
-
     return $uid;
-}
-
-/** Build the cgroup-v1 user.slice directory for one positive UID. */
-function pmssCgroupDirectUserSliceDir(int $uid): string { return PMSS_CGROUP_DIRECT_BLKIO_ROOT.'/user.slice/user-'.$uid.'.slice'; }
-
-/** Build one direct blkio target path below a managed user's cgroup-v1 slice. */
-function pmssCgroupDirectUserBlkioFilePath(int $uid, string $fileName): string { return pmssCgroupDirectUserSliceDir($uid).'/'.$fileName; }
-
-/** Allow only explicitly pinned files below positive-UID per-user blkio slices. */
-function pmssCgroupDirectUserBlkioPathAllowed(string $cgPath, array $allowedFiles): bool
-{
-    $patterns = [];
-    foreach ($allowedFiles as $fileName) {
-        if (is_string($fileName) && $fileName !== '' && strpos($fileName, '/') === false && strpos($fileName, "\0") === false) $patterns[] = preg_quote($fileName, '#');
-    }
-
-    return $patterns !== []
-        && preg_match('#^'.preg_quote(PMSS_CGROUP_DIRECT_BLKIO_ROOT, '#').'/user\.slice/user-[1-9][0-9]*\.slice/(?:'.implode('|', $patterns).')$#', $cgPath) === 1;
-}
-
-/** Refuse links, directories, and missing targets before direct cgroup writes. */
-function pmssCgroupDirectWritableFileTarget(string $path): bool
-{
-    return $path !== ''
-        && strpos($path, "\0") === false
-        && is_file($path)
-        && !is_link($path)
-        && is_writable($path);
-}
-
-/** Write one bounded integer target and reject failed or short sysfs writes. */
-function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum, int $maximum): bool
-{
-    return $minimum <= $maximum && $value >= $minimum && $value <= $maximum
-        && pmssCgroupDirectWritableFileTarget($path)
-        && pmssFileWriteComplete($path, (string) $value);
-}
-
-/** Read only this device's old integer from the writer's already captured state. */
-function pmssCgroupDirectDeviceValueParse(string $raw, string $device): ?int
-{
-    if (strpos($raw, "\0") !== false) return null;
-    foreach (pmssConfigTextRows($raw, 2, []) as $columns) {
-        if ($columns[0] === $device) return count($columns) === 2 ? pmssUnsignedDecimalIntParse($columns[1]) : null;
-    }
-    return null;
 }
 
 /** Audit successful direct writes privately; failures warn without affecting enforcement. */
@@ -162,56 +109,12 @@ function pmssCgroupDirectFinishCycle(bool $dryRun, int $total, int $written, int
 }
 
 /**
- * Parse an IOReadIOPS/IOWriteIOPS spec into its positive-integer value.
- * "/home:2000" -> 2000. "/dev/md0:2000" -> 2000. Empty/malformed -> null.
- */
-function pmssIopsParseSpec($raw): ?int
-{
-    if (!is_string($raw) || $raw === '' || $raw === '0') {
-        return null;
-    }
-
-    // Do not let an arbitrary "label:number" string trigger a /home throttle.
-    if (preg_match('#^(?:/home|/dev/[^:\r\n\x00]+):([0-9]+)$#', $raw, $m) !== 1) {
-        return null;
-    }
-
-    $n = (int) $m[1];
-    return $n > 0 ? $n : null;
-}
-
-/**
  * Write "MAJ:MIN VALUE" to the cgroup blkio.throttle file IF current state differs.
  * Returns true if written or already correct; false on error.
  */
 function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array
 {
-    if (!pmssCgroupPolicyMajorMinorIsValid($majMin)
-        || $iops <= 0
-        || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
-    ) {
-        return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
-    }
-    if (!is_file($cgPath) || !is_writable($cgPath)) {
-        return ['ok' => false, 'reason' => 'unwritable', 'cur' => null];
-    }
-    $cur = trim((string) @file_get_contents($cgPath));
-    $desired = $majMin.' '.$iops;
-    // Current may contain other-device entries; check whether OUR device line matches.
-    $hasMatch = false;
-    foreach (pmssTextLines($cur) as $line) {
-        if (trim($line) === $desired) { $hasMatch = true; break; }
-    }
-    if ($hasMatch) {
-        return ['ok' => true, 'reason' => 'already-set', 'cur' => $cur];
-    }
-    if ($dryRun) {
-        return ['ok' => true, 'reason' => 'dry-run', 'cur' => $cur];
-    }
-    if (@file_put_contents($cgPath, $desired) === false) {
-        return ['ok' => false, 'reason' => 'write-failed', 'cur' => $cur];
-    }
-    return ['ok' => true, 'reason' => 'written', 'cur' => $cur];
+    return pmssIopsThrottleApply($cgPath, $majMin, $iops, $dryRun);
 }
 
 /**
@@ -219,47 +122,38 @@ function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $
  */
 function pmssIopsClearThrottle(string $cgPath, string $majMin, bool $dryRun): array
 {
+    return pmssIopsThrottleApply($cgPath, $majMin, null, $dryRun);
+}
+
+/** One throttle lifecycle; null requests clearing, while zero remains an invalid set value. */
+function pmssIopsThrottleApply(string $cgPath, string $majMin, ?int $iops, bool $dryRun): array
+{
     if (!pmssCgroupPolicyMajorMinorIsValid($majMin)
+        || ($iops !== null && $iops <= 0)
         || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
     ) {
         return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
     }
-    if (!is_file($cgPath)) {
-        return ['ok' => true, 'reason' => 'no-slice', 'cur' => null];
+    // Setting checks writability before reading; clearing checks it only when a write is needed.
+    if (!is_file($cgPath) || ($iops !== null && !is_writable($cgPath))) {
+        return ['ok' => $iops === null, 'reason' => $iops === null ? 'no-slice' : 'unwritable', 'cur' => null];
     }
     $cur = trim((string) @file_get_contents($cgPath));
-    if (pmssCgroupDirectDeviceValueParse($cur, $majMin) === null) {
+    $desired = $majMin.' '.($iops ?? 0);
+    if ($iops === null && pmssCgroupDirectDeviceValueParse($cur, $majMin) === null) {
         return ['ok' => true, 'reason' => 'already-clear', 'cur' => $cur];
+    }
+    if ($iops !== null) {
+        // Setting matches any exact device line; clearing retains first-record parsing.
+        foreach (pmssTextLines($cur) as $line) {
+            if (trim($line) === $desired) return ['ok' => true, 'reason' => 'already-set', 'cur' => $cur];
+        }
     }
     if ($dryRun) {
         return ['ok' => true, 'reason' => 'dry-run', 'cur' => $cur];
     }
-    if (!is_writable($cgPath) || @file_put_contents($cgPath, $majMin.' 0') === false) {
+    if (($iops === null && !is_writable($cgPath)) || @file_put_contents($cgPath, $desired) === false) {
         return ['ok' => false, 'reason' => 'write-failed', 'cur' => $cur];
     }
     return ['ok' => true, 'reason' => 'written', 'cur' => $cur];
-}
-
-/**
- * Keep an account's cgroup counters and limits readable only by that account and root (ADR 0232):
- * its slice directory in every mounted hierarchy becomes root:<account group> 0750 and user.slice
- * 0711, so other accounts can neither list slices nor read them. Root readers are unaffected.
- * Systemd creates slices 0755, so each IOPS cycle re-applies the modes.
- */
-function pmssCgroupDirectSlicePrivacyApply(int $uid, int $gid, bool $dryRun, string $cgroupRoot = '/sys/fs/cgroup'): bool
-{
-    // A shared or system group would hand the slice to other accounts.
-    if ($uid < 1000 || $gid < 1000) return false;
-    $ok = true;
-    foreach (array_merge(glob($cgroupRoot.'/*/user.slice', GLOB_ONLYDIR) ?: [], glob($cgroupRoot.'/user.slice', GLOB_ONLYDIR) ?: []) as $parent) {
-        $slice = $parent.'/user-'.$uid.'.slice';
-        foreach ([[$parent, 0, 0711], [$slice, $gid, 0750]] as [$dir, $group, $mode]) {
-            $stat = @lstat($dir);
-            if (!is_array($stat) || ($stat['mode'] & 0170000) !== 0040000 || $stat['uid'] !== 0) continue;
-            if ($stat['gid'] === $group && ($stat['mode'] & 07777) === $mode) continue;
-            if ($dryRun) continue;
-            if (!@chgrp($dir, $group) || !@chmod($dir, $mode)) $ok = false;
-        }
-    }
-    return $ok;
 }

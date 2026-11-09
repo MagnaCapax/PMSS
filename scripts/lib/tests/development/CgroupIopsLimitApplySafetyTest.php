@@ -56,19 +56,23 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
                     ],
                 ],
             ]);
-        // The unchanged parser/writer live in the shared direct-apply library now.
+        // The facade owns the shared write lifecycle; pure spec policy has its own module.
         $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directApply.php', [
                 'ordered' => [
                     [
                         'needles' => [
-                            'function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array',
+                            'function pmssIopsThrottleApply(string $cgPath, string $majMin, ?int $iops, bool $dryRun): array',
                             "pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])",
                             "return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];",
-                            'if (@file_put_contents($cgPath, $desired) === false)',
+                            'if (($iops === null && !is_writable($cgPath)) || @file_put_contents($cgPath, $desired) === false)',
                         ],
                         'missingPrefix' => 'missing IOPS direct-write guard: ',
                         'orderPrefix' => 'IOPS direct-write guard must run before file_put_contents: ',
                     ],
+                ],
+            ]);
+        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directPolicy.php', [
+                'ordered' => [
                     [
                         'needles' => [
                             'function pmssIopsParseSpec($raw): ?int',
@@ -112,8 +116,8 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
     public function testPlannedUsersPreserveCycleAccountingAndResolverFailures(): void
     {
         $usersDir = $this->pmssMakeTempDir('pmss-cgroup-users-', 0700);
-        $this->pmssWriteFile($usersDir.'/alice.json', '{"enabled":true}', 0700);
-        $this->pmssWriteFile($usersDir.'/bob.json', '{"enabled":true}', 0700);
+        $this->pmssWriteFile($usersDir.'/fixtur01.json', '{"enabled":true}', 0700);
+        $this->pmssWriteFile($usersDir.'/fixtur02.json', '{"enabled":true}', 0700);
         $this->pmssWriteFile($usersDir.'/skipme.json', '{"enabled":false}', 0700);
         $this->pmssWriteFile($usersDir.'/badjson.json', '{', 0700);
         $this->pmssWriteFile($usersDir.'/bad name.json', '{"enabled":true}', 0700);
@@ -130,7 +134,7 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
             },
             static function (string $user, int &$errors) use (&$seenResolvers): ?int {
                 $seenResolvers[] = $user;
-                if ($user === 'bob') {
+                if ($user === 'fixtur02') {
                     $errors++;
                     return null;
                 }
@@ -140,11 +144,11 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
 
         $this->assertSame(2, $total, 'only planned valid configs count toward total');
         $this->assertSame(3, $errors, 'bad json, invalid username, and failed UID resolution count as errors');
-        $this->assertEquals(['alice', 'bob'], $seenResolvers, 'skipped plans must not resolve UIDs');
+        $this->assertEquals(['fixtur01', 'fixtur02'], $seenResolvers, 'skipped plans must not resolve UIDs');
         $this->assertSame(1, count($planned));
-        $this->assertSame('alice', $planned[0][0]);
+        $this->assertSame('fixtur01', $planned[0][0]);
         $this->assertSame(1001, $planned[0][1]);
-        $this->assertEquals(['plan' => 'alice-work'], $planned[0][2]);
+        $this->assertEquals(['plan' => 'fixtur01-work'], $planned[0][2]);
     }
 
 }

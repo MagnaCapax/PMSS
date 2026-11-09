@@ -148,7 +148,7 @@ class CgroupBfqWeightApplyTest extends TestCase
 
     public function testSharedDirectWriteSourceChecksExactByteCount(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directApply.php', [
+        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directFiles.php', [
                 'required' => [
                     'function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum, int $maximum): bool',
                     'return $minimum <= $maximum && $value >= $minimum && $value <= $maximum',
