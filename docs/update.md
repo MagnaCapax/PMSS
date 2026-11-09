@@ -449,6 +449,10 @@ The panel delivery set places `toggleAppCatalog.php` before all twelve ADR 0099
 also restores the catalog before those parts, so a missing catalog can recover
 without waiting for a full per-user update (#1076). These ordered writes do not
 make the remote guiv heal atomic; affected-host verification remains necessary.
+The updater and watchdog obtain the twelve part names from the operator-side
+`scripts/lib/update/users/panelFiles.php` inventory (ADR 0244). The watchdog keeps
+its existing index/loader-before-parts order; updater delivery keeps parts before
+the loader. Customer PHP continues loading only its delivered local helpers.
 
 Two `[ -f ]`-guarded hooks sourced at the END of `etc/skel/.bashrc` are NOT in the force-sync
 set and survive updates: `~/.bashrc.custom` (installer-managed — `install-media-stack.sh` writes

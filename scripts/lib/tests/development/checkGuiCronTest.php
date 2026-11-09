@@ -50,8 +50,7 @@ PHP;
                 'pmssCheckGuiWebRootReconcileIfSentinelMissing',
                 'pmssUserReconcileWebRoot',
                 "'scriptsInc.php'",
-                "'scriptsIncFormat.php'",
-                "'scriptsIncActionJs.php'",
+                'pmssUserPanelHelperFiles()',
                 'pmssCheckGuiManagedUserNameNormalize($thisUser)',
             ],
             'checkGui should keep core userspace repair wiring: '

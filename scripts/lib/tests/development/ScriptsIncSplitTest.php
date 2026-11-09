@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update/users/panelFiles.php';
 
 /** Keep guiv-delivered parts guarded and complete after the loader switch. */
 class ScriptsIncSplitTest extends TestCase
@@ -162,37 +163,30 @@ class ScriptsIncSplitTest extends TestCase
         $this->assertOrderedStrings(array_map(static function ($part): string {
             return "'".$part."'";
         }, self::PARTS), $loader);
-        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-        $checkGui = $this->pmssReadRepoFile('scripts/cron/checkGui.php');
         foreach (self::PARTS as $part) {
             $this->assertStringContainsString("'".$part."'", $loader);
-            $this->assertStringContainsString("'www/scriptsInc".$part.".php'", $manifest);
-            $this->assertStringContainsString("'scriptsInc".$part.".php'", $checkGui);
         }
+        $this->assertSame(array_map(static function ($part): string { return 'scriptsInc'.$part.'.php'; }, self::PARTS),
+            \pmssUserPanelHelperFiles());
     }
 
     public function testManifestListsPartsImmediatelyBeforeMonolith(): void
     {
         $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
         // A current AppProcess/AppsStatus part cannot run without its catalog (#1076).
-        $entries = array(preg_quote("'www/toggleAppCatalog.php',", '/'));
         $this->assertSame(1, substr_count($manifest, "'www/toggleAppCatalog.php',"));
-        foreach (self::PARTS as $part) {
-            $entry = "'www/scriptsInc".$part.".php',";
-            $this->assertSame(1, substr_count($manifest, $entry), 'Manifest entry must occur once: '.$entry);
-            $entries[] = preg_quote($entry, '/');
-        }
-        $this->assertTrue(preg_match('/'.implode('\s*', $entries).'\s*'.preg_quote("'www/scriptsInc.php',", '/').'/', $manifest) === 1,
+        $this->assertSame(1, substr_count($manifest, "pmssUserPanelHelperFiles('www/')"));
+        $this->assertTrue(preg_match('/'.preg_quote("'www/toggleAppCatalog.php',", '/').'\s*'
+            .preg_quote("], pmssUserPanelHelperFiles('www/'), [", '/').'\s*'.preg_quote("'www/scriptsInc.php',", '/').'/', $manifest) === 1,
             'Catalog and parts must appear in order immediately before scriptsInc.php.');
+        $this->assertSame(array_map(static function ($part): string { return 'www/scriptsInc'.$part.'.php'; }, self::PARTS),
+            \pmssUserPanelHelperFiles('www/'));
         $this->assertOrderedStrings(array("'www/scriptsInc.php',", "'www/welcome.php',"), $manifest);
     }
 
     public function testWatchdogRestoresCatalogBeforeAllTwelveParts(): void
     {
-        $entries = array("'toggleAppCatalog.php'");
-        foreach (self::PARTS as $part) {
-            $entries[] = "'scriptsInc".$part.".php'";
-        }
-        $this->assertOrderedStrings($entries, $this->pmssReadRepoFile('scripts/cron/checkGui.php'));
+        $this->pmssAssertRepoFileContainsString('scripts/cron/checkGui.php',
+            "array_merge(['toggleAppCatalog.php', 'index.php', 'scriptsInc.php'], pmssUserPanelHelperFiles())");
     }
 }

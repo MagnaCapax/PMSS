@@ -250,12 +250,7 @@ function pmssCheckGuiMain(array $argv): int
         pmssCheckGuiEnsureUserDirectory($dataDir, $thisUser, 'data', $log, $homeDir);
 
         // Restore the catalog before the split helpers that require it.
-        foreach (['toggleAppCatalog.php', 'index.php', 'scriptsInc.php', 'scriptsIncFormat.php', 'scriptsIncFiles.php',
-            'scriptsIncFrontend.php', 'scriptsIncBonus.php', 'scriptsIncCgroup.php',
-            'scriptsIncBackup.php', 'scriptsIncRestoreTar.php', 'scriptsIncRestore.php',
-            'scriptsIncAppProcess.php',
-            'scriptsIncAppsHtml.php', 'scriptsIncAppsStatus.php',
-            'scriptsIncActionJs.php'] as $guiFile) {
+        foreach (array_merge(['toggleAppCatalog.php', 'index.php', 'scriptsInc.php'], pmssUserPanelHelperFiles()) as $guiFile) {
             pmssCheckGuiRestoreUserFile(
                 $wwwDir.'/'.$guiFile,
                 $skeletonWwwDir.'/'.$guiFile,

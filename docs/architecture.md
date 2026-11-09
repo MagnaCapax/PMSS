@@ -141,6 +141,11 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/systemPrep/dbusPolicyHardening.php** – One ordered artifact registry renders and converges the systemd1/login1 D-Bus policies and `/run/systemd/{users,sessions}` tmpfiles protections; the update flow has one installer and no per-channel implementations.
 - **scripts/lib/update/services/** – Runtime templates (rc.local, systemd, sshd), legacy service disablement, mediainfo installer, security tweaks.
 - **scripts/lib/update/users/** – User maintenance (context, HTTP, home maintenance, ruTorrent refresh).
+  `filesystem.php` retains ordered skeleton delivery. Its path maintenance,
+  guarded text patches and legacy panel-index repair live in `filesystemPaths.php`,
+  `filesystemPatch.php` and `panelCompatibility.php`. `panelFiles.php` supplies
+  the twelve panel-helper names to both updater delivery and the GUI watchdog;
+  each caller retains its existing surrounding order (ADR 0244).
   Web-root migration keeps account mutations in `webRoot.php`; `webRootInspection.php`
   owns one read-only traversal with snapshot, link and ownership policies,
   `webRootPaths.php` owns destination conflicts, and `webRootReconcileCopy.php`

@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update/users/panelFiles.php';
 require_once dirname(__DIR__, 4).'/scripts/dev/appsLsioCatalogBuild.php';
 ob_start();
 require_once dirname(__DIR__, 4).'/etc/skel/www/apps.php';
@@ -163,7 +164,7 @@ class AppsCatalogTest extends TestCase
             'fileReadVerified', 'configureFileWrite', 'configureTorrentClients', 'configureTorrentClientsProcess',
             'configureTorrentClientsStart', 'configureTorrentClientsVersion', 'torrentClientsResolve', 'transmissionLaunch',
             'deluge', 'transmission', 'rclone', 'slskd', 'copyparty', 'toggleApp', 'toggleAppCatalog', 'toggleAppRuntime', 'rtorrentRestart', 'lighttpdRestart');
-        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        $manifest = $this->skeletonDeliveryManifest();
         foreach ($guiv as $name) {
             $this->assertStringContainsString("'www/".$name.".php'", $manifest, $name.' must reach existing homes');
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
@@ -669,11 +670,7 @@ class AppsCatalogTest extends TestCase
     public function testEveryPanelPhpFileReachesExistingAccountsOnUpdate(): void
     {
         // Existing accounts only receive skeleton files on this list; an endpoint left off keeps its creation-time copy forever.
-        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-        $start = strpos($source, 'function pmssUserApplySkeletonFiles(');
-        $this->assertTrue($start !== false);
-        $listStart = strpos($source, '$files = [', $start);
-        $list = substr($source, $listStart, strpos($source, '];', $listStart) - $listStart);
+        $list = $this->skeletonDeliveryManifest();
         $root = dirname(__DIR__, 4).'/etc/skel/';
         $missing = array();
         foreach (glob($root.'www/*.php') as $path) {
@@ -681,6 +678,21 @@ class AppsCatalogTest extends TestCase
             if (strpos($list, "'".$relative."'") === false) $missing[] = $relative;
         }
         $this->assertSame(array(), $missing);
+    }
+
+    /** Inspect the actual delivery traversal, including its shared panel-helper inventory. */
+    private function skeletonDeliveryManifest(): string
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        $start = strpos($source, 'function pmssUserApplySkeletonFiles(');
+        $this->assertTrue($start !== false);
+        $listStart = strpos($source, 'foreach (array_merge([', $start);
+        $this->assertTrue($listStart !== false);
+        $listEnd = strpos($source, ']) as $file) {', $listStart);
+        $this->assertTrue($listEnd !== false);
+        $list = substr($source, $listStart, $listEnd - $listStart);
+        $this->assertStringContainsString("pmssUserPanelHelperFiles('www/')", $list);
+        return $list."\n'".implode("'\n'", \pmssUserPanelHelperFiles('www/'))."'";
     }
 
     public function testWelcomeStillRendersControlsUsingPostRequests(): void

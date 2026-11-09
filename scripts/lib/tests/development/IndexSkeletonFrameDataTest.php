@@ -691,7 +691,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             'Skeleton helper signature changed: '
         );
         $this->pmssAssertRepoFileContainsString(
-            'scripts/lib/update/users/filesystem.php',
+            'scripts/lib/update/users/panelCompatibility.php',
             $guard,
             'Panel index migration guard should track the current skeleton helper signature: '
         );
