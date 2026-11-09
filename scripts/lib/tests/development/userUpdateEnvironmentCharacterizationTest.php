@@ -48,7 +48,7 @@ PHP
         $script = $this->buildUserEnvironmentScript(
             'web-root-before-context',
             <<<'PHP'
-$user = 'alice';
+$user = 'fixtur01';
 $home = $base.'/home/'.$user;
 $skel = $base.'/skel/www';
 $locks = $base.'/locks';
@@ -134,7 +134,7 @@ PHP
             <<<'PHP'
 $homeRoot = $base.'/home';
 $skelRoot = $base.'/skel';
-$user = 'alice';
+$user = 'fixtur01';
 $home = $homeRoot.'/'.$user;
 
 @mkdir($home.'/data', 0755, true);
@@ -161,6 +161,9 @@ file_put_contents($home.'/www/rutorrent/plugins/rss/action.php', "before\nob_flu
 copy($repoRoot.'/etc/skel/www/deluge.php', $skelRoot.'/www/deluge.php');
 copy($repoRoot.'/etc/skel/www/qbittorrent.php', $skelRoot.'/www/qbittorrent.php');
 copy($repoRoot.'/etc/skel/www/transmission.php', $skelRoot.'/www/transmission.php');
+foreach (['mediaStack.php', 'userMediaStackPanel.php'] as $file) {
+    copy($repoRoot.'/etc/skel/www/'.$file, $skelRoot.'/www/'.$file);
+}
 file_put_contents($skelRoot.'/www/rutorrent/plugins/hddquota/action.php', "return \$field;\n");
 file_put_contents($skelRoot.'/.irssi/config', "test\n");
 file_put_contents($skelRoot.'/www/rutorrent/plugins/hddquota/sample.txt', "quota\n");
@@ -202,7 +205,7 @@ PHP
 
         $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), $this->pmssTestModeEnv());
 
-        $this->assertStringContainsString('***** Updating user alice', $result['output']);
+        $this->assertStringContainsString('***** Updating user fixtur01', $result['output']);
         $this->assertTrue($result['converged']);
         $this->assertEquals([], $result['linger']);
         $this->assertTrue($result['tmp_exists']);

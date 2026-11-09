@@ -454,6 +454,16 @@ The updater and watchdog obtain the twelve part names from the operator-side
 its existing index/loader-before-parts order; updater delivery keeps parts before
 the loader. Customer PHP continues loading only its delivered local helpers.
 
+After the shared per-user environment pass, provisioning, recreation and updates
+read back `www/mediaStack.php` and `www/userMediaStackPanel.php`. Both must be safe
+regular files, match the current skeleton byte-for-byte and parse as PHP. Reads
+are bounded to 256 KiB per file; account PHP is never executed by this check.
+A mismatch logs the affected basename and returns
+`media-stack-panel-delivery-failed`, withholding the update completion marker so
+the next update retries delivery (#953). Recreation retains its existing
+non-fatal environment-failure behavior. The check detects delivery drift; it
+does not make the remote guiv heal atomic or establish why a copy became stale.
+
 Two `[ -f ]`-guarded hooks sourced at the END of `etc/skel/.bashrc` are NOT in the force-sync
 set and survive updates: `~/.bashrc.custom` (installer-managed — `install-media-stack.sh` writes
 its PATH/alias blocks here) and `~/.bashrc.user` (tenant-owned; permissions reserved by

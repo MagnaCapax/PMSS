@@ -620,6 +620,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh,
     plugin maintenance, then permissions.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
+  - After handlers and torrent-client convergence, checks the delivered media-stack
+    panel pair against the skeleton using bounded regular-file reads and PHP
+    parsing without execution. Missing, unsafe, mismatched or malformed files
+    return false with reason `media-stack-panel-delivery-failed`, preventing an
+    update completion marker; provisioning and recreation use this same pass (#953).
 - pmssUserWatchdogLockAcquire(string $path)
   - Acquires one non-blocking watchdog lock and exports its descriptor list so
     the shared service launcher closes those descriptors before child exec.

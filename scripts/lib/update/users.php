@@ -55,5 +55,10 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '',
     // Recreate already calls this pass after home handback (ADR 0089).
     pmssTorrentClientsPostSetupConverge($user, '/home/'.$user);
 
+    if (!pmssUserMediaStackPanelDeliveryCheck($ctx)) {
+        $reason = 'media-stack-panel-delivery-failed';
+        return false;
+    }
+
     return true;
 }

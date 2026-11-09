@@ -47,3 +47,33 @@ function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
         logMessage("[user:{$user}] Updated legacy panel index.php for frameData compatibility");
     }
 }
+
+/**
+ * Verify the coupled media-stack panel files after account delivery (Refs #953).
+ *
+ * Exact readback detects stale siblings without a brittle function-name list.
+ * Parse bytes only: customer-owned PHP must never be included by the updater.
+ */
+function pmssUserMediaStackPanelDeliveryCheck(array $ctx): bool
+{
+    [$user, $home] = pmssUserContextIdentity($ctx);
+    foreach (['mediaStack.php', 'userMediaStackPanel.php'] as $file) {
+        $target = $home.'/www/'.$file;
+        $source = pmssReadRegularFileContentsVerified(pmssSkeletonBase().'/www/'.$file, null, 262144);
+        $delivered = pmssUserPathWithinHomeRoot($target) && pmssPathTargetIsSafe($target, false, false, false)
+            ? pmssReadRegularFileContentsVerified($target, null, 262144) : null;
+        if ($source === null || $delivered === null || $source !== $delivered) {
+            logMessage("[user:{$user}] [WARN] Media-stack panel delivery incomplete: {$file} missing, unsafe, unreadable or differs from skeleton");
+            return false;
+        }
+        try {
+            token_get_all($delivered, TOKEN_PARSE);
+        } catch (\ParseError $error) {
+            // Do not log customer-controlled source text or parser excerpts.
+            logMessage("[user:{$user}] [WARN] Media-stack panel delivery incomplete: {$file} has invalid PHP syntax");
+            return false;
+        }
+    }
+
+    return true;
+}
