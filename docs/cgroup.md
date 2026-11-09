@@ -230,25 +230,6 @@ and the [logging field map/read commands](observability/logging.md#io-sharing-ob
 
 ## Enforced read IOPS rollout
 
-### Journal-holder read-cap release (Linux before 6.12)
-
-[ADR 0242](adr/0242-journal-holder-read-cap-release.md) adds a minute cron at
-second 5, a nonblocking run lock and a hard 20-second timeout. On ext4 `/home`,
-two jbd2 `jbd2_journal_wait_updates` stack samples five seconds apart allow
-releasing only a D-state metadata reader's positive, real-UID-matched user
-slice read cap. Transaction-entry/commit waiters are excluded. Other account
-caps and write caps remain unchanged. The five-minute IOPS writer reapplies
-the cap when its exact device/value line is missing; there is no restore job.
-The shipped `cgroup.dynamicIops.journalHolderRelease` boolean defaults to true;
-false or kernel >= 6.12 skips the workaround. There is no host-local policy.
-The private dynamic IOPS JSONL log records releases (including the prior cap,
-metadata frame, five-second stall lower bound and UTC per-UID daily count) and
-uncapped/outside-slice holders, with no task names, arguments or paths. Quiet
-runs emit nothing. For a manual run retain the deadline:
-`timeout --signal=KILL 20s /scripts/cron/cgroupJournalHolderRelease.php`.
-
-### Allocation and rollout
-
 [ADR 0230](adr/0230-enforced-read-iops-with-iowait-pool-curb.md) enforces read
 caps in the existing IOPS cron; since [ADR 0231](adr/0231-read-caps-enforced-by-default-and-contention-without-cap-stall.md)
 that is the shipped default on every host, with placement on. Running account
