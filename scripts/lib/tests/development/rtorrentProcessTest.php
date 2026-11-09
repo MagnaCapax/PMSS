@@ -43,7 +43,7 @@ class RtorrentProcessTest extends TestCase
         $stateFile = $this->tempDir.'/test-state.ts';
 
         // Record initial state.
-        file_put_contents($stateFile, (string)(time() - 30));
+        $this->pmssWriteFile($stateFile, (string)(time() - 30));
 
         $result = rtorrentProcessCheckStaleState($stateFile, 60);
 
@@ -59,7 +59,7 @@ class RtorrentProcessTest extends TestCase
         $stateFile = $this->tempDir.'/test-state.ts';
 
         // Record state from 120 seconds ago.
-        file_put_contents($stateFile, (string)(time() - 120));
+        $this->pmssWriteFile($stateFile, (string)(time() - 120));
 
         $result = rtorrentProcessCheckStaleState($stateFile, 60);
 
@@ -73,7 +73,7 @@ class RtorrentProcessTest extends TestCase
     public function testClearStaleStateRemovesFile(): void
     {
         $stateFile = $this->tempDir.'/test-state.ts';
-        file_put_contents($stateFile, (string)time());
+        $this->pmssWriteFile($stateFile, (string)time());
 
         $this->assertTrue(file_exists($stateFile));
 
@@ -99,7 +99,7 @@ class RtorrentProcessTest extends TestCase
     {
         foreach (['invalid', '', '0'] as $value) {
             $stateFile = $this->tempDir.'/test-state-'.md5($value).'.ts';
-            file_put_contents($stateFile, $value);
+            $this->pmssWriteFile($stateFile, $value);
 
             $result = rtorrentProcessCheckStaleState($stateFile, 60);
 
@@ -118,7 +118,7 @@ class RtorrentProcessTest extends TestCase
             list($initial, $threshold, $action, $count) = $case;
             $stateFile = $this->tempDir.'/test-failure-'.md5($label).'.count';
             if ($initial !== null) {
-                file_put_contents($stateFile, $initial);
+                $this->pmssWriteFile($stateFile, $initial);
             }
 
             $result = rtorrentProcessCheckFailureCountState($stateFile, $threshold);
@@ -133,7 +133,7 @@ class RtorrentProcessTest extends TestCase
     {
         foreach (['invalid', '-3'] as $value) {
             $stateFile = $this->tempDir.'/test-failure-'.md5($value).'.count';
-            file_put_contents($stateFile, $value);
+            $this->pmssWriteFile($stateFile, $value);
 
             $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
 
@@ -145,7 +145,7 @@ class RtorrentProcessTest extends TestCase
     public function testFailureCountStateCapsRepresentableCounter(): void
     {
         $stateFile = $this->tempDir.'/max-failure.count';
-        file_put_contents($stateFile, (string) PHP_INT_MAX);
+        $this->pmssWriteFile($stateFile, (string) PHP_INT_MAX);
 
         $this->assertSame(['action' => 'stale', 'count' => PHP_INT_MAX],
             rtorrentProcessCheckFailureCountState($stateFile, 4));
@@ -221,7 +221,7 @@ PHP;
 
         $target = $this->tempDir.'/target-state.ts';
         $link = $this->tempDir.'/linked-state.ts';
-        file_put_contents($target, '123');
+        $this->pmssWriteFile($target, '123');
         if (@symlink($target, $link) === false) {
             throw new SkipTest('symlink() failed');
         }
@@ -489,13 +489,12 @@ PHP;
         $user = 'fixtur01';
         $home = $root.'/homes/'.$user;
         $runtime = $root.'/runtime';
-        mkdir($home.'/session', 0755, true);
-        mkdir($runtime, 0700);
-        file_put_contents($home.'/.rtorrent.rc', 'fixture');
-        file_put_contents($home.'/.rtorrentExecute.php', '.rtorrentExecute.lock flock(');
+        $this->pmssEnsureDir($home.'/session', 0755);
+        $this->pmssEnsureDir($runtime, 0700);
+        $this->pmssWriteFiles($home, ['.rtorrent.rc' => 'fixture', '.rtorrentExecute.php' => '.rtorrentExecute.lock flock(']);
         $counter = $runtime.'/startRtorrent-customrc-fail-'.$user.'.count';
         $launchMarker = $root.'/login-launch';
-        file_put_contents($counter, 'kept');
+        $this->pmssWriteFile($counter, 'kept');
         $this->pmssWriteExecutableFiles($root, [
             'pgrep' => "#!/bin/sh\nexit 1\n",
             'ps' => "#!/bin/sh\nexit 0\n",
@@ -552,7 +551,7 @@ PHP;
         $user = $this->sessionResetTestUser();
         $home = $this->tempDir.'/'.$user;
         $sessionDir = $this->pmssEnsureDir($home.'/session');
-        file_put_contents($sessionDir.'/resume.dat', 'state');
+        $this->pmssWriteFile($sessionDir.'/resume.dat', 'state');
         [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home, $user): bool {
             return rtorrentProcessResetSessionDirectory($home, $user, $logger);
         });
@@ -614,7 +613,7 @@ PHP;
         $user = $this->sessionResetTestUser();
         $home = $this->tempDir.'/'.$user;
         $targetHome = dirname($this->pmssEnsureDir($this->tempDir.'/target-home/session'));
-        file_put_contents($targetHome.'/session/resume.dat', 'state');
+        $this->pmssWriteFile($targetHome.'/session/resume.dat', 'state');
         if (@symlink($targetHome, $home) === false) {
             throw new SkipTest('symlink() failed');
         }

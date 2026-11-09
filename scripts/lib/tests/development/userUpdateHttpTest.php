@@ -34,12 +34,12 @@ PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/users/http.php', 'HttpRefreshFixture');
         $script .= <<<'PHP'
 $runs = [];
-foreach ([['alice', 1], ['bob', 0], ['alice', 0]] as [$user, $rc]) {
+foreach ([['fixtur01', 1], ['fixtur02', 0], ['fixtur01', 0]] as [$user, $rc]) {
     $GLOBALS['rc'] = $rc;
     $GLOBALS['logs'] = $GLOBALS['continued'] = [];
     pmssUserConfigureHttp(['user' => $user, 'home' => '/fixture/'.$user, 'user_esc' => escapeshellarg($user)]);
     $runs[] = ['continued' => $GLOBALS['continued'], 'logs' => implode("\n", $GLOBALS['logs']),
-        'failed' => [pmssUserLighttpdRefreshFailed('alice'), pmssUserLighttpdRefreshFailed('bob')]];
+        'failed' => [pmssUserLighttpdRefreshFailed('fixtur01'), pmssUserLighttpdRefreshFailed('fixtur02')]];
 }
 echo json_encode($runs);
 PHP;
@@ -56,14 +56,13 @@ PHP;
     public function testConfigureHttpRestoresQbittorrentWebUiProtections(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-qbittorrent-');
-        mkdir($home.'/.config/qBittorrent', 0755, true);
 
         $config = "[Preferences]\n";
         $config .= "WebUI\\CSRFProtection=false\n";
         $config .= "WebUI\\ClickjackingProtection=false\n";
         $config .= "WebUI\\HostHeaderValidation=false\n";
         $config .= "WebUI\\Port=12345\n";
-        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', $config);
+        $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', $config);
 
         $ctx = $this->pmssUserUpdateContext($home);
 
@@ -80,9 +79,8 @@ PHP;
     public function testConfigureHttpCreatesTempDirectory(): void
     {
         $tempHome = $this->pmssMakeTempDir('pmss-http-');
-        mkdir($tempHome.'/.lighttpd', 0755, true);
         $original = $this->pmssReadRepoFile('etc/skel/.lighttpd/php.ini');
-        file_put_contents($tempHome.'/.lighttpd/php.ini', $original);
+        $this->pmssWriteFile($tempHome.'/.lighttpd/php.ini', $original);
 
         $ctx = $this->pmssUserUpdateContext($tempHome);
 
@@ -98,8 +96,8 @@ PHP;
     {
         $tempHome = $this->pmssMakeTempDir('pmss-http-phpini-link-home-');
         $target = $this->pmssMakeTempFile('pmss-http-phpini-link-target-');
-        mkdir($tempHome.'/.lighttpd', 0755, true);
-        file_put_contents($target, "display_errors = On\n");
+        $this->pmssEnsureDir($tempHome.'/.lighttpd', 0755);
+        $this->pmssWriteFile($target, "display_errors = On\n");
         $this->pmssCreateSymlinkOrSkip($target, $tempHome.'/.lighttpd/php.ini');
 
         $ctx = $this->pmssUserUpdateContext($tempHome);
@@ -115,12 +113,11 @@ PHP;
     public function testConfigureHttpRestoresQbittorrentManagedKeysWhenMissing(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-qbittorrent-missing-');
-        @mkdir($home.'/.config/qBittorrent', 0755, true);
 
         $config = "[Preferences]\n";
         $config .= "WebUI\\Port=12345\n";
         $config .= "WebUI\\Address=*\n";
-        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', $config);
+        $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', $config);
 
         $ctx = $this->pmssUserUpdateContext($home);
 
@@ -134,8 +131,7 @@ PHP;
     public function testConfigureHttpRefreshesDelugeManagedKeys(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-deluge-');
-        @mkdir($home.'/.config/deluge', 0755, true);
-        file_put_contents($home.'/.config/deluge/core.conf', <<<'JSON'
+        $this->pmssWriteFile($home.'/.config/deluge/core.conf', <<<'JSON'
 {
     "file": 1,
     "format": 1
@@ -166,7 +162,7 @@ JSON
         $ctx = $this->pmssUserUpdateContext($home);
 
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
-        file_put_contents($jsonLog, '');
+        $this->pmssWriteFile($jsonLog, '');
 
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 
@@ -189,9 +185,9 @@ JSON
     public function testConfigureHttpSkipsIrssiCopyWhenDirectoryCannotBeCreated(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-irssi-conflict-');
-        file_put_contents($home.'/.irssi', 'customer content');
+        $this->pmssWriteFile($home.'/.irssi', 'customer content');
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
-        file_put_contents($jsonLog, '');
+        $this->pmssWriteFile($jsonLog, '');
 
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         try {
@@ -209,13 +205,12 @@ JSON
     {
         $home = $this->pmssMakeTempDir('pmss-http-skel-override-home-');
         $skel = $this->pmssMakeTempDir('pmss-http-skel-override-skel-');
-        @mkdir($skel.'/.irssi', 0755, true);
-        @file_put_contents($skel.'/.irssi/config', 'test');
+        $this->pmssWriteFile($skel.'/.irssi/config', 'test');
 
         $ctx = $this->pmssUserUpdateContext($home);
 
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
-        file_put_contents($jsonLog, '');
+        $this->pmssWriteFile($jsonLog, '');
 
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 

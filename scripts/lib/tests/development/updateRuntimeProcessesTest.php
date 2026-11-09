@@ -9,10 +9,10 @@ class UpdateRuntimeProcessesTest extends TestCase
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-runtime-processes');
-        @file_put_contents($this->tempDir.'/state', "stopped\n");
-        @file_put_contents($this->tempDir.'/commands.log', '');
-        @file_put_contents($this->tempDir.'/kill-mode', "term\n");
-        @file_put_contents($this->tempDir.'/.bash_profile', 'export PATH="'.$this->tempDir.'/bin:$PATH"'."\n");
+        $this->pmssWriteFiles($this->tempDir, [
+            'state' => "stopped\n", 'commands.log' => '', 'kill-mode' => "term\n",
+            '.bash_profile' => 'export PATH="'.$this->tempDir.'/bin:$PATH"'."\n",
+        ]);
 
         $this->pmssWriteExecutableFiles($this->tempDir.'/bin', [
             'pgrep' => <<<'BASH'
@@ -80,7 +80,7 @@ BASH
 
     public function testKillProcessSkipsWhenInitialProbeFails(): void
     {
-        @file_put_contents($this->tempDir.'/state', "error\n");
+        $this->pmssWriteFile($this->tempDir.'/state', "error\n");
 
         \killProcess('demo', 'Stopping demo process', null, 0);
 
@@ -90,7 +90,7 @@ BASH
 
     public function testKillProcessSkipsUnsafeProcessName(): void
     {
-        @file_put_contents($this->tempDir.'/state', "running\n");
+        $this->pmssWriteFile($this->tempDir.'/state', "running\n");
 
         foreach (['demo name', "\0demo", "demo\0", "de\0mo"] as $name) {
             \killProcess($name, 'Stopping demo process', null, 0);
@@ -102,7 +102,7 @@ BASH
 
     public function testKillProcessRetainsWhitespaceNormalization(): void
     {
-        @file_put_contents($this->tempDir.'/state', "running\n");
+        $this->pmssWriteFile($this->tempDir.'/state', "running\n");
 
         \killProcess(" demo \n", 'Stopping demo process', null, 0);
 
@@ -117,7 +117,7 @@ BASH
             $toolPath = $this->tempDir.'/bin/'.$missingTool;
             $backupPath = $toolPath.'.disabled';
             $this->assertTrue(rename($toolPath, $backupPath), 'Failed to disable '.$missingTool.' fixture');
-            @file_put_contents($this->tempDir.'/state', "running\n");
+            $this->pmssWriteFile($this->tempDir.'/state', "running\n");
             $this->pmssResetRuntimeProfile();
 
             try {
@@ -153,8 +153,7 @@ BASH
 
     public function testKillProcessStopsAfterSigtermWhenProcessExits(): void
     {
-        @file_put_contents($this->tempDir.'/state', "running\n");
-        @file_put_contents($this->tempDir.'/kill-mode', "term\n");
+        $this->pmssWriteFiles($this->tempDir, ['state' => "running\n", 'kill-mode' => "term\n"]);
 
         \killProcess('demo', 'Stopping demo process', null, 1);
 
@@ -165,8 +164,7 @@ BASH
 
     public function testKillProcessEscalatesToSigkillWhenProcessSurvivesSigterm(): void
     {
-        @file_put_contents($this->tempDir.'/state', "running\n");
-        @file_put_contents($this->tempDir.'/kill-mode', "kill\n");
+        $this->pmssWriteFiles($this->tempDir, ['state' => "running\n", 'kill-mode' => "kill\n"]);
 
         \killProcess('demo', 'Stopping demo process', null, 0);
 
@@ -178,8 +176,7 @@ BASH
 
     public function testKillProcessDoesNotEscalateWhenPostTermProbeFails(): void
     {
-        @file_put_contents($this->tempDir.'/state', "running\n");
-        @file_put_contents($this->tempDir.'/kill-mode', "error\n");
+        $this->pmssWriteFiles($this->tempDir, ['state' => "running\n", 'kill-mode' => "error\n"]);
 
         \killProcess('demo', 'Stopping demo process', null, 0);
 
@@ -189,8 +186,7 @@ BASH
 
     public function testKillProcessSkipsUnsafeSystemdUnitButStillKillsProcess(): void
     {
-        @file_put_contents($this->tempDir.'/state', "running\n");
-        @file_put_contents($this->tempDir.'/kill-mode', "term\n");
+        $this->pmssWriteFiles($this->tempDir, ['state' => "running\n", 'kill-mode' => "term\n"]);
 
         \killProcess('demo', 'Stopping demo process', 'demo service', 1);
 
@@ -203,9 +199,7 @@ BASH
     {
         foreach ([0, 33] as $uid) {
             foreach (['term', 'kill', 'error'] as $mode) {
-                file_put_contents($this->tempDir.'/state', "running\n");
-                file_put_contents($this->tempDir.'/kill-mode', $mode."\n");
-                file_put_contents($this->tempDir.'/probes.log', '');
+                $this->pmssWriteFiles($this->tempDir, ['state' => "running\n", 'kill-mode' => $mode."\n", 'probes.log' => '']);
                 $this->pmssResetRuntimeProfile();
                 \killProcess('demo', 'Stopping system process', null, 0, $uid);
 
@@ -234,7 +228,7 @@ BASH
         // The process-table shims model simultaneous system and tenant daemons.
         $table = $this->tempDir.'/processes';
         $survivors = "1001 lighttpd 501\n1001 php-cgi 502\n1002 lighttpd 503\n1002 php-cgi 504\n0 other 505\n33 other 506\n";
-        file_put_contents($table, "0 lighttpd 401\n0 php-cgi 402\n33 lighttpd 403\n33 php-cgi 404\n".$survivors);
+        $this->pmssWriteFile($table, "0 lighttpd 401\n0 php-cgi 402\n33 lighttpd 403\n33 php-cgi 404\n".$survivors);
         $this->pmssTrackEnvOverrides(['PMSS_TEST_PROCESS_TABLE' => $table]);
 
         foreach ([0, 33] as $uid) {

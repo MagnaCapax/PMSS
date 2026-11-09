@@ -61,10 +61,10 @@ class ResourceStatsProcessorTest extends TestCase
 
         $this->assertTrue(!$processor->validateUser($user));
 
-        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
+        $this->pmssWriteFile($this->paths['resource_dir'].'/'.$user, 'seed');
         $this->assertTrue(!$processor->validateUser($user));
 
-        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+        $this->pmssEnsureDir($this->paths['home_dir'].'/'.$user, 0755);
         $this->assertTrue($processor->validateUser($user));
     }
 
@@ -83,7 +83,7 @@ class ResourceStatsProcessorTest extends TestCase
     public function testEnsureRuntimeRejectsSymlinkedRuntimeDir(): void
     {
         $targetRuntime = dirname($this->paths['runtime_dir']).'/runtime-target';
-        @mkdir($targetRuntime, 0755, true);
+        $this->pmssEnsureDir($targetRuntime, 0755);
         @rmdir($this->paths['runtime_dir']);
         $this->pmssCreateSymlinkOrSkip($targetRuntime, $this->paths['runtime_dir']);
 
@@ -98,7 +98,7 @@ class ResourceStatsProcessorTest extends TestCase
     {
         $messages = [];
         $targetRuntime = dirname($this->paths['runtime_dir']).'/runtime-target';
-        @mkdir($targetRuntime, 0755, true);
+        $this->pmssEnsureDir($targetRuntime, 0755);
         @rmdir($this->paths['runtime_dir']);
         $this->pmssCreateSymlinkOrSkip($targetRuntime, $this->paths['runtime_dir']);
 
@@ -143,7 +143,7 @@ class ResourceStatsProcessorTest extends TestCase
         $stats = new StubResourceStatsProcessorStatistics();
         $paths = $this->paths;
         $targetRuntime = dirname($paths['runtime_dir']).'/runtime-target';
-        @mkdir($targetRuntime, 0755, true);
+        $this->pmssEnsureDir($targetRuntime, 0755);
         @rmdir($paths['runtime_dir']);
         $this->pmssCreateSymlinkOrSkip($targetRuntime, $paths['runtime_dir']);
 
@@ -335,7 +335,7 @@ class ResourceStatsProcessorTest extends TestCase
         }
         file_put_contents($this->paths['passwd_file'], "fixtur02:x:1001:1001::{$this->paths['home_dir']}/fixtur02:/bin/bash\n", FILE_APPEND);
         // Ghost series: data without a home, and data plus home without a passwd record.
-        file_put_contents($this->paths['resource_dir'].'/ghost', 'seed');
+        $this->pmssWriteFile($this->paths['resource_dir'].'/ghost', 'seed');
         $this->seedManagedUser('no-passwd');
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'));
@@ -429,8 +429,8 @@ class ResourceStatsProcessorTest extends TestCase
 
     private function seedManagedUser(string $user = 'fixtur01'): string
     {
-        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
-        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+        $this->pmssWriteFile($this->paths['resource_dir'].'/'.$user, 'seed');
+        $this->pmssEnsureDir($this->paths['home_dir'].'/'.$user, 0755);
         return $user;
     }
 
@@ -457,10 +457,10 @@ class ResourceStatsProcessorTest extends TestCase
             'passwd_file' => $root.'/passwd',
         ];
 
-        @mkdir($paths['resource_dir'], 0755, true);
-        @mkdir($paths['home_dir'], 0755, true);
-        @mkdir($paths['runtime_dir'], 0755, true);
-        file_put_contents($paths['passwd_file'], "fixtur01:x:1000:1000::{$paths['home_dir']}/fixtur01:/bin/bash\n");
+        $this->pmssEnsureDir($paths['resource_dir'], 0755);
+        $this->pmssEnsureDir($paths['home_dir'], 0755);
+        $this->pmssEnsureDir($paths['runtime_dir'], 0755);
+        $this->pmssWriteFile($paths['passwd_file'], "fixtur01:x:1000:1000::{$paths['home_dir']}/fixtur01:/bin/bash\n");
 
         return $paths;
     }

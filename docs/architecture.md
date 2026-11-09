@@ -222,6 +222,9 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Development runner: `php scripts/lib/tests/development/Runner.php`
 - Production scaffolding: `php scripts/lib/tests/production/Runner.php`
 - Shared helpers: `scripts/lib/tests/common/`
+- Process, HTTP, plugin, logging and resource fixtures use `TestCase::pmssWriteFiles()`
+  and `pmssWriteFile()` for checked publication and parent creation. Keep deliberately
+  empty directories, append operations and injected runtime writes explicit.
 - Generated text and repository source contracts share `TestCase::pmssAssertStringContract()`
   for required/forbidden fragments, regexes and ordered fragments. Required and
   forbidden maps retain per-fragment diagnostic messages.

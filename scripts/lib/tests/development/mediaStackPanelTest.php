@@ -14,7 +14,7 @@ class MediaStackPanelTest extends TestCase
     private function mediaHomeCreate(string $prefix): string
     {
         $home = $this->pmssMakeTempDir($prefix);
-        @file_put_contents($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
+        $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
         return $home;
     }
 
@@ -126,8 +126,7 @@ class MediaStackPanelTest extends TestCase
     public function testStatusBlocksWhenBinAlreadyPopulated(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-blocked-bin-');
-        @mkdir($home.'/.bin', 0755, true);
-        @file_put_contents($home.'/.bin/existing', '1');
+        $this->pmssWriteFile($home.'/.bin/existing', '1');
 
         $status = $this->mediaStatusRead($home);
 
@@ -171,8 +170,7 @@ class MediaStackPanelTest extends TestCase
     public function testStartGateReportsMissingInstallerBeforePopulatedBin(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-gate-priority-');
-        @mkdir($home.'/.bin', 0755, true);
-        @file_put_contents($home.'/.bin/existing', '1');
+        $this->pmssWriteFile($home.'/.bin/existing', '1');
 
         $gate = \pmssMediaStackPanelStartGateRead($home);
 
@@ -300,30 +298,16 @@ class MediaStackPanelTest extends TestCase
     public function testAppPolicyBehaviorSnapshot(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-app-policy-');
-        foreach (array(
-            '.config/jellyfin' => 'dir',
-            '.bin/jellyfin/jellyfin.dll' => 'file',
-            '.config/jellyfin/config/network.xml' => 'file',
-            '.config/radarr' => 'dir',
-            '.bin/Radarr/Radarr.dll' => 'file',
-            '.config/radarr/config.xml' => 'file',
-            '.config/sonarr' => 'dir',
-            '.bin/Sonarr/Sonarr.dll' => 'file',
-            '.config/sonarr/config.xml' => 'file',
-            '.config/prowlarr' => 'dir',
-            '.bin/Prowlarr/Prowlarr.dll' => 'file',
-            '.config/prowlarr/config.xml' => 'file',
-            '.config/sabnzbd' => 'dir',
-            '.bin/sabnzbd/sabnzbd/SABnzbd.py' => 'file',
-            '.config/sabnzbd/sabnzbd.ini' => 'file',
-            '.config/autobrr' => 'dir',
-            '.bin/autobrr/autobrr' => 'file',
-            '.bin/autobrr/autobrrctl' => 'file',
-        ) as $path => $type) {
-            $type === 'dir'
-                ? $this->pmssEnsureDir($home.'/'.$path)
-                : $this->pmssWriteRelativeFile($home, $path, 'fixture');
-        }
+        // Autobrr's config directory is deliberately empty; the writer creates other parents.
+        $this->pmssEnsureDir($home.'/.config/autobrr');
+        $this->pmssWriteFiles($home, array_fill_keys([
+            '.bin/jellyfin/jellyfin.dll', '.config/jellyfin/config/network.xml',
+            '.bin/Radarr/Radarr.dll', '.config/radarr/config.xml',
+            '.bin/Sonarr/Sonarr.dll', '.config/sonarr/config.xml',
+            '.bin/Prowlarr/Prowlarr.dll', '.config/prowlarr/config.xml',
+            '.bin/sabnzbd/sabnzbd/SABnzbd.py', '.config/sabnzbd/sabnzbd.ini',
+            '.bin/autobrr/autobrr', '.bin/autobrr/autobrrctl',
+        ], 'fixture'));
         $this->pmssWriteRelativeFile(
             $home,
             '.lighttpd/custom.d/autobrr-custom.conf',
@@ -441,9 +425,10 @@ class MediaStackPanelTest extends TestCase
     public function testStatusShowsFileQuotaFailureAfterPartialInstall(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-quota-partial-');
-        @mkdir($home.'/.bin/Sonarr', 0755, true);
-        @file_put_contents($home.'/.bin/Sonarr/Sonarr.dll', 'partial');
-        @file_put_contents($home.'/.install-media-stack.log', "[ERR ] File quota reached during media stack install; free account files and retry.\n");
+        $this->pmssWriteFiles($home, [
+            '.bin/Sonarr/Sonarr.dll' => 'partial',
+            '.install-media-stack.log' => "[ERR ] File quota reached during media stack install; free account files and retry.\n",
+        ]);
 
         $status = $this->mediaStatusRead($home);
         $this->assertSame('failed', $status['state']);

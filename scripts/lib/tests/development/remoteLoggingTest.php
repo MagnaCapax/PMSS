@@ -28,8 +28,8 @@ class RemoteLoggingTest extends TestCase
         $target = $fixture['target'];
         $messages = [];
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=0\n");
-        file_put_contents($target, "*.* @@old.example:514\n");
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=0\n");
+        $this->pmssWriteFile($target, "*.* @@old.example:514\n");
 
         $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
@@ -44,8 +44,8 @@ class RemoteLoggingTest extends TestCase
         $target = $fixture['target'];
         $messages = [];
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=1\n");
-        file_put_contents($target, "*.* @@old.example:514\n");
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=1\n");
+        $this->pmssWriteFile($target, "*.* @@old.example:514\n");
 
         $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
@@ -60,14 +60,14 @@ class RemoteLoggingTest extends TestCase
         $target = $fixture['target'];
         $messages = [];
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', implode("\n", [
             'remote_logging_enabled=1',
             'remote_host=logserver.example.com',
             'remote_port=1514',
             'remote_protocol=udp',
             '',
         ]));
-        file_put_contents($fixture['cfgDir'].'/template.rsyslog-remote.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/template.rsyslog-remote.conf', implode("\n", [
             '*.* @%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%',
             '# protocol=%%PMSS_RSYSLOG_PROTOCOL%%',
             '',
@@ -87,7 +87,7 @@ class RemoteLoggingTest extends TestCase
         $fixture = $this->pmssRemoteLoggingFixture();
         $messages = [];
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', implode("\n", [
             'remote_logging_enabled=1',
             'remote_host=logserver.example.com',
             '',
@@ -107,7 +107,7 @@ class RemoteLoggingTest extends TestCase
         $target = $fixture['target'];
         $messages = [];
 
-        file_put_contents($realTarget, "*.* @@old.example:514\n");
+        $this->pmssWriteFile($realTarget, "*.* @@old.example:514\n");
         symlink($realTarget, $target);
 
         $result = \pmssWriteManagedPathFile($target, "*.* @new.example:1514\n", 'remote logging config', $this->pmssMakeArrayLogger($messages));
@@ -125,13 +125,13 @@ class RemoteLoggingTest extends TestCase
         $target = $fixture['target'];
         $messages = [];
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', implode("\n", [
             'remote_logging_enabled=1',
             'remote_host=logserver.example.com',
             '',
         ]));
-        file_put_contents($fixture['cfgDir'].'/template.rsyslog-remote.conf', "*.* @@%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%\n");
-        file_put_contents($realTarget, "*.* @@old.example:514\n");
+        $this->pmssWriteFile($fixture['cfgDir'].'/template.rsyslog-remote.conf', "*.* @@%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%\n");
+        $this->pmssWriteFile($realTarget, "*.* @@old.example:514\n");
         symlink($realTarget, $target);
 
         $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
@@ -150,8 +150,8 @@ class RemoteLoggingTest extends TestCase
         $realTarget = $realTargetDir.'/50-pmss-remote.conf';
         $messages = [];
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=0\n");
-        file_put_contents($realTarget, "*.* @@old.example:514\n");
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=0\n");
+        $this->pmssWriteFile($realTarget, "*.* @@old.example:514\n");
         symlink($realTargetDir, $targetDir);
 
         try {

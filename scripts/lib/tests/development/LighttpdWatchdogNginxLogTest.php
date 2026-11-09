@@ -10,10 +10,10 @@ class LighttpdWatchdogNginxLogTest extends TestCase
     {
         $logPath = $this->pmssMakeTempFile('lighttpd-nginx-close-log-');
         $statePath = $this->pmssMakeTempFile('lighttpd-nginx-close-state-');
-        file_put_contents($logPath, $this->nginxLine(25000));
+        $this->pmssWriteFile($logPath, $this->nginxLine(25000));
         $stat = stat($logPath);
         $state = json_encode(['device' => $stat['dev'], 'inode' => $stat['ino'], 'offset' => 0, 'users' => []]);
-        file_put_contents($statePath, $state);
+        $this->pmssWriteFile($statePath, $state);
         // Namespace interception keeps fault injection away from global runtime helpers.
         $script = <<<'PHP'
 namespace NginxReadFixture;
@@ -58,7 +58,7 @@ foreach (['stat', 'path-stat', 'state', 'seek', 'read', 'parse', 'tell', 'open-f
         $caught = null;
         $actions = [];
         try {
-            $actions = pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+            $actions = pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'fixtur01']);
         } catch (\Throwable $error) {
             $caught = $error;
         }
@@ -83,7 +83,7 @@ PHP;
 
     private function nginxLine(int $port, int $status = 502, string $upstreamStatus = '502', string $headerTime = '-'): string
     {
-        return '127.0.0.1 - - [23/Aug/2026:12:00:00 +0200] "GET /user-alice/ HTTP/1.1" '
+        return '127.0.0.1 - - [23/Aug/2026:12:00:00 +0200] "GET /user-fixtur01/ HTTP/1.1" '
             .$status.' 123 "-" "fixture" pmss_status="'.$status.'" pmss_upstream_addr="127.0.0.1:'.$port
             .'" pmss_upstream_status="'.$upstreamStatus.'" pmss_upstream_header_time="'.$headerTime.'"' . "\n";
     }
@@ -136,9 +136,9 @@ PHP;
     {
         $state = array();
         for ($cycle = 1; $cycle <= 3; $cycle++) {
-            $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'alice']);
+            $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'fixtur01']);
             $state = array('users' => $result['users']);
-            $this->assertSame($cycle === 3 ? array('alice' => 'restart') : array(), $result['actions']);
+            $this->assertSame($cycle === 3 ? array('fixtur01' => 'restart') : array(), $result['actions']);
         }
     }
 
@@ -147,54 +147,54 @@ PHP;
         $result = \pmssLighttpdWatchdogNginxStateAdvance(
             array(),
             [$this->failureEvent(), $this->failureEvent(), $this->failureEvent()],
-            [25000 => 'alice']
+            [25000 => 'fixtur01']
         );
-        $this->assertSame(1, $result['users']['alice']['failureCycles']);
+        $this->assertSame(1, $result['users']['fixtur01']['failureCycles']);
         $this->assertSame(array(), $result['actions']);
     }
 
     public function testHealthyResponseResetsFailureAndRecoveryStage(): void
     {
-        $state = array('users' => array('alice' => array('failureCycles' => 2, 'recoveryStage' => 1)));
+        $state = array('users' => array('fixtur01' => array('failureCycles' => 2, 'recoveryStage' => 1)));
         $events = [
             $this->failureEvent(),
             array('port' => 25000, 'outcome' => 'healthy'),
         ];
-        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, $events, [25000 => 'alice']);
-        $this->assertSame(array('failureCycles' => 0, 'recoveryStage' => 0), $result['users']['alice']);
+        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, $events, [25000 => 'fixtur01']);
+        $this->assertSame(array('failureCycles' => 0, 'recoveryStage' => 0), $result['users']['fixtur01']);
         $this->assertSame(array(), $result['actions']);
     }
 
     public function testContinuedFailureAfterRestartEscalatesToReconfigure(): void
     {
-        $state = array('users' => array('alice' => array('failureCycles' => 2, 'recoveryStage' => 1)));
-        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'alice']);
-        $this->assertSame(array('alice' => 'reconfigure'), $result['actions']);
-        $this->assertSame(2, $result['users']['alice']['recoveryStage']);
+        $state = array('users' => array('fixtur01' => array('failureCycles' => 2, 'recoveryStage' => 1)));
+        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'fixtur01']);
+        $this->assertSame(array('fixtur01' => 'reconfigure'), $result['actions']);
+        $this->assertSame(2, $result['users']['fixtur01']['recoveryStage']);
     }
 
     public function testExhaustedRecoveryDoesNotRepeatDestructiveActions(): void
     {
-        $state = array('users' => array('alice' => array('failureCycles' => 2, 'recoveryStage' => 2)));
-        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'alice']);
+        $state = array('users' => array('fixtur01' => array('failureCycles' => 2, 'recoveryStage' => 2)));
+        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'fixtur01']);
         $this->assertSame(array(), $result['actions']);
-        $this->assertSame(0, $result['users']['alice']['failureCycles']);
+        $this->assertSame(0, $result['users']['fixtur01']['failureCycles']);
     }
 
     public function testIncrementalReaderBaselinesThenPersistsRestartDecision(): void
     {
         $logPath = $this->pmssMakeTempPath('lighttpd-nginx-log-', '.log');
         $statePath = $this->pmssMakeTempPath('lighttpd-nginx-state-', '.json');
-        $usersByPort = [25000 => 'alice'];
+        $usersByPort = [25000 => 'fixtur01'];
 
-        file_put_contents($logPath, $this->nginxLine(25000));
+        $this->pmssWriteFile($logPath, $this->nginxLine(25000));
         $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, $usersByPort));
         $actions = array();
         for ($cycle = 1; $cycle <= 3; $cycle++) {
             file_put_contents($logPath, $this->nginxLine(25000), FILE_APPEND);
             $actions = \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, $usersByPort);
         }
-        $this->assertSame(array('alice' => 'restart'), $actions);
+        $this->assertSame(array('fixtur01' => 'restart'), $actions);
         $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, $usersByPort));
     }
 
@@ -202,42 +202,42 @@ PHP;
     {
         $logPath = $this->pmssMakeTempPath('lighttpd-nginx-log-', '.log');
         $statePath = $this->pmssMakeTempPath('lighttpd-nginx-state-', '.json');
-        file_put_contents($logPath, '');
-        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        $this->pmssWriteFile($logPath, '');
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'fixtur01']);
 
         file_put_contents($logPath, rtrim($this->nginxLine(25000), "\n"), FILE_APPEND);
-        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'fixtur01']);
         file_put_contents($logPath, "\n", FILE_APPEND);
-        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'fixtur01']);
 
         $state = json_decode((string) file_get_contents($statePath), true);
-        $this->assertSame(1, $state['users']['alice']['failureCycles']);
+        $this->assertSame(1, $state['users']['fixtur01']['failureCycles']);
     }
 
     public function testIncrementalReaderAdvancesPastCompleteLineBeforeIncompleteLine(): void
     {
         $logPath = $this->pmssMakeTempPath('lighttpd-nginx-log-', '.log');
         $statePath = $this->pmssMakeTempPath('lighttpd-nginx-state-', '.json');
-        file_put_contents($logPath, '');
-        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        $this->pmssWriteFile($logPath, '');
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'fixtur01']);
 
         $completeLine = $this->nginxLine(25000);
-        file_put_contents($logPath, $completeLine.rtrim($completeLine, "\n"));
-        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        $this->pmssWriteFile($logPath, $completeLine.rtrim($completeLine, "\n"));
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'fixtur01']);
         $state = json_decode((string) file_get_contents($statePath), true);
         $this->assertSame(strlen($completeLine), $state['offset']);
-        $this->assertSame(1, $state['users']['alice']['failureCycles']);
+        $this->assertSame(1, $state['users']['fixtur01']['failureCycles']);
 
         file_put_contents($logPath, "\n", FILE_APPEND);
-        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'fixtur01']);
         $state = json_decode((string) file_get_contents($statePath), true);
-        $this->assertSame(2, $state['users']['alice']['failureCycles']);
+        $this->assertSame(2, $state['users']['fixtur01']['failureCycles']);
     }
 
     public function testIncrementalReaderFailsSoftForUnsafeInputs(): void
     {
         $logPath = $this->pmssMakeTempPath('lighttpd-nginx-log-', '.log');
-        file_put_contents($logPath, $this->nginxLine(25000));
+        $this->pmssWriteFile($logPath, $this->nginxLine(25000));
         $target = $this->pmssMakeTempPath('lighttpd-nginx-target-', '.json');
         $link = $this->pmssMakeTempPath('lighttpd-nginx-link-', '.json');
         @unlink($link);
@@ -245,7 +245,7 @@ PHP;
             throw new SkipTest('symlink fixture unavailable');
         }
 
-        $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead($logPath, $link, [25000 => 'alice']));
-        $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead('/missing/nginx.log', $target, [25000 => 'alice']));
+        $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead($logPath, $link, [25000 => 'fixtur01']));
+        $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead('/missing/nginx.log', $target, [25000 => 'fixtur01']));
     }
 }

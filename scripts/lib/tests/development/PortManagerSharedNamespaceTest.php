@@ -53,8 +53,8 @@ final class PortManagerSharedNamespaceTest extends TestCase
     private function runLockRace(string $action, string $mutation): array
     {
         $portDir = $this->makePortDir();
-        $assignment = $portDir.'/rclone-alice';
-        if ($mutation === 'remove') file_put_contents($assignment, "25000\n");
+        $assignment = $portDir.'/rclone-fixtur01';
+        if ($mutation === 'remove') $this->pmssWriteFile($assignment, "25000\n");
         $script = 'namespace PortManagerLockRaceFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/portManager.php'), true).';';
         $script .= '$GLOBALS["assignment"] = '.var_export($assignment, true).'; $GLOBALS["mutation"] = '.var_export($mutation, true).';';
         $script .= <<<'PHP'
@@ -70,10 +70,10 @@ PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/portManager.php', 'PortManagerLockRaceFixture',
             ['portManager/selection.php', 'portManager/assignment.php', 'portManager/cli.php']);
         if ($action === 'assign') {
-            $script .= '$status = null; $port = pmssPortManagerAssignServicePort("alice", "rclone", 26000, $status);';
+            $script .= '$status = null; $port = pmssPortManagerAssignServicePort("fixtur01", "rclone", 26000, $status);';
             $script .= 'echo json_encode(["port" => $port, "status" => $status, "file" => \file_get_contents($GLOBALS["assignment"])]);';
         } else {
-            $script .= '\ob_start(); $rc = pmssPortManagerMain(["portManager.php", "release", "alice", "rclone"]); $output = \ob_get_clean();';
+            $script .= '\ob_start(); $rc = pmssPortManagerMain(["portManager.php", "release", "fixtur01", "rclone"]); $output = \ob_get_clean();';
             $script .= 'echo json_encode(["rc" => $rc, "output" => $output, "present" => \file_exists($GLOBALS["assignment"])]);';
         }
         return $this->pmssRunInlinePhpJson($script, ['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $portDir.'/missing']);
@@ -98,11 +98,10 @@ PHP;
     {
         $portDir = $this->makePortDir();
         $legacyDir = $this->makePortDir();
-        mkdir($legacyDir.'/scgi', 0755, true);
-        file_put_contents($portDir.'/lighttpd-alice', "24000\n");
-        file_put_contents($portDir.'/rclone-bob', "25000\n");
-        file_put_contents($portDir.'/qbittorrent-carol', "not-a-port\n");
-        file_put_contents($legacyDir.'/scgi/26000', '');
+        $this->pmssWriteFiles($portDir, [
+            'lighttpd-fixtur01' => "24000\n", 'rclone-fixtur02' => "25000\n", 'qbittorrent-fixtur03' => "not-a-port\n",
+        ]);
+        $this->pmssWriteFile($legacyDir.'/scgi/26000', '');
 
         $used = \pmssPortManagerUsedPorts($portDir, $legacyDir);
 
@@ -120,9 +119,9 @@ PHP;
         $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_LEGACY_DIR' => $link]);
 
         $status = '';
-        $this->assertSame(null, \pmssPortManagerAssignServicePort('alice', 'rclone', 25000, $status));
+        $this->assertSame(null, \pmssPortManagerAssignServicePort('fixtur01', 'rclone', 25000, $status));
         $this->assertSame('reservation_scan_failed', $status);
-        $this->assertFalse(file_exists($portDir.'/rclone-alice'));
+        $this->assertFalse(file_exists($portDir.'/rclone-fixtur01'));
     }
 
     public function testFailedReservationGlobIsDistinguishedFromEmptyNamespace(): void
@@ -151,35 +150,34 @@ PHP;
     {
         [$portDir] = $this->trackPortNamespace();
 
-        $port = \pmssPortManagerAssignServicePort('alice', 'rclone', 25000);
+        $port = \pmssPortManagerAssignServicePort('fixtur01', 'rclone', 25000);
 
         $this->assertSame(25000, $port);
-        $this->assertSame('25000', trim((string) file_get_contents($portDir.'/rclone-alice')));
+        $this->assertSame('25000', trim((string) file_get_contents($portDir.'/rclone-fixtur01')));
     }
 
     public function testAssignServicePortDoesNotReuseOtherServicePort(): void
     {
         [$portDir] = $this->trackPortNamespace();
-        file_put_contents($portDir.'/lighttpd-alice', "25000\n");
+        $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "25000\n");
 
-        $port = \pmssPortManagerAssignServicePort('bob', 'rclone', 25000);
+        $port = \pmssPortManagerAssignServicePort('fixtur02', 'rclone', 25000);
 
         $this->assertTrue(is_int($port));
         $this->assertTrue($port !== 25000);
-        $this->assertSame((string) $port, trim((string) file_get_contents($portDir.'/rclone-bob')));
+        $this->assertSame((string) $port, trim((string) file_get_contents($portDir.'/rclone-fixtur02')));
     }
 
     public function testAssignServicePortDoesNotReuseLegacyRtorrentReservation(): void
     {
         [$portDir, $legacyDir] = $this->trackPortNamespace();
-        mkdir($legacyDir.'/scgi', 0755, true);
-        file_put_contents($legacyDir.'/scgi/25000', '');
+        $this->pmssWriteFile($legacyDir.'/scgi/25000', '');
 
-        $port = \pmssPortManagerAssignServicePort('bob', 'deluge-web', 25000);
+        $port = \pmssPortManagerAssignServicePort('fixtur02', 'deluge-web', 25000);
 
         $this->assertTrue(is_int($port));
         $this->assertTrue($port !== 25000);
-        $this->assertSame((string) $port, trim((string) file_get_contents($portDir.'/deluge-web-bob')));
+        $this->assertSame((string) $port, trim((string) file_get_contents($portDir.'/deluge-web-fixtur02')));
     }
 
     public function testAssignHelperReportsCliStatusWithoutChangingPortContract(): void
@@ -187,10 +185,10 @@ PHP;
         $this->trackPortNamespace();
 
         $assigned = '';
-        $port = \pmssPortManagerAssignServicePort('alice', 'rclone', 25000, $assigned);
-        $cli = $this->runPortManagerMain(['assign', 'alice', 'rclone']);
+        $port = \pmssPortManagerAssignServicePort('fixtur01', 'rclone', 25000, $assigned);
+        $cli = $this->runPortManagerMain(['assign', 'fixtur01', 'rclone']);
         $existing = '';
-        $again = \pmssPortManagerAssignServicePort('alice', 'rclone', null, $existing);
+        $again = \pmssPortManagerAssignServicePort('fixtur01', 'rclone', null, $existing);
 
         $this->assertSame(25000, $port);
         $this->assertSame('assigned', $assigned);

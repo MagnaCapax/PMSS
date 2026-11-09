@@ -17,8 +17,8 @@ class UserFilemanagerCompatPatchTest extends TestCase
         $this->skelDir = $this->pmssMakeTempDir('pmss-user-filemanager-skel-');
         $this->user = 'user'.bin2hex(random_bytes(2));
 
-        @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
-        @mkdir($this->skelDir.'/www', 0755, true);
+        $this->pmssEnsureDir($this->homeRoot.'/'.$this->user, 0755);
+        $this->pmssEnsureDir($this->skelDir.'/www', 0755);
 
         $this->pmssTrackEnvOverrides([
             'PMSS_HOME_DIR' => $this->homeRoot,
@@ -86,11 +86,11 @@ PHP;
     public function testApplySkeletonFilesSkipsSymlinkedFilemanagerTarget(): void
     {
         $this->pmssWriteRelativeFile($this->skelDir, 'www/filemanager.php', "before\n        ob_flush();\nafter\n");
-        @mkdir(dirname($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php')), 0755, true);
+        $this->pmssEnsureDir(dirname($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php')), 0755);
 
         $target = $this->pmssMakeTempPhpPath('pmss-user-filemanager-', 'patch-symlink-target');
         $link = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php');
-        file_put_contents($target, "before\n        ob_flush();\nafter\n");
+        $this->pmssWriteFile($target, "before\n        ob_flush();\nafter\n");
         @symlink($target, $link);
 
         \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
