@@ -31,11 +31,25 @@ function pmssLiveStatsNodeCountersParse(string $stat, string $meminfo, string $n
     if (!preg_match('/^cpu\s+(\d+(?:\s+\d+){3,9})/m', $stat, $cpu)
         || !preg_match('/^MemTotal:\s+(\d+) kB/m', $meminfo, $mt) || !preg_match('/^MemAvailable:\s+(\d+) kB/m', $meminfo, $ma)) return null;
     // guest fields are already inside user/nice: only the first eight count.
-    $j = array_pad(array_map('intval', pmssConfigLineColumns($cpu[1], 0, [])), 8, 0);
-    $total = array_sum(array_slice($j, 0, 8));
+    $j = array_pad(array_slice(pmssConfigLineColumns($cpu[1], 0, []), 0, 8), 8, '0');
+    $total = 0;
+    foreach ($j as $index => $raw) {
+        $ticks = pmssUnsignedDecimalIntParse($raw);
+        // Individually valid counters can still overflow their aggregate.
+        if ($ticks === null || $ticks > PHP_INT_MAX - $total) return null;
+        $j[$index] = $ticks;
+        $total += $ticks;
+    }
     if (!preg_match('/^\s*'.preg_quote($iface, '/').':\s*(\d+)(?:\s+\d+){7}\s+(\d+)/m', $netDev, $n)) return null;
-    return ['busy' => $total - $j[3] - $j[4], 'total' => $total, 'mem_total' => (int) $mt[1] * 1024,
-        'mem_used' => ((int) $mt[1] - (int) $ma[1]) * 1024, 'rx' => (int) $n[1], 'tx' => (int) $n[2], 'steal' => $j[7]];
+    $memoryTotal = pmssUnsignedDecimalIntParse($mt[1]);
+    $memoryAvailable = pmssUnsignedDecimalIntParse($ma[1]);
+    $rx = pmssUnsignedDecimalIntParse($n[1]);
+    $tx = pmssUnsignedDecimalIntParse($n[2]);
+    if ($memoryTotal === null || $memoryAvailable === null || $rx === null || $tx === null) return null;
+    // Keep KiB-to-byte arithmetic representable as integers as well.
+    if ($memoryTotal > intdiv(PHP_INT_MAX, 1024) || $memoryAvailable > intdiv(PHP_INT_MAX, 1024)) return null;
+    return ['busy' => $total - $j[3] - $j[4], 'total' => $total, 'mem_total' => $memoryTotal * 1024,
+        'mem_used' => ($memoryTotal - $memoryAvailable) * 1024, 'rx' => $rx, 'tx' => $tx, 'steal' => $j[7]];
 }
 
 /** Delta of two snapshots as one ring sample; null for resets or implausible intervals. */
@@ -80,7 +94,8 @@ function pmssLiveStatsTraffic(?string $line, int $now, int $since = 0): int
 {
     if ($line === null || !preg_match('/^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d): (\d+)$/', trim($line), $m)) return 0;
     $at = strtotime($m[1]);
-    return $at !== false && $at > $since && $now - $at <= PMSS_LIVESTATS_MAX_LINE_AGE ? (int) $m[2] : 0;
+    return $at !== false && $at > $since && $now - $at <= PMSS_LIVESTATS_MAX_LINE_AGE
+        ? (pmssUnsignedDecimalIntParse($m[2]) ?? 0) : 0;
 }
 
 /**

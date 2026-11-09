@@ -844,6 +844,12 @@ iptables helpers:
 
 ## Resource Statistics
 
+- Live-statistics text counters in `scripts/lib/liveStats.php` must fit PHP integers
+  before conversion. Oversized CPU ticks or their sum, memory KiB-to-byte
+  conversions, and network byte counters return the existing `null` node result;
+  oversized traffic-log counters return zero. Valid counters retain their field
+  order, integer types, guest-tick exclusion, freshness and duplicate-line rules.
+  `LiveStatsCounterSafetyTest` covers overflow and accepted boundaries without I/O.
 - `pmssStatsCollect()` checks that persisted `memory` metrics are arrays before
   reading `current`. Malformed containers, including serialized object placeholders,
   use the existing cgroup/null fallback; valid numeric conversions, payload fields
