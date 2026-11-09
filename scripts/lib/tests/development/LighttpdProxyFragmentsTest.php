@@ -230,7 +230,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     public function testProxyFragmentSiblingConflictMatchesExactConditional(): void
     {
         [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
-        file_put_contents(
+        $this->pmssWriteFile(
             $directory.'/legacy.conf',
             "  \$HTTP[\"url\"]\t=~  \"^/user-demo/rclone/\" {\n  auth.require = ()\n}\n"
         );
@@ -241,7 +241,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     public function testProxyFragmentSiblingConflictIgnoresMentionsAndDifferentPaths(): void
     {
         [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
-        file_put_contents(
+        $this->pmssWriteFile(
             $directory.'/legacy.conf',
             "# \$HTTP[\"url\"] =~ \"^/user-demo/rclone/\" {\n"
             ."\$HTTP[\"url\"] =~ \"^/user-demo/other/\" {\n  auth.require = ()\n}\n"
@@ -253,7 +253,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     public function testProxyFragmentSiblingConflictExcludesManagedTarget(): void
     {
         [, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
-        file_put_contents($managedPath, $managedFragment);
+        $this->pmssWriteFile($managedPath, $managedFragment);
 
         $this->assertSame(false, \pmssLighttpdProxyFragmentSiblingConflict($managedPath, $managedFragment));
     }
@@ -261,8 +261,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     public function testProxyFragmentSiblingConflictFailsClosedForSymlink(): void
     {
         [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
-        $outsidePath = $directory.'/outside-fragment';
-        file_put_contents($outsidePath, $managedFragment);
+        $outsidePath = $this->pmssWriteFile($directory.'/outside-fragment', $managedFragment);
         $this->assertTrue(symlink($outsidePath, $directory.'/legacy.conf'));
 
         $this->assertSame(null, \pmssLighttpdProxyFragmentSiblingConflict($managedPath, $managedFragment));
@@ -273,7 +272,7 @@ class LighttpdProxyFragmentsTest extends TestCase
         [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
         $legacyPath = $directory.'/legacy.conf';
         $legacyFragment = "# customer rule\n".$managedFragment;
-        file_put_contents($legacyPath, $legacyFragment);
+        $this->pmssWriteFile($legacyPath, $legacyFragment);
 
         $this->assertTrue(\pmssLighttpdWriteManagedProxyFragment('rclone', 'demo', 4001, $managedPath));
         $this->assertFalse(file_exists($managedPath));
@@ -287,8 +286,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     public function testManagedProxyFragmentRemovesOwnedCollisionSide(): void
     {
         [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
-        file_put_contents($managedPath, $managedFragment);
-        file_put_contents($directory.'/legacy.conf', $managedFragment);
+        $this->pmssWriteFiles($directory, [basename($managedPath) => $managedFragment, 'legacy.conf' => $managedFragment]);
 
         $this->assertTrue(\pmssLighttpdWriteManagedProxyFragment('rclone', 'demo', 4001, $managedPath));
         $this->assertFalse(file_exists($managedPath));
@@ -298,9 +296,8 @@ class LighttpdProxyFragmentsTest extends TestCase
     public function testManagedProxyFragmentPreservesOwnedFileWhenScanIsUnsafe(): void
     {
         [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
-        file_put_contents($managedPath, 'existing managed fragment');
-        $outsidePath = $directory.'/outside-fragment';
-        file_put_contents($outsidePath, $managedFragment);
+        $this->pmssWriteFile($managedPath, 'existing managed fragment');
+        $outsidePath = $this->pmssWriteFile($directory.'/outside-fragment', $managedFragment);
         $this->assertTrue(symlink($outsidePath, $directory.'/legacy.conf'));
 
         $this->assertFalse(\pmssLighttpdWriteManagedProxyFragment('rclone', 'demo', 4001, $managedPath));

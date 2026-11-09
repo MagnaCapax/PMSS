@@ -61,7 +61,7 @@ class UserConfigStoreTest extends TestCase
     public function testSetAndGetRoundTripPreservesUnknownKeysAndForcesTrafficLimit(): void
     {
         $store = $this->newStore();
-        $this->assertTrue($store->set('alice', $this->basePayload([
+        $this->assertTrue($store->set('fixtur01', $this->basePayload([
             'ramMiB'       => 512,
             'quota'        => 100,
             'quotaBurst'   => 125,
@@ -69,7 +69,7 @@ class UserConfigStoreTest extends TestCase
             'customNote'   => 'keep-me',
         ])));
 
-        $reloaded = $store->get('alice');
+        $reloaded = $store->get('fixtur01');
         $this->assertTrue(is_array($reloaded));
         $this->assertEquals('keep-me', $reloaded['customNote']);
         $this->assertEquals(0, $reloaded['trafficLimit']);
@@ -104,7 +104,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testLegacyRtorrentRamCreatesRamMiBButPreservesKey(): void
     {
-        $reloaded = $this->persistAndReload('bob', [
+        $reloaded = $this->persistAndReload('fixtur02', [
             'rtorrentRam'  => 256,
             'rtorrentPort' => 4100,
             'quota'        => 10,
@@ -116,7 +116,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testBillingIdentifiersDefaultTo0AndSuspendedDefaultsFalse(): void
     {
-        $reloaded = $this->persistAndReload('carol', $this->basePayload(['rtorrentPort' => 5001]));
+        $reloaded = $this->persistAndReload('fixtur03', $this->basePayload(['rtorrentPort' => 5001]));
         $this->assertEquals(0, $reloaded['billingServiceId']);
         $this->assertEquals(0, $reloaded['billingClientId']);
         $this->assertEquals(false, $reloaded['suspended']);
@@ -190,7 +190,7 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserDockerEnabledDefaultsTrueWhenMissing(): void
     {
         $store = $this->newStore();
-        $this->assertEquals(true, \pmssUserDockerEnabled('alice', $store));
+        $this->assertEquals(true, \pmssUserDockerEnabled('fixtur01', $store));
     }
 
     public function testPmssUserDockerEnabledRespectsFalse(): void
@@ -239,7 +239,7 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserLighttpdEnabledDefaultsTrueWhenMissing(): void
     {
         $store = $this->newStore();
-        $this->assertEquals(true, \pmssUserLighttpdEnabled('alice', $store));
+        $this->assertEquals(true, \pmssUserLighttpdEnabled('fixtur01', $store));
     }
 
     public function testPmssUserLighttpdEnabledRespectsFalse(): void
@@ -262,7 +262,7 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserLingerEnabledDefaultsOffAndNormalisesStoredValues(): void
     {
         $store = $this->newStore();
-        $this->assertEquals(false, \pmssUserLingerEnabled('alice', $store));
+        $this->assertEquals(false, \pmssUserLingerEnabled('fixtur01', $store));
 
         foreach ([
             ['lingfalse', false, false],
@@ -285,7 +285,7 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserPanelSessionLoginEnabledDefaultsOffAndNormalisesStoredValues(): void
     {
         $store = $this->newStore();
-        $this->assertEquals(false, \pmssUserPanelSessionLoginEnabled('alice', $store));
+        $this->assertEquals(false, \pmssUserPanelSessionLoginEnabled('fixtur01', $store));
 
         foreach ([
             ['panelfalse', false, false],
@@ -308,7 +308,7 @@ class UserConfigStoreTest extends TestCase
     public function testResolvePayloadKeepsMissingValidUserAsEmptyArray(): void
     {
         $store = new \UserConfigStore($this->configDirPath());
-        $payload = \pmssUserConfigResolvePayload('alice', $store);
+        $payload = \pmssUserConfigResolvePayload('fixtur01', $store);
 
         $this->assertEquals([], $payload);
         $this->assertTrue($store instanceof \UserConfigStore);
@@ -319,7 +319,7 @@ class UserConfigStoreTest extends TestCase
         $store = $this->newStore();
         $this->assertTrue(function_exists('pmssUserConfigFeatureEnabled'));
         $this->assertTrue(function_exists('pmssUserPanelSessionLoginEnabled'));
-        $this->assertEquals(true, \pmssUserConfigFeatureEnabled('alice', 'dockerEnabled', $store));
+        $this->assertEquals(true, \pmssUserConfigFeatureEnabled('fixtur01', 'dockerEnabled', $store));
 
         $payload = $this->basePayload(['lighttpdEnabled' => false]);
         $this->assertTrue($store->set('facade', $payload));
@@ -333,11 +333,11 @@ class UserConfigStoreTest extends TestCase
             'ramMiB' => 256,
         ]);
 
-        $this->assertTrue($store->set(' Alice ', $payload));
-        $this->assertTrue(is_array($store->get('ALICE')));
-        $this->assertEquals(true, \pmssUserDockerEnabled(' alice ', $store));
-        $this->assertTrue($store->remove(' alice '));
-        $this->assertEquals(null, $store->get('alice'));
+        $this->assertTrue($store->set(' Fixtur01 ', $payload));
+        $this->assertTrue(is_array($store->get('FIXTUR01')));
+        $this->assertEquals(true, \pmssUserDockerEnabled(' fixtur01 ', $store));
+        $this->assertTrue($store->remove(' fixtur01 '));
+        $this->assertEquals(null, $store->get('fixtur01'));
     }
 
     public function testInvalidUsernameRejected(): void
@@ -351,7 +351,7 @@ class UserConfigStoreTest extends TestCase
     public function testInvalidPayloadRejected(): void
     {
         $store = $this->newStore();
-        $this->assertTrue($store->set('dave', [
+        $this->assertTrue($store->set('fixtur04', [
             'ramMiB'     => 128,
             'quota'      => 10,
             'quotaBurst' => 12,
@@ -361,10 +361,9 @@ class UserConfigStoreTest extends TestCase
     public function testGetReturnsNullForInvalidJson(): void
     {
         $usersDir = $this->configDirPath().'/users';
-        @mkdir($usersDir, 0755, true);
-        @file_put_contents($usersDir.'/alice.json', '{not-json');
+        $this->pmssWriteFile($usersDir.'/fixtur01.json', '{not-json');
         $store = $this->newStore();
-        $this->assertTrue($store->get('alice') === null);
+        $this->assertTrue($store->get('fixtur01') === null);
     }
 
     public function testGetSkipsSymlinkFiles(): void
@@ -372,24 +371,24 @@ class UserConfigStoreTest extends TestCase
         $usersDir = $this->configDirPath().'/users';
         @mkdir($usersDir, 0755, true);
         $target = $this->tempDir.'/target.json';
-        @file_put_contents($target, json_encode([
+        $this->pmssWriteFile($target, json_encode([
             'ramMiB' => 1,
             'rtorrentPort' => 1,
             'quota' => 1,
             'quotaBurst' => 1,
         ]));
-        @symlink($target, $usersDir.'/alice.json');
+        @symlink($target, $usersDir.'/fixtur01.json');
         $store = $this->newStore();
-        $this->assertTrue($store->get('alice') === null, 'Symlinked user config must be ignored');
+        $this->assertTrue($store->get('fixtur01') === null, 'Symlinked user config must be ignored');
     }
 
     public function testRemoveDeletesFile(): void
     {
         $store = $this->newStore();
-        $this->assertTrue($store->set('erin', $this->basePayload()));
-        $userFile = $this->configDirPath().'/users/erin.json';
+        $this->assertTrue($store->set('fixtur05', $this->basePayload()));
+        $userFile = $this->configDirPath().'/users/fixtur05.json';
         $this->assertTrue(is_file($userFile));
-        $this->assertTrue($store->remove('erin'));
+        $this->assertTrue($store->remove('fixtur05'));
         $this->assertTrue(!file_exists($userFile));
     }
 
@@ -397,18 +396,17 @@ class UserConfigStoreTest extends TestCase
     {
         $store = $this->newStore();
         $payload = $this->basePayload();
-        $this->assertTrue($store->set('bob', $payload));
-        $this->assertTrue($store->set('alice', $payload));
+        $this->assertTrue($store->set('fixtur02', $payload));
+        $this->assertTrue($store->set('fixtur01', $payload));
         $all = $store->loadAll();
-        $this->assertEquals(['alice', 'bob'], array_keys($all));
+        $this->assertEquals(['fixtur01', 'fixtur02'], array_keys($all));
     }
 
     public function testGetFallsBackToLegacyAggregateWhenCanonicalMissing(): void
     {
         $legacyPath = $this->legacyUsersJsonPath();
-        @mkdir(dirname($legacyPath), 0755, true);
-        @file_put_contents($legacyPath, json_encode([
-            'alice' => [
+        $this->pmssWriteFile($legacyPath, json_encode([
+            'fixtur01' => [
                 'ramMiB' => 256,
                 'rtorrentPort' => 5000,
                 'quota' => 10,
@@ -418,7 +416,7 @@ class UserConfigStoreTest extends TestCase
         ]));
 
         $store = $this->newStore();
-        $payload = $store->get('alice');
+        $payload = $store->get('fixtur01');
         $this->assertTrue(is_array($payload));
         $this->assertEquals(256, $payload['ramMiB']);
         $this->assertEquals(0, $payload['trafficLimit']);
@@ -426,8 +424,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testGetReturnsNullWhenLegacyAggregateEntryIsNotArray(): void
     {
-        @mkdir(dirname($this->legacyUsersJsonPath()), 0755, true);
-        file_put_contents(
+        $this->pmssWriteFile(
             $this->legacyUsersJsonPath(),
             json_encode(['users' => ['legacyx' => 'invalid']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
@@ -439,15 +436,14 @@ class UserConfigStoreTest extends TestCase
     public function testLoadAllMergesLegacyAndCanonicalPreferringCanonical(): void
     {
         $legacyPath = $this->legacyUsersJsonPath();
-        @mkdir(dirname($legacyPath), 0755, true);
-        @file_put_contents($legacyPath, json_encode([
-            'alice' => [
+        $this->pmssWriteFile($legacyPath, json_encode([
+            'fixtur01' => [
                 'ramMiB' => 128,
                 'rtorrentPort' => 4000,
                 'quota' => 5,
                 'quotaBurst' => 6,
             ],
-            'bob' => [
+            'fixtur02' => [
                 'ramMiB' => 256,
                 'rtorrentPort' => 4001,
                 'quota' => 10,
@@ -456,7 +452,7 @@ class UserConfigStoreTest extends TestCase
         ]));
 
         $store = $this->newStore();
-        $this->assertTrue($store->set('bob', [
+        $this->assertTrue($store->set('fixtur02', [
             'ramMiB'       => 512,
             'rtorrentPort' => 5000,
             'quota'        => 20,
@@ -464,19 +460,18 @@ class UserConfigStoreTest extends TestCase
         ]));
 
         $all = $store->loadAll();
-        $this->assertEquals(['alice', 'bob'], array_keys($all));
-        $this->assertEquals(128, $all['alice']['ramMiB']);
-        $this->assertEquals(512, $all['bob']['ramMiB'], 'Canonical per-user file should override legacy aggregate');
+        $this->assertEquals(['fixtur01', 'fixtur02'], array_keys($all));
+        $this->assertEquals(128, $all['fixtur01']['ramMiB']);
+        $this->assertEquals(512, $all['fixtur02']['ramMiB'], 'Canonical per-user file should override legacy aggregate');
     }
 
     public function testGetAndLoadAllShareTheSameNormalizationAcrossStorageBackends(): void
     {
-        @mkdir(dirname($this->legacyUsersJsonPath()), 0755, true);
-        file_put_contents(
+        $this->pmssWriteFile(
             $this->legacyUsersJsonPath(),
             json_encode([
                 'users' => [
-                    'alice' => [
+                    'fixtur01' => [
                         'ramMiB' => '256',
                         'rtorrentPort' => 4000,
                         'quota' => 10,
@@ -489,7 +484,7 @@ class UserConfigStoreTest extends TestCase
         );
 
         $store = $this->newStore();
-        $this->assertTrue($store->set('bob', [
+        $this->assertTrue($store->set('fixtur02', [
             'ramMiB' => 512,
             'rtorrentPort' => 5000,
             'quota' => 20,
@@ -499,21 +494,20 @@ class UserConfigStoreTest extends TestCase
 
         $all = $store->loadAll();
 
-        $this->assertEquals(['alice', 'bob'], array_keys($all));
-        $this->assertEquals($all['alice'], $store->get('alice'));
-        $this->assertEquals($all['bob'], $store->get('bob'));
-        $this->assertEquals(256, $all['alice']['ramMiB']);
-        $this->assertEquals(0, $all['alice']['trafficLimit']);
+        $this->assertEquals(['fixtur01', 'fixtur02'], array_keys($all));
+        $this->assertEquals($all['fixtur01'], $store->get('fixtur01'));
+        $this->assertEquals($all['fixtur02'], $store->get('fixtur02'));
+        $this->assertEquals(256, $all['fixtur01']['ramMiB']);
+        $this->assertEquals(0, $all['fixtur01']['trafficLimit']);
         $this->assertEquals(null, $store->get('legacyx'));
     }
 
     public function testLoadAllSkipsInvalidCanonicalPayloads(): void
     {
         $userDir = $this->configDirPath().'/users';
-        @mkdir($userDir, 0755, true);
-        file_put_contents($userDir.'/alice.json', '{invalid');
-        file_put_contents(
-            $userDir.'/bob.json',
+        $this->pmssWriteFile($userDir.'/fixtur01.json', '{invalid');
+        $this->pmssWriteFile(
+            $userDir.'/fixtur02.json',
             json_encode([
                 'ramMiB' => 256,
                 'rtorrentPort' => 5200,
@@ -523,6 +517,6 @@ class UserConfigStoreTest extends TestCase
         );
 
         $store = $this->newStore();
-        $this->assertEquals(['bob'], array_keys($store->loadAll()));
+        $this->assertEquals(['fixtur02'], array_keys($store->loadAll()));
     }
 }

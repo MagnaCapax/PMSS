@@ -45,13 +45,13 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
         $this->pmssWriteFiles($sysfs, ['md0/md/array_state' => "clean\n"]);
 
-        file_put_contents($sysfs.'/md0/md/level', "raid0\n");
+        $this->pmssWriteFile($sysfs.'/md0/md/level', "raid0\n");
         $raid0 = $this->deviceResolve($sysfs, '/dev/md0');
         $this->pmssAssertArraySubsetSame([
             'ok' => true, 'md' => ['array_state' => 'clean', 'degraded' => 0, 'level' => 'raid0'],
         ], $raid0);
 
-        file_put_contents($sysfs.'/md0/md/level', "raid10\n");
+        $this->pmssWriteFile($sysfs.'/md0/md/level', "raid10\n");
         $raid10 = $this->deviceResolve($sysfs, '/dev/md0');
         $this->pmssAssertArraySubsetSame(['ok' => false, 'error' => 'unable to read md array status'], $raid10);
     }
@@ -62,12 +62,12 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $this->pmssWriteFiles($sysfs, ['md0/md/array_state' => "clean\n", 'md0/md/level' => "raid10\n"]);
 
         foreach (['', '-1', '1.0', '1x', (string) PHP_INT_MAX.'0'] as $counter) {
-            file_put_contents($sysfs.'/md0/md/degraded', $counter."\n");
+            $this->pmssWriteFile($sysfs.'/md0/md/degraded', $counter."\n");
             $result = $this->deviceResolve($sysfs, '/dev/md0');
             $this->pmssAssertArraySubsetSame(['ok' => false, 'error' => 'unable to read md array status'], $result);
         }
 
-        file_put_contents($sysfs.'/md0/md/degraded', "0001\n");
+        $this->pmssWriteFile($sysfs.'/md0/md/degraded', "0001\n");
         $result = $this->deviceResolve($sysfs, '/dev/md0');
         $this->assertSame(true, $result['ok']);
         $this->assertSame(1, $result['md']['degraded']);
@@ -105,7 +105,7 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         unlink($sysfs.'/md0/md/degraded');
         foreach (['raid0', 'linear'] as $level) {
             foreach (["\0".$level, $level."\0", " \0".$level."\0\n", $level."\n"] as $index => $raw) {
-                file_put_contents($sysfs.'/md0/md/level', $raw);
+                $this->pmssWriteFile($sysfs.'/md0/md/level', $raw);
                 $result = $this->deviceResolve($sysfs, '/dev/md0');
                 $expected = $base + ($index === 3
                     ? ['md' => array_replace($metadata, ['level' => $level]), 'ok' => true]
@@ -118,8 +118,7 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
     public function testUnsafeAndNonBlockMountsAreRejected(): void
     {
         $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
-        $fixture = $sysfs.'/regular';
-        file_put_contents($fixture, 'fixture');
+        $fixture = $this->pmssWriteFile($sysfs.'/regular', 'fixture');
         $check = static function () use ($fixture): bool { return is_readable($fixture) && filetype($fixture) === 'block'; };
         foreach (['overlay', '/dev/../etc/passwd', "/dev/sda\nother", '/dev/sda'.chr(0).'x'] as $unsafe) {
             $result = $this->deviceResolve($sysfs, $unsafe, 1048576, $check);

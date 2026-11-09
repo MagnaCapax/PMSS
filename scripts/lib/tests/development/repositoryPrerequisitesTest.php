@@ -49,9 +49,9 @@ class RepositoryPrerequisitesTest extends TestCase
     public function testEnsureSonarrKeyScopesLegacySourcesAndRemovesGlobalKey(): void
     {
         $this->withTempSonarrPaths(function (array $paths): void {
-            file_put_contents($paths['key'], 'scoped-key');
-            file_put_contents($paths['legacy_key'], 'legacy-key');
-            file_put_contents($paths['list'], "deb https://apt.sonarr.tv/debian bullseye main\n");
+            $this->pmssWriteFile($paths['key'], 'scoped-key');
+            $this->pmssWriteFile($paths['legacy_key'], 'legacy-key');
+            $this->pmssWriteFile($paths['list'], "deb https://apt.sonarr.tv/debian bullseye main\n");
 
             \pmssEnsureSonarrKey();
 
@@ -64,8 +64,8 @@ class RepositoryPrerequisitesTest extends TestCase
     public function testEnsureSonarrKeyDoesNotModifyCommentedSourceLines(): void
     {
         $this->withTempSonarrPaths(function (array $paths): void {
-            file_put_contents($paths['key'], 'scoped-key');
-            file_put_contents($paths['list'], "# deb https://apt.sonarr.tv/debian bullseye main\n");
+            $this->pmssWriteFile($paths['key'], 'scoped-key');
+            $this->pmssWriteFile($paths['list'], "# deb https://apt.sonarr.tv/debian bullseye main\n");
 
             \pmssEnsureSonarrKey();
 
@@ -105,11 +105,9 @@ class RepositoryPrerequisitesTest extends TestCase
         $listPath = $sourcesDir.'/sonarr.list';
 
         foreach ([$root, $keyDir, $legacyDir, $sourcesDir] as $dir) {
-            if (!is_dir($dir)) {
-                @mkdir($dir, 0700, true);
-            }
+            $this->pmssEnsureDir($dir, 0700);
         }
-        file_put_contents($sourcesPath, "deb http://deb.debian.org/debian bullseye main\n");
+        $this->pmssWriteFile($sourcesPath, "deb http://deb.debian.org/debian bullseye main\n");
 
         $this->pmssWithTrackedEnv([
             'PMSS_APT_KEYRING_DIR' => $keyDir,

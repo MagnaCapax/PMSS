@@ -14,12 +14,11 @@ class SourcesListBackupPruneTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-apt-backups-');
         foreach (['20260208071027', '20261027201326', '20261028201328'] as $stamp) {
-            file_put_contents($dir.'/sources.list.pmss-backup-'.$stamp, "deb x\n");
+            $this->pmssWriteFile($dir.'/sources.list.pmss-backup-'.$stamp, "deb x\n");
         }
-        file_put_contents($dir.'/sources.list.pmss-backup', "safe-write copy\n");
-        file_put_contents($dir.'/sources.list.pmss-backup-keepme', "other\n");
-        $target = $dir.'/outside-target';
-        file_put_contents($target, "intact\n");
+        $this->pmssWriteFile($dir.'/sources.list.pmss-backup', "safe-write copy\n");
+        $this->pmssWriteFile($dir.'/sources.list.pmss-backup-keepme', "other\n");
+        $target = $this->pmssWriteFile($dir.'/outside-target', "intact\n");
         symlink($target, $dir.'/sources.list.pmss-backup-20200101000000');
 
         $this->assertSame(2, \pmssPruneSourcesListBackups($dir));
@@ -37,7 +36,7 @@ class SourcesListBackupPruneTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-apt-backups-');
         $this->assertSame(0, \pmssPruneSourcesListBackups($dir));
-        file_put_contents($dir.'/sources.list.pmss-backup-20261028201328', "deb x\n");
+        $this->pmssWriteFile($dir.'/sources.list.pmss-backup-20261028201328', "deb x\n");
         $this->assertSame(0, \pmssPruneSourcesListBackups($dir));
         $this->assertTrue(is_file($dir.'/sources.list.pmss-backup-20261028201328'), 'a single copy is the newest and stays');
     }

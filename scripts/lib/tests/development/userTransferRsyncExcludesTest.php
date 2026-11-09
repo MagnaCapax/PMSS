@@ -14,8 +14,7 @@ class UserTransferRsyncExcludesTest extends TestCase
         }
         $root = $this->pmssMakeTempDir('pmss-transfer-proxies-');
         $source = $root.'/source';
-        $this->pmssEnsureDir($source.'/.lighttpd/custom.d');
-        file_put_contents($source.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
+        $this->pmssWriteFile($source.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
             \pmssLighttpdManagedProxyFragment('qbittorrent', 'source', 45000));
         $customerFiles = [
             '.lighttpd/custom', '.lighttpd/custom.d/customer.conf', '.lighttpd/custom.d/pmss-notes.txt',
@@ -23,22 +22,18 @@ class UserTransferRsyncExcludesTest extends TestCase
             '.lighttpd/custom.d/pmss-rclone.conf', '.lighttpd/custom.d/pmss-qbittorrent.conf.backup',
         ];
         foreach ($customerFiles as $path) {
-            $this->pmssEnsureDir(dirname($source.'/'.$path));
-            file_put_contents($source.'/'.$path, $path);
+            $this->pmssWriteFile($source.'/'.$path, $path);
         }
         // Hardlinks must survive even across the final pass's separate source roots (#977).
-        $this->pmssEnsureDir($source.'/.local');
-        file_put_contents($source.'/.local/payload', 'linked payload');
+        $this->pmssWriteFile($source.'/.local/payload', 'linked payload');
         $this->assertTrue(link($source.'/.local/payload', $source.'/www/public/payload'));
-        file_put_contents($source.'/www/public/independent', 'linked payload');
+        $this->pmssWriteFile($source.'/www/public/independent', 'linked payload');
 
         foreach ([false, true] as $namespaceRsync) {
             $target = $root.'/target-'.(int) $namespaceRsync;
-            $this->pmssEnsureDir($target.'/.lighttpd/custom.d');
-            file_put_contents($target.'/.qbittorrentPort', '46000');
+            $this->pmssWriteFile($target.'/.qbittorrentPort', '46000');
             $fragment = \pmssLighttpdManagedProxyFragment('qbittorrent', 'target', 46000);
-            $proxyPath = $target.'/.lighttpd/custom.d/pmss-qbittorrent.conf';
-            file_put_contents($proxyPath, $fragment);
+            $proxyPath = $this->pmssWriteFile($target.'/.lighttpd/custom.d/pmss-qbittorrent.conf', $fragment);
             // Force rsync to notice equal-sized fragments even within the same second.
             touch($proxyPath, 946684800);
             $cfg = ['localUser' => 'target', 'remoteUser' => 'source', 'hostname' => 'example.invalid',
@@ -97,18 +92,16 @@ class UserTransferRsyncExcludesTest extends TestCase
         ];
         foreach (['', 'data/x/'] as $prefix) {
             foreach (array_merge($homeState, ['upload.pmss-tmp-123', 'dir.pmss-tmp-456/file']) as $path) {
-                $file = $source.'/'.$prefix.$path;
-                $this->pmssEnsureDir(dirname($file));
-                file_put_contents($file, $prefix.$path);
+                $this->pmssWriteFile($source.'/'.$prefix.$path, $prefix.$path);
             }
         }
         // Exact state names must not swallow neighbouring customer files either.
-        file_put_contents($source.'/.rtorrent.rc.custom', 'custom');
-        file_put_contents($source.'/data/x/rTorrentLog.backup', 'backup');
+        $this->pmssWriteFile($source.'/.rtorrent.rc.custom', 'custom');
+        $this->pmssWriteFile($source.'/data/x/rTorrentLog.backup', 'backup');
         // Cross-seeding shares inodes across directories; equal bytes alone do not make a hardlink.
-        file_put_contents($source.'/data/payload', 'linked payload');
+        $this->pmssWriteFile($source.'/data/payload', 'linked payload');
         $this->assertTrue(link($source.'/data/payload', $source.'/data/x/payload'));
-        file_put_contents($source.'/data/independent', 'linked payload');
+        $this->pmssWriteFile($source.'/data/independent', 'linked payload');
         $cfg = ['localUser' => 'target', 'remoteUser' => 'source', 'hostname' => 'example.invalid',
             'namespaceRsync' => true, 'receiver' => ['uid' => 1200, 'gid' => 1200, 'home' => $target]];
         $script = \pmssUserTransferBuildRsyncMain($cfg);

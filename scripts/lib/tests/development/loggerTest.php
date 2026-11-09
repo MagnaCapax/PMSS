@@ -48,8 +48,7 @@ class LoggerTest extends TestCase
     {
         // A second name on the file means someone else can reach the bytes; nothing may be appended.
         $dir = $this->pmssMakeTempDir('pmss-log-shared-', 0700);
-        $target = $dir.'/target';
-        file_put_contents($target, "kept\n");
+        $target = $this->pmssWriteFile($dir.'/target', "kept\n");
         $this->assertTrue(link($target, $dir.'/shared.log'));
         $this->assertFalse(\pmssLogAppendTimestampedLine($dir.'/shared.log', 'leaked', '[Y-m-d H:i:s] ', '', 0600));
         $this->assertSame("kept\n", file_get_contents($target));
@@ -64,7 +63,7 @@ class LoggerTest extends TestCase
         $this->assertTrue($start !== false && $end !== false && $end > $start, 'update.php bootstrap logger located');
         $code = str_replace("'/var/log/pmss'", "'/proc/pmss-no-such-log-dir'", substr($source, $start, $end - $start));
         $script = $this->pmssMakeTempDir('pmss-update-logmsg-', 0700).'/run.php';
-        file_put_contents($script, "<?php\n\$_SERVER['SCRIPT_NAME'] = ".var_export($scriptName, true).";\n".$code
+        $this->pmssWriteFile($script, "<?php\n\$_SERVER['SCRIPT_NAME'] = ".var_export($scriptName, true).";\n".$code
             ."\nlogmsg(".var_export($message, true).");\n");
         $rc = $this->pmssExecArgvCommand([PHP_BINARY, $script], [], '>/dev/null 2>&1')['rc'];
         $this->assertSame(0, $rc, 'update.php bootstrap logmsg ran');
@@ -87,7 +86,7 @@ class LoggerTest extends TestCase
         $fallbackPath = '/tmp/pmss-bootstrap-linked-test.log';
         @unlink($fallbackPath);
         $dir = $this->pmssMakeTempDir('pmss-log-wrapper-', 0700);
-        file_put_contents($dir.'/target', "kept\n");
+        $this->pmssWriteFile($dir.'/target', "kept\n");
         $this->assertTrue(link($dir.'/target', $fallbackPath));
         $this->runUpdateBootstrapLogmsg('/no/perm/pmss-bootstrap-linked-test.php', 'wrapper leaked line');
         $this->assertSame("kept\n", file_get_contents($dir.'/target'));
@@ -111,8 +110,7 @@ class LoggerTest extends TestCase
     {
         // A leftover of ours from an older version (0644) is narrowed before the new line lands in it.
         $dir = $this->pmssMakeTempDir('pmss-log-leftover-', 0700);
-        $path = $dir.'/shared.log';
-        file_put_contents($path, "old\n");
+        $path = $this->pmssWriteFile($dir.'/shared.log', "old\n");
         chmod($path, 0644);
         $this->assertTrue(\pmssLogAppendTimestampedLine($path, 'new line', '[Y-m-d H:i:s] ', '', 0600));
         clearstatcache(true, $path);
@@ -144,8 +142,7 @@ class LoggerTest extends TestCase
         if (!is_array($account)) throw new SkipTest('Fixture account unavailable');
         // Another account created the name first: root must neither write to it nor re-mode it.
         $dir = $this->pmssMakeTempDir('pmss-log-foreign-', 0700);
-        $path = $dir.'/shared.log';
-        file_put_contents($path, "theirs\n");
+        $path = $this->pmssWriteFile($dir.'/shared.log', "theirs\n");
         chmod($path, 0644);
         chown($path, $account['uid']);
         $this->assertFalse(\pmssLogAppendTimestampedLine($path, 'leaked', '[Y-m-d H:i:s] ', '', 0600));
@@ -154,7 +151,7 @@ class LoggerTest extends TestCase
         $this->assertSame(0644, fileperms($path) & 0777);
         $fallbackPath = '/tmp/pmss-bootstrap-foreign-test.log';
         @unlink($fallbackPath);
-        file_put_contents($fallbackPath, "theirs\n");
+        $this->pmssWriteFile($fallbackPath, "theirs\n");
         chmod($fallbackPath, 0644);
         chown($fallbackPath, $account['uid']);
         $this->runUpdateBootstrapLogmsg('/no/perm/pmss-bootstrap-foreign-test.php', 'wrapper leaked line');

@@ -9,8 +9,7 @@ class LighttpdWatchdogErrorPageTest extends TestCase
     public function testHangingConfigProbeReportsInvalidAndBacksOff(): void
     {
         $binDir = $this->pmssMakeTempDir('pmss-watchdog-probe-timeout-');
-        $config = $binDir.'/config';
-        file_put_contents($config, 'fixture');
+        $config = $this->pmssWriteFile($binDir.'/config', 'fixture');
         $this->pmssWriteExecutableFiles($binDir, [
             'id' => "#!/bin/sh\necho 2002\n",
             'lighttpd' => "#!/bin/sh\nsleep 30\n",
@@ -35,7 +34,7 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $marker = $binDir.'/launched';
         $stub = "#!/bin/sh\nprintf launched > ".escapeshellarg($marker)."\n";
         $this->pmssWriteExecutableFiles($binDir, ['df' => $stub, 'quota' => $stub, 'lighttpd' => $stub]);
-        file_put_contents($binDir.'/config', 'fixture');
+        $this->pmssWriteFile($binDir.'/config', 'fixture');
         $this->pmssWithPathPrefix($binDir, function () use ($binDir, $marker): void {
             foreach (["\0", "\0suffix", "prefix\0suffix", "prefix\0", "\0\0"] as $invalid) {
                 $this->assertSame(null, pmssLighttpdWatchdogCommandCapture('df', $invalid));
@@ -45,7 +44,7 @@ class LighttpdWatchdogErrorPageTest extends TestCase
                 $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead($invalid, $binDir));
             }
             // A rejected account name reads no snapshot, and a file in the home is never one.
-            file_put_contents($binDir.'/.quota', "/dev/sda1 10G* 9G 10G 0 0 0\n");
+            $this->pmssWriteFile($binDir.'/.quota', "/dev/sda1 10G* 9G 10G 0 0 0\n");
             $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead("fixtur91\0", $binDir));
             $this->assertFalse(file_exists($marker));
         });
@@ -72,7 +71,7 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $binDir = $this->pmssMakeTempDir('pmss-watchdog-account-');
         $config = $binDir.'/config';
         $log = $binDir.'/launch.log';
-        file_put_contents($config, 'fixture');
+        $this->pmssWriteFile($config, 'fixture');
         $this->pmssWriteExecutableFiles($binDir, [
             'id' => "#!/bin/sh\n[ \"\$1\" = '-u' ] && [ \"\$2\" = 'fixtur91' ] && echo 2002 && exit 0\nexit 1\n",
             'lighttpd' => "#!/bin/sh\nprintf '%s\\n' \"\$*\" > ".escapeshellarg($log)."\nexit 7\n",
@@ -92,7 +91,7 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $binDir = $this->pmssMakeTempDir('pmss-watchdog-no-account-');
         $config = $binDir.'/config';
         $marker = $binDir.'/launched';
-        file_put_contents($config, 'fixture');
+        $this->pmssWriteFile($config, 'fixture');
         $this->pmssWriteExecutableFiles($binDir, [
             'id' => "#!/bin/sh\nexit 1\n",
             'lighttpd' => "#!/bin/sh\nprintf launched > ".escapeshellarg($marker)."\nexit 1\n",
@@ -163,8 +162,8 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         foreach ([[$healthy, 0, $exhausted, false], [$exhausted, 1, $healthy, true],
             ['', 1, $exhausted, true], ['', 0, $healthy, false],
             ['unavailable', 1, $exhausted, null], ['', 1, '', null]] as [$output, $rc, $snapshot, $expected]) {
-            file_put_contents($rootDir.'/fixtur91', $snapshot);
-            file_put_contents($homeDir.'/.quota', $snapshot === $healthy ? $exhausted : $healthy);
+            $this->pmssWriteFile($rootDir.'/fixtur91', $snapshot);
+            $this->pmssWriteFile($homeDir.'/.quota', $snapshot === $healthy ? $exhausted : $healthy);
             $this->pmssWriteExecutableFiles($homeDir, ['quota' => "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)."\nexit {$rc}\n"]);
             $this->pmssWithEnv(['PMSS_QUOTA_RUNTIME_DIR' => $rootDir], function () use ($homeDir, $expected): void {
                 $this->pmssWithPathPrefix($homeDir, function () use ($homeDir, $expected): void {
@@ -358,8 +357,7 @@ SH
     public function testDeleteErrorPageRemovesExistingFile(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
-        $path = $this->watchdogErrorPagePath($webRoot);
-        file_put_contents($path, 'demo');
+        $path = $this->pmssWriteFile($this->watchdogErrorPagePath($webRoot), 'demo');
         $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('fixtur91', $webRoot));
         $this->assertFalse(file_exists($path));
     }
@@ -373,8 +371,7 @@ SH
     public function testErrorPageFileOperationsRejectInvalidAccountNames(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
-        $path = $this->watchdogErrorPagePath($webRoot);
-        file_put_contents($path, 'untouched');
+        $path = $this->pmssWriteFile($this->watchdogErrorPagePath($webRoot), 'untouched');
         foreach (['', 'Fixtur91', 'fixtur91/../fixtur91', "fixtur91\0", 'toolongname'] as $username) {
             $this->assertFalse(pmssLighttpdWatchdogWriteErrorPage($username, 'php', $webRoot));
             $this->assertFalse(pmssLighttpdWatchdogDeleteErrorPage($username, $webRoot));

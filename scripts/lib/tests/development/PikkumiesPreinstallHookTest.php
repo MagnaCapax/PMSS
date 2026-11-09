@@ -11,27 +11,25 @@ final class PikkumiesPreinstallHookTest extends TestCase
         require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
         $root = $this->pmssMakeTempDir('pmss-pk-clear-');
         $state = $root.'/state';
-        $this->pmssEnsureDir($state);
+        $this->pmssWriteFile($state.'/fixt01', 'done');
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('fixt01', $state));
+        $this->assertFalse(file_exists($state.'/fixt01'));
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('fixt01', $state));
 
-        file_put_contents($state.'/alice', 'done');
-        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
-        $this->assertFalse(file_exists($state.'/alice'));
-        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
-
-        file_put_contents($root.'/target', 'keep');
-        symlink($root.'/target', $state.'/alice');
-        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
-        $this->assertFalse(is_link($state.'/alice'));
+        $this->pmssWriteFile($root.'/target', 'keep');
+        symlink($root.'/target', $state.'/fixt01');
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('fixt01', $state));
+        $this->assertFalse(is_link($state.'/fixt01'));
         $this->assertSame('keep', file_get_contents($root.'/target'));
 
-        $this->pmssEnsureDir($state.'/alice');
-        $this->assertFalse(\pmssPikkumiesPreinstallStateClear('alice', $state));
-        $this->assertTrue(is_dir($state.'/alice'));
+        $this->pmssEnsureDir($state.'/fixt01');
+        $this->assertFalse(\pmssPikkumiesPreinstallStateClear('fixt01', $state));
+        $this->assertTrue(is_dir($state.'/fixt01'));
         $this->assertFalse(\pmssPikkumiesPreinstallStateClear('../target', $state));
         $this->assertSame('keep', file_get_contents($root.'/target'));
 
         symlink($state, $root.'/state-link');
-        $this->assertFalse(\pmssPikkumiesPreinstallStateClear('alice', $root.'/state-link'));
+        $this->assertFalse(\pmssPikkumiesPreinstallStateClear('fixt01', $root.'/state-link'));
     }
 
     public function testAskStateClearRemovesOnlyThatAccountsFilesAndNoLinkTarget(): void
@@ -39,29 +37,28 @@ final class PikkumiesPreinstallHookTest extends TestCase
         require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
         $root = $this->pmssMakeTempDir('pmss-pk-ask-');
         $dir = $root.'/ask';
-        $this->pmssEnsureDir($dir);
         foreach (['.out', '.in', '.lock', '.out.rc'] as $suffix) {
-            file_put_contents($dir.'/alice'.$suffix, 'x');
+            $this->pmssWriteFile($dir.'/fixt01'.$suffix, 'x');
         }
-        file_put_contents($dir.'/alicebob.out', 'other account');
-        file_put_contents($root.'/target', 'keep');
-        unlink($dir.'/alice.in');
-        symlink($root.'/target', $dir.'/alice.in');
+        $this->pmssWriteFile($dir.'/fixt01ab.out', 'other account');
+        $this->pmssWriteFile($root.'/target', 'keep');
+        unlink($dir.'/fixt01.in');
+        symlink($root.'/target', $dir.'/fixt01.in');
 
-        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $dir));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('fixt01', $dir));
         foreach (['.out', '.in', '.lock', '.out.rc'] as $suffix) {
-            $this->assertFalse(file_exists($dir.'/alice'.$suffix) || is_link($dir.'/alice'.$suffix));
+            $this->assertFalse(file_exists($dir.'/fixt01'.$suffix) || is_link($dir.'/fixt01'.$suffix));
         }
-        $this->assertSame('other account', file_get_contents($dir.'/alicebob.out'));
+        $this->assertSame('other account', file_get_contents($dir.'/fixt01ab.out'));
         $this->assertSame('keep', file_get_contents($root.'/target'));
-        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $dir));
-        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $root.'/missing'));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('fixt01', $dir));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('fixt01', $root.'/missing'));
 
-        $this->pmssEnsureDir($dir.'/alice.out');
-        $this->assertFalse(\pmssPikkumiesAskStateClear('alice', $dir));
+        $this->pmssEnsureDir($dir.'/fixt01.out');
+        $this->assertFalse(\pmssPikkumiesAskStateClear('fixt01', $dir));
         $this->assertFalse(\pmssPikkumiesAskStateClear('../target', $dir));
         symlink($dir, $root.'/ask-link');
-        $this->assertFalse(\pmssPikkumiesAskStateClear('alice', $root.'/ask-link'));
+        $this->assertFalse(\pmssPikkumiesAskStateClear('fixt01', $root.'/ask-link'));
     }
 
     public function testStateHelpersRejectUnsafeDirectoryChainsWithoutChangingFiles(): void
@@ -69,24 +66,23 @@ final class PikkumiesPreinstallHookTest extends TestCase
         require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
         $root = $this->pmssMakeTempDir('pmss-pk-state-path-');
         $state = $root.'/target/state';
-        $this->pmssEnsureDir($state);
-        $names = ['alice', 'alice.out', 'alice.in', 'alice.lock', 'alice.out.rc'];
-        foreach ($names as $name) file_put_contents($state.'/'.$name, 'keep');
+        $names = ['fixt01', 'fixt01.out', 'fixt01.in', 'fixt01.lock', 'fixt01.out.rc'];
+        foreach ($names as $name) $this->pmssWriteFile($state.'/'.$name, 'keep');
         symlink($root.'/target', $root.'/parent-link');
         symlink($state, $root.'/state-link');
-        file_put_contents($root.'/file', 'keep');
+        $this->pmssWriteFile($root.'/file', 'keep');
 
         // Include a linked leaf with a trailing slash: is_link alone misses it.
         foreach (['', '/', 'relative-state', $root.'/target/../target/state',
             "\0".$state, $state."\0", $root.'/parent-link/state',
             $root.'/parent-link/new-state', $root.'/state-link/', $root.'/file'] as $unsafe) {
-            $this->assertFalse(\pmssPikkumiesPreinstallStateClear('alice', $unsafe));
-            $this->assertFalse(\pmssPikkumiesAskStateClear('alice', $unsafe));
-            $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('bob', $unsafe));
+            $this->assertFalse(\pmssPikkumiesPreinstallStateClear('fixt01', $unsafe));
+            $this->assertFalse(\pmssPikkumiesAskStateClear('fixt01', $unsafe));
+            $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('fixt02', $unsafe));
         }
         foreach ($names as $name) $this->assertSame('keep', file_get_contents($state.'/'.$name));
         $this->assertSame('keep', file_get_contents($root.'/file'));
-        $this->assertFalse(file_exists($state.'/bob'));
+        $this->assertFalse(file_exists($state.'/fixt02'));
         $this->assertFalse(file_exists($root.'/target/new-state'));
     }
 
@@ -94,17 +90,16 @@ final class PikkumiesPreinstallHookTest extends TestCase
     {
         require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
         $root = $this->pmssMakeTempDir('pmss-pk-hook-path-');
-        file_put_contents($root.'/marker', '');
-        $this->pmssEnsureDir($root.'/target/state');
-        file_put_contents($root.'/target/state/alice', 'keep');
+        $this->pmssWriteFile($root.'/marker', '');
+        $this->pmssWriteFile($root.'/target/state/fixt01', 'keep');
         symlink($root.'/target', $root.'/parent-link');
         $calls = [];
-        $ops = self::pmssMakeCallbacks(['users' => ['alice'], 'run' => null], $calls);
+        $ops = self::pmssMakeCallbacks(['users' => ['fixt01'], 'run' => null], $calls);
         foreach (['state', 'new-state'] as $leaf) {
             \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/parent-link/'.$leaf, $ops);
         }
         $this->assertSame([], $calls);
-        $this->assertSame('keep', file_get_contents($root.'/target/state/alice'));
+        $this->assertSame('keep', file_get_contents($root.'/target/state/fixt01'));
         $this->assertFalse(file_exists($root.'/target/new-state'));
     }
 
@@ -113,13 +108,13 @@ final class PikkumiesPreinstallHookTest extends TestCase
         require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
         $root = $this->pmssMakeTempDir('pmss-pk-state-valid-');
         $state = $root.'/new/parent/state/';
-        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
-        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $state));
-        $this->assertSame($state.'/alice', \pmssPikkumiesPreinstallStateMarkerPath('alice', $state));
-        file_put_contents($state.'/alice', 'done');
-        file_put_contents($state.'/alice.out', 'output');
-        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('alice', $state));
-        $this->assertTrue(\pmssPikkumiesAskStateClear('alice', $state));
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('fixt01', $state));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('fixt01', $state));
+        $this->assertSame($state.'/fixt01', \pmssPikkumiesPreinstallStateMarkerPath('fixt01', $state));
+        $this->pmssWriteFile($state.'/fixt01', 'done');
+        $this->pmssWriteFile($state.'/fixt01.out', 'output');
+        $this->assertTrue(\pmssPikkumiesPreinstallStateClear('fixt01', $state));
+        $this->assertTrue(\pmssPikkumiesAskStateClear('fixt01', $state));
         $this->assertSame([], glob($state.'*'));
     }
 
@@ -154,16 +149,13 @@ final class PikkumiesPreinstallHookTest extends TestCase
         // stopped; fxmark: the same, marked as installed by the earlier hook; fxdone: re-run once already
         $users = ['fxfresh', 'fxfin', 'fxstop', 'fxmark', 'fxdone'];
         foreach ($users as $user) {
-            $this->pmssEnsureDir($root.'/home/'.$user.'/bin');
-            file_put_contents($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
+            $this->pmssWriteFile($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
             if ($user !== 'fxfresh') $this->pmssEnsureDir($root.'/home/'.$user.'/.mcxPikkumies/pikkumies/local');
         }
-        $this->pmssEnsureDir($root.'/home/fxfin/.mcxPikkumies/pikkumies/local/hermes-managed');
-        file_put_contents($root.'/home/fxfin/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
+        $this->pmssWriteFile($root.'/home/fxfin/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
         $this->pmssEnsureDir($root.'/state');
         touch($root.'/state/fxmark');
-        file_put_contents($root.'/state/fxdone', 'finished');
-        $this->pmssEnsureDir($root.'/stub');
+        $this->pmssWriteFile($root.'/state/fxdone', 'finished');
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
         $path = (string) getenv('PATH');
         $runs = [];
@@ -198,17 +190,17 @@ final class PikkumiesPreinstallHookTest extends TestCase
     {
         require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
         $root = $this->pmssMakeTempDir('pmss-pk-links-');
-        file_put_contents($root.'/marker', '');
+        $this->pmssWriteFile($root.'/marker', '');
         $this->pmssEnsureDir($root.'/target');
         symlink($root.'/target', $root.'/state-link');
         $calls = [];
-        $ops = self::pmssMakeCallbacks(['users' => ['alice'], 'run' => null], $calls);
+        $ops = self::pmssMakeCallbacks(['users' => ['fixt01'], 'run' => null], $calls);
         \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state-link', $ops);
         $this->assertSame([], $calls);
         $this->assertSame([], glob($root.'/target/*'));
 
         $this->pmssEnsureDir($root.'/state');
-        symlink($root.'/absent', $root.'/state/alice');
+        symlink($root.'/absent', $root.'/state/fixt01');
         \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
         $this->assertSame(['users'], $calls);
         $this->assertFalse(file_exists($root.'/absent'));
@@ -218,18 +210,16 @@ final class PikkumiesPreinstallHookTest extends TestCase
     {
         require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
         $root = $this->pmssMakeTempDir('pmss-pk-run-');
-        file_put_contents($root.'/marker', '');
+        $this->pmssWriteFile($root.'/marker', '');
         // big: eligible; small: below the floor; noinst: no installer; has: already has Pikkumies; done: tried before
         $ram = ['big' => 4096, 'small' => 256, 'noinst' => 4096, 'has' => 4096, 'done' => 4096];
         foreach (array_keys($ram) as $user) {
             $this->pmssEnsureDir($root.'/home/'.$user.'/bin');
-            if ($user !== 'noinst') file_put_contents($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
+            if ($user !== 'noinst') $this->pmssWriteFile($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
         }
-        $this->pmssEnsureDir($root.'/home/has/.mcxPikkumies/pikkumies/local/hermes-managed');
-        file_put_contents($root.'/home/has/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
+        $this->pmssWriteFile($root.'/home/has/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
         $this->pmssEnsureDir($root.'/state');
         touch($root.'/state/done');
-        $this->pmssEnsureDir($root.'/stub');
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
         $path = (string) getenv('PATH');
         $runs = [];
@@ -264,16 +254,16 @@ public function testMarkerPathIsMadeInARootOnlyDirectoryAndRefusesLinksAndRepeat
         require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
         $root = $this->pmssMakeTempDir('pmss-pk-path-');
         $state = $root.'/state';
-        $this->assertSame($state.'/alice', \pmssPikkumiesPreinstallStateMarkerPath('alice', $state));
+        $this->assertSame($state.'/fixt01', \pmssPikkumiesPreinstallStateMarkerPath('fixt01', $state));
         $this->assertSame(0700, fileperms($state) & 0777, 'the state directory is created root-only');
         $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('../etc', $state));
-        touch($state.'/alice');
-        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('alice', $state), 'already marked');
-        symlink($root.'/absent', $state.'/bob');
-        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('bob', $state), 'a link is never a marker target');
+        touch($state.'/fixt01');
+        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('fixt01', $state), 'already marked');
+        symlink($root.'/absent', $state.'/fixt02');
+        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('fixt02', $state), 'a link is never a marker target');
         $this->pmssEnsureDir($root.'/target');
         symlink($root.'/target', $root.'/state-link');
-        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('carol', $root.'/state-link'));
+        $this->assertSame(null, \pmssPikkumiesPreinstallStateMarkerPath('fixt03', $root.'/state-link'));
         $this->assertSame([], glob($root.'/target/*'));
     }
 
@@ -284,18 +274,16 @@ public function testMarkerPathIsMadeInARootOnlyDirectoryAndRefusesLinksAndRepeat
         require_once dirname(__DIR__, 2).'/user/add/postProvision.php';
         $root = $this->pmssMakeTempDir('pmss-pk-new-');
         $home = $root.'/account';
-        $this->pmssEnsureDir($home.'/bin');
-        file_put_contents($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
-        $this->pmssEnsureDir($root.'/stub');
+        $this->pmssWriteFile($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
         $path = (string) getenv('PATH');
         putenv('PATH='.$root.'/stub:'.$path);
         try {
-            $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => 'alice', 'memory' => '2000'], $home, $root.'/state');
+            $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => 'fixt01', 'memory' => '2000'], $home, $root.'/state');
         } finally {
             putenv('PATH='.$path);
         }
-        $this->assertTrue(strpos($command, ") && touch -- '\\''".$root."/state/alice'\\''") !== false, 'the marker must follow a successful install: '.$command);
-        $this->assertFalse(file_exists($root.'/state/alice'), 'nothing is marked before the install has run');
+        $this->assertTrue(strpos($command, ") && touch -- '\\''".$root."/state/fixt01'\\''") !== false, 'the marker must follow a successful install: '.$command);
+        $this->assertFalse(file_exists($root.'/state/fixt01'), 'nothing is marked before the install has run');
     }
 }

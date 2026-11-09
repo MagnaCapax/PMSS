@@ -40,9 +40,9 @@ class ArrRootExecutionBlockTest extends TestCase
     public function testKeepsALeftoverRootConfigInsteadOfDeletingIt(): void
     {
         $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
-        @mkdir($configRoot.'/Sonarr', 0700, true);
-        @file_put_contents($configRoot.'/Sonarr/config.xml', '<Config><ApiKey>keepme</ApiKey></Config>');
-        @file_put_contents($configRoot.'/Sonarr/sonarr.db', 'database');
+        $this->pmssWriteFiles($configRoot.'/Sonarr', [
+            'config.xml' => '<Config><ApiKey>keepme</ApiKey></Config>', 'sonarr.db' => 'database',
+        ], 0700);
 
         $messages = $this->block($configRoot, '20260730120000');
 
@@ -57,10 +57,8 @@ class ArrRootExecutionBlockTest extends TestCase
     public function testLeavesTheDirectoryAloneRatherThanClobberingAnExistingBackup(): void
     {
         $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
-        @mkdir($configRoot.'/Lidarr', 0700, true);
-        @file_put_contents($configRoot.'/Lidarr/config.xml', 'current');
-        @mkdir($configRoot.'/Lidarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'20260730120000', 0700, true);
-        @file_put_contents($configRoot.'/Lidarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'20260730120000/config.xml', 'earlier');
+        $this->pmssWriteFile($configRoot.'/Lidarr/config.xml', 'current', 0700);
+        $this->pmssWriteFile($configRoot.'/Lidarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'20260730120000/config.xml', 'earlier', 0700);
 
         $messages = $this->block($configRoot, '20260730120000');
 
@@ -73,7 +71,7 @@ class ArrRootExecutionBlockTest extends TestCase
     {
         $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
         $outside = $this->pmssMakeTempDir('pmss-arr-outside-', 0700);
-        @file_put_contents($outside.'/config.xml', 'original');
+        $this->pmssWriteFile($outside.'/config.xml', 'original');
         $this->pmssCreateSymlinkOrSkip($outside, $configRoot.'/Prowlarr');
 
         $messages = $this->block($configRoot);
@@ -105,7 +103,7 @@ class ArrRootExecutionBlockTest extends TestCase
         $this->assertSame(null, \pmssRootGuardAppForExe('/opt/RadarrEvil/Radarr', $prefixes));
         $this->assertSame(null, \pmssRootGuardAppForExe('/opt/Radarr2/Radarr', $prefixes));
         // A customer's own copy lives under their home and must never be selected.
-        $this->assertSame(null, \pmssRootGuardAppForExe('/home/tomate/.bin/Sonarr/Sonarr', $prefixes));
+        $this->assertSame(null, \pmssRootGuardAppForExe('/home/fixtur01/.bin/Sonarr/Sonarr', $prefixes));
         $this->assertSame(null, \pmssRootGuardAppForExe('/usr/bin/bash', $prefixes));
 
         $this->assertSame('Whisparr', \pmssRootGuardAppForExe('/opt/Whisparr/Whisparr', $prefixes));
@@ -121,8 +119,7 @@ class ArrRootExecutionBlockTest extends TestCase
     {
         $procRoot = $this->pmssMakeTempDir('pmss-arr-proc-', 0700);
         $installRoot = $this->pmssMakeTempDir('pmss-arr-opt-', 0700);
-        @mkdir($installRoot.'/Radarr', 0755, true);
-        @touch($installRoot.'/Radarr/Radarr');
+        $this->pmssWriteFile($installRoot.'/Radarr/Radarr', '');
 
         // uid 0 running the managed install: must be selected.
         $this->pmssWriteFakeProcess($procRoot, 101, $installRoot.'/Radarr/Radarr', 0);
@@ -131,8 +128,7 @@ class ArrRootExecutionBlockTest extends TestCase
         // uid 0 running something else entirely: must NOT be selected.
         $this->pmssWriteFakeProcess($procRoot, 103, '/usr/bin/bash', 0);
         // Unknown root software outside standard paths: alert-only, never killed.
-        $unknownExe = $this->pmssMakeTempPath('pmss-root-unknown-exe-');
-        @file_put_contents($unknownExe, 'binary');
+        $unknownExe = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-root-unknown-exe-'), 'binary');
         $this->pmssWriteFakeProcess($procRoot, 104, $unknownExe, 0);
         // A look-alike under /opt is neither a known app nor an alert-only unknown path.
         $this->pmssWriteFakeProcess($procRoot, 105, '/opt/RadarrEvil/Radarr', 0);
@@ -151,8 +147,7 @@ class ArrRootExecutionBlockTest extends TestCase
         $procRoot = $this->pmssMakeTempDir('pmss-arr-proc-', 0700);
         $procNetRoot = $this->pmssMakeTempDir('pmss-arr-net-', 0700);
         $installRoot = $this->pmssMakeTempDir('pmss-arr-opt-', 0700);
-        @mkdir($installRoot.'/Radarr', 0755, true);
-        @touch($installRoot.'/Radarr/Radarr');
+        $this->pmssWriteFile($installRoot.'/Radarr/Radarr', '');
         $this->pmssWriteFakeTcpTable($procNetRoot, [301 => 7878, 302 => 7879]);
 
         $this->pmssWriteFakeProcess($procRoot, 301, $installRoot.'/Radarr/Radarr', 1046, [301]);
@@ -183,10 +178,8 @@ class ArrRootExecutionBlockTest extends TestCase
     {
         $procRoot = $this->pmssMakeTempDir('pmss-arr-proc-', 0700);
         $installRoot = $this->pmssMakeTempDir('pmss-arr-opt-', 0700);
-        @mkdir($installRoot.'/Radarr', 0755, true);
-        @touch($installRoot.'/Radarr/Radarr');
-        $unknownExe = $this->pmssMakeTempPath('pmss-root-unknown-exe-');
-        @file_put_contents($unknownExe, 'binary');
+        $this->pmssWriteFile($installRoot.'/Radarr/Radarr', '');
+        $unknownExe = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-root-unknown-exe-'), 'binary');
         $this->pmssWriteFakeProcess($procRoot, 201, $installRoot.'/Radarr/Radarr', 0);
         $this->pmssWriteFakeProcess($procRoot, 202, $unknownExe, 0);
         $this->pmssWriteFakeProcess($procRoot, 203, $installRoot.'/Radarr/Radarr', 0);
@@ -239,6 +232,6 @@ class ArrRootExecutionBlockTest extends TestCase
                 $inode
             );
         }
-        @file_put_contents($procNetRoot.'/tcp', implode("\n", $lines)."\n");
+        $this->pmssWriteFile($procNetRoot.'/tcp', implode("\n", $lines)."\n");
     }
 }

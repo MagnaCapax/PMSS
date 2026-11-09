@@ -11,9 +11,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
         [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "new config\n");
         $serviceDir = $backupRoot.'/nginx';
-        mkdir($serviceDir, 0700);
-        $backupPath = $serviceDir.'/20000101000000__'.\pmssConfigBackupsPathKey($source).'.bak';
-        file_put_contents($backupPath, 'keep');
+        $backupPath = $this->pmssWriteFile($serviceDir.'/20000101000000__'.\pmssConfigBackupsPathKey($source).'.bak', 'keep', 0700);
 
         // Include edge bytes that trim() used to erase and embedded bytes it retained.
         foreach (["\0%s", "%s\0", " \0%s\t", "\t%s\0\n", "%s\0suffix"] as $format) {
@@ -82,16 +80,16 @@ class ConfigBackupsCharacterizationTest extends TestCase
     {
         [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
         $serviceDir = $backupRoot.'/nginx';
-        @mkdir($serviceDir, 0700, true);
-
         $targetSource = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
         $otherSource = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/proxy_params', "proxy_set_header Host \$host;\n");
 
         $targetKey = \pmssConfigBackupsPathKey($targetSource);
         $otherKey = \pmssConfigBackupsPathKey($otherSource);
-        file_put_contents($serviceDir.'/20260131100000__'.$targetKey.'.bak', 'old');
-        file_put_contents($serviceDir.'/20260131110000__'.$targetKey.'.bak', 'new');
-        file_put_contents($serviceDir.'/20260131120000__'.$otherKey.'.bak', 'other');
+        $this->pmssWriteFiles($serviceDir, [
+            '20260131100000__'.$targetKey.'.bak' => 'old',
+            '20260131110000__'.$targetKey.'.bak' => 'new',
+            '20260131120000__'.$otherKey.'.bak' => 'other',
+        ], 0700);
 
         \pmssPruneCriticalConfigBackups('nginx', $targetSource, array(
             'backupRoot' => $backupRoot,
@@ -144,8 +142,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/proftpd/proftpd.conf', "ServerName pmss\n");
 
         $sourceKey = \pmssConfigBackupsPathKey($source);
-        $backupPath = $outsideRoot.'/20260131100000__'.$sourceKey.'.bak';
-        file_put_contents($backupPath, 'old');
+        $backupPath = $this->pmssWriteFile($outsideRoot.'/20260131100000__'.$sourceKey.'.bak', 'old');
         symlink($outsideRoot, $backupRoot.'/proftpd');
 
         \pmssPruneCriticalConfigBackups('proftpd', $source, array(

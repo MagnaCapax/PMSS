@@ -133,7 +133,7 @@ class UserConfigLighttpdLogicTest extends TestCase
         $this->assertFalse(\pmssShouldConfigureLighttpdForHome($home));
 
         // Add .rtorrent.rc and expect the helper to allow configuration.
-        file_put_contents($home.'/.rtorrent.rc', "dummy");
+        $this->pmssWriteFile($home.'/.rtorrent.rc', "dummy");
         $this->assertTrue(\pmssShouldConfigureLighttpdForHome($home));
     }
 
@@ -163,7 +163,7 @@ LIGHTTPD;
         $root = $this->pmssMakeTempDir('pmss-lighttpd-write-');
         $realPath = $root.'/real.conf';
         $linkPath = $root.'/link.conf';
-        file_put_contents($realPath, 'original');
+        $this->pmssWriteFile($realPath, 'original');
         symlink($realPath, $linkPath);
 
         $this->assertFalse(\pmssAtomicWriteFile($linkPath, 'updated'));
@@ -184,9 +184,7 @@ LIGHTTPD;
     public function testPhpIniSyncKeepsOtherDirectivesAndAccountOwnership(): void
     {
         $home = $this->pmssMakeTempDir('pmss-php-ini-home-');
-        $this->pmssEnsureDir($home.'/.lighttpd');
-        $path = $home.'/.lighttpd/php.ini';
-        file_put_contents($path, "memory_limit = 128M\n; keep this line\n");
+        $path = $this->pmssWriteFile($home.'/.lighttpd/php.ini', "memory_limit = 128M\n; keep this line\n");
         $reason = null;
         $owner = $this->pmssCurrentOwner();
 
@@ -205,8 +203,7 @@ LIGHTTPD;
         $home = $this->pmssMakeTempDir('pmss-php-ini-link-');
         $this->pmssEnsureDir($home.'/.lighttpd');
         $path = $home.'/.lighttpd/php.ini';
-        $outside = $home.'/outside';
-        file_put_contents($outside, 'keep');
+        $outside = $this->pmssWriteFile($home.'/outside', 'keep');
         symlink($outside, $path);
         $this->assertFalse(\pmssLighttpdPhpIniWrite($path, $this->pmssCurrentOwner(), 'new'));
         $this->assertSame('keep', file_get_contents($outside));
@@ -222,7 +219,7 @@ LIGHTTPD;
         $root = $this->pmssMakeTempDir('pmss-lighttpd-proxy-port-');
         $realPath = $root.'/real-port';
         $linkPath = $root.'/rclone-port';
-        file_put_contents($realPath, '1234');
+        $this->pmssWriteFile($realPath, '1234');
         symlink($realPath, $linkPath);
 
         $ports = \pmssLighttpdProxyPortsEnsure(['rclone' => $linkPath]);
@@ -323,8 +320,7 @@ LIGHTTPD;
         foreach (['', '; error_log = php_errors.log', 'error_log = syslog', 'error_log =', '  ; error_log = /tmp/errors'] as $line) {
             $rendered = \pmssLighttpdApplyPhpIniContent("engine = On\n".$line."\n", 'fixtureuser', 256);
             $this->assertSame(5, substr_count($rendered, "\n"));
-            $path = $this->pmssMakeTempFile('pmss-http-phpini-');
-            file_put_contents($path, $rendered);
+            $path = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-http-phpini-'), $rendered);
             $this->assertSame('/home/fixtureuser/.lighttpd/error.log', parse_ini_file($path)['error_log']);
             $this->assertSame($rendered, \pmssLighttpdApplyPhpIniContent($rendered, 'fixtureuser', 256));
         }
@@ -335,8 +331,7 @@ LIGHTTPD;
         foreach (['session.upload_progress.enabled = On', '  ;session.upload_progress.enabled = On', 'session.upload_progress.enabled=1', ''] as $line) {
             $rendered = \pmssLighttpdApplyPhpIniContent("[Session]\n".$line."\n", 'fixtureuser', 256);
             $this->assertSame(1, substr_count($rendered, 'session.upload_progress.enabled'));
-            $path = $this->pmssMakeTempFile('pmss-http-phpini-');
-            file_put_contents($path, $rendered);
+            $path = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-http-phpini-'), $rendered);
             $this->assertSame('', parse_ini_file($path)['session.upload_progress.enabled']);
         }
         $skel = $this->pmssReadRepoFile('etc/skel/.lighttpd/php.ini');

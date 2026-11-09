@@ -34,8 +34,7 @@ class ManagedPathTest extends TestCase
     public function testManagedPathRejectsFileAsParent(): void
     {
         [$root] = $this->managedPathFixture('pmss-env-parent-file-');
-        $parentFile = $root.'/not-a-dir';
-        file_put_contents($parentFile, 'x');
+        $parentFile = $this->pmssWriteFile($root.'/not-a-dir', 'x');
         $messages = [];
 
         $this->assertFalse(\pmssManagedPathIsSafe($parentFile.'/managed.conf', 'test target', $this->pmssMakeArrayLogger($messages)));
@@ -57,7 +56,7 @@ class ManagedPathTest extends TestCase
         [$root] = $this->managedPathFixture('pmss-completed-version-');
         $versionPath = $root.'/version';
         $completedPath = $root.'/version.completed';
-        file_put_contents($versionPath, "  git/main@2026-10-18  \n");
+        $this->pmssWriteFile($versionPath, "  git/main@2026-10-18  \n");
         $messages = [];
 
         $this->assertTrue(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $this->pmssMakeArrayLogger($messages)));
@@ -76,7 +75,7 @@ class ManagedPathTest extends TestCase
 
         $this->assertFalse(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $logger));
         $this->assertFalse(file_exists($completedPath));
-        file_put_contents($versionPath, " \n\t");
+        $this->pmssWriteFile($versionPath, " \n\t");
         $this->assertFalse(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $logger));
         $this->assertFalse(file_exists($completedPath));
         $this->assertSame(2, count($messages));
@@ -88,7 +87,7 @@ class ManagedPathTest extends TestCase
         [$root] = $this->managedPathFixture('pmss-completed-dry-run-');
         $versionPath = $root.'/version';
         $completedPath = $root.'/version.completed';
-        file_put_contents($versionPath, "git/main\n");
+        $this->pmssWriteFile($versionPath, "git/main\n");
         $messages = [];
 
         $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($versionPath, $completedPath, &$messages): void {
@@ -124,7 +123,7 @@ class ManagedPathTest extends TestCase
     public function testManagedWriteWithBackupPreservesOriginalAndLogsSuccess(): void
     {
         [, $path] = $this->managedPathFixture('pmss-env-write-backup-');
-        file_put_contents($path, "before\n");
+        $this->pmssWriteFile($path, "before\n");
         $messages = [];
 
         $this->assertTrue(
@@ -147,7 +146,7 @@ class ManagedPathTest extends TestCase
     public function testManagedBackupSkipsPreExistingSymlinkCandidate(): void
     {
         [$root, $path] = $this->managedPathFixture('pmss-env-backup-symlink-');
-        file_put_contents($path, "before\n");
+        $this->pmssWriteFile($path, "before\n");
         $outside = $root.'/outside.conf';
         $timestamp = '20260102030405';
         $blocked = \pmssManagedPathBackupCandidate($path, $timestamp, 0);
@@ -165,10 +164,9 @@ class ManagedPathTest extends TestCase
     public function testManagedBackupSkipsPreExistingRegularCandidate(): void
     {
         [, $path] = $this->managedPathFixture('pmss-env-backup-collision-');
-        file_put_contents($path, "before\n");
+        $this->pmssWriteFile($path, "before\n");
         $timestamp = '20260102030406';
-        $blocked = \pmssManagedPathBackupCandidate($path, $timestamp, 0);
-        file_put_contents($blocked, "occupied\n");
+        $blocked = $this->pmssWriteFile(\pmssManagedPathBackupCandidate($path, $timestamp, 0), "occupied\n");
         $messages = [];
 
         $backup = \pmssCreateManagedPathBackup($path, 'test target', $this->pmssMakeArrayLogger($messages), $timestamp);
@@ -204,10 +202,10 @@ class ManagedPathTest extends TestCase
     public function testManagedBackupLogsWhenAllTimestampCandidatesExist(): void
     {
         [, $path] = $this->managedPathFixture('pmss-env-backup-full-');
-        file_put_contents($path, "before\n");
+        $this->pmssWriteFile($path, "before\n");
         $timestamp = '20260102030407';
         for ($attempt = 0; $attempt < 10; $attempt++) {
-            file_put_contents(\pmssManagedPathBackupCandidate($path, $timestamp, $attempt), "occupied\n");
+            $this->pmssWriteFile(\pmssManagedPathBackupCandidate($path, $timestamp, $attempt), "occupied\n");
         }
         $messages = [];
 
@@ -220,10 +218,10 @@ class ManagedPathTest extends TestCase
     public function testManagedWritePreservesOriginalWhenBackupCandidatesAreFull(): void
     {
         [, $path] = $this->managedPathFixture('pmss-env-write-backup-full-');
-        file_put_contents($path, "before\n");
+        $this->pmssWriteFile($path, "before\n");
         $timestamp = date('YmdHis');
         for ($attempt = 0; $attempt < 10; $attempt++) {
-            file_put_contents(\pmssManagedPathBackupCandidate($path, $timestamp, $attempt), "occupied\n");
+            $this->pmssWriteFile(\pmssManagedPathBackupCandidate($path, $timestamp, $attempt), "occupied\n");
         }
         $messages = [];
 
