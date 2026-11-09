@@ -80,12 +80,9 @@ class SetVirsilipasKeyTest extends TestCase
     public function testCliNeverPrintsTheKey(): void
     {
         $script = __DIR__.'/../../../util/setVirsilipasKey.php';
-        exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' --jsonl --create nosuchuser9 '
-            .escapeshellarg(self::KEY).' 2>&1', $out, $rc);
-        $text = implode("\n", $out);
-        $this->assertStringNotContainsString(self::KEY, $text);
-        $this->assertTrue($rc !== 0, 'non-root or missing user must not report success');
-        exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' --jsonl --create 2>&1', $out2, $rc2);
-        $this->assertSame(1, $rc2);
+        $result = $this->pmssExecArgvCommand([PHP_BINARY, $script, '--jsonl', '--create', 'nosuchuser9', self::KEY]);
+        $this->assertStringNotContainsString(self::KEY, $result['output']);
+        $this->assertTrue($result['rc'] !== 0, 'non-root or missing user must not report success');
+        $this->assertSame(1, $this->pmssExecArgvCommand([PHP_BINARY, $script, '--jsonl', '--create'])['rc']);
     }
 }

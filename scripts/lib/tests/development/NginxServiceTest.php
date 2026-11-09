@@ -95,7 +95,7 @@ SH;
             'PMSS_TEST_NGINX_ACTIVE_RC' => '0', 'PMSS_TEST_NGINX_SHOW_RC' => '0', 'PMSS_TEST_NGINX_PID' => '12345',
         ];
         $this->pmssWithPathPrefixedEnv($root, $environment + $defaults, function () use ($action, $expectedRc, $expectedCalls, $root): void {
-            exec(\pmssNginxServiceCommand($action, true).' 2>/dev/null', $output, $rc);
+            $rc = $this->pmssExecShellCommand(\pmssNginxServiceCommand($action, true), [], '2>/dev/null')['rc'];
             if ($expectedRc === null) $this->assertTrue($rc !== 0);
             else $this->assertSame($expectedRc, $rc);
             $this->assertSame($expectedCalls, file($root.'/calls', FILE_IGNORE_NEW_LINES));

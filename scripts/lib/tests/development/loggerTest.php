@@ -66,7 +66,7 @@ class LoggerTest extends TestCase
         $script = $this->pmssMakeTempDir('pmss-update-logmsg-', 0700).'/run.php';
         file_put_contents($script, "<?php\n\$_SERVER['SCRIPT_NAME'] = ".var_export($scriptName, true).";\n".$code
             ."\nlogmsg(".var_export($message, true).");\n");
-        exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' >/dev/null 2>&1', $out, $rc);
+        $rc = $this->pmssExecArgvCommand([PHP_BINARY, $script], [], '>/dev/null 2>&1')['rc'];
         $this->assertSame(0, $rc, 'update.php bootstrap logmsg ran');
     }
 

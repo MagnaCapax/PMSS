@@ -25,8 +25,8 @@ class PikkumiesInstallerSelfUpdateTest extends TestCase
             'etc/skel/bin/install-pikkumies.sh' => 'The self-update URL must point at this file',
         ], 'forbidden' => ['exec "$tmp"' => 'The fetched copy must be run by bash, not executed from /tmp']]);
 
-        exec('bash -n '.escapeshellarg($path).' 2>&1', $out, $code);
-        $this->assertTrue($code === 0, 'bash -n failed: '.implode(' ', $out));
+        $result = $this->pmssExecArgvCommand(['bash', '-n', $path]);
+        $this->assertTrue($result['rc'] === 0, 'bash -n failed: '.implode(' ', $result['lines']));
     }
 
     /**
@@ -54,11 +54,10 @@ class PikkumiesInstallerSelfUpdateTest extends TestCase
                 mkdir($home.'/.mcxPikkumies', 0700);
                 file_put_contents($home.'/.mcxPikkumies/keep.txt', 'customer file');
             }
-            $cmd = 'env -i HOME='.escapeshellarg($home).' PATH='.escapeshellarg($bin.':/usr/bin:/bin')
-                .' bash '.escapeshellarg($script).' --no-self-update 2>&1';
-            exec($cmd, $out, $code);
+            $result = $this->pmssExecArgvCommand(['env', '-i', 'HOME='.$home, 'PATH='.$bin.':/usr/bin:/bin',
+                'bash', $script, '--no-self-update']);
             $kept = glob($home.'/.mcxPikkumies.kept-*') ?: [];
-            $this->assertTrue($code === 0, 'installer exited '.$code.': '.implode(' ', $out));
+            $this->assertTrue($result['rc'] === 0, 'installer exited '.$result['rc'].': '.implode(' ', $result['lines']));
             $this->assertTrue(is_dir($home.'/.mcxPikkumies/.git'), 'the fresh checkout must exist');
             $this->assertTrue(trim((string) @file_get_contents($home.'/ran')) === 'install', 'the installer must run pikkumies install');
             if ($leftover) {
@@ -67,8 +66,7 @@ class PikkumiesInstallerSelfUpdateTest extends TestCase
             } else {
                 $this->assertTrue($kept === [], 'nothing is kept when there was no leftover folder');
             }
-            exec('rm -rf -- '.escapeshellarg($root));
-            $out = [];
+            $this->pmssExecArgvCommand(['rm', '-rf', '--', $root], [], '');
         }
     }
 }

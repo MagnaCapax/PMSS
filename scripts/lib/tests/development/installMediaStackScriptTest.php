@@ -924,8 +924,7 @@ BASH
             $config = $dir.'/'.$name.'.xml';
             $this->pmssWriteFile($config, "<Config>\n  ".$case[0]."\n</Config>\n");
             $script = "set -u\n".$functions."\nservarr_config_auth_configured ".escapeshellarg($config)."\n";
-            exec('bash -c '.escapeshellarg($script), $output, $rc);
-            $this->assertSame($case[1], $rc, $name);
+            $this->assertSame($case[1], $this->pmssExecArgvCommand(['bash', '-c', $script], [], '')['rc'], $name);
         }
     }
 

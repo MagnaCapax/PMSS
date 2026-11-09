@@ -34,9 +34,7 @@ PHP;
         $script .= 'namespace ProfileBoundaryFixture; '.$body;
         $result = $this->pmssExecInlinePhp($script);
         $this->assertSame(0, $result['rc'], $result['output']);
-        $decoded = json_decode($result['output'], true);
-        $this->assertTrue(is_array($decoded), $result['output']);
-        return $decoded;
+        return $this->pmssDecodeJsonArray($result['output'], $result['output']);
     }
 
     /** Explicit ordered row contract, independent of runtime normalization. */
