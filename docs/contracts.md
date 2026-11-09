@@ -467,6 +467,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## System Preparation
 
+- pmssTotalCpuThreads(): int
+  - Honors `PMSS_TOTAL_CPU_THREADS`, including zero; otherwise counts line-anchored
+    `processor:` fields in `/proc/cpuinfo` via `pmssCpuInfoThreadCount()`.
+  - CPU model-name text does not contribute to the count. Missing or unmatched
+    cpuinfo retains the nonnegative `nproc` fallback.
+
 - pmssHomeInodeDensityCheck(?callable $logger=null, string $path='/home', int $warnThresholdBytes=262144): void
   - Inputs: mounted filesystem path, optional logger, warning threshold in bytes per inode.
   - Output: logs `[OK]`, `[WARN]`, or `[SKIP]` only; no return value.

@@ -11,6 +11,36 @@ class hostResourcesDetectTest extends TestCase
         $this->pmssTrackEnvKeys(['PMSS_TOTAL_MEM_MIB', 'PMSS_TOTAL_CPU_THREADS']);
     }
 
+    public function testCpuInfoThreadCountMatchesOnlyProcessorFields(): void
+    {
+        // Exercise the pure parser in systemPrep/hostEnvironment.php without reading host files.
+        foreach ([
+            ['', 0],
+            ["model name\t: Common KVM processor\n", 0],
+            ["processor\t: 0\nmodel name\t: Example Processor\n", 1],
+            ["processor: 0\nprocessor : 1\nprocessor\t: 2\n", 3],
+            ["processor\t: 0\r\n\r\nprocessor\t: 1\r\n", 2],
+            ["processor: 0", 1],
+            ["model name: processor: 0\nprocessor count: 8\ncoprocessor: 1\n", 0],
+        ] as $case) {
+            $this->assertSame($case[1], \pmssCpuInfoThreadCount($case[0]));
+        }
+    }
+
+    public function testKvmModelNameDoesNotDoubleHostCpuQuota(): void
+    {
+        $cpuinfo = '';
+        foreach (range(0, 5) as $thread) {
+            $cpuinfo .= "processor\t: ".$thread."\nmodel name\t: Common KVM processor\n\n";
+        }
+
+        // Six logical CPUs must size the 85% host default to 510%, rather than 1020%.
+        $threads = \pmssCpuInfoThreadCount($cpuinfo);
+        $this->assertSame(6, $threads);
+        $sizing = \pmssSystemdSliceSizing([], 16384, $threads);
+        $this->assertSame('510%', $sizing['%%USER_CGROUP_CPU_QUOTA%%']);
+    }
+
     public function testResourceOverrideMatrix(): void
     {
         foreach ([

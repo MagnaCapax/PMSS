@@ -17,6 +17,14 @@ function pmssTotalMemMiB(): int
 }
 
 /**
+ * Count logical-CPU fields without matching 'processor' inside model names.
+ */
+function pmssCpuInfoThreadCount(string $cpuinfo): int
+{
+    return (int) preg_match_all('/^processor\s*:/m', $cpuinfo);
+}
+
+/**
  * Return total logical CPU threads.
  */
 function pmssTotalCpuThreads(): int
@@ -25,7 +33,7 @@ function pmssTotalCpuThreads(): int
         return (int) $override;
     }
 
-    $count = substr_count(pmssReadRegularFileContents('/proc/cpuinfo') ?? '', 'processor');
+    $count = pmssCpuInfoThreadCount(pmssReadRegularFileContents('/proc/cpuinfo') ?? '');
     return $count > 0 ? $count : max(0, (int) trim((string) @shell_exec('nproc')));
 }
 
