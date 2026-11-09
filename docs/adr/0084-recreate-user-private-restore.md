@@ -44,6 +44,11 @@ only after the password step succeeds. No later rebuild step reads from it. An
 in-script per-account runtime lock prevents two rebuilds from operating on the
 same home at once (ADR 0049).
 Before backup handling, a private exclusive write probe must succeed in `/home`, the port runtime directory (or its parent before creation), and `/etc`.
+The probe restores the prior umask even when opening throws, closes an acquired
+stream when writing or flushing throws, and attempts removal even when closing
+throws. With successful cleanup, the original throwable propagates unchanged.
+Ordinary probe bytes, mode, directory order and refusal messages remain unchanged;
+`RecreateWriteProbeSafetyTest` injects these faults using memory streams only.
 
 ## Consequences
 
