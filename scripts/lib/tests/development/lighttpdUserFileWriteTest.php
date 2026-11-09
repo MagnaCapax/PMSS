@@ -79,8 +79,7 @@ class LighttpdUserFileWriteTest extends TestCase
     public function testAccountFileReplacementRejectsLinkedTarget(): void
     {
         $home = $this->tempDir.'/account';
-        $this->assertTrue(@mkdir($home));
-        $this->assertTrue(@file_put_contents($home.'/original', 'kept') !== false);
+        $this->pmssWriteFile($home.'/original', 'kept', 0777);
         $this->assertTrue(@symlink($home.'/original', $home.'/linked'));
         $this->assertFalse(\pmssReplaceAccountFile($this->pmssCurrentOwner(), $home, $home.'/linked', 'new', 0600));
         $this->assertSame('kept', file_get_contents($home.'/original'));
@@ -192,9 +191,8 @@ class LighttpdUserFileWriteTest extends TestCase
     public function testAccountFileMetadataConvergesOnlySafeOwnedFile(): void
     {
         $home = $this->tempDir.'/account';
-        $this->assertTrue(@mkdir($home));
         $path = $home.'/custom';
-        $this->assertTrue(@file_put_contents($path, 'kept') !== false);
+        $this->pmssWriteFile($path, 'kept', 0777);
         $this->assertTrue(@chmod($path, 0750));
         $owner = $this->pmssCurrentOwner();
 
@@ -230,8 +228,7 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testApplyMetadataRefusesLinkedEntriesAndConvergesRegularFiles(): void
     {
-        $outside = $this->tempDir.'/outside';
-        $this->pmssWriteFile($outside, 'kept');
+        $outside = $this->pmssWriteFile($this->tempDir.'/outside', 'kept');
         $this->assertTrue(chmod($outside, 0644));
         $directory = $this->tempDir.'/user';
         $this->assertTrue(@mkdir($directory));
@@ -245,8 +242,7 @@ class LighttpdUserFileWriteTest extends TestCase
         }
         $this->assertSame('kept', file_get_contents($outside));
 
-        $regular = $directory.'/regular';
-        $this->pmssWriteFile($regular, 'content');
+        $regular = $this->pmssWriteFile($directory.'/regular', 'content');
         $this->assertTrue(chmod($regular, 0644));
         \pmssUserFileApplyMetadata($regular, $this->pmssCurrentOwner(), 0600);
         clearstatcache(true, $regular);
@@ -266,8 +262,7 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testAppendUserFilePreservesExistingContent(): void
     {
-        $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
-        $this->pmssWriteFile($path, "first:hash\n");
+        $path = $this->pmssWriteFile($this->tempDir.'/user/.lighttpd/.htpasswd', "first:hash\n");
 
         $this->assertTrue(\pmssAppendUserFile($path, "second:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertEquals("first:hash\nsecond:hash\n", file_get_contents($path));
@@ -283,8 +278,7 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testAppendUserFileRefusesLinkedTargetsWithoutTouchingThem(): void
     {
-        $outside = $this->tempDir.'/outside.htpasswd';
-        $this->pmssWriteFile($outside, "user:hash\n");
+        $outside = $this->pmssWriteFile($this->tempDir.'/outside.htpasswd', "user:hash\n");
         $this->assertTrue(chmod($outside, 0644));
         $directory = $this->tempDir.'/user';
         $this->assertTrue(@mkdir($directory));
@@ -371,8 +365,7 @@ class LighttpdUserFileWriteTest extends TestCase
     public function testAccountAppendRejectsUnsafeTargets(): void
     {
         $home = $this->tempDir.'/account';
-        $this->assertTrue(@mkdir($home));
-        $this->assertTrue(@file_put_contents($home.'/original', 'kept') !== false);
+        $this->pmssWriteFile($home.'/original', 'kept', 0777);
         $this->assertTrue(@symlink($home.'/original', $home.'/linked'));
         $owner = $this->pmssCurrentOwner();
 
@@ -428,8 +421,7 @@ class LighttpdUserFileWriteTest extends TestCase
         @mkdir($managedDir, 0755, true);
         @mkdir($outsideDir, 0755, true);
 
-        $outsidePath = $outsideDir.'/state.json';
-        file_put_contents($outsidePath, json_encode(['ok' => true]));
+        $outsidePath = $this->pmssWriteFile($outsideDir.'/state.json', json_encode(['ok' => true]));
 
         $this->assertEquals(null, \pmssJsonFileReadAssoc($managedDir.'/../outside/state.json', true));
     }
@@ -514,8 +506,7 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testReplaceUserFileRejectsRegularStagingReplacementAndExtraLink(): void
     {
-        $path = $this->tempDir.'/managed';
-        $this->pmssWriteFile($path, 'original');
+        $path = $this->pmssWriteFile($this->tempDir.'/managed', 'original');
         foreach (['replacement', 'hardlink'] as $kind) {
             $this->assertFalse(\pmssReplaceUserFile($path, 'new', function (string $opened) use ($path, $kind): void {
                 $staged = glob($path.'.pmss-tmp-*');
@@ -624,8 +615,7 @@ PHP;
 
     public function testReplacementMetadataFailurePreservesExistingFile(): void
     {
-        $path = $this->tempDir.'/managed';
-        $this->pmssWriteFile($path, 'original');
+        $path = $this->pmssWriteFile($this->tempDir.'/managed', 'original');
         $this->assertTrue(chmod($path, 0600));
 
         foreach ([-1, 010000] as $mode) {

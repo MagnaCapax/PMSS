@@ -121,7 +121,7 @@ class UserCgroupSliceHealthTest extends TestCase
         $file = $this->pmssWriteFile($dir.'/90-pmss-user.conf', $original);
         $timestamp = date('YmdHis');
         for ($attempt = 0; $attempt < 10; $attempt++) {
-            file_put_contents(\pmssManagedPathBackupCandidate($file, $timestamp, $attempt), 'occupied');
+            $this->pmssWriteFile(\pmssManagedPathBackupCandidate($file, $timestamp, $attempt), 'occupied');
         }
         $messages = [];
 

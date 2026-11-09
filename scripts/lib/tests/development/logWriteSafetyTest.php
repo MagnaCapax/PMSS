@@ -47,7 +47,7 @@ PHP;
             ['', null, true, []],
             ["invalid\nnull\n", null, true, []],
         ] as [$contents, $failAt, $success, $entries]) {
-            file_put_contents($path, $contents);
+            $this->pmssWriteFile($path, $contents);
             $this->assertSame([$success, $entries, $entries,
                 $entries === [] ? null : $entries[count($entries) - 1], true],
                 $this->pmssRunInlinePhpJson($script, [
@@ -85,7 +85,7 @@ PHP;
         foreach (['json' => '{"event":"ready\\u0000","path":"/data/test"}'.PHP_EOL,
             'text' => "[INFO] ready\0".PHP_EOL] as $kind => $line) {
             foreach ([false, 0, 1, strlen($line) - 1, strlen($line), null] as $limit) {
-                file_put_contents($path, 'previous'.PHP_EOL);
+                $this->pmssWriteFile($path, 'previous'.PHP_EOL);
                 chmod($path, 0600);
                 $complete = $limit === null || $limit === strlen($line);
                 $bytes = $limit === false ? '' : ($limit === null ? $line : substr($line, 0, $limit));
@@ -97,8 +97,8 @@ PHP;
             }
         }
         foreach ([false, 0, 1] as $limit) {
-            file_put_contents($path, 'previous'.PHP_EOL);
-            file_put_contents($path.'.fallback', '');
+            $this->pmssWriteFile($path, 'previous'.PHP_EOL);
+            $this->pmssWriteFile($path.'.fallback', '');
             [$output, $fallback, $requests] = $this->pmssRunInlinePhpJson($script, [
                 'PMSS_TEST_LOG_APPEND' => json_encode([$path, 'mirror', $limit]),
             ]);
@@ -139,7 +139,7 @@ PHP;
         $directory = $this->pmssMakeTempDir('pmss-log-boundary-');
         $path = $directory.'/events.jsonl';
         $original = "{\"event\":\"original\"}\n";
-        file_put_contents($path, $original);
+        $this->pmssWriteFile($path, $original);
         $handled = false;
         $handler = static function () use (&$handled): void { $handled = true; };
 
@@ -199,8 +199,7 @@ PHP;
 
     public function testJsonLineReadRejectsSymlinkTarget(): void
     {
-        $target = $this->pmssMakeTempFile('pmss-log-jsonl-target-');
-        file_put_contents($target, "{\"event\":\"blocked\"}\n");
+        $target = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-log-jsonl-target-'), "{\"event\":\"blocked\"}\n");
         $link = $this->pmssMakeTempDir('pmss-log-jsonl-link-dir-').'/events.jsonl';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
@@ -215,8 +214,7 @@ PHP;
 
     public function testJsonLineReadAcceptsRegularFileTarget(): void
     {
-        $path = $this->pmssMakeTempFile('pmss-log-jsonl-read-');
-        file_put_contents($path, "{\"event\":\"ready\"}\nnot-json\n{\"event\":\"done\"}\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-log-jsonl-read-'), "{\"event\":\"ready\"}\nnot-json\n{\"event\":\"done\"}\n");
 
         $this->assertEquals([['event' => 'ready'], ['event' => 'done']], \pmssJsonLineFileRead($path));
         $this->assertEquals(['event' => 'done'], \pmssJsonLineFileLast($path));
@@ -226,7 +224,7 @@ PHP;
     {
         $path = $this->pmssMakeTempFile('pmss-log-jsonl-cleanup-');
         $contents = "invalid\nnull\n{\"event\":\"first\"}\n{\"event\":\"last\"}";
-        file_put_contents($path, $contents);
+        $this->pmssWriteFile($path, $contents);
 
         foreach ([null, new \RuntimeException('first'), new \Error('first'),
             new \RuntimeException('last'), new \Error('last')] as $failure) {

@@ -15,14 +15,14 @@ class UserLifecycleWatchdogTest extends TestCase
                 $rc = 99;
                 $output = ['stale'];
                 list($pids, $stdout) = $this->pmssCaptureStdout(function () use ($pattern, &$rc, &$output): array {
-                    return pmssUserWatchdogProcessPids('alice', $pattern, ['full' => true, 'captureStderr' => true], $rc, $output);
+                    return pmssUserWatchdogProcessPids('fixtur01', $pattern, ['full' => true, 'captureStderr' => true], $rc, $output);
                 });
                 $this->assertSame([], $pids);
                 $this->assertSame(1, $rc);
                 $this->assertSame([], $output);
                 $this->assertSame('', $stdout);
-                $this->assertFalse(pmssUserWatchdogProcessRunning('alice', $pattern));
-                $this->assertSame(null, pmssUserWatchdogProcessStartTime('alice', $pattern));
+                $this->assertFalse(pmssUserWatchdogProcessRunning('fixtur01', $pattern));
+                $this->assertSame(null, pmssUserWatchdogProcessStartTime('fixtur01', $pattern));
             }
         });
         $this->assertSame('', file_get_contents($log));
@@ -46,14 +46,14 @@ foreach ([['^demo', []], ["demo's", ['full' => true]], [' demo ', ['exact' => tr
     ['^demo.*worker$', ['full' => true, 'exact' => true, 'captureStderr' => true]]] as $case) {
     $rc = 99;
     $output = ['stale'];
-    $pids = pmssUserWatchdogProcessPids('alice', $case[0], $case[1], $rc, $output);
+    $pids = pmssUserWatchdogProcessPids('fixtur01', $case[0], $case[1], $rc, $output);
     $results[] = [$pids, $rc, $output];
 }
 echo json_encode([$GLOBALS['commands'], $results]);
 PHP;
         $this->assertSame([
-            ["pgrep -u 'alice' '^demo' 2>/dev/null", "pgrep -u 'alice' -f 'demo'\\''s' 2>/dev/null",
-                "pgrep -u 'alice' -x ' demo ' 2>/dev/null", "pgrep -u 'alice' -f -x '^demo.*worker$' 2>&1"],
+            ["pgrep -u 'fixtur01' '^demo' 2>/dev/null", "pgrep -u 'fixtur01' -f 'demo'\\''s' 2>/dev/null",
+                "pgrep -u 'fixtur01' -x ' demo ' 2>/dev/null", "pgrep -u 'fixtur01' -f -x '^demo.*worker$' 2>&1"],
             array_fill(0, 4, [[17, 9], 0, ['0017', '17', '9']]),
         ], $this->pmssRunInlinePhpJson($script));
     }
@@ -63,10 +63,10 @@ PHP;
         $runtime = $this->pmssMakeTempDir('pmss-lighttpd-regen-');
         $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime, 'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1'], function (): void {
             $start = microtime(true);
-            $result = pmssUserWatchdogCommandRun('sleep 30', 60, 'alice', 'lighttpd');
+            $result = pmssUserWatchdogCommandRun('sleep 30', 60, 'fixtur01', 'lighttpd');
             $this->assertTrue($result['timed_out']);
             $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
-            $this->assertTrue(pmssUserWatchdogBackoffActive('alice', 'lighttpd'));
+            $this->assertTrue(pmssUserWatchdogBackoffActive('fixtur01', 'lighttpd'));
         });
         $source = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
         $this->assertSame(3, substr_count($source, "60, \$thisUser, 'lighttpd'"));
@@ -76,13 +76,13 @@ PHP;
     {
         $runtime = $this->pmssMakeTempDir('pmss-watchdog-callable-');
         $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime], function (): void {
-            pmssUserWatchdogBackoffRecord('alice', 'demo');
+            pmssUserWatchdogBackoffRecord('fixtur01', 'demo');
             $called = false;
             $spec = pmssUserWatchdogServiceSpec('demo', static function () use (&$called): string {
                 $called = true;
                 return 'true';
             }, 'start requested');
-            pmssUserWatchdogEnsureServices('alice', [$spec], ['demo' => false]);
+            pmssUserWatchdogEnsureServices('fixtur01', [$spec], ['demo' => false]);
             $this->assertFalse($called);
         });
     }
@@ -90,35 +90,35 @@ PHP;
     public function testTimedOutAccountBacksOffWhileNextAccountStarts(): void
     {
         $runtime = $this->pmssMakeTempDir('pmss-watchdog-backoff-');
-        $started = $runtime.'/bob-started';
+        $started = $runtime.'/fixtur02-started';
         $this->pmssWithEnv([
             'PMSS_RUNTIME_DIR' => $runtime,
             'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1',
         ], function () use ($runtime, $started): void {
             $start = microtime(true);
             $this->pmssCaptureStdout(function () use ($started): void {
-                pmssUserWatchdogEnsureServices('alice', [
+                pmssUserWatchdogEnsureServices('fixtur01', [
                     pmssUserWatchdogServiceSpec('demo', 'sleep 30', 'start requested'),
                 ], ['demo' => false]);
-                pmssUserWatchdogEnsureServices('bob', [
+                pmssUserWatchdogEnsureServices('fixtur02', [
                     pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($started), 'start requested'),
                 ], ['demo' => false]);
             });
             $this->assertTrue(file_exists($started));
             $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
-            $this->assertTrue(pmssUserWatchdogBackoffActive('alice', 'demo'));
+            $this->assertTrue(pmssUserWatchdogBackoffActive('fixtur01', 'demo'));
 
-            $marker = $runtime.'/alice-ran';
+            $marker = $runtime.'/fixtur01-ran';
             $this->pmssCaptureStdout(function () use ($marker): void {
-                pmssUserWatchdogEnsureServices('alice', [
+                pmssUserWatchdogEnsureServices('fixtur01', [
                     pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'start requested'),
                 ], ['demo' => false]);
             });
             $this->assertFalse(file_exists($marker));
-            $this->assertFalse(pmssUserWatchdogBackoffActive('alice', 'demo', time() + 901));
-            file_put_contents(pmssUserWatchdogBackoffPath('alice', 'demo'), (string) (time() - 901));
+            $this->assertFalse(pmssUserWatchdogBackoffActive('fixtur01', 'demo', time() + 901));
+            $this->pmssWriteFile(pmssUserWatchdogBackoffPath('fixtur01', 'demo'), (string) (time() - 901));
             $this->pmssCaptureStdout(function () use ($marker): void {
-                pmssUserWatchdogEnsureServices('alice', [
+                pmssUserWatchdogEnsureServices('fixtur01', [
                     pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'start requested'),
                 ], ['demo' => false]);
             });
@@ -134,7 +134,7 @@ PHP;
         $start = microtime(true);
         $result = null;
         $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime], function () use ($command, &$result): void {
-            $result = pmssUserWatchdogCommandRun($command, 1, 'alice', 'demo');
+            $result = pmssUserWatchdogCommandRun($command, 1, 'fixtur01', 'demo');
         });
         $this->assertTrue($result['timed_out']);
         $this->assertTrue(microtime(true) - $start < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
@@ -149,7 +149,7 @@ PHP;
         $calledFor = [];
 
         $applied = pmssUserWatchdogApplyManagedConfigWhenStopped(
-            'alice',
+            'fixtur01',
             false,
             static function (string $username) use (&$calledFor): bool {
                 $calledFor[] = $username;
@@ -158,7 +158,7 @@ PHP;
         );
 
         $this->assertTrue($applied);
-        $this->assertEquals(['alice'], $calledFor);
+        $this->assertEquals(['fixtur01'], $calledFor);
     }
 
     public function testManagedConfigSkipsRunningMissingAndInvalidTargets(): void
@@ -169,8 +169,8 @@ PHP;
             return true;
         };
 
-        $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('alice', true, $applier));
-        $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('alice', false, 'pmssMissingConfigApplierForTest'));
+        $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('fixtur01', true, $applier));
+        $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('fixtur01', false, 'pmssMissingConfigApplierForTest'));
         $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('bad-user', false, $applier));
         $this->assertFalse($called);
     }
@@ -180,7 +180,7 @@ PHP;
         $called = false;
 
         $running = pmssUserWatchdogRestartProcessesIf(
-            'alice',
+            'fixtur01',
             false,
             ['demo'],
             static function () use (&$called): bool {
@@ -199,7 +199,7 @@ PHP;
         $terminated = false;
 
         $running = pmssUserWatchdogRestartProcessesIf(
-            'alice',
+            'fixtur01',
             true,
             ['demo'],
             static function (): bool {
@@ -241,7 +241,7 @@ PHP;
     public function testRestartProcessesIfLeavesRunningStateWhenRestartNotNeeded(): void
     {
         $running = pmssUserWatchdogRestartProcessesIf(
-            'alice',
+            'fixtur01',
             true,
             ['demo'],
             static function (): bool {
@@ -259,14 +259,14 @@ PHP;
         @unlink($marker);
 
         list($states, $output) = $this->pmssCaptureStdout(function () use ($marker): array {
-            return pmssUserWatchdogEnsureServices('alice', [
+            return pmssUserWatchdogEnsureServices('fixtur01', [
                 pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
             ], ['demo' => false]);
         });
 
         $this->assertTrue(file_exists($marker));
         $this->assertEquals(['demo' => false], $states);
-        $this->assertTrue(strpos($output, 'Start Demo for user: alice') !== false);
+        $this->assertTrue(strpos($output, 'Start Demo for user: fixtur01') !== false);
     }
 
     public function testEnsureServicesSkipsStartForRunningServiceFromProvidedState(): void
@@ -275,7 +275,7 @@ PHP;
         @unlink($marker);
 
         list($states,) = $this->pmssCaptureStdout(function () use ($marker): array {
-            return pmssUserWatchdogEnsureServices('alice', [
+            return pmssUserWatchdogEnsureServices('fixtur01', [
                 pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
             ], ['demo' => true]);
         });
@@ -290,7 +290,7 @@ PHP;
         @unlink($marker);
 
         $this->pmssCaptureStdout(function () use ($marker): void {
-            pmssUserWatchdogEnsureServices('alice', [
+            pmssUserWatchdogEnsureServices('fixtur01', [
                 pmssUserWatchdogServiceSpec('demo', static function () use ($marker): string {
                     return 'touch '.escapeshellarg($marker);
                 }, 'demo start requested', 'Demo'),
@@ -318,7 +318,7 @@ PHP;
             }, $fds);
 
             list($states,) = $this->pmssCaptureStdout(function () use ($closedChecks, $marker): array {
-                return pmssUserWatchdogEnsureServices('alice', [
+                return pmssUserWatchdogEnsureServices('fixtur01', [
                     pmssUserWatchdogServiceSpec('demo', implode(' && ', $closedChecks).' && touch '.escapeshellarg($marker), 'demo start requested'),
                 ], ['demo' => false]);
             });
@@ -357,47 +357,45 @@ PHP;
 
     public function testTerminateProcessesSeparatesKillallOptionsFromProcessNames(): void
     {
-        $log = $this->pmssMakeTempFile('watchdog-killall-');
-        @file_put_contents($log, '');
+        $log = $this->pmssWriteFile($this->pmssMakeTempFile('watchdog-killall-'), '');
         $binDir = $this->pmssMakeInvocationLogStub('killall', $log, 'watchdog-killall-bin-');
 
         $this->pmssWithPathPrefix($binDir, function (): void {
-            pmssUserWatchdogTerminateProcesses('alice', ['demo', '-TERM', 'php-cgi', "bad\nname"], 15);
+            pmssUserWatchdogTerminateProcesses('fixtur01', ['demo', '-TERM', 'php-cgi', "bad\nname"], 15);
         });
 
         $lines = file($log, FILE_IGNORE_NEW_LINES);
-        $this->assertEquals(['-15 -u alice -- demo', '-15 -u alice -- php-cgi'], $lines);
+        $this->assertEquals(['-15 -u fixtur01 -- demo', '-15 -u fixtur01 -- php-cgi'], $lines);
     }
 
     public function testTerminateProcessesWorksAfterIsolatedWatchdogLoad(): void
     {
-        $log = $this->pmssMakeTempFile('watchdog-isolated-killall-');
-        @file_put_contents($log, '');
+        $log = $this->pmssWriteFile($this->pmssMakeTempFile('watchdog-isolated-killall-'), '');
         $binDir = $this->pmssMakeInvocationLogStub('killall', $log, 'watchdog-isolated-killall-bin-');
         $watchdog = var_export(dirname(__DIR__, 2).'/user/watchdog.php', true);
 
         $script = "require_once {$watchdog}; ".
-            "pmssUserWatchdogTerminateProcesses('alice', ['php-cgi'], 15); ".
+            "pmssUserWatchdogTerminateProcesses('fixtur01', ['php-cgi'], 15); ".
             "echo json_encode(['ok'=>true]);";
 
         $this->assertSame(
             ['ok' => true],
             $this->pmssRunInlinePhpJson($script, ['PATH' => $binDir.':'.getenv('PATH')], '2>&1')
         );
-        $this->assertEquals(['-15 -u alice -- php-cgi'], file($log, FILE_IGNORE_NEW_LINES));
+        $this->assertEquals(['-15 -u fixtur01 -- php-cgi'], file($log, FILE_IGNORE_NEW_LINES));
     }
 
     public function testRunServiceStartsOnlyEnabledStoppedUsers(): void
     {
         $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-');
-        foreach (['alice', 'bob', 'cara'] as $user) {
+        foreach (['fixtur01', 'fixtur02', 'fixtur03'] as $user) {
             $this->pmssEnsureUserWebHome($homeRoot, $user);
         }
-        touch($homeRoot.'/alice/.demoEnable');
-        touch($homeRoot.'/cara/.demoEnable');
+        touch($homeRoot.'/fixtur01/.demoEnable');
+        touch($homeRoot.'/fixtur03/.demoEnable');
 
         $listUsers = $this->pmssMakeTempDir('watchdog-list-users-').'/listUsers.php';
-        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"alice\\nbob\\ncara\\n\";");
+        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"fixtur01\\nfixtur02\\nfixtur03\\n\";");
 
         $marker = $this->pmssMakeTempFile('watchdog-run-service-started-');
         @unlink($marker);
@@ -414,7 +412,7 @@ PHP;
                     }, 'demo start requested', 'Demo'),
                 ],
                 static function (string $username): array {
-                    return ['demo' => $username === 'cara'];
+                    return ['demo' => $username === 'fixtur03'];
                 },
                 null,
                 $homeRoot,
@@ -422,20 +420,20 @@ PHP;
             );
         });
 
-        $this->assertEquals("alice\n", (string) file_get_contents($marker));
-        $this->assertStringContainsString('Start Demo for user: alice', $output);
-        $this->assertStringNotContainsString('Start Demo for user: bob', $output);
-        $this->assertStringNotContainsString('Start Demo for user: cara', $output);
+        $this->assertEquals("fixtur01\n", (string) file_get_contents($marker));
+        $this->assertStringContainsString('Start Demo for user: fixtur01', $output);
+        $this->assertStringNotContainsString('Start Demo for user: fixtur02', $output);
+        $this->assertStringNotContainsString('Start Demo for user: fixtur03', $output);
     }
 
     public function testRunServiceStopsWhenListUsersCommandFails(): void
     {
         $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-fail-');
-        $this->pmssEnsureUserWebHome($homeRoot, 'alice');
-        touch($homeRoot.'/alice/.demoEnable');
+        $this->pmssEnsureUserWebHome($homeRoot, 'fixtur01');
+        touch($homeRoot.'/fixtur01/.demoEnable');
 
         $listUsers = $this->pmssMakeTempDir('watchdog-list-users-fail-').'/listUsers.php';
-        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"alice\\n\"; exit(1);");
+        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"fixtur01\\n\"; exit(1);");
 
         $marker = $this->pmssMakeTempFile('watchdog-run-service-blocked-');
         @unlink($marker);
@@ -465,9 +463,9 @@ PHP;
     public function testRunServiceReportsMissingMarkersOnlyWhenRequested(): void
     {
         $homeRoot = $this->pmssMakeTempDir('watchdog-missing-marker-');
-        $this->pmssEnsureUserWebHome($homeRoot, 'alice');
+        $this->pmssEnsureUserWebHome($homeRoot, 'fixtur01');
         $listUsers = $this->pmssMakeTempDir('watchdog-missing-list-').'/listUsers.php';
-        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"alice\\n\";");
+        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"fixtur01\\n\";");
 
         list(, $quiet) = $this->pmssCaptureStdout(function () use ($homeRoot, $listUsers): void {
             pmssUserWatchdogRunService('', 'demoEnable', [], '', [], null, null, $homeRoot, $listUsers);
@@ -482,8 +480,7 @@ PHP;
 
     public function testLocalPortReadAcceptsTrimmedNumericPort(): void
     {
-        $path = $this->pmssMakeTempFile('watchdog-port-');
-        file_put_contents($path, "1500\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempFile('watchdog-port-'), "1500\n");
 
         $this->assertSame(1500, pmssReadRegularFileNetworkPort($path));
     }
@@ -491,12 +488,9 @@ PHP;
     public function testLocalPortReadRejectsUnsafeInputs(): void
     {
         $missing = $this->pmssMakeTempPath('watchdog-port-missing-');
-        $path = $this->pmssMakeTempFile('watchdog-port-bad-');
-        file_put_contents($path, '1500; touch /tmp/bad');
-        $outOfRange = $this->pmssMakeTempFile('watchdog-port-high-');
-        file_put_contents($outOfRange, '65536');
-        $target = $this->pmssMakeTempFile('watchdog-port-target-');
-        file_put_contents($target, '1500');
+        $path = $this->pmssWriteFile($this->pmssMakeTempFile('watchdog-port-bad-'), '1500; touch /tmp/bad');
+        $outOfRange = $this->pmssWriteFile($this->pmssMakeTempFile('watchdog-port-high-'), '65536');
+        $target = $this->pmssWriteFile($this->pmssMakeTempFile('watchdog-port-target-'), '1500');
         $link = $this->pmssMakeTempPath('watchdog-port-link-');
         symlink($target, $link);
 
@@ -509,7 +503,7 @@ PHP;
     {
         $path = $this->pmssMakeTempFile('watchdog-port-nul-');
         foreach (["\0".'1500', "1500\0", "15\0".'00', " \0"."1500\n", "1500\0\r\n", "\0"] as $raw) {
-            file_put_contents($path, $raw);
+            $this->pmssWriteFile($path, $raw);
             $this->assertSame(null, pmssNetworkPortParseDigits($raw));
             $this->assertSame(null, pmssReadRegularFileNetworkPort($path));
         }
@@ -519,13 +513,13 @@ PHP;
     {
         $path = $this->pmssMakeTempFile('watchdog-port-valid-');
         foreach ([1, 65535, '001500', " \t1500\r\n", "\v1500\v"] as $raw) {
-            file_put_contents($path, (string) $raw);
+            $this->pmssWriteFile($path, (string) $raw);
             $this->assertSame((int) trim((string) $raw), pmssNetworkPortParseDigits($raw));
             $this->assertSame((int) trim((string) $raw), pmssReadRegularFileNetworkPort($path));
         }
         foreach ([[1500, 1500, 1500], [1500, 1501, 65535], [1500, 1, 1499], [1500, 0, 65535], [1500, 1, 65536], [1500, 2000, 1000]] as $case) {
             list($raw, $min, $max) = $case;
-            file_put_contents($path, (string) $raw);
+            $this->pmssWriteFile($path, (string) $raw);
             $expected = $min === 1500 && $max === 1500 ? 1500 : null;
             $this->assertSame($expected, pmssNetworkPortParseDigits($raw, $min, $max));
             $this->assertSame($expected, pmssReadRegularFileNetworkPort($path, $min, $max));
@@ -543,17 +537,16 @@ PHP;
     public function testProcStartTimeReadsKernelStartNotInodeTime(): void
     {
         $proc = $this->pmssMakeTempDir('watchdog-proc-');
-        file_put_contents($proc.'/stat', "cpu  1 2 3\nbtime 1794000000\nprocesses 9\n");
-        mkdir($proc.'/1403');
         // A command name with spaces and a ')' must not shift the fields; 12345 ticks = 123 s after boot.
         $tail = 'S 1 1403 1403 0 -1 4194560 100 0 0 0 1 1 0 0 20 0 1 0 12345 1000 50';
-        file_put_contents($proc.'/1403/stat', "1403 (light tpd) x) {$tail} 0\n");
+        $this->pmssWriteFiles($proc, [
+            'stat' => "cpu  1 2 3\nbtime 1794000000\nprocesses 9\n", '1403/stat' => "1403 (light tpd) x) {$tail} 0\n",
+        ], 0777);
         touch($proc.'/1403', 1794128578);
         $this->assertSame(1794000123, pmssUserWatchdogProcStartTime($proc, '1403'));
 
         // Unparseable stat keeps the old inode-time reading; a missing process or a non-numeric pid is unknown.
-        mkdir($proc.'/77');
-        file_put_contents($proc.'/77/stat', 'garbage');
+        $this->pmssWriteFile($proc.'/77/stat', 'garbage', 0777);
         touch($proc.'/77', 1794000500);
         $this->assertSame(1794000500, pmssUserWatchdogProcStartTime($proc, '77'));
         $this->assertSame(null, pmssUserWatchdogProcStartTime($proc, '999'));

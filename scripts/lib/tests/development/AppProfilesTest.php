@@ -91,10 +91,10 @@ final class AppProfilesTest extends TestCase
 
     public function testHermesHostGateRejectsMissingRoutesPortsAndHostname(): void
     {
-        $home = $this->tempDir.'/alice';
+        $home = $this->tempDir.'/fixtur01';
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $ops = ['host' => 'node.example.com', 'port' => static function () { return 24000; },
-            'read' => static function () { return '^/user-alice/hermes/'; }];
+            'read' => static function () { return '^/user-fixtur01/hermes/'; }];
         $files = ['used' => 0, 'soft' => 100000];
         $this->assertSame(null, \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $ops));
         foreach ([null, 0, 443, 1023] as $port) {
@@ -105,9 +105,9 @@ final class AppProfilesTest extends TestCase
             $bad = array_replace($ops, ['host' => $host]);
             $this->assertSame('panel hostname or account unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
         }
-        foreach (['.lighttpd.conf', '/etc/nginx/users/alice'] as $missing) {
+        foreach (['.lighttpd.conf', '/etc/nginx/users/fixtur01'] as $missing) {
             $bad = array_replace($ops, ['read' => static function ($path) use ($missing) {
-                return strpos($path, $missing) !== false ? null : '^/user-alice/hermes/';
+                return strpos($path, $missing) !== false ? null : '^/user-fixtur01/hermes/';
             }]);
             $this->assertStringContainsString('Hermes panel route unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
         }
@@ -160,15 +160,14 @@ final class AppProfilesTest extends TestCase
     {
         $home = $this->tempDir.'/home';
         $this->pmssEnsureDir($home);
-        $name = posix_geteuid() === 0 ? 'root' : 'alice';
+        $name = posix_geteuid() === 0 ? 'root' : 'fixtur01';
         $user = ['name' => $name];
         $registry = \pmssUserAppSwitchRegistry();
         $markers = ['qbittorrent' => '.qbittorrentEnable', 'deluge' => '.delugeEnable', 'rclone' => '.rcloneEnable'];
         foreach (\pmssToggleAppCatalogRead() as $app => $row) {
             if (isset($row['enable'])) $markers[$app] = $row['enable'];
         }
-        $outside = $this->tempDir.'/outside';
-        file_put_contents($outside, 'unchanged');
+        $outside = $this->pmssWriteFile($this->tempDir.'/outside', 'unchanged');
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($registry, $markers, $user, $home, $outside): void {
             foreach ($markers as $app => $marker) {
                 $switch = $registry[$app]['apply'];
@@ -205,15 +204,13 @@ final class AppProfilesTest extends TestCase
     private function applyProfile(string $profile, int $memory = 2048, bool $quota = true, bool $missingApp = false, bool $hermesRoute = true): array
     {
         $home = $this->pmssMakeTempDir('pmss-app-home-');
-        $this->pmssEnsureDir($home.'/bin');
-        file_put_contents($home.'/bin/install-pikkumies.sh', "#!/bin/sh\n");
-        file_put_contents($home.'/bin/install-openclaw', '<?php');
+        $this->pmssWriteFiles($home.'/bin', ['install-pikkumies.sh' => "#!/bin/sh\n", 'install-openclaw' => '<?php']);
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $this->pmssWriteExecutableFile($home.'/stubs/id', "#!/bin/sh\necho 4321\n", 0755, 0700);
         $this->pmssWriteExecutableFile($home.'/stubs/quota', $quota ? "#!/bin/sh\necho '/dev/md4 123 1000 1250 100 100100 125125'\n" : "#!/bin/sh\nexit 1\n");
         $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/user/appSwitch.php'), true).';'
             .'$home = '.var_export($home, true).'; $missingApp = '.var_export($missingApp, true).'; $hermesRoute = '.var_export($hermesRoute, true).';'
-            .'$user = '.var_export(['name' => posix_geteuid() === 0 ? 'root' : 'alice', 'memory' => $memory, 'appProfile' => $profile], true).';';
+            .'$user = '.var_export(['name' => posix_geteuid() === 0 ? 'root' : 'fixtur01', 'memory' => $memory, 'appProfile' => $profile], true).';';
         $script .= <<<'PHP'
 function logProvisionMessage(string $message): void { $GLOBALS['logs'][] = $message; }
 function runProvisionStep(string $label, string $command): void { $GLOBALS['queues'][] = [$label, $command]; }

@@ -104,8 +104,7 @@ PHP;
         foreach (['', 'RuntimeException', 'Error'] as $closeType) {
             foreach (['', 'RuntimeException', 'Error'] as $callbackType) {
                 foreach ([0, 0027, 0077] as $mask) {
-                    $path = $root.'/snapshot.log';
-                    file_put_contents($path, '');
+                    $path = $this->pmssWriteFile($root.'/snapshot.log', '');
                     $this->assertSame([
                         $closeType === '' && $callbackType === '' ? 7 : null,
                         true, $mask, 1, false, "snapshot\n",
@@ -152,7 +151,7 @@ PHP;
         $path = $root.'/snapshot.log';
         foreach (['', "\0", "\0".$path, $path."\0", $path."\0suffix",
             $root."/missing/snapshot\0.log", $root."/missing\0/snapshot.log"] as $invalid) {
-            file_put_contents($path, "previous snapshot\n");
+            $this->pmssWriteFile($path, "previous snapshot\n");
             $this->assertSame([1, false, 0027, "previous snapshot\n", false, false],
                 $this->pmssRunInlinePhpJson($script, [
                     'PMSS_TEST_SNAPSHOT_ROOT' => $root,
@@ -163,7 +162,7 @@ PHP;
         // Defaults and env overrides keep append bytes, callback status, and slash normalization.
         foreach (['0', '1'] as $override) {
             foreach ([$path, $path.'/'] as $valid) {
-                file_put_contents($path, "previous snapshot\n");
+                $this->pmssWriteFile($path, "previous snapshot\n");
                 $this->assertSame([7, true, 0027, "previous snapshot\nnew snapshot\n", false, false],
                     $this->pmssRunInlinePhpJson($script, [
                         'PMSS_TEST_SNAPSHOT_ROOT' => $root,
@@ -189,8 +188,7 @@ $rc = pmssRunSnapshotLogTask('snapshot-test.php', 'PMSS_TEST_SNAPSHOT_TARGET',
 echo json_encode([$rc, $called]);
 PHP;
         $root = $this->pmssMakeTempDir('pmss-snapshot-target-');
-        $target = $root.'/existing.log';
-        file_put_contents($target, "previous snapshot\n");
+        $target = $this->pmssWriteFile($root.'/existing.log', "previous snapshot\n");
         $link = $root.'/linked.log';
         $linkedDir = $root.'/linked-dir';
         mkdir($root.'/logs');

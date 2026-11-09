@@ -70,15 +70,14 @@ class ArrInstallerNoExecPolicyTest extends TestCase
         $this->assertFalse(is_file($installPath.'/EXECUTED'), 'version detection must not execute the installed binary');
 
         // Metadata is the only accepted source.
-        @file_put_contents($installPath.'/version.txt', "6.2.0.10390\n");
+        $this->pmssWriteFile($installPath.'/version.txt', "6.2.0.10390\n");
         $this->assertSame('6.2.0.10390', \pmssArrInstalledVersionRead($installPath));
     }
 
     public function testInstalledVersionReadRejectsSymlinkedVersionMarkers(): void
     {
         $installPath = $this->pmssMakeTempDir('pmss-arr-symlink-', 0700);
-        $outside = $this->pmssMakeTempFile('pmss-arr-outside-');
-        @file_put_contents($outside, "1.2.3\n");
+        $outside = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-arr-outside-'), "1.2.3\n");
         $this->pmssCreateSymlinkOrSkip($outside, $installPath.'/version.txt');
 
         $this->assertTrue(
@@ -138,7 +137,7 @@ class ArrInstallerNoExecPolicyTest extends TestCase
         ], '/Radarr\.(?:develop|master)\.([0-9.]+).*linux.*tar\.gz/i', 'amd64');
 
         $installPath = $this->pmssMakeTempDir('pmss-arr-roundtrip-', 0700);
-        @file_put_contents($installPath.'/version.txt', $asset[0].PHP_EOL);
+        $this->pmssWriteFile($installPath.'/version.txt', $asset[0].PHP_EOL);
 
         $this->assertSame(
             $asset[0],

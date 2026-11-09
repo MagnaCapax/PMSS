@@ -94,12 +94,12 @@ SH
         $command = \pmssTerminateUserAccountSocketRemoveCommand('user1234', $target);
         $this->assertStringContainsString('env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin ', $command);
         $stubbed = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin', 'PATH='.escapeshellarg($bin.':/usr/sbin:/usr/bin:/sbin:/bin'), $command);
-        file_put_contents($target, 'socket');
+        $this->pmssWriteFile($target, 'socket');
         $this->assertSame(0, $this->pmssExecShellCommand($stubbed, [], '')['rc']);
         $this->assertFalse(file_exists($target));
         $this->assertSame(0, $this->pmssExecShellCommand($stubbed, [], '')['rc'], 'absent path is an idempotent no-op');
         mkdir($target);
-        file_put_contents($target.'/child', 'keep');
+        $this->pmssWriteFile($target.'/child', 'keep');
         // A failing rm must surface through runuser and the outer timeout.
         $this->pmssWriteExecutableFile($bin.'/rm', "#!/bin/sh\nexit 1\n");
         $this->assertSame(1, $this->pmssExecShellCommand($stubbed, [], '')['rc'], 'inner command failure must not be masked');
@@ -142,7 +142,7 @@ exec sh -c "$1"
 SH
         );
         $builder = $root.'/build.php';
-        file_put_contents($builder, '<?php require '.var_export($this->pmssRepoPath('scripts/lib/runtime/environment.php'), true)
+        $this->pmssWriteFile($builder, '<?php require '.var_export($this->pmssRepoPath('scripts/lib/runtime/environment.php'), true)
             .'; echo pmssBuildUserShellNoPamCommand("user1234", "touch ".escapeshellarg($argv[1]));');
         foreach ([true, false] as $pty) {
             $effect = $root.'/effect-'.($pty ? 'pty' : 'setsid');
@@ -163,13 +163,11 @@ SH
     {
         $root = $this->pmssMakeTempDir('pmss-terminate-manager-');
         $bin = $root.'/bin';
-        mkdir($bin);
         $log = $root.'/calls';
-        $state = $root.'/state';
-        file_put_contents($state, '0');
-        file_put_contents($bin.'/timeout', "#!/bin/sh\nshift 2\n\"\$@\"\n");
-        file_put_contents($bin.'/sleep', "#!/bin/sh\nexit 0\n");
-        file_put_contents($bin.'/systemctl', <<<'SH'
+        $state = $this->pmssWriteFile($root.'/state', '0');
+        $this->pmssWriteExecutableFiles($bin, [
+            'timeout' => "#!/bin/sh\nshift 2\n\"\$@\"\n", 'sleep' => "#!/bin/sh\nexit 0\n",
+            'systemctl' => <<<'SH'
 #!/bin/sh
 printf '%s\n' "$1" >> "$PMSS_TEST_LOG"
 case "$1" in
@@ -185,15 +183,13 @@ case "$1" in
 esac
 exit 1
 SH
-        );
-        foreach (['timeout', 'sleep', 'systemctl'] as $stub) chmod($bin.'/'.$stub, 0755);
+        ], 0777);
         $env = 'PATH='.escapeshellarg($bin.':'.getenv('PATH')).' PMSS_TEST_LOG='.escapeshellarg($log)
             .' PMSS_TEST_STATE='.escapeshellarg($state).' PMSS_TEST_RESET_RC=9';
         $result = $this->pmssExecShellCommand($env.' sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), [], '');
         $this->assertSame(9, $result['rc']);
         $this->assertSame(['is-active', 'is-active', 'is-active', 'is-failed', 'reset-failed'], file($log, FILE_IGNORE_NEW_LINES));
-        file_put_contents($state, '0');
-        file_put_contents($log, '');
+        $this->pmssWriteFiles($root, ['state' => '0', 'calls' => '']);
         $result = $this->pmssExecShellCommand($env.' PMSS_TEST_ALWAYS_ACTIVE=1 sh -c '.escapeshellarg(\pmssTerminateUserResetFailedCommand(1234)), [], '');
         $this->assertSame(1, $result['rc']);
         $this->assertSame(array_fill(0, 10, 'is-active'), file($log, FILE_IGNORE_NEW_LINES));
@@ -202,7 +198,7 @@ SH
     public function testPreinstallMarkerIsKeptWhenPasswdEntryRemains(): void
     {
         $state = $this->pmssMakeTempDir('pmss-terminate-marker-');
-        file_put_contents($state.'/user1234', 'preinstalled');
+        $this->pmssWriteFile($state.'/user1234', 'preinstalled');
         $events = [];
         $log = static function (...$fields) use (&$events): void { $events[] = $fields; };
         $this->assertSame('SKIP', \pmssTerminateUserClearPreinstallState('user1234', false, true, $state, $log));
@@ -304,8 +300,7 @@ SH
         $this->pmssWriteExecutableFile($root.'/bin/chown', "#!/bin/sh\n[ \"\$*\" = 'root:root -- .' ] || exit 97\nexit \"\${SEAL_RC:-0}\"\n");
         $paths = ['/home/user1234', '/home/backup-user1234', '/home/backup-user1234.superseded'];
         foreach ($paths as $index => $path) {
-            mkdir($root.'/tree'.$index, 0755);
-            file_put_contents($root.'/tree'.$index.'/keep', 'private');
+            $this->pmssWriteFile($root.'/tree'.$index.'/keep', 'private');
         }
         $script = 'namespace ResumeSealFixture; $root = '.var_export($root, true).';';
         $script .= <<<'PHP'
@@ -385,11 +380,9 @@ PHP;
         $base = $this->pmssMakeTempDir('pmss-purge-real-');
         $home = $base.'/home';
         $outside = $base.'/outside';
-        $this->pmssEnsureDir($home.'/nested');
-        $this->pmssEnsureDir($outside);
-        file_put_contents($home.'/nested/data', "customer\0bytes");
-        file_put_contents($home.'/.hidden', 'hidden');
-        file_put_contents($outside.'/sentinel', 'outside');
+        $this->pmssWriteFiles($base, [
+            'home/nested/data' => "customer\0bytes", 'home/.hidden' => 'hidden', 'outside/sentinel' => 'outside',
+        ]);
         symlink($outside, $home.'/nested/outside-link');
         foreach ([false, true, false] as $clear) {
             $this->assertSame(0, $this->pmssExecShellCommand(\pmssPinnedTreePurgeCommand($home, $clear), [], '')['rc']);
@@ -403,10 +396,7 @@ PHP;
         $base = $this->pmssMakeTempDir('pmss-purge-linked-');
         $home = $base.'/home';
         $outside = $base.'/outside';
-        $this->pmssEnsureDir($home);
-        $this->pmssEnsureDir($outside);
-        file_put_contents($home.'/customer', 'tenant');
-        file_put_contents($outside.'/sentinel', 'outside');
+        $this->pmssWriteFiles($base, ['home/customer' => 'tenant', 'outside/sentinel' => 'outside']);
         rename($home, $base.'/saved-home');
         symlink($outside, $home);
         $this->assertSame(0, $this->pmssExecShellCommand(\pmssPinnedTreePurgeCommand($home, false), [], '')['rc']);
@@ -487,8 +477,7 @@ PHP;
         rmdir($paths['user_backup_superseded']);
         $this->assertSame('## Incomplete: account_still_present', \pmssTerminateUserCompletion('root', $paths, $results, false)['line']);
         $lingerRoot = $root.'/linger';
-        $this->pmssEnsureDir($lingerRoot);
-        file_put_contents($lingerRoot.'/'.$username, 'enabled');
+        $this->pmssWriteFile($lingerRoot.'/'.$username, 'enabled');
         $this->assertSame('## Incomplete: linger_still_present',
             \pmssTerminateUserCompletion($username, $paths, $results, false, $lingerRoot)['line']);
         unlink($lingerRoot.'/'.$username);
@@ -668,8 +657,7 @@ PHP;
     public function testEmptyDirectoryCleanupKeepsMissingAndNonEmptyPathResults(): void
     {
         $root = $this->pmssMakeTempDir('pmss-terminate-scan-');
-        $file = $root.'/retained';
-        $this->pmssWriteFile($file, 'preserved');
+        $file = $this->pmssWriteFile($root.'/retained', 'preserved');
         foreach ([false, true] as $dryRun) {
             foreach ([$root.'/absent', $file, $root] as $path) {
                 $this->assertTrue(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', $path, $dryRun));
@@ -690,8 +678,7 @@ PHP;
             'quota' => 10,
             'quotaBurst' => 12,
         ]));
-        $config = $this->pmssMakeTempFile('pmss-terminate-ports-config-');
-        $this->pmssWriteFile($config, "# ignored\nscgi_port = 127.0.0.1:6050\ndht.port.set = 0\nnetwork.port_range.set = 20000-60000\n");
+        $config = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-terminate-ports-config-'), "# ignored\nscgi_port = 127.0.0.1:6050\ndht.port.set = 0\nnetwork.port_range.set = 20000-60000\n");
         $this->pmssWriteFile($base.'/scgi/5050', 'user1234');
         $this->pmssWriteFile($base.'/scgi/6050', 'legacy');
         $this->pmssWriteFile($base.'/dht/5051', 'user1234');
@@ -722,8 +709,7 @@ PHP;
     {
         $base = $this->pmssMakeTempDir('pmss-terminate-legacy-ports-');
         $store = new \UserConfigStore($this->pmssMakeTempDir('pmss-terminate-empty-store-').'/seedbox/config');
-        $config = $this->pmssMakeTempFile('pmss-terminate-legacy-ports-config-');
-        $this->pmssWriteFile($config, "scgi_port = localhost:6060\ndht_port = 6061\nport_range = 6062-6062\nnetwork.port_range.set = 20000-60000\n");
+        $config = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-terminate-legacy-ports-config-'), "scgi_port = localhost:6060\ndht_port = 6061\nport_range = 6062-6062\nnetwork.port_range.set = 20000-60000\n");
         $this->pmssWriteFile($base.'/scgi/6060', 'legacy');
         $this->pmssWriteFile($base.'/dht/6061', 'legacy');
         $this->pmssWriteFile($base.'/listen/6062', 'legacy');

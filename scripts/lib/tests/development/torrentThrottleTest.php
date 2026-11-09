@@ -11,7 +11,7 @@ class TorrentThrottleTest extends TestCase
     public function setUp(): void
     {
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-throttle-');
-        $this->user = 'alice';
+        $this->user = 'fixtur01';
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
     }
 
@@ -22,8 +22,7 @@ class TorrentThrottleTest extends TestCase
 
     private function writeThrottleFile(string $content, int $mode = 0640): void
     {
-        $path = $this->throttlePath();
-        file_put_contents($path, $content);
+        $path = $this->pmssWriteFile($this->throttlePath(), $content);
         chmod($path, $mode);
     }
 
@@ -42,9 +41,9 @@ class TorrentThrottleTest extends TestCase
                 'negative' => [['uploadThrottleKib' => -1], null],
                 'text' => [['uploadThrottleKib' => 'nope'], null],
             ] as $label => [$extra, $expected]) {
-                @unlink($configDir.'/users/alice.json');
+                @unlink($configDir.'/users/fixtur01.json');
                 if ($extra !== null) {
-                    file_put_contents($configDir.'/users/alice.json', json_encode(['ramMiB' => 512, 'rtorrentPort' => 0, 'quota' => 5, 'quotaBurst' => 6] + $extra));
+                    $this->pmssWriteFile($configDir.'/users/fixtur01.json', json_encode(['ramMiB' => 512, 'rtorrentPort' => 0, 'quota' => 5, 'quotaBurst' => 6] + $extra));
                 }
                 $this->assertSame($expected, pmssReadTorrentThrottle($this->user), $label);
             }
@@ -53,10 +52,9 @@ class TorrentThrottleTest extends TestCase
 
     public function testReadRejectsInvalidUsernameBeforePathResolution(): void
     {
-        $this->pmssEnsureDir($this->homeRoot.'/alice/evil');
-        file_put_contents($this->homeRoot.'/alice/evil/.torrentThrottle', '77');
+        $this->pmssWriteFile($this->homeRoot.'/fixtur01/evil/.torrentThrottle', '77');
 
-        $this->assertEquals(null, pmssReadTorrentThrottle('alice/evil'));
+        $this->assertEquals(null, pmssReadTorrentThrottle('fixtur01/evil'));
     }
 
     public function testReadRejectsMultiplyLinkedEntry(): void
@@ -90,7 +88,7 @@ class TorrentThrottleTest extends TestCase
     public function testWriteRejectsSymlink(): void
     {
         $path = $this->throttlePath();
-        file_put_contents($this->homeRoot.'/'.$this->user.'/target', '1');
+        $this->pmssWriteFile($this->homeRoot.'/'.$this->user.'/target', '1');
         symlink($this->homeRoot.'/'.$this->user.'/target', $path);
         $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 10), 'Expected write to fail on symlink');
     }
@@ -107,10 +105,10 @@ class TorrentThrottleTest extends TestCase
 
     public function testWriteRejectsInvalidUsernameBeforePathResolution(): void
     {
-        $this->pmssEnsureDir($this->homeRoot.'/alice/evil');
+        $this->pmssEnsureDir($this->homeRoot.'/fixtur01/evil');
 
-        $this->assertTrue(!pmssWriteTorrentThrottle('alice/evil', 10), 'Expected invalid username write to fail');
-        $this->assertTrue(!is_file($this->homeRoot.'/alice/evil/.torrentThrottle'), 'Traversal-like path should remain untouched');
+        $this->assertTrue(!pmssWriteTorrentThrottle('fixtur01/evil', 10), 'Expected invalid username write to fail');
+        $this->assertTrue(!is_file($this->homeRoot.'/fixtur01/evil/.torrentThrottle'), 'Traversal-like path should remain untouched');
     }
 
     public function testDiskQuotaRefreshUsesSeparateGuardedCommands(): void

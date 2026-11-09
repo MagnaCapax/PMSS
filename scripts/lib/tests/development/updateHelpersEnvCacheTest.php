@@ -43,7 +43,7 @@ PHP;
         $file = $this->pmssWriteTempFile('cache', "ID=test\nVERSION_ID=1\n", 'pmss-env');
         $this->pmssWithOsReleasePath($file, function () use ($file): void {
             $first = \getOsReleaseData();
-            file_put_contents($file, "ID=test\nVERSION_ID=2\n");
+            $this->pmssWriteFile($file, "ID=test\nVERSION_ID=2\n");
             $second = \getOsReleaseData();
             $this->assertEquals($first, $second);
         });
@@ -54,7 +54,7 @@ PHP;
         $file = $this->pmssWriteTempFile('reload', "ID=test\nVERSION_ID=3\n", 'pmss-env');
         $this->pmssWithOsReleasePath($file, function () use ($file): void {
             \getOsReleaseData();
-            file_put_contents($file, "ID=test\nVERSION_ID=4\n");
+            $this->pmssWriteFile($file, "ID=test\nVERSION_ID=4\n");
             \pmssResetOsReleaseCache();
             $data = \getOsReleaseData();
             $this->assertEquals('4', $data['VERSION_ID']);

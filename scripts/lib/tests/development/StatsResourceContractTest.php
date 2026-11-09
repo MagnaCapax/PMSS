@@ -14,7 +14,7 @@ final class StatsResourceContractTest extends TestCase
         $missing = array('data' => null, 'time' => null, 'error' => null);
         $this->assertSame($missing, \pmssStatsSerializedStateRead($path, 'invalid'));
         foreach (array('bad', serialize(false), serialize('text'), serialize(array()), serialize(array('raw' => array('month' => 12)))) as $content) {
-            file_put_contents($path, $content);
+            $this->pmssWriteFile($path, $content);
             clearstatcache(true, $path);
             $expected = @unserialize($content, array('allowed_classes' => false));
             $this->assertSame(array('data' => is_array($expected) ? $expected : null,

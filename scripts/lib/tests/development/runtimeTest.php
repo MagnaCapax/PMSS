@@ -12,7 +12,7 @@ class RuntimeTest extends TestCase
     {
         $path = $this->pmssMakeTempFile('pmss-read-contract-');
         foreach (['', '0', " a\r\nb\n", "binary\0bytes", str_repeat('x', 4097)] as $bytes) {
-            file_put_contents($path, $bytes);
+            $this->pmssWriteFile($path, $bytes);
             clearstatcache(true, $path);
             $before = lstat($path);
             $this->assertSame($bytes, \pmssReadRegularFileContents($path));
@@ -32,8 +32,7 @@ class RuntimeTest extends TestCase
     public function testRegularReadPathAndLimitCharacterization(): void
     {
         $root = $this->pmssMakeTempDir('pmss-read-path-contract-');
-        $path = $root.'/record';
-        file_put_contents($path, 'kept');
+        $path = $this->pmssWriteFile($root.'/record', 'kept');
         symlink($path, $root.'/symlink');
         link($path, $root.'/hardlink');
         foreach (['', "bad\0path", $root, $root.'/missing', $root.'/symlink', $root.'/hardlink', $path] as $invalid) {
@@ -114,8 +113,7 @@ try {
 echo json_encode([$value, $GLOBALS['reads'], $GLOBALS['closes'], $caught,
     $bounded ? ($metadata === null ? null : $metadata === \stat($path)) : 'unused']);
 PHP;
-        $path = $this->pmssMakeTempFile('pmss-opened-read-contract-');
-        file_put_contents($path, 'kept');
+        $path = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-opened-read-contract-'), 'kept');
         foreach (['normal', 'open', 'stat', 'dev', 'ino', 'type', 'links', 'uid', 'size', 'read', 'short', 'long', 'throw'] as $mode) {
             foreach ([false, true] as $bounded) {
                 $blocked = in_array($mode, ['open', 'stat', 'dev', 'ino', 'type', 'links'], true)
@@ -137,7 +135,7 @@ PHP;
         foreach ([['', '', [], null, 99], [" 0012\r\n", '0012', [' 0012'], '0012', 12],
             ["one\n\n  two \r\n", "one\n\n  two", ['one', '  two '], null, 99],
             ['-1', '-1', ['-1'], null, 99], ['0', '0', ['0'], '0', 0]] as $case) {
-            file_put_contents($path, $case[0]);
+            $this->pmssWriteFile($path, $case[0]);
             $this->assertSame($case[1], \pmssReadRegularFileTrimmed($path));
             $this->assertSame($case[2], \pmssReadRegularFileNonEmptyLines($path));
             $this->assertSame($case[3], \pmssReadRegularFileDigits($path));
@@ -146,7 +144,7 @@ PHP;
         foreach ([[], ['zero' => 0, 'false' => false, 'nested' => ['binary' => "a\0b"]], 'text', 0, null, false, 1.5, (object) ['field' => 'value']] as $value) {
             $raw = serialize($value);
             $this->assertSame(is_array($value) ? $value : null, \pmssSerializedArrayDecode($raw));
-            file_put_contents($path, $raw);
+            $this->pmssWriteFile($path, $raw);
             $this->assertSame(is_array($value) ? $value : null, \pmssReadSerializedArrayFile($path));
         }
     }
@@ -1129,7 +1127,7 @@ PHP;
     {
         $path = $this->pmssMakeTempFile('pmss-meminfo-');
         foreach (['', "invalid\nMemTotal: nope\n"] as $contents) {
-            file_put_contents($path, $contents);
+            $this->pmssWriteFile($path, $contents);
             $this->assertSame([], \pmssProcMeminfoFieldsRead($path));
             $this->assertSame(0, \pmssProcMeminfoTotalMiBRead($path));
         }
@@ -1205,8 +1203,7 @@ echo json_encode([$result, $called, is_resource($GLOBALS['snapshotHandle']), uma
 umask($before);
 PHP;
         foreach (['chmod_failed', 'failed', 'success', 'nonzero', 'throw', 'unavailable', 'closed', 'closed_throw'] as $case) {
-            $path = $this->pmssMakeTempFile('pmss-snapshot-lock-');
-            file_put_contents($path, "previous snapshot\n");
+            $path = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-snapshot-lock-'), "previous snapshot\n");
             $expectedBody = "previous snapshot\n";
             $throws = in_array($case, ['throw', 'closed_throw'], true);
             if (!in_array($case, ['chmod_failed', 'failed', 'throw', 'closed', 'closed_throw'], true)) $expectedBody .= "snapshot payload\n";

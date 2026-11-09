@@ -64,8 +64,7 @@ class PmssStatsResourceSafetyTest extends TestCase
     private function collect(array $resource): array
     {
         $serialized = serialize($resource + ['fixture' => 'preserved']);
-        $path = $this->root.'/home/.resourceData';
-        file_put_contents($path, $serialized);
+        $path = $this->pmssWriteFile($this->root.'/home/.resourceData', $serialized);
         $stats = \pmssStatsCollect([
             'user' => 'fixtur01', 'home' => $this->root.'/home',
             'config_dir' => $this->root.'/config', 'cgroup_dir' => $this->root.'/cgroup',

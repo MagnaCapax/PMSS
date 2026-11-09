@@ -110,8 +110,7 @@ class UpdateHelpersTest extends TestCase
 
     public function testGetPmssVersionFromCustomFile(): void
     {
-        $f = $this->pmssMakeTempFile('pmss');
-        file_put_contents($f, "git/main:2024-01-01\n");
+        $f = $this->pmssWriteFile($this->pmssMakeTempFile('pmss'), "git/main:2024-01-01\n");
         $this->assertEquals('git/main:2024-01-01', \getPmssVersion($f));
     }
 
