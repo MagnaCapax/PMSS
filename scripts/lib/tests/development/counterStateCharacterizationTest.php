@@ -78,8 +78,9 @@ class CounterStateCharacterizationTest extends TestCase
         $path = $this->makeRoot().'/state.json';
         $this->pmssWriteFile($path, '{"ingress":100}');
         $result = \pmssCounterStateUpdate($path, ['ingress' => 160, 'invalid' => NAN], ['ingress']);
-        $this->assertSame(['ingress' => 60], $result['delta']);
-        $this->assertSame(['ingress' => 100], $result['previous_state']);
+        $this->pmssAssertArraySubsetSame([
+            'delta' => ['ingress' => 60], 'previous_state' => ['ingress' => 100],
+        ], $result);
         $this->assertSame('{"ingress":100}', file_get_contents($path));
         $handle = \pmssLockFileAcquire($path, true, 'c+');
         try {
@@ -140,9 +141,9 @@ class CounterStateCharacterizationTest extends TestCase
             'io_read' => 9500, 'io_write' => 8100, 'io_read_ops' => 5000100, 'io_write_ops' => 4000050,
             'cpu_nsec' => 2000, 'memory' => 600, 'tasks' => 4, 'io_source' => 'bfq',
         ]);
-        $this->assertSame(500, $next['delta']['io_read']);
-        $this->assertSame(100, $next['delta']['io_read_ops']);
-        $this->assertSame(50, $next['delta']['io_write_ops']);
+        $this->pmssAssertArraySubsetSame([
+            'io_read' => 500, 'io_read_ops' => 100, 'io_write_ops' => 50,
+        ], $next['delta']);
     }
 
     public function testResourceLogReseedsIoOnScopeChangesAndResumesNormalDeltas(): void

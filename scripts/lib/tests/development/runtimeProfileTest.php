@@ -126,10 +126,9 @@ class RuntimeProfileTest extends TestCase
         $profile = $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain normalized entries');
         $this->assertSame(2, count($profile));
         $this->assertSame('valid step', $profile[0]['description']);
-        $this->assertSame('array', $profile[1]['description']);
-        $this->assertSame('cmd text', $profile[1]['command']);
-        $this->assertSame('OTHER', $profile[1]['status']);
-        $this->assertSame(0, $profile[1]['rc']);
+        $this->pmssAssertArraySubsetSame([
+            'description' => 'array', 'command' => 'cmd text', 'status' => 'OTHER', 'rc' => 0,
+        ], $profile[1]);
         $this->assertEquals(0.0, $profile[1]['duration']);
     }
 

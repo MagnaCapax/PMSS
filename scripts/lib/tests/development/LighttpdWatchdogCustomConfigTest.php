@@ -35,13 +35,10 @@ class LighttpdWatchdogCustomConfigTest extends TestCase
     public function testThreeFailuresSetAsideOnlyTheNamedFileAndAllowRestoration(): void
     {
         $result = $this->scenario('recover');
-        $this->assertSame([false, false, true], $result['results']);
-        $this->assertSame([1, 2, null], $result['counts']);
-        $this->assertSame(false, $result['sourceExists']);
-        $this->assertSame('broken', $result['backup']);
-        $this->assertSame('sibling', $result['sibling']);
-        $this->assertSame([0640, $result['uid']], $result['backupMetadata']);
-        $this->assertSame('broken', $result['restored']);
+        $this->pmssAssertArraySubsetSame([
+            'results' => [false, false, true], 'counts' => [1, 2, null], 'sourceExists' => false, 'backup' => 'broken',
+            'sibling' => 'sibling', 'backupMetadata' => [0640, $result['uid']], 'restored' => 'broken',
+        ], $result);
         $this->assertSame(1, count($result['logs']));
         $this->assertStringContainsString('3 consecutive syntax failures', $result['logs'][0]);
         $this->assertStringContainsString('media-stack.conf.disabled-', $result['logs'][0]);
@@ -54,11 +51,10 @@ class LighttpdWatchdogCustomConfigTest extends TestCase
     {
         foreach (['running', 'new-process', 'backoff', 'timeout', 'valid', 'generic', 'main-config', 'ambiguous'] as $scenario) {
             $result = $this->scenario($scenario);
-            $this->assertSame([false, false, false], $result['results'], $scenario);
-            $this->assertSame([1, 2, null], $result['counts'], $scenario);
-            $this->assertSame('broken', $result['source'], $scenario);
-            $this->assertSame(null, $result['backup'], $scenario);
-            $this->assertSame([], $result['logs'], $scenario);
+            $this->pmssAssertArraySubsetSame([
+                'results' => [false, false, false], 'counts' => [1, 2, null], 'source' => 'broken', 'backup' => null,
+                'logs' => [],
+            ], $result, $scenario);
         }
     }
 
@@ -66,9 +62,9 @@ class LighttpdWatchdogCustomConfigTest extends TestCase
     {
         foreach (['changed', 'different', 'replaced', 'malformed-state'] as $scenario) {
             $result = $this->scenario($scenario);
-            $this->assertSame([false, false, false], $result['results'], $scenario);
-            $this->assertSame([1, 2, 1], $result['counts'], $scenario);
-            $this->assertSame(null, $result['backup'], $scenario);
+            $this->pmssAssertArraySubsetSame([
+                'results' => [false, false, false], 'counts' => [1, 2, 1], 'backup' => null,
+            ], $result, $scenario);
         }
     }
 
@@ -76,10 +72,9 @@ class LighttpdWatchdogCustomConfigTest extends TestCase
     {
         foreach (['source-link', 'parent-link', 'hardlink', 'foreign-owner', 'write-failure', 'state-link', 'unsafe-runtime'] as $scenario) {
             $result = $this->scenario($scenario);
-            $this->assertSame([false, false, false], $result['results'], $scenario);
-            $this->assertSame(null, $result['backup'], $scenario);
-            $this->assertSame([], $result['moveCommands'], $scenario);
-            $this->assertSame('untouched', $result['outside'], $scenario);
+            $this->pmssAssertArraySubsetSame([
+                'results' => [false, false, false], 'backup' => null, 'moveCommands' => [], 'outside' => 'untouched',
+            ], $result, $scenario);
         }
     }
 
@@ -87,9 +82,10 @@ class LighttpdWatchdogCustomConfigTest extends TestCase
     {
         foreach (['move-failure', 'changed-at-move', 'collision'] as $scenario) {
             $result = $this->scenario($scenario);
-            $this->assertSame([false, false, false], $result['results'], $scenario);
-            $this->assertSame($scenario === 'changed-at-move' ? 'repaired' : 'broken', $result['source'], $scenario);
-            $this->assertSame($scenario === 'collision' ? 'prior backup' : null, $result['backup'], $scenario);
+            $this->pmssAssertArraySubsetSame([
+                'results' => [false, false, false], 'source' => $scenario === 'changed-at-move' ? 'repaired' : 'broken',
+                'backup' => $scenario === 'collision' ? 'prior backup' : null,
+            ], $result, $scenario);
             $this->assertSame(1, count($result['logs']), $scenario);
             $this->assertStringContainsString('refused or failed', $result['logs'][0], $scenario);
         }

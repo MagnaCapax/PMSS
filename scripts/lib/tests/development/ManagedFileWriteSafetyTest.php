@@ -59,8 +59,7 @@ final class ManagedFileWriteSafetyTest extends TestCase
             $before = lstat($outside);
             $this->assertTrue(\pmssRootStageFileWrite($inside.'/managed', 'payload', $group['name'], 0640));
             $managed = lstat($inside.'/managed');
-            $this->assertSame(0, $managed['uid']);
-            $this->assertSame($account['gid'], $managed['gid']);
+            $this->pmssAssertArraySubsetSame(['uid' => 0, 'gid' => $account['gid']], $managed);
             $this->assertSame(0640, $managed['mode'] & 0777);
             $this->assertSame('payload', file_get_contents($inside.'/managed'));
             $integerPath = $home.'/.trafficLimit';
@@ -270,11 +269,10 @@ PHP
     {
         foreach (['encoding', 'temp', 'false', 'zero', 'short', 'chmod', 'rename'] as $mode) {
             $result = $this->atomicJsonWriteFixture($mode);
-            $this->assertSame(false, $result['result'], $mode);
-            $this->assertSame('previous snapshot', $result['bytes'], $mode);
-            $this->assertSame([], $result['temporaryFiles'], $mode);
-            $this->assertSame(null, $result['exception'], $mode);
-            $this->assertSame($mode === 'encoding' ? 0 : 1, $result['tempCalls'], $mode);
+            $this->pmssAssertArraySubsetSame([
+                'result' => false, 'bytes' => 'previous snapshot', 'temporaryFiles' => [], 'exception' => null,
+                'tempCalls' => $mode === 'encoding' ? 0 : 1,
+            ], $result, $mode);
         }
     }
 
@@ -282,22 +280,20 @@ PHP
     {
         foreach (['writeThrow', 'chmodThrow', 'renameThrow', 'writeError'] as $mode) {
             $result = $this->atomicJsonWriteFixture($mode);
-            $this->assertSame(null, $result['result'], $mode);
-            $this->assertSame(true, $result['sameThrowable'], $mode);
-            $this->assertSame($mode, $result['exception'], $mode);
-            $this->assertSame('previous snapshot', $result['bytes'], $mode);
-            $this->assertSame([], $result['temporaryFiles'], $mode);
+            $this->pmssAssertArraySubsetSame([
+                'result' => null, 'sameThrowable' => true, 'exception' => $mode, 'bytes' => 'previous snapshot',
+                'temporaryFiles' => [],
+            ], $result, $mode);
         }
     }
 
     public function testAtomicJsonPublicationPreservesSuccessfulBytesAndMode(): void
     {
         $result = $this->atomicJsonWriteFixture('success');
-        $this->assertSame(true, $result['result']);
-        $this->assertSame(\pmssJsonEncodePrettyLine(['state' => 'healthy']), $result['bytes']);
-        $this->assertSame(0644, $result['permissions']);
-        $this->assertSame([], $result['temporaryFiles']);
-        $this->assertSame(null, $result['exception']);
+        $this->pmssAssertArraySubsetSame([
+            'result' => true, 'bytes' => \pmssJsonEncodePrettyLine(['state' => 'healthy']), 'permissions' => 0644,
+            'temporaryFiles' => [], 'exception' => null,
+        ], $result);
     }
 
     private function atomicJsonWriteFixture(string $mode): array

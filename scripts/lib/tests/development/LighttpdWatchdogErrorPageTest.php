@@ -23,9 +23,9 @@ class LighttpdWatchdogErrorPageTest extends TestCase
             'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '1',
         ], function () use ($config): void {
             $started = microtime(true);
-            $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('alice', $config));
+            $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('fixtur91', $config));
             $this->assertTrue(microtime(true) - $started < 1 + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS + 3);
-            $this->assertTrue(pmssUserWatchdogBackoffActive('alice', 'lighttpd'));
+            $this->assertTrue(pmssUserWatchdogBackoffActive('fixtur91', 'lighttpd'));
         });
     }
 
@@ -41,12 +41,12 @@ class LighttpdWatchdogErrorPageTest extends TestCase
                 $this->assertSame(null, pmssLighttpdWatchdogCommandCapture('df', $invalid));
                 $this->assertSame(null, pmssLighttpdWatchdogCommandCapture('df'.$invalid, ''));
                 $this->assertFalse(pmssLighttpdWatchdogRootInodesExhausted($invalid));
-                $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('alice', $binDir.'/config'.$invalid));
+                $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('fixtur91', $binDir.'/config'.$invalid));
                 $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead($invalid, $binDir));
             }
             // A rejected account name reads no snapshot, and a file in the home is never one.
             file_put_contents($binDir.'/.quota', "/dev/sda1 10G* 9G 10G 0 0 0\n");
-            $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead("alice\0", $binDir));
+            $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead("fixtur91\0", $binDir));
             $this->assertFalse(file_exists($marker));
         });
     }
@@ -74,16 +74,16 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $log = $binDir.'/launch.log';
         file_put_contents($config, 'fixture');
         $this->pmssWriteExecutableFiles($binDir, [
-            'id' => "#!/bin/sh\n[ \"\$1\" = '-u' ] && [ \"\$2\" = 'alice' ] && echo 2002 && exit 0\nexit 1\n",
+            'id' => "#!/bin/sh\n[ \"\$1\" = '-u' ] && [ \"\$2\" = 'fixtur91' ] && echo 2002 && exit 0\nexit 1\n",
             'lighttpd' => "#!/bin/sh\nprintf '%s\\n' \"\$*\" > ".escapeshellarg($log)."\nexit 7\n",
             'systemctl' => "#!/bin/sh\nexit 0\n",
             'systemd-run' => "#!/bin/sh\nprintf '%s\\n' \"\$*\" > ".escapeshellarg($binDir.'/scope.log')."\nwhile [ \"\$1\" != '--' ]; do shift; done\nshift\n\"\$@\"\n",
-            'su' => "#!/bin/sh\n[ \"\$1\" = 'alice' ] || exit 8\nshift\n[ \"\$1\" = '-c' ] || exit 9\nshift\n/bin/sh -c \"\$1\"\n",
+            'su' => "#!/bin/sh\n[ \"\$1\" = 'fixtur91' ] || exit 8\nshift\n[ \"\$1\" = '-c' ] || exit 9\nshift\n/bin/sh -c \"\$1\"\n",
         ]);
         $this->pmssWithPathPrefix($binDir, function () use ($binDir, $config, $log): void {
-            $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('alice', $config));
+            $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('fixtur91', $config));
             $this->assertSame('-t -f '.$config."\n", file_get_contents($log));
-            $this->assertStringContainsAllStrings(['--slice=user-2002.slice', 'su alice -c'], file_get_contents($binDir.'/scope.log'));
+            $this->assertStringContainsAllStrings(['--slice=user-2002.slice', 'su fixtur91 -c'], file_get_contents($binDir.'/scope.log'));
         });
     }
 
@@ -103,7 +103,7 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         });
     }
 
-    private function watchdogErrorPagePath(string $webRoot, string $username = 'alice'): string
+    private function watchdogErrorPagePath(string $webRoot, string $username = 'fixtur91'): string
     {
         return $webRoot.'/error-502-'.$username.'.html';
     }
@@ -141,9 +141,9 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $state = pmssLighttpdWatchdogQuotaStateParse(
             "Disk quotas for user demo (uid 1000):\n/dev/sda1 10G* 9G 10G 0 0 0\n"
         );
-        $this->assertSame(10737418240, $state['usedBytes']);
-        $this->assertSame(9663676416, $state['softLimitBytes']);
-        $this->assertSame(10737418240, $state['hardLimitBytes']);
+        $this->pmssAssertArraySubsetSame([
+            'usedBytes' => 10737418240, 'softLimitBytes' => 9663676416, 'hardLimitBytes' => 10737418240,
+        ], $state);
         $this->assertTrue($state['exceeded']);
     }
 
@@ -163,12 +163,12 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         foreach ([[$healthy, 0, $exhausted, false], [$exhausted, 1, $healthy, true],
             ['', 1, $exhausted, true], ['', 0, $healthy, false],
             ['unavailable', 1, $exhausted, null], ['', 1, '', null]] as [$output, $rc, $snapshot, $expected]) {
-            file_put_contents($rootDir.'/alice', $snapshot);
+            file_put_contents($rootDir.'/fixtur91', $snapshot);
             file_put_contents($homeDir.'/.quota', $snapshot === $healthy ? $exhausted : $healthy);
             $this->pmssWriteExecutableFiles($homeDir, ['quota' => "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)."\nexit {$rc}\n"]);
             $this->pmssWithEnv(['PMSS_QUOTA_RUNTIME_DIR' => $rootDir], function () use ($homeDir, $expected): void {
                 $this->pmssWithPathPrefix($homeDir, function () use ($homeDir, $expected): void {
-                    $state = pmssLighttpdWatchdogQuotaStateRead('alice', $homeDir);
+                    $state = pmssLighttpdWatchdogQuotaStateRead('fixtur91', $homeDir);
                     $this->assertSame($expected, $state['exceeded'] ?? null);
                 });
             });
@@ -282,7 +282,7 @@ SH
         $homeDir = $this->pmssMakeTempDir('pmss-watchdog-home-');
 
         $this->pmssWithPathPrefix($binDir, function () use ($homeDir): void {
-            $reason = pmssLighttpdWatchdogDetectReason('alice', $homeDir, $homeDir.'/.lighttpd.conf', true);
+            $reason = pmssLighttpdWatchdogDetectReason('fixtur91', $homeDir, $homeDir.'/.lighttpd.conf', true);
             $this->assertSame('inode', $reason);
         });
     }
@@ -351,7 +351,7 @@ SH
     public function testWriteErrorPageCreatesExpectedPerUserPath(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
-        $this->assertTrue(pmssLighttpdWatchdogWriteErrorPage('alice', 'php', $webRoot));
+        $this->assertTrue(pmssLighttpdWatchdogWriteErrorPage('fixtur91', 'php', $webRoot));
         $this->assertTrue(file_exists($this->watchdogErrorPagePath($webRoot)));
     }
 
@@ -360,14 +360,14 @@ SH
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
         $path = $this->watchdogErrorPagePath($webRoot);
         file_put_contents($path, 'demo');
-        $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('alice', $webRoot));
+        $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('fixtur91', $webRoot));
         $this->assertFalse(file_exists($path));
     }
 
     public function testDeleteErrorPageSucceedsWhenFileIsAlreadyMissing(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
-        $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('alice', $webRoot));
+        $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('fixtur91', $webRoot));
     }
 
     public function testErrorPageFileOperationsRejectInvalidAccountNames(): void
@@ -375,7 +375,7 @@ SH
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
         $path = $this->watchdogErrorPagePath($webRoot);
         file_put_contents($path, 'untouched');
-        foreach (['', 'Alice', 'alice/../alice', "alice\0", 'toolongname'] as $username) {
+        foreach (['', 'Fixtur91', 'fixtur91/../fixtur91', "fixtur91\0", 'toolongname'] as $username) {
             $this->assertFalse(pmssLighttpdWatchdogWriteErrorPage($username, 'php', $webRoot));
             $this->assertFalse(pmssLighttpdWatchdogDeleteErrorPage($username, $webRoot));
             $this->assertSame('untouched', file_get_contents($path));

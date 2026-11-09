@@ -18,8 +18,7 @@ class ShowTrafficFormatTest extends TestCase
             [['--color', '--no-color'], 2, 'Error: --color and --no-color are mutually exclusive.'],
         ] as [$args, $rc, $output]) {
             $result = $this->pmssRunRepoPhpScriptCommand('scripts/showTraffic.php', $args);
-            $this->assertSame($rc, $result['rc']);
-            $this->assertSame($output, $result['output']);
+            $this->pmssAssertArraySubsetSame(['rc' => $rc, 'output' => $output], $result);
         }
     }
 
@@ -158,14 +157,14 @@ class ShowTrafficFormatTest extends TestCase
     public function testJsonPayloadBuilderMatchesSnapshot(): void
     {
         $row = [
-            'user' => 'alice', 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
+            'user' => 'fixtur91', 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
             'inboundMonthMiB' => 256.5, 'inboundRatio' => 0.25, 'limitMiB' => 2048.0, 'pctUsed' => 87.654, 'overLimit' => false, 'nearLimit' => true,
             'rawMiB' => ['month' => 1024.0, 'week' => 2.0, 'day' => 3.0, 'hour' => 4.0, '15min' => 5.0],
         ];
 
         $this->assertEquals([
             'users' => [[
-                'user' => 'alice', 'display' => ['month' => '1024MiB', 'week' => '2MiB', 'day' => '3MiB'], 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
+                'user' => 'fixtur91', 'display' => ['month' => '1024MiB', 'week' => '2MiB', 'day' => '3MiB'], 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
                 'inboundMonthMiB' => 256.5, 'inboundOutboundRatio' => 0.25, 'limitMiB' => 2048.0, 'pctUsed' => 87.65, 'overLimit' => false, 'nearLimit' => true,
                 'rawMiB' => ['month' => 1024.0, 'week' => 2.0, 'day' => 3.0, 'hour' => 4.0, '15min' => 5.0],
             ]],
@@ -184,37 +183,36 @@ class ShowTrafficFormatTest extends TestCase
         $statsDir = $root.'/runtime/trafficStats';
         $homeDir = $root.'/home';
         @mkdir($statsDir, 0755, true);
-        @mkdir($homeDir.'/alice', 0755, true);
-        @mkdir($homeDir.'/bob', 0755, true);
+        @mkdir($homeDir.'/fixtur91', 0755, true);
+        @mkdir($homeDir.'/fixtur92', 0755, true);
         // The limit comes from the root runtime file; the home copy is display only (ADR 0213).
         @mkdir($root.'/seedbox/trafficLimits', 0755, true);
-        file_put_contents($root.'/seedbox/trafficLimits/alice', "1\n");
-        file_put_contents($homeDir.'/bob/.trafficLimit', "1\n");
+        file_put_contents($root.'/seedbox/trafficLimits/fixtur91', "1\n");
+        file_put_contents($homeDir.'/fixtur92/.trafficLimit', "1\n");
         $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $homeDir, 'PMSS_RUNTIME_DIR' => $root.'/seedbox']);
 
         $payload = static function (float $month): array {
             return ['raw' => ['month' => $month, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0], 'daily' => []];
         };
-        file_put_contents($statsDir.'/alice', serialize($payload(900.0)));
-        file_put_contents($statsDir.'/alice-localnet', serialize($payload(50.0)));
-        file_put_contents($statsDir.'/bob', serialize($payload(500.0)));
+        file_put_contents($statsDir.'/fixtur91', serialize($payload(900.0)));
+        file_put_contents($statsDir.'/fixtur91-localnet', serialize($payload(50.0)));
+        file_put_contents($statsDir.'/fixtur92', serialize($payload(500.0)));
 
-        $report = \pmssShowTrafficReportBuild(['bob', 'alice-localnet', 'ghost', 'alice'], $statsDir);
+        $report = \pmssShowTrafficReportBuild(['fixtur92', 'fixtur91-localnet', 'ghost', 'fixtur91'], $statsDir);
         \pmssShowTrafficRowsSort($report['rows'], 'pct');
 
         $this->assertEquals([
             'users' => [
-                ['user' => 'alice', 'display' => ['month' => '900MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => 1024, 'pctUsed' => 87.89, 'overLimit' => false, 'nearLimit' => true, 'rawMiB' => ['month' => 900.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
-                ['user' => 'alice-localnet', 'display' => ['month' => '50MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => 1024, 'pctUsed' => 4.88, 'overLimit' => false, 'nearLimit' => false, 'rawMiB' => ['month' => 50.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
-                ['user' => 'bob', 'display' => ['month' => '500MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => null, 'pctUsed' => null, 'overLimit' => false, 'nearLimit' => false, 'rawMiB' => ['month' => 500.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
+                ['user' => 'fixtur91', 'display' => ['month' => '900MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => 1024, 'pctUsed' => 87.89, 'overLimit' => false, 'nearLimit' => true, 'rawMiB' => ['month' => 900.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
+                ['user' => 'fixtur91-localnet', 'display' => ['month' => '50MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => 1024, 'pctUsed' => 4.88, 'overLimit' => false, 'nearLimit' => false, 'rawMiB' => ['month' => 50.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
+                ['user' => 'fixtur92', 'display' => ['month' => '500MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => null, 'pctUsed' => null, 'overLimit' => false, 'nearLimit' => false, 'rawMiB' => ['month' => 500.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
             ],
             'totals' => ['monthMiB' => 1450.0, 'monthLocalMiB' => 50.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
             'summary' => ['totalUsers' => 3, 'usersWithStats' => 2, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
             'missingStatsUsers' => ['ghost'],
         ], \pmssShowTrafficJsonPayload($report));
-        $this->assertSame(3, $report['summary']['totalUsers']);
-        $this->assertSame(2, $report['summary']['usersWithStats']);
-        $duplicateReport = \pmssShowTrafficReportBuild(['alice', 'alice'], $statsDir);
+        $this->pmssAssertArraySubsetSame(['totalUsers' => 3, 'usersWithStats' => 2], $report['summary']);
+        $duplicateReport = \pmssShowTrafficReportBuild(['fixtur91', 'fixtur91'], $statsDir);
         $this->assertSame(1, \pmssShowTrafficJsonPayload($duplicateReport)['summary']['usersWithStats']);
     }
 
@@ -253,12 +251,15 @@ class ShowTrafficFormatTest extends TestCase
         file_put_contents($statsDir.'/bad', serialize(['raw' => array_replace($raw, ['hour' => 'bad'])]));
         $report = \pmssShowTrafficReportBuild(['zed-localnet', 'broken', 'zero', 'bad', 'alpha', 'alpha', 'absent', 'zed-localnet'], $statsDir);
         $payload = \pmssShowTrafficJsonPayload($report);
-        $this->assertSame(['monthMiB' => 2000.75, 'monthLocalMiB' => 200.5, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0], $payload['totals']);
-        $this->assertSame(['totalUsers' => 6, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 2, 'missingStats' => 1], $payload['summary']);
-        $this->assertSame(['absent'], $payload['missingStatsUsers']);
-        $this->assertSame($raw, $payload['users'][1]['rawMiB']);
-        $this->assertSame(['week' => '700MiB', 'month' => '900.13MiB', 'day' => '144MiB'], $payload['users'][1]['display']);
-        $this->assertSame(87.9, $payload['users'][1]['pctUsed']);
+        $this->pmssAssertArraySubsetSame([
+            'totals' => ['monthMiB' => 2000.75, 'monthLocalMiB' => 200.5, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
+            'summary' => ['totalUsers' => 6, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 2, 'missingStats' => 1],
+            'missingStatsUsers' => ['absent'],
+        ], $payload);
+        $this->pmssAssertArraySubsetSame([
+            'rawMiB' => $raw, 'display' => ['week' => '700MiB', 'month' => '900.13MiB', 'day' => '144MiB'],
+            'pctUsed' => 87.9,
+        ], $payload['users'][1]);
         [, $plain] = $this->pmssCaptureStdout(static function () use ($report): void {
             \pmssShowTrafficPrintSummary($report, false, true);
         });
@@ -270,8 +271,10 @@ class ShowTrafficFormatTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-traffic-total-order-');
         $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root]);
         $empty = \pmssShowTrafficJsonPayload(\pmssShowTrafficReportBuild([], $root));
-        $this->assertSame(['monthMiB' => 0.0, 'monthLocalMiB' => 0.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0], $empty['totals']);
-        $this->assertSame(['totalUsers' => 0, 'usersWithStats' => 0, 'overLimit' => 0, 'nearLimit' => 0, 'missingStats' => 0], $empty['summary']);
+        $this->pmssAssertArraySubsetSame([
+            'totals' => ['monthMiB' => 0.0, 'monthLocalMiB' => 0.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
+            'summary' => ['totalUsers' => 0, 'usersWithStats' => 0, 'overLimit' => 0, 'nearLimit' => 0, 'missingStats' => 0],
+        ], $empty);
         foreach (['alpha' => 1.0e16, 'beta' => -1.0e16, 'gamma' => 1.0] as $user => $month) {
             file_put_contents($root.'/'.$user, serialize(['raw' => ['month' => $month, 'week' => 1, 'day' => 1, 'hour' => 1, '15min' => 1]]));
         }

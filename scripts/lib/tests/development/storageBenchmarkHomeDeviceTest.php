@@ -196,11 +196,8 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $this->assertSame(['4k', '1M'], array_column(array_column($jobs, 3), 'bs'));
         $this->assertSame([64, 32], array_column(array_column($jobs, 3), 'iodepth'));
         foreach ($jobs as $job) {
-            $this->assertSame('/dev/md0', $job[0]);
-            $this->assertSame(17, $job[2]);
-            $this->assertSame(1, $job[3]['numjobs']);
-            $this->assertSame(1, $job[3]['direct']);
-            $this->assertSame(true, $job[3]['readonly']);
+            $this->pmssAssertArraySubsetSame([0 => '/dev/md0', 2 => 17], $job);
+            $this->pmssAssertArraySubsetSame(['numjobs' => 1, 'direct' => 1, 'readonly' => true], $job[3]);
         }
         $this->assertSame(10, $rows[0]->metrics->read_bw_MBps);
     }

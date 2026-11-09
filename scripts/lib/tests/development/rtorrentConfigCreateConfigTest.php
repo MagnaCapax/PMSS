@@ -193,8 +193,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
 
         $this->assertEquals([], $cfg->reservedTypes);
         $this->assertEquals("scgi=0\n", (string) $result['configFile']);
-        $this->assertSame('', $result['config']['dhtPort']);
-        $this->assertSame(null, $result['config']['listenPort']);
+        $this->pmssAssertArraySubsetSame(['dhtPort' => '', 'listenPort' => null], $result['config']);
     }
 
     public function testCreateConfigKeepsRenderingSilent(): void
@@ -595,8 +594,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             $fixture['lockPath']
         );
 
-        $this->assertSame('ok', $result['status']);
-        $this->assertSame(1, $result['removed']);
+        $this->pmssAssertArraySubsetSame(['status' => 'ok', 'removed' => 1], $result);
         $this->assertFalse(file_exists($fixture['portsBase'].'/scgi/4002'), 'old unreferenced marker must be reclaimed');
         $this->assertTrue(is_file($fixture['portsBase'].'/scgi/4003'), 'recent marker must survive publication grace');
         $this->assertTrue(is_link($fixture['portsBase'].'/scgi/4004'), 'unsafe marker must remain untouched');
@@ -624,9 +622,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             ['dummy'], $fixture['homeRoot'], $fixture['configRoot'], $fixture['portsBase'], 10000, 3600, $fixture['lockPath']
         );
 
-        $this->assertSame('ok', $result['status']);
-        $this->assertSame('', $result['reason']);
-        $this->assertSame(0, $result['removed']);
+        $this->pmssAssertArraySubsetSame(['status' => 'ok', 'reason' => '', 'removed' => 0], $result);
         $this->assertTrue(is_file($fixture['portsBase'].'/dht/24001'));
         $this->assertTrue(is_file($fixture['portsBase'].'/listen/44001'));
     }
@@ -643,8 +639,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             ['dummy'], $fixture['homeRoot'], $fixture['configRoot'], $fixture['portsBase'], 10000, 3600, $fixture['lockPath']
         );
 
-        $this->assertSame('skipped', $result['status']);
-        $this->assertSame('uncertain_scgi_ownership', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['status' => 'skipped', 'reason' => 'uncertain_scgi_ownership'], $result);
         $this->assertTrue(is_file($fixture['portsBase'].'/scgi/4002'));
     }
 
@@ -659,8 +654,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             $result = \pmssRtorrentPortReservationsReconcile(
                 [], $fixture['homeRoot'], $fixture['configRoot'], $fixture['portsBase'], 10000, 0, $fixture['lockPath']
             );
-            $this->assertSame('skipped', $result['status']);
-            $this->assertSame('lock_busy', $result['reason']);
+            $this->pmssAssertArraySubsetSame(['status' => 'skipped', 'reason' => 'lock_busy'], $result);
             $this->assertTrue(is_file($fixture['portsBase'].'/scgi/4002'));
         } finally {
             \pmssLockHandleRelease($lock);

@@ -11,12 +11,12 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testRootAccountCommandUsesNoPamIsolatedRunner(): void
     {
-        $command = \pmssAccountPathShellCommand(0, 1001, 'alice', 'touch /tmp/example');
-        $this->assertStringContainsAllStrings(['env -i', 'setsid runuser', '-u', "'alice'"], $command);
+        $command = \pmssAccountPathShellCommand(0, 1001, 'fixtur91', 'touch /tmp/example');
+        $this->assertStringContainsAllStrings(['env -i', 'setsid runuser', '-u', "'fixtur91'"], $command);
         $this->assertFalse(strpos($command, 'su -s') !== false);
         $this->assertFalse(strpos($command, '</dev/null') !== false);
         $this->assertFalse(strpos($command, '--pty') !== false);
-        $this->assertSame("sh -c 'true'", \pmssAccountPathShellCommand(1001, 1001, 'alice', 'true'));
+        $this->assertSame("sh -c 'true'", \pmssAccountPathShellCommand(1001, 1001, 'fixtur91', 'true'));
     }
 
     public function testRootAccountCommandDeliversStandardInputToTheAccountCommand(): void
@@ -26,7 +26,7 @@ class LighttpdUserFileWriteTest extends TestCase
         // Stand-in for runuser: drop "-u USER --" and run the rest as this user.
         $this->pmssWriteExecutableFile($stub.'/runuser', "#!/bin/sh\nshift 3\nexec \"\$@\"\n", 0755, 0700);
         $received = $this->tempDir.'/received';
-        $command = \pmssAccountPathShellCommand(0, 1001, 'alice', 'cat > '.escapeshellarg($received));
+        $command = \pmssAccountPathShellCommand(0, 1001, 'fixtur91', 'cat > '.escapeshellarg($received));
         $command = str_replace('PATH=/usr/sbin:/usr/bin:/sbin:/bin',
             'PATH='.escapeshellarg($stub.':/usr/sbin:/usr/bin:/sbin:/bin'), $command);
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
@@ -568,11 +568,10 @@ echo json_encode(['ok' => $ok, 'attempts' => $GLOBALS['attempts'], 'mode' => $pe
 PHP;
             $result = $this->pmssRunInlinePhpJson($script);
             $success = is_int($collisions) && $collisions < 4;
-            $this->assertSame($success, $result['ok']);
-            $this->assertSame($collisions === 'entropy' ? 0 : min(4, $collisions + 1), $result['attempts']);
-            $this->assertSame($success ? 0600 : null, $result['mode']);
-            $this->assertSame(0, $result['umask']);
-            $this->assertSame(array_fill(0, (int) $collisions, 'existing'), $result['kept']);
+            $this->pmssAssertArraySubsetSame([
+                'ok' => $success, 'attempts' => $collisions === 'entropy' ? 0 : min(4, $collisions + 1),
+                'mode' => $success ? 0600 : null, 'umask' => 0, 'kept' => array_fill(0, (int) $collisions, 'existing'),
+            ], $result);
             $this->assertSame((int) $collisions, count($result['temporary']));
         }
     }
@@ -669,8 +668,9 @@ PHP;
                 $this->assertFalse($result['ok']);
                 $this->assertSame($existing, $result['content']);
                 $this->assertFalse($result['prepared']);
-                $this->assertSame([], $result['temporary']);
-                $this->assertSame($existing === null ? null : 0600, $result['mode']);
+                $this->pmssAssertArraySubsetSame([
+                    'temporary' => [], 'mode' => $existing === null ? null : 0600,
+                ], $result);
             }
         }
     }
@@ -711,9 +711,9 @@ PHP;
         foreach ([0, 1, 7] as $bytes) {
             $result = $this->writeWithFileSizeLimit(true, 'original', 'complete', 8 + $bytes);
             $this->assertFalse($result['ok']);
-            $this->assertSame('original'.substr('complete', 0, $bytes), $result['content']);
-            $this->assertSame(0600, $result['mode']);
-            $this->assertSame([], $result['temporary']);
+            $this->pmssAssertArraySubsetSame([
+                'content' => 'original'.substr('complete', 0, $bytes), 'mode' => 0600, 'temporary' => [],
+            ], $result);
         }
     }
 
@@ -725,10 +725,10 @@ PHP;
                     $expected = ($append ? (string) $existing : '').$payload;
                     $result = $this->writeWithFileSizeLimit($append, $existing, $payload, strlen($expected));
                     $this->assertTrue($result['ok']);
-                    $this->assertSame(base64_encode($expected), $result['encoded']);
-                    $this->assertSame(!$append, $result['prepared']);
-                    $this->assertSame(0640, $result['mode']);
-                    $this->assertSame([], $result['temporary']);
+                    $this->pmssAssertArraySubsetSame([
+                        'encoded' => base64_encode($expected), 'prepared' => !$append, 'mode' => 0640,
+                        'temporary' => [],
+                    ], $result);
                 }
             }
         }
