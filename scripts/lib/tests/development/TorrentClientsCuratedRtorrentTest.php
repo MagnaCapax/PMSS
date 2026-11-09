@@ -42,7 +42,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-rtorrent-curated-');
         $store = $root.'/pmss/clients';
-        mkdir(dirname($store), 0755);
+        $this->pmssEnsureDir(dirname($store));
         $entry = $this->entries()[1];
         // Executable fixture bytes stand in for the separately verified upstream artifact.
         $bytes = "#!/bin/sh\nprintf 'selected-rtorrent'\n";
@@ -62,7 +62,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             $this->assertTrue(\pmssTorrentClientsProjectionWrite([$entry], $projection));
             $this->assertSame(['0.9.8-r16'], array_keys(\pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent')));
             $home = $root.'/t';
-            mkdir($home.'/bin/rtorrent', 0755, true);
+            $this->pmssEnsureDir($home.'/bin/rtorrent');
             $binary = $store.'/rtorrent/0.9.8-r16/rtorrent';
             symlink(dirname($binary), $home.'/bin/rtorrent/default');
             $this->assertSame($binary, \pmssTorrentClientResolve($home, 'rtorrent', $projection, $store));
@@ -78,7 +78,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     public function testSystemRepointAndRestartPreflightPreserveStoppedAccounts(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rtorrent-switch-');
-        mkdir($home.'/bin/rtorrent', 0755, true);
+        $this->pmssEnsureDir($home.'/bin/rtorrent');
         symlink('/missing', $home.'/bin/rtorrent/default');
         $this->assertTrue(\pmssConfigureTorrentClientOtherRepoint($home, 'rtorrent', 'system'));
         $this->assertFalse(is_link($home.'/bin/rtorrent/default'));
@@ -86,7 +86,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertFalse(\pmssConfigureTorrentClientOtherStart($home, 'rtorrent', 'system'));
         $this->assertFalse(\pmssConfigureTorrentClientOtherStart($home, 'rtorrent', '0.9.8-r16'));
         $this->assertFalse(file_exists($home.'/www/.rtorrentRestart'));
-        file_put_contents($home.'/.rtorrentDisable', '');
+        $this->pmssWriteFile($home.'/.rtorrentDisable', '');
         $result = \pmssConfigureTorrentClientOtherSwitch($home,
             ['client' => 'rtorrent', 'version' => '0.9.8-r16'],
             ['versions' => ['0.9.8-r16' => ['kind' => 'static']]]);
@@ -147,7 +147,6 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $rows = [];
         foreach ($this->entries() as $row) {
             if ($row['kind'] === 'system') continue;
-            mkdir($store.'/rtorrent/'.$row['version'], 0755, true);
             // The fixture prints its argv so the test sees the exact launch arguments.
             $this->pmssWriteExecutableFile($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\nprintf '%s|' \"\$@\"\n");
             $row['disabled'] = false;
@@ -157,12 +156,12 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($rows, $projection));
         });
         $home = $root.'/t';
-        mkdir($home.'/bin/rtorrent', 0755, true);
+        $this->pmssEnsureDir($home.'/bin/rtorrent');
         $caDefault = 'branch = "network.http.cacert=", "cat=", "network.http.capath=", "cat=", '
             .'"network.http.cacert.set=/etc/ssl/certs/ca-certificates.crt"';
         // Old account configs need no regeneration, and every family receives one shell-safe option.
-        file_put_contents($home.'/.rtorrent.rc', "try_import = .rtorrent.rc.custom\n");
-        file_put_contents($home.'/.rtorrent.rc.custom', "network.http.cacert.set = /custom/ca.pem\n");
+        $this->pmssWriteFiles($home, ['.rtorrent.rc' => "try_import = .rtorrent.rc.custom\n",
+            '.rtorrent.rc.custom' => "network.http.cacert.set = /custom/ca.pem\n"]);
         foreach (['0.16.25', '0.16.26', '0.9.8-r16', '0.9.8-stickz7.2'] as $version) {
             symlink($store.'/rtorrent/'.$version, $home.'/bin/rtorrent/default');
             $result = $this->pmssExecShellCommand(\pmssRtorrentExecutorCommand($home, $projection, $store), [], '');
@@ -207,8 +206,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $rows = [];
         foreach ($this->entries() as $row) {
             if ($row['kind'] === 'system') continue;
-            mkdir($store.'/rtorrent/'.$row['version'], 0755, true);
-            file_put_contents($store.'/rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\n");
+            $this->pmssWriteRelativeFile($store, 'rtorrent/'.$row['version'].'/rtorrent', "#!/bin/sh\n");
             // Model withdrawal independently of which versions the shipped catalog offers.
             $row['disabled'] = $row['version'] !== '0.9.8-stickz7.2';
             $row['isDefault'] = false;
@@ -220,7 +218,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         // Every installed build is on disk; only the enabled one is offered.
         $this->assertSame(['0.9.8-stickz7.2'], array_keys(\pmssConfigureTorrentClientVersionsRead($projection, 'rtorrent')));
         $home = $root.'/t';
-        mkdir($home.'/bin/rtorrent', 0755, true);
+        $this->pmssEnsureDir($home.'/bin/rtorrent');
         symlink($store.'/rtorrent/0.16.25', $home.'/bin/rtorrent/default');
         // An account that selected a now-disabled build runs the system build again.
         $this->assertSame('/usr/local/bin/rtorrent', \pmssRtorrentExecutorCommand($home, $projection, $store));

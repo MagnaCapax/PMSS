@@ -23,11 +23,10 @@ final class TorrentClientsDefaultLinksTest extends TestCase
         $skeleton = $root.'/rc.custom';
         copy(dirname(__DIR__, 4).'/etc/skel/.rtorrent.rc.custom', $skeleton);
         foreach ($this->rpcMarkers() as $file => $marker) {
-            $source = dirname(__DIR__, 4).'/etc/skel/www/rutorrent/'.$file;
+            $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/'.$file);
             // Use delivered bytes so a marker typo cannot make this a self-fulfilling fixture.
-            $this->assertStringContainsString($marker, file_get_contents($source));
-            mkdir(dirname($home.'/www/rutorrent/'.$file), 0755, true);
-            copy($source, $home.'/www/rutorrent/'.$file);
+            $this->assertStringContainsString($marker, $source);
+            $this->pmssWriteRelativeFile($home, 'www/rutorrent/'.$file, $source);
         }
         $ops = ['root' => $store, 'homeRoot' => $root, 'catalog' => $catalog,
             'rtorrentCustomSkeleton' => $skeleton,
@@ -58,7 +57,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
         foreach (['edited', 'symlink', 'dangling', 'directory', 'unreadable'] as $kind) {
             [$home, $store, $ops] = $this->fixture();
             $custom = $home.'/.rtorrent.rc.custom';
-            if ($kind === 'edited') file_put_contents($custom, 'customer configuration');
+            if ($kind === 'edited') $this->pmssWriteFile($custom, 'customer configuration');
             elseif ($kind === 'directory') mkdir($custom);
             elseif ($kind === 'unreadable') {
                 copy($ops['rtorrentCustomSkeleton'], $custom);
@@ -97,10 +96,10 @@ final class TorrentClientsDefaultLinksTest extends TestCase
                 [$home, $store, $ops] = $this->fixture();
                 $path = $home.'/www/rutorrent/'.$file;
                 unlink($path);
-                if ($kind === 'unpatched') file_put_contents($path, 'legacy file without compatibility patch');
+                if ($kind === 'unpatched') $this->pmssWriteFile($path, 'legacy file without compatibility patch');
                 elseif ($kind === 'directory') mkdir($path);
                 elseif ($kind === 'unreadable') {
-                    file_put_contents($path, $marker);
+                    $this->pmssWriteFile($path, $marker);
                     chmod($path, 0000);
                 } elseif ($kind !== 'missing') symlink($kind === 'symlink'
                     ? dirname(__DIR__, 4).'/etc/skel/www/rutorrent/'.$file : $home.'/missing', $path);
@@ -118,7 +117,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
     public function testDanglingPriorSwitchRecordPreventsSeeding(): void
     {
         [$home, $store, $ops] = $this->fixture();
-        mkdir($home.'/.config/pmss/torrentClients', 0700, true);
+        $this->pmssEnsureDir($home.'/.config/pmss/torrentClients', 0700);
         symlink($home.'/missing', $home.'/.config/pmss/torrentClients/rtorrent.lastRun');
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
         $this->assertFalse(is_link($home.'/bin/rtorrent/default'));
@@ -128,9 +127,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
     {
         foreach (['system', '0.9.8-r16', ''] as $choice) {
             [$home, $store, $ops] = $this->fixture();
-            mkdir($home.'/.config/pmss/torrentClients', 0700, true);
-            $lastRun = $home.'/.config/pmss/torrentClients/rtorrent.lastRun';
-            file_put_contents($lastRun, $choice);
+            $lastRun = $this->pmssWriteRelativeFile($home, '.config/pmss/torrentClients/rtorrent.lastRun', $choice, 0700);
             $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
             $this->assertFalse(is_link($home.'/bin/rtorrent/default'));
             $this->assertSame($choice, file_get_contents($lastRun));
@@ -143,7 +140,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
         foreach (['file', 'directory', 'link', 'dangling'] as $kind) {
             [$home, $store, $ops] = $this->fixture();
             $default = $home.'/bin/rtorrent/default';
-            if ($kind === 'file') file_put_contents($default, 'keep');
+            if ($kind === 'file') $this->pmssWriteFile($default, 'keep');
             elseif ($kind === 'directory') mkdir($default);
             else symlink($kind === 'link' ? $store.'/rtorrent/0.16.25' : '/missing', $default);
             $before = lstat($default);
@@ -164,7 +161,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
             if ($entry['client'] === 'rtorrent') $entry['isDefault'] = $entry['kind'] === 'system';
         }
         unset($entry);
-        file_put_contents($ops['catalog'], json_encode($catalog));
+        $this->pmssWriteFile($ops['catalog'], json_encode($catalog));
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
         $this->assertFalse(is_link($home.'/bin/rtorrent/default'));
         $this->assertSame($store.'/rtorrent/0.16.25', readlink($home.'/bin/rtorrent/0.16.25'));
@@ -175,7 +172,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
         foreach ([null, '{invalid', '[]'] as $contents) {
             [$home, $store, $ops] = $this->fixture();
             if ($contents === null) unlink($ops['catalog']);
-            else file_put_contents($ops['catalog'], $contents);
+            else $this->pmssWriteFile($ops['catalog'], $contents);
             $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
             $this->assertFalse(is_link($home.'/bin/rtorrent/default'));
             $this->assertSame($store.'/rtorrent/0.16.25', readlink($home.'/bin/rtorrent/0.16.25'));
@@ -204,7 +201,7 @@ final class TorrentClientsDefaultLinksTest extends TestCase
         $default = array_values(array_filter(json_decode(file_get_contents($ops['catalog']), true),
             static function ($entry) { return $entry['client'] === 'transmission' && $entry['isDefault']; }));
         $this->assertSame(1, count($default));
-        mkdir($store.'/transmission/'.$default[0]['version'], 0755, true);
+        $this->pmssEnsureDir($store.'/transmission/'.$default[0]['version']);
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
         $this->assertSame($store.'/transmission/'.$default[0]['version'],
             readlink($home.'/bin/transmission/'.$default[0]['version']));

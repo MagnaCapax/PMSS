@@ -25,8 +25,7 @@ final class TorrentClientsP6LaunchTest extends TestCase
         [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-p6-launch-',
             'deluge', '2.1.1', ['bin/deluged' => 'fixture', 'bin/deluge-web' => 'fixture'], 't@localhost');
         symlink($store.'/deluge/2.1.1', $home.'/bin/deluge/default');
-        $projection = $root.'/projection.json';
-        file_put_contents($projection, json_encode(['versions' => [
+        $projection = $this->pmssWriteFile($root.'/projection.json', json_encode(['versions' => [
             ['client' => 'deluge', 'version' => '2.1.1', 'kind' => 'venv'],
         ]]));
         $commands = [];
@@ -44,7 +43,7 @@ final class TorrentClientsP6LaunchTest extends TestCase
     public function testNoSelectionCannotInvokeResolverLaunch(): void
     {
         $home = $this->pmssMakeTempDir('pmss-p6-no-selection-').'/t@localhost';
-        mkdir($home.'/bin/deluge', 0755, true);
+        $this->pmssEnsureDir($home.'/bin/deluge');
         $calls = 0;
         $run = static function () use (&$calls): int { $calls++; return 0; };
         $this->assertFalse(\pmssTorrentClientDelugeLaunch($home, '/missing', '/missing', $run));

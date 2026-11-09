@@ -64,7 +64,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-qbit-curated-');
         $store = $root.'/pmss/clients';
-        mkdir(dirname($store), 0755);
+        $this->pmssEnsureDir(dirname($store));
         $entries = $this->entries();
         $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_STORE_ROOT' => $store], function () use ($entries, $root, $store): void {
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($entries, $root.'/public/catalog.json'));
@@ -81,7 +81,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
             $this->assertTrue(\pmssTorrentClientsProjectionWrite($entries, $root.'/public/catalog.json'));
             $picker = \pmssConfigureTorrentClientVersionsRead($root.'/public/catalog.json');
             $this->assertSame(array_column($entries, 'version'), array_keys($picker));
-            mkdir($root.'/t/bin/qbittorrent', 0755, true);
+            $this->pmssEnsureDir($root.'/t/bin/qbittorrent');
             foreach ($entries as $entry) {
                 $link = $root.'/t/bin/qbittorrent/default';
                 symlink($store.'/qbittorrent/'.$entry['version'], $link);
@@ -100,8 +100,7 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
     public function testExactSpaceReserveSkipsCuratedInstallAndPreservesOldBinary(): void
     {
         $root = $this->pmssMakeTempDir('pmss-qbit-reserve-');
-        mkdir($root.'/qbittorrent/old', 0755, true);
-        file_put_contents($root.'/qbittorrent/old/qbittorrent-nox', 'old');
+        $this->pmssWriteRelativeFile($root, 'qbittorrent/old/qbittorrent-nox', 'old');
         foreach ([null, 3 * 1024 ** 3, 3 * 1024 ** 3 + 10] as $free) {
             $result = \pmssTorrentClientsStoreConverge($this->entries(), [
                 'root' => $root,

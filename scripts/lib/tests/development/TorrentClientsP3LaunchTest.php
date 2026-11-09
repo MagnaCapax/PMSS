@@ -17,10 +17,10 @@ final class TorrentClientsP3LaunchTest extends TestCase
             'su' => "#!/bin/sh\nshift\n[ \"\$1\" = '-c' ] || exit 9\nshift\n/bin/sh -c \"\$1\"\n",
         ]);
         $this->pmssWithPathPrefixedEnv($bin, ['PMSS_RUNTIME_DIR' => $bin.'/runtime'], function (): void {
-            $command = \pmssBuildUserServiceShellCommand('alice', 'sleep 30');
-            $result = \pmssUserWatchdogCommandRun($command, 1, 'alice', 'transmission');
+            $command = \pmssBuildUserServiceShellCommand('fixtur01', 'sleep 30');
+            $result = \pmssUserWatchdogCommandRun($command, 1, 'fixtur01', 'transmission');
             $this->assertTrue($result['timed_out']);
-            $this->assertTrue(\pmssUserWatchdogBackoffActive('alice', 'transmission'));
+            $this->assertTrue(\pmssUserWatchdogBackoffActive('fixtur01', 'transmission'));
         });
         $source = $this->pmssReadRepoFile('scripts/cron/transmissionInstancesCheck.php');
         $this->assertTrue(strpos($source, 'pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $command)') !== false);
@@ -29,18 +29,17 @@ final class TorrentClientsP3LaunchTest extends TestCase
     private function fixture(): array
     {
         [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-p3-launch-',
-            'transmission', '4.1.3', ['transmission-daemon' => "#!/bin/sh\nexit 0\n"], 't', 0700);
-        mkdir($home.'/.config/transmission-daemon', 0700, true);
-        mkdir($home.'/.lighttpd', 0700, true);
+            'transmission', '4.1.3', [], 't', 0700);
+        $this->pmssEnsureDir($home.'/.config/transmission-daemon', 0700);
+        $this->pmssEnsureDir($home.'/.lighttpd', 0700);
         $binary = $store.'/transmission/4.1.3/transmission-daemon';
-        chmod($binary, 0755);
+        $this->pmssWriteExecutableFile($binary, "#!/bin/sh\nexit 0\n");
         symlink($store.'/transmission/4.1.3', $home.'/bin/transmission/default');
-        $projection = $root.'/projection.json';
-        file_put_contents($projection, json_encode(['versions' => [[
+        $projection = $this->pmssWriteFile($root.'/projection.json', json_encode(['versions' => [[
             'client' => 'transmission', 'version' => '4.1.3', 'kind' => 'static', 'rpcUnixSocket' => true,
         ]]]));
         $settings = \pmssTransmissionSettingsContent('{}', $home.'/.lighttpd/transmission.sock', '/user-t/transmission/');
-        file_put_contents($home.'/.config/transmission-daemon/settings.json', $settings);
+        $this->pmssWriteFile($home.'/.config/transmission-daemon/settings.json', $settings);
         return [$home, $store, $projection, $binary];
     }
 
@@ -49,7 +48,7 @@ final class TorrentClientsP3LaunchTest extends TestCase
         [$home, $store, $projection] = $this->fixture();
         $marker = $home.'/.transmissionDisable';
         $this->assertTrue(\pmssTransmissionAccountEnabled($home));
-        file_put_contents($marker, '');
+        $this->pmssWriteFile($marker, '');
         $this->assertFalse(\pmssTransmissionAccountEnabled($home));
         $unexpected = static function (): void { throw new \RuntimeException('Disabled launch did work'); };
         $this->assertFalse(\pmssTransmissionLaunch($home, [
@@ -70,7 +69,7 @@ final class TorrentClientsP3LaunchTest extends TestCase
         [$home] = $this->fixture();
         $marker = $home.'/.transmissionDisable';
         $target = $home.'/marker-target';
-        file_put_contents($target, 'unchanged');
+        $this->pmssWriteFile($target, 'unchanged');
         $this->pmssCreateSymlinkOrSkip($target, $marker);
         $this->assertFalse(\pmssTransmissionAccountEnabled($home));
         $this->assertSame('unchanged', file_get_contents($target));
@@ -103,7 +102,7 @@ final class TorrentClientsP3LaunchTest extends TestCase
     {
         [$home, $store, $projection] = $this->fixture();
         $path = $home.'/.config/transmission-daemon/settings.json';
-        file_put_contents($path, '{"rpc_whitelist_enabled":false}');
+        $this->pmssWriteFile($path, '{"rpc_whitelist_enabled":false}');
         $calls = 0;
         $ops = ['storeRoot' => $store, 'projection' => $projection,
             'run' => static function () use (&$calls): void { $calls++; }];
@@ -118,7 +117,7 @@ final class TorrentClientsP3LaunchTest extends TestCase
         foreach (['absent', 'directory', 'symlink', 'file'] as $case) {
             if ($case === 'directory') mkdir($web);
             if ($case === 'symlink') { rmdir($web); symlink(dirname($web), $web); }
-            if ($case === 'file') { unlink($web); file_put_contents($web, 'not a directory'); }
+            if ($case === 'file') { unlink($web); $this->pmssWriteFile($web, 'not a directory'); }
             $command = '';
             $probes = 0;
             $this->assertTrue(\pmssTransmissionLaunch($home, [
@@ -191,13 +190,13 @@ final class TorrentClientsP3LaunchTest extends TestCase
     public function testLighttpdRouteIsStaleOnlyWhenSelectionAndRenderedRouteDisagree(): void
     {
         require_once dirname(__DIR__, 2).'/lighttpd/transmissionProxy.php';
-        $routed = "x\n".\pmssLighttpdTransmissionProxyBlock('alice')."y\n";
-        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('alice', true, "no route here\n"));
-        $this->assertFalse(\pmssLighttpdTransmissionRouteStale('alice', true, $routed));
-        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('alice', false, $routed));
-        $this->assertFalse(\pmssLighttpdTransmissionRouteStale('alice', false, "no route here\n"));
+        $routed = "x\n".\pmssLighttpdTransmissionProxyBlock('fixtur01')."y\n";
+        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('fixtur01', true, "no route here\n"));
+        $this->assertFalse(\pmssLighttpdTransmissionRouteStale('fixtur01', true, $routed));
+        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('fixtur01', false, $routed));
+        $this->assertFalse(\pmssLighttpdTransmissionRouteStale('fixtur01', false, "no route here\n"));
         // Another account's route never satisfies this account.
-        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('alice', true, \pmssLighttpdTransmissionProxyBlock('alicex')));
+        $this->assertTrue(\pmssLighttpdTransmissionRouteStale('fixtur01', true, \pmssLighttpdTransmissionProxyBlock('fixtur02')));
     }
 
     public function testLighttpdWatchdogReconcilesTheRouteAndLaunchCliPreparesSettings(): void
@@ -214,7 +213,7 @@ final class TorrentClientsP3LaunchTest extends TestCase
         // The resolver CLI loads transmissionLaunch.php alone; Prepare must not depend on configure.php.
         [$home] = $this->fixture();
         $path = $home.'/.config/transmission-daemon/settings.json';
-        file_put_contents($path, '{"rpc-whitelist-enabled":false}');
+        $this->pmssWriteFile($path, '{"rpc-whitelist-enabled":false}');
         $script = 'require '.var_export($this->pmssRepoPath('etc/skel/www/transmissionLaunch.php'), true).';'
             .'$ok = pmssTransmissionSettingsPrepare('.var_export($home, true).');'
             .'echo json_encode(["ok" => $ok, "ready" => pmssTransmissionSettingsReady('.var_export($home, true).')]);';
