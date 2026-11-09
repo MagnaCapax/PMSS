@@ -13,9 +13,9 @@ return [
         // 2.0 means PMSS assigns up to 200% of the passive host read-IOPS estimate.
         'assignMax' => ['iops' => 2.0],
 
-        // Enforced read caps with an iowait pool curb (ADRs 0230, 0231); 'off' clears them.
+        // Read caps OFF by default since ADR 0243 (Linux 6.1 journal stall); 'off' clears existing caps, 'enforce' applies them (ADRs 0230, 0231).
         'dynamicIops' => [
-            'mode' => 'enforce',
+            'mode' => 'off',
             'idlePressure' => 5.0, 'busyPressure' => 15.0,
             'idleMultiplier' => 10.0, 'busyMultiplier' => 2.0,
             'floor' => 15, 'floorCharge' => 0.25,
