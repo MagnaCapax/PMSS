@@ -25,9 +25,7 @@ class UserProcHeldBlocksTest extends TestCase
     public function testAggregatesOnlyDeletedAccountBlocksAndDeduplicatesInodes(): void
     {
         $procRoot = $this->makeProcFixture([12345 => 1500, 12346 => 1500, 12347 => 1600]);
-        file_put_contents($procRoot.'/12345/fd/4', '');
-        file_put_contents($procRoot.'/12346/fd/4', '');
-        file_put_contents($procRoot.'/12347/fd/4', '');
+        $this->pmssWriteFiles($procRoot, ['12345/fd/4' => '', '12346/fd/4' => '', '12347/fd/4' => '']);
         $stats = [
             '12345/3' => ['dev' => 7, 'ino' => 10, 'nlink' => 0, 'uid' => 1500, 'blocks' => 8],
             '12345/4' => ['dev' => 7, 'ino' => 10, 'nlink' => 0, 'uid' => 1500, 'blocks' => 8],
@@ -62,7 +60,7 @@ class UserProcHeldBlocksTest extends TestCase
     public function testReturnsNullWhenHeldBlockSumWouldOverflow(): void
     {
         $procRoot = $this->makeProcFixture([12345 => 1500]);
-        file_put_contents($procRoot.'/12345/fd/4', '');
+        $this->pmssWriteFile($procRoot.'/12345/fd/4', '');
         $stats = [
             '12345/3' => ['dev' => 7, 'ino' => 10, 'nlink' => 0, 'uid' => 1500, 'blocks' => PHP_INT_MAX],
             '12345/4' => ['dev' => 7, 'ino' => 11, 'nlink' => 0, 'uid' => 1500, 'blocks' => 1],

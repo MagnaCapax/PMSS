@@ -51,8 +51,7 @@ class UpdateSnapshotLifecycleTest extends TestCase
         foreach (['missing', 'empty', 'populated'] as $state) {
             $root = $this->pmssMakeTempDir('pmss-snapshot-stage-');
             $bootstrap = $this->bootstrapFixture($root);
-            $this->pmssWriteFile($root.'/scripts/update.php', '<?php');
-            $this->pmssWriteFile($root.'/scripts/util/update-step2.php', '<?php');
+            $this->pmssWriteFiles($root, ['scripts/update.php' => '<?php', 'scripts/util/update-step2.php' => '<?php']);
             foreach (['etc', 'var'] as $tree) {
                 if ($state === 'empty') $this->pmssEnsureDir($root.'/'.$tree);
                 if ($state === 'populated') $this->pmssWriteFile($root.'/'.$tree.'/.hidden', 'keep');
@@ -78,8 +77,7 @@ class UpdateSnapshotLifecycleTest extends TestCase
         foreach (['root-link', 'absolute-link', 'file-tree'] as $kind) {
             $root = $this->pmssMakeTempDir('pmss-snapshot-unsafe-');
             $bootstrap = $this->bootstrapFixture($root);
-            $this->pmssWriteFile($root.'/scripts/update.php', '<?php');
-            $this->pmssWriteFile($root.'/scripts/util/update-step2.php', '<?php');
+            $this->pmssWriteFiles($root, ['scripts/update.php' => '<?php', 'scripts/util/update-step2.php' => '<?php']);
             if ($kind === 'root-link') $this->pmssCreateSymlinkOrSkip($root.'/scripts', $root.'/etc');
             if ($kind === 'absolute-link') {
                 $this->pmssEnsureDir($root.'/etc');
@@ -101,9 +99,8 @@ class UpdateSnapshotLifecycleTest extends TestCase
             foreach (['missing', 'empty', 'populated'] as $seedbox) {
                 $root = $this->pmssMakeTempDir('pmss-snapshot-publish-');
                 $bootstrap = $this->bootstrapFixture($root, true);
-                foreach (['scripts/update.php', 'scripts/util/update-step2.php', 'etc/skel/.hidden', 'var/state'] as $file) {
-                    $this->pmssWriteFile($root.'/'.$file, 'fixture');
-                }
+                $this->pmssWriteFiles($root, array_fill_keys(
+                    ['scripts/update.php', 'scripts/util/update-step2.php', 'etc/skel/.hidden', 'var/state'], 'fixture'));
                 if ($seedbox !== 'missing') $this->pmssEnsureDir($root.'/etc/seedbox');
                 if ($seedbox === 'populated') $this->pmssWriteFile($root.'/etc/seedbox/config', 'config');
                 $result = $this->pmssExecInlinePhp(
@@ -195,8 +192,7 @@ class UpdateSnapshotLifecycleTest extends TestCase
         $live = $this->pmssMakeTempDir('pmss-snapshot-skel-live-');
         $this->pmssEnsureDir($root.'/etc/skel');
         if ($populatedSnapshot) $this->pmssWriteFile($root.'/etc/skel/new.txt', 'new');
-        $this->pmssWriteFile($live.'/etc/skel/old.txt', 'old');
-        $this->pmssWriteFile($live.'/etc/skel/nested/keep.txt', 'keep');
+        $this->pmssWriteFiles($live.'/etc/skel', ['old.txt' => 'old', 'nested/keep.txt' => 'keep']);
         return [$root, $live];
     }
 

@@ -54,8 +54,7 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
     public function testRemovesStaleRuntimeFlagAfterSuccessfulEviction(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-dirtyfrag-cleanup-');
-        @mkdir($dir.'/runtime', 0755, true);
-        file_put_contents($dir.'/runtime/dirtyfrag-modules-loaded', "esp4\t1\n");
+        $this->pmssWriteFile($dir.'/runtime/dirtyfrag-modules-loaded', "esp4\t1\n");
 
         $logs = [];
         $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $this->dirtyFragEnv($dir, "Module                  Size  Used by\n"), $logs);

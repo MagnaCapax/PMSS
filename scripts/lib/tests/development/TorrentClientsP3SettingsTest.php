@@ -10,9 +10,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-p3-settings-');
         $home = $root.'/t';
-        $dir = $home.'/.config/transmission-daemon';
-        mkdir($dir, 0700, true);
-        file_put_contents($dir.'/settings.json', $raw);
+        $path = $this->pmssWriteRelativeFile($home, '.config/transmission-daemon/settings.json', $raw, 0700);
         $writes = (object) ['count' => 0];
         $ops = [
             'write' => static function (string $path, string $content) use ($writes): bool {
@@ -20,7 +18,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
                 return file_put_contents($path, $content) === strlen($content);
             },
         ] + self::pmssMakeCallbacks(['running' => false, 'prepare' => true]);
-        return [$home, $dir.'/settings.json', $ops, $writes];
+        return [$home, $path, $ops, $writes];
     }
 
     public function testManagedSettingsUseSocketAndEmptyWhitelist(): void
@@ -70,7 +68,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
         [$home, $path, $ops, $writes] = $this->fixture('bad-json');
         $this->assertFalse(\pmssTransmissionSettingsApply('t', $home, $ops));
         unlink($path);
-        file_put_contents($home.'/outside.json', '{}');
+        $this->pmssWriteFile($home.'/outside.json', '{}');
         symlink($home.'/outside.json', $path);
         $this->assertFalse(\pmssTransmissionSettingsApply('t', $home, $ops));
         $this->assertSame(0, $writes->count);
@@ -83,7 +81,7 @@ final class TorrentClientsP3SettingsTest extends TestCase
         [$home, $path, $ops, $writes] = $this->fixture('{"pad":"'.str_repeat('x', 1048576).'"}');
         $this->assertFalse(\pmssTransmissionSettingsApply('t', $home, $ops));
         $this->assertSame(0, $writes->count);
-        file_put_contents($path, '{}');
+        $this->pmssWriteFile($path, '{}');
         $this->assertTrue(\pmssTransmissionSettingsApply('t', $home, $ops));
         $this->assertSame(1, $writes->count);
     }

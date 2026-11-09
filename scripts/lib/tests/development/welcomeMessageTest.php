@@ -10,7 +10,7 @@ class WelcomeMessageTest extends TestCase
     private function makeUserHome(): string
     {
         $home = $this->tempDir.'/home/fixtur01';
-        @mkdir($home.'/.config', 0755, true);
+        $this->pmssEnsureDir($home.'/.config');
         return $home;
     }
 
@@ -230,18 +230,19 @@ class WelcomeMessageTest extends TestCase
             $homeRoot = $this->tempDir.'/customer-home';
             $home = $homeRoot.'/fixtur01';
             $overrideHome = $homeRoot.'/fixtur02';
+            // Publish fixtures in the parent; the customer subprocess only loads and renders.
+            $this->pmssWriteFiles($homeRoot, [
+                'fixtur01/.config/pmss-user.json' => json_encode(['product' => 'm1000']),
+                'fixtur02/.config/pmss-user.json' => json_encode(['product' => 'm1000']),
+                'fixtur02/.config/welcome-message.html' => 'custom {{username}} / {{quota}}',
+                'plain.json' => json_encode(['m1000' => 'plain {{username}}']),
+                'nested.json' => json_encode(['products' => ['m1000' => 'nested {{username}}']]),
+            ]);
             $script = ''
                 .'$lib = '.var_export($this->pmssRepoPath('etc/skel/www/welcomeMessage.php'), true).';'
                 .'$home = '.var_export($home, true).';'
                 .'$overrideHome = '.var_export($overrideHome, true).';'
                 .'$root = '.var_export($homeRoot, true).';'
-                .'@mkdir($home."/.config", 0755, true);'
-                .'@mkdir($overrideHome."/.config", 0755, true);'
-                .'file_put_contents($home."/.config/pmss-user.json", json_encode(["product" => "m1000"]));'
-                .'file_put_contents($overrideHome."/.config/pmss-user.json", json_encode(["product" => "m1000"]));'
-                .'file_put_contents($overrideHome."/.config/welcome-message.html", "custom {{username}} / {{quota}}");'
-                .'file_put_contents($root."/plain.json", json_encode(["m1000" => "plain {{username}}"]));'
-                .'file_put_contents($root."/nested.json", json_encode(["products" => ["m1000" => "nested {{username}}"]]));'
                 .'require $lib;'
                 .'echo json_encode(['
                 .'"plain" => pmssWelcomeMessageForUser([], $home, "fixtur01", $root."/plain.json"),'
