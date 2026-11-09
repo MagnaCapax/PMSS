@@ -114,20 +114,20 @@ class ShowTrafficFormatTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-traffic-finite-');
         $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root]);
         $raw = ['week' => '700', 'month' => '900.125', 'day' => 144, 'hour' => '36', '15min' => 15, 'extra' => 'kept'];
-        file_put_contents($root.'/valid', serialize(['raw' => $raw]));
-        $users = ['valid', 'absent'];
+        $this->pmssWriteSerializedFixture($root.'/fixtur90', ['raw' => $raw]);
+        $users = ['fixtur90', 'fixtur97'];
         foreach (['month' => INF, 'week' => -INF, 'day' => NAN, 'hour' => '1e309', '15min' => '-1e309'] as $key => $value) {
-            $user = 'bad'.count($users);
+            $user = 'fixtur8'.count($users);
             $users[] = $user;
-            file_put_contents($root.'/'.$user, serialize(['raw' => array_replace($raw, [$key => $value])]));
+            $this->pmssWriteSerializedFixture($root.'/'.$user, ['raw' => array_replace($raw, [$key => $value])]);
         }
 
         $report = \pmssShowTrafficReportBuild($users, $root);
         $payload = \pmssShowTrafficJsonPayload($report);
-        $this->assertSame(['valid'], array_column($report['rows'], 'user'));
+        $this->assertSame(['fixtur90'], array_column($report['rows'], 'user'));
         $this->assertSame($raw, $payload['users'][0]['rawMiB']);
         $this->assertSame(900.125, $report['totals']['monthMiB']);
-        $this->assertSame(['absent'], $payload['missingStatsUsers']);
+        $this->assertSame(['fixtur97'], $payload['missingStatsUsers']);
         $this->assertSame(['totalUsers' => 7, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 0, 'missingStats' => 1], $report['summary']);
         $this->assertTrue(is_string(json_encode($payload)));
     }
@@ -170,10 +170,10 @@ class ShowTrafficFormatTest extends TestCase
             ]],
             'totals' => ['monthMiB' => 1536.25, 'monthLocalMiB' => 512.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
             'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
-            'missingStatsUsers' => ['ghost'],
+            'missingStatsUsers' => ['fixtur98'],
         ], \pmssShowTrafficJsonPayload([
             'rows' => [$row], 'totals' => ['monthMiB' => 1536.25, 'monthLocalMiB' => 512.0, 'monthTiB' => 1536.25 / 1024 / 1024, 'monthLocalTiB' => 512.0 / 1024 / 1024],
-            'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1], 'missingStats' => ['ghost'],
+            'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1], 'missingStats' => ['fixtur98'],
         ]));
     }
 
@@ -182,23 +182,20 @@ class ShowTrafficFormatTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-show-traffic-report-');
         $statsDir = $root.'/runtime/trafficStats';
         $homeDir = $root.'/home';
-        @mkdir($statsDir, 0755, true);
-        @mkdir($homeDir.'/fixtur91', 0755, true);
-        @mkdir($homeDir.'/fixtur92', 0755, true);
+        $this->pmssEnsureDir($homeDir.'/fixtur91');
         // The limit comes from the root runtime file; the home copy is display only (ADR 0213).
-        @mkdir($root.'/seedbox/trafficLimits', 0755, true);
-        file_put_contents($root.'/seedbox/trafficLimits/fixtur91', "1\n");
-        file_put_contents($homeDir.'/fixtur92/.trafficLimit', "1\n");
+        $this->pmssWriteFile($root.'/seedbox/trafficLimits/fixtur91', "1\n");
+        $this->pmssWriteFile($homeDir.'/fixtur92/.trafficLimit', "1\n");
         $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $homeDir, 'PMSS_RUNTIME_DIR' => $root.'/seedbox']);
 
         $payload = static function (float $month): array {
             return ['raw' => ['month' => $month, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0], 'daily' => []];
         };
-        file_put_contents($statsDir.'/fixtur91', serialize($payload(900.0)));
-        file_put_contents($statsDir.'/fixtur91-localnet', serialize($payload(50.0)));
-        file_put_contents($statsDir.'/fixtur92', serialize($payload(500.0)));
+        $this->pmssWriteSerializedFixture($statsDir.'/fixtur91', $payload(900.0));
+        $this->pmssWriteSerializedFixture($statsDir.'/fixtur91-localnet', $payload(50.0));
+        $this->pmssWriteSerializedFixture($statsDir.'/fixtur92', $payload(500.0));
 
-        $report = \pmssShowTrafficReportBuild(['fixtur92', 'fixtur91-localnet', 'ghost', 'fixtur91'], $statsDir);
+        $report = \pmssShowTrafficReportBuild(['fixtur92', 'fixtur91-localnet', 'fixtur98', 'fixtur91'], $statsDir);
         \pmssShowTrafficRowsSort($report['rows'], 'pct');
 
         $this->assertEquals([
@@ -209,7 +206,7 @@ class ShowTrafficFormatTest extends TestCase
             ],
             'totals' => ['monthMiB' => 1450.0, 'monthLocalMiB' => 50.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
             'summary' => ['totalUsers' => 3, 'usersWithStats' => 2, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
-            'missingStatsUsers' => ['ghost'],
+            'missingStatsUsers' => ['fixtur98'],
         ], \pmssShowTrafficJsonPayload($report));
         $this->pmssAssertArraySubsetSame(['totalUsers' => 3, 'usersWithStats' => 2], $report['summary']);
         $duplicateReport = \pmssShowTrafficReportBuild(['fixtur91', 'fixtur91'], $statsDir);
@@ -219,13 +216,13 @@ class ShowTrafficFormatTest extends TestCase
     public function testTextSummaryMatchesExistingLayouts(): void
     {
         $report = [
-            'missingStats' => ['ghost'], 'totals' => ['monthTiB' => 1.0, 'monthLocalTiB' => 0.5],
+            'missingStats' => ['fixtur98'], 'totals' => ['monthTiB' => 1.0, 'monthLocalTiB' => 0.5],
             'summary' => ['totalUsers' => 2, 'overLimit' => 1, 'nearLimit' => 0],
         ];
         [, $plain] = $this->pmssCaptureStdout(static function () use ($report): void {
             \pmssShowTrafficPrintSummary($report, false, true);
         });
-        $this->assertSame("* Month Total: 1.00TiB - Local Total: 0.50TiB\n* Missing traffic stats for 1 users (run trafficStats to rebuild).\n* Missing: ghost\n", $plain);
+        $this->assertSame("* Month Total: 1.00TiB - Local Total: 0.50TiB\n* Missing traffic stats for 1 users (run trafficStats to rebuild).\n* Missing: fixtur98\n", $plain);
         [, $extended] = $this->pmssCaptureStdout(static function () use ($report): void {
             \pmssShowTrafficPrintSummary($report, true, false);
         });
@@ -237,24 +234,22 @@ class ShowTrafficFormatTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-traffic-summary-lock-');
         $statsDir = $root.'/stats';
-        mkdir($statsDir);
-        mkdir($root.'/alpha');
-        mkdir($root.'/seedbox/trafficLimits', 0755, true);
-        file_put_contents($root.'/seedbox/trafficLimits/alpha', "1\n");
+        $this->pmssEnsureDir($root.'/fixtur01');
+        $this->pmssWriteFile($root.'/seedbox/trafficLimits/fixtur01', "1\n");
         $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $root, 'PMSS_RUNTIME_DIR' => $root.'/seedbox']);
         // Preserve raw numeric strings, extra fields, and their original insertion order.
         $raw = ['week' => '700', 'month' => '900.125', 'day' => 144, 'hour' => '36', '15min' => 15, 'extra' => 'kept'];
-        file_put_contents($statsDir.'/alpha', serialize(['raw' => $raw]));
-        file_put_contents($statsDir.'/zed-localnet', serialize(['raw' => array_replace($raw, ['month' => '100.25'])]));
-        file_put_contents($statsDir.'/broken', 'invalid serialized payload');
-        file_put_contents($statsDir.'/zero', serialize(['raw' => array_replace($raw, ['month' => 0])]));
-        file_put_contents($statsDir.'/bad', serialize(['raw' => array_replace($raw, ['hour' => 'bad'])]));
-        $report = \pmssShowTrafficReportBuild(['zed-localnet', 'broken', 'zero', 'bad', 'alpha', 'alpha', 'absent', 'zed-localnet'], $statsDir);
+        $this->pmssWriteSerializedFixture($statsDir.'/fixtur01', ['raw' => $raw]);
+        $this->pmssWriteSerializedFixture($statsDir.'/fixtur99-localnet', ['raw' => array_replace($raw, ['month' => '100.25'])]);
+        $this->pmssWriteFile($statsDir.'/fixtur94', 'invalid serialized payload');
+        $this->pmssWriteSerializedFixture($statsDir.'/fixtur95', ['raw' => array_replace($raw, ['month' => 0])]);
+        $this->pmssWriteSerializedFixture($statsDir.'/fixtur96', ['raw' => array_replace($raw, ['hour' => 'bad'])]);
+        $report = \pmssShowTrafficReportBuild(['fixtur99-localnet', 'fixtur94', 'fixtur95', 'fixtur96', 'fixtur01', 'fixtur01', 'fixtur97', 'fixtur99-localnet'], $statsDir);
         $payload = \pmssShowTrafficJsonPayload($report);
         $this->pmssAssertArraySubsetSame([
             'totals' => ['monthMiB' => 2000.75, 'monthLocalMiB' => 200.5, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
             'summary' => ['totalUsers' => 6, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 2, 'missingStats' => 1],
-            'missingStatsUsers' => ['absent'],
+            'missingStatsUsers' => ['fixtur97'],
         ], $payload);
         $this->pmssAssertArraySubsetSame([
             'rawMiB' => $raw, 'display' => ['week' => '700MiB', 'month' => '900.13MiB', 'day' => '144MiB'],
@@ -263,7 +258,7 @@ class ShowTrafficFormatTest extends TestCase
         [, $plain] = $this->pmssCaptureStdout(static function () use ($report): void {
             \pmssShowTrafficPrintSummary($report, false, true);
         });
-        $this->assertSame("* Month Total: 0.00TiB - Local Total: 0.00TiB\n* Missing traffic stats for 1 users (run trafficStats to rebuild).\n* Missing: absent\n", $plain);
+        $this->assertSame("* Month Total: 0.00TiB - Local Total: 0.00TiB\n* Missing traffic stats for 1 users (run trafficStats to rebuild).\n* Missing: fixtur97\n", $plain);
     }
 
     public function testReportSummationPrecedesSortingAndKeepsEmptyFloatTotals(): void
@@ -275,12 +270,12 @@ class ShowTrafficFormatTest extends TestCase
             'totals' => ['monthMiB' => 0.0, 'monthLocalMiB' => 0.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
             'summary' => ['totalUsers' => 0, 'usersWithStats' => 0, 'overLimit' => 0, 'nearLimit' => 0, 'missingStats' => 0],
         ], $empty);
-        foreach (['alpha' => 1.0e16, 'beta' => -1.0e16, 'gamma' => 1.0] as $user => $month) {
-            file_put_contents($root.'/'.$user, serialize(['raw' => ['month' => $month, 'week' => 1, 'day' => 1, 'hour' => 1, '15min' => 1]]));
+        foreach (['fixtur01' => 1.0e16, 'fixtur02' => -1.0e16, 'fixtur03' => 1.0] as $user => $month) {
+            $this->pmssWriteSerializedFixture($root.'/'.$user, ['raw' => ['month' => $month, 'week' => 1, 'day' => 1, 'hour' => 1, '15min' => 1]]);
         }
-        $report = \pmssShowTrafficReportBuild(['alpha', 'beta', 'gamma'], $root);
+        $report = \pmssShowTrafficReportBuild(['fixtur01', 'fixtur02', 'fixtur03'], $root);
         \pmssShowTrafficRowsSort($report['rows'], 'month');
-        $this->assertSame(['alpha', 'gamma', 'beta'], array_column($report['rows'], 'user'));
+        $this->assertSame(['fixtur01', 'fixtur03', 'fixtur02'], array_column($report['rows'], 'user'));
         $this->assertSame(1.0, \pmssShowTrafficJsonPayload($report)['totals']['monthMiB']);
     }
 }

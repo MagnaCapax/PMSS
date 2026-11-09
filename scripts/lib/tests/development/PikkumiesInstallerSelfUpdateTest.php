@@ -41,18 +41,15 @@ class PikkumiesInstallerSelfUpdateTest extends TestCase
             $root = $this->pmssMakeTempDir('pikkumies-installer-', 0700);
             $home = $root.'/home';
             $bin = $root.'/bin';
-            mkdir($home, 0700);
-            mkdir($bin, 0700);
+            $this->pmssEnsureDir($home, 0700);
             // Stand-in git: "clone ... DIR" fails like git on a non-empty DIR, else creates a checkout with a launcher.
-            file_put_contents($bin.'/git', "#!/bin/sh\nfor d; do :; done\n"
+            $this->pmssWriteExecutableFile($bin.'/git', "#!/bin/sh\nfor d; do :; done\n"
                 ."if [ -e \"\$d\" ] && [ -n \"\$(ls -A \"\$d\")\" ]; then echo 'fatal: destination path exists and is not an empty directory' >&2; exit 128; fi\n"
                 ."mkdir -p \"\$d/.git\" \"\$d/pikkumies/bin\"\n"
                 ."printf '#!/bin/sh\\necho \"\$*\" > \"\$HOME/ran\"\\n' > \"\$d/pikkumies/bin/pikkumies\"\n"
-                ."chmod 755 \"\$d/pikkumies/bin/pikkumies\"\n");
-            chmod($bin.'/git', 0755);
+                ."chmod 755 \"\$d/pikkumies/bin/pikkumies\"\n", 0700);
             if ($leftover) {
-                mkdir($home.'/.mcxPikkumies', 0700);
-                file_put_contents($home.'/.mcxPikkumies/keep.txt', 'customer file');
+                $this->pmssWriteFile($home.'/.mcxPikkumies/keep.txt', 'customer file', 0700);
             }
             $result = $this->pmssExecArgvCommand(['env', '-i', 'HOME='.$home, 'PATH='.$bin.':/usr/bin:/bin',
                 'bash', $script, '--no-self-update']);

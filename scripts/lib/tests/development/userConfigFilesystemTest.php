@@ -9,7 +9,7 @@ class UserConfigFilesystemTest extends TestCase
     public function testReadSerializedArrayFileReturnsArrayForValidPayload(): void
     {
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/resources.serialized';
-        file_put_contents($path, serialize(['ramBlock' => 256, 'uploadSlots' => 4]));
+        $this->pmssWriteSerializedFixture($path, ['ramBlock' => 256, 'uploadSlots' => 4]);
 
         $this->assertEquals(['ramBlock' => 256, 'uploadSlots' => 4], \pmssReadSerializedArrayFile($path));
     }
@@ -21,8 +21,7 @@ class UserConfigFilesystemTest extends TestCase
 
     public function testReadSerializedArrayFileReturnsNullForMalformedPayload(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/bad.serialized';
-        file_put_contents($path, 'not-a-serialized-array');
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/bad.serialized', 'not-a-serialized-array');
 
         $this->assertSame(null, \pmssReadSerializedArrayFile($path));
     }
@@ -30,7 +29,7 @@ class UserConfigFilesystemTest extends TestCase
     public function testReadSerializedArrayFileReturnsNullForSerializedObject(): void
     {
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/object.serialized';
-        file_put_contents($path, serialize((object) ['ramBlock' => 256]));
+        $this->pmssWriteSerializedFixture($path, (object) ['ramBlock' => 256]);
 
         $this->assertSame(null, \pmssReadSerializedArrayFile($path));
     }
@@ -51,7 +50,7 @@ class UserConfigFilesystemTest extends TestCase
     public function testReadRtorrentResourcesThrowsForInvalidPayload(): void
     {
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/invalid-resources';
-        file_put_contents($path, serialize('nope'));
+        $this->pmssWriteSerializedFixture($path, 'nope');
 
         $this->assertThrowsRuntime(static function () use ($path): void {
             \pmssReadOptionalSerializedArrayFile($path, 'rTorrent resource configuration');
@@ -60,8 +59,7 @@ class UserConfigFilesystemTest extends TestCase
 
     public function testReadRequiredFileReturnsContents(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/defaults.conf';
-        file_put_contents($path, "enabled = yes\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/defaults.conf', "enabled = yes\n");
 
         $this->assertSame("enabled = yes\n", \pmssReadRequiredRegularFile($path, 'demo defaults'));
     }
@@ -85,8 +83,7 @@ class UserConfigFilesystemTest extends TestCase
 
     public function testReadRegularFileContentsPreservesWhitespace(): void
     {
-        $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/content.txt';
-        file_put_contents($path, "  enabled = yes\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/content.txt', "  enabled = yes\n");
 
         $this->assertSame("  enabled = yes\n", \pmssReadRegularFileContents($path));
     }

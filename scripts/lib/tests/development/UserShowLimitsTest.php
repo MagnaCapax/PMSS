@@ -56,7 +56,7 @@ final class UserShowLimitsTest extends TestCase
         $o = $this->fixture();
         $path = $o['home'].'/.quota';
         $this->assertSame(1048576.0, \pmssUserShowLimitsCollect($o)['sections']['disk']['metrics'][2]['value']);
-        file_put_contents($path, "/dev/long\n  2G* 1G 3G 6days 9* 8 10 23:59\n");
+        $this->pmssWriteFile($path, "/dev/long\n  2G* 1G 3G 6days 9* 8 10 23:59\n");
         $data = \pmssUserShowLimitsCollect($o);
         $this->assertSame(2147483648.0, $this->metric($data, 'disk', 'blocks used')['value']);
         $this->assertSame(9.0, $this->metric($data, 'disk', 'files used')['value']);
@@ -79,9 +79,9 @@ final class UserShowLimitsTest extends TestCase
         $this->assertSame('bytes_per_second', $this->metric($data, 'disk I/O', 'read bps enforced')['unit']);
         $this->assertSame('iops', $this->metric($data, 'disk I/O', 'IOReadIOPS configured')['unit']);
         $this->assertSame('iops', $this->metric($data, 'disk I/O', 'read IOPS enforced')['unit']);
-        file_put_contents($o['cgroups']['memory'].'/memory.limit_in_bytes', "9223372036854771712\n");
+        $this->pmssWriteFile($o['cgroups']['memory'].'/memory.limit_in_bytes', "9223372036854771712\n");
         $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'memory', 'memory')['limit']);
-        file_put_contents($o['home'].'/.trafficLimit', "0\n");
+        $this->pmssWriteFile($o['home'].'/.trafficLimit', "0\n");
         $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'traffic', 'upload past 30 days')['limit']);
     }
 
@@ -116,7 +116,7 @@ final class UserShowLimitsTest extends TestCase
     {
         $o = $this->fixture();
         $this->pmssWriteFiles($o['cgroups']['pids'], ['pids.current' => "71\n", 'pids.max' => "16384\n"]);
-        file_put_contents($o['home'].'/.resourceData', serialize(array('ram_hours' => array('raw' => array('month' => 0.086071551640828)), 'cpu' => array('raw' => array('month' => 5633041754)))));
+        $this->pmssWriteSerializedFixture($o['home'].'/.resourceData', array('ram_hours' => array('raw' => array('month' => 0.086071551640828)), 'cpu' => array('raw' => array('month' => 5633041754))));
         touch($o['home'].'/.quota', $o['now'] - 65);
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) {
             \pmssUserShowLimitsMain(array('userShowLimits'), $o);
@@ -139,7 +139,7 @@ final class UserShowLimitsTest extends TestCase
     {
         $o = $this->fixture();
         $cpu = $o['cgroups']['cpu'];
-        file_put_contents($cpu.'/cpu.max', "max 100000\n");
+        $this->pmssWriteFile($cpu.'/cpu.max', "max 100000\n");
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits'), $o); }, array('NO_COLOR' => '1'));
         $this->assertTrue(strpos($human, 'CPU quota enforced') !== false);
         $this->assertTrue((bool) preg_match('/CPU quota enforced\s+unlimited \[cgroup\]/', $human));

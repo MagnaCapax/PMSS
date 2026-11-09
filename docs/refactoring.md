@@ -524,6 +524,10 @@ installer return values and staged missing-file cases explicit; these exercise
 runtime failure boundaries rather than fixture setup. Empty directories and
 permission transitions remain separate from file publication.
 
+Traffic, resource-limit, filesystem-reader and watchdog setup writes use these
+checked writers too. `pmssWriteSerializedFixture()` retains object and scalar
+rejection payloads; simulated runtime writes remain explicit operation callbacks.
+
 Executable test fixtures use `pmssWriteExecutableFile()` for the shared write
 and mode application. Keep stub bytes and paths at each test, passing the
 existing file mode explicitly when it differs from 0755. Permission-failure

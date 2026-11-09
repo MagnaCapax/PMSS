@@ -33,7 +33,7 @@ class rtorrentWatchdogDecisionTest extends TestCase
     private function writeWatchdogStateFiles(array $state): void
     {
         foreach ($state as $path) {
-            file_put_contents($path, '1');
+            $this->pmssWriteFile($path, '1');
         }
     }
 
@@ -109,7 +109,7 @@ PHP;
         foreach (['', '0', '1700000000', "binary\0payload", '{"timestamp":900,"user":"fixtur01","count":6}'] as $payload) {
             $escalation = substr($payload, 0, 1) === '{';
             foreach ([false, 0, 1, max(0, strlen($payload) - 1), strlen($payload), null] as $limit) {
-                file_put_contents($path, 'prior marker');
+                $this->pmssWriteFile($path, 'prior marker');
                 $bytes = $limit === false ? 'prior marker' : ($limit === null ? $payload : substr($payload, 0, $limit));
                 $complete = $limit !== false && ($limit === null || $limit >= strlen($payload));
                 $this->assertSame([$complete, $bytes, [[$path, $payload, LOCK_EX]]],
@@ -126,7 +126,7 @@ PHP;
         $original = '{"timestamp":900,"user":"fixtur01","count":6}';
         // Invalid UTF-8 at each position and truncated/overlong sequences fail encoding.
         foreach (["\xfffixtur01", "fix\xfftur01", "fixtur01\xff", "\xc3", "\xc0\xaf"] as $user) {
-            file_put_contents($path, $original);
+            $this->pmssWriteFile($path, $original);
             $this->assertFalse(\rtorrentProcessWriteEscalationState($path, $user, 7, 1000));
             $this->assertSame($original, file_get_contents($path));
             $this->assertSame(['action' => 'wait', 'age' => 100], \rtorrentProcessEscalationRetryState($path, 180, 1000));
@@ -163,10 +163,10 @@ PHP;
         $this->assertSame(['action' => 'wait', 'age' => 99], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 999));
         $this->assertSame(['action' => 'retry', 'age' => 180], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1080));
 
-        file_put_contents($state['escalation'], '500');
+        $this->pmssWriteFile($state['escalation'], '500');
         $this->assertSame(['action' => 'retry', 'age' => 500], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1000));
 
-        file_put_contents($state['escalation'], 'not-json');
+        $this->pmssWriteFile($state['escalation'], 'not-json');
         $this->assertSame(['action' => 'record', 'age' => 0], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1000));
     }
 
@@ -276,7 +276,7 @@ PHP;
             if ($case[0] === null) {
                 @unlink($marker);
             } else {
-                file_put_contents($marker, $case[0]);
+                $this->pmssWriteFile($marker, $case[0]);
             }
             $this->assertEquals(['grace' => $case[2], 'restartAge' => $case[3]], \rtorrentProcessUnresponsiveGraceState($marker, 120, $case[1]));
         }
@@ -351,7 +351,7 @@ PHP;
         foreach ([[''], ['0'], ['fixtur01 -> fixtur02'], ['fixtur01 -> fixtur02', 'fixtur03 -> fixtur04']] as $changes) {
             $payload = implode("\n", $changes);
             foreach ([false, 0, 1, max(0, strlen($payload) - 1), strlen($payload), null] as $limit) {
-                file_put_contents($path, 'prior report');
+                $this->pmssWriteFile($path, 'prior report');
                 $bytes = $limit === false ? 'prior report' : ($limit === null ? $payload : substr($payload, 0, $limit));
                 $complete = $limit !== false && ($limit === null || $limit >= strlen($payload));
                 // Retain void return, one unflagged write, original bytes and no retry/cleanup.
