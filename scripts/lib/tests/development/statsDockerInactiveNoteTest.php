@@ -13,9 +13,8 @@ class statsDockerInactiveNoteTest extends TestCase
     public function testShowsDebianVersionSpecificGrubGuidanceFromOsRelease(): void
     {
         $fixture = $this->pmssMakeTempDir('pmss-stats-docker-note-os-');
-        file_put_contents($fixture.'/os-release', "ID=debian\nVERSION_ID=12\n");
-        file_put_contents($fixture.'/debian_version', "12.13\n");
-        file_put_contents($fixture.'/cmdline', "quiet splash\n");
+        $this->pmssWriteFiles($fixture, ['os-release' => "ID=debian\nVERSION_ID=12\n",
+            'debian_version' => "12.13\n", 'cmdline' => "quiet splash\n"]);
 
         $note = $this->renderNote('inactive', true, $fixture.'/os-release', $fixture.'/debian_version', $fixture.'/cmdline');
 
@@ -25,8 +24,7 @@ class statsDockerInactiveNoteTest extends TestCase
     public function testFallsBackToDebianVersionFileWhenOsReleaseIsMissing(): void
     {
         $fixture = $this->pmssMakeTempDir('pmss-stats-docker-note-fallback-');
-        file_put_contents($fixture.'/debian_version', "11.11\n");
-        file_put_contents($fixture.'/cmdline', "panic=1\n");
+        $this->pmssWriteFiles($fixture, ['debian_version' => "11.11\n", 'cmdline' => "panic=1\n"]);
 
         $note = $this->renderNote('inactive', null, $fixture.'/missing-os-release', $fixture.'/debian_version', $fixture.'/cmdline');
 
@@ -36,7 +34,7 @@ class statsDockerInactiveNoteTest extends TestCase
     public function testShowsDisabledPolicyGuidanceWhenBootSettingIsPresent(): void
     {
         $fixture = $this->pmssMakeTempDir('pmss-stats-docker-note-disabled-');
-        file_put_contents($fixture.'/cmdline', "quiet systemd.unified_cgroup_hierarchy=0\n");
+        $this->pmssWriteFile($fixture.'/cmdline', "quiet systemd.unified_cgroup_hierarchy=0\n");
 
         $note = $this->renderNote('inactive', false, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 
@@ -46,7 +44,7 @@ class statsDockerInactiveNoteTest extends TestCase
     public function testShowsRuntimeGuidanceWhenPolicyIsEnabled(): void
     {
         $fixture = $this->pmssMakeTempDir('pmss-stats-docker-note-enabled-');
-        file_put_contents($fixture.'/cmdline', "quiet systemd.unified_cgroup_hierarchy=0\n");
+        $this->pmssWriteFile($fixture.'/cmdline', "quiet systemd.unified_cgroup_hierarchy=0\n");
 
         $note = $this->renderNote('inactive', true, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 
@@ -56,7 +54,7 @@ class statsDockerInactiveNoteTest extends TestCase
     public function testShowsGenericControlGuidanceWhenPolicyIsUnknown(): void
     {
         $fixture = $this->pmssMakeTempDir('pmss-stats-docker-note-unknown-');
-        file_put_contents($fixture.'/cmdline', "quiet unified_cgroup_hierarchy=0\n");
+        $this->pmssWriteFile($fixture.'/cmdline', "quiet unified_cgroup_hierarchy=0\n");
 
         $note = $this->renderNote('inactive', null, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 

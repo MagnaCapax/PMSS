@@ -17,8 +17,7 @@ class AiToolsPublicationCharacterizationTest extends TestCase
         $stub = ['codex' => 'pmssAiToolsCodexStub', 'claude' => 'pmssAiToolsClaudeStub', 'gemini' => 'pmssAiToolsGeminiStub'][$tool];
         foreach (['source' => 'launcher fixture', 'launcher' => 'launcher fixture', 'stub' => $stub(),
             'binary' => 'binary fixture', 'defaults' => \pmssAiToolsGeminiDefaults()] as $key => $content) {
-            file_put_contents($files[$key], $content);
-            chmod($files[$key], in_array($key, ['stub', 'binary'], true) ? 0755 : 0644);
+            $this->pmssWriteExecutableFile($files[$key], $content, 0755, in_array($key, ['stub', 'binary'], true) ? 0755 : 0644);
         }
         return $files;
     }
@@ -53,7 +52,7 @@ class AiToolsPublicationCharacterizationTest extends TestCase
             foreach (['source', 'launcher', 'stub'] as $key) {
                 foreach (['missing', 'changed', 'link', 'directory'] as $fault) {
                     $f = $this->fixture($tool);
-                    if ($fault === 'changed') file_put_contents($f[$key], 'stale');
+                    if ($fault === 'changed') $this->pmssWriteFile($f[$key], 'stale');
                     else {
                         rename($f[$key], $f[$key].'.saved');
                         if ($fault === 'link') symlink($f[$key].'.saved', $f[$key]);
@@ -89,7 +88,7 @@ class AiToolsPublicationCharacterizationTest extends TestCase
         chmod($f['root'], 0755);
         $this->assertFalse($this->needed('gemini', $f));
         foreach (['', '{}'] as $content) {
-            file_put_contents($f['defaults'], $content);
+            $this->pmssWriteFile($f['defaults'], $content);
             $this->assertTrue($this->needed('gemini', $f));
         }
         unlink($f['defaults']);
@@ -107,8 +106,8 @@ class AiToolsPublicationCharacterizationTest extends TestCase
         $f = $this->fixture('codex');
         $f['stub'] = $f['launcher'];
         $this->assertTrue($this->needed('codex', $f));
-        file_put_contents($f['source'], \pmssAiToolsCodexStub());
-        file_put_contents($f['launcher'], \pmssAiToolsCodexStub());
+        $this->pmssWriteFile($f['source'], \pmssAiToolsCodexStub());
+        $this->pmssWriteFile($f['launcher'], \pmssAiToolsCodexStub());
         $this->assertFalse($this->needed('codex', $f));
     }
 

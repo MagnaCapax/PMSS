@@ -22,7 +22,7 @@ class DelugeCoreTemplateTest extends TestCase
     public function testBullseyeTemplateKeepsCacheSettings(): void
     {
         $config = \pmssDelugeRenderCoreConfig(
-            ['name' => 'alice', 'memory' => 4],
+            ['name' => 'fixtur01', 'memory' => 4],
             6000,
             '123.0',
             ['version' => 11, 'codename' => 'bullseye']
@@ -34,7 +34,7 @@ class DelugeCoreTemplateTest extends TestCase
     public function testBookwormTemplateOmitsLegacyCacheSettings(): void
     {
         $config = \pmssDelugeRenderCoreConfig(
-            ['name' => 'alice', 'memory' => 4],
+            ['name' => 'fixtur01', 'memory' => 4],
             6000,
             '-1.0',
             ['version' => 12, 'codename' => 'bookworm']
@@ -73,17 +73,16 @@ class DelugeCoreTemplateTest extends TestCase
         putenv('PMSS_DRY_RUN=1');
 
         $configDir = $this->homeRoot.'/'.$username.'/.config/deluge';
-        @mkdir($configDir, 0755, true);
+        // Empty download/session directories are distinct from the checked file tree.
         @mkdir($this->homeRoot.'/'.$username.'/dataUnfinished', 0755, true);
         @mkdir($this->homeRoot.'/'.$username.'/.sessionDeluge', 0755, true);
-        file_put_contents($configDir.'/core.conf', 'original core');
-        file_put_contents($configDir.'/hostlist.conf', 'original hostlist');
-        file_put_contents($configDir.'/web.conf', 'original web');
-        file_put_contents($this->homeRoot.'/'.$username.'/.delugePort', '6111');
+        $this->pmssWriteFiles($configDir, ['core.conf' => 'original core',
+            'hostlist.conf' => 'original hostlist', 'web.conf' => 'original web']);
+        $this->pmssWriteFile($this->homeRoot.'/'.$username.'/.delugePort', '6111');
 
-        file_put_contents($this->configRoot.'/template.deluge.core.conf', '"daemon_port": ##DAEMONPORT');
-        file_put_contents($this->configRoot.'/template.deluge.core.nocache.conf', '"daemon_port": ##DAEMONPORT');
-        file_put_contents($this->configRoot.'/template.deluge.hostlist.conf', 'daemon=##DAEMONPORT');
+        $this->pmssWriteFiles($this->configRoot, ['template.deluge.core.conf' => '"daemon_port": ##DAEMONPORT',
+            'template.deluge.core.nocache.conf' => '"daemon_port": ##DAEMONPORT',
+            'template.deluge.hostlist.conf' => 'daemon=##DAEMONPORT']);
 
         \userConfigureDeluge($user, ['config' => ['scgiPort' => 6200]]);
 
@@ -105,16 +104,15 @@ class DelugeCoreTemplateTest extends TestCase
         putenv('PMSS_DRY_RUN=1');
 
         $configDir = $this->homeRoot.'/'.$username.'/.config/deluge';
-        @mkdir($configDir, 0755, true);
         @mkdir($this->homeRoot.'/'.$username.'/dataUnfinished', 0755, true);
         @mkdir($this->homeRoot.'/'.$username.'/.sessionDeluge', 0755, true);
-        file_put_contents($configDir.'/auth', "localclient:seed:10\n");
-        file_put_contents($this->homeRoot.'/'.$username.'/.delugeWebPort', '6201');
-        file_put_contents($this->configRoot.'/template.deluge.core.conf', '"daemon_port": ##DAEMONPORT, "max_upload_speed": ##UPLOAD_THROTTLE##');
-        file_put_contents($this->configRoot.'/template.deluge.core.nocache.conf', '"daemon_port": ##DAEMONPORT, "max_upload_speed": ##UPLOAD_THROTTLE##');
-        file_put_contents($this->configRoot.'/template.deluge.hostlist.conf', 'daemon=##DAEMONPORT');
-        file_put_contents($this->configRoot.'/template.deluge.web.conf', 'user=##USER port=##WEBPORT');
-        file_put_contents($this->configRoot.'/template.deluge.auth', "localclient:seed:10\n");
+        $this->pmssWriteFile($configDir.'/auth', "localclient:seed:10\n");
+        $this->pmssWriteFile($this->homeRoot.'/'.$username.'/.delugeWebPort', '6201');
+        $this->pmssWriteFiles($this->configRoot, [
+            'template.deluge.core.conf' => '"daemon_port": ##DAEMONPORT, "max_upload_speed": ##UPLOAD_THROTTLE##',
+            'template.deluge.core.nocache.conf' => '"daemon_port": ##DAEMONPORT, "max_upload_speed": ##UPLOAD_THROTTLE##',
+            'template.deluge.hostlist.conf' => 'daemon=##DAEMONPORT',
+            'template.deluge.web.conf' => 'user=##USER port=##WEBPORT', 'template.deluge.auth' => "localclient:seed:10\n"]);
 
         \userConfigureDeluge($user, ['config' => ['scgiPort' => 6200]]);
 

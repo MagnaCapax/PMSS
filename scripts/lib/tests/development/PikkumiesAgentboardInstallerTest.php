@@ -11,10 +11,9 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
     private function archive(string $temp, string $name, bool $index = true, string $extra = ''): string
     {
         $source = $temp.'/source-'.$name;
-        mkdir($source.'/dist/client', 0755, true);
-        file_put_contents($source.'/agentboard', "#!/bin/sh\nexit 0\n");
-        if ($index) file_put_contents($source.'/dist/client/index.html', '<h1>Agentboard</h1>');
-        file_put_contents($source.'/dist/client/app.js', 'console.log(1);');
+        $this->pmssWriteFile($source.'/agentboard', "#!/bin/sh\nexit 0\n");
+        if ($index) $this->pmssWriteFile($source.'/dist/client/index.html', '<h1>Agentboard</h1>');
+        $this->pmssWriteFile($source.'/dist/client/app.js', 'console.log(1);');
         if ($extra === 'symlink') symlink('/etc/passwd', $source.'/dist/client/escape');
         if ($extra === 'hardlink') link($source.'/dist/client/app.js', $source.'/dist/client/extra.js');
         $archive = $temp.'/'.$name.'.tar.gz';
@@ -103,7 +102,7 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-agentboard-gate-');
         $marker = $root.'/enabled';
         $this->assertFalse(\pmssPikkumiesAgentboardHostEnabled($marker));
-        file_put_contents($marker, '');
+        $this->pmssWriteFile($marker, '');
         $this->assertTrue(\pmssPikkumiesAgentboardHostEnabled($marker));
         unlink($marker);
         symlink($root.'/missing', $marker);
@@ -114,9 +113,7 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
     {
         $temp = $this->pmssMakeTempDir('pmss-agentboard-refresh-');
         $root = $temp.'/installed';
-        mkdir($root);
-        mkdir($root.'/v2');
-        file_put_contents($root.'/v2/agentboard', 'stale');
+        $this->pmssWriteFile($root.'/v2/agentboard', 'stale', 0777);
         $archive = $this->archive($temp, 'refresh');
         $before = umask(0077);
         try {
@@ -141,7 +138,7 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         $uid = posix_geteuid();
         $sha = hash_file('sha256', $archive);
         $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha, $root, $uid));
-        file_put_contents($root.'/v1/dist/client/app.js', 'changed');
+        $this->pmssWriteFile($root.'/v1/dist/client/app.js', 'changed');
         $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha, $root, $uid));
         $this->assertSame('console.log(1);', file_get_contents($root.'/v1/dist/client/app.js'));
         $this->assertSame(1, count(glob($root.'/.quarantine/v1-*')));
@@ -161,7 +158,7 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', str_repeat('a', 64), $root, $uid), 'new pin');
         $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v2', $sha, $root, $uid), 'other version');
         $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid + 1), 'other owner');
-        file_put_contents($root.'/v1/dist/client/app.js', 'changed');
+        $this->pmssWriteFile($root.'/v1/dist/client/app.js', 'changed');
         $this->assertFalse(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid), 'changed content');
         $this->assertTrue(\pmssPikkumiesAgentboardArchiveInstall($archive, 'v1', $sha, $root, $uid));
         $this->assertTrue(\pmssPikkumiesAgentboardInstalled('v1', $sha, $root, $uid));

@@ -44,8 +44,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir);
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
 
-        $this->pmssEnsureDir($installPath);
-        @file_put_contents($installPath.'/marker.txt', 'existing');
+        $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
 
         try {
             $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
@@ -189,7 +188,7 @@ class ArrUpdateTest extends TestCase
         $installPath = $baseDir.'/install';
 
         try {
-            @file_put_contents($installPath, 'not a directory');
+            $this->pmssWriteFile($installPath, 'not a directory');
             list(, $output) = $this->pmssCaptureStdout(function () use ($installPath, $baseDir): void {
                 $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
             });
@@ -233,9 +232,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir);
         $probeLog = $baseDir.'/probe.log';
 
-        $this->pmssEnsureDir($installPath);
-        @file_put_contents($installPath.'/marker.txt', 'existing');
-        @file_put_contents($installPath.'/version.txt', "1.2.3\n");
+        $this->pmssWriteFiles($installPath, ['marker.txt' => 'existing', 'version.txt' => "1.2.3\n"]);
         // Canary: a runnable binary that records any invocation. It must stay silent.
         $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
@@ -292,8 +289,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir);
         $probeLog = $baseDir.'/probe.log';
 
-        $this->pmssEnsureDir($installPath);
-        @file_put_contents($installPath.'/marker.txt', 'existing');
+        $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
         $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
         try {
@@ -342,7 +338,7 @@ class ArrUpdateTest extends TestCase
     private function writeMetadata(string $baseDir, string $assetName, string $archivePath): string
     {
         $metadataPath = $baseDir.'/releases.json';
-        @file_put_contents($metadataPath, json_encode([
+        $this->pmssWriteFile($metadataPath, json_encode([
             [
                 'assets' => [
                     [
@@ -366,7 +362,7 @@ class ArrUpdateTest extends TestCase
             ];
         }
 
-        @file_put_contents($metadataPath, json_encode([$payload]));
+        $this->pmssWriteFile($metadataPath, json_encode([$payload]));
         return $metadataPath;
     }
 

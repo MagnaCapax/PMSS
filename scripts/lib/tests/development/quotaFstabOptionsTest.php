@@ -23,7 +23,7 @@ class QuotaFstabOptionsTest extends TestCase
             $this->assertSame(['[SKIP] '.$labels[1].' already present for /home'], $this->pmssArrayLoggerMessages($apply));
             $this->assertSame($expected, file_get_contents($fstab));
             $this->assertSame(1, count(glob($fstab.'.pmss-backup-*') ?: []));
-            file_put_contents($fstab, "UUID=abc /srv ext4 defaults 0 0\n");
+            $this->pmssWriteFile($fstab, "UUID=abc /srv ext4 defaults 0 0\n");
             $missing = ['quota' => 'quota updates', 'journal' => 'journal commit update', 'nofail' => 'nofail update'][$policy];
             $this->assertSame(['[WARN] Mount point /home not found in '.$fstab.'; skipping '.$missing.'.'], $this->pmssArrayLoggerMessages($apply));
         }
@@ -129,8 +129,7 @@ class QuotaFstabOptionsTest extends TestCase
     public function testWarnUnexpectedQuotaFilesNoUnexpectedEntries(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-quota-files-', 0700);
-        file_put_contents($dir.'/aquota.user', 'x');
-        file_put_contents($dir.'/aquota.group', 'x');
+        $this->pmssWriteFiles($dir, ['aquota.user' => 'x', 'aquota.group' => 'x'], 0700);
 
         $messages = $this->warnUnexpectedQuotaFiles($dir);
         $this->assertEquals([], $messages);
@@ -164,7 +163,7 @@ class QuotaFstabOptionsTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
         $stale = $dir.'/aquota.user.new';
-        file_put_contents($stale, 'stale');
+        $this->pmssWriteFile($stale, 'stale');
 
         [$removed, $messages] = $this->removeStaleQuotaCheckFiles($dir);
 
@@ -190,7 +189,7 @@ class QuotaFstabOptionsTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
         $stale = $dir.'/aquota.user.new';
-        file_put_contents($stale, 'stale');
+        $this->pmssWriteFile($stale, 'stale');
 
         // Prefix/suffix controls used to disappear during trim(), authorizing deletion.
         foreach (["\0", "\r", "\n", "\r\n"] as $control) {
@@ -209,7 +208,7 @@ class QuotaFstabOptionsTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
         $stale = $dir.'/aquota.user.new';
         foreach ([$dir, $dir.'/', '  '.$dir.'//  ', "\t".$dir."\t"] as $path) {
-            file_put_contents($stale, 'stale');
+            $this->pmssWriteFile($stale, 'stale');
             [$removed, $messages] = $this->removeStaleQuotaCheckFiles($path);
             $this->assertSame(1, $removed);
             $this->assertFalse(file_exists($stale));
