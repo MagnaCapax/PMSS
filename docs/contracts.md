@@ -1909,6 +1909,10 @@ This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
 Reflected characterization fixtures share `pmssTestingFunctionExport()` in
 `scripts/lib/testing/filesystem.php`; selection, substitutions and strict mode stay with callers.
 
+- Mount, quota, port, logging and installer fixtures reuse `pmssWriteFile()` and
+  `pmssWriteFiles()` for checked publication and parent creation. Preserve explicit
+  directory modes; keep deliberately empty directories and injected runtime writes
+  at their callers.
 - Test environment scopes use `TestCase::pmssWithEnv()` and
   `pmssWithPathPrefixedEnv()` for override/restoration lifetimes. Use
   `pmssWithTrackedEnv()` when the callback changes additional keys. These helpers

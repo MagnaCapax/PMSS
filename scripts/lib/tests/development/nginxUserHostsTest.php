@@ -82,7 +82,7 @@ class NginxUserHostsTest extends TestCase
         foreach ($vectors as $vector) {
             if ($vector['kind'] !== 'service') continue;
             $home = $this->pmssMakeTempDir('mcx-certs-home-');
-            file_put_contents($home.'/.billingServiceId', $vector['id']);
+            $this->pmssWriteFile($home.'/.billingServiceId', $vector['id']);
             $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script), ['HOME' => $home]);
             $this->assertSame(0, $result['rc']);
             $this->assertTrue(strpos($result['output'], 'https://'.\pmssMcxLabel('service', $vector['id']).'.mcx.fi/') !== false);
@@ -94,15 +94,15 @@ class NginxUserHostsTest extends TestCase
     {
         $mcx = \pmssNginxUserMcxHostname('123');
         $cases = [
-            ['username', '123', ['alice.host.example', $mcx]],
-            ['username', null, ['alice.host.example']],
+            ['username', '123', ['fixtur01.host.example', $mcx]],
+            ['username', null, ['fixtur01.host.example']],
             ['default', '123', [$mcx]],
             ['default', null, []],
             ['2026-09-01T00:00:00Z', '123', [$mcx]],
             [null, '123', [$mcx]],
         ];
         foreach ($cases as [$request, $serviceId, $expected]) {
-            $this->assertSame($expected, \pmssWebPublicCertNames('alice', 'host.example', $serviceId, $request));
+            $this->assertSame($expected, \pmssWebPublicCertNames('fixtur01', 'host.example', $serviceId, $request));
         }
     }
 
@@ -112,7 +112,7 @@ class NginxUserHostsTest extends TestCase
         $php = escapeshellarg(PHP_BINARY);
 
         $legacyHome = $this->pmssMakeTempDir('mcx-certs-legacy-');
-        file_put_contents($legacyHome.'/.billingId', "123\n");
+        $this->pmssWriteFile($legacyHome.'/.billingId', "123\n");
         $result = $this->pmssExecShellCommand($php.' '.$script, ['HOME' => $legacyHome]);
         $this->assertSame(0, $result['rc']);
         $this->assertTrue(strpos($result['output'], 'https://'.\pmssNginxUserMcxHostname('123').'/') !== false);
@@ -124,7 +124,7 @@ class NginxUserHostsTest extends TestCase
         $this->assertTrue(!file_exists($emptyHome.'/.request-web-certs'));
 
         $yesHome = $this->pmssMakeTempDir('mcx-certs-yes-');
-        file_put_contents($yesHome.'/.billingId', "123\n");
+        $this->pmssWriteFile($yesHome.'/.billingId', "123\n");
         $result = $this->pmssExecShellCommand("printf 'yes\\n' | HOME=".escapeshellarg($yesHome).' '.$php.' '.$script.' --with-username-hostname');
         $this->assertSame(0, $result['rc']);
         $this->assertSame("username\n", file_get_contents($yesHome.'/.request-web-certs'));

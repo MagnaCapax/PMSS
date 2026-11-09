@@ -24,7 +24,7 @@ class QuotaPolicyCharacterizationTest extends TestCase
             ['usrquota, grpjquota=aquota.group', ['user'], false],
         ] as [$options, $types, $journaled]) {
             // The first matching row wins, and quota declarations on other mounts do not count.
-            file_put_contents($fstab, "# x /home ext4 usrjquota=aquota.user 0 0\n"
+            $this->pmssWriteFile($fstab, "# x /home ext4 usrjquota=aquota.user 0 0\n"
                 ."x /srv ext4 usrjquota=aquota.user 0 0\n"
                 .'x /home ext4 '.$options." 0 0\nx /home ext4 usrjquota=aquota.user 0 0\n");
             $messages = [];
@@ -32,7 +32,7 @@ class QuotaPolicyCharacterizationTest extends TestCase
             $this->assertSame($journaled, \pmssQuotaSnapshotMountDeclaresJournaledQuota('/home', $fstab));
             $this->assertSame([], $messages);
         }
-        file_put_contents($fstab, "x /srv ext4 usrquota 0 0\n");
+        $this->pmssWriteFile($fstab, "x /srv ext4 usrquota 0 0\n");
         $this->assertSame(null, \pmssQuotaHomeDeclaredTypes(static function (): void {}, $fstab, 'policy check.'));
         $this->assertFalse(\pmssQuotaSnapshotMountDeclaresJournaledQuota('/home', $fstab));
     }
@@ -55,7 +55,7 @@ class QuotaPolicyCharacterizationTest extends TestCase
     {
         $fstab = $this->pmssMakeTempFile('pmss-quota-counts-');
         foreach ([['defaults', 0], ['usrquota', 1], ['grpquota,usrquota', 2]] as [$options, $declared]) {
-            file_put_contents($fstab, 'x /home ext4 '.$options." 0 0\n");
+            $this->pmssWriteFile($fstab, 'x /home ext4 '.$options." 0 0\n");
             foreach ([0, 1, 2, 127] as $enabled) {
                 $commands = [];
                 $counts = \pmssQuotaHomeEnforcementCounts(static function (string $command) use (&$commands, $enabled): array {

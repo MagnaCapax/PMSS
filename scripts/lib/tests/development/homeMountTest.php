@@ -74,17 +74,16 @@ MOUNTS
         $mountsPath = $this->stageMounts("/dev/md0    /home    ext4    rw,relatime,data=ordered    0    0\n");
         $this->assertTrue(pmssIsHomeMounted(), 'Should match /home with extra spaces');
 
-        file_put_contents($mountsPath, "/dev/md0\t/home\text4\trw,relatime\t0\t0\n");
+        $this->pmssWriteFile($mountsPath, "/dev/md0\t/home\text4\trw,relatime\t0\t0\n");
         $this->assertTrue(pmssIsHomeMounted(), 'Should match /home with tabs');
 
-        file_put_contents($mountsPath, "server:/export/home /home nfs4 rw,relatime,vers=4.2 0 0\n");
+        $this->pmssWriteFile($mountsPath, "server:/export/home /home nfs4 rw,relatime,vers=4.2 0 0\n");
         $this->assertTrue(pmssIsHomeMounted(), 'Should match /home on NFS');
     }
 
     private function stageMounts(string $content, ?string $skip = null): string
     {
-        $path = $this->pmssMakeTempPath('pmss-test-mounts-');
-        file_put_contents($path, $content);
+        $path = $this->pmssWriteTempFile('test-mounts', $content);
         $env = ['PMSS_PROC_MOUNTS_PATH' => $path];
         if ($skip !== null) {
             $env['PMSS_SKIP_HOME_MOUNT_CHECK'] = $skip;

@@ -17,7 +17,7 @@ class RuntimeDirectoryEntriesTest extends TestCase
     public function testMissingAndRegularFilePathsReturnScanFailure(): void
     {
         $directory = $this->pmssMakeTempDir('pmss-directory-entries-');
-        file_put_contents($directory.'/file', 'fixture');
+        $this->pmssWriteFile($directory.'/file', 'fixture');
         foreach ([$directory.'/missing', $directory.'/file', $directory.'/file/child'] as $path) {
             $this->assertSame(false, pmssDirectoryEntriesRead($path));
         }
@@ -31,9 +31,7 @@ class RuntimeDirectoryEntriesTest extends TestCase
     public function testScanPreservesKeysOrderingAndLiteralNames(): void
     {
         $directory = $this->pmssMakeTempDir('pmss-directory-entries-');
-        foreach (['z', '.hidden', ' spaced ', "line\nbreak", 'A'] as $name) {
-            file_put_contents($directory.'/'.$name, 'fixture');
-        }
+        $this->pmssWriteFiles($directory, array_fill_keys(['z', '.hidden', ' spaced ', "line\nbreak", 'A'], 'fixture'));
         mkdir($directory.'/child');
         symlink($directory.'/missing', $directory.'/broken-link');
         $expected = array_diff(scandir($directory), ['.', '..']);
@@ -44,8 +42,7 @@ class RuntimeDirectoryEntriesTest extends TestCase
     public function testDirectorySymlinkAndWhitespacePathRemainSupported(): void
     {
         $directory = $this->pmssMakeTempDir('pmss-directory-entries-');
-        mkdir($directory.'/ spaced ');
-        file_put_contents($directory.'/ spaced /entry', 'fixture');
+        $this->pmssWriteFile($directory.'/ spaced /entry', 'fixture', 0777);
         symlink($directory.'/ spaced ', $directory.'/alias');
         $expected = array_diff(scandir($directory.'/ spaced '), ['.', '..']);
         $this->assertSame($expected, pmssDirectoryEntriesRead($directory.'/ spaced '));

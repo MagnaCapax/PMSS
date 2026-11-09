@@ -37,10 +37,10 @@ final class TorrentClientsP3ProxyTest extends TestCase
         symlink($store.'/transmission/4.1.3', $home.'/bin/transmission/default');
         $projection = $root.'/projection.json';
         $version = ['client' => 'transmission', 'version' => '4.1.3', 'kind' => 'static'];
-        file_put_contents($projection, json_encode(['versions' => [$version]]));
+        $this->pmssWriteFile($projection, json_encode(['versions' => [$version]]));
         $this->assertFalse(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
         $version['rpcUnixSocket'] = true;
-        file_put_contents($projection, json_encode(['versions' => [$version]]));
+        $this->pmssWriteFile($projection, json_encode(['versions' => [$version]]));
         $this->assertTrue(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
         unlink($store.'/transmission/4.1.3/transmission-daemon');
         $this->assertFalse(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
@@ -57,8 +57,7 @@ final class TorrentClientsP3ProxyTest extends TestCase
         $config = 'server.modules = ( "mod_proxy" )' . "\n"
             .'server.document-root = "'.$root.'"' . "\n"
             .'server.port = 30000' . "\n".$match[0]."\n";
-        $path = $root.'/lighttpd.conf';
-        file_put_contents($path, $config);
+        $path = $this->pmssWriteFile($root.'/lighttpd.conf', $config);
         $result = $this->pmssExecShellCommand(escapeshellarg($binary).' -t -f '.escapeshellarg($path));
         $this->assertSame(0, $result['rc'], $result['output']);
     }

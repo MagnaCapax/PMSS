@@ -62,8 +62,8 @@ final class OpenClawInstallerTest extends TestCase
         mkdir($lib.'/openclaw-update-runtime');
         mkdir($lib.'/other-openclaw-update-runtime-old');
         $outside = $this->pmssMakeTempDir('pmss-oc-debris-outside-');
-        file_put_contents($outside.'/keep', 'kept');
-        file_put_contents($lib.'/openclaw-update-runtime-file', 'kept');
+        $this->pmssWriteFile($outside.'/keep', 'kept');
+        $this->pmssWriteFile($lib.'/openclaw-update-runtime-file', 'kept');
         symlink($outside, $lib.'/openclaw-update-runtime-link');
         symlink($outside.'/missing', $lib.'/openclaw-update-runtime-broken');
         symlink($outside, $lib.'/openclaw-update-runtime-old/redirect');
@@ -110,15 +110,12 @@ final class OpenClawInstallerTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-oc-update-');
         $paths = \ocPaths($home);
         $this->openClawNodeShim($paths);
-        mkdir(dirname($paths['entry']), 0700, true);
-        mkdir(dirname($paths['npm']), 0700, true);
         mkdir($paths['state'], 0700);
-        mkdir($home.'/stubs', 0700);
         \ocEnsureToken($paths);
         $token = file_get_contents($paths['env']);
-        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
-        $this->pmssWriteExecutableFile($home.'/stubs/quota', "#!/bin/sh\ncat \"\$HOME/quota-output\"\n", 0755, 0700);
-        file_put_contents($paths['entry'], '<?php
+        $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteExecutableFile($home.'/stubs/quota', "#!/bin/sh\ncat \"\$HOME/quota-output\"\n", 0700, 0700);
+        $this->pmssWriteFile($paths['entry'], '<?php
 $command = $argv[1] ?? "";
 file_put_contents(getenv("HOME")."/calls", $command."\\n", FILE_APPEND);
 if ($command === "--version") echo "2026.10.5";
@@ -131,22 +128,22 @@ if ($command === "doctor") {
     file_put_contents(getenv("HOME")."/doctor-env", $valid ? "valid" : "invalid");
     echo "private-doctor-output";
     exit(1);
-}');
-        file_put_contents($paths['npm'], '<?php
+}', 0700);
+        $this->pmssWriteFile($paths['npm'], '<?php
 file_put_contents(getenv("HOME")."/calls", "npm\\n", FILE_APPEND);
 file_put_contents(getenv("HOME")."/npm-path", explode(":", getenv("PATH"))[0]);
 echo getenv("OC_TEST_NPM_ERROR");
-exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
+exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);', 0700);
         $env = getenv();
         $env['HOME'] = $home;
         $env['PATH'] = $home.'/stubs:'.$env['PATH'];
         $installer = dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw';
-        file_put_contents($home.'/quota-output', '/dev/md4 123 1000 1250 43751 75000 93750');
+        $this->pmssWriteFile($home.'/quota-output', '/dev/md4 123 1000 1250 43751 75000 93750');
         list($rc, $output) = \ocRun(array(PHP_BINARY, $installer, 'update'), $env);
         $this->assertSame(1, $rc);
         $this->assertStringContainsString('60000 additional files', $output);
         $this->assertFalse(file_exists($home.'/calls'));
-        file_put_contents($home.'/quota-output', '/dev/md4 123 1000 1250 25000 75000 93750');
+        $this->pmssWriteFile($home.'/quota-output', '/dev/md4 123 1000 1250 25000 75000 93750');
         // The fake gateway exits immediately: verify each failure still reaches a restart attempt.
         foreach (array('ENOENT mid-extract', 'EDQUOT', 'errno -122', '') as $npmError) {
             @unlink($home.'/calls');
@@ -182,13 +179,12 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $paths = \ocPaths($home);
         mkdir($home.'/bin', 0750);
         mkdir($paths['state'], 0700);
-        file_put_contents($paths['state'].'/pmss-stopped', '');
+        $this->pmssWriteFile($paths['state'].'/pmss-stopped', '');
         // No installation: the watchdog leaves ~/bin alone.
         \ocCheck($paths);
         $this->assertFalse(file_exists($home.'/bin/openclaw'));
-        mkdir(dirname($paths['entry']), 0700, true);
-        file_put_contents($paths['entry'], '');
-        file_put_contents($home.'/bin/openclaw', "#!/bin/sh\nexec node openclaw.mjs \"\$@\"\n");
+        $this->pmssWriteFile($paths['entry'], '', 0700);
+        $this->pmssWriteFile($home.'/bin/openclaw', "#!/bin/sh\nexec node openclaw.mjs \"\$@\"\n");
         \ocCheck($paths);
         $wrapper = file_get_contents($home.'/bin/openclaw');
         $this->assertStringContainsString("export OPENCLAW_SUPERVISOR_MODE=external\n", $wrapper);
@@ -210,14 +206,13 @@ exit(getenv("OC_TEST_NPM_ERROR") ? 1 : 0);');
         $paths = \ocPaths($home);
         mkdir(dirname($paths['node']), 0700, true);
         symlink(PHP_BINARY, $paths['node']);
-        mkdir(dirname($paths['entry']), 0700, true);
-        file_put_contents($paths['entry'], '<?php file_put_contents(getenv("HOME")."/calls", json_encode(array_slice($argv,1))."\\n", FILE_APPEND); if (($argv[1] ?? "") === "config" && ($argv[2] ?? "") === "get") echo "token";');
+        $this->pmssWriteFile($paths['entry'], '<?php file_put_contents(getenv("HOME")."/calls", json_encode(array_slice($argv,1))."\\n", FILE_APPEND); if (($argv[1] ?? "") === "config" && ($argv[2] ?? "") === "get") echo "token";', 0700);
         mkdir($paths['state'], 0700);
         \ocEnsureToken($paths);
         $token = file_get_contents($paths['env']);
-        file_put_contents($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":{"primary":"own/model"}}}}');
-        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
-        file_put_contents($home.'/.lighttpd.conf', "server.port = 24000\n");
+        $this->pmssWriteFile($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":{"primary":"own/model"}}}}');
+        $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteFile($home.'/.lighttpd.conf', "server.port = 24000\n");
         foreach (array('quota' => 'exit 0', 'pkill' => 'exit 0', 'lighttpd' => 'exit 0', 'curl' => 'echo 401',
             'crontab' => 'if [ "$1" = "-l" ]; then echo "no crontab for fixtur01"; exit 1; fi') as $name => $body) {
             $this->pmssWriteExecutableFile($home.'/stubs/'.$name, "#!/bin/sh\n".$body."\n", 0755, 0700);
@@ -276,7 +271,7 @@ LIGHTTPD;
         $file = $home.'/.lighttpd/custom.d/openclaw.conf';
         $legacy = \pmssLighttpdProxyRuleFragment('^/user-fixtur01/openclaw($|/)', 23000);
         $current = \ocProxyFragment('/user-fixtur01/openclaw', 23000);
-        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
         $restarts = 0;
         $restart = function () use (&$restarts, $file, $current): bool {
             ++$restarts;
@@ -284,30 +279,30 @@ LIGHTTPD;
             return true;
         };
         foreach (array(null, '', $legacy."\n# customer edit\n", $current) as $contents) {
-            if ($contents !== null) file_put_contents($file, $contents);
+            if ($contents !== null) $this->pmssWriteFile($file, $contents);
             \ocProxyRefresh($paths, $restart);
             $this->assertSame($contents, is_file($file) ? file_get_contents($file) : null);
         }
         $this->assertSame(0, $restarts);
         // Invalid or changed reservations must not repoint an existing route.
-        file_put_contents($file, $legacy);
+        $this->pmssWriteFile($file, $legacy);
         foreach (array('invalid', '23001') as $marker) {
-            file_put_contents($home.'/.media-stack-port-openclaw', $marker."\n");
+            $this->pmssWriteFile($home.'/.media-stack-port-openclaw', $marker."\n");
             \ocProxyRefresh($paths, $restart);
             $this->assertSame($legacy, file_get_contents($file));
         }
-        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
         // A linked legacy file belongs to the customer, even when its bytes match.
         unlink($file);
         $outside = $this->pmssMakeTempFile('pmss-oc-proxy-link-');
-        file_put_contents($outside, $legacy);
+        $this->pmssWriteFile($outside, $legacy);
         symlink($outside, $file);
         \ocProxyRefresh($paths, $restart);
         $this->assertSame($legacy, file_get_contents($outside));
         $this->assertSame(0, $restarts);
         unlink($file);
         // The old generated file converges in one restart; later checks do nothing.
-        file_put_contents($file, $legacy);
+        $this->pmssWriteFile($file, $legacy);
         \ocProxyRefresh($paths, $restart);
         \ocProxyRefresh($paths, $restart);
         $this->assertSame($current, file_get_contents($file));
@@ -320,9 +315,9 @@ LIGHTTPD;
         $root = $this->pmssMakeTempDir('pmss-oc-refresh-fail-');
         $home = $root.'/fixtur01';
         mkdir($home.'/.lighttpd/custom.d', 0700, true);
-        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
         $file = $home.'/.lighttpd/custom.d/openclaw.conf';
-        file_put_contents($file, \pmssLighttpdProxyRuleFragment('^/user-fixtur01/openclaw($|/)', 23000));
+        $this->pmssWriteFile($file, \pmssLighttpdProxyRuleFragment('^/user-fixtur01/openclaw($|/)', 23000));
         $restarts = 0;
         // The failed new route is removed before retrying the account panel.
         $this->assertThrowsRuntime(static function () use ($home, &$restarts): void {
@@ -439,12 +434,12 @@ LIGHTTPD;
         $paths = \ocPaths($home);
         $paths['node'] = PHP_BINARY;
         $paths['entry'] = $home.'/cli.php';
-        file_put_contents($paths['entry'], '<?php file_put_contents(getenv("HOME")."/calls", json_encode(array_slice($argv,1))."\\n", FILE_APPEND);');
-        file_put_contents($paths['state'].'/openclaw.json', '{}');
+        $this->pmssWriteFile($paths['entry'], '<?php file_put_contents(getenv("HOME")."/calls", json_encode(array_slice($argv,1))."\\n", FILE_APPEND);', 0700);
+        $this->pmssWriteFile($paths['state'].'/openclaw.json', '{}');
         \ocEnsureToken($paths);
         \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
         $this->assertFalse(\ocPendingProviderApply($paths));
-        file_put_contents($home.'/.virsilipasKey', "endpoint=https://ai.example/v1\nkey=private-test-service-key\n");
+        $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://ai.example/v1\nkey=private-test-service-key\n");
         chmod($home.'/.virsilipasKey', 0600);
         $this->pmssWithEnv(['HOME' => $home], function () use ($paths): void {
             $this->assertTrue(\ocPendingProviderApply($paths));
@@ -461,12 +456,12 @@ LIGHTTPD;
         $this->assertSame(0600, fileperms($paths['state'].'/pmss-virsilipas') & 0777);
         $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
         \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
-        file_put_contents($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":{"primary":"own/model"}}}}');
+        $this->pmssWriteFile($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":{"primary":"own/model"}}}}');
         $this->assertFalse(\ocPendingProviderApply($paths));
         $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
         $this->assertSame($calls, file_get_contents($home.'/calls'));
         \ocPrivateMarkerWrite($paths['state'].'/pmss-provider-pending', "pending\n");
-        file_put_contents($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":"own/shorthand"}}}');
+        $this->pmssWriteFile($paths['state'].'/openclaw.json', '{"agents":{"defaults":{"model":"own/shorthand"}}}');
         $this->assertFalse(\ocPendingProviderApply($paths));
         $this->assertFalse(file_exists($paths['state'].'/pmss-provider-pending'));
         $this->assertSame($calls, file_get_contents($home.'/calls'));
@@ -480,10 +475,10 @@ LIGHTTPD;
         $paths['node'] = PHP_BINARY;
         $paths['entry'] = $paths['home'].'/cli.php';
         \ocEnsureToken($paths);
-        file_put_contents($paths['home'].'/.virsilipasKey', "endpoint=https://ai.example/v1\nkey=private-test-service-key\n");
+        $this->pmssWriteFile($paths['home'].'/.virsilipasKey', "endpoint=https://ai.example/v1\nkey=private-test-service-key\n");
         chmod($paths['home'].'/.virsilipasKey', 0600);
-        file_put_contents($paths['state'].'/openclaw.json', json_encode($config));
-        file_put_contents($paths['entry'], '<?php
+        $this->pmssWriteFile($paths['state'].'/openclaw.json', json_encode($config));
+        $this->pmssWriteFile($paths['entry'], '<?php
 $file = __DIR__."/.openclaw/openclaw.json";
 file_put_contents(__DIR__."/calls", json_encode(array_slice($argv, 1))."\\n", FILE_APPEND);
 $config = json_decode(file_get_contents($file), true);
@@ -503,7 +498,7 @@ if (($argv[1] ?? "") === "--version") echo "2026.10.5";
 file_put_contents($file, json_encode($config));
 function ocTestOnboardFlags() { return array("--non-interactive", "--accept-risk", "--skip-daemon", "--skip-channels",
     "--gateway-token-ref-env", "--custom-base-url", "--custom-model-id", "--custom-provider-id", "--custom-compatibility", "--secret-input-mode"); }
-');
+', 0700);
         return $paths;
     }
 
@@ -516,7 +511,7 @@ function ocTestOnboardFlags() { return array("--non-interactive", "--accept-risk
 if (($argv[1] ?? "") === "--version") { echo "v'.OC_NODE_VERSION.'"; exit; }
 $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
         $paths['npm'] = $paths['home'].'/npm.php';
-        file_put_contents($paths['npm'], '<?php // No network.');
+        $this->pmssWriteFile($paths['npm'], '<?php // No network.', 0700);
         $this->assertTrue(\ocInstallFresh($paths, \ocVirsilipasCredentials($paths['home']), true, 23000));
         $provider = \ocConfigRead($paths)['models']['providers']['virsilipas'];
         $this->assertSame('onboarded name', $provider['models'][0]['name']);
@@ -551,7 +546,7 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
             if ($case === 'multiple') $custom['models'][] = array('id' => 'other');
             if ($case === 'api') $custom['api'] = 'openai-responses';
             $config = array('models' => array('providers' => array('virsilipas' => $custom)));
-            file_put_contents($paths['state'].'/openclaw.json', json_encode($config));
+            $this->pmssWriteFile($paths['state'].'/openclaw.json', json_encode($config));
             $this->assertFalse(\ocVirsilipasModelApply($paths, \ocGatewayEnv($paths)), $case);
             $this->assertSame($config, \ocConfigRead($paths));
         }
@@ -720,8 +715,7 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
         touch($paths['state'].'/pmss-kokko-disabled');
         \ocKokkoApply($paths, false, $download);
         unlink($paths['state'].'/pmss-kokko-disabled');
-        mkdir($paths['state'].'/pmss-kokko', 0700);
-        file_put_contents($paths['state'].'/pmss-kokko/keep', 'user data');
+        $this->pmssWriteFile($paths['state'].'/pmss-kokko/keep', 'user data', 0700);
         \ocKokkoApply($paths, false, $download);
         \ocKokkoApply($paths, true, $download);
         $this->assertSame('user data', file_get_contents($paths['state'].'/pmss-kokko/keep'));
@@ -735,12 +729,11 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
         $paths = $this->openClawConfigFixture(array('models' => array('providers' => array('virsilipas' => $provider))));
         $paths['node'] = $this->openClawNodeShim($paths);
         $paths['npm'] = $paths['home'].'/npm.php';
-        file_put_contents($paths['npm'], '<?php // No network.');
+        $this->pmssWriteFile($paths['npm'], '<?php // No network.', 0700);
         \ocPrivateMarkerWrite($paths['state'].'/pmss-virsilipas', "virsilipas\n");
         touch($paths['state'].'/pmss-kokko-disabled');
-        mkdir($paths['home'].'/stubs', 0700);
-        $this->pmssWriteExecutableFile($paths['home'].'/stubs/quota', "#!/bin/sh\nexit 0\n", 0755, 0700);
-        file_put_contents($paths['home'].'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteExecutableFile($paths['home'].'/stubs/quota', "#!/bin/sh\nexit 0\n", 0700, 0700);
+        $this->pmssWriteFile($paths['home'].'/.media-stack-port-openclaw', "23000\n");
         $this->pmssWithPathPrefix($paths['home'].'/stubs', function () use ($paths): void {
             // The fake gateway exits; no real service or listening socket is created.
             $this->assertThrowsRuntime(static function () use ($paths): void { \ocUpdate($paths); }, 'Gateway did not stay running');
@@ -760,9 +753,9 @@ $file = $argv[1]; array_shift($argv); require $file;', 0755, 0700);
         $home = $paths['home'];
         $paths['node'] = $this->openClawNodeShim($paths, '24.21.0');
         $paths['npm'] = $home.'/npm.php';
-        file_put_contents($paths['npm'], '<?php touch(getenv("OC_TEST_NPM_MARK"));');
+        $this->pmssWriteFile($paths['npm'], '<?php touch(getenv("OC_TEST_NPM_MARK"));', 0700);
         touch($paths['state'].'/pmss-kokko-disabled');
-        file_put_contents($home.'/.media-stack-port-openclaw', "23000\n");
+        $this->pmssWriteFile($home.'/.media-stack-port-openclaw', "23000\n");
         // The fake download is never the pinned archive, so its SHA256 check must fail.
         $this->pmssWriteExecutableFiles($home.'/stubs', [
             'quota' => "#!/bin/sh\nexit 0\n",
@@ -808,9 +801,7 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         $header = str_pad($header, 512, "\0");
         $sum = array_sum(unpack('C*', $header));
         $header = substr_replace($header, sprintf('%06o', $sum)."\0 ", 148, 8);
-        $archive = $this->pmssMakeTempPath('pmss-oc-tar-', '.tar.gz');
-        file_put_contents($archive, gzencode($header.str_repeat("\0", 1024)));
-        return $archive;
+        return $this->pmssWriteFile($this->pmssMakeTempPath('pmss-oc-tar-', '.tar.gz'), gzencode($header.str_repeat("\0", 1024)));
     }
 
     public function testKokkoArchiveRejectsTraversalAbsoluteLinksAndForeignRoot(): void
@@ -907,21 +898,20 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         $home = $this->pmssMakeTempDir('pmss-openclaw-key-');
         $file = $home.'/.virsilipasKey';
         $this->assertSame(null, \ocVirsilipasCredentials($home));
-        file_put_contents($file, "endpoint=https://virsilipas.mcx.fi/v1\nkey=\n");
+        $this->pmssWriteFile($file, "endpoint=https://virsilipas.mcx.fi/v1\nkey=\n");
         chmod($file, 0600);
         $this->assertSame(null, \ocVirsilipasCredentials($home));
-        file_put_contents($file, "endpoint=http://virsilipas.mcx.fi/v1\nkey=test-private-key\n");
+        $this->pmssWriteFile($file, "endpoint=http://virsilipas.mcx.fi/v1\nkey=test-private-key\n");
         $this->assertSame(null, \ocVirsilipasCredentials($home));
-        file_put_contents($file, "endpoint=https://virsilipas.mcx.fi/v1?x=1\nkey=test-private-key\n");
+        $this->pmssWriteFile($file, "endpoint=https://virsilipas.mcx.fi/v1?x=1\nkey=test-private-key\n");
         $this->assertSame(null, \ocVirsilipasCredentials($home));
-        file_put_contents($file, "endpoint=https://virsilipas.mcx.fi/v1\nkey=test-private-key\n");
+        $this->pmssWriteFile($file, "endpoint=https://virsilipas.mcx.fi/v1\nkey=test-private-key\n");
         $credentials = \ocVirsilipasCredentials($home);
         $this->assertSame('test-private-key', $credentials['key']);
         $state = $home.'/.openclaw';
         $this->assertTrue(\ocUseVirsilipas($state, $credentials));
         $this->assertFalse(\ocUseVirsilipas($state, null));
-        mkdir($state, 0700);
-        file_put_contents($state.'/openclaw.json', '{"models":{"providers":{"own":{"baseUrl":"https://own.example/v1"}}}}');
+        $this->pmssWriteFile($state.'/openclaw.json', '{"models":{"providers":{"own":{"baseUrl":"https://own.example/v1"}}}}', 0700);
         $this->assertFalse(\ocUseVirsilipas($state, $credentials));
         chmod($file, 0644);
         $this->assertSame(null, \ocVirsilipasCredentials($home));
@@ -957,11 +947,10 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         $paths = \ocPaths($home);
         mkdir(dirname($paths['node']), 0700, true);
         symlink(PHP_BINARY, $paths['node']);
-        mkdir(dirname($paths['entry']), 0700, true);
         mkdir($paths['state'], 0700);
         \ocEnsureToken($paths);
         $token = trim(substr(file_get_contents($paths['env']), strlen('OPENCLAW_GATEWAY_TOKEN=')));
-        file_put_contents($paths['entry'], '<?php echo getenv("OPENCLAW_GATEWAY_TOKEN"), "|", getenv("OPENCLAW_SUPERVISOR_MODE"), "|", implode(" ", array_slice($argv, 1));');
+        $this->pmssWriteFile($paths['entry'], '<?php echo getenv("OPENCLAW_GATEWAY_TOKEN"), "|", getenv("OPENCLAW_SUPERVISOR_MODE"), "|", implode(" ", array_slice($argv, 1));', 0700);
         $wrapper = $home.'/openclaw-wrapper';
         $this->pmssWriteExecutableFile($wrapper, \ocCliWrapper($paths), 0755, 0700);
         $env = getenv();
@@ -978,7 +967,7 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         symlink($home.'/elsewhere.env', $paths['env']);
         $this->assertSame('|external|x', \ocRun(array($wrapper, 'x'), $env)[1]);
         unlink($paths['env']);
-        file_put_contents($paths['env'], "OPENCLAW_GATEWAY_TOKEN=\$(touch pwned)\n");
+        $this->pmssWriteFile($paths['env'], "OPENCLAW_GATEWAY_TOKEN=\$(touch pwned)\n");
         $this->assertSame('|external|x', \ocRun(array($wrapper, 'x'), $env)[1]);
         $this->assertFalse(file_exists($home.'/pwned'));
     }
@@ -995,17 +984,17 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         $root = $this->pmssMakeTempDir('pmss-openclaw-port-');
         $file = $root.'/port';
         foreach (array('1' => 1, "65535\n" => 65535, "25000\nignored\n" => 25000) as $value => $expected) {
-            file_put_contents($file, (string) $value);
+            $this->pmssWriteFile($file, (string) $value);
             $this->assertSame($expected, \ocReservedPort($file));
         }
         foreach (array('', '0', '65536', '18789x', ' 123', '-1', '999999') as $value) {
-            file_put_contents($file, $value);
+            $this->pmssWriteFile($file, $value);
             $this->assertSame(null, \ocReservedPort($file));
         }
         unlink($file);
         $this->assertSame(null, \ocReservedPort($file));
         $outside = $this->pmssMakeTempFile('pmss-openclaw-outside-');
-        file_put_contents($outside, "23000\n");
+        $this->pmssWriteFile($outside, "23000\n");
         $this->pmssCreateSymlinkOrSkip($outside, $file);
         $this->assertSame(null, \ocReservedPort($file));
     }
@@ -1054,13 +1043,13 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         $paths = array('home' => $home, 'env' => $home.'/.openclaw/gateway.env',
             'node' => $home.'/node/bin/node', 'state' => $home.'/.openclaw');
         \ocEnsureToken($paths);
-        file_put_contents($paths['state'].'/pmss-virsilipas', "virsilipas\n");
+        $this->pmssWriteFile($paths['state'].'/pmss-virsilipas', "virsilipas\n");
         $keyFile = $home.'/.virsilipasKey';
-        file_put_contents($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=first-private-key\n");
+        $this->pmssWriteFile($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=first-private-key\n");
         chmod($keyFile, 0600);
         $this->pmssWithEnv(['CUSTOM_API_KEY' => null], function () use ($paths, $keyFile): void {
             $this->assertSame('first-private-key', \ocGatewayEnv($paths)['CUSTOM_API_KEY']);
-            file_put_contents($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=second-private-key\n");
+            $this->pmssWriteFile($keyFile, "endpoint=https://virsilipas.mcx.fi/v1\nkey=second-private-key\n");
             $this->assertSame('second-private-key', \ocGatewayEnv($paths)['CUSTOM_API_KEY']);
             $this->assertSame(false, strpos(file_get_contents($paths['env']), 'private-key'));
             unlink($paths['state'].'/pmss-virsilipas');
@@ -1075,9 +1064,9 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         $this->pmssEnsureDir($home.'/.openclaw');
         $definition = \pmssMediaStackPortDefinitions()['openclaw'];
         $this->assertSame('.openclaw/gateway.port', $definition['path']);
-        file_put_contents($home.'/.openclaw/gateway.port', "23010\n");
+        $this->pmssWriteFile($home.'/.openclaw/gateway.port', "23010\n");
         $this->assertSame(23010, \pmssMediaStackConfiguredPortRead($home, $definition));
-        file_put_contents($home.'/.openclaw/gateway.port', "port=23010\n");
+        $this->pmssWriteFile($home.'/.openclaw/gateway.port', "port=23010\n");
         $this->assertSame(null, \pmssMediaStackConfiguredPortRead($home, $definition));
     }
 }

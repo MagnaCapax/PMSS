@@ -16,10 +16,8 @@ class CreateNginxConfigPermissionHardeningTest extends TestCase
 
     public function testChmodGlobAppliesModeToMatchedFiles(): void
     {
-        $first = $this->root.'/plain.conf';
-        $second = $this->root.'/name with spaces.conf';
-        file_put_contents($first, "one\n");
-        file_put_contents($second, "two\n");
+        $first = $this->pmssWriteFile($this->root.'/plain.conf', "one\n");
+        $second = $this->pmssWriteFile($this->root.'/name with spaces.conf', "two\n");
         @chmod($first, 0666);
         @chmod($second, 0600);
 
@@ -37,10 +35,8 @@ class CreateNginxConfigPermissionHardeningTest extends TestCase
 
     public function testChmodGlobLeavesOtherFilesUntouched(): void
     {
-        $target = $this->root.'/target.conf';
-        $other = $this->root.'/other.txt';
-        file_put_contents($target, "target\n");
-        file_put_contents($other, "other\n");
+        $target = $this->pmssWriteFile($this->root.'/target.conf', "target\n");
+        $other = $this->pmssWriteFile($this->root.'/other.txt', "other\n");
         @chmod($target, 0600);
         @chmod($other, 0666);
 
@@ -52,9 +48,8 @@ class CreateNginxConfigPermissionHardeningTest extends TestCase
 
     public function testChmodGlobRefusesSymlinkTargets(): void
     {
-        $target = $this->root.'/real-target.txt';
+        $target = $this->pmssWriteFile($this->root.'/real-target.txt', "target\n");
         $link = $this->root.'/linked.conf';
-        file_put_contents($target, "target\n");
         @chmod($target, 0600);
         if (!@symlink($target, $link)) {
             throw new SkipTest('symlink unavailable');

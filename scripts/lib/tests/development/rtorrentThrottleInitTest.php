@@ -44,7 +44,7 @@ class RtorrentThrottleInitTest extends TestCase
             "throttle_down = thr_1, 128\n",
         ] as $customConfig) {
             $fixture = $this->startupFixture('return true;');
-            file_put_contents(dirname($fixture['script']).'/.rtorrent.rc.custom', $customConfig);
+            $this->pmssWriteFile(dirname($fixture['script']).'/.rtorrent.rc.custom', $customConfig);
 
             $result = $this->pmssExecArgvCommand([PHP_BINARY, $fixture['script']]);
 
@@ -56,7 +56,7 @@ class RtorrentThrottleInitTest extends TestCase
     public function testStartupHelperIgnoresCommentedCustomThrottleExample(): void
     {
         $fixture = $this->startupFixture('return true;');
-        file_put_contents(dirname($fixture['script']).'/.rtorrent.rc.custom', "# throttle.up = thr_0, 64\n");
+        $this->pmssWriteFile(dirname($fixture['script']).'/.rtorrent.rc.custom', "# throttle.up = thr_0, 64\n");
 
         $result = $this->pmssExecArgvCommand([PHP_BINARY, $fixture['script']]);
 
@@ -84,7 +84,7 @@ class RtorrentThrottleInitTest extends TestCase
         $script = $home.'/.rtorrentThrottleInit.php';
         $observed = $home.'/throttle-observed.json';
         copy($this->pmssRepoPath('etc/skel/.rtorrentThrottleInit.php'), $script);
-        file_put_contents($pluginRoot.'/throttle.php', '<?php
+        $this->pmssWriteFile($pluginRoot.'/throttle.php', '<?php
 class rThrottle
 {
     public static function load()

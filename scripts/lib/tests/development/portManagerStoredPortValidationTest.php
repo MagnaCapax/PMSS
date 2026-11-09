@@ -16,8 +16,8 @@ class PortManagerStoredPortValidationTest extends TestCase
 
     private function assignmentPath(?string $payload = null): string
     {
-        $path = $this->portDir.'/lighttpd-alice';
-        if ($payload !== null) file_put_contents($path, $payload);
+        $path = $this->portDir.'/lighttpd-fixtur01';
+        if ($payload !== null) $this->pmssWriteFile($path, $payload);
 
         return $path;
     }
@@ -27,7 +27,7 @@ class PortManagerStoredPortValidationTest extends TestCase
         $this->assignmentPath("22000oops\n");
         $command = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
             'scripts/util/portManager.php',
-            [$action, 'alice'],
+            [$action, 'fixtur01'],
             ['PMSS_PORT_MANAGER_DIR' => $this->portDir],
             'pmss-port-'.$action.'-stderr-'
         );
@@ -59,7 +59,7 @@ class PortManagerStoredPortValidationTest extends TestCase
     {
         $realPath = $this->portDir.'/real';
         $linkPath = $this->assignmentPath();
-        file_put_contents($realPath, "22000\n");
+        $this->pmssWriteFile($realPath, "22000\n");
         $this->pmssCreateSymlinkOrSkip($realPath, $linkPath);
 
         $this->assertSame(null, \pmssPortManagerReadAssignedPort($linkPath));
@@ -78,7 +78,7 @@ class PortManagerStoredPortValidationTest extends TestCase
     {
         $realPath = $this->pmssMakeTempFile('pmss-port-real-');
         $linkPath = $this->assignmentPath();
-        file_put_contents($realPath, "22000\n");
+        $this->pmssWriteFile($realPath, "22000\n");
         $this->pmssCreateSymlinkOrSkip($realPath, $linkPath);
 
         $this->assertFalse(\pmssPortManagerWriteAssignedPort($this->portDir, $linkPath, 23000));

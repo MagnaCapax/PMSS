@@ -16,8 +16,7 @@ class SocketTablePrivacyTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-procnet-', 0700);
         foreach (pmssSocketTablePrivacyTables() as $table) {
-            $path = $dir.'/'.$table;
-            file_put_contents($path, "sl local_address rem_address\n");
+            $path = $this->pmssWriteFile($dir.'/'.$table, "sl local_address rem_address\n");
             chmod($path, $mode);
         }
         return $dir;
@@ -42,7 +41,7 @@ class SocketTablePrivacyTest extends TestCase
     {
         $procNet = $this->fakeProcNet(0444);
         $marker = $this->pmssMakeTempDir('pmss-marker-', 0700).'/socket-table-privacy.enabled';
-        file_put_contents($marker, "");
+        $this->pmssWriteFile($marker, "");
         $dropin = $this->pmssMakeTempDir('pmss-sysctl-', 0700).'/91-pmss-socket-table-privacy.conf';
 
         $result = pmssSocketTablePrivacyApply(static function (): void {}, $marker, $procNet, $dropin);
@@ -62,7 +61,7 @@ class SocketTablePrivacyTest extends TestCase
         $marker = $this->pmssMakeTempDir('pmss-marker-', 0700).'/socket-table-privacy.enabled'; // absent
         $dropinDir = $this->pmssMakeTempDir('pmss-sysctl-', 0700);
         $dropin = $dropinDir.'/91-pmss-socket-table-privacy.conf';
-        file_put_contents($dropin, "net.ipv4.tcp_no_metrics_save = 1\n");
+        $this->pmssWriteFile($dropin, "net.ipv4.tcp_no_metrics_save = 1\n");
 
         $result = pmssSocketTablePrivacyApply(static function (): void {}, $marker, $procNet, $dropin);
 
@@ -107,7 +106,7 @@ class SocketTablePrivacyTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-marker-detect-', 0700);
         $marker = $dir.'/socket-table-privacy.enabled';
         $this->assertFalse(pmssSocketTablePrivacyEnabled($marker), 'absent marker => disabled');
-        file_put_contents($marker, "");
+        $this->pmssWriteFile($marker, "");
         $this->assertTrue(pmssSocketTablePrivacyEnabled($marker), 'present marker => enabled');
     }
 

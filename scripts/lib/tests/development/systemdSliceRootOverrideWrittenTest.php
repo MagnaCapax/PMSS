@@ -9,8 +9,7 @@ class SystemdSliceRootOverrideWrittenTest extends TestCase
     public function testRootUnlimitedDropinCreated(): void
     {
         $base = $this->pmssMakeTempDir('pmss-cg-basedir-');
-        $drop = $base.'/user-.slice.d';
-        @mkdir($drop, 0755, true);
+        $drop = $this->pmssEnsureDir($base.'/user-.slice.d');
 
         $fixture = $this->pmssSystemdSliceFixturePrepare([
             'dropDir' => $drop,
@@ -36,19 +35,18 @@ class SystemdSliceRootOverrideWrittenTest extends TestCase
             $drop = $base.'/user-.slice.d';
             $rootDir = $base.'/user-0.slice.d';
             mkdir($drop, 0755);
-            mkdir($rootDir, 0755);
             $legacy = $rootDir.'/99-pmss-unlimited.conf';
             $target = $rootDir.'/99-zz-pmss-unlimited.conf';
             $body = "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n";
-            file_put_contents($legacy, $body);
+            $this->pmssWriteFile($legacy, $body);
             $referent = $base.'/referent';
             if ($kind === 'regular') {
-                file_put_contents($target, 'old replacement');
+                $this->pmssWriteFile($target, 'old replacement');
             } elseif ($kind === 'directory') {
                 mkdir($target, 0755);
             } elseif ($kind === 'symlink' || $kind === 'dangling') {
                 if ($kind === 'symlink') {
-                    file_put_contents($referent, 'preserved referent');
+                    $this->pmssWriteFile($referent, 'preserved referent');
                 }
                 symlink($referent, $target);
             }

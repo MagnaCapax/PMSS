@@ -178,7 +178,7 @@ class DynamicIopsShadowTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-dynamic-iops-', 0700); $path = $root.'/history';
         $sample = ['time' => 1800000000, 'psiFullAvg300' => 10];
         $line = '2026-01-01 00:00:00 || '.serialize($sample)."\n";
-        file_put_contents($path, str_repeat('x', 70000)."\n".$line.'partial');
+        $this->pmssWriteFile($path, str_repeat('x', 70000)."\n".$line.'partial');
         $this->assertSame([$sample], iterator_to_array(\pmssDynamicIopsHistory($path), false));
         $this->pmssCreateSymlinkOrSkip($path, $root.'/link');
         $this->assertSame([], \pmssDynamicIopsTailLines($root.'/link'));
@@ -189,10 +189,10 @@ class DynamicIopsShadowTest extends TestCase
             'run_ts' => gmdate('c', time() - 3600), 'metrics' => ['read_iops' => 4000]];
         foreach ([['ok' => false], ['device' => '/dev/other'], ['test' => 'dev-randread-4k'],
             ['run_ts' => 'invalid'], ['metrics' => ['read_iops' => INF]]] as $bad) {
-            file_put_contents($path, json_encode(array_replace($base, $bad))."\n");
+            $this->pmssWriteFile($path, json_encode(array_replace($base, $bad))."\n");
             $this->assertSame(null, \pmssDynamicIopsBenchmark($path, '/dev/example'));
         }
-        file_put_contents($path, json_encode($base)."\n".json_encode(array_replace($base, ['metrics' => ['read_iops' => 9000]])));
+        $this->pmssWriteFile($path, json_encode($base)."\n".json_encode(array_replace($base, ['metrics' => ['read_iops' => 9000]])));
         $this->assertEquals(4000, \pmssDynamicIopsBenchmark($path, '/dev/example'));
     }
 }

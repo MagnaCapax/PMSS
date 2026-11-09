@@ -23,7 +23,7 @@ class RemoteLoggingCharacterizationTest extends TestCase
         $fixture = $this->pmssRemoteLoggingFixture('pmss-remote-logging-char-');
         $messages = [];
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', implode("\n", [
             '# Comments and malformed lines must be ignored',
             'remote_logging_enabled=yes',
             'junk line without equals',
@@ -32,7 +32,7 @@ class RemoteLoggingCharacterizationTest extends TestCase
             'remote_protocol=sctp',
             '',
         ]));
-        file_put_contents($fixture['cfgDir'].'/template.rsyslog-remote.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/template.rsyslog-remote.conf', implode("\n", [
             '*.* @@%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%',
             '# protocol=%%PMSS_RSYSLOG_PROTOCOL%%',
             '',
@@ -51,14 +51,14 @@ class RemoteLoggingCharacterizationTest extends TestCase
     {
         $fixture = $this->pmssRemoteLoggingFixture('pmss-remote-logging-char-');
 
-        file_put_contents($fixture['cfgDir'].'/logging.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/logging.conf', implode("\n", [
             'remote_logging_enabled=1',
             'remote_host=mirror.example.net',
             'remote_port=10514',
             'remote_protocol=udp',
             '',
         ]));
-        file_put_contents($fixture['cfgDir'].'/template.rsyslog-remote.conf', implode("\n", [
+        $this->pmssWriteFile($fixture['cfgDir'].'/template.rsyslog-remote.conf', implode("\n", [
             '*.* @%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%',
             '# copy=%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%',
             '# protocol=%%PMSS_RSYSLOG_PROTOCOL%%/%%PMSS_RSYSLOG_PROTOCOL%%',

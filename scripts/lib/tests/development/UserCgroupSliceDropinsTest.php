@@ -95,11 +95,11 @@ class UserCgroupSliceDropinsTest extends TestCase
             if ($kind === 'source-link') symlink($outside, $source);
             elseif ($kind === 'fifo') posix_mkfifo($source, 0600);
             elseif ($kind === 'directory') mkdir($source);
-            else file_put_contents($source, 'legacy');
+            else $this->pmssWriteFile($source, 'legacy');
             if ($kind === 'dir-link') { rename($dir, $base.'/real'); symlink($base.'/real', $dir); }
             if ($kind === 'ancestor-link') { symlink($base, $base.'/alias'); $base .= '/alias'; }
             if ($kind === 'target-link') symlink($outside, $dir.'/40-pmss-user-legacy.conf');
-            if ($kind === 'target-file') file_put_contents($dir.'/40-pmss-user-legacy.conf', 'occupied');
+            if ($kind === 'target-file') $this->pmssWriteFile($dir.'/40-pmss-user-legacy.conf', 'occupied');
             $this->assertFalse($this->repair($base), $kind);
             $this->assertSame('unchanged', file_get_contents($outside));
             $this->assertSame([], glob($dir.'/*.pmss-backup-*'));
@@ -125,7 +125,7 @@ class UserCgroupSliceDropinsTest extends TestCase
         $base = $this->pmssMakeTempDir('pmss-slice-backup-');
         $file = $this->pmssWriteFile($base.'/user-1234.slice.d/99-pmss.conf', 'legacy');
         $timestamp = date('YmdHis');
-        for ($i = 0; $i < 10; $i++) file_put_contents(\pmssManagedPathBackupCandidate($file, $timestamp, $i), 'occupied');
+        for ($i = 0; $i < 10; $i++) $this->pmssWriteFile(\pmssManagedPathBackupCandidate($file, $timestamp, $i), 'occupied');
         $this->assertFalse($this->repair($base));
         $this->assertSame('legacy', file_get_contents($file));
         $this->assertSame(0, $this->reloads);

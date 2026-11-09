@@ -73,7 +73,6 @@ class ConfigBackupsTest extends TestCase
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
 
         $serviceDir = $backupRoot.'/sshd';
-        @mkdir($serviceDir, 0700, true);
         $key = \pmssConfigBackupsPathKey($source);
 
         $paths = array(
@@ -82,9 +81,7 @@ class ConfigBackupsTest extends TestCase
             $serviceDir.'/20260131120000__'.$key.'.bak',
             $serviceDir.'/20260131130000__'.$key.'.bak',
         );
-        foreach ($paths as $p) {
-            file_put_contents($p, 'x');
-        }
+        $this->pmssWriteFiles($serviceDir, array_fill_keys(array_map('basename', $paths), 'x'), 0700);
 
         \pmssPruneCriticalConfigBackups('sshd', $source, array(
             'backupRoot' => $backupRoot,
@@ -106,13 +103,10 @@ class ConfigBackupsTest extends TestCase
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         $serviceDir = $backupRoot.'/nginx';
-        @mkdir($serviceDir, 0700, true);
         $key = \pmssConfigBackupsPathKey($source);
 
-        $old = $serviceDir.'/20251201000000__'.$key.'.bak';
-        $new = $serviceDir.'/20260104000000__'.$key.'.bak';
-        file_put_contents($old, 'old');
-        file_put_contents($new, 'new');
+        $old = $this->pmssWriteFile($serviceDir.'/20251201000000__'.$key.'.bak', 'old', 0700);
+        $new = $this->pmssWriteFile($serviceDir.'/20260104000000__'.$key.'.bak', 'new', 0700);
 
         $dt = \DateTime::createFromFormat('YmdHis', '20260105000000');
         $this->assertTrue($dt !== false);
