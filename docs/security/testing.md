@@ -5,6 +5,9 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
 ## Negative Tests
 - Invalid/edge inputs for parsers (spec parsing, config readers) must return safe defaults or explicit errors.
 - File writes must fail safely (temp files, backups, atomic replace) and restore on error.
+- Masked file opens share `pmssFileOpenWithUmask()` in `runtime/filesystemStream.php`.
+  Logging, staging, rebuild probes, restart audits and support snapshots retain their
+  open modes, masks and path guards; fault fixtures load the real helper beside their I/O shims.
 - Directory and support snapshot creation restore the caller's umask in `finally`,
   including when `mkdir` or exclusive `fopen` throws. `CreationUmaskSafetyTest`
   injects exceptions, errors and false returns without creating host files;

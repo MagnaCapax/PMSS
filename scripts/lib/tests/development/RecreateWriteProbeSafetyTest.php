@@ -42,6 +42,7 @@ function unlink($path) {
     return $removed;
 }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'RecreateProbeFixture');
         $script .= \pmssTestingFunctionExport('pmssRecreateRequireWritableDirectories', 'RecreateProbeFixture',
             ['Throwable' => '\\Throwable', 'RuntimeException' => '\\RuntimeException']);
         $script .= <<<'PHP'

@@ -17,12 +17,7 @@ function pmssRestartUserLogWrite(array $record, string $path = '/var/log/pmss/re
         && (fileowner($dir) !== 0 || (fileperms($dir) & 0022) !== 0)) return false;
 
     $created = !file_exists($path);
-    $oldUmask = umask(0137);
-    try {
-        $handle = @fopen($path, 'ab');
-    } finally {
-        umask($oldUmask);
-    }
+    $handle = pmssFileOpenWithUmask($path, 'ab', 0137);
     if ($handle === false) return false;
     try {
         clearstatcache(true, $path);

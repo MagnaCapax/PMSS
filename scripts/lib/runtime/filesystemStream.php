@@ -1,5 +1,20 @@
 <?php
-/** Blocking stream writes and open-stream validation. @license GPL-3.0-only */
+/** Stream acquisition, blocking writes and open-stream validation. @license GPL-3.0-only */
+
+/**
+ * Open with a caller-selected creation mask, restoring process state before returning or throwing.
+ * Path checks, open mode, stream ownership and cleanup remain with the caller.
+ * @return resource|false
+ */
+function pmssFileOpenWithUmask(string $path, string $mode, int $mask)
+{
+    $previous = umask($mask);
+    try {
+        return @fopen($path, $mode);
+    } finally {
+        umask($previous);
+    }
+}
 
 /** Reject closed streams and other resource types before stream operations. */
 function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && get_resource_type($handle) === 'stream'; }

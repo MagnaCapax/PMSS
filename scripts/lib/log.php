@@ -211,13 +211,7 @@ function pmssLogSharedFileIsOwn(string $path, int $mode): bool
     }
     clearstatcache(true, $path);
     if (!pmssPathExistsOrLink($path)) {
-        $umask = umask(0777 & ~$mode);
-        try {
-            $handle = @fopen($path, 'x');
-        } finally {
-            // File creation must not leave a temporary process-wide mask behind.
-            umask($umask);
-        }
+        $handle = pmssFileOpenWithUmask($path, 'x', 0777 & ~$mode);
         $handle !== false && fclose($handle);
         clearstatcache(true, $path);
     }

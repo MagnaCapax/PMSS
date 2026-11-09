@@ -90,12 +90,7 @@ function pmssUserFileTempCreate(string $path, ?string &$tmp)
             return null;
         }
         clearstatcache(true);
-        $umask = umask(0077);
-        try {
-            $handle = @fopen($candidate, 'xb');
-        } finally {
-            umask($umask);
-        }
+        $handle = pmssFileOpenWithUmask($candidate, 'xb', 0077);
         if (!pmssStreamHandleIsOpen($handle)) {
             clearstatcache(true, $candidate);
             if (pmssPathExistsOrLink($candidate)) {

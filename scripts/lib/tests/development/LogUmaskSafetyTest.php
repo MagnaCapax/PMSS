@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../runtime/filesystemStream.php';
 
 /** Process-state fault coverage for scripts/lib/log.php without filesystem writes. */
 class LogUmaskSafetyTest extends TestCase
@@ -47,6 +48,7 @@ function pmssFileWriteComplete($path, $bytes, $flags) {
 }
 function chmod($path, $mode) { observe('chmod', [$path, $mode]); return true; }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'LogUmaskFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogUmaskFixture');
         $script .= <<<'PHP'
 $results = [];

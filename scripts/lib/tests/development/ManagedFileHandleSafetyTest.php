@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../runtime/filesystemStream.php';
 
 /** Verify acquisition ownership without opening or removing managed files. */
 class ManagedFileHandleSafetyTest extends TestCase
@@ -40,6 +41,7 @@ function pmssPathExistsOrLink($path) { return false; }
 function fclose($handle) { $GLOBALS['events'][] = 'close'; return \fclose($handle); }
 function unlink($path) { $GLOBALS['unlinks'][] = $path; return true; }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'ManagedHandleFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileHandle.php', 'ManagedHandleFixture');
         $script .= <<<'PHP'
 $results = [];

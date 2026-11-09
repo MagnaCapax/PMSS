@@ -17,13 +17,7 @@ function pmssRecreateRequireWritableDirectories(array $directories): void
         } catch (Throwable $error) {
             throw new RuntimeException('Rebuild write pre-flight failed for '.$directory, 0, $error);
         }
-        $oldUmask = umask(0077);
-        try {
-            $handle = @fopen($path, 'x+b'); // Exclusive create; the umask makes the initial mode 0600.
-        } finally {
-            // Opening failures must not change the mode policy for later rebuild work.
-            umask($oldUmask);
-        }
+        $handle = pmssFileOpenWithUmask($path, 'x+b', 0077);
         if ($handle === false) {
             throw new RuntimeException('Rebuild write pre-flight failed for '.$directory);
         }

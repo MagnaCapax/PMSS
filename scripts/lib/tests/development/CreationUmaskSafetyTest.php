@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../runtime/filesystemStream.php';
 
 /** Creation faults in user/directories.php and support/diagnostics.php use memory-only I/O. */
 class CreationUmaskSafetyTest extends TestCase
@@ -57,6 +58,7 @@ function fflush($handle) { observe('flush'); return true; }
 function fclose($handle) { observe('close'); return \fclose($handle); }
 function pmssRegularFilePathIsReadable($path) { return true; }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'CreationUmaskFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/directories.php', 'CreationUmaskFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/diagnostics.php', 'CreationUmaskFixture');
         $script .= <<<'PHP'
