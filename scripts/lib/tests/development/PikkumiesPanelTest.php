@@ -10,13 +10,10 @@ final class PikkumiesPanelTest extends TestCase
     private function fixture()
     {
         $home = $this->pmssMakeTempDir('pmss-pikkumies-panel-');
-        mkdir($home.'/billing');
-        mkdir($home.'/.mcxPikkumies/pikkumies/bin', 0700, true);
-        mkdir($home.'/.mcxPikkumies/pikkumies/local');
-        file_put_contents($home.'/marker', '');
-        file_put_contents($home.'/billing/fixtur01', "123\n");
+        $this->pmssWriteFiles($home, ['marker' => '', 'billing/fixtur01' => "123\n"], 0777);
         $binary = $home.'/.mcxPikkumies/pikkumies/bin/pikkumies';
-        $this->pmssWriteExecutableFile($binary, "#!/bin/sh\n", 0755, 0700);
+        $this->pmssWriteExecutableFile($binary, "#!/bin/sh\n", 0700, 0700);
+        $this->pmssEnsureDir($home.'/.mcxPikkumies/pikkumies/local', 0777);
         return $home;
     }
 
@@ -39,7 +36,7 @@ final class PikkumiesPanelTest extends TestCase
         $home = $this->fixture();
         unlink($home.'/marker');
         $this->assertFalse($this->state($home)['visible']);
-        file_put_contents($home.'/marker', '');
+        $this->pmssWriteFile($home.'/marker', '');
         unlink($home.'/billing/fixtur01');
         $this->assertSame('', $this->state($home)['origin']);
     }
@@ -47,9 +44,9 @@ final class PikkumiesPanelTest extends TestCase
     public function testInvalidBillingAndIdentityAreRejected(): void
     {
         $home = $this->fixture();
-        file_put_contents($home.'/billing/fixtur01', "0\n");
+        $this->pmssWriteFile($home.'/billing/fixtur01', "0\n");
         $this->assertFalse($this->state($home)['visible']);
-        file_put_contents($home.'/billing/fixtur01', "123\n");
+        $this->pmssWriteFile($home.'/billing/fixtur01', "123\n");
         $this->assertFalse($this->state($home, '../fixtur01')['visible']);
         $this->assertSame('', \pmssPikkumiesPanelStateRead($home, 'fixtur01', $home.'/marker', $home.'/billing', -1)['origin']);
     }
@@ -57,8 +54,7 @@ final class PikkumiesPanelTest extends TestCase
     public function testHermesSectionWorksWithoutMarkerOrBillingButNeedsSafeInstaller(): void
     {
         $home = $this->fixture();
-        mkdir($home.'/bin');
-        file_put_contents($home.'/bin/install-hermes', "#!/bin/sh\n");
+        $this->pmssWriteFile($home.'/bin/install-hermes', "#!/bin/sh\n", 0777);
         $none = array('visible' => false, 'origin' => '', 'mode' => 'simplified', 'off' => false);
         $this->assertTrue(\pmssAgentsSectionVisible($none, $home));
         unlink($home.'/marker');
@@ -66,7 +62,7 @@ final class PikkumiesPanelTest extends TestCase
         symlink($home.'/billing/fixtur01', $home.'/marker');
         $this->assertTrue(\pmssAgentsSectionVisible($none, $home));
         unlink($home.'/marker');
-        file_put_contents($home.'/marker', '');
+        $this->pmssWriteFile($home.'/marker', '');
         unlink($home.'/bin/install-hermes');
         $this->assertFalse(\pmssAgentsSectionVisible($none, $home));
         $this->assertTrue(\pmssAgentsSectionVisible($this->state($home), $home));
@@ -76,7 +72,7 @@ final class PikkumiesPanelTest extends TestCase
     {
         $home = $this->fixture();
         $marker = $home.'/.mcxPikkumies/pikkumies/local/eternals.off';
-        file_put_contents($marker, '');
+        $this->pmssWriteFile($marker, '');
         $state = $this->state($home);
         $this->assertFalse($state['visible']);
         $this->assertTrue($state['off']);
@@ -89,11 +85,10 @@ final class PikkumiesPanelTest extends TestCase
     public function testOnlyTheKnownPreferenceEnablesPowerUser(): void
     {
         $home = $this->fixture();
-        mkdir($home.'/.config/pmss/ui', 0700, true);
         $path = $home.'/.config/pmss/ui/pikkumies-interface';
-        file_put_contents($path, "power-user\n");
+        $this->pmssWriteFile($path, "power-user\n", 0700);
         $this->assertSame('power-user', $this->state($home)['mode']);
-        file_put_contents($path, "unknown\n");
+        $this->pmssWriteFile($path, "unknown\n");
         $this->assertSame('simplified', $this->state($home)['mode']);
     }
 

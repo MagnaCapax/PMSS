@@ -12,9 +12,9 @@ class LighttpdConfigRefreshResultTest extends TestCase
             foreach (['public-link', 'dangling-public', 'lighttpd-link', 'custom-directory'] as $kind) {
                 $result = $this->refreshFixture($kind, $arguments);
                 $this->assertSame($arguments === [] ? 0 : 1, $result['rc'], $kind);
-                $this->assertSame(['alice', 'bob'], $result['attempted'], 'later accounts must still run');
-                $this->assertStringContainsString('Password protected area (alice)', $result['config']);
-                $this->assertStringContainsString('/user-alice/', $result['config']);
+                $this->assertSame(['fixtur01', 'fixtur02'], $result['attempted'], 'later accounts must still run');
+                $this->assertStringContainsString('Password protected area (fixtur01)', $result['config']);
+                $this->assertStringContainsString('/user-fixtur01/', $result['config']);
                 $this->assertSame([['root', 0644]], $result['writes']);
                 $this->assertSame([], $result['auxiliary'], 'no runtime writes after refused preparation');
                 $this->assertFalse($result['linkChanged']);
@@ -56,17 +56,17 @@ class LighttpdConfigRefreshResultTest extends TestCase
 
     public function testStrictFlagCanPrecedeOrFollowValidatedUsername(): void
     {
-        foreach ([['alice'], ['--strict', 'alice'], ['alice', '--strict']] as $arguments) {
+        foreach ([['fixtur01'], ['--strict', 'fixtur01'], ['fixtur01', '--strict']] as $arguments) {
             $result = $this->refreshFixture('public-link', $arguments);
             $this->assertSame(in_array('--strict', $arguments, true) ? 1 : 0, $result['rc']);
-            $this->assertSame(['alice'], $result['attempted']);
-            $this->assertStringContainsString('Password protected area (alice)', $result['config']);
+            $this->assertSame(['fixtur01'], $result['attempted']);
+            $this->assertStringContainsString('Password protected area (fixtur01)', $result['config']);
         }
     }
 
     public function testInvalidArgumentsNeverConfigureAnAccount(): void
     {
-        foreach ([['../alice'], ['--strict', '../alice'], ['--unknown'], ['--strict', '--unknown'], ['alice', 'bob']] as $arguments) {
+        foreach ([['../fixtur01'], ['--strict', '../fixtur01'], ['--unknown'], ['--strict', '--unknown'], ['fixtur01', 'fixtur02']] as $arguments) {
             $result = $this->refreshFixture('ready', $arguments);
             $this->pmssAssertArraySubsetSame(['rc' => 1, 'attempted' => [], 'writes' => []], $result);
         }
@@ -101,7 +101,7 @@ class LighttpdConfigRefreshResultTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-lighttpd-refresh-');
         mkdir($home.'/www', 0755);
         mkdir($home.'/elsewhere', 0700);
-        file_put_contents($home.'/.rtorrent.rc', 'fixture');
+        $this->pmssWriteFile($home.'/.rtorrent.rc', 'fixture');
         if (in_array($kind, ['public-link', 'dangling-public', 'lighttpd-link'], true)) {
             symlink($kind === 'dangling-public' ? $home.'/missing' : $home.'/elsewhere',
                 $home.($kind === 'lighttpd-link' ? '/.lighttpd' : '/www/public'));
@@ -111,12 +111,12 @@ class LighttpdConfigRefreshResultTest extends TestCase
         $script = <<<'PHP'
 namespace LighttpdRefreshFixture;
 class UserConfigStore { public function get($user) { return []; } }
-function pmssValidateUsername($user) { return $user === 'alice' || $user === 'bob'; }
+function pmssValidateUsername($user) { return $user === 'fixtur01' || $user === 'fixtur02'; }
 function pmssShouldConfigureLighttpdForHome($home) { return $GLOBALS['kind'] !== 'ineligible'; }
 function pmssPrepareLighttpdUserDirectories($user, $home, $deflate, &$reason) {
     $GLOBALS['attempted'][] = $user;
     // The second account succeeds without overwriting the first account's result.
-    if ($user === 'bob') return true;
+    if ($user === 'fixtur02') return true;
     return \pmssPrepareLighttpdUserDirectories($user, $GLOBALS['home'], $deflate, $reason);
 }
 function pmssReadRegularFileInt($path) { return 31234; }
@@ -129,17 +129,17 @@ function pmssLighttpdResourcePlan($props, $defaults, $config) {
 function pmssUserPanelSessionLoginEnabledFromPayload($config) { return false; }
 function pmssLighttpdPanelSessionLoginOptions(...$args) { return []; }
 function pmssWriteUserFile($path, $content, $owner, $mode) {
-    if (strpos($path, '/bob/') !== false) return true;
+    if (strpos($path, '/fixtur02/') !== false) return true;
     $GLOBALS['writes'][] = [$owner, $mode];
     if ($GLOBALS['kind'] === 'config-write') return false;
     return \file_put_contents($GLOBALS['home'].'/.lighttpd.conf', $content) === strlen($content);
 }
-function pmssEnsureWebdavLockDatabase($user, $home) { if ($user === 'alice') $GLOBALS['auxiliary'][] = 'webdav'; }
-function pmssMediaStackPortsEnsure($user, $home) { if ($user === 'alice') $GLOBALS['auxiliary'][] = 'media-ports'; return []; }
-function pmssLighttpdWriteManagedProxyFragment($app, $user, ...$args) { if ($user === 'alice') $GLOBALS['auxiliary'][] = 'proxy'; }
+function pmssEnsureWebdavLockDatabase($user, $home) { if ($user === 'fixtur01') $GLOBALS['auxiliary'][] = 'webdav'; }
+function pmssMediaStackPortsEnsure($user, $home) { if ($user === 'fixtur01') $GLOBALS['auxiliary'][] = 'media-ports'; return []; }
+function pmssLighttpdWriteManagedProxyFragment($app, $user, ...$args) { if ($user === 'fixtur01') $GLOBALS['auxiliary'][] = 'proxy'; }
 function pmssLighttpdDelugeWebPortResolve(...$args) { return null; }
 function pmssLighttpdSyncPhpIni($path, $user, $memory, &$reason) {
-    if ($user === 'bob') return true;
+    if ($user === 'fixtur02') return true;
     $GLOBALS['auxiliary'][] = 'php.ini';
     return $GLOBALS['kind'] !== 'php-write';
 }
@@ -153,7 +153,7 @@ function glob($pattern) { return []; }
 function exec(...$args) { throw new \RuntimeException('Unexpected external command'); }
 function pmssDetectDistro() { return ['version' => 11]; }
 function pmssManagedUsersSelectFromCommand($command, $user, $options) {
-    return \pmssManagedUsersSelectFromList(['alice', 'bob'], $user, $options);
+    return \pmssManagedUsersSelectFromList(['fixtur01', 'fixtur02'], $user, $options);
 }
 function pmssRunCliEntrypointWithArgv(...$args) {}
 PHP;
@@ -176,7 +176,7 @@ $output = \ob_get_clean();
 // Ignore the successful second account's auxiliary activity and success line.
 echo json_encode(['rc' => $rc, 'attempted' => $GLOBALS['attempted'], 'writes' => $GLOBALS['writes'],
     'config' => \is_file($GLOBALS['home'].'/.lighttpd.conf') ? \file_get_contents($GLOBALS['home'].'/.lighttpd.conf') : null,
-    'auxiliary' => $GLOBALS['auxiliary'], 'output' => preg_replace('/^\[user:bob\].*\n/m', '', $output),
+    'auxiliary' => $GLOBALS['auxiliary'], 'output' => preg_replace('/^\[user:fixtur02\].*\n/m', '', $output),
     'linkChanged' => in_array($GLOBALS['kind'], ['public-link', 'dangling-public', 'lighttpd-link'], true)
         && !\is_link($GLOBALS['home'].($GLOBALS['kind'] === 'lighttpd-link' ? '/.lighttpd' : '/www/public')),
     'elsewhere' => \scandir($GLOBALS['home'].'/elsewhere')]);

@@ -39,9 +39,8 @@ class UserUpdatePluginsTest extends TestCase
         $root = $this->pmssMakeTrackedHomeRoot('pmss-plugins-retracker-');
         $home = $this->pmssEnsureDir($root.'/'.$user);
         $settingsDir = $home.'/www/rutorrent/share/users/'.$user.'/settings';
-        @mkdir($home.'/www/rutorrent/plugins/unpack', 0755, true);
-        @mkdir($settingsDir, 0755, true);
-        file_put_contents(
+        $this->pmssEnsureDir($home.'/www/rutorrent/plugins/unpack');
+        $this->pmssWriteFile(
             $settingsDir.'/retrackers.dat',
             'O:11:"rRetrackers":4:{s:4:"hash";s:14:"retrackers.dat";s:4:"list";a:1:{i:0;a:1:{i:0;s:33:"http://149.5.241.17:6969/announce";}}s:14:"dontAddPrivate";s:1:"1";s:10:"addToBegin";s:1:"1";}'
         );

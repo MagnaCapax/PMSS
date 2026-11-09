@@ -11,10 +11,8 @@ final class PikkumiesUiRenderingCharacterizationTest extends TestCase
     public function testCompleteRouteRenderingSnapshots(): void
     {
         $live = $this->pmssMakeTempDir('pmss-ui-rendering-');
-        mkdir($live.'/second-user.other.example');
-        foreach (['fullchain.pem', 'privkey.pem'] as $file) {
-            file_put_contents($live.'/second-user.other.example/'.$file, 'fixture');
-        }
+        $this->pmssWriteFiles($live.'/second-user.other.example',
+            array_fill_keys(['fullchain.pem', 'privkey.pem'], 'fixture'), 0777);
         $snapshots = [];
         foreach ([
             ['first-user', 'node.example', 'service.example', 12345],

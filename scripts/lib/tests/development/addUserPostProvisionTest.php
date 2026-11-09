@@ -8,10 +8,9 @@ final class AddUserPostProvisionTest extends TestCase
 {
     public function testOpenClawProfileRequiresRamQuotaHeadroomAndAbsentState(): void
     {
-        $home = $this->tempDir.'/alice';
-        mkdir($home.'/bin', 0700, true);
-        file_put_contents($home.'/bin/install-openclaw', '<?php');
-        $user = array('name' => 'alice', 'memory' => 2048, 'appProfile' => 'openclaw');
+        $home = $this->tempDir.'/fixtur01';
+        $this->pmssWriteFile($home.'/bin/install-openclaw', '<?php', 0700);
+        $user = array('name' => 'fixtur01', 'memory' => 2048, 'appProfile' => 'openclaw');
         $files = array('used' => 100, 'soft' => 60100, 'hard' => 75125);
         $this->assertSame(null, \pmssAddUserOpenClawGate($user, $home, $files));
         $small = $user;
@@ -70,33 +69,32 @@ final class AddUserPostProvisionTest extends TestCase
 
     public function testBonusQuotaPersistenceIsOptionalAtomicAndSymlinkSafe(): void
     {
-        $home = $this->tempDir.'/alice';
+        $home = $this->tempDir.'/fixtur01';
         $this->pmssEnsureDir($home);
 
-        $this->assertTrue(\pmssAddUserBonusQuotaPersist(['name' => 'alice'], $home));
+        $this->assertTrue(\pmssAddUserBonusQuotaPersist(['name' => 'fixtur01'], $home));
         $this->assertFalse(file_exists($home.'/.bonusQuota'));
-        $this->assertTrue(\pmssAddUserBonusQuotaPersist(['name' => 'alice', 'bonusQuotaGiB' => 0], $home));
+        $this->assertTrue(\pmssAddUserBonusQuotaPersist(['name' => 'fixtur01', 'bonusQuotaGiB' => 0], $home));
         $this->assertFalse(file_exists($home.'/.bonusQuota'));
-        $this->assertFalse(\pmssAddUserBonusQuotaPersist(['name' => 'alice', 'bonusQuotaGiB' => -1], $home));
-        $this->assertFalse(\pmssAddUserBonusQuotaPersist(['name' => 'alice', 'bonusQuotaGiB' => '25'], $home));
+        $this->assertFalse(\pmssAddUserBonusQuotaPersist(['name' => 'fixtur01', 'bonusQuotaGiB' => -1], $home));
+        $this->assertFalse(\pmssAddUserBonusQuotaPersist(['name' => 'fixtur01', 'bonusQuotaGiB' => '25'], $home));
 
-        $this->assertTrue(\pmssAddUserBonusQuotaPersist(['name' => 'alice', 'bonusQuotaGiB' => 25], $home));
+        $this->assertTrue(\pmssAddUserBonusQuotaPersist(['name' => 'fixtur01', 'bonusQuotaGiB' => 25], $home));
         $this->assertSame('25', trim((string) file_get_contents($home.'/.bonusQuota')));
         $this->assertSame(0640, fileperms($home.'/.bonusQuota') & 0777);
 
         unlink($home.'/.bonusQuota');
         $outside = $this->tempDir.'/outside';
-        file_put_contents($outside, 'unchanged');
+        $this->pmssWriteFile($outside, 'unchanged');
         symlink($outside, $home.'/.bonusQuota');
-        $this->assertFalse(\pmssAddUserBonusQuotaPersist(['name' => 'alice', 'bonusQuotaGiB' => 50], $home));
+        $this->assertFalse(\pmssAddUserBonusQuotaPersist(['name' => 'fixtur01', 'bonusQuotaGiB' => 50], $home));
         $this->assertSame('unchanged', file_get_contents($outside));
     }
 
     public function testPikkumiesPreinstallNeedsTheRamFloorAndTheSkeletonInstaller(): void
     {
         // The slice launcher resolves the uid with `id -u`; a stub keeps the test independent of the host's users.
-        $name = 'alice';
-        $this->pmssEnsureDir($this->tempDir.'/stub');
+        $name = 'fixtur01';
         $this->pmssWriteExecutableFile($this->tempDir.'/stub/id', "#!/bin/sh\necho 4321\n");
         $path = (string) getenv('PATH');
         $home = $this->tempDir.'/home';
@@ -106,10 +104,10 @@ final class AddUserPostProvisionTest extends TestCase
         putenv('PATH='.$this->tempDir.'/stub:'.$path);
         try {
             $openclaw = \pmssAddUserOpenClawPreinstallCommand($name);
-            $this->assertStringContainsAllStrings(array('systemd-run', '--slice=user-4321.slice', 'su', 'alice',
+            $this->assertStringContainsAllStrings(array('systemd-run', '--slice=user-4321.slice', 'su', 'fixtur01',
                 'php "$HOME/bin/install-openclaw" install --yes', 'umask 077', '.install-openclaw.log'), $openclaw);
             $noInstaller = \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) $floor], $home);
-            file_put_contents($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
+            $this->pmssWriteFile($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
             $belowFloor = \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) ($floor - 1)], $home);
             $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) $floor], $home);
         } finally {
