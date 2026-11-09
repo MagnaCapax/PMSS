@@ -55,20 +55,18 @@ class UserSystemdWatchdogTest extends TestCase
 
     public function testSnapshotDebouncesInactiveManagerAcrossTwoObservations(): void
     {
-        $first = \pmssUserSystemdWatchdogSnapshot('alice', 1, 'inactive');
-        $second = \pmssUserSystemdWatchdogSnapshot('alice', 1, 'inactive', $first);
+        $first = \pmssUserSystemdWatchdogSnapshot('fixtur01', 1, 'inactive');
+        $second = \pmssUserSystemdWatchdogSnapshot('fixtur01', 1, 'inactive', $first);
 
         $this->assertSame('pending', $first['state']);
-        $this->assertSame('degraded', $second['state']);
-        $this->assertSame('observe-only', $second['restartPolicy']);
-        $this->assertSame(1, $second['accountUnitCount']);
+        $this->pmssAssertArraySubsetSame(['state' => 'degraded', 'restartPolicy' => 'observe-only', 'accountUnitCount' => 1], $second);
     }
 
     public function testSnapshotResetsDebounceAndFailsSoftOnUnknown(): void
     {
-        $previous = \pmssUserSystemdWatchdogSnapshot('alice', 1, 'inactive');
-        $healthy = \pmssUserSystemdWatchdogSnapshot('alice', 1, 'active', $previous);
-        $unknown = \pmssUserSystemdWatchdogSnapshot('alice', 1, 'unknown', $previous);
+        $previous = \pmssUserSystemdWatchdogSnapshot('fixtur01', 1, 'inactive');
+        $healthy = \pmssUserSystemdWatchdogSnapshot('fixtur01', 1, 'active', $previous);
+        $unknown = \pmssUserSystemdWatchdogSnapshot('fixtur01', 1, 'unknown', $previous);
 
         $this->assertSame('healthy', $healthy['state']);
         $this->assertSame('unknown', $unknown['state']);
@@ -77,8 +75,8 @@ class UserSystemdWatchdogTest extends TestCase
     public function testPendingObservationAndUnannouncedRecoveryStayQuiet(): void
     {
         [, $output] = $this->pmssCaptureStdout(static function (): void {
-            \pmssUserSystemdWatchdogLogTransition('alice', ['state' => 'pending'], []);
-            \pmssUserSystemdWatchdogLogTransition('alice', ['state' => 'healthy'], ['state' => 'pending']);
+            \pmssUserSystemdWatchdogLogTransition('fixtur01', ['state' => 'pending'], []);
+            \pmssUserSystemdWatchdogLogTransition('fixtur01', ['state' => 'healthy'], ['state' => 'pending']);
         });
 
         $this->assertSame('', $output);
@@ -88,7 +86,7 @@ class UserSystemdWatchdogTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('user-systemd-watchdog-status-');
         $path = \pmssUserSystemdWatchdogStatusPath($home);
-        $status = \pmssUserSystemdWatchdogSnapshot('alice', 1, 'active');
+        $status = \pmssUserSystemdWatchdogSnapshot('fixtur01', 1, 'active');
 
         $this->assertTrue(\pmssUserSystemdWatchdogStatusWrite($home, $path, $status));
         $this->assertEquals($status, \pmssJsonFileReadAssoc($path, true));
@@ -100,17 +98,17 @@ class UserSystemdWatchdogTest extends TestCase
     {
         $homeRoot = $this->pmssMakeTempDir('user-systemd-watchdog-homes-');
         $lingerRoot = $this->pmssMakeTempDir('user-systemd-watchdog-linger-');
-        $this->pmssWriteRelativeFile($homeRoot.'/alice', '.config/systemd/user/custom.service', '[Unit]');
-        $this->pmssWriteRelativeFile($lingerRoot, 'alice', '');
+        $this->pmssWriteRelativeFile($homeRoot.'/fixtur01', '.config/systemd/user/custom.service', '[Unit]');
+        $this->pmssWriteRelativeFile($lingerRoot, 'fixtur01', '');
         $ops = self::pmssMakeCallbacks(['lookup' => ['uid' => 1001], 'probe' => ['rc' => 0, 'stdout' => "active\n"]]);
         $status = null;
 
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], static function () use (&$status, $homeRoot, $lingerRoot, $ops): void {
-            $status = \pmssUserSystemdWatchdogRunUser('alice', $homeRoot, $lingerRoot, $ops['probe'], $ops['lookup']);
+            $status = \pmssUserSystemdWatchdogRunUser('fixtur01', $homeRoot, $lingerRoot, $ops['probe'], $ops['lookup']);
         });
 
         $this->assertSame('healthy', $status['state']);
-        $this->assertTrue(is_file($homeRoot.'/alice/.systemd-user-status.json'));
+        $this->assertTrue(is_file($homeRoot.'/fixtur01/.systemd-user-status.json'));
         $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('bad-name', $homeRoot, $lingerRoot, $ops['probe'], $ops['lookup']));
     }
 
@@ -118,17 +116,17 @@ class UserSystemdWatchdogTest extends TestCase
     {
         $homeRoot = $this->pmssMakeTempDir('user-systemd-watchdog-skip-homes-');
         $lingerRoot = $this->pmssMakeTempDir('user-systemd-watchdog-skip-linger-');
-        $this->pmssWriteRelativeFile($homeRoot.'/alice', '.config/systemd/user/docker.service', '[Unit]');
-        $this->pmssWriteRelativeFile($lingerRoot, 'alice', '');
+        $this->pmssWriteRelativeFile($homeRoot.'/fixtur01', '.config/systemd/user/docker.service', '[Unit]');
+        $this->pmssWriteRelativeFile($lingerRoot, 'fixtur01', '');
         $probe = static function (): array { throw new \RuntimeException('probe must not run'); };
         $lookup = self::pmssMakeCallbacks(['lookup' => ['uid' => 1001]])['lookup'];
 
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($homeRoot, $lingerRoot, $probe, $lookup): void {
-            $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('alice', $homeRoot, $lingerRoot, $probe, $lookup));
+            $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('fixtur01', $homeRoot, $lingerRoot, $probe, $lookup));
         });
-        $this->pmssWriteRelativeFile($homeRoot.'/alice', '.config/systemd/user/custom.service', '[Unit]');
+        $this->pmssWriteRelativeFile($homeRoot.'/fixtur01', '.config/systemd/user/custom.service', '[Unit]');
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v2'], function () use ($homeRoot, $lingerRoot, $probe, $lookup): void {
-            $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('alice', $homeRoot, $lingerRoot, $probe, $lookup));
+            $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('fixtur01', $homeRoot, $lingerRoot, $probe, $lookup));
         });
     }
 

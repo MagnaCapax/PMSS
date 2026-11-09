@@ -302,9 +302,7 @@ SH;
         ]);
         $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'configured_bridge_mtu' => true], $result);
         $payload = $this->pmssReadJsonArrayFile($home.'/.config/docker/daemon.json', []);
-        $this->assertSame('overlay2', $payload['storage-driver']);
-        $this->assertSame(1500, $payload['mtu']);
-        $this->assertSame(['192.0.2.53'], $payload['dns']);
+        $this->pmssAssertArraySubsetSame(['storage-driver' => 'overlay2', 'mtu' => 1500, 'dns' => ['192.0.2.53']], $payload);
         $this->assertSame('65520', $payload['default-network-opts']['bridge']['com.docker.network.driver.mtu']);
     }
 

@@ -66,12 +66,12 @@ final class StatsResourceContractTest extends TestCase
             'io_write_ops' => array('raw' => array('month' => 2)),
             'daily' => array('day-b' => array('io_read' => 1048576, 'io_write' => 2097152, 'cpu' => 3600000000000, 'io_read_ops' => 2.125, 'io_write_ops' => 1), 'day-a' => array()),
         ));
-        $this->assertSame(array('month' => '1 CPU-hours', 'week' => 'saved', 'day' => '1m', 'hour' => '1s'), $model['cpuDisplay']);
-        $this->assertSame(5.5, $model['ioOperationsMonth']);
-        $this->assertSame(array('day-b', 'day-a'), $model['ioDailyLabels']);
-        foreach (array('ioDailyRead' => array(1.0, 0.0), 'ioDailyWrite' => array(2.0, 0.0), 'ioDailyOperations' => array(3.13, 0.0), 'cpuDailyHours' => array(1.0, 0.0)) as $field => $expected) {
-            $this->assertSame($expected, $model[$field], $field);
-        }
+        $this->pmssAssertArraySubsetSame(array(
+            'cpuDisplay' => array('month' => '1 CPU-hours', 'week' => 'saved', 'day' => '1m', 'hour' => '1s'),
+            'ioOperationsMonth' => 5.5, 'ioDailyLabels' => array('day-b', 'day-a'),
+            'ioDailyRead' => array(1.0, 0.0), 'ioDailyWrite' => array(2.0, 0.0),
+            'ioDailyOperations' => array(3.13, 0.0), 'cpuDailyHours' => array(1.0, 0.0),
+        ), $model);
     }
 
     public function testChartRenderingKeepsExactJavascriptAndHtmlBytes(): void

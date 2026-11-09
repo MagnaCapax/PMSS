@@ -14,7 +14,7 @@ class ScheduledConfigBackupTest extends TestCase
     protected function setUp(): void
     {
         $this->homeRoot = $this->pmssMakeTempDir('pmss-scheduled-config-backup-home-');
-        $this->home = $this->pmssEnsureDir($this->homeRoot.'/alice');
+        $this->home = $this->pmssEnsureDir($this->homeRoot.'/fixtur01');
         $this->configDir = $this->pmssMakeTempDir('pmss-scheduled-config-backup-config-').'/seedbox/config';
         $logDir = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-scheduled-config-backup-log-').'/pmss');
         $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $this->homeRoot, 'PMSS_LOG_DIR' => $logDir]);
@@ -74,8 +74,7 @@ class ScheduledConfigBackupTest extends TestCase
         $result = \pmssCustomerBackupRetentionPrune($this->home, 2);
 
         $this->assertTrue($result['ok'], $result['message']);
-        $this->assertSame(2, $result['keptCount']);
-        $this->assertSame(2, $result['deletedCount']);
+        $this->pmssAssertArraySubsetSame(['keptCount' => 2, 'deletedCount' => 2], $result);
         $remaining = array_map('basename', glob($this->home.'/.pmss-backups/config-*.tar.gz') ?: []);
         sort($remaining);
         $this->assertSame(['config-20260103-000001.tar.gz', 'config-20260104-000001.tar.gz'], $remaining);
@@ -96,7 +95,7 @@ class ScheduledConfigBackupTest extends TestCase
             return ['rc' => 1, 'stdout' => '{"ok":false,"message":"simulated backup failure","bytes":0,"path":""}', 'stderr' => ''];
         };
 
-        $result = \pmssScheduledConfigBackupRunUser('alice', $this->basePayload(['scheduledConfigBackup' => true]), [
+        $result = \pmssScheduledConfigBackupRunUser('fixtur01', $this->basePayload(['scheduledConfigBackup' => true]), [
             'homeRoot' => $this->homeRoot,
             'retention' => 1,
             'runner' => $runner,
@@ -114,7 +113,7 @@ class ScheduledConfigBackupTest extends TestCase
     public function testToggleOffIsNoopByDefault(): void
     {
         $store = new \UserConfigStore($this->configDir);
-        $this->assertTrue($store->set('alice', $this->basePayload()));
+        $this->assertTrue($store->set('fixtur01', $this->basePayload()));
         $runnerCalled = false;
 
         $summary = \pmssScheduledConfigBackupRun($store, [
@@ -128,9 +127,6 @@ class ScheduledConfigBackupTest extends TestCase
         ]);
 
         $this->assertFalse($runnerCalled, 'Absent scheduledConfigBackup must not invoke the user backup helper');
-        $this->assertSame(1, $summary['processed']);
-        $this->assertSame(0, $summary['succeeded']);
-        $this->assertSame(0, $summary['failed']);
-        $this->assertSame(1, $summary['skipped']);
+        $this->pmssAssertArraySubsetSame(['processed' => 1, 'succeeded' => 0, 'failed' => 0, 'skipped' => 1], $summary);
     }
 }

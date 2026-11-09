@@ -14,9 +14,7 @@ class IoSharingDiagnosticsTest extends TestCase
             'system_conf_bytes', 'default_io_accounting', 'slice_direct_tasks', 'account_tasks'], array_keys($specs));
         $this->assertSame($specs, \pmssAgentDiagnosticsSectionSpecs("fixture'; echo injected")['io_sharing']);
         foreach ($specs as $spec) {
-            $this->assertSame('command', $spec['type']);
-            $this->assertSame('text', $spec['format']);
-            $this->assertSame('unknown', $spec['fallback']);
+            $this->pmssAssertArraySubsetSame(['type' => 'command', 'format' => 'text', 'fallback' => 'unknown'], $spec);
         }
     }
 

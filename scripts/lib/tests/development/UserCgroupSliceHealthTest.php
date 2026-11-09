@@ -15,7 +15,7 @@ class UserCgroupSliceHealthTest extends TestCase
             }
         };
 
-        foreach (['', '../', 'Alice', "alice\n", 'toolongusername'] as $username) {
+        foreach (['', '../', 'FIXTUR01', "fixtur01\n", 'toolongusername'] as $username) {
             $this->assertFalse(\pmssUserCgroupSliceSelfHeal($username, $store));
         }
     }
@@ -32,16 +32,15 @@ class UserCgroupSliceHealthTest extends TestCase
     public function testRefreshPlanDetectsTemplateDefaultBelowStoredPlan(): void
     {
         $plan = \pmssUserCgroupSliceMemoryRefreshPlan(
-            'alice',
+            'fixtur01',
             ['ramMiB' => 8192],
             ['MemoryMax' => (string) (750 * 1048576)],
             32768
         );
 
         $this->assertTrue($plan['needed']);
-        $this->assertSame('memory_max_below_plan', $plan['reason']);
-        $this->assertSame(750 * 1048576, $plan['currentMemoryMaxBytes']);
-        $this->assertSame(10240 * 1048576, $plan['expectedMemoryMaxBytes']);
+        $this->pmssAssertArraySubsetSame(['reason' => 'memory_max_below_plan',
+            'currentMemoryMaxBytes' => 750 * 1048576, 'expectedMemoryMaxBytes' => 10240 * 1048576], $plan);
     }
 
     public function testRefreshPlanSkipsHealthyOrUnreadableSlice(): void
@@ -50,7 +49,7 @@ class UserCgroupSliceHealthTest extends TestCase
             [(string) (12000 * 1048576), 'memory_max_at_or_above_plan'],
             ['infinity', 'memory_max_unset_or_unreadable'],
         ] as $case) {
-            $plan = \pmssUserCgroupSliceMemoryRefreshPlan('alice', ['ramMiB' => 8192], ['MemoryMax' => $case[0]], 32768);
+            $plan = \pmssUserCgroupSliceMemoryRefreshPlan('fixtur01', ['ramMiB' => 8192], ['MemoryMax' => $case[0]], 32768);
 
             $this->assertFalse($plan['needed']);
             $this->assertSame($case[1], $plan['reason']);
@@ -59,7 +58,7 @@ class UserCgroupSliceHealthTest extends TestCase
 
     public function testApplyCommandUsesStoredCgroupArgs(): void
     {
-        $command = \pmssUserConfigCliBuildStoredCgroupApplyCommand('alice', [
+        $command = \pmssUserConfigCliBuildStoredCgroupApplyCommand('fixtur01', [
             'ramMiB' => 8192,
             'IOWeight' => 300,
             'cpuQuotaPercent' => 'infinity',
@@ -67,7 +66,7 @@ class UserCgroupSliceHealthTest extends TestCase
 
         $this->assertTrue(is_string($command));
         $this->assertStringContainsAllStrings([
-            "'/scripts/util/userConfigCgroup.php' 'alice' '--apply' '--memory-high=8192'",
+            "'/scripts/util/userConfigCgroup.php' 'fixtur01' '--apply' '--memory-high=8192'",
             "'--io-weight=300'",
             "'--cpu-quota-percent=infinity'",
         ], $command);
@@ -80,8 +79,8 @@ class UserCgroupSliceHealthTest extends TestCase
         );
 
         $this->assertTrue($plan['changed']);
-        $this->assertSame("[Slice]\nMemoryMax=750M\nMemoryLimit=750M\nMemoryHigh=600M\n", $plan['content']);
-        $this->assertSame(['750'], $plan['values']);
+        $this->pmssAssertArraySubsetSame(['content' => "[Slice]\nMemoryMax=750M\nMemoryLimit=750M\nMemoryHigh=600M\n",
+            'values' => ['750']], $plan);
     }
 
     public function testDropinContentRepairLeavesSuffixedAndByteSizedValuesAlone(): void

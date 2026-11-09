@@ -80,25 +80,19 @@ PHP;
         foreach (['cgroupIopsLimitApply' => ['read_iops', 200], 'cgroupBfqWeightApply' => ['bfq_weight', 125]] as $cron => [$control, $new]) {
             foreach (['changed', 'audit-failed'] as $mode) {
                 $result = $this->cycle($cron, $mode);
-                $this->assertSame([['fixture', 1000, $control, 100, $new]], $result[0]);
-                $this->assertSame([$cron === 'cgroupIopsLimitApply' ? '8:0 '.$new : $new], $result[1]);
-                $this->assertSame([1, 1, 0, 0], $result[2]);
-                $this->assertSame(0, $result[3]);
+                $this->pmssAssertArraySubsetSame([0 => [['fixture', 1000, $control, 100, $new]],
+                    1 => [$cron === 'cgroupIopsLimitApply' ? '8:0 '.$new : $new], 2 => [1, 1, 0, 0], 3 => 0], $result);
             }
             $unchanged = $this->cycle($cron, 'unchanged');
             $this->assertSame([[], [], [1, 0, 0, 0], 0], $unchanged);
             $failed = $this->cycle($cron, 'write-failed');
-            $this->assertSame([], $failed[0]);
-            $this->assertSame([1, 0, 0, 1], $failed[2]);
-            $this->assertSame(1, $failed[3]);
+            $this->pmssAssertArraySubsetSame([0 => [], 2 => [1, 0, 0, 1], 3 => 1], $failed);
             $dryRun = $this->cycle($cron, 'changed', ['--dry-run']);
-            $this->assertSame([], $dryRun[0]);
-            $this->assertSame([], $dryRun[1]);
+            $this->pmssAssertArraySubsetSame([0 => [], 1 => []], $dryRun);
         }
         foreach ([['--census'], ['--census', '--dry-run']] as $args) {
             $result = $this->cycle('cgroupIopsLimitApply', 'changed', $args);
-            $this->assertSame([], $result[0]);
-            $this->assertSame([], $result[1]);
+            $this->pmssAssertArraySubsetSame([0 => [], 1 => []], $result);
         }
         // Off clears a read cap that no configuration or derivation supplies (md /home derives none).
         $this->assertSame([['fixture', 1000, 'read_iops', 100, 0], ['fixture', 1000, 'write_iops', 100, 300]],

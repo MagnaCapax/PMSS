@@ -20,9 +20,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
 
-        $this->assertSame(['md0'], $plan['healthy']);
-        $this->assertSame(['md1'], $plan['degraded']);
-        $this->assertSame([], $plan['unknown']);
+        $this->pmssAssertArraySubsetSame(['healthy' => ['md0'], 'degraded' => ['md1'], 'unknown' => []], $plan);
         $this->assertFalse($plan['fallback_all']);
     }
 
