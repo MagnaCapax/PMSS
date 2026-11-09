@@ -96,7 +96,7 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         $this->assertSame($uid, fileowner($launcher));
         $this->assertSame($uid, fileowner($binary));
         $this->assertSame($gid, filegroup($stub));
-        $installer = file_get_contents(__DIR__.'/../../update/apps/aiToolsInstall.php');
+        $installer = file_get_contents(__DIR__.'/../../update/apps/aiTools/codexInstall.php');
         $this->assertStringContainsString("['-o', 'root', '-g', 'root', '-m', '0755'", $installer);
         $this->assertFalse(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, false));
         $this->assertTrue(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, true));

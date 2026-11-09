@@ -10,33 +10,50 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->pmssAssertRepoFileContractCases([
             'aiToolsInstall.php' => [
                 'required' => [
+                    "require_once __DIR__.'/aiToolsCodex.php';",
+                    'PMSS_FORCE_AI_TOOLS_REFRESH',
+                    "pmssRequireRelativeFiles(__DIR__.'/aiTools', ['node.php', 'npm.php', 'codexInstall.php'])",
+                    'pmssAiToolsNodeRuntimeResolve(', 'pmssAiToolsNpmInstall(', 'pmssAiToolsCodexInstall(',
+                ],
+            ],
+            'aiTools/node.php' => [
+                'required' => [
+                    "\$nodeVersion = '22.23.4';",
+                    "\$nodeArchive = basename(\$nodeDir).'.tar.xz';",
+                    "pmssAppVersionProbeMatch([escapeshellarg(\$systemNode)",
+                    '>= 22',
+                ],
+                'forbidden' => ['function pmssAiTools'.'NodeMajor(' => 'Node major parsing should stay inline'],
+                'matches' => ['/[0-9a-f]{64}/'],
+            ],
+            'aiTools/npm.php' => [
+                'required' => [
                     '@google/gemini-cli',
                     '@anthropic-ai/claude-code',
                     "['Claude Code', '@anthropic-ai/claude-code', '2.1.112', 'claude']",
                     "\$installTarget = \$toolSpec[1].(\$toolSpec[2] === '' ? '' : '@'.\$toolSpec[2]);",
                     "lib/node_modules/'.\$toolSpec[1].'/package.json",
+                    "\$launcherSource = dirname(__DIR__).'/templates/pmss-ai-launch.php';",
+                    "\$launcher = '/opt/pmss/ai-tools/pmss-ai-launch.php';",
+                    "dirname(\$nodeBinary).'/npm'",
+                    'npm not available',
+                    "putenv('PATH='.dirname(\$nodeBinary)",
+                    'pmssAiToolsFilesPublish(',
+                ],
+                'forbidden' => ['function pmssAiTools'.'InstallNpmCli(' => 'Avoid per-package installation wrappers'],
+            ],
+            'aiTools/codexInstall.php' => [
+                'required' => [
                     '/usr/local/bin/codex',
-                    "require_once __DIR__.'/aiToolsCodex.php';",
                     "\$codexRoot = '/opt/pmss/ai-tools/codex';",
-                    "\$launcherSource = __DIR__.'/templates/pmss-ai-launch.php';",
+                    "\$launcherSource = dirname(__DIR__).'/templates/pmss-ai-launch.php';",
                     "\$launcher = '/opt/pmss/ai-tools/pmss-ai-launch.php';",
                     'pmssAiToolsCodexInstallNeeded(',
                     'pmssAiToolsFilesPublish(',
                     'PMSS_AI_CODEX_CHAT_TAGS',
-                    'node-v22.23.4-linux-x64.tar.xz',
                     'codex-x86_64-unknown-linux-musl.tar.gz',
-                    'PMSS_FORCE_AI_TOOLS_REFRESH',
-                    "pmssAppVersionProbeMatch([escapeshellarg(\$systemNode)",
-                    '>= 22',
-                    "dirname(\$nodeBinary).'/npm'",
-                    'npm not available',
-                    "putenv('PATH='.dirname(\$nodeBinary)",
                     '/etc/codex/config.toml',
                     'danger-full-access',
-                ],
-                'forbidden' => [
-                    'function pmssAiTools'.'NodeMajor(' => 'Node major parsing should stay inline in the only call site',
-                    'function pmssAiTools'.'InstallNpmCli(' => 'NPM CLI installation should stay inline in the only installer',
                 ],
                 'matches' => ['/[0-9a-f]{64}/'],
             ],
@@ -238,10 +255,12 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testPinnedDownloadInstallersReuseRemoteBinaryHelper(): void
     {
-        foreach (['aiToolsInstall.php', 'deluge.php', 'rtorrent.php'] as $installer) {
-            $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.$installer, [
+        foreach (['aiTools/node.php' => 'aiToolsInstall.php', 'aiTools/codexInstall.php' => 'aiToolsInstall.php',
+            'deluge.php' => 'deluge.php', 'rtorrent.php' => 'rtorrent.php'] as $installer => $loader) {
+            $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/'.$loader, [
                 "require_once __DIR__.'/remoteBinary.php';",
-            ], [
+            ]);
+            $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.$installer, [], [
                 "pmssBuildCommand('wget'" => $installer.' should delegate pinned downloads to remoteBinary.php',
                 "@hash_file('sha256'" => $installer.' should delegate checksum verification to remoteBinary.php',
             ]);

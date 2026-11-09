@@ -35,9 +35,9 @@ require_once __DIR__.'/../common/TestCase.php';
 class AiToolsInstallDecisionCharacterizationTest extends TestCase
 {
     /** Select bounded decision code before any command or download can run. */
-    private function decisionSource(string $start, string $end): string
+    private function decisionSource(string $file, string $start, string $end): string
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/aiToolsInstall.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/aiTools/'.$file);
         $first = strpos($source, $start);
         $this->assertTrue($first !== false);
         $last = strpos($source, $end, $first);
@@ -47,8 +47,8 @@ class AiToolsInstallDecisionCharacterizationTest extends TestCase
 
     public function testNodeRefreshKeepsRemovalFailureAndDryRunOrder(): void
     {
-        $decision = $this->decisionSource('        if (!$dryRun && pmssRootOwnedTreeNeedsRefresh($nodeDir))',
-            "            runStep('Ensuring AI tools install root exists'");
+        $decision = $this->decisionSource('node.php', '    if (!$dryRun && pmssRootOwnedTreeNeedsRefresh($nodeDir))',
+            "    runStep('Ensuring AI tools install root exists'");
         foreach ([[true, true, false, false], [false, false, false, true], [false, false, false, false],
             [false, true, false, false], [false, true, true, false], [false, true, true, true]] as $case) {
             [$dryRun, $refresh, $remove, $executable] = $case;
@@ -59,7 +59,7 @@ class AiToolsInstallDecisionCharacterizationTest extends TestCase
             $GLOBALS['pmssAiToolsDecisionFixture'] = compact('refresh', 'remove', 'executable', 'events');
             $logger = static function (string $message): void { $GLOBALS['pmssAiToolsDecisionFixture']['events'][] = ['log', $message]; };
             try {
-                eval($decision.'$GLOBALS["pmssAiToolsDecisionFixture"]["events"][] = ["download"]; }');
+                $selected = eval($decision.'$GLOBALS["pmssAiToolsDecisionFixture"]["events"][] = ["download"]; return $nodeBinary;');
                 $expected = [];
                 if (!$dryRun) $expected[] = ['refresh', $nodeDir];
                 if (!$dryRun && $refresh) {
@@ -72,7 +72,7 @@ class AiToolsInstallDecisionCharacterizationTest extends TestCase
                     $expected[] = ['executable', $original];
                     if (!$executable) $expected[] = ['download'];
                 }
-                $this->assertSame($ready ? $original : '', $nodeBinary);
+                $this->assertSame($ready ? $original : '', $selected);
                 $this->assertSame($expected, $GLOBALS['pmssAiToolsDecisionFixture']['events']);
             } finally {
                 unset($GLOBALS['pmssAiToolsDecisionFixture']);
@@ -82,7 +82,7 @@ class AiToolsInstallDecisionCharacterizationTest extends TestCase
 
     public function testNpmVersionChecksOnlyReadWhenInstalledAndPinned(): void
     {
-        $decision = $this->decisionSource('        if (!$installNeeded && $toolSpec[2]', '        if ($installNeeded) {');
+        $decision = $this->decisionSource('npm.php', '        if (!$installNeeded && $toolSpec[2]', '        if ($installNeeded) {');
         foreach ([[true, '2.1.112', null], [false, '', null], [false, '2.1.112', null],
             [false, '2.1.112', []], [false, '2.1.112', ['version' => '2.1.112']],
             [false, '2.1.112', ['version' => '2.1.111']]] as $case) {
