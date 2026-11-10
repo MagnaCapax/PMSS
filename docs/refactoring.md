@@ -152,6 +152,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Operator and customer qBittorrent build probes attempt every cleanup stage even
+when an earlier stage throws: process-group signal, direct-child termination,
+stdout close, process reap, then private-profile removal. Later cleanup retains
+PHP's normal exception precedence; a lone exception or error propagates unchanged.
+Successful captures, exit-status precedence, deadlines and output limits retain
+their contracts. `QbittorrentBuildCleanupSafetyTest` uses memory streams and
+process/signal stubs for both copies; execution stays on the testing machine.
+
 Shared-log creation and timestamped appends restore the caller's umask in
 `finally`, including when exclusive open, line formatting or writing throws.
 Original exceptions and errors propagate unchanged; no-mode appends leave the

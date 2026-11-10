@@ -32,14 +32,27 @@ function pmssQbittorrentBuildProbe(string $binary, array $ops = []): ?string
             $pause();
         } while (true);
     } finally {
-        // setsid makes pid the group leader; terminate descendants as well as the direct child.
-        if (!$complete) {
-            @posix_kill(-$pid, 9);
-            @proc_terminate($process, 9);
+        // Each cleanup owns the next: a thrown failure must not strand later resources.
+        try {
+            if (!$complete) {
+                // setsid makes pid the group leader; terminate descendants too.
+                try {
+                    @posix_kill(-$pid, 9);
+                } finally {
+                    @proc_terminate($process, 9);
+                }
+            }
+        } finally {
+            try {
+                fclose($pipes[1]);
+            } finally {
+                try {
+                    $closed = proc_close($process);
+                } finally {
+                    pmssQbittorrentBuildProbeClean($profile);
+                }
+            }
         }
-        fclose($pipes[1]);
-        $closed = proc_close($process);
-        pmssQbittorrentBuildProbeClean($profile);
     }
     $rc = $exitCode ?? $closed;
     return $complete && $rc === 0 && strlen($output) <= 4096 ? $output : null;
