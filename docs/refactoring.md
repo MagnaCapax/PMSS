@@ -1,5 +1,16 @@
 # Refactoring Guidelines
 
+Quota refresh retains its locked cron entrypoint and existing `quotaSnapshot.php`
+include (ADR 0254). Account refresh and lifecycle reporting live in
+`quota/snapshotRefresh.php`; pure display transforms and bounded report/sweep
+operations live in `snapshotText.php` and `snapshotReport.php`. Refresh consumes
+the probe result directly instead of copying its fields and keeping separate
+validity/status/message state. Failure returns before successful publication;
+the logging helper is a direct dependency rather than a captured callback.
+Characterization traces lock home refusals, timeout stopping, snapshot recognition,
+fallback bytes, write/log ordering and original exceptions. Run these only on
+testing machines; the devbox permits syntax checks on changed files only.
+
 Runtime service bootstrap keeps its original include and public helpers while
 separating hostname convergence, SSH config transforms/publication, SSH recovery
 and inherited OOM repair (ADR 0216). Normalization derives missing directives

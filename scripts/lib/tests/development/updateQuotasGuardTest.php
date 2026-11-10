@@ -27,15 +27,15 @@ class UpdateQuotasGuardTest extends TestCase
         // single, quoted quota invocation. Snapshot writes must use the shared
         // same-dir replacer so refreshes never leave ~/.quota missing.
         $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/updateQuotas.php',
+            'scripts/lib/quota/snapshotRefresh.php',
             [
                 '$quotaFile = "/home/{$thisUser}/.quota";',
                 "pmssReadRegularFileContents(\$quotaFile) ?? ''",
-                "require_once __DIR__.'/../lib/quotaSnapshot.php';",
+                "require_once dirname(__DIR__).'/quotaSnapshot.php';",
                 '$realHome === false || $realHome !== $expectedHome',
                 'pmssQuotaSnapshotWrite($quotaFile, $fallbackContent)',
                 'pmssQuotaSnapshotWrite($quotaFile, $content)',
-                'pmssQuotaSnapshotNormalizeHumanReadableOutput($content)',
+                "pmssQuotaSnapshotNormalizeHumanReadableOutput(implode(PHP_EOL, \$quotaRun['lines']).PHP_EOL)",
                 "strpos(\$existingQuotaContent, 'Disk quotas') !== false",
                 'Disk quotas for user {$thisUser} (uid 0):',
                 '/dev/null      0K      0K      0K',
@@ -43,14 +43,14 @@ class UpdateQuotasGuardTest extends TestCase
             'updateQuotas.php should keep quota snapshot guard: '
         );
         $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/cron/updateQuotas.php',
+            'scripts/lib/quota/snapshotRefresh.php',
             ['strpos($realHome, $expectedHome) !== 0', 'unlink($quotaFile)', 'file_put_contents($quotaFile'],
             'updateQuotas.php should keep safe quota snapshot writes, not: '
         );
 
         // The quota binary itself must be invoked once with a safely quoted username.
         $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/updateQuotas.php',
+            'scripts/lib/quota/snapshotRefresh.php',
             ["'quota -u '.escapeshellarg(\$thisUser).' -v -s 2>&1'", 'escapeshellarg($thisUser)'],
             'updateQuotas.php should keep quoted quota command: '
         );
@@ -64,13 +64,18 @@ class UpdateQuotasGuardTest extends TestCase
             'scripts/cron/updateQuotas.php',
             [
                 'pmssLockHandleExportChildCloseFds($updateQuotasLock);',
-                '$quotaRun = pmssQuotaReportCapture($quotaCmd);',
-                "\"quota command for {\$thisUser} exceeded its \".PMSS_QUOTA_REPORT_TIMEOUT_SECONDS.'s deadline and was killed'",
-                'pmssQuotaSweepRun($users, $refreshUserQuota, array($logger, \'msg\'));',
+                "require_once __DIR__.'/../lib/quota/snapshotRefresh.php';",
+                'pmssQuotaSweepRun($users, static function (string $user) use ($logger): bool {',
+                "return pmssQuotaSnapshotRefreshUser(\$user, array(\$logger, 'msg'));",
             ],
             'updateQuotas.php should bound and stop on hung quota calls: '
         );
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/quota/snapshotRefresh.php', [
+            '$quotaRun = pmssQuotaReportCapture($quotaCmd);',
+            "\"quota command for {\$thisUser} exceeded its \".PMSS_QUOTA_REPORT_TIMEOUT_SECONDS.'s deadline and was killed'",
+        ]);
         $this->pmssAssertRepoFileNotContainsStrings('scripts/cron/updateQuotas.php', ['exec($quotaCmd'], 'updateQuotas.php should not run quota unbounded: ');
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/quota/snapshotRefresh.php', ['exec($quotaCmd'], 'Quota refresh should not run quota unbounded: ');
         $this->pmssAssertRepoFileContainsString('scripts/lib/lighttpd/watchdogQuotaProbe.php', 'pmssQuotaReportCapture(escapeshellarg($quotaPath)');
         $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/lighttpd/watchdogQuotaProbe.php', ["pmssLighttpdWatchdogCommandCapture('quota'"], 'watchdog quota probe should not run quota unbounded: ');
         $this->assertTrue(PMSS_QUOTA_REPORT_TIMEOUT_SECONDS + PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT < 60, 'A hung call must end well inside the one-minute cron cadence');
@@ -131,16 +136,16 @@ class UpdateQuotasGuardTest extends TestCase
         $log = static function (string $message) use (&$logs): void { $logs[] = $message; };
         $refresh = static function (string $user) use (&$visited): bool {
             $visited[] = $user;
-            return $user !== 'bob';
+            return $user !== 'fixtur02';
         };
 
-        $this->assertSame(2, pmssQuotaSweepRun(['alice', 'bob', 'carol', 'dave'], $refresh, $log));
-        $this->assertSame(['alice', 'bob'], $visited, 'No further quota call may start after a hung one');
-        $this->assertSame(['Quota sweep stopped after a hung quota call for bob; 2 remaining account(s) keep their previous snapshot until the next run'], $logs);
+        $this->assertSame(2, pmssQuotaSweepRun(['fixtur01', 'fixtur02', 'fixtur03', 'fixtur04'], $refresh, $log));
+        $this->assertSame(['fixtur01', 'fixtur02'], $visited, 'No further quota call may start after a hung one');
+        $this->assertSame(['Quota sweep stopped after a hung quota call for fixtur02; 2 remaining account(s) keep their previous snapshot until the next run'], $logs);
 
         $visited = $logs = [];
-        $this->assertSame(0, pmssQuotaSweepRun(['alice', 'carol'], $refresh, $log));
-        $this->assertSame(['alice', 'carol'], $visited);
+        $this->assertSame(0, pmssQuotaSweepRun(['fixtur01', 'fixtur03'], $refresh, $log));
+        $this->assertSame(['fixtur01', 'fixtur03'], $visited);
         $this->assertSame([], $logs);
     }
 
@@ -156,7 +161,7 @@ class UpdateQuotasGuardTest extends TestCase
 
         // Execute only the actual snapshot read/recognition block, never cron
         // setup or quota commands. Bound the child so a FIFO regression fails.
-        $source = file_get_contents($this->pmssRepoPath('scripts/cron/updateQuotas.php'));
+        $source = file_get_contents($this->pmssRepoPath('scripts/lib/quota/snapshotRefresh.php'));
         $this->assertSame(1, preg_match('/    \$existingQuotaContent = .*?;\n    \$hasExistingSnapshot = .*?;/s', $source, $matches));
         $paths = [$directory.'/regular', $directory.'/empty', $directory.'/missing',
             $directory, $directory.'/link', $directory.'/dangling', $directory.'/fifo'];

@@ -25,7 +25,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
 
     private const ALLOWED = [
         // Writers and repairers of display copies.
-        'scripts/cron/updateQuotas.php' => ['.quota'],
+        'scripts/lib/quota/snapshotRefresh.php' => ['.quota'],
         'scripts/lib/resources/processor.php' => ['.resourceData'],
         'scripts/lib/traffic/storage.php' => ['.trafficLimit', '.trafficData', '.trafficDataLocal', '.trafficDataIngress'],
         'scripts/lib/user/add/artifactVerification.php' => ['.quota'],
@@ -107,20 +107,20 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         require_once __DIR__.'/../../cgroup/policy.php';
         $store = new \UserConfigStore($this->pmssMakeTempDir('pmss-store-values-').'/config');
         $base = ['ramMiB' => 512, 'rtorrentPort' => 5000, 'quota' => 5, 'quotaBurst' => 6];
-        $this->assertTrue($store->set('alice', $base));
-        $this->assertTrue($store->setValue('alice', 'bonusPercent', 100));
-        $this->assertTrue($store->setValue('alice', 'bonusTrafficGiB', 50));
+        $this->assertTrue($store->set('fixtur01', $base));
+        $this->assertTrue($store->setValue('fixtur01', 'bonusPercent', 100));
+        $this->assertTrue($store->setValue('fixtur01', 'bonusTrafficGiB', 50));
         // A whole-record write (userConfig.php) keeps the values the provisioning CLIs set.
-        $this->assertTrue($store->set('alice', $base + ['bonusPercent' => 0, 'bonusTrafficGiB' => 1]));
-        $record = $store->get('alice');
+        $this->assertTrue($store->set('fixtur01', $base + ['bonusPercent' => 0, 'bonusTrafficGiB' => 1]));
+        $record = $store->get('fixtur01');
         $this->assertSame(100, $record['bonusPercent']);
         $this->assertSame(100, \pmssUserBonusPercentFromConfig($record));
-        $this->assertSame(50, $store->getInt('alice', 'bonusTrafficGiB'));
-        $this->assertTrue($store->setValue('alice', 'bonusTrafficGiB', null));
-        $this->assertSame(0, $store->getInt('alice', 'bonusTrafficGiB'));
+        $this->assertSame(50, $store->getInt('fixtur01', 'bonusTrafficGiB'));
+        $this->assertTrue($store->setValue('fixtur01', 'bonusTrafficGiB', null));
+        $this->assertSame(0, $store->getInt('fixtur01', 'bonusTrafficGiB'));
         $this->assertSame(0, \pmssUserBonusPercentFromConfig(['bonusPercent' => 301]));
         $this->assertSame(0, \pmssUserBonusPercentFromConfig(['bonusPercent' => '50']));
-        $this->assertFalse($store->setValue('bob', 'bonusPercent', 10));
+        $this->assertFalse($store->setValue('fixtur02', 'bonusPercent', 10));
     }
 
     public function testSettingReadersUseRootStores(): void

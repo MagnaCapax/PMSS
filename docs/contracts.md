@@ -1310,6 +1310,22 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/ftpConfig.php
   - Behavior: Installs a PMSS-owned `proftpd.service` restart-only drop-in when the ProFTPD configuration directory exists and systemd is available. A changed drop-in triggers a systemd reload before the existing configuration test and service restart (ADR 0093).
 
+- scripts/cron/updateQuotas.php
+  - Behavior: Holds the existing non-blocking cron lock, exports its descriptor
+    for child closure, lists managed accounts and runs one ordered quota sweep.
+    `quota/snapshotRefresh.php` owns per-account refresh and lifecycle reporting;
+    `quotaSnapshot.php` retains publication helpers and loads `quota/snapshotText.php`
+    (display rows/normalization) and `quota/snapshotReport.php` (bounded capture/sweep).
+    All existing snapshot helper names remain available from the original include.
+  - Contract: Requires the exact resolved home before reading the previous snapshot
+    or probing quota. Valid output with rc 1 remains an over-quota success; a failed
+    probe preserves a recognized snapshot and writes a fallback only for an
+    unrecognized, non-symlink display target. Timeout stops the sweep without either
+    publication. Successful probes write the root copy before the display copy;
+    root-copy failure still permits display publication. Event fields, account-log
+    messages, fallback bytes and exception propagation retain their previous behavior.
+    See ADR 0254 and `QuotaSnapshotRefreshCharacterizationTest`.
+
 - scripts/cron/checkGui.php
   - Behavior: Runs outside the panel request path and checks non-empty
     `www/index.php` and `www/rutorrent/index.html` sentinels. When either

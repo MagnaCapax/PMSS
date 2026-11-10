@@ -78,7 +78,7 @@ class UpdateLibraryDependencyTest extends TestCase
             ['scripts/cron/userTrackerCleaner.php', ["require_once __DIR__.'/../lib/userLifecycle.php';", 'pmssUserLog($thisUser, $summary);'], ['pmssUserLogPath', "function_exists('pmssUserLog')"], 'userTrackerCleaner.php should use userLifecycle.php as its user logger bootstrap'],
             ['scripts/util/createNginxConfig.php', ["require_once __DIR__.'/../lib/user/log.php';"], ['pmssUserLogPath'], 'createNginxConfig.php should require the user logger directly instead of probing it'],
             ['scripts/util/userPermissions.php', ["require_once __DIR__.'/../lib/userLifecycle.php';", "require_once __DIR__.'/../lib/shell.php';", "pmssUserLog(\$thisUser, \$binSpec[1]);"], ['pmssUserLogPath', "function_exists('pmssUserLog')"], 'userPermissions.php should use required shared libraries directly'],
-            ['scripts/cron/updateQuotas.php', ["require_once '/scripts/lib/userLifecycle.php';", "if (\$mirrorUserLog) {"], ['pmssUserLogPath', "function_exists('pmssUserLog')"], 'updateQuotas.php should log through the required user logger directly'],
+            ['scripts/lib/quota/snapshotRefresh.php', ["require_once dirname(__DIR__).'/userLifecycle.php';", "if (\$mirrorUserLog) {"], ['pmssUserLogPath', "function_exists('pmssUserLog')"], 'Quota refresh should log through the required user logger directly'],
             ['scripts/util/checkUserHtpasswd.php', ["require_once __DIR__.'/../lib/userLifecycle.php';", "pmssUserLog(\$thisUser, 'htpasswd sync: appended legacy credential to per-user .htpasswd');"], ['pmssUserLogPath', "function_exists('pmssUserLog')"], 'checkUserHtpasswd.php should log through the required user logger directly'],
         ]);
     }
