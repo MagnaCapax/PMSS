@@ -25,10 +25,33 @@ function networkParseMonitoringCommands(string $raw): array
     return $commands;
 }
 
-/** Render per-UID egress accounting commands for the monitoring chain. */
-function networkMonitoringRulesRender(array $userUids, array $localnets): string
+/** Accept only numeric Linux UIDs before interpolating owner matches. */
+function networkMonitoringOwnerUid($value): ?int
+{
+    if (!is_int($value) && !is_string($value)) return null;
+    $uid = pmssUnsignedDecimalIntParse((string) $value);
+    return $uid !== null && $uid <= 4294967294 ? $uid : null;
+}
+
+/** Render egress accounting, optionally restricting registered loopback WebUI ports. */
+function networkMonitoringRulesRender(array $userUids, array $localnets, array $webUiPorts = [], bool $loopbackOwnerGuardEnabled = false): string
 {
     $lastLocalNet = $localnets ? end($localnets) : '';
+    $ownerRules = '';
+    if ($loopbackOwnerGuardEnabled) {
+        foreach ($userUids as $user => $value) {
+            $uid = networkMonitoringOwnerUid($value);
+            if ($uid === null || !is_array($webUiPorts[$user] ?? null)) continue;
+            $seenPorts = [];
+            foreach ($webUiPorts[$user] as $value) {
+                $port = pmssNetworkPortParseDigits($value, 1024);
+                if ($port === null || isset($seenPorts[$port])) continue;
+                $seenPorts[$port] = true;
+                // Loopback service ports accept connections only from the owning account and root.
+                $ownerRules .= "/sbin/iptables -A OUTPUT -o lo -p tcp --syn --dport {$port} -m owner ! --uid-owner {$uid} -m owner ! --uid-owner 0 -j REJECT --reject-with tcp-reset\n";
+            }
+        }
+    }
     $rules = "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";
     foreach ($userUids as $thisUid) {
         foreach ($localnets as $thisLocalNet) {
@@ -42,7 +65,7 @@ function networkMonitoringRulesRender(array $userUids, array $localnets): string
     foreach ($localnets as $thisLocalNet) {
         $rules .= "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -j ACCEPT\n";
     }
-    return $rules;
+    return $ownerRules.$rules;
 }
 
 /**
