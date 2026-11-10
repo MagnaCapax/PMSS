@@ -6,22 +6,8 @@ require_once dirname(__DIR__, 2).'/user/delugeManagedConfig.php';
 
 class DelugeManagedConfigTest extends TestCase
 {
-    private function pmssDelugeHostlistFixture(string $token, string $host = '127.0.0.1'): string
-    {
-        return json_encode(['file' => 1, 'format' => 1], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-            .json_encode(
-                [
-                    'hosts' => [
-                        ['ThisFieldNeedsDocumentation', $host, 58846, 'localclient', $token],
-                    ],
-                ],
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
-            );
-    }
-
-    private function pmssWriteConvergedCoreConfig(string $homeRoot, string $username): string
-    {
-        return $this->pmssWriteRelativeFile($homeRoot, $username.'/.config/deluge/core.conf', <<<'JSON'
+    /** Converged core settings shared by no-change and hostlist-sync cases. */
+    private const CONVERGED_CORE_CONFIG = <<<'JSON'
 {
     "file": 1,
     "format": 1
@@ -33,8 +19,19 @@ class DelugeManagedConfigTest extends TestCase
     "max_upload_slots_global": 15,
     "pre_allocate_storage": true
 }
-JSON
-        );
+JSON;
+
+    private function pmssDelugeHostlistFixture(string $token, string $host = '127.0.0.1'): string
+    {
+        return json_encode(['file' => 1, 'format' => 1], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            .json_encode(
+                [
+                    'hosts' => [
+                        ['ThisFieldNeedsDocumentation', $host, 58846, 'localclient', $token],
+                    ],
+                ],
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+            );
     }
 
     public function testApplyManagedConfigRestoresFleetSafetyLimits(): void
@@ -90,7 +87,7 @@ JSON
     public function testApplyManagedConfigReturnsFalseWhenAlreadyConverged(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-managed-nochange-');
-        $configPath = $this->pmssWriteConvergedCoreConfig($homeRoot, 'fixtur01');
+        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/core.conf', self::CONVERGED_CORE_CONFIG);
         $original = (string) file_get_contents($configPath);
 
         $this->assertFalse(\pmssDelugeApplyManagedConfig('fixtur01'));
@@ -110,7 +107,7 @@ JSON
     public function testApplyManagedConfigSynchronizesHostlistPasswordFromAuth(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-hostlist-sync-');
-        $this->pmssWriteConvergedCoreConfig($homeRoot, 'fixtur01');
+        $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/core.conf', self::CONVERGED_CORE_CONFIG);
         $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/auth', "localclient:new-secret:10\n");
         $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/hostlist.conf', $this->pmssDelugeHostlistFixture('old-secret'));
 

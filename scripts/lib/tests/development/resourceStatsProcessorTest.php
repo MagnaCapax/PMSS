@@ -132,7 +132,7 @@ class ResourceStatsProcessorTest extends TestCase
         $user = $this->seedManagedUser();
 
         $now = time();
-        $this->setResourceData($stats, $user, [
+        $stats->map[$user] = implode("\n", [
             $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
             $this->resourceLine($now - 3600, '2048 4096 30 40 7200 2097152 6'),
         ]);
@@ -167,7 +167,7 @@ class ResourceStatsProcessorTest extends TestCase
         $user = $this->seedManagedUser();
 
         $now = time();
-        $this->setResourceData($stats, $user, [
+        $stats->map[$user] = implode("\n", [
             $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
             $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
         ]);
@@ -189,7 +189,7 @@ class ResourceStatsProcessorTest extends TestCase
         $user = $this->seedManagedUser();
 
         $now = time();
-        $this->setResourceData($stats, $user, [
+        $stats->map[$user] = implode("\n", [
             $this->resourceLine($now - 120, '1048576 2097152 3600 7200 3600000000000 1073741824 4'),
             $this->resourceLine($now - 60, '2097152 3145728 7200 10800 7200000000000 2147483648 6'),
         ]);
@@ -234,7 +234,7 @@ class ResourceStatsProcessorTest extends TestCase
         $user = $this->seedManagedUser();
 
         $now = time();
-        $this->setResourceData($stats, $user, [
+        $stats->map[$user] = implode("\n", [
             $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4 524288 262144'),
             $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6 1048576 524288'),
         ]);
@@ -251,7 +251,7 @@ class ResourceStatsProcessorTest extends TestCase
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = new \ResourceStatsProcessor($stats, $this->paths);
 
-        $this->setResourceData($stats, 'ghost', [
+        $stats->map['ghost'] = implode("\n", [
             $this->resourceLine(time() - 120, '1024 2048 1 1 3600 1024 1'),
             $this->resourceLine(time() - 60, '2048 4096 1 1 3600 1024 1'),
         ]);
@@ -281,7 +281,7 @@ class ResourceStatsProcessorTest extends TestCase
         $user = $this->seedManagedUser();
 
         $now = time();
-        $this->setResourceData($stats, $user, [
+        $stats->map[$user] = implode("\n", [
             $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
             $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
         ]);
@@ -341,7 +341,7 @@ class ResourceStatsProcessorTest extends TestCase
         $now = time();
         foreach (['fixtur01', 'fixtur02'] as $user) {
             $this->seedManagedUser($user);
-            $this->setResourceData($stats, $user, [
+            $stats->map[$user] = implode("\n", [
                 $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
                 $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
             ]);
@@ -367,7 +367,7 @@ class ResourceStatsProcessorTest extends TestCase
     {
         $stats = new StubResourceStatsProcessorStatistics();
         $user = $this->seedManagedUser();
-        $this->setResourceData($stats, $user, [
+        $stats->map[$user] = implode("\n", [
             $this->resourceLine(time() - 120, '1024 2048 10 20 3600 1048576 4'),
             $this->resourceLine(time() - 60, '2048 4096 30 40 7200 2097152 6'),
         ]);
@@ -440,11 +440,6 @@ class ResourceStatsProcessorTest extends TestCase
         $this->pmssWriteFile($this->paths['resource_dir'].'/'.$user, 'seed');
         $this->pmssEnsureDir($this->paths['home_dir'].'/'.$user, 0755);
         return $user;
-    }
-
-    private function setResourceData(StubResourceStatsProcessorStatistics $stats, string $user, array $lines): void
-    {
-        $stats->map[$user] = implode("\n", $lines);
     }
 
     private function resourceLine(int $timestamp, string $payload): string

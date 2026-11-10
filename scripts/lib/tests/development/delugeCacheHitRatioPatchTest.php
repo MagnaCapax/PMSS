@@ -5,6 +5,9 @@ require_once __DIR__.'/DelugeAppTestCase.php';
 
 class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 {
+    /** Unpatched input shared by mutation, dry-run and symlink cases. */
+    private const LEGACY_CACHE_RATIO_SOURCE = "class Core:\n    def update_stats(self):\n        if blocks_read:\n            self.session_status['read_hit_ratio'] = (\n                self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n            )\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
+
     protected function setUp(): void
     {
         $this->pmssSetUpDelugeFixture('pmss-deluge-cache-hit-ratio-');
@@ -12,7 +15,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 
     public function testPatchAddsKeyErrorGuardToLegacyBlock(): void
     {
-        [$result, $content] = $this->pmssDelugePatchFixtureApply('core.py', $this->legacyCacheRatioSource(), 'pmssPatchDelugeCacheHitRatio');
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('core.py', self::LEGACY_CACHE_RATIO_SOURCE, 'pmssPatchDelugeCacheHitRatio');
 
         $this->assertTrue($result, 'Expected legacy cache ratio block to be patched');
         $this->assertEquals("class Core:\n    def update_stats(self):\n        if blocks_read:\n            try:\n                self.session_status['read_hit_ratio'] = (\n                    self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n                )\n            except KeyError:\n                self.session_status['read_hit_ratio'] = 0.0\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n", $content);
@@ -132,7 +135,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 
     public function testPatchDryRunDoesNotModifyFile(): void
     {
-        $original = $this->legacyCacheRatioSource();
+        $original = self::LEGACY_CACHE_RATIO_SOURCE;
         [$result, $content] = $this->pmssDelugePatchFixtureApply('core.py', $original, 'pmssPatchDelugeCacheHitRatio', true);
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
@@ -159,12 +162,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 
     public function testPatchRejectsSymlinkPath(): void
     {
-        $this->pmssAssertDelugePatchSymlinkRefused('core.py', $this->legacyCacheRatioSource(), 'pmssPatchDelugeCacheHitRatio');
-    }
-
-    private function legacyCacheRatioSource(): string
-    {
-        return "class Core:\n    def update_stats(self):\n        if blocks_read:\n            self.session_status['read_hit_ratio'] = (\n                self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n            )\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
+        $this->pmssAssertDelugePatchSymlinkRefused('core.py', self::LEGACY_CACHE_RATIO_SOURCE, 'pmssPatchDelugeCacheHitRatio');
     }
 
 }

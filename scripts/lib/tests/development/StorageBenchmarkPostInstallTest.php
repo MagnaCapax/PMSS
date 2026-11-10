@@ -6,14 +6,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class StorageBenchmarkPostInstallTest extends TestCase
 {
-    private function markerPath(): string
-    {
-        return $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
-    }
-
     public function testSkipsWhenManagedUsersExist(): void
     {
-        $marker = $this->markerPath();
+        $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
         $logs = [];
         $calls = [];
 
@@ -33,7 +28,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
 
     public function testSkipsWhenSuccessMarkerExists(): void
     {
-        $marker = $this->markerPath();
+        $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
         $this->pmssWriteFile($marker, "{}\n");
         $calls = [];
         $logs = [];
@@ -53,7 +48,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
 
     public function testRunsBenchmarkLogsWarningsAndRecordsMarkerOnSuccess(): void
     {
-        $marker = $this->markerPath();
+        $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
         $calls = [];
         $logs = [];
 
@@ -82,7 +77,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
 
     public function testFailedBenchmarkLeavesMarkerUnset(): void
     {
-        $marker = $this->markerPath();
+        $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$logs): void {

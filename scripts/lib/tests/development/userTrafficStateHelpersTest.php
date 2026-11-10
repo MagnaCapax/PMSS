@@ -47,7 +47,7 @@ class UserTrafficStateHelpersTest extends TestCase
             ['valid', serialize(['raw' => ['month' => 1536.4]]), 1536],
         ] as [$name, $payload, $expected]) {
             $path = $this->tempDir.'/traffic-data-'.$name;
-            $this->writeOptionalFixture($path, $payload);
+            if ($payload !== null) $this->pmssWriteFile($path, $payload);
 
             $this->assertEquals($expected, \pmssReadUserTrafficMonth($path), 'case '.$name);
         }
@@ -334,7 +334,7 @@ class UserTrafficStateHelpersTest extends TestCase
             ['invalid', "five hundred\n", 0],
         ] as [$name, $payload, $expected]) {
             $path = $this->tempDir.'/limit-'.$name;
-            $this->writeOptionalFixture($path, $payload);
+            if ($payload !== null) $this->pmssWriteFile($path, $payload);
 
             $this->assertEquals($expected, \pmssTrafficLimitReadGiBFile($path), 'case '.$name);
         }
@@ -351,7 +351,7 @@ class UserTrafficStateHelpersTest extends TestCase
             ['empty', '', null],
         ] as [$name, $payload, $expected]) {
             $path = $this->tempDir.'/limit-or-null-'.$name;
-            $this->writeOptionalFixture($path, $payload);
+            if ($payload !== null) $this->pmssWriteFile($path, $payload);
 
             $this->assertSame($expected, \pmssIntegerSettingFileReadOrNull($path, 'pmssTrafficLimitParseGiB'), 'case '.$name);
         }
@@ -380,17 +380,11 @@ class UserTrafficStateHelpersTest extends TestCase
         ] as [$name, $limitPayload, $bonusPayload, $expected]) {
             $limitPath = $this->tempDir.'/traffic-limit-'.$name;
             $bonusPath = $this->tempDir.'/bonus-traffic-'.$name;
-            $this->writeOptionalFixture($limitPath, $limitPayload);
+            if ($limitPayload !== null) $this->pmssWriteFile($limitPath, $limitPayload);
             $this->pmssWriteFile($bonusPath, $bonusPayload);
 
             $this->assertEquals($expected, \pmssTrafficLimitStateRead($limitPath, $bonusPath), 'case '.$name);
         }
     }
 
-    private function writeOptionalFixture(string $path, ?string $payload): void
-    {
-        if ($payload !== null) {
-            $this->pmssWriteFile($path, $payload);
-        }
-    }
 }
