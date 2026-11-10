@@ -22,7 +22,7 @@ function pmssAddUserOpenClawGate(array $user, string $home, ?array $files): ?str
 {
     if (!pmssAddUserOpenClawInstallerLoad()) return 'skeleton installer unavailable';
     if ((int) ($user['memory'] ?? 0) < 2048) return 'RAM below 2048 MiB';
-    if (file_exists($home.'/.openclaw') || is_link($home.'/.openclaw')) return 'existing ~/.openclaw';
+    if (pmssPathExistsOrLink($home.'/.openclaw')) return 'existing ~/.openclaw';
     if ($files === null || $files['used'] > $files['soft'] - OC_REQUIRED_FILES) return 'file quota has fewer than 60000 free files or is unavailable';
     if (!is_file($home.'/bin/install-openclaw')) return 'installer missing';
     return null;

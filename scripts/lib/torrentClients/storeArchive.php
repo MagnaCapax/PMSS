@@ -22,9 +22,9 @@ function pmssTorrentClientsStoreArchiveIsSafe(string $archive): bool
 function pmssTorrentClientsStoreVenvInstall(array $entry, string $binary): bool
 {
     $versionDir = dirname($binary);
-    if (file_exists($versionDir) || is_link($versionDir)) return false;
+    if (pmssPathExistsOrLink($versionDir)) return false;
     $stage = $versionDir.'.stage-'.getmypid();
-    if (file_exists($stage) || is_link($stage) || !@mkdir($stage, 0755)) return false;
+    if (pmssPathExistsOrLink($stage) || !@mkdir($stage, 0755)) return false;
     $installed = false;
     try {
         foreach ($entry['url'] as $url) {

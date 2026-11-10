@@ -43,7 +43,7 @@ function pmssUserWebRootReconcileCopyEntry(
         $linkTarget = @readlink($source);
         $installed = is_string($linkTarget)
             && pmssUserWebRootReconcileLinkTargetIsSafe($target, $linkTarget, $home)
-            && ($merge || (!file_exists($target) && !is_link($target)))
+            && ($merge || !pmssPathExistsOrLink($target))
             && pmssUserWebRootMigrationRun($user, $home, [$target],
                 'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($target));
         if ($merge && !$installed) {

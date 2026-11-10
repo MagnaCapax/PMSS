@@ -20,8 +20,7 @@ function pmssAddUserHermesGate(array $user, string $home, ?array $files, array $
 {
     if (!pmssAddUserHermesInstallerLoad()) return 'skeleton installer unavailable';
     if ((int) ($user['memory'] ?? 0) < pmssUserHermesMinRamMiB()) return 'RAM below '.pmssUserHermesMinRamMiB().' MiB';
-    if (file_exists($home.'/.hermes') || is_link($home.'/.hermes')
-        || file_exists($home.'/.local/bin/hermes') || is_link($home.'/.local/bin/hermes')) return 'existing Hermes install';
+    if (pmssPathExistsOrLink($home.'/.hermes') || pmssPathExistsOrLink($home.'/.local/bin/hermes')) return 'existing Hermes install';
     if ($files === null || $files['used'] > $files['soft'] - HERMES_REQUIRED_FILES)
         return 'file quota has fewer than '.HERMES_REQUIRED_FILES.' free files or is unavailable';
     $installer = $home.'/bin/install-hermes';

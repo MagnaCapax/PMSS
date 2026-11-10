@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
-/** Hermetic coverage for the shared web-root recovery contract. */
+/** Hermetic coverage for scripts/lib/update/users/webRootReconcileCopy.php and web-root recovery. */
 class UserWebRootReconcileTest extends TestCase
 {
     private $homeRoot;

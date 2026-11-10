@@ -88,9 +88,7 @@ function pmssRecreateEnsureDirectory(string $path, int $uid, int $gid): void
 /** Rename a customer directory only into a vacant real directory. */
 function pmssRecreateMoveDirectory(string $source, string $destination): bool
 {
-    if (!file_exists($source) && !is_link($source)) {
-        return false;
-    }
+    if (!pmssPathExistsOrLink($source)) return false;
     if (is_link($source) || pmssRecreateHasLinkedParent($source) || !is_dir($source)
         || pmssRecreateHasLinkedParent($destination) || !is_dir(dirname($destination))
         || is_link($destination) || (file_exists($destination) && !is_dir($destination))) {

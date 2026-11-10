@@ -77,11 +77,9 @@ function pmssUserTransferRenameRutorrentShare(string $home, string $remoteUser, 
     $dst = $share.'/users/'.$localUser;
     clearstatcache(true, $src);
     clearstatcache(true, $dst);
-    if (!file_exists($src) && !is_link($src)) {
-        return;
-    }
+    if (!pmssPathExistsOrLink($src)) return;
     if (!pmssPathTargetIsSafe($src, true, true) || !is_dir($src)
-        || !pmssPathTargetIsSafe($dst, true, true) || file_exists($dst) || is_link($dst)
+        || !pmssPathTargetIsSafe($dst, true, true) || pmssPathExistsOrLink($dst)
         || !pmssUserTransferIsPathWithinHome($src, $home)
         || !pmssUserTransferIsPathWithinHome(dirname($dst), $home)) {
         logMessage('[WARN] Skipping ruTorrent rename (unsafe source or destination)');

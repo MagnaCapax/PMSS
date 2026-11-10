@@ -490,6 +490,9 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Operator path-occupancy checks share `pmssPathExistsOrLink()` so dangling links
+still count as occupied. Keep type, owner, parent and operation guards at callers.
+
 Customer native shutdown polling shares `pmssCustomerNativeWaitForExit()` in the
 existing AppProcess part. Apps, Configure and qBittorrent containment retain
 their PID selectors, signal checks, budgets and return values. Only an empty

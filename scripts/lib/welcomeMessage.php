@@ -92,7 +92,7 @@ function pmssWelcomeUserMessageSet(string $username, string $userHome, string $t
     }
 
     if (trim($template) === '') {
-        if (!file_exists($path) && !is_link($path)) return true;
+        if (!pmssPathExistsOrLink($path)) return true;
         return pmssAccountPathRun($username, $userHome, [$userHome.'/.config/.pmss-check'],
             'test ! -L '.escapeshellarg($path).' && { test ! -e '.escapeshellarg($path)
             .' || rm -f -- '.escapeshellarg($path).'; }');

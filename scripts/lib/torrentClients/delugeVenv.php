@@ -63,7 +63,7 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
         $paths[] = $path;
     }
     $link = $versionDir.'/.deluge-cli';
-    if (file_exists($link) || is_link($link)) return false;
+    if (pmssPathExistsOrLink($link)) return false;
     $install = $ops['install'] ?? 'pmssPythonVenvInstallCli';
     $log = $ops['log'] ?? 'logmsg';
     $install($versionDir, 'Deluge '.$version,

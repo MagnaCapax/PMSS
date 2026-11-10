@@ -74,7 +74,7 @@ function pmssTransmissionSettingsApply(string $user, string $home, array $ops = 
     if (!$prepare($user, $home, $dir) || is_link($dir) || !is_dir($dir)) return false;
     // Root reads an account-owned file here: bound it like the other account config reads.
     $raw = pmssReadRegularFileContentsVerified($path, null, 1048576);
-    if ($raw === null && (file_exists($path) || is_link($path))) return false;
+    if ($raw === null && pmssPathExistsOrLink($path)) return false;
     $updated = pmssTransmissionSettingsContent($raw ?? '{}', $socketPath,
         '/user-'.$user.'/transmission/', $ops['snakeCase'] ?? null);
     if ($updated === null) return false;

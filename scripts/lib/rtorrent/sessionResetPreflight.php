@@ -29,10 +29,10 @@ function pmssCheckRtorrentSessionResetEnvironmentReady(string $user, string $hom
     // same bounded account operation used by managed file writers and the launcher.
     $command = 'test -r '.escapeshellarg($home.'/.rtorrent.rc')
         .' && test -x /usr/local/bin/rtorrent && command -v screen >/dev/null';
-    if (file_exists('/etc/seedbox/config/localnet') || is_link('/etc/seedbox/config/localnet')) {
+    if (pmssPathExistsOrLink('/etc/seedbox/config/localnet')) {
         $command .= ' && test -r /etc/seedbox/config/localnet && test -s /etc/seedbox/config/localnet';
     }
-    if (file_exists($home.'/.rtorrentExecute.php') || is_link($home.'/.rtorrentExecute.php')) {
+    if (pmssPathExistsOrLink($home.'/.rtorrentExecute.php')) {
         $command .= ' && test -x '.escapeshellarg($home.'/.rtorrentExecute.php')
             .' && test -r '.escapeshellarg($home.'/.scriptsInc.php').' && command -v php >/dev/null';
     }

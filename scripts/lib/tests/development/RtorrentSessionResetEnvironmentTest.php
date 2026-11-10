@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../runtime/filesystem.php';
 
 /** Simulate storage and account failures without probing the host or launching services. */
 final class RtorrentSessionResetEnvironmentTest extends TestCase
@@ -37,6 +38,7 @@ function rtorrentProcessStart(...$args) { $GLOBALS['events'][] = 'start'; return
 function pmssCheckRtorrentHandleEscalatedStartFailure(...$args) { $GLOBALS['events'][] = 'escalate'; }
 function pmssUserLog($user, $message) { $GLOBALS['accountLog'][] = [$user, $message]; }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssPathExistsOrLink', 'RtorrentSessionEnvironmentFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/sessionResetPreflight.php', 'RtorrentSessionEnvironmentFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/watchdogMissing.php', 'RtorrentSessionEnvironmentFixture');
         $script .= <<<'PHP'

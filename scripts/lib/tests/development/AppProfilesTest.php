@@ -86,7 +86,7 @@ final class AppProfilesTest extends TestCase
         unlink($home.'/bin/install-hermes');
         $this->assertSame('installer missing or unsafe', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 100000]));
         symlink($home.'/absent', $home.'/.hermes');
-        $this->assertSame('existing Hermes install', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 100000]));
+        $this->assertSame('existing Hermes install', \pmssAddUserHermesGate($user, $home, ['used' => 0, 'soft' => 100000]), 'scripts/lib/user/add/hermes.php must reject a dangling install marker');
     }
 
     public function testHermesHostGateRejectsMissingRoutesPortsAndHostname(): void

@@ -60,7 +60,7 @@ function pmssQbittorrentThrottleAccount(string $home, ?int $throttle, bool $appl
             if (!$write($path, $updated)) return $refuse('qBittorrent upload throttle failed: the stopped configuration could not be written.');
         }
         // A customer edit after application is preserved; forgetting our record needs no daemon restart.
-        if (($throttle ?? 0) <= 0 && (file_exists($state) || is_link($state))) {
+        if (($throttle ?? 0) <= 0 && pmssPathExistsOrLink($state)) {
             if (!pmssQbittorrentFileSafe($state) || !@unlink($state))
                 return $refuse('qBittorrent upload throttle failed: the applied-cap record could not be cleared.');
         }

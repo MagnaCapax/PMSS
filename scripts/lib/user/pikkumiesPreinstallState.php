@@ -18,7 +18,7 @@ function pmssPikkumiesPreinstallStateClear(
     clearstatcache(true, $path);
     $stat = @lstat($path);
     if ($stat === false) {
-        return !file_exists($path) && !is_link($path);
+        return !pmssPathExistsOrLink($path);
     }
 
     // lstat inspects the marker itself; unlink removes a symlink, never its target.
@@ -67,5 +67,5 @@ function pmssPikkumiesPreinstallStateMarkerPath(
         return null;
     }
     $path = $stateDir.'/'.$username;
-    return is_link($path) || file_exists($path) ? null : $path;
+    return pmssPathExistsOrLink($path) ? null : $path;
 }
