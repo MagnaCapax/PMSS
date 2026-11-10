@@ -1,7 +1,7 @@
 # ADR 0257: Required system service recovery
 
 Date: 2026-11-10
-Category: operations
+Category: architecture
 
 ## Status
 Accepted
