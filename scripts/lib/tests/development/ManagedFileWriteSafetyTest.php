@@ -303,6 +303,7 @@ PHP
 namespace AtomicJsonWriteFixture;
 PHP;
         $script .= $this->pmssInlinePhpAtomicPublicationShims('temp');
+        $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'AtomicJsonWriteFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'AtomicJsonWriteFixture', \PMSS_USER_FILE_MODULES);
         $script .= <<<'PHP'
 $GLOBALS['mode'] = getenv('PMSS_TEST_STATUS_MODE');
