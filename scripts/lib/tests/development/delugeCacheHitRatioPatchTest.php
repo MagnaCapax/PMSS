@@ -15,7 +15,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
         [$result, $content] = $this->pmssDelugePatchFixtureApply('core.py', $this->legacyCacheRatioSource(), 'pmssPatchDelugeCacheHitRatio');
 
         $this->assertTrue($result, 'Expected legacy cache ratio block to be patched');
-        $this->assertEquals($this->patchedCacheRatioSource(), $content);
+        $this->assertEquals("class Core:\n    def update_stats(self):\n        if blocks_read:\n            try:\n                self.session_status['read_hit_ratio'] = (\n                    self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n                )\n            except KeyError:\n                self.session_status['read_hit_ratio'] = 0.0\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n", $content);
     }
 
     public function testPatchEnsureVisitsUniqueGlobMatchesInOrder(): void
@@ -165,11 +165,6 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
     private function legacyCacheRatioSource(): string
     {
         return "class Core:\n    def update_stats(self):\n        if blocks_read:\n            self.session_status['read_hit_ratio'] = (\n                self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n            )\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
-    }
-
-    private function patchedCacheRatioSource(): string
-    {
-        return "class Core:\n    def update_stats(self):\n        if blocks_read:\n            try:\n                self.session_status['read_hit_ratio'] = (\n                    self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n                )\n            except KeyError:\n                self.session_status['read_hit_ratio'] = 0.0\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
     }
 
 }

@@ -16,20 +16,6 @@ class rtorrentWatchdogDecisionTest extends TestCase
         return $this->tempDir.'/accept-queue.count';
     }
 
-    private function assertScgiDecisionExtendsGrace(
-        array $pids,
-        array $processStates,
-        ?array $queueSnapshot,
-        string $messageNeedle,
-        string $label
-    ): void {
-        $decision = \rtorrentProcessScgiUnresponsiveDecision($pids, $processStates, $queueSnapshot, $this->wedgeStatePath(), 3);
-
-        $this->assertSame('extend_grace', $decision['action'], $label);
-        $this->assertStringContainsString($messageNeedle, $decision['message'], $label);
-        $this->assertFalse(file_exists($this->wedgeStatePath()), $label.' must not advance queue wedge count');
-    }
-
     public function testCronLogHonorsForceAndDebugFlags(): void
     {
         $this->assertSame('', $this->pmssCaptureStdout(static function (): void {
@@ -280,7 +266,11 @@ PHP;
             'missing queue' => [[44], $aliveStates, null, 'queue=unavailable'],
             'open queue' => [[44], $aliveStates, ['recvQ' => 1, 'sendQ' => 100], 'recvQ=1 sendQ=100'],
         ] as $label => $case) {
-            $this->assertScgiDecisionExtendsGrace($case[0], $case[1], $case[2], $case[3], $label);
+            $decision = \rtorrentProcessScgiUnresponsiveDecision($case[0], $case[1], $case[2], $this->wedgeStatePath(), 3);
+
+            $this->assertSame('extend_grace', $decision['action'], $label);
+            $this->assertStringContainsString($case[3], $decision['message'], $label);
+            $this->assertFalse(file_exists($this->wedgeStatePath()), $label.' must not advance queue wedge count');
         }
     }
 

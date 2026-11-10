@@ -104,28 +104,6 @@ PHP
         }
     }
 
-    private function assertReadCounters(array $outputLines, ?array $expected): void
-    {
-        // Pin v2 so the systemd-property path is exercised regardless of the host's real hierarchy.
-        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v2'], function () use ($outputLines, $expected): void {
-            $this->pmssWithPathPrefix(
-                $this->pmssMakeLineOutputStub('systemctl', $outputLines, 'pmss-resource-systemctl-'),
-                function () use ($expected): void {
-                    $counters = \pmssResourceLogReadCounters(1000);
-                    if ($expected === null) {
-                        $this->assertSame(null, $counters);
-                        return;
-                    }
-
-                    $this->assertTrue(is_array($counters));
-                    foreach ($expected as $field => $value) {
-                        $this->assertEquals($value, $counters[$field]);
-                    }
-                }
-            );
-        });
-    }
-
     public function testReadCountersV1ReadsRealCountersFromSysfs(): void
     {
         $slice = 'user.slice/user-1000.slice';
@@ -618,7 +596,24 @@ PHP
                 null,
             ],
         ] as [$outputLines, $expected]) {
-            $this->assertReadCounters($outputLines, $expected);
+            // Pin v2 so the systemd-property path is exercised regardless of the host's real hierarchy.
+            $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v2'], function () use ($outputLines, $expected): void {
+                $this->pmssWithPathPrefix(
+                    $this->pmssMakeLineOutputStub('systemctl', $outputLines, 'pmss-resource-systemctl-'),
+                    function () use ($expected): void {
+                        $counters = \pmssResourceLogReadCounters(1000);
+                        if ($expected === null) {
+                            $this->assertSame(null, $counters);
+                            return;
+                        }
+
+                        $this->assertTrue(is_array($counters));
+                        foreach ($expected as $field => $value) {
+                            $this->assertEquals($value, $counters[$field]);
+                        }
+                    }
+                );
+            });
         }
     }
 

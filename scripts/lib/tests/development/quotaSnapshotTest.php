@@ -97,31 +97,11 @@ class QuotaSnapshotTest extends TestCase
             ['usrjquota=aquota.user', 0, ['1001 -- 1 2 3 4 5 6'], false],
         ] as [$options, $rc, $output, $alert]) {
             file_put_contents($fstab, 'UUID=fixture /home ext4 '.$options." 0 0\n");
-            $capture = $this->quotaSnapshotObserve($fstab, $rc, $output);
-            $this->assertSame(0, $capture['result']['rc']);
-            $result = json_decode($capture['result']['output'], true);
-            $this->assertSame($alert ? 1 : 0, $result['rc']);
-            $this->assertSame(['/fixture/repquota -u -n '.escapeshellarg('/home').' 2>&1'], $result['commands']);
-            $this->assertSame($alert ? '###PMSS_QUOTA_ALERT repquota_failed mount=home rc='.$rc.PHP_EOL : '',
-                (string) file_get_contents($capture['stderrPath']));
-            // Failed reports retain timestamped evidence even when no alert is warranted.
-            if ($rc !== 0) {
-                $this->assertStringContainsString('2026-01-01T00:00:00 WARN repquota_failed rc='.$rc.' mount=/home', $result['log']);
-            } elseif ($output === []) {
-                $this->assertStringContainsString('WARN repquota_no_rows', $result['log']);
-            } else {
-                $this->assertSame("2026-01-01T00:00:00 1001 1 2 3 4 5 6\n", $result['log']);
-            }
-        }
-    }
-
-    /** Run the real cron callback with in-memory logging and a simulated repquota. */
-    private function quotaSnapshotObserve(string $fstab, int $rc, array $output): array
-    {
-        $source = $this->pmssReadRepoFile('scripts/cron/quotaSnapshot.php');
-        $source = substr($source, strpos($source, '<?php') + 5);
-        $source = preg_replace('/^require_once [^\n]+;\n/m', '', $source);
-        $script = <<<'PHP'
+            // Run the real cron callback with in-memory logging and a simulated repquota.
+            $source = $this->pmssReadRepoFile('scripts/cron/quotaSnapshot.php');
+            $source = substr($source, strpos($source, '<?php') + 5);
+            $source = preg_replace('/^require_once [^\n]+;\n/m', '', $source);
+            $script = <<<'PHP'
 namespace QuotaSnapshotAlertFixture;
 use function pmssSnapshotWriteWarn, pmssSnapshotWriteLine, pmssSnapshotWarnToken,
     pmssQuotaSnapshotMountDeclaresJournaledQuota, pmssQuotaSnapshotParseRepquotaUserRows,
@@ -145,11 +125,26 @@ function pmssRunSnapshotLogTask($file, $envKey, $defaultLog, $callback) {
     }
 }
 PHP;
-        $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/quotaSnapshotCron.php'), true).';';
-        $script .= $source;
-        $script .= '$GLOBALS["commands"] = []; $GLOBALS["report"] = '.var_export(['rc' => $rc, 'output' => $output], true).';';
-        $script .= '$rc = pmssQuotaSnapshotRun('.var_export($fstab, true).');';
-        $script .= 'echo json_encode(["rc" => $rc, "commands" => $GLOBALS["commands"], "log" => $GLOBALS["log"]]);';
-        return $this->pmssExecInlinePhpWithTempStderr($script, ['PMSS_QUOTA_SNAPSHOT_MOUNT' => '/home']);
+            $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/quotaSnapshotCron.php'), true).';';
+            $script .= $source;
+            $script .= '$GLOBALS["commands"] = []; $GLOBALS["report"] = '.var_export(['rc' => $rc, 'output' => $output], true).';';
+            $script .= '$rc = pmssQuotaSnapshotRun('.var_export($fstab, true).');';
+            $script .= 'echo json_encode(["rc" => $rc, "commands" => $GLOBALS["commands"], "log" => $GLOBALS["log"]]);';
+            $capture = $this->pmssExecInlinePhpWithTempStderr($script, ['PMSS_QUOTA_SNAPSHOT_MOUNT' => '/home']);
+            $this->assertSame(0, $capture['result']['rc']);
+            $result = json_decode($capture['result']['output'], true);
+            $this->assertSame($alert ? 1 : 0, $result['rc']);
+            $this->assertSame(['/fixture/repquota -u -n '.escapeshellarg('/home').' 2>&1'], $result['commands']);
+            $this->assertSame($alert ? '###PMSS_QUOTA_ALERT repquota_failed mount=home rc='.$rc.PHP_EOL : '',
+                (string) file_get_contents($capture['stderrPath']));
+            // Failed reports retain timestamped evidence even when no alert is warranted.
+            if ($rc !== 0) {
+                $this->assertStringContainsString('2026-01-01T00:00:00 WARN repquota_failed rc='.$rc.' mount=/home', $result['log']);
+            } elseif ($output === []) {
+                $this->assertStringContainsString('WARN repquota_no_rows', $result['log']);
+            } else {
+                $this->assertSame("2026-01-01T00:00:00 1001 1 2 3 4 5 6\n", $result['log']);
+            }
+        }
     }
 }
