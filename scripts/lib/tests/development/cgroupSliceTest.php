@@ -6,17 +6,6 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class cgroupSliceTest extends TestCase
 {
-    private function renderSlice(string $tplBody, int $cpuThreads, int $memMiB): string
-    {
-        return $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
-            'cfgPrefix' => 'pmss-cg-cfg-tasks-',
-            'dropPrefix' => 'pmss-cg-drop-tasks-',
-            'v2Template' => $tplBody,
-            'totalCpuThreads' => $cpuThreads,
-            'totalMemMiB' => $memMiB,
-        ]));
-    }
-
     public function testV2RenderingReplacesPlaceholders(): void
     {
         $tplBody = "[Slice]\nCPUAccounting=yes\nIOAccounting=yes\nMemoryAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
@@ -150,7 +139,14 @@ class cgroupSliceTest extends TestCase
             [2, 16384, 'TasksMax=8192', 'TasksMax did not scale with RAM GiB'], // RAM dominates.
             [64, 262144, 'TasksMax=16384', 'TasksMax ceiling clamp not applied'], // 131072 → 16384
         ] as [$cpuThreads, $memMiB, $needle, $message]) {
-            $this->pmssAssertStringContract($this->renderSlice($tplBody, $cpuThreads, $memMiB), ['required' => [$needle => $message]]);
+            $content = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+                'cfgPrefix' => 'pmss-cg-cfg-tasks-',
+                'dropPrefix' => 'pmss-cg-drop-tasks-',
+                'v2Template' => $tplBody,
+                'totalCpuThreads' => $cpuThreads,
+                'totalMemMiB' => $memMiB,
+            ]));
+            $this->pmssAssertStringContract($content, ['required' => [$needle => $message]]);
         }
     }
 }

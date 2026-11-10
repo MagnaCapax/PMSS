@@ -26,15 +26,6 @@ final class PortManagerSharedNamespaceTest extends TestCase
         throw new SkipTest('No free in-range listener port available');
     }
 
-    private function runPortManagerMain(array $arguments): array
-    {
-        [$rc, $output] = $this->pmssCaptureStdout(static function () use ($arguments): int {
-            return \pmssPortManagerMain(array_merge(['portManager.php'], $arguments));
-        });
-
-        return ['rc' => $rc, 'output' => $output];
-    }
-
     private function trackPortNamespace(): array
     {
         $portDir = $this->pmssMakeTempDir('pmss-port-shared-', 0755);
@@ -181,14 +172,16 @@ PHP;
 
         $assigned = '';
         $port = \pmssPortManagerAssignServicePort('fixtur01', 'rclone', 25000, $assigned);
-        $cli = $this->runPortManagerMain(['assign', 'fixtur01', 'rclone']);
+        [$rc, $output] = $this->pmssCaptureStdout(static function (): int {
+            return \pmssPortManagerMain(['portManager.php', 'assign', 'fixtur01', 'rclone']);
+        });
         $existing = '';
         $again = \pmssPortManagerAssignServicePort('fixtur01', 'rclone', null, $existing);
 
         $this->assertSame(25000, $port);
         $this->assertSame('assigned', $assigned);
-        $this->assertSame(0, $cli['rc']);
-        $this->assertSame('25000', $cli['output']);
+        $this->assertSame(0, $rc);
+        $this->assertSame('25000', $output);
         $this->assertSame(25000, $again);
         $this->assertSame('already_assigned', $existing);
     }

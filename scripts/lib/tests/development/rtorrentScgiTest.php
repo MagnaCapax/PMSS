@@ -12,16 +12,6 @@ require_once dirname(__DIR__, 2).'/rtorrent/scgi.php';
 
 class RtorrentScgiTest extends TestCase
 {
-    private function fakeSocketPath(): string
-    {
-        return '/tmp/pmss-test-nonexistent-' . getmypid() . '.socket';
-    }
-
-    private function xmlrpcResponseWrap(string $body): string
-    {
-        return "Status: 200 OK\r\n\r\n" . $body;
-    }
-
     public function testScgiFormatRequestProducesValidHeader(): void
     {
         $xmlData = '<test>data</test>';
@@ -92,7 +82,7 @@ class RtorrentScgiTest extends TestCase
             'double' => ['<double>4.25</double>', 4.25],
             'struct' => ['<struct><member><name>enabled</name><value><boolean>0</boolean></value></member><member><name>rate</name><value><int>9</int></value></member></struct>', ['enabled' => false, 'rate' => 9]],
         ] as $label => $case) {
-            $response = $this->xmlrpcResponseWrap('<?xml version="1.0"?><methodResponse><params><param><value>'.$case[0].'</value></param></params></methodResponse>');
+            $response = "Status: 200 OK\r\n\r\n".'<?xml version="1.0"?><methodResponse><params><param><value>'.$case[0].'</value></param></params></methodResponse>';
             $this->assertSame($case[1], rtorrentScgiDecodeResponse($response), $label);
         }
     }
@@ -109,7 +99,7 @@ class RtorrentScgiTest extends TestCase
     {
         foreach ([
             'fixtur01' => '/home/fixtur01/.rtorrent.socket',
-            'bob123' => '/home/bob123/.rtorrent.socket',
+            'fixtur02' => '/home/fixtur02/.rtorrent.socket',
         ] as $username => $expected) {
             $this->assertEquals($expected, rtorrentScgiSocketPath($username), $username);
         }
@@ -188,7 +178,7 @@ class RtorrentScgiTest extends TestCase
 
     public function testCallAndSendRejectInvalidBoundaries(): void
     {
-        $missingSocket = $this->fakeSocketPath();
+        $missingSocket = '/tmp/pmss-test-nonexistent-' . getmypid() . '.socket';
         foreach ([
             'call should reject missing socket' => function () use ($missingSocket) { return rtorrentScgiCall($missingSocket, 'system.api_version', [], 1); },
             'call should reject empty path' => function () { return rtorrentScgiCall('', 'system.api_version', [], 1); },

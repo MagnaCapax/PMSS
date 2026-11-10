@@ -262,16 +262,11 @@ class RuntimeProfileTest extends TestCase
         ], $overrides));
     }
 
-    private function profileSummaryEvents(string $jsonPath): array
-    {
-        return array_values(array_filter(pmssJsonLineFileRead($jsonPath), static function (array $decoded): bool {
-            return ($decoded['event'] ?? '') === 'profile_summary';
-        }));
-    }
-
     private function assertProfileStatusCounts(string $jsonPath, array $expected): void
     {
-        $summaryEvents = $this->profileSummaryEvents($jsonPath);
+        $summaryEvents = array_values(array_filter(pmssJsonLineFileRead($jsonPath), static function (array $decoded): bool {
+            return ($decoded['event'] ?? '') === 'profile_summary';
+        }));
         $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
         $last = end($summaryEvents);
         $this->assertTrue(isset($last['status_counts']) && is_array($last['status_counts']));

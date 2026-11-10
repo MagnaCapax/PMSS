@@ -16,22 +16,13 @@ class TempMountHardeningCommandFailureTest extends TestCase
         ]);
     }
 
-    /** Create a PATH prefix where mount fails before any real system mount can run. */
-    private function failingMountPath(): string
-    {
-        return $this->pmssMakeExecutableStub(
-            'mount',
-            "#!/bin/sh\nexit 17\n",
-            'pmss-mount-hardening-fail-bin-'
-        );
-    }
-
     private function runWithFailingMount(array $env, callable $callback): array
     {
         $messages = [];
         $this->pmssResetRuntimeProfile();
+        // Fail through a PATH stub before any real system mount can run.
         $this->pmssWithPathPrefixedEnv(
-            $this->failingMountPath(),
+            $this->pmssMakeExecutableStub('mount', "#!/bin/sh\nexit 17\n", 'pmss-mount-hardening-fail-bin-'),
             $env + ['PMSS_DRY_RUN' => null],
             function () use (&$messages, $callback): void {
                 $messages = $this->pmssArrayLoggerMessages($callback);
