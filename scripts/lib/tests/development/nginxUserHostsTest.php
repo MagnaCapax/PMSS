@@ -47,8 +47,7 @@ class NginxUserHostsTest extends TestCase
 
     public function testMcxLabelsMatchPublishedVectors(): void
     {
-        $vectors = json_decode((string) file_get_contents(__DIR__.'/../fixtures/mcx-label-vectors.json'), true);
-        $this->assertTrue(is_array($vectors));
+        $vectors = $this->pmssReadJsonArrayFile(__DIR__.'/../fixtures/mcx-label-vectors.json');
         foreach ($vectors as $vector) {
             $this->assertSame($vector['label'], \pmssMcxLabel($vector['kind'], $vector['id']));
             $hostname = $vector['kind'] === 'service'
@@ -77,7 +76,7 @@ class NginxUserHostsTest extends TestCase
 
     public function testCustomerCertCommandMatchesServiceVectors(): void
     {
-        $vectors = json_decode((string) file_get_contents(__DIR__.'/../fixtures/mcx-label-vectors.json'), true);
+        $vectors = $this->pmssReadJsonArrayFile(__DIR__.'/../fixtures/mcx-label-vectors.json');
         $script = dirname(__DIR__, 4).'/etc/skel/bin/createWebPublicCerts';
         foreach ($vectors as $vector) {
             if ($vector['kind'] !== 'service') continue;

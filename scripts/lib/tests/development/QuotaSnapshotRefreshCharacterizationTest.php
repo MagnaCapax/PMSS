@@ -63,9 +63,7 @@ PHP;
             .'echo json_encode([$result, $GLOBALS["trace"], $error]);';
         $run = $this->pmssExecInlinePhpWithTempStderr($script);
         $this->assertSame(0, $run['result']['rc'], (string) @file_get_contents($run['stderrPath']));
-        $decoded = json_decode($run['result']['output'], true);
-        $this->assertTrue(is_array($decoded), $run['result']['output']);
-        return $decoded;
+        return $this->pmssDecodeJsonArray($run['result']['output'], $run['result']['output']);
     }
 
     private function probeTrace(): array

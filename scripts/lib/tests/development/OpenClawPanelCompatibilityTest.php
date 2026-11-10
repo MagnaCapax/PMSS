@@ -35,7 +35,7 @@ class OpenClawPanelCompatibilityTest extends TestCase
                 $probe = $render('openclaw-probe.php', array('minBytes' => 1));
                 $this->assertSame('', $probe['stderr'], $version);
                 $this->assertSame(array($version === 'current', $version === 'current' ? 'off' : 'fallback'),
-                    json_decode($probe['stdout'], true), $version);
+                    $this->pmssDecodeJsonArray($probe['stdout']), $version);
                 foreach (array('welcome.php' => 10000, 'configure.php' => 4000) as $page => $minimum) {
                     $result = $render($page, array('minBytes' => $minimum));
                     $this->assertSame('', $result['stderr'], $version.' '.$page);
@@ -91,7 +91,7 @@ class OpenClawPanelCompatibilityTest extends TestCase
                     }
                     $result = $render('welcome.php', array('query' => 'status=1', 'minBytes' => 100));
                     $this->assertSame('', $result['stderr']);
-                    $status = json_decode($result['stdout'], true);
+                    $status = $this->pmssDecodeJsonArray($result['stdout']);
                     $this->assertSame('gave up', $status['apps']['openclaw']['state']);
                     $this->assertSame('running', $status['apps']['lighttpd']['state']);
                     $this->assertTrue(isset($status['apps']['rtorrent']));

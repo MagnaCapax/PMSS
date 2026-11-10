@@ -44,7 +44,7 @@ HTML;
         foreach (['operator', 'customer', 'operator,customer'] as $order) {
             $result = $this->pmssRunRepoPhpScriptCommand('scripts/lib/tests/fixtures/storageHealthNoticeContract.php', [$order]);
             $this->assertSame(0, $result['rc']);
-            $this->assertSame($expected, json_decode($result['output'], true), $order);
+            $this->assertSame($expected, $this->pmssDecodeJsonArray($result['output']), $order);
         }
     }
 

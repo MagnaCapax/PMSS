@@ -16,7 +16,7 @@ class UserRootArtifactPermissionsTest extends TestCase
             .'echo json_encode([$allowed, $GLOBALS["logs"]]);';
         $run = $this->pmssExecInlinePhpWithTempStderr($code);
         $this->assertSame(0, $run['result']['rc']);
-        return json_decode($run['result']['output'], true);
+        return $this->pmssDecodeJsonArray($run['result']['output']);
     }
 
     public function testUserOwnedRegularFileRemainsUnadopted(): void

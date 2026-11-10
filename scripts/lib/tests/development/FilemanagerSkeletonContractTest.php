@@ -93,8 +93,7 @@ PHP;
                 var_export($method, true), var_export($token, true), var_export($home.'/victim', true), var_export($source, true)
             ));
             $this->assertSame(0, $run['rc'], $run['output']);
-            $result = json_decode($run['output'], true);
-            $this->assertTrue(is_array($result), $run['output']);
+            $result = $this->pmssDecodeJsonArray($run['output'], $run['output']);
             $this->assertSame($case === 'POST-valid', !$result[1], $case);
             if ($case !== 'POST-valid') $this->assertSame(403, $result[0]);
         }
@@ -170,9 +169,8 @@ PHP;
                 var_export($files, true), var_export($body, true), var_export($home.'/victim', true), var_export($source, true)
             ));
             $this->assertSame(0, $run['rc'], $name.': '.$run['output']);
-            $result = json_decode($run['output'], true);
+            $result = $this->pmssDecodeJsonArray($run['output'], $run['output']);
             if (strpos($name, 'readonly-') === 0) {
-                $this->assertTrue(is_array($result), $run['output']);
                 $this->assertTrue($result[0] !== 403, $name);
                 $this->assertSame('keep', $result[1], $name);
             } else {
@@ -258,8 +256,7 @@ PHP;
         );
         $run = $this->pmssExecInlinePhp($script);
         $this->assertSame(0, $run['rc'], 'Filemanager settings probe failed: '.$run['output']);
-        $result = json_decode($run['output'], true);
-        $this->assertTrue(is_array($result), 'Filemanager settings probe did not return JSON: '.$run['output']);
+        $result = $this->pmssDecodeJsonArray($run['output'], 'Filemanager settings probe did not return JSON: '.$run['output']);
         $this->assertSame(['lang', 'error_reporting', 'show_hidden', 'hide_Cols', 'calc_folder'], array_keys($result['defaults']));
         $this->assertFalse($result['createdOnRead']);
         $this->assertTrue($result['saved']);
@@ -330,9 +327,7 @@ PHP;
         $script = sprintf($script, var_export($user, true), var_export($source, true));
         $run = $this->pmssExecInlinePhp($script);
         $this->assertSame(0, $run['rc'], 'Filemanager helper probe failed: '.$run['output']);
-        $result = json_decode($run['output'], true);
-        $this->assertTrue(is_array($result), 'Filemanager helper probe did not return JSON: '.$run['output']);
-        return $result;
+        return $this->pmssDecodeJsonArray($run['output'], 'Filemanager helper probe did not return JSON: '.$run['output']);
     }
 
     public function testSkeletonUsesCurrentFrontendAssetPins(): void

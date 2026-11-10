@@ -132,7 +132,7 @@ PHP;
             $script .= 'echo json_encode(["rc" => $rc, "commands" => $GLOBALS["commands"], "log" => $GLOBALS["log"]]);';
             $capture = $this->pmssExecInlinePhpWithTempStderr($script, ['PMSS_QUOTA_SNAPSHOT_MOUNT' => '/home']);
             $this->assertSame(0, $capture['result']['rc']);
-            $result = json_decode($capture['result']['output'], true);
+            $result = $this->pmssDecodeJsonArray($capture['result']['output']);
             $this->assertSame($alert ? 1 : 0, $result['rc']);
             $this->assertSame(['/fixture/repquota -u -n '.escapeshellarg('/home').' 2>&1'], $result['commands']);
             $this->assertSame($alert ? '###PMSS_QUOTA_ALERT repquota_failed mount=home rc='.$rc.PHP_EOL : '',

@@ -172,7 +172,7 @@ class UpdateQuotasGuardTest extends TestCase
         $result = $this->pmssExecShellCommand('timeout --kill-after=2s 5s '.$this->pmssBuildInlinePhpCommand($script));
 
         $this->assertSame(0, $result['rc'], 'Snapshot reads must finish without opening the FIFO');
-        $this->assertSame(array_merge([[$content, true]], array_fill(0, 6, ['', false])), json_decode($result['output'], true));
+        $this->assertSame(array_merge([[$content, true]], array_fill(0, 6, ['', false])), $this->pmssDecodeJsonArray($result['output']));
         $this->assertSame($content, file_get_contents($directory.'/regular'));
         $this->assertSame('fifo', filetype($directory.'/fifo'));
     }

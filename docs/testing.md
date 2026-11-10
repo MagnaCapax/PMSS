@@ -45,6 +45,10 @@ line output, or `pmssExecInlinePhpWithTempStderr()` for a tracked stderr file.
 Both reuse the shell runners; callers retain environment, redirection, timeout,
 process descriptors and assertions. These fixtures run only on testing machines.
 
+Array-shaped JSON outputs use `TestCase::pmssDecodeJsonArray()`; JSON fixture
+files use `pmssReadJsonArrayFile()`. Keep exit-status checks, scenario assertions
+and custom decode diagnostics at callers; nullable or scalar JSON stays explicit.
+
 Torrent-client operation fixtures use `TestCase::pmssMakeCallbacks($results,
 $events)` for callbacks that return a fixed value and, when an event array is
 passed, append their operation name to it. Results remain explicit, including

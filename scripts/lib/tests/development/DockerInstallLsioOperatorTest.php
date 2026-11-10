@@ -66,7 +66,7 @@ final class DockerInstallLsioOperatorTest extends TestCase
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame(
             ['argv' => $args, 'home' => $home, 'docker' => 'unix:///run/user/4321/docker.sock'],
-            json_decode($result['output'], true)
+            $this->pmssDecodeJsonArray($result['output'])
         );
         $this->assertFalse(file_exists($home.'/pmss-injected'));
     }
