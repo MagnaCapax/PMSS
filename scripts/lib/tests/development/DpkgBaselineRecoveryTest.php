@@ -32,6 +32,29 @@ class DpkgBaselineRecoveryTest extends TestCase
         $this->assertSame([], $result['trace']);
     }
 
+    public function testApplicationReleasesStagedSelectionsBeforePropagatingThrowables(): void
+    {
+        foreach (['RuntimeException', 'Error'] as $class) {
+            foreach ([
+                'summary', 'Applying dpkg selection baseline', 'Installing packages from selection baseline',
+                'Completing pending dpkg configuration', 'Attempting apt fix-broken install (dpkg baseline)',
+                'Retrying package selection install', '[ERROR] Package baseline installation still failing after retry',
+            ] as $boundary) {
+                $result = $this->fixture(['throwAt' => $boundary, 'throwClass' => $class, 'install' => [100, 100]]);
+                $this->assertTrue($result['sameFailure'], $boundary);
+                $this->assertTrue($result['cleaned'], $boundary);
+                $this->assertSame(['unlink', '/fixture/staged'], end($result['trace']));
+                $this->assertSame(1, count(array_filter($result['trace'], static function (array $row): bool {
+                    return $row[0] === 'unlink';
+                })));
+            }
+            // No staged file exists when the availability command fails.
+            $result = $this->fixture(['throwAt' => 'Refreshing dpkg availability database', 'throwClass' => $class]);
+            $this->assertTrue($result['sameFailure']);
+            $this->assertFalse($result['cleaned']);
+        }
+    }
+
     public function testFailedStagingRefusesRawBaselineBeforeSummaryAndPackageWrites(): void
     {
         $result = $this->fixture(['stage' => null]);
@@ -180,7 +203,10 @@ function exec($command, &$output, &$rc) {
     $rc = strpos($command, "'".$GLOBALS['options']['lock']."'") !== false && time() < $GLOBALS['busy'] ? 0 : 1;
 }
 function logMessage($message) { $GLOBALS['logs'][] = $message; }
-function logmsg($message) { logMessage($message); }
+function logmsg($message) {
+    if (($GLOBALS['options']['throwAt'] ?? '') === $message) throw $GLOBALS['failure'];
+    logMessage($message);
+}
 function pmssLogJson($row) { $GLOBALS['json'][] = $row; }
 function aptCmd($args) { return 'apt-get '.$args; }
 function dpkgCmd($args) { return 'dpkg '.$args; }
@@ -198,7 +224,10 @@ function pmssDpkgSelectionsSanitise($lines, $version) {
     return ['sanitised' => $GLOBALS['options']['sanitised'] ?? $lines, 'warnings' => $GLOBALS['options']['warnings'] ?? false];
 }
 function pmssWriteSanitisedDpkgSelectionsTempFile($lines) { $GLOBALS['trace'][] = ['stage', $lines]; return $GLOBALS['options']['stage']; }
-function pmssDpkgSelectionsLogSummary($plan) { $GLOBALS['trace'][] = ['summary']; }
+function pmssDpkgSelectionsLogSummary($plan) {
+    $GLOBALS['trace'][] = ['summary'];
+    if (($GLOBALS['options']['throwAt'] ?? '') === 'summary') throw $GLOBALS['failure'];
+}
 function pmssLogStatus($level, $message, $rc) { $GLOBALS['trace'][] = [$level, $message, $rc]; }
 function pmssRunProfiledCallable($description, $callback, $args) {
     if ($callback !== 'pmssApplyDpkgSelections') throw new \RuntimeException('Unexpected callback');
@@ -207,6 +236,7 @@ function pmssRunProfiledCallable($description, $callback, $args) {
 }
 function runStep($description, $command) {
     $GLOBALS['trace'][] = [$description, $command];
+    if (($GLOBALS['options']['throwAt'] ?? '') === $description) throw $GLOBALS['failure'];
     if ($description === 'Applying dpkg selection baseline') return $GLOBALS['options']['setRc'] ?? 0;
     $action = strpos($command, 'dselect-upgrade') !== false ? 'install'
         : (strpos($command, '--fix-broken') !== false ? 'fix'
@@ -228,6 +258,8 @@ PHP;
         }
         $script .= '$GLOBALS["clock"] = 0; $GLOBALS["busy"] = $GLOBALS["options"]["busy"];'
             .'$GLOBALS["trace"] = $GLOBALS["actions"] = $GLOBALS["logs"] = $GLOBALS["json"] = $GLOBALS["sleeps"] = []; $GLOBALS["cleaned"] = false;';
+        $script .= '$failureClass = $GLOBALS["options"]["throwClass"] ?? "RuntimeException";'
+            .'$GLOBALS["failure"] = new $failureClass("application fault"); $sameFailure = null; $ok = null; try {';
         if (($options['entry'] ?? '') === 'step2') {
             // Execute the actual orchestrator recovery block without running step2's system setup.
             $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
@@ -238,7 +270,8 @@ PHP;
         } else {
             $script .= '$ok = $GLOBALS["options"]["entry"] === "wait" ? pmssWaitForDpkgLocks($GLOBALS["options"]["budget"], 5) : pmssApplyDpkgSelections(12, true);';
         }
-        $script .= 'echo json_encode(["ok" => $ok, "actions" => $GLOBALS["actions"], "logs" => $GLOBALS["logs"],'
+        $script .= '} catch (\\Throwable $caught) { if ($caught !== $GLOBALS["failure"]) throw $caught; $sameFailure = true; }'
+            .'echo json_encode(["ok" => $ok, "sameFailure" => $sameFailure, "actions" => $GLOBALS["actions"], "logs" => $GLOBALS["logs"],'
             .'"json" => $GLOBALS["json"], "time" => $GLOBALS["clock"], "sleeps" => $GLOBALS["sleeps"], "cleaned" => $GLOBALS["cleaned"], "trace" => $GLOBALS["trace"]]);';
         return $this->pmssRunInlinePhpJson($script);
     }

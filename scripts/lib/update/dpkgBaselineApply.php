@@ -25,40 +25,43 @@ function pmssApplyDpkgSelections(?int $distroVersion = null, bool $skipUpdate = 
     );
 
     $tmpSelection = null;
-    $lines = @file($selectionPath, FILE_IGNORE_NEW_LINES);
-    if ($lines !== false) {
-        $runtimeVersion = function_exists('pmssDistroVersionFromEnv')
-            ? pmssDistroVersionFromEnv($distroVersion)
-            : (int) ($distroVersion ?? 0);
-        $selectionPlan = pmssDpkgSelectionsSanitise($lines, $runtimeVersion);
-        if (!empty($selectionPlan['sanitised'])) {
-            $tmpSelection = pmssWriteSanitisedDpkgSelectionsTempFile($selectionPlan['sanitised']);
-            if ($tmpSelection === null) {
-                logMessage('[ERROR] Refusing to apply raw dpkg selections baseline after sanitized baseline staging failed');
-                return false;
+    try {
+        $lines = @file($selectionPath, FILE_IGNORE_NEW_LINES);
+        if ($lines !== false) {
+            $runtimeVersion = function_exists('pmssDistroVersionFromEnv')
+                ? pmssDistroVersionFromEnv($distroVersion)
+                : (int) ($distroVersion ?? 0);
+            $selectionPlan = pmssDpkgSelectionsSanitise($lines, $runtimeVersion);
+            if (!empty($selectionPlan['sanitised'])) {
+                $tmpSelection = pmssWriteSanitisedDpkgSelectionsTempFile($selectionPlan['sanitised']);
+                if ($tmpSelection === null) {
+                    logMessage('[ERROR] Refusing to apply raw dpkg selections baseline after sanitized baseline staging failed');
+                    return false;
+                }
+                $selectionPath = $tmpSelection;
             }
-            $selectionPath = $tmpSelection;
+
+            pmssDpkgSelectionsLogSummary($selectionPlan);
         }
 
-        pmssDpkgSelectionsLogSummary($selectionPlan);
-    }
+        $success = runStep('Applying dpkg selection baseline',
+            sprintf('%s < %s', dpkgCmd('--set-selections'), escapeshellarg($selectionPath))) === 0;
 
-    $success = runStep('Applying dpkg selection baseline',
-        sprintf('%s < %s', dpkgCmd('--set-selections'), escapeshellarg($selectionPath))) === 0;
-
-    $installCmd = aptCmd('dselect-upgrade -y');
-    $rc = runStep('Installing packages from selection baseline', $installCmd);
-    if ($rc !== 0) {
-        $retryRc = pmssRecoverDpkgBaseline('Attempting apt fix-broken install (dpkg baseline)')
-            ? runStep('Retrying package selection install', $installCmd) : 1;
-        if ($retryRc !== 0) {
-            logmsg('[ERROR] Package baseline installation still failing after retry');
+        $installCmd = aptCmd('dselect-upgrade -y');
+        $rc = runStep('Installing packages from selection baseline', $installCmd);
+        if ($rc !== 0) {
+            $retryRc = pmssRecoverDpkgBaseline('Attempting apt fix-broken install (dpkg baseline)')
+                ? runStep('Retrying package selection install', $installCmd) : 1;
+            if ($retryRc !== 0) {
+                logmsg('[ERROR] Package baseline installation still failing after retry');
+            }
+            $success = $success && ($retryRc === 0);
         }
-        $success = $success && ($retryRc === 0);
-    }
-
-    if ($tmpSelection !== null) {
-        @unlink($tmpSelection);
+    } finally {
+        // Summary, command and recovery throwables must also release our staged file.
+        if ($tmpSelection !== null) {
+            @unlink($tmpSelection);
+        }
     }
 
     // GH#643: after the baseline install, HOLD fuse3 so an explicit `apt-get install fuse`

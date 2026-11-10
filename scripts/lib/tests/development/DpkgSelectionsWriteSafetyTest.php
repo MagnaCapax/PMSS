@@ -32,6 +32,41 @@ class DpkgSelectionsWriteSafetyTest extends TestCase
         }
     }
 
+    public function testStagingCleansUpPayloadAndWriteThrowablesBeforePropagatingThem(): void
+    {
+        foreach (['RuntimeException', 'Error'] as $class) {
+            foreach (['payload', 'write'] as $boundary) {
+                $script = <<<'PHP'
+namespace DpkgStagingFixture;
+function pmssCreatePrivateTempFile($prefix) { $GLOBALS['trace'][] = ['create', $prefix]; return '/fixture/staged'; }
+function implode($separator, $lines) {
+    if ($GLOBALS['boundary'] === 'payload') throw $GLOBALS['failure'];
+    return \implode($separator, $lines);
+}
+function pmssFileWriteComplete($path, $payload, $flags) {
+    $GLOBALS['trace'][] = ['write', $path, $payload, $flags];
+    throw $GLOBALS['failure'];
+}
+function unlink($path) { $GLOBALS['trace'][] = ['unlink', $path]; return true; }
+function logMessage($message) { $GLOBALS['trace'][] = ['log', $message]; }
+PHP;
+                $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/dpkgBaseline.php', 'DpkgStagingFixture');
+                $script .= '$class = '.var_export($class, true).'; $GLOBALS["failure"] = new $class("staging fault");'
+                    .'$GLOBALS["boundary"] = '.var_export($boundary, true).';'
+                    .'$GLOBALS["trace"] = []; $lines = ["fixture-package\tinstall"];';
+                $script .= '$same = false; try { pmssWriteSanitisedDpkgSelectionsTempFile($lines); }'
+                    .'catch (\\Throwable $caught) { $same = $caught === $GLOBALS["failure"]; }'
+                    .'echo json_encode(["same" => $same, "trace" => $GLOBALS["trace"]]);';
+                $expected = [['create', 'pmss-selections-']];
+                if ($boundary === 'write') {
+                    $expected[] = ['write', '/fixture/staged', "fixture-package\tinstall".PHP_EOL, LOCK_EX];
+                }
+                $expected[] = ['unlink', '/fixture/staged'];
+                $this->assertSame(['same' => true, 'trace' => $expected], $this->pmssRunInlinePhpJson($script));
+            }
+        }
+    }
+
     /** Confine resource limits and signal handling to a disposable PHP child. */
     private function stageWithFileSizeLimit(array $lines, int $limit): array
     {

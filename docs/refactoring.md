@@ -162,6 +162,15 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Dpkg selections staging removes its private temporary file if payload assembly
+or writing throws; only a complete write transfers cleanup to the application
+controller. That controller removes the staged file in `finally`, including
+summary, command and recovery failures, before propagating the original exception
+or error. Normal cleanup still precedes the fuse3 hold. Package commands, retry
+ordering, warnings, return values and staging refusal retain their contracts
+(ADR 0261). `DpkgSelectionsWriteSafetyTest` and `DpkgBaselineRecoveryTest` inject
+these faults; execution stays on the testing machine.
+
 Operator and customer qBittorrent build probes attempt every cleanup stage even
 when an earlier stage throws: process-group signal, direct-child termination,
 stdout close, process reap, then private-profile removal. Later cleanup retains

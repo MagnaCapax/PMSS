@@ -58,12 +58,19 @@ function pmssWriteSanitisedDpkgSelectionsTempFile(array $sanitised): ?string
         logMessage('[ERROR] Unable to create temporary file for sanitized dpkg selections baseline');
         return null;
     }
-    $payload = implode(PHP_EOL, $sanitised).PHP_EOL;
-    // Never hand dpkg a truncated baseline after a short filesystem write.
-    if (pmssFileWriteComplete($tmpSelection, $payload, LOCK_EX)) {
-        return $tmpSelection;
+    $complete = false;
+    try {
+        $payload = implode(PHP_EOL, $sanitised).PHP_EOL;
+        // A complete write transfers cleanup to the caller; short writes never reach dpkg.
+        $complete = pmssFileWriteComplete($tmpSelection, $payload, LOCK_EX);
+        if ($complete) {
+            return $tmpSelection;
+        }
+    } finally {
+        if (!$complete) {
+            @unlink($tmpSelection);
+        }
     }
-    @unlink($tmpSelection);
     logMessage('[ERROR] Unable to write temporary file for sanitized dpkg selections baseline');
     return null;
 }
