@@ -773,6 +773,14 @@ Sub-handlers:
 
 ## Web Stack & System Prep
 
+- Managed lighttpd proxies retain `scripts/lib/lighttpd/proxyFragments.php` as
+  their include and publication boundary. `proxyRoutes.php` selects and frames
+  routes, `proxyRule.php` renders conditionals, and `proxyPorts.php` adopts or
+  allocates ports (ADR 0263). Public helpers, fragment bytes, catalog policy,
+  legacy aliases, sibling-conflict refusal/yield behavior, 1024–65500 port
+  bounds and 0640 writes retain their contracts. Redirects precede homogeneous
+  proxy rules; unknown catalog names still return an empty fragment.
+
 - pmssConfigureWebStack(): void
   - Disables/stops system lighttpd; limits lingering `lighttpd` and `php-cgi` cleanup to the effective UIDs of `root` and `www-data`, preserving tenant processes and the existing low-space stop guard. Missing service accounts skip their cleanup.
   - Enables nginx, regenerates all per-user nginx configs from the freshly staged templates without restarting nginx, and hardens `/home` perms.

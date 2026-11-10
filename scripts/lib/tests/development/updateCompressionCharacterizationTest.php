@@ -93,8 +93,11 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 'forbidden' => ['function pmssSshdStarvation'.'DropinTemplatePath(' => 'the sole drop-in caller should resolve its template directly'],
             ],
             'scripts/lib/lighttpd/proxyFragments.php' => [
-                'required' => ["\$fragment .= '\$HTTP[\"url\"] == \"'.\$rule[1]"],
-                'forbidden' => ['function pmssLighttpdProxyExact'.'RedirectFragment(' => 'the sole redirect renderer should stay in the rule branch'],
+                'required' => ["require_once __DIR__.'/proxyRoutes.php';", "require_once __DIR__.'/proxyPorts.php';"],
+            ],
+            'scripts/lib/lighttpd/proxyRoutes.php' => [
+                'required' => ["\$fragment .= '\$HTTP[\"url\"] == \"'.\$base"],
+                'forbidden' => ['function pmssLighttpdProxyExact'.'RedirectFragment(' => 'the sole redirect renderer should stay with route framing'],
             ],
             'scripts/lib/lighttpd/watchdogSocketListeners.php' => [
                 'required' => ['function pmssLighttpdWatchdogListeningSocketSnapshot(', 'function pmssLighttpdWatchdogSocketPathsFromLines('],
