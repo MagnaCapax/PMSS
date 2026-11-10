@@ -124,6 +124,17 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `scripts/lib/user/directories.php` retains `pmssEnsureDir()`,
+  `pmssEnsureUserHomeDir()` and `pmssAccountDirectoryEnsure()` through its loaded
+  account and managed-directory modules (ADR 0258). Validation and ancestor
+  authority routing precede mutations. Account paths execute as that account;
+  the managed traversal retains root-owner and writable-ancestor refusals.
+  Leaf mode repair precedes UID/GID inspection; both IDs are read before either
+  ownership repair, owner precedes group, and one successful repair logs once.
+  Failed metadata changes retain the existing fail-soft result; throwables
+  propagate without a fabricated success note. Creation restores umask before
+  logging, returning or propagating a failure.
+
 - `pmssConfigAssignments(iterable $lines)` yields `name => value` assignments
   split at the first `=`. Missing separators are skipped; empty fields,
   whitespace, control bytes and duplicate assignments are preserved. Systemd,

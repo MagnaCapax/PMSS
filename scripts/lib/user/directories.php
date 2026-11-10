@@ -18,52 +18,8 @@
 require_once dirname(__DIR__).'/pathSafety.php';
 require_once dirname(__DIR__).'/lighttpd/accountPath.php';
 
-/** Create and repair home directories with the account's own authority. */
-function pmssAccountDirectoryEnsure(
-    string $user, string $home, string $path, int $mode, int $parentMode, ?callable $logger = null
-): bool
-{
-    $home = rtrim($home, '/');
-    if ($mode < 0 || $mode > 0777 || $parentMode < 0 || $parentMode > 0777
-        || !pmssPathTargetIsSafe($home, true) || !is_dir($home)
-        || ($path !== $home && strpos($path, $home.'/') !== 0)
-        || !pmssPathSegmentsAreSafe($path, false, true)) {
-        return false;
-    }
-    if ($path === $home) {
-        $target = escapeshellarg($home);
-        $command = 'test ! -L '.$target
-            .' && chmod '.sprintf('%04o', $mode).' -- '.$target;
-        return pmssAccountPathRun($user, $home, [$home.'/.pmss-directory-check'], $command);
-    }
-    $relative = substr($path, strlen($home) + 1);
-    $parts = explode('/', $relative);
-    $current = $home;
-    foreach ($parts as $index => $part) {
-        if ($part === '') return false;
-        $current .= '/'.$part;
-        clearstatcache(true, $current);
-        $before = @lstat($current);
-        if (is_link($current) || (file_exists($current) && !is_dir($current))) return false;
-        $wanted = $index === count($parts) - 1 ? $mode : $parentMode;
-        $target = escapeshellarg($current);
-        $command = 'test ! -L '.$target.' && { test -d '.$target
-            .' || mkdir -m '.sprintf('%04o', $wanted).' -- '.$target.'; }';
-        if ($index === count($parts) - 1) {
-            $command .= ' && chmod '.sprintf('%04o', $wanted).' -- '.$target;
-        }
-        if (!pmssAccountPathRun($user, $home, [$current], $command)) {
-            return false;
-        }
-        if ($logger !== null && !is_array($before)) $logger('[WARN] Created directory: '.$current);
-        if ($logger !== null && is_array($before) && $index === count($parts) - 1
-            && (((int) $before['mode']) & 0777) !== $wanted) {
-            $logger('[WARN] Updated directory mode: '.$current);
-        }
-    }
-    clearstatcache(true, $path);
-    return is_dir($path) && !is_link($path);
-}
+require_once __DIR__.'/directoryAccount.php';
+require_once __DIR__.'/directoryManaged.php';
 
 if (!function_exists('pmssEnsureDir')) {
     /**
@@ -106,18 +62,14 @@ if (!function_exists('pmssEnsureDir')) {
 
         $wantUid = null;
         $wantGid = null;
-        if ($ownerUser !== null && function_exists('posix_getpwnam')) {
-            $pw = @posix_getpwnam($ownerUser);
-            if (is_array($pw) && isset($pw['uid'], $pw['gid'])) {
-                $wantUid = (int)$pw['uid'];
-                $wantGid = (int)$pw['gid'];
-            }
+        if ($ownerUser !== null && function_exists('posix_getpwnam')
+            && is_array($pw = @posix_getpwnam($ownerUser)) && isset($pw['uid'], $pw['gid'])) {
+            $wantUid = (int)$pw['uid'];
+            $wantGid = (int)$pw['gid'];
         }
-        if ($ownerGroup !== null && function_exists('posix_getgrnam')) {
-            $gr = @posix_getgrnam($ownerGroup);
-            if (is_array($gr) && isset($gr['gid'])) {
-                $wantGid = (int)$gr['gid'];
-            }
+        if ($ownerGroup !== null && function_exists('posix_getgrnam')
+            && is_array($gr = @posix_getgrnam($ownerGroup)) && isset($gr['gid'])) {
+            $wantGid = (int)$gr['gid'];
         }
 
         $isRoot = function_exists('posix_geteuid') ? (posix_geteuid() === 0) : false;
@@ -139,82 +91,7 @@ if (!function_exists('pmssEnsureDir')) {
             if ($wantUid !== null && $wantUid !== 0) return false;
         }
 
-        // mkdir -p equivalent with per-segment modes (parents vs leaf).
-        $segments = explode('/', ltrim($path, '/'));
-        $current = '';
-        $lastIndex = count($segments) - 1;
-        foreach ($segments as $i => $segment) {
-            if ($segment === '') {
-                continue;
-            }
-            $current .= '/'.$segment;
-            if (is_link($current)) {
-                $log('[WARN] Refusing to ensure dir; parent is a symlink: '.$current);
-                return false;
-            }
-            $existing = @lstat($current);
-            if ($isRoot && is_array($existing)
-                && ((int) $existing['uid'] !== 0 || (((int) $existing['mode']) & 0022) !== 0)) {
-                return false;
-            }
-            if (is_dir($current)) {
-                continue;
-            }
-            if (file_exists($current)) {
-                $log('[WARN] Refusing to ensure dir; parent path exists and is not a directory: '.$current);
-                return false;
-            }
-
-            $modeForThis = ($i === $lastIndex) ? $mode : $parentMode;
-            if ($isRoot && $wantUid !== null && $wantUid !== 0) return false;
-            $oldUmask = umask(0);
-            try {
-                $made = @mkdir($current, $modeForThis);
-            } finally {
-                // A creation throwable must not leave later writes unmasked.
-                umask($oldUmask);
-            }
-            if (!$made) {
-                $log('[WARN] Failed to create directory: '.$current);
-                return false;
-            }
-            $log('[WARN] Created directory: '.$current);
-        }
-
-        // Converge leaf perms/ownership when the directory already existed.
-        $leafMode = @fileperms($path);
-        if ($leafMode !== false) {
-            $leafMode = $leafMode & 0777;
-            if ($leafMode !== ($mode & 0777)) {
-                if (@chmod($path, $mode)) {
-                    // Refresh stat cache so callers observe updated permissions.
-                    clearstatcache(true, $path);
-                    $log('[WARN] Updated directory mode: '.$path);
-                }
-            }
-        }
-
-        if ($isRoot && ($wantUid !== null || $wantGid !== null) && is_dir($path)) {
-            $changedOwner = false;
-            $curUid = @fileowner($path);
-            $curGid = @filegroup($path);
-            if ($wantUid !== null && $curUid !== false && (int)$curUid !== $wantUid) {
-                if (@chown($path, $wantUid)) {
-                    $changedOwner = true;
-                }
-            }
-            if ($wantGid !== null && $curGid !== false && (int)$curGid !== $wantGid) {
-                if (@chgrp($path, $wantGid)) {
-                    $changedOwner = true;
-                }
-            }
-            if ($changedOwner) {
-                $log('[WARN] Updated directory ownership: '.$path);
-            }
-        }
-
-        // Avoid noise: if nothing was created and no perms/ownership changed, pmssEnsureDir is silent.
-        return is_dir($path);
+        return pmssDirectoryManagedEnsure($path, $mode, $wantUid, $wantGid, $isRoot, $log, $parentMode);
     }
 }
 

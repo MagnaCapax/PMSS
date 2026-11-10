@@ -59,7 +59,7 @@ function fclose($handle) { observe('close'); return \fclose($handle); }
 function pmssRegularFilePathIsReadable($path) { return true; }
 PHP;
         $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'CreationUmaskFixture');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/directories.php', 'CreationUmaskFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/directories.php', 'CreationUmaskFixture', ['directoryManaged.php']);
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/diagnostics.php', 'CreationUmaskFixture');
         $script .= <<<'PHP'
 $results = [];
