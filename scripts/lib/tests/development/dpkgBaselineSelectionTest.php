@@ -60,7 +60,7 @@ class DpkgBaselineSelectionTest extends TestCase
 
         $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
 
-        if (is_readable($this->dpkgDir().'/selections-debian9.txt')) {
+        if (is_readable(dirname(__DIR__, 2).'/update/dpkg/selections-debian9.txt')) {
             $this->assertStringContainsString('selections-debian9.txt', $path);
             $this->assertEquals([], $logs, 'Did not expect warnings when Debian 9 baseline exists');
             return;
@@ -82,15 +82,10 @@ class DpkgBaselineSelectionTest extends TestCase
         $this->assertEquals([], $logs, 'Did not expect warnings when distro version is unknown');
     }
 
-    private function dpkgDir(): string
-    {
-        return dirname(__DIR__, 2).'/update/dpkg';
-    }
-
     private function latestValidatedBaselineMajor(): int
     {
         $baselines = [];
-        foreach (glob($this->dpkgDir().'/selections-debian*.txt') ?: [] as $path) {
+        foreach (glob(dirname(__DIR__, 2).'/update/dpkg/selections-debian*.txt') ?: [] as $path) {
             if (preg_match('/selections-debian([0-9]+)\\.txt$/', $path, $match)) {
                 $major = (int) $match[1];
                 if ($major <= 12) {

@@ -19,7 +19,9 @@ class ArrUpdateTest extends TestCase
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
 
         try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->pmssWithPathPrefixedEnv($shimDir, [
+                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
@@ -47,7 +49,9 @@ class ArrUpdateTest extends TestCase
         $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
 
         try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->pmssWithPathPrefixedEnv($shimDir, [
+                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
@@ -69,7 +73,11 @@ class ArrUpdateTest extends TestCase
         $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
 
         try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath): void { $this->runArrUpdate($app, $installPath, $metadataPath, 'PackageDir'); });
+            $this->pmssWithPathPrefixedEnv($shimDir, [
+                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath): void {
+                $this->runArrUpdate($app, $installPath, $metadataPath, 'PackageDir');
+            });
 
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
             $this->assertEquals([], glob($workPattern) ?: [], 'expected workspace cleanup after download failure');
@@ -92,7 +100,9 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir, 'amd64');
 
         try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->pmssWithPathPrefixedEnv($shimDir, [
+                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)-.*\.tar\.gz/');
             });
 
@@ -115,7 +125,9 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir, 'amd64');
 
         try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->pmssWithPathPrefixedEnv($shimDir, [
+                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)(?:-.*)?\.tar\.gz/');
             });
 
@@ -237,7 +249,9 @@ class ArrUpdateTest extends TestCase
         $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
         try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->pmssWithPathPrefixedEnv($shimDir, [
+                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
@@ -293,7 +307,9 @@ class ArrUpdateTest extends TestCase
         $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
         try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->pmssWithPathPrefixedEnv($shimDir, [
+                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
@@ -364,13 +380,6 @@ class ArrUpdateTest extends TestCase
 
         $this->pmssWriteFile($metadataPath, json_encode([$payload]));
         return $metadataPath;
-    }
-
-    private function withArrShim(string $shimDir, callable $callback, array $env = []): void
-    {
-        $this->pmssWithPathPrefixedEnv($shimDir, array_merge([
-            'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
-        ], $env), $callback);
     }
 
     private function writeCurlShim(string $baseDir, string $architecture = ''): string
