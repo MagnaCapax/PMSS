@@ -19,18 +19,12 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         return $user !== '' ? $user : 'root';
     }
 
-    private function noOpLogFn(): callable
-    {
-        return static function (string $message, bool $force = true): void {
-        };
-    }
-
     private function quarantineCustomConfig(string $user = '', ?callable $logFn = null): ?string
     {
         return \rtorrentCustomConfigQuarantine(
             $this->tempHome,
             $user !== '' ? $user : $this->resolveTestUser(),
-            $logFn ?? $this->noOpLogFn()
+            $logFn ?? $this->pmssMakeCallbacks(['log' => null])['log']
         );
     }
 
@@ -68,7 +62,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         $this->pmssWriteRelativeFile($targetHome, '.rtorrent.rc.custom', "broken_line\n");
         $this->pmssCreateSymlinkOrSkip($targetHome, $linkHome);
 
-        $dst = \rtorrentCustomConfigQuarantine($linkHome, $this->resolveTestUser(), $this->noOpLogFn());
+        $dst = \rtorrentCustomConfigQuarantine($linkHome, $this->resolveTestUser(), $this->pmssMakeCallbacks(['log' => null])['log']);
 
         $this->assertTrue($dst === null);
         $this->assertTrue(is_link($linkHome), 'Home symlink should remain untouched');

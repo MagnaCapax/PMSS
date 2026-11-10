@@ -77,20 +77,6 @@ class CustomerBackupTest extends TestCase
         return $this->pmssWriteFile($this->home.'/'.$filename, $encoded);
     }
 
-    private function pmssArchiveFileContent(string $archivePath, string $member): string
-    {
-        $archive = new \PharData($archivePath);
-        $prefix = 'phar://'.$archivePath.'/';
-        foreach (new \RecursiveIteratorIterator($archive, \RecursiveIteratorIterator::SELF_FIRST) as $entry) {
-            if ($entry->getPathname() === $prefix.$member) {
-                return $entry->getContent();
-            }
-        }
-
-        $this->fail('Expected archive member: '.$member);
-        return '';
-    }
-
     public function testCandidateSetCoversTorrentClientsWithoutMediaData(): void
     {
         $candidates = \pmssCustomerBackupRelativePaths();
@@ -329,7 +315,14 @@ class CustomerBackupTest extends TestCase
         $this->assertTrue($result['ok'], $result['message']);
         $this->assertSame('new-config', (string) file_get_contents($this->home.'/.rtorrent.rc'));
         $this->assertMatches('#/\.pmss-pre-restore-[0-9]{8}-[0-9]{6}(?:-[0-9]{2})?\.tar\.gz\z#', $result['snapshotPath']);
-        $this->assertSame('old-config', $this->pmssArchiveFileContent($result['snapshotPath'], '.rtorrent.rc'));
+        $snapshot = new \PharData($result['snapshotPath']);
+        foreach (new \RecursiveIteratorIterator($snapshot, \RecursiveIteratorIterator::SELF_FIRST) as $entry) {
+            if ($entry->getPathname() === 'phar://'.$result['snapshotPath'].'/.rtorrent.rc') {
+                $this->assertSame('old-config', $entry->getContent());
+                return;
+            }
+        }
+        $this->fail('Expected archive member: .rtorrent.rc');
     }
 
     public function testRestoreRefusesRtorrentConfigWhenSessionLockExists(): void

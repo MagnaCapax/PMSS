@@ -32,7 +32,8 @@ class ErrorPageTemplateTest extends TestCase
             ['var/www/error-404.html', '/404_images/404-', 32, true],
             ['var/www/error-502.html', '/502_images/502-', 13, true],
         ] as [$path, $prefix, $count, $hasHomeLink]) {
-            $contents = $this->assertErrorPageImagePool($path, $prefix, $count);
+            $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings($path,
+                ['data-error-image-prefix="'.$prefix.'"', 'data-error-image-count="'.$count.'"', '<script src="/error-page.js"></script>']);
             $this->assertStringContainsString('data-error-image-ext="jpg"', $contents, $path);
             $this->assertImageFilesExist(ltrim($prefix, '/'), $count);
             if ($hasHomeLink) {
@@ -43,7 +44,8 @@ class ErrorPageTemplateTest extends TestCase
 
     public function testLandingPageKeepsLinksAndImagePool(): void
     {
-        $contents = $this->assertErrorPageImagePool('var/www/index.html', '/landing_images/landing-', 5);
+        $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('var/www/index.html',
+            ['data-error-image-prefix="/landing_images/landing-"', 'data-error-image-count="5"', '<script src="/error-page.js"></script>']);
         $this->assertStringContainsAllStrings([
             '<!DOCTYPE html>', '<html lang="en">', 'Pulsed Media Seedbox Server',
             '/user-YOURUSERNAME/', 'data-error-image-ext="jpg"',
@@ -149,10 +151,5 @@ class ErrorPageTemplateTest extends TestCase
             $path = 'var/www/'.$prefix.$number.'.jpg';
             $this->assertTrue(is_file($this->pmssRepoPath($path)), $path.' is missing');
         }
-    }
-
-    private function assertErrorPageImagePool(string $path, string $prefix, int $count): string
-    {
-        return $this->pmssAssertRepoFileContainsAndOmitsStrings($path, ['data-error-image-prefix="'.$prefix.'"', 'data-error-image-count="'.$count.'"', '<script src="/error-page.js"></script>']);
     }
 }

@@ -73,12 +73,12 @@ final class AppProfilesTest extends TestCase
 
     public function testHermesGateBoundariesAndExistingInstall(): void
     {
-        $home = $this->tempDir.'/hermes';
+        $home = $this->tempDir.'/fixtur01';
         $this->pmssEnsureDir($home.'/bin');
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $user = ['memory' => 1000];
-        $ops = ['host' => 'node.example.com', 'port' => static function () { return 24000; },
-            'read' => static function () { return '^/user-hermes/hermes/'; }];
+        $ops = ['host' => 'node.example.com'] + $this->pmssMakeCallbacks([
+            'port' => 24000, 'read' => '^/user-fixtur01/hermes/']);
         $this->assertSame(null, \pmssAddUserHermesGate($user, $home, ['used' => 100, 'soft' => 100100], $ops));
         foreach ([null, ['used' => 101, 'soft' => 100100], ['used' => 0, 'soft' => 0]] as $files) {
             $this->assertStringContainsString('file quota', \pmssAddUserHermesGate($user, $home, $files));
@@ -93,12 +93,12 @@ final class AppProfilesTest extends TestCase
     {
         $home = $this->tempDir.'/fixtur01';
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
-        $ops = ['host' => 'node.example.com', 'port' => static function () { return 24000; },
-            'read' => static function () { return '^/user-fixtur01/hermes/'; }];
+        $ops = ['host' => 'node.example.com'] + $this->pmssMakeCallbacks([
+            'port' => 24000, 'read' => '^/user-fixtur01/hermes/']);
         $files = ['used' => 0, 'soft' => 100000];
         $this->assertSame(null, \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $ops));
         foreach ([null, 0, 443, 1023] as $port) {
-            $bad = array_replace($ops, ['port' => static function () use ($port) { return $port; }]);
+            $bad = array_replace($ops, $this->pmssMakeCallbacks(['port' => $port]));
             $this->assertSame('reserved Hermes port unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
         }
         foreach (['', 'localhost', 'user@node.example.com', 'node.example.com:846', "node.example.com\n"] as $host) {

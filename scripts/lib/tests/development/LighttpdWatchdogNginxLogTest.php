@@ -92,14 +92,9 @@ PHP;
             .'" pmss_upstream_status="'.$upstreamStatus.'" pmss_upstream_header_time="'.$headerTime.'"' . "\n";
     }
 
-    private function failureEvent(int $port = 25000): array
-    {
-        return array('port' => $port, 'outcome' => 'failure');
-    }
-
     public function testParserClassifiesNoHeader502AsTransportFailure(): void
     {
-        $this->assertSame($this->failureEvent(), \pmssLighttpdWatchdogNginxEventParse($this->nginxLine(25000)));
+        $this->assertSame(array('port' => 25000, 'outcome' => 'failure'), \pmssLighttpdWatchdogNginxEventParse($this->nginxLine(25000)));
     }
 
     public function testNginxTemplateEmitsTheParserSuffix(): void
@@ -140,7 +135,7 @@ PHP;
     {
         $state = array();
         for ($cycle = 1; $cycle <= 3; $cycle++) {
-            $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'fixtur01']);
+            $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [array('port' => 25000, 'outcome' => 'failure')], [25000 => 'fixtur01']);
             $state = array('users' => $result['users']);
             $this->assertSame($cycle === 3 ? array('fixtur01' => 'restart') : array(), $result['actions']);
         }
@@ -150,7 +145,7 @@ PHP;
     {
         $result = \pmssLighttpdWatchdogNginxStateAdvance(
             array(),
-            [$this->failureEvent(), $this->failureEvent(), $this->failureEvent()],
+            array_fill(0, 3, array('port' => 25000, 'outcome' => 'failure')),
             [25000 => 'fixtur01']
         );
         $this->assertSame(1, $result['users']['fixtur01']['failureCycles']);
@@ -161,7 +156,7 @@ PHP;
     {
         $state = array('users' => array('fixtur01' => array('failureCycles' => 2, 'recoveryStage' => 1)));
         $events = [
-            $this->failureEvent(),
+            array('port' => 25000, 'outcome' => 'failure'),
             array('port' => 25000, 'outcome' => 'healthy'),
         ];
         $result = \pmssLighttpdWatchdogNginxStateAdvance($state, $events, [25000 => 'fixtur01']);
@@ -172,7 +167,7 @@ PHP;
     public function testContinuedFailureAfterRestartEscalatesToReconfigure(): void
     {
         $state = array('users' => array('fixtur01' => array('failureCycles' => 2, 'recoveryStage' => 1)));
-        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'fixtur01']);
+        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [array('port' => 25000, 'outcome' => 'failure')], [25000 => 'fixtur01']);
         $this->assertSame(array('fixtur01' => 'reconfigure'), $result['actions']);
         $this->assertSame(2, $result['users']['fixtur01']['recoveryStage']);
     }
@@ -180,7 +175,7 @@ PHP;
     public function testExhaustedRecoveryDoesNotRepeatDestructiveActions(): void
     {
         $state = array('users' => array('fixtur01' => array('failureCycles' => 2, 'recoveryStage' => 2)));
-        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [$this->failureEvent()], [25000 => 'fixtur01']);
+        $result = \pmssLighttpdWatchdogNginxStateAdvance($state, [array('port' => 25000, 'outcome' => 'failure')], [25000 => 'fixtur01']);
         $this->assertSame(array(), $result['actions']);
         $this->assertSame(0, $result['users']['fixtur01']['failureCycles']);
     }
