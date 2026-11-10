@@ -9,23 +9,27 @@ function pmssQbittorrentFrontendBuildProbe(string $binary, array $ops = []): ?st
     if (!@mkdir($profile, 0700)) return null;
     $env = ['PATH' => getenv('PATH') ?: '/usr/bin:/bin', 'HOME' => $profile, 'XDG_CONFIG_HOME' => $profile.'/.config',
         'XDG_DATA_HOME' => $profile.'/.local/share', 'XDG_CACHE_HOME' => $profile.'/.cache'];
-    $process = @proc_open('exec setsid '.escapeshellarg($binary).' --version',
-        [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, $profile, $env);
-    if (!is_resource($process)) { pmssQbittorrentFrontendBuildProbeClean($profile); return null; }
-    stream_set_blocking($pipes[1], false);
-    $clock = $ops['clock'] ?? static function (): float { return microtime(true); };
-    $pause = $ops['pause'] ?? static function (): void { usleep(10000); };
-    $deadline = $clock() + 2;
-    $output = '';
-    $status = proc_get_status($process);
-    $pid = $status['pid'];
-    $exitCode = $status['exitcode'] >= 0 ? $status['exitcode'] : null;
+    $process = null; $pipes = []; $pid = null;
     $complete = false;
     try {
+        $process = @proc_open('exec setsid '.escapeshellarg($binary).' --version',
+            [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, $profile, $env);
+        if (!is_resource($process)) return null;
+        // Capture the group identity before setup or injected clocks can fail.
+        $status = proc_get_status($process);
+        if ($status === false) return null;
+        $pid = $status['pid'];
+        $exitCode = $status['exitcode'] >= 0 ? $status['exitcode'] : null;
+        if (!stream_set_blocking($pipes[1], false)) return null;
+        $clock = $ops['clock'] ?? static function (): float { return microtime(true); };
+        $pause = $ops['pause'] ?? static function (): void { usleep(10000); };
+        $deadline = $clock() + 2;
+        $output = '';
         do {
             $chunk = @stream_get_contents($pipes[1], 4097 - strlen($output));
             if (is_string($chunk)) $output .= $chunk;
             $status = proc_get_status($process);
+            if ($status === false) return null;
             if ($status['exitcode'] >= 0) $exitCode = $status['exitcode'];
             if (!$status['running'] && feof($pipes[1])) { $complete = true; break; }
             if (strlen($output) > 4096 || $clock() >= $deadline) break;
@@ -34,20 +38,20 @@ function pmssQbittorrentFrontendBuildProbe(string $binary, array $ops = []): ?st
     } finally {
         // Each cleanup owns the next: a thrown failure must not strand later resources.
         try {
-            if (!$complete) {
+            if (is_resource($process) && !$complete) {
                 // setsid makes pid the group leader; terminate descendants too.
                 try {
-                    @posix_kill(-$pid, 9);
+                    if ($pid !== null && $pid > 0) @posix_kill(-$pid, 9);
                 } finally {
                     @proc_terminate($process, 9);
                 }
             }
         } finally {
             try {
-                fclose($pipes[1]);
+                if (isset($pipes[1]) && is_resource($pipes[1])) fclose($pipes[1]);
             } finally {
                 try {
-                    $closed = proc_close($process);
+                    if (is_resource($process)) $closed = proc_close($process);
                 } finally {
                     pmssQbittorrentFrontendBuildProbeClean($profile);
                 }

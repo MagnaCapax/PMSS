@@ -325,6 +325,14 @@ the existing false/empty-list failure results. Valid filename bytes, listing
 commands, and member validation remain unchanged. `ArchiveListingPathSafetyTest`
 covers these boundaries with recording dependencies on the testing machine.
 
+Operator and customer qBittorrent version probes own their private profile,
+process and stdout pipe throughout launch and setup, including thrown failures.
+A failed nonblocking request or process-status read returns the existing `null`
+result through cleanup; no read runs on a pipe left blocking. Group signals
+require an observed positive PID. Normal captures, output limits and exit-code
+precedence remain covered by `QbittorrentBuildCleanupSafetyTest` and the deadline
+fixtures, which execute only on the testing machine.
+
 The shared rTorrent template explicitly sets `network.http.cacert.set` to
 `/etc/ssl/certs/ca-certificates.crt`, the Debian CA bundle, so static store builds
 do not depend on their compiled-in CA path. Certificate and hostname verification
