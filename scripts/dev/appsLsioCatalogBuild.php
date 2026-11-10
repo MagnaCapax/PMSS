@@ -75,13 +75,16 @@ function pmssLsioCatalogWrite(string $target, string $output): bool
         return false;
     }
 
-    // A short write or failed mode change must leave the previous snapshot intact.
-    $ready = pmssFileWriteComplete($temporary, $output) && @chmod($temporary, 0644);
-    if (!$ready || !@rename($temporary, $target)) {
-        @unlink($temporary);
-        return false;
+    $published = false;
+    try {
+        // A short write or failed mode change must leave the previous snapshot intact.
+        $ready = pmssFileWriteComplete($temporary, $output) && @chmod($temporary, 0644);
+        $published = $ready && @rename($temporary, $target);
+        return $published;
+    } finally {
+        // Unpublished files also need cleanup when writing, chmod or rename throws.
+        if (!$published) @unlink($temporary);
     }
-    return true;
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {

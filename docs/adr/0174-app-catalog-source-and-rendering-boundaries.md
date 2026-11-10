@@ -46,6 +46,12 @@ builder filtering and ordering, generator reproducibility, standalone snapshot
 loading, escaped row markup, optional tags, and category boundaries. Existing
 panel render tests continue to cover the two page layouts.
 
+The catalog writer cleans unpublished temporary files in `finally`, including
+when writing, setting the public read mode, or renaming throws. Complete writes,
+mode `0644`, rename order and boolean results remain unchanged. The isolated
+`LsioCatalogCleanupSafetyTest` covers false returns, exceptions and errors at
+each boundary without filesystem mutations; execution belongs on the testing VM.
+
 ## References
 
 - [Apps catalog](0088-panel-apps-catalog-tab.md)
