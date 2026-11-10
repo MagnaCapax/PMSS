@@ -93,6 +93,30 @@ class LighttpdSocketRetryCharacterizationTest extends TestCase
         }
     }
 
+    public function testNativeConnectionRejectsMalformedPathsBeforeOpeningASocket(): void
+    {
+        $script = <<<'PHP'
+namespace SocketPathFixture;
+function fsockopen($path, $port, &$errno, &$errstr, $timeout) {
+    throw new \LogicException('Malformed path reached socket transport');
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/watchdogSocketProbe.php', 'SocketPathFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach (['', "\0", "\0/socket", "/soc\0ket", "/socket\0", "/socket\0ignored"] as $path) {
+    $results[] = pmssLighttpdWatchdogSocketConnect($path, 7);
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script);
+        $this->assertSame(['ok' => false, 'errno' => 0, 'errstr' => 'socket path missing'], $results[0]);
+        foreach (array_slice($results, 1) as $result) {
+            $this->assertSame(['ok' => false, 'errno' => 0, 'errstr' => 'socket path invalid'], $result);
+        }
+        $this->assertSame(6, count($results));
+    }
+
     public function testNativeConnectionSuccessAlsoRequiresCleanErrorFieldsAndClosesTheStream(): void
     {
         $script = <<<'PHP'
@@ -110,15 +134,20 @@ $results = [];
 foreach ([[true, 0, ''], [false, 111, 'refused'], [true, 111, ''], [true, 0, 'warning'], [false, 0, ''], [true, '0', '']] as $case) {
     $GLOBALS['case'] = $case;
     $GLOBALS['closed'] = 0;
-    $results[] = [pmssLighttpdWatchdogSocketConnect('/socket', 7), $GLOBALS['args'], $GLOBALS['closed'], is_resource($GLOBALS['handle'])];
+    foreach (['/socket', '/socket with spaces', 'relative.socket', ' /socket ', '/socket-0'] as $path) {
+        $GLOBALS['closed'] = 0;
+        $results[] = [pmssLighttpdWatchdogSocketConnect($path, 7), $GLOBALS['args'], $GLOBALS['closed'], is_resource($GLOBALS['handle'])];
+    }
 }
 echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script);
         foreach ([[true, 0, '', 1], [false, 111, 'refused', 0], [false, 111, '', 1],
             [false, 0, 'warning', 1], [false, 0, '', 0], [false, 0, '', 1]] as $i => $case) {
-            $this->assertSame([['ok' => $case[0], 'errno' => $case[1], 'errstr' => $case[2]],
-                ['unix:///socket', 0, 7], $case[3], false], $results[$i]);
+            foreach (['/socket', '/socket with spaces', 'relative.socket', ' /socket ', '/socket-0'] as $j => $path) {
+                $this->assertSame([['ok' => $case[0], 'errno' => $case[1], 'errstr' => $case[2]],
+                    ['unix://'.$path, 0, 7], $case[3], false], $results[$i * 5 + $j]);
+            }
         }
     }
 }

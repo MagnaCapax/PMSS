@@ -30,6 +30,10 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
 /** Observe and close one native connection; errno and errstr also participate in success. */
 function pmssLighttpdWatchdogSocketConnect(string $socketPath, int $timeoutSeconds): array
 {
+    // Direct callers must not bypass the retry facade's socket-path guard.
+    if ($socketPath === '' || strpos($socketPath, "\0") !== false) {
+        return array('ok' => false, 'errno' => 0, 'errstr' => $socketPath === '' ? 'socket path missing' : 'socket path invalid');
+    }
     $errno = 0;
     $errstr = '';
     $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, $timeoutSeconds);

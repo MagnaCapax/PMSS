@@ -1235,6 +1235,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
     The socket restart decision preserves the first-failure stop, stale-index
     listener gate, diagnostics and failure-marker operations, including cleared
     state when php-cgi is missing. No service is restarted by the helper itself.
+    Direct native connections also reject empty or NUL-containing paths before
+    `fsockopen()`, returning `ok=false`, `errno=0`, and the retry facade's
+    `socket path missing` or `socket path invalid` diagnostic without an
+    `attempts` field. Valid path bytes, timeout, error fields and stream closure
+    retain their contracts, covered by `LighttpdSocketRetryCharacterizationTest`.
   - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy. A non-blocking runtime lock makes overlapping invocations print the existing skip line. A busy single-account invocation exits 75; the no-argument cron invocation still exits 0. The updater records the single-account result as `SKIP` and continues marking the account refreshed. The 502 page file helpers reject invalid account names before writing or treating a missing file as a completed deletion.
   - Socket failure markers: validates both the runtime directory and marker path before recording or clearing consecutive failures. Symlinks and non-regular markers remain untouched; an unsafe path or incomplete counter write retains the existing `wait` action with count zero and cannot authorize a socket-failure restart.
   - Custom-fragment recovery: after a start leaves lighttpd absent, runs a bounded full-config syntax check as the account. Three consecutive checks naming the same unchanged account-owned `custom.d/*.conf` fragment set aside only that file as `.conf.disabled-<timestamp>-<pid>`, log the reason and restoration instructions, and retry the normal starter once. Live lighttpd, timeout/backoff, successful parses and unrelated errors reset the sequence. Symlinks, hardlinks, foreign-owned files, ambiguous diagnostics and failed counter writes cannot authorize a rename. The managed config and legacy `custom` file stay outside recovery (ADR 0222, Refs #1109).
