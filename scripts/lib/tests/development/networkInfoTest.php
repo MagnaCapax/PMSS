@@ -7,12 +7,6 @@ require_once dirname(__DIR__, 2).'/networkInfo.php';
 
 class NetworkInfoTest extends TestCase
 {
-    private function networkSpeedFixture(string $iface, string $speed): string
-    {
-        $root = $this->pmssMakeTempDir('pmss-network-sys-class-net-');
-        return $this->pmssWriteFiles($root, [$iface.'/speed' => $speed]);
-    }
-
     private function withNetworkConfig(array $config, callable $callback, array $env = []): void
     {
         $path = $this->pmssWritePhpArrayFixture($config, 'pmss-network-info-');
@@ -47,13 +41,13 @@ class NetworkInfoTest extends TestCase
     public function testSysfsSpeedRejectsOverflowAndPreservesRepresentableValues(): void
     {
         foreach (['', '-1', '0', 'unknown', '1.5', (string) PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0'] as $raw) {
-            $root = $this->networkSpeedFixture('probe0', $raw);
+            $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-network-sys-class-net-'), ['probe0/speed' => $raw]);
             $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function (): void {
                 $this->assertSame(0, \getDetectedLinkSpeed('probe0'));
             });
         }
         foreach (['1' => 1, '001000' => 1000, " 10000\n" => 10000, (string) PHP_INT_MAX => PHP_INT_MAX] as $raw => $expected) {
-            $root = $this->networkSpeedFixture('probe0', (string) $raw);
+            $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-network-sys-class-net-'), ['probe0/speed' => (string) $raw]);
             $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function () use ($expected): void {
                 $this->assertSame($expected, \getDetectedLinkSpeed('probe0'));
             });
@@ -91,7 +85,7 @@ class NetworkInfoTest extends TestCase
 
     public function testDetectedLinkSpeedReadsSysfsFixture(): void
     {
-        $root = $this->networkSpeedFixture('eth0', '10000');
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-network-sys-class-net-'), ['eth0/speed' => '10000']);
 
         $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function (): void {
             $this->assertSame(10000, \getDetectedLinkSpeed('eth0'));
@@ -100,7 +94,7 @@ class NetworkInfoTest extends TestCase
 
     public function testDetectedLinkSpeedTreatsUnknownSysfsSpeedAsNoDetection(): void
     {
-        $root = $this->networkSpeedFixture('eth0', '-1');
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-network-sys-class-net-'), ['eth0/speed' => '-1']);
 
         $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function (): void {
             $this->assertSame(0, \getDetectedLinkSpeed('eth0'));
@@ -109,7 +103,7 @@ class NetworkInfoTest extends TestCase
 
     public function testConfiguredSpeedRemainsAuthoritativeWhenPhysicalSpeedIsHigher(): void
     {
-        $root = $this->networkSpeedFixture('eth0', '10000');
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-network-sys-class-net-'), ['eth0/speed' => '10000']);
 
         $this->withNetworkConfig(['speed' => '1000'], function (): void {
             $this->assertSame(1000, \getLinkSpeed('eth0'));

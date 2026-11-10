@@ -5,13 +5,6 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class StorageHealthReportCliCharacterizationTest extends TestCase
 {
-    private function storageHealthJsonl(array $entries): string
-    {
-        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
-        $this->pmssAppendFixtureLines($jsonPath, $entries);
-        return $jsonPath;
-    }
-
     private function storageHealthRaidEntry(array $overrides): array
     {
         return array_merge([
@@ -25,7 +18,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
 
     public function testOnlyProblemsAndDeviceFilterKeepLatestMatchingEntry(): void
     {
-        $jsonPath = $this->storageHealthJsonl([
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $this->pmssAppendFixtureLines($jsonPath, [
             [
                 'timestamp' => '2025-01-01T00:00:00+00:00',
                 'kind' => 'smart',
@@ -68,7 +62,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
 
     public function testMixedSmartAndNvmeDisksShareSeverityOrdering(): void
     {
-        $jsonPath = $this->storageHealthJsonl([
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $this->pmssAppendFixtureLines($jsonPath, [
             [
                 'timestamp' => '2025-01-01T00:00:01+00:00',
                 'kind' => 'nvme',
@@ -123,7 +118,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
     {
         $noticePath = $this->pmssMakeTempPath('pmss-storage-health-notice-', '.json');
 
-        $jsonPath = $this->storageHealthJsonl([$this->storageHealthRaidEntry([
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $this->pmssAppendFixtureLines($jsonPath, [$this->storageHealthRaidEntry([
             'detail' => 'recovery = 1.0% (1/100)',
             'severity' => 'warn',
             'flags' => ['rebuild_in_progress'],
@@ -143,7 +139,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
     {
         $noticePath = $this->pmssMakeTempPath('pmss-storage-health-separate-', '.json');
 
-        $jsonPath = $this->storageHealthJsonl([$this->storageHealthRaidEntry([
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $this->pmssAppendFixtureLines($jsonPath, [$this->storageHealthRaidEntry([
             'array' => 'md1',
             'detail' => 'check = 1.0% (1/100)',
             'severity' => 'warn',
@@ -163,7 +160,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
     {
         $noticePath = $this->pmssMakeTempFile('pmss-storage-health-notice-');
 
-        $jsonPath = $this->storageHealthJsonl([$this->storageHealthRaidEntry([
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $this->pmssAppendFixtureLines($jsonPath, [$this->storageHealthRaidEntry([
             'detail' => 'sda1[0] sdb1[1]',
             'severity' => 'ok',
             'flags' => [],
@@ -181,7 +179,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $realNoticePath = $this->pmssMakeTempFile('pmss-storage-health-real-notice-');
         $linkNoticePath = $this->pmssMakeTempPath('pmss-storage-health-link-notice-', '.json');
 
-        $jsonPath = $this->storageHealthJsonl([$this->storageHealthRaidEntry([
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $this->pmssAppendFixtureLines($jsonPath, [$this->storageHealthRaidEntry([
             'detail' => 'recovery = 1.0% (1/100)',
             'severity' => 'warn',
             'flags' => ['rebuild_in_progress'],
@@ -202,7 +201,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $raid = ['timestamp'=>'2025-01-01T00:00:02+00:00','kind'=>'raid','array'=>'md0','level'=>'raid1','state'=>'active','detail'=>'sda1[0] sdb1[1]','severity'=>'ok','flags'=>[]];
         $olderSmart = array_merge($smart, ['timestamp' => '2024-12-31T23:59:59+00:00', 'severity' => 'warn']);
         $unknown = ['timestamp' => '2025-01-01T00:00:09+00:00', 'kind' => 'unknown'];
-        $jsonPath = $this->storageHealthJsonl([$raid, $olderSmart, $smart, $unknown]);
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $this->pmssAppendFixtureLines($jsonPath, [$raid, $olderSmart, $smart, $unknown]);
 
         $expected = json_encode($smart, JSON_UNESCAPED_SLASHES).PHP_EOL.json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL;
         $actual = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--raw']);

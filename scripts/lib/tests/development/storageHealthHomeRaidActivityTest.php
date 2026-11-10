@@ -155,14 +155,6 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         }
     }
 
-    private function hostPressurePath(array $payload): string
-    {
-        return $this->pmssWriteFile(
-            $this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
-            json_encode($payload)."\n"
-        );
-    }
-
     private function psiPath(string $full = '4.25'): string
     {
         return $this->pmssWriteRelativeFile($this->tmpDir, 'pressure-'.bin2hex(random_bytes(3)),
@@ -172,10 +164,12 @@ class StorageHealthHomeRaidActivityTest extends TestCase
     public function testHostPressureStateUsesConservativeThresholds(): void
     {
         $now = 2000;
-        $healthy = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 100.0]);
+        $healthy = $this->pmssWriteFile($this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
+            json_encode(['timestamp' => $now, 'ioping_home_ms' => 100.0])."\n");
         $this->assertSame('normal', \pmssStorageHealthHostPressureStateRead($healthy, $now, $this->psiPath('19.9'))['status']);
         $this->assertSame('heavy', \pmssStorageHealthHostPressureStateRead($healthy, $now, $this->psiPath('20.0'))['status']);
-        $slow = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 100.1]);
+        $slow = $this->pmssWriteFile($this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
+            json_encode(['timestamp' => $now, 'ioping_home_ms' => 100.1])."\n");
         $this->assertSame('heavy', \pmssStorageHealthHostPressureStateRead($slow, $now, $this->psiPath())['status']);
         $this->assertSame(4.25, \pmssStorageHealthHostPressureStateRead($slow, $now, $this->psiPath())['psi_io_full_avg300']);
         $this->assertSame('absent', \pmssStorageHealthHostPressureStateRead($slow, $now, $this->tmpDir.'/missing')['status']);
@@ -188,8 +182,10 @@ class StorageHealthHomeRaidActivityTest extends TestCase
     {
         $now = 5000;
         foreach ([
-            $this->hostPressurePath(['timestamp' => $now - 901, 'ioping_home_ms' => 500]),
-            $this->hostPressurePath(['timestamp' => $now + 1, 'ioping_home_ms' => 500]),
+            $this->pmssWriteFile($this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
+                json_encode(['timestamp' => $now - 901, 'ioping_home_ms' => 500])."\n"),
+            $this->pmssWriteFile($this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
+                json_encode(['timestamp' => $now + 1, 'ioping_home_ms' => 500])."\n"),
             $this->pmssWriteFile($this->tmpDir.'/malformed.json', '{broken'),
         ] as $path) {
             $state = \pmssStorageHealthHostPressureStateRead($path, $now, $this->psiPath());
@@ -197,7 +193,8 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             $this->assertFalse(isset($state['ioping_home_ms']));
         }
 
-        $target = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 500]);
+        $target = $this->pmssWriteFile($this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
+            json_encode(['timestamp' => $now, 'ioping_home_ms' => 500])."\n");
         $link = $this->tmpDir.'/host-pressure-link.json';
         $this->pmssCreateSymlinkOrSkip($target, $link);
         $this->assertSame('normal', \pmssStorageHealthHostPressureStateRead($link, $now, $this->psiPath())['status']);
@@ -232,7 +229,8 @@ class StorageHealthHomeRaidActivityTest extends TestCase
     public function testCombinedNoticePrefersSpecificRaidActivity(): void
     {
         $now = 9000;
-        $pressurePath = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 500]);
+        $pressurePath = $this->pmssWriteFile($this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
+            json_encode(['timestamp' => $now, 'ioping_home_ms' => 500])."\n");
         $raidHtml = \pmssStorageHealthNoticeHtmlRead(
             $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700),
             [['array' => 'md1', 'resync' => 'resync = 50.0% finish=10min speed=1000K/sec']],

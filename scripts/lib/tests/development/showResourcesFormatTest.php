@@ -32,13 +32,6 @@ class ShowResourcesFormatTest extends TestCase
         ];
     }
 
-    private function resourceStatsRuntimeWithUser(array $values): string
-    {
-        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($values));
-        return $runtimeDir;
-    }
-
     public function testHelpOutputMatchesSnapshot(): void
     {
         $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--help']);
@@ -56,7 +49,8 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testUserFilteredOutputFormatsCpuRamAndIops(): void
     {
-        $runtimeDir = $this->resourceStatsRuntimeWithUser($this->sampleUsageValues());
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues()));
         $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--user=fixtur01'], ['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
     }
 
@@ -78,7 +72,8 @@ class ShowResourcesFormatTest extends TestCase
                 '6.00 M ops',
             ],
         ] as [$overrides, $needle]) {
-            $runtimeDir = $this->resourceStatsRuntimeWithUser($this->sampleUsageValues($overrides));
+            $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
+            $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues($overrides)));
             $this->assertStringContainsString($needle, $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--user=fixtur01'], ['PMSS_RUNTIME_DIR' => $runtimeDir]));
         }
     }
@@ -104,7 +99,8 @@ class ShowResourcesFormatTest extends TestCase
     {
         $values = $this->numericUsageValues();
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
-        $runtimeDir = $this->resourceStatsRuntimeWithUser($values);
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($values));
 
         $this->assertEquals(
             ['users' => ['fixtur01' => $expectedRow], 'totals' => $expectedRow, 'missing' => []],

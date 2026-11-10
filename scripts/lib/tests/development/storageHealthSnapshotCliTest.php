@@ -1,11 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+/** CLI assertions pair fresh lsblk fixtures with the shared command environment. */
 class StorageHealthSnapshotCliTest extends TestCase
 {
     public function testHelpShowsUsage(): void
     {
-        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/storageHealthSnapshot.php', ['--help'], ['Usage: storageHealthSnapshot.php'], $this->storageHealthSnapshotCommandEnvironment());
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/storageHealthSnapshot.php', ['--help'], ['Usage: storageHealthSnapshot.php'],
+            $this->pmssPathPrefixedEnvironment($this->pmssMakeLineOutputStub('lsblk', ['pmssfake0 disk 1 PMSSSERIAL 1T'], 'pmss-storage-health-lsblk-')));
     }
 
     public function testJsonOptionWritesSnapshotVariants(): void
@@ -22,7 +24,8 @@ class StorageHealthSnapshotCliTest extends TestCase
             }
 
             $result = $this->pmssRunRepoPhpScriptCommand(
-                'scripts/util/storageHealthSnapshot.php', $arguments, $this->storageHealthSnapshotCommandEnvironment()
+                'scripts/util/storageHealthSnapshot.php', $arguments,
+                $this->pmssPathPrefixedEnvironment($this->pmssMakeLineOutputStub('lsblk', ['pmssfake0 disk 1 PMSSSERIAL 1T'], 'pmss-storage-health-lsblk-'))
             );
 
             $this->assertSame(0, $result['rc']);
@@ -71,22 +74,11 @@ class StorageHealthSnapshotCliTest extends TestCase
     private function assertSnapshotRejectsUnsafeLogTarget(array $arguments): array
     {
         $result = $this->pmssRunRepoPhpScriptCommand(
-            'scripts/util/storageHealthSnapshot.php', $arguments, $this->storageHealthSnapshotCommandEnvironment()
+            'scripts/util/storageHealthSnapshot.php', $arguments,
+            $this->pmssPathPrefixedEnvironment($this->pmssMakeLineOutputStub('lsblk', ['pmssfake0 disk 1 PMSSSERIAL 1T'], 'pmss-storage-health-lsblk-'))
         );
         $this->pmssAssertArraySubsetSame(['rc' => 1], $result, 'snapshot rejection ');
         $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
         return $result;
-    }
-
-    /** Return the command environment shared by storage health CLI assertions. */
-    private function storageHealthSnapshotCommandEnvironment(): array
-    {
-        $stubDir = $this->pmssMakeLineOutputStub(
-            'lsblk',
-            ['pmssfake0 disk 1 PMSSSERIAL 1T'],
-            'pmss-storage-health-lsblk-'
-        );
-
-        return $this->pmssPathPrefixedEnvironment($stubDir);
     }
 }
