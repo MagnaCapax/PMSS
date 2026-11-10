@@ -423,6 +423,14 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    iptables owner match; when unavailable `setupNetwork.php` skips those rules
    and logs to `/var/log/pmss/iptables.log`.
 
+Network observations keep their existing entry points (ADR 0252).
+`networkInfo.php` retains configured interface/speed selection and the `$link`
+and `$linkSpeed` globals. `network/linkSpeed.php` owns the ordered physical
+sysfs/ethtool probe; `network/uplink.php`, loaded by `network/setup.php`, owns
+setup's tunnel fallback and speed-drift warnings. Interface names use the shared
+normalizer directly. Explicit sysfs overrides still suppress ethtool fallback;
+configured shaping speeds and the legacy unknown-speed defaults retain precedence.
+
 Same-version resume markers under `/var/lib/pmss/user-refresh` are checked
 through the shared path-safety predicate before reads or writes, including the
 marker leaf. Symlinks and non-regular markers cannot authorize a resume skip;

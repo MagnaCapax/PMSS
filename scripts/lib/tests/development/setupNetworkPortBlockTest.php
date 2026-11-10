@@ -13,10 +13,15 @@ class SetupNetworkPortBlockTest extends TestCase
                 "-A INPUT -i ##IFACE## -p tcp --dport 8112 -j DROP",
                 '--log-prefix "tcpsack: "',
                 '-m limit --limit 2/second --limit-burst 10',
-                "networkInterfaceNameNormalized(\$configuredInterface)",
+                "require_once __DIR__.'/uplink.php';",
+            ],
+        ]);
+        $this->pmssAssertRepoFileContract('scripts/lib/network/uplink.php', [
+            'required' => [
+                "pmssNetworkInterfaceNameNormalize(\$configuredInterface)",
                 "logMessage('setupNetwork: unsafe configured interface name')",
                 "die(\"Error: Unsafe configured network interface\\n\")",
-                "networkInterfaceNameNormalized(\$matches[1])",
+                "pmssNetworkInterfaceNameNormalize(\$matches[1])",
             ],
         ]);
         $this->pmssAssertRepoFileContract('scripts/util/setupNetwork.php', [

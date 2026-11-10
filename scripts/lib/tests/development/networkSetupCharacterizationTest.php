@@ -67,7 +67,7 @@ RULES;
             $script = <<<'PHP'
 namespace NetworkSetupFixture;
 function detectPrimaryInterface() { $GLOBALS['calls'][] = 'primary'; return $GLOBALS['input']['primary']; }
-function networkInterfaceNameNormalized($name) {
+function pmssNetworkInterfaceNameNormalize($name) {
     $GLOBALS['calls'][] = 'normalize:'.$name;
     return $name === 'bad!' ? '' : $name;
 }
@@ -79,7 +79,7 @@ function getLinkSpeed($name) { $GLOBALS['calls'][] = 'speed:'.$name; return 1000
 function getDetectedLinkSpeed($name) { $GLOBALS['calls'][] = 'detected:'.$name; return 10000; }
 function logMessage($message) { $GLOBALS['logs'][] = $message; }
 PHP;
-            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/network/setup.php', 'NetworkSetupFixture');
+            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/network/uplink.php', 'NetworkSetupFixture');
             $script .= '$GLOBALS["input"] = '.var_export(compact('config', 'primary', 'routes'), true).';';
             $script .= <<<'PHP'
 $GLOBALS['calls'] = $GLOBALS['logs'] = [];

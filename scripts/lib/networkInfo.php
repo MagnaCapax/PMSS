@@ -15,75 +15,21 @@
  */
 
 require_once __DIR__.'/network/config.php';
-require_once __DIR__.'/network/interface.php';
-
-/** Normalize interface names before they reach shell commands. */
-function networkInterfaceNameNormalized(string $iface): string
-{
-    return pmssNetworkInterfaceNameNormalize($iface);
-}
+require_once __DIR__.'/network/linkSpeed.php';
 
 /** Determine the primary network interface name. */
 function detectPrimaryInterface(): string
 {
     $config = networkLoadConfig();
     if (is_array($config) && !empty($config['interface'])) {
-        $iface = networkInterfaceNameNormalized((string) $config['interface']);
+        $iface = pmssNetworkInterfaceNameNormalize((string) $config['interface']);
         if ($iface !== '') {
             return $iface;
         }
     }
 
-    $iface = networkInterfaceNameNormalized((string) shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'"));
+    $iface = pmssNetworkInterfaceNameNormalize((string) shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'"));
     return $iface !== '' ? $iface : 'eth0';
-}
-
-/** Probe the physical interface speed from sysfs, returning 0 when unknown. */
-function pmssNetworkProbeSysfsLinkSpeed(string $iface): int
-{
-    $iface = networkInterfaceNameNormalized($iface);
-    if ($iface === '') {
-        return 0;
-    }
-
-    $baseDir = getenv('PMSS_NETWORK_SYS_CLASS_NET_DIR');
-    if (!is_string($baseDir) || trim($baseDir) === '' || strpos($baseDir, "\0") !== false) {
-        $baseDir = '/sys/class/net';
-    }
-
-    $raw = @file_get_contents(rtrim($baseDir, '/').'/'.$iface.'/speed');
-    $speed = is_string($raw) ? trim($raw) : '';
-    // Oversized probe values are unknown, never saturated link speeds.
-    $speedMbit = pmssUnsignedDecimalIntParse($speed);
-    return $speedMbit !== null && $speedMbit > 0 ? $speedMbit : 0;
-}
-
-/** Probe the physical interface speed with ethtool, returning 0 when unknown. */
-function pmssNetworkProbeEthtoolLinkSpeed(string $iface): int
-{
-    $iface = networkInterfaceNameNormalized($iface);
-    if ($iface === '') {
-        return 0;
-    }
-
-    $raw = shell_exec('/sbin/ethtool '.escapeshellarg($iface).' 2>/dev/null');
-    if (!$raw || !preg_match('/Speed:\s*(\d+)Mb/', $raw, $m)) return 0;
-    return pmssUnsignedDecimalIntParse($m[1]) ?? 0;
-}
-
-/** Detect physical interface speed in Mbps without applying config overrides. */
-function getDetectedLinkSpeed(string $iface): int
-{
-    $speed = pmssNetworkProbeSysfsLinkSpeed($iface);
-    $sysfsOverride = getenv('PMSS_NETWORK_SYS_CLASS_NET_DIR');
-    $hasSysfsOverride = is_string($sysfsOverride)
-        && trim($sysfsOverride) !== ''
-        && strpos($sysfsOverride, "\0") === false;
-    if ($speed > 0 || $hasSysfsOverride) {
-        return $speed;
-    }
-
-    return pmssNetworkProbeEthtoolLinkSpeed($iface);
 }
 
 /** Resolve configured link speed in Mbps, falling back to physical detection. */

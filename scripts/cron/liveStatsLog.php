@@ -46,7 +46,7 @@ if ($nodeSample === null) exit(0); // first run, reboot or gap: wait for the nex
 // Never use getLinkSpeed()'s guessed fallback; an override NIC may have no shaping cap.
 $network = networkLoadConfig();
 $nodeSample += pmssLiveStatsNetworkCapacity(getDetectedLinkSpeed($iface),
-    $iface === networkInterfaceNameNormalized((string) ($network['interface'] ?? 'eth0')) ? (int) ($network['speed'] ?? 0) : 0);
+    $iface === pmssNetworkInterfaceNameNormalize((string) ($network['interface'] ?? 'eth0')) ? (int) ($network['speed'] ?? 0) : 0);
 
 $nodePath = $publicDir.'/node-live.json';
 if (!pmssAtomicWriteFile($nodePath, pmssLiveStatsRingEncode(pmssLiveStatsRingRead($nodePath), $nodeSample), 0644)) {

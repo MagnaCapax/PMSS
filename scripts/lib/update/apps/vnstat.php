@@ -10,7 +10,7 @@ require_once '/scripts/lib/networkInfo.php';
 require_once __DIR__.'/vnstatConfig.php';
 
 $link = $link ?? '';
-$link = networkInterfaceNameNormalized((string) $link);
+$link = pmssNetworkInterfaceNameNormalize((string) $link);
 
 #TODO This should be in the install script
 #TODO Use an actual config template

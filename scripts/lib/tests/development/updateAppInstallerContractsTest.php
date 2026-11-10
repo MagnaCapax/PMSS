@@ -216,7 +216,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 'required' => [
                     "require_once '/scripts/lib/networkInfo.php';",
                     "require_once __DIR__.'/vnstatConfig.php';",
-                    "networkInterfaceNameNormalized((string) \$link)",
+                    "pmssNetworkInterfaceNameNormalize((string) \$link)",
                     "runStep('Installing vnstat'",
                     "aptCmd('install -y vnstat')",
                     "runStep('Updating vnstat interface database'",

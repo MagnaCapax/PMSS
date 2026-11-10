@@ -11,10 +11,12 @@ class NetworkInfoCharacterizationTest extends TestCase
         $script = <<<'PHP'
 namespace NetworkProbeFixture;
 function networkLoadConfig() { return $GLOBALS['config']; }
+function file_get_contents($path) { return false; }
 function shell_exec($command) { $GLOBALS['commands'][] = $command; return $GLOBALS['raw']; }
 $GLOBALS['commands'] = [];
 $GLOBALS['config'] = ['interface' => 'fixture0', 'speed' => 1000];
 PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/network/linkSpeed.php', 'NetworkProbeFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/networkInfo.php', 'NetworkProbeFixture');
         $script .= <<<'PHP'
 $results = [];
@@ -22,11 +24,11 @@ foreach (['', 'Speed: Unknown!', 'Speed: -1Mb/s', 'Speed: 0Mb/s',
     'Speed: '.PHP_INT_MAX.'0Mb/s', 'Speed: 000'.PHP_INT_MAX.'0Mb/s',
     'Speed: 001000Mb/s', 'Speed: '.PHP_INT_MAX.'Mb/s'] as $raw) {
     $GLOBALS['raw'] = $raw;
-    $results[] = pmssNetworkProbeEthtoolLinkSpeed(' fixture0 ');
+    $results[] = getDetectedLinkSpeed(' fixture0 ');
 }
 $before = count($GLOBALS['commands']);
 foreach (["\0fixture0", "fixture0\0", "fix\0ture0", " \0fixture0\t", "fixture0\0\n"] as $name) {
-    $results[] = pmssNetworkProbeEthtoolLinkSpeed($name);
+    $results[] = getDetectedLinkSpeed($name);
 }
 $rejectedCalls = count($GLOBALS['commands']) - $before;
 $speedCommands = $GLOBALS['commands'];
@@ -39,7 +41,7 @@ foreach (["\0route9", "route9\0", "rou\0te9", " \0route9\t", "route9\0\n", " \tr
 echo json_encode(['speeds' => $results, 'commands' => $speedCommands,
     'rejectedCalls' => $rejectedCalls, 'routes' => $routes, 'routeCommands' => $GLOBALS['commands']]);
 PHP;
-        $result = $this->pmssRunInlinePhpJson($script);
+        $result = $this->pmssRunInlinePhpJson($script, ['PMSS_NETWORK_SYS_CLASS_NET_DIR' => null]);
         $this->pmssAssertArraySubsetSame([
             'speeds' => [0, 0, 0, 0, 0, 0, 1000, PHP_INT_MAX, 0, 0, 0, 0, 0], 'rejectedCalls' => 0,
             'commands' => array_fill(0, 8, "/sbin/ethtool 'fixture0' 2>/dev/null"),
@@ -67,12 +69,15 @@ PHP;
             ["require_once __DIR__.'/network/config.php';", 'networkLoadConfig()'],
             ['/etc/seedbox/config/network']
         );
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/networkInfo.php', [
+            "require_once __DIR__.'/network/linkSpeed.php';", '$link = detectPrimaryInterface();', '$linkSpeed = getLinkSpeed($link);',
+        ]);
     }
 
     public function testSetupNetworkKeepsConfiguredCapAndWarnsOnPhysicalSpeedDrift(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'scripts/lib/network/setup.php',
+            'scripts/lib/network/uplink.php',
             [
                 '$detectedLinkSpeed = getDetectedLinkSpeed($interface);',
                 'detected %s link speed %dMbit exceeds configured FireQOS speed %dMbit; keeping configured cap',
