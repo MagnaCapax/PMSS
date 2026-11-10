@@ -40,6 +40,10 @@ Immediate call exclusions share one token-kind list.
   contracts. Existing guard heuristics retain their accepted and rejected cases.
 - The private traits share the scanner's token helpers; this is an internal
   source split, with no supported trait API or alternate implementation.
+- Shebang discovery closes each acquired stream in `finally`, including read
+  exceptions and errors. Failed opens still skip the file; matching and sorted
+  results remain unchanged. `CustomerContextDiscoverySafetyTest.php` covers
+  stream ownership, original throwable identity and cleanup-fault precedence.
 - `CustomerContextFatalScanTest.php` locks both result schemas, discovery and
   guard cases plus mixed CLI diagnostics. Execution belongs on the testing VM
   and CI; devbox verification is changed-file PHP syntax and symbol searches.

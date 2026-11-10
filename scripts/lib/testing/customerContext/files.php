@@ -31,8 +31,12 @@ trait PmssCustomerContextFiles
             if (!$file->isFile()) continue;
             $handle = @fopen($file->getPathname(), 'r');
             if ($handle === false) continue;
-            $first = fgets($handle);
-            fclose($handle);
+            try {
+                $first = fgets($handle);
+            } finally {
+                // Shebang inspection owns the stream even when reading throws.
+                fclose($handle);
+            }
             if (is_string($first) && preg_match('~^#!/usr/bin/(?:env )?php\s*$~', $first)) $files[] = $file->getPathname();
         }
         sort($files);
