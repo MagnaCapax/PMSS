@@ -21,7 +21,9 @@ class StorageHealthSnapshotCliTest extends TestCase
                 $arguments[] = '--quiet';
             }
 
-            $result = $this->runSnapshotCommand($arguments);
+            $result = $this->pmssRunRepoPhpScriptCommand(
+                'scripts/util/storageHealthSnapshot.php', $arguments, $this->storageHealthSnapshotCommandEnvironment()
+            );
 
             $this->assertSame(0, $result['rc']);
             $this->assertTrue(is_file($jsonPath), 'expected JSONL file to be created');
@@ -68,20 +70,12 @@ class StorageHealthSnapshotCliTest extends TestCase
     /** @return array{rc:int,output:string,lines:array<int,string>} */
     private function assertSnapshotRejectsUnsafeLogTarget(array $arguments): array
     {
-        $result = $this->runSnapshotCommand($arguments);
+        $result = $this->pmssRunRepoPhpScriptCommand(
+            'scripts/util/storageHealthSnapshot.php', $arguments, $this->storageHealthSnapshotCommandEnvironment()
+        );
         $this->pmssAssertArraySubsetSame(['rc' => 1], $result, 'snapshot rejection ');
         $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
         return $result;
-    }
-
-    /** @return array{rc:int,output:string,lines:array<int,string>} */
-    private function runSnapshotCommand(array $arguments): array
-    {
-        return $this->pmssRunRepoPhpScriptCommand(
-            'scripts/util/storageHealthSnapshot.php',
-            $arguments,
-            $this->storageHealthSnapshotCommandEnvironment()
-        );
     }
 
     /** Return the command environment shared by storage health CLI assertions. */

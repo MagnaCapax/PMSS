@@ -14,11 +14,6 @@ class ResourceReportTest extends TestCase
         $this->statsDir = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-resource-report-').'/stats');
     }
 
-    private function writeUserStats(string $user, array $values): void
-    {
-        $this->pmssWriteSerializedFixture($this->statsDir.'/'.$user, $this->pmssBuildResourceStatsPayloadFromValues($values));
-    }
-
     public function testBuildReportAggregatesRowsAndTotals(): void
     {
         $fixtur01Values = [
@@ -31,8 +26,8 @@ class ResourceReportTest extends TestCase
             'io_write_ops' => $this->pmssBuildWindowValues(41, 42, 43, 44), 'cpu' => $this->pmssBuildWindowValues(51, 52, 53, 54), 'ram_hours' => $this->pmssBuildWindowValues(61, 62, 63, 64),
             'memory_current' => 71, 'memory_avg_month' => 72, 'tasks_current' => 73,
         ];
-        $this->writeUserStats('fixtur01', $fixtur01Values);
-        $this->writeUserStats('fixtur02', $fixtur02Values);
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($fixtur01Values));
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur02', $this->pmssBuildResourceStatsPayloadFromValues($fixtur02Values));
         $expectedRows = [
             'fixtur01' => $this->pmssBuildResourceReportRowFromValues($fixtur01Values),
             'fixtur02' => $this->pmssBuildResourceReportRowFromValues($fixtur02Values),
@@ -104,7 +99,7 @@ class ResourceReportTest extends TestCase
             'memory_avg_month' => 20,
             'tasks_current' => 21,
         ];
-        $this->writeUserStats('fixtur01', $values);
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($values));
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
 
         $this->assertEquals([
@@ -125,7 +120,7 @@ class ResourceReportTest extends TestCase
     public function testBuildReportSingleUserMatchesSnapshot(): void
     {
         $values = $this->standardValues();
-        $this->writeUserStats('fixtur01', $values);
+        $this->pmssWriteSerializedFixture($this->statsDir.'/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($values));
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
 
         $this->assertEquals([

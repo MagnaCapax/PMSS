@@ -16,11 +16,6 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->pmssEnsureDir($this->tmpDir.'/dev/mapper', 0700);
     }
 
-    private function homeMountsPath(string $device): string
-    {
-        return $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', $device." /home ext4 rw 0 0\n", 0700);
-    }
-
     public function testParsesRaidActivitySummaryDetails(): void
     {
         $summary = \pmssStorageHealthRaidActivitySummaryParse(
@@ -47,7 +42,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testResolvesHomeArrayFromDirectMdMount(): void
     {
-        $homeArray = \pmssStorageHealthHomeArrayResolve($this->homeMountsPath('/dev/md0'));
+        $homeArray = \pmssStorageHealthHomeArrayResolve($this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md0 /home ext4 rw 0 0\n", 0700));
         $this->assertEquals('md0', $homeArray);
     }
 
@@ -66,7 +61,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeArrayPathFailuresStayNull(): void
     {
-        $path = $this->homeMountsPath('/dev/md1');
+        $path = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700);
         foreach (["\0", $path."\0suffix", "\0".$path, $this->tmpDir.'/missing'] as $invalid) {
             $this->assertSame(null, \pmssStorageHealthHomeArrayResolve($invalid));
         }
@@ -77,7 +72,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
     public function testHomeArrayRejectsNulInsideMountSource(): void
     {
         foreach (["/dev/\0md1", "/dev/md1\0suffix", "/dev/md\0/../md1"] as $source) {
-            $path = $this->homeMountsPath($source);
+            $path = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', $source." /home ext4 rw 0 0\n", 0700);
             $this->assertSame(null, \pmssStorageHealthHomeArrayResolve($path));
             $this->assertSame(null, \pmssStorageHealthHomeRaidActivity($path, []));
         }
@@ -123,7 +118,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
                 ['operation' => 'recovery', 'progress' => '7.5%'],
             ],
         ] as [$raidEntries, $expected]) {
-            $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
+            $activity = \pmssStorageHealthHomeRaidActivity($this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700), $raidEntries);
             $this->assertTrue(is_array($activity), 'Expected activity for /home array');
             $this->pmssAssertArraySubsetSame($expected, $activity);
         }
@@ -131,7 +126,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityReturnsNullWhenHomeIsNotOnMd(): void
     {
-        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/vda1'), [
+        $activity = \pmssStorageHealthHomeRaidActivity($this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/vda1 /home ext4 rw 0 0\n", 0700), [
             ['array' => 'md1', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
         ]);
         $this->assertTrue($activity === null, 'Expected no activity when /home is not backed by md');
@@ -239,7 +234,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $now = 9000;
         $pressurePath = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 500]);
         $raidHtml = \pmssStorageHealthNoticeHtmlRead(
-            $this->homeMountsPath('/dev/md1'),
+            $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700),
             [['array' => 'md1', 'resync' => 'resync = 50.0% finish=10min speed=1000K/sec']],
             $pressurePath,
             $now,
@@ -249,7 +244,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertStringNotContainsString('Shared storage is under heavy load', $raidHtml);
 
         $pressureHtml = \pmssStorageHealthNoticeHtmlRead(
-            $this->homeMountsPath('/dev/vda1'),
+            $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/vda1 /home ext4 rw 0 0\n", 0700),
             [],
             $pressurePath,
             $now,

@@ -239,7 +239,7 @@ class IndexSkeletonFrameDataTest extends TestCase
     {
         $this->loadIndexFrameHelpers();
         $gib = 1024 * 1024 * 1024;
-        $quotaPath = $this->writeQuotaSnapshotContent(
+        $quotaPath = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-quota-', '.txt'),
             "Disk quotas for user panel (uid 1000):\n"
             ."     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n"
             ."       /dev/md4    594G   1380G   1725G            5642    690k    863k\n"
@@ -263,7 +263,7 @@ class IndexSkeletonFrameDataTest extends TestCase
     {
         $this->loadIndexFrameHelpers();
         $tib = pow(1024, 4);
-        $quotaPath = $this->writeQuotaSnapshotContent(
+        $quotaPath = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-quota-', '.txt'),
             "Disk quotas for user panel (uid 1000):\n"
             ."     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n"
             ."       /dev/mapper/vg-home\n"
@@ -280,7 +280,7 @@ class IndexSkeletonFrameDataTest extends TestCase
     public function testLocalFallbackQuotaParserMarksOverHardLimit(): void
     {
         $this->loadIndexFrameHelpers();
-        $quotaPath = $this->writeQuotaSnapshotContent(
+        $quotaPath = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-quota-', '.txt'),
             "Disk quotas for user panel (uid 1000):\n"
             ."     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n"
             ."       /dev/md4      4T      2T      3T               0       0       0\n"
@@ -296,7 +296,7 @@ class IndexSkeletonFrameDataTest extends TestCase
     {
         $this->loadIndexFrameHelpers();
         $missingPath = $this->pmssMakeTempPath('pmss-index-missing-quota-', '.txt');
-        $invalidPath = $this->writeQuotaSnapshotContent("Disk quotas for user panel (uid 1000):\ninvalid\n");
+        $invalidPath = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-quota-', '.txt'), "Disk quotas for user panel (uid 1000):\ninvalid\n");
 
         $this->assertSame('welcome.php', \pmssLocalFrameWelcomeUrlBuild($missingPath));
         $this->assertSame('welcome.php', \pmssLocalFrameWelcomeUrlBuild($invalidPath));
@@ -729,12 +729,6 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $fixture = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-frame-helpers-', '.php'), "<?php\n".substr($source, $start, $end - $start));
         require_once $fixture;
-    }
-
-    private function writeQuotaSnapshotContent(string $content): string
-    {
-        $path = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-quota-', '.txt'), $content);
-        return $path;
     }
 
     private function quotaInfoFromWelcomeUrl(string $url): array

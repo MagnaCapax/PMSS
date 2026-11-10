@@ -380,28 +380,23 @@ PHP;
         $this->assertShowPathContains($log, $expected, $case);
     }
 
-    private function benchmarkSecurityLogPath(): string
-    {
-        return $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-    }
-
     private function writeBenchmarkSecurityLog(string $content, int $flags = 0): string
     {
-        $log = $this->benchmarkSecurityLogPath();
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         file_put_contents($log, $content, $flags);
         return $log;
     }
 
     public function testPathTraversalInJsonPathIsRead(): void
     {
-        $log = $this->benchmarkSecurityLogPath(); @touch($log);
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); @touch($log);
         $up = dirname($log).'/../'.basename(dirname($log)).'/'.basename($log);
         $this->assertShowPathContains($up, 'No runs found.');
     }
 
     public function testSymlinkJsonLogIsHandled(): void
     {
-        $log = $this->benchmarkSecurityLogPath(); $dir = dirname($log); @mkdir($dir, 0700, true);
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $dir = dirname($log); @mkdir($dir, 0700, true);
         $real = $dir.'/real.jsonl'; @file_put_contents($real, json_encode($this->pmssStorageBenchmarkPreflightEntry('r', date('c')))."\n");
         $link = $dir.'/link.jsonl'; @symlink($real, $link);
         $this->assertShowPathContains($link, 'Storage benchmark (last run)');
@@ -454,7 +449,7 @@ PHP;
 
     public function testManyLinesDoNotTimeout(): void
     {
-        $log = $this->benchmarkSecurityLogPath();
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         for($i=0;$i<200;$i++){ $ts = gmdate('c', time()-200+$i); $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('r'.$i, $ts)]); }
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
@@ -466,7 +461,7 @@ PHP;
 
     public function testLeadingBOMInFileIsTolerated(): void
     {
-        $log = $this->benchmarkSecurityLogPath();
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         file_put_contents($log, "\xEF\xBB\xBF", FILE_APPEND);
         file_put_contents($log, json_encode($this->pmssStorageBenchmarkPreflightEntry('bom', date('c')))."\n", FILE_APPEND);
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
@@ -488,7 +483,7 @@ PHP;
 
     public function testMalformedThenValidLineWorks(): void
     {
-        $log = $this->benchmarkSecurityLogPath();
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         file_put_contents($log, "{bad}\n", FILE_APPEND);
         $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('ok', date('c'))]);
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
@@ -758,7 +753,7 @@ SH,
         $log = $base.'/unsafe/../blocked/benchmark-storage.jsonl';
 
         foreach ([
-            'target traversal' => [['--target='.$target, '--json='.$this->benchmarkSecurityLogPath()], "Error: unsafe target directory: {$target}\n"],
+            'target traversal' => [['--target='.$target, '--json='.$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl')], "Error: unsafe target directory: {$target}\n"],
             'JSON log parent file' => [['--json='.$parent.'/benchmark-storage.jsonl'], "Error: failed to create JSON log directory: {$parent}\n"],
             'directory JSON log path' => [['--json='.$dir], "Error: unsafe JSON log path: {$dir}\n"],
             'JSON log traversal' => [['--json='.$log], "Error: unsafe JSON log path: {$log}\n"],
@@ -777,7 +772,7 @@ SH,
         $this->pmssCreateSymlinkOrSkip($targetReal, $targetLink);
 
         $this->assertBenchmarkInputGuard(
-            ['--target='.$targetLink, '--json='.$this->benchmarkSecurityLogPath()],
+            ['--target='.$targetLink, '--json='.$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl')],
             "Error: unsafe target directory: {$targetLink}\n"
         );
 
