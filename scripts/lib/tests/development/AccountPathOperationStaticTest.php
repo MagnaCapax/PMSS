@@ -202,7 +202,18 @@ final class AccountPathOperationStaticTest extends TestCase
     {
         $source = (string) file_get_contents($path);
         if (substr($path, -4) === '.php') {
-            $source = $this->withoutPhpComments($source);
+            // Drop comments while retaining line numbers for the reviewed operation keys.
+            $result = '';
+            foreach (token_get_all($source) as $token) {
+                if (!is_array($token)) {
+                    $result .= $token;
+                } elseif ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
+                    $result .= str_repeat("\n", substr_count($token[1], "\n"));
+                } else {
+                    $result .= $token[1];
+                }
+            }
+            $source = $result;
         }
         $findings = [];
         foreach (explode("\n", $source) as $index => $line) {
@@ -238,20 +249,5 @@ final class AccountPathOperationStaticTest extends TestCase
     private function hasAccountPath(string $text): bool
     {
         return preg_match('~(?:/home/|\$home(?:Dir)?\b|\$userHome\b)~', $text) === 1;
-    }
-
-    private function withoutPhpComments(string $source): string
-    {
-        $result = '';
-        foreach (token_get_all($source) as $token) {
-            if (!is_array($token)) {
-                $result .= $token;
-            } elseif ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
-                $result .= str_repeat("\n", substr_count($token[1], "\n"));
-            } else {
-                $result .= $token[1];
-            }
-        }
-        return $result;
     }
 }

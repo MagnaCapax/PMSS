@@ -19,9 +19,9 @@ class DelugeManagedConfigTest extends TestCase
             );
     }
 
-    private function pmssWriteConvergedCoreConfig(string $homeRoot, string $username): void
+    private function pmssWriteConvergedCoreConfig(string $homeRoot, string $username): string
     {
-        $this->pmssWriteRelativeFile($homeRoot, $username.'/.config/deluge/core.conf', <<<'JSON'
+        return $this->pmssWriteRelativeFile($homeRoot, $username.'/.config/deluge/core.conf', <<<'JSON'
 {
     "file": 1,
     "format": 1
@@ -90,20 +90,7 @@ JSON
     public function testApplyManagedConfigReturnsFalseWhenAlreadyConverged(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-deluge-managed-nochange-');
-        $configPath = $this->pmssWriteRelativeFile($homeRoot, 'fixtur01/.config/deluge/core.conf', <<<'JSON'
-{
-    "file": 1,
-    "format": 1
-}{
-    "download_location": "/home/fixtur01/data",
-    "max_active_downloading": 5,
-    "max_active_limit": 500,
-    "max_connections_global": 300,
-    "max_upload_slots_global": 15,
-    "pre_allocate_storage": true
-}
-JSON
-        );
+        $configPath = $this->pmssWriteConvergedCoreConfig($homeRoot, 'fixtur01');
         $original = (string) file_get_contents($configPath);
 
         $this->assertFalse(\pmssDelugeApplyManagedConfig('fixtur01'));

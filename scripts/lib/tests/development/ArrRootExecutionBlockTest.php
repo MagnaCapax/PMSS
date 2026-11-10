@@ -148,7 +148,17 @@ class ArrRootExecutionBlockTest extends TestCase
         $procNetRoot = $this->pmssMakeTempDir('pmss-arr-net-', 0700);
         $installRoot = $this->pmssMakeTempDir('pmss-arr-opt-', 0700);
         $this->pmssWriteFile($installRoot.'/Radarr/Radarr', '');
-        $this->pmssWriteFakeTcpTable($procNetRoot, [301 => 7878, 302 => 7879]);
+        // Write the minimum /proc/net/tcp fixture needed by the inode matcher.
+        $lines = ["  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode"];
+        foreach ([301 => 7878, 302 => 7879] as $inode => $port) {
+            $lines[] = sprintf(
+                '  %d: 0100007F:%04X 00000000:0000 0A 00000000:0000 00:00000000 00000000 0 0 %d 1 0000000000000000 100 0 0 10 0',
+                $inode,
+                $port,
+                $inode
+            );
+        }
+        $this->pmssWriteFile($procNetRoot.'/tcp', implode("\n", $lines)."\n");
 
         $this->pmssWriteFakeProcess($procRoot, 301, $installRoot.'/Radarr/Radarr', 1046, [301]);
         $this->pmssWriteFakeProcess($procRoot, 302, $installRoot.'/Radarr/Radarr', 1046, [302]);
@@ -218,20 +228,5 @@ class ArrRootExecutionBlockTest extends TestCase
         $links = ['exe' => $exeTarget];
         foreach ($socketInodes as $inode) $links['fd/'.$inode] = 'socket:['.$inode.']';
         $this->pmssWriteSymlinks($dir, $links, 0700);
-    }
-
-    /** Write the minimum /proc/net/tcp fixture needed by the inode matcher. */
-    private function pmssWriteFakeTcpTable(string $procNetRoot, array $portsByInode): void
-    {
-        $lines = ["  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode"];
-        foreach ($portsByInode as $inode => $port) {
-            $lines[] = sprintf(
-                '  %d: 0100007F:%04X 00000000:0000 0A 00000000:0000 00:00000000 00000000 0 0 %d 1 0000000000000000 100 0 0 10 0',
-                $inode,
-                $port,
-                $inode
-            );
-        }
-        $this->pmssWriteFile($procNetRoot.'/tcp', implode("\n", $lines)."\n");
     }
 }

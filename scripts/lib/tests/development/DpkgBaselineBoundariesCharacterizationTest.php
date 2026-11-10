@@ -26,7 +26,22 @@ class DpkgBaselineBoundariesCharacterizationTest extends TestCase
             // With no validated snapshots at all, retain the existing highest-version fallback.
             [13, [13], ['selections-debian13.txt'], 'selections-debian13.txt', []],
         ] as $case) {
-            $result = $this->selection($case[0], $case[1], $case[2]);
+            // Inject directory entries and readability; the production selector supplies all policy.
+            $script = <<<'PHP'
+namespace DpkgBaselineFixture;
+function glob($pattern) {
+    return array_map(static function ($major) use ($pattern) {
+        return dirname($pattern).'/selections-debian'.$major.'.txt';
+    }, $GLOBALS['majors']);
+}
+function is_readable($path) { return in_array(basename($path), $GLOBALS['readable'], true); }
+PHP;
+            $script .= '$GLOBALS["majors"] = '.var_export($case[1], true).';'
+                .'$GLOBALS["readable"] = '.var_export($case[2], true).'; $logs = [];';
+            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/dpkgBaseline.php', 'DpkgBaselineFixture');
+            $script .= '$path = pmssSelectDpkgSelectionsBaseline('.var_export($case[0], true).', static function ($line) use (&$logs) { $logs[] = $line; });'
+                .'echo json_encode(["path" => $path === null ? null : basename($path), "logs" => $logs]);';
+            $result = $this->pmssRunInlinePhpJson($script);
             $this->assertSame(['path' => $case[3], 'logs' => $case[4]], $result);
         }
     }
@@ -42,25 +57,5 @@ class DpkgBaselineBoundariesCharacterizationTest extends TestCase
                 ], true).'));';
             $this->assertSame(array_fill(0, 6, true), $this->pmssRunInlinePhpJson($script));
         }
-    }
-
-    /** Inject directory entries and readability; the production selector supplies all policy. */
-    private function selection(?int $version, array $majors, array $readable): array
-    {
-        $script = <<<'PHP'
-namespace DpkgBaselineFixture;
-function glob($pattern) {
-    return array_map(static function ($major) use ($pattern) {
-        return dirname($pattern).'/selections-debian'.$major.'.txt';
-    }, $GLOBALS['majors']);
-}
-function is_readable($path) { return in_array(basename($path), $GLOBALS['readable'], true); }
-PHP;
-        $script .= '$GLOBALS["majors"] = '.var_export($majors, true).';'
-            .'$GLOBALS["readable"] = '.var_export($readable, true).'; $logs = [];';
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/dpkgBaseline.php', 'DpkgBaselineFixture');
-        $script .= '$path = pmssSelectDpkgSelectionsBaseline('.var_export($version, true).', static function ($line) use (&$logs) { $logs[] = $line; });'
-            .'echo json_encode(["path" => $path === null ? null : basename($path), "logs" => $logs]);';
-        return $this->pmssRunInlinePhpJson($script);
     }
 }

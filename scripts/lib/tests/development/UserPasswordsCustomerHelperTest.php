@@ -10,15 +10,10 @@ final class UserPasswordsCustomerHelperTest extends TestCase
         return $this->pmssRepoPath('etc/skel/www/userPasswords.php');
     }
 
-    private function runHelperJson(string $script, array $environment = []): array
-    {
-        return $this->pmssRunInlinePhpRequireJson($this->helperPath(), $script, $environment);
-    }
-
     private function assertLocalclientPassword(string $expected, string $path): void
     {
         $script = 'echo json_encode(array("password" => pmssDelugeAuthReadLocalclientPassword('.var_export($path, true).')));';
-        $this->assertSame($expected, $this->runHelperJson($script)['password']);
+        $this->assertSame($expected, $this->pmssRunInlinePhpRequireJson($this->helperPath(), $script)['password']);
     }
 
     public function testReadLocalclientPasswordReturnsEmptyWhenMissing(): void
@@ -66,8 +61,8 @@ final class UserPasswordsCustomerHelperTest extends TestCase
     public function testRotateDelugeServicePasswordUpdatesAuthAndWebUiTogether(): void
     {
         $homeRoot = $this->pmssTrackHomeRoot($this->pmssMakeTempDir('pmss-deluge-home-'));
-        $authPath = $homeRoot.'/alice/.config/deluge/auth';
-        $webConfPath = $homeRoot.'/alice/.config/deluge/web.conf';
+        $authPath = $homeRoot.'/fixtur01/.config/deluge/auth';
+        $webConfPath = $homeRoot.'/fixtur01/.config/deluge/web.conf';
         $salt = '2222222222222222222222222222222222222222';
         @mkdir(dirname($authPath), 0755, true);
         file_put_contents($authPath, "localclient:old-secret:10\n");
@@ -79,7 +74,7 @@ final class UserPasswordsCustomerHelperTest extends TestCase
 
         $result = $this->pmssRunInlinePhpRequireJson(
             $this->helperPath(),
-            '$rotated = pmssDelugeServicePasswordRotate("alice");'
+            '$rotated = pmssDelugeServicePasswordRotate("fixtur01");'
             .'$parsed = pmssUserPasswordsWebConfRead('.var_export($webConfPath, true).');'
             .'echo json_encode(array("rotated" => $rotated, "parsed" => $parsed));',
             array('PMSS_HOME_DIR' => $homeRoot)
