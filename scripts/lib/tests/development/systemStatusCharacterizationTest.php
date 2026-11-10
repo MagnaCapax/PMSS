@@ -90,15 +90,6 @@ final class SystemStatusCharacterizationTest extends TestCase
         return array_intersect_key($this->buildSystemStatusDependencies(), array_flip(['runCommand', 'pathExists', 'readFile', 'isExecutable']));
     }
 
-    private function runStatusEmitScript(string $script): array
-    {
-        return $this->pmssExecInlinePhpWithTempStderr(
-            'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'.$script,
-            [],
-            'pmss-status-stderr-'
-        );
-    }
-
     public function testComponentChecksStayStableWithHermeticInputs(): void
     {
         $dependencies = $this->buildComponentStatusDependencies();
@@ -369,15 +360,15 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testStatusEmitJsonSubstitutesInvalidUtf8(): void
     {
-        $command = $this->runStatusEmitScript(
-            'exit(pmssStatusEmit('
+        $command = $this->pmssExecInlinePhpWithTempStderr(
+            'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'exit(pmssStatusEmit('
             .'[pmssStatus("bin.php", "OK", "ready")],'
             .'"PMSS Status",'
             .'true,'
             .'["results" => [pmssStatus("bin.php", "OK", "bad\xB1detail")]],'
             .'null'
-            .'));'
-        );
+            .'));', [], 'pmss-status-stderr-');
 
         $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
         $this->assertStringContainsAllStrings(['"results"', '\\ufffd'], $command['result']['output']);
@@ -385,16 +376,16 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testStatusEmitReturnsErrorWhenJsonEncodingFails(): void
     {
-        $command = $this->runStatusEmitScript(
-            'exit(pmssStatusEmit('
+        $command = $this->pmssExecInlinePhpWithTempStderr(
+            'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'exit(pmssStatusEmit('
             .'[pmssStatus("bin.php", "OK", "ready")],'
             .'"PMSS Status",'
             .'true,'
             .'["results" => [["name" => "bin.php", "status" => "OK", "detail" => INF]]],'
             .'null,'
             .'JSON_PRETTY_PRINT'
-            .'));'
-        );
+            .'));', [], 'pmss-status-stderr-');
         $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Failed to encode status JSON.\n");
     }
 
@@ -405,18 +396,19 @@ final class SystemStatusCharacterizationTest extends TestCase
             ['status' => 'WARN', 'detail' => ['nested' => 'ignored']],
             ['name' => ['nested' => 'ignored'], 'status' => 'ERR', 'detail' => 'broken'],
         ];
-        $command = $this->runStatusEmitScript(
-            '$checks = '.var_export($checks, true).';'
-            .'exit(pmssStatusEmit($checks, "PMSS Status", false, [], null, 0, false, 8, false));'
-        );
+        $command = $this->pmssExecInlinePhpWithTempStderr(
+            'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'$checks = '.var_export($checks, true).';'
+            .'exit(pmssStatusEmit($checks, "PMSS Status", false, [], null, 0, false, 8, false));', [], 'pmss-status-stderr-');
         $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
         $this->assertStringContainsAllStrings(['PMSS Status (', 'Summary: 1 OK, 1 WARN, 1 ERR'], $command['result']['output']);
     }
 
     public function testStatusEmitTextDefaultsMissingSummaryKeysToZero(): void
     {
-        $command = $this->runStatusEmitScript(
-            'exit(pmssStatusEmit('
+        $command = $this->pmssExecInlinePhpWithTempStderr(
+            'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'exit(pmssStatusEmit('
             .'[pmssStatus("bin.php", "OK", "ready")],'
             .'"PMSS Status",'
             .'false,'
@@ -426,8 +418,7 @@ final class SystemStatusCharacterizationTest extends TestCase
             .'false,'
             .'8,'
             .'false'
-            .'));'
-        );
+            .'));', [], 'pmss-status-stderr-');
         $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
         $this->assertStringContainsString('Summary: 1 OK, 0 WARN, 0 ERR', $command['result']['output']);
     }

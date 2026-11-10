@@ -41,8 +41,9 @@ class UpdateBootstrapLockReleaseTest extends TestCase
 
     public function testReleaseUpdateLockDoesNotDependOnRuntimeHelper(): void
     {
-        $result = $this->runBootstrapInline(
-            '$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
+        $result = $this->pmssExecInlinePhp(
+            'require '.var_export(dirname(__DIR__).'/common/updateBootstrapShim.php', true).'; '
+            .'$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
             .'$handle = fopen($path, "c+"); '
             .'$GLOBALS["PMSS_UPDATE_LOCK_HANDLE"] = $handle; '
             .'putenv("PMSS_UPDATE_LOCK_HELD=1"); '
@@ -51,8 +52,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
             .'"env" => getenv("PMSS_UPDATE_LOCK_HELD"), '
             .'"handle_defined" => isset($GLOBALS["PMSS_UPDATE_LOCK_HANDLE"]), '
             .'"handle_is_resource" => is_resource($handle)'
-            .']);'
-        );
+            .']);', $this->pmssTestModeEnv());
 
         $this->assertEquals(0, $result['rc'], 'pmssReleaseUpdateLock should complete without fatal shutdown errors');
         $payload = $this->pmssDecodeJsonArray($result['output']);
@@ -63,8 +63,9 @@ class UpdateBootstrapLockReleaseTest extends TestCase
 
     public function testBootstrapExportsHeldLockFdClosePrefix(): void
     {
-        $result = $this->runBootstrapInline(
-            '$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
+        $result = $this->pmssExecInlinePhp(
+            'require '.var_export(dirname(__DIR__).'/common/updateBootstrapShim.php', true).'; '
+            .'$path = '.var_export($this->pmssMakeTempFile('pmss-lock-'), true).'; '
             .'$handle = fopen($path, "c+"); '
             .'flock($handle, LOCK_EX); '
             .'pmssUpdateLockExportChildCloseFds($handle); '
@@ -73,8 +74,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
             .'"prefix" => pmssUpdateLockChildClosePrefix(), '
             .'"command" => pmssShellCommandWithoutInheritedUpdateLock("printf ok")'
             .']); '
-            .'fclose($handle);'
-        );
+            .'fclose($handle);', $this->pmssTestModeEnv());
 
         $this->assertEquals(0, $result['rc'], 'bootstrap lock fd export should complete');
         $payload = $this->pmssDecodeJsonArray($result['output']);
@@ -148,26 +148,18 @@ class UpdateBootstrapLockReleaseTest extends TestCase
 
     public function testReleaseUpdateLockIsSafeWhenHandleAlreadyMissing(): void
     {
-        $result = $this->runBootstrapInline(
-            'putenv("PMSS_UPDATE_LOCK_HELD=1"); '
+        $result = $this->pmssExecInlinePhp(
+            'require '.var_export(dirname(__DIR__).'/common/updateBootstrapShim.php', true).'; '
+            .'putenv("PMSS_UPDATE_LOCK_HELD=1"); '
             .'pmssReleaseUpdateLock(); '
             .'echo json_encode(['
             .'"env" => getenv("PMSS_UPDATE_LOCK_HELD"), '
             .'"handle_defined" => isset($GLOBALS["PMSS_UPDATE_LOCK_HANDLE"])'
-            .']);'
-        );
+            .']);', $this->pmssTestModeEnv());
 
         $this->assertEquals(0, $result['rc'], 'pmssReleaseUpdateLock should tolerate a missing handle');
         $payload = $this->pmssDecodeJsonArray($result['output']);
         $this->assertEquals(false, $payload['env'], 'pmssReleaseUpdateLock should still clear the held-lock environment flag');
         $this->assertFalse($payload['handle_defined'], 'pmssReleaseUpdateLock should leave no global handle behind');
-    }
-
-    /** @return array{rc:int, output:string, lines:array<int, string>} */
-    private function runBootstrapInline(string $script): array
-    {
-        $libraryPath = dirname(__DIR__).'/common/updateBootstrapShim.php';
-        return $this->pmssExecInlinePhp('require '.var_export($libraryPath, true).'; '.$script,
-            $this->pmssTestModeEnv());
     }
 }

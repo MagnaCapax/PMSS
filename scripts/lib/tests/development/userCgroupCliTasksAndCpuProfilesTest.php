@@ -9,27 +9,32 @@ class UserCgroupCliTasksAndCpuProfilesTest extends TestCase
 
     public function testTasksProfileLow(): void
     {
-        $this->assertNamedProfile('--tasks-profile=low', 'TasksMax=1024');
+        $this->assertStringContainsString('TasksMax=1024',
+            $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--tasks-profile=low']));
     }
 
     public function testTasksProfileHigh(): void
     {
-        $this->assertNamedProfile('--tasks-profile=high', 'TasksMax=8192');
+        $this->assertStringContainsString('TasksMax=8192',
+            $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--tasks-profile=high']));
     }
 
     public function testCpuProfileLow(): void
     {
-        $this->assertNamedProfile('--cpu-profile=low', 'CPUWeight=50');
+        $this->assertStringContainsString('CPUWeight=50',
+            $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--cpu-profile=low']));
     }
 
     public function testCpuProfileHigh(): void
     {
-        $this->assertNamedProfile('--cpu-profile=high', 'CPUWeight=300');
+        $this->assertStringContainsString('CPUWeight=300',
+            $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--cpu-profile=high']));
     }
 
     public function testMemProfileDefault(): void
     {
-        $this->assertNamedProfile('--mem-profile=default', 'MemoryHigh=500M');
+        $this->assertStringContainsString('MemoryHigh=500M',
+            $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--mem-profile=default']));
     }
 
     public function testExplicitValuesOverrideNamedProfiles(): void
@@ -48,11 +53,5 @@ class UserCgroupCliTasksAndCpuProfilesTest extends TestCase
 
         $this->assertStringContainsAndOmitsStrings(['CPUWeight=111', 'TasksMax=222', 'MemoryHigh=333M'],
             ['CPUWeight=300', 'TasksMax=8192', 'MemoryHigh=1024M'], $out);
-    }
-
-    private function assertNamedProfile(string $profileArg, string $expected): void
-    {
-        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', $profileArg]);
-        $this->assertStringContainsString($expected, $out);
     }
 }
