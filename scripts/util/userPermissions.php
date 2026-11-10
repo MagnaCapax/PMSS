@@ -34,8 +34,7 @@ if (!is_array($userIds)) die("No such user\n");
 // descriptor out of the commands below; the handle is held until exit.
 $permissionsLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-userPermissions-'.$thisUser.'.lock'), false, 'ce');
 if ($permissionsLock === false) {
-    fwrite(STDERR, "Unable to lock permissions for {$thisUser}\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Unable to lock permissions for {$thisUser}\n"));
 }
 
 // Each repair acts on the object it checked (scripts/lib/user/permissionsApply.php):

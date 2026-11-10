@@ -102,8 +102,7 @@ if ($accountInfo === null) {
             }
         }
         pmssUserLifecycleContextLogStatusMessage('terminate', 'resume_refused', $username, 'ERR', $message, array('reason' => $reason));
-        fwrite(STDERR, $message."\n");
-        exit(1);
+        exit(pmssCliReturnWithStderr($message."\n"));
     };
     $proof = pmssTerminateUserResumeUid($username, $resumePaths);
     $running = $proof['reason'] === 'nothing_to_resume' ? false : pmssTerminateUserResumeRunning($username);
@@ -170,8 +169,7 @@ while (!in_array($continue, array('Y', 'N'))) {
     $input = fgets(STDIN);
     if ($input === false) {
         pmssUserLifecycleContextLogStatusMessage('terminate', 'confirm', $username, 'ERR', 'Unable to read confirmation input (EOF). Re-run with --confirm for non-interactive use.');
-        fwrite(STDERR, "Error: confirmation input unavailable (EOF). Re-run with --confirm.\n");
-        exit(1);
+        exit(pmssCliReturnWithStderr("Error: confirmation input unavailable (EOF). Re-run with --confirm.\n"));
     }
     $continue = strtoupper(trim($input));
 }

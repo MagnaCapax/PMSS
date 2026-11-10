@@ -9,6 +9,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/helpText.php';
+require_once __DIR__.'/../runtime/cli.php';
 
 function pmssCliArgv(?array $argv = null): array { return $argv ?? ($_SERVER['argv'] ?? []); }
 
@@ -99,7 +100,7 @@ function pmssCliRejectMutuallyExclusiveOptions(array $parsed, array $longOptions
 }
 
 /** Emit an exact stderr payload and terminate the current CLI process. */
-function pmssCliExitWithStderr(string $message, int $exitCode): void { fwrite(STDERR, $message); exit($exitCode); }
+function pmssCliExitWithStderr(string $message, int $exitCode): void { exit(pmssCliReturnWithStderr($message, $exitCode)); }
 
 /** Return whether the standard help option was requested. */
 function pmssCliHelpRequested(array $parsed, ?string $short = 'h'): bool

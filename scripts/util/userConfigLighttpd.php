@@ -40,8 +40,7 @@ function pmssUserConfigLighttpdMain(array $argv): int
     $strict = in_array('--strict', $arguments, true);
     $arguments = array_values(array_filter($arguments, static function ($argument): bool { return $argument !== '--strict'; }));
     if (count($arguments) > 1) {
-        fwrite(STDERR, "Usage: userConfigLighttpd.php [--strict] [username]\n");
-        return 1;
+        return pmssCliReturnWithStderr("Usage: userConfigLighttpd.php [--strict] [username]\n");
     }
     $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', (string) ($arguments[0] ?? ''), array('emitEmptyMessage' => true, 'emptyToStderr' => true, 'notFoundMessage' => "Username not found\n"));
     if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];

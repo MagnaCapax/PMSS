@@ -112,10 +112,13 @@ class CliHelperTest extends TestCase
 
     public function testCliExitWithStderrPreservesPayloadAndStatus(): void
     {
-        $script = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-cli-exit-', '.php'), "<?php\nrequire_once ".var_export(dirname(__DIR__, 2).'/cli/optionParser.php', true).";\npmssCliExitWithStderr(\"exact failure\\n\", 7);\n");
-        $result = $this->pmssExecArgvCommand([PHP_BINARY, $script]);
-
-        $this->assertSame(7, $result['rc']);
-        $this->assertSame('exact failure', $result['output']);
+        // Capture streams separately: whitespace and NUL bytes belong to the diagnostic contract.
+        foreach ([["exact failure\n", 7], ['', 0], ['  failure  ', 1], ["first\nsecond\n", 2], ["binary\0payload", 255]] as [$message, $exitCode]) {
+            $code = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/cli/optionParser.php'), true).';'
+                .'pmssCliExitWithStderr('.var_export($message, true).', '.$exitCode.'); echo "unexpected return";';
+            $capture = $this->pmssExecInlinePhpWithTempStderr($code);
+            $this->pmssAssertArraySubsetSame(['rc' => $exitCode, 'output' => ''], $capture['result']);
+            $this->assertSame($message, file_get_contents($capture['stderrPath']));
+        }
     }
 }

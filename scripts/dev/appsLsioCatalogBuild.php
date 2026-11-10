@@ -2,6 +2,7 @@
 /** Build the delivered, documentation-only LinuxServer.io app catalog. */
 require_once dirname(__DIR__).'/lib/log.php';
 require_once __DIR__.'/../lib/runtime/filesystem.php';
+require_once __DIR__.'/../lib/runtime/cli.php';
 const PMSS_LSIO_SOURCE = 'https://api.linuxserver.io/api/v1/images?include_config=false';
 const PMSS_LSIO_EXCLUDED = array(
     // PMSS already provides these applications: media stack (jellyfin, sonarr, radarr, prowlarr, sabnzbd),
@@ -89,15 +90,13 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     $data = is_string($json) ? pmssJsonDecodeAssoc($json) : null;
     if ($data === null || !isset($data['data']['repositories']['linuxserver'])
         || !is_array($data['data']['repositories']['linuxserver'])) {
-        fwrite(STDERR, "Could not read LinuxServer.io image catalog: {$source}\n");
-        exit(1);
+        exit(pmssCliReturnWithStderr("Could not read LinuxServer.io image catalog: {$source}\n"));
     }
     $entries = pmssLsioCatalogBuild($data['data']['repositories']['linuxserver']);
     $output = pmssLsioCatalogExport($entries, date('Y-m-d'));
     $target = dirname(__DIR__, 2).'/etc/skel/www/appsLsioCatalog.php';
     if (!pmssLsioCatalogWrite($target, $output)) {
-        fwrite(STDERR, "Could not write {$target}\n");
-        exit(1);
+        exit(pmssCliReturnWithStderr("Could not write {$target}\n"));
     }
     fwrite(STDOUT, count($entries)." entries written to {$target}\n");
 }

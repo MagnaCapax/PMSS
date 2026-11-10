@@ -31,8 +31,7 @@ function pmssCgroupDirectRequireRuntime(string $skipMessage): void
 {
     $check = pmssCgroupDirectRuntimeCheck($skipMessage);
     if ($check['exitCode'] !== null) {
-        fwrite(STDERR, $check['message']."\n");
-        exit((int) $check['exitCode']);
+        exit(pmssCliReturnWithStderr($check['message']."\n", (int) $check['exitCode']));
     }
 }
 

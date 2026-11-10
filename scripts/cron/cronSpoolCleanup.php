@@ -11,8 +11,7 @@ require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/cronSpool.php';
 
 if (!function_exists('posix_geteuid') || posix_geteuid() !== 0) {
-    fwrite(STDERR, "cronSpoolCleanup requires root.\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("cronSpoolCleanup requires root.\n"));
 }
 $lock = pmssCronLockAcquire('cronSpoolCleanup');
 $log = static function (array $record): void {

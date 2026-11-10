@@ -302,7 +302,8 @@ SH
         foreach ($paths as $index => $path) {
             $this->pmssWriteFile($root.'/tree'.$index.'/keep', 'private');
         }
-        $script = 'namespace ResumeSealFixture; $root = '.var_export($root, true).';';
+        $script = 'namespace ResumeSealFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/runtime/cli.php'), true).';'
+            .'$root = '.var_export($root, true).';';
         $script .= <<<'PHP'
 $username = 'user1234'; $dryRun = true; $events = [];
 function pmssUserAccountLookup($name) { return null; }
