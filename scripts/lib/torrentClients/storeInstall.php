@@ -1,5 +1,23 @@
 <?php
-/** Install a pinned venv archive as a version directory, never as a partial tree. */
+/** Install pinned static, archived and wheel-based store artifacts. */
+
+require_once dirname(__DIR__).'/update/apps/remoteBinary.php';
+require_once __DIR__.'/delugeVenv.php';
+
+/** Dispatch installation without owning store traversal or publication policy. */
+function pmssTorrentClientsStoreInstall(array $entry, string $binary): bool
+{
+    if ($entry['kind'] === 'venv') return $entry['client'] === 'deluge'
+        ? pmssTorrentClientsDelugeVenvInstall($entry, dirname(dirname($binary)))
+        : pmssTorrentClientsStoreVenvInstall($entry, $binary);
+    foreach ($entry['url'] as $url) {
+        pmssInstallPinnedRemoteBinary(
+            $entry['client'].' '.$entry['version'], $url, $entry['sha256'], $binary, true
+        );
+        if (is_file($binary) && hash_file('sha256', $binary) === strtolower($entry['sha256'])) return true;
+    }
+    return false;
+}
 
 /** Accept only regular files and directories with lexical relative member paths. */
 function pmssTorrentClientsStoreArchiveIsSafe(string $archive): bool

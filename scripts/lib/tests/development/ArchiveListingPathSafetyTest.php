@@ -53,7 +53,7 @@ function pmssPinnedRemoteArchiveMembersRead($pathsCommand, $detailsCommand): arr
 }
 PHP;
         $script .= '$GLOBALS["calls"] = []; $GLOBALS["members"] = '.var_export($members, true).';';
-        foreach (['torrentClients/storeArchive.php', 'torrentClients/transmissionWebArchive.php',
+        foreach (['torrentClients/storeInstall.php', 'torrentClients/transmissionWebArchive.php',
             'update/apps/pikkumiesAgentboard.php'] as $library) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/'.$library, 'ArchiveListingPathFixture');
         }

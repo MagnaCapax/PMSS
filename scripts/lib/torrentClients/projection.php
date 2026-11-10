@@ -19,18 +19,14 @@ function pmssTorrentClientsProjectionWrite(
     $versions = [];
     $notInstalled = array_fill_keys(array_keys(pmssTorrentClientsBinaryNames()), 0);
     foreach ($catalog as $entry) {
-        if (!is_array($entry) || !isset($notInstalled[$entry['client'] ?? ''], $entry['version'], $entry['kind'])) continue;
         // A disabled entry is not offered even when an earlier run installed it.
-        if (!empty($entry['disabled'])) continue;
+        if (!is_array($entry) || !isset($notInstalled[$entry['client'] ?? ''], $entry['version'], $entry['kind'])
+            || !empty($entry['disabled'])) continue;
         $client = $entry['client'];
         $version = $entry['version'];
         $binary = $entry['kind'] === 'system' ? ($entry['binary'] ?? '')
             : pmssTorrentClientsStoreBinaryPath($root, $client, $version, $entry['kind']);
-        if (!is_string($binary) || !is_file($binary) || is_link($binary)) { ++$notInstalled[$client]; continue; }
-        if ($client === 'deluge' && $entry['kind'] === 'venv'
-            && (!is_file(dirname($binary).'/deluge-web') || is_link(dirname($binary).'/deluge-web'))) {
-            ++$notInstalled[$client]; continue;
-        }
+        if (!pmssTorrentClientsBinaryAvailable($binary, $client, $entry['kind'])) { ++$notInstalled[$client]; continue; }
         $published = [
             'client' => $client,
             'version' => $version,

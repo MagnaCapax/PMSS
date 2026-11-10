@@ -31,6 +31,15 @@ function pmssTorrentClientsCatalogWebValid($web): bool
         && preg_match('/\A[a-f0-9]{64}\z/', $web['sha256']) === 1;
 }
 
+/** Keep wheel names and pins identical at catalog and direct-install boundaries. */
+function pmssTorrentClientsCatalogWheelValid($wheel): bool
+{
+    return is_array($wheel) && is_string($wheel['file'] ?? null)
+        && preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\.whl\z/', $wheel['file']) === 1
+        && is_string($wheel['sha256'] ?? null)
+        && preg_match('/\A[a-fA-F0-9]{64}\z/', $wheel['sha256']) === 1;
+}
+
 /** Reject the entire document if any entry is malformed or ambiguous. */
 function pmssTorrentClientsCatalogLoad(string $path): array
 {
@@ -84,11 +93,7 @@ function pmssTorrentClientsCatalogLoad(string $path): array
                 || !in_array($entry['compatWindow'] ?? '', ['', 'bullseye-cp37-310', 'bookworm-cp311'], true)) return [];
             $wheelNames = [];
             foreach ($entry['wheels'] as $wheel) {
-                if (!is_array($wheel) || !is_string($wheel['file'] ?? null)
-                    || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\.whl\z/', $wheel['file']) !== 1
-                    || !is_string($wheel['sha256'] ?? null)
-                    || preg_match('/\A[a-fA-F0-9]{64}\z/', $wheel['sha256']) !== 1
-                    || isset($wheelNames[$wheel['file']])) return [];
+                if (!pmssTorrentClientsCatalogWheelValid($wheel) || isset($wheelNames[$wheel['file']])) return [];
                 $wheelNames[$wheel['file']] = true;
             }
             continue;

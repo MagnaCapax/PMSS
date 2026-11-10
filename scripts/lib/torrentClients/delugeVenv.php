@@ -2,10 +2,10 @@
 /** Build a catalog Deluge version from a root-owned mirror of pinned wheels. */
 
 require_once dirname(__DIR__).'/update/apps/pythonVenv.php';
+require_once dirname(__DIR__).'/update/apps/remoteBinary.php';
 require_once dirname(__DIR__).'/update/apps/delugeWebBasePatch.php';
 require_once dirname(__DIR__).'/update/distro.php';
-require_once __DIR__.'/storePaths.php';
-require_once __DIR__.'/store.php';
+require_once __DIR__.'/catalog.php';
 
 /** Check the reviewed wheel set's distro, architecture and Python window before pip. */
 function pmssTorrentClientsDelugeVenvCompatible(array $entry): bool
@@ -43,24 +43,19 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
     };
     if (!pmssTorrentClientsStoreDirectory($wheelDir)) return false;
     $paths = [];
-    $seen = [];
     foreach ($entry['wheels'] as $wheel) {
-        if (!is_array($wheel) || !is_string($wheel['file'] ?? null)
-            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\.whl\z/', $wheel['file']) !== 1
-            || !is_string($wheel['sha256'] ?? null)
-            || preg_match('/\A[a-fA-F0-9]{64}\z/', $wheel['sha256']) !== 1) return false;
+        if (!pmssTorrentClientsCatalogWheelValid($wheel)) return false;
         $path = $wheelDir.'/'.$wheel['file'];
-        if (!isset($seen[$path]) && (!is_file($path) || is_link($path)
+        if (!isset($paths[$path]) && (!is_file($path) || is_link($path)
             || hash_file('sha256', $path) !== strtolower($wheel['sha256']))) {
             $fetch($wheel['file'], strtolower($wheel['sha256']), $path);
             clearstatcache(true, $path);
         }
         $stat = @lstat($path);
-        if (isset($seen[$path]) || !is_array($stat) || $stat['uid'] !== pmssTorrentClientsStoreOwnerIds()[0]
+        if (isset($paths[$path]) || !is_array($stat) || $stat['uid'] !== pmssTorrentClientsStoreOwnerIds()[0]
             || !is_file($path) || is_link($path)
             || hash_file('sha256', $path) !== strtolower($wheel['sha256'])) return false;
-        $seen[$path] = true;
-        $paths[] = $path;
+        $paths[$path] = $path;
     }
     $link = $versionDir.'/.deluge-cli';
     if (pmssPathExistsOrLink($link)) return false;
@@ -75,7 +70,6 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
     // Do not publish a version with the installer's temporary CLI link left behind.
     if (is_link($link) && !$unlink($link)) return false;
     // InstallCli calls pmssPythonVenvEnsure; both daemon scripts must exist.
-    return $linked && is_file($versionDir.'/bin/deluged') && !is_link($versionDir.'/bin/deluged')
-        && is_file($versionDir.'/bin/deluge-web') && !is_link($versionDir.'/bin/deluge-web')
+    return $linked && pmssTorrentClientsBinaryAvailable($versionDir.'/bin/deluged', 'deluge', 'venv')
         && pmssDelugeWebBasePathPatchVenv($versionDir, $log, $ops['patch'] ?? 'pmssPatchDelugeWebBasePathBytes');
 }

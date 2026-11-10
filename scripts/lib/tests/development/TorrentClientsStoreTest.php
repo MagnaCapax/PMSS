@@ -69,7 +69,7 @@ final class TorrentClientsStoreTest extends TestCase
     {
         // Only the namespaced filesystem probe is replaced; conversion uses the real library.
         $script = 'namespace StoreSpaceFixture; function disk_free_space($path) { return $GLOBALS["bytes"]; }';
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/torrentClients/store.php', 'StoreSpaceFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/torrentClients/storePaths.php', 'StoreSpaceFixture');
         $script .= '$results = []; foreach ([false, null, "42", [], -1, -0.5, INF, NAN, '
             .'(float) PHP_INT_MAX, PHP_INT_MAX * 2.0, 0, 0.0, 42.75, PHP_INT_MAX] as $bytes) {'
             .'$GLOBALS["bytes"] = $bytes; $results[] = pmssTorrentClientsStoreFreeSpace(); } echo json_encode($results);';
