@@ -52,14 +52,14 @@ class UserMetricsCollectTest extends TestCase
             ], null, PHP_INT_MAX],
         ];
         foreach ($cases as [$files, $rootCount, $panelCount]) {
-            $slice = $this->tree($files);
+            $slice = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), $files);
             $this->assertSame($rootCount, \pmssOomStatusV1CountRead($slice));
             $this->assertSame($panelCount, \pmssWebCgroupMemoryStatusV1OomKillRead($slice, 1000));
         }
         $this->assertSame(null, \pmssOomStatusV1CountRead($slice.'/missing'));
         $this->assertSame(0, \pmssWebCgroupMemoryStatusV1OomKillRead('', 1000));
         // Preserve the existing UID gate: invalid identities permit only the parent read.
-        $slice = $this->tree(['memory.oom_control' => "oom_kill 2\n", 'session-1.scope/memory.oom_control' => "oom_kill 3\n"]);
+        $slice = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), ['memory.oom_control' => "oom_kill 2\n", 'session-1.scope/memory.oom_control' => "oom_kill 3\n"]);
         foreach ([null, -1, '1000'] as $uid) {
             $this->assertSame(2, \pmssWebCgroupMemoryStatusV1OomKillRead($slice, $uid));
         }
@@ -68,8 +68,8 @@ class UserMetricsCollectTest extends TestCase
     /** A sibling account or symlink cycle must never become part of the account total. */
     public function testOomReadersSkipSymlinkedScopesAndCounters(): void
     {
-        $slice = $this->tree(['session-1.scope/memory.oom_control' => "oom_kill 3\n"]);
-        $outside = $this->tree(['memory.oom_control' => "oom_kill 99\n"]);
+        $slice = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), ['session-1.scope/memory.oom_control' => "oom_kill 3\n"]);
+        $outside = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), ['memory.oom_control' => "oom_kill 99\n"]);
         $this->assertTrue(symlink($outside, $slice.'/other.scope'));
         $this->assertTrue(symlink($slice, $slice.'/session-1.scope/loop'));
         $this->assertTrue(symlink($outside.'/memory.oom_control', $slice.'/memory.oom_control'));
@@ -108,11 +108,6 @@ class UserMetricsCollectTest extends TestCase
         $this->assertSame([true, false], $loaded);
     }
 
-    private function tree(array $files): string
-    {
-        return $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), $files);
-    }
-
     public function testHybridIoPressureIsNumericOptionalAndUidScoped(): void
     {
         $path = 'unified/user.slice/user-1000.slice/io.pressure';
@@ -126,7 +121,7 @@ class UserMetricsCollectTest extends TestCase
             ["other avg300=2 total=3\n", []],
             ['', []],
         ] as [$raw, $expected]) {
-            $root = $this->tree([$path => $raw]);
+            $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [$path => $raw]);
             $this->assertSame($expected, \pmssUserMetricsCollect(1000, $root));
             $this->assertSame([], \pmssUserMetricsCollect(1001, $root));
             $this->assertSame(null, \pmssResourceLogReadCountersV1(1000, $root));
@@ -136,7 +131,7 @@ class UserMetricsCollectTest extends TestCase
     public function testCollectsFullV1MetricSet(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->tree([
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
             'cpuacct/'.$slice.'/cpuacct.usage' => "900\n",
             'cpuacct/'.$slice.'/cpuacct.stat' => "user 12\nsystem 8\n",
             'cpu/'.$slice.'/cpu.stat' => "nr_periods 100\nnr_throttled 7\nthrottled_time 4200\n",
@@ -165,11 +160,11 @@ class UserMetricsCollectTest extends TestCase
 
     public function testOmitsAbsentSourcesAndReturnsEmptyWhenNothingReadable(): void
     {
-        $this->assertEquals([], \pmssUserMetricsCollect(1000, $this->tree([])));
+        $this->assertEquals([], \pmssUserMetricsCollect(1000, $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [])));
 
         // Invalid counters stay absent; a valid zero must survive omission filtering.
         $slice = 'user.slice/user-1000.slice/';
-        $root2 = $this->tree([
+        $root2 = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
             'cpuacct/'.$slice.'cpuacct.usage' => "-1\n", 'cpu/'.$slice.'cpu.stat' => "nr_periods nope\n",
             'memory/'.$slice.'memory.limit_in_bytes' => "18446744073709551615\n",
             'pids/'.$slice.'pids.current' => "0\n",
@@ -181,7 +176,7 @@ class UserMetricsCollectTest extends TestCase
     public function testBlkioSumsAcrossDevicesAndIgnoresTotalRows(): void
     {
         $slice = 'user.slice/user-1000.slice';
-        $root = $this->tree([
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
             'blkio/'.$slice.'/blkio.bfq.io_service_bytes_recursive' =>
                 "8:0 Read 1000\n8:0 Write 2000\n8:16 Read 500\n8:16 Write 250\nTotal 3750\n",
             'blkio/'.$slice.'/blkio.throttle.io_service_bytes_recursive' => "8:0 Read 1\n8:0 Write 2\n",
@@ -196,7 +191,7 @@ class UserMetricsCollectTest extends TestCase
     public function testV1ConsumersKeepTheirOwnProjections(): void
     {
         $slice = 'user.slice/user-1234.slice/';
-        $root = $this->tree([
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
             'cpuacct/'.$slice.'cpuacct.usage' => "900\n",
             'cpuacct/'.$slice.'cpuacct.stat' => "system 8\nuser 12\n",
             'cpu/'.$slice.'cpu.stat' => "throttled_time 42\nnr_throttled 0\nnr_periods 7\n",
@@ -231,7 +226,7 @@ class UserMetricsCollectTest extends TestCase
     public function testV1ConsumersRetainFirstNumericRowAndSentinelOmission(): void
     {
         $slice = 'user.slice/user-1000.slice/';
-        $root = $this->tree([
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
             'cpuacct/'.$slice.'cpuacct.usage' => "18446744073709551615\n",
             'cpuacct/'.$slice.'cpuacct.stat' => "user invalid\nuser 12\nuser 99\nsystem 0\n",
             'memory/'.$slice.'memory.stat' => "total_rss 0\nrss 9\ncache 9223372036854775807\ncache 5\nswap 0\n",
@@ -244,7 +239,7 @@ class UserMetricsCollectTest extends TestCase
     public function testV1ConsumersKeepDistinctPartialIoRules(): void
     {
         $slice = 'blkio/user.slice/user-1000.slice/';
-        $root = $this->tree([
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
             $slice.'blkio.bfq.io_service_bytes_recursive' => "8:0 Read 100\n8:0 Write 0\n",
             // A different family's ops cannot complete a BFQ billing sample.
             $slice.'blkio.throttle.io_serviced_recursive' => "8:0 Read 99\n8:0 Write 99\n",
@@ -257,7 +252,7 @@ class UserMetricsCollectTest extends TestCase
     {
         $slice = 'blkio/user.slice/user-1000.slice/';
         foreach ([0, 10] as $bytes) {
-            $root = $this->tree([
+            $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
                 $slice.'blkio.bfq.io_service_bytes_recursive' => "8:0 Read 0\n8:0 Write 0\n",
                 $slice.'blkio.bfq.io_serviced_recursive' => "8:0 Read 0\n8:0 Write 0\n",
                 $slice.'blkio.throttle.io_service_bytes_recursive' => "8:0 Read {$bytes}\n8:0 Write 0\n",
@@ -276,7 +271,7 @@ class UserMetricsCollectTest extends TestCase
     public function testV1ConsumersOmitMalformedSources(): void
     {
         $slice = 'user.slice/user-1000.slice/';
-        $root = $this->tree([
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
             'cpuacct/'.$slice.'cpuacct.usage' => "-1\n",
             'memory/'.$slice.'memory.usage_in_bytes' => "1 extra\n",
             'memory/'.$slice.'memory.stat' => "rss invalid\ncache -1\n",

@@ -37,7 +37,7 @@ class UserWebRootMigrationTest extends TestCase
         $publicStat = stat($public);
         $shareStat = stat($share);
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $this->assertTrue(is_link($this->home.'/www/public'));
         $this->assertSame('../.local/share/pmss/public', readlink($this->home.'/www/public'));
@@ -127,7 +127,7 @@ class UserWebRootMigrationTest extends TestCase
         $beforeMode = fileperms($target) & 07777;
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $this->assertSame('../.local/share/pmss/public', readlink($this->home.'/www/public'));
         $this->assertSame('durable', file_get_contents($target.'/index.html'));
@@ -143,7 +143,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->pmssWriteFile($target.'/destination.txt', 'destination');
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $this->assertTrue(is_dir($source) && !is_link($source));
         $this->assertTrue(is_dir($target) && !is_link($target));
@@ -159,7 +159,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/www/public');
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $this->assertTrue(is_link($this->home.'/www/public'));
         $this->assertSame($outside, readlink($this->home.'/www/public'));
@@ -277,7 +277,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->pmssWriteFile($target.'/users/'.$this->user.'/settings.ini', 'durable-share');
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
         $this->assertSame('../../.local/share/pmss/rutorrent/share', readlink($this->home.'/www/rutorrent/share'));
@@ -302,7 +302,7 @@ class UserWebRootMigrationTest extends TestCase
         $shareGroup = filegroup($shareFile);
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $durableShare = $this->home.'/.local/share/pmss/rutorrent/share';
         $durablePublic = $this->home.'/.local/share/pmss/public';
@@ -332,7 +332,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->pmssWriteFile($target, 'durable-profile');
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $this->assertEquals('misfiled-profile', file_get_contents($misfile));
         $this->assertEquals('durable-profile', file_get_contents($target));
@@ -345,7 +345,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->pmssWriteFile($source, 'ordinary-profile');
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $target = $this->home.'/.local/share/pmss/rutorrent/share/users/'.$this->user.'/settings/profile.ini';
         $this->assertFalse(file_exists($this->home.'/share'));
@@ -362,7 +362,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/share');
 
         $messages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($messages));
 
         $this->assertTrue(is_link($this->home.'/share'));
         $this->assertSame($outside, readlink($this->home.'/share'));
@@ -378,13 +378,13 @@ class UserWebRootMigrationTest extends TestCase
         $this->pmssWriteFile($misfile, 'legacy-profile');
 
         $firstMessages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($firstMessages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($firstMessages));
         $target = $this->home.'/.local/share/pmss/rutorrent/share';
         $beforeTarget = \pmssUserWebRootMigrationSnapshot($target);
         $beforeMisfile = \pmssUserWebRootMigrationSnapshot($this->home.'/share');
 
         $secondMessages = [];
-        \pmssUserMigrateWebRootState($this->context(), $this->logger($secondMessages));
+        \pmssUserMigrateWebRootState($this->pmssUserHomeContext($this->homeRoot, $this->user), $this->pmssMakeArrayLogger($secondMessages));
 
         $this->assertEquals($beforeTarget, \pmssUserWebRootMigrationSnapshot($target));
         $this->assertEquals($beforeMisfile, \pmssUserWebRootMigrationSnapshot($this->home.'/share'));
@@ -396,13 +396,4 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertFalse($this->pmssMessagesContain($secondMessages, 'Copied misfiled share'));
     }
 
-    private function context(): array
-    {
-        return $this->pmssUserHomeContext($this->homeRoot, $this->user);
-    }
-
-    private function logger(array &$messages): callable
-    {
-        return $this->pmssMakeArrayLogger($messages);
-    }
 }

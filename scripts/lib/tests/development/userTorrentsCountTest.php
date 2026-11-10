@@ -8,22 +8,20 @@ class UserTorrentsCountTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-usertorrents-']; }
 
-    private function homeDir(): string { return $this->tempDir.'/home'; }
-
     public function testEntryNamesInsideHomeAreCounted(): void
     {
-        $directory = $this->homeDir().'/fixtur01/session';
+        $directory = $this->tempDir.'/home/fixtur01/session';
         $this->pmssWriteFiles($directory, ['a.torrent' => 'test', 'b.torrent' => 'test']);
-        $this->assertSame(['a', 'b'], \pmssUserTorrentsEntryNames($directory, '*.torrent', realpath($this->homeDir().'/fixtur01')));
+        $this->assertSame(['a', 'b'], \pmssUserTorrentsEntryNames($directory, '*.torrent', realpath($this->tempDir.'/home/fixtur01')));
 
-        $counts = \pmssUserTorrentsCountForUser($this->homeDir(), 'fixtur01');
+        $counts = \pmssUserTorrentsCountForUser($this->tempDir.'/home', 'fixtur01');
         $this->assertEquals(2, $counts['rtorrent']);
         $this->assertEquals(2, $counts['total']);
     }
 
     public function testEntryNamesSkipDirectoryWithSymlinkedComponentOutsideHome(): void
     {
-        $home = $this->homeDir().'/fixtur01';
+        $home = $this->tempDir.'/home/fixtur01';
         $outside = $this->tempDir.'/outside';
         $this->pmssWriteFile($outside.'/session/foreign.torrent', 'test');
         $this->pmssEnsureDir($home);
@@ -34,7 +32,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testCountsAllClientsAndTotals(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $this->pmssWriteFiles($home.'/fixtur01', array_fill_keys([
             // rTorrent, Deluge state, then qBittorrent backups in their original order.
             'session/a.torrent', 'session/b.torrent', 'session/c.torrent',
@@ -52,7 +50,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testDedupesQbittorrentTorrentAndFastresumeByBaseName(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $this->pmssWriteFiles($home.'/fixtur01/.local/share/qBittorrent/BT_backup', ['abc.torrent' => 'test', 'abc.fastresume' => 'test']);
         $counts = \pmssUserTorrentsCountForUser($home, 'fixtur01');
         $this->assertEquals(1, $counts['qbittorrent']);
@@ -61,7 +59,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testDedupesDelugeAcrossMultipleDirs(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $this->pmssWriteFiles($home.'/fixtur01', ['.config/deluge/state/same.torrent' => 'test', '.delugeSession/same.torrent' => 'test']);
         $counts = \pmssUserTorrentsCountForUser($home, 'fixtur01');
         $this->assertEquals(1, $counts['deluge']);
@@ -70,7 +68,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testIgnoresEntriesWithEmptyTorrentBaseName(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $this->pmssWriteFiles($home.'/fixtur01/session', ['.torrent' => 'test', 'good.torrent' => 'test']);
 
         $counts = \pmssUserTorrentsCountForUser($home, 'fixtur01');
@@ -81,7 +79,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testMissingDirsReturnZeros(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $counts = \pmssUserTorrentsCountForUser($home, 'fixtur01');
         $this->assertEquals(0, $counts['rtorrent']);
         $this->assertEquals(0, $counts['deluge']);
@@ -91,7 +89,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testSymlinkedSessionOutsideHomeIsSkipped(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $this->pmssWriteFile($home.'/fixtur02/session/foreign.torrent', 'test');
         $this->pmssEnsureDir($home.'/fixtur01');
         $this->assertTrue(symlink($home.'/fixtur02/session', $home.'/fixtur01/session'));
@@ -103,7 +101,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testSymlinkedConfigParentOutsideHomeIsSkipped(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $this->pmssWriteFiles($home, ['fixtur02/.config/deluge/state/foreign.torrent' => 'test', 'fixtur01/session/own.torrent' => 'test']);
         $this->assertTrue(symlink($home.'/fixtur02/.config', $home.'/fixtur01/.config'));
 
@@ -115,7 +113,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testSymlinkedTorrentEntryIsSkipped(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $foreign = $this->pmssWriteFile($home.'/fixtur02/session/foreign.torrent', 'test');
         $this->pmssWriteFile($home.'/fixtur01/session/own.torrent', 'test');
         $this->assertTrue(symlink($foreign, $home.'/fixtur01/session/foreign.torrent'));
@@ -127,7 +125,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testSymlinkedDirectoryWithinHomeStillCounts(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $this->pmssWriteFile($home.'/fixtur01/private-session/own.torrent', 'test');
         $this->assertTrue(symlink($home.'/fixtur01/private-session', $home.'/fixtur01/session'));
 
@@ -138,7 +136,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testInvalidUsernameReturnsZeros(): void
     {
-        $home = $this->homeDir();
+        $home = $this->tempDir.'/home';
         $counts = \pmssUserTorrentsCountForUser($home, '../evil');
         $this->assertEquals(0, $counts['total']);
     }

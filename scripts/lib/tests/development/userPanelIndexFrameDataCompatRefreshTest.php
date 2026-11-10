@@ -48,7 +48,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
     {
         $this->pmssWriteRelativeFile($this->home, 'www/index.php', $this->legacyPanelIndexSource());
 
-        \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
+        \pmssUserRefreshPanelIndexForFrameDataCompat($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertEquals($this->fixedPanelIndexSource(), file_get_contents($this->home.'/www/index.php'));
     }
@@ -57,7 +57,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
     {
         $this->pmssWriteRelativeFile($this->home, 'www/index.php', $this->legacyPanelIndexSource());
 
-        \pmssUserApplySkeletonFiles($this->context());
+        \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertEquals($this->fixedPanelIndexSource(), file_get_contents($this->home.'/www/index.php'));
     }
@@ -67,7 +67,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $this->pmssEnsureDir($this->home.'/data');
         $this->pmssEnsureDir($this->home.'/watch');
 
-        \pmssUserApplySkeletonFiles($this->context());
+        \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertTrue(is_link($this->home.'/www/data'));
         $this->assertSame('../data', readlink($this->home.'/www/data'));
@@ -81,7 +81,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $this->pmssWriteRelativeFile($this->home, 'www/index.php', $custom);
 
         // The full skeleton apply flow may still refresh this file via updateUserFile().
-        \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
+        \pmssUserRefreshPanelIndexForFrameDataCompat($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertEquals($custom, file_get_contents($this->home.'/www/index.php'));
     }
@@ -93,7 +93,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         @unlink($this->home.'/www/index.php');
         $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/www/index.php');
 
-        \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
+        \pmssUserRefreshPanelIndexForFrameDataCompat($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertTrue(is_link($this->home.'/www/index.php'));
         $this->assertEquals('outside', file_get_contents($outside));
@@ -104,14 +104,9 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $custom = "<?php\n// User-owned custom panel.\necho 'ok';\n";
         $this->pmssWriteRelativeFile($this->home, 'www/index.php', $custom);
 
-        \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
+        \pmssUserRefreshPanelIndexForFrameDataCompat($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertEquals($custom, file_get_contents($this->home.'/www/index.php'));
-    }
-
-    private function context(): array
-    {
-        return $this->pmssUserHomeContext($this->homeRoot, $this->user);
     }
 
     private function legacyPanelIndexSource(): string

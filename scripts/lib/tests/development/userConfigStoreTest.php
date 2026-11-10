@@ -34,11 +34,6 @@ class UserConfigStoreTest extends TestCase
         return $this->tempDir.'/seedbox/runtime/users.json';
     }
 
-    private function newStore(): \UserConfigStore
-    {
-        return new \UserConfigStore($this->configDirPath());
-    }
-
     private function basePayload(array $overrides = []): array
     {
         return $overrides + [
@@ -51,7 +46,7 @@ class UserConfigStoreTest extends TestCase
 
     private function persistAndReload(string $username, array $payload): array
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->set($username, $payload));
         $reloaded = $store->get($username);
         $this->assertTrue(is_array($reloaded));
@@ -60,7 +55,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testSetAndGetRoundTripPreservesUnknownKeysAndForcesTrafficLimit(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->set('fixtur01', $this->basePayload([
             'ramMiB'       => 512,
             'quota'        => 100,
@@ -189,7 +184,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testPmssUserDockerEnabledDefaultsTrueWhenMissing(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(true, \pmssUserDockerEnabled('fixtur01', $store));
     }
 
@@ -231,14 +226,14 @@ class UserConfigStoreTest extends TestCase
 
     public function testPmssUserDockerEnabledRejectsInvalidUsername(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(false, \pmssUserDockerEnabled('../evil', $store));
         $this->assertEquals(false, \pmssUserDockerEnabled('../evil'));
     }
 
     public function testPmssUserLighttpdEnabledDefaultsTrueWhenMissing(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(true, \pmssUserLighttpdEnabled('fixtur01', $store));
     }
 
@@ -254,14 +249,14 @@ class UserConfigStoreTest extends TestCase
 
     public function testPmssUserLighttpdEnabledRejectsInvalidUsername(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(false, \pmssUserLighttpdEnabled('../evil', $store));
         $this->assertEquals(false, \pmssUserLighttpdEnabled('../evil'));
     }
 
     public function testPmssUserLingerEnabledDefaultsOffAndNormalisesStoredValues(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(false, \pmssUserLingerEnabled('fixtur01', $store));
 
         foreach ([
@@ -284,7 +279,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testPmssUserPanelSessionLoginEnabledDefaultsOffAndNormalisesStoredValues(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(false, \pmssUserPanelSessionLoginEnabled('fixtur01', $store));
 
         foreach ([
@@ -316,7 +311,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testStoreFacadeLoadsFeaturePolicyHelpers(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue(function_exists('pmssUserConfigFeatureEnabled'));
         $this->assertTrue(function_exists('pmssUserPanelSessionLoginEnabled'));
         $this->assertEquals(true, \pmssUserConfigFeatureEnabled('fixtur01', 'dockerEnabled', $store));
@@ -328,7 +323,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testUsernameNormalizationStaysConsistentAcrossStoreOperations(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $payload = $this->basePayload([
             'ramMiB' => 256,
         ]);
@@ -342,7 +337,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testInvalidUsernameRejected(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $payload = $this->basePayload(['quota' => 10, 'quotaBurst' => 12]);
         $this->assertTrue($store->set('../evil', $payload) === false);
         $this->assertTrue($store->get('../evil') === null);
@@ -350,7 +345,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testInvalidPayloadRejected(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->set('fixtur04', [
             'ramMiB'     => 128,
             'quota'      => 10,
@@ -362,7 +357,7 @@ class UserConfigStoreTest extends TestCase
     {
         $usersDir = $this->configDirPath().'/users';
         $this->pmssWriteFile($usersDir.'/fixtur01.json', '{not-json');
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->get('fixtur01') === null);
     }
 
@@ -378,13 +373,13 @@ class UserConfigStoreTest extends TestCase
             'quotaBurst' => 1,
         ]));
         @symlink($target, $usersDir.'/fixtur01.json');
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->get('fixtur01') === null, 'Symlinked user config must be ignored');
     }
 
     public function testRemoveDeletesFile(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->set('fixtur05', $this->basePayload()));
         $userFile = $this->configDirPath().'/users/fixtur05.json';
         $this->assertTrue(is_file($userFile));
@@ -394,7 +389,7 @@ class UserConfigStoreTest extends TestCase
 
     public function testLoadAllReturnsSortedByUsername(): void
     {
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $payload = $this->basePayload();
         $this->assertTrue($store->set('fixtur02', $payload));
         $this->assertTrue($store->set('fixtur01', $payload));
@@ -415,7 +410,7 @@ class UserConfigStoreTest extends TestCase
             ],
         ]));
 
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $payload = $store->get('fixtur01');
         $this->assertTrue(is_array($payload));
         $this->assertEquals(256, $payload['ramMiB']);
@@ -429,7 +424,7 @@ class UserConfigStoreTest extends TestCase
             json_encode(['users' => ['legacyx' => 'invalid']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
 
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(null, $store->get('legacyx'));
     }
 
@@ -451,7 +446,7 @@ class UserConfigStoreTest extends TestCase
             ],
         ]));
 
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->set('fixtur02', [
             'ramMiB'       => 512,
             'rtorrentPort' => 5000,
@@ -483,7 +478,7 @@ class UserConfigStoreTest extends TestCase
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
 
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertTrue($store->set('fixtur02', [
             'ramMiB' => 512,
             'rtorrentPort' => 5000,
@@ -516,7 +511,7 @@ class UserConfigStoreTest extends TestCase
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
 
-        $store = $this->newStore();
+        $store = new \UserConfigStore($this->configDirPath());
         $this->assertEquals(['fixtur02'], array_keys($store->loadAll()));
     }
 }
