@@ -100,7 +100,12 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         $wouldPool = max(0.0, $pool - $settings['floorCharge'] * $wouldLift);
         $water = []; $wouldWater = [];
         if ($fallback === null && $settings['mode'] === 'enforce' && $rates !== null) {
-            $demand = pmssDynamicIopsDemand($rows, $rates, $wantsMore, $settings['workConservingHeadroom']);
+            $bounds = [];
+            foreach ($rows as $user => $row) {
+                $explicit = $row['explicit'] ? pmssIopsParseSpec($users[$user]['source']['IOReadIOPS']) : null;
+                $bounds[$user] = min($row['ceiling'] ?? INF, $explicit ?? INF);
+            }
+            $demand = pmssDynamicIopsDemand($rows, $rates, $wantsMore, $settings['workConservingHeadroom'], $bounds);
             $water = pmssDynamicIopsWaterFill($weights, $demand, $chargedPool);
             $wouldWater = pmssDynamicIopsWaterFill($weights, $demand, $wouldPool);
             foreach ($rows as $user => &$row) {

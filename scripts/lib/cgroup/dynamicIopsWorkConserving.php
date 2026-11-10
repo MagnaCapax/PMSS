@@ -27,14 +27,15 @@ function pmssDynamicIopsWaterFill(array $weights, array $demand, float $pool): a
     return $allocation;
 }
 
-/** Unknown or throttle-limited demand stays unbounded; measured quiet readers retain headroom. */
-function pmssDynamicIopsDemand(array $rows, array $rates, ?array $wantsMore, float $headroom): array
+/** Unknown or throttle-limited demand stays unbounded; measured quiet readers retain headroom.
+ *  No account claims more than its tier ceiling or explicit cap lets it use, so that pool goes to others. */
+function pmssDynamicIopsDemand(array $rows, array $rates, ?array $wantsMore, float $headroom, array $bounds = []): array
 {
     $demand = [];
     foreach ($rows as $user => $row) {
         $rate = pmssFiniteNonNegativeFloat($rates[$user] ?? null);
-        $demand[$user] = $rate === null || ($wantsMore[$user] ?? false) === true
-            ? INF : max((float) $row['floor'], $rate * $headroom);
+        $demand[$user] = min((float) ($bounds[$user] ?? INF), $rate === null || ($wantsMore[$user] ?? false) === true
+            ? INF : max((float) $row['floor'], $rate * $headroom));
     }
     return $demand;
 }

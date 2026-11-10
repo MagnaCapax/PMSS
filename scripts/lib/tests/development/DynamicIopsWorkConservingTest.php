@@ -52,7 +52,8 @@ class DynamicIopsWorkConservingTest extends TestCase
                 foreach ($variant['users'] as $user => $row) {
                     $this->assertTrue($row['would_be'] >= $legacy['variants'][$label]['users'][$user]['would_be']);
                     $this->assertSame($user === 'fixture0' ? ($held ? 5600 : 600) : 200, $row['would_be']);
-                    $this->assertSame($held && $user === 'fixture0' ? null : ($user === 'fixture0' ? 600.0 : 15.0), $row['demand']);
+                    // Unbounded demand stops at the fixtures' 100000 tier ceiling.
+                    $this->assertSame($held && $user === 'fixture0' ? 100000.0 : ($user === 'fixture0' ? 600.0 : 15.0), $row['demand']);
                 }
             }
         }
@@ -61,25 +62,39 @@ class DynamicIopsWorkConservingTest extends TestCase
         $this->assertTrue(\pmssJsonEncodeSafe($this->allocate($users, $rates)) !== null);
         foreach ([-1, INF, NAN, [], null] as $invalid) {
             $rates['fixture0'] = $invalid;
-            $this->assertSame(null, $this->allocate($users, $rates)['variants']['1.0']['users']['fixture0']['demand']);
+            $this->assertSame(100000.0, $this->allocate($users, $rates)['variants']['1.0']['users']['fixture0']['demand']);
+        }
+        // Without a ceiling, unknown demand is unbounded and logged as JSON null.
+        foreach ($users as &$entry) unset($entry['source']['resourceIOPSReadMax']);
+        unset($entry);
+        $this->assertSame(null, \pmssCgroupPolicyReadIopsTierCeiling($users['fixture0']['source'], []));
+        foreach ([null, 200.0] as $rate) {
+            $rates['fixture0'] = $rate;
+            $this->assertSame(null, $this->allocate($users, $rates, ['fixture0' => true])['variants']['1.0']['users']['fixture0']['demand']);
         }
     }
 
     public function testBothQuotaVariantsWaterFillByTheirOwnSharesAndRespectTierCeilings(): void
     {
         $users = $this->users(); $users['fixture1']['source']['quota'] = 4000;
-        $users['fixture1']['source']['resourceIOPSReadMax'] = 1000;
         $rates = array_fill_keys(array_keys($users), 0.0); $rates['fixture0'] = $rates['fixture1'] = null;
-        $legacy = $this->allocate($users);
         foreach ($this->allocate($users, $rates)['variants'] as $label => $variant) {
             $rows = $variant['users'];
             $this->assertEquals($label === '1.0' ? 4.0 : 2.0,
                 $rows['fixture1']['water']['would_be'] / $rows['fixture0']['water']['would_be']);
+        }
+        $users['fixture1']['source']['resourceIOPSReadMax'] = 1000;
+        $legacy = $this->allocate($users);
+        foreach ($this->allocate($users, $rates)['variants'] as $label => $variant) {
+            $rows = $variant['users'];
             foreach ($rows as $user => $row) foreach (['proposed', 'would_be'] as $field) {
                 $this->assertTrue($row[$field] >= $legacy['variants'][$label]['users'][$user][$field]);
                 $this->assertTrue($row[$field] <= $row['ceiling']);
             }
             $this->assertSame(1000, $rows['fixture1']['would_be']);
+            // The ceiling-bound reader claims only 1000; the rest of the pool goes to the other reader.
+            $this->assertEquals(1000.0, $rows['fixture1']['water']['would_be']);
+            $this->assertEquals($variant['would_be_charged_pool'], array_sum(array_column(array_column($rows, 'water'), 'would_be')));
         }
     }
 
@@ -103,8 +118,9 @@ class DynamicIopsWorkConservingTest extends TestCase
         $result = $this->allocate($users, $rates);
         foreach ($result['variants'] as $variant) {
             $row = $variant['users']['fixture0'];
-            $this->assertEquals($variant['charged_pool'] - 1420, $row['water']['proposed']);
-            $this->assertEquals($variant['would_be_charged_pool'] - 1420, $row['water']['would_be']);
+            // The explicit /home:50 account claims 50, not its 1000 floor; 28 quiet accounts claim 15 each.
+            $this->assertEquals($variant['charged_pool'] - 470, $row['water']['proposed']);
+            $this->assertEquals($variant['would_be_charged_pool'] - 470, $row['water']['would_be']);
             $this->assertSame(null, $variant['users']['fixture1']['proposed']);
         }
         $this->assertSame(50, \pmssDynamicIopsReadCaps($users, [], $result)['fixture1']);

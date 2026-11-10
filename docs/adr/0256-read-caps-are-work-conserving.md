@@ -33,7 +33,8 @@ or cron stalled, the delta would average idle hours into the rate and understate
 demand. Unknown rates and accounts satisfying the existing held predicate at
 `PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO` have unbounded demand. The predicate uses the
 current kernel cap, including any explicit lower limit. Other demand is
-`max(floor, rate * workConservingHeadroom)`.
+`max(floor, rate * workConservingHeadroom)`. No demand exceeds the account's tier
+ceiling or explicit cap, so pool an account cannot use goes to the others.
 
 `workConservingHeadroom` defaults to 3.0. It must be finite, at most 100, and its
 product with `PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO` must be strictly greater than 1.
