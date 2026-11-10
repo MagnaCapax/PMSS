@@ -32,11 +32,11 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
         // Sysfs returns a newline-terminated record; normalization belongs at the read boundary.
         foreach (['8:0', "8:0\n", "8:0\r\n", " 8:0\n", "\t8:0\n"] as $raw) {
             $this->assertSame('8:0', \pmssCgroupPolicyDeviceMajorMinorResolve('/dev/sda',
-                static function (string $path) use ($raw): string { return $raw; }));
+                self::pmssMakeCallbacks(['read' => $raw])['read']));
         }
         foreach (['', 'error', "8:0\n8:1", '8:', '8:0 100'] as $raw) {
             $this->assertSame(null, \pmssCgroupPolicyDeviceMajorMinorResolve('/dev/sda',
-                static function (string $path) use ($raw): string { return $raw; }));
+                self::pmssMakeCallbacks(['read' => $raw])['read']));
         }
     }
 

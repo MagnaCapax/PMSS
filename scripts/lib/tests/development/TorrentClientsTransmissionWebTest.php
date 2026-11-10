@@ -30,7 +30,7 @@ final class TorrentClientsTransmissionWebTest extends TestCase
                 mkdir($stage.'/public_html', 0700);
                 return file_put_contents($stage.'/public_html/index.html', 'web') === 3;
             },
-            'log' => static function (string $line) use (&$events): void { $events[] = $line; },
+            'log' => $this->pmssMakeArrayLogger($events),
         ] + self::pmssMakeCallbacks(['list' => [
             ['path' => 'public_html/', 'type' => 'd'], ['path' => 'public_html/index.html', 'type' => '-'],
         ]], $events);

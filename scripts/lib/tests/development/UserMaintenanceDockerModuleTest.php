@@ -37,7 +37,7 @@ class UserMaintenanceDockerModuleTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-linger-');
         $this->pmssWriteFile($dir.'/fixtur01', '');
-        $lookup = static function (string $name) { return false; };
+        $lookup = self::pmssMakeCallbacks(['lookup' => false])['lookup'];
         $this->pmssWithEnv(['PMSS_TEST_MODE' => '1'], function () use ($dir, $lookup): void {
             $this->assertSame(0, \pmssUserMaintenancePruneStaleLinger($dir, $lookup, false, posix_getuid()));
         });

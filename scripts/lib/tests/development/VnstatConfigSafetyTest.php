@@ -49,7 +49,7 @@ class VnstatConfigSafetyTest extends TestCase
         $original = "RateUnit 1\n";
         $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-vnstat-write-'), 'vnstat.conf', $original);
         $messages = [];
-        $this->assertFalse(\pmssVnstatConfigRefresh($path, $this->pmssMakeArrayLogger($messages), static function (): bool { return false; }));
+        $this->assertFalse(\pmssVnstatConfigRefresh($path, $this->pmssMakeArrayLogger($messages), self::pmssMakeCallbacks(['write' => false])['write']));
         $this->assertSame($original, file_get_contents($path));
         $this->pmssAssertMessagesContain($messages, 'skipping vnStat restart', 'expected write warning');
     }

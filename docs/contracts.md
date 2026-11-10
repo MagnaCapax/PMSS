@@ -1997,6 +1997,10 @@ Reflected characterization fixtures share `pmssTestingFunctionExport()` in
   when the map is built, including `false`, `null`, and empty arrays. Keep
   argument-dependent, stateful, throwing, and differently named event callbacks
   explicit. Merge overrides on the left so their callbacks retain precedence.
+- Quota command, sysfs, ARP, device-probe and package-runner fixtures use that
+  factory for immutable observations, including single injected operations.
+  String log captures use `pmssMakeArrayLogger()`; callbacks that inspect
+  arguments, count invocations, change state or throw remain explicit.
 - Prefer high-level helpers (`runStep`, `pmssRefreshRepositories`, `pmssApplyDpkgSelections`, `pmssUpdateUserEnvironment`) to keep logs/profile consistent.
 - Honor environment overrides in tests (`PMSS_*` flags) to avoid mutating the real system.
 - Treat vendor/third-party code as read-only unless a narrower rule explicitly allows the change. First-party `etc/skel/www` files are editable normally.

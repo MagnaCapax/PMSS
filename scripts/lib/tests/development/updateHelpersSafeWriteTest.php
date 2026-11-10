@@ -123,12 +123,12 @@ class UpdateHelpersSafeWriteTest extends TestCase
     {
         foreach ([
             [
-                static function (): array { return ['rc' => 0, 'output' => '']; },
+                self::pmssMakeCallbacks(['run' => ['rc' => 0, 'output' => '']])['run'],
                 true,
                 '',
             ],
             [
-                static function (): array { return ['rc' => 100, 'output' => 'simulated apt failure']; },
+                self::pmssMakeCallbacks(['run' => ['rc' => 100, 'output' => 'simulated apt failure']])['run'],
                 false,
                 'apt-get clean failed with rc 100 (simulated apt failure)',
             ],
@@ -138,7 +138,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
                 'apt-get clean runner failed: simulated runner failure',
             ],
             [
-                static function (): array { return ['rc' => 'not-a-number', 'output' => 'ignored']; },
+                self::pmssMakeCallbacks(['run' => ['rc' => 'not-a-number', 'output' => 'ignored']])['run'],
                 false,
                 'apt-get clean runner returned invalid rc; treating as failure',
             ],

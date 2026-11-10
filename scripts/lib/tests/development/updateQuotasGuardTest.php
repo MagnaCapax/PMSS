@@ -133,7 +133,7 @@ class UpdateQuotasGuardTest extends TestCase
     public function testQuotaSweepStopsAtTheFirstTimedOutAccountAndSaysSo(): void
     {
         $visited = $logs = [];
-        $log = static function (string $message) use (&$logs): void { $logs[] = $message; };
+        $log = $this->pmssMakeArrayLogger($logs);
         $refresh = static function (string $user) use (&$visited): bool {
             $visited[] = $user;
             return $user !== 'fixtur02';

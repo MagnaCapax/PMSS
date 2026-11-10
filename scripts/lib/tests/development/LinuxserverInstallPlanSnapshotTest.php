@@ -28,7 +28,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
                 'credentialFile' => $spec['credentialFile'],
                 'dbName' => $spec['dbName'] ?? '',
                 'dbUser' => $spec['dbUser'] ?? '',
-                'command' => \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec, static function (): bool { return false; }),
+                'command' => \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec, self::pmssMakeCallbacks(['renderDevice' => false])['renderDevice']),
             );
         }
 
@@ -103,7 +103,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
     public function testJellyfinGetsRenderDeviceWhenProbeFindsOne(): void
     {
         $spec = \pmssDockerInstallLsioAppSpec('jellyfin', '/srv/pmss-test-home', true);
-        $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '8096', 'UTC', $spec, static function (): bool { return true; });
+        $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '8096', 'UTC', $spec, self::pmssMakeCallbacks(['renderDevice' => true])['renderDevice']);
 
         $this->assertSame('/dev/dri:/dev/dri', $command[array_search('--device', $command, true) + 1]);
         $this->assertStringContainsString('--device /dev/dri:/dev/dri', \pmssDockerInstallLsioDisplayCommand($command));
@@ -112,7 +112,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
     public function testJellyfinOmitsRenderDeviceWhenProbeFindsNone(): void
     {
         $spec = \pmssDockerInstallLsioAppSpec('jellyfin', '/srv/pmss-test-home', true);
-        $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '8096', 'UTC', $spec, static function (): bool { return false; });
+        $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '8096', 'UTC', $spec, self::pmssMakeCallbacks(['renderDevice' => false])['renderDevice']);
 
         $this->assertSame(false, in_array('--device', $command, true));
     }
@@ -124,7 +124,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
                 continue;
             }
             $spec = $this->appSpec($app, '/srv/pmss-test-home', true);
-            $command = \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec, static function (): bool { return true; });
+            $command = \pmssDockerInstallLsioDockerRunCommand($app, (string) $spec['defaultPort'], 'UTC', $spec, self::pmssMakeCallbacks(['renderDevice' => true])['renderDevice']);
             $this->assertSame(false, in_array('--device', $command, true));
         }
     }

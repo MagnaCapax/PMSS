@@ -17,49 +17,47 @@ class MonitoringRulesLoopbackRegistryTest extends TestCase
 
     private function readPorts(array $users, array &$messages): array
     {
-        return \networkQbittorrentWebUiPortsRead($users, $this->tempDir, static function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        });
+        return \networkQbittorrentWebUiPortsRead($users, $this->tempDir, $this->pmssMakeArrayLogger($messages));
     }
 
     public function testRegistryReadsNativeAndSeparateDockerReservations(): void
     {
-        $this->pmssWriteFiles($this->tempDir, ['qbittorrent-alice' => "22001\n", 'media-stack-qbittorrent-alice' => "32001\n"]);
+        $this->pmssWriteFiles($this->tempDir, ['qbittorrent-fixtur01' => "22001\n", 'media-stack-qbittorrent-fixtur01' => "32001\n"]);
         $messages = [];
-        $this->assertSame(['alice' => [22001, 32001]], $this->readPorts(['alice' => 1001], $messages));
+        $this->assertSame(['fixtur01' => [22001, 32001]], $this->readPorts(['fixtur01' => 1001], $messages));
         $this->assertSame([], $messages);
     }
 
     public function testAbsentRegistryEntrySkipsOnlyThatAccountSilently(): void
     {
         // Accounts without qBittorrent have no reservation; the five-minute rebuild must not log for them.
-        $this->pmssWriteFile($this->tempDir.'/qbittorrent-bob', '22002');
+        $this->pmssWriteFile($this->tempDir.'/qbittorrent-fixtur02', '22002');
         $messages = [];
-        $this->assertSame(['bob' => [22002]], $this->readPorts(['alice' => 1001, 'bob' => 1002], $messages));
+        $this->assertSame(['fixtur02' => [22002]], $this->readPorts(['fixtur01' => 1001, 'fixtur02' => 1002], $messages));
         $this->assertSame([], $messages);
     }
 
     public function testInvalidRegistryPortsAreSkippedWithoutStoppingOtherAccounts(): void
     {
         foreach (['', '1023', '65536', '-22001', '22001junk', "22001\0", '1e4', str_repeat('9', 40)] as $raw) {
-            $this->pmssWriteFiles($this->tempDir, ['qbittorrent-alice' => $raw, 'qbittorrent-bob' => '65535']);
+            $this->pmssWriteFiles($this->tempDir, ['qbittorrent-fixtur01' => $raw, 'qbittorrent-fixtur02' => '65535']);
             $messages = [];
-            $this->assertSame(['bob' => [65535]], $this->readPorts(['alice' => 1001, 'bob' => 1002], $messages));
+            $this->assertSame(['fixtur02' => [65535]], $this->readPorts(['fixtur01' => 1001, 'fixtur02' => 1002], $messages));
             $this->assertSame(1, count($messages));
         }
-        $this->pmssWriteFile($this->tempDir.'/qbittorrent-alice', '1024');
+        $this->pmssWriteFile($this->tempDir.'/qbittorrent-fixtur01', '1024');
         $messages = [];
-        $this->assertSame(['alice' => [1024]], $this->readPorts(['alice' => '1001'], $messages));
+        $this->assertSame(['fixtur01' => [1024]], $this->readPorts(['fixtur01' => '1001'], $messages));
     }
 
     public function testHomeDisplayPortIsIgnoredWithAndWithoutReservation(): void
     {
         $homeRoot = $this->pmssMakeTempDir('pmss-loopback-home-');
         $this->pmssTrackHomeRoot($homeRoot);
-        $this->pmssWriteFiles($homeRoot, ['alice/.qbittorrentPort' => '28001', 'bob/.qbittorrentPort' => '28002']);
-        $this->pmssWriteFile($this->tempDir.'/qbittorrent-alice', '22001');
+        $this->pmssWriteFiles($homeRoot, ['fixtur01/.qbittorrentPort' => '28001', 'fixtur02/.qbittorrentPort' => '28002']);
+        $this->pmssWriteFile($this->tempDir.'/qbittorrent-fixtur01', '22001');
         $messages = [];
-        $this->assertSame(['alice' => [22001]], $this->readPorts(['alice' => 1001, 'bob' => 1002], $messages));
+        $this->assertSame(['fixtur01' => [22001]], $this->readPorts(['fixtur01' => 1001, 'fixtur02' => 1002], $messages));
         $this->assertSame([], $messages);
     }
 
@@ -67,42 +65,42 @@ class MonitoringRulesLoopbackRegistryTest extends TestCase
     {
         $target = $this->pmssMakeTempFile('pmss-loopback-port-');
         $this->pmssWriteFile($target, '22001');
-        $this->pmssCreateSymlinkOrSkip($target, $this->tempDir.'/qbittorrent-alice');
-        $this->pmssEnsureDir($this->tempDir.'/qbittorrent-bob');
+        $this->pmssCreateSymlinkOrSkip($target, $this->tempDir.'/qbittorrent-fixtur01');
+        $this->pmssEnsureDir($this->tempDir.'/qbittorrent-fixtur02');
         $messages = [];
-        $this->assertSame([], $this->readPorts(['alice' => 1001, 'bob' => 1002], $messages));
+        $this->assertSame([], $this->readPorts(['fixtur01' => 1001, 'fixtur02' => 1002], $messages));
         $this->assertSame(2, count($messages));
     }
 
     public function testWritableOrForeignOwnedRegistryFilesAreRefused(): void
     {
-        $this->pmssWriteFiles($this->tempDir, ['qbittorrent-alice' => '22001', 'qbittorrent-bob' => '22002']);
-        $this->assertTrue(chmod($this->tempDir.'/qbittorrent-alice', 0666));
-        $this->assertTrue(chown($this->tempDir.'/qbittorrent-bob', 65534));
+        $this->pmssWriteFiles($this->tempDir, ['qbittorrent-fixtur01' => '22001', 'qbittorrent-fixtur02' => '22002']);
+        $this->assertTrue(chmod($this->tempDir.'/qbittorrent-fixtur01', 0666));
+        $this->assertTrue(chown($this->tempDir.'/qbittorrent-fixtur02', 65534));
         $messages = [];
-        $this->assertSame([], $this->readPorts(['alice' => 1001, 'bob' => 1002], $messages));
+        $this->assertSame([], $this->readPorts(['fixtur01' => 1001, 'fixtur02' => 1002], $messages));
         $this->assertSame(2, count($messages));
     }
 
     public function testUnsafeRegistryDirectoryAndInvalidUidAreRefused(): void
     {
-        $this->pmssWriteFile($this->tempDir.'/qbittorrent-alice', '22001');
+        $this->pmssWriteFile($this->tempDir.'/qbittorrent-fixtur01', '22001');
         $messages = [];
-        $this->assertSame([], $this->readPorts(['alice' => '1001;id'], $messages));
+        $this->assertSame([], $this->readPorts(['fixtur01' => '1001;id'], $messages));
         $this->assertSame(1, count($messages));
         $this->assertStringContainsString('invalid uid', $messages[0]);
         $this->assertTrue(chmod($this->tempDir, 0777));
         $messages = [];
-        $this->assertSame([], $this->readPorts(['alice' => 1001], $messages));
+        $this->assertSame([], $this->readPorts(['fixtur01' => 1001], $messages));
         $this->assertSame(1, count($messages));
         $this->assertStringContainsString('registry directory', $messages[0]);
     }
 
     public function testInvalidDockerReservationKeepsNativeGuard(): void
     {
-        $this->pmssWriteFiles($this->tempDir, ['qbittorrent-alice' => '22001', 'media-stack-qbittorrent-alice' => 'invalid']);
+        $this->pmssWriteFiles($this->tempDir, ['qbittorrent-fixtur01' => '22001', 'media-stack-qbittorrent-fixtur01' => 'invalid']);
         $messages = [];
-        $this->assertSame(['alice' => [22001]], $this->readPorts(['alice' => 1001], $messages));
+        $this->assertSame(['fixtur01' => [22001]], $this->readPorts(['fixtur01' => 1001], $messages));
         $this->assertSame(1, count($messages));
     }
 }

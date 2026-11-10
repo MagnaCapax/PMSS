@@ -82,9 +82,7 @@ class RsyslogRateLimitTest extends TestCase
         ], function () use (&$messages): void {
             \pmssApplyRsyslogKernelInputRateLimit(
                 $this->pmssMakeArrayLogger($messages),
-                static function (string $description, string $command): int {
-                    return 1;
-                }
+                self::pmssMakeCallbacks(['validate' => 1])['validate']
             );
         });
 

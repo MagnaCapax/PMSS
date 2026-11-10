@@ -8,9 +8,7 @@ class QuotaFixGuardTest extends TestCase
 {
     public function testQuotaCommandRunCapturesExitCodeAndOutput(): void
     {
-        $result = \pmssQuotaCommandRun('quotaoff -av', static function (string $command): array {
-            return ['rc' => 5, 'stdout' => "stdout\n", 'stderr' => "stderr\n"];
-        });
+        $result = \pmssQuotaCommandRun('quotaoff -av', self::pmssMakeCallbacks(['command' => ['rc' => 5, 'stdout' => "stdout\n", 'stderr' => "stderr\n"]])['command']);
 
         $this->assertFalse($result['ok']);
         $this->pmssAssertArraySubsetSame(['rc' => 5, 'output' => "stdout\nstderr\n"], $result);
@@ -18,9 +16,7 @@ class QuotaFixGuardTest extends TestCase
 
     public function testQuotaCommandRunRejectsEmptyCommands(): void
     {
-        $result = \pmssQuotaCommandRun('   ', static function (string $command): array {
-            return ['rc' => 0, 'stdout' => 'unexpected', 'stderr' => ''];
-        });
+        $result = \pmssQuotaCommandRun('   ', self::pmssMakeCallbacks(['command' => ['rc' => 0, 'stdout' => 'unexpected', 'stderr' => '']])['command']);
 
         $this->assertFalse($result['ok']);
         $this->pmssAssertArraySubsetSame(['rc' => 1, 'output' => ''], $result);
@@ -64,9 +60,7 @@ class QuotaFixGuardTest extends TestCase
                 false,
                 $exitCode,
                 true,
-                static function (string $command): array {
-                    return ['rc' => 2, 'stdout' => "quota state\n", 'stderr' => ''];
-                },
+                self::pmssMakeCallbacks(['command' => ['rc' => 2, 'stdout' => "quota state\n", 'stderr' => '']])['command'],
                 $this->pmssMakeArrayLogger($logs)
             );
             $criticalResult = \pmssQuotaFixRunCommand(
@@ -75,9 +69,7 @@ class QuotaFixGuardTest extends TestCase
                 true,
                 $exitCode,
                 false,
-                static function (string $command): array {
-                    return ['rc' => 5, 'stdout' => '', 'stderr' => "quotaon failed\n"];
-                },
+                self::pmssMakeCallbacks(['command' => ['rc' => 5, 'stdout' => '', 'stderr' => "quotaon failed\n"]])['command'],
                 $this->pmssMakeArrayLogger($logs)
             );
             return [$queryResult, $criticalResult];
@@ -155,9 +147,7 @@ class QuotaFixGuardTest extends TestCase
         ['dir' => $dir] = $this->pmssMountFixtureCreate('pmss-quota-recalc-', '');
         file_put_contents($dir.'/stamp', "x\n");
         $logs = [];
-        $this->assertTrue(\pmssQuotaHomeRecalculationNeeded(static function (): array {
-            return ['rc' => 2, 'stdout' => '', 'stderr' => ''];
-        }, $this->pmssMakeArrayLogger($logs), $dir.'/missing/fstab', $dir.'/stamp'));
+        $this->assertTrue(\pmssQuotaHomeRecalculationNeeded(self::pmssMakeCallbacks(['command' => ['rc' => 2, 'stdout' => '', 'stderr' => '']])['command'], $this->pmssMakeArrayLogger($logs), $dir.'/missing/fstab', $dir.'/stamp'));
         $this->assertSame(1, count($logs));
     }
 

@@ -9,7 +9,7 @@ class CronSpoolCleanupTest extends TestCase
     /** Model an orphan without changing any account or file ownership. */
     private function orphanLookup(): callable
     {
-        return static function (int $uid) { return false; };
+        return self::pmssMakeCallbacks(['lookup' => false])['lookup'];
     }
 
     public function testOrphanRemovalAndRepeatedPass(): void
@@ -39,7 +39,7 @@ class CronSpoolCleanupTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-cron-spool-');
         $path = $this->pmssWriteFile($dir.'/fixtur01', 'keep jobs');
         foreach (array(null, array(), true, 0) as $value) {
-            $lookup = static function (int $uid) use ($value) { return $value; };
+            $lookup = self::pmssMakeCallbacks(['lookup' => $value])['lookup'];
             $this->assertSame('claimed', \pmssUserCronSpoolRemoveOrphan($path, $lookup)['status']);
             $this->assertTrue(file_exists($path));
         }

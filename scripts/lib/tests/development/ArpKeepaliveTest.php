@@ -17,10 +17,11 @@ class ArpKeepaliveTest extends TestCase
     private function runKeepalive(string $marker, string $route, string $arp, bool &$sent = null): string
     {
         $sent = false;
+        $readers = self::pmssMakeCallbacks(['route' => $route, 'arp' => $arp]);
         return \pmssArpKeepaliveRun(
             $marker,
-            static function (string $ip) use ($route): string { return $route; },
-            static function () use ($arp): string { return $arp; },
+            $readers['route'],
+            $readers['arp'],
             static function (string $ip) use (&$sent): bool { $sent = true; return true; }
         );
     }
