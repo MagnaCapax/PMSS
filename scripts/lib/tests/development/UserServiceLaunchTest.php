@@ -107,12 +107,11 @@ exit 0
 SH
             ,
         ]);
-        $this->pmssTrackEnvOverrides([
-            'PATH' => $binDir.':'.((string) getenv('PATH')),
+        $this->pmssTrackEnvOverrides($this->pmssPathPrefixedEnvironment($binDir, [
             'PMSS_FAKE_CGROUP_ROOT' => $fakeCgroup,
             'PMSS_FAKE_SYSTEMD_RUN_LOG' => $this->tempDir.'/systemd-run.log',
             'PMSS_FAKE_SYSTEMCTL_LOG' => $this->tempDir.'/systemctl.log',
-        ]);
+        ]));
 
         $command = \pmssBuildUserServiceShellCommand('pmssdemo', 'storm 12');
         $result = $this->pmssExecShellCommand($command);
@@ -141,7 +140,7 @@ SH
         $binDir = $this->pmssWriteExecutableFiles($this->tempDir.'/bin', [
             'id' => "#!/bin/sh\n[ \"\$1\" = '-u' ] && [ \"\$2\" = 'fixtur01' ] && echo 2002 && exit 0\nexit 1\n",
         ]);
-        $this->pmssTrackEnvOverrides(['PATH' => $binDir.':'.((string) getenv('PATH'))]);
+        $this->pmssTrackEnvOverrides($this->pmssPathPrefixedEnvironment($binDir));
 
         $command = \pmssBuildUserServiceShellCommand('fixtur01', 'screen -S rtorrent -fa -d -m rtorrent', true);
 

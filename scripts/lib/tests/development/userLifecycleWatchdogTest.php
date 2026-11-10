@@ -380,7 +380,7 @@ PHP;
 
         $this->assertSame(
             ['ok' => true],
-            $this->pmssRunInlinePhpJson($script, ['PATH' => $binDir.':'.getenv('PATH')], '2>&1')
+            $this->pmssRunInlinePhpJson($script, $this->pmssPathPrefixedEnvironment($binDir), '2>&1')
         );
         $this->assertEquals(['-15 -u fixtur01 -- php-cgi'], file($log, FILE_IGNORE_NEW_LINES));
     }

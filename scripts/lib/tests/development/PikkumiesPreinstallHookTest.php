@@ -157,22 +157,18 @@ final class PikkumiesPreinstallHookTest extends TestCase
         touch($root.'/state/fxmark');
         $this->pmssWriteFile($root.'/state/fxdone', 'finished');
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
-        $path = (string) getenv('PATH');
         $runs = [];
         $ops = [
             'users' => static function () use (&$users): array { return $users; },
             'run' => static function (string $command) use (&$runs): void { $runs[] = $command; },
             'homeBase' => $root.'/home',
         ] + self::pmssMakeCallbacks(['ramMiB' => 4096]);
-        putenv('PATH='.$root.'/stub:'.$path);
-        try {
+        $this->pmssWithPathPrefix($root.'/stub', function () use ($root, &$users, $ops, &$marked): void {
             \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', $ops);
             $marked = array_map('basename', glob($root.'/state/*'));
             $users = ['fxfresh', 'fxfin'];
             \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', $ops);
-        } finally {
-            putenv('PATH='.$path);
-        }
+        });
 
         sort($marked);
         $this->assertSame(['fxdone', 'fxfin', 'fxmark'], $marked, 'a finished install is marked; a stopped one stays unmarked until it succeeds');
@@ -221,24 +217,20 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->pmssEnsureDir($root.'/state');
         touch($root.'/state/done');
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
-        $path = (string) getenv('PATH');
         $runs = [];
         $ops = [
             'ramMiB' => static function (string $user) use ($ram): int { return $ram[$user]; },
             'run' => static function (string $command) use (&$runs): void { $runs[] = $command; },
             'homeBase' => $root.'/home',
         ] + self::pmssMakeCallbacks(['users' => array_merge(array_keys($ram), ['../etc'])]);
-        putenv('PATH='.$root.'/stub:'.$path);
-        try {
+        $this->pmssWithPathPrefix($root.'/stub', function () use ($root, $ops, &$marked): void {
             \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
             $marked = array_map('basename', glob($root.'/state/*'));
             // the install did not run (stubbed), so the next update starts it again
             \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
             touch($root.'/state/big'); // what the chain does when the install exits 0
             \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
-        } finally {
-            putenv('PATH='.$path);
-        }
+        });
 
         sort($marked);
         $this->assertSame(['done', 'has'], $marked, 'only an existing install is marked up front; below the floor, without an installer or not yet installed stay unmarked');
@@ -276,13 +268,9 @@ public function testMarkerPathIsMadeInARootOnlyDirectoryAndRefusesLinksAndRepeat
         $home = $root.'/account';
         $this->pmssWriteFile($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
-        $path = (string) getenv('PATH');
-        putenv('PATH='.$root.'/stub:'.$path);
-        try {
+        $this->pmssWithPathPrefix($root.'/stub', function () use ($root, $home, &$command): void {
             $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => 'fixt01', 'memory' => '2000'], $home, $root.'/state');
-        } finally {
-            putenv('PATH='.$path);
-        }
+        });
         $this->assertTrue(strpos($command, ") && touch -- '\\''".$root."/state/fixt01'\\''") !== false, 'the marker must follow a successful install: '.$command);
         $this->assertFalse(file_exists($root.'/state/fixt01'), 'nothing is marked before the install has run');
     }

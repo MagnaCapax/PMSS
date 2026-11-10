@@ -81,7 +81,7 @@ PHP;
     {
         $binDir = $this->pmssMakeTempDir("pmss-command-path-newline-\n");
         $this->pmssWriteExecutableFile($binDir.'/pmss-newline-binary', "#!/bin/sh\nexit 0\n");
-        $this->prependCommandPath($binDir);
+        $this->pmssTrackEnvOverrides($this->pmssPathPrefixedEnvironment($binDir));
 
         $this->assertEquals('', pmssCommandPath('pmss-newline-binary'));
     }
@@ -100,7 +100,7 @@ PHP;
     public function testCommandPathReturnsStubPathForSafeBinary(): void
     {
         $binDir = $this->pmssMakeExecutableStub('pmss-demo-binary', "#!/bin/sh\nexit 0\n", 'pmss-command-path-');
-        $this->prependCommandPath($binDir);
+        $this->pmssTrackEnvOverrides($this->pmssPathPrefixedEnvironment($binDir));
 
         $this->assertEquals($binDir.'/pmss-demo-binary', pmssCommandPath('pmss-demo-binary'));
     }
@@ -108,7 +108,7 @@ PHP;
     public function testCommandPathRejectsUnsafeBinaryNamesBeforeShellLookup(): void
     {
         $binDir = $this->pmssMakeExecutableStub('pmss-safe-binary', "#!/bin/sh\nexit 0\n", 'pmss-command-path-');
-        $this->prependCommandPath($binDir);
+        $this->pmssTrackEnvOverrides($this->pmssPathPrefixedEnvironment($binDir));
 
         $this->assertEquals('', pmssCommandPath('../pmss-safe-binary'));
         $this->assertEquals('', pmssCommandPath('pmss-safe-binary;id'));
@@ -267,11 +267,5 @@ PHP;
         $this->pmssWithEnv(['PATH' => '/nonexistent'], function (): void {
             $this->assertSame(null, pmssIopingAverageMs('/tmp'));
         });
-    }
-
-    private function prependCommandPath(string $binDir): void
-    {
-        $path = getenv('PATH');
-        putenv('PATH='.$binDir.($path !== false ? ':'.$path : ''));
     }
 }

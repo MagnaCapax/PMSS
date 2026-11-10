@@ -17,10 +17,10 @@ class UserTransferDockerHandoverTest extends TestCase
         $script = $this->pmssWriteFile($root.'/quiesce.sh', \pmssUserTransferBuildDockerQuiesce(
             ['remoteUser' => 'fixtur02', 'hostname' => 'source.example'], $idsPath));
         foreach ([0, 1, 23, 255] as $rc) {
-            $result = $this->pmssExecShellCommand('bash '.escapeshellarg($script), [
-                'PATH' => $bin.':'.getenv('PATH'), 'PMSS_TEST_DOCKER_IDS' => str_repeat('a', 64),
+            $result = $this->pmssExecShellCommand('bash '.escapeshellarg($script), $this->pmssPathPrefixedEnvironment($bin, [
+                'PMSS_TEST_DOCKER_IDS' => str_repeat('a', 64),
                 'PMSS_TEST_SSH_RC' => (string) $rc,
-            ]);
+            ]));
             $this->assertSame($rc === 0, $result['rc'] === 0, 'SSH rc='.$rc);
             $this->assertSame('', $result['output']);
             $this->assertSame(str_repeat('a', 64)."\n", file_get_contents($idsPath));
@@ -29,9 +29,9 @@ class UserTransferDockerHandoverTest extends TestCase
         // A failed capture cannot silently authorize promotion either.
         $script = $this->pmssWriteFile($script, \pmssUserTransferBuildDockerQuiesce(
             ['remoteUser' => 'fixtur02', 'hostname' => 'source.example'], $root.'/absent/ids'));
-        $result = $this->pmssExecShellCommand('bash '.escapeshellarg($script), [
-            'PATH' => $bin.':'.getenv('PATH'), 'PMSS_TEST_DOCKER_IDS' => '', 'PMSS_TEST_SSH_RC' => '0',
-        ]);
+        $result = $this->pmssExecShellCommand('bash '.escapeshellarg($script), $this->pmssPathPrefixedEnvironment($bin, [
+            'PMSS_TEST_DOCKER_IDS' => '', 'PMSS_TEST_SSH_RC' => '0',
+        ]));
         $this->assertTrue($result['rc'] !== 0);
     }
 

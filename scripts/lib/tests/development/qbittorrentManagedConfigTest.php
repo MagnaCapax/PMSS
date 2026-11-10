@@ -154,7 +154,7 @@ class QbittorrentManagedConfigTest extends TestCase
         // ADR 0182 keys the throttle on the discovered build; pin a 4.4+ build so the host's system build cannot decide.
         $bin = $this->pmssMakeTempDir('pmss-qbt-bin-');
         $this->pmssWriteExecutableFile($bin.'/qbittorrent-nox', "#!/bin/sh\necho 'qBittorrent v4.6.7'\n");
-        $this->pmssTrackEnvOverrides(['PATH' => $bin.':'.(string) getenv('PATH')]);
+        $this->pmssTrackEnvOverrides($this->pmssPathPrefixedEnvironment($bin));
         $before = "[Meta]\nMigrationVersion=2\n[BitTorrent]\nSession\\GlobalUPSpeedLimit=10\n[Preferences]\nLocale=en\n";
         $path = $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.config/qBittorrent/qBittorrent.conf', $before);
         $this->storeUploadCap(512);

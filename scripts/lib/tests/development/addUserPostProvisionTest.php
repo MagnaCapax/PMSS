@@ -94,13 +94,11 @@ final class AddUserPostProvisionTest extends TestCase
         // The slice launcher resolves the uid with `id -u`; a stub keeps the test independent of the host's users.
         $name = 'fixtur01';
         $this->pmssWriteExecutableFile($this->tempDir.'/stub/id', "#!/bin/sh\necho 4321\n");
-        $path = (string) getenv('PATH');
         $home = $this->tempDir.'/home';
         $this->pmssEnsureDir($home.'/bin');
         $floor = \pmssUserPikkumiesPreinstallMinRamMiB();
         $this->assertSame(400, $floor);
-        putenv('PATH='.$this->tempDir.'/stub:'.$path);
-        try {
+        $this->pmssWithPathPrefix($this->tempDir.'/stub', function () use ($name, $home, $floor, &$noInstaller, &$belowFloor, &$command): void {
             $openclaw = \pmssAddUserOpenClawPreinstallCommand($name);
             $this->assertStringContainsAllStrings(array('systemd-run', '--slice=user-4321.slice', 'su', 'fixtur01',
                 'php "$HOME/bin/install-openclaw" install --yes', 'umask 077', '.install-openclaw.log'), $openclaw);
@@ -108,9 +106,7 @@ final class AddUserPostProvisionTest extends TestCase
             $this->pmssWriteFile($home.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
             $belowFloor = \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) ($floor - 1)], $home);
             $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => $name, 'memory' => (string) $floor], $home);
-        } finally {
-            putenv('PATH='.$path);
-        }
+        });
 
         $this->assertTrue($noInstaller === null, 'no installer in ~/bin');
         $this->assertTrue($belowFloor === null, 'below the RAM floor');

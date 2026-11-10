@@ -53,16 +53,14 @@ esac
 BASH
         ]);
 
-        $path = getenv('PATH');
-        $this->pmssTrackEnvOverrides([
-            'PATH' => $this->tempDir.'/bin'.($path !== false ? ':'.$path : ''),
+        $this->pmssTrackEnvOverrides($this->pmssPathPrefixedEnvironment($this->tempDir.'/bin', [
             'HOME' => $this->tempDir,
             'PMSS_TEST_PGREP_STATE' => $this->tempDir.'/state',
             'PMSS_TEST_COMMAND_LOG' => $this->tempDir.'/commands.log',
             'PMSS_TEST_PROBE_LOG' => $this->tempDir.'/probes.log',
             'PMSS_TEST_PROCESS_TABLE' => '',
             'PMSS_TEST_KILL_MODE' => $this->tempDir.'/kill-mode',
-        ]);
+        ]));
         $this->pmssResetRuntimeProfile();
     }
 

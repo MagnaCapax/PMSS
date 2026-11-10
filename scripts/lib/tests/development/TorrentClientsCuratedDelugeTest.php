@@ -59,8 +59,7 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
         $this->pmssWriteExecutableFile($root.'/python3', "#!/bin/sh\nprintf '%s\\n' '".$pythonVersion."'\n");
         $major = $codename === 'bookworm' ? '12' : '11';
         file_put_contents($root.'/os-release', "ID=debian\nVERSION_ID=$major\nVERSION_CODENAME=$codename\n");
-        $this->pmssWithEnv(['PATH' => $root.':'.getenv('PATH'),
-            'PMSS_OS_RELEASE_PATH' => $root.'/os-release'], $check);
+        $this->pmssWithPathPrefixedEnv($root, ['PMSS_OS_RELEASE_PATH' => $root.'/os-release'], $check);
     }
 
     public function testPythonWindowRejectsNonMatchingAndMalformedVersions(): void

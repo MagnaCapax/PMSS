@@ -280,6 +280,10 @@ adapter adds no policy. Single-use setup and assertions stay with their scenario
 preserving fixture bytes, strict comparisons, stderr redirection and sandbox skips.
 Tar headers stay with archive assembly; traffic CLI case tables and panel-asset
 collection stay with their sole scenario, retaining checks and traversal order.
+Stub command paths use `pmssWithPathPrefix()` / `pmssWithPathPrefixedEnv()` for
+callback scopes, or `pmssPathPrefixedEnvironment()` with tracked overrides for
+whole-test scopes. These share PATH construction and restoration, including
+absent or empty prior values, without local prepend or try/finally adapters.
 
 Development tests must avoid network/system changes; production tests and the CLI probe are intended for curated post-provision runs.
 

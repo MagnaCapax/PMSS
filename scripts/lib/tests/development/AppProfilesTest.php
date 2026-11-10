@@ -235,6 +235,6 @@ ksort($markers);
 echo json_encode(['starts' => $starts, 'markers' => $markers, 'config' => pmssUserAppProfileConfig($user),
     'logs' => $GLOBALS['logs'], 'queues' => $GLOBALS['queues'], 'earlyQueues' => $GLOBALS['earlyQueues']]);
 PHP;
-        return $this->pmssRunInlinePhpJson($script, ['PATH' => $home.'/stubs:'.getenv('PATH'), 'PMSS_TEST_MODE' => '1', 'PMSS_DRY_RUN' => '0']);
+        return $this->pmssRunInlinePhpJson($script, $this->pmssPathPrefixedEnvironment($home.'/stubs', ['PMSS_TEST_MODE' => '1', 'PMSS_DRY_RUN' => '0']));
     }
 }

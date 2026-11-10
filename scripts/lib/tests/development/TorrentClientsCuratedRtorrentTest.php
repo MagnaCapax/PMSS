@@ -100,8 +100,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $probe = $root.'/pgrep';
         // Mimic pgrep matching the 0.9.8 main thread; never inspect a live PID.
         $this->pmssWriteExecutableFile($probe, "#!/bin/sh\ncase \"\$*\" in *'^rtorrent'*) printf '123\\n';; *) exit 1;; esac\n");
-        $this->pmssWithEnv(['PATH' => $root.':'.getenv('PATH')], function (): void {
-            $this->assertSame([123], \pmssUserWatchdogProcessPids('testuser', '^rtorrent'));
+        $this->pmssWithPathPrefix($root, function (): void {
+            $this->assertSame([123], \pmssUserWatchdogProcessPids('fixtur01', '^rtorrent'));
         });
         $this->pmssAssertRepoFileContainsString('scripts/cron/checkRtorrent.php', "pmssUserWatchdogProcessPids(\$user, '^rtorrent')");
     }
