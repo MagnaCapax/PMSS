@@ -47,14 +47,9 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         return array($result, $probeCalls, $sleepCalls);
     }
 
-    private function socketFailureOptions(string $runtimeDir, int $threshold): array
-    {
-        return array('runtimeDir' => $runtimeDir, 'threshold' => $threshold);
-    }
-
     private function recordSocketFailure(string $runtimeDir, int $threshold, string $username = 'fixtur01'): array
     {
-        return \pmssLighttpdWatchdogRecordSocketFailure($username, $this->socketFailureOptions($runtimeDir, $threshold));
+        return \pmssLighttpdWatchdogRecordSocketFailure($username, array('runtimeDir' => $runtimeDir, 'threshold' => $threshold));
     }
 
     public function testProbeSucceedsOnFirstAttemptWithoutSleeping(): void
@@ -335,7 +330,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     public function testSocketFailureStateClearsAfterHealthyProbe(): void
     {
         $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-clear-');
-        $options = $this->socketFailureOptions($runtimeDir, 2);
+        $options = array('runtimeDir' => $runtimeDir, 'threshold' => 2);
 
         $this->assertSame(
             array('action' => 'wait', 'count' => 1, 'threshold' => 2),
@@ -386,7 +381,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
                 array('action' => 'wait', 'count' => 0, 'threshold' => 1),
                 $this->recordSocketFailure($runtimeDir, 1)
             );
-            \pmssLighttpdWatchdogClearSocketFailure('fixtur01', $this->socketFailureOptions($runtimeDir, 1));
+            \pmssLighttpdWatchdogClearSocketFailure('fixtur01', array('runtimeDir' => $runtimeDir, 'threshold' => 1));
             $this->assertSame($target, readlink($statePath));
             $this->assertSame($targetExists, file_exists($target));
             if ($targetExists) {
@@ -415,7 +410,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
                 array('action' => 'wait', 'count' => 0, 'threshold' => 1),
                 $this->recordSocketFailure($runtimeDir, 1)
             );
-            \pmssLighttpdWatchdogClearSocketFailure('fixtur01', $this->socketFailureOptions($runtimeDir, 1));
+            \pmssLighttpdWatchdogClearSocketFailure('fixtur01', array('runtimeDir' => $runtimeDir, 'threshold' => 1));
             $this->assertSame($type === 'directory' ? 'dir' : 'fifo', filetype($statePath));
         }
     }

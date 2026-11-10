@@ -28,7 +28,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testCreatesParentDirectoriesForMissingPath(): void
     {
         $home = $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $relative = $this->skelRelative('nested/dir/config.txt');
+        $relative = $this->skelDirName.'/nested/dir/config.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'alpha');
 
         \updateUserFile($relative, $this->user);
@@ -42,7 +42,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testIdempotentWhenContentMatches(): void
     {
         $home = $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $relative = $this->skelRelative('same.txt');
+        $relative = $this->skelDirName.'/same.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'same');
 
         $target = $this->pmssWriteFile($home.'/'.$relative, 'same');
@@ -59,7 +59,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testUpdatesWhenContentDiffers(): void
     {
         $home = $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $relative = $this->skelRelative('diff.txt');
+        $relative = $this->skelDirName.'/diff.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'new');
 
         $target = $this->pmssWriteFile($home.'/'.$relative, 'old');
@@ -73,7 +73,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
 
     public function testSkipsWhenHomeMissing(): void
     {
-        $relative = $this->skelRelative('missing-home.txt');
+        $relative = $this->skelDirName.'/missing-home.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
 
         $target = $this->homeRoot.'/'.$this->user.'/'.$relative;
@@ -85,7 +85,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testSkipsWhenTargetIsDirectory(): void
     {
         $home = $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $relative = $this->skelRelative('dir-target.txt');
+        $relative = $this->skelDirName.'/dir-target.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
 
         $target = $home.'/'.$relative;
@@ -120,7 +120,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testSkipsControlCharacterPath(): void
     {
         $home = $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $relative = $this->skelRelative("bad\nname.txt");
+        $relative = $this->skelDirName."/bad\nname.txt";
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
 
         \updateUserFile($relative, $this->user);
@@ -131,7 +131,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testSkipsUnsafeUserPathSegment(): void
     {
         $home = $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $relative = $this->skelRelative('unsafe-user.txt');
+        $relative = $this->skelDirName.'/unsafe-user.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
 
         \updateUserFile($relative, '..');
@@ -142,7 +142,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testSkipsExistingSymlinkTarget(): void
     {
         $home = $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $relative = $this->skelRelative('linked-target.txt');
+        $relative = $this->skelDirName.'/linked-target.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'new-data');
 
         $outside = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-linked-target-'), 'keep-data');
@@ -159,7 +159,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testSkipsHomeSymlinkEscapingHomeRoot(): void
     {
         $outside = $this->pmssMakeTempDir('pmss-home-escape-');
-        $relative = $this->skelRelative('home-escape.txt');
+        $relative = $this->skelDirName.'/home-escape.txt';
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'escape-data');
         $this->pmssCreateSymlinkOrSkip($outside, $this->homeRoot.'/'.$this->user);
 
@@ -208,11 +208,6 @@ class UpdateUserFileSafeWriteTest extends TestCase
 
         $this->assertTrue(\copyToUserSpace($source, $target, $this->user));
         $this->assertEquals('payload', file_get_contents($target));
-    }
-
-    private function skelRelative(string $suffix): string
-    {
-        return $this->skelDirName.'/'.$suffix;
     }
 
 }

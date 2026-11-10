@@ -16,7 +16,7 @@ class A00_JsonLogPathTest extends TestCase
 
     public function tearDown(): void
     {
-        $this->resetCorrelationIdCache();
+        $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = null;
         $this->resetJsonLogPath();
     }
 
@@ -59,7 +59,7 @@ class A00_JsonLogPathTest extends TestCase
         file_put_contents($path, '');
         putenv('PMSS_JSON_LOG='.$path);
         putenv('PMSS_CORRELATION_ID=test-correlation-id');
-        $this->resetCorrelationIdCache();
+        $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = null;
         \pmssLogJson(['event' => 'edge', 'val' => 2]);
         $data = $this->pmssDecodeJsonArray(trim(file_get_contents($path)));
         $this->assertEquals('test-correlation-id', $data['pmss_correlation_id'] ?? '');
@@ -74,11 +74,6 @@ class A00_JsonLogPathTest extends TestCase
     private function resetCorrelationId(): void
     {
         putenv('PMSS_CORRELATION_ID');
-        $this->resetCorrelationIdCache();
-    }
-
-    private function resetCorrelationIdCache(): void
-    {
         $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = null;
     }
 }
