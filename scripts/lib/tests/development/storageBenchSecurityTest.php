@@ -343,15 +343,6 @@ PHP;
         }
     }
 
-    private function runShow(string $path): string
-    {
-        if ($this->isSandbox()) {
-            throw new SkipTest('skip in sandbox');
-        }
-
-        return $this->pmssRunStorageBenchmarkShowLast($path);
-    }
-
     private function assertBenchmarkInputGuard(array $arguments, string $expectedMessage): void
     {
         $run = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
@@ -364,7 +355,11 @@ PHP;
 
     private function assertShowPathContains(string $path, string $expected, string $case = ''): void
     {
-        $this->assertStringContainsString($expected, $this->runShow($path), $case);
+        if ($this->isSandbox()) {
+            throw new SkipTest('skip in sandbox');
+        }
+
+        $this->assertStringContainsString($expected, $this->pmssRunStorageBenchmarkShowLast($path), $case);
     }
 
     private function assertSecurityRunContains(

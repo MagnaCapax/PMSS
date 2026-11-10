@@ -449,7 +449,7 @@ class SkeletonWebLocalAssetTest extends TestCase
         $classes = [];
         foreach ($tagMatches[0] as $tag) {
             if (preg_match('/^<div\b/i', $tag)) {
-                if ($depth === 0 && $this->customerPanelTagHasClass($tag, 'portfoliobox')) {
+                if ($depth === 0 && in_array('portfoliobox', $this->customerPanelTagClasses($tag), true)) {
                     $depth = 1;
                     continue;
                 }
@@ -471,11 +471,6 @@ class SkeletonWebLocalAssetTest extends TestCase
         $classes = array_values(array_unique($classes));
         sort($classes);
         return $classes;
-    }
-
-    private function customerPanelTagHasClass(string $tag, string $expected): bool
-    {
-        return in_array($expected, $this->customerPanelTagClasses($tag), true);
     }
 
     /** @return array<int, string> */

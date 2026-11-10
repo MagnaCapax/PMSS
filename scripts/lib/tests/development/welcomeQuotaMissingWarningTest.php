@@ -79,14 +79,6 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssRunInlinePhpRequire($fixture, $script, [], $stderrRedirect);
     }
 
-    private function assertWelcomeUsageScriptContains(string $script, array $needles, string $stderrRedirect = '2>&1'): string
-    {
-        $output = $this->runWelcomeUsageScript($script, $stderrRedirect);
-        $this->assertStringContainsAllStrings($needles, $output);
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
-        return $output;
-    }
-
     public function testWelcomeSourceContractsUseSafeCustomerHelpers(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', [
@@ -336,10 +328,15 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeTrafficDisclosureShowsApproachWarning(): void
     {
-        $this->assertWelcomeUsageScriptContains(
+        $output = $this->runWelcomeUsageScript(
             'echo pmssWelcomeTrafficDisclosureHtmlBuild(80.0, array("effectiveCapMbit" => 100, "isReduced" => false), 42, false);',
-            ['Current effective: full plan port speed', 'Usage: <b>80.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42']
+            '2>&1'
         );
+        $this->assertStringContainsAllStrings(
+            ['Current effective: full plan port speed', 'Usage: <b>80.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42'],
+            $output
+        );
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeHomeAlertsShowOverCapWithoutThrottle(): void

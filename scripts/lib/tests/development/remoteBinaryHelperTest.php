@@ -216,17 +216,6 @@ SH
         });
     }
 
-    private function createSourceArchive(string $root): string
-    {
-        $archiveRoot = $root.'/archive-root';
-        $sourceDir = $archiveRoot.'/source';
-        $this->pmssWriteFile($sourceDir.'/payload.txt', 'archive-ok');
-
-        $archivePath = $root.'/archive.tar.gz';
-        $this->pmssCreateTarGzArchive($archivePath, $archiveRoot, ['source'], '', '2>&1');
-        return $archivePath;
-    }
-
     private function runDemoArchiveStep(
         string $expectedSha256,
         string $workDir,
@@ -408,7 +397,11 @@ SH
 
     public function testRunPinnedRemoteArchiveStepReturnsTrueForSharedExtraction(): void
     {
-        $archivePath = $this->createSourceArchive($this->pmssMakeTempDir('pmss-remote-archive-', 0700));
+        $root = $this->pmssMakeTempDir('pmss-remote-archive-', 0700);
+        $archiveRoot = $root.'/archive-root';
+        $this->pmssWriteFile($archiveRoot.'/source/payload.txt', 'archive-ok');
+        $archivePath = $root.'/archive.tar.gz';
+        $this->pmssCreateTarGzArchive($archivePath, $archiveRoot, ['source'], '', '2>&1');
 
         $this->withFakeDownloadBody('', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
             $result = $this->runDemoArchiveStep($expectedSha256, $root.'/compile');

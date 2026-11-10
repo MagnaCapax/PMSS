@@ -139,18 +139,12 @@ class UserCgroupUtilTest extends TestCase
     }
 
     /**
-     * Create a manager instance backed by a no-op system implementation.
+     * Build the shared no-op cgroup system stub used by dry-run manager tests.
      *
      * computeSetProps does not depend on the SystemInterface, but wiring
      * a stub keeps the construction path identical to real usage while
      * remaining hermetic.
      */
-    private function makeManager(): Manager
-    {
-        return new Manager($this->makeSystemStub());
-    }
-
-    /** Build the shared no-op cgroup system stub used by dry-run manager tests. */
     private function makeSystemStub(string $resolvedDevice = ''): SystemInterface
     {
         return new class($resolvedDevice) implements SystemInterface {
@@ -179,7 +173,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testComputePropsClampsMemory(): void
     {
-        $mgr = $this->makeManager();
+        $mgr = new Manager($this->makeSystemStub());
         $sys = 4096; // MiB
         $p = $mgr->computeSetProps(['memory-high' => 100, 'memory-max' => 10000], $sys);
         $this->assertEquals('250M', $p['MemoryHigh']);
@@ -189,7 +183,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testComputePropsDerivesMaxFromHighWhenMaxMissing(): void
     {
-        $mgr = $this->makeManager();
+        $mgr = new Manager($this->makeSystemStub());
         $sys = 8192;
         $p = $mgr->computeSetProps(['memory-high' => 500], $sys);
         $mh = (int)rtrim($p['MemoryHigh'],'M');
@@ -200,7 +194,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testComputePropsAcceptsCpuIoTasks(): void
     {
-        $mgr = $this->makeManager();
+        $mgr = new Manager($this->makeSystemStub());
         $this->assertSame(
             ['CPUWeight' => 300, 'IOWeight' => 250, 'TasksMax' => 8192],
             $mgr->computeSetProps(['cpu-weight'=>300,'io-weight'=>250,'tasks-max'=>8192], 32768)
@@ -209,7 +203,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testComputePropsDefaultsHighWhenOnlyMaxProvided(): void
     {
-        $mgr = $this->makeManager();
+        $mgr = new Manager($this->makeSystemStub());
         $p = $mgr->computeSetProps(['memory-max'=>3000], 16000);
         $this->assertTrue(isset($p['MemoryHigh']), 'MemoryHigh should be set when only max provided');
         $this->assertTrue((int)rtrim($p['MemoryMax'],'M') >= (int)rtrim($p['MemoryHigh'],'M'));
@@ -217,7 +211,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testComputePropsHandlesZeroSysMemGracefully(): void
     {
-        $mgr = $this->makeManager();
+        $mgr = new Manager($this->makeSystemStub());
         $p = $mgr->computeSetProps(['memory-high'=>250,'memory-max'=>500], 0);
         $this->assertEquals('250M', $p['MemoryHigh']);
         $this->assertEquals('500M', $p['MemoryMax']);
@@ -225,7 +219,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testComputePropsSupportsCpuQuota(): void
     {
-        $mgr = $this->makeManager();
+        $mgr = new Manager($this->makeSystemStub());
         $withQuota = $mgr->computeSetProps(['memory-high'=>400,'cpu-quota-percent'=>85], 16000);
         $this->assertEquals('85%', $withQuota['CPUQuota']);
         $infinity = $mgr->computeSetProps(['memory-high'=>400,'cpu-quota-percent'=>0], 16000);
@@ -249,7 +243,7 @@ class UserCgroupUtilTest extends TestCase
         ]);
 
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $cfgDir], function (): void {
-            $mgr = $this->makeManager();
+            $mgr = new Manager($this->makeSystemStub());
             list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
                 return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--device=/dev/sdb', '--io-profile=archive']);
             });
@@ -276,7 +270,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testRejectsExplicitIoDeviceWithDotSegments(): void
     {
-        $mgr = $this->makeManager();
+        $mgr = new Manager($this->makeSystemStub());
         list($rc) = $this->pmssCaptureStdout(function () use ($mgr): int {
             return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--io-read-bw=/dev/../etc/passwd:20M']);
         });
@@ -308,7 +302,7 @@ class UserCgroupUtilTest extends TestCase
         ]);
 
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $cfgDir], function (): void {
-            $mgr = $this->makeManager();
+            $mgr = new Manager($this->makeSystemStub());
             list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
                 return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--defaults']);
             });

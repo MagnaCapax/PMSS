@@ -268,6 +268,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   sibling fields this way; nested records remain separate assertion targets.
 - CLI probes: `/scripts/util/systemTest.php`, `/scripts/util/componentStatus.php`, `/scripts/util/agentDiagnostics.php`
 
+Test fixtures call constructors and shared helpers directly when a private
+adapter adds no policy. Single-use setup and assertions stay with their scenario,
+preserving fixture bytes, strict comparisons, stderr redirection and sandbox skips.
+
 Development tests must avoid network/system changes; production tests and the CLI probe are intended for curated post-provision runs.
 
 ## Config Templates
