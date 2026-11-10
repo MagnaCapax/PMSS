@@ -1,18 +1,19 @@
 <?php
 /** Pure quota variants projected from one account cohort. Loaded by dynamicIopsPolicy.php. @license GPL-3.0-only */
 require_once __DIR__.'/directApply.php';
+require_once __DIR__.'/dynamicIopsWorkConserving.php';
 
 /** Keep identical floor, two-significant-figure rounding and ceiling for both projections. */
-function pmssDynamicIopsProposal(array $row, float $chargedPool): int
+function pmssDynamicIopsProposal(array $row, float $chargedPool, float $water = 0.0): int
 {
-    $value = max($row['floor'], $chargedPool * $row['share']);
+    $value = max($row['floor'], $chargedPool * $row['share'], $water);
     $rounded = max($row['floor'], round($value, 1 - (int) floor(log10(max(1.0, $value)))));
     // The kernel throttle delivers whole tens per second, so round up to the next ten it delivers.
     return min($row['ceiling'] ?? PHP_INT_MAX, (int) min(ceil($rounded / 10) * 10, PHP_INT_MAX - 1024));
 }
 
 /** Compare quota exponents using already bonus-adjusted BFQ weights. */
-function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?float $passive, ?float $benchmark, ?string $storageClass, bool $legacyAllowed, ?float $legacyPassive = null): ?array
+function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?float $passive, ?float $benchmark, ?string $storageClass, bool $legacyAllowed, ?float $legacyPassive = null, ?array $rates = null, ?array $wantsMore = null): ?array
 {
     $settings = pmssDynamicIopsSettings($policy);
     if ($settings === null) return null;
@@ -85,8 +86,10 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         }
         $sum = array_sum(array_column($rows, 'share'));
         if (!is_finite($sum)) return null;
-        foreach ($rows as &$row) {
+        $weights = [];
+        foreach ($rows as $user => &$row) {
             $row['share'] = $sum > 0 ? $row['share'] / $sum : 0.0;
+            $weights[$user] = $row['share'];
             $shortfall = max(0.0, $row['floor'] - $pool * $row['share']);
             if (!$row['explicit']) $lift += $shortfall;
             // Counterfactual floor charging includes every account, including explicit caps.
@@ -95,10 +98,23 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
         unset($row);
         $chargedPool = max(0.0, $pool - $settings['floorCharge'] * $lift);
         $wouldPool = max(0.0, $pool - $settings['floorCharge'] * $wouldLift);
-        foreach ($rows as &$row) {
+        $water = []; $wouldWater = [];
+        if ($fallback === null && $settings['mode'] === 'enforce' && $rates !== null) {
+            $demand = pmssDynamicIopsDemand($rows, $rates, $wantsMore, $settings['workConservingHeadroom']);
+            $water = pmssDynamicIopsWaterFill($weights, $demand, $chargedPool);
+            $wouldWater = pmssDynamicIopsWaterFill($weights, $demand, $wouldPool);
+            foreach ($rows as $user => &$row) {
+                $row['rate'] = pmssFiniteNonNegativeFloat($rates[$user] ?? null);
+                // JSON cannot encode INF; null denotes unbounded demand in the private cycle log.
+                $row['demand'] = is_finite($demand[$user]) ? $demand[$user] : null;
+                $row['water'] = ['proposed' => $water[$user], 'would_be' => $wouldWater[$user]];
+            }
+            unset($row);
+        }
+        foreach ($rows as $user => &$row) {
             $row['proposed'] = $fallback !== null || $row['explicit'] ? $row['legacy'] :
-                pmssDynamicIopsProposal($row, $chargedPool);
-            $row['would_be'] = $fallback !== null ? null : pmssDynamicIopsProposal($row, $wouldPool);
+                pmssDynamicIopsProposal($row, $chargedPool, $water[$user] ?? 0.0);
+            $row['would_be'] = $fallback !== null ? null : pmssDynamicIopsProposal($row, $wouldPool, $wouldWater[$user] ?? 0.0);
         }
         unset($row);
         $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lift, 'charged_pool' => $chargedPool,

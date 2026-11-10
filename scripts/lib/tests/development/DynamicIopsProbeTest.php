@@ -219,12 +219,20 @@ class DynamicIopsProbeTest extends TestCase
         }
         $normal = $this->enforceCycle();
         $this->assertSame('probe', $normal['logs']['PMSS_DYNAMIC_IOPS_LOG'][0]['steer']);
-        $this->assertSame(5.0, (float) $normal['stateWrites'][0][1]['lo']);
+        // The contention observer also saves its counts (ADR 0256); pick the probe state by its path.
+        $this->assertSame(5.0, (float) $this->probeWrites($normal)[0][1]['lo']);
         foreach (['ssd', 'nvme'] as $media) {
             $row = $this->enforceCycle(['media' => $media, 'pressure' => ['blend' => 15.0, 'latency_ms' => 0.2]]);
             // The fixture supplies no reference: ADR 0237 keeps pressure steering.
             $this->assertSame('pressure', $row['logs']['PMSS_DYNAMIC_IOPS_LOG'][0]['steer']);
-            $this->assertSame([], $row['stateWrites']);
+            $this->assertSame([], $this->probeWrites($row));
         }
+    }
+
+    private function probeWrites(array $row): array
+    {
+        return array_values(array_filter($row['stateWrites'], static function (array $write): bool {
+            return $write[0] === '/var/lib/pmss/dynamic-iops-probe.json';
+        }));
     }
 }

@@ -21,6 +21,7 @@ return [
             'floor' => 15, 'floorCharge' => 0.25,
             'curbStartIowait' => 50.0, 'curbFullIowait' => 80.0, 'curbMaxCut' => 0.25,
             'quotaExponent' => 1.0,
+            'workConservingHeadroom' => 3.0,
             // Hourly HDD A/B blocks; solid state retains its latency step (ADRs 0237, 0238).
             'probeStartLo' => 5.0, 'probeBlockCycles' => 12, 'probePairs' => 11, 'probeGain' => 0.10,
             'latencyStep' => 1.1,

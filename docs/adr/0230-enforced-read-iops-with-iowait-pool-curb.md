@@ -4,6 +4,7 @@ Date: 2026-11-05
 Category: architecture
 
 ## Status
+The "lone reader stays at its own share" property is replaced by [ADR 0256](0256-read-caps-are-work-conserving.md).
 Accepted 2026-11-05: read caps are enforced in production. Enabling them host by host
 was an implementation choice, superseded by ADR 0231 (enforced by default) and ADR 0233
 (no host-local policy).

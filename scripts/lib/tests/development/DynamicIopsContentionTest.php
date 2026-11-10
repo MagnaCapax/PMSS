@@ -184,6 +184,83 @@ PHP;
         $this->assertSame($samples[3], $scaled[3]);
     }
 
+    public function testObserverPersistsDemandWithoutUnifiedOrHostPressureAndPreviewDoesNotWrite(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-contention-demand-', 0700);
+        $this->pmssWriteFiles($root, ['slice/blkio.throttle.io_serviced' => "8:0 Read 1000\n",
+            'slice/blkio.throttle.io_service_bytes' => "8:0 Read 4096000\n",
+            'slice/blkio.throttle.read_iops_device' => "8:0 100\n", 'host' => $this->psi(40.0),
+            'unified/user.slice/.keep' => '']);
+        $script = <<<'PHP'
+namespace ContentionDemandFixture;
+function pmssCgroupDirectUserUidOrError($user, &$errors) { return 1001; }
+function pmssCgroupDirectUserSliceDir($uid) { return getenv('PMSS_TEST_CONTENTION_ROOT').'/slice'; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/dynamicIopsContention.php', 'ContentionDemandFixture');
+        $script .= <<<'PHP'
+$root = getenv('PMSS_TEST_CONTENTION_ROOT'); $state = $root.'/state/contention.json';
+$users = ['fixture' => []];
+// No unified hierarchy: save counts so the next cycle has a baseline.
+$first = pmssDynamicIopsContentionObserve($users, '8:0', 1000, false, $state, $root.'/absent', $root.'/host');
+$savedFirst = pmssJsonFileReadAssoc($state, true);
+file_put_contents($root.'/slice/blkio.throttle.io_serviced', "8:0 Read 61000\n");
+$second = pmssDynamicIopsContentionObserve($users, '8:0', 1300, false, $state, $root.'/absent', $root.'/host');
+$savedSecond = pmssJsonFileReadAssoc($state, true);
+file_put_contents($root.'/slice/blkio.throttle.io_serviced', "8:0 Read 64000\n");
+// A missing host PSI with unified present must take the same counter-only path.
+$preview = pmssDynamicIopsContentionObserve($users, '8:0', 1600, true, $state, $root.'/unified', $root.'/missing');
+$afterPreview = pmssJsonFileReadAssoc($state, true);
+$third = pmssDynamicIopsContentionObserve($users, '8:0', 1600, false, $state, $root.'/unified', $root.'/missing');
+echo json_encode([$first, $savedFirst, $second, $savedSecond, $preview, $afterPreview, $third,
+    pmssJsonFileReadAssoc($state, true), fileperms($state) & 0777], JSON_PRESERVE_ZERO_FRACTION);
+PHP;
+        [$first, $savedFirst, $second, $savedSecond, $preview, $afterPreview, $third, $savedThird, $mode] =
+            $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_CONTENTION_ROOT' => $root]);
+        $this->pmssAssertArraySubsetSame(['current' => null, 'rates' => ['fixture' => null],
+            'wants_more' => ['fixture' => false]], $first);
+        $this->pmssAssertArraySubsetSame(['time' => 1000, 'counts' => [1001 => 1000], 'held' => [], 'rows' => []], $savedFirst);
+        $this->pmssAssertArraySubsetSame(['current' => null, 'rates' => ['fixture' => 200.0],
+            'wants_more' => ['fixture' => true]], $second);
+        $this->pmssAssertArraySubsetSame(['time' => 1300, 'counts' => [1001 => 61000], 'held' => [1001], 'rows' => []], $savedSecond);
+        $this->assertSame($savedSecond, $afterPreview);
+        foreach ([$preview, $third] as $row) $this->pmssAssertArraySubsetSame(['current' => null,
+            'rates' => ['fixture' => 10.0], 'wants_more' => ['fixture' => false]], $row);
+        $this->assertSame(1600, $savedThird['time']);
+        $this->assertSame(0600, $mode);
+    }
+
+    public function testRateValidationMatchesHeldElapsedAndMonotonicCounterChecks(): void
+    {
+        $script = <<<'PHP'
+namespace ContentionRateFixture;
+function pmssCgroupDirectUserUidOrError($user, &$errors) { return $user === 'unresolved' ? null : 1001; }
+function pmssCgroupDirectUserSliceDir($uid) { return '/fixture/slice'; }
+function pmssJsonFileReadAssoc($path, $safe) { return $GLOBALS['state']; }
+function file_get_contents($path) { return $GLOBALS['raw']; }
+function is_dir($path) { return false; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/dynamicIopsContention.php', 'ContentionRateFixture');
+        $script .= <<<'PHP'
+$result = [];
+foreach ([[1000, 0, 6000], [1000, null, 6000], [1000, -1, 6000], [1000, 7000, 6000],
+    [1241, 0, 6000], [1240, 0, 6000], [1300, 0, 6000], [1400, 0, 6000], [-1, 0, 6000],
+    [1000, 6000, 6000], [1000, 0, null], [400, 0, 9000], [399, 0, 9000]] as [$then, $before, $after]) {
+    $GLOBALS['state'] = ['time' => $then, 'counts' => [1001 => $before]];
+    // No kernel cap: valid rates still count, but wants-more cannot be established.
+    $GLOBALS['raw'] = $after === null ? '' : "8:0 Read $after\n";
+    $row = pmssDynamicIopsContentionObserve(['fixture' => [], 'unresolved' => []], '8:0', 1300, true);
+    $result[] = [$row['rates'], $row['wants_more']];
+}
+echo json_encode($result, JSON_PRESERVE_ZERO_FRACTION);
+PHP;
+        $rows = $this->pmssRunInlinePhpJson($script);
+        // The last two: a 900-second baseline still gives a rate; 901 seconds is stale.
+        foreach ([20.0, null, null, null, null, 100.0, null, null, null, 0.0, null, 10.0, null] as $i => $rate) {
+            $this->assertSame([['fixture' => $rate, 'unresolved' => null],
+                ['fixture' => false, 'unresolved' => false]], $rows[$i]);
+        }
+    }
+
     public function testObserveRecordsAnHourOfRowsAndNeedsTheUnifiedHierarchy(): void
     {
         $root = $this->pmssMakeTempDir('pmss-contention-', 0700);

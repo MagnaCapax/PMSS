@@ -75,7 +75,7 @@ function pmssDynamicIopsContention(float $host, ?float $system, array $slices): 
     return $held ? min($host, $free) : $host;
 }
 
-/** Read v1 counters once; keep contention rows only when unified pressure is available. */
+/** Read v1 counters and persist demand even when unified contention pressure is unavailable. */
 function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now, bool $readOnly,
     string $statePath = PMSS_DYNAMIC_IOPS_CONTENTION_STATE_DEFAULT, string $unifiedRoot = PMSS_CGROUP_UNIFIED_ROOT,
     string $hostPressure = '/proc/pressure/io'): array
@@ -94,27 +94,38 @@ function pmssDynamicIopsContentionObserve(array $users, string $majMin, int $now
         $counts[$uid] = pmssBlkioReadCount(pmssCgroupDirectUserSliceDir($uid).'/blkio.throttle.io_serviced', $majMin);
         $bytes[$uid] = pmssBlkioReadCount(pmssCgroupDirectUserSliceDir($uid).'/blkio.throttle.io_service_bytes', $majMin);
     }
-    if ($host === null || !is_dir($unifiedRoot.'/user.slice')) return ['rows' => $rows, 'current' => null, 'held' => [], 'counts' => $counts, 'bytes' => $bytes];
     // A corrupt negative epoch must not become a floating elapsed argument to the held predicate.
     $then = is_int($state['time'] ?? null) && $state['time'] >= 0 && $state['time'] < $now ? $state['time'] : null;
+    $seconds = $then === null ? 0 : $now - $then;
     $wasHeld = pmssDynamicIopsHeldLastCycle($state, $now);
     $slices = []; $heldUsers = []; $heldUids = [];
+    $rates = array_fill_keys(array_keys($users), null);
+    $wantsMore = array_fill_keys(array_keys($users), false);
     foreach ($uids as $user => $uid) {
         $dir = pmssCgroupDirectUserSliceDir($uid);
         $cap = pmssCgroupDirectDeviceValueParse((string) @file_get_contents($dir.'/blkio.throttle.read_iops_device'), $majMin);
         $before = is_int($state['counts'][$uid] ?? null) ? $state['counts'][$uid] : null;
-        $heldUsers[$user] = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then);
-        $exclude = $then !== null && pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $now - $then, PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO);
+        // Use the held predicate's elapsed/count checks without requiring an existing throttle cap. A baseline older
+        // than 15 minutes (caps were off, or cron stalled) averages idle time into the rate, so it gives no rate.
+        $rates[$user] = $seconds >= 60 && $seconds <= 900 && $before !== null && $before >= 0
+            && $counts[$uid] !== null && $counts[$uid] >= $before ? (float) ($counts[$uid] - $before) / $seconds : null;
+        $heldUsers[$user] = pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $seconds);
+        $exclude = pmssDynamicIopsSliceHeld($cap, $before, $counts[$uid], $seconds, PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO);
+        $wantsMore[$user] = $exclude;
         if ($exclude) $heldUids[] = $uid;
         $slices[] = ['full' => pmssPsiFullAvg300("$unifiedRoot/user.slice/user-$uid.slice/io.pressure"), 'held' => $exclude || isset($wasHeld[$uid])];
     }
-    $current = ['time' => $now, 'host' => $host, 'held' => count(array_filter($heldUsers)), 'excluded' => count(array_filter(array_column($slices, 'held'))),
-        'contention' => pmssDynamicIopsContention($host, pmssPsiFullAvg300("$unifiedRoot/system.slice/io.pressure"), $slices)];
-    $rows[] = $current;
+    $current = null;
+    if ($host !== null && is_dir($unifiedRoot.'/user.slice')) {
+        $current = ['time' => $now, 'host' => $host, 'held' => count(array_filter($heldUsers)), 'excluded' => count(array_filter(array_column($slices, 'held'))),
+            'contention' => pmssDynamicIopsContention($host, pmssPsiFullAvg300("$unifiedRoot/system.slice/io.pressure"), $slices)];
+        $rows[] = $current;
+    }
     if (!$readOnly && pmssEnsureSafeDir(dirname($statePath), 0755)) {
         pmssAtomicJsonFileWrite($statePath, ['time' => $now, 'counts' => $counts, 'held' => $heldUids, 'rows' => $rows], 0600);
     }
-    return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers, 'counts' => $counts, 'bytes' => $bytes];
+    return ['rows' => $rows, 'current' => $current, 'held' => $heldUsers, 'counts' => $counts, 'bytes' => $bytes,
+        'rates' => $rates, 'wants_more' => $wantsMore];
 }
 
 /** Scale each five-minute host sample by the contention share measured within half a bucket of it. */

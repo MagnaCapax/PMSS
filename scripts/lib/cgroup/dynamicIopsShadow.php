@@ -79,7 +79,7 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $legacyPassive = pmssIoCeilingPublishedReadIops($statePath);
     $passive = $stamp !== false && $stamp <= $now && $stamp >= $now - 86400 ? $legacyPassive : null;
     $majMin = $device !== '' ? pmssCgroupPolicyDeviceMajorMinorResolve($device) : null;
-    $contention = $majMin === null ? ['rows' => [], 'current' => null, 'held' => []]
+    $contention = $majMin === null ? ['rows' => [], 'current' => null, 'held' => [], 'rates' => [], 'wants_more' => []]
         : pmssDynamicIopsContentionObserve($users, $majMin, $now, $readOnly);
     // Stall of accounts held at their own cap is not contention; scale host samples to what remains.
     $pressure = pmssDynamicIopsPressure(pmssDynamicIopsContentionScale(
@@ -97,7 +97,8 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
     $pressure['latency_reference_ms'] = pmssDynamicIopsLatencyReference($fleetCompare, $ownFloor, $now);
     $allowed = !$md && pmssCgroupPolicyReadIopsDerivationAllowed($legacyPassive, pmssCgroupPolicyReadIopsClassFloor($class, $policy), count($users));
     $benchmark = pmssDynamicIopsBenchmark('/var/log/pmss/benchmark-storage.jsonl', $device);
-    $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive, $benchmark, $class, $allowed, $legacyPassive);
+    $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive, $benchmark, $class, $allowed, $legacyPassive,
+        $contention['rates'], $contention['wants_more']);
     $probe = null;
     $probePath = pmssResolvePathFromEnv('PMSS_DYNAMIC_IOPS_PROBE_STATE', '/var/lib/pmss/dynamic-iops-probe.json');
     if ($pressure['media'] === 'hdd') {
@@ -107,7 +108,8 @@ function pmssDynamicIopsShadowCycle(array $users, array $policy, ?array &$result
             $cohortComplete && pmssDynamicIopsReadCaps($users, $policy, $result) !== null,
             in_array(true, $contention['held'] ?? [], true));
         $pressure['probe_multiplier'] = $probe['multiplier'];
-        $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive, $benchmark, $class, $allowed, $legacyPassive);
+        $result = pmssDynamicIopsAllocate($users, $policy, $pressure, $passive, $benchmark, $class, $allowed, $legacyPassive,
+            $contention['rates'], $contention['wants_more']);
         if ($result !== null) $result['probe'] = $probe['probe'];
     }
     if ($result === null) $result = ['fallback' => 'allocation-failed'];

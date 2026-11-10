@@ -256,6 +256,15 @@ Quota exponents 1.0 and 0.5 are supported; floor/ceiling/rounding stay shared.
 This applies to md-backed `/home` too. Write caps retain legacy behavior;
 v1 buffered-write throttling is outside this feature.
 
+In enforce cycles, [ADR 0256](adr/0256-read-caps-are-work-conserving.md) water-fills
+the pool by weighted max-min fairness over measured read demand, passing quiet
+accounts' unused shares to readers while retaining today's share cap as a minimum.
+`workConservingHeadroom` defaults to 3.0 and must be finite, at most 100, and satisfy
+`headroom * PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO > 1` to avoid cap oscillation. Unknown
+rates or readers wanting more have unbounded demand. Each projection uses its own
+charged pool; explicit caps, rounding and tier ceilings still apply. The shipped
+mode remains `off` per [ADR 0243](adr/0243-read-caps-off-by-default-after-the-linux-6-1-journal-stall.md).
+
 Preview with `/scripts/cron/cgroupIopsLimitApply.php --dry-run`; `--census`
 also uses the selected enforce map without writing. `PMSS_DRY_RUN=1` suppresses
 enforce writes and JSONL output. Inspect the actual device's
