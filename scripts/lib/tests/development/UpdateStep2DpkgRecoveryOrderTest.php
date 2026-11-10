@@ -22,7 +22,7 @@ class UpdateStep2DpkgRecoveryOrderTest extends TestCase
     public function testPendingDpkgRecoveryUsesConffileDefaults(): void
     {
         $this->pmssAssertRepoFileContainsString(
-            'scripts/lib/update/environment.php',
+            'scripts/lib/update/dpkgRecovery.php',
             "dpkgCmd('--force-confdef --force-confold --configure -a')",
             'dpkg --configure -a must keep PMSS conffiles on unattended recovery'
         );

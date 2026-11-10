@@ -1,5 +1,15 @@
 # Refactoring Guidelines
 
+Dpkg baseline maintenance retains the environment and selection includes and
+public helpers (ADR 0261). Baseline discovery/staging, line policy, read-only
+package/hardware observations, application and interrupted configuration have
+separate owners. Application consumes sanitizer fields directly; candidate
+selection returns during traversal, and configuration recovery has one retry
+gate. Characterization cases retain fallback warning bytes, staging refusal,
+command order, cleanup, failed selection results and systemd retry ordering.
+Baseline data, validation and MediaArea handling retain their existing policy.
+Run these tests on testing machines; devbox checks changed PHP syntax only.
+
 Quota refresh retains its locked cron entrypoint and existing `quotaSnapshot.php`
 include (ADR 0254). Account refresh and lifecycle reporting live in
 `quota/snapshotRefresh.php`; pure display transforms and bounded report/sweep

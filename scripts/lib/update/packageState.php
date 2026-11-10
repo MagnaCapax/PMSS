@@ -2,7 +2,7 @@
 /**
  * Read-only package-state probes for update modules.
  *
- * Package installation is owned by dpkg selections in environment.php. Keep this
+ * Package installation is owned by dpkgBaselineApply.php via environment.php. Keep this
  * module free of queueing or install orchestration so there is one package
  * authority during update-step2.
  *
@@ -101,4 +101,19 @@ function pmssPackageAvailable(string $package): bool
     }
 
     return $cache[$package] = true;
+}
+
+/** Detect an Intel display controller from read-only PCI sysfs metadata. */
+function pmssHostHasIntelDisplayPciDevice(string $devicesPath = '/sys/bus/pci/devices'): bool
+{
+    foreach (@glob(rtrim($devicesPath, '/').'/*/class') ?: [] as $classPath) {
+        $class = @file_get_contents($classPath);
+        $vendor = @file_get_contents(dirname($classPath).'/vendor');
+        if (is_string($class) && is_string($vendor)
+            && strpos(strtolower(trim($class)), '0x03') === 0
+            && strtolower(trim($vendor)) === '0x8086') {
+            return true;
+        }
+    }
+    return false;
 }

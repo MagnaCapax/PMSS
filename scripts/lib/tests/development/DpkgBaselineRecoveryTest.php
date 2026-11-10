@@ -6,6 +6,76 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Exercise real recovery control flow with every package command and clock stubbed. */
 class DpkgBaselineRecoveryTest extends TestCase
 {
+    public function testBaselineApplicationKeepsStagingCommandAndCleanupOrder(): void
+    {
+        $result = $this->fixture(['install' => [0], 'warnings' => true, 'fuse' => true]);
+        $this->assertTrue($result['ok']);
+        $this->assertSame([
+            ['Refreshing dpkg availability database', ' apt-cache dumpavail | dpkg --merge-avail'],
+            ['read', '/fixture/selections'],
+            ['sanitize', ['alpha install'], 12],
+            ['stage', ['alpha install']],
+            ['summary'],
+            ['Applying dpkg selection baseline', "dpkg --set-selections < '/fixture/staged'"],
+            ['Installing packages from selection baseline', 'apt-get dselect-upgrade -y'],
+            ['unlink', '/fixture/staged'],
+            ['fuse-query'],
+            ['Holding fuse3 to block the fuse2 conflict-removal cascade (GH#643)', ' apt-mark hold fuse3 || true'],
+            ['WARN', 'Dpkg selection baseline contained ignored entries; proceeding with remaining packages', 0],
+        ], $result['trace']);
+    }
+
+    public function testMissingBaselineDoesNothingAndReturnsSuccess(): void
+    {
+        $result = $this->fixture(['baseline' => null]);
+        $this->assertTrue($result['ok']);
+        $this->assertSame([], $result['trace']);
+    }
+
+    public function testFailedStagingRefusesRawBaselineBeforeSummaryAndPackageWrites(): void
+    {
+        $result = $this->fixture(['stage' => null]);
+        $this->assertFalse($result['ok']);
+        $this->assertSame(['Refreshing dpkg availability database', 'read', 'sanitize', 'stage'], array_column($result['trace'], 0));
+        $this->assertFalse($result['cleaned']);
+        $this->assertSame(['[ERROR] Refusing to apply raw dpkg selections baseline after sanitized baseline staging failed'], $result['logs']);
+    }
+
+    public function testUnreadableAndEmptyPlansKeepRawPathAndDoNotStage(): void
+    {
+        foreach ([['lines' => false], ['sanitised' => []]] as $options) {
+            $result = $this->fixture($options + ['install' => [0]]);
+            $this->assertTrue($result['ok']);
+            $this->assertFalse($result['cleaned']);
+            $this->assertSame([], array_values(array_filter($result['trace'], static function (array $row): bool { return $row[0] === 'stage'; })));
+            $this->assertTrue(in_array(['Applying dpkg selection baseline', "dpkg --set-selections < '/fixture/selections'"], $result['trace'], true));
+        }
+    }
+
+    public function testFailedSetSelectionsStillInstallsButKeepsFailedResult(): void
+    {
+        foreach ([[0], [100, 0]] as $install) {
+            $result = $this->fixture(['setRc' => 1, 'install' => $install]);
+            $this->assertFalse($result['ok']);
+            $this->assertSame('install', $result['actions'][0]);
+            $this->assertTrue($result['cleaned']);
+        }
+    }
+
+    public function testSystemdMaskAndFailedConfigureKeepUnmaskAndRetryOrder(): void
+    {
+        foreach (['masked', 'enabled'] as $state) {
+            $result = $this->fixture(['systemd' => true, 'unit' => $state, 'configure' => [1]]);
+            $unmasks = array_values(array_filter($result['trace'], static function (array $row): bool {
+                return strpos((string) ($row[1] ?? ''), 'systemctl unmask') === 0;
+            }));
+            $expected = $state === 'masked' ? [['command', 'systemctl unmask proftpd.service']] : [];
+            $expected[] = ['Unmasking proftpd for dpkg retry', 'systemctl unmask proftpd.service || true'];
+            $this->assertSame($expected, $unmasks);
+            $this->assertSame(['install', 'configure', 'proftpd', 'fix', 'install'], $result['actions']);
+        }
+    }
+
     public function testTimeoutAndOrdinaryFailureConfigureDpkgBeforeFixBrokenAndRetry(): void
     {
         foreach ([124, 100, 137] as $rc) {
@@ -115,20 +185,29 @@ function pmssLogJson($row) { $GLOBALS['json'][] = $row; }
 function aptCmd($args) { return 'apt-get '.$args; }
 function dpkgCmd($args) { return 'dpkg '.$args; }
 function pmssAptDpkgEnvPrefix() { return ''; }
-function pmssSystemdRuntimeAvailable() { return false; }
-function shell_exec($command) { return ''; }
-function file($path, $flags) { return ['alpha install']; }
-function unlink($path) { $GLOBALS['cleaned'] = true; }
-function pmssSelectDpkgSelectionsBaseline($version) { return '/fixture/selections'; }
-function pmssDpkgSelectionsSanitise($lines, $version) { return ['sanitised' => $lines, 'warnings' => false]; }
-function pmssWriteSanitisedDpkgSelectionsTempFile($lines) { return '/fixture/staged'; }
-function pmssDpkgSelectionsLogSummary($plan) {}
+function pmssSystemdRuntimeAvailable() { return $GLOBALS['options']['systemd'] ?? false; }
+function pmssSystemdUnitState($verb, $unit) { return $GLOBALS['options']['unit']; }
+function runCommand($command) { $GLOBALS['trace'][] = ['command', $command]; return 0; }
+function shell_exec($command) { $GLOBALS['trace'][] = ['fuse-query']; return !empty($GLOBALS['options']['fuse']) ? 'install ok installed' : ''; }
+function file($path, $flags) { $GLOBALS['trace'][] = ['read', $path]; return $GLOBALS['options']['lines']; }
+function unlink($path) { $GLOBALS['trace'][] = ['unlink', $path]; $GLOBALS['cleaned'] = true; }
+function pmssSelectDpkgSelectionsBaseline($version) { return $GLOBALS['options']['baseline']; }
+function pmssDistroVersionFromEnv($version) { return $version; }
+function pmssDpkgSelectionsSanitise($lines, $version) {
+    $GLOBALS['trace'][] = ['sanitize', $lines, $version];
+    return ['sanitised' => $GLOBALS['options']['sanitised'] ?? $lines, 'warnings' => $GLOBALS['options']['warnings'] ?? false];
+}
+function pmssWriteSanitisedDpkgSelectionsTempFile($lines) { $GLOBALS['trace'][] = ['stage', $lines]; return $GLOBALS['options']['stage']; }
+function pmssDpkgSelectionsLogSummary($plan) { $GLOBALS['trace'][] = ['summary']; }
+function pmssLogStatus($level, $message, $rc) { $GLOBALS['trace'][] = [$level, $message, $rc]; }
 function pmssRunProfiledCallable($description, $callback, $args) {
     if ($callback !== 'pmssApplyDpkgSelections') throw new \RuntimeException('Unexpected callback');
     $GLOBALS['actions'][] = 'reapply';
     return pmssApplyDpkgSelections(...$args);
 }
 function runStep($description, $command) {
+    $GLOBALS['trace'][] = [$description, $command];
+    if ($description === 'Applying dpkg selection baseline') return $GLOBALS['options']['setRc'] ?? 0;
     $action = strpos($command, 'dselect-upgrade') !== false ? 'install'
         : (strpos($command, '--fix-broken') !== false ? 'fix'
         : (strpos($command, '--configure -a') !== false ? 'configure'
@@ -142,12 +221,13 @@ function runStep($description, $command) {
 }
 PHP;
         $script .= '$GLOBALS["options"] = '.var_export($options + ['entry' => 'baseline', 'install' => [124, 0],
-            'release' => 2, 'busy' => 0, 'budget' => 7, 'lock' => '/var/lib/dpkg/lock', 'fuser' => true], true).';';
-        foreach (['dpkgLocks.php', 'dpkgRecovery.php', 'environment.php'] as $module) {
+            'release' => 2, 'busy' => 0, 'budget' => 7, 'lock' => '/var/lib/dpkg/lock', 'fuser' => true,
+            'baseline' => '/fixture/selections', 'stage' => '/fixture/staged', 'lines' => ['alpha install']], true).';';
+        foreach (['dpkgLocks.php', 'dpkgRecovery.php', 'dpkgBaselineApply.php', 'environment.php'] as $module) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/'.$module, 'DpkgRecoveryFixture');
         }
         $script .= '$GLOBALS["clock"] = 0; $GLOBALS["busy"] = $GLOBALS["options"]["busy"];'
-            .'$GLOBALS["actions"] = $GLOBALS["logs"] = $GLOBALS["json"] = $GLOBALS["sleeps"] = []; $GLOBALS["cleaned"] = false;';
+            .'$GLOBALS["trace"] = $GLOBALS["actions"] = $GLOBALS["logs"] = $GLOBALS["json"] = $GLOBALS["sleeps"] = []; $GLOBALS["cleaned"] = false;';
         if (($options['entry'] ?? '') === 'step2') {
             // Execute the actual orchestrator recovery block without running step2's system setup.
             $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
@@ -159,7 +239,7 @@ PHP;
             $script .= '$ok = $GLOBALS["options"]["entry"] === "wait" ? pmssWaitForDpkgLocks($GLOBALS["options"]["budget"], 5) : pmssApplyDpkgSelections(12, true);';
         }
         $script .= 'echo json_encode(["ok" => $ok, "actions" => $GLOBALS["actions"], "logs" => $GLOBALS["logs"],'
-            .'"json" => $GLOBALS["json"], "time" => $GLOBALS["clock"], "sleeps" => $GLOBALS["sleeps"], "cleaned" => $GLOBALS["cleaned"]]);';
+            .'"json" => $GLOBALS["json"], "time" => $GLOBALS["clock"], "sleeps" => $GLOBALS["sleeps"], "cleaned" => $GLOBALS["cleaned"], "trace" => $GLOBALS["trace"]]);';
         return $this->pmssRunInlinePhpJson($script);
     }
 }

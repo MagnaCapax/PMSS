@@ -31,3 +31,24 @@ function pmssRecoverDpkgBaseline(string $description): bool
     return runStep($description, aptCmd('--fix-broken install -y')) === 0
         || pmssPrepareDpkgRecovery();
 }
+
+/**
+ * Finish any interrupted dpkg configuration runs.
+ */
+function pmssCompletePendingDpkg(): void
+{
+    // #TODO replace special-casing with a generic unit-unmask helper when more services require it.
+    $hasSystemd = pmssSystemdRuntimeAvailable();
+    if ($hasSystemd && pmssSystemdUnitState('is-enabled', 'proftpd.service') === 'masked') {
+        runCommand('systemctl unmask proftpd.service');
+    }
+
+    $rc = runStep('Completing pending dpkg configuration', dpkgCmd('--force-confdef --force-confold --configure -a'));
+    if ($rc === 0 || !pmssWaitForDpkgLocks(60, 1, 'package recovery')) {
+        return;
+    }
+    if ($hasSystemd) {
+        runStep('Unmasking proftpd for dpkg retry', 'systemctl unmask proftpd.service || true');
+    }
+    runStep('Retrying proftpd configure', dpkgCmd('--force-confdef --force-confold --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic').' || true');
+}
