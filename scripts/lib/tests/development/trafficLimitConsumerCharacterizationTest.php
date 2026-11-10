@@ -53,24 +53,18 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testTrafficLimitCronClearsUnlimitedBeforeReadingUsage(): void
     {
-        $source = file_get_contents(dirname(__DIR__, 4).'/scripts/cron/trafficLimits.php');
-        $clear = strpos($source, 'pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile)');
-        $usage = strpos($source, 'if (!file_exists($trafficDataFile)) {');
-
-        $this->assertTrue($clear !== false);
-        $this->assertTrue($usage !== false);
-        $this->assertTrue($clear < $usage);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/trafficLimits.php', [
+            'pmssTrafficLimitThrottleClearUnlimited($thisUser, $userTrafficLimitEnabledFile)',
+            'if (!file_exists($trafficDataFile)) {',
+        ]);
     }
 
     public function testTrafficLimitCronReconcilesThrottleWhenUsageDataUnavailable(): void
     {
-        $source = file_get_contents(dirname(__DIR__, 4).'/scripts/cron/trafficLimits.php');
-        $reconcile = strpos($source, 'pmssTrafficLimitThrottleReconcileWithoutUsage($thisUser, $userTrafficLimitEnabledFile, $trafficLimitPeriod)');
-        $usage = strpos($source, '$trafficLimit = (float) $trafficLimitState[\'effectiveLimitGiB\'];');
-
-        $this->assertTrue($reconcile !== false);
-        $this->assertTrue($usage !== false);
-        $this->assertTrue($reconcile < $usage);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/trafficLimits.php', [
+            'pmssTrafficLimitThrottleReconcileWithoutUsage($thisUser, $userTrafficLimitEnabledFile, $trafficLimitPeriod)',
+            '$trafficLimit = (float) $trafficLimitState[\'effectiveLimitGiB\'];',
+        ]);
     }
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void

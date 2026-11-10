@@ -137,9 +137,9 @@ final class AccountPathOperationStaticTest extends TestCase
             'pmssPathTargetIsSafe($dst, true, true)',
             'pmssAccountPathRun($localUser, $home, [$src, $dst], $command)',
         ]);
-        $source = $this->pmssReadRepoFile('scripts/lib/userTransfer/postSetup.php');
-        $this->assertTrue(strpos($source, "'Normalising user permissions'") < strpos($source, 'pmssUserTransferRenameRutorrentShare($home, $remoteUser, $localUser)'),
-            'Imported source ownership must be normalised before account rename');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/userTransfer/postSetup.php',
+            ["'Normalising user permissions'", 'pmssUserTransferRenameRutorrentShare($home, $remoteUser, $localUser)'], '',
+            'Imported source ownership must be normalised before account rename: ');
     }
 
     public function testWebRootDirectoryMovesRunUnderAccount(): void

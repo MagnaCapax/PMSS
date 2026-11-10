@@ -182,10 +182,8 @@ final class TorrentClientsP3LaunchTest extends TestCase
         symlink($home.'/lighttpd-real', $home.'/.lighttpd');
         $this->assertTrue(\pmssTransmissionSocketPathIsSymlink($socketPath));
 
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/cron/transmissionInstancesCheck.php');
-        $guard = strpos($source, 'if (pmssTransmissionSocketPathIsSymlink($socketPath)) continue;');
-        $connect = strpos($source, "stream_socket_client('unix://'.\$socketPath");
-        $this->assertTrue($guard !== false && $connect !== false && $guard < $connect);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/transmissionInstancesCheck.php',
+            ['if (pmssTransmissionSocketPathIsSymlink($socketPath)) continue;', "stream_socket_client('unix://'.\$socketPath"]);
     }
     public function testLighttpdRouteIsStaleOnlyWhenSelectionAndRenderedRouteDisagree(): void
     {
@@ -201,10 +199,8 @@ final class TorrentClientsP3LaunchTest extends TestCase
 
     public function testLighttpdWatchdogReconcilesTheRouteAndLaunchCliPreparesSettings(): void
     {
-        $watchdog = (string) file_get_contents($this->pmssRepoPath('scripts/cron/checkLighttpdInstances.php'));
-        $converge = strpos($watchdog, 'pmssLighttpdTransmissionRouteConverge($thisUser, $homeDir);');
-        $backoff = strpos($watchdog, "if (pmssUserWatchdogBackoffActive(\$thisUser, 'lighttpd')) continue;");
-        $this->assertTrue($converge !== false && $backoff !== false && $converge < $backoff);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkLighttpdInstances.php',
+            ['pmssLighttpdTransmissionRouteConverge($thisUser, $homeDir);', "if (pmssUserWatchdogBackoffActive(\$thisUser, 'lighttpd')) continue;"]);
         $cli = (string) file_get_contents($this->pmssRepoPath('etc/skel/www/torrentClientsResolve.php'));
         $this->assertStringContainsString('pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home)', $cli);
     }

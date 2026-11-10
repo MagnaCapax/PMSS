@@ -531,6 +531,9 @@ panel-session decisions, crontab ownership, installer self-update and watchdog
 lock handoff use these same helpers. Keep test methods,
 fragment bytes, ordering checks and per-fragment diagnostics at the callers;
 the protected common harness needs no change for additional adopters.
+First-occurrence ordering checks use `assertOrderedStrings()` or
+`pmssAssertRepoFileContainsOrderedStrings()` instead of local position variables.
+Keep offset searches and last-occurrence checks explicit; they have different semantics.
 Generated panel, route, quota, launch, preflight and PHP-ini text checks use
 `assertStringContainsAllStrings()` and `assertStringContainsAndOmitsStrings()`
 for repeated fragments, retaining caller-owned bytes and assertion order.

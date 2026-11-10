@@ -362,12 +362,9 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testTrafficLimitsCronKeepsThrottleWhenLimitUnreadable(): void
     {
-        $cron = (string) file_get_contents(dirname(__DIR__, 3).'/cron/trafficLimits.php');
-        $keep = strpos($cron, "if (\$trafficLimitState['limitUnreadable'])");
-        $clear = strpos($cron, 'pmssTrafficLimitThrottleClearUnlimited(');
-        $this->assertTrue($keep !== false, 'cron checks limitUnreadable');
-        $this->assertTrue($clear !== false, 'cron clears unlimited');
-        $this->assertTrue($keep < $clear, 'the unreadable check runs before the unlimited clear');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/trafficLimits.php',
+            ["if (\$trafficLimitState['limitUnreadable'])", 'pmssTrafficLimitThrottleClearUnlimited('], '',
+            'the unreadable check runs before the unlimited clear: ');
     }
 
     public function testTrafficLimitStateReadHandlesBaseAndBonusCases(): void

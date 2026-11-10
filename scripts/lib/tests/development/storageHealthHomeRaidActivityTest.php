@@ -253,8 +253,8 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testInfoRendersRaidNoticeBeforeStandingStatus(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/info.php');
-        $this->assertTrue(strpos($source, 'echo $pmssStorageHealthNoticeHtml') < strpos($source, 'echo $pmssStorageStatusHtml'));
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/info.php',
+            ['echo $pmssStorageHealthNoticeHtml', 'echo $pmssStorageStatusHtml']);
     }
 
 }

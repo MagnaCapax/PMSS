@@ -9,7 +9,7 @@ final class TorrentClientsP3ProxyTest extends TestCase
     private function render(bool $selected): string
     {
         $template = (string) file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd');
-        return \pmssLighttpdRenderUserConfig($template, 't', 30000, 0, 0,
+        return \pmssLighttpdRenderUserConfig($template, 'fixtur01', 30000, 0, 0,
             ['maxProcs' => 2, 'children' => 2], [], $selected);
     }
 
@@ -23,27 +23,26 @@ final class TorrentClientsP3ProxyTest extends TestCase
     public function testSelectedRoutePrecedesCustomIncludes(): void
     {
         $config = $this->render(true);
-        $route = strpos($config, '$HTTP["url"] =~ "^/user-t/transmission/"');
-        $custom = strpos($config, 'include "/home/t/.lighttpd/custom.d/*.conf"');
-        $this->assertTrue(is_int($route) && is_int($custom) && $route < $custom);
-        $this->assertStringContainsString('"socket" => "/home/t/.lighttpd/transmission.sock"', $config);
-        $this->assertStringContainsString('"/user-t/" =>', $config);
+        $this->assertOrderedStrings(['$HTTP["url"] =~ "^/user-fixtur01/transmission/"',
+            'include "/home/fixtur01/.lighttpd/custom.d/*.conf"'], $config);
+        $this->assertStringContainsString('"socket" => "/home/fixtur01/.lighttpd/transmission.sock"', $config);
+        $this->assertStringContainsString('"/user-fixtur01/" =>', $config);
     }
 
     public function testSelectionNeedsPublishedCapabilityWithoutHostSetup(): void
     {
         [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-p3-proxy-',
-            'transmission', '4.1.3', ['transmission-daemon' => 'fixture']);
+            'transmission', '4.1.3', ['transmission-daemon' => 'fixture'], 'fixtur01');
         symlink($store.'/transmission/4.1.3', $home.'/bin/transmission/default');
         $projection = $root.'/projection.json';
         $version = ['client' => 'transmission', 'version' => '4.1.3', 'kind' => 'static'];
         $this->pmssWriteFile($projection, json_encode(['versions' => [$version]]));
-        $this->assertFalse(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
+        $this->assertFalse(\pmssLighttpdTransmissionSelected('fixtur01', $home, $projection, $store));
         $version['rpcUnixSocket'] = true;
         $this->pmssWriteFile($projection, json_encode(['versions' => [$version]]));
-        $this->assertTrue(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
+        $this->assertTrue(\pmssLighttpdTransmissionSelected('fixtur01', $home, $projection, $store));
         unlink($store.'/transmission/4.1.3/transmission-daemon');
-        $this->assertFalse(\pmssLighttpdTransmissionSelected('t', $home, $projection, $store));
+        $this->assertFalse(\pmssLighttpdTransmissionSelected('fixtur01', $home, $projection, $store));
     }
 
     public function testRenderedRouteParsesWithLighttpdWhenAvailable(): void
@@ -52,7 +51,7 @@ final class TorrentClientsP3ProxyTest extends TestCase
         if ($binary === '') throw new SkipTest('lighttpd is unavailable');
         $root = $this->pmssMakeTempDir('pmss-p3-lighttpd-');
         $rendered = $this->render(true);
-        preg_match('/\$HTTP\["url"\] =~ "\^\/user-t\/transmission\/" \{[^}]+\}/', $rendered, $match);
+        preg_match('/\$HTTP\["url"\] =~ "\^\/user-fixtur01\/transmission\/" \{[^}]+\}/', $rendered, $match);
         $this->assertTrue(isset($match[0]));
         $config = 'server.modules = ( "mod_proxy" )' . "\n"
             .'server.document-root = "'.$root.'"' . "\n"

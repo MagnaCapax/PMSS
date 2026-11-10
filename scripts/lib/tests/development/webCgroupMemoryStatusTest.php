@@ -357,10 +357,8 @@ class WebCgroupMemoryStatusTest extends TestCase
             ['RAM THROTTLE ACTIVE', 'RAM LIMIT EXCEEDED', '$isThrottleActive', '$hasOomEvents']
         );
 
-        $this->assertTrue(
-            strpos($source, 'RAM THROTTLE ACTIVE') < strpos($source, 'RAM LIMIT EXCEEDED'),
-            'Throttle copy must be selected before the hard-limit/OOM warning copy.'
-        );
+        $this->assertOrderedStrings(['RAM THROTTLE ACTIVE', 'RAM LIMIT EXCEEDED'], $source, '',
+            'Throttle copy must be selected before the hard-limit/OOM warning copy: ');
     }
 
     public function testMemoryStatParserKeepsCgroupV1AndV2MemoryFields(): void
@@ -470,7 +468,7 @@ class WebCgroupMemoryStatusTest extends TestCase
         }
         $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
         foreach ($modules as $module) {
-            $this->assertTrue(strpos($source, "'www/".$module.".php'") < strpos($source, "'www/webCgroupMemoryStatus.php'"));
+            $this->assertOrderedStrings(["'www/".$module.".php'", "'www/webCgroupMemoryStatus.php'"], $source);
         }
     }
 

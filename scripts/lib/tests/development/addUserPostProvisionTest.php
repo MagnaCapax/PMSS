@@ -35,11 +35,9 @@ final class AddUserPostProvisionTest extends TestCase
     {
         // A node without the skeleton installer must still create ordinary accounts.
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/user/add/openclaw.php');
-        $loader = strpos($source, 'function pmssAddUserOpenClawInstallerLoad');
-        $require = strpos($source, 'require_once $installer;');
-        $guard = strpos($source, 'if (!is_file($installer) || is_link($installer)) return false;');
         // The only require sits inside the loader, after the missing-file guard.
-        $this->assertTrue($loader !== false && $guard !== false && $require !== false && $loader < $guard && $guard < $require);
+        $this->assertOrderedStrings(['function pmssAddUserOpenClawInstallerLoad',
+            'if (!is_file($installer) || is_link($installer)) return false;', 'require_once $installer;'], $source);
         $this->assertSame(1, substr_count($source, 'require_once'.' $installer;') + substr_count($source, "require_once dirname(__DIR__, 4)"));
     }
 

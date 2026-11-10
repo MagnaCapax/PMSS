@@ -68,12 +68,9 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
             'elif log_due "$now"; then',
             'rm -f "$FAIL_FILE" "$LOG_STATE" "$SUSTAINED_FILE" 2>/dev/null || true',
         ], $template);
-        $gate = strpos($template, 'if [ ! -f "$SUSTAINED_FILE" ]; then');
-        $boundary = strpos($template, 'log_line "SUSTAINED FAILURE');
-        $periodic = strpos($template, 'elif log_due "$now"; then');
-        $failure = strpos($template, 'exit 1');
-        $this->assertTrue($gate < $boundary && $boundary < $periodic && $periodic < $failure,
-            'The full sustained block must be gated while every sustained check still exits 1.');
+        $this->assertOrderedStrings(['if [ ! -f "$SUSTAINED_FILE" ]; then', 'log_line "SUSTAINED FAILURE',
+            'elif log_due "$now"; then', 'exit 1'], $template, '',
+            'The full sustained block must be gated while every sustained check still exits 1: ');
     }
 
     public function testNetworkCheckWritesRotatedEvidenceBeforeSyslog(): void
@@ -81,10 +78,8 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
 
         $this->assertStringContainsString('EVIDENCE_LOG="/var/log/pmss/check', $template);
-        $fileWrite = strpos($template, '>>"$EVIDENCE_LOG" 2>/dev/null || true');
-        $syslogWrite = strpos($template, 'logger -t "$LOG_TAG"');
-        $this->assertTrue($fileWrite !== false && $syslogWrite !== false && $fileWrite < $syslogWrite,
-            'The rotated file must be the first evidence sink.');
+        $this->assertOrderedStrings(['>>"$EVIDENCE_LOG" 2>/dev/null || true', 'logger -t "$LOG_TAG"'], $template, '',
+            'The rotated file must be the first evidence sink: ');
     }
 
     public function testNetworkCheckCapturesLocalDiscriminators(): void
