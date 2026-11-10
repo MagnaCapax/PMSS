@@ -59,15 +59,14 @@ class ErrorPageTemplateTest extends TestCase
 
     public function testErrorPageScriptKeepsPngDefaultAndImageBehavior(): void
     {
-        $contents = $this->pmssReadRepoFile('var/www/error-page.js');
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-page.js', [
             "getAttribute('data-error-image-ext') || 'png'",
             "['png', 'jpg', 'webp'].indexOf(extension)",
             "extension = 'png'", "'.' + extension",
             'Math.floor(Math.random() * count) + 1',
             "imageElement.style.display = 'none'",
             "link.href = '/css/error-styles.css'",
-        ], $contents);
+        ]);
     }
 
     public function testSuspendedPageInlineBackgroundMatchesBody(): void
@@ -154,8 +153,6 @@ class ErrorPageTemplateTest extends TestCase
 
     private function assertErrorPageImagePool(string $path, string $prefix, int $count): string
     {
-        $contents = $this->pmssReadRepoFile($path);
-        $this->assertStringContainsAllStrings(['data-error-image-prefix="'.$prefix.'"', 'data-error-image-count="'.$count.'"', '<script src="/error-page.js"></script>'], $contents);
-        return $contents;
+        return $this->pmssAssertRepoFileContainsAndOmitsStrings($path, ['data-error-image-prefix="'.$prefix.'"', 'data-error-image-count="'.$count.'"', '<script src="/error-page.js"></script>']);
     }
 }

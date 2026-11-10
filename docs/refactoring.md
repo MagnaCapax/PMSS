@@ -550,6 +550,11 @@ panel-session decisions, crontab ownership, installer self-update and watchdog
 lock handoff use these same helpers. Keep test methods,
 fragment bytes, ordering checks and per-fragment diagnostics at the callers;
 the protected common harness needs no change for additional adopters.
+Console, Deluge proxy, nginx defaults, bootstrap, mail and service-watchdog
+contracts also use those shared readers and assertions. Required, forbidden and
+ordered checks reuse one acquired source when combined; scoped parsing and
+generated-file observations retain their own reads. Individual test methods,
+fragment bytes and ordering diagnostics remain at their callers.
 First-occurrence ordering checks use `assertOrderedStrings()` or
 `pmssAssertRepoFileContainsOrderedStrings()` instead of local position variables.
 Keep offset searches and last-occurrence checks explicit; they have different semantics.

@@ -10,10 +10,7 @@ class installBootstrapSafetyTest extends TestCase
 
     protected function setUp(): void
     {
-        $path = $this->pmssRepoPath('install.sh');
-        $script = file_get_contents($path);
-        $this->assertTrue($script !== false, 'Failed to read install.sh');
-        $this->script = $script;
+        $this->script = $this->pmssReadRepoFile('install.sh');
     }
 
     public function testSnapshotCleanupAvoidsWildcardDelete(): void
@@ -310,16 +307,12 @@ BASH;
     }
     public function testSharedConvergenceRemainsInUpdateStep2(): void
     {
-        $path = $this->pmssRepoPath('scripts/util/update-step2.php');
-        $updateStep2 = file_get_contents($path);
-        $this->assertTrue($updateStep2 !== false, 'Failed to read update-step2.php');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
             "['Applying hostname configuration', 'pmssApplyHostnameConfig'",
             "['Configuring quota mounts', 'pmssConfigureQuotaMount'",
             "['Applying boot defaults', 'pmssEnsureBootDefaults'",
             "['Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline'",
             "['Configuring root shell defaults', 'pmssConfigureRootShellDefaults'",
-        ], $updateStep2);
+        ]);
     }
 }

@@ -54,10 +54,8 @@ class SupportMailTest extends TestCase
 
     public function testMailLoadsStreamWriterWithoutDiagnostics(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/support/mail.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/stream.php';", $source);
-        $this->assertStringNotContainsString("require_once __DIR__.'/diagnostics.php';", $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/support/mail.php',
+            ["require_once __DIR__.'/stream.php';"], ["require_once __DIR__.'/diagnostics.php';"]);
     }
 
     public function testStreamWriteAllWritesFullPayload(): void

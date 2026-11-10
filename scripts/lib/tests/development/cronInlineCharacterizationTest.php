@@ -46,8 +46,7 @@ class CronInlineCharacterizationTest extends TestCase
             "exec('systemctl reload nginx 2>&1 || /etc/init.d/nginx reload 2>&1', \$reloadOut, \$reloadRc);",
             "\$cmd = 'certbot '.pmssCommandArgvShellQuote(\$args)",
         ], $source, 'ACME must use the activated current vhost: ');
-        $this->assertStringContainsString('if ($configRc !== 0)', $source);
-        $this->assertStringContainsString('if ($reloadRc !== 0)', $source);
+        $this->assertStringContainsAllStrings(['if ($configRc !== 0)', 'if ($reloadRc !== 0)'], $source);
     }
 
     public function testBootTuningUsesSharedManagedPathWrites(): void
@@ -84,7 +83,7 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkLighttpdInstances.php', [
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkLighttpdInstances.php', [
             "require_once __DIR__.'/../lib/runtime.php';",
             "pmssCronLockAcquire('checkLighttpdInstances', \$onBusy, 'pmssUserWatchdogLockAcquire')",
             "require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';",
@@ -111,7 +110,7 @@ class CronInlineCharacterizationTest extends TestCase
         $this->assertOrderedStrings([
             "pmssCronLockAcquire('checkLighttpdInstances', \$onBusy, 'pmssUserWatchdogLockAcquire')",
             "pmssUserWatchdogServiceSpec('lighttpd'",
-        ], $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php'), 'lighttpd shared lock-fd close contract: ');
+        ], $source, 'lighttpd shared lock-fd close contract: ');
         // Socket decision wiring moved intact behind the cron-facing helper.
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/watchdogSocketHealth.php', [
             'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
@@ -122,14 +121,12 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testMediaStackWatchdogKeepsRootGuardAndUserLoopSingleInstance(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/cron/mediaStackInstancesCheck.php');
-
-        $this->assertOrderedStrings([
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/mediaStackInstancesCheck.php', [
             'pmssRootGuardAuditAndKill(',
             "\$pmssMediaStackInstancesLock = pmssCronLockAcquire('mediaStackInstancesCheck'",
             'return $rootGuardFindings > 0 ? 1 : 0;',
             "foreach (\$result['users'] as \$username) {",
-        ], $source, 'media-stack watchdog guard contract: ');
+        ], 'media-stack watchdog guard contract: ');
     }
 
     public function testWireguardSyncconfRejectsPartialTempfileWrites(): void

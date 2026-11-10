@@ -20,16 +20,14 @@ class WatchdogInstallerSafetyTest extends TestCase
 
     public function testWatchdogDeviceRewriteFailureStopsBeforeEnable(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/watchdog.php');
-        $this->assertStringContainsString(
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/watchdog.php', [
             "logMessage('[WARN] Unable to update watchdog device path; leaving service disabled.');\n            return;\n",
-            $source
-        );
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/watchdog.php', [
+        ]);
+        $this->assertOrderedStrings([
             "!pmssFileWriteComplete('/etc/watchdog.conf', \$updated)",
             "logMessage('[WARN] Unable to update watchdog device path; leaving service disabled.');",
             "runStep('Enabling watchdog service'",
-        ]);
+        ], $source);
     }
 
     public function testAlternateDeviceRequiresReadableAndRewritableConfiguration(): void
@@ -47,24 +45,21 @@ class WatchdogInstallerSafetyTest extends TestCase
 
     public function testMaskedAndDevicelessUnitsAreHandledBeforeInstallation(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/watchdog.php');
-        $this->assertStringContainsAllStrings([
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/watchdog.php', [
             'function pmssWatchdogDevice(array $candidates',
             'file_exists($candidate)',
             "filetype(\$candidate) === 'char'",
             "pmssSystemdUnitState('is-enabled', 'watchdog.service') === 'masked'",
             "pmssSystemdUnitState('is-enabled', 'watchdog.service') === 'enabled'",
             'systemctl disable --now watchdog.service',
-        ], $source);
-        $this->assertStringNotContainsString('is_file(\'/dev/watchdog', $source);
-        $this->assertStringNotContainsString('systemctl unmask watchdog', $source);
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/watchdog.php', [
+        ], ['is_file(\'/dev/watchdog', 'systemctl unmask watchdog']);
+        $this->assertOrderedStrings([
             "pmssSystemdUnitState('is-enabled', 'watchdog.service') === 'masked'",
             "\$device = pmssWatchdogDevice();",
             "if (\$device === '') {",
             'systemctl disable --now watchdog.service',
             "['Installing watchdog configuration'",
             "runStep('Enabling watchdog service'",
-        ]);
+        ], $source);
     }
 }

@@ -132,11 +132,9 @@ class UserSystemdWatchdogTest extends TestCase
 
     public function testCronAndSkeletonUseTheExistingPerUserFlow(): void
     {
-        $cron = $this->pmssReadRepoFile('scripts/cron/mediaStackInstancesCheck.php');
-        $seed = $this->pmssReadRepoFile('etc/skel/.config/systemd/user/.gitkeep');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/userSystemdWatchdog.php';", $cron);
+        $cron = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/mediaStackInstancesCheck.php',
+            ["require_once __DIR__.'/../lib/userSystemdWatchdog.php';"]);
         $this->assertOrderedStrings(['pmssMediaStackWatchdogRunUser(', 'pmssUserSystemdWatchdogRunUser('], $cron);
-        $this->assertStringContainsString('standard systemd user-unit directory', $seed);
+        $this->pmssAssertRepoFileContainsString('etc/skel/.config/systemd/user/.gitkeep', 'standard systemd user-unit directory');
     }
 }

@@ -31,35 +31,29 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testNginxUserTemplateDelugeLegacyHasExactRedirectWithoutSlash(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-
-        $this->assertStringContainsString('location = /deluge-##username {', $template);
-        $this->assertStringContainsString('return 308 /deluge-##username/$is_args$args;', $template);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.nginx-user', [
+            'location = /deluge-##username {',
+            'return 308 /deluge-##username/$is_args$args;',
+        ]);
     }
 
     public function testNginxUserTemplateDelugeLegacyProxyLocationExists(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-
-        $this->assertStringContainsAllStrings(['location /deluge-##username/ {', 'proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;', 'include /etc/nginx/proxy_params;'], $template);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.nginx-user', ['location /deluge-##username/ {', 'proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;', 'include /etc/nginx/proxy_params;']);
     }
 
     public function testNginxUserTemplateDelugeCanonicalCookiePathIsNormalized(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-
         // Normalize doubled cookie paths caused by lighttpd map-urlpath rewrites.
-        $this->assertStringContainsString(
-            'proxy_cookie_path ~^/user-##username/deluge/user-##username/deluge/.* /user-##username/deluge/;',
-            $template
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/template.nginx-user',
+            'proxy_cookie_path ~^/user-##username/deluge/user-##username/deluge/.* /user-##username/deluge/;'
         );
     }
 
     public function testNginxUserTemplateDelugeLegacyDoesNotUseRegexRedirectForSubpaths(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-
-        $this->assertStringNotContainsString('location ~ ^/deluge-##username/(.*)$ {', $template);
+        $this->pmssAssertRepoFileNotContainsString('etc/seedbox/config/template.nginx-user', 'location ~ ^/deluge-##username/(.*)$ {');
     }
 
     public function testNginxUserTemplateDelugeLegacyRedirectPreservesQueryString(): void
@@ -84,19 +78,16 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testNginxUserTemplateDelugeLegacyRedirectKeepsDeprecationMarker(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-        $this->assertStringContainsString('Keep for compatibility until at least 2028-01-28', $template);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.nginx-user', 'Keep for compatibility until at least 2028-01-28');
     }
 
     public function testNginxUserTemplateDelugeLegacyDoesNotProxyToDelugeWebPort(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-
         // Regression guard: legacy configs proxied directly to deluge-web.
-        $this->assertStringContainsAndOmitsStrings([], [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/template.nginx-user', [], [
             '##delugeWebPort' => 'nginx user template must not use delugeWebPort placeholder',
             'proxy_pass http://127.0.0.1:##delugeWebPort' => 'nginx must not proxy deluge-web directly',
-        ], $template);
+        ]);
     }
 
     public function testNginxUserTemplateDelugeLegacyRedirectIsNotAnOpenRedirect(): void
@@ -124,19 +115,15 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigAddsBaseHostnameToDefaultServerName(): void
     {
-        $script = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
-
         // Regression guard: base-host requests (FQDN) must land on the main vhost
         // where /etc/nginx/users/* is included (legacy Deluge redirects live there).
-        $this->assertStringContainsAllStrings(["'server_name localhost;'", "'server_name localhost '.\$subdomainBase.';'"], $script);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/setup.php', ["'server_name localhost;'", "'server_name localhost '.\$subdomainBase.';'"]);
     }
 
     public function testCreateNginxConfigStillSupportsLegacyDelugeWebPortPlaceholder(): void
     {
-        $generator = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
-
         // Backward compat: older nginx user templates may still use ##delugeWebPort.
-        $this->assertStringContainsAllStrings(["strpos(\$template, '##delugeWebPort')", "\$replacements['##delugeWebPort']"], $generator);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', ["strpos(\$template, '##delugeWebPort')", "\$replacements['##delugeWebPort']"]);
     }
 
     public function testCreateNginxConfigDelugeWebPortPlaceholderUsesThePortReservation(): void
@@ -144,9 +131,9 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $script = $this->pmssReadRepoExecutableSource('scripts/lib/nginxConfig/userConfigsGenerate.php');
 
         // The legacy placeholder takes the root port-manager reservation, never a file in the home (ADR 0213).
-        $this->assertStringContainsString("pmssReadRegularFileNetworkPort(\$runtimePortDir.'/deluge-web-'.\$user) ?? 1", $script);
-        $this->assertStringNotContainsString("'/.delugePort'", $script);
-        $this->assertStringNotContainsString("'/.delugeWebPort'", $script);
+        $this->assertStringContainsAndOmitsStrings([
+            "pmssReadRegularFileNetworkPort(\$runtimePortDir.'/deluge-web-'.\$user) ?? 1",
+        ], ["'/.delugePort'", "'/.delugeWebPort'"], $script);
     }
 
     // =========================================================================
@@ -390,20 +377,17 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeWebTemplateBaseIsCanonical(): void
     {
-        $tpl = $this->pmssReadRepoFile('etc/seedbox/config/template.deluge.web.conf');
-        $this->assertStringContainsAndOmitsStrings(['"base": "/user-##USER/deluge/"'], ['"/deluge-##USER/"'], $tpl);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/template.deluge.web.conf', ['"base": "/user-##USER/deluge/"'], ['"/deluge-##USER/"']);
     }
 
     public function testDelugeWebTemplateDisablesFirstLoginWizard(): void
     {
-        $tpl = $this->pmssReadRepoFile('etc/seedbox/config/template.deluge.web.conf');
-        $this->assertStringContainsString('"first_login": false', $tpl);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.deluge.web.conf', '"first_login": false');
     }
 
     public function testDelugeWebTemplateUsesBoundedSessionTimeout(): void
     {
-        $tpl = $this->pmssReadRepoFile('etc/seedbox/config/template.deluge.web.conf');
-        $this->assertStringContainsString('"session_timeout": 3600', $tpl);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.deluge.web.conf', '"session_timeout": 3600');
     }
 
     public function testCreateNginxConfigUsesScopedWebdavProxyParamsInWebdavBlocks(): void
@@ -417,8 +401,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testWebdavLocationsAllowLargeUploads(): void
     {
-        $userTpl = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-        $this->assertStringContainsAllStrings(['location /webdav-##username/', 'client_max_body_size 0;'], $userTpl);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.nginx-user', ['location /webdav-##username/', 'client_max_body_size 0;']);
 
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $templates = \pmssNginxUserSubdomainTemplates();

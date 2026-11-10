@@ -11,16 +11,9 @@ namespace PMSS\Tests;
  */
 class BrowserConsoleArtifactsTest extends TestCase
 {
-    private function repoFile(string $rel): string
-    {
-        $path = dirname(__DIR__, 4).'/'.$rel;
-        $this->assertTrue(is_file($path), "missing artifact: {$rel}");
-        return (string) file_get_contents($path);
-    }
-
     public function testInstallerUsesPinnedChecksumPath(): void
     {
-        $src = $this->repoFile('scripts/lib/update/apps/ttyd.php');
+        $src = $this->pmssReadRepoFile('scripts/lib/update/apps/ttyd.php');
         // Pinned version + SHA256 + arch gate + supported fetch helper (no ad-hoc curl|bash).
         $this->assertStringContainsString('1.7.7', $src);
         $this->assertMatches('/[a-f0-9]{64}/', $src, 'ttyd installer must pin a SHA256');
@@ -30,7 +23,7 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testLauncherKeepsCustomerTreeSeparation(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
         // AGENTS.md INVIOLABLE: customer-facing PHP must never require/include from
         // the operator-only /scripts/ tree. console.php is designed self-contained,
         // so assert it carries no include/require statement at all (strongest form).
@@ -42,7 +35,7 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testLauncherExportsHomeForTheSpawnedShell(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
         $cd = strpos($src, "'cd '.escapeshellarg(\$home)");
         $export = strpos($src, "'export HOME='.escapeshellarg(\$home)");
         $cmd = strpos($src, "\$cmd.' </dev/null");
@@ -55,14 +48,14 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testLauncherLivenessProbeIsNotAProcessMatch(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
         $this->assertStringNotContainsString('pgrep', $src);
         $this->assertStringContainsString("stream_socket_client('unix://'", $src);
     }
 
     public function testLauncherSocketProbeDistinguishesStaleFromLive(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
         $this->assertTrue(
             preg_match('/^function pmssConsoleSocketLive\(.*?^\}$/ms', $src, $match) === 1,
             'console.php must define a standalone pmssConsoleSocketLive function'
@@ -92,7 +85,7 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testLauncherIsUnprivilegedAndInjectionSafe(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
         // Loopback UNIX socket, origin-checked, and no root.
         $this->assertStringContainsAndOmitsStrings(['console.sock', '--check-origin'], ['sudo', ' su '], $src);
         // Mode is a fixed enum: request data must not build the spawned command.
@@ -105,43 +98,37 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testLauncherFailsSoftWhenGatewayAbsent(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
         // Disabled-path behaviour: guard on the binary before spawning.
-        $this->assertStringContainsAllStrings(['is_executable', '--once'], $src);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/console.php', ['is_executable', '--once']);
     }
 
     public function testLauncherReportsSocketSpawnFailure(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
         // A failed detached spawn must not fall through to a guaranteed proxy 503.
-        $this->assertStringContainsAllStrings(['console-error.log', 'error_log(', 'http_response_code(503)',
-            'Try again'], $src);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/console.php', ['console-error.log', 'error_log(', 'http_response_code(503)',
+            'Try again']);
     }
 
     public function testEndedSessionReturnsToLauncher(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
-        $this->assertStringContainsAllStrings(['disableReconnect=true', 'querySelectorAll(".xterm > div")',
-            'Press ⏎ to Reconnect', 'window.location.reload()'], $src);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/console.php', ['disableReconnect=true', 'querySelectorAll(".xterm > div")',
+            'Press ⏎ to Reconnect', 'window.location.reload()']);
     }
 
     public function testProxyBlockUsesLoopbackSocketUpgrade(): void
     {
-        $src = $this->repoFile('etc/seedbox/config/template.lighttpd');
-        $this->assertStringContainsAllStrings(['^/user-##username/console/', 'console.sock', '"upgrade" => "enable"'], $src);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.lighttpd', ['^/user-##username/console/', 'console.sock', '"upgrade" => "enable"']);
     }
 
     public function testConsoleButtonIsAdditive(): void
     {
-        $src = $this->repoFile('etc/skel/www/info.php');
-        $this->assertStringContainsString('console.php', $src);
         // Must not have removed the existing stats include.
-        $this->assertStringContainsString('stats.php', $src);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/info.php', ['console.php', 'stats.php']);
     }
 
     public function testConsoleButtonRequiresLocalAndBackendArtifacts(): void
     {
-        $src = $this->repoFile('etc/skel/www/info.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/info.php');
         // guiv may heal info.php before console.php reaches the same user tree;
         // hide the buttons unless both the launcher and system-wide backend exist.
         $this->assertMatches(
@@ -153,7 +140,7 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testConsoleBlockDoesNotReusePortfolioFlexContainer(): void
     {
-        $src = $this->repoFile('etc/skel/www/info.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/info.php');
         // The info page already has an outer .portfoliobox flex row for stats.
         // The console block must stay a plain block so its heading/body/buttons stack.
         $this->assertStringContainsString('id="pmss-console"', $src);
@@ -169,13 +156,12 @@ class BrowserConsoleArtifactsTest extends TestCase
         // only if it is listed in pmssUserApplySkeletonFiles()'s distribution
         // allowlist. Without this, the info.php "Open console" button 404s for every
         // current customer (caught on first fleet deploy to arkstream).
-        $src = $this->repoFile('scripts/lib/update/users/filesystem.php');
-        $this->assertStringContainsString("'www/console.php'", $src);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/console.php'");
     }
 
     private function loadLifecycleHelpers(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
         foreach (array('pmssConsoleTtydProcesses', 'pmssConsoleSpawnAllowed') as $function) {
             $this->assertTrue(preg_match('/^function '.$function.'\(.*?^\}$/ms', $src, $match) === 1);
             if (!function_exists($function)) eval($match[0]);
@@ -286,7 +272,7 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testConsoleSerializesProbeCleanupAndSpawn(): void
     {
-        $src = $this->repoFile('etc/skel/www/console.php');
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
         $lock = strpos($src, 'LOCK_EX | LOCK_NB');
         $probe = strpos($src, '$running = pmssConsoleSocketLive($sock)');
         $cleanup = strpos($src, 'if (!pmssConsoleSpawnAllowed(');

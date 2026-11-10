@@ -31,8 +31,7 @@ class UserPermissionsFailureTest extends TestCase
 
     public function testRecreateUserKeepsPermissionRepairAdvisory(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/recreateUser.php');
-        $this->assertStringContainsString("pmssRun('/scripts/util/userPermissions.php '", $source);
-        $this->assertStringNotContainsString("pmssRunOrExit('/scripts/util/userPermissions.php '", $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/recreateUser.php',
+            ["pmssRun('/scripts/util/userPermissions.php '"], ["pmssRunOrExit('/scripts/util/userPermissions.php '"]);
     }
 }
