@@ -22,8 +22,14 @@ class UserWebRootReconcileTest extends TestCase
         $this->pmssEnsureDir($this->home.'/data');
         $this->skeleton = $this->pmssMakeTempDir('pmss-web-reconcile-skel-').'/www';
         $this->config = $this->pmssMakeTempDir('pmss-web-reconcile-config-');
-        $this->pmssSeedSkeleton();
-        $this->pmssSeedRutorrentTemplates();
+        $this->pmssWriteFiles($this->skeleton, [
+            'index.php' => 'panel', 'rutorrent/index.html' => 'rutorrent',
+            'rutorrent/conf/config.php' => 'skeleton-config',
+        ]);
+        $this->pmssCreateSymlinkOrSkip('../data', $this->skeleton.'/data');
+        $this->pmssWriteFiles($this->config, [
+            'template.rutorrent.config' => '$scgi_host = "";', 'template.rutorrent.access' => 'access',
+        ]);
         $this->pmssTrackEnvOverrides([
             'PMSS_SKEL_DIR' => dirname($this->skeleton),
             'PMSS_CONFIG_DIR' => $this->config,
@@ -288,16 +294,4 @@ class UserWebRootReconcileTest extends TestCase
         return $snapshot;
     }
 
-    private function pmssSeedSkeleton(): void
-    {
-        $this->pmssWriteFile($this->skeleton.'/index.php', 'panel');
-        $this->pmssWriteFile($this->skeleton.'/rutorrent/index.html', 'rutorrent');
-        $this->pmssWriteFile($this->skeleton.'/rutorrent/conf/config.php', 'skeleton-config');
-        $this->pmssCreateSymlinkOrSkip('../data', $this->skeleton.'/data');
-    }
-    private function pmssSeedRutorrentTemplates(): void
-    {
-        $this->pmssWriteFile($this->config.'/template.rutorrent.config', '$scgi_host = "";');
-        $this->pmssWriteFile($this->config.'/template.rutorrent.access', 'access');
-    }
 }

@@ -23,20 +23,11 @@ class HomeInodeDensityTest extends TestCase
         return $messages;
     }
 
-    private function runHomeInodeDensityCheckWithStat(array $statOutput, string $prefix): array
-    {
-        $home = $this->pmssMakeTempDir($prefix.'home-');
-        $binDir = $this->pmssMakeLineOutputStub('stat', $statOutput, $prefix.'bin-');
-        return $this->runHomeInodeDensityCheck($home, $binDir);
-    }
-
     private function runUpdateStep2PreflightChecks(array $homePaths, array $lockPaths, array $cachePaths, float $minBytes = 1.0): array
     {
-        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($homePaths, $lockPaths, $cachePaths, $minBytes): bool {
+        return $this->pmssArrayLoggerCapture(function (callable $logger) use ($homePaths, $lockPaths, $cachePaths, $minBytes): bool {
             return \pmssUpdateStep2PreflightChecks($logger, $homePaths, $lockPaths, $cachePaths, '', $minBytes);
         });
-
-        return [$result, $messages];
     }
 
     public function testParsesStatLineAndComputesBytesPerInode(): void
@@ -108,7 +99,9 @@ class HomeInodeDensityTest extends TestCase
         // A wrapped integer must never turn an extreme density into an OK result.
         $overflow = PHP_INT_MAX.'0';
         foreach (["$overflow 1 1", "1 $overflow 1", "1 1 $overflow", PHP_INT_MAX.' 2 1', PHP_INT_MAX.' '.PHP_INT_MAX.' 1'] as $line) {
-            $messages = $this->runHomeInodeDensityCheckWithStat([$line], 'pmss-inode-overflow-');
+            $home = $this->pmssMakeTempDir('pmss-inode-overflow-home-');
+            $binDir = $this->pmssMakeLineOutputStub('stat', [$line], 'pmss-inode-overflow-bin-');
+            $messages = $this->runHomeInodeDensityCheck($home, $binDir);
             $this->assertSame(1, count($messages));
             $this->pmssAssertMessagesContain($messages, '[WARN] Unable to parse home inode density from stat output');
         }
@@ -116,14 +109,18 @@ class HomeInodeDensityTest extends TestCase
 
     public function testLogsOkWhenInodeDensityIsBelowThreshold(): void
     {
-        $messages = $this->runHomeInodeDensityCheckWithStat(['4096 1024 128'], 'pmss-inode-ok-');
+        $home = $this->pmssMakeTempDir('pmss-inode-ok-home-');
+        $binDir = $this->pmssMakeLineOutputStub('stat', ['4096 1024 128'], 'pmss-inode-ok-bin-');
+        $messages = $this->runHomeInodeDensityCheck($home, $binDir);
 
         $this->pmssAssertMessagesContain($messages, '[OK] Home inode density');
     }
 
     public function testLogsWarnWhenInodeDensityExceedsThreshold(): void
     {
-        $messages = $this->runHomeInodeDensityCheckWithStat(['4096 1048576 1024'], 'pmss-inode-warn-');
+        $home = $this->pmssMakeTempDir('pmss-inode-warn-home-');
+        $binDir = $this->pmssMakeLineOutputStub('stat', ['4096 1048576 1024'], 'pmss-inode-warn-bin-');
+        $messages = $this->runHomeInodeDensityCheck($home, $binDir);
 
         $this->pmssAssertMessagesContain($messages, '[WARN] Home inode density');
         $this->pmssAssertMessagesContain($messages, 'media-stack workloads may exhaust inodes');

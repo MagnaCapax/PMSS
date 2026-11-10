@@ -13,9 +13,7 @@ class MediaStackPanelTest extends TestCase
 
     private function mediaHomeCreate(string $prefix): string
     {
-        $home = $this->pmssMakeTempDir($prefix);
-        $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
-        return $home;
+        return $this->pmssWriteFiles($this->pmssMakeTempDir($prefix), ['install-media-stack.sh' => "#!/bin/bash\nexit 0\n"]);
     }
 
     private function mediaStatusRead(string $home): array

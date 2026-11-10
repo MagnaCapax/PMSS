@@ -30,18 +30,6 @@ class rtorrentWatchdogDecisionTest extends TestCase
         $this->assertFalse(file_exists($this->wedgeStatePath()), $label.' must not advance queue wedge count');
     }
 
-    private function writeWatchdogStateFiles(array $state): void
-    {
-        foreach ($state as $path) {
-            $this->pmssWriteFile($path, '1');
-        }
-    }
-
-    private function escalatedStatePaths(): array
-    {
-        return \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
-    }
-
     public function testCronLogHonorsForceAndDebugFlags(): void
     {
         $this->assertSame('', $this->pmssCaptureStdout(static function (): void {
@@ -74,7 +62,7 @@ class rtorrentWatchdogDecisionTest extends TestCase
     public function testClearResolvedWatchdogStatePreservesExistingMarkerSemantics(): void
     {
         $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
-        $this->writeWatchdogStateFiles($state);
+        $this->pmssWriteFiles('/', array_fill_keys($state, '1'));
 
         \rtorrentProcessClearResolvedWatchdogState($state, true, false);
         $this->assertFalse(file_exists($state['missing']), 'missing marker clears once rtorrent is present');
@@ -83,7 +71,7 @@ class rtorrentWatchdogDecisionTest extends TestCase
             $this->assertFalse(file_exists($state[$key]), $key.' clears once start path has resolved');
         }
 
-        $this->writeWatchdogStateFiles($state);
+        $this->pmssWriteFiles('/', array_fill_keys($state, '1'));
         \rtorrentProcessClearResolvedWatchdogState($state, false, false);
         $this->assertFalse(file_exists($state['missing']), 'missing marker clears when no executor remains');
         $this->assertFalse(file_exists($state['acceptQueueWedge']), 'queue wedge marker clears when rtorrent is gone');
@@ -122,7 +110,7 @@ PHP;
 
     public function testEscalationEncodingFailurePreservesExistingAndAbsentMarkers(): void
     {
-        $path = $this->escalatedStatePaths()['escalation'];
+        $path = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01')['escalation'];
         $original = '{"timestamp":900,"user":"fixtur01","count":6}';
         // Invalid UTF-8 at each position and truncated/overlong sequences fail encoding.
         foreach (["\xfffixtur01", "fix\xfftur01", "fixtur01\xff", "\xc3", "\xc0\xaf"] as $user) {
@@ -139,7 +127,7 @@ PHP;
 
     public function testEscalationEncodingPreservesLegacyBytes(): void
     {
-        $path = $this->escalatedStatePaths()['escalation'];
+        $path = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01')['escalation'];
         foreach ([
             ['fixtur01', 'fixtur01'],
             ['', ''],
@@ -155,7 +143,7 @@ PHP;
 
     public function testEscalationRetryStateUsesMarkerTimestamp(): void
     {
-        $state = $this->escalatedStatePaths();
+        $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
 
         $this->assertSame(['action' => 'record', 'age' => 0], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1000));
 
@@ -172,7 +160,7 @@ PHP;
 
     public function testEscalatedStartFailureRetriesOnceAfterBoundedIntervalAndClearsOnSuccess(): void
     {
-        $state = $this->escalatedStatePaths();
+        $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time() - 3600);
         $attempts = 0;
         $logger = static function (string $message, bool $force = false): void {};
@@ -200,7 +188,7 @@ PHP;
 
     public function testEscalatedStartFailureWaitsBeforeBoundedInterval(): void
     {
-        $state = $this->escalatedStatePaths();
+        $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time());
         $before = (string) file_get_contents($state['escalation']);
         $attempts = 0;
@@ -228,7 +216,7 @@ PHP;
 
     public function testEscalatedStartFailureRearmsAfterFailedOneShot(): void
     {
-        $state = $this->escalatedStatePaths();
+        $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time() - 3600);
         $before = time();
         $attempts = 0;
