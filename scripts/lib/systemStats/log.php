@@ -8,7 +8,7 @@ function pmssSystemStatsLogLine(array $stats, ?string $timestamp = null): string
     $line = $timestamp ?? date('Ymd H:i:s');
     foreach ([
         'load' => 'load', 'cpu_iowait' => 'cpuIowait', 'mem_total' => 'memTotal', 'mem_free' => 'memFree',
-        'mem_cache' => 'memCache', 'mem_buffers' => 'memBuffers', 'swap_total' => 'swapTotal', 'swap_free' => 'swapFree', 'disk_busy' => 'diskBusy', 'ioping_root' => 'iopingRoot', 'ioping_home' => 'iopingHome', 'top_mem' => 'topMem', 'psi_io' => 'psiIo', 'psi_mem' => 'psiMem',
+        'mem_cache' => 'memCache', 'mem_buffers' => 'memBuffers', 'swap_total' => 'swapTotal', 'swap_free' => 'swapFree', 'disk_busy' => 'diskBusy', 'ioping_root' => 'iopingRoot', 'ioping_home' => 'iopingHome', 'top_mem' => 'topMem', 'psi_io' => 'psiIo', 'psi_mem' => 'psiMem', 'jbd2_home' => 'jbd2Home',
     ] as $label => $key) {
         $line .= ' | '.$label.':'.(string) ($stats[$key] ?? 'na');
     }

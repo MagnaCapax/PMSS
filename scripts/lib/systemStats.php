@@ -42,5 +42,6 @@ function pmssSystemStatsCollect(): array
         'topMem'      => pmssSystemStatsTopMemoryProcesses(),
         'psiIo'       => pmssSystemStatsPsiRead('/proc/pressure/io'),
         'psiMem'      => pmssSystemStatsPsiRead('/proc/pressure/memory'),
+        'jbd2Home'    => pmssSystemStatsJbd2HomeRead(),
     ];
 }

@@ -25,6 +25,7 @@ function pmssCommandPath($name) { $GLOBALS['events'][] = $name; return $GLOBALS[
 function pmssSystemStatsIopingMs($path) { $GLOBALS['events'][] = $path; return '1.2ms'; }
 function pmssSystemStatsTopMemoryProcesses() { $GLOBALS['events'][] = 'ps'; return 'cron:1K'; }
 function pmssSystemStatsPsiRead($path) { $GLOBALS['events'][] = $path; return 'na'; }
+function pmssSystemStatsJbd2HomeRead() { $GLOBALS['events'][] = 'jbd2'; return 'na'; }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats.php', 'HostStatsCollectionFixture');
         $script .= <<<'PHP'
@@ -42,9 +43,10 @@ PHP;
             $expected = ['load' => '1.00,2.50,0', 'cpuIowait' => '0.0']
                 + array_combine(['memTotal', 'memFree', 'memCache', 'memBuffers', 'swapTotal', 'swapFree'], $values)
                 + ['diskBusy' => '0.0', 'iopingRoot' => $ioping ? '1.2ms' : 'na', 'iopingHome' => $ioping ? '1.2ms' : 'na',
-                    'topMem' => 'cron:1K', 'psiIo' => 'na', 'psiMem' => 'na'];
+                    'topMem' => 'cron:1K', 'psiIo' => 'na', 'psiMem' => 'na', 'jbd2Home' => 'na'];
+            // The journal read is the last probe, after every pre-existing one.
             $events = array_merge(['/proc/stat', '/proc/diskstats', 50000, '/proc/stat', '/proc/diskstats', 'memory', 'ioping', '/proc/loadavg'],
-                $ioping ? ['/', '/home'] : [], ['ps', '/proc/pressure/io', '/proc/pressure/memory']);
+                $ioping ? ['/', '/home'] : [], ['ps', '/proc/pressure/io', '/proc/pressure/memory', 'jbd2']);
             $this->assertSame([$expected, $events], $this->pmssRunInlinePhpJson($script, [
                 'PMSS_TEST_HOST_COLLECTION' => json_encode([$memory, $ioping]),
             ]));

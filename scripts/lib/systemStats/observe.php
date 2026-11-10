@@ -1,6 +1,7 @@
 <?php
 /** Host-statistics observations; parsers and log publication stay separate. @license GPL-3.0-only */
 require_once __DIR__.'/parse.php';
+require_once __DIR__.'/jbd2.php';
 
 /**
  * Collect the bounded top-memory process summary while checking command rc.
@@ -26,3 +27,20 @@ function pmssSystemStatsPsiRead(string $path): string { return is_readable($path
 
 /** Format optional representative ioping latency for the stats log. */
 function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingMedianMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
+
+/**
+ * Read the jbd2 journal counters of the filesystem mounted at /home as the `jbd2_home` field.
+ *
+ * Resolves /home through mountinfo's major:minor to the kernel block name (the journal's
+ * device name, which differs from the md/dm/nvme name shown by mount) and reads the single
+ * matching /proc/fs/jbd2 directory. Not a separate ext3/ext4 mount, no journal directory, or any
+ * unreadable step degrades to `na`. Paths are parameters only so tests stay hermetic.
+ */
+function pmssSystemStatsJbd2HomeRead(string $mountinfo = '/proc/self/mountinfo', string $sysDevBlock = '/sys/dev/block', string $jbd2Root = '/proc/fs/jbd2'): string
+{
+    $majorMinor = pmssSystemStatsJbd2HomeDeviceFromMountinfo(pmssReadRegularFileContents($mountinfo));
+    $link = $majorMinor === null ? false : @readlink($sysDevBlock.'/'.$majorMinor);
+    $entries = is_string($link) ? @scandir($jbd2Root) : false;
+    $directory = is_array($entries) ? pmssSystemStatsJbd2DirectoryFor(basename($link), $entries) : null;
+    return $directory === null ? 'na' : pmssSystemStatsJbd2FromRaw(pmssReadRegularFileContents($jbd2Root.'/'.$directory.'/info'));
+}

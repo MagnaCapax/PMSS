@@ -43,7 +43,7 @@ Keep the canonical installer/update details under `docs/install.md` and
   propagates the original throwable. Successful exports still transfer the open
   lock to the caller; `WatchdogLockSafetyTest` covers both ownership paths.
 - **scripts/lib/systemStats.php** retains host snapshot collection, while
-  `systemStats/observe.php` owns host probes and `systemStats/log.php` owns
+  `systemStats/observe.php` owns host probes (including the `/home` journal read; pure jbd2 parsing is `systemStats/jbd2.php`, ADR 0253) and `systemStats/log.php` owns
   legacy line rendering and checked append. `diskIostat/observe.php` appends
   supplemental observations to the pure iostat fields; its facade retains
   checked publication and one runner invocation path (ADRs 0162 and 0226).
