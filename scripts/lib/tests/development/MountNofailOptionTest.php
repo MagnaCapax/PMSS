@@ -10,12 +10,6 @@ require_once dirname(__DIR__, 2).'/update/services/quota.php';
  */
 class MountNofailOptionTest extends TestCase
 {
-    private function makeFstab(string $content): string
-    {
-        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-nofail-', $content);
-        return $fstab;
-    }
-
     private function ensureNofail(string $fstab): array
     {
         return $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab): void {
@@ -27,7 +21,7 @@ class MountNofailOptionTest extends TestCase
     {
         // Real-world /home line observed in the fleet without nofail.
         $original = "/dev/md1 /home ext4 defaults,noatime,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1,commit=60 0 0\n";
-        $fstab = $this->makeFstab($original);
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-nofail-', $original);
 
         $messages = $this->ensureNofail($fstab);
 
@@ -48,7 +42,7 @@ class MountNofailOptionTest extends TestCase
     public function testNoChangeWhenNofailPresent(): void
     {
         $original = "/dev/md1 /home ext4 defaults,noatime,nofail 0 0\n";
-        $fstab = $this->makeFstab($original);
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-nofail-', $original);
 
         $messages = $this->ensureNofail($fstab);
 
@@ -59,7 +53,7 @@ class MountNofailOptionTest extends TestCase
     public function testMountNotFoundIsSafe(): void
     {
         $original = "/dev/md0 / ext4 defaults 0 1\n";
-        $fstab = $this->makeFstab($original);
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-nofail-', $original);
 
         $messages = $this->ensureNofail($fstab);
 

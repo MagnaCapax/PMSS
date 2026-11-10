@@ -61,7 +61,7 @@ class ResourceStatsProcessorTest extends TestCase
     {
         $this->pmssWriteFiles($this->paths['resource_dir'], array_fill_keys(['user2', 'user10', 'user1'], 'seed'));
 
-        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+        $processor = new \ResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
         $users = $processor->discoverUsers();
 
         $this->assertEquals(['user1', 'user2', 'user10'], $users);
@@ -70,7 +70,7 @@ class ResourceStatsProcessorTest extends TestCase
     public function testValidateUserRequiresResourcePasswdAndHome(): void
     {
         $user = 'fixtur01';
-        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+        $processor = new \ResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
 
         $this->assertTrue(!$processor->validateUser($user));
 
@@ -83,7 +83,7 @@ class ResourceStatsProcessorTest extends TestCase
 
     public function testEnsureRuntimeCreatesRuntimeDirectories(): void
     {
-        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+        $processor = new \ResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
 
         $this->assertTrue(!is_dir($this->paths['runtime_dir'].'/resourceStats'));
 
@@ -100,7 +100,7 @@ class ResourceStatsProcessorTest extends TestCase
         @rmdir($this->paths['runtime_dir']);
         $this->pmssCreateSymlinkOrSkip($targetRuntime, $this->paths['runtime_dir']);
 
-        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+        $processor = new \ResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
         $processor->ensureRuntime();
 
         $this->assertTrue(is_link($this->paths['runtime_dir']));
@@ -127,7 +127,7 @@ class ResourceStatsProcessorTest extends TestCase
     public function testProcessUserPersistsMetricsWithoutDisplayCache(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
-        $processor = $this->makeProcessor($stats);
+        $processor = new \ResourceStatsProcessor($stats, $this->paths);
 
         $user = $this->seedManagedUser();
 
@@ -184,7 +184,7 @@ class ResourceStatsProcessorTest extends TestCase
     public function testProcessUserSavedPayloadStillFeedsPmssStats(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
-        $processor = $this->makeProcessor($stats);
+        $processor = new \ResourceStatsProcessor($stats, $this->paths);
 
         $user = $this->seedManagedUser();
 
@@ -229,7 +229,7 @@ class ResourceStatsProcessorTest extends TestCase
     public function testProcessUserPersistsMemoryBreakdownCurrentValues(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
-        $processor = $this->makeProcessor($stats);
+        $processor = new \ResourceStatsProcessor($stats, $this->paths);
 
         $user = $this->seedManagedUser();
 
@@ -249,7 +249,7 @@ class ResourceStatsProcessorTest extends TestCase
     public function testProcessUserSkipsInvalidUserWithoutPersisting(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
-        $processor = $this->makeProcessor($stats);
+        $processor = new \ResourceStatsProcessor($stats, $this->paths);
 
         $this->setResourceData($stats, 'ghost', [
             $this->resourceLine(time() - 120, '1024 2048 1 1 3600 1024 1'),
@@ -264,7 +264,7 @@ class ResourceStatsProcessorTest extends TestCase
     public function testProcessUserSkipsTooLittleData(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
-        $processor = $this->makeProcessor($stats);
+        $processor = new \ResourceStatsProcessor($stats, $this->paths);
 
         $user = $this->seedManagedUser();
         $stats->map[$user] = $this->resourceLine(time() - 120, '1024 2048 1 1 3600 1024 1');
@@ -393,7 +393,7 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue(is_resource($handle), 'Expected test to acquire resource stats lock');
 
         try {
-            $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+            $processor = new \ResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
             $this->assertFalse($processor->beforeSpawn());
         } finally {
             if (is_resource($handle)) {
@@ -433,11 +433,6 @@ class ResourceStatsProcessorTest extends TestCase
 
         $decoded = @unserialize($raw);
         return is_array($decoded) ? $decoded : null;
-    }
-
-    private function makeProcessor(StubResourceStatsProcessorStatistics $stats): \ResourceStatsProcessor
-    {
-        return new \ResourceStatsProcessor($stats, $this->paths);
     }
 
     private function seedManagedUser(string $user = 'fixtur01'): string

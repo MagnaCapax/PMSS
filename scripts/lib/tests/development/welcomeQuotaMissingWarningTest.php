@@ -26,12 +26,6 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssWriteFile($fixture, "<?php\nrequire_once __DIR__.'/scriptsInc.php';\n".substr($source, $start, $end - $start));
     }
 
-    private function runWelcomeSafetyScript(string $script): string
-    {
-        $fixture = $this->makeWelcomeSafetyFixture();
-        return $this->pmssRunInlinePhpRequire($fixture, $script);
-    }
-
     private function runWelcomePageStateBonusQuota(string $home): int
     {
         $fixture = $this->makeWelcomeSafetyFixture();
@@ -73,12 +67,6 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         );
     }
 
-    private function runWelcomeUsageScript(string $script, string $stderrRedirect = '2>/dev/null'): string
-    {
-        $fixture = $this->makeWelcomeUsageFixture();
-        return $this->pmssRunInlinePhpRequire($fixture, $script, [], $stderrRedirect);
-    }
-
     public function testWelcomeSourceContractsUseSafeCustomerHelpers(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', [
@@ -106,7 +94,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeRemoteFetchRejectsUnexpectedEndpoints(): void
     {
-        $output = $this->runWelcomeUsageScript(
+        $output = $this->pmssRunInlinePhpRequire($this->makeWelcomeUsageFixture(),
             'echo json_encode(array('
             .'"http" => pmssWelcomeRemoteFetch("http://pulsedmedia.com/clients/announcementsrss.php") === false,'
             .'"otherHost" => pmssWelcomeRemoteFetch("https://example.invalid/clients/announcementsrss.php") === false,'
@@ -162,7 +150,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomeQuotaReaderAcceptsSerializedArrayContract(): void
     {
         $payload = array('hardLimit' => 200, 'totalSpace' => 100, 'usedBytes' => 25);
-        $output = $this->runWelcomeSafetyScript(
+        $output = $this->pmssRunInlinePhpRequire($this->makeWelcomeSafetyFixture(),
             '$_GET["quota"] = urlencode(serialize('.var_export($payload, true).'));'
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
@@ -172,7 +160,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeQuotaReaderRejectsObjectPayloads(): void
     {
-        $output = $this->runWelcomeSafetyScript(
+        $output = $this->pmssRunInlinePhpRequire($this->makeWelcomeSafetyFixture(),
             '$_GET["quota"] = urlencode(serialize(array("hardLimit" => new stdClass())));'
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
@@ -182,11 +170,11 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeQuotaReaderRejectsNonScalarAndOversizeInput(): void
     {
-        $arrayOutput = $this->runWelcomeSafetyScript(
+        $arrayOutput = $this->pmssRunInlinePhpRequire($this->makeWelcomeSafetyFixture(),
             '$_GET["quota"] = array("not-scalar");'
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
-        $largeOutput = $this->runWelcomeSafetyScript(
+        $largeOutput = $this->pmssRunInlinePhpRequire($this->makeWelcomeSafetyFixture(),
             '$_GET["quota"] = str_repeat("x", 8193);'
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
@@ -197,7 +185,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeQuotaReaderRejectsPathologicallyDeepInput(): void
     {
-        $output = $this->runWelcomeSafetyScript(
+        $output = $this->pmssRunInlinePhpRequire($this->makeWelcomeSafetyFixture(),
             '$payload = array(); $cursor =& $payload;'
             .'for ($i = 0; $i < 34; $i++) { $cursor["child"] = array(); $cursor =& $cursor["child"]; }'
             .'$_GET["quota"] = urlencode(serialize($payload));'
@@ -243,7 +231,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $traffic = $trafficMonthMiB === null ? array('raw' => array()) : array('raw' => array('month' => $trafficMonthMiB));
         $bandwidthState += array('effectiveCapMbit' => 100, 'isReduced' => false);
         $limitState = array('limitGiB' => $limitGiB, 'bonusGiB' => 0, 'effectiveLimitGiB' => $limitGiB);
-        $output = $this->runWelcomeUsageScript(
+        $output = $this->pmssRunInlinePhpRequire($this->makeWelcomeUsageFixture(),
             '$bandwidth = '.var_export($bandwidthState, true).';'
             .'$quota = pmssWelcomeHomeQuotaStateBuild('.var_export($quotaInfo, true).');'
             .'$traffic = pmssWelcomeHomeTrafficStateBuild('.var_export($traffic, true).', array(), '.var_export($limitState, true).', $bandwidth);'
@@ -253,7 +241,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             .'"traffic" => pmssWelcomeHomeTrafficMetricHtmlBuild($traffic, '.$billingServiceId.'),'
             .'"alerts" => pmssWelcomeHomeAlertsHtmlBuild($quota, $traffic, '.var_export($memory, true).', $bandwidth, '.$billingServiceId.')'
             .'));',
-            '2>&1'
+            [], '2>&1'
         );
         $this->pmssAssertStringNotContainsString('Undefined', $output);
         return $this->pmssDecodeJsonArray($output);
@@ -328,9 +316,9 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeTrafficDisclosureShowsApproachWarning(): void
     {
-        $output = $this->runWelcomeUsageScript(
+        $output = $this->pmssRunInlinePhpRequire($this->makeWelcomeUsageFixture(),
             'echo pmssWelcomeTrafficDisclosureHtmlBuild(80.0, array("effectiveCapMbit" => 100, "isReduced" => false), 42, false);',
-            '2>&1'
+            [], '2>&1'
         );
         $this->assertStringContainsAllStrings(
             ['Current effective: full plan port speed', 'Usage: <b>80.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Add extra traffic to your plan', 'type=configoptions&amp;id=42'],

@@ -11,11 +11,6 @@ class rtorrentWatchdogDecisionTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-rtorrent-watchdog-');
     }
 
-    private function wedgeStatePath(): string
-    {
-        return $this->tempDir.'/accept-queue.count';
-    }
-
     public function testCronLogHonorsForceAndDebugFlags(): void
     {
         $this->assertSame('', $this->pmssCaptureStdout(static function (): void {
@@ -258,6 +253,7 @@ PHP;
 
     public function testScgiDecisionExtendsGraceForUnsafeStatesOrOpenQueue(): void
     {
+        $path = $this->tempDir.'/accept-queue.count';
         $aliveStates = [44 => ['pid' => 44, 'stat' => 'Sl', 'wchan' => 'poll_schedule_timeout']];
 
         foreach ([
@@ -266,25 +262,26 @@ PHP;
             'missing queue' => [[44], $aliveStates, null, 'queue=unavailable'],
             'open queue' => [[44], $aliveStates, ['recvQ' => 1, 'sendQ' => 100], 'recvQ=1 sendQ=100'],
         ] as $label => $case) {
-            $decision = \rtorrentProcessScgiUnresponsiveDecision($case[0], $case[1], $case[2], $this->wedgeStatePath(), 3);
+            $decision = \rtorrentProcessScgiUnresponsiveDecision($case[0], $case[1], $case[2], $path, 3);
 
             $this->assertSame('extend_grace', $decision['action'], $label);
             $this->assertStringContainsString($case[3], $decision['message'], $label);
-            $this->assertFalse(file_exists($this->wedgeStatePath()), $label.' must not advance queue wedge count');
+            $this->assertFalse(file_exists($path), $label.' must not advance queue wedge count');
         }
     }
 
     public function testScgiDecisionObservesSaturatedQueueUntilThresholdThenRestarts(): void
     {
+        $path = $this->tempDir.'/accept-queue.count';
         $states = [44 => ['pid' => 44, 'stat' => 'Sl', 'wchan' => 'poll_schedule_timeout']];
         $queue = ['recvQ' => 100, 'sendQ' => 100];
 
         // Freeze both the decision sequence and its persisted counter bytes.
         foreach (['observe_wedge', 'observe_wedge', 'restart'] as $index => $action) {
-            $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $this->wedgeStatePath(), 3);
+            $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $path, 3);
             $this->assertSame($action, $decision['action']);
             $this->assertStringContainsString($index === 2 ? 'consecutive checks' : 'count='.($index + 1).'/3', $decision['message']);
-            $this->assertSame((string) ($index + 1), (string) file_get_contents($this->wedgeStatePath()));
+            $this->assertSame((string) ($index + 1), (string) file_get_contents($path));
         }
     }
 
