@@ -166,15 +166,9 @@ class RtorrentProcessTest extends TestCase
 
     public function testStaleStateRefusesSymlinkParentWithoutWriting(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $targetDir = $this->pmssEnsureDir($this->tempDir.'/target');
         $linkDir = $this->tempDir.'/link';
-        if (@symlink($targetDir, $linkDir) === false) {
-            throw new SkipTest('symlink() failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
 
         $result = rtorrentProcessCheckStaleState($linkDir.'/state.ts', 60);
 
@@ -215,16 +209,10 @@ PHP;
 
     public function testClearStaleStateRefusesSymlinkLeaf(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $target = $this->tempDir.'/target-state.ts';
         $link = $this->tempDir.'/linked-state.ts';
         $this->pmssWriteFile($target, '123');
-        if (@symlink($target, $link) === false) {
-            throw new SkipTest('symlink() failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
         rtorrentProcessClearStaleState($link);
 
@@ -606,17 +594,11 @@ PHP;
 
     public function testResetSessionDirectoryRejectsSymlinkedHome(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $user = $this->sessionResetTestUser();
         $home = $this->tempDir.'/'.$user;
         $targetHome = dirname($this->pmssEnsureDir($this->tempDir.'/target-home/session'));
         $this->pmssWriteFile($targetHome.'/session/resume.dat', 'state');
-        if (@symlink($targetHome, $home) === false) {
-            throw new SkipTest('symlink() failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($targetHome, $home);
 
         [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home, $user): bool {
             return rtorrentProcessResetSessionDirectory($home, $user, $logger);

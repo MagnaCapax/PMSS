@@ -228,9 +228,7 @@ class QuotaFstabOptionsTest extends TestCase
     {
         $target = $this->pmssMakeTempDir('pmss-quota-target-', 0700);
         $link = $this->pmssMakeTempPath('pmss-quota-link-');
-        if (!@symlink($target, $link)) {
-            throw new SkipTest('filesystem does not support symlinks');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
         [$removed, $messages] = $this->removeStaleQuotaCheckFiles($link);
 

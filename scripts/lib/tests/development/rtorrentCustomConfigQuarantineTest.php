@@ -54,9 +54,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
     {
         $target = $this->pmssWriteRelativeFile($this->tempHome, 'target', 'x');
         $src = $this->tempHome.'/.rtorrent.rc.custom';
-        if (@symlink($target, $src) === false) {
-            throw new SkipTest('symlink() not available; skipping');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $src);
 
         $dst = $this->quarantineCustomConfig();
         $this->assertTrue($dst === null);
@@ -65,16 +63,10 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
     public function testQuarantineRefusesSymlinkedHome(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $targetHome = $this->tempHome.'-target';
         $linkHome = $this->tempHome.'-link';
         $this->pmssWriteRelativeFile($targetHome, '.rtorrent.rc.custom', "broken_line\n");
-        if (@symlink($targetHome, $linkHome) === false) {
-            throw new SkipTest('symlink() failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($targetHome, $linkHome);
 
         $dst = \rtorrentCustomConfigQuarantine($linkHome, $this->resolveTestUser(), $this->noOpLogFn());
 

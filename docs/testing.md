@@ -33,6 +33,12 @@ cgroup, boot and network file trees. Use `pmssWriteRelativeFile()` when a fixtur
 also needs the written path, such as before setting its mtime. Keep deliberately
 empty directories, absent files and mode transitions explicit at the caller.
 
+Symlink fixtures that skip on unavailable link support use
+`TestCase::pmssCreateSymlinkOrSkip()` for availability, creation and skip
+diagnostics. rTorrent, nginx, quota and updater-marker tests retain their link
+targets and refusal assertions, including dangling links. Keep assertion-based
+or optional symlink probes explicit when they have a different failure policy.
+
 Inline PHP fixtures share `TestCase::pmssBuildInlinePhpCommand()` across captured,
 timed and asynchronous launches. Use `pmssExecInlinePhp()` for exit status and
 line output, or `pmssExecInlinePhpWithTempStderr()` for a tracked stderr file.

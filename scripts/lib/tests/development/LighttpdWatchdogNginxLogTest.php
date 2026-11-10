@@ -245,9 +245,7 @@ PHP;
         $target = $this->pmssMakeTempPath('lighttpd-nginx-target-', '.json');
         $link = $this->pmssMakeTempPath('lighttpd-nginx-link-', '.json');
         @unlink($link);
-        if (!@symlink($target, $link)) {
-            throw new SkipTest('symlink fixture unavailable');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
         $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead($logPath, $link, [25000 => 'fixtur01']));
         $this->assertSame(array(), \pmssLighttpdWatchdogNginxActionsRead('/missing/nginx.log', $target, [25000 => 'fixtur01']));

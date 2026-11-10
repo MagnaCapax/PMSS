@@ -51,9 +51,7 @@ class CreateNginxConfigPermissionHardeningTest extends TestCase
         $target = $this->pmssWriteFile($this->root.'/real-target.txt', "target\n");
         $link = $this->root.'/linked.conf';
         @chmod($target, 0600);
-        if (!@symlink($target, $link)) {
-            throw new SkipTest('symlink unavailable');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
         \pmssCreateNginxConfigChmodGlob(0640, $this->root.'/*.conf');
 

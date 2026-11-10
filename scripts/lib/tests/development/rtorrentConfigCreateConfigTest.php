@@ -256,9 +256,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertFalse($cfg->writeConfig('dummy', "x = y\n"));
 
         $target = $this->pmssMakeTempDir('pmss-rtorrent-target-');
-        if (!@symlink($target, $this->pmssUserHomePath($homeRoot, 'dummy'))) {
-            throw new SkipTest('symlink fixtures unavailable');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $this->pmssUserHomePath($homeRoot, 'dummy'));
         $this->assertFalse($cfg->writeConfig('dummy', "x = y\n"));
         $this->assertFalse(file_exists($target.'/.rtorrent.rc'));
     }
@@ -447,9 +445,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             $cfg->reservePrivatePort('scgi', 4000, 4001);
         }, 'No available rTorrent scgi port reservation slots');
 
-        if (!@symlink($portRoot.'/missing', $portRoot.'/scgi/4002')) {
-            throw new SkipTest('symlink fixtures unavailable');
-        }
+        $this->pmssCreateSymlinkOrSkip($portRoot.'/missing', $portRoot.'/scgi/4002');
 
         $this->assertThrowsRuntime(static function () use ($cfg): void {
             $cfg->reservePrivatePort('scgi', 4002, 4002);
@@ -580,9 +576,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             @touch($fixture['portsBase'].'/'.$relative, 1000);
         }
         @touch($fixture['portsBase'].'/scgi/4003', 9900);
-        if (!@symlink($fixture['portsBase'].'/missing', $fixture['portsBase'].'/scgi/4004')) {
-            throw new SkipTest('symlink fixtures unavailable');
-        }
+        $this->pmssCreateSymlinkOrSkip($fixture['portsBase'].'/missing', $fixture['portsBase'].'/scgi/4004');
 
         $result = \pmssRtorrentPortReservationsReconcile(
             ['dummy'],

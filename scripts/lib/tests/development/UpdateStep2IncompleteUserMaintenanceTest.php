@@ -99,7 +99,7 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
         $relative = 'pmss-test-incomplete-relative.json';
         putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH='.$relative);
         try {
-            pmssUpdateRecordIncompleteUserMaintenance(1, 2, ['alice: skipped']);
+            pmssUpdateRecordIncompleteUserMaintenance(1, 2, ['fixtur01: skipped']);
             $this->assertFalse(is_file($relative), 'relative marker path must not be written');
             $this->assertFalse(pmssUpdateIncompleteUserMaintenancePathIsSafe($relative));
         } finally {
@@ -114,9 +114,7 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
         $targetDir = $root.'/target';
         $linkDir = $root.'/link';
         @mkdir($targetDir, 0755, true);
-        if (!@symlink($targetDir, $linkDir)) {
-            throw new SkipTest('symlink unavailable');
-        }
+        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
 
         $marker = $linkDir.'/marker.json';
         $realMarker = $targetDir.'/marker.json';

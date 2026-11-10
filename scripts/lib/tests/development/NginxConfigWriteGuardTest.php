@@ -177,7 +177,7 @@ PHP;
         $this->pmssWriteFile($runtimePortDir.'/lighttpd-fixtur01', "12345\n");
         $priorRoute = $this->pmssWriteFile($this->tempDir.'/prior-route', "old route\n");
         @mkdir($nginxUsersDir, 0755, true);
-        if (!@symlink($priorRoute, $nginxUsersDir.'/fixtur01')) throw new SkipTest('symlink unavailable');
+        $this->pmssCreateSymlinkOrSkip($priorRoute, $nginxUsersDir.'/fixtur01');
         $ctx = ['nginxUsersDir' => $nginxUsersDir, 'homeBase' => $homeBase, 'runtimePortDir' => $runtimePortDir,
             'userTemplate' => 'proxy ##username ##serverPort', 'subdomainEnabled' => false];
 
@@ -276,7 +276,7 @@ PHP;
         $this->assertTrue(\pmssCreateNginxConfigUserRouteIsServiceable('fixtur01', $ctx));
         @unlink($route);
         $target = $this->pmssWriteFile($this->tempDir.'/target', "route\n");
-        if (!@symlink($target, $route)) throw new SkipTest('symlink unavailable');
+        $this->pmssCreateSymlinkOrSkip($target, $route);
         $this->assertFalse(\pmssCreateNginxConfigUserRouteIsServiceable('fixtur01', $ctx));
         @unlink($route);
         $this->assertFalse(\pmssCreateNginxConfigUserRouteIsServiceable('fixtur01', $ctx));
@@ -308,7 +308,7 @@ PHP;
         $homeDir = $this->tempDir.'/home/fixtur01';
         @mkdir($homeDir, 0755, true);
         $target = $this->pmssWriteFile($this->tempDir.'/outside-port', "62000\n");
-        if (!@symlink($target, $homeDir.'/.delugeWebPort')) throw new SkipTest('symlink unavailable');
+        $this->pmssCreateSymlinkOrSkip($target, $homeDir.'/.delugeWebPort');
         $this->pmssWriteFile($homeDir.'/.delugePort', "65535\n");
         $this->assertEquals(1, \pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, 'fixtur01'));
     }

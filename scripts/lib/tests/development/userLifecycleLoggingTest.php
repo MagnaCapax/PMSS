@@ -15,7 +15,7 @@ class userLifecycleLoggingTest extends TestCase
 function pmssStdoutHeartbeatStartForStdout() {}
 function pmssRequireHomeMounted($name) {}
 function pmssUserLifecycleRequireUserRoots($argv, $name, $action) {
-    return ['username' => 'alice', 'homeDir' => '/tmp/alice', 'activeRoot' => '/tmp/alice/www', 'disabledRoot' => '/tmp/alice/www-disabled'];
+    return ['username' => 'fixtur01', 'homeDir' => '/tmp/fixtur01', 'activeRoot' => '/tmp/fixtur01/www', 'disabledRoot' => '/tmp/fixtur01/www-disabled'];
 }
 function pmssUserLifecycleRequireWebRootState($action, $user, $home, $active, $disabled) {
     return ['activeRootExists' => true, 'disabledRootExists' => false];
@@ -35,8 +35,8 @@ PHP;
         );
         $this->assertSame(1, $result['rc']);
         $steps = (string) file_get_contents($record);
-        $this->assertStringContainsString("set_expiry usermod --expiredate 1 'alice'", $steps);
-        $this->assertStringContainsString("kill_processes_after_expiry killall -9 -u 'alice'", $steps);
+        $this->assertStringContainsString("set_expiry usermod --expiredate 1 'fixtur01'", $steps);
+        $this->assertStringContainsString("kill_processes_after_expiry killall -9 -u 'fixtur01'", $steps);
         $this->assertTrue(strpos($steps, 'set_expiry') < strpos($steps, 'kill_processes_after_expiry'));
         // The account is expired before the first kill, so cron cannot start it again during the account-side steps.
         $this->assertTrue(strpos($steps, 'set_expiry') < strpos($steps, 'kill_processes '));
@@ -91,7 +91,7 @@ PHP;
     public function testRunStepsPreservesOrderAndDryRunResults(): void
     {
         list($result, $output) = $this->pmssCaptureStdout(static function (): array {
-            return \pmssUserLifecycleRunSteps('test', 'alice', array(
+            return \pmssUserLifecycleRunSteps('test', 'fixtur01', array(
                 array('first', 'printf first'),
                 array('second', 'printf second'),
             ), true);
@@ -104,17 +104,17 @@ PHP;
     public function testRefreshNginxConfigKeepsFallbackOrder(): void
     {
         $cases = array(
-            array('suspend', 'refresh_nginx_config', 'php /scripts/util/createNginxConfig.php --user \'alice\'', array(), null, array('refresh_nginx_config', 'restart_nginx_systemctl')),
+            array('suspend', 'refresh_nginx_config', 'php /scripts/util/createNginxConfig.php --user \'fixtur01\'', array(), null, array('refresh_nginx_config', 'restart_nginx_systemctl')),
             array('terminate', 'regen_nginx_user_configs', '/scripts/util/createNginxConfig.php', array('systemctlStep' => 'restart_nginx', 'initStep' => 'restart_nginx_init'), 'restart_nginx', array('regen_nginx_user_configs', 'restart_nginx', 'restart_nginx_init')),
         );
 
         foreach ($cases as $case) {
             $calls = array();
-            $result = \pmssUserLifecycleRefreshNginxConfig($case[0], 'alice', false, $case[1], $case[2], $case[3], $this->recordLifecycleSteps($calls, $case[4]));
+            $result = \pmssUserLifecycleRefreshNginxConfig($case[0], 'fixtur01', false, $case[1], $case[2], $case[3], $this->recordLifecycleSteps($calls, $case[4]));
 
             $this->assertSame(0, $result);
             $this->assertSame($case[5], array_column($calls, 'step'));
-            $this->assertSame('alice', $calls[0]['username']);
+            $this->assertSame('fixtur01', $calls[0]['username']);
             $this->assertFalse($calls[0]['dryRun']);
         }
     }
@@ -124,15 +124,15 @@ PHP;
         $calls = array();
         $result = \pmssUserLifecycleRefreshManagedNginxConfig(
             'unsuspend',
-            'alice',
+            'fixtur01',
             true,
             $this->recordLifecycleSteps($calls)
         );
 
         $this->assertSame(0, $result);
         $this->assertSame(array('refresh_nginx_config', 'restart_nginx_systemctl'), array_column($calls, 'step'));
-        $this->assertSame('php /scripts/util/createNginxConfig.php --user \'alice\'', $calls[0]['command']);
-        $this->assertSame('alice', $calls[0]['username']);
+        $this->assertSame('php /scripts/util/createNginxConfig.php --user \'fixtur01\'', $calls[0]['command']);
+        $this->assertSame('fixtur01', $calls[0]['username']);
         $this->assertTrue($calls[0]['dryRun']);
     }
 
@@ -152,7 +152,7 @@ PHP;
             $processCalls = array();
             $result = \pmssUserLifecycleWebStackStartAndVerify(
                 'unsuspend',
-                'alice',
+                'fixtur01',
                 $case[2],
                 static function (string $action, string $username, string $step, string $command, bool $dryRun) use (&$stepCalls, $case): int {
                     $stepCalls[] = array($action, $username, $step, $command, $dryRun);
@@ -165,7 +165,7 @@ PHP;
             );
 
             $this->assertSame($case[4], $result, $case[0]);
-            $this->assertSame(array('unsuspend', 'alice', 'start_lighttpd', "/scripts/startLighttpd 'alice'", $case[2]), $stepCalls[0], $case[0]);
+            $this->assertSame(array('unsuspend', 'fixtur01', 'start_lighttpd', "/scripts/startLighttpd 'fixtur01'", $case[2]), $stepCalls[0], $case[0]);
             $this->assertSame($case[5], $processCalls, $case[0]);
         }
     }
@@ -179,7 +179,7 @@ PHP;
         @mkdir($disabledRoot, 0755, true);
 
         $suspended = \pmssUserLifecycleSyncSuspendedState(
-            'alice',
+            'fixtur01',
             $disabledRoot,
             static function (string $username, bool $state) use (&$calls): bool {
                 $calls[] = array('username' => $username, 'state' => $state);
@@ -187,7 +187,7 @@ PHP;
             }
         );
         $active = \pmssUserLifecycleSyncSuspendedState(
-            'alice',
+            'fixtur01',
             $base.'/missing-marker',
             static function (string $username, bool $state) use (&$calls): bool {
                 $calls[] = array('username' => $username, 'state' => $state);
@@ -199,8 +199,8 @@ PHP;
         $this->assertFalse($active);
         $this->assertSame(
             array(
-                array('username' => 'alice', 'state' => true),
-                array('username' => 'alice', 'state' => false),
+                array('username' => 'fixtur01', 'state' => true),
+                array('username' => 'fixtur01', 'state' => false),
             ),
             $calls
         );
@@ -245,9 +245,9 @@ PHP;
         $disabledRoot = $home.'/www-disabled';
         $this->pmssEnsureDir($activeRoot);
 
-        $active = \pmssUserLifecycleRequireWebRootState('suspend', 'alice', $home, $activeRoot, $disabledRoot);
+        $active = \pmssUserLifecycleRequireWebRootState('suspend', 'fixtur01', $home, $activeRoot, $disabledRoot);
         $this->pmssEnsureDir($disabledRoot);
-        $suspended = \pmssUserLifecycleRequireWebRootState('unsuspend', 'alice', $home, $activeRoot, $disabledRoot);
+        $suspended = \pmssUserLifecycleRequireWebRootState('unsuspend', 'fixtur01', $home, $activeRoot, $disabledRoot);
 
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => false), $active);
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => true), $suspended);
@@ -357,9 +357,7 @@ PHP;
         $home = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-link-');
         $target = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-target-');
         $link = $home.'/www-suspended-link';
-        if (!@symlink($target, $link)) {
-            throw new SkipTest('symlink creation unavailable');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
         $this->pmssWriteFile($target.'/index.php', '');
         $valid = $home.'/www-suspended-valid';
