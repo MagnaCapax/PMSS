@@ -47,6 +47,16 @@ using `/scripts/util/motdGenerate.php`, logging to `/var/log/pmss/motdGenerate.l
 Successful hourly refreshes keep the banner aligned with the staged version even
 if phase 2 did not finish; they do not mark that version as completed.
 
+The per-minute systemd service guard also recovers enabled nginx, ssh, cron and
+proftpd units that are inactive or failed (ADR 0257). It holds the global update
+lock throughout recovery, skipping if that lock is busy or unavailable, so a
+deliberate web-stack stop during an update stays stopped. Disabled or masked
+units remain untouched. Recovery requires systemd's `running` or `degraded`
+state, avoiding starts from the early-boot hardening unit and during shutdown.
+Actions and failures appear in `/var/log/pmss/systemdServicesGuard.log`; nginx
+starts retain the configuration test and managed-master verification. Cron's
+own restart policy is still needed when the scheduler itself is unavailable.
+
 Immediately before phase-2 handoff, the bootstrap requires 3 GiB free on `/`
 and `/home`. It always checks `/` using space available to ordinary users.
 When running as root, it also reads `/home` free blocks including the filesystem

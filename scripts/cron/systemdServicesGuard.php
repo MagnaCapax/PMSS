@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * Enforce that unwanted system-wide services stay stopped/disabled/masked.
+ * Keep unwanted system services off and recover enabled required services.
  *
  * Policy list: pmssSeedboxSystemServiceSpecs().
  * See scripts/lib/update/services/systemd.php for the current list.
@@ -12,6 +12,7 @@
  */
 
 require_once __DIR__.'/../lib/update/services/systemd.php';
+require_once __DIR__.'/../lib/update/services/systemd/recovery.php';
 
 if (!pmssTestModeEnabled()) {
     requireRoot();
@@ -35,3 +36,5 @@ foreach (pmssSeedboxSystemServiceSpecs() as $unit => $label) {
 
     pmssStopDisableMaskSystemdUnit($unit, $label, true);
 }
+
+pmssRecoverRequiredSystemdServices();
