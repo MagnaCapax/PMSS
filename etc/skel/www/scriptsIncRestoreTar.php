@@ -83,8 +83,9 @@ if (!function_exists('pmssCustomerBackupRestoreMemberNormalize')) {
 }
 
 if (!function_exists('pmssCustomerBackupRestoreTarMemberTypesRead')) {
-/** Read tar headers so link members can be skipped before Phar extraction. */
- function pmssCustomerBackupRestoreTarMemberTypesRead($archivePath) {
+/** Read normalized types and retain exact member names for selective GNU tar extraction. */
+ function pmssCustomerBackupRestoreTarMemberTypesRead($archivePath, &$memberNames = null) {
+  $memberNames = array();
   $handle = @gzopen($archivePath, 'rb');
   if (!is_resource($handle)) return null;
 
@@ -121,11 +122,13 @@ if (!function_exists('pmssCustomerBackupRestoreTarMemberTypesRead')) {
     }
 
     if (!pmssCustomerBackupRestoreTarSkipPayload($handle, $size)) return null;
-    $member = pmssCustomerBackupRestoreMemberNormalize($pendingName !== null ? $pendingName : $name);
+    $name = $pendingName !== null ? $pendingName : $name;
+    $member = pmssCustomerBackupRestoreMemberNormalize($name);
     $pendingName = null;
     if ($member !== '') {
      $currentType = pmssCustomerBackupRestoreMemberTypeAllowed($type) ? $type : '!';
      $types[$member] = isset($types[$member]) && $types[$member] !== $currentType ? '!' : $currentType;
+     $memberNames[$name] = $member;
     }
    }
    return $types;

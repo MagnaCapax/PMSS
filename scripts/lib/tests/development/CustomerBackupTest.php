@@ -198,6 +198,104 @@ class CustomerBackupTest extends TestCase
         $this->assertFalse(file_exists($this->home.'/data/media.bin'), 'Non-backup paths must not be extracted');
     }
 
+    public function testRestoreLongGnuAndPaxMembersAndPreservesSnapshot(): void
+    {
+        $traffic = '.local/share/pmss/rutorrent/share/users/fixtur01/settings/trafic/torrents/'.str_repeat('a', 40).'.csv';
+        $deep = '.config/deluge/'.str_repeat('nested/', 40).'state';
+        $this->assertTrue(strlen($traffic) > 100);
+        $this->assertTrue(strlen($deep) > 255);
+        $source = $this->pmssEnsureDir($this->homeRoot.'/archive-source');
+        $this->pmssTrackEnvOverrides(array('TAR_OPTIONS' => ''));
+        foreach (array('gnu', 'pax') as $format) {
+            foreach (array($traffic, $deep) as $member) {
+                $this->pmssWriteRelativeFile($source, $member, 'saved-'.$format);
+                $this->pmssWriteRelativeFile($this->home, $member, 'current-'.$format);
+            }
+            $this->pmssWriteRelativeFile($this->home, '.rtorrent.rc', 'snapshot-'.$format);
+            $archive = $this->home.'/long-'.$format.'.tar.gz';
+            $this->pmssCreateTarGzArchive($archive, $source, array('.local', '.config'), ' --format='.$format);
+
+            $result = \pmssCustomerBackupRestore($this->home, $archive);
+
+            $this->assertTrue($result['ok'], $result['message']);
+            foreach (array($traffic, $deep) as $member) {
+                $this->assertSame('saved-'.$format, (string) file_get_contents($this->home.'/'.$member));
+            }
+            // Inspect the undo archive with tar too: it contains the same long paths.
+            $snapshot = $this->pmssExecShellCommand('TAR_OPTIONS= /bin/tar --extract --gzip --to-stdout'
+                .' --file='.escapeshellarg($result['snapshotPath']).' -- .rtorrent.rc');
+            $this->assertSame(0, $snapshot['rc'], $snapshot['output']);
+            $this->assertSame('snapshot-'.$format, $snapshot['output']);
+        }
+    }
+
+    public function testRestoreMatchesExactNamesWithoutRecursingIntoSkippedLinks(): void
+    {
+        $literal = '.config/deluge/item[1]';
+        $newline = ".config/deluge/line\n--checkpoint=1";
+        $this->pmssWriteRelativeFile($this->home, '.rtorrent.rc', 'snapshot');
+        $archive = $this->pmssWriteTarGzArchive(array(
+            array('name' => './.config/deluge/', 'type' => '5'),
+            array('name' => './'.$literal, 'content' => 'literal'),
+            array('name' => './'.$newline, 'content' => 'newline'),
+            array('name' => './.config/deluge/item1', 'type' => '2', 'linkName' => 'item[1]'),
+            array('name' => './.config/deluge/hard', 'type' => '1', 'linkName' => $literal),
+        ));
+
+        $result = \pmssCustomerBackupRestore($this->home, $archive);
+
+        $this->assertTrue($result['ok'], $result['message']);
+        $this->assertSame('literal', (string) file_get_contents($this->home.'/'.$literal));
+        $this->assertSame('newline', (string) file_get_contents($this->home.'/'.$newline));
+        $this->assertFalse(is_link($this->home.'/.config/deluge/item1'));
+        $this->assertFalse(file_exists($this->home.'/.config/deluge/hard'));
+    }
+
+    public function testRestoreSkipsConflictingTypesAndExistingSymlinkDestinations(): void
+    {
+        $outside = $this->pmssWriteRelativeFile($this->homeRoot, 'outside/state', 'outside');
+        $this->pmssWriteRelativeFile($this->home, '.rtorrent.rc', 'snapshot');
+        $this->pmssEnsureDir($this->home.'/.config/deluge');
+        symlink($outside, $this->home.'/.config/deluge/linked');
+        $archive = $this->pmssWriteTarGzArchive(array(
+            array('name' => '.config/deluge/', 'type' => '5'),
+            array('name' => '.config/deluge/safe', 'content' => 'safe'),
+            array('name' => '.config/deluge/linked', 'content' => 'overwrite'),
+            array('name' => '.config/deluge/conflict', 'content' => 'regular'),
+            array('name' => './.config/deluge/conflict', 'type' => '2', 'linkName' => 'safe'),
+            array('name' => '.config/deluge/reverse', 'type' => '1', 'linkName' => '.config/deluge/safe'),
+            array('name' => './.config/deluge/reverse', 'content' => 'regular'),
+        ));
+
+        $result = \pmssCustomerBackupRestore($this->home, $archive);
+
+        $this->assertTrue($result['ok'], $result['message']);
+        $this->assertSame('safe', (string) file_get_contents($this->home.'/.config/deluge/safe'));
+        $this->assertSame('outside', (string) file_get_contents($outside));
+        $this->assertTrue(is_link($this->home.'/.config/deluge/linked'));
+        $this->assertFalse(file_exists($this->home.'/.config/deluge/conflict'));
+        $this->assertFalse(file_exists($this->home.'/.config/deluge/reverse'));
+    }
+
+    public function testRestoreRejectsInvalidChecksumBeforeSnapshotOrWrites(): void
+    {
+        $this->pmssWriteRelativeFile($this->home, '.rtorrent.rc', 'current');
+        $archive = $this->pmssWriteTarGzArchive(array(
+            array('name' => '.rtorrent.rc', 'content' => 'replacement'),
+        ));
+        // The header reader can read the fields; tar must still reject the checksum.
+        $tar = gzdecode((string) file_get_contents($archive));
+        $tar = substr_replace($tar, "000000\0 ", 148, 8);
+        $this->pmssWriteFile($archive, gzencode($tar));
+
+        $result = \pmssCustomerBackupRestore($this->home, $archive);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('Could not open the backup archive.', $result['message']);
+        $this->assertSame('current', (string) file_get_contents($this->home.'/.rtorrent.rc'));
+        $this->assertSame(array(), glob($this->home.'/.pmss-pre-restore-*.tar.gz') ?: array());
+    }
+
     public function testValidBackupArchiveRestoresAllowlistedPathsAndLogsOutcome(): void
     {
         $this->pmssWriteRelativeFile($this->home, '.rtorrent.rc', 'old-config');

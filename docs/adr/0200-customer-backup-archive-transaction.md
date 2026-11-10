@@ -55,8 +55,34 @@ path/allowlist/link guards stay intact. PHP's documented extraction semantics
 and its TAR parser entry-injection advisory make preserving those guards
 necessary; this refactor does not replace or relax them.
 
+## Restore compatibility follow-up (Refs #972)
+
+GNU tar backups carry long-name records that PharData cannot reliably iterate
+or extract. Restore now selects from the existing tar reader and feeds exact,
+validated member spellings to GNU tar through a NUL-delimited stdin list.
+A full tar listing preserves whole-archive validation before snapshot or writes.
+Normalized names still govern the allowlist, conflicting-type rejection and
+destination guards. Non-recursive, literal matching prevents directory entries
+or filename patterns from selecting skipped links. List writes and process
+exit status both gate success; the undo snapshot still precedes extraction.
+Changing only the backup format or catching Phar exceptions would leave
+existing long-path archives unrestorable, so neither is used.
+
+Security review considered PHP's CVE-2026-6103 parser disagreement and GNU tar's
+history of pathname and link attacks (Debian's tar security tracker). Restores
+retain file/directory-only selection and existing-symlink/traversal refusal,
+clear `TAR_OPTIONS`, and request neither stored owners nor unmasked permissions.
+Execution stays under the customer UID. Exposure of backup contents can reveal
+that account's tracker URLs and separate service credentials; this fix changes
+no primary/service credential separation, secret logging, archive permissions,
+authentication, public routes or listening ports. Integration fixtures cover
+GNU/PAX long paths, literal names, skipped links and conflicting member types;
+they run only on a testing machine.
+
 ## References
 - [Customer backup contracts](../contracts.md#customer-torrent-state-backup--etcskelwwwscriptsincbackupphp-and-welcomephp)
 - [Customer delivery boundary](0022-guiv-delivered-customer-files-must-be-self-contained.md)
 - [PharData extraction semantics](https://www.php.net/phardata.extractto.php)
 - [PHP TAR entry-injection advisory, CVE-2026-6103](https://github.com/php/php-src/security/advisories/GHSA-j3wh-g957-2m85)
+- [GNU tar option semantics](https://www.gnu.org/software/tar/manual/html_node/Option-Summary.html)
+- [Debian tar security history](https://security-tracker.debian.org/tracker/source-package/tar)

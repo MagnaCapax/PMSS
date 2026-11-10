@@ -1662,6 +1662,21 @@ and enumeration/status-read exceptions; original exceptions still propagate.
 Isolated backup transaction and restore probe tests cover these failure paths
 and the unchanged successful results without reading live process state.
 
+Restore selects from the tar header reader, retaining exact member spellings
+alongside normalized paths for allowlist, type and destination checks. GNU long
+names and PAX paths restore without PharData iteration or extraction, including
+existing backups with paths over 100 or 255 bytes (Refs #972). Conflicting types,
+links, traversal and existing symlink destinations remain excluded; backslashes
+are excluded because GNU tar treats them as literal filename bytes.
+GNU tar must accept a full archive listing before snapshot creation or writes,
+preserving format/checksum rejection previously provided by PharData.
+After the pre-restore snapshot, GNU tar reads only the selected NUL-delimited
+names from stdin, with recursion and wildcard matching disabled, verbatim list
+handling, no owner/permission preservation and an empty `TAR_OPTIONS`. Directory
+selection cannot reintroduce skipped children. A short/failed list write or a
+nonzero tar exit returns the existing failure result and snapshot path. The
+customer UID, audit result shape, live-client refusal and disk precheck remain.
+
 ## Customer Whole-Account Service Restart – `etc/skel/www/scriptsIncAppsHtml.php` and `scriptsIncActionJs.php`
 
 - Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone/slskd/Copyparty frontends, stopped media-stack tmux apps, and Lighttpd.

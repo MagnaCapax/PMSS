@@ -96,38 +96,39 @@ if (!function_exists('pmssCustomerBackupRestoreDiskPrecheck')) {
 }
 
 if (!function_exists('pmssCustomerBackupRestoreEntriesSelect')) {
-/** Select only safe, allowlisted archive members for explicit Phar extraction. */
+/** Select only safe, allowlisted archive members for explicit GNU tar extraction. */
  function pmssCustomerBackupRestoreEntriesSelect($home, $archivePath, &$skippedCount, &$error, &$rtorrentLiveStateTouched) {
   $skippedCount = 0;
   $error = '';
   $rtorrentLiveStateTouched = false;
-  $types = pmssCustomerBackupRestoreTarMemberTypesRead($archivePath);
+  $memberNames = array();
+  $types = pmssCustomerBackupRestoreTarMemberTypesRead($archivePath, $memberNames);
   if (!is_array($types)) {
    $error = 'Could not read the backup archive member list.';
    return null;
   }
   $rtorrentLiveStateTouched = pmssCustomerBackupRestoreTouchesRtorrentLiveState(array_keys($types));
 
-  try {
-   $archive = new PharData($archivePath);
-   $iterator = new RecursiveIteratorIterator($archive, RecursiveIteratorIterator::SELF_FIRST);
-  } catch (Exception $e) {
+  // Keep whole-archive format/checksum validation ahead of the snapshot and writes.
+  $probe = @popen('TAR_OPTIONS= /bin/tar --list --gzip --file='.escapeshellarg($archivePath).' >/dev/null 2>/dev/null', 'r');
+  if (!is_resource($probe) || @pclose($probe) !== 0) {
    $error = 'Could not open the backup archive.';
    return null;
   }
 
   $entries = array();
-  foreach ($iterator as $entry) {
-   $member = pmssCustomerBackupRestoreMemberNormalize(pmssCustomerBackupRestoreMemberNameFromPhar($archivePath, $entry));
+  foreach ($memberNames as $name => $member) {
    $type = $types[$member] ?? null;
    if ($member === ''
+       || strpos($name, '\\') !== false
        || !pmssCustomerBackupRestoreMemberAllowed($member)
        || !pmssCustomerBackupRestoreMemberTypeAllowed($type)
        || !pmssCustomerBackupRestoreTargetPathIsSafe($home, $member)) {
     $skippedCount++;
     continue;
    }
-   $entries[$member] = $member;
+   // Validate normalized destinations, but match the archive's exact spelling.
+   $entries[$name] = $name;
   }
 
   return array_values($entries);
@@ -211,7 +212,7 @@ if (!function_exists('pmssCustomerBackupRestoreSnapshotCreate')) {
 }
 
 if (!function_exists('pmssCustomerBackupRestore')) {
-/** Restore a PMSS config backup through allowlisted Phar extraction only. */
+/** Restore a PMSS config backup through explicit, non-recursive GNU tar extraction. */
  function pmssCustomerBackupRestore($home, $archivePath) {
   $home = rtrim((string) $home, '/');
   if (!is_dir($home) || !pmssCustomerPathIsSafe($home)) {
@@ -221,7 +222,7 @@ if (!function_exists('pmssCustomerBackupRestore')) {
   $error = '';
   $archivePath = pmssCustomerBackupRestoreArchiveResolve($home, $archivePath, $error);
   if ($archivePath === '') return pmssCustomerBackupRestoreFinish($home, false, $error);
-  if (!class_exists('PharData')) return pmssCustomerBackupRestoreFinish($home, false, 'Restore is unavailable on this host.');
+  if (!is_executable('/bin/tar') || !pmssFrontendFunctionAvailable('popen')) return pmssCustomerBackupRestoreFinish($home, false, 'Restore is unavailable on this host.');
   if (!pmssCustomerBackupRestoreDiskPrecheck($home, $archivePath, $error)) return pmssCustomerBackupRestoreFinish($home, false, $error);
 
   $skippedCount = 0;
@@ -237,11 +238,26 @@ if (!function_exists('pmssCustomerBackupRestore')) {
   $snapshotPath = pmssCustomerBackupRestoreSnapshotCreate($home, $error);
   if ($snapshotPath === '') return pmssCustomerBackupRestoreFinish($home, false, $error, '', 0, $skippedCount);
 
-  try {
-   $archive = new PharData($archivePath);
-   $restored = @$archive->extractTo($home, $entries, true);
-  } catch (Exception $e) {
-   $restored = false;
+  // Never let directory selection, wildcards, list-file options or TAR_OPTIONS widen the allowlist.
+  $command = 'TAR_OPTIONS= /bin/tar --extract --gzip --no-same-owner --no-same-permissions'
+   .' --no-recursion --no-wildcards --anchored --null --verbatim-files-from'
+   .' --directory='.escapeshellarg($home).' --file='.escapeshellarg($archivePath)
+   .' --files-from=- >/dev/null 2>/dev/null';
+  $pipe = @popen($command, 'w');
+  $restored = false;
+  if (is_resource($pipe)) {
+   $members = implode("\0", $entries)."\0";
+   $offset = 0;
+   try {
+    while ($offset < strlen($members)) {
+     $written = @fwrite($pipe, substr($members, $offset));
+     if ($written === false || $written === 0) break;
+     $offset += $written;
+    }
+   } finally {
+    $returnCode = @pclose($pipe);
+   }
+   $restored = $offset === strlen($members) && $returnCode === 0;
   }
 
   if (!$restored) {
