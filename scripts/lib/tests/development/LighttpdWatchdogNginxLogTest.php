@@ -55,6 +55,7 @@ foreach (['stat', 'path-stat', 'state', 'seek', 'read', 'parse', 'tell', 'open-f
         $GLOBALS['failure'] = substr($stage, -6) === '-false' ? null
             : ($kind === 'exception' ? new \RuntimeException('read failed') : new \Error('read failed'));
         $GLOBALS['closes'] = 0;
+        $GLOBALS['handle'] = null;
         $caught = null;
         $actions = [];
         try {
@@ -76,7 +77,9 @@ PHP;
         ]);
         $this->assertSame(26, count($results));
         foreach ($results as $case => $result) {
-            $this->assertSame([true, true, strpos($case, 'open-false-') === 0 ? 0 : 1, [], true], $result, $case);
+            // Snapshot failures now precede acquisition, so no stream needs closing.
+            $unopened = strpos($case, 'open-false-') === 0 || strpos($case, 'path-stat-') === 0;
+            $this->assertSame([true, true, $unopened ? 0 : 1, [], true], $result, $case);
         }
         $this->assertSame($this->nginxLine(25000), file_get_contents($logPath));
     }

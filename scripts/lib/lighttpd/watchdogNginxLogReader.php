@@ -15,11 +15,16 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
         return array();
     }
 
-    $handle = @fopen($logPath, 'rb');
+    clearstatcache(true, $logPath);
+    $pathStat = @lstat($logPath);
+    if (!is_array($pathStat) || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000) {
+        return array();
+    }
+    // Pin the intended regular inode before a non-blocking open can encounter a replacement.
+    $handle = @fopen($logPath, 'rbn');
     try {
         $logStat = null;
-        $pathStat = @lstat($logPath);
-        if (!pmssStreamHandleIsOpen($handle) || !is_array($pathStat)
+        if (!pmssStreamHandleIsOpen($handle)
             || !pmssLockFileHandleMatchesPath($handle, $logPath, $pathStat, $logStat)
         ) {
             return array();

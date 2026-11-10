@@ -133,6 +133,13 @@ Keep the canonical installer/update details under `docs/install.md` and
   temporary workspaces, stream writes, file reads, and host values. Its sibling
   modules keep those responsibilities separate. Bounded and unbounded readers
   share one checked-open lifetime and the existing inode matcher (ADR 0167).
+- **scripts/lib/log.php** and **lighttpd/watchdogNginxLogReader.php** snapshot regular
+  logs before non-blocking acquisition and verify the opened device/inode before
+  reading. Failed snapshots, opens and inode checks retain their false/empty
+  results without invoking JSON handlers or publishing nginx recovery state.
+  Hard-linked logs remain supported; acquired streams close on refusals and
+  throwables. `LogReaderAcquisitionSafetyTest` covers these boundaries on the
+  testing machine alongside the existing decoding and cursor fixtures.
 - **scripts/lib/update/environment.php** – dpkg/apt guards plus helper to apply release-specific package selections.
 - **scripts/lib/update/filesystem.php** – warning-only filesystem preflights, including `/home` inode density detection for media-stack-heavy hosts.
 - **scripts/lib/update/arrRootExecutionBlock.php** – occupies `/root/.config/<App>` with a regular file so a root launch cannot create its data directory and aborts before binding; leftover config directories are moved aside, never deleted. Root has no legitimate Servarr instance, and `/opt` stays fully usable by customers (ADR 0034). Backstopped by **scripts/lib/arrRootGuard.php**, which the every-2-minute media-stack cron uses to kill root-owned `/opt/<App>/` processes and any known ARR process holding its default listener.
