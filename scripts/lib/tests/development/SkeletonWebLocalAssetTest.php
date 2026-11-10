@@ -319,29 +319,6 @@ class SkeletonWebLocalAssetTest extends TestCase
      */
     public function testManifestLocalAssetsAreReferencedByPanelSources(): void
     {
-        $referenced = $this->customerPanelReferencedLocalAssets();
-        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-        preg_match_all("/'www\\/([^']+\\.(?:css|js))'/", $manifest, $matches);
-        $assets = array_values(array_unique($matches[1]));
-        sort($assets);
-        $this->assertTrue($assets !== [], 'Expected customer-panel .css/.js manifest entries');
-        $unreferenced = [];
-        foreach ($assets as $asset) {
-            if (!isset($referenced[$asset])) {
-                $unreferenced[] = 'www/'.$asset;
-            }
-        }
-
-        $this->assertSame(
-            [],
-            $unreferenced,
-            "Customer-panel .css/.js manifest asset(s) have no local loader:\n".implode("\n", $unreferenced)
-        );
-    }
-
-    /** @return array<string, bool> */
-    private function customerPanelReferencedLocalAssets(): array
-    {
         $referenced = [];
         $files = [];
         foreach ($this->pmssRepoFiles('etc/skel/www', '/\.(?:php|html|css|js)$/i') as $path => $file) {
@@ -363,7 +340,23 @@ class SkeletonWebLocalAssetTest extends TestCase
         }
 
         ksort($referenced);
-        return $referenced;
+        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        preg_match_all("/'www\\/([^']+\\.(?:css|js))'/", $manifest, $matches);
+        $assets = array_values(array_unique($matches[1]));
+        sort($assets);
+        $this->assertTrue($assets !== [], 'Expected customer-panel .css/.js manifest entries');
+        $unreferenced = [];
+        foreach ($assets as $asset) {
+            if (!isset($referenced[$asset])) {
+                $unreferenced[] = 'www/'.$asset;
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $unreferenced,
+            "Customer-panel .css/.js manifest asset(s) have no local loader:\n".implode("\n", $unreferenced)
+        );
     }
 
     /** @return array<int, string> */

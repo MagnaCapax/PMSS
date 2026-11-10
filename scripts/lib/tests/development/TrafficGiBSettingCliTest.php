@@ -38,7 +38,33 @@ PHP;
 
     public function testGiBSettingCliModesPreserveContracts(): void
     {
-        foreach ($this->gibSettingCliCases() as $label => $case) {
+        $definitions = $this->gibSettingDefinitions();
+        $definition = $definitions['traffic-limit'];
+        $trafficCases = [
+            'traffic-limit show' => $this->gibSettingCliCase('traffic', $definition, ['--show'], "Traffic limit for fixtur01: 15 GiB\n", ['runtime' => "15GiB\n"], ['home' => null, 'runtime' => '15GiB']),
+            'traffic-limit help' => $this->gibSettingCliCase('traffic', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null, 'runtime' => null]),
+            'traffic-limit set' => $this->gibSettingCliCase('traffic', $definition, ['--limit=20'], "Traffic limit for fixtur01 set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['fixtur01', 'traffic limit set to 20 GiB (monthly quota)']]),
+            'traffic-limit unset' => $this->gibSettingCliCase('traffic', $definition, ['--unset'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
+            'traffic-limit zero' => $this->gibSettingCliCase('traffic', $definition, ['--limit=0'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
+        ];
+
+        $definition = $definitions['bonus'];
+        // The root store holds the bonus; the home file is its display copy and is never read (ADR 0213).
+        $bonusCases = [
+            'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for fixtur01: 15 GiB\n", ['home' => "900\n"], ['home' => '900']) + ['existingStore' => 15, 'store' => 15],
+            'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
+            'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for fixtur01 set to 20 GiB\n", [], ['home' => '20'], [], [['fixtur01', 'bonus traffic set to 20 GiB (monthly add-on)']]) + ['store' => 20],
+            'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
+            'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
+        ];
+        foreach ($bonusCases as &$case) {
+            $case['fixture']['storeKey'] = 'bonusTrafficGiB';
+            if (array_key_exists('existingStore', $case)) $case['fixture']['existingStore'] = $case['existingStore'];
+            unset($case['existingStore']);
+        }
+        unset($case);
+
+        foreach (array_merge($trafficCases, $bonusCases) as $label => $case) {
             $result = $this->pmssRunUserGiBSettingCliFixture($case['fixture']);
 
             $this->assertEquals(0, $result['rc'], $label);
@@ -222,50 +248,6 @@ PHP;
     private function gibSettingUsageText(array $definition): string
     {
         return implode("\n", $this->gibSettingUsageLines($definition))."\n";
-    }
-
-    /**
-     * @return array<string,array{fixture:array<string,mixed>,stdout:string,files:array<string,?string>,modes:array<string,int>,logs:array<int,array<int,string>>}>
-     */
-    private function gibSettingCliCases(): array
-    {
-        $definitions = $this->gibSettingDefinitions();
-        return array_merge(
-            $this->trafficLimitCliCases($definitions['traffic-limit']),
-            $this->bonusTrafficCliCases($definitions['bonus'])
-        );
-    }
-
-    /** @param array<string,string> $definition @return array<string,array<string,mixed>> */
-    private function trafficLimitCliCases(array $definition): array
-    {
-        return [
-            'traffic-limit show' => $this->gibSettingCliCase('traffic', $definition, ['--show'], "Traffic limit for fixtur01: 15 GiB\n", ['runtime' => "15GiB\n"], ['home' => null, 'runtime' => '15GiB']),
-            'traffic-limit help' => $this->gibSettingCliCase('traffic', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null, 'runtime' => null]),
-            'traffic-limit set' => $this->gibSettingCliCase('traffic', $definition, ['--limit=20'], "Traffic limit for fixtur01 set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['fixtur01', 'traffic limit set to 20 GiB (monthly quota)']]),
-            'traffic-limit unset' => $this->gibSettingCliCase('traffic', $definition, ['--unset'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
-            'traffic-limit zero' => $this->gibSettingCliCase('traffic', $definition, ['--limit=0'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
-        ];
-    }
-
-    /** @param array<string,string> $definition @return array<string,array<string,mixed>> */
-    private function bonusTrafficCliCases(array $definition): array
-    {
-        // The root store holds the bonus; the home file is its display copy and is never read (ADR 0213).
-        $cases = [
-            'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for fixtur01: 15 GiB\n", ['home' => "900\n"], ['home' => '900']) + ['existingStore' => 15, 'store' => 15],
-            'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
-            'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for fixtur01 set to 20 GiB\n", [], ['home' => '20'], [], [['fixtur01', 'bonus traffic set to 20 GiB (monthly add-on)']]) + ['store' => 20],
-            'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
-            'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
-        ];
-        foreach ($cases as &$case) {
-            $case['fixture']['storeKey'] = 'bonusTrafficGiB';
-            if (array_key_exists('existingStore', $case)) $case['fixture']['existingStore'] = $case['existingStore'];
-            unset($case['existingStore']);
-        }
-        unset($case);
-        return $cases;
     }
 
     /** Build one shared GiB-setting CLI fixture. */

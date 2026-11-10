@@ -26,36 +26,6 @@ class CustomerBackupTest extends TestCase
         return str_pad(decoct($value), $length - 1, '0', STR_PAD_LEFT)."\0";
     }
 
-    private function pmssTarHeader(string $name, string $type, string $content = '', string $linkName = ''): string
-    {
-        $this->assertTrue(strlen($name) <= 100, 'Fixture tar member name too long: '.$name);
-        $size = $type === '0' ? strlen($content) : 0;
-        $header = $this->pmssTarField($name, 100)
-            .$this->pmssTarOctal($type === '5' ? 0755 : 0644, 8)
-            .$this->pmssTarOctal(0, 8)
-            .$this->pmssTarOctal(0, 8)
-            .$this->pmssTarOctal($size, 12)
-            .$this->pmssTarOctal(1, 12)
-            .str_repeat(' ', 8)
-            .$type
-            .$this->pmssTarField($linkName, 100)
-            .$this->pmssTarField('ustar', 6)
-            .$this->pmssTarField('00', 2)
-            .$this->pmssTarField('pmss', 32)
-            .$this->pmssTarField('pmss', 32)
-            .$this->pmssTarOctal(0, 8)
-            .$this->pmssTarOctal(0, 8)
-            .$this->pmssTarField('', 155)
-            .$this->pmssTarField('', 12);
-
-        $checksum = 0;
-        for ($i = 0; $i < strlen($header); $i++) {
-            $checksum += ord($header[$i]);
-        }
-
-        return substr_replace($header, str_pad(decoct($checksum), 6, '0', STR_PAD_LEFT)."\0 ", 148, 8);
-    }
-
     private function pmssWriteTarGzArchive(array $members, string $filename = 'pmss-torrent-config-test.tar.gz'): string
     {
         if (!function_exists('gzencode') || !class_exists(\PharData::class)) {
@@ -68,7 +38,33 @@ class CustomerBackupTest extends TestCase
             $type = isset($member['type']) ? (string) $member['type'] : '0';
             $content = isset($member['content']) ? (string) $member['content'] : '';
             $linkName = isset($member['linkName']) ? (string) $member['linkName'] : '';
-            $tar .= $this->pmssTarHeader($name, $type, $content, $linkName);
+            // Build each header beside its payload so their sizes stay coupled.
+            $this->assertTrue(strlen($name) <= 100, 'Fixture tar member name too long: '.$name);
+            $size = $type === '0' ? strlen($content) : 0;
+            $header = $this->pmssTarField($name, 100)
+                .$this->pmssTarOctal($type === '5' ? 0755 : 0644, 8)
+                .$this->pmssTarOctal(0, 8)
+                .$this->pmssTarOctal(0, 8)
+                .$this->pmssTarOctal($size, 12)
+                .$this->pmssTarOctal(1, 12)
+                .str_repeat(' ', 8)
+                .$type
+                .$this->pmssTarField($linkName, 100)
+                .$this->pmssTarField('ustar', 6)
+                .$this->pmssTarField('00', 2)
+                .$this->pmssTarField('pmss', 32)
+                .$this->pmssTarField('pmss', 32)
+                .$this->pmssTarOctal(0, 8)
+                .$this->pmssTarOctal(0, 8)
+                .$this->pmssTarField('', 155)
+                .$this->pmssTarField('', 12);
+
+            $checksum = 0;
+            for ($i = 0; $i < strlen($header); $i++) {
+                $checksum += ord($header[$i]);
+            }
+
+            $tar .= substr_replace($header, str_pad(decoct($checksum), 6, '0', STR_PAD_LEFT)."\0 ", 148, 8);
             if ($type === '0') {
                 $padding = (512 - (strlen($content) % 512)) % 512;
                 $tar .= $content.str_repeat("\0", $padding);

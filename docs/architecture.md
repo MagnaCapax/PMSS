@@ -278,6 +278,8 @@ Keep the canonical installer/update details under `docs/install.md` and
 Test fixtures call constructors and shared helpers directly when a private
 adapter adds no policy. Single-use setup and assertions stay with their scenario,
 preserving fixture bytes, strict comparisons, stderr redirection and sandbox skips.
+Tar headers stay with archive assembly; traffic CLI case tables and panel-asset
+collection stay with their sole scenario, retaining checks and traversal order.
 
 Development tests must avoid network/system changes; production tests and the CLI probe are intended for curated post-provision runs.
 
