@@ -1729,7 +1729,8 @@ function pmssWelcomeHomeAppTileHtml(array $app)
     $label = pmssWelcomeHtmlAttr($app['name']);
     $sr = '<span class="h-sr"> '.$label.'</span>';
     $configure = 'href="configure.php#apps" onclick="return pmssWelcomeTabOpen(\'#pmssconfigure\', this)"';
-    $route = $app['action'] === 'open' ? pmssCustomerAppOpenRoute($app['id'], $app['url']) : null;
+    // A healed page can precede the host helper update; retain the plain Open link on older helpers.
+    $route = ($app['action'] === 'open' && function_exists('pmssCustomerAppOpenRoute')) ? pmssCustomerAppOpenRoute($app['id'], $app['url']) : null;
     if ($route !== null) $button = '<button type="button" class="h-btn" disabled data-app-route="'.pmssWelcomeHtmlAttr($route).'" data-app-href="'.pmssWelcomeHtmlAttr($app['url']).'" title="Waiting for the app route">Open'.$sr.'</button>';
     elseif ($app['action'] === 'open') $button = '<a class="h-btn" href="'.pmssWelcomeHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open'.$sr.'</a>';
     elseif ($app['action'] === 'start') $button = '<button type="button" class="h-btn" data-tile-action="start">Start'.$sr.'</button>';

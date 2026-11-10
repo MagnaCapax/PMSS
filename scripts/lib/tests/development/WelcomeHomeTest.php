@@ -11,7 +11,7 @@ final class WelcomeHomeTest extends TestCase
      * Run PHP against welcome.php's helper tail in a child process and decode its JSON answer.
      * Everything from pmssWelcomeTrafficUpgradeUrlBuild() on is function definitions only.
      */
-    private function runWelcomeHome(string $script, bool $offline = false, ?array $toggle = null): array
+    private function runWelcomeHome(string $script, bool $offline = false, ?array $toggle = null, bool $formatOnly = false): array
     {
         // Written per call: the harness removes each test's temporary files when the test ends.
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
@@ -21,7 +21,7 @@ final class WelcomeHomeTest extends TestCase
         if ($toggle !== null) $this->pmssWriteFile($fixtureDir.'/toggleAppCatalog.php', '<?php return '.var_export($toggle, true).';');
         $fixture = $this->pmssWriteFile(
             $fixtureDir.'/welcome.php',
-            "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).";\n"
+            "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/'.($formatOnly ? 'scriptsIncFormat.php' : 'scriptsInc.php')), true).";\n"
             .preg_replace('/\?>\s*$/', '', substr($source, $start))
         );
         // Offline: URL streams are off in the child, so a credit-service read fails at once instead of reaching the network.
@@ -450,6 +450,20 @@ final class WelcomeHomeTest extends TestCase
             $html = $this->runWelcomeHome('echo json_encode(array("html" => pmssWelcomeHomeAppTileHtml('.var_export($tile, true).')));')['html'];
             $this->assertStringContainsAllStrings(array('<button type="button" class="h-btn" disabled data-app-route="'.$route.'"', 'data-app-href="'.htmlspecialchars($url, ENT_QUOTES).'"', '>Open<span class="h-sr"> '.$id.'</span></button>'), $html);
             $this->pmssAssertStringNotContainsString('<a class="h-btn" href=', $html);
+        }
+    }
+
+    public function testAppTilesKeepPlainOpenLinksWithoutTheRouteHelper(): void
+    {
+        // Load only formatting helpers to represent a host missing the newer app-route helper.
+        foreach (array('openclaw', 'copyparty', 'rtorrent') as $id) {
+            $tile = array('id' => $id, 'name' => $id, 'desc' => '', 'state' => 'running', 'url' => 'apps.php?app='.$id.'&action=open',
+                'action' => 'open', 'restart' => true, 'start' => false, 'hero' => false, 'more' => false);
+            $result = $this->runWelcomeHome('echo json_encode(array("routeHelper" => function_exists("pmssCustomerAppOpenRoute"), "html" => pmssWelcomeHomeAppTileHtml('.var_export($tile, true).')));', false, null, true);
+            $this->assertSame(false, $result['routeHelper']);
+            $this->assertStringContainsAllStrings(array('<a class="h-btn" href="apps.php?app='.$id.'&amp;action=open" target="_blank" rel="noopener">Open',
+                'data-tile-action="restart">Restart'), $result['html']);
+            $this->pmssAssertStringNotContainsString('data-app-route=', $result['html']);
         }
     }
 
