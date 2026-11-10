@@ -18,56 +18,8 @@ class UserServiceLaunchTest extends TestCase
         $this->pmssWriteFile($hostDir.'/pids.max', "100\n");
         $this->pmssWriteFile($hostDir.'/pids.current', "0\n");
 
-        $binDir = $this->pmssWriteExecutableFiles($this->tempDir.'/bin', $this->fakeLaunchBinaries());
-        $this->pmssTrackEnvOverrides([
-            'PATH' => $binDir.':'.((string) getenv('PATH')),
-            'PMSS_FAKE_CGROUP_ROOT' => $fakeCgroup,
-            'PMSS_FAKE_SYSTEMD_RUN_LOG' => $this->tempDir.'/systemd-run.log',
-            'PMSS_FAKE_SYSTEMCTL_LOG' => $this->tempDir.'/systemctl.log',
-        ]);
-
-        $command = \pmssBuildUserServiceShellCommand('pmssdemo', 'storm 12');
-        $result = $this->pmssExecShellCommand($command);
-
-        $this->assertSame(73, $result['rc'], $result['output']);
-        $this->assertSame("4\n", $this->pmssReadFileOrEmpty($sliceDir.'/pids.current'));
-        $this->assertSame("0\n", $this->pmssReadFileOrEmpty($hostDir.'/pids.current'));
-        $this->assertStringContainsAllStrings([
-            'arg=--scope',
-            'arg=--slice=user-1001.slice',
-            'arg=su',
-        ], $this->pmssReadFileOrEmpty($this->tempDir.'/systemd-run.log'));
-        $this->assertStringContainsString('start user-1001.slice', $this->pmssReadFileOrEmpty($this->tempDir.'/systemctl.log'));
-        $this->assertStringContainsString(
-            'fork denied in /pids/user.slice/user-1001.slice/process-storm.scope current=4 max=4',
-            $this->pmssReadFileOrEmpty($fakeCgroup.'/result.log')
-        );
-        $this->assertStringContainsString(
-            'cgroup=/pids/user.slice/user-1001.slice/process-storm.scope',
-            $this->pmssReadFileOrEmpty($fakeCgroup.'/pids.log')
-        );
-    }
-
-    public function testLoginShellLaunchPreservesLegacySuDashShapeInsideScope(): void
-    {
+        // Keep the fake service manager and bounded process storm with this scenario.
         $binDir = $this->pmssWriteExecutableFiles($this->tempDir.'/bin', [
-            'id' => "#!/bin/sh\n[ \"\$1\" = '-u' ] && [ \"\$2\" = 'alice' ] && echo 2002 && exit 0\nexit 1\n",
-        ]);
-        $this->pmssTrackEnvOverrides(['PATH' => $binDir.':'.((string) getenv('PATH'))]);
-
-        $command = \pmssBuildUserServiceShellCommand('alice', 'screen -S rtorrent -fa -d -m rtorrent', true);
-
-        $this->assertStringContainsAllStrings([
-            "systemctl 'start' 'user-2002.slice'",
-            "systemd-run '--scope' '--collect' '--quiet' '--slice=user-2002.slice' '--' 'su' '-' 'alice' '-c'",
-            "'screen -S rtorrent -fa -d -m rtorrent'",
-        ], $command);
-    }
-
-    /** @return array<string,string> */
-    private function fakeLaunchBinaries(): array
-    {
-        return [
             'id' => <<<'SH'
 #!/bin/sh
 if [ "$1" = "-u" ] && [ "$2" = "pmssdemo" ]; then
@@ -154,6 +106,50 @@ done
 exit 0
 SH
             ,
-        ];
+        ]);
+        $this->pmssTrackEnvOverrides([
+            'PATH' => $binDir.':'.((string) getenv('PATH')),
+            'PMSS_FAKE_CGROUP_ROOT' => $fakeCgroup,
+            'PMSS_FAKE_SYSTEMD_RUN_LOG' => $this->tempDir.'/systemd-run.log',
+            'PMSS_FAKE_SYSTEMCTL_LOG' => $this->tempDir.'/systemctl.log',
+        ]);
+
+        $command = \pmssBuildUserServiceShellCommand('pmssdemo', 'storm 12');
+        $result = $this->pmssExecShellCommand($command);
+
+        $this->assertSame(73, $result['rc'], $result['output']);
+        $this->assertSame("4\n", $this->pmssReadFileOrEmpty($sliceDir.'/pids.current'));
+        $this->assertSame("0\n", $this->pmssReadFileOrEmpty($hostDir.'/pids.current'));
+        $this->assertStringContainsAllStrings([
+            'arg=--scope',
+            'arg=--slice=user-1001.slice',
+            'arg=su',
+        ], $this->pmssReadFileOrEmpty($this->tempDir.'/systemd-run.log'));
+        $this->assertStringContainsString('start user-1001.slice', $this->pmssReadFileOrEmpty($this->tempDir.'/systemctl.log'));
+        $this->assertStringContainsString(
+            'fork denied in /pids/user.slice/user-1001.slice/process-storm.scope current=4 max=4',
+            $this->pmssReadFileOrEmpty($fakeCgroup.'/result.log')
+        );
+        $this->assertStringContainsString(
+            'cgroup=/pids/user.slice/user-1001.slice/process-storm.scope',
+            $this->pmssReadFileOrEmpty($fakeCgroup.'/pids.log')
+        );
     }
+
+    public function testLoginShellLaunchPreservesLegacySuDashShapeInsideScope(): void
+    {
+        $binDir = $this->pmssWriteExecutableFiles($this->tempDir.'/bin', [
+            'id' => "#!/bin/sh\n[ \"\$1\" = '-u' ] && [ \"\$2\" = 'fixtur01' ] && echo 2002 && exit 0\nexit 1\n",
+        ]);
+        $this->pmssTrackEnvOverrides(['PATH' => $binDir.':'.((string) getenv('PATH'))]);
+
+        $command = \pmssBuildUserServiceShellCommand('fixtur01', 'screen -S rtorrent -fa -d -m rtorrent', true);
+
+        $this->assertStringContainsAllStrings([
+            "systemctl 'start' 'user-2002.slice'",
+            "systemd-run '--scope' '--collect' '--quiet' '--slice=user-2002.slice' '--' 'su' '-' 'fixtur01' '-c'",
+            "'screen -S rtorrent -fa -d -m rtorrent'",
+        ], $command);
+    }
+
 }

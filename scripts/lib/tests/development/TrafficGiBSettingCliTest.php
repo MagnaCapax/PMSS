@@ -133,20 +133,20 @@ PHP;
     {
         $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
         $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
-        @mkdir($homeRoot.'/alice', 0755, true);
+        @mkdir($homeRoot.'/fixtur01', 0755, true);
         @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
-        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/alice', "750GiB\n");
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "750GiB\n");
         $logs = array();
 
         $this->assertTrue(\pmssTrafficLimitHomeArtifactReconcile(
-            'alice',
+            'fixtur01',
             $homeRoot,
             $runtimeRoot,
             $this->pmssMakeArrayLogger($logs)
         ));
 
-        $this->assertSame('750', trim((string) @file_get_contents($homeRoot.'/alice/.trafficLimit')));
-        $this->assertSame(0664, @fileperms($homeRoot.'/alice/.trafficLimit') & 0777);
+        $this->assertSame('750', trim((string) @file_get_contents($homeRoot.'/fixtur01/.trafficLimit')));
+        $this->assertSame(0664, @fileperms($homeRoot.'/fixtur01/.trafficLimit') & 0777);
         $this->assertSame(array('traffic limit home artifact reconciled from runtime limit'), $logs);
     }
 
@@ -154,32 +154,32 @@ PHP;
     {
         $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
         $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
-        @mkdir($homeRoot.'/alice', 0755, true);
+        @mkdir($homeRoot.'/fixtur01', 0755, true);
         @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
-        $this->pmssWriteFile($homeRoot.'/alice/.trafficLimit', "25\n");
-        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/alice', "750\n");
+        $this->pmssWriteFile($homeRoot.'/fixtur01/.trafficLimit', "25\n");
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "750\n");
 
-        $this->assertTrue(\pmssTrafficLimitHomeArtifactReconcile('alice', $homeRoot, $runtimeRoot));
-        $this->assertSame('25', trim((string) @file_get_contents($homeRoot.'/alice/.trafficLimit')));
+        $this->assertTrue(\pmssTrafficLimitHomeArtifactReconcile('fixtur01', $homeRoot, $runtimeRoot));
+        $this->assertSame('25', trim((string) @file_get_contents($homeRoot.'/fixtur01/.trafficLimit')));
     }
 
     public function testHomeArtifactReconcileRejectsInvalidRuntimeTrafficLimit(): void
     {
         $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
         $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
-        @mkdir($homeRoot.'/alice', 0755, true);
+        @mkdir($homeRoot.'/fixtur01', 0755, true);
         @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
-        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/alice', "-1\n");
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "-1\n");
         $logs = array();
 
         $this->assertFalse(\pmssTrafficLimitHomeArtifactReconcile(
-            'alice',
+            'fixtur01',
             $homeRoot,
             $runtimeRoot,
             $this->pmssMakeArrayLogger($logs)
         ));
 
-        $this->assertFalse(file_exists($homeRoot.'/alice/.trafficLimit'));
+        $this->assertFalse(file_exists($homeRoot.'/fixtur01/.trafficLimit'));
         $this->assertSame(array('traffic limit home artifact skipped: invalid runtime limit (invalid format)'), $logs);
     }
 
@@ -240,11 +240,11 @@ PHP;
     private function trafficLimitCliCases(array $definition): array
     {
         return [
-            'traffic-limit show' => $this->gibSettingCliCase('traffic', $definition, ['--show'], "Traffic limit for alice: 15 GiB\n", ['runtime' => "15GiB\n"], ['home' => null, 'runtime' => '15GiB']),
+            'traffic-limit show' => $this->gibSettingCliCase('traffic', $definition, ['--show'], "Traffic limit for fixtur01: 15 GiB\n", ['runtime' => "15GiB\n"], ['home' => null, 'runtime' => '15GiB']),
             'traffic-limit help' => $this->gibSettingCliCase('traffic', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null, 'runtime' => null]),
-            'traffic-limit set' => $this->gibSettingCliCase('traffic', $definition, ['--limit=20'], "Traffic limit for alice set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['alice', 'traffic limit set to 20 GiB (monthly quota)']]),
-            'traffic-limit unset' => $this->gibSettingCliCase('traffic', $definition, ['--unset'], "Traffic limit for alice set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['alice', 'traffic limit unset (GiB quota removed)']]),
-            'traffic-limit zero' => $this->gibSettingCliCase('traffic', $definition, ['--limit=0'], "Traffic limit for alice set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['alice', 'traffic limit unset (GiB quota removed)']]),
+            'traffic-limit set' => $this->gibSettingCliCase('traffic', $definition, ['--limit=20'], "Traffic limit for fixtur01 set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['fixtur01', 'traffic limit set to 20 GiB (monthly quota)']]),
+            'traffic-limit unset' => $this->gibSettingCliCase('traffic', $definition, ['--unset'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
+            'traffic-limit zero' => $this->gibSettingCliCase('traffic', $definition, ['--limit=0'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
         ];
     }
 
@@ -253,11 +253,11 @@ PHP;
     {
         // The root store holds the bonus; the home file is its display copy and is never read (ADR 0213).
         $cases = [
-            'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for alice: 15 GiB\n", ['home' => "900\n"], ['home' => '900']) + ['existingStore' => 15, 'store' => 15],
+            'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for fixtur01: 15 GiB\n", ['home' => "900\n"], ['home' => '900']) + ['existingStore' => 15, 'store' => 15],
             'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
-            'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for alice set to 20 GiB\n", [], ['home' => '20'], [], [['alice', 'bonus traffic set to 20 GiB (monthly add-on)']]) + ['store' => 20],
-            'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
-            'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
+            'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for fixtur01 set to 20 GiB\n", [], ['home' => '20'], [], [['fixtur01', 'bonus traffic set to 20 GiB (monthly add-on)']]) + ['store' => 20],
+            'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
+            'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
         ];
         foreach ($cases as &$case) {
             $case['fixture']['storeKey'] = 'bonusTrafficGiB';
@@ -284,7 +284,7 @@ PHP;
                 'library' => 'scripts/lib/user/trafficLimit.php',
                 'function' => 'pmssUserTrafficLimitCli',
                 'homeFile' => '.trafficLimit',
-                'runtimeFile' => 'alice',
+                'runtimeFile' => 'fixtur01',
                 'homePrefix' => 'pmss-traffic-home-',
                 'runtimePrefix' => 'pmss-traffic-runtime-',
                 'homeGlobal' => 'PMSS_TRAFFIC_LIMIT_TEST_HOME',
@@ -304,7 +304,10 @@ PHP;
 
         return [
             'fixture' => array_merge([
-                'argv' => $this->gibSettingArgv($definition['script'], $args),
+                'user' => 'fixtur01',
+                'argv' => in_array('--help', $args, true)
+                    ? array_merge([$definition['script']], $args)
+                    : array_merge([$definition['script'], '--user=fixtur01'], $args),
                 'existingFiles' => $existingFiles,
             ], $fixtures[$kind]),
             'stdout' => $stdout,
@@ -314,11 +317,4 @@ PHP;
         ];
     }
 
-    /** @param array<int,string> $args @return array<int,string> */
-    private function gibSettingArgv(string $script, array $args): array
-    {
-        return in_array('--help', $args, true)
-            ? array_merge([$script], $args)
-            : array_merge([$script, '--user=alice'], $args);
-    }
 }

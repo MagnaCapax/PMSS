@@ -60,27 +60,23 @@ class SystemdSlicesCharacterizationTest extends TestCase
             'unsafe-device' => '05075d7896b75b88ae687ec22b6c498335c8f363ddfe5c9958181872c469ec11',
             'missing-device' => '463989cff5e94f36834de4a8351de50ae6213d73687a99a08f8f753e5bb282cd',
         ];
-        foreach ($cases as $name => $options) {
-            $trace = $this->setupTrace($options);
-            $this->assertSame($expected[$name], hash('sha256', json_encode($trace)), $name.': '.json_encode($trace));
+        foreach ($cases as $caseName => $options) {
+            // Reflect the actual production helpers with in-memory dependencies.
+            $script = 'namespace SystemdSlicesCharacterization; require '.var_export($this->pmssRepoPath('scripts/lib/tests/fixtures/systemdSlicesCharacterization.php'), true).';';
+            $functions = ['pmssCgroupPolicyIoPairs', 'pmssCgroupPolicyIoPairSpecs', 'pmssCgroupPolicyPositiveValue',
+                'pmssConfigTextRows', 'pmssConfigRows', 'pmssConfigLineColumns', 'pmssConfigLineTrimmed', 'pmssTextLines'];
+            foreach (get_defined_functions()['user'] as $name) {
+                $function = new \ReflectionFunction($name);
+                if (strpos(basename($function->getFileName()), 'systemdSlice') === 0) $functions[] = $name;
+            }
+            foreach ($functions as $name) {
+                $script .= \pmssTestingFunctionExport($name, 'SystemdSlicesCharacterization');
+            }
+            $script .= '$GLOBALS["sliceCase"] = '.var_export($options, true).'; $GLOBALS["sliceTrace"] = [];';
+            $script .= 'pmssEnsureSystemdSlices(static function ($message) { record(["log", $message]); });';
+            $trace = $this->pmssRunInlinePhpJson($script.'echo json_encode($GLOBALS["sliceTrace"]);');
+            $this->assertSame($expected[$caseName], hash('sha256', json_encode($trace)), $caseName.': '.json_encode($trace));
         }
     }
 
-    /** Execute reflected production functions with in-memory dependencies, never a copied flow. */
-    private function setupTrace(array $options): array
-    {
-        $script = 'namespace SystemdSlicesCharacterization; require '.var_export($this->pmssRepoPath('scripts/lib/tests/fixtures/systemdSlicesCharacterization.php'), true).';';
-        $functions = ['pmssCgroupPolicyIoPairs', 'pmssCgroupPolicyIoPairSpecs', 'pmssCgroupPolicyPositiveValue',
-            'pmssConfigTextRows', 'pmssConfigRows', 'pmssConfigLineColumns', 'pmssConfigLineTrimmed', 'pmssTextLines'];
-        foreach (get_defined_functions()['user'] as $name) {
-            $function = new \ReflectionFunction($name);
-            if (strpos(basename($function->getFileName()), 'systemdSlice') === 0) $functions[] = $name;
-        }
-        foreach ($functions as $name) {
-            $script .= \pmssTestingFunctionExport($name, 'SystemdSlicesCharacterization');
-        }
-        $script .= '$GLOBALS["sliceCase"] = '.var_export($options, true).'; $GLOBALS["sliceTrace"] = [];';
-        $script .= 'pmssEnsureSystemdSlices(static function ($message) { record(["log", $message]); });';
-        return $this->pmssRunInlinePhpJson($script.'echo json_encode($GLOBALS["sliceTrace"]);');
-    }
 }

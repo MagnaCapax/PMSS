@@ -13,8 +13,8 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         ));
 
         $this->assertSame(1, $result['rc']);
-        $this->assertStringContainsAllStrings(['FATAL: User already exists; refusing to overwrite', '###ADDUSER:ERROR user=alice'], $result['output']);
-        $this->assertTrue(strpos($result['output'], 'FATAL: User already exists; refusing to overwrite') < strpos($result['output'], '###ADDUSER:ERROR user=alice'));
+        $this->assertStringContainsAllStrings(['FATAL: User already exists; refusing to overwrite', '###ADDUSER:ERROR user=fixtur01'], $result['output']);
+        $this->assertTrue(strpos($result['output'], 'FATAL: User already exists; refusing to overwrite') < strpos($result['output'], '###ADDUSER:ERROR user=fixtur01'));
         $this->assertTrue(is_array($result['summary_json']), 'Expected fatal exit to emit a JSON summary line');
         $this->assertSame('ERROR', $result['summary_json']['status']);
         $this->assertSame('user_exists', $result['summary_json']['message']);
@@ -23,7 +23,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
     public function testFatalExitAddsExtraSummaryFieldsToJsonPayload(): void
     {
         $result = $this->fatalExitHarness(array(
-            'detail' => 'Invalid username "alice/evil": slash not allowed',
+            'detail' => 'Invalid username "fixtur01/evil": slash not allowed',
             'message' => 'invalid_username',
             'extra' => array(
                 'reason' => 'invalid_character',
@@ -39,13 +39,13 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
     public function testFatalExitWritesOptionalStderrLineForAutomation(): void
     {
         $result = $this->fatalExitHarness(array(
-            'detail' => 'Invalid username "alice/evil": slash not allowed',
+            'detail' => 'Invalid username "fixtur01/evil": slash not allowed',
             'message' => 'invalid_username',
-            'stderr' => 'ERROR: Invalid username "alice/evil": slash not allowed',
+            'stderr' => 'ERROR: Invalid username "fixtur01/evil": slash not allowed',
         ));
 
-        $this->assertStringContainsAllStrings(['ERROR: Invalid username "alice/evil": slash not allowed', '###ADDUSER_JSON:'], $result['output']);
-        $this->assertStringContainsString('ERROR: Invalid username "alice/evil": slash not allowed', $result['stderr']);
+        $this->assertStringContainsAllStrings(['ERROR: Invalid username "fixtur01/evil": slash not allowed', '###ADDUSER_JSON:'], $result['output']);
+        $this->assertStringContainsString('ERROR: Invalid username "fixtur01/evil": slash not allowed', $result['stderr']);
     }
 
     public function testAddUserWrapperDropsLegacyFatalFunctionExistsGuards(): void
@@ -76,7 +76,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         $options = array_merge(
             array(
                 'status' => 'ERROR',
-                'user' => 'alice',
+                'user' => 'fixtur01',
                 'detail' => 'fatal detail',
                 'message' => 'fatal_message',
                 'extra' => array(),
@@ -95,7 +95,33 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         $scriptPath = $this->pmssMakeTempPhpPath('pmss-adduser-fatal-', 'harness');
         $libraryPath = $this->pmssRepoPath('scripts/lib/user/add/provisioningRuntime.php');
 
-        file_put_contents($scriptPath, $this->buildFatalExitHarnessScript($libraryPath, $userLogPath, $options));
+        file_put_contents($scriptPath, implode("\n", array(
+            '<?php',
+            "if (!function_exists('pmssLogAppendTimestampedLine')) {",
+            "function pmssLogAppendTimestampedLine(string \$path, string \$message, string \$timestampFormat = '[Y-m-d H:i:s] ', string \$prefix = '', ?int \$mode = null): bool",
+            '{',
+            "    return file_put_contents(\$path, date('Y-m-d H:i:s').' '.\$prefix.\$message.PHP_EOL, FILE_APPEND) !== false;",
+            '}',
+            '}',
+            'function pmssUserBaseContext(string $action, string $phase, string $username, array $extra = array()): array',
+            '{',
+            "    return array_merge(array('action' => \$action, 'phase' => \$phase, 'username' => \$username), \$extra);",
+            '}',
+            'function pmssUserWriteLogs(array $payload): void',
+            '{',
+            '    file_put_contents('.var_export($userLogPath, true).', json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);',
+            '}',
+            'function pmssUserLifecycleContextLog($action, $phase, $username, $extra): void',
+            '{',
+            '    pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
+            '}',
+            'require '.var_export($libraryPath, true).';',
+            '$user = array('.var_export('name', true).' => '.var_export((string) $options['user'], true).');',
+            '$provisionStart = microtime(true) - 1;',
+            '$provisionStats = array('.var_export('steps', true).' => '.(int) $options['steps'].', '.var_export('ok', true).' => '.(int) $options['ok'].', '.var_export('err', true).' => '.(int) $options['err'].', '.var_export('last_error', true).' => '.var_export($options['last_error'], true).');',
+            '$provisionFinalized = false;',
+            'pmssAddUserFatalExit('.var_export((string) $options['status'], true).', '.var_export((string) $options['detail'], true).', '.var_export((string) $options['message'], true).', '.var_export($options['extra'], true).', '.var_export($options['stderr'], true).');',
+        ))."\n");
 
         $result = $this->pmssExecShellCommand(
             escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath),
@@ -122,40 +148,6 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         }
 
         throw new \AssertionError('Expected fatal exit JSON summary in output: '.$result['output']);
-    }
-
-    /**
-     * @param array<string,mixed> $options
-     */
-    private function buildFatalExitHarnessScript(string $libraryPath, string $userLogPath, array $options): string
-    {
-        return implode("\n", array(
-            '<?php',
-            "if (!function_exists('pmssLogAppendTimestampedLine')) {",
-            "function pmssLogAppendTimestampedLine(string \$path, string \$message, string \$timestampFormat = '[Y-m-d H:i:s] ', string \$prefix = '', ?int \$mode = null): bool",
-            '{',
-            "    return file_put_contents(\$path, date('Y-m-d H:i:s').' '.\$prefix.\$message.PHP_EOL, FILE_APPEND) !== false;",
-            '}',
-            '}',
-            'function pmssUserBaseContext(string $action, string $phase, string $username, array $extra = array()): array',
-            '{',
-            "    return array_merge(array('action' => \$action, 'phase' => \$phase, 'username' => \$username), \$extra);",
-            '}',
-            'function pmssUserWriteLogs(array $payload): void',
-            '{',
-            '    file_put_contents('.var_export($userLogPath, true).', json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);',
-            '}',
-            'function pmssUserLifecycleContextLog($action, $phase, $username, $extra): void',
-            '{',
-            '    pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
-            '}',
-            'require '.var_export($libraryPath, true).';',
-            '$user = array('.var_export('name', true).' => '.var_export((string) $options['user'], true).');',
-            '$provisionStart = microtime(true) - 1;',
-            '$provisionStats = array('.var_export('steps', true).' => '.(int) $options['steps'].', '.var_export('ok', true).' => '.(int) $options['ok'].', '.var_export('err', true).' => '.(int) $options['err'].', '.var_export('last_error', true).' => '.var_export($options['last_error'], true).');',
-            '$provisionFinalized = false;',
-            'pmssAddUserFatalExit('.var_export((string) $options['status'], true).', '.var_export((string) $options['detail'], true).', '.var_export((string) $options['message'], true).', '.var_export($options['extra'], true).', '.var_export($options['stderr'], true).');',
-        ))."\n";
     }
 
 }

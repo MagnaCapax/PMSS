@@ -105,65 +105,6 @@ class ConfigSyntaxValidationTest extends TestCase
         return $rendered;
     }
 
-    /**
-     * Extract and render WebDAV nginx blocks from createNginxConfig.php.
-     */
-    private function extractNginxWebdavBlocks(): string
-    {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $templates = \pmssNginxUserSubdomainTemplates();
-
-        $serverBlocks = '';
-        $webdavProxyParamsPath = $this->pmssRepoPath('etc/seedbox/config/template.nginx-webdav_proxy_params');
-        $webdavProxyParams = (string)file_get_contents($webdavProxyParamsPath);
-        foreach ($templates as $block) {
-            // Only include blocks that have server { } definitions
-            if (strpos($block, 'server {') !== false) {
-                // Substitute placeholders
-                $rendered = str_replace(
-                    array('##user##', '##port##', '##host##', '##ssl_block##'),
-                    array('testuser', '30000', 'test.example.com', ''),
-                    $block
-                );
-                // Inline WebDAV proxy params so nginx -t validates the real scoped directives.
-                $rendered = str_replace('include /etc/nginx/webdav_proxy_params;', rtrim($webdavProxyParams), $rendered);
-                // Remove proxy_params includes; we inline minimal proxy params below.
-                $rendered = str_replace('include /etc/nginx/proxy_params;', '', $rendered);
-                $serverBlocks .= $rendered."\n";
-            }
-        }
-
-        // Wrap in minimal nginx.conf
-        $nginxConf = <<<NGINX
-worker_processes 1;
-error_log /dev/null;
-pid {$this->tempDir}/nginx-test.pid;
-
-events {
-    worker_connections 1;
-}
-
-http {
-    access_log off;
-
-    # Include proxy_params content inline for testing
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header Authorization \$http_authorization;
-    proxy_read_timeout 300s;
-    proxy_send_timeout 300s;
-    client_body_timeout 300s;
-    send_timeout 300s;
-    proxy_buffering off;
-
-$serverBlocks
-}
-NGINX;
-
-        return $nginxConf;
-    }
-
     // =========================================================================
     // LIGHTTPD TESTS
     // =========================================================================
@@ -263,7 +204,57 @@ NGINX;
             throw new \PMSS\Tests\SkipTest('nginx binary not found - skipping binary validation');
         }
 
-        $config = $this->extractNginxWebdavBlocks();
+        // Render the server blocks with the real scoped WebDAV directives.
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $templates = \pmssNginxUserSubdomainTemplates();
+
+        $serverBlocks = '';
+        $webdavProxyParamsPath = $this->pmssRepoPath('etc/seedbox/config/template.nginx-webdav_proxy_params');
+        $webdavProxyParams = (string)file_get_contents($webdavProxyParamsPath);
+        foreach ($templates as $block) {
+            // Only include blocks that have server { } definitions
+            if (strpos($block, 'server {') !== false) {
+                // Substitute placeholders
+                $rendered = str_replace(
+                    array('##user##', '##port##', '##host##', '##ssl_block##'),
+                    array('testuser', '30000', 'test.example.com', ''),
+                    $block
+                );
+                // Inline WebDAV proxy params so nginx -t validates the real scoped directives.
+                $rendered = str_replace('include /etc/nginx/webdav_proxy_params;', rtrim($webdavProxyParams), $rendered);
+                // Remove proxy_params includes; we inline minimal proxy params below.
+                $rendered = str_replace('include /etc/nginx/proxy_params;', '', $rendered);
+                $serverBlocks .= $rendered."\n";
+            }
+        }
+
+        // Wrap in minimal nginx.conf
+        $config = <<<NGINX
+worker_processes 1;
+error_log /dev/null;
+pid {$this->tempDir}/nginx-test.pid;
+
+events {
+    worker_connections 1;
+}
+
+http {
+    access_log off;
+
+    # Include proxy_params content inline for testing
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header Authorization \$http_authorization;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_body_timeout 300s;
+    send_timeout 300s;
+    proxy_buffering off;
+
+$serverBlocks
+}
+NGINX;
         $configFile = $this->tempDir.'/nginx-test.conf';
         file_put_contents($configFile, $config);
 
