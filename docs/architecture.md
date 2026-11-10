@@ -28,6 +28,13 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/support/diagnostics.php** retains the support snapshot writer and
+  original include. `identity.php` resolves account identity; `collect.php` builds
+  diagnostics directly in the returned record. `mail.php` selects the transport,
+  `envelope.php` owns message bytes, and `sendmail.php` and `smtp.php` own their
+  transport lifetimes. SMTP commands, body and quit share one ordered exchange
+  loop. Public helpers, snapshot permissions and failure behavior remain stable
+  (ADR 0260).
 - **scripts/lib/rtorrent/processInspection.php** retains process observations and
   one `ps` acquisition path. `processRows.php` owns PID validation and pure
   executor/state decoding; `processReadiness.php` owns startup stability, reboot

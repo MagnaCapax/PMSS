@@ -44,7 +44,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         'scripts/lib/userTransfer/remoteScripts.php' => ['.bonusTraffic', '.bonusQuota', '.billingId', '.billingServiceId', '.billingClientId', '.trafficLimit', '.trafficData', '.qbittorrentPort', '.quota', 'pmss-user.json', '.resourceData', '.trafficDataIngress', '.trafficDataLocal'],
         // Display for the account (panel text, account-run stats and support reports, ADR 0152).
         'scripts/lib/stats/collect.php' => ['.bonusTraffic', '.trafficLimit', '.trafficData', '.quota', '.resourceData', '.trafficDataIngress'],
-        'scripts/lib/support/diagnostics.php' => ['.billingId', '.billingServiceId', '.billingClientId'],
+        'scripts/lib/support/collect.php' => ['.billingId', '.billingServiceId', '.billingClientId'],
         'scripts/lib/welcomeMessage.php' => ['pmss-user.json', '.product'],
         // Account switches and the account's own applications (ADR 0213 Decision 4).
         'scripts/cron/checkRcloneInstances.php' => ['.rclonePort'],
