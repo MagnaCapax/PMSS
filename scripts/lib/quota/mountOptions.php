@@ -57,9 +57,10 @@ function pmssQuotaFstabOptionsApply(string $mountPoint, array $requiredOptions, 
  * Ensure the given mount point in /etc/fstab carries an ext4 journal commit interval.
  *
  * A longer commit interval (default 60s vs the ext4 default 5s) batches journal commits, easing
- * jbd2 write-convoy contention on shared RAID5 seedbox hosts. `commit=` is remount-able, so
- * pmssConfigureQuotaMount's remount applies it live — no reboot needed. Uses the same
- * backup-protected fstab helpers as pmssEnsureQuotaOptions.
+ * jbd2 write-convoy contention on shared RAID5 seedbox hosts. `commit=` is remount-able, but
+ * active journaled quota prevents the normal remount; pmssConfigureQuotaMount reports an
+ * interval pending the next mount/boot. Uses the same backup-protected fstab helpers as
+ * pmssEnsureQuotaOptions.
  *
  * NOTE: `data=writeback` is deliberately NOT set here. It trades crash-consistency for speed and
  * requires a reboot to take effect — an operator policy decision, not an automatic default.

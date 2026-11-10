@@ -18,8 +18,8 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
     $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
     pmssEnsureQuotaOptions($mount, null, $log);
     // Default ext4 journal commit interval (60s vs the 5s ext4 default) — batches jbd2 commits to
-    // ease RAID5 write-convoy contention on shared seedbox hosts. The remount below applies it live
-    // (commit= is remount-able). Skippable via PMSS_SKIP_QUOTA (same gate that guards this whole step).
+    // ease RAID5 write-convoy contention on shared seedbox hosts. The remount applies it live only
+    // when journaled quota is not active; otherwise report any interval pending the next mount.
     pmssEnsureJournalCommitOption($mount, 60, $log);
     // Ensure `nofail` so a boot-time mount failure of this mount leaves the host REACHABLE for
     // remote recovery instead of hanging at an emergency prompt (Phase 5.3 pre-reboot expectation).
@@ -38,10 +38,34 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
     $fstabOptions = $fstabEntry['columns'][3] ?? '';
     if (pmssJournaledQuotaRemountBlocked($mount, $fstabOptions)) {
         $log('[INFO] Skipping remount for '.$mount.' (journaled quota is active; options cannot be re-applied until the next mount)');
+        pmssWarnPendingJournalCommit($mount, $fstabOptions, $log);
     } else {
         runStep('Remounting '.$mount.' to refresh quota options', sprintf('mount -o remount %s', escapeshellarg($mount)));
     }
     pmssWarnUnexpectedQuotaFiles($mount, $log);
+}
+
+/** Report a deferred fstab journal interval without changing live quota or mount state. */
+function pmssWarnPendingJournalCommit(string $mount, string $fstabOptions, callable $logger): void
+{
+    if (preg_match('/(?:^|,)(commit=[1-9][0-9]*)(?:,|$)/', $fstabOptions, $desired) !== 1) {
+        return;
+    }
+
+    // Reuse the mount-row parser and existing proc override for hermetic observations.
+    $mountsPath = pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
+    $lines = pmssFilesystemPathHasNulByte($mountsPath) ? false : @file($mountsPath, FILE_IGNORE_NEW_LINES);
+    $entry = is_array($lines) ? pmssFstabMountEntryRead($lines, $mount) : null;
+    if ($entry === null) {
+        $logger('[WARN] Cannot verify live journal commit option for '.$mount.'; '.$desired[1]
+            .' in fstab may be pending until the next mount/boot');
+        return;
+    }
+
+    if (!in_array($desired[1], explode(',', $entry['columns'][3]), true)) {
+        $logger('[WARN] Journal commit option '.$desired[1].' for '.$mount
+            .' is pending until the next mount/boot (journaled quota is active)');
+    }
 }
 
 /** Skip a journaled-quota remount only when user or group quota is live. */
