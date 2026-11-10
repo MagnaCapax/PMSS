@@ -28,6 +28,12 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/rtorrent/processInspection.php** retains process observations and
+  one `ps` acquisition path. `processRows.php` owns PID validation and pure
+  executor/state decoding; `processReadiness.php` owns startup stability, reboot
+  grace and staggering. Signals and launches remain in `processLifecycle.php`.
+  Existing public helpers, raw diagnostic references, command bytes and polling
+  order are covered by characterization fixtures (ADR 0251).
 - **scripts/lib/user/watchdogProcess.php** keeps watchdog process observations and
   guarded actions behind the existing include (ADR 0211). Option-shaped process
   selectors use the invalid-request result before pgrep runs; valid command bytes

@@ -341,7 +341,7 @@ function posix_kill($pid, $signal) { $GLOBALS['calls'][] = [$pid, $signal]; retu
 function exec($command) { $GLOBALS['calls'][] = $command; }
 PHP;
         $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true).';';
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/processInspection.php', 'RtorrentSignalFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/processRows.php', 'RtorrentSignalFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/processLifecycle.php', 'RtorrentSignalFixture');
         $script .= <<<'PHP'
 $result = [];

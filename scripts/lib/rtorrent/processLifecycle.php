@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/watchdogScgi.php';
+require_once __DIR__.'/processReadiness.php';
 
 /**
  * Send a signal to multiple PIDs.
@@ -54,46 +55,6 @@ function rtorrentProcessKillManagedPids(string $user, int $signal): int
     rtorrentProcessKillPids($managedPids, $signal);
 
     return count($managedPids);
-}
-
-/**
- * Check if system was recently rebooted.
- *
- * Reads /proc/uptime to determine seconds since boot. Used to detect
- * post-reboot conditions and trigger staggered starts.
- *
- * @param int $threshold Seconds threshold (default: 600 = 10 minutes).
- *
- * @return bool True if uptime is less than threshold.
- */
-function rtorrentProcessRecentReboot(int $threshold = 600): bool
-{
-    $uptime = @file_get_contents('/proc/uptime');
-    if ($uptime === false) {
-        return false;
-    }
-    // /proc/uptime format: "12345.67 98765.43" (uptime idle_time)
-    $parts = explode(' ', trim($uptime));
-    $seconds = (float) $parts[0];
-    return $seconds > 0 && $seconds < $threshold;
-}
-
-/**
- * Calculate a deterministic delay for a user.
- *
- * Uses crc32 hash of username to generate a consistent but distributed delay.
- * This ensures the same user always gets the same delay, but different users
- * are spread across the time window.
- *
- * @param string $user      Username.
- * @param int    $maxDelay  Maximum delay in seconds (default: 300 = 5 minutes).
- *
- * @return int Delay in seconds (0 to $maxDelay).
- */
-function rtorrentProcessStaggerDelay(string $user, int $maxDelay = 300): int
-{
-    $hash = crc32($user);
-    return ($hash < 0 ? $hash & 0x7FFFFFFF : $hash) % ($maxDelay + 1);
 }
 
 /**
