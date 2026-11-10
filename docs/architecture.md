@@ -278,6 +278,8 @@ Keep the canonical installer/update details under `docs/install.md` and
 Test fixtures call constructors and shared helpers directly when a private
 adapter adds no policy. Single-use setup and assertions stay with their scenario,
 preserving fixture bytes, strict comparisons, stderr redirection and sandbox skips.
+Panel-index source copies use private constants; mount paths, Python stub PATHs
+and preflight log captures compose the shared fixture helpers at their scenarios.
 Tar headers stay with archive assembly; traffic CLI case tables and panel-asset
 collection stay with their sole scenario, retaining checks and traversal order.
 Stub command paths use `pmssWithPathPrefix()` / `pmssWithPathPrefixedEnv()` for

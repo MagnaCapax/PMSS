@@ -24,7 +24,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $this->home = $this->pmssEnsureUserWebHome($this->homeRoot, $this->user);
         $this->skelIndex = $skelBase.'/www/index.php';
 
-        $this->pmssWriteFile($this->skelIndex, $this->fixedPanelIndexSource());
+        $this->pmssWriteFile($this->skelIndex, self::FIXED_PANEL_INDEX);
     }
 
     protected function tearDown(): void
@@ -36,30 +36,30 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
 
     public function testDetectorMatchesLegacyFrameDataMergeWithoutInitializer(): void
     {
-        $this->assertTrue(\pmssUserPanelIndexNeedsFrameDataCompatRefresh($this->legacyPanelIndexSource()));
+        $this->assertTrue(\pmssUserPanelIndexNeedsFrameDataCompatRefresh(self::LEGACY_PANEL_INDEX));
     }
 
     public function testDetectorIgnoresInitializedPanelCopy(): void
     {
-        $this->assertFalse(\pmssUserPanelIndexNeedsFrameDataCompatRefresh($this->customInitializedPanelSource()));
+        $this->assertFalse(\pmssUserPanelIndexNeedsFrameDataCompatRefresh(self::CUSTOM_INITIALIZED_PANEL));
     }
 
     public function testRefreshReplacesLegacyPanelIndexFromSkeleton(): void
     {
-        $this->pmssWriteRelativeFile($this->home, 'www/index.php', $this->legacyPanelIndexSource());
+        $this->pmssWriteRelativeFile($this->home, 'www/index.php', self::LEGACY_PANEL_INDEX);
 
         \pmssUserRefreshPanelIndexForFrameDataCompat($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
-        $this->assertEquals($this->fixedPanelIndexSource(), file_get_contents($this->home.'/www/index.php'));
+        $this->assertEquals(self::FIXED_PANEL_INDEX, file_get_contents($this->home.'/www/index.php'));
     }
 
     public function testSkeletonApplyFlowRefreshesLegacyPanelIndexFromSkeleton(): void
     {
-        $this->pmssWriteRelativeFile($this->home, 'www/index.php', $this->legacyPanelIndexSource());
+        $this->pmssWriteRelativeFile($this->home, 'www/index.php', self::LEGACY_PANEL_INDEX);
 
         \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
-        $this->assertEquals($this->fixedPanelIndexSource(), file_get_contents($this->home.'/www/index.php'));
+        $this->assertEquals(self::FIXED_PANEL_INDEX, file_get_contents($this->home.'/www/index.php'));
     }
 
     public function testSkeletonApplyFlowRestoresDataAndWatchLinks(): void
@@ -77,7 +77,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
 
     public function testTargetedRefreshLeavesCustomInitializedPanelCopyAloneInIsolation(): void
     {
-        $custom = $this->customInitializedPanelSource();
+        $custom = self::CUSTOM_INITIALIZED_PANEL;
         $this->pmssWriteRelativeFile($this->home, 'www/index.php', $custom);
 
         // The full skeleton apply flow may still refresh this file via updateUserFile().
@@ -109,9 +109,8 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $this->assertEquals($custom, file_get_contents($this->home.'/www/index.php'));
     }
 
-    private function legacyPanelIndexSource(): string
-    {
-        return <<<'PHP'
+    // Literal panel copies keep byte-for-byte expectations shared across scenarios.
+    private const LEGACY_PANEL_INDEX = <<<'PHP'
 <?php
 $frames = array();
 if (file_exists('../.customFrames')) {
@@ -120,11 +119,8 @@ if (file_exists('../.customFrames')) {
 }
 $frames = array_merge($frames, $frameData);
 PHP;
-    }
 
-    private function customInitializedPanelSource(): string
-    {
-        return <<<'PHP'
+    private const CUSTOM_INITIALIZED_PANEL = <<<'PHP'
 <?php
 $frames = array();
 $frameData = array();
@@ -134,11 +130,8 @@ if (file_exists('../.customFrames')) {
 $frames = array_merge($frames, $frameData);
 echo 'custom';
 PHP;
-    }
 
-    private function fixedPanelIndexSource(): string
-    {
-        return <<<'PHP'
+    private const FIXED_PANEL_INDEX = <<<'PHP'
 <?php
 function pmssFrameOpensInNewWindow(array $frame)
 {
@@ -152,5 +145,4 @@ if (file_exists('../.customFrames')) {
 }
 $frames = array_merge($frames, $frameData);
 PHP;
-    }
 }

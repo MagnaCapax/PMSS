@@ -8,7 +8,7 @@ class QuotaFstabOptionsTest extends TestCase
     public function testMountPoliciesPreserveMessagesDefaultsAndReruns(): void
     {
         foreach (['quota' => 'usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1', 'journal' => 'commit=60', 'nofail' => 'defaults,nofail'] as $policy => $options) {
-            $fstab = $this->makeQuotaFstab("UUID=abc /home ext4 defaults 0 0\n");
+            ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', "UUID=abc /home ext4 defaults 0 0\n");
             $apply = function (callable $logger) use ($policy, $fstab): void {
                 if ($policy === 'quota') \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
                 elseif ($policy === 'journal') \pmssEnsureJournalCommitOption('/home', 60, $logger, $fstab);
@@ -27,12 +27,6 @@ class QuotaFstabOptionsTest extends TestCase
             $missing = ['quota' => 'quota updates', 'journal' => 'journal commit update', 'nofail' => 'nofail update'][$policy];
             $this->assertSame(['[WARN] Mount point /home not found in '.$fstab.'; skipping '.$missing.'.'], $this->pmssArrayLoggerMessages($apply));
         }
-    }
-
-    private function makeQuotaFstab(string $content): string
-    {
-        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', $content);
-        return $fstab;
     }
 
     private function ensureQuotaOptions(string $fstab): array
@@ -61,7 +55,7 @@ class QuotaFstabOptionsTest extends TestCase
     public function testNoChangeWhenQuotaOptionsPresent(): void
     {
         $original = "UUID=abc /home ext4 defaults,noatime,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1 0 0\n";
-        $fstab = $this->makeQuotaFstab($original);
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', $original);
 
         $messages = $this->ensureQuotaOptions($fstab);
 
@@ -72,7 +66,7 @@ class QuotaFstabOptionsTest extends TestCase
     public function testAddsQuotaOptionsAndCreatesBackup(): void
     {
         $original = "UUID=abc /home ext4 defaults,noatime 0 0\n";
-        $fstab = $this->makeQuotaFstab($original);
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', $original);
 
         $messages = $this->ensureQuotaOptions($fstab);
 
@@ -92,7 +86,7 @@ class QuotaFstabOptionsTest extends TestCase
 
     public function testDefaultsOnlyLineDropsDefaultsToken(): void
     {
-        $fstab = $this->makeQuotaFstab("UUID=abc /home ext4 defaults 0 0\n");
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', "UUID=abc /home ext4 defaults 0 0\n");
 
         $this->ensureQuotaOptions($fstab);
 
@@ -107,7 +101,7 @@ class QuotaFstabOptionsTest extends TestCase
     public function testMountPointMissingDoesNotTouchFile(): void
     {
         $original = "UUID=abc /srv ext4 defaults,noatime 0 0\n";
-        $fstab = $this->makeQuotaFstab($original);
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', $original);
 
         $messages = $this->ensureQuotaOptions($fstab);
 
@@ -117,7 +111,7 @@ class QuotaFstabOptionsTest extends TestCase
 
     public function testUnreadableFstabSkipsConfiguration(): void
     {
-        $fstab = $this->makeQuotaFstab("UUID=abc /home ext4 defaults 0 0\n");
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', "UUID=abc /home ext4 defaults 0 0\n");
         chmod($fstab, 0000);
 
         $messages = $this->ensureQuotaOptions($fstab);

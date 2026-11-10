@@ -23,13 +23,6 @@ class HomeInodeDensityTest extends TestCase
         return $messages;
     }
 
-    private function runUpdateStep2PreflightChecks(array $homePaths, array $lockPaths, array $cachePaths, float $minBytes = 1.0): array
-    {
-        return $this->pmssArrayLoggerCapture(function (callable $logger) use ($homePaths, $lockPaths, $cachePaths, $minBytes): bool {
-            return \pmssUpdateStep2PreflightChecks($logger, $homePaths, $lockPaths, $cachePaths, '', $minBytes);
-        });
-    }
-
     public function testParsesStatLineAndComputesBytesPerInode(): void
     {
         $stats = \pmssFilesystemStatLineParse('4096 1024 128');
@@ -145,12 +138,16 @@ class HomeInodeDensityTest extends TestCase
     public function testUpdateStep2PreflightKeepsFatalAndWarningOnlyContracts(): void
     {
         $home = $this->pmssMakeTempDir('pmss-preflight-disk-home-');
-        [$result, $messages] = $this->runUpdateStep2PreflightChecks([$home], [], [], 1.0E20);
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
+            return \pmssUpdateStep2PreflightChecks($logger, [$home], [], [], '', 1.0E20);
+        });
         $this->assertFalse($result, 'Fatal disk-space failures should abort the caller');
         $this->assertStringContainsAllStrings(['Insufficient free space on', 'Preflight checks failed (fatal)'], implode("\n", $messages));
 
         $missingBase = sys_get_temp_dir().'/pmss-preflight-missing-'.uniqid('', true);
-        [$result, $messages] = $this->runUpdateStep2PreflightChecks([], [$missingBase.'/dpkg.lock'], [$missingBase.'/apt-cache']);
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($missingBase): bool {
+            return \pmssUpdateStep2PreflightChecks($logger, [], [$missingBase.'/dpkg.lock'], [$missingBase.'/apt-cache'], '', 1.0);
+        });
         $this->assertTrue($result, 'Warning-only preflight failures should not abort update-step2');
         $this->assertStringContainsAllStrings(['Unable to open dpkg lock file', 'APT cache path missing or not writable'], implode("\n", $messages));
     }
