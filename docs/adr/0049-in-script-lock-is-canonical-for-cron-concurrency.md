@@ -54,6 +54,13 @@ primitive; callers retain the returned stream for their entire run. Callbacks
 preserve legacy logging and exit statuses, and watchdogs retain their existing
 `pmssUserWatchdogLockAcquire()` descriptor-export step for child services.
 
+The rootless Docker watchdog exports its acquired cron lock through
+`pmssLockHandleExportChildCloseFds()` before any `runCommand()` call (Refs #949).
+The shared shell wrapper closes that descriptor before launching child helpers,
+so long-lived Docker daemons cannot retain the watchdog lock after it exits.
+This prevents new leaks; existing inherited locks remain held until every
+process retaining the descriptor exits.
+
 Lock acquisition rejects empty modes, modes containing NUL bytes, and all
 `w`-prefixed modes before opening the target or creating its parent directory.
 Opening with `w` would truncate stored state before `flock()` could reject a

@@ -17,6 +17,8 @@ pmssRequireRelativeFiles('/scripts/lib', ['user/log.php', 'user/userConfigStore.
 // Docker (re)starts and stack on a hung mount (GH #850/#853). Non-blocking:
 // skip if another run holds the lock. Hold the handle until exit.
 $checkRootlessDockerLock = pmssCronLockAcquire('checkRootlessDocker');
+// Keep the parent lock, but close its descriptor before launching Docker children.
+pmssLockHandleExportChildCloseFds($checkRootlessDockerLock);
 
 $logger = new Logger(__FILE__);
 // Mirror messages to the legacy logfile when stdout is interactive.
