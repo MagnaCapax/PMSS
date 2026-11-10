@@ -24,6 +24,8 @@ function pmssFileOpenWithUmask(string $path, string $mode, int $mask)
 function pmssRegularFileOpenVerified(string $path, ?array $pathStat = null, ?array &$handleStat = null)
 {
     $handleStat = null;
+    // Supplied metadata must not bypass raw-path validation before fopen().
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     if ($pathStat === null) {
         clearstatcache(true, $path);
         $pathStat = @lstat($path);

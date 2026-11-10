@@ -248,6 +248,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   Lock, snapshot, TTY, and command-pipe callers keep their existing failure results
   for closed handles and resources of other types.
 
+- `pmssRegularFileOpenVerified()` rejects empty and NUL-containing paths before
+  metadata lookup or open, including when a caller supplies a regular-file snapshot.
+  Rejection returns `false` and clears the output metadata. Valid paths retain
+  their exact bytes, nonblocking open, inode verification and stream ownership.
+  `RegularFileAcquisitionSafetyTest` covers these boundaries on the testing machine.
+
 - `pmssStreamWriteAll($handle, string $payload): bool` checks for an open stream
   before each write, including partial-write retries. Invalid or closed handles
   return `false` without consuming other resource types; empty payloads retain
