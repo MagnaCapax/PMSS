@@ -11,12 +11,10 @@ function pmssPinnedRemoteChecksum(string $path): string
     // Follow installed binary symlinks, but never open a known device or FIFO.
     $entry = @stat($path);
     if (!is_array($entry) || (($entry['mode'] ?? 0) & 0170000) !== 0100000) return '';
-    $handle = @fopen($path, 'rbn');
+    $handle = pmssRegularFileOpenVerified($path, $entry, $opened);
     if ($handle === false) return '';
     try {
-        // A FIFO substituted after stat must not block; a replacement inode is not evidence.
-        if (!pmssLockFileHandleMatchesPath($handle, $path, $entry, $opened)
-            || (($opened['mode'] ?? 0) & 0170000) !== 0100000) return '';
+        if ((($opened['mode'] ?? 0) & 0170000) !== 0100000) return '';
         $hash = hash_init('sha256');
         if (@hash_update_stream($hash, $handle) !== ($opened['size'] ?? null)) return '';
         return hash_final($hash);

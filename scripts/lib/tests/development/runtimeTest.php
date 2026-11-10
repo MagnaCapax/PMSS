@@ -61,7 +61,7 @@ class RuntimeTest extends TestCase
     public function testFilesystemFacadeAloneExportsAllResponsibilityGroups(): void
     {
         $script = 'require_once '.var_export(dirname(__DIR__, 2).'/runtime/filesystem.php', true).';';
-        $symbols = ['pmssDirectoryEntriesRead', 'pmssCreatePrivateTempFile', 'pmssStreamWriteAll', 'pmssSerializedArrayDecode',
+        $symbols = ['pmssDirectoryEntriesRead', 'pmssCreatePrivateTempFile', 'pmssStreamWriteAll', 'pmssRegularFileOpenVerified', 'pmssSerializedArrayDecode',
             'pmssReadRegularFileContentsVerified', 'pmssReadSerializedArrayFile', 'pmssColonRecordFieldsLookup',
             'pmssProcMeminfoFieldsRead', 'pmssHostnameIsValid', 'pmssNetworkPortParseDigits'];
         $script .= 'echo json_encode(array_map("function_exists", '.var_export($symbols, true).'));';

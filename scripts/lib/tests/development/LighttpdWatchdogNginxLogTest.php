@@ -42,6 +42,7 @@ function pmssLighttpdWatchdogNginxEventParse($line) { fault('parse'); return \pm
 function ftell($handle) { fault('tell'); return $GLOBALS['stage'] === 'tell-false' ? false : \ftell($handle); }
 function fclose($handle) { $GLOBALS['closes']++; return \fclose($handle); }
 PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystemStream.php', 'NginxReadFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/watchdogNginxLogReader.php', 'NginxReadFixture');
         $script .= <<<'PHP'
 [$logPath, $statePath] = json_decode(getenv('PMSS_TEST_NGINX_READ'), true);

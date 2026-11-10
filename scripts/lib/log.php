@@ -152,20 +152,11 @@ function pmssJsonLineFileEach(string $path, callable $handler): bool
         return false;
     }
 
-    clearstatcache(true, $path);
-    $pathStat = @lstat($path);
-    if (!is_array($pathStat) || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000) {
-        return false;
-    }
-    // A FIFO substituted after the snapshot must not block acquisition.
-    $handle = @fopen($path, 'rbn');
+    $handle = pmssRegularFileOpenVerified($path);
     if ($handle === false) {
         return false;
     }
     try {
-        if (!pmssLockFileHandleMatchesPath($handle, $path, $pathStat)) {
-            return false;
-        }
         while (($line = fgets($handle)) !== false) {
             if (($decoded = pmssJsonDecodeAssoc($line)) !== null) {
                 $handler($decoded);

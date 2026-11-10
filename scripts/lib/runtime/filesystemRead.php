@@ -17,12 +17,10 @@ function pmssRegularFileRead(string $path, ?int $requiredUid = null, ?int $maxBy
     clearstatcache(true, $path);
     $entry = @lstat($path);
     if (!pmssUserFileStatIsSingleRegular($entry)) return null;
-    // Non-blocking open keeps a substituted FIFO from stalling either reader.
-    $handle = @fopen($path, 'rbn');
-    if (!pmssStreamHandleIsOpen($handle)) return null;
+    $handle = pmssRegularFileOpenVerified($path, $entry, $opened);
+    if ($handle === false) return null;
     try {
-        if (!pmssLockFileHandleMatchesPath($handle, $path, $entry, $opened)
-            || !pmssUserFileStatIsSingleRegular($opened)
+        if (!pmssUserFileStatIsSingleRegular($opened)
             || ($requiredUid !== null && ($opened['uid'] ?? null) !== $requiredUid)
             || ($maxBytes !== null && ($opened['size'] ?? PHP_INT_MAX) > $maxBytes)) return null;
         $contents = $maxBytes === null ? @stream_get_contents($handle) : @stream_get_contents($handle, $maxBytes + 1);

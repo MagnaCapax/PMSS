@@ -87,6 +87,7 @@ function fclose($handle) { \fclose($handle); return observe('close', true); }
 PHP;
         // Exercise the shared inode matcher with injected metadata, rather than replacing it.
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'LiveStatsTailAcquisitionFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystemStream.php', 'LiveStatsTailAcquisitionFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/liveStats.php', 'LiveStatsTailAcquisitionFixture');
         $script .= <<<'PHP'
 $results = [];
@@ -200,6 +201,7 @@ function stream_get_contents($handle) { ++$GLOBALS['reads']; return failAt('read
 function fclose($handle) { ++$GLOBALS['closes']; return \fclose($handle); }
 PHP;
         $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'LiveStatsTailFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystemStream.php', 'LiveStatsTailFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/liveStats.php', 'LiveStatsTailFixture');
         $script .= <<<'PHP'
 $GLOBALS['operation'] = getenv('PMSS_TEST_LIVE_TAIL_OPERATION');

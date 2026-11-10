@@ -70,6 +70,7 @@ function fclose($handle) {
 PHP;
         // Exercise the shared inode matcher with injected fstat failures.
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'PinnedArtifactChecksumFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystemStream.php', 'PinnedArtifactChecksumFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/apps/remoteBinary/artifact.php', 'PinnedArtifactChecksumFixture');
         $script .= <<<'PHP'
 $results = [];

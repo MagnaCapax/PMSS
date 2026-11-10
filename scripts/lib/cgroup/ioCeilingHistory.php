@@ -30,15 +30,11 @@ function pmssIoCeilingHistorySamples(string $path): iterable
             || !is_array($entry = @lstat($file)) || (($entry['mode'] ?? 0) & 0170000) !== 0100000) {
             continue;
         }
-        // A replacement FIFO must not block the reader before inode validation.
-        $handle = @fopen($file, 'rbn');
+        $handle = pmssRegularFileOpenVerified($file, $entry, $stat);
         if ($handle === false) {
             continue;
         }
         try {
-            if (!pmssLockFileHandleMatchesPath($handle, $file, $entry, $stat)) {
-                continue;
-            }
             $size = $stat['size'] ?? 0;
             $offset = max(0, $size - 16 * 1024 * 1024);
             if (fseek($handle, $offset) !== 0) {

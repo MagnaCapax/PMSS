@@ -15,10 +15,9 @@ require_once __DIR__.'/readLimitStatus.php';
 function pmssDynamicIopsTailLines(string $path): array
 {
     if (!pmssPathTargetIsSafe($path, false, true) || !pmssUserFileStatIsSingleRegular($stat = @lstat($path))) return [];
-    $handle = @fopen($path, 'rbn');
+    $handle = pmssRegularFileOpenVerified($path, $stat, $opened);
     if ($handle === false) return [];
     try {
-        if (!pmssLockFileHandleMatchesPath($handle, $path, $stat, $opened)) return [];
         $offset = max(0, $opened['size'] - 65536);
         if (fseek($handle, $offset) !== 0) return [];
         $raw = stream_get_contents($handle, 65536);

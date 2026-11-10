@@ -15,21 +15,9 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
         return array();
     }
 
-    clearstatcache(true, $logPath);
-    $pathStat = @lstat($logPath);
-    if (!is_array($pathStat) || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000) {
-        return array();
-    }
-    // Pin the intended regular inode before a non-blocking open can encounter a replacement.
-    $handle = @fopen($logPath, 'rbn');
+    $handle = pmssRegularFileOpenVerified($logPath, null, $logStat);
+    if ($handle === false) return array();
     try {
-        $logStat = null;
-        if (!pmssStreamHandleIsOpen($handle)
-            || !pmssLockFileHandleMatchesPath($handle, $logPath, $pathStat, $logStat)
-        ) {
-            return array();
-        }
-
         $state = pmssJsonFileReadAssoc($statePath, true);
         $firstRun = !is_array($state) || !isset($state['offset'], $state['device'], $state['inode']);
         $sameFile = !$firstRun

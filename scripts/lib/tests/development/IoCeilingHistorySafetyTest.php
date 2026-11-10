@@ -68,6 +68,7 @@ function fclose($handle) {
 PHP;
         // Use the shared inode matcher itself, rather than a fixture acceptance stub.
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystem.php', 'IoCeilingHistoryFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/filesystemStream.php', 'IoCeilingHistoryFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/ioCeilingHistory.php', 'IoCeilingHistoryFixture');
         $script .= <<<'PHP'
 $results = [];

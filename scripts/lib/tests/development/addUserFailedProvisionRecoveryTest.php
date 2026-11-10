@@ -83,7 +83,7 @@ function fgets($handle) {
 function feof($handle) { return observe('eof', $GLOBALS['case'] === 'eof-false' ? false : \feof($handle)); }
 function fclose($handle) { \fclose($handle); return observe('close', true); }
 PHP;
-        foreach (['runtime/filesystem.php', 'user/add/orphanCleanup.php'] as $library) {
+        foreach (['runtime/filesystem.php', 'runtime/filesystemStream.php', 'user/add/orphanCleanup.php'] as $library) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/'.$library, 'ProvisionLogSafetyFixture');
         }
         $script .= <<<'PHP'

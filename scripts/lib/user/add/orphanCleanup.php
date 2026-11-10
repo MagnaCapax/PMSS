@@ -35,22 +35,13 @@ function pmssAddUserLatestProvisionSummary(string $userName): ?array
         return null;
     }
 
-    clearstatcache(true, $logPath);
-    $pathStat = @lstat($logPath);
-    if (!is_array($pathStat) || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000) {
-        return null;
-    }
     $summary = null;
-    // A FIFO substituted after the snapshot must not block provisioning.
-    $handle = @fopen($logPath, 'rbn');
-    if (!is_resource($handle)) {
+    $handle = pmssRegularFileOpenVerified($logPath);
+    if ($handle === false) {
         return null;
     }
 
     try {
-        if (!pmssLockFileHandleMatchesPath($handle, $logPath, $pathStat)) {
-            return null;
-        }
         while (($line = fgets($handle)) !== false) {
             $markerPos = strpos($line, '###ADDUSER_JSON:');
             if ($markerPos === false) {

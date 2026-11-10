@@ -16,6 +16,30 @@ function pmssFileOpenWithUmask(string $path, string $mode, int $mask)
     }
 }
 
+/**
+ * Open a regular inode without blocking on a substituted FIFO; transfer only verified streams.
+ * Callers retain path/owner/link policy and may supply their already-validated stat or lstat snapshot.
+ * @return resource|false Caller owns successful streams; rejected streams close here, even on throws.
+ */
+function pmssRegularFileOpenVerified(string $path, ?array $pathStat = null, ?array &$handleStat = null)
+{
+    $handleStat = null;
+    if ($pathStat === null) {
+        clearstatcache(true, $path);
+        $pathStat = @lstat($path);
+    }
+    if (!is_array($pathStat) || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000) return false;
+    $handle = @fopen($path, 'rbn');
+    if (!pmssStreamHandleIsOpen($handle)) return false;
+    $verified = false;
+    try {
+        $verified = pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat);
+        return $verified ? $handle : false;
+    } finally {
+        if (!$verified) fclose($handle);
+    }
+}
+
 /** Reject closed streams and other resource types before stream operations. */
 function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && get_resource_type($handle) === 'stream'; }
 /**
