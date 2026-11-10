@@ -2,6 +2,15 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/testing/customerContextFatalScan.php';
+
+/**
+ * Behavior lock for scripts/lib/testing/customerContextFatalScan.php and its internals:
+ * scripts/lib/testing/customerContext/scanner.php
+ * scripts/lib/testing/customerContext/files.php
+ * scripts/lib/testing/customerContext/tokens.php
+ * scripts/lib/testing/customerContext/guards.php
+ */
 
 class CustomerContextFatalScanTest extends TestCase
 {
@@ -163,6 +172,95 @@ PHP
 
         $this->assertSame(1, $result['rc']);
         $this->assertSame("[customer-context-fatal-scan] FAIL - UNDEFINED_FUNCTION_CALL: 2 operator PHP call(s) to undefined functions:\n  scripts/lib/lighttpd/proxy.php:2 - is_socket()\n  scripts/startDaemon:3 - pmssMissingStarter()", $result['output']);
+    }
+
+    public function testScanScopesRetainDiscoveryOrderDuplicatesAndDefinitionPrecedence(): void
+    {
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-fatal-scan-order-', 0700), [
+            'etc/skel/helper.php' => "<?php\nfunction pmssFixtureHomeHelper() {}\n",
+            'etc/skel/www/first.php' => "<?php\nPmssFixtureMissing();\npmssFixtureHomeHelper();\npmssFixtureNested();\n",
+            'etc/skel/www/nested/ignored.php' => "<?php\nfunction pmssFixtureNested() {}\npmssFixtureIgnored();\n",
+            // A PHP command appears in both the extension and interpreter inventories.
+            'etc/skel/bin/first.php' => "#!/usr/bin/env php\n<?php\npmssFixtureBinMissing();\n",
+            'etc/skel/bin/second' => "#!/usr/bin/php\n<?php\npmssFixtureCommandMissing();\n",
+            'etc/skel/bin/not-php' => "#!/bin/sh\npmssFixtureIgnored\n",
+            'scripts/lib/first.php' => "<?php\nfunction pmssFixtureMissing() {}\n",
+            'scripts/lib/last.php' => "<?php\nfunction pmssFixtureMissing() {}\n",
+            'scripts/lib/tests/ignored.php' => "<?php\npmssFixtureIgnored();\n",
+            'scripts/lib/devristo/ignored.php' => "<?php\npmssFixtureIgnored();\n",
+            'scripts/run' => "#!/usr/bin/env php\n<?php\npmssFixtureOperatorMissing();\n",
+        ]);
+        $scanner = new \PmssCustomerContextFatalScanner($root);
+        $this->assertSame([
+            ['file' => 'etc/skel/www/first.php', 'line' => 2, 'function' => 'PmssFixtureMissing', 'operator_tree_source' => 'scripts/lib/last.php'],
+            ['file' => 'etc/skel/www/first.php', 'line' => 4, 'function' => 'pmssFixtureNested', 'operator_tree_source' => ''],
+            ['file' => 'etc/skel/bin/first.php', 'line' => 3, 'function' => 'pmssFixtureBinMissing', 'operator_tree_source' => ''],
+            ['file' => 'etc/skel/bin/first.php', 'line' => 3, 'function' => 'pmssFixtureBinMissing', 'operator_tree_source' => ''],
+            ['file' => 'etc/skel/bin/second', 'line' => 3, 'function' => 'pmssFixtureCommandMissing', 'operator_tree_source' => ''],
+        ], $scanner->scan());
+        $this->assertSame([
+            ['file' => 'scripts/run', 'line' => 3, 'function' => 'pmssFixtureOperatorMissing'],
+        ], $scanner->scanOperatorTree());
+    }
+
+    public function testBothScanScopesRetainGuardAndTokenDecisions(): void
+    {
+        // These are token fixtures, never executed PHP. Include the existing heuristic's
+        // permissive and restrictive decisions so this refactor cannot change policy.
+        $cases = [
+            'bare' => ['pmssFixtureAbsent();', true],
+            'braced' => ["if (function_exists('pmssFixtureAbsent')) { pmssFixtureAbsent(); }", false],
+            'nested sibling' => ["if (function_exists('pmssFixtureAbsent')) { if (true) { strlen('x'); } pmssFixtureAbsent(); }", false],
+            'closed nested braces' => ["if (function_exists('pmssFixtureAbsent')) { while (false) { if (true) {} } pmssFixtureAbsent(); }", false],
+            'unrelated preceding block' => ["if (true) { strlen('x'); } pmssFixtureAbsent();", true],
+            'wrong guard' => ["if (function_exists('pmssFixtureOther')) { pmssFixtureAbsent(); }", true],
+            'braceless' => ["if (function_exists('pmssFixtureAbsent')) pmssFixtureAbsent();", false],
+            'braceless disjunction' => ["if (function_exists('pmssFixtureAbsent') || true) pmssFixtureAbsent();", true],
+            'short circuit and' => ["function_exists('pmssFixtureAbsent') && pmssFixtureAbsent();", false],
+            'negative or' => ["!function_exists('pmssFixtureAbsent') || pmssFixtureAbsent();", false],
+            'ternary' => ["function_exists('pmssFixtureAbsent') ? pmssFixtureAbsent() : null;", false],
+            'early return' => ["if (!function_exists('pmssFixtureAbsent')) { return; } pmssFixtureAbsent();", false],
+            'early exit' => ["if (!function_exists('pmssFixtureAbsent')) { exit; } pmssFixtureAbsent();", false],
+            'no early return' => ["if (!function_exists('pmssFixtureAbsent')) { strlen('x'); } pmssFixtureAbsent();", true],
+            'positive early return' => ["if (function_exists('pmssFixtureAbsent')) { return; } pmssFixtureAbsent();", true],
+            'case and trivia' => ["if (FUNCTION_EXISTS /* comment */ ('PMSSfixtureABSENT')) { pmssFixtureAbsent /* call */ (); }", false],
+            'reference declaration' => ['function &pmssFixtureAbsent() {} pmssFixtureAbsent();', false],
+            'method definition index' => ['class FixtureType { function pmssFixtureAbsent() {} } pmssFixtureAbsent();', false],
+            'member calls' => ['$object->pmssFixtureAbsent(); FixtureType::pmssFixtureAbsent(); new pmssFixtureAbsent();', false],
+            'qualified call' => ['\\pmssFixtureAbsent();', false],
+            'literal and comment' => ["'pmssFixtureAbsent()'; /* pmssFixtureAbsent(); */", false],
+            'unmatched delimiter' => ['} pmssFixtureAbsent();', true],
+        ];
+        foreach ($cases as $label => [$fragment, $unresolved]) {
+            $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-fatal-scan-guards-', 0700), [
+                'etc/skel/www/probe.php' => "<?php\n".$fragment."\n",
+                'scripts/probe.php' => "<?php\n".$fragment."\n",
+            ]);
+            $scanner = new \PmssCustomerContextFatalScanner($root);
+            $expected = $unresolved ? ['pmssFixtureAbsent'] : [];
+            $this->assertSame($expected, array_column($scanner->scan(), 'function'), 'customer: '.$label);
+            $this->assertSame($expected, array_column($scanner->scanOperatorTree(), 'function'), 'operator: '.$label);
+        }
+    }
+
+    public function testAbsentScanScopesReturnEmptyResults(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-fatal-scan-empty-', 0700);
+        $scanner = new \PmssCustomerContextFatalScanner($root);
+        $this->assertSame([], $scanner->scan());
+        $this->assertSame([], $scanner->scanOperatorTree());
+        $this->assertSame([], \pmssCustomerContextFatalScan($root));
+    }
+
+    public function testMixedCliDiagnosticsRetainOperatorFirstSnapshot(): void
+    {
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-fatal-scan-cli-', 0700), [
+            'etc/skel/www/probe.php' => "<?php\npmssFixtureOperatorOnly();\n",
+            'scripts/lib/probe.php' => "<?php\nfunction pmssFixtureOperatorOnly() { pmssFixtureMissing(); }\n",
+        ]);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/testing/customer-context-fatal-scan.php', [], ['PMSS_CUSTOMER_CONTEXT_SCAN_ROOT' => $root]);
+        $this->assertSame(1, $result['rc']);
+        $this->assertSame("[customer-context-fatal-scan] FAIL - UNDEFINED_FUNCTION_CALL: 1 operator PHP call(s) to undefined functions:\n  scripts/lib/probe.php:2 - pmssFixtureMissing()\n\n[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 1 unresolved customer PHP function call(s):\n  etc/skel/www/probe.php:2 - pmssFixtureOperatorOnly() (operator tree definition: scripts/lib/probe.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.", $result['output']);
     }
 
 }
