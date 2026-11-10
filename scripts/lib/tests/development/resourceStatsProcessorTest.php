@@ -41,7 +41,20 @@ class ResourceStatsProcessorTest extends TestCase
 
     public function setUp(): void
     {
-        $this->paths = $this->makePaths();
+        // Keep the isolated path tree and its publication order with fixture setup.
+        $root = $this->pmssMakeTempDir('pmss-resource-processor-');
+        $paths = [
+            'resource_dir' => $root.'/resources',
+            'home_dir' => $root.'/home',
+            'runtime_dir' => $root.'/run',
+            'passwd_file' => $root.'/passwd',
+        ];
+
+        $this->pmssEnsureDir($paths['resource_dir'], 0755);
+        $this->pmssEnsureDir($paths['home_dir'], 0755);
+        $this->pmssEnsureDir($paths['runtime_dir'], 0755);
+        $this->pmssWriteFile($paths['passwd_file'], "fixtur01:x:1000:1000::{$paths['home_dir']}/fixtur01:/bin/bash\n");
+        $this->paths = $paths;
     }
 
     public function testDiscoverUsersReturnsNaturalSortedFiles(): void
@@ -444,24 +457,4 @@ class ResourceStatsProcessorTest extends TestCase
         return date('Y-m-d H:i:s', $timestamp).' '.$payload;
     }
 
-    /**
-     * @return array<string, string>
-     */
-    private function makePaths(): array
-    {
-        $root = $this->pmssMakeTempDir('pmss-resource-processor-');
-        $paths = [
-            'resource_dir' => $root.'/resources',
-            'home_dir' => $root.'/home',
-            'runtime_dir' => $root.'/run',
-            'passwd_file' => $root.'/passwd',
-        ];
-
-        $this->pmssEnsureDir($paths['resource_dir'], 0755);
-        $this->pmssEnsureDir($paths['home_dir'], 0755);
-        $this->pmssEnsureDir($paths['runtime_dir'], 0755);
-        $this->pmssWriteFile($paths['passwd_file'], "fixtur01:x:1000:1000::{$paths['home_dir']}/fixtur01:/bin/bash\n");
-
-        return $paths;
-    }
 }

@@ -167,6 +167,7 @@ class PmssStatsCollectTest extends TestCase
 
     /**
      * Collect stats with the shared fixture paths used by this test case.
+     * Default RPC replies stay deterministic unless the scenario supplies a caller.
      *
      * @param array<string, string> $overrides
      * @return array<string, mixed>
@@ -178,17 +179,7 @@ class PmssStatsCollectTest extends TestCase
             'home' => $this->home,
             'config_dir' => $this->configDir,
             'cgroup_dir' => $this->cgroupDir,
-        ], $overrides), $rtorrentCaller ?? $this->rtorrentCallerStub());
-    }
-
-    /**
-     * Build a deterministic rTorrent caller stub for hermetic stats tests.
-     *
-     * @return callable(string, string, array<int, mixed>, int): mixed
-     */
-    private function rtorrentCallerStub(): callable
-    {
-        return static function (string $socketPath, string $method, array $params, int $timeout) {
+        ], $overrides), $rtorrentCaller ?? static function (string $socketPath, string $method, array $params, int $timeout) {
             unset($socketPath, $timeout);
             $responses = [
                 'get_up_rate' => 44302336,
@@ -215,6 +206,6 @@ class PmssStatsCollectTest extends TestCase
             }
 
             return false;
-        };
+        });
     }
 }

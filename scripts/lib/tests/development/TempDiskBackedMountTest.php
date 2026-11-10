@@ -24,16 +24,6 @@ class TempDiskBackedMountTest extends TestCase
         return $messages;
     }
 
-    private function assertTmpMountMasked(int $distroVersion, string $prefix): void
-    {
-        $logPath = $this->pmssMakeTempPath($prefix, '.log');
-        $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, $prefix.'bin-');
-
-        $this->configureTempDiskBacked($distroVersion, $binDir);
-
-        $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
-    }
-
     public function testSkipsBeforeDebian13(): void
     {
         $messages = $this->configureTempDiskBacked(12);
@@ -54,7 +44,12 @@ class TempDiskBackedMountTest extends TestCase
 
     public function testMasksTmpMountOnLaterDebianVersions(): void
     {
-        $this->assertTmpMountMasked(14, 'pmss-tmp-mask-later-');
+        $logPath = $this->pmssMakeTempPath('pmss-tmp-mask-later-', '.log');
+        $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-mask-later-bin-');
+
+        $this->configureTempDiskBacked(14, $binDir);
+
+        $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
     }
 
     public function testWarnsWhenSystemctlMissing(): void

@@ -30,7 +30,10 @@ class RootCleanupCharacterizationTest extends TestCase
         $this->assertSame("Reclaimed 100.0M — root 95% -> 80%.\n"
             .$this->byteTable(['apt_cache' => '1.0K', 'journald' => '100.0M', 'rotated_logs' => '20B',
                 'atop_logs' => '30B', 'distupgrade_tmp' => '50B']), $result['output']);
-        $entry = $this->auditEntry($freed);
+        $entry = ['ts' => '2026-01-01T00:00:00+00:00', 'tool' => 'safeRootCleanup', 'host' => 'fixture.example',
+            'root_use_pct_before' => 95, 'root_use_pct_after' => 80, 'freed_bytes' => $freed,
+            'freed_total' => array_sum($freed), 'rotated_files_removed' => 1, 'atop_files_removed' => 1,
+            'log_days' => 3, 'journal_mb' => 200];
         $this->assertSame(array_merge($this->discoveryTrace(), [
             ['command', "du -sb '/var/cache/apt/archives' 2>/dev/null"],
             ['command', 'apt-get clean 2>/dev/null'],
@@ -137,14 +140,6 @@ class RootCleanupCharacterizationTest extends TestCase
         $text = '';
         foreach ($values as $name => $value) $text .= sprintf("  %-16s %10s\n", $name, $value);
         return $text;
-    }
-
-    private function auditEntry(array $freed): array
-    {
-        return ['ts' => '2026-01-01T00:00:00+00:00', 'tool' => 'safeRootCleanup', 'host' => 'fixture.example',
-            'root_use_pct_before' => 95, 'root_use_pct_after' => 80, 'freed_bytes' => $freed,
-            'freed_total' => array_sum($freed), 'rotated_files_removed' => 1, 'atop_files_removed' => 1,
-            'log_days' => 3, 'journal_mb' => 200];
     }
 
     private function jsonEntry(array $result): array
