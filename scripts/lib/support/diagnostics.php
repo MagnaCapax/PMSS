@@ -220,9 +220,13 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
         }
         $deletePath = false;
     } finally {
-        @fclose($handle);
-        if ($deletePath) {
-            @unlink($path);
+        try {
+            @fclose($handle);
+        } finally {
+            // A close failure must not prevent removal of an incomplete snapshot.
+            if ($deletePath) {
+                @unlink($path);
+            }
         }
     }
 

@@ -13,6 +13,12 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
   injects exceptions, errors and false returns without creating host files;
   successful modes, diagnostics and return values retain their contracts.
   Run these fixtures only on testing machines.
+- Failed support snapshot writes and flushes attempt partial-file removal even
+  when stream closure throws. `SupportSnapshotCleanupSafetyTest` injects single
+  and combined failures with memory streams and intercepted unlink calls.
+  Successful snapshots stay in place; write/flush throwables propagate when
+  closure succeeds, while close throwables retain precedence when unlink succeeds.
+  Run these fixtures only on testing machines.
 - Network-affecting helpers (iptables rendering, FireQOS config) must degrade to no-op rather than partial application.
 - Boot-default activation follows successful managed writes: failed fstab writes
   must not trigger a `/proc` remount, and failed GRUB defaults writes must not
