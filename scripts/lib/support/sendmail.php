@@ -15,16 +15,15 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
     if (!is_resource($process)) {
         throw new RuntimeException('Unable to start sendmail transport.');
     }
-    if (!isset($pipes[0], $pipes[1], $pipes[2])
-        || !pmssStreamHandleIsOpen($pipes[0])
-        || !pmssStreamHandleIsOpen($pipes[1])
-        || !pmssStreamHandleIsOpen($pipes[2])) {
-        pmssProcessPipesClose($pipes);
-        proc_close($process);
-        throw new RuntimeException('Sendmail transport did not provide usable pipes.');
-    }
-
     try {
+        // Own the process and every returned pipe before inspecting the launch result.
+        if (!isset($pipes[0], $pipes[1], $pipes[2])
+            || !pmssStreamHandleIsOpen($pipes[0])
+            || !pmssStreamHandleIsOpen($pipes[1])
+            || !pmssStreamHandleIsOpen($pipes[2])) {
+            throw new RuntimeException('Sendmail transport did not provide usable pipes.');
+        }
+
         pmssSupportStreamWriteAll($pipes[0], (string) $envelope['data'], 'support mail message to sendmail');
         fclose($pipes[0]);
         unset($pipes[0]);
@@ -37,9 +36,13 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
         $rc = proc_close($process);
         $process = null;
     } finally {
-        pmssProcessPipesClose($pipes);
-        if (is_resource($process)) {
-            proc_close($process);
+        try {
+            pmssProcessPipesClose($pipes);
+        } finally {
+            // A pipe wrapper's close failure must not skip reaping the child.
+            if (is_resource($process)) {
+                proc_close($process);
+            }
         }
     }
 

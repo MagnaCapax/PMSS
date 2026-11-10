@@ -23,6 +23,13 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
   Successful snapshots stay in place; write/flush throwables propagate when
   closure succeeds, while close throwables retain precedence when unlink succeeds.
   Run these fixtures only on testing machines.
+- Local support mail owns the child and its pipes before validating pipe handles.
+  Cleanup attempts process reaping even when a pipe close throws; a lone throwable
+  propagates unchanged, while a reaping throwable retains normal `finally` precedence.
+  `SupportSendmailCleanupSafetyTest` covers missing/invalid pipes, validation,
+  write/read faults and combined close/reap faults with memory streams and fake
+  process operations. Existing command bytes, message bytes and exit diagnostics
+  remain covered. Run these fixtures only on testing machines.
 - Network-affecting helpers (iptables rendering, FireQOS config) must degrade to no-op rather than partial application.
 - Boot-default activation follows successful managed writes: failed fstab writes
   must not trigger a `/proc` remount, and failed GRUB defaults writes must not
