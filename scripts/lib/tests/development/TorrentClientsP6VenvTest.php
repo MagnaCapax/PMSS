@@ -105,4 +105,65 @@ final class TorrentClientsP6VenvTest extends TestCase
         $this->assertSame(1, $cleanupCalls);
         $this->assertTrue(is_link($versionDir.'/.deluge-cli'));
     }
+
+    public function testInstallerThrowablesAttemptOnlyTemporaryLinkCleanup(): void
+    {
+        // All filesystem work stays in the fixture; no pip or daemon is launched.
+        foreach (['RuntimeException', 'Error'] as $type) {
+            foreach ([['absent', 'ok'], ['regular', 'ok'], ['valid', 'ok'], ['dangling', 'ok'],
+                ['valid', 'false'], ['valid', 'throw']] as [$node, $cleanup]) {
+                [$root, $entry] = $this->fixture();
+                $versionDir = $root.'/deluge/2.1.1';
+                $link = $versionDir.'/.deluge-cli';
+                $this->pmssEnsureDir($versionDir);
+                $failure = new $type('installer fault');
+                $cleanupFailure = new $type('cleanup fault');
+                $events = [];
+                $install = function ($dir, $label, $steps, $cli, $temporary) use ($node, $failure, &$events): void {
+                    $events[] = 'install';
+                    if ($node === 'valid') $this->pmssWriteFile($cli, 'fixture daemon');
+                    if ($node === 'valid' || $node === 'dangling') {
+                        $this->assertTrue(symlink($cli, $temporary));
+                    } elseif ($node === 'regular') {
+                        $this->pmssWriteFile($temporary, 'fixture entry');
+                    }
+                    throw $failure;
+                };
+                $unlink = static function (string $path) use ($cleanup, $cleanupFailure, &$events): bool {
+                    $events[] = ['unlink', $path];
+                    if ($cleanup === 'throw') throw $cleanupFailure;
+                    return $cleanup !== 'false' && unlink($path);
+                };
+                $caught = null;
+                try {
+                    \pmssTorrentClientsDelugeVenvInstall($entry, $versionDir, ['install' => $install, 'unlink' => $unlink]);
+                } catch (\Throwable $error) {
+                    $caught = $error;
+                }
+                // A false cleanup result must not swallow the active installer fault.
+                $this->assertSame($cleanup === 'throw' ? $cleanupFailure : $failure, $caught);
+                $wasLink = $node === 'valid' || $node === 'dangling';
+                $this->assertSame($wasLink ? ['install', ['unlink', $link]] : ['install'], $events);
+                $this->assertSame($wasLink && $cleanup !== 'ok', is_link($link));
+                if ($node === 'regular') $this->assertSame('fixture entry', file_get_contents($link));
+            }
+        }
+    }
+
+    public function testPreexistingTemporaryEntriesRemainUntouched(): void
+    {
+        foreach (['regular', 'dangling'] as $node) {
+            [$root, $entry] = $this->fixture();
+            $versionDir = $root.'/deluge/2.1.1';
+            $link = $versionDir.'/.deluge-cli';
+            $this->pmssEnsureDir($versionDir);
+            if ($node === 'regular') $this->pmssWriteFile($link, 'fixture entry');
+            else $this->assertTrue(symlink($versionDir.'/missing', $link));
+            $unexpected = static function (): void { throw new \RuntimeException('unexpected operation'); };
+            $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $versionDir,
+                ['install' => $unexpected, 'unlink' => $unexpected]));
+            if ($node === 'regular') $this->assertSame('fixture entry', file_get_contents($link));
+            else $this->assertSame($versionDir.'/missing', readlink($link));
+        }
+    }
 }

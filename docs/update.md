@@ -402,6 +402,12 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    root-owned store mirror and publish both daemon scripts (ADR 0110). The
    shipped catalog offers 2.0.5, 2.1.1 and 2.2.0 on compatible Bookworm hosts
    (ADR 0129); the system launch remains the default.
+   The Deluge installer's temporary `.deluge-cli` link is removed in `finally`,
+   including when installation or link inspection throws. Cleanup still touches
+   only links; pre-existing entries are refused before installation. A failed
+   unlink still prevents publication, and an active installer exception or error
+   propagates unless cleanup itself throws. `TorrentClientsP6VenvTest` covers
+   these faults on the testing machine; devbox verification is syntax-only.
 8. Configure the web stack, regenerate per-user nginx configs from staged
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).

@@ -61,14 +61,19 @@ function pmssTorrentClientsDelugeVenvInstall(array $entry, string $versionDir, a
     if (pmssPathExistsOrLink($link)) return false;
     $install = $ops['install'] ?? 'pmssPythonVenvInstallCli';
     $log = $ops['log'] ?? 'logmsg';
-    $install($versionDir, 'Deluge '.$version,
-        [['Installing pinned Deluge wheels', '--no-index --no-deps '.pmssCommandArgvShellQuote($paths)]],
-        $versionDir.'/bin/deluged', $link,
-        '[WARN] Skipping Deluge venv: python3 missing', '[WARN] Deluge venv missing deluged', $log);
-    $linked = is_link($link) && readlink($link) === $versionDir.'/bin/deluged';
-    $unlink = $ops['unlink'] ?? static function (string $path): bool { return @unlink($path); };
+    try {
+        $install($versionDir, 'Deluge '.$version,
+            [['Installing pinned Deluge wheels', '--no-index --no-deps '.pmssCommandArgvShellQuote($paths)]],
+            $versionDir.'/bin/deluged', $link,
+            '[WARN] Skipping Deluge venv: python3 missing', '[WARN] Deluge venv missing deluged', $log);
+        $linked = is_link($link) && readlink($link) === $versionDir.'/bin/deluged';
+    } finally {
+        $unlink = $ops['unlink'] ?? static function (string $path): bool { return @unlink($path); };
+        // Retire temporary links even when installation or link inspection throws.
+        $removed = !is_link($link) || $unlink($link);
+    }
     // Do not publish a version with the installer's temporary CLI link left behind.
-    if (is_link($link) && !$unlink($link)) return false;
+    if (!$removed) return false;
     // InstallCli calls pmssPythonVenvEnsure; both daemon scripts must exist.
     return $linked && pmssTorrentClientsBinaryAvailable($versionDir.'/bin/deluged', 'deluge', 'venv')
         && pmssDelugeWebBasePathPatchVenv($versionDir, $log, $ops['patch'] ?? 'pmssPatchDelugeWebBasePathBytes');
