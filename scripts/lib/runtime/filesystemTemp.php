@@ -11,20 +11,28 @@ function pmssPrivateTempBaseDirRealpath(?string $path = null): ?string
 }
 // Match the entire prefix: $ also accepts a position before a final newline.
 function pmssPrivateTempPrefixIsSafe(string $prefix): bool { return preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\z/', $prefix) === 1; }
+/** Retain a temporary file only after its existing scope checks succeed. */
 function pmssCreatePrivateTempFile(string $prefix): ?string
 {
     if (!pmssPrivateTempPrefixIsSafe($prefix) || ($base = pmssPrivateTempBaseDirRealpath()) === null) return null;
     $path = @tempnam($base, $prefix);
     if (!is_string($path) || pmssFilesystemPathHasNulByte($path) || is_link($path)) return null;
-    $real = realpath($path);
-    $basePrefix = $base.DIRECTORY_SEPARATOR;
-    if ($real === false || !is_file($real) || strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) {
-        if (pmssRegularFilePathIsReadable($path)) @unlink($path);
-        return null;
+    $retained = false;
+    try {
+        $real = realpath($path);
+        $basePrefix = $base.DIRECTORY_SEPARATOR;
+        if ($real === false || !is_file($real) || strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) {
+            return null;
+        }
+        $retained = true;
+        return $path;
+    } finally {
+        // Metadata throwables use the same guarded cleanup as ordinary refusals.
+        if (!$retained && pmssRegularFilePathIsReadable($path)) @unlink($path);
     }
-    return $path;
 }
 
+/** Own a newly created empty directory until mode and scope verification finish. */
 function pmssCreatePrivateTempDir(string $prefix): ?string
 {
     if (!pmssPrivateTempPrefixIsSafe($prefix)) { logMessage('[WARN] Refusing private temporary directory with unsafe prefix'); return null; }
@@ -34,16 +42,17 @@ function pmssCreatePrivateTempDir(string $prefix): ?string
         if (pmssRegularFilePathIsReadable($path)) @unlink($path);
         return null;
     }
-    // Do not hand a caller a workspace whose private mode could not be set.
-    if (is_link($path) || !@chmod($path, 0700)) {
-        @rmdir($path);
-        return null;
+    $retained = false;
+    try {
+        // Do not hand a caller a workspace whose private mode could not be set.
+        if (is_link($path) || !@chmod($path, 0700)) return null;
+        if (pmssPrivateTempDirRealpath($path, $prefix) === null) return null;
+        $retained = true;
+        return $path;
+    } finally {
+        // rmdir remains non-recursive: never remove contents placed by another actor.
+        if (!$retained) @rmdir($path);
     }
-    if (pmssPrivateTempDirRealpath($path, $prefix) === null) {
-        @rmdir($path);
-        return null;
-    }
-    return $path;
 }
 
 function pmssPrivateTempDirRealpath(string $path, string $prefix, ?callable $logger = null): ?string

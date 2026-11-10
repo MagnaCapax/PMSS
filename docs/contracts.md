@@ -221,6 +221,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   from a suppressed `scandir()`, preserving keys, order, and `false` on failure.
   Callers own path/symlink validation and whether scan failures may be ignored.
 
+- Private temporary acquisition in `runtime/filesystemTemp.php` attempts cleanup
+  in `finally` when file scope or directory mode/scope verification fails or
+  throws an exception or error. File cleanup retains its regular-file guard;
+  directory cleanup remains a best-effort empty-directory `rmdir()`.
+  Successful calls transfer ownership to the caller. Existing null results,
+  prefixes, paths and modes remain unchanged. `PrivateTempAcquisitionSafetyTest`
+  injects acquisition faults without filesystem writes on the testing machine.
+
 - `pmssLockFileHandleMatchesPath($handle, string $path, ?array $pathStat=null, ?array &$handleStat=null): bool`
   confirms matching device/inode metadata; supplied path snapshots can reuse
   returned handle metadata. Invalid/closed handles and unreadable metadata return false.
