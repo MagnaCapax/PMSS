@@ -178,10 +178,8 @@ PHP;
         $samples = [['time' => 1100, 'psiFullAvg300' => 80, 'cpuIowaitPct' => 40, 'diskUtil' => 9],
             ['time' => 1200, 'psiFullAvg300' => 50], ['time' => 2000, 'psiFullAvg300' => 70], ['psiFullAvg300' => 70]];
         $scaled = iterator_to_array(\pmssDynamicIopsContentionScale($samples, $rows), false);
-        $this->assertSame(['time' => 1100, 'psiFullAvg300' => 20.0, 'cpuIowaitPct' => 10.0, 'diskUtil' => 9], $scaled[0]);
-        $this->assertSame($samples[1], $scaled[1]);
-        $this->assertSame($samples[2], $scaled[2]);
-        $this->assertSame($samples[3], $scaled[3]);
+        $this->pmssAssertArraySubsetSame([0 => ['time' => 1100, 'psiFullAvg300' => 20.0, 'cpuIowaitPct' => 10.0, 'diskUtil' => 9],
+            1 => $samples[1], 2 => $samples[2], 3 => $samples[3]], $scaled);
     }
 
     public function testObserverPersistsDemandWithoutUnifiedOrHostPressureAndPreviewDoesNotWrite(): void

@@ -31,8 +31,7 @@ PHP;
 
         $this->assertFalse($result['normalizeBefore']);
         $this->assertFalse($result['lookupBefore']);
-        $this->assertSame('user1', $result['normalizedUser']);
-        $this->assertSame(null, $result['invalidUser']);
+        $this->pmssAssertArraySubsetSame(['normalizedUser' => 'user1', 'invalidUser' => null], $result);
         $this->assertTrue($result['lookupRootDir'] !== '');
     }
 

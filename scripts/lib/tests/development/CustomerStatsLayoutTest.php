@@ -249,8 +249,8 @@ final class CustomerStatsLayoutTest extends TestCase
             'io_write' => array('raw' => array('month' => 3145728, 'week' => 4194304, 'day' => 5242880, 'hour' => 6144)),
         );
         $snapshot = \pmssStatsResourceSnapshotBuild($resourceData);
-        $this->assertSame(array('month' => 'saved read', 'week' => '2MiB', 'day' => '0KiB', 'hour' => '1KiB'), $snapshot['ioReadDisplay']);
-        $this->assertSame(array('month' => '3MiB', 'week' => '4MiB', 'day' => '5MiB', 'hour' => '6KiB'), $snapshot['ioWriteDisplay']);
+        $this->pmssAssertArraySubsetSame(['ioReadDisplay' => array('month' => 'saved read', 'week' => '2MiB', 'day' => '0KiB', 'hour' => '1KiB'),
+            'ioWriteDisplay' => array('month' => '3MiB', 'week' => '4MiB', 'day' => '5MiB', 'hour' => '6KiB')], $snapshot);
 
         [, $output] = $this->pmssCaptureStdout(function () use ($resourceData): void {
             \pmssStatsRenderResourceBlocks(array('data' => $resourceData, 'time' => 0, 'error' => null));

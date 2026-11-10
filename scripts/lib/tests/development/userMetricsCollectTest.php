@@ -96,8 +96,7 @@ class UserMetricsCollectTest extends TestCase
         $this->pmssWriteFile($homePath, serialize(['count' => 1000, 'last_increase' => 200, 'sampled_at' => 200]));
         $this->assertTrue(\pmssOomStatusProject('www-data', 5, 300, $homeRoot, $stateRoot));
         $projected = unserialize((string) file_get_contents($homePath));
-        $this->assertSame(5, $projected['count']);
-        $this->assertSame(300, $projected['last_increase']);
+        $this->pmssAssertArraySubsetSame(['count' => 5, 'last_increase' => 300], $projected);
         $this->assertSame(5, $this->pmssReadJsonArrayFile($stateRoot.'/www-data.json')['count']);
     }
     /** Metrics alone must load the counter reader without the persistence writer. */

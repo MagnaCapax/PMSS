@@ -43,17 +43,15 @@ class LiveStatsCounterSafetyTest extends TestCase
             $cpu = array_fill(0, 8, '0');
             $cpu[$index] = '000'.PHP_INT_MAX;
             $result = $this->parseCounters(['cpu' => $cpu]);
-            $this->assertSame(PHP_INT_MAX, $result['total']);
-            $this->assertSame(in_array($index, [3, 4], true) ? 0 : PHP_INT_MAX, $result['busy']);
-            $this->assertSame($index === 7 ? PHP_INT_MAX : 0, $result['steal']);
+            $this->pmssAssertArraySubsetSame(['total' => PHP_INT_MAX, 'busy' => in_array($index, [3, 4], true) ? 0 : PHP_INT_MAX,
+                'steal' => $index === 7 ? PHP_INT_MAX : 0], $result);
         }
         foreach (range(4, 10) as $count) {
             $cpu = array_fill(0, $count, '1');
             if ($count > 8) $cpu[8] = (string) PHP_INT_MAX.'0';
             if ($count > 9) $cpu[9] = (string) PHP_INT_MAX.'0';
             $result = $this->parseCounters(['cpu' => $cpu]);
-            $this->assertSame(min($count, 8), $result['total']);
-            $this->assertSame($count >= 8 ? 1 : 0, $result['steal']);
+            $this->pmssAssertArraySubsetSame(['total' => min($count, 8), 'steal' => $count >= 8 ? 1 : 0], $result);
         }
     }
 
