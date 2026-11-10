@@ -189,7 +189,11 @@ class ArchitectureSmokeTest extends TestCase
                 if (!$this->functionNamesShareShape($functions[$i]['name'], $functions[$j]['name'])) {
                     continue;
                 }
-                if ($this->functionPairAllowlisted($functions[$i]['name'], $functions[$j]['name'])) {
+                // Pair keys are independent of order; exemptions require an explicit justification.
+                $pair = [$functions[$i]['name'], $functions[$j]['name']];
+                sort($pair);
+                $reason = self::NEAR_DUPLICATE_ALLOWLIST[implode('|', $pair)] ?? '';
+                if (is_string($reason) && strlen(trim($reason)) >= 20) {
                     continue;
                 }
                 if ($this->bodyLineCount($functions[$i]['body']) < 30 || $this->bodyLineCount($functions[$j]['body']) < 30) {
@@ -264,21 +268,6 @@ class ArchitectureSmokeTest extends TestCase
     private function bodyLineCount(string $body): int
     {
         return count(preg_split('/\r?\n/', rtrim($body, "\r\n")) ?: []);
-    }
-
-    /** Return a stable allowlist key independent of pair order. */
-    private function functionPairKey(string $first, string $second): string
-    {
-        $pair = [$first, $second];
-        sort($pair);
-        return implode('|', $pair);
-    }
-
-    /** Check whether a near-duplicate pair is explicitly justified. */
-    private function functionPairAllowlisted(string $first, string $second): bool
-    {
-        $reason = self::NEAR_DUPLICATE_ALLOWLIST[$this->functionPairKey($first, $second)] ?? '';
-        return is_string($reason) && strlen(trim($reason)) >= 20;
     }
 
     /** Count matching characters from the start of two strings. */

@@ -12,7 +12,7 @@ class CustomerBackupTest extends TestCase
     protected function setUp(): void
     {
         $this->homeRoot = $this->pmssMakeTempDir('pmss-customer-backup-');
-        $this->home = $this->pmssEnsureDir($this->homeRoot.'/alice');
+        $this->home = $this->pmssEnsureDir($this->homeRoot.'/fixtur01');
         $this->pmssTrackEnvOverrides(array('PMSS_HOME_DIR' => $this->homeRoot));
     }
 
@@ -56,12 +56,6 @@ class CustomerBackupTest extends TestCase
         return substr_replace($header, str_pad(decoct($checksum), 6, '0', STR_PAD_LEFT)."\0 ", 148, 8);
     }
 
-    private function pmssTarPayload(string $content): string
-    {
-        $padding = (512 - (strlen($content) % 512)) % 512;
-        return $content.str_repeat("\0", $padding);
-    }
-
     private function pmssWriteTarGzArchive(array $members, string $filename = 'pmss-torrent-config-test.tar.gz'): string
     {
         if (!function_exists('gzencode') || !class_exists(\PharData::class)) {
@@ -76,7 +70,8 @@ class CustomerBackupTest extends TestCase
             $linkName = isset($member['linkName']) ? (string) $member['linkName'] : '';
             $tar .= $this->pmssTarHeader($name, $type, $content, $linkName);
             if ($type === '0') {
-                $tar .= $this->pmssTarPayload($content);
+                $padding = (512 - (strlen($content) % 512)) % 512;
+                $tar .= $content.str_repeat("\0", $padding);
             }
         }
         $tar .= str_repeat("\0", 1024);

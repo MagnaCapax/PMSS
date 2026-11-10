@@ -36,20 +36,16 @@ class ArrActivationCharacterizationTest extends TestCase
                 $trace[] = ['cleanup', '/fixture/work', 'radarr-', 'Cleaning Radarr updater workspace'];
                 $trace[] = ['command', 'fixture-cleanup'];
             }
-            $this->assertSame(['result' => $message === null, 'trace' => $trace], $this->activationTrace($scenario), $scenario);
+            // Read the real implementation so the fixture never carries a second activation flow.
+            $script = 'namespace ArrActivationCharacterization; require '.var_export($this->pmssRepoPath('scripts/lib/tests/fixtures/arrActivationCharacterization.php'), true).';';
+            // Legacy string callbacks bypass namespace resolution; bind only those predicates to the same stubs.
+            $script .= \pmssTestingFunctionExport('pmssArrReleaseActivate', 'ArrActivationCharacterization', [
+                "'is_file'" => var_export('ArrActivationCharacterization\\is_file', true), "'is_dir'" => var_export('ArrActivationCharacterization\\is_dir', true),
+            ]);
+            $script .= '$GLOBALS["scenario"] = '.var_export($scenario, true).';';
+            $script .= '$result = pmssArrReleaseActivate(["extract_dir" => "Package", "install_path" => "/fixture/install"], "Radarr", "https://example.invalid/bundle", "bundle.tar.gz", static function ($message) { $GLOBALS["trace"][] = ["log", $message]; });';
+            $observed = $this->pmssRunInlinePhpJson($script.'echo json_encode(["result" => $result, "trace" => $GLOBALS["trace"]]);');
+            $this->assertSame(['result' => $message === null, 'trace' => $trace], $observed, $scenario);
         }
-    }
-
-    /** Read the real implementation so the fixture never carries a second activation flow. */
-    private function activationTrace(string $scenario): array
-    {
-        $script = 'namespace ArrActivationCharacterization; require '.var_export($this->pmssRepoPath('scripts/lib/tests/fixtures/arrActivationCharacterization.php'), true).';';
-        // Legacy string callbacks bypass namespace resolution; bind only those predicates to the same stubs.
-        $script .= \pmssTestingFunctionExport('pmssArrReleaseActivate', 'ArrActivationCharacterization', [
-            "'is_file'" => var_export('ArrActivationCharacterization\\is_file', true), "'is_dir'" => var_export('ArrActivationCharacterization\\is_dir', true),
-        ]);
-        $script .= '$GLOBALS["scenario"] = '.var_export($scenario, true).';';
-        $script .= '$result = pmssArrReleaseActivate(["extract_dir" => "Package", "install_path" => "/fixture/install"], "Radarr", "https://example.invalid/bundle", "bundle.tar.gz", static function ($message) { $GLOBALS["trace"][] = ["log", $message]; });';
-        return $this->pmssRunInlinePhpJson($script.'echo json_encode(["result" => $result, "trace" => $GLOBALS["trace"]]);');
     }
 }

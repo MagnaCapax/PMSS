@@ -239,7 +239,10 @@ class SkeletonWebLocalAssetTest extends TestCase
         $welcome = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
         $scriptsInc = $this->pmssReadScriptsIncSources();
 
-        $startup = $this->welcomeStartupPhpBlock($welcome);
+        $start = strpos($welcome, "require_once __DIR__.'/scriptsInc.php';");
+        $end = strpos($welcome, '?>', $start === false ? 0 : $start);
+        $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php startup block markers changed');
+        $startup = substr($welcome, $start, $end - $start);
         preg_match_all('/\b(pmss[A-Za-z0-9_]*)\s*\(/', $startup, $callMatches);
         // A call behind function_exists() is an optional helper from a separately healed file; it cannot fatal.
         preg_match_all('/function_exists\(\s*[\'"](pmss[A-Za-z0-9_]*)[\'"]\s*\)/', $startup, $guardedMatches);
@@ -317,8 +320,13 @@ class SkeletonWebLocalAssetTest extends TestCase
     public function testManifestLocalAssetsAreReferencedByPanelSources(): void
     {
         $referenced = $this->customerPanelReferencedLocalAssets();
+        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        preg_match_all("/'www\\/([^']+\\.(?:css|js))'/", $manifest, $matches);
+        $assets = array_values(array_unique($matches[1]));
+        sort($assets);
+        $this->assertTrue($assets !== [], 'Expected customer-panel .css/.js manifest entries');
         $unreferenced = [];
-        foreach ($this->customerPanelManifestLocalAssets() as $asset) {
+        foreach ($assets as $asset) {
             if (!isset($referenced[$asset])) {
                 $unreferenced[] = 'www/'.$asset;
             }
@@ -331,23 +339,16 @@ class SkeletonWebLocalAssetTest extends TestCase
         );
     }
 
-    /** @return array<int, string> */
-    private function customerPanelManifestLocalAssets(): array
-    {
-        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-        preg_match_all("/'www\\/([^']+\\.(?:css|js))'/", $manifest, $matches);
-        $assets = array_values(array_unique($matches[1]));
-        sort($assets);
-
-        $this->assertTrue($assets !== [], 'Expected customer-panel .css/.js manifest entries');
-        return $assets;
-    }
-
     /** @return array<string, bool> */
     private function customerPanelReferencedLocalAssets(): array
     {
         $referenced = [];
-        foreach ($this->customerPanelReferenceSourceFiles() as $sourceFile) {
+        $files = [];
+        foreach ($this->pmssRepoFiles('etc/skel/www', '/\.(?:php|html|css|js)$/i') as $path => $file) {
+            $files[] = 'etc/skel/www/'.str_replace('\\', '/', substr($path, strlen('etc/skel/www/')));
+        }
+        sort($files);
+        foreach ($files as $sourceFile) {
             $source = @file_get_contents($this->pmssRepoPath($sourceFile));
             $this->assertTrue(is_string($source), 'Unable to read '.$sourceFile);
             $baseDir = dirname(substr($sourceFile, strlen('etc/skel/www/')));
@@ -363,18 +364,6 @@ class SkeletonWebLocalAssetTest extends TestCase
 
         ksort($referenced);
         return $referenced;
-    }
-
-    /** @return array<int, string> */
-    private function customerPanelReferenceSourceFiles(): array
-    {
-        $files = [];
-        foreach ($this->pmssRepoFiles('etc/skel/www', '/\.(?:php|html|css|js)$/i') as $path => $file) {
-            $files[] = 'etc/skel/www/'.str_replace('\\', '/', substr($path, strlen('etc/skel/www/')));
-        }
-        sort($files);
-
-        return $files;
     }
 
     /** @return array<int, string> */
@@ -424,15 +413,6 @@ class SkeletonWebLocalAssetTest extends TestCase
         }
 
         return $parts === [] ? null : implode('/', $parts);
-    }
-
-    private function welcomeStartupPhpBlock(string $welcome): string
-    {
-        $start = strpos($welcome, "require_once __DIR__.'/scriptsInc.php';");
-        $end = strpos($welcome, '?>', $start === false ? 0 : $start);
-        $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php startup block markers changed');
-
-        return substr($welcome, $start, $end - $start);
     }
 
     private function phpFunctionNames(string $source): array

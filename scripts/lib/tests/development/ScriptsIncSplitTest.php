@@ -53,21 +53,6 @@ class ScriptsIncSplitTest extends TestCase
         return array($name, substr($source, $offsets[$index], $offsets[$end] + 1 - $offsets[$index]), $end + 1);
     }
 
-    private function namedFunctions(string $source): array
-    {
-        list($tokens, $offsets) = $this->sourceTokens($source);
-        $functions = array();
-        foreach ($tokens as $index => $token) {
-            if (!is_array($token) || $token[0] !== T_FUNCTION) continue;
-            $nameIndex = $this->nextCodeToken($tokens, $index + 1);
-            if (!is_array($tokens[$nameIndex]) || $tokens[$nameIndex][0] !== T_STRING) continue;
-            list($name, $body) = $this->functionAt($source, $tokens, $offsets, $index);
-            $this->assertTrue(!isset($functions[$name]), 'Duplicate function '.$name);
-            $functions[$name] = $body;
-        }
-        return $functions;
-    }
-
     /** Parse only an open tag, comments, and individually guarded functions. */
     private function partFunctions(string $source, string $part): array
     {
@@ -138,7 +123,17 @@ class ScriptsIncSplitTest extends TestCase
             'pmssCustomerAppButton', 'pmssCustomerAppOpenRoute', 'pmssCustomerAppRowHtmlBuild', 'pmssCustomerAppsMediaRowsBuild', 'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsCss',
             'pmssCustomerAppsStatusJsonEmit', 'pmssCustomerAppsLogJsonEmit', 'pmssActionScriptJs', 'pmssFrontendToggleAction',
         );
-        $loader = $this->namedFunctions($this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
+        $source = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        list($tokens, $offsets) = $this->sourceTokens($source);
+        $loader = array();
+        foreach ($tokens as $index => $token) {
+            if (!is_array($token) || $token[0] !== T_FUNCTION) continue;
+            $nameIndex = $this->nextCodeToken($tokens, $index + 1);
+            if (!is_array($tokens[$nameIndex]) || $tokens[$nameIndex][0] !== T_STRING) continue;
+            list($name, $body) = $this->functionAt($source, $tokens, $offsets, $index);
+            $this->assertTrue(!isset($loader[$name]), 'Duplicate function '.$name);
+            $loader[$name] = $body;
+        }
         $this->assertSame(array('writeLog'), array_keys($loader), 'The loader must retain only writeLog.');
         $functions = $loader;
         foreach (self::PARTS as $part) {
