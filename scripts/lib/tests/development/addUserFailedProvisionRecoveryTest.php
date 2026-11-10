@@ -27,6 +27,107 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         });
     }
 
+    public function testProvisionLogRequiresVerifiedAcquisitionAndCompleteRead(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-provision-evidence-');
+        $lines = [
+            '2026-04-01 10:00:00: ###ADDUSER_JSON:{"event":"adduser_summary","status":"FAIL","user":"fixtur01"}',
+            'invalid JSON: ###ADDUSER_JSON:{',
+            '2026-04-01 10:01:00: ###ADDUSER_JSON:{"event":"adduser_summary","status":"FAIL","user":"fixtur02"}',
+            '2026-04-01 10:02:00: ###ADDUSER_JSON:{"event":"adduser_summary","status":"OK","user":"fixtur01"}',
+        ];
+        $content = implode("\n", $lines)."\n";
+        $this->pmssWriteFile($path, $content);
+        // Faults use memory streams; no provisioning, service or cleanup action runs.
+        $script = <<<'PHP'
+namespace ProvisionLogSafetyFixture;
+function observe($phase, $value) {
+    $GLOBALS['events'][] = $phase;
+    if ($GLOBALS['case'] === $phase.'-throw') throw $GLOBALS['failure'];
+    return $value;
+}
+function lstat($path) {
+    $stat = $GLOBALS['snapshot'] = \lstat($path);
+    if ($GLOBALS['case'] === 'missing') $stat = false;
+    if ($GLOBALS['case'] === 'empty-metadata') $stat = [];
+    foreach (['fifo' => 0010600, 'directory' => 0040700, 'symlink' => 0120777] as $case => $mode) {
+        if ($GLOBALS['case'] === $case) $stat['mode'] = $mode;
+    }
+    return observe('snapshot', $stat);
+}
+function fopen($path, $mode) {
+    $GLOBALS['modes'][] = $mode;
+    observe('open', null);
+    if ($GLOBALS['case'] === 'open-false') return false;
+    $handle = \fopen('php://memory', 'w+');
+    $content = \file_get_contents($path);
+    if ($GLOBALS['case'] === 'empty') $content = '';
+    if ($GLOBALS['case'] === 'no-newline') $content = rtrim($content, "\n");
+    \fwrite($handle, $content);
+    \rewind($handle);
+    return $GLOBALS['handle'] = $handle;
+}
+function fstat($handle) {
+    $stat = $GLOBALS['snapshot'];
+    if ($GLOBALS['case'] === 'inode-changed') $stat['ino']++;
+    if ($GLOBALS['case'] === 'device-changed') $stat['dev']++;
+    if ($GLOBALS['case'] === 'stat-false') $stat = false;
+    return observe('stat', $stat);
+}
+function fgets($handle) {
+    observe('read', null);
+    $GLOBALS['reads']++;
+    if ($GLOBALS['case'] === 'read-false' || ($GLOBALS['case'] === 'read-partial' && $GLOBALS['reads'] > 1)) return false;
+    return \fgets($handle);
+}
+function feof($handle) { return observe('eof', $GLOBALS['case'] === 'eof-false' ? false : \feof($handle)); }
+function fclose($handle) { \fclose($handle); return observe('close', true); }
+PHP;
+        foreach (['runtime/filesystem.php', 'user/add/orphanCleanup.php'] as $library) {
+            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/'.$library, 'ProvisionLogSafetyFixture');
+        }
+        $script .= <<<'PHP'
+$results = [];
+foreach (['valid', 'empty', 'no-newline', 'missing', 'empty-metadata', 'fifo', 'directory', 'symlink',
+    'open-false', 'stat-false', 'inode-changed', 'device-changed', 'read-false', 'read-partial', 'eof-false',
+    'snapshot-throw', 'open-throw', 'stat-throw', 'read-throw', 'eof-throw'] as $case) {
+    foreach (substr($case, -6) === '-throw' ? [new \RuntimeException($case), new \Error($case)] : [null] as $failure) {
+        $GLOBALS['case'] = $case; $GLOBALS['failure'] = $failure; $GLOBALS['handle'] = null;
+        $GLOBALS['events'] = $GLOBALS['modes'] = []; $GLOBALS['reads'] = 0;
+        $summary = $caught = null;
+        try { $summary = pmssAddUserLatestProvisionSummary('fixtur01'); }
+        catch (\Throwable $error) { $caught = $error; }
+        $live = is_resource($GLOBALS['handle']);
+        if ($live) \fclose($GLOBALS['handle']); // Observe leaks before fixture cleanup.
+        $results[] = [$case, $summary, $caught === $failure, $live, $GLOBALS['events'], $GLOBALS['modes']];
+    }
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script, ['PMSS_ADDUSER_LOG_PATH' => $path]);
+        $this->assertSame(25, count($results));
+        $latest = ['event' => 'adduser_summary', 'status' => 'OK', 'user' => 'fixtur01',
+            'timestamp' => strtotime('2026-04-01 10:02:00')];
+        foreach ($results as [$case, $summary, $sameFailure, $live, $events, $modes]) {
+            $opened = !in_array($case, ['missing', 'empty-metadata', 'fifo', 'directory', 'symlink', 'snapshot-throw'], true);
+            $acquired = $opened && !in_array($case, ['open-false', 'open-throw'], true);
+            $read = $acquired && !in_array($case, ['stat-false', 'inode-changed', 'device-changed', 'stat-throw'], true);
+            $expectedEvents = ['snapshot'];
+            if ($opened) $expectedEvents[] = 'open';
+            if ($acquired) $expectedEvents[] = 'stat';
+            if ($read) {
+                $count = $case === 'read-partial' ? 2 : (in_array($case, ['empty', 'read-false', 'read-throw'], true) ? 1 : 5);
+                $expectedEvents = array_merge($expectedEvents, array_fill(0, $count, 'read'));
+                if ($case !== 'read-throw') $expectedEvents[] = 'eof';
+            }
+            if ($acquired) $expectedEvents[] = 'close';
+            $this->assertSame([in_array($case, ['valid', 'no-newline'], true) ? $latest : null,
+                true, false, $expectedEvents, $opened ? ['rbn'] : []],
+                [$summary, $sameFailure, $live, $events, $modes], $case);
+        }
+        $this->assertSame($content, file_get_contents($path));
+    }
+
     public function testProvisionSummaryRecoverableRejectsGuardErrors(): void
     {
         $summary = array('status' => 'ERROR', 'timestamp' => 200);

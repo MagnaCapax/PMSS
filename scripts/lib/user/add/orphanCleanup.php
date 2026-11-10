@@ -35,13 +35,22 @@ function pmssAddUserLatestProvisionSummary(string $userName): ?array
         return null;
     }
 
+    clearstatcache(true, $logPath);
+    $pathStat = @lstat($logPath);
+    if (!is_array($pathStat) || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000) {
+        return null;
+    }
     $summary = null;
-    $handle = @fopen($logPath, 'r');
+    // A FIFO substituted after the snapshot must not block provisioning.
+    $handle = @fopen($logPath, 'rbn');
     if (!is_resource($handle)) {
         return null;
     }
 
     try {
+        if (!pmssLockFileHandleMatchesPath($handle, $logPath, $pathStat)) {
+            return null;
+        }
         while (($line = fgets($handle)) !== false) {
             $markerPos = strpos($line, '###ADDUSER_JSON:');
             if ($markerPos === false) {
@@ -54,11 +63,11 @@ function pmssAddUserLatestProvisionSummary(string $userName): ?array
             $payload['timestamp'] = strtotime(substr($line, 0, 19)) ?: 0;
             $summary = $payload;
         }
+        // Earlier failures cannot authorize cleanup when a newer record may be unread.
+        return feof($handle) ? $summary : null;
     } finally {
         fclose($handle);
     }
-
-    return $summary;
 }
 
 /**
