@@ -42,7 +42,7 @@ PHP;
         $definition = $definitions['traffic-limit'];
         $trafficCases = [
             'traffic-limit show' => $this->gibSettingCliCase('traffic', $definition, ['--show'], "Traffic limit for fixtur01: 15 GiB\n", ['runtime' => "15GiB\n"], ['home' => null, 'runtime' => '15GiB']),
-            'traffic-limit help' => $this->gibSettingCliCase('traffic', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null, 'runtime' => null]),
+            'traffic-limit help' => $this->gibSettingCliCase('traffic', $definition, ['--help'], implode("\n", $this->gibSettingUsageLines($definition))."\n", [], ['home' => null, 'runtime' => null]),
             'traffic-limit set' => $this->gibSettingCliCase('traffic', $definition, ['--limit=20'], "Traffic limit for fixtur01 set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['fixtur01', 'traffic limit set to 20 GiB (monthly quota)']]),
             'traffic-limit unset' => $this->gibSettingCliCase('traffic', $definition, ['--unset'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
             'traffic-limit zero' => $this->gibSettingCliCase('traffic', $definition, ['--limit=0'], "Traffic limit for fixtur01 set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['fixtur01', 'traffic limit unset (GiB quota removed)']]),
@@ -52,7 +52,7 @@ PHP;
         // The root store holds the bonus; the home file is its display copy and is never read (ADR 0213).
         $bonusCases = [
             'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for fixtur01: 15 GiB\n", ['home' => "900\n"], ['home' => '900']) + ['existingStore' => 15, 'store' => 15],
-            'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
+            'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], implode("\n", $this->gibSettingUsageLines($definition))."\n", [], ['home' => null]),
             'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for fixtur01 set to 20 GiB\n", [], ['home' => '20'], [], [['fixtur01', 'bonus traffic set to 20 GiB (monthly add-on)']]) + ['store' => 20],
             'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
             'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for fixtur01 set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['fixtur01', 'bonus traffic unset (GiB add-on removed)']]) + ['existingStore' => 9, 'store' => null],
@@ -242,12 +242,6 @@ PHP;
             '  - '.$definition['unitNote'],
             '  - '.$definition['removeNote'],
         ];
-    }
-
-    /** @param array<string,string> $definition */
-    private function gibSettingUsageText(array $definition): string
-    {
-        return implode("\n", $this->gibSettingUsageLines($definition))."\n";
     }
 
     /** Build one shared GiB-setting CLI fixture. */

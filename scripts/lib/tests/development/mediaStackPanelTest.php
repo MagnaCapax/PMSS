@@ -177,7 +177,9 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusOnlyShowsInstalledUrlsWhenJellyfinConfigExists(): void
     {
-        $status = $this->mediaStatusFixture('pmss-media-installed-', '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+        $home = $this->mediaHomeCreate('pmss-media-installed-');
+        $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+        $status = $this->mediaStatusRead($home);
 
         $this->assertSame('installed', $status['state']);
         $this->assertStringContainsString('/public-fixtur01/jellyfin/web/', $status['urls']['Jellyfin']);
@@ -374,7 +376,9 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusIgnoresUnrelatedLivePid(): void
     {
-        $status = $this->mediaStatusFixture('pmss-media-running-', '.install-media-stack-web.pid', (string) getmypid());
+        $home = $this->mediaHomeCreate('pmss-media-running-');
+        $this->pmssWriteRelativeFile($home, '.install-media-stack-web.pid', (string) getmypid());
+        $status = $this->mediaStatusRead($home);
 
         $this->pmssAssertArraySubsetSame(['state' => 'ready', 'poll' => false], $status);
     }
@@ -401,7 +405,9 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusShowsFailedLogWhenPreviousRunStopped(): void
     {
-        $status = $this->mediaStatusFixture('pmss-media-failed-', '.install-media-stack.log', "[ERR ] Download failed\nPartial output\n");
+        $home = $this->mediaHomeCreate('pmss-media-failed-');
+        $this->pmssWriteRelativeFile($home, '.install-media-stack.log', "[ERR ] Download failed\nPartial output\n");
+        $status = $this->mediaStatusRead($home);
 
         $this->assertSame('failed', $status['state']);
         $this->assertStringContainsString('Download failed', $status['tail']);
@@ -414,7 +420,9 @@ class MediaStackPanelTest extends TestCase
             array('[ERR ] File quota reached during media stack install; free account files and retry.', 'File quota reached'),
         ) as $case) {
             list($line, $message) = $case;
-            $status = $this->mediaStatusFixture('pmss-media-quota-', '.install-media-stack.log', $line."\n");
+            $home = $this->mediaHomeCreate('pmss-media-quota-');
+            $this->pmssWriteRelativeFile($home, '.install-media-stack.log', $line."\n");
+            $status = $this->mediaStatusRead($home);
             $this->assertSame('failed', $status['state']);
             $this->assertStringContainsString($message, $status['message']);
         }
@@ -534,14 +542,6 @@ class MediaStackPanelTest extends TestCase
         $this->assertSame('/home/fixtur01/install-media-stack.sh', \pmssCustomerHomePath($home, 'install-media-stack.sh'));
         $this->assertSame('/home/fixtur01/.install-media-stack.log', \pmssCustomerHomePath($home, '.install-media-stack.log'));
         $this->assertSame('/home/fixtur01/.install-media-stack-web.pid', \pmssCustomerHomePath($home, '.install-media-stack-web.pid'));
-    }
-
-    private function mediaStatusFixture(string $prefix, string $relativePath, string $content): array
-    {
-        $home = $this->mediaHomeCreate($prefix);
-        $this->pmssWriteRelativeFile($home, $relativePath, $content);
-
-        return $this->mediaStatusRead($home);
     }
 
     private function mediaStackCgroupV2Fixture(int $limitBytes): array

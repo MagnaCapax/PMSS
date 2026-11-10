@@ -91,7 +91,32 @@ class SkeletonWebLocalAssetTest extends TestCase
             if (strpos($source, 'class="portfoliobox"') !== false) {
                 $portfolioboxPages[] = basename($path);
             }
-            $classes = $this->customerPanelPortfolioboxDirectChildClasses($source);
+            // Discover direct children within this page before checking their styles.
+            preg_match_all('/<\/?div\b[^>]*>/i', $source, $tagMatches);
+            $depth = 0;
+            $classes = [];
+            foreach ($tagMatches[0] as $tag) {
+                if (preg_match('/^<div\b/i', $tag)) {
+                    if ($depth === 0 && in_array('portfoliobox', $this->customerPanelTagClasses($tag), true)) {
+                        $depth = 1;
+                        continue;
+                    }
+                    if ($depth === 1) {
+                        foreach ($this->customerPanelTagClasses($tag) as $class) {
+                            if (strpos($class, 'pmss-') === 0) {
+                                $classes[] = $class;
+                            }
+                        }
+                    }
+                    if ($depth > 0) {
+                        $depth++;
+                    }
+                } elseif ($depth > 0 && preg_match('/^<\/div\b/i', $tag)) {
+                    $depth--;
+                }
+            }
+            $classes = array_values(array_unique($classes));
+            sort($classes);
             if ($classes !== []) {
                 $candidates['etc/skel/www/'.basename($path)] = [$source, $classes];
             }
@@ -412,38 +437,6 @@ class SkeletonWebLocalAssetTest extends TestCase
     {
         preg_match_all('/\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/', $source, $matches);
         return array_unique($matches[1]);
-    }
-
-    /** @return array<int, string> */
-    private function customerPanelPortfolioboxDirectChildClasses(string $source): array
-    {
-        preg_match_all('/<\/?div\b[^>]*>/i', $source, $tagMatches);
-        $depth = 0;
-        $classes = [];
-        foreach ($tagMatches[0] as $tag) {
-            if (preg_match('/^<div\b/i', $tag)) {
-                if ($depth === 0 && in_array('portfoliobox', $this->customerPanelTagClasses($tag), true)) {
-                    $depth = 1;
-                    continue;
-                }
-                if ($depth === 1) {
-                    foreach ($this->customerPanelTagClasses($tag) as $class) {
-                        if (strpos($class, 'pmss-') === 0) {
-                            $classes[] = $class;
-                        }
-                    }
-                }
-                if ($depth > 0) {
-                    $depth++;
-                }
-            } elseif ($depth > 0 && preg_match('/^<\/div\b/i', $tag)) {
-                $depth--;
-            }
-        }
-
-        $classes = array_values(array_unique($classes));
-        sort($classes);
-        return $classes;
     }
 
     /** @return array<int, string> */

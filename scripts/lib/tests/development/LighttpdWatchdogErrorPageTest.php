@@ -102,11 +102,6 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         });
     }
 
-    private function watchdogErrorPagePath(string $webRoot, string $username = 'fixtur91'): string
-    {
-        return $webRoot.'/error-502-'.$username.'.html';
-    }
-
     public function testQuotaOutputShowsExhaustionWhenBlockColumnHasMarker(): void
     {
         $output = "Disk quotas for user demo (uid 1000):\nFilesystem blocks quota limit grace files quota limit grace\n/dev/sda1 10G* 9G 10G 0 0 0\n";
@@ -351,13 +346,13 @@ SH
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
         $this->assertTrue(pmssLighttpdWatchdogWriteErrorPage('fixtur91', 'php', $webRoot));
-        $this->assertTrue(file_exists($this->watchdogErrorPagePath($webRoot)));
+        $this->assertTrue(file_exists($webRoot.'/error-502-fixtur91.html'));
     }
 
     public function testDeleteErrorPageRemovesExistingFile(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
-        $path = $this->pmssWriteFile($this->watchdogErrorPagePath($webRoot), 'demo');
+        $path = $this->pmssWriteFile($webRoot.'/error-502-fixtur91.html', 'demo');
         $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('fixtur91', $webRoot));
         $this->assertFalse(file_exists($path));
     }
@@ -371,7 +366,7 @@ SH
     public function testErrorPageFileOperationsRejectInvalidAccountNames(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
-        $path = $this->pmssWriteFile($this->watchdogErrorPagePath($webRoot), 'untouched');
+        $path = $this->pmssWriteFile($webRoot.'/error-502-fixtur91.html', 'untouched');
         foreach (['', 'Fixtur91', 'fixtur91/../fixtur91', "fixtur91\0", 'toolongname'] as $username) {
             $this->assertFalse(pmssLighttpdWatchdogWriteErrorPage($username, 'php', $webRoot));
             $this->assertFalse(pmssLighttpdWatchdogDeleteErrorPage($username, $webRoot));
