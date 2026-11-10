@@ -72,8 +72,14 @@ function pmssLiveStatsNodeSample(array $prev, array $cur, int $now): ?array
 /** Last line of a regular, non-symlink file (reads only the tail). */
 function pmssLiveStatsLastLine(string $path): ?string
 {
-    if (pmssFilesystemPathHasNulByte($path) || is_link($path) || !is_file($path) || ($h = @fopen($path, 'rb')) === false) return null;
+    if (pmssFilesystemPathHasNulByte($path) || is_link($path) || !is_file($path)) return null;
+    clearstatcache(true, $path);
+    $entry = @lstat($path);
+    if (!is_array($entry) || (($entry['mode'] ?? 0) & 0170000) !== 0100000) return null;
+    // A substituted FIFO must not block before the opened inode can be checked.
+    if (($h = @fopen($path, 'rbn')) === false) return null;
     try {
+        if (!pmssLockFileHandleMatchesPath($h, $path, $entry)) return null;
         // Failed positioning must not fall back to reading the entire log.
         $size = @filesize($path);
         if ($size === false || fseek($h, max(0, $size - 1024)) !== 0) return null;

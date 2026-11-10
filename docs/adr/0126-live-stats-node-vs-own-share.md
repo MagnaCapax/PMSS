@@ -86,3 +86,9 @@ per-user samples come from the logs that already handle the cgroup mode.
   makes the size check stale. Stable-file results and incomplete-line rejection
   retain their existing behavior. `LiveStatsLastLineSafetyTest` covers growth
   and exact-budget boundaries; fixtures run only on testing machines.
+- Tail acquisition opens non-blocking and matches the opened device/inode to a
+  regular-file snapshot before seeking or reading. Missing metadata and file
+  substitutions return `null`; acquired streams close on refusals and metadata
+  exceptions. Hard-linked regular logs, tail bytes, growth handling and parsing
+  keep their prior behavior. `LiveStatsLastLineSafetyTest` injects these failures
+  without opening host logs.
