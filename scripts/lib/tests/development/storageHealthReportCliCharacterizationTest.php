@@ -23,11 +23,6 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         ], $overrides);
     }
 
-    private function runStorageHealthReport(string $jsonPath, array $arguments = []): string
-    {
-        return $this->pmssRunRepoPhpScript('scripts/storageHealth.php', array_merge(['--json', $jsonPath], $arguments));
-    }
-
     public function testOnlyProblemsAndDeviceFilterKeepLatestMatchingEntry(): void
     {
         $jsonPath = $this->storageHealthJsonl([
@@ -65,7 +60,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             ],
         ]);
 
-        $output = $this->runStorageHealthReport($jsonPath, ['--device', 'sdb', '--only-problems']);
+        $output = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--device', 'sdb', '--only-problems']);
 
         $this->assertStringContainsAndOmitsStrings(['Performance status: OK', 'Summary: 0 ok, 0 warn, 1 fail',
             'Broken Disk', 'pending_sectors'], ['Healthy Disk', 'MD RAID', ' sda '], $output);
@@ -109,7 +104,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             ],
         ]);
 
-        $output = $this->runStorageHealthReport($jsonPath);
+        $output = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath]);
 
         $this->assertOrderedStrings(
             ['Failing Disk', 'Fast Flash', 'Healthy Disk'],
@@ -135,7 +130,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'operation' => 'recovery',
         ])]);
 
-        $this->runStorageHealthReport($jsonPath, ['--user-notice='.(string) $noticePath]);
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--user-notice='.(string) $noticePath]);
 
         $this->assertTrue(is_file($noticePath), 'Expected user notice file to be created');
         $notice = $this->pmssReadJsonArrayFile($noticePath, null, 'Expected user notice to contain JSON');
@@ -156,7 +151,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'operation' => 'check',
         ])]);
 
-        $this->runStorageHealthReport($jsonPath, ['--user-notice', (string) $noticePath]);
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--user-notice', (string) $noticePath]);
 
         $this->assertTrue(is_file($noticePath), 'Expected separate-path user notice file to be created');
         $notice = $this->pmssReadJsonArrayFile($noticePath, null, 'Expected separate-path user notice to contain JSON');
@@ -175,7 +170,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         ])]);
         $this->pmssWriteFile($noticePath, "stale\n");
 
-        $this->runStorageHealthReport($jsonPath, ['--user-notice='.(string) $noticePath]);
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--user-notice='.(string) $noticePath]);
 
         clearstatcache(true, (string) $noticePath);
         $this->assertFalse(is_file($noticePath), 'Expected stale user notice to be removed');
@@ -195,7 +190,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $this->pmssWriteFile($realNoticePath, "safe\n");
         symlink((string) $realNoticePath, (string) $linkNoticePath);
 
-        $this->runStorageHealthReport($jsonPath, ['--user-notice='.(string) $linkNoticePath]);
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--user-notice='.(string) $linkNoticePath]);
 
         $this->assertTrue(is_link($linkNoticePath), 'Expected symlinked notice path to remain a symlink');
         $this->assertEquals("safe\n", file_get_contents($realNoticePath), 'Expected symlink target to stay untouched');
@@ -210,9 +205,9 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $jsonPath = $this->storageHealthJsonl([$raid, $olderSmart, $smart, $unknown]);
 
         $expected = json_encode($smart, JSON_UNESCAPED_SLASHES).PHP_EOL.json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL;
-        $actual = $this->runStorageHealthReport($jsonPath, ['--raw']);
+        $actual = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--raw']);
 
         $this->assertSame($expected, $actual);
-        $this->assertStringContainsString('latest snapshot '.$unknown['timestamp'], $this->runStorageHealthReport($jsonPath));
+        $this->assertStringContainsString('latest snapshot '.$unknown['timestamp'], $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath]));
     }
 }

@@ -8,7 +8,7 @@ class LighttpdSocketCleanupTest extends TestCase
 {
     public function testStartScriptCreatesManagedDirectoriesViaSuBeforeLaunch(): void
     {
-        $script = $this->readStartScript();
+        $script = $this->pmssReadRepoFile('scripts/startLighttpd');
         $this->pmssAssertStringContract($script, [
             'required' => ["if (\$deflateEnabled) {", "\$requiredDirs[] = \$lighttpdDir.'/compress';",
                 'pmssStartLighttpdPathWithinHome($dir, $homeDir)', "if (\$result['rc'] !== 0) {", 'Unable to prepare lighttpd directory'],
@@ -23,7 +23,7 @@ class LighttpdSocketCleanupTest extends TestCase
 
     public function testStartScriptRemovesPhpSocketEntriesBeforeLaunch(): void
     {
-        $script = $this->readStartScript();
+        $script = $this->pmssReadRepoFile('scripts/startLighttpd');
         $this->pmssAssertStringContract($script, [
             'required' => ['is_link($socketPath)', 'Unable to remove stale lighttpd socket'],
             'ordered' => [["foreach (glob(rtrim(\$lighttpdDir, '/').'/php.socket*') ?: [] as \$socketPath) {",
@@ -34,7 +34,7 @@ class LighttpdSocketCleanupTest extends TestCase
 
     public function testStartScriptEntersUserHomeBeforeLaunchingLighttpd(): void
     {
-        $script = $this->readStartScript();
+        $script = $this->pmssReadRepoFile('scripts/startLighttpd');
         $this->pmssAssertStringContract($script, [
             'required' => ["require_once __DIR__.'/lib/user/serviceLaunch.php';", 'fwrite(STDERR, "Unable to enter user home\n");',
                 'fwrite(STDERR, "Unable to start lighttpd inside user slice\n");', 'return 1;', "ps aux | grep '.escapeshellarg(\$user)"],
@@ -170,8 +170,4 @@ class LighttpdSocketCleanupTest extends TestCase
         return ['rc' => $result['rc'], 'output' => $result['output']];
     }
 
-    private function readStartScript(): string
-    {
-        return $this->pmssReadRepoFile('scripts/startLighttpd');
-    }
 }

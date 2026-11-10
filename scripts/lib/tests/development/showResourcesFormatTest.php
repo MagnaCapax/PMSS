@@ -32,16 +32,11 @@ class ShowResourcesFormatTest extends TestCase
         ];
     }
 
-    private function resourceStatsRuntimeWithAlice(array $values): string
+    private function resourceStatsRuntimeWithUser(array $values): string
     {
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($values));
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($values));
         return $runtimeDir;
-    }
-
-    private function runShowResources(array $arguments, string $runtimeDir): string
-    {
-        return $this->pmssRunRepoPhpScript('scripts/showResources.php', $arguments, ['PMSS_RUNTIME_DIR' => $runtimeDir]);
     }
 
     public function testHelpOutputMatchesSnapshot(): void
@@ -61,8 +56,8 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testUserFilteredOutputFormatsCpuRamAndIops(): void
     {
-        $runtimeDir = $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues());
-        $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--user=alice'], ['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        $runtimeDir = $this->resourceStatsRuntimeWithUser($this->sampleUsageValues());
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--user=fixtur01'], ['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
     }
 
     public function testUserFilteredOutputFormatsLargeByteAndIoOperationSuffixes(): void
@@ -83,7 +78,8 @@ class ShowResourcesFormatTest extends TestCase
                 '6.00 M ops',
             ],
         ] as [$overrides, $needle]) {
-            $this->assertStringContainsString($needle, $this->runShowResources(['--user=alice'], $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues($overrides))));
+            $runtimeDir = $this->resourceStatsRuntimeWithUser($this->sampleUsageValues($overrides));
+            $this->assertStringContainsString($needle, $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--user=fixtur01'], ['PMSS_RUNTIME_DIR' => $runtimeDir]));
         }
     }
 
@@ -93,26 +89,26 @@ class ShowResourcesFormatTest extends TestCase
         $values = $this->numericUsageValues();
         $payload = $this->pmssBuildResourceStatsPayloadFromValues($values);
         $payload['ignored_field'] = ['month' => 999.0];
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $payload);
-        $json = $this->runShowResources(['--json', '--user=alice'], $runtimeDir);
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/fixtur01', $payload);
+        $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=fixtur01'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $payload = $this->pmssDecodeJsonArray($json);
-        $this->assertEquals(6.0, $payload['users']['alice']['memory']['current']);
-        $this->assertEquals(8.0, $payload['users']['alice']['ram_hours']['month']);
+        $this->assertEquals(6.0, $payload['users']['fixtur01']['memory']['current']);
+        $this->assertEquals(8.0, $payload['users']['fixtur01']['ram_hours']['month']);
         $this->assertEquals(9.0, $payload['totals']['tasks']['current']);
         $this->assertEquals([], $payload['missing']);
-        $this->assertTrue(!isset($payload['users']['alice']['ignored_field']));
+        $this->assertTrue(!isset($payload['users']['fixtur01']['ignored_field']));
     }
 
     public function testUserFilteredJsonOutputMatchesSnapshot(): void
     {
         $values = $this->numericUsageValues();
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
-        $runtimeDir = $this->resourceStatsRuntimeWithAlice($values);
+        $runtimeDir = $this->resourceStatsRuntimeWithUser($values);
 
         $this->assertEquals(
-            ['users' => ['alice' => $expectedRow], 'totals' => $expectedRow, 'missing' => []],
-            $this->pmssDecodeJsonArray($this->runShowResources(['--json', '--user=alice'], $runtimeDir))
+            ['users' => ['fixtur01' => $expectedRow], 'totals' => $expectedRow, 'missing' => []],
+            $this->pmssDecodeJsonArray($this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=fixtur01'], ['PMSS_RUNTIME_DIR' => $runtimeDir]))
         );
     }
 
@@ -121,23 +117,23 @@ class ShowResourcesFormatTest extends TestCase
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         @mkdir($runtimeDir.'/resourceStats', 0755, true);
 
-        $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=ghost'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=fixtur02'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $payload = $this->pmssDecodeJsonArray($json);
         $this->assertEquals([], $payload['users']);
         $this->assertEquals(0.0, $payload['totals']['memory']['current']);
-        $this->assertEquals(['ghost'], $payload['missing']);
+        $this->assertEquals(['fixtur02'], $payload['missing']);
     }
 
     public function testJsonOutputReportsEncodingFailuresOnStderrOnly(): void
     {
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues([
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/fixtur01', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues([
             'memory_current' => INF,
         ])));
         $command = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
             'scripts/showResources.php',
-            ['--json', '--user=alice'],
+            ['--json', '--user=fixtur01'],
             ['PMSS_RUNTIME_DIR' => $runtimeDir],
             'pmss-show-stderr-'
         );

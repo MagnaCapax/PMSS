@@ -563,6 +563,12 @@ builder use that same execution path. Fixture-specific arguments, archive
 members, malformed-member transforms, exit checks and content assertions stay
 with their tests; these fixtures run only on testing machines.
 
+CLI and source-contract fixtures call `pmssRunRepoPhpScript()`,
+`pmssRunRepoPhpScriptCommand()` and `pmssReadRepoFile()` directly instead of
+local forwarding methods. Keep script paths, argument order, environment
+overrides and output assertions at the scenario; fixture trees compose the
+existing temporary-directory and checked-publication helpers directly.
+
 Torrent-client fixtures, hardware probes, watchdogs, account restart space,
 held-block observations and installer gates use `TestCase::pmssMakeCallbacks()`
 for fixed operation results, with optional call-order recording. Literal results,

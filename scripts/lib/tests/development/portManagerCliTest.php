@@ -5,20 +5,10 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class PortManagerCliTest extends TestCase
 {
-    private function runPortManager(array $arguments, array $environment = []): array
-    {
-        return $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', $arguments, $environment);
-    }
-
-    private function runPortManagerInDir(array $arguments, string $portDir): array
-    {
-        return $this->runPortManager($arguments, ['PMSS_PORT_MANAGER_DIR' => $portDir]);
-    }
-
     public function testAssignPersistsPortInsideOverrideDirectory(): void
     {
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(0, $result['rc']);
         $this->assertMatches('/^\d+$/', trim($result['output']));
@@ -29,11 +19,11 @@ final class PortManagerCliTest extends TestCase
     {
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
 
-        $assign = $this->runPortManagerInDir(['assign', 'fixtur01'], $portDir);
+        $assign = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
         $assignedPort = trim($assign['output']);
-        $viewAssigned = $this->runPortManagerInDir(['view', 'fixtur01'], $portDir);
-        $release = $this->runPortManagerInDir(['release', 'fixtur01'], $portDir);
-        $viewReleased = $this->runPortManagerInDir(['view', 'fixtur01'], $portDir);
+        $viewAssigned = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['view', 'fixtur01'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $release = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['release', 'fixtur01'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $viewReleased = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['view', 'fixtur01'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(0, $assign['rc']);
         $this->assertMatches('/^\d+$/', $assignedPort);
@@ -50,7 +40,7 @@ final class PortManagerCliTest extends TestCase
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "24567\n");
 
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(0, $result['rc']);
         $this->assertSame('24567', trim($result['output']));
@@ -62,7 +52,7 @@ final class PortManagerCliTest extends TestCase
         $lockDir = $this->pmssMakeTempDir('pmss-port-lock-');
         $this->pmssCreateSymlinkOrSkip($this->pmssMakeTempFile('pmss-port-lock-target-'), $lockDir.'/pmss-portManager.lock');
 
-        $result = $this->runPortManager(['assign', 'fixtur01', 'lighttpd'], [
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], [
             'PMSS_PORT_MANAGER_DIR' => $portDir,
             'PMSS_RUNTIME_LOCK_DIR' => $lockDir,
         ]);
@@ -79,7 +69,7 @@ final class PortManagerCliTest extends TestCase
         $lockDir = $this->pmssMakeTempDir('pmss-port-lock-');
         $this->pmssCreateSymlinkOrSkip($this->pmssMakeTempFile('pmss-port-lock-target-'), $lockDir.'/pmss-portManager.lock');
 
-        $result = $this->runPortManager(['release', 'fixtur01', 'lighttpd'], [
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['release', 'fixtur01', 'lighttpd'], [
             'PMSS_PORT_MANAGER_DIR' => $portDir,
             'PMSS_RUNTIME_LOCK_DIR' => $lockDir,
         ]);
@@ -94,7 +84,7 @@ final class PortManagerCliTest extends TestCase
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "not-a-port\n");
 
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
@@ -105,7 +95,7 @@ final class PortManagerCliTest extends TestCase
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur02', "not-a-port\n");
 
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(0, $result['rc']);
         $this->assertMatches('/^\d+$/', trim($result['output']));
@@ -117,7 +107,7 @@ final class PortManagerCliTest extends TestCase
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "24567\n");
 
-        $result = $this->runPortManagerInDir(['release', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['release', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('Port released', $result['output']);
@@ -129,7 +119,7 @@ final class PortManagerCliTest extends TestCase
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
         $this->pmssWriteFile($portDir.'/lighttpd-fixtur01', "not-a-port\n");
 
-        $result = $this->runPortManagerInDir(['view', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['view', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
@@ -138,7 +128,7 @@ final class PortManagerCliTest extends TestCase
     public function testRejectsInvalidUsernameBeforeTouchingFilesystem(): void
     {
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
-        $result = $this->runPortManagerInDir(['assign', '../fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', '../fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid username', $result['output']);
@@ -148,7 +138,7 @@ final class PortManagerCliTest extends TestCase
     public function testRejectsInvalidServiceBeforeTouchingFilesystem(): void
     {
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', '../lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', '../lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid service', $result['output']);
@@ -158,7 +148,7 @@ final class PortManagerCliTest extends TestCase
     public function testFailsWhenPortDirectoryCannotBeCreated(): void
     {
         $blockedParent = $this->pmssMakeTempFile('pmss-port-blocked-');
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $blockedParent.'/ports');
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $blockedParent.'/ports']);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: unable to initialize port directory', $result['output']);
@@ -170,7 +160,7 @@ final class PortManagerCliTest extends TestCase
         $linkDir = $this->pmssMakeTempPath('pmss-port-link-');
         $this->pmssCreateSymlinkOrSkip($realDir, $linkDir);
 
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $linkDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $linkDir]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: unable to initialize port directory', $result['output']);
@@ -184,7 +174,7 @@ final class PortManagerCliTest extends TestCase
         $portFile = $portDir.'/lighttpd-fixtur01';
         $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);
 
-        $result = $this->runPortManagerInDir(['assign', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['assign', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
@@ -199,7 +189,7 @@ final class PortManagerCliTest extends TestCase
         $portFile = $portDir.'/lighttpd-fixtur01';
         $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);
 
-        $result = $this->runPortManagerInDir(['release', 'fixtur01', 'lighttpd'], $portDir);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['release', 'fixtur01', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
@@ -209,7 +199,7 @@ final class PortManagerCliTest extends TestCase
 
     public function testInvalidActionKeepsUsageContract(): void
     {
-        $result = $this->runPortManager(['dance', 'fixtur01']);
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['dance', 'fixtur01']);
 
         $this->assertSame(0, $result['rc']);
         $this->assertSame('Usage: portManager.php [view|assign|release] USER [SERVICE]', $result['output']);
