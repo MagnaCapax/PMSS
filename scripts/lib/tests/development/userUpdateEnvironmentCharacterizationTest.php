@@ -212,17 +212,12 @@ PHP
         $this->assertTrue($result['irssi_exists']);
         $this->assertTrue($result['recycle_exists']);
         $this->assertStringContainsString('@ob_flush();', $result['filemanager']);
-        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['deluge']);
-        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['deluge']);
-        $this->assertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $result['deluge']);
-        $this->assertStringNotContainsString('.delugePort.py', $result['deluge']);
-        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['qbittorrent_frontend']);
-        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['qbittorrent_frontend']);
-        $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
-        $this->assertStringNotContainsString('.qbittorrentPort.py', $result['qbittorrent_frontend']);
+        $this->assertStringContainsAndOmitsStrings([], ["if (is_readable('/scripts/lib/user/torrentPort.php')) {",
+            "require_once '/scripts/lib/user/torrentPort.php';", 'pmssDelugePortEnsureCurrentUser', '.delugePort.py'], $result['deluge']);
+        $this->assertStringContainsAndOmitsStrings([], ["if (is_readable('/scripts/lib/user/torrentPort.php')) {",
+            "require_once '/scripts/lib/user/torrentPort.php';", 'pmssQbittorrentPortEnsureCurrentUser', '.qbittorrentPort.py'], $result['qbittorrent_frontend']);
         $this->assertSame($this->pmssReadRepoFile('etc/skel/www/transmission.php'), $result['transmission_frontend']);
-        $this->assertStringContainsString('$interval = (int)$interval;', $result['settings']);
-        $this->assertStringContainsString('if($interval<1)', $result['settings']);
+        $this->assertStringContainsAllStrings(['$interval = (int)$interval;', 'if($interval<1)'], $result['settings']);
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));
         $this->assertStringContainsString('@ob_flush();', $result['rss']);
         $this->assertStringContainsString('return (int) $field;', $result['hddquota']);

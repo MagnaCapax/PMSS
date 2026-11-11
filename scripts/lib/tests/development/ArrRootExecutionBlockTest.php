@@ -205,9 +205,8 @@ class ArrRootExecutionBlockTest extends TestCase
 
         $this->assertSame(3, $findings);
         $this->assertSame([[201, 9], [203, 9]], $signals);
-        $this->assertStringContainsString('action=killed pid=201', implode("\n", $messages));
-        $this->assertStringContainsString('action=observed_unknown_root_process pid=202', implode("\n", $messages));
-        $this->assertStringContainsString('action=kill_failed pid=203', implode("\n", $messages));
+        $this->assertStringContainsAllStrings(['action=killed pid=201', 'action=observed_unknown_root_process pid=202',
+            'action=kill_failed pid=203'], implode("\n", $messages));
     }
 
     /** Build a /proc-shaped entry: exe symlink plus the Uid line the scanner parses. */

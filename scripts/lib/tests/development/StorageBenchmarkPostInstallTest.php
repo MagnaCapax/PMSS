@@ -67,9 +67,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
         });
 
         $this->assertSame(1, count($calls));
-        $this->assertStringContainsString('/scripts/util/storageBenchmark.php', $calls[0][1]);
-        $this->assertStringContainsString('--require-idle', $calls[0][1]);
-        $this->assertStringContainsString('--devices', $calls[0][1]);
+        $this->assertStringContainsAllStrings(['/scripts/util/storageBenchmark.php', '--require-idle', '--devices'], $calls[0][1]);
         $this->assertTrue(is_file($marker));
         $this->assertSame('storage_benchmark_post_install', $this->pmssReadJsonArrayFile($marker)['event'] ?? '');
         $this->assertStringContainsString('[storage-benchmark] WARN: /dev/sdb seqread < 60% median', implode("\n", $logs));

@@ -40,9 +40,8 @@ class LighttpdWatchdogCustomConfigTest extends TestCase
             'sibling' => 'sibling', 'backupMetadata' => [0640, $result['uid']], 'restored' => 'broken',
         ], $result);
         $this->assertSame(1, count($result['logs']));
-        $this->assertStringContainsString('3 consecutive syntax failures', $result['logs'][0]);
-        $this->assertStringContainsString('media-stack.conf.disabled-', $result['logs'][0]);
-        $this->assertStringContainsString('rename it back', $result['logs'][0]);
+        $this->assertStringContainsAllStrings(['3 consecutive syntax failures', 'media-stack.conf.disabled-',
+            'rename it back'], $result['logs'][0]);
         $this->assertStringContainsString("'-t' '-f'", $result['probeCommands'][0]);
         $this->assertSame(3, count($result['probeCommands']));
     }

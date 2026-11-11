@@ -51,9 +51,8 @@ class CertbotRenewalLogTest extends TestCase
         $this->assertEquals('fail', $summary['status']);
         $this->assertTrue(is_int($summary['event_ts']) && $summary['event_ts'] > 0, 'Expected event_ts to be an int timestamp');
         $this->assertStringContainsString('all renewals failed', strtolower($summary['event']));
-        $this->assertStringContainsString('/etc/letsencrypt/live/example/fullchain.pem', $summary['error_excerpt']);
-        $this->assertStringContainsString('some error detail line', $summary['error_excerpt']);
-        $this->assertTrue(strpos($summary['error_excerpt'], 'Next run') === false, 'Excerpt should stop before the next timestamped entry');
+        $this->assertStringContainsAndOmitsStrings(['/etc/letsencrypt/live/example/fullchain.pem', 'some error detail line'],
+            ['Next run' => 'Excerpt should stop before the next timestamped entry'], $summary['error_excerpt']);
     }
 
     public function testLastMarkerWinsWhenMultipleRunsExist(): void
