@@ -422,6 +422,12 @@ conversion never removes another actor's directory. Ordinary results, modes and
 operation order remain unchanged; later cleanup faults retain PHP's normal
 throwable precedence. `PrivateTempAcquisitionSafetyTest` covers these cases with
 memory-only operations on the testing machine.
+Temporary-file acquisition also includes its initial symlink inspection in that
+cleanup lifetime. Inspection exceptions and errors attempt regular-file-guarded
+removal before propagating; replacement symlinks remain untouched. Both direct
+file callers and directory conversion use the same acquisition path. The same
+fixture covers this first probe, cleanup refusals and cleanup-fault precedence;
+successful paths and ordinary symlink refusals retain their existing results.
 
 For any optimization/refactor touching existing CLI/API output, follow this
 minimal loop before merge:

@@ -16,9 +16,11 @@ function pmssCreatePrivateTempFile(string $prefix): ?string
 {
     if (!pmssPrivateTempPrefixIsSafe($prefix) || ($base = pmssPrivateTempBaseDirRealpath()) === null) return null;
     $path = @tempnam($base, $prefix);
-    if (!is_string($path) || pmssFilesystemPathHasNulByte($path) || is_link($path)) return null;
+    if (!is_string($path) || pmssFilesystemPathHasNulByte($path)) return null;
     $retained = false;
     try {
+        // The first metadata probe also belongs to the candidate cleanup lifetime.
+        if (is_link($path)) return null;
         $real = realpath($path);
         $basePrefix = $base.DIRECTORY_SEPARATOR;
         if ($real === false || !is_file($real) || strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) {

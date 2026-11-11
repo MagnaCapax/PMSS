@@ -13,7 +13,8 @@ class PrivateTempAcquisitionSafetyTest extends TestCase
 namespace PrivateTempAcquisitionFixture;
 function operation($name) {
     $GLOBALS['calls'][$name] = ($GLOBALS['calls'][$name] ?? 0) + 1;
-    if ($name === 'unlink' && $GLOBALS['calls'][$name] === 2 && $GLOBALS['cleanupFailure'] !== null) {
+    if ($name === 'unlink' && $GLOBALS['calls'][$name] === ($GLOBALS['case']['cleanupFaultAt'] ?? 2)
+        && $GLOBALS['cleanupFailure'] !== null) {
         throw $GLOBALS['cleanupFailure'];
     }
     if ($name !== ($GLOBALS['case']['stage'] ?? null)) return true;
@@ -28,7 +29,14 @@ function tempnam($base, $prefix) {
     $GLOBALS['node'] = 'file';
     return '/fixture/pmss-temp-token';
 }
-function is_link($path) { return false; }
+function is_link($path) {
+    operation('link');
+    if ($GLOBALS['case']['symlink'] ?? false) {
+        $GLOBALS['node'] = 'link';
+        return true;
+    }
+    return false;
+}
 function realpath($path) { return operation('file-realpath') ? $path : false; }
 function is_file($path) { return operation('file-type'); }
 function pmssRegularFilePathIsReadable($path) {
@@ -98,6 +106,38 @@ PHP;
                     [null, 'file', [], [], $class, true],
                 ], $this->observe([['stage' => $stage, 'fault' => $fault],
                     ['stage' => $stage, 'fault' => $fault, 'cleanupAllowed' => false]]));
+            }
+        }
+    }
+
+    public function testInitialLinkProbeThrowablesCleanCandidatesBeforeEitherOwnershipTransfer(): void
+    {
+        foreach (['file', 'directory'] as $kind) {
+            foreach (['exception' => 'RuntimeException', 'error' => 'Error'] as $fault => $class) {
+                $case = ['kind' => $kind, 'stage' => 'link', 'fault' => $fault];
+                $this->assertSame([
+                    [null, null, ['unlink'], [], $class, true],
+                    [null, 'file', [], [], $class, true],
+                ], $this->observe([$case, $case + ['cleanupAllowed' => false]]));
+            }
+        }
+    }
+
+    public function testInitialLinkRefusalsLeaveReplacementLinksUntouched(): void
+    {
+        $this->assertSame([
+            [null, 'link', [], [], null, true],
+            [null, 'link', [], [], null, true],
+        ], $this->observe([['symlink' => true], ['kind' => 'directory', 'symlink' => true]]));
+    }
+
+    public function testInitialLinkProbeCleanupFaultUsesNormalThrowablePrecedence(): void
+    {
+        foreach (['exception', 'error'] as $fault) {
+            foreach (['RuntimeException', 'Error'] as $cleanupFault) {
+                $this->assertSame([[null, 'file', ['unlink'], [], $cleanupFault, true]],
+                    $this->observe([['stage' => 'link', 'fault' => $fault,
+                        'cleanupFault' => $cleanupFault, 'cleanupFaultAt' => 1]]));
             }
         }
     }
