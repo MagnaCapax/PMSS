@@ -172,6 +172,16 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Command-pipe cleanup retries a close once only while the stream remains live.
+A false result or throwable before closure cannot strand a transiently failing
+pipe; persistent faults remain bounded so later descriptors are still attempted.
+The first close throwable propagates unchanged even when retry succeeds or throws
+again. Already-closed streams and non-stream resources remain untouched; normal
+close order, void results and command output contracts stay unchanged.
+`RuntimeCommandPipeCloseRetrySafetyTest` covers both throwable families, false
+results, faults before/after closure, persistent failures and later-pipe cleanup
+with memory streams. Execution stays on testing machines; no process is launched.
+
 Dpkg selections staging removes its private temporary file if payload assembly
 or writing throws; only a complete write transfers cleanup to the application
 controller. That controller removes the staged file in `finally`, including

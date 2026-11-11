@@ -8,12 +8,13 @@ function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMo
     return [0 => ['pipe', $stdinMode], 1 => ['pipe', $stdoutMode], 2 => ['pipe', $stderrMode]];
 }
 
-/** Attempt every live pipe close, then propagate the first close failure unchanged. */
+/** Attempt every live pipe close with one retry, then propagate the first close failure unchanged. */
 function pmssProcessPipesClose(array $pipes): void
 {
     $failure = null;
     foreach ($pipes as $pipe) {
-        if (pmssStreamHandleIsOpen($pipe)) {
+        // A failed close can leave its stream live; retry once without delaying the other pipes indefinitely.
+        for ($attempt = 0; $attempt < 2 && pmssStreamHandleIsOpen($pipe); $attempt++) {
             try {
                 fclose($pipe);
             } catch (\Throwable $error) {
