@@ -42,49 +42,25 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
 
     public function testCronSourceSafetyContracts(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/cron/cgroupIopsLimitApply.php', [
-                'ordered' => [
-                    [
-                        'needles' => [
-                            'foreach ($userConfigs as $user => $json) {',
-                            'if (($uid = pmssCgroupDirectUserUidOrError($user, $errors)) === null) {',
-                            '$limits = [$readIops, $writeIops];',
-                            '$sliceDir = pmssCgroupDirectUserSliceDir($uid);',
-                        ],
-                        'missingPrefix' => 'missing IOPS passwd UID guard: ',
-                        'orderPrefix' => 'IOPS UID guard must run before sysfs path assembly: ',
-                    ],
-                ],
-            ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/cgroupIopsLimitApply.php', [
+            'foreach ($userConfigs as $user => $json) {',
+            'if (($uid = pmssCgroupDirectUserUidOrError($user, $errors)) === null) {',
+            '$limits = [$readIops, $writeIops];',
+            '$sliceDir = pmssCgroupDirectUserSliceDir($uid);',
+        ], 'missing IOPS passwd UID guard: ', 'IOPS UID guard must run before sysfs path assembly: ');
         // The facade owns the shared write lifecycle; pure spec policy has its own module.
-        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directApply.php', [
-                'ordered' => [
-                    [
-                        'needles' => [
-                            'function pmssIopsThrottleApply(string $cgPath, string $majMin, ?int $iops, bool $dryRun): array',
-                            "pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])",
-                            "return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];",
-                            'if (($iops === null && !is_writable($cgPath)) || @file_put_contents($cgPath, $desired) === false)',
-                        ],
-                        'missingPrefix' => 'missing IOPS direct-write guard: ',
-                        'orderPrefix' => 'IOPS direct-write guard must run before file_put_contents: ',
-                    ],
-                ],
-            ]);
-        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directPolicy.php', [
-                'ordered' => [
-                    [
-                        'needles' => [
-                            'function pmssIopsParseSpec($raw): ?int',
-                            'Do not let an arbitrary "label:number" string trigger a /home throttle.',
-                            "if (preg_match('#^(?:/home|/dev/[^:\\r\\n\\x00]+):([0-9]+)$#', \$raw, \$m) !== 1) {",
-                            '$n = (int) $m[1];',
-                        ],
-                        'missingPrefix' => 'missing IOPS config spec guard: ',
-                        'orderPrefix' => 'IOPS config spec guard must run before suffix parsing: ',
-                    ],
-                ],
-            ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/cgroup/directApply.php', [
+            'function pmssIopsThrottleApply(string $cgPath, string $majMin, ?int $iops, bool $dryRun): array',
+            "pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])",
+            "return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];",
+            'if (($iops === null && !is_writable($cgPath)) || @file_put_contents($cgPath, $desired) === false)',
+        ], 'missing IOPS direct-write guard: ', 'IOPS direct-write guard must run before file_put_contents: ');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/cgroup/directPolicy.php', [
+            'function pmssIopsParseSpec($raw): ?int',
+            'Do not let an arbitrary "label:number" string trigger a /home throttle.',
+            "if (preg_match('#^(?:/home|/dev/[^:\\r\\n\\x00]+):([0-9]+)$#', \$raw, \$m) !== 1) {",
+            '$n = (int) $m[1];',
+        ], 'missing IOPS config spec guard: ', 'IOPS config spec guard must run before suffix parsing: ');
     }
 
     public function testSharedDirectBlkioPathGuardLocksPerUserTargetShapes(): void

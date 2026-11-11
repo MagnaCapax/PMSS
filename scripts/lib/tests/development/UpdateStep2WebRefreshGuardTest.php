@@ -50,18 +50,14 @@ class UpdateStep2WebRefreshGuardTest extends TestCase
     {
         // Retry every managed account, including resume skips, through the
         // existing watchdogs while root cron is still deliberately disabled.
-        $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
-            'ordered' => [[
-                'needles' => [
-                    "\$userMaintenanceSummary = pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [\$rutorrentIndexSha]);",
-                    'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
-                    "runStep('Recovering lighttpd instances after user maintenance', '/scripts/cron/checkLighttpdInstances.php');",
-                    "runStep('Recovering qBittorrent instances after user maintenance', '/scripts/cron/checkQbittorrentInstances.php');",
-                    "runStep('Post-update nginx configuration refresh'",
-                    "runStep('Refreshing system permissions'",
-                    "runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');",
-                ],
-            ]],
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/update-step2.php', [
+            "\$userMaintenanceSummary = pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [\$rutorrentIndexSha]);",
+            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
+            "runStep('Recovering lighttpd instances after user maintenance', '/scripts/cron/checkLighttpdInstances.php');",
+            "runStep('Recovering qBittorrent instances after user maintenance', '/scripts/cron/checkQbittorrentInstances.php');",
+            "runStep('Post-update nginx configuration refresh'",
+            "runStep('Refreshing system permissions'",
+            "runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');",
         ]);
     }
 }

@@ -13,11 +13,9 @@ class checkRtorrentRestartGraceContractTest extends TestCase
         // flock releases immediately — making the single-instance guard a no-op
         // (regression fixed 2026-06-10; the */2min watchdog has no external flock
         // wrapper, so this in-script lock is the only concurrency guard).
-        $this->pmssAssertRepoFileContract('scripts/cron/checkRtorrent.php', [
-            'required' => [
-                "\$pmssCheckRtorrentLock = pmssCronLockAcquire('checkRtorrent'",
-                'pmssCheckRtorrentLog($message, false, $debug);',
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkRtorrent.php', [
+            "\$pmssCheckRtorrentLock = pmssCronLockAcquire('checkRtorrent'",
+            'pmssCheckRtorrentLog($message, false, $debug);',
         ]);
     }
 

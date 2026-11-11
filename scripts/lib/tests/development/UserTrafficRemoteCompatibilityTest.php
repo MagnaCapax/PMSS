@@ -28,13 +28,13 @@ class UserTrafficRemoteCompatibilityTest extends TestCase
     /** The heartbeat covers the slow reads and is reaped before the payload is written. */
     public function testRemoteUserTrafficStopsHeartbeatBeforePayload(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/remote/userTraffic.php', ['ordered' => [[
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/remote/userTraffic.php', [
             "require_once dirname(__DIR__, 2).'/lib/runtime/stdoutHeartbeat.php';",
             'pmssStdoutHeartbeatStartForStdout();',
             'foreach (pmssManagedHomeUsersList() as $userName)',
             'pmssStdoutHeartbeatStop();',
             'echo serialize($userTrafficData);',
-        ]]]);
+        ]);
     }
 
     /**
