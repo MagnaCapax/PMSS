@@ -53,10 +53,15 @@ function pmssRtorrentPortReserve(string $directoryBase, $type, $rangeStart = 200
             throw new RuntimeException('Unable to reserve port file: '.$path);
         }
 
-        @fclose($handle);
-        if (!pmssRegularFilePathIsReadable($path)) {
+        try {
+            @fclose($handle);
+            if (!pmssRegularFilePathIsReadable($path)) {
+                throw new RuntimeException('Unable to reserve port file: '.$path);
+            }
+        } catch (\Throwable $error) {
+            // Only the successful exclusive open authorizes rollback of this reservation.
             @unlink($path);
-            throw new RuntimeException('Unable to reserve port file: '.$path);
+            throw $error;
         }
         return $port;
     }

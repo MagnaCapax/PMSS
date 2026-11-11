@@ -30,6 +30,14 @@ file modes, localnet handling, and replacement order remain unchanged.
 Literal render snapshots, memory boundary cases, a seeded fallback, and existing
 unsafe-path tests lock behavior. No production migration is needed.
 
+The exclusive writer also attempts to remove its uncompleted reservation when
+closing the stream or checking readability throws. Failed exclusive opens never
+authorize removal of occupied slots. The original throwable propagates unless
+rollback itself throws, retaining PHP's usual exception precedence. Successful
+reservations and ordinary refusal messages remain unchanged.
+`RtorrentPortReservationCleanupSafetyTest` covers these boundaries with in-memory
+streams and recorded filesystem operations; execution stays on testing machines.
+
 ## References
 - [ADR 0036](0036-pmss-owned-config-files-are-generated-from-a-template-never-parsed-and-patched.md)
 - [Contracts](../contracts.md#rtorrent-configuration--scriptslibrtorrentconfigphp)
