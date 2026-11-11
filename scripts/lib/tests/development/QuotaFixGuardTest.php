@@ -221,9 +221,7 @@ class QuotaFixGuardTest extends TestCase
         $zero = ['aquota.user' => str_repeat("\0", 64), 'aquota.group' => str_repeat("\0", 64)];
         foreach (['usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1', 'defaults'] as $options) {
             $run = $this->quotaFixCheckCommandsRun(true, $options, ['rc' => 2, 'stdout' => '', 'stderr' => ''], $zero);
-            $this->assertSame(['quotacheck -avugmn'], $run['checks'], $options);
-            $this->assertSame([], $run['commands'], $options);
-            $this->assertSame([], $run['logs'], $options);
+            $this->pmssAssertArraySubsetSame(['checks' => ['quotacheck -avugmn'], 'commands' => [], 'logs' => []], $run, $options.': ');
         }
     }
 
@@ -243,9 +241,7 @@ class QuotaFixGuardTest extends TestCase
         ];
         foreach ($cases as $label => [$files, $expected]) {
             $run = $this->quotaFixCheckCommandsRun(false, $journaled, $off, $files);
-            $this->assertSame($expected, $run['checks'], $label);
-            $this->assertSame(['quotaon -p /home'], $run['commands'], $label);
-            $this->assertSame([], $run['logs'], $label);
+            $this->pmssAssertArraySubsetSame(['checks' => $expected, 'commands' => ['quotaon -p /home'], 'logs' => []], $run, $label.': ');
         }
 
         $userOnly = $this->quotaFixCheckCommandsRun(false, 'usrjquota=aquota.user,jqfmt=vfsv1', ['rc' => 0, 'stdout' => "user quota on /home (/dev/md1) is off\n", 'stderr' => ''], ['aquota.user' => str_repeat("\0", 8)]);
@@ -268,8 +264,7 @@ class QuotaFixGuardTest extends TestCase
         ];
         foreach ($cases as $label => [$options, $state]) {
             $run = $this->quotaFixCheckCommandsRun(false, $options, $state, $zero);
-            $this->assertSame([], $run['checks'], $label);
-            $this->assertSame(['quotaon -p /home'], $run['commands'], $label);
+            $this->pmssAssertArraySubsetSame(['checks' => [], 'commands' => ['quotaon -p /home']], $run, $label.': ');
         }
 
         $none = $this->quotaFixCheckCommandsRun(false, 'defaults', ['rc' => 0, 'stdout' => '', 'stderr' => ''], $zero);

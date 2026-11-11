@@ -30,8 +30,7 @@ class FstabHelperCharacterizationTest extends TestCase
 
         $entry = \pmssFstabMountEntryRead($lines, '/tmp', 'tmpfs');
 
-        $this->assertSame(2, $entry['index']);
-        $this->assertSame(['tmpfs', '/tmp', 'tmpfs', 'defaults', '0', '0'], $entry['columns']);
+        $this->pmssAssertArraySubsetSame(['index' => 2, 'columns' => ['tmpfs', '/tmp', 'tmpfs', 'defaults', '0', '0']], $entry);
         $this->assertSame(null, \pmssFstabMountEntryRead($lines, '/tmp', 'xfs'));
     }
 

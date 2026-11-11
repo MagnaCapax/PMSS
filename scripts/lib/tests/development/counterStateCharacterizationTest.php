@@ -125,10 +125,9 @@ class CounterStateCharacterizationTest extends TestCase
             'io_read' => 9000, 'io_write' => 8000, 'io_read_ops' => 5000000, 'io_write_ops' => 4000000,
             'cpu_nsec' => 1500, 'memory' => 600, 'tasks' => 4, 'io_source' => 'bfq',
         ]);
-        $this->assertSame(0, $migration['delta']['io_read'], 'io_read must reseed to 0 on source switch');
-        $this->assertSame(0, $migration['delta']['io_write']);
-        $this->assertSame(0, $migration['delta']['io_read_ops'], 'phantom io_read_ops must not reach enforcement');
-        $this->assertSame(0, $migration['delta']['io_write_ops']);
+        $this->pmssAssertArraySubsetSame([
+            'io_read' => 0, 'io_write' => 0, 'io_read_ops' => 0, 'io_write_ops' => 0,
+        ], $migration['delta'], 'source-switch reseed prevents phantom IO enforcement: ');
         $this->assertSame(500, $migration['delta']['cpu_nsec'], 'non-io delta unaffected by the guard');
 
         // Subsequent sample: same source, normal delta (guard does not persist).

@@ -647,7 +647,8 @@ PHP;
         foreach ($this->commandNulInputs() as $command) {
             foreach ([0, 2] as $timeout) {
                 $result = \pmssCommandPipedCapture($command, 'nul-input-test', $timeout, 0, false, 'custom launch error', 17, true);
-                $this->assertPipedCaptureLaunchFailure($result, 17, 'unsafe proc_open command');
+                $this->pmssAssertArraySubsetSame(['rc' => 17, 'stdout' => '', 'stderr' => 'unsafe proc_open command',
+                    'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false], $result);
             }
         }
     }
@@ -656,7 +657,8 @@ PHP;
     {
         foreach ($this->commandNulInputs() as $command) {
             $result = \pmssCommandInheritedTtyCapture($command, 'nul-input-test', 0);
-            $this->assertPipedCaptureLaunchFailure($result, 1, 'unsafe proc_open command');
+            $this->pmssAssertArraySubsetSame(['rc' => 1, 'stdout' => '', 'stderr' => 'unsafe proc_open command',
+                'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false], $result);
         }
     }
 
@@ -733,7 +735,8 @@ PHP;
         foreach (['', $filePath, '/definitely-not-a-real-pmss-cwd', "/tmp/pmss\0bad"] as $cwd) {
             $result = \pmssCommandPipedCapture($bash, 'pipe-cwd-safety-test', 0, 0, false, 'proc_open failed', 17, false, 'stream_select failed', $cwd);
 
-            $this->assertPipedCaptureLaunchFailure($result, 17, 'unsafe proc_open cwd', 'cwd '.str_replace("\0", '\\0', $cwd));
+            $this->pmssAssertArraySubsetSame(['rc' => 17, 'stdout' => '', 'stderr' => 'unsafe proc_open cwd',
+                'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false], $result, 'cwd '.str_replace("\0", '\\0', $cwd).': ');
         }
     }
 
@@ -756,7 +759,8 @@ PHP;
         ] as $env) {
             $result = \pmssCommandPipedCapture($bash, 'pipe-env-safety-test', 0, 0, false, 'proc_open failed', 19, false, 'stream_select failed', $cwd, $env);
 
-            $this->assertPipedCaptureLaunchFailure($result, 19, 'unsafe proc_open environment');
+            $this->pmssAssertArraySubsetSame(['rc' => 19, 'stdout' => '', 'stderr' => 'unsafe proc_open environment',
+                'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false], $result);
         }
     }
 
@@ -1245,18 +1249,6 @@ PHP;
     private function commandNulInputs(): array
     {
         return ["\0", "\0printf SHOULD_NOT_RUN", "printf SHOULD_NOT_RUN\0", "printf SHOULD_NOT_RUN\0; exit 9", "printf 'SHOULD\0NOT_RUN'", "printf SHOULD_NOT_RUN\0\0"];
-    }
-
-    /** Assert the common launch-failure shape for piped command capture. */
-    private function assertPipedCaptureLaunchFailure(array $result, int $rc, string $stderr, string $label = ''): void
-    {
-        $prefix = $label !== '' ? $label.': ' : '';
-        $this->assertSame($rc, $result['rc'], $prefix.'rc');
-        $this->assertSame('', $result['stdout'], $prefix.'stdout');
-        $this->assertSame($stderr, $result['stderr'], $prefix.'stderr');
-        $this->assertFalse($result['timed_out'], $prefix.'timed_out');
-        $this->assertTrue($result['launch_failed'], $prefix.'launch_failed');
-        $this->assertFalse($result['pipe_failed'], $prefix.'pipe_failed');
     }
 
     private function withRuntimeArgv(array $argv, callable $callback): void

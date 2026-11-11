@@ -109,8 +109,9 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
         $missingRoot = $this->pmssMakeTempPath('pmss-missing-blkio-');
         $check = \pmssCgroupDirectRuntimeCheck('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here', 0, $missingRoot);
 
-        $this->assertSame(0, $check['exitCode']);
-        $this->assertSame('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here', $check['message']);
+        $this->pmssAssertArraySubsetSame([
+            'exitCode' => 0, 'message' => 'INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here',
+        ], $check);
     }
 
     public function testPlannedUsersPreserveCycleAccountingAndResolverFailures(): void
@@ -146,8 +147,7 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
         $this->assertSame(3, $errors, 'bad json, invalid username, and failed UID resolution count as errors');
         $this->assertEquals(['fixtur01', 'fixtur02'], $seenResolvers, 'skipped plans must not resolve UIDs');
         $this->assertSame(1, count($planned));
-        $this->assertSame('fixtur01', $planned[0][0]);
-        $this->assertSame(1001, $planned[0][1]);
+        $this->pmssAssertArraySubsetSame([0 => 'fixtur01', 1 => 1001], $planned[0]);
         $this->assertEquals(['plan' => 'fixtur01-work'], $planned[0][2]);
     }
 
