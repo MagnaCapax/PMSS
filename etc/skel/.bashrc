@@ -156,8 +156,11 @@ alias arrinfo='echo "RADARR-URL = https://$(hostname)/public-$(whoami)/radarr/" 
 passwordChange() {
     local length=16
     local newPassword=""
+    local currentPassword=""
     local user
-    user="$(whoami)"
+    local userId
+    user="$(whoami)" || return 1
+    userId="$(id -u)" || return 1
 
     if [[ $# -gt 0 ]]; then
         if [[ "$1" =~ ^[0-9]+$ ]]; then
@@ -178,20 +181,43 @@ passwordChange() {
         return 1
     fi
 
-    if ! printf '%s\n%s\n' "$newPassword" "$newPassword" | passwd "$user"; then
+    # Refuse an incomplete reset before changing the Unix credential.
+    if ! command -v htpasswd >/dev/null 2>&1; then
+        echo "Error: htpasswd is required to update the web password." >&2
+        return 1
+    fi
+
+    # Non-root PAM conversations require current, new, then retyped passwords.
+    if [[ "$userId" != 0 ]]; then
+        if ! IFS= read -r -s -p 'Current password: ' currentPassword; then
+            echo >&2
+            echo "Error: could not read the current password." >&2
+            return 1
+        fi
+        echo >&2
+    fi
+    if ! {
+        if [[ "$userId" != 0 ]]; then
+            printf '%s\n' "$currentPassword"
+        fi
+        printf '%s\n%s\n' "$newPassword" "$newPassword"
+    } | passwd "$user"; then
         echo "Error: password change failed."
         return 1
     fi
 
-    if command -v htpasswd >/dev/null 2>&1; then
-        local htpasswdFile="$HOME/.lighttpd/.htpasswd"
-        local htpasswdFlags="-b -m"
-        if [[ ! -f "$htpasswdFile" ]]; then
-            htpasswdFlags="$htpasswdFlags -c"
-        fi
-        if ! htpasswd $htpasswdFlags "$htpasswdFile" "$user" "$newPassword"; then
-            echo "Warning: htpasswd update failed."
-        fi
+    local htpasswdFile="$HOME/.lighttpd/.htpasswd"
+    local htpasswdFlags="-i -B"
+    if [[ ! -f "$htpasswdFile" ]]; then
+        htpasswdFlags="$htpasswdFlags -c"
+    fi
+    # Match the operator reset's stdin transport and bcrypt storage (ADR 0137).
+    if ! printf '%s\n' "$newPassword" | (
+        umask 077
+        htpasswd $htpasswdFlags "$htpasswdFile" "$user"
+    ); then
+        echo "Error: Unix password changed, but web password update failed. Contact support." >&2
+        return 1
     fi
 
     echo "New password is: $newPassword"
@@ -203,6 +229,15 @@ pmssPasswordValidate() {
 
     if [[ ${#password} -lt 12 ]]; then
         echo "Error: password must be at least 12 characters."
+        return 1
+    fi
+
+    # Bcrypt truncates after 72 bytes; refuse a Unix/web credential mismatch.
+    if ! (
+        LC_ALL=C
+        [[ ${#password} -le 72 ]]
+    ); then
+        echo "Error: password must not exceed 72 bytes."
         return 1
     fi
 

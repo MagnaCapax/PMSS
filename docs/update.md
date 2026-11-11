@@ -490,6 +490,15 @@ its non-interactive return, including for remote SSH commands. System paths
 lead, followed by inherited entries, then existing `~/.bin`, `~/bin` and
 `~/.local/bin` directories. The remaining setup and custom hooks stay interactive-only.
 
+The interactive `passwordChange [PASSWORD|LENGTH]` helper prompts silently for
+the current Unix password for non-root accounts. It retains the existing password
+rules and rejects values over bcrypt's 72-byte limit before changing anything.
+`htpasswd` must be available before the reset starts; web credentials use bcrypt
+and stdin rather than command arguments (ADRs 0117 and 0137). Success requires
+both Unix and web updates. A web-update failure reports the partial reset and
+returns nonzero; contact support to synchronize the credentials. The helper
+does not synchronize separate application passwords.
+
 Step 9's per-user refresh force-syncs a fixed set of skeleton files into each home
 (`pmssUserApplySkeletonFiles()` in `scripts/lib/update/users/filesystem.php`), `.bashrc`
 among them. `updateUserFile()` (`scripts/lib/update.php`) SHA1-compares the tenant copy
