@@ -82,11 +82,18 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
         }
     }
     if ($pipeFailed) {
-        pmssProcessPipesClose($pipes);
-        if (function_exists('proc_terminate')) {
-            @proc_terminate($process);
+        try {
+            pmssProcessPipesClose($pipes);
+        } finally {
+            try {
+                if (function_exists('proc_terminate')) {
+                    @proc_terminate($process);
+                }
+            } finally {
+                // Pipe-close or termination faults must not skip reaping the child.
+                @proc_close($process);
+            }
         }
-        @proc_close($process);
         return pmssCommandProcessFailure($launchRc, 'proc_open pipes unavailable', true);
     }
 

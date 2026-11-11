@@ -300,6 +300,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - A non-negative integer `exitcode` from the last observed status replaces
     only a `-1` close result. Native process exit codes retain precedence.
 
+- Failed command-pipe setup attempts pipe closure, optional child termination,
+  and process reaping in that order, even if an earlier cleanup stage throws.
+  A lone throwable propagates unchanged; a later cleanup throwable takes
+  precedence under PHP's normal `finally` rules. Ordinary pipe failures retain
+  their result fields and caller-selected exit code; successful capture is
+  unchanged. `RuntimeCommandFailureCleanupSafetyTest` injects cleanup faults
+  with memory streams and process stubs on the testing machine.
+
 - `pmssNetworkPortParseDigits($value, int $min=1, int $max=65535): ?int`
   - Accepts integers or whitespace-trimmed decimal strings within the requested
     port range; malformed inputs return `null` without output.
