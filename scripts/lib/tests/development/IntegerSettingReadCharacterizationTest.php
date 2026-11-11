@@ -20,7 +20,7 @@ function pmssReadRegularFileContentsVerified($path, $owner, $max) {
 }
 PHP;
         // Export by reflection so the same behavior lock runs against the original facade too.
-        foreach (['pmssIntegerSettingFileRead', 'pmssIntegerSettingFileReadOrNull', 'pmssIntegerSettingFileParse'] as $name) {
+        foreach (['pmssFilesystemPathHasNulByte', 'pmssIntegerSettingFileRead', 'pmssIntegerSettingFileReadOrNull', 'pmssIntegerSettingFileParse'] as $name) {
             if (function_exists($name)) $script .= \pmssTestingFunctionExport($name, 'IntegerSettingReadFixture');
         }
         $script .= <<<'PHP'
@@ -74,6 +74,34 @@ PHP;
             }
         }
         $this->assertSame($expected, $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_SETTING_READ' => json_encode($cases)]));
+    }
+
+    public function testMalformedPathsCannotSelectTheAbsentFileDefault(): void
+    {
+        $script = <<<'PHP'
+namespace IntegerSettingPathFixture;
+function clearstatcache($real, $path) { throw new \RuntimeException('unexpected cache access'); }
+function lstat($path) { throw new \RuntimeException('unexpected metadata access'); }
+function pmssIntegerSettingFileParse($path, $parser) { throw new \RuntimeException('unexpected file read'); }
+PHP;
+        // Use the runtime guard itself; every filesystem operation is a failing stub.
+        foreach (['pmssFilesystemPathHasNulByte', 'pmssIntegerSettingFileReadOrNull'] as $name) {
+            $script .= \pmssTestingFunctionExport($name, 'IntegerSettingPathFixture');
+        }
+        $script .= <<<'PHP'
+$results = [];
+$parser = static function () { throw new \RuntimeException('unexpected parser call'); };
+foreach (json_decode(getenv('PMSS_TEST_SETTING_PATHS'), true) as $path) {
+    foreach ([0, 17, -2] as $default) {
+        $results[] = pmssIntegerSettingFileReadOrNull($path, $parser, $default);
+    }
+}
+echo json_encode($results);
+PHP;
+        $paths = ['', "\0", "\0/fixture/limit", "/fixture/\0limit", "/fixture/limit\0", " /fixture/limit\0 \t"];
+        $this->assertSame(array_fill(0, count($paths) * 3, null), $this->pmssRunInlinePhpJson($script, [
+            'PMSS_TEST_SETTING_PATHS' => json_encode($paths),
+        ]));
     }
 
     public function testValuePolicyRetainsErrorBytesAndBoundaries(): void

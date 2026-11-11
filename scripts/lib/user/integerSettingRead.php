@@ -15,6 +15,8 @@ function pmssIntegerSettingFileRead(string $path, callable $parser, int $default
  */
 function pmssIntegerSettingFileReadOrNull(string $path, callable $parser, int $default = 0): ?int
 {
+    // An invalid path cannot prove absence; keep enforcing callers on their unreadable-state path.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return null;
     clearstatcache(true, $path);
     if (@lstat($path) === false) return $default;
     return pmssIntegerSettingFileParse($path, $parser);

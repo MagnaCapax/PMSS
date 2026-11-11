@@ -63,6 +63,14 @@ The existing file-type, owner, path and mode checks remain intact. This change
 introduces no credential handling, service, listener or public endpoint. The
 root-store/display-copy boundary of ADR 0213 remains unchanged.
 
+The nullable integer-setting reader rejects empty or NUL-containing paths before
+cache, metadata or content access. Such paths cannot establish file absence and
+return the existing unreadable result (`null`), preserving the caller's current
+throttle state rather than selecting the absent-file default. Valid missing paths
+still return the supplied default; valid present paths retain their read/parse
+order. IntegerSettingReadCharacterizationTest covers the malformed boundaries
+with failing I/O stubs and retains the valid-path observation matrix.
+
 ## References
 - [ADR 0065: Traffic limit storage and CLI boundaries](0065-traffic-limit-storage-and-cli-boundaries.md)
 - [ADR 0213: Home files are display only](0213-home-directory-files-are-display-only-never-system-settings.md)
