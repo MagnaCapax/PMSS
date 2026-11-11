@@ -501,6 +501,13 @@ handle still names that regular file before creating a copy. A backup is usable
 only after a complete copy, close, and mode application. The user slice drop-in
 repair leaves its original file in place when backup creation fails; valid
 repairs keep their content and backup format.
+An exception or error during copying, closing or mode application also attempts
+to remove the uncompleted backup after both stream close attempts. Removal is
+authorized only after the exclusive destination open succeeds; failed opens and
+pre-existing candidates remain untouched. The original throwable propagates
+unless cleanup itself throws, retaining PHP's usual exception precedence.
+`ManagedPathBackupSafetyTest` checks these fault paths with memory streams on
+the testing machine; normal warnings, copy bytes and successful backups stay unchanged.
 
 Snapshot log writers ignore invalid, closed, and non-stream handles without
 consuming unrelated resources. Task cleanup tolerates a callback closing its

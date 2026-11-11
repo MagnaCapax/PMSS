@@ -58,7 +58,11 @@ function chmod($path, $mode) {
     $GLOBALS['mode'] = $mode;
     return observe('chmod', $GLOBALS['case'] !== 'mode-failed');
 }
-function unlink($path) { $GLOBALS['events'][] = 'unlink'; return true; }
+function unlink($path) {
+    $GLOBALS['events'][] = 'unlink';
+    $GLOBALS['unlinks'][] = $path;
+    return $GLOBALS['unlinkResult'];
+}
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/managedPath.php', 'ManagedBackupFixture');
         $script .= <<<'PHP'
@@ -72,6 +76,9 @@ foreach (array_merge($cases, $phases) as $case) {
     foreach ($phase === null ? [null] : [new \RuntimeException($case), new \Error($case)] as $failure) {
         $GLOBALS['case'] = $case; $GLOBALS['phase'] = $phase;
         $GLOBALS['events'] = []; $GLOBALS['handles'] = []; $GLOBALS['opens'] = []; $GLOBALS['mode'] = null;
+        $GLOBALS['unlinks'] = [];
+        // Failed best-effort removal must also preserve the original throwable.
+        $GLOBALS['unlinkResult'] = !($failure instanceof \Error);
         $caught = null; $result = null; $logs = [];
         try {
             $result = pmssCreateManagedPathBackup('/fixture/managed.conf', 'fixture config',
@@ -81,7 +88,7 @@ foreach (array_merge($cases, $phases) as $case) {
         // Observe leaked descriptors before releasing them in the fixture.
         foreach ($live as $handle) \fclose($handle);
         $results[] = [$case, $result, $caught === $failure, count($live), $GLOBALS['events'], $logs,
-            $GLOBALS['opens'], $GLOBALS['mode']];
+            $GLOBALS['opens'], $GLOBALS['mode'], $GLOBALS['unlinks']];
     }
 }
 echo json_encode($results);
@@ -110,6 +117,8 @@ PHP;
             $events = array_slice($trace, 0, array_search($phase, $trace, true) + 1);
             if (in_array($phase, ['stat', 'copy'], true)) $events[] = 'close-target';
             if (in_array($phase, ['match', 'open-target', 'stat', 'copy', 'close-target'], true)) $events[] = 'close-source';
+            // Copies created by this invocation are retired after both close attempts.
+            if (in_array($phase, ['stat', 'copy', 'close-target', 'close-source', 'chmod'], true)) $events[] = 'unlink';
             $cases[$phase] = [null, $events, []];
         }
         $index = 0;
@@ -119,8 +128,9 @@ PHP;
                 if (in_array('open-'.$role, $events, true) && $case !== 'open-'.$role) $opens[] = $args;
             }
             $mode = in_array('chmod', $events, true) ? 0640 : null;
+            $unlinks = in_array('unlink', $events, true) ? [$backup] : [];
             for ($kind = 0; $kind < ($expected === null ? 2 : 1); $kind++) {
-                $this->assertSame([$case, $expected, true, 0, $events, $logs, $opens, $mode], $results[$index++], $case);
+                $this->assertSame([$case, $expected, true, 0, $events, $logs, $opens, $mode, $unlinks], $results[$index++], $case);
             }
         }
         $this->assertSame($index, count($results));

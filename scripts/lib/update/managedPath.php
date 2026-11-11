@@ -152,42 +152,48 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
         }
         $target = false;
         try {
-            $sourceMatches = pmssLockFileHandleMatchesPath($source, $path, null, $opened)
-                && pmssFilesystemStatSameInode($entry, $opened)
-                && (($opened['mode'] ?? 0) & 0170000) === 0100000;
-            if ($sourceMatches) {
-                $target = @fopen($backup, 'xb');
-                if (is_resource($target)) {
-                    try {
-                        $sourceStat = @fstat($source);
-                        $copied = @stream_copy_to_stream($source, $target);
-                    } finally {
-                        // The destination closes before the source, including failed copies.
-                        $targetClosed = @fclose($target);
+            try {
+                $sourceMatches = pmssLockFileHandleMatchesPath($source, $path, null, $opened)
+                    && pmssFilesystemStatSameInode($entry, $opened)
+                    && (($opened['mode'] ?? 0) & 0170000) === 0100000;
+                if ($sourceMatches) {
+                    $target = @fopen($backup, 'xb');
+                    if (is_resource($target)) {
+                        try {
+                            $sourceStat = @fstat($source);
+                            $copied = @stream_copy_to_stream($source, $target);
+                        } finally {
+                            // The destination closes before the source, including failed copies.
+                            $targetClosed = @fclose($target);
+                        }
                     }
                 }
+            } finally {
+                // Metadata/open/copy throwables must not retain the acquired source.
+                @fclose($source);
             }
-        } finally {
-            // Metadata/open/copy throwables must not retain the acquired source.
-            @fclose($source);
-        }
-        if (!$sourceMatches) {
-            $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
-            return '';
-        }
-
-        if ($target === false) {
-            if (pmssPathExistsOrLink($backup)) {
-                continue;
+            if (!$sourceMatches) {
+                $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
+                return '';
             }
-            $logger('[WARN] Unable to create '.$label.' backup at '.$backup);
-            return '';
-        }
 
-        // A short copy must not be published as a usable backup.
-        if (is_array($sourceStat) && isset($sourceStat['size'], $sourceStat['mode']) && $copied === $sourceStat['size'] && $targetClosed
-            && @chmod($backup, $sourceStat['mode'] & 0777)) {
-            return $backup;
+            if ($target === false) {
+                if (pmssPathExistsOrLink($backup)) {
+                    continue;
+                }
+                $logger('[WARN] Unable to create '.$label.' backup at '.$backup);
+                return '';
+            }
+
+            // A short copy must not be published as a usable backup.
+            if (is_array($sourceStat) && isset($sourceStat['size'], $sourceStat['mode']) && $copied === $sourceStat['size'] && $targetClosed
+                && @chmod($backup, $sourceStat['mode'] & 0777)) {
+                return $backup;
+            }
+        } catch (\Throwable $error) {
+            // Only an exclusive open authorizes removing this uncompleted copy.
+            if ($target !== false) @unlink($backup);
+            throw $error;
         }
 
         @unlink($backup);
