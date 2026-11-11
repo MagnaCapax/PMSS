@@ -16,11 +16,6 @@ class MediaStackPanelTest extends TestCase
         return $this->pmssWriteFiles($this->pmssMakeTempDir($prefix), ['install-media-stack.sh' => "#!/bin/bash\nexit 0\n"]);
     }
 
-    private function mediaStatusRead(string $home): array
-    {
-        return \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
-    }
-
     public function testFormatBytesPreservesWholeNumbersAndTrimsFractions(): void
     {
         $cases = [
@@ -75,7 +70,7 @@ class MediaStackPanelTest extends TestCase
     {
         $home = $this->mediaHomeCreate('pmss-media-ready-');
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->pmssAssertArraySubsetSame(['state' => 'ready', 'canStart' => true], $status);
     }
@@ -113,7 +108,7 @@ class MediaStackPanelTest extends TestCase
                         ? 'Automatic crash-loop restart remains disabled; review the app log, then use Start all stopped for one recovery attempt.'
                         : $denied;
                 }
-                $status = $this->mediaStatusRead($home);
+                $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
                 $this->assertSame(['tail', 'urls', 'security', 'canStart', 'canRestart', 'poll', 'state', 'message', 'details'], array_keys($status));
                 $this->assertSame([$state, $message, $details, $canRestart, false, false],
                     [$status['state'], $status['message'], $status['details'], $status['canRestart'], $status['canStart'], $status['poll']]);
@@ -126,7 +121,7 @@ class MediaStackPanelTest extends TestCase
         $home = $this->mediaHomeCreate('pmss-media-blocked-bin-');
         $this->pmssWriteFile($home.'/.bin/existing', '1');
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->pmssAssertArraySubsetSame(['state' => 'blocked', 'canStart' => false], $status);
     }
@@ -141,7 +136,7 @@ class MediaStackPanelTest extends TestCase
         ] as [$limitBytes, $expectedState, $expectedCanStart, $messageNeedle]) {
             $home = $this->mediaHomeCreate('pmss-media-memory-');
             $this->pmssWithEnv($this->mediaStackCgroupV2Fixture($limitBytes), function () use ($home, $expectedState, $expectedCanStart, $messageNeedle): void {
-                $status = $this->mediaStatusRead($home);
+                $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
                 $this->pmssAssertArraySubsetSame(['state' => $expectedState, 'canStart' => $expectedCanStart], $status);
                 if ($messageNeedle !== '') {
@@ -179,7 +174,7 @@ class MediaStackPanelTest extends TestCase
     {
         $home = $this->mediaHomeCreate('pmss-media-installed-');
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->assertSame('installed', $status['state']);
         $this->assertStringContainsString('/public-fixtur01/jellyfin/web/', $status['urls']['Jellyfin']);
@@ -204,7 +199,7 @@ class MediaStackPanelTest extends TestCase
                 $this->pmssWriteRelativeFile($home, $marker, 'marker');
             }
 
-            $status = $this->mediaStatusRead($home);
+            $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
             $this->assertTrue(isset($status['urls'][$label]), $label.' marker should expose its URL.');
         }
@@ -216,7 +211,7 @@ class MediaStackPanelTest extends TestCase
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
         $this->pmssWriteRelativeFile($home, '.bin/autobrr/autobrr', 'marker');
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->assertFalse(isset($status['urls']['Autobrr']));
     }
@@ -231,7 +226,7 @@ class MediaStackPanelTest extends TestCase
             '$HTTP["url"] =~ "^/autobrr(?:/|$)" { "map-urlpath" => ( "/autobrr" => "" ) }'
         );
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->assertSame('https://seedbox.example/public-fixtur01/autobrr/', $status['urls']['Autobrr']);
     }
@@ -247,7 +242,7 @@ class MediaStackPanelTest extends TestCase
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/system.xml', '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>');
         $this->pmssWriteRelativeFile($home, '.bin/jellyfin/jellyfin.dll', 'marker');
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->assertTrue($status['security']['radarr']['protected']);
         $this->assertTrue($status['security']['sabnzbd']['protected']);
@@ -261,7 +256,7 @@ class MediaStackPanelTest extends TestCase
         $this->pmssWriteRelativeFile($home, '.config/sonarr/config.xml', "<Config>\n<AuthenticationMethod>None</AuthenticationMethod>\n<AuthenticationRequired>Disabled</AuthenticationRequired>\n</Config>\n");
         $this->pmssWriteRelativeFile($home, '.bin/Sonarr/Sonarr.dll', 'marker');
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
         $html = \pmssMediaStackPanelHtmlBuild($status);
 
         $this->assertFalse($status['security']['sonarr']['protected']);
@@ -290,7 +285,7 @@ class MediaStackPanelTest extends TestCase
         $db->exec("INSERT INTO users (username) VALUES ('fixtur01')");
         $db->close();
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->assertTrue($status['security']['autobrr']['protected']);
     }
@@ -367,7 +362,7 @@ class MediaStackPanelTest extends TestCase
             ),
         )));
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->assertSame('degraded', $status['state']);
         $this->assertTrue($status['canRestart']);
@@ -378,7 +373,7 @@ class MediaStackPanelTest extends TestCase
     {
         $home = $this->mediaHomeCreate('pmss-media-running-');
         $this->pmssWriteRelativeFile($home, '.install-media-stack-web.pid', (string) getmypid());
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->pmssAssertArraySubsetSame(['state' => 'ready', 'poll' => false], $status);
     }
@@ -407,7 +402,7 @@ class MediaStackPanelTest extends TestCase
     {
         $home = $this->mediaHomeCreate('pmss-media-failed-');
         $this->pmssWriteRelativeFile($home, '.install-media-stack.log', "[ERR ] Download failed\nPartial output\n");
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
         $this->assertSame('failed', $status['state']);
         $this->assertStringContainsString('Download failed', $status['tail']);
@@ -422,7 +417,7 @@ class MediaStackPanelTest extends TestCase
             list($line, $message) = $case;
             $home = $this->mediaHomeCreate('pmss-media-quota-');
             $this->pmssWriteRelativeFile($home, '.install-media-stack.log', $line."\n");
-            $status = $this->mediaStatusRead($home);
+            $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
             $this->assertSame('failed', $status['state']);
             $this->assertStringContainsString($message, $status['message']);
         }
@@ -436,7 +431,7 @@ class MediaStackPanelTest extends TestCase
             '.install-media-stack.log' => "[ERR ] File quota reached during media stack install; free account files and retry.\n",
         ]);
 
-        $status = $this->mediaStatusRead($home);
+        $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
         $this->assertSame('failed', $status['state']);
         $this->assertFalse($status['canStart']);
     }

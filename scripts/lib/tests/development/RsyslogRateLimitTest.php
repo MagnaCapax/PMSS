@@ -6,21 +6,18 @@ require_once dirname(__DIR__, 2).'/update/services/logging.php';
 
 class RsyslogRateLimitTest extends TestCase
 {
-    private function stockConfig(): string
-    {
-        return "module(load=\"imuxsock\")\nmodule(load=\"imklog\")   # kernel input\n\$IncludeConfig /etc/rsyslog.d/*.conf\n";
-    }
+    private const STOCK_CONFIG = "module(load=\"imuxsock\")\nmodule(load=\"imklog\")   # kernel input\n\$IncludeConfig /etc/rsyslog.d/*.conf\n";
 
     public function testStockDebianDeclarationGetsRateLimit(): void
     {
-        $rendered = \pmssRsyslogKernelInputRateLimitConfig($this->stockConfig());
+        $rendered = \pmssRsyslogKernelInputRateLimitConfig(self::STOCK_CONFIG);
         $this->assertTrue(strpos($rendered, 'module(load="imklog" RatelimitInterval="10" RatelimitBurst="2000")') !== false);
         $this->assertTrue(strpos($rendered, '$IncludeConfig /etc/rsyslog.d/*.conf') !== false, 'foreign config content changed');
     }
 
     public function testExistingRateLimitIsIdempotent(): void
     {
-        $configured = \pmssRsyslogKernelInputRateLimitConfig($this->stockConfig());
+        $configured = \pmssRsyslogKernelInputRateLimitConfig(self::STOCK_CONFIG);
         $this->assertEquals($configured, \pmssRsyslogKernelInputRateLimitConfig($configured));
     }
 
@@ -36,7 +33,7 @@ class RsyslogRateLimitTest extends TestCase
         $target = $root.'/rsyslog.conf';
         $messages = [];
         $commands = [];
-        $this->pmssWriteFile($target, $this->stockConfig());
+        $this->pmssWriteFile($target, self::STOCK_CONFIG);
         chmod($target, 0640);
 
         $this->pmssWithEnv([
@@ -72,7 +69,7 @@ class RsyslogRateLimitTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-rsyslog-invalid-');
         $target = $root.'/rsyslog.conf';
-        $original = $this->stockConfig();
+        $original = self::STOCK_CONFIG;
         $messages = [];
         $this->pmssWriteFile($target, $original);
 
@@ -95,7 +92,7 @@ class RsyslogRateLimitTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-rsyslog-exception-');
         $target = $root.'/rsyslog.conf';
-        $original = $this->stockConfig();
+        $original = self::STOCK_CONFIG;
         $this->pmssWriteFile($target, $original);
 
         try {

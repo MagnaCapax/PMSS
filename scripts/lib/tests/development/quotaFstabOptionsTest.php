@@ -45,11 +45,9 @@ class QuotaFstabOptionsTest extends TestCase
 
     private function removeStaleQuotaCheckFiles(string $path): array
     {
-        [$removed, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($path): int {
+        return $this->pmssArrayLoggerCapture(function (callable $logger) use ($path): int {
             return \pmssRemoveStaleQuotaCheckFiles($path, $logger);
         });
-
-        return [$removed, $messages];
     }
 
     public function testNoChangeWhenQuotaOptionsPresent(): void

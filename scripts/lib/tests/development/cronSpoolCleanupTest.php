@@ -4,23 +4,18 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/cronSpool.php';
 
+/** Model orphans with fixed lookup results, without changing accounts or file ownership. */
 class CronSpoolCleanupTest extends TestCase
 {
-    /** Model an orphan without changing any account or file ownership. */
-    private function orphanLookup(): callable
-    {
-        return self::pmssMakeCallbacks(['lookup' => false])['lookup'];
-    }
-
     public function testOrphanRemovalAndRepeatedPass(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-cron-spool-');
         $path = $this->pmssWriteFile($dir.'/fixtur01', 'private former jobs');
         $uid = fileowner($path);
         $this->assertSame(array('status' => 'removed', 'uid' => $uid),
-            \pmssUserCronSpoolRemoveOrphan($path, $this->orphanLookup()));
+            \pmssUserCronSpoolRemoveOrphan($path, self::pmssMakeCallbacks(['lookup' => false])['lookup']));
         $this->assertFalse(file_exists($path));
-        $this->assertSame('absent', \pmssUserCronSpoolRemoveOrphan($path, $this->orphanLookup())['status']);
+        $this->assertSame('absent', \pmssUserCronSpoolRemoveOrphan($path, self::pmssMakeCallbacks(['lookup' => false])['lookup'])['status']);
     }
 
     public function testAnyLiveUidPreservesContentsAndMetadata(): void
@@ -55,7 +50,7 @@ class CronSpoolCleanupTest extends TestCase
         $this->pmssWriteFile($dir.'/folder/fixtur02', 'keep nested jobs');
         foreach (array('', '../fixtur01', $target."\0suffix", $dir.'/folder', $dir.'/link',
             $dir.'/parent/fixtur02', $dir.'/folder/../fixtur01') as $path) {
-            $this->assertSame('unsafe', \pmssUserCronSpoolRemoveOrphan($path, $this->orphanLookup())['status']);
+            $this->assertSame('unsafe', \pmssUserCronSpoolRemoveOrphan($path, self::pmssMakeCallbacks(['lookup' => false])['lookup'])['status']);
         }
         $this->assertSame('keep jobs', file_get_contents($target));
         $this->assertTrue(is_link($dir.'/link'));
@@ -84,7 +79,7 @@ class CronSpoolCleanupTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-cron-spool-');
         $path = $this->pmssWriteFile($dir.'/fixtur01', 'private former jobs');
-        $this->assertSame('would_remove', \pmssUserCronSpoolRemoveOrphan($path, $this->orphanLookup(), true)['status']);
+        $this->assertSame('would_remove', \pmssUserCronSpoolRemoveOrphan($path, self::pmssMakeCallbacks(['lookup' => false])['lookup'], true)['status']);
         $this->assertSame('private former jobs', file_get_contents($path));
     }
 
@@ -95,9 +90,9 @@ class CronSpoolCleanupTest extends TestCase
         $uid = fileowner($path);
         $records = array();
         $log = static function (array $record) use (&$records): void { $records[] = $record; };
-        $this->assertTrue(\pmssUserCronSpoolSweep($dir, $log, $this->orphanLookup()));
+        $this->assertTrue(\pmssUserCronSpoolSweep($dir, $log, self::pmssMakeCallbacks(['lookup' => false])['lookup']));
         $this->assertSame(array(array('user' => 'fixtur01', 'path' => $path, 'status' => 'removed', 'uid' => $uid)), $records);
-        $this->assertTrue(\pmssUserCronSpoolSweep($dir, $log, $this->orphanLookup()));
+        $this->assertTrue(\pmssUserCronSpoolSweep($dir, $log, self::pmssMakeCallbacks(['lookup' => false])['lookup']));
         $this->assertSame(1, count($records));
     }
 
@@ -120,7 +115,7 @@ class CronSpoolCleanupTest extends TestCase
         $path = $this->pmssWriteFile($dir.'/fixtur02', 'old jobs');
         $records = array();
         $log = static function (array $record) use (&$records): void { $records[] = $record; };
-        $this->assertFalse(\pmssUserCronSpoolSweep($dir, $log, $this->orphanLookup()));
+        $this->assertFalse(\pmssUserCronSpoolSweep($dir, $log, self::pmssMakeCallbacks(['lookup' => false])['lookup']));
         $this->assertSame(array('unsafe', 'removed'), array_column($records, 'status'));
         $this->assertFalse(file_exists($path));
         $this->assertTrue(is_dir($dir.'/fixtur01'));
@@ -132,13 +127,13 @@ class CronSpoolCleanupTest extends TestCase
         $path = $this->pmssWriteFile($dir.'/fixtur01', 'old jobs');
         $records = array();
         $log = static function (array $record) use (&$records): void { $records[] = $record; };
-        $this->assertTrue(\pmssUserCronSpoolSweep($dir, $log, $this->orphanLookup(), true));
+        $this->assertTrue(\pmssUserCronSpoolSweep($dir, $log, self::pmssMakeCallbacks(['lookup' => false])['lookup'], true));
         $this->assertSame('would_remove', $records[0]['status']);
         $this->assertTrue(file_exists($path));
         $link = $this->pmssMakeTempDir('pmss-cron-spool-link-').'/spool';
         symlink($dir, $link);
         foreach (array($dir.'/missing', $path, $link) as $unavailable) {
-            $this->assertFalse(\pmssUserCronSpoolSweep($unavailable, $log, $this->orphanLookup()));
+            $this->assertFalse(\pmssUserCronSpoolSweep($unavailable, $log, self::pmssMakeCallbacks(['lookup' => false])['lookup']));
         }
         $this->assertSame(array('would_remove', 'scan_failed', 'scan_failed', 'scan_failed'), array_column($records, 'status'));
     }
