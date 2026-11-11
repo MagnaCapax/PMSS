@@ -35,8 +35,7 @@ PHP;
         );
         $this->assertSame(1, $result['rc']);
         $steps = (string) file_get_contents($record);
-        $this->assertStringContainsString("set_expiry usermod --expiredate 1 'fixtur01'", $steps);
-        $this->assertStringContainsString("kill_processes_after_expiry killall -9 -u 'fixtur01'", $steps);
+        $this->assertStringContainsAllStrings(["set_expiry usermod --expiredate 1 'fixtur01'", "kill_processes_after_expiry killall -9 -u 'fixtur01'"], $steps);
         $this->assertTrue(strpos($steps, 'set_expiry') < strpos($steps, 'kill_processes_after_expiry'));
         // The account is expired before the first kill, so cron cannot start it again during the account-side steps.
         $this->assertTrue(strpos($steps, 'set_expiry') < strpos($steps, 'kill_processes '));

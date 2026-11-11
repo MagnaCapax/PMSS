@@ -153,8 +153,7 @@ class ScriptsIncSplitTest extends TestCase
     public function testLoaderGuardsPartsInManifestOrder(): void
     {
         $loader = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
-        $this->assertStringContainsString('is_file($p) && !is_link($p)', $loader);
-        $this->assertStringContainsString('require_once $p', $loader);
+        $this->assertStringContainsAllStrings(['is_file($p) && !is_link($p)', 'require_once $p'], $loader);
         $this->assertOrderedStrings(array_map(static function ($part): string {
             return "'".$part."'";
         }, self::PARTS), $loader);

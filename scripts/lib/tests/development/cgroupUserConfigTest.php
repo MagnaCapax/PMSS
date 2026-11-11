@@ -240,8 +240,7 @@ class CgroupUserConfigTest extends TestCase
 
         $this->assertEquals(1, $res['rc']);
         $this->assertEquals(2, count($steps));
-        $this->assertStringContainsString('systemctl', $steps[0][1]);
-        $this->assertStringNotContainsString('|| true', $steps[0][1]);
+        $this->assertStringContainsAndOmitsStrings(['systemctl'], ['|| true'], $steps[0][1]);
         if (!isset($steps[1])) {
             $this->fail('Expected unlimit step after revert failure.');
         }
@@ -263,8 +262,7 @@ class CgroupUserConfigTest extends TestCase
         $this->assertEquals(1, $res['rc']);
         $this->assertEquals(1, count($steps));
         $this->assertSame('Applying io.cost setting', $steps[0][0]);
-        $this->assertStringContainsString('[ERR] io.cost path not writable:', $steps[0][1]);
-        $this->assertStringContainsString('exit 1', $steps[0][1]);
+        $this->assertStringContainsAllStrings(['[ERR] io.cost path not writable:', 'exit 1'], $steps[0][1]);
     }
 
     public function testMixedFlagPlanSnapshotLocksParsingPrecedence(): void

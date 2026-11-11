@@ -20,8 +20,7 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $parsed = \pmssParseCliTokens(['storageBenchmark.php', '--home-device'], []);
         $this->assertTrue(\pmssCliOptionPresent($parsed, 'home-device', null, true));
         $help = $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--help']);
-        $this->assertStringContainsString('--home-device', $help);
-        $this->assertStringContainsString('Read-only test of the block device', $help);
+        $this->assertStringContainsAllStrings(['--home-device', 'Read-only test of the block device'], $help);
     }
 
     public function testPlainDiskAndMdMetadata(): void

@@ -12,9 +12,7 @@ class PmssLogrotatePolicyTest extends TestCase
         $this->assertTrue((bool) preg_match($pattern, $source, $matches), $messagePrefix.'missing stanza');
 
         $body = (string) $matches['body'];
-        $this->assertStringContainsAllStrings($required, $body, $messagePrefix);
-
-        $this->pmssAssertStringNotContainsString('nocompress', $body, $messagePrefix.'nocompress');
+        $this->assertStringContainsAndOmitsStrings($required, ['nocompress' => $messagePrefix.'nocompress'], $body, $messagePrefix);
         $this->assertMatches('#\n\s+compress\n\s+delaycompress\n#', $body, $messagePrefix.'compress + delaycompress');
     }
 
