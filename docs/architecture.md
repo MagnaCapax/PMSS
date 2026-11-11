@@ -283,6 +283,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   nested values and keeping exact-shape and ordering checks explicit.
 - CLI probes: `/scripts/util/systemTest.php`, `/scripts/util/componentStatus.php`, `/scripts/util/agentDiagnostics.php`
 
+String-only fixture observations reuse `TestCase::pmssMakeArrayLogger()` for
+diagnostics, failed paths, fetched filenames and command traces. Callers retain
+record transformations and callbacks that inspect publication ordering.
+
 Test fixtures call constructors and shared helpers directly when a private
 adapter adds no policy. Single-use setup and assertions stay with their scenario,
 preserving fixture bytes, strict comparisons, stderr redirection and sandbox skips.

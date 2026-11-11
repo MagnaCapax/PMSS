@@ -510,9 +510,7 @@ PHP;
     {
         $marker = $this->tempDir.'/start-marker.ts';
         $messages = [];
-        $logger = static function (string $message, bool $force = false) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         $result = rtorrentProcessStart('bad;name', $logger, $marker);
 
@@ -524,9 +522,7 @@ PHP;
     public function testProcessRestartRejectsInvalidUsernameBeforeSnapshot(): void
     {
         $messages = [];
-        $logger = static function (string $message, bool $force = false) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         $result = rtorrentProcessRestart('bad;name', [1], [2], $logger);
 

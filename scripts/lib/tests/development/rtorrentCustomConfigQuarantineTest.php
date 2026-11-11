@@ -116,9 +116,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
             "schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\nexecute = sh,-c,echo ok\n");
 
         $messages = [];
-        $logFn = function (string $message, bool $force = true) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logFn = $this->pmssMakeArrayLogger($messages);
 
         $dst = $this->quarantineCustomConfig('', $logFn);
         $this->assertTrue(is_string($dst) && $dst !== '');

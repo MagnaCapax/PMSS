@@ -11,17 +11,18 @@ class AccountRestartSpaceTest extends TestCase
     {
         $running = true;
         $warnings = [];
+        $logger = $this->pmssMakeArrayLogger($warnings);
         $starts = 0;
         $start = static function () use (&$starts): bool {
             $starts++;
             return false; // Stub the ENOSPC start failure on a full home.
         };
-        $restart = static function () use (&$running, &$warnings): bool {
-            return pmssAccountRestartSpaceAllows('alice', '/srv/pmss-test-home', 'automatic lighttpd restart',
-                static function (string $line) use (&$warnings): void { $warnings[] = $line; },
+        $restart = static function () use (&$running, $logger): bool {
+            return pmssAccountRestartSpaceAllows('fixtur01', '/srv/pmss-test-home', 'automatic lighttpd restart',
+                $logger,
                 self::pmssMakeCallbacks(['freeBytes' => 0])['freeBytes']);
         };
-        $running = pmssUserWatchdogRestartProcessesIf('alice', $running, ['lighttpd', 'php-cgi'], $restart,
+        $running = pmssUserWatchdogRestartProcessesIf('fixtur01', $running, ['lighttpd', 'php-cgi'], $restart,
             'lighttpd restart requested', 15,
             static function () use (&$running): void { $running = false; });
         if (!$running) $running = $start();
@@ -29,7 +30,7 @@ class AccountRestartSpaceTest extends TestCase
         $this->assertTrue($running);
         $this->assertSame(0, $starts);
         $this->assertSame(1, count($warnings));
-        $this->assertTrue(strpos($warnings[0], '[WARN] Account alice:') === 0);
+        $this->assertTrue(strpos($warnings[0], '[WARN] Account fixtur01:') === 0);
         $this->assertStringContainsString('automatic lighttpd restart', $warnings[0]);
     }
 
@@ -37,10 +38,11 @@ class AccountRestartSpaceTest extends TestCase
     {
         $stopped = false;
         $warnings = [];
-        $running = pmssUserWatchdogRestartProcessesIf('alice', true, ['lighttpd', 'php-cgi'],
-            static function () use (&$warnings): bool {
-                return pmssAccountRestartSpaceAllows('alice', '/srv/pmss-test-home', 'automatic lighttpd restart',
-                    static function (string $line) use (&$warnings): void { $warnings[] = $line; },
+        $logger = $this->pmssMakeArrayLogger($warnings);
+        $running = pmssUserWatchdogRestartProcessesIf('fixtur01', true, ['lighttpd', 'php-cgi'],
+            static function () use ($logger): bool {
+                return pmssAccountRestartSpaceAllows('fixtur01', '/srv/pmss-test-home', 'automatic lighttpd restart',
+                    $logger,
                     self::pmssMakeCallbacks(['freeBytes' => PMSS_ACCOUNT_RESTART_MIN_FREE_BYTES])['freeBytes']);
             }, 'lighttpd restart requested', 15,
             static function () use (&$stopped): void { $stopped = true; });

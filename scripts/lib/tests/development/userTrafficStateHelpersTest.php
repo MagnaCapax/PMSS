@@ -115,9 +115,7 @@ class UserTrafficStateHelpersTest extends TestCase
         \pmssManagedDirsEnsure([
             $unsafePath => 0755,
             $safePath => 0600,
-        ], function (string $dir) use (&$failures): void {
-            $failures[] = $dir;
-        });
+        ], $this->pmssMakeArrayLogger($failures));
 
         $this->assertEquals([$unsafePath], $failures);
         $this->assertTrue(is_dir($safePath));
@@ -136,9 +134,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $result = \pmssManagedSerializedTargetsWrite(serialize($payload), [
             [$goodPath, 'root', 0600, false],
             [$badPath, 'root', 0600, false],
-        ], function (string $path) use (&$failures): void {
-            $failures[] = $path;
-        });
+        ], $this->pmssMakeArrayLogger($failures));
 
         $this->assertFalse($result);
         $this->assertEquals([$badPath], $failures);

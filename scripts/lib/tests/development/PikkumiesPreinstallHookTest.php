@@ -160,7 +160,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $runs = [];
         $ops = [
             'users' => static function () use (&$users): array { return $users; },
-            'run' => static function (string $command) use (&$runs): void { $runs[] = $command; },
+            'run' => $this->pmssMakeArrayLogger($runs),
             'homeBase' => $root.'/home',
         ] + self::pmssMakeCallbacks(['ramMiB' => 4096]);
         $this->pmssWithPathPrefix($root.'/stub', function () use ($root, &$users, $ops, &$marked): void {
@@ -220,7 +220,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $runs = [];
         $ops = [
             'ramMiB' => static function (string $user) use ($ram): int { return $ram[$user]; },
-            'run' => static function (string $command) use (&$runs): void { $runs[] = $command; },
+            'run' => $this->pmssMakeArrayLogger($runs),
             'homeBase' => $root.'/home',
         ] + self::pmssMakeCallbacks(['users' => array_merge(array_keys($ram), ['../etc'])]);
         $this->pmssWithPathPrefix($root.'/stub', function () use ($root, $ops, &$marked): void {

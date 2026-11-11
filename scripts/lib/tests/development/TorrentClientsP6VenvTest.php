@@ -55,7 +55,7 @@ final class TorrentClientsP6VenvTest extends TestCase
         $calls = 0;
         $install = static function () use (&$calls): void { $calls++; };
         $fetched = [];
-        $fetch = static function (string $file) use (&$fetched): void { $fetched[] = $file; };
+        $fetch = $this->pmssMakeArrayLogger($fetched);
         $ops = ['install' => $install, 'fetch' => $fetch];
         $this->pmssWriteRelativeFile($root, 'wheels/'.$entry['wheels'][0]['file'], 'changed');
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', $ops));

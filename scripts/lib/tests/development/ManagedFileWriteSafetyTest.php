@@ -173,9 +173,7 @@ PHP
 
         $ok = \pmssManagedSerializedTargetsWrite('payload', [
             [$this->tempDir."/bad\0state", 'root', 0640, true],
-        ], static function (string $path) use (&$failures): void {
-            $failures[] = $path;
-        });
+        ], $this->pmssMakeArrayLogger($failures));
 
         $this->assertFalse($ok);
         $this->assertSame(['(invalid target)'], $failures);
@@ -188,9 +186,7 @@ PHP
 
         $ok = \pmssManagedSerializedTargetsWrite('payload', [
             [$path],
-        ], static function (string $path) use (&$failures): void {
-            $failures[] = $path;
-        });
+        ], $this->pmssMakeArrayLogger($failures));
 
         $this->assertFalse($ok);
         $this->assertSame([$path], $failures);
@@ -204,9 +200,7 @@ PHP
 
         $ok = \pmssManagedSerializedTargetsWrite('payload', [
             [$path, 'root', 0640, false],
-        ], static function (string $path) use (&$failures): void {
-            $failures[] = $path;
-        });
+        ], $this->pmssMakeArrayLogger($failures));
 
         $this->assertTrue($ok);
         $this->assertSame([], $failures);
@@ -252,9 +246,7 @@ PHP
             $failures = [];
             $ok = \pmssManagedSerializedTargetsWrite('replacement', [
                 [$path, 'root', $mode, false],
-            ], static function (string $failedPath) use (&$failures): void {
-                $failures[] = $failedPath;
-            });
+            ], $this->pmssMakeArrayLogger($failures));
 
             $this->assertFalse($ok, (string) $mode);
             $this->assertSame([$path], $failures, (string) $mode);
