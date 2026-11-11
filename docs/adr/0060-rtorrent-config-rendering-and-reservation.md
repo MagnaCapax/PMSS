@@ -38,6 +38,13 @@ reservations and ordinary refusal messages remain unchanged.
 `RtorrentPortReservationCleanupSafetyTest` covers these boundaries with in-memory
 streams and recorded filesystem operations; execution stays on testing machines.
 
+If an exceptional close leaves the acquired stream live, rollback retries close
+once before removing the reservation. Removal is attempted even when that retry
+throws; already-closed streams are never closed again. Later cleanup throwables
+retain PHP's normal precedence. `RtorrentReservationCloseSafetyTest` covers close
+faults before and after release, repeated close faults, and rollback failures
+without allocating filesystem reservations. Successful calls remain unchanged.
+
 ## References
 - [ADR 0036](0036-pmss-owned-config-files-are-generated-from-a-template-never-parsed-and-patched.md)
 - [Contracts](../contracts.md#rtorrent-configuration--scriptslibrtorrentconfigphp)
