@@ -68,10 +68,8 @@ class cgroupSliceTest extends TestCase
             'v1Template' => $v1Body,
             'totalMemMiB' => 4096,
         ]));
-        $this->pmssAssertStringContract($content, [
-            'required' => ['BlockIOAccounting=yes' => 'v1 template not applied'],
-            'forbidden' => ['%%' => 'placeholders remained'],
-        ]);
+        $this->assertStringContainsAndOmitsStrings(['BlockIOAccounting=yes' => 'v1 template not applied'],
+            ['%%' => 'placeholders remained'], $content);
     }
 
     public function testNoVendorPathsUsedForDropins(): void
@@ -146,7 +144,7 @@ class cgroupSliceTest extends TestCase
                 'totalCpuThreads' => $cpuThreads,
                 'totalMemMiB' => $memMiB,
             ]));
-            $this->pmssAssertStringContract($content, ['required' => [$needle => $message]]);
+            $this->assertStringContainsString($needle, $content, $message);
         }
     }
 }

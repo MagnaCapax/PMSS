@@ -41,6 +41,6 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
             'totalMemMiB' => 2048,
         ]);
         // Device string varies; assert IO lines present.
-        $this->pmssAssertStringContract($out, ['required' => ['IOReadBandwidthMax=', 'IOWriteBandwidthMax=']]);
+        $this->assertStringContainsAllStrings(['IOReadBandwidthMax=', 'IOWriteBandwidthMax='], $out);
     }
 }

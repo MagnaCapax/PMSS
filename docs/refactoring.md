@@ -604,6 +604,8 @@ fragment order and diagnostic prefixes when removing single-entry table wrappers
 Generated panel, route, quota, launch, preflight and PHP-ini text checks use
 `assertStringContainsAllStrings()` and `assertStringContainsAndOmitsStrings()`
 for repeated fragments, retaining caller-owned bytes and assertion order.
+Generated-text checks with only fragments call these assertions directly;
+reserve `pmssAssertStringContract()` tables for regex or ordering checks too.
 
 Dynamic IOPS policy, cycle, latency, monitoring and probe fixtures group strict
 field checks with `TestCase::pmssAssertArraySubsetSame()`. Expected values and

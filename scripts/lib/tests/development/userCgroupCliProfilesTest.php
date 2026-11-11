@@ -22,7 +22,7 @@ class UserCgroupCliProfilesTest extends TestCase
     public function testMemProfileHeavyDerivesMax(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--dry-run', '--mem-profile=heavy']);
-        $this->pmssAssertStringContract($out, ['required' => ['MemoryHigh=', 'MemoryMax=']]);
+        $this->assertStringContainsAllStrings(['MemoryHigh=', 'MemoryMax='], $out);
     }
 
     public function testDeviceHomeResolveUsesEnv(): void
@@ -37,9 +37,7 @@ class UserCgroupCliProfilesTest extends TestCase
     public function testAdditiveSingleChangeOnlyCpuWeight(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--dry-run', '--cpu-weight=333']);
-        $this->pmssAssertStringContract($out, [
-            'required' => ['CPUWeight=333'], 'forbidden' => ['IOWeight=', 'TasksMax='],
-        ]);
+        $this->assertStringContainsAndOmitsStrings(['CPUWeight=333'], ['IOWeight=', 'TasksMax='], $out);
     }
 
     public function testWipeDryRunDoesNotApply(): void

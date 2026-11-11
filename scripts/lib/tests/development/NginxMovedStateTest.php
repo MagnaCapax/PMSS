@@ -32,16 +32,13 @@ class NginxMovedStateTest extends TestCase
         $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('mvdtst', $ctx, true));
         foreach ([$ctx['nginxUsersDir'].'/mvdtst', $ctx['subdomainConfigDir'].'/pmss-user-mvdtst.conf'] as $path) {
             $rendered = file_get_contents($path);
-            $this->pmssAssertStringContract($rendered, [
-                'required' => ['2026-11-30'], 'forbidden' => ['proxy_pass', '##'],
-            ]);
+            $this->assertStringContainsAndOmitsStrings(['2026-11-30'], ['proxy_pass', '##'], $rendered);
             preg_match_all('/<!DOCTYPE html>.*?<\/html>/s', $rendered, $matches);
             $this->assertSame(2, count($matches[0]));
             foreach ($matches[0] as $html) {
-                $this->pmssAssertStringContract($html, [
-                    'required' => ['/css/error-styles.css', 'Your service has moved', 'https://pulsedmedia.com/clients/clientarea.php'],
-                    'forbidden' => ['mvdtst', 'old.example.test', '<script'],
-                ]);
+                $this->assertStringContainsAndOmitsStrings(
+                    ['/css/error-styles.css', 'Your service has moved', 'https://pulsedmedia.com/clients/clientarea.php'],
+                    ['mvdtst', 'old.example.test', '<script'], $html);
             }
         }
         $primary = file_get_contents($ctx['nginxUsersDir'].'/mvdtst');

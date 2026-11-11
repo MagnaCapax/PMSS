@@ -48,14 +48,13 @@ PHP
         \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php'));
-        $this->pmssAssertStringContract($content, [
-            'required' => ['        @ob_flush();', 'header("Content-Disposition: $contentDisposition;filename=\\"$fileName\\"");',
+        $this->assertStringContainsAndOmitsStrings(
+            ['        @ob_flush();', 'header("Content-Disposition: $contentDisposition;filename=\\"$fileName\\"");',
                 '        $range = str_replace("-", "", $range);',
                 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js',
                 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js',
                 'https://cdn.datatables.net/2.0.8/js/dataTables.min.js'],
-            'forbidden' => ["\n        ob_flush();\n", 'strstr($_SERVER[\'HTTP_USER_AGENT\'], "MSIE")'],
-        ]);
+            ["\n        ob_flush();\n", 'strstr($_SERVER[\'HTTP_USER_AGENT\'], "MSIE")'], $content);
     }
 
     public function testApplySkeletonFilesLeavesPatchedFilemanagerUntouched(): void

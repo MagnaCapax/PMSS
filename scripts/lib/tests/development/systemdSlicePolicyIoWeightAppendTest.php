@@ -43,9 +43,9 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
             ],
             'totalMemMiB' => 2048,
         ]);
-        $this->pmssAssertStringContract($out, ['required' => [
+        $this->assertStringContainsAllStrings([
             'IOReadIOPSMax=' => 'IOReadIOPSMax not appended', 'IOWriteIOPSMax=' => 'IOWriteIOPSMax not appended',
-        ]]);
+        ], $out);
     }
 
     public function testBandwidthLimitsAppendedWhenConfigured(): void
@@ -100,7 +100,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
             'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);
-        $this->pmssAssertStringContract($out, ['forbidden' => ['IODeviceLatencyTargetSec=', 'TasksMax=infinity']]);
+        $this->assertStringContainsAndOmitsStrings([], ['IODeviceLatencyTargetSec=', 'TasksMax=infinity'], $out);
     }
 
     public function testMountIoSkipsUnsafeBackingDevice(): void
@@ -135,8 +135,6 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
             'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);
-        $this->pmssAssertStringContract($out, [
-            'required' => ['IOWriteBandwidthMax=/dev/md0 120M'], 'forbidden' => ['IOReadBandwidthMax=', 'TasksMax=infinity'],
-        ]);
+        $this->assertStringContainsAndOmitsStrings(['IOWriteBandwidthMax=/dev/md0 120M'], ['IOReadBandwidthMax=', 'TasksMax=infinity'], $out);
     }
 }
