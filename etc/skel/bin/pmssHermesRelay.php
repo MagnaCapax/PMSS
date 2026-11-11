@@ -1,5 +1,6 @@
 <?php
 /** Account-owned Unix entrypoint for the two Hermes dashboard variants. */
+require_once __DIR__.'/pmssAccountAgent.php';
 
 function pmssHermesRelayListenerOwned(int $port, ?callable $owner = null): bool
 {
@@ -278,23 +279,17 @@ function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null
 /** A PID is actionable only when it still names this account's relay script. */
 function pmssHermesRelayStop(string $pidFile, string $socket): void
 {
-    clearstatcache(true, $pidFile);
-    $raw = is_file($pidFile) && !is_link($pidFile) ? trim((string) @file_get_contents($pidFile)) : '';
-    if (preg_match('/^[1-9][0-9]*$/D', $raw)) {
-        $proc = '/proc/'.$raw;
-        $cmd = @file_get_contents($proc.'/cmdline');
-        if (@fileowner($proc) === posix_geteuid() && is_string($cmd)
-            && strpos($cmd, 'pmssHermesRelay.php') !== false && strpos($cmd, $socket) !== false)
-            @posix_kill((int) $raw, SIGTERM);
-    }
+    $raw = pmssAgentPidFileRead($pidFile);
+    $cmd = $raw !== '' ? pmssAgentProcessCommandRead($raw) : null;
+    if ($cmd !== null && strpos($cmd, 'pmssHermesRelay.php') !== false && strpos($cmd, $socket) !== false)
+        @posix_kill((int) $raw, SIGTERM);
 }
 
 /** A relay started before the sign-in exchange existed has no credentials argument and is replaced on the next start. */
 function pmssHermesRelayCurrent(string $pidFile, string $socket, string $credentials): bool
 {
-    clearstatcache(true, $pidFile);
-    $raw = is_file($pidFile) && !is_link($pidFile) ? trim((string) @file_get_contents($pidFile)) : '';
-    if (!preg_match('/^[1-9][0-9]*$/D', $raw) || @fileowner('/proc/'.$raw) !== posix_geteuid()) return false;
+    $raw = pmssAgentPidFileRead($pidFile);
+    if ($raw === '' || @fileowner('/proc/'.$raw) !== posix_geteuid()) return false;
     $arguments = explode("\0", (string) @file_get_contents('/proc/'.$raw.'/cmdline'));
     $serve = array_search('serve', $arguments, true);
     return is_int($serve) && $serve > 0 && substr($arguments[$serve - 1], -20) === '/pmssHermesRelay.php'
@@ -328,7 +323,6 @@ function pmssHermesRelayStart(string $home, string $pidFile, string $socket, int
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    require_once __DIR__.'/pmssAccountAgent.php';
     try {
         $home = pmssAgentHome();
         $socket = (string) ($argv[2] ?? '');

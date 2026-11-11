@@ -37,10 +37,8 @@ function pmssHermesRunningPid(array $paths): ?int
     clearstatcache(true, $paths['pid']);
     $raw = is_file($paths['pid']) && !is_link($paths['pid']) ? trim((string) file_get_contents($paths['pid'])) : '';
     if (!preg_match('/^[1-9][0-9]*$/D', $raw)) return null;
-    $proc = '/proc/'.$raw;
-    $cmd = @file_get_contents($proc.'/cmdline');
-    if (@fileowner($proc) !== posix_geteuid() || !is_string($cmd)
-        || strpos($cmd, $paths['tree']) === false || strpos($cmd, 'dashboard') === false) return null;
+    $cmd = pmssAgentProcessCommandRead($raw);
+    if ($cmd === null || strpos($cmd, $paths['tree']) === false || strpos($cmd, 'dashboard') === false) return null;
     return (int) $raw;
 }
 

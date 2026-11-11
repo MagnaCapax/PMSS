@@ -76,25 +76,18 @@ function pmssPikkumiesHermesReady(array $paths): bool
 function pmssPikkumiesHermesStop(array $paths): void
 {
     pmssHermesRelayStop($paths['relayPid'], $paths['socket']);
-    clearstatcache(true, $paths['pid']);
-    $raw = is_file($paths['pid']) && !is_link($paths['pid']) ? trim((string) @file_get_contents($paths['pid'])) : '';
-    if (preg_match('/^[1-9][0-9]*$/D', $raw)) {
-        $proc = '/proc/'.$raw;
-        $cmd = @file_get_contents($proc.'/cmdline');
-        if (@fileowner($proc) === posix_geteuid() && is_string($cmd)
-            && strpos($cmd, 'dashboard') !== false
-            && (strpos($cmd, 'hermes') !== false || strpos($cmd, 'pikkumies') !== false)) {
-            @posix_kill((int) $raw, SIGTERM);
-            for ($i = 0; $i < 20; ++$i) {
-                $still = @file_get_contents($proc.'/cmdline');
-                if (@fileowner($proc) !== posix_geteuid() || !is_string($still)
-                    || strpos($still, 'dashboard') === false) break;
-                usleep(100000);
-            }
-            $still = @file_get_contents($proc.'/cmdline');
-            if (@fileowner($proc) === posix_geteuid() && is_string($still)
-                && strpos($still, 'dashboard') !== false) @posix_kill((int) $raw, SIGKILL);
+    $raw = pmssAgentPidFileRead($paths['pid']);
+    $cmd = $raw !== '' ? pmssAgentProcessCommandRead($raw) : null;
+    if ($cmd !== null && strpos($cmd, 'dashboard') !== false
+        && (strpos($cmd, 'hermes') !== false || strpos($cmd, 'pikkumies') !== false)) {
+        @posix_kill((int) $raw, SIGTERM);
+        for ($i = 0; $i < 20; ++$i) {
+            $still = pmssAgentProcessCommandRead($raw);
+            if ($still === null || strpos($still, 'dashboard') === false) break;
+            usleep(100000);
         }
+        $still = pmssAgentProcessCommandRead($raw);
+        if ($still !== null && strpos($still, 'dashboard') !== false) @posix_kill((int) $raw, SIGKILL);
     }
     $port = pmssAgentReservedPort($paths['port']);
     if ($port !== null && pmssAgentTcpListenerPid($port) !== null) pmssPikkumiesHermesStopUngated($port);

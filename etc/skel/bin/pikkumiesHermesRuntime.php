@@ -88,9 +88,7 @@ function pmssPikkumiesSimplifiedStop(array $paths): void
         if (!is_file($file) || is_link($file)) continue;
         $pid = trim((string) @file_get_contents($file));
         if (!preg_match('/^[1-9][0-9]*$/D', $pid)) continue;
-        $proc = '/proc/'.$pid;
-        $cmd = @file_get_contents($proc.'/cmdline');
-        if (@fileowner($proc) === posix_geteuid() && is_string($cmd)
-            && strpos($cmd, '/opt/pikkumies-agentboard/agentboard') !== false) @posix_kill((int) $pid, SIGTERM);
+        $cmd = pmssAgentProcessCommandRead($pid);
+        if ($cmd !== null && strpos($cmd, '/opt/pikkumies-agentboard/agentboard') !== false) @posix_kill((int) $pid, SIGTERM);
     }
 }

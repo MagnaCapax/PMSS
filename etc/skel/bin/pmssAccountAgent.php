@@ -36,6 +36,22 @@ function pmssAgentPrivateFileIsSafe(string $file, int $maxBytes): bool
         && (fileperms($file) & 0077) === 0 && filesize($file) <= $maxBytes;
 }
 
+/** Read a recorded PID without following links; callers retain their process matching. */
+function pmssAgentPidFileRead(string $file): string
+{
+    clearstatcache(true, $file);
+    $raw = is_file($file) && !is_link($file) ? trim((string) @file_get_contents($file)) : '';
+    return preg_match('/^[1-9][0-9]*$/D', $raw) === 1 ? $raw : '';
+}
+
+/** Observe a validated PID's command before checking its owner, including on stop retries. */
+function pmssAgentProcessCommandRead(string $pid): ?string
+{
+    $proc = '/proc/'.$pid;
+    $cmd = @file_get_contents($proc.'/cmdline');
+    return @fileowner($proc) === posix_geteuid() && is_string($cmd) ? $cmd : null;
+}
+
 /** Query listeners once; callers retain their own PID matching policy. */
 function pmssAgentTcpListenerRows(int $port): array
 {
