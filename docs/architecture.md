@@ -28,6 +28,15 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **etc/skel/bin/pmssAccountAgent.php** keeps account command capture local to
+  the customer tree. Pipe I/O faults attempt both pipe closes, then terminate
+  and reap only the child acquired by that invocation. An already-reaped child
+  is left alone; later cleanup runs even when an earlier cleanup stage throws.
+  Lone throwables propagate unchanged, with normal `finally` precedence for
+  combined faults. Successful command bytes, environment, merged output and
+  exit-status results retain their contracts. `AccountAgentCommandCleanupSafetyTest`
+  covers these paths with memory streams and fake process operations; execution
+  stays on testing machines.
 - **scripts/cron/rtorrentPortReservationsReconcile.php** owns the home-directory
   enumeration probe through `finally`, releasing it even when the passwd read
   throws. Existing enumeration refusals, JSON output and exit codes remain intact.

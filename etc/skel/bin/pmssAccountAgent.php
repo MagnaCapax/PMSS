@@ -116,10 +116,32 @@ function pmssAgentRun(array $args, ?array $env = null): array
     $command = implode(' ', array_map('escapeshellarg', $args)).' 2>&1';
     $process = proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w')), $pipes, null, $env);
     if (!is_resource($process)) return array(1, 'Could not launch command');
-    fclose($pipes[0]);
-    $output = stream_get_contents($pipes[1]);
-    fclose($pipes[1]);
-    return array(proc_close($process), (string) $output);
+    try {
+        fclose($pipes[0]);
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        return array(proc_close($process), (string) $output);
+    } catch (\Throwable $error) {
+        // Failed I/O still owns both pipes and this invocation's child.
+        try {
+            try {
+                if (is_resource($pipes[0])) fclose($pipes[0]);
+            } finally {
+                if (is_resource($pipes[1])) fclose($pipes[1]);
+            }
+        } finally {
+            // Later cleanup must run even when a pipe close or termination throws.
+            // proc_close() may already have reaped the child before throwing.
+            if (is_resource($process)) {
+                try {
+                    if (function_exists('proc_terminate')) @proc_terminate($process);
+                } finally {
+                    @proc_close($process);
+                }
+            }
+        }
+        throw $error;
+    }
 }
 
 /** Install a merged crontab from a private file, never stdin. */
