@@ -781,6 +781,15 @@ Sub-handlers:
 
 ## Web Stack & System Prep
 
+- `scripts/lib/update/systemPrep.php` remains the definition-only system preparation
+  include. Temporary-mount policy, boot-tuning installation, locale/timezone
+  convergence and root-shell defaults live in `systemPrep/tempMount.php`,
+  `bootTuning.php`, `locale.php` and `shellDefaults.php` (ADR 0267).
+  Boot templates share one ordered artifact list: preflight both, read both,
+  publish both, then evaluate the systemd action gate. Locale defaults retain
+  case-insensitive last-assignment precedence and literal quoted values.
+  Existing public signatures, messages, command bytes and fail-soft behavior remain.
+
 - Managed lighttpd proxies retain `scripts/lib/lighttpd/proxyFragments.php` as
   their include and publication boundary. `proxyRoutes.php` selects and frames
   routes, `proxyRule.php` renders conditionals, and `proxyPorts.php` adopts or

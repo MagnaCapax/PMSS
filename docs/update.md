@@ -187,6 +187,13 @@ list in the installer, the post-install benchmark checks skip conditions and bui
 its command in the trigger, and locale preparation handles the single shared
 LANG/LC_TIME baseline directly. Command bytes, log messages and skip order are preserved.
 
+Base system preparation retains `systemPrep.php` as its include (ADR 0267).
+Temporary-mount policy, boot-tuning installation, locale/timezone convergence
+and root-shell defaults have separate modules. Boot templates share ordered
+preflight, reads and publication; the systemd gate follows both writes. Locale
+observations retain their original matching rules without separate match flags.
+Public helpers, command/log bytes and the phase-2 call order stay unchanged.
+
 Environment hints captured by `install.sh` are passed via `PMSS_HOSTNAME`,
 `PMSS_SKIP_HOSTNAME`, `PMSS_QUOTA_MOUNT`, and `PMSS_SKIP_QUOTA`; phase 2 honors
 those flags when reapplying legacy hostname/quota defaults. Optional hardening

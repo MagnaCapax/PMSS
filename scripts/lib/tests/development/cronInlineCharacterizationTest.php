@@ -51,10 +51,10 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testBootTuningUsesSharedManagedPathWrites(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep.php', [
-            '[$scriptTarget, $scriptRaw, 0755, \'Boot tuning script\']',
-            '[$serviceTarget, $serviceRaw, 0644, \'Boot tuning service\']',
-            'pmssInstallManagedPathFile($path, $content, $label, $log, [\'mode\' => $mode])',
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/bootTuning.php', [
+            "[\$cfgDir.'/template.pmss-boot-tuning.sh', \$scriptTarget, 0755, 'Boot tuning script']",
+            "[\$cfgDir.'/template.systemd.pmss-boot-tuning.service', \$serviceTarget ?? '/etc/systemd/system/pmss-boot-tuning.service', 0644, 'Boot tuning service']",
+            'pmssInstallManagedPathFile($target, $content, $label, $log, [\'mode\' => $mode])',
         ], ['$write'.'Target = static function' => 'pmssEnsureBootTuning() should keep its two file writes inline rather than via a local wrapper']);
     }
 

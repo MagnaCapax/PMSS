@@ -1,5 +1,15 @@
 # Refactoring Guidelines
 
+Base system preparation retains its original include and public helpers while
+separating temporary-mount policy, boot installation, locale/timezone convergence
+and root-shell defaults (ADR 0267). Boot preflight, reads and publication share
+one artifact list. Locale availability uses normalized membership; default locale
+checks consume the existing assignment parser's last values directly. Duplicate
+artifact metadata and separate locale match states disappear. Characterization
+traces lock messages, command/write bytes, stage order and exception boundaries;
+existing mount, shell and complete-write tests retain their facade entrypoint.
+All execution verification belongs on testing machines.
+
 Dpkg baseline maintenance retains the environment and selection includes and
 public helpers (ADR 0261). Baseline discovery/staging, line policy, read-only
 package/hardware observations, application and interrupted configuration have
