@@ -53,8 +53,8 @@ class LighttpdSocketRetryCharacterizationTest extends TestCase
     public function testMalformedCallbackResultsAndFinalSnapshotStatusArePreserved(): void
     {
         foreach ([null, false, 'invalid', 0, []] as $payload) {
-            $result = \pmssLighttpdWatchdogSocketProbeWithRetry('/socket', ['attemptCount' => 1,
-                'probe' => static function () use ($payload) { return $payload; }]);
+            $result = \pmssLighttpdWatchdogSocketProbeWithRetry('/socket',
+                ['attemptCount' => 1] + self::pmssMakeCallbacks(['probe' => $payload]));
             $this->assertSame(['ok' => false, 'errno' => 0,
                 'errstr' => is_array($payload) ? '' : 'probe callback returned invalid result', 'attempts' => 1], $result);
         }

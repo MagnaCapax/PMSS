@@ -44,7 +44,7 @@ final class TorrentClientsHookTest extends TestCase
                 'homeRoot' => $root,
                 'root' => $root.'/store',
                 'catalog' => dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json',
-                'run' => static function () use (&$events): bool { $events[] = 'link'; return true; },
+                'run' => self::pmssMakeCallbacks(['link' => true], $events)['link'],
             ]));
             $this->assertSame(['download', 'link', 'link', 'link'], $events);
         });

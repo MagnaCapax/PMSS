@@ -81,7 +81,7 @@ class UserCgroupUtilTest extends TestCase
         ];
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($cases): void {
             $snapshot = [];
-            $manager = new Manager($this->makeSystemStub('/dev/sdb'), static function (): int { return 0; });
+            $manager = new Manager($this->makeSystemStub('/dev/sdb'), self::pmssMakeCallbacks(['run' => 0])['run']);
             foreach ($cases as $flags) {
                 $snapshot[] = $this->pmssCaptureStdout(static function () use ($manager, $flags): int {
                     return $manager->run(array_merge(['userConfigCgroup.php', 'testuser', '--apply'], $flags));
@@ -124,10 +124,7 @@ class UserCgroupUtilTest extends TestCase
                 public function requireRoot(): void { $this->rootChecks++; }
             };
             $steps = [];
-            $manager = new Manager($system, static function (string $label, string $command) use (&$steps, $stepRc): int {
-                $steps[] = [$label, $command];
-                return $stepRc;
-            });
+            $manager = new Manager($system, $this->pmssMakeStepRunner($steps, $stepRc));
             [$rc, $output] = $this->pmssCaptureStdout(static function () use ($manager, $flags): int {
                 return $manager->run(array_merge(['userConfigCgroup.php', 'testuser'], $flags));
             });

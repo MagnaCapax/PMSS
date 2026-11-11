@@ -217,9 +217,7 @@ class ResourceStatsProcessorTest extends TestCase
             'config_dir' => $configDir,
             'cgroup_dir' => $cgroupDir,
             'version_file' => $this->pmssWriteTempFile('stats-version', "3.0.0\n"),
-        ], static function (): bool {
-            return false;
-        });
+        ], self::pmssMakeCallbacks(['rpc' => false])['rpc']);
 
         $this->assertEquals('fixtur01', $payload['context']['user']);
         $this->assertEquals(2147483648.0, $payload['memory']['current_bytes']);

@@ -27,9 +27,7 @@ class RtorrentThrottleGetTest extends TestCase
     public function testFailedOrMalformedReadsNeverEmitPartialOutput(): void
     {
         [$firstFailure, $output] = $this->pmssCaptureStdout(static function (): int {
-            return \pmssRtorrentThrottleGetCli(['script', 'fixtur01'], static function () {
-                return false;
-            });
+            return \pmssRtorrentThrottleGetCli(['script', 'fixtur01'], self::pmssMakeCallbacks(['rpc' => false])['rpc']);
         });
         $this->assertSame(2, $firstFailure);
         $this->assertSame('', $output);
