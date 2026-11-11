@@ -18,6 +18,13 @@ The remote termination caller stops reading after 15 seconds without stdout. Hom
 
 Start a shell heartbeat after the termination script loads its helpers when stdout is not a TTY. The child writes an empty line every five seconds and checks the parent's PID each interval. Stop and reap it at shutdown, and stop it explicitly before printing the completion line. The same behavior applies to dry runs; interactive prompts and output remain unchanged.
 
+Startup retains the child only after shutdown registration and status inspection
+succeed. Exceptions or errors during either step stop and reap it immediately.
+Stopping attempts to reap even when termination throws, with PHP's usual cleanup
+exception precedence. The global handle is cleared before cleanup, so a later
+stop remains a no-op. `StdoutHeartbeatCleanupSafetyTest` covers these failures
+with memory streams and process stubs; execution stays on the testing machine.
+
 ## Consequences
 
 - Remote readers receive bytes through long silent steps and can continue to read the existing final result.

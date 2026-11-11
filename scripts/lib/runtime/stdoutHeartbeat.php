@@ -34,14 +34,20 @@ function pmssStdoutHeartbeatStart(int $intervalSeconds = 5): ?int
     }
 
     $GLOBALS['PMSS_STDOUT_HEARTBEAT_PROCESS'] = $process;
-    register_shutdown_function('pmssStdoutHeartbeatStop');
-    $status = proc_get_status($process);
-    // Reap an unobservable or already-exited child rather than reporting a PID.
-    if (!is_array($status) || !is_int($status['pid'] ?? null) || $status['pid'] < 1 || empty($status['running'])) {
-        pmssStdoutHeartbeatStop();
-        return null;
+    $retained = false;
+    try {
+        register_shutdown_function('pmssStdoutHeartbeatStop');
+        $status = proc_get_status($process);
+        // Reap an unobservable or already-exited child rather than reporting a PID.
+        if (!is_array($status) || !is_int($status['pid'] ?? null) || $status['pid'] < 1 || empty($status['running'])) {
+            return null;
+        }
+        $retained = true;
+        return $status['pid'];
+    } finally {
+        // Startup owns the child until shutdown registration and observation succeed.
+        if (!$retained) pmssStdoutHeartbeatStop();
     }
-    return $status['pid'];
 }
 
 /** Stop and reap the child before returning to the caller or exiting. */
@@ -52,6 +58,10 @@ function pmssStdoutHeartbeatStop(): void
     if (!is_resource($process) || get_resource_type($process) !== 'process') {
         return;
     }
-    @proc_terminate($process);
-    @proc_close($process);
+    try {
+        @proc_terminate($process);
+    } finally {
+        // A termination failure must not skip reaping the child we started.
+        @proc_close($process);
+    }
 }
