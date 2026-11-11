@@ -53,8 +53,10 @@ Torrent-client operation fixtures use `TestCase::pmssMakeCallbacks($results,
 $events)` for callbacks that return a fixed value and, when an event array is
 passed, append their operation name to it. Results remain explicit, including
 `false`, `null` and backup arrays; callbacks share the event array by
-reference. Argument-dependent behavior,
-lock checks, filesystem effects and assertions stay in the individual tests.
+reference. Socket-reader result tables, watchdog restart decisions, status
+availability probes, and mount/device observations use that same factory.
+Argument-dependent behavior, lock checks, filesystem effects and assertions
+stay in the individual tests.
 
 In-process environment fixtures use `TestCase::pmssWithEnv($values, $callback)`
 to restore unset, empty and existing values even when the callback throws.

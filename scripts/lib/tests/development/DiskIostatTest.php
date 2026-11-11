@@ -64,13 +64,13 @@ PHP;
     /** Resolve a fake /home source without invoking findmnt. */
     private function homeDevices(array $sampled, string $source, string $class, string $devRoot): ?array
     {
-        return \pmssDiskIostatHomeDevices($sampled, $class, static function () use ($source): string { return $source; }, $devRoot);
+        return \pmssDiskIostatHomeDevices($sampled, $class, self::pmssMakeCallbacks(['mountRunner' => $source])['mountRunner'], $devRoot);
     }
 
     /** Select the same devices used by the cron command, with a fake mount. */
     private function sampleDevices(array $discovered, string $source, string $class, string $devRoot): array
     {
-        return \pmssDiskIostatSampleDevices($discovered, $class, static function () use ($source): string { return $source; }, $devRoot);
+        return \pmssDiskIostatSampleDevices($discovered, $class, self::pmssMakeCallbacks(['mountRunner' => $source])['mountRunner'], $devRoot);
     }
 
     /** Lock the shared walk's order, deduplication, and incomplete-scan signal. */

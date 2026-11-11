@@ -10,9 +10,9 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
     private function deviceResolve(string $sysfs, string $path, int $size = 1048576, ?callable $deviceCheck = null): array
     {
         return \storageBenchmarkHomeDeviceResolve('/home', $path, $sysfs,
-            $deviceCheck ?? static function (): bool { return true; },
+            $deviceCheck ?? self::pmssMakeCallbacks(['deviceCheck' => true])['deviceCheck'],
             static function (string $path): string { return $path; },
-            static function () use ($size): int { return $size; });
+            self::pmssMakeCallbacks(['sizeRead' => $size])['sizeRead']);
     }
 
     public function testOptionAndUsage(): void

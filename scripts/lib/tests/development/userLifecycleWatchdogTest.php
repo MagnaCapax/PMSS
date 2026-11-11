@@ -202,9 +202,7 @@ PHP;
             'fixtur01',
             true,
             ['demo'],
-            static function (): bool {
-                return true;
-            },
+            self::pmssMakeCallbacks(['restartNeeded' => true])['restartNeeded'],
             'demo restart requested',
             15,
             static function () use (&$terminated): void {
@@ -224,9 +222,7 @@ PHP;
             'bad-user',
             true,
             ['demo'],
-            static function (): bool {
-                return true;
-            },
+            self::pmssMakeCallbacks(['restartNeeded' => true])['restartNeeded'],
             'demo restart requested',
             15,
             static function () use (&$terminated): void {
@@ -244,9 +240,7 @@ PHP;
             'fixtur01',
             true,
             ['demo'],
-            static function (): bool {
-                return false;
-            },
+            self::pmssMakeCallbacks(['restartNeeded' => false])['restartNeeded'],
             'demo restart requested'
         );
 
@@ -446,9 +440,7 @@ PHP;
                 [
                     pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
                 ],
-                static function (): array {
-                    return ['demo' => false];
-                },
+                self::pmssMakeCallbacks(['stateReader' => ['demo' => false]])['stateReader'],
                 null,
                 $homeRoot,
                 $listUsers

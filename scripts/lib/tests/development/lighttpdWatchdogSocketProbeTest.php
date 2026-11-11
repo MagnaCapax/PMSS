@@ -196,13 +196,13 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testListeningSocketReaderRejectsFailedAndMalformedResults(): void
     {
-        foreach (array(
-            static function (): array { return array('rc' => 0); },
-            static function (): array { return array('lines' => null, 'rc' => 0); },
-            static function (): array { return array('lines' => array(), 'rc' => 1); },
-            static function (): array { return array('lines' => 'not-an-array', 'rc' => 0); },
-            static function () { return 'not-an-array'; },
-        ) as $reader) {
+        foreach (self::pmssMakeCallbacks(array(
+            array('rc' => 0),
+            array('lines' => null, 'rc' => 0),
+            array('lines' => array(), 'rc' => 1),
+            array('lines' => 'not-an-array', 'rc' => 0),
+            'not-an-array',
+        )) as $reader) {
             $this->assertSame(
                 array('ok' => false, 'paths' => array()),
                 \pmssLighttpdWatchdogListeningSocketSnapshot('/home/fixtur01', array('reader' => $reader))
@@ -213,9 +213,9 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     public function testListeningSocketReaderReturnsStrictlyParsedPaths(): void
     {
         $path = '/home/fixtur01/.lighttpd/php.socket-4';
-        $reader = static function () use ($path): array {
-            return array('lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0);
-        };
+        $reader = self::pmssMakeCallbacks(['reader' => array(
+            'lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0,
+        )])['reader'];
 
         $this->assertSame(
             array('ok' => true, 'paths' => array($path)),
@@ -226,12 +226,10 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     public function testListeningSocketSnapshotPreservesProbeStatus(): void
     {
         $path = '/home/fixtur01/.lighttpd/php.socket-1';
-        $healthyReader = static function () use ($path): array {
-            return array('lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0);
-        };
-        $failedReader = static function (): array {
-            return array('lines' => array(), 'rc' => 124);
-        };
+        $healthyReader = self::pmssMakeCallbacks(['reader' => array(
+            'lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0,
+        )])['reader'];
+        $failedReader = self::pmssMakeCallbacks(['reader' => array('lines' => array(), 'rc' => 124)])['reader'];
 
         $this->assertSame(
             array('ok' => true, 'paths' => array($path)),
@@ -280,8 +278,8 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testRestartVerificationDistinguishesDownFromUnverified(): void
     {
-        $noListeners = static function (): array { return array('lines' => array(), 'rc' => 0); };
-        $probeFailure = static function (): array { return array('lines' => array(), 'rc' => 124); };
+        $noListeners = self::pmssMakeCallbacks(['reader' => array('lines' => array(), 'rc' => 0)])['reader'];
+        $probeFailure = self::pmssMakeCallbacks(['reader' => array('lines' => array(), 'rc' => 124)])['reader'];
         $options = array('attemptCount' => 0, 'retryDelaySeconds' => 0);
 
         $this->assertSame(

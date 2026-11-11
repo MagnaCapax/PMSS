@@ -151,9 +151,7 @@ final class SystemStatusCharacterizationTest extends TestCase
     public function testComponentChecksUseInjectedSourcesFilePredicate(): void
     {
         $dependencies = $this->buildComponentStatusDependencies();
-        $dependencies['isFile'] = static function (string $path): bool {
-            return false;
-        };
+        $dependencies['isFile'] = self::pmssMakeCallbacks(['isFile' => false])['isFile'];
 
         $checks = pmssComponentStatusChecks($dependencies);
 
@@ -265,9 +263,7 @@ final class SystemStatusCharacterizationTest extends TestCase
             return '/usr/sbin/nginx';
         }, static function (string $path): bool {
             return $path === '/usr/sbin/nginx';
-        }, static function (): bool {
-            return false;
-        }, false);
+        }, self::pmssMakeCallbacks(['pathExists' => false])['pathExists'], false);
 
         $this->assertSame([], $views['system']);
         $this->assertSame([
@@ -290,9 +286,7 @@ final class SystemStatusCharacterizationTest extends TestCase
                 return $command === "command -v 'nginx'" ? '/usr/sbin/nginx' : '';
             }, static function (string $path): bool {
                 return $path === '/usr/sbin/nginx';
-            }, static function (): bool {
-                return false;
-            }, true);
+            }, self::pmssMakeCallbacks(['pathExists' => false])['pathExists'], true);
         });
 
         $this->assertSame([
