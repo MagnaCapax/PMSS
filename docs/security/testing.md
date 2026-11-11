@@ -46,6 +46,11 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
 ## Checklists
 - Inputs validated and sanitized.
 - Paths normalized; no traversal.
+- Operator path-occupancy checks use `pmssPathExistsOrLink()` from the existing
+  runtime filesystem facade. Recreation, suspension, account UI identity cleanup,
+  legacy htpasswd lookup and ACME contact lookup retain dangling links as occupied.
+  Their type, owner, inode and permission checks remain at the callers. The ACME
+  contact fixture also checks that a dangling configured path suppresses fallback.
 - Commands routed through `runStep()` with logs and rc checks.
 - Permissions set conservatively; no world-writable artifacts.
 

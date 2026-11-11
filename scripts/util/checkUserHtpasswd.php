@@ -28,7 +28,7 @@ function pmssCheckUserHtpasswdHasUserEntry(string $path, string $username)
         return false;
     }
 
-    if (!file_exists($path) && !is_link($path)) {
+    if (!pmssPathExistsOrLink($path)) {
         return false;
     }
 

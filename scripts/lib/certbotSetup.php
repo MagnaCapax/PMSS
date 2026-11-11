@@ -12,7 +12,7 @@ require_once __DIR__.'/lighttpd/userFileWrite.php';
 /** Resolve the host ACME contact without assigning fleet mail to other installs. */
 function pmssSetupLetsEncryptEmailResolve(string $hostname, string $configPath = '/etc/seedbox/config/letsencrypt-email'): ?string
 {
-    if (file_exists($configPath) || is_link($configPath)) {
+    if (pmssPathExistsOrLink($configPath)) {
         $email = @file_get_contents($configPath);
         if (!is_string($email)) {
             return null;

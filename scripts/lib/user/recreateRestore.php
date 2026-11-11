@@ -15,7 +15,7 @@ function pmssRecreateMoveTopDirectory(string $source, string $destination): void
         || !pmssPathTargetIsSafe(dirname($source), true)
         || !pmssPathTargetIsSafe($source, true, true) || !is_dir($source)
         || !pmssPathTargetIsSafe($destination, true, true)
-        || file_exists($destination) || is_link($destination)) {
+        || pmssPathExistsOrLink($destination)) {
         throw new RuntimeException('Unsafe top-level recreate move: '.$source);
     }
     $before = @lstat($source);
@@ -39,13 +39,13 @@ function pmssRecreatePurgeSupersededDirectory(string $path): bool
         exec(pmssPinnedTreePurgeCommand($path, $clearImmutable).' 2>&1', $output, $rc);
     }
     clearstatcache(true, $path);
-    return !file_exists($path) && !is_link($path);
+    return !pmssPathExistsOrLink($path);
 }
 
 /** Copy the checked single-link regular source inode to a regular-file destination beneath real directories. */
 function pmssRecreateCopyFile(string $source, string $destination, ?int $requiredUid = null, ?int $targetUid = null, ?int $targetGid = null): bool
 {
-    if (!file_exists($source) && !is_link($source)) {
+    if (!pmssPathExistsOrLink($source)) {
         return false;
     }
     clearstatcache(true, $source);
@@ -98,7 +98,7 @@ function pmssRecreateRestoreHome(string $home, string $backup, bool $hadHome, in
     if ($hadHome) {
         // The fresh skeleton has a populated bin; archive that generated copy
         // before restoring the customer's complete bin tree and its selections.
-        if (file_exists($backup.'/bin') || is_link($backup.'/bin')) {
+        if (pmssPathExistsOrLink($backup.'/bin')) {
             if (is_link($backup.'/bin') || !is_dir($backup.'/bin')) {
                 throw new RuntimeException('Unsafe restore directory: '.$backup.'/bin');
             }
@@ -108,7 +108,7 @@ function pmssRecreateRestoreHome(string $home, string $backup, bool $hadHome, in
             pmssRecreateMoveDirectory($backup.'/'.$dir, $home.'/'.$dir);
         }
         $share = $backup.'/.local/share/pmss';
-        if (file_exists($share) || is_link($share)) {
+        if (pmssPathExistsOrLink($share)) {
             pmssRecreateEnsureDirectory($home.'/.local', $uid, $gid);
             pmssRecreateEnsureDirectory($home.'/.local/share', $uid, $gid);
             pmssRecreateMoveDirectory($share, $home.'/.local/share/pmss');
@@ -129,22 +129,20 @@ function pmssRecreateRestoreHome(string $home, string $backup, bool $hadHome, in
     }
     foreach (['.billingServiceId', '.billingId', '.billingClientId', '.notifyEmail'] as $name) {
         $source = $backup.'/'.$name;
-        if ((file_exists($source) || is_link($source))
-            && !pmssRecreateCopyFile($source, $home.'/'.$name, $identityUid, $identityUid, $gid)) {
+        if (pmssPathExistsOrLink($source) && !pmssRecreateCopyFile($source, $home.'/'.$name, $identityUid, $identityUid, $gid)) {
             // Billing sources that do not meet the ownership and file-type contract stay in the archive.
             $leftBehind[] = $source;
         }
     }
     $credential = $backup.'/.lighttpd/.htpasswd';
-    if ((file_exists($credential) || is_link($credential))
-        && !pmssRecreateCopyFile($credential, $home.'/.lighttpd/.htpasswd', $uid, $uid, $gid)) {
+    if (pmssPathExistsOrLink($credential) && !pmssRecreateCopyFile($credential, $home.'/.lighttpd/.htpasswd', $uid, $uid, $gid)) {
         throw new RuntimeException('Refusing unverified credential file: '.$credential);
     }
     // These customer overrides are intentionally retained for manual review.
     foreach (['.config/pmss', '.rtorrent.rc.custom', '.lighttpd/custom', '.lighttpd/custom.d',
         'watch', 'www/public', 'www/rutorrent/share'] as $relative) {
         $path = $backup.'/'.$relative;
-        if (file_exists($path) || is_link($path)) {
+        if (pmssPathExistsOrLink($path)) {
             $leftBehind[] = $path;
         }
     }

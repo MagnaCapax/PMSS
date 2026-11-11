@@ -20,6 +20,11 @@ class SetupLetsEncryptTest extends TestCase
         $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
         $this->pmssWriteFile($config, '');
         $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
+
+        // An explicitly configured dangling link must suppress the fleet email fallback.
+        $this->assertTrue(unlink($config));
+        $this->assertTrue(symlink($config.'.missing', $config));
+        $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
     }
 
     /** Build the shared hermetic certbot setup options used by these tests. */

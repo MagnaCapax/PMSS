@@ -34,7 +34,7 @@ function pmssPikkumiesUiIdentityPublish(string $user, ?string $serviceId, string
     @chmod($directory, 0711);
     $path = $directory.'/'.$user;
     if (!$enabled || $serviceId === null) {
-        if (!file_exists($path) && !is_link($path)) return true;
+        if (!pmssPathExistsOrLink($path)) return true;
         $entry = @lstat($path);
         return pmssUserFileStatIsSingleRegular($entry) && $entry['uid'] === 0 && @unlink($path);
     }

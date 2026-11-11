@@ -65,7 +65,7 @@ if ($activeRootExists) {
 
 // The canonical suspended marker is www-disabled. Ensure it exists even when the
 // user did not have a www/ directory at suspend time (rare legacy state).
-if (!file_exists($disabledRoot) && !is_link($disabledRoot)) {
+if (!pmssPathExistsOrLink($disabledRoot)) {
     pmssEnsureUserHomeDir($username, $homeDir, 'www-disabled', 0755);
 }
 
