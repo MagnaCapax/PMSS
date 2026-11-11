@@ -52,7 +52,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testPermissionTargetsFilterBeforeChmod(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupPermissions.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/setupPermissions.php', [
             'find /etc/skel -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +',
             'find /etc/seedbox -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +',
             'find /etc/skel -type f -perm /007 -exec chmod o-rwx -- {} +',
@@ -60,8 +60,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
             "find /etc/openvpn -maxdepth 1 -type f -name '*.conf'",
             '-not -user root -o -not -group root',
             '-exec chown root:root {} +',
-        ]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/util/setupPermissions.php', 'chmod -R o-w');
+        ], ['chmod -R o-w']);
     }
 
     public function testPermissionHardeningSkipsSymlinkTargetsBeforeActing(): void
@@ -98,18 +97,17 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testStartRtorrentRefreshesExecutorThroughManagedWriter(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/startRtorrent', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/startRtorrent', [
             "require_once __DIR__.'/lib/lighttpd/userFileWrite.php';",
             'pmssReplaceAccountFile($user, $home, $executor, $skelData, 0755, true)',
-        ]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/startRtorrent', '@copy($skelExecutor, $executor)');
+        ], ['@copy($skelExecutor, $executor)']);
     }
 
     public function testStartRtorrentCreatesSessionAsAccountUser(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/startRtorrent',
-            "pmssBuildUserShellCommand(\$user, 'mkdir -m 755 -p -- '.escapeshellarg(\$home.'/session'))");
-        $this->pmssAssertRepoFileNotContainsString('scripts/startRtorrent', "@chown(\$home.'/session', \$user)");
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/startRtorrent', [
+            "pmssBuildUserShellCommand(\$user, 'mkdir -m 755 -p -- '.escapeshellarg(\$home.'/session'))",
+        ], ["@chown(\$home.'/session', \$user)"]);
     }
 
     public function testUpdateStep2RegistersPermissionShutdownRescueBeforeWork(): void

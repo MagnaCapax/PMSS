@@ -137,7 +137,7 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertStringContainsAllStrings(['location = /error-502-##username.html {', 'try_files $uri /error-502.html;'], $contents, 'user template: ');
         $suspended = \pmssNginxUserSubdomainTemplates()['publicSuspended'];
         $this->assertEquals(2, substr_count($suspended, 'location ^~ /suspended_images/'));
-        $this->assertTrue(strpos($suspended, 'location ^~ /suspended_images/') < strpos($suspended, 'location / {'));
+        $this->assertOrderedStrings(['location ^~ /suspended_images/', 'location / {'], $suspended);
     }
 
     private function assertImageFilesExist(string $prefix, int $count): void

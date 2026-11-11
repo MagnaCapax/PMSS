@@ -45,9 +45,8 @@ final class TorrentClientsNotesTest extends TestCase
                 '<p>4.6.7 (libtorrent 1.2): Certificate &lt;checks&gt; &amp; &quot;details&quot;</p>',
                 '<p>5.2.4 (libtorrent 2.0): A second note</p>',
             ], $card);
-            $this->assertTrue(strpos($card, '</select>') < strpos($card, '<p>4.6.7'));
-            $this->assertStringNotContainsString('Certificate <checks>', $card);
-            $this->assertStringNotContainsString('<p>system:', $card);
+            $this->assertOrderedStrings(['</select>', '<p>4.6.7'], $card);
+            $this->assertStringContainsAndOmitsStrings([], ['Certificate <checks>', '<p>system:'], $card);
         });
     }
 

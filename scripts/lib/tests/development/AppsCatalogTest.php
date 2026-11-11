@@ -270,8 +270,7 @@ class AppsCatalogTest extends TestCase
         $this->assertStringContainsString('Turn on', \pmssCustomerAppRowHtmlBuild('Transmission', $app));
         $html = \pmssCustomerAppsSectionHtmlBuild(['apps' => ['Deluge' => $app, 'Transmission' => $app],
             'installed' => false, 'message' => '']);
-        $this->assertTrue(strpos($html, 'data-app="Deluge"') < strpos($html, 'data-app="Transmission"'));
-        $this->assertTrue(strpos($html, 'data-app="Transmission"') < strpos($html, 'id="pmss-transfer-apps"'));
+        $this->assertOrderedStrings(['data-app="Deluge"', 'data-app="Transmission"', 'id="pmss-transfer-apps"'], $html);
         $this->assertSame(1, substr_count($html, 'data-app="Transmission"'));
     }
 
@@ -423,7 +422,7 @@ class AppsCatalogTest extends TestCase
         $this->assertSame(1, substr_count($html, '>Restart all my services</button>'));
         $header = substr($html, strpos($html, '<div class="apps-header">'), 220);
         $this->assertStringContainsString('<h2>Your apps</h2><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button>', $header);
-        $this->assertTrue(strpos($html, 'Restart all my services</button>') < strpos($html, '<div class="group">Media Stack</div>'));
+        $this->assertOrderedStrings(['Restart all my services</button>', '<div class="group">Media Stack</div>'], $html);
         $this->assertStringContainsString('.apps-header{align-items:flex-start;flex-direction:column}', $html);
     }
 
