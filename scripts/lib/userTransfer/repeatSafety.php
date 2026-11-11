@@ -89,8 +89,7 @@ function pmssUserTransferAssertSourceNotOlder(array $cfg, string $home, array $p
     if (!empty($cfg['namespaceRsync'])) {
         $remote = 'unshare --map-auto --map-root-user '.$remote;
     }
-    pmssUserTransferWriteFile($paths['newestProbe'], "#!/bin/bash\nset -e\n"
-        .pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n", 0700);
+    pmssUserTransferWriteFile($paths['newestProbe'], pmssUserTransferBuildSshProbeScript($cfg, $remote), 0700);
     $commands = [
         'source' => pmssBuildCommand($paths['expect'], [$paths['newestProbe']]),
         'target' => pmssUserTransferBuildReceiver($cfg,

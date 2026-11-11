@@ -41,7 +41,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         'scripts/util/userPermissions.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail', '.trafficData', '.throttle', '.quota', '.resourceData', '.trafficDataIngress'],
         // Moving or rebuilding the home itself.
         'scripts/lib/user/recreateRestore.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail'],
-        'scripts/lib/userTransfer/remoteScripts.php' => ['.bonusTraffic', '.bonusQuota', '.billingId', '.billingServiceId', '.billingClientId', '.trafficLimit', '.trafficData', '.qbittorrentPort', '.quota', 'pmss-user.json', '.resourceData', '.trafficDataIngress', '.trafficDataLocal'],
+        'scripts/lib/userTransfer/rsyncScripts.php' => ['.bonusTraffic', '.bonusQuota', '.billingId', '.billingServiceId', '.billingClientId', '.trafficLimit', '.trafficData', '.qbittorrentPort', '.quota', 'pmss-user.json', '.resourceData', '.trafficDataIngress', '.trafficDataLocal'],
         // Display for the account (panel text, account-run stats and support reports, ADR 0152).
         'scripts/lib/stats/collect.php' => ['.bonusTraffic', '.trafficLimit', '.trafficData', '.quota', '.resourceData', '.trafficDataIngress'],
         'scripts/lib/support/collect.php' => ['.billingId', '.billingServiceId', '.billingClientId'],

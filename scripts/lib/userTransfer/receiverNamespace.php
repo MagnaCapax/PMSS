@@ -12,14 +12,13 @@ require_once __DIR__.'/intoDestination.php';
 /** Obtain the source account and subordinate ranges without trusting names in rsync's file list. */
 function pmssUserTransferBuildIdentityProbe(array $cfg): string
 {
-    $user = escapeshellarg($cfg['remoteUser']);
     $remote = 'uid=$(id -u); gid=$(id -g); printf "\\nPMSS_TRANSFER_IDENTITY_BEGIN uid=%s gid=%s\\n" "$uid" "$gid"; '
         .'for kind in uid gid; do file=/etc/sub$kind; test -r "$file" || exit 1; '
         .'case "$kind" in uid) primary=$uid ;; gid) primary=$gid ;; esac; '
-        .'awk -F: -v user='.$user.' -v primary="$primary" -v kind="$kind" '
+        .'awk -F: -v user='.escapeshellarg($cfg['remoteUser']).' -v primary="$primary" -v kind="$kind" '
         .escapeshellarg('$1 == user || $1 == primary { print "sub" kind "=" $2 ":" $3 }').' "$file"; done; '
         .'printf "PMSS_TRANSFER_IDENTITY_END\\n"';
-    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
+    return pmssUserTransferBuildSshProbeScript($cfg, $remote);
 }
 
 /** Reject malformed, duplicate, overlapping, or unrepresentable source ID declarations. */
@@ -83,25 +82,19 @@ function pmssUserTransferIdMap(array $sourceRanges, array $targetRanges, int $ta
         $previousEnd = $range[0] + $range[1];
     }
     $lines = ['0 '.$targetId.' 1'];
-    $targetIndex = 0;
-    $targetOffset = 0;
-    foreach ($sourceRanges as $source) {
-        $sourceStart = $source[0];
-        $left = $source[1];
+    // Consume the sorted target ranges directly; no separate cursor or offset.
+    foreach ($sourceRanges as [$sourceStart, $left]) {
         while ($left > 0) {
-            if (!isset($targetRanges[$targetIndex])) {
+            if (!isset($targetRanges[0])) {
                 throw new RuntimeException('Target subordinate ID allocation is too small', 1);
             }
-            $available = $targetRanges[$targetIndex][1] - $targetOffset;
-            $length = min($left, $available);
-            $lines[] = $sourceStart.' '.($targetRanges[$targetIndex][0] + $targetOffset).' '.$length;
+            $length = min($left, $targetRanges[0][1]);
+            $lines[] = $sourceStart.' '.($targetRanges[0][0] + 0).' '.$length;
             $sourceStart += $length;
             $left -= $length;
-            $targetOffset += $length;
-            if ($targetOffset === $targetRanges[$targetIndex][1]) {
-                $targetIndex++;
-                $targetOffset = 0;
-            }
+            $targetRanges[0][0] += $length;
+            $targetRanges[0][1] -= $length;
+            if ($targetRanges[0][1] == 0) array_shift($targetRanges);
         }
     }
     return implode("\n", $lines)."\n";
@@ -143,8 +136,7 @@ function pmssUserTransferBuildReceiver(array $cfg, string $rsync): string
 
     // Mounts are private before any remount. A bind of this home remains writable
     // while every other writable mount is made read-only inside the child view.
-    $home = escapeshellarg($receiver['home']);
-    $mount = 'home='.$home."\n"
+    $mount = 'home='.escapeshellarg($receiver['home'])."\n"
         .'[ "$(cat /proc/sys/fs/protected_symlinks)" = 1 ]' . "\n"
         .'[ "$(cat /proc/sys/fs/protected_hardlinks)" = 1 ]' . "\n"
         .'mount --make-rprivate /' . "\n"
