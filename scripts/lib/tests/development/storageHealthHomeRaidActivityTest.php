@@ -240,8 +240,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             $now,
             $this->psiPath()
         );
-        $this->assertStringContainsString('Home storage maintenance in progress', $raidHtml);
-        $this->assertStringNotContainsString('Shared storage is under heavy load', $raidHtml);
+        $this->assertStringContainsAndOmitsStrings(['Home storage maintenance in progress'], ['Shared storage is under heavy load'], $raidHtml);
 
         $pressureHtml = \pmssStorageHealthNoticeHtmlRead(
             $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/vda1 /home ext4 rw 0 0\n", 0700),

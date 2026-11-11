@@ -63,23 +63,22 @@ final class resourceStatsCliCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsString('scripts/lib/runtime/cli.php', 'function pmssRunCliProcessorEntrypoint(string $scriptPath, object $processor): void');
         $this->pmssAssertRepoFileContainsString('scripts/lib/stats/userStatsProcessor.php', 'function runCli(array $argv, string $scriptPath): int');
         foreach (['scripts/lib/resources/processor.php', 'scripts/lib/traffic/processor.php'] as $path) {
-            $this->pmssAssertRepoFileContainsString($path, 'extends PmssUserStatsProcessor');
-            $this->pmssAssertRepoFileNotContainsString($path, "preg_match('/^'.preg_quote(");
+            $this->pmssAssertRepoFileContainsAndOmitsStrings($path, ['extends PmssUserStatsProcessor'], ["preg_match('/^'.preg_quote("]);
         }
         $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/preflight.php', 'pmssPasswdEntryLookup($userName) !== null');
     }
 
     public function testStatsProcessorCliKeepsUserAndSpawnContracts(): void
     {
-        $processor = new ResourceStatsCliHarness(['alice'], ['alice', 'bob']);
+        $processor = new ResourceStatsCliHarness(['fixtur01'], ['fixtur01', 'fixtur02']);
 
         list($userRc, $userOutput) = $this->pmssCaptureStdout(function () use ($processor): int {
-            return $processor->runCli(['resourceStats.php', 'alice!'], '/scripts/cron/resourceStats.php');
+            return $processor->runCli(['resourceStats.php', 'fixtur01!'], '/scripts/cron/resourceStats.php');
         });
 
         $this->assertSame(0, $userRc);
         $this->assertSame('', $userOutput);
-        $this->assertEquals(['alice', ['month', 'week', 'day', 'hour', '15min']], $processor->processed);
+        $this->assertEquals(['fixtur01', ['month', 'week', 'day', 'hour', '15min']], $processor->processed);
         $this->assertEquals([], $processor->spawned);
 
         list($spawnRc, $spawnOutput) = $this->pmssCaptureStdout(function () use ($processor): int {
@@ -88,7 +87,7 @@ final class resourceStatsCliCharacterizationTest extends TestCase
 
         $this->assertSame(0, $spawnRc);
         $this->assertSame('', $spawnOutput);
-        $this->assertEquals(['/scripts/cron/resourceStats.php', ['alice', 'bob']], $processor->spawned);
+        $this->assertEquals(['/scripts/cron/resourceStats.php', ['fixtur01', 'fixtur02']], $processor->spawned);
     }
 
     public function testStatsProcessorCliKeepsInvalidUserOutput(): void
@@ -106,11 +105,11 @@ final class resourceStatsCliCharacterizationTest extends TestCase
     public function testStatsProcessorSpawnBuildsEscapedDetachedCommands(): void
     {
         $processor = new ResourceStatsSpawnHarness();
-        $processor->spawnWorkers('/tmp/worker script.php', ['alice', 'bob-localnet']);
+        $processor->spawnWorkers('/tmp/worker script.php', ['fixtur01', 'fixtur02-localnet']);
 
         $this->assertEquals([
-            'nohup '.escapeshellarg('/tmp/worker script.php').' '.escapeshellarg('alice').' >> '.escapeshellarg('/tmp/pmss stats.log').' 2>&1 &',
-            'nohup '.escapeshellarg('/tmp/worker script.php').' '.escapeshellarg('bob-localnet').' >> '.escapeshellarg('/tmp/pmss stats.log').' 2>&1 &',
+            'nohup '.escapeshellarg('/tmp/worker script.php').' '.escapeshellarg('fixtur01').' >> '.escapeshellarg('/tmp/pmss stats.log').' 2>&1 &',
+            'nohup '.escapeshellarg('/tmp/worker script.php').' '.escapeshellarg('fixtur02-localnet').' >> '.escapeshellarg('/tmp/pmss stats.log').' 2>&1 &',
         ], $processor->commands);
     }
 
@@ -119,7 +118,7 @@ final class resourceStatsCliCharacterizationTest extends TestCase
         $processor = new ResourceStatsSpawnHarness([7]);
 
         list(, $output) = $this->pmssCaptureStdout(function () use ($processor): void {
-            $processor->spawnWorkers('/tmp/worker.php', ['alice']);
+            $processor->spawnWorkers('/tmp/worker.php', ['fixtur01']);
         });
 
         $this->assertStringContainsString('Failed to start stats worker, rc=7', $output);
@@ -132,12 +131,10 @@ final class resourceStatsCliCharacterizationTest extends TestCase
             foreach ([[$path, '/tmp/stats.log'], ['/tmp/worker.php', $path]] as $paths) {
                 $processor = new ResourceStatsSpawnHarness([], $paths[1]);
                 list(, $output) = $this->pmssCaptureStdout(function () use ($processor, $paths): void {
-                    $processor->spawnWorkers($paths[0], ['alice']);
+                    $processor->spawnWorkers($paths[0], ['fixtur01']);
                 });
                 $this->assertSame([], $processor->commands);
-                $this->assertStringContainsString('NUL byte in script or log path', $output);
-                $this->assertFalse(strpos($output, 'secret') !== false);
-                $this->assertFalse(strpos($output, "\0") !== false);
+                $this->assertStringContainsAndOmitsStrings(['NUL byte in script or log path'], ['secret', "\0"], $output);
             }
         }
     }
@@ -146,22 +143,21 @@ final class resourceStatsCliCharacterizationTest extends TestCase
     {
         $processor = new ResourceStatsSpawnHarness();
         list(, $output) = $this->pmssCaptureStdout(function () use ($processor): void {
-            $processor->spawnWorkers('/tmp/worker.php', ['alice', "\0secret", "prefix\0secret", "suffix\0", 'bob-localnet']);
+            $processor->spawnWorkers('/tmp/worker.php', ['fixtur01', "\0secret", "prefix\0secret", "suffix\0", 'fixtur02-localnet']);
         });
         $this->assertSame([
-            "nohup '/tmp/worker.php' 'alice' >> '/tmp/pmss stats.log' 2>&1 &",
-            "nohup '/tmp/worker.php' 'bob-localnet' >> '/tmp/pmss stats.log' 2>&1 &",
+            "nohup '/tmp/worker.php' 'fixtur01' >> '/tmp/pmss stats.log' 2>&1 &",
+            "nohup '/tmp/worker.php' 'fixtur02-localnet' >> '/tmp/pmss stats.log' 2>&1 &",
         ], $processor->commands);
         $this->assertSame(3, substr_count($output, 'NUL byte in user argument'));
-        $this->assertFalse(strpos($output, 'secret') !== false);
-        $this->assertFalse(strpos($output, "\0") !== false);
+        $this->assertStringContainsAndOmitsStrings([], ['secret', "\0"], $output);
     }
 
     public function testStatsProcessorSpawnPreservesNonNulShellArguments(): void
     {
         $processor = new ResourceStatsSpawnHarness();
         $script = "/tmp/worker's script.php";
-        $users = ['', 'www-data', 'alice-localnet', "quoted'user", '$(false)', "line\nbreak"];
+        $users = ['', 'www-data', 'fixtur01-localnet', "quoted'user", '$(false)', "line\nbreak"];
         $processor->spawnWorkers($script, $users);
         $expected = [];
         foreach ($users as $user) {

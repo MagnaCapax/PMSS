@@ -42,8 +42,7 @@ final class TorrentClientsP6VenvTest extends TestCase
         $this->assertTrue(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', ['install' => $install]));
         $this->assertSame($root.'/deluge/2.1.1', $calls[0]);
         $this->assertSame('Deluge 2.1.1', $calls[1]);
-        $this->assertStringContainsString('--no-index --no-deps', $calls[2][0][1]);
-        $this->assertStringContainsString($root.'/wheels/'.$entry['wheels'][0]['file'], $calls[2][0][1]);
+        $this->assertStringContainsAllStrings(['--no-index --no-deps', $root.'/wheels/'.$entry['wheels'][0]['file']], $calls[2][0][1]);
         $this->assertFalse(is_link($calls[4]));
         $this->pmssAssertRepoFileContainsString('scripts/lib/torrentClients/delugeVenv.php', "'pmssPythonVenvInstallCli'");
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/pythonVenv.php', 'pmssPythonVenvEnsure($venvDir');

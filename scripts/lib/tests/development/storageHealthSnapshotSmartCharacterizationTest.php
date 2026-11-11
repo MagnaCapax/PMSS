@@ -13,8 +13,7 @@ final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
 
         $this->assertSame(75, $smart['lock_exit_code']);
         $this->assertSame(75, $nvme['lock_exit_code']);
-        $this->assertStringContainsString(" -xn -E 75 ", $smart['command']);
-        $this->assertStringContainsString('pmss-storage-smart-sda.lock', $smart['command']);
+        $this->assertStringContainsAllStrings([" -xn -E 75 ", 'pmss-storage-smart-sda.lock'], $smart['command']);
         $this->assertStringContainsString('pmss-storage-nvme-sda.lock', $nvme['command']);
         $this->assertTrue($smart['command'] !== $nvme['command']);
     }

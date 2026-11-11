@@ -165,9 +165,7 @@ class QbittorrentManagedConfigTest extends TestCase
         file_put_contents($path, $before."WebUI\\Port=23456\n");
         $this->assertTrue(pmssQbittorrentApplyUploadThrottle('fixtur01'));
         $updated = file_get_contents($path);
-        $this->assertStringContainsString("Session\\GlobalUPSpeedLimit=512\n", $updated);
-        $this->assertStringContainsString("WebUI\\Port=23456\n", $updated);
-        $this->assertStringNotContainsString('Connection\\GlobalUPLimit', $updated);
+        $this->assertStringContainsAndOmitsStrings(["Session\\GlobalUPSpeedLimit=512\n", "WebUI\\Port=23456\n"], ['Connection\\GlobalUPLimit'], $updated);
         $this->assertFalse(pmssQbittorrentUploadThrottleNeedsUpdate('fixtur01'));
         $this->assertFalse(pmssQbittorrentApplyUploadThrottle('fixtur01'));
     }
