@@ -8,8 +8,9 @@ class SkeletonWebLocalAssetTest extends TestCase
     public function testWelcomeAndInfoUseBundledScreenStylesheet(): void
     {
         foreach (['etc/skel/www/welcome.php', 'etc/skel/www/info.php'] as $path) {
-            $this->pmssAssertRepoFileContainsString($path, 'href="screen.css"', $path.' should load the bundled stylesheet.');
-            $this->pmssAssertRepoFileNotContainsString($path, 'static.pulsedmedia.com/wc/css/screen.css', $path.' should not depend on the retired static stylesheet host.');
+            $this->pmssAssertRepoFileContainsAndOmitsStrings($path,
+                ['href="screen.css"' => $path.' should load the bundled stylesheet.'],
+                ['static.pulsedmedia.com/wc/css/screen.css' => $path.' should not depend on the retired static stylesheet host.']);
         }
     }
 
@@ -42,7 +43,7 @@ class SkeletonWebLocalAssetTest extends TestCase
      */
     public function testWelcomeHomeStylesStayWithGuivDeliveredPage(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/welcome.php',
             [
                 'function pmssWelcomeHomeCss()',
@@ -59,7 +60,7 @@ class SkeletonWebLocalAssetTest extends TestCase
         // Compact density: the Welcome body keeps the 13px panel text size.
         $this->assertMatches(
             '/\.h-body\{[^}]*font:13px\/1\.45 /',
-            $this->pmssReadRepoFile('etc/skel/www/welcome.php'),
+            $source,
             'welcome.php must keep the compact 13px/1.45 body font on .h-body.'
         );
 

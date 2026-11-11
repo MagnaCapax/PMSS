@@ -16,18 +16,19 @@ class UpdateQuotasGuardTest extends TestCase
 
     public function testUpdateQuotasSkipsEmptyAndInvalidUsers(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/cron/updateQuotas.php', "pmssListManagedUsers('/scripts/listUsers.php')", 'updateQuotas.php must use the shared listUsers helper');
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/cron/updateQuotas.php',
+        $source = $this->pmssReadRepoFile('scripts/cron/updateQuotas.php');
+        $this->assertStringContainsString("pmssListManagedUsers('/scripts/listUsers.php')", $source, 'updateQuotas.php must use the shared listUsers helper');
+        $this->assertStringContainsAndOmitsStrings([],
             ['$thisUser = trim($thisUser);', "if (\$thisUser === '') {", "shell_exec('/scripts/listUsers.php')"],
+            $source,
             'updateQuotas.php should not keep redundant user filtering: '
         );
 
         // Quota handling must be split into safe PHP filesystem operations and a
         // single, quoted quota invocation. Snapshot writes must use the shared
         // same-dir replacer so refreshes never leave ~/.quota missing.
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/lib/quota/snapshotRefresh.php',
+        $source = $this->pmssReadRepoFile('scripts/lib/quota/snapshotRefresh.php');
+        $this->assertStringContainsAllStrings(
             [
                 '$quotaFile = "/home/{$thisUser}/.quota";',
                 "pmssReadRegularFileContents(\$quotaFile) ?? ''",
@@ -40,19 +41,17 @@ class UpdateQuotasGuardTest extends TestCase
                 'Disk quotas for user {$thisUser} (uid 0):',
                 '/dev/null      0K      0K      0K',
             ],
-            'updateQuotas.php should keep quota snapshot guard: '
+            $source, 'updateQuotas.php should keep quota snapshot guard: '
         );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/lib/quota/snapshotRefresh.php',
+        $this->assertStringContainsAndOmitsStrings([],
             ['strpos($realHome, $expectedHome) !== 0', 'unlink($quotaFile)', 'file_put_contents($quotaFile'],
-            'updateQuotas.php should keep safe quota snapshot writes, not: '
+            $source, 'updateQuotas.php should keep safe quota snapshot writes, not: '
         );
 
         // The quota binary itself must be invoked once with a safely quoted username.
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/lib/quota/snapshotRefresh.php',
+        $this->assertStringContainsAllStrings(
             ["'quota -u '.escapeshellarg(\$thisUser).' -v -s 2>&1'", 'escapeshellarg($thisUser)'],
-            'updateQuotas.php should keep quoted quota command: '
+            $source, 'updateQuotas.php should keep quoted quota command: '
         );
     }
 
@@ -60,24 +59,26 @@ class UpdateQuotasGuardTest extends TestCase
     {
         // Both live quota calls go through the bounded runner; a timeout is logged with the
         // account and the deadline, then stops the sweep without touching ~/.quota (GH #1183).
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/updateQuotas.php',
+        $cronSource = $this->pmssReadRepoFile('scripts/cron/updateQuotas.php');
+        $this->assertStringContainsAllStrings(
             [
                 'pmssLockHandleExportChildCloseFds($updateQuotasLock);',
                 "require_once __DIR__.'/../lib/quota/snapshotRefresh.php';",
                 'pmssQuotaSweepRun($users, static function (string $user) use ($logger): bool {',
                 "return pmssQuotaSnapshotRefreshUser(\$user, array(\$logger, 'msg'));",
             ],
-            'updateQuotas.php should bound and stop on hung quota calls: '
+            $cronSource, 'updateQuotas.php should bound and stop on hung quota calls: '
         );
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/quota/snapshotRefresh.php', [
+        $snapshotSource = $this->pmssReadRepoFile('scripts/lib/quota/snapshotRefresh.php');
+        $this->assertStringContainsAllStrings([
             '$quotaRun = pmssQuotaReportCapture($quotaCmd);',
             "\"quota command for {\$thisUser} exceeded its \".PMSS_QUOTA_REPORT_TIMEOUT_SECONDS.'s deadline and was killed'",
-        ]);
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/cron/updateQuotas.php', ['exec($quotaCmd'], 'updateQuotas.php should not run quota unbounded: ');
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/quota/snapshotRefresh.php', ['exec($quotaCmd'], 'Quota refresh should not run quota unbounded: ');
-        $this->pmssAssertRepoFileContainsString('scripts/lib/lighttpd/watchdogQuotaProbe.php', 'pmssQuotaReportCapture(escapeshellarg($quotaPath)');
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/lighttpd/watchdogQuotaProbe.php', ["pmssLighttpdWatchdogCommandCapture('quota'"], 'watchdog quota probe should not run quota unbounded: ');
+        ], $snapshotSource);
+        $this->assertStringContainsAndOmitsStrings([], ['exec($quotaCmd'], $cronSource, 'updateQuotas.php should not run quota unbounded: ');
+        $this->assertStringContainsAndOmitsStrings([], ['exec($quotaCmd'], $snapshotSource, 'Quota refresh should not run quota unbounded: ');
+        $probeSource = $this->pmssReadRepoFile('scripts/lib/lighttpd/watchdogQuotaProbe.php');
+        $this->assertStringContainsString('pmssQuotaReportCapture(escapeshellarg($quotaPath)', $probeSource);
+        $this->assertStringContainsAndOmitsStrings([], ["pmssLighttpdWatchdogCommandCapture('quota'"], $probeSource, 'watchdog quota probe should not run quota unbounded: ');
         $this->assertTrue(PMSS_QUOTA_REPORT_TIMEOUT_SECONDS + PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT < 60, 'A hung call must end well inside the one-minute cron cadence');
     }
 

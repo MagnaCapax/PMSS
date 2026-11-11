@@ -66,30 +66,27 @@ class SetupLetsEncryptTest extends TestCase
 
     public function testRequiresSharedHostnameValidationForLetsEncryptDomain(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupLetsEncrypt.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/setupLetsEncrypt.php', [
             "require_once __DIR__.'/../lib/runtime.php';",
             'pmssHostnameIsValid($domain, false)',
             "strpos(\$domain, '.') === false",
-        ]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/util/setupLetsEncrypt.php', 'userTransfer/cliParse.php');
+        ], ['userTransfer/cliParse.php']);
     }
 
     public function testCliDelegatesToSharedSetupLibraryWithoutShellExec(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupLetsEncrypt.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/setupLetsEncrypt.php', [
             "pmssRequireRelativeFiles(__DIR__.'/../lib', ['update/distro.php', 'certbotSetup.php']);",
             'pmssSetupLetsEncryptRun($domain, $email, $codename);',
-        ]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/util/setupLetsEncrypt.php', 'shell_exec(');
+        ], ['shell_exec(']);
     }
 
     public function testSharedSetupUsesCheckedCommandsAndPhpCronWrites(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/certbotSetup.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/certbotSetup.php', [
             'pmssCommandCapture($command)',
             'pmssAtomicWriteFile($cronPath, pmssSetupLetsEncryptRenewalCronContents(), 0644)',
-        ]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/certbotSetup.php', 'shell_exec(');
+        ], ['shell_exec(']);
     }
 
     public function testSharedSetupBuildsShellEscapedCertbotCommand(): void
@@ -300,12 +297,10 @@ class SetupLetsEncryptTest extends TestCase
         // `python3` (present on every PMSS-supported Debian release). `python`
         // is Python 2, absent on bookworm+; the `&&` chain made certbot renew
         // silently never run. See Refs #484 adversarial review supplement.
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/certbotSetup.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/certbotSetup.php', [
             "python3 -c 'import random; import time; time.sleep",
-        ]);
-        $this->pmssAssertRepoFileNotContainsString(
-            'scripts/lib/certbotSetup.php',
+        ], [
             "python -c 'import random; import time; time.sleep"
-        );
+        ]);
     }
 }

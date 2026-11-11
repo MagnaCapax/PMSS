@@ -31,14 +31,14 @@ class OpenvpnHelpersTest extends TestCase
 
     public function testConfigureOpenvpnSkipsWithoutPackagedEasyRsa(): void
     {
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/util/configureOpenvpn.php', [
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/configureOpenvpn.php', [], [
             'wget',
             'github.com/OpenVPN/easy-rsa',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/configureOpenvpn.php', [
+        $this->assertStringContainsAllStrings([
             'EasyRSA package not installed (expected from the dpkg baseline); skipping OpenVPN provisioning',
             'return;',
-        ]);
+        ], $source);
     }
 
     public function testConfigureOpenvpnValidatesHostnameBeforeHomeArtifacts(): void

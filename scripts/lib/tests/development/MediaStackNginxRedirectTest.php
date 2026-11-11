@@ -79,8 +79,6 @@ class MediaStackNginxRedirectTest extends TestCase
 
     public function testProxyParamsForwardOriginalScheme(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
-
-        $this->assertStringContainsString('proxy_set_header X-Forwarded-Proto $scheme;', $template);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.nginx-proxy_params', 'proxy_set_header X-Forwarded-Proto $scheme;');
     }
 }
