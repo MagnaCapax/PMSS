@@ -9,15 +9,18 @@ require_once __DIR__.'/../lib/rtorrentPortReservationsReconcile.php';
 function pmssRtorrentPortReservationsReconcileMain(): int
 {
     $homeHandle = is_dir('/home') && !is_link('/home') ? @opendir('/home') : false;
-    $passwd = pmssReadRegularFileContents('/etc/passwd');
-    if ($homeHandle === false || $passwd === null || preg_match('/(?:^|\n)root:[^:\n]*:/', $passwd) !== 1) {
+    try {
+        $passwd = pmssReadRegularFileContents('/etc/passwd');
+    } finally {
+        // The enumeration probe owns its directory even when the passwd read throws.
         if (is_resource($homeHandle)) {
             @closedir($homeHandle);
         }
+    }
+    if ($homeHandle === false || $passwd === null || preg_match('/(?:^|\n)root:[^:\n]*:/', $passwd) !== 1) {
         echo "{\"status\":\"skipped\",\"reason\":\"user_enumeration_unavailable\"}\n";
         return 0;
     }
-    @closedir($homeHandle);
 
     $result = pmssRtorrentPortReservationsReconcile(pmssManagedHomeUsersList(true));
     $level = $result['status'] === 'error' ? 'error' : ($result['status'] === 'skipped' ? 'warn' : 'info');

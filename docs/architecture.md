@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/cron/rtorrentPortReservationsReconcile.php** owns the home-directory
+  enumeration probe through `finally`, releasing it even when the passwd read
+  throws. Existing enumeration refusals, JSON output and exit codes remain intact.
+  `RtorrentReservationPreflightSafetyTest` covers cleanup and downstream ordering
+  with in-memory handles; execution stays on testing machines.
 - **scripts/lib/support/diagnostics.php** retains the support snapshot writer and
   original include. `identity.php` resolves account identity; `collect.php` builds
   diagnostics directly in the returned record. `mail.php` selects the transport,
