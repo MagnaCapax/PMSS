@@ -14,7 +14,7 @@ class ArrUpdateTest extends TestCase
         $installPath = $baseDir.'/install';
         $extractDir = 'PackageDir';
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'new']);
-        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $metadataPath = $this->writeMetadata($baseDir, [[basename($archivePath), $archivePath]]);
         $shimDir = $this->writeCurlShim($baseDir);
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
 
@@ -42,7 +42,7 @@ class ArrUpdateTest extends TestCase
         $installPath = $baseDir.'/install';
         $extractDir = 'ExpectedDir';
         $archivePath = $this->createArchive($baseDir, 'WrongDir', ['marker.txt' => 'replacement']);
-        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $metadataPath = $this->writeMetadata($baseDir, [[basename($archivePath), $archivePath]]);
         $shimDir = $this->writeCurlShim($baseDir);
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
 
@@ -68,7 +68,7 @@ class ArrUpdateTest extends TestCase
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-download-fail-');
         $app = 'PmssArrDownloadFail'.bin2hex(random_bytes(3));
         $installPath = $baseDir.'/install'; $shimDir = $this->writeCurlShim($baseDir);
-        $metadataPath = $this->writeMetadata($baseDir, 'bundle-1.2.3.tar.gz', $baseDir.'/missing.tar.gz');
+        $metadataPath = $this->writeMetadata($baseDir, [['bundle-1.2.3.tar.gz', $baseDir.'/missing.tar.gz']]);
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
         $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
 
@@ -92,7 +92,7 @@ class ArrUpdateTest extends TestCase
         $app = 'PmssArrArch'.bin2hex(random_bytes(3));
         $installPath = $baseDir.'/install';
         $extractDir = 'PackageDir';
-        $metadataPath = $this->writeMetadataForAssets($baseDir, [
+        $metadataPath = $this->writeMetadata($baseDir, [
             ['bundle-1.2.3-arm.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'arm'], 'bundle-1.2.3-arm.tar.gz')],
             ['bundle-1.2.3-arm64.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'arm64'], 'bundle-1.2.3-arm64.tar.gz')],
             ['bundle-1.2.3-x64.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'x64'], 'bundle-1.2.3-x64.tar.gz')],
@@ -118,7 +118,7 @@ class ArrUpdateTest extends TestCase
         $app = 'PmssArrArchFallback'.bin2hex(random_bytes(3));
         $installPath = $baseDir.'/install';
         $extractDir = 'PackageDir';
-        $metadataPath = $this->writeMetadataForAssets($baseDir, [
+        $metadataPath = $this->writeMetadata($baseDir, [
             ['bundle-1.2.3-arm.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'arm'], 'bundle-1.2.3-arm.tar.gz')],
             ['bundle-1.2.3.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'generic'])],
         ]);
@@ -218,7 +218,7 @@ class ArrUpdateTest extends TestCase
         $installPath = $baseDir.'/missing-parent/install';
         $extractDir = 'PackageDir';
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'new']);
-        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $metadataPath = $this->writeMetadata($baseDir, [[basename($archivePath), $archivePath]]);
         $shimDir = $this->writeCurlShim($baseDir);
 
         try {
@@ -240,7 +240,7 @@ class ArrUpdateTest extends TestCase
         $installPath = $baseDir.'/install';
         $extractDir = 'PackageDir';
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
-        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $metadataPath = $this->writeMetadata($baseDir, [[basename($archivePath), $archivePath]]);
         $shimDir = $this->writeCurlShim($baseDir);
         $probeLog = $baseDir.'/probe.log';
 
@@ -269,7 +269,7 @@ class ArrUpdateTest extends TestCase
         $app = 'PmssArrOwner'.bin2hex(random_bytes(3));
         $installPath = $baseDir.'/install';
         $archivePath = $this->createArchive($baseDir, 'PackageDir', ['marker.txt' => 'replacement']);
-        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $metadataPath = $this->writeMetadata($baseDir, [[basename($archivePath), $archivePath]]);
         $shimDir = $this->writeCurlShim($baseDir);
         $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
         $this->pmssWriteFile($installPath.'/version.txt', "1.2.3\n");
@@ -299,7 +299,7 @@ class ArrUpdateTest extends TestCase
         $installPath = $baseDir.'/install';
         $extractDir = 'PackageDir';
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
-        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $metadataPath = $this->writeMetadata($baseDir, [[basename($archivePath), $archivePath]]);
         $shimDir = $this->writeCurlShim($baseDir);
         $probeLog = $baseDir.'/probe.log';
 
@@ -351,23 +351,8 @@ class ArrUpdateTest extends TestCase
         ]);
     }
 
-    private function writeMetadata(string $baseDir, string $assetName, string $archivePath): string
-    {
-        $metadataPath = $baseDir.'/releases.json';
-        $this->pmssWriteFile($metadataPath, json_encode([
-            [
-                'assets' => [
-                    [
-                        'name' => $assetName,
-                        'browser_download_url' => 'file://'.$archivePath,
-                    ],
-                ],
-            ],
-        ]));
-        return $metadataPath;
-    }
-
-    private function writeMetadataForAssets(string $baseDir, array $assets): string
+    // One release encoder covers both single-asset failures and architecture selection.
+    private function writeMetadata(string $baseDir, array $assets): string
     {
         $metadataPath = $baseDir.'/releases.json';
         $payload = ['assets' => []];

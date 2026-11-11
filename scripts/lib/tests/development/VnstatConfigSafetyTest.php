@@ -8,7 +8,7 @@ class VnstatConfigSafetyTest extends TestCase
 {
     public function testRefreshKeepsSettingsAndMetadata(): void
     {
-        $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-vnstat-config-'), 'vnstat.conf',
+        $path = $this->pmssWriteTempFile('vnstat-config',
             "RateUnit 1\nMaxBandwidth 1000\nBandwidthDetection 1\nForeign yes\n");
         chmod($path, 0640);
         $messages = [];
@@ -25,7 +25,7 @@ class VnstatConfigSafetyTest extends TestCase
 
     public function testAbsentSettingsUseLegacyAppendShape(): void
     {
-        $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-vnstat-append-'), 'vnstat.conf', "Foreign yes\n");
+        $path = $this->pmssWriteTempFile('vnstat-append', "Foreign yes\n");
         $this->assertTrue(\pmssVnstatConfigRefresh($path, static function (string $message): void {}));
         $this->assertSame("Foreign yes\n\nMaxBandwidth 50000\n\nBandwidthDetection 0\n", file_get_contents($path));
     }
@@ -47,7 +47,7 @@ class VnstatConfigSafetyTest extends TestCase
     public function testFailedReplacementPreservesExistingConfig(): void
     {
         $original = "RateUnit 1\n";
-        $path = $this->pmssWriteRelativeFile($this->pmssMakeTempDir('pmss-vnstat-write-'), 'vnstat.conf', $original);
+        $path = $this->pmssWriteTempFile('vnstat-write', $original);
         $messages = [];
         $this->assertFalse(\pmssVnstatConfigRefresh($path, $this->pmssMakeArrayLogger($messages), self::pmssMakeCallbacks(['write' => false])['write']));
         $this->assertSame($original, file_get_contents($path));

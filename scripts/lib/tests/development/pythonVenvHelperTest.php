@@ -64,10 +64,9 @@ class PythonVenvHelperTest extends TestCase
         $venvDir = $this->pmssMakeTempDir('pmss-python-venv-missing-cli-');
         $this->pmssWriteExecutableFile($venvDir.'/bin/python', "#!/bin/sh\nexit 0\n");
         $stubPath = $this->pmssMakeExecutableStub('python3', "#!/bin/sh\nexit 0\n", 'pmss-python-path-');
-        $pythonPath = $this->pmssPathPrefixedEnvironment($stubPath)['PATH'];
         $linkPath = $this->pmssMakeTempFile('pmss-flexget-link-');
 
-        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $linkPath): void {
+        $this->pmssWithPathPrefix($stubPath, function () use (&$messages, $venvDir, $linkPath): void {
             \pmssPythonVenvInstallCli(
                 $venvDir,
                 'FlexGet',
@@ -89,13 +88,12 @@ class PythonVenvHelperTest extends TestCase
         $venvDir = $this->pmssMakeTempDir('pmss-python-venv-link-cli-');
         $this->pmssWriteExecutableFile($venvDir.'/bin/python', "#!/bin/sh\nexit 0\n");
         $stubPath = $this->pmssMakeExecutableStub('python3', "#!/bin/sh\nexit 0\n", 'pmss-python-path-');
-        $pythonPath = $this->pmssPathPrefixedEnvironment($stubPath)['PATH'];
         $cliBin = $venvDir.'/bin/pyload';
         $linkPath = $this->pmssMakeTempDir('pmss-python-link-dir-').'/pyload';
         $this->pmssWriteExecutableFile($cliBin, "#!/bin/sh\nexit 0\n");
         $this->pmssResetRuntimeProfile();
 
-        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
+        $this->pmssWithPathPrefix($stubPath, function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
             \pmssPythonVenvInstallCli(
                 $venvDir,
                 'pyLoad',
@@ -126,9 +124,8 @@ class PythonVenvHelperTest extends TestCase
         $this->pmssWriteExecutableFile($cliBin, "#!/bin/sh\nexit 0\n");
         $linkPath = $venvDir.'/missing-parent/pyload';
         $stubPath = $this->pmssMakeExecutableStub('python3', "#!/bin/sh\nexit 0\n", 'pmss-python-path-');
-        $pythonPath = $this->pmssPathPrefixedEnvironment($stubPath)['PATH'];
 
-        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
+        $this->pmssWithPathPrefix($stubPath, function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
             \pmssPythonVenvInstallCli(
                 $venvDir, 'pyLoad', [['Installing pyLoad', 'pyload-ng']], $cliBin, $linkPath,
                 '[WARN] pyLoad setup: python3 missing', '[WARN] pyLoad binary missing after install',
@@ -150,10 +147,9 @@ class PythonVenvHelperTest extends TestCase
         ]);
         $linkPath = $this->pmssMakeTempDir('pmss-python-failed-link-').'/pyload';
         $stubPath = $this->pmssMakeExecutableStub('python3', "#!/bin/sh\nexit 0\n", 'pmss-python-path-');
-        $pythonPath = $this->pmssPathPrefixedEnvironment($stubPath)['PATH'];
         $this->pmssResetRuntimeProfile();
 
-        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $linkPath): void {
+        $this->pmssWithPathPrefix($stubPath, function () use (&$messages, $venvDir, $linkPath): void {
             \pmssPythonVenvInstallCli(
                 $venvDir,
                 'pyLoad',
@@ -182,10 +178,9 @@ class PythonVenvHelperTest extends TestCase
         ]);
         $linkPath = $this->pmssMakeTempDir('pmss-python-tooling-link-').'/pyload';
         $stubPath = $this->pmssMakeExecutableStub('python3', "#!/bin/sh\nexit 0\n", 'pmss-python-path-');
-        $pythonPath = $this->pmssPathPrefixedEnvironment($stubPath)['PATH'];
         $this->pmssResetRuntimeProfile();
 
-        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $linkPath): void {
+        $this->pmssWithPathPrefix($stubPath, function () use (&$messages, $venvDir, $linkPath): void {
             \pmssPythonVenvInstallCli(
                 $venvDir,
                 'pyLoad',

@@ -6,21 +6,13 @@ require_once dirname(__DIR__, 2).'/update/filesystem.php';
 
 class HomeInodeDensityTest extends TestCase
 {
-    private function runHomeInodeDensityCheck(string $home, ?string $binDir = null): array
+    private function runHomeInodeDensityCheck(string $home, string $binDir): array
     {
-        $messages = [];
-        $callback = function () use (&$messages, $home): void {
-            $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($home): void {
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($home, $binDir): void {
+            $this->pmssWithPathPrefix($binDir, static function () use ($logger, $home): void {
                 \pmssHomeInodeDensityCheck($logger, $home, 262144);
             });
-        };
-
-        if ($binDir === null) {
-            $callback();
-        } else {
-            $this->pmssWithPathPrefix($binDir, $callback);
-        }
-        return $messages;
+        });
     }
 
     public function testParsesStatLineAndComputesBytesPerInode(): void
@@ -130,7 +122,9 @@ class HomeInodeDensityTest extends TestCase
 
     public function testSkipsWhenHomePathIsMissing(): void
     {
-        $messages = $this->runHomeInodeDensityCheck('/tmp/pmss-missing-home-path');
+        $messages = $this->pmssArrayLoggerMessages(static function (callable $logger): void {
+            \pmssHomeInodeDensityCheck($logger, '/tmp/pmss-missing-home-path', 262144);
+        });
 
         $this->pmssAssertMessagesContain($messages, 'path missing');
     }
