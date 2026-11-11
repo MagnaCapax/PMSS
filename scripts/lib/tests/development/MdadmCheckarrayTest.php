@@ -92,7 +92,7 @@ class MdadmCheckarrayTest extends TestCase
             foreach ([['md0', 'md12'], []] as $arrays) {
                 $this->assertSame(0, \pmssMdadmCheckarrayRunCommand($stub, $arrays));
             }
-            $this->assertSame("--idle --quiet md0 md12\n--idle --quiet --all\n", $this->readStubLog());
+            $this->assertSame("--idle --quiet md0 md12\n--idle --quiet --all\n", $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
         });
     }
 
@@ -111,7 +111,7 @@ class MdadmCheckarrayTest extends TestCase
             });
             $this->assertFalse(file_exists(dirname($path)), 'Invalid state paths must not create parents');
         }
-        $this->assertSame(str_repeat("--idle --quiet md0\n", 5), $this->readStubLog());
+        $this->assertSame(str_repeat("--idle --quiet md0\n", 5), $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
     }
 
     public function testPlanFallsBackToAllWhenMdstatIsUnreadable(): void
@@ -160,7 +160,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('skipping md0 (state unknown)', $result['output']);
-        $this->assertSame('', $this->readStubLog());
+        $this->assertSame('', $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
     }
 
     public function testMainChecksHealthyArraysAndSkipsDegradedOnes(): void
@@ -178,7 +178,7 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsAllStrings(['skipping md1 (degraded); requested sync_action=idle',
             'checking non-degraded arrays: md0'], $result['output']);
-        $this->assertSame("--idle --quiet md0\n", $this->readStubLog());
+        $this->assertSame("--idle --quiet md0\n", $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
         $this->assertSame("idle\n", (string) file_get_contents($syncTarget));
     }
 
@@ -190,7 +190,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('preserving checkarray --all behavior', $result['output']);
-        $this->assertSame("--idle --quiet --all\n", $this->readStubLog());
+        $this->assertSame("--idle --quiet --all\n", $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
         $this->assertTrue(is_file($this->fixtureRoot.'/state/mdadm-checkarray-last'));
     }
 
@@ -215,7 +215,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('skipping: last check '.date('c', $lastStarted).' is within the 365-day host minimum', $result['output']);
-        $this->assertSame('', $this->readStubLog());
+        $this->assertSame('', $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
     }
 
     public function testMainRecordsFirstCheckWithHostMinimum(): void
@@ -227,7 +227,7 @@ class MdadmCheckarrayTest extends TestCase
         $result = $this->runCommand($mdstat, $this->writeCheckarrayStub());
 
         $this->assertSame(0, $result['rc']);
-        $this->assertSame("--idle --quiet md0\n", $this->readStubLog());
+        $this->assertSame("--idle --quiet md0\n", $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
         $lastStarted = (int) trim((string) file_get_contents($this->fixtureRoot.'/state/mdadm-checkarray-last'));
         $this->assertTrue($lastStarted >= $before && $lastStarted <= time());
     }
@@ -241,7 +241,7 @@ class MdadmCheckarrayTest extends TestCase
         $result = $this->runCommand($mdstat, $this->writeCheckarrayStub());
 
         $this->assertSame(0, $result['rc']);
-        $this->assertSame("--idle --quiet md0\n", $this->readStubLog());
+        $this->assertSame("--idle --quiet md0\n", $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
     }
 
     public function testFailedCheckDoesNotAdvanceState(): void
@@ -263,7 +263,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('unable to write last-check state', $result['output']);
-        $this->assertSame("--idle --quiet md0\n", $this->readStubLog());
+        $this->assertSame("--idle --quiet md0\n", $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
     }
 
     public function testIdleRequestRequiresCompleteWrite(): void
@@ -284,11 +284,9 @@ class MdadmCheckarrayTest extends TestCase
 
     public function testRootCronUsesGuardWithoutChangingQuarterlyGate(): void
     {
-        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
-
-        $this->assertStringContainsAllStrings(['/scripts/cron/mdadmCheckarray.php', '[ $(date +\%d) -le 7 ]',
-            '$(($(date +\%-m) \% 3)) -eq $((H \% 3))'], $cron);
-        $this->assertStringNotContainsString('/usr/share/mdadm/checkarray'.' --cron --all', $cron);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/root.cron',
+            ['/scripts/cron/mdadmCheckarray.php', '[ $(date +\%d) -le 7 ]',
+                '$(($(date +\%-m) \% 3)) -eq $((H \% 3))'], ['/usr/share/mdadm/checkarray'.' --cron --all']);
     }
 
     private function writeCheckarrayStub(int $exitCode = 0): string
@@ -297,12 +295,6 @@ class MdadmCheckarrayTest extends TestCase
         $body = "#!/usr/bin/env bash\nprintf '%s\\n' \"\$*\" >> \"\$PMSS_MDADM_CHECKARRAY_STUB_LOG\"\nexit ".$exitCode."\n";
         $this->pmssWriteExecutableFile($path, $body);
         return $path;
-    }
-
-    private function readStubLog(): string
-    {
-        $path = $this->fixtureRoot.'/checkarray.log';
-        return is_file($path) ? (string) file_get_contents($path) : '';
     }
 
     /** @return array{rc:int,output:string,lines:array<int,string>} */

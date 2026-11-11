@@ -423,22 +423,18 @@ PHP;
 
     public function testWatchdogCleanupUsesManagedPidsAndPreservesSignals(): void
     {
-        $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/processLifecycle.php');
-        $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/processLifecycle.php', [
             'function rtorrentProcessKillManagedPids(',
             "pmssUserWatchdogProcessPids(\$user, '^rtorrent')",
             "rtorrentProcessExecutorPids(\$user)['all']",
             'rtorrentProcessKillPids($managedPids, $signal);',
-        ], $processSource);
-        $this->assertStringContainsAllStrings([
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkRtorrent.php', [
             'rtorrentProcessKillManagedPids($user, SIGKILL)',
             'rtorrentProcessKillManagedPids($user, SIGTERM)',
             'cleanup signal requested (signal=KILL',
             'cleanup signal requested (signal=TERM',
-        ], $watchdogSource);
-        $this->pmssAssertStringNotContainsString('killall', $watchdogSource);
+        ], ['killall']);
     }
 
     public function testRestartMarkerLivesWithRootOwnedWatchdogState(): void

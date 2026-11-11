@@ -31,8 +31,7 @@ final class WelcomeServerInfoTest extends TestCase
             [],
             '2>&1'
         );
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
-        $this->pmssAssertStringNotContainsString('Warning', $output);
+        $this->assertStringContainsAndOmitsStrings([], ['Undefined', 'Warning'], $output);
         return $this->pmssDecodeJsonArray($output);
     }
 
@@ -58,8 +57,7 @@ final class WelcomeServerInfoTest extends TestCase
     {
         list($html) = $this->renderServerMetrics(array($this->pmssWriteTempFile('uptime', "1 1\n").'.missing'));
 
-        $this->assertStringContainsAllStrings(array('<div class="h-metric-v">—</div>', 'uptime unavailable'), $html);
-        $this->pmssAssertStringNotContainsString('shared server', $html);
+        $this->assertStringContainsAndOmitsStrings(array('<div class="h-metric-v">—</div>', 'uptime unavailable'), array('shared server'), $html);
     }
 
     public function testInvalidUptimeInputsFailSoft(): void

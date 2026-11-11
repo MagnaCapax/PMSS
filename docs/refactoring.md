@@ -659,6 +659,8 @@ overrides and output assertions at the scenario; fixture trees compose the
 existing temporary-directory and checked-publication helpers directly.
 Error-page contracts likewise call the shared assertion reader directly;
 nginx failure events and single-use archive inspections stay with their scenarios.
+RAID scrub fixtures read optional command logs through `pmssReadFileOrEmpty()`
+directly, preserving the empty-string fallback without a local forwarding method.
 App-profile observations and discarded rTorrent logs use the fixed-result
 callback factory, retaining argument-dependent and recording callbacks explicitly.
 

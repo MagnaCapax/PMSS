@@ -92,11 +92,10 @@ class BootDefaultsEnsureTest extends TestCase
 
         \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
         $updatedGrub = (string) file_get_contents($grub);
-        $this->assertStringContainsAllStrings([
+        $this->assertStringContainsAndOmitsStrings([
             'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"',
             'GRUB_CMDLINE_LINUX="text '.$option.'"',
-        ], $updatedGrub);
-        $this->assertStringNotContainsString($option.$duplicateQuote, $updatedGrub);
+        ], [$option.$duplicateQuote], $updatedGrub);
 
         \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
         $this->assertSame($updatedGrub, (string) file_get_contents($grub));
