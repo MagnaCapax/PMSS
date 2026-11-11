@@ -28,8 +28,7 @@ final class RcloneInstallerTest extends TestCase
         $this->assertMatches("~\Awget '-q' '-O' '([^']+)' 'https://downloads\.rclone\.org/v1\.69\.1/rclone-v1\.69\.1-linux-amd64\.zip'\z~", $commands[0]);
         preg_match("~'-O' '([^']+)'~", $commands[0], $download);
         $install = (string) $this->pmssFindProfileCommand('Installing rclone 1.69.1');
-        $this->assertStringContainsString("unzip '-q' '".$download[1]."'", $install);
-        $this->assertStringContainsString("install '-m' '0755' '-o' 'root' '-g' 'root' 'rclone' '/usr/bin/rclone'", $install);
-        $this->assertStringNotContainsString('wget', $install);
+        $this->assertStringContainsAndOmitsStrings(["unzip '-q' '".$download[1]."'",
+            "install '-m' '0755' '-o' 'root' '-g' 'root' 'rclone' '/usr/bin/rclone'"], ['wget'], $install);
     }
 }

@@ -37,8 +37,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ], ['root', '--apply', '--dry-run', '--mem-profile=streaming']);
 
-        $this->assertStringContainsString('MemoryHigh=1536M', $output);
-        $this->assertStringContainsString('MemoryMax=', $output);
+        $this->assertStringContainsAllStrings(['MemoryHigh=1536M', 'MemoryMax='], $output);
     }
 
     public function testBuiltInProfileStillWorksWithoutPolicyFamily(): void

@@ -80,8 +80,7 @@ class MotdRenderTest extends TestCase
 
         $out = \Motd::renderMotdTemplate($tpl, $model, false);
         $this->pmssAssertStringNotContainsString('Runtime Version:', $out, 'Legacy runtime version line should be removed');
-        $this->assertStringContainsString("Hello\n", $out);
-        $this->assertStringContainsString("\nWorld\n", $out);
+        $this->assertStringContainsAllStrings(["Hello\n", "\nWorld\n"], $out);
     }
 
     public function testRenderMotdTemplateAppliesColorToggleForBasics(): void

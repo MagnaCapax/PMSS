@@ -16,8 +16,7 @@ final class TorrentClientsP3ProxyTest extends TestCase
     public function testUnselectedRouteRendersEmpty(): void
     {
         $config = $this->render(false);
-        $this->assertFalse(strpos($config, 'transmission.sock') !== false);
-        $this->assertFalse(strpos($config, '##PMSS_TRANSMISSION_PROXY##') !== false);
+        $this->assertStringContainsAndOmitsStrings([], ['transmission.sock', '##PMSS_TRANSMISSION_PROXY##'], $config);
     }
 
     public function testSelectedRoutePrecedesCustomIncludes(): void
@@ -25,8 +24,7 @@ final class TorrentClientsP3ProxyTest extends TestCase
         $config = $this->render(true);
         $this->assertOrderedStrings(['$HTTP["url"] =~ "^/user-fixtur01/transmission/"',
             'include "/home/fixtur01/.lighttpd/custom.d/*.conf"'], $config);
-        $this->assertStringContainsString('"socket" => "/home/fixtur01/.lighttpd/transmission.sock"', $config);
-        $this->assertStringContainsString('"/user-fixtur01/" =>', $config);
+        $this->assertStringContainsAllStrings(['"socket" => "/home/fixtur01/.lighttpd/transmission.sock"', '"/user-fixtur01/" =>'], $config);
     }
 
     public function testSelectionNeedsPublishedCapabilityWithoutHostSetup(): void

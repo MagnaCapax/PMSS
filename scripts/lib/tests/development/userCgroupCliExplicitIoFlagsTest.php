@@ -28,8 +28,7 @@ class UserCgroupCliExplicitIoFlagsTest extends TestCase
     public function testCombinedIoFlags(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--io-read-bw=/dev/sda:1M', '--io-write-iops=/dev/sda:9']);
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/sda 1M', $out);
-        $this->assertStringContainsString('IOWriteIOPSMax=/dev/sda 9', $out);
+        $this->assertStringContainsAllStrings(['IOReadBandwidthMax=/dev/sda 1M', 'IOWriteIOPSMax=/dev/sda 9'], $out);
     }
 
     public function testExplicitIoFlagsKeepCanonicalPropertyOrder(): void

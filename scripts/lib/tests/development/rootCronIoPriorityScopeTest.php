@@ -29,8 +29,7 @@ class RootCronIoPriorityScopeTest extends TestCase
             $this->assertTrue(isset($lines[$name]), "root.cron should still schedule {$name}");
             foreach ($lines[$name] as $line) {
                 // Shape only; what each filter lets through is checked by running it below.
-                $this->assertStringContainsString("ps -o pid=,uid= -C {$name} | awk '", $line);
-                $this->assertStringContainsString("|xargs -I'{1}' ", $line);
+                $this->assertStringContainsAllStrings(["ps -o pid=,uid= -C {$name} | awk '", "|xargs -I'{1}' "], $line);
             }
         }
     }
