@@ -38,20 +38,21 @@ function pmssCreatePrivateTempDir(string $prefix): ?string
     if (!pmssPrivateTempPrefixIsSafe($prefix)) { logMessage('[WARN] Refusing private temporary directory with unsafe prefix'); return null; }
     $path = pmssCreatePrivateTempFile($prefix);
     if ($path === null) return null;
-    if (!@unlink($path) || !@mkdir($path, 0700)) {
-        if (pmssRegularFilePathIsReadable($path)) @unlink($path);
-        return null;
-    }
+    $directoryCreated = false;
     $retained = false;
     try {
+        if (!@unlink($path) || !($directoryCreated = @mkdir($path, 0700))) return null;
         // Do not hand a caller a workspace whose private mode could not be set.
         if (is_link($path) || !@chmod($path, 0700)) return null;
         if (pmssPrivateTempDirRealpath($path, $prefix) === null) return null;
         $retained = true;
         return $path;
     } finally {
-        // rmdir remains non-recursive: never remove contents placed by another actor.
-        if (!$retained) @rmdir($path);
+        if (!$retained) {
+            // Only our successful mkdir authorizes non-recursive empty-directory cleanup.
+            if ($directoryCreated) @rmdir($path);
+            elseif (pmssRegularFilePathIsReadable($path)) @unlink($path);
+        }
     }
 }
 

@@ -405,6 +405,13 @@ Private temporary directory creation returns a path only after its 0700 mode
 has been applied. A failed chmod or replaced symlink returns `null` and attempts
 to remove the newly created directory; successful callers retain the same path
 and private permissions, including under a restrictive process umask.
+Its cleanup lifetime also covers the initial file unlink and directory creation:
+conversion exceptions and errors attempt the existing guarded file removal.
+Only a successful `mkdir()` authorizes empty-directory cleanup, so a failed
+conversion never removes another actor's directory. Ordinary results, modes and
+operation order remain unchanged; later cleanup faults retain PHP's normal
+throwable precedence. `PrivateTempAcquisitionSafetyTest` covers these cases with
+memory-only operations on the testing machine.
 
 For any optimization/refactor touching existing CLI/API output, follow this
 minimal loop before merge:

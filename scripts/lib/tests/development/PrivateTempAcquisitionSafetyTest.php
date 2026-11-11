@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../runtime/filesystem.php';
 
-/** Exercise runtime/filesystemTemp.php acquisition with memory-only filesystem faults. */
+/** Exercise scripts/lib/runtime/filesystemTemp.php acquisition with memory-only filesystem faults. */
 class PrivateTempAcquisitionSafetyTest extends TestCase
 {
     private function observe(array $cases): array
@@ -12,7 +12,12 @@ class PrivateTempAcquisitionSafetyTest extends TestCase
         $script = <<<'PHP'
 namespace PrivateTempAcquisitionFixture;
 function operation($name) {
+    $GLOBALS['calls'][$name] = ($GLOBALS['calls'][$name] ?? 0) + 1;
+    if ($name === 'unlink' && $GLOBALS['calls'][$name] === 2 && $GLOBALS['cleanupFailure'] !== null) {
+        throw $GLOBALS['cleanupFailure'];
+    }
     if ($name !== ($GLOBALS['case']['stage'] ?? null)) return true;
+    if (($GLOBALS['case']['once'] ?? false) && $GLOBALS['calls'][$name] > 1) return true;
     if ($GLOBALS['failure'] !== null) throw $GLOBALS['failure'];
     return false;
 }
@@ -37,6 +42,7 @@ function unlink($path) {
 }
 function mkdir($path, $mode) {
     $GLOBALS['modes']['mkdir'] = $mode;
+    if ($GLOBALS['case']['foreignDirectory'] ?? false) $GLOBALS['node'] = 'foreign-directory';
     if (!operation('mkdir')) return false;
     $GLOBALS['node'] = 'directory';
     return true;
@@ -55,14 +61,16 @@ foreach ($cases as $case) {
     $GLOBALS['case'] = $case;
     $GLOBALS['failure'] = ($case['fault'] ?? '') === 'exception' ? new \RuntimeException('acquisition fault')
         : (($case['fault'] ?? '') === 'error' ? new \Error('acquisition fault') : null);
-    $GLOBALS['node'] = null; $GLOBALS['cleanup'] = $GLOBALS['modes'] = [];
+    $cleanupClass = $case['cleanupFault'] ?? null;
+    $GLOBALS['cleanupFailure'] = $cleanupClass !== null ? new $cleanupClass('cleanup fault') : null;
+    $GLOBALS['node'] = null; $GLOBALS['cleanup'] = $GLOBALS['modes'] = $GLOBALS['calls'] = [];
     $result = $caught = null;
     try {
         $result = ($case['kind'] ?? 'file') === 'file'
             ? pmssCreatePrivateTempFile('pmss-temp-') : pmssCreatePrivateTempDir('pmss-temp-');
     } catch (\Throwable $error) { $caught = $error; }
     $rows[] = [$result, $GLOBALS['node'], $GLOBALS['cleanup'], $GLOBALS['modes'],
-        $caught === null ? null : get_class($caught), $caught === $GLOBALS['failure']];
+        $caught === null ? null : get_class($caught), $caught === ($GLOBALS['cleanupFailure'] ?? $GLOBALS['failure'])];
 }
 echo json_encode($rows);
 PHP;
@@ -115,6 +123,40 @@ PHP;
             foreach (['exception' => 'RuntimeException', 'error' => 'Error'] as $fault => $class) {
                 $this->assertSame([[null, null, ['unlink', 'rmdir'], ['mkdir' => 0700, 'chmod' => 0700], $class, true]],
                     $this->observe([['kind' => 'directory', 'stage' => $stage, 'fault' => $fault]]));
+            }
+        }
+    }
+
+    public function testDirectoryConversionThrowablesKeepGuardedCleanup(): void
+    {
+        foreach (['exception' => 'RuntimeException', 'error' => 'Error'] as $fault => $class) {
+            $cases = [
+                ['stage' => 'unlink', 'once' => true],
+                ['stage' => 'unlink', 'cleanupAllowed' => false],
+                ['stage' => 'mkdir'],
+                ['stage' => 'mkdir', 'foreignDirectory' => true],
+            ];
+            $this->assertSame([
+                [null, null, ['unlink', 'unlink'], [], $class, true],
+                [null, 'file', ['unlink'], [], $class, true],
+                [null, null, ['unlink'], ['mkdir' => 0700], $class, true],
+                [null, 'foreign-directory', ['unlink'], ['mkdir' => 0700], $class, true],
+            ], $this->observe(array_map(static function (array $case) use ($fault): array {
+                return $case + ['kind' => 'directory', 'fault' => $fault];
+            }, $cases)));
+        }
+        // Failed mkdir must never authorize removal of another actor's directory.
+        $this->assertSame([[null, 'foreign-directory', ['unlink'], ['mkdir' => 0700], null, true]],
+            $this->observe([['kind' => 'directory', 'stage' => 'mkdir', 'foreignDirectory' => true]]));
+    }
+
+    public function testDirectoryConversionCleanupFaultUsesNormalThrowablePrecedence(): void
+    {
+        foreach (['exception', 'error'] as $fault) {
+            foreach (['RuntimeException', 'Error'] as $cleanupFault) {
+                $this->assertSame([[null, 'file', ['unlink', 'unlink'], [], $cleanupFault, true]],
+                    $this->observe([['kind' => 'directory', 'stage' => 'unlink', 'fault' => $fault,
+                        'cleanupFault' => $cleanupFault]]));
             }
         }
     }
