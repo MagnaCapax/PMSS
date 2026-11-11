@@ -78,8 +78,12 @@ function pmssAiToolsCodexInstall(bool $force, bool $dryRun, bool $supportsPinned
             ) !== true) return;
         } finally {
             if ($downloadDir !== '') {
-                @unlink($downloadDir.'/codex-x86_64-unknown-linux-musl');
-                @rmdir($downloadDir);
+                try {
+                    @unlink($downloadDir.'/codex-x86_64-unknown-linux-musl');
+                } finally {
+                    // A file cleanup throwable must not skip the empty-directory attempt.
+                    @rmdir($downloadDir);
+                }
             }
         }
     }

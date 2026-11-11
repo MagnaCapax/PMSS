@@ -2,7 +2,14 @@
 namespace PMSS\Tests\AiToolsStagesFixture;
 
 /** All stage effects are observations; these functions never reach installed tools. */
-function event(string $kind, ...$values): void { $GLOBALS['pmssAiStages']['events'][] = array_merge([$kind], $values); }
+function event(string $kind, ...$values): void
+{
+    $GLOBALS['pmssAiStages']['events'][] = array_merge([$kind], $values);
+    if (in_array($kind, ['unlink', 'rmdir'], true)
+        && isset($GLOBALS['pmssAiStages']['cleanupFaults'][$values[0]])) {
+        throw $GLOBALS['pmssAiStages']['cleanupFaults'][$values[0]];
+    }
+}
 function is_dir(string $path): bool { return $GLOBALS['pmssAiStages']['directory'] ?? false; }
 function is_file(string $path): bool { return $GLOBALS['pmssAiStages']['files'][$path] ?? true; }
 function is_link(string $path): bool { return $GLOBALS['pmssAiStages']['links'][$path] ?? false; }
@@ -42,8 +49,8 @@ function php_uname(string $mode): string { return $GLOBALS['pmssAiStages']['kern
 function pmssCreatePrivateTempDir(string $prefix): ?string { event('allocate', $prefix); return array_key_exists('downloadDir', $GLOBALS['pmssAiStages']) ? $GLOBALS['pmssAiStages']['downloadDir'] : '/fixture/download'; }
 function tempnam(string $directory, string $prefix) { event('temporary', $directory, $prefix); return $GLOBALS['pmssAiStages']['temporary'] ?? $directory.'/.pmss-fixture'; }
 function rename(string $source, string $destination): bool { event('rename', $source, $destination); return $GLOBALS['pmssAiStages']['rename'] ?? true; }
-function unlink(string $path): bool { event('unlink', $path); return true; }
-function rmdir(string $path): bool { event('rmdir', $path); return true; }
+function unlink(string $path): bool { event('unlink', $path); return empty($GLOBALS['pmssAiStages']['cleanupFalse']['unlink']); }
+function rmdir(string $path): bool { event('rmdir', $path); return empty($GLOBALS['pmssAiStages']['cleanupFalse']['rmdir']); }
 
 namespace PMSS\Tests;
 
@@ -250,6 +257,47 @@ class AiToolsInstallerStagesCharacterizationTest extends TestCase
             ['unlink', '/fixture/download/codex-x86_64-unknown-linux-musl']], $this->events('unlink'));
         $this->assertSame([['rmdir', '/fixture/download']], $this->events('rmdir'));
         $this->assertSame([], $this->events('publish'));
+    }
+
+    public function testCodexCleanupThrowablesAttemptEveryStageBeforePropagating(): void
+    {
+        $cleanup = [
+            ['unlink', '/opt/pmss/ai-tools/codex/.pmss-fixture'],
+            ['unlink', '/fixture/download/codex-x86_64-unknown-linux-musl'],
+            ['rmdir', '/fixture/download'],
+        ];
+        foreach (['RuntimeException', 'Error'] as $type) {
+            foreach ([[0], [1], [2], [0, 1], [0, 2], [1, 2], [0, 1, 2]] as $stages) {
+                foreach ([false, true] as $installFails) {
+                    $faults = [];
+                    foreach ($stages as $stage) $faults[$cleanup[$stage][1]] = new $type('cleanup '.$stage);
+                    $this->resetFixture(['cleanupFaults' => $faults,
+                        'throwAt' => $installFails ? 'Installing Codex CLI binary' : '',
+                        'throwable' => new $type('install failure')]);
+                    $caught = null;
+                    try {
+                        AiToolsStagesFixture\pmssAiToolsCodexInstall(true, false, true, $this->logger());
+                    } catch (\Throwable $error) { $caught = $error; }
+                    // Later finally failures retain PHP's precedence, including combined faults.
+                    $this->assertSame($faults[$cleanup[max($stages)][1]], $caught);
+                    $this->assertSame($cleanup, array_slice($GLOBALS['pmssAiStages']['events'], -3));
+                    $this->assertSame([], $this->events('publish'));
+                    $this->assertSame([], $this->events('fallback'));
+                }
+            }
+        }
+    }
+
+    public function testCodexCleanupFalseResultsRetainPublication(): void
+    {
+        foreach ([['unlink'], ['rmdir'], ['unlink', 'rmdir']] as $operations) {
+            $this->resetFixture(['cleanupFalse' => array_fill_keys($operations, true)]);
+            AiToolsStagesFixture\pmssAiToolsCodexInstall(true, false, true, $this->logger());
+            $this->assertSame([['unlink', '/opt/pmss/ai-tools/codex/.pmss-fixture'],
+                ['unlink', '/fixture/download/codex-x86_64-unknown-linux-musl']], $this->events('unlink'));
+            $this->assertSame([['rmdir', '/fixture/download']], $this->events('rmdir'));
+            $this->assertSame(1, count($this->events('publish')));
+        }
     }
 
     public function testCodexDryRunAcquisitionNeverAllocatesOrPublishes(): void

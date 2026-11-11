@@ -53,6 +53,17 @@ and continues after the same per-tool failures.
 - Validation here is changed-file PHP lint and symbol searches only. Behavioral
   tests and dry-run execution belong on the testing VM/CI, never the dev box.
 
+### Cleanup fault containment
+
+Codex download cleanup attempts the existing empty-directory `rmdir()` in a
+nested `finally`, even when unlinking the extracted binary throws an exception
+or error. Cleanup stays non-recursive and keeps staging-file, extracted-file,
+then directory order. A lone throwable propagates unchanged; later cleanup
+throwables retain PHP's normal precedence. False cleanup results, publication
+gates and dry runs keep their existing behavior. The stage characterization
+fixture covers each cleanup fault, combined faults and false results without
+touching installed files; execution remains on the testing VM/CI.
+
 ## Security Review
 Upstream Node history includes TLS denial of service (CVE-2026-21637) and
 permission-model path disclosure (CVE-2026-21715). Claude Code advisories include
