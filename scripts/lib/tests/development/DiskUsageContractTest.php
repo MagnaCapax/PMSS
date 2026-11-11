@@ -7,9 +7,8 @@ class DiskUsageContractTest extends TestCase
 {
     public function testOutputKeepsSerializedSegmentsWithoutHomeLiteral(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/remote/diskUsage.php', [
-            'required' => ['echo serialize($segments);'], 'forbidden' => ['/home/'],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/remote/diskUsage.php',
+            ['echo serialize($segments);'], ['/home/']);
 
         $binDir = $this->pmssMakeTempDir('pmss-disk-usage-bin-', 0700);
         $this->pmssWriteExecutableFile($binDir.'/df', "#!/bin/sh\nprintf '%s\\n' 'Filesystem Blocks Used Available' 'mock 100 25 75'\n", 0755, 0700);

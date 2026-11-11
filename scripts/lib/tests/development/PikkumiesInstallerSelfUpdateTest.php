@@ -19,11 +19,11 @@ class PikkumiesInstallerSelfUpdateTest extends TestCase
         $this->assertTrue(($lines[0] ?? '') === '#!/usr/bin/env bash', 'Line 1 must stay the bash shebang the self-update checks for');
         $this->assertTrue(($lines[1] ?? '') === '# PMSS: Pikkumies Installer', 'Line 2 must stay the marker the self-update checks for');
         // /tmp is mounted noexec on PMSS servers: executing the fetched copy directly fails with exit 126, so bash reads it.
-        $this->pmssAssertRepoFileContract('etc/skel/bin/install-pikkumies.sh', ['required' => [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/bin/install-pikkumies.sh', [
             '--no-self-update' => 'The opt-out flag must be handled',
             'exec bash "$tmp" --skip-update' => 'The fetched copy must run with --skip-update so it never fetches again',
             'etc/skel/bin/install-pikkumies.sh' => 'The self-update URL must point at this file',
-        ], 'forbidden' => ['exec "$tmp"' => 'The fetched copy must be run by bash, not executed from /tmp']]);
+        ], ['exec "$tmp"' => 'The fetched copy must be run by bash, not executed from /tmp']);
 
         $result = $this->pmssExecArgvCommand(['bash', '-n', $path]);
         $this->assertTrue($result['rc'] === 0, 'bash -n failed: '.implode(' ', $result['lines']));

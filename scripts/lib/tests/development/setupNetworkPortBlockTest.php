@@ -7,30 +7,24 @@ class SetupNetworkPortBlockTest extends TestCase
 {
     public function testSetupNetworkKeepsPortBlockAndSafetyContracts(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/network/setup.php', [
-            'required' => [
-                "-A INPUT -i ##IFACE## -p tcp --dport 8080 -j DROP",
-                "-A INPUT -i ##IFACE## -p tcp --dport 8112 -j DROP",
-                '--log-prefix "tcpsack: "',
-                '-m limit --limit 2/second --limit-burst 10',
-                "require_once __DIR__.'/uplink.php';",
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/network/setup.php', [
+            "-A INPUT -i ##IFACE## -p tcp --dport 8080 -j DROP",
+            "-A INPUT -i ##IFACE## -p tcp --dport 8112 -j DROP",
+            '--log-prefix "tcpsack: "',
+            '-m limit --limit 2/second --limit-burst 10',
+            "require_once __DIR__.'/uplink.php';",
         ]);
-        $this->pmssAssertRepoFileContract('scripts/lib/network/uplink.php', [
-            'required' => [
-                "pmssNetworkInterfaceNameNormalize(\$configuredInterface)",
-                "logMessage('setupNetwork: unsafe configured interface name')",
-                "die(\"Error: Unsafe configured network interface\\n\")",
-                "pmssNetworkInterfaceNameNormalize(\$matches[1])",
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/network/uplink.php', [
+            "pmssNetworkInterfaceNameNormalize(\$configuredInterface)",
+            "logMessage('setupNetwork: unsafe configured interface name')",
+            "die(\"Error: Unsafe configured network interface\\n\")",
+            "pmssNetworkInterfaceNameNormalize(\$matches[1])",
         ]);
-        $this->pmssAssertRepoFileContract('scripts/util/setupNetwork.php', [
-            'required' => [
-                "@file_put_contents('/proc/sys/net/ipv4/ip_forward', '1') === false",
-                "logMessage('setupNetwork: unable to enable IPv4 forwarding')",
-                'networkSetupUplinkRead($networkConfig)',
-                'networkSetupFirewallCommands($monitoringCommands)',
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupNetwork.php', [
+            "@file_put_contents('/proc/sys/net/ipv4/ip_forward', '1') === false",
+            "logMessage('setupNetwork: unable to enable IPv4 forwarding')",
+            'networkSetupUplinkRead($networkConfig)',
+            'networkSetupFirewallCommands($monitoringCommands)',
         ]);
     }
 }
