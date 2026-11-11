@@ -47,56 +47,6 @@ function pmssTrafficLimitThrottleFileRemove(string $path, ?string &$error = null
     return true;
 }
 
-function pmssTrafficLimitLog(string $user, string $message): void
-{
-    echo pmssLogFormatTimestampedLine($message);
-    if (function_exists('pmssUserLog') && ($normalizedUser = pmssTrafficLimitCliUsernameNormalize($user)) !== null) {
-        pmssUserLog($normalizedUser, $message);
-    }
-}
-
-/** Confirm traffic throttle markers cannot follow unsafe path segments. */
-function pmssTrafficLimitMarkerPathIsSafe(string $path): bool
-{
-    return function_exists('pmssUserFilePathIsSafe') && pmssUserFilePathIsSafe($path);
-}
-
-/**
- * Refresh the root runtime throttle marker. With $capMbit the marker also records the cap
- * FireQOS applies (networkFireqosUserCaps); ~/.throttle is only its display copy.
- */
-function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool
-{
-    if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$path})");
-        return false;
-    }
-    if ($capMbit !== null ? !pmssIntegerSettingFileWrite($path, $capMbit) : !@touch($path)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker touch failed ({$path})");
-        return false;
-    }
-    if (!@chmod($path, 0600)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker chmod failed ({$path})");
-    }
-    return true;
-}
-
-function pmssTrafficLimitMarkerRemove(string $user, string $path): bool
-{
-    if (!pmssPathExistsOrLink($path)) {
-        return true;
-    }
-    if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$path})");
-        return false;
-    }
-    if (!file_exists($path) || @unlink($path) || !file_exists($path)) {
-        return true;
-    }
-    pmssTrafficLimitLog($user, "traffic throttle marker removal failed ({$path})");
-    return false;
-}
-
 function pmssTrafficLimitThrottleFilePath(string $user, string $homeRoot = '/home'): ?string
 {
     $user = pmssTrafficLimitCliUsernameNormalize($user) ?? '';
@@ -118,104 +68,13 @@ function pmssTrafficLimitThrottleApply(string $user, int $trafficCapMbit, bool $
         return false;
     }
     $error = null;
-    $ok = $enable
+    if ($enable
         ? pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)
-        : pmssTrafficLimitThrottleFileRemove($throttleFile, $error);
-    if (!$ok) {
-        $failure = $enable ? 'traffic throttle file write failed (' : 'traffic throttle file removal failed (';
-        pmssTrafficLimitLog($user, $failure.($error ?: $throttleFile).')');
-    }
-    return $ok;
+        : pmssTrafficLimitThrottleFileRemove($throttleFile, $error)) return true;
+    pmssTrafficLimitLog($user, ($enable ? 'traffic throttle file write failed (' : 'traffic throttle file removal failed (')
+        .($error ?: $throttleFile).')');
+    return false;
 }
 
-/**
- * Remove stale persistent throttle state when the runtime enforcement marker is gone.
- */
-function pmssTrafficLimitThrottleOrphanReconcile(
-    string $user,
-    int $trafficCapMbit,
-    string $enabledMarkerPath,
-    string $homeRoot = '/home'
-): bool {
-    if (!pmssTrafficLimitMarkerPathIsSafe($enabledMarkerPath)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$enabledMarkerPath})");
-        return false;
-    }
-    $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
-    if (pmssPathExistsOrLink($enabledMarkerPath)
-        || $throttleFile === null || !pmssRegularFilePathIsReadable($throttleFile)) {
-        return true;
-    }
-
-    pmssTrafficLimitLog($user, 'orphaned traffic throttle file removed after runtime marker loss');
-    return pmssTrafficLimitThrottleApply($user, $trafficCapMbit, false, $homeRoot);
-}
-
-/**
- * Lift an expired throttle: drop the runtime marker, then remove ~/.throttle.
- * Removal does not always take effect on the first attempt, so it runs twice;
- * the result is the second attempt's.
- */
-function pmssTrafficLimitThrottleLiftAfterCooldown(string $user, string $enabledMarkerPath, string $reason, string $homeRoot = '/home'): bool
-{
-    if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {
-        return false;
-    }
-    pmssTrafficLimitLog($user, $reason);
-    pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
-    sleep(1);
-    return pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
-}
-
-/**
- * Reconcile throttle state when usage data is missing or invalid.
- *
- * No data is not "under limit": the payload reader returns null for a
- * permission drift as well as for corrupt data, and the runtime stats copy
- * is gone after every reboot until trafficStats runs again. So lift the
- * throttle only when nothing has reasserted it for a full cooldown. Every
- * over-limit run touches the runtime marker and rewrites ~/.throttle, so
- * the marker's mtime dates the last reassertion, and ~/.throttle's mtime
- * does once the marker (tmpfs) is gone after a reboot.
- */
-function pmssTrafficLimitThrottleReconcileWithoutUsage(string $user, string $enabledMarkerPath, int $cooldownSeconds, string $homeRoot = '/home'): bool
-{
-    if (!pmssTrafficLimitMarkerPathIsSafe($enabledMarkerPath)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$enabledMarkerPath})");
-        return false;
-    }
-    if (!pmssPathExistsOrLink($enabledMarkerPath)) {
-        $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
-        if ($throttleFile === null || !pmssRegularFilePathIsReadable($throttleFile)) {
-            return true;
-        }
-        $assertedAt = @filemtime($throttleFile);
-        if ($assertedAt === false || (time() - $assertedAt) <= $cooldownSeconds) {
-            return true;
-        }
-        return pmssTrafficLimitThrottleOrphanReconcile($user, 0, $enabledMarkerPath, $homeRoot);
-    }
-    $assertedAt = @filemtime($enabledMarkerPath);
-    if ($assertedAt === false || (time() - $assertedAt) <= $cooldownSeconds) {
-        return true;
-    }
-    return pmssTrafficLimitThrottleLiftAfterCooldown(
-        $user,
-        $enabledMarkerPath,
-        'traffic throttle removed after cooldown (no usage data)',
-        $homeRoot
-    );
-}
-
-/** Lift persisted throttle state when the root-owned traffic limit is cleared. */
-function pmssTrafficLimitThrottleClearUnlimited(string $user, string $enabledMarkerPath, string $homeRoot = '/home'): bool
-{
-    if (!pmssPathExistsOrLink($enabledMarkerPath)) {
-        return pmssTrafficLimitThrottleOrphanReconcile($user, 0, $enabledMarkerPath, $homeRoot);
-    }
-    if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {
-        return false;
-    }
-    pmssTrafficLimitLog($user, 'traffic throttle removed: traffic limit cleared');
-    return pmssTrafficLimitThrottleApply($user, 0, false, $homeRoot);
-}
+require_once __DIR__.'/trafficLimitMarkers.php';
+require_once __DIR__.'/trafficLimitReconcile.php';

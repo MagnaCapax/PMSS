@@ -236,6 +236,14 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/user/trafficThrottlePolicy.php** – Configuration normalization and
   the stable throttle-policy include. `trafficThrottle/tiers.php` owns tier rules;
   `plan.php` owns progressive arithmetic and one ordered plan/result path (ADR 0195).
+- **scripts/lib/user/integerSetting.php** retains storage and path helpers, loading
+  value policy and verified reads from `integerSettingValue.php` and
+  `integerSettingRead.php`. Both readers share parsing while retaining distinct
+  absent/unreadable defaults. Traffic throttle display operations retain their
+  include; `trafficLimitMarkers.php` owns runtime markers and
+  `trafficLimitReconcile.php` owns recovery with one assertion-age decision.
+  `trafficLimitAccount.php` owns GiB CLI account resolution. Existing public
+  helpers, guards, errors and retry order stay stable (ADR 0269).
 - **scripts/lib/storageHealth/** – SMART/NVMe backends own device eligibility and
   bounded probes; `deviceParse.php` interprets text without I/O. `deviceMetrics.php`
   shares ordered matching, threshold selection, counter growth and entry status.

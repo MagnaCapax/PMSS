@@ -128,6 +128,7 @@ PHP;
         foreach ([
             'trafficLimit.php' => ['pmssTrafficLimitPersistTargetModes'],
             'trafficLimitCli.php' => ['pmssUserGiBSettingCli', 'pmssUserGiBSettingUsageText', 'pmssUserTrafficCliBootstrap'],
+            'trafficLimitAccount.php' => ['pmssTrafficLimitCliUserAccountLookup', 'pmssTrafficLimitResolveCliUserHome'],
             'trafficLimitCommands.php' => ['pmssTrafficLimitCliTargetModes', 'pmssUserTrafficLimitCli', 'pmssUserBonusTrafficCli'],
         ] as $file => $functions) {
             foreach ($functions as $function) {

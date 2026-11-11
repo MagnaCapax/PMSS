@@ -33,12 +33,18 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
                 'pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)',
                 'traffic throttle file write failed',
                 'pmssTrafficLimitThrottleFileRemove($throttleFile, $error)',
-                'function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool',
-                'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
                 "function pmssTrafficLimitThrottleFilePath(string \$user, string \$homeRoot = '/home'): ?string",
                 'pmssTrafficLimitCliUsernameNormalize($user)',
                 '@realpath($home) !== $home',
                 'pmssUserFilePathIsSafe($path)',
+                "require_once __DIR__.'/trafficLimitMarkers.php';",
+                "require_once __DIR__.'/trafficLimitReconcile.php';",
+            ]],
+            'scripts/lib/user/trafficLimitMarkers.php' => ['required' => [
+                'function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool',
+                'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
+            ]],
+            'scripts/lib/user/trafficLimitReconcile.php' => ['required' => [
                 'if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {',
             ]],
             'scripts/cron/trafficLimits.php' => ['required' => [
