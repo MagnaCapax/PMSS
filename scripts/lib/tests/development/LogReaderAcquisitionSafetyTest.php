@@ -57,7 +57,7 @@ function fclose($handle) { \fclose($handle); return observe('close', true); }
 function pmssAtomicJsonFileWrite($path, $payload, $mode) { $GLOBALS['published'][] = $payload; return true; }
 PHP;
         // Use the real inode matcher, JSON decoder and nginx cursor logic in both paths.
-        foreach (['runtime/filesystem.php', 'runtime/filesystemStream.php', 'log.php', 'lighttpd/watchdogNginxLogReader.php'] as $library) {
+        foreach (['runtime/filesystem.php', 'runtime/filesystemStream.php', 'log.php', 'log/text.php', 'log/json.php', 'log/append.php', 'log/jsonFiles.php', 'lighttpd/watchdogNginxLogReader.php'] as $library) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/'.$library, 'LogReaderAcquisitionFixture');
         }
         $script .= <<<'PHP'

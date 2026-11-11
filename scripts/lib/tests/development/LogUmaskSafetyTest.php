@@ -49,7 +49,7 @@ function pmssFileWriteComplete($path, $bytes, $flags) {
 function chmod($path, $mode) { observe('chmod', [$path, $mode]); return true; }
 PHP;
         $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'LogUmaskFixture');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogUmaskFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogUmaskFixture', ['log/text.php', 'log/json.php', 'log/append.php', 'log/jsonFiles.php']);
         $script .= <<<'PHP'
 $results = [];
 foreach (json_decode(getenv('PMSS_TEST_LOG_UMASK'), true) as [$kind, $mode, $initial, $stage, $type]) {

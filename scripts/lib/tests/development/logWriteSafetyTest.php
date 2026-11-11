@@ -17,7 +17,7 @@ function fgets($handle) {
     return \fgets($handle);
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogReadFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogReadFixture', ['log/text.php', 'log/json.php', 'log/append.php', 'log/jsonFiles.php']);
         $script .= <<<'PHP'
 [$path, $GLOBALS['failAt']] = json_decode(getenv('PMSS_TEST_LOG_READ'), true);
 $GLOBALS['reads'] = 0;
@@ -61,7 +61,7 @@ PHP;
     {
         // Replace only the write boundary in an isolated child; use real temp files.
         $script = 'namespace LogAppendFixture;'.$this->pmssInlinePhpLimitedWriteShims().$this->pmssInlinePhpFileWriteCompleteShim();
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogAppendFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogAppendFixture', ['log/text.php', 'log/json.php', 'log/append.php', 'log/jsonFiles.php']);
         $script .= <<<'PHP'
 [$path, $kind, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_LOG_APPEND'), true);
 $GLOBALS['requests'] = [];
