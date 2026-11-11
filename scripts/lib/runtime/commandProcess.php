@@ -105,29 +105,46 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
         return pmssCommandProcessFailure($launchRc, 'proc_open pipes unavailable', true);
     }
 
-    $startedAt = microtime(true);
-    $lastStatus = null;
-    $capture = $inheritTty ? ['stdout' => '', 'stderr' => '', 'timed_out' => false]
-        : pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
-    if (!$inheritTty) pmssProcessPipesClose([$pipes[1], $pipes[2]]);
-    // Both modes wait here; closed pipes do not prove a bounded child has exited.
-    // Keep inherited-terminal cadence, strict deadline and failed-status behavior.
-    if ($inheritTty || (!$capture['timed_out'] && $timeoutSec > 0)) {
-        while (true) {
-            $status = proc_get_status($process);
-            $lastStatus = is_array($status) ? $status : $lastStatus;
-            if (!is_array($status)) { $capture['timed_out'] = !$inheritTty; break; }
-            if (empty($status['running'])) break;
-            if ($timeoutSec > 0) {
-                $elapsed = microtime(true) - $startedAt;
-                if ($inheritTty ? $elapsed > $timeoutSec : $elapsed >= $timeoutSec) { $capture['timed_out'] = true; break; }
+    try {
+        $startedAt = microtime(true);
+        $lastStatus = null;
+        $capture = $inheritTty ? ['stdout' => '', 'stderr' => '', 'timed_out' => false]
+            : pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
+        if (!$inheritTty) pmssProcessPipesClose([$pipes[1], $pipes[2]]);
+        // Both modes wait here; closed pipes do not prove a bounded child has exited.
+        // Keep inherited-terminal cadence, strict deadline and failed-status behavior.
+        if ($inheritTty || (!$capture['timed_out'] && $timeoutSec > 0)) {
+            while (true) {
+                $status = proc_get_status($process);
+                $lastStatus = is_array($status) ? $status : $lastStatus;
+                if (!is_array($status)) { $capture['timed_out'] = !$inheritTty; break; }
+                if (empty($status['running'])) break;
+                if ($timeoutSec > 0) {
+                    $elapsed = microtime(true) - $startedAt;
+                    if ($inheritTty ? $elapsed > $timeoutSec : $elapsed >= $timeoutSec) { $capture['timed_out'] = true; break; }
+                }
+                usleep($inheritTty ? 200000 : 100000);
             }
-            usleep($inheritTty ? 200000 : 100000);
         }
-    }
-    $rc = $capture['timed_out']
-        ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
-        : pmssProcessCloseExitCode($process, $lastStatus);
+        $rc = $capture['timed_out']
+            ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
+            : pmssProcessCloseExitCode($process, $lastStatus);
 
-    return ['rc' => $rc] + $capture + ['launch_failed' => false, 'pipe_failed' => false];
+        return ['rc' => $rc] + $capture + ['launch_failed' => false, 'pipe_failed' => false];
+    } catch (\Throwable $error) {
+        // Capture owns the ready child too: observation faults must not strand it.
+        try {
+            pmssProcessPipesClose($pipes);
+        } finally {
+            // Timeout logging can throw after reaping; never signal a closed process.
+            if (is_resource($process)) {
+                try {
+                    pmssCommandTimeoutTerminate($process);
+                } finally {
+                    @proc_close($process);
+                }
+            }
+        }
+        throw $error;
+    }
 }

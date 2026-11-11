@@ -310,6 +310,15 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   unchanged. `RuntimeCommandFailureCleanupSafetyTest` injects cleanup faults
   with memory streams and process stubs on the testing machine.
 
+- Ready command capture also releases pipes and reaps its child when collection,
+  polling or finalization throws. A still-open child uses the existing bounded
+  child/group termination helper before reaping; a process already closed before
+  a logging fault is never signalled or closed again. Nested cleanup attempts
+  continue after faults, with PHP's normal cleanup-exception precedence. Normal
+  results and polling policies remain unchanged. These paths are covered by
+  `RuntimeCommandCaptureCleanupSafetyTest` using memory streams on the testing
+  machine; no command or signal is issued by its process fixtures.
+
 - `pmssNetworkPortParseDigits($value, int $min=1, int $max=65535): ?int`
   - Accepts integers or whitespace-trimmed decimal strings within the requested
     port range; malformed inputs return `null` without output.
