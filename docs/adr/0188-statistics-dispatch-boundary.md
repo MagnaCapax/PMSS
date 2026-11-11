@@ -62,6 +62,14 @@ Resource layouts compose shared field groups, defaults are built directly, and
 diagnostics invoke the configured logger without a private pass-through method.
 Record lengths, field order, messages and persistence ordering stay unchanged.
 
+## Current execution policy
+
+ADR 0049 supersedes the resource execution policy described above. Both concrete
+processors now aggregate inline, taking the run-lock hook before discovery and
+filtering batch accounts before processing. The shared base still exposes the
+detached-worker machinery; it is also referenced by the common test harness.
+The resource run lock remains held through the account loop and process exit.
+
 ## References
 
 - [Cron lock policy](0049-in-script-lock-is-canonical-for-cron-concurrency.md)
