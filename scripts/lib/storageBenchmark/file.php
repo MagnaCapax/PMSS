@@ -34,16 +34,21 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
     $testFile = rtrim($targetDir, '/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat';
     $testFileIdentity = storageBenchmarkFileReserve($testFile);
     if ($testFileIdentity === null) storageBenchmarkFail("Error: failed to reserve benchmark file.\n");
-    register_shutdown_function(static function () use ($testFile, $testFileIdentity): void {
+    try {
+        register_shutdown_function(static function () use ($testFile, $testFileIdentity): void {
+            storageBenchmarkFileCleanup($testFile, $testFileIdentity);
+        });
+        if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) storageBenchmarkFail("Error: failed to preallocate benchmark file.\n");
+        $summary = [];
+        foreach (storageBenchmarkFioJobsRun($jsonLog, $testFile, $use, $runtime, storageBenchmarkFileJobs($runtime),
+            storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir, 'device' => $mntDev, 'filesystem' => $fs],
+            array_fill_keys(['rw', 'rwmixread', 'bs', 'bssplit', 'iodepth', 'numjobs', 'direct', 'runtime'], null) + ['size_bytes' => $use]) as $name => $res) {
+            if ($res['ok']) $summary[] = [$name, $res['result']['read_bw_MBps'], $res['result']['write_bw_MBps'], $res['result']['read_iops'], $res['result']['write_iops'], $res['result']['read_p95_ms'], $res['result']['write_p95_ms']];
+        }
+        return $summary;
+    } finally {
+        // Release the reserved inode before a caller can catch a benchmark failure.
+        // Keep the shutdown retry for exit paths and failed cleanup attempts.
         storageBenchmarkFileCleanup($testFile, $testFileIdentity);
-    });
-    if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) storageBenchmarkFail("Error: failed to preallocate benchmark file.\n");
-    $summary = [];
-    foreach (storageBenchmarkFioJobsRun($jsonLog, $testFile, $use, $runtime, storageBenchmarkFileJobs($runtime),
-        storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir, 'device' => $mntDev, 'filesystem' => $fs],
-        array_fill_keys(['rw', 'rwmixread', 'bs', 'bssplit', 'iodepth', 'numjobs', 'direct', 'runtime'], null) + ['size_bytes' => $use]) as $name => $res) {
-        if ($res['ok']) $summary[] = [$name, $res['result']['read_bw_MBps'], $res['result']['write_bw_MBps'], $res['result']['read_iops'], $res['result']['write_iops'], $res['result']['read_p95_ms'], $res['result']['write_p95_ms']];
     }
-    storageBenchmarkFileCleanup($testFile, $testFileIdentity);
-    return $summary;
 }

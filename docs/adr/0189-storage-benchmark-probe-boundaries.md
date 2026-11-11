@@ -50,6 +50,13 @@ decoding and preserves execution/read exceptions.
   errors, missing job zero and ordered metric/raw payloads.
 - Static checks run on the development control host. The lane runs the development
   suite on a testing machine before publishing; no benchmark or test runs locally.
+- File-backed runs own the reserved inode through `finally`, including shutdown
+  registration, preallocation and job iteration. Exceptions and errors trigger the
+  existing inode-checked cleanup before reaching the caller; normal summaries and
+  command order remain unchanged. The shutdown callback still handles explicit
+  exits and retries failed removals without deleting a replaced inode.
+  `StorageBenchmarkFileCleanupSafetyTest` covers these paths with memory streams
+  and intercepted commands; execution belongs on a testing machine.
 - Mounted-device sysfs values reject NUL bytes before whitespace normalization.
   Malformed rotational samples retain the unknown value; malformed md state,
   level or degraded counts retain the existing status-read failure, including
