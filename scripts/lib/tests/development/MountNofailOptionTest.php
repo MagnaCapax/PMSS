@@ -25,17 +25,20 @@ class MountNofailOptionTest extends TestCase
 
         $messages = $this->ensureNofail($fstab);
 
-        $updated = (string) file_get_contents($fstab);
-        $this->assertStringContainsString('nofail', $updated, 'nofail should be added to the /home options');
-        // Every pre-existing option is preserved (minimal delta — add only).
-        foreach (['noatime', 'usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1', 'commit=60'] as $opt) {
-            $this->assertStringContainsString($opt, $updated, "pre-existing option {$opt} must be preserved");
-        }
-        // Only the /home options column changed — device + mount + fstype values preserved
-        // (assert token presence, not exact spacing — the fstab writer normalises column whitespace).
-        foreach (['/dev/md1', '/home', 'ext4'] as $col) {
-            $this->assertStringContainsString($col, $updated, "column value {$col} must be preserved");
-        }
+        $this->assertStringContainsAllStrings([
+            'nofail' => 'nofail should be added to the /home options',
+            // Every pre-existing option is preserved (minimal delta — add only).
+            'noatime' => 'pre-existing option noatime must be preserved',
+            'usrjquota=aquota.user' => 'pre-existing option usrjquota=aquota.user must be preserved',
+            'grpjquota=aquota.group' => 'pre-existing option grpjquota=aquota.group must be preserved',
+            'jqfmt=vfsv1' => 'pre-existing option jqfmt=vfsv1 must be preserved',
+            'commit=60' => 'pre-existing option commit=60 must be preserved',
+            // Only the /home options column changed — device + mount + fstype values preserved
+            // (assert token presence, not exact spacing — the fstab writer normalises column whitespace).
+            '/dev/md1' => 'column value /dev/md1 must be preserved',
+            '/home' => 'column value /home must be preserved',
+            'ext4' => 'column value ext4 must be preserved',
+        ], (string) file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Added nofail option'), 'expected an added-nofail log');
     }
 

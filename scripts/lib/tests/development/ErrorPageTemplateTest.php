@@ -33,8 +33,8 @@ class ErrorPageTemplateTest extends TestCase
             ['var/www/error-502.html', '/502_images/502-', 13, true],
         ] as [$path, $prefix, $count, $hasHomeLink]) {
             $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings($path,
-                ['data-error-image-prefix="'.$prefix.'"', 'data-error-image-count="'.$count.'"', '<script src="/error-page.js"></script>']);
-            $this->assertStringContainsString('data-error-image-ext="jpg"', $contents, $path);
+                ['data-error-image-prefix="'.$prefix.'"', 'data-error-image-count="'.$count.'"',
+                    '<script src="/error-page.js"></script>', 'data-error-image-ext="jpg"' => $path]);
             $this->assertImageFilesExist(ltrim($prefix, '/'), $count);
             if ($hasHomeLink) {
                 $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
@@ -44,9 +44,8 @@ class ErrorPageTemplateTest extends TestCase
 
     public function testLandingPageKeepsLinksAndImagePool(): void
     {
-        $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('var/www/index.html',
-            ['data-error-image-prefix="/landing_images/landing-"', 'data-error-image-count="5"', '<script src="/error-page.js"></script>']);
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('var/www/index.html', [
+            'data-error-image-prefix="/landing_images/landing-"', 'data-error-image-count="5"', '<script src="/error-page.js"></script>',
             '<!DOCTYPE html>', '<html lang="en">', 'Pulsed Media Seedbox Server',
             '/user-YOURUSERNAME/', 'data-error-image-ext="jpg"',
             'https://pulsedmedia.com/clients/clientarea.php',
@@ -54,8 +53,7 @@ class ErrorPageTemplateTest extends TestCase
             'https://pulsedmedia.com/clients/knowledgebase.php?action=displayarticle&amp;id=108',
             'https://pulsedmedia.com/clients/submitticket.php',
             "e.textContent='https://'+location.host+'/user-YOURUSERNAME/'",
-        ], $contents);
-        $this->assertEquals(0, substr_count($contents, 'innerHTML'));
+        ], ['innerHTML']);
         $this->assertImageFilesExist('landing_images/landing-', 5);
     }
 
@@ -134,12 +132,9 @@ class ErrorPageTemplateTest extends TestCase
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
 
-        foreach ([
-            'user template' => [$this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user'), '##username', 3],
-        ] as $label => [$contents, $token, $count]) {
-            $this->assertEquals($count, substr_count($contents, 'error_page 502 /error-502-'.$token.'.html;'), $label);
-            $this->assertStringContainsAllStrings(['location = /error-502-'.$token.'.html {', 'try_files $uri /error-502.html;'], $contents, $label.': ');
-        }
+        $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
+        $this->assertEquals(3, substr_count($contents, 'error_page 502 /error-502-##username.html;'), 'user template');
+        $this->assertStringContainsAllStrings(['location = /error-502-##username.html {', 'try_files $uri /error-502.html;'], $contents, 'user template: ');
         $suspended = \pmssNginxUserSubdomainTemplates()['publicSuspended'];
         $this->assertEquals(2, substr_count($suspended, 'location ^~ /suspended_images/'));
         $this->assertTrue(strpos($suspended, 'location ^~ /suspended_images/') < strpos($suspended, 'location / {'));

@@ -10,9 +10,8 @@ class RsyslogRateLimitTest extends TestCase
 
     public function testStockDebianDeclarationGetsRateLimit(): void
     {
-        $rendered = \pmssRsyslogKernelInputRateLimitConfig(self::STOCK_CONFIG);
-        $this->assertTrue(strpos($rendered, 'module(load="imklog" RatelimitInterval="10" RatelimitBurst="2000")') !== false);
-        $this->assertTrue(strpos($rendered, '$IncludeConfig /etc/rsyslog.d/*.conf') !== false, 'foreign config content changed');
+        $this->assertStringContainsAllStrings(['module(load="imklog" RatelimitInterval="10" RatelimitBurst="2000")',
+            '$IncludeConfig /etc/rsyslog.d/*.conf' => 'foreign config content changed'], \pmssRsyslogKernelInputRateLimitConfig(self::STOCK_CONFIG));
     }
 
     public function testExistingRateLimitIsIdempotent(): void

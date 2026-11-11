@@ -16,8 +16,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
         $this->assertEquals([$this->tempDir.'/.lighttpd/php.socket-0'],
             \pmssLighttpdWatchdogSocketPaths($this->tempDir, $configPath));
         $this->assertTrue(microtime(true) - $started < 2);
-        $source = $this->pmssReadRepoFile('scripts/startLighttpd');
-        $this->assertTrue(strpos($source, 'pmssReadRegularFileContentsVerified($configPath, null, 1048576)') !== false);
+        $this->pmssAssertRepoFileContainsString('scripts/startLighttpd', 'pmssReadRegularFileContentsVerified($configPath, null, 1048576)');
         $this->assertSame(null, \pmssReadRegularFileContentsVerified($configPath, null, 1048576));
     }
 

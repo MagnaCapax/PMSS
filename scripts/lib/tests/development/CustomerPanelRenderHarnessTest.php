@@ -221,12 +221,11 @@ class CustomerPanelRenderHarnessTest extends TestCase
                 'id="h-support-activity"',
             );
             $assertPlainForm = function (string $html, string $case): void {
-                $this->assertStringContainsString('id="h-support-form"', $html, $case);
-                $this->assertStringContainsString('data-pikkumies="0"', $html, $case);
-                foreach (array('data-pikkumies="1"', 'id="h-support-pikkumies"', 'class="h-support-skip"',
-                    'Send to support instead', 'id="h-support-activity"') as $needle) {
-                    $this->assertStringNotContainsString($needle, $html, $case.': '.$needle);
-                }
+                $this->assertStringContainsAndOmitsStrings(
+                    ['id="h-support-form"' => $case, 'data-pikkumies="0"' => $case],
+                    ['data-pikkumies="1"', 'id="h-support-pikkumies"', 'class="h-support-skip"',
+                        'Send to support instead', 'id="h-support-activity"'], $html, $case.': '
+                );
             };
 
             $key = $this->pmssWriteFile($home.'/.virsilipasKey', "endpoint=https://virsilipas.mcx.fi/v1\nkey=vsk-".str_repeat('a', 24)."\n");
