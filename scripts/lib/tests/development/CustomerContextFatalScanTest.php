@@ -23,8 +23,8 @@ class CustomerContextFatalScanTest extends TestCase
 
         $result = $this->pmssRunRepoPhpScriptCommand('scripts/testing/customer-context-fatal-scan.php', [], ['PMSS_CUSTOMER_CONTEXT_SCAN_ROOT' => $root]);
 
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame("[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 1 unresolved customer PHP function call(s):\n  etc/skel/www/welcome.php:2 - pmssJsonFileReadAssoc() (operator tree definition: scripts/lib/lighttpd/userFileWrite.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.", $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 1,
+            'output' => "[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 1 unresolved customer PHP function call(s):\n  etc/skel/www/welcome.php:2 - pmssJsonFileReadAssoc() (operator tree definition: scripts/lib/lighttpd/userFileWrite.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior."], $result);
     }
 
     public function testAllowsCustomerTreeFunctionDefinitions(): void
@@ -155,8 +155,8 @@ PHP
 
         $result = $this->pmssRunRepoPhpScriptCommand('scripts/testing/customer-context-fatal-scan.php', [], ['PMSS_CUSTOMER_CONTEXT_SCAN_ROOT' => $root]);
 
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame("[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 3 unresolved customer PHP function call(s):\n  etc/skel/www/alpha.php:2 - pmssAlphaOperator() (operator tree definition: scripts/lib/alpha.php)\n  etc/skel/www/alpha.php:3 - pmssUnknownOperator()\n  etc/skel/www/omega.php:2 - pmssOmegaOperator() (operator tree definition: scripts/lib/nested/omega.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.", $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 1,
+            'output' => "[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 3 unresolved customer PHP function call(s):\n  etc/skel/www/alpha.php:2 - pmssAlphaOperator() (operator tree definition: scripts/lib/alpha.php)\n  etc/skel/www/alpha.php:3 - pmssUnknownOperator()\n  etc/skel/www/omega.php:2 - pmssOmegaOperator() (operator tree definition: scripts/lib/nested/omega.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior."], $result);
     }
 
     public function testReportsOperatorCallsToUndefinedFunctions(): void
@@ -170,8 +170,8 @@ PHP
 
         $result = $this->pmssRunRepoPhpScriptCommand('scripts/testing/customer-context-fatal-scan.php', [], ['PMSS_CUSTOMER_CONTEXT_SCAN_ROOT' => $root]);
 
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame("[customer-context-fatal-scan] FAIL - UNDEFINED_FUNCTION_CALL: 2 operator PHP call(s) to undefined functions:\n  scripts/lib/lighttpd/proxy.php:2 - is_socket()\n  scripts/startDaemon:3 - pmssMissingStarter()", $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 1,
+            'output' => "[customer-context-fatal-scan] FAIL - UNDEFINED_FUNCTION_CALL: 2 operator PHP call(s) to undefined functions:\n  scripts/lib/lighttpd/proxy.php:2 - is_socket()\n  scripts/startDaemon:3 - pmssMissingStarter()"], $result);
     }
 
     public function testScanScopesRetainDiscoveryOrderDuplicatesAndDefinitionPrecedence(): void
@@ -259,8 +259,8 @@ PHP
             'scripts/lib/probe.php' => "<?php\nfunction pmssFixtureOperatorOnly() { pmssFixtureMissing(); }\n",
         ]);
         $result = $this->pmssRunRepoPhpScriptCommand('scripts/testing/customer-context-fatal-scan.php', [], ['PMSS_CUSTOMER_CONTEXT_SCAN_ROOT' => $root]);
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame("[customer-context-fatal-scan] FAIL - UNDEFINED_FUNCTION_CALL: 1 operator PHP call(s) to undefined functions:\n  scripts/lib/probe.php:2 - pmssFixtureMissing()\n\n[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 1 unresolved customer PHP function call(s):\n  etc/skel/www/probe.php:2 - pmssFixtureOperatorOnly() (operator tree definition: scripts/lib/probe.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.", $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 1,
+            'output' => "[customer-context-fatal-scan] FAIL - UNDEFINED_FUNCTION_CALL: 1 operator PHP call(s) to undefined functions:\n  scripts/lib/probe.php:2 - pmssFixtureMissing()\n\n[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 1 unresolved customer PHP function call(s):\n  etc/skel/www/probe.php:2 - pmssFixtureOperatorOnly() (operator tree definition: scripts/lib/probe.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior."], $result);
     }
 
 }

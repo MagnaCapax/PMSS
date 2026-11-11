@@ -136,10 +136,8 @@ class ArrRootExecutionBlockTest extends TestCase
         $found = \pmssRootGuardScan($procRoot, $installRoot);
 
         $this->assertSame([101, 104], array_keys($found));
-        $this->assertSame('Radarr', $found[101]['app']);
-        $this->assertSame('kill', $found[101]['action']);
-        $this->assertSame(null, $found[104]['app']);
-        $this->assertSame('alert', $found[104]['action']);
+        $this->pmssAssertArraySubsetSame(['app' => 'Radarr', 'action' => 'kill'], $found[101]);
+        $this->pmssAssertArraySubsetSame(['app' => null, 'action' => 'alert'], $found[104]);
     }
 
     public function testGuardSelectsNonRootArrOnlyOnItsDefaultListeningPort(): void
@@ -168,8 +166,7 @@ class ArrRootExecutionBlockTest extends TestCase
         $found = \pmssRootGuardScan($procRoot, $installRoot, $procNetRoot);
 
         $this->assertSame([301, 304], array_keys($found));
-        $this->assertSame(1046, $found[301]['uid']);
-        $this->assertSame('default_port', $found[301]['predicate']);
+        $this->pmssAssertArraySubsetSame(['uid' => 1046, 'predicate' => 'default_port'], $found[301]);
         $this->assertSame('uid0', $found[304]['predicate']);
     }
 

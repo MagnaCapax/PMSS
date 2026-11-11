@@ -60,10 +60,8 @@ class UserConfigStoreCharacterizationTest extends TestCase
         }
         $row = $this->readPayload(['billingServiceId' => 7, 'billingId' => 42, 'billingClientId' => '2.9',
             'ramMiB' => null, 'rtorrentRam' => '256', 'movedUntil' => '2028-02-29']);
-        $this->assertSame(7, $row['billingServiceId']);
-        $this->assertSame(2, $row['billingClientId']);
-        $this->assertSame(256, $row['ramMiB']);
-        $this->assertSame('2028-02-29', $row['movedUntil']);
+        $this->pmssAssertArraySubsetSame(['billingServiceId' => 7, 'billingClientId' => 2,
+            'ramMiB' => 256, 'movedUntil' => '2028-02-29'], $row);
         foreach (['2026-02-29', '2026-1-01', "2026-01-01\n", null, 20260101] as $date) {
             $this->assertFalse(array_key_exists('movedUntil', $this->readPayload(['movedUntil' => $date])));
         }

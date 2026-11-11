@@ -29,10 +29,8 @@ final class PortManagerCliTest extends TestCase
         $this->assertMatches('/^\d+$/', $assignedPort);
         $this->assertSame(0, $viewAssigned['rc']);
         $this->assertSame($assignedPort, trim($viewAssigned['output']));
-        $this->assertSame(0, $release['rc']);
-        $this->assertSame('Port released', $release['output']);
-        $this->assertSame(0, $viewReleased['rc']);
-        $this->assertSame('No port assigned', $viewReleased['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => 'Port released'], $release);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => 'No port assigned'], $viewReleased);
     }
 
     public function testAssignReusesExistingPort(): void
@@ -201,7 +199,6 @@ final class PortManagerCliTest extends TestCase
     {
         $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', ['dance', 'fixtur01']);
 
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame('Usage: portManager.php [view|assign|release] USER [SERVICE]', $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => 'Usage: portManager.php [view|assign|release] USER [SERVICE]'], $result);
     }
 }

@@ -1030,9 +1030,8 @@ $file = $argv[1]; array_shift($argv); require $file;', 0700, 0700);
         $paths = array('env' => $root.'/gateway.env', 'node' => $root.'/node/bin/node', 'state' => $root);
         \ocEnsureToken($paths);
         $env = \ocGatewayEnv($paths);
-        $this->assertSame('external', $env['OPENCLAW_SUPERVISOR_MODE']);
-        $this->assertSame('external', $env['OPENCLAW_SERVICE_REPAIR_POLICY']);
-        $this->assertSame($root.'/npm-cache', $env['npm_config_cache']);
+        $this->pmssAssertArraySubsetSame(['OPENCLAW_SUPERVISOR_MODE' => 'external',
+            'OPENCLAW_SERVICE_REPAIR_POLICY' => 'external', 'npm_config_cache' => $root.'/npm-cache'], $env);
         $this->assertSame($root.'/node/bin', explode(':', $env['PATH'])[0]);
     }
 

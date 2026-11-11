@@ -64,8 +64,7 @@ class SupportCommandTest extends TestCase
 
         $config = \pmssSupportConfigRead();
 
-        $this->assertSame('override@example.com', $config['targetEmail']);
-        $this->assertSame(26, $config['smtpPort']);
+        $this->pmssAssertArraySubsetSame(['targetEmail' => 'override@example.com', 'smtpPort' => 26], $config);
     }
 
     public function testConfigReadRejectsUnreadableOverridePath(): void
@@ -129,8 +128,7 @@ class SupportCommandTest extends TestCase
 
         $serviceId = fileowner($record) === 0 ? 42 : 0;
         $clientId = fileowner($record) === 0 ? 99 : 0;
-        $this->assertSame($serviceId, $diagnostics['billingServiceId']);
-        $this->assertSame($clientId, $diagnostics['billingClientId']);
+        $this->pmssAssertArraySubsetSame(['billingServiceId' => $serviceId, 'billingClientId' => $clientId], $diagnostics);
         $this->assertStringContainsAllStrings(['billing_service_id='.$serviceId, 'billing_client_id='.$clientId], $diagnostics['body']);
     }
 
@@ -144,8 +142,8 @@ class SupportCommandTest extends TestCase
 
         $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner());
 
-        $this->assertSame(fileowner($servicePath) === 0 ? 42 : 0, $diagnostics['billingServiceId']);
-        $this->assertSame(fileowner($clientPath) === 0 ? 99 : 0, $diagnostics['billingClientId']);
+        $this->pmssAssertArraySubsetSame(['billingServiceId' => fileowner($servicePath) === 0 ? 42 : 0,
+            'billingClientId' => fileowner($clientPath) === 0 ? 99 : 0], $diagnostics);
     }
 
     public function testSnapshotWriteCreatesPrivateFile(): void

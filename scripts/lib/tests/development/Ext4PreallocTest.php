@@ -69,8 +69,7 @@ class Ext4PreallocTest extends TestCase
     {
         $root = $this->fixture(['md1' => ['1536', '1536']]);
         $rows = $this->apply($root, '', '6.8.0');
-        $this->assertSame('skip:fixed-kernel', $rows[0]['result']);
-        $this->assertSame(1536, $rows[0]['after']);
+        $this->pmssAssertArraySubsetSame(['result' => 'skip:fixed-kernel', 'after' => 1536], $rows[0]);
     }
 
     public function testFailedWritesAndReadbackMismatchAreAudited(): void
@@ -78,14 +77,12 @@ class Ext4PreallocTest extends TestCase
         $root = $this->fixture(['md1' => ['1536', '1536']]);
         // Inject a failing write builtin, leaving all effects inside the fixture.
         $rows = $this->apply($root, 'printf() { if [ "$1" = "%s\\n" ]; then return 1; fi; command printf "$@"; }');
-        $this->assertSame('write-failed', $rows[0]['result']);
-        $this->assertSame(null, $rows[0]['after']);
+        $this->pmssAssertArraySubsetSame(['result' => 'write-failed', 'after' => null], $rows[0]);
 
         $this->pmssWriteFile($root.'/sys/md1/mb_group_prealloc', "1536\n");
         // Emulate a kernel accepting the write but retaining a different value.
         $rows = $this->apply($root, 'printf() { if [ "$1" = "%s\\n" ]; then command printf "1536\\n"; else command printf "$@"; fi; }');
-        $this->assertSame('readback-mismatch', $rows[0]['result']);
-        $this->assertSame(1536, $rows[0]['after']);
+        $this->pmssAssertArraySubsetSame(['result' => 'readback-mismatch', 'after' => 1536], $rows[0]);
     }
 
     public function testMarkerIsFirstAndAbsentMarkerExecutesNothing(): void

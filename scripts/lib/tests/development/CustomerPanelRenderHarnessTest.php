@@ -106,9 +106,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $result = $render('welcome.php', array('query' => 'credits=1', 'minBytes' => 10));
             $this->assertTrue(microtime(true) - $started < 15, 'The credits request must not wait for the page reads');
             $credits = $this->pmssDecodeJsonArray($result['stdout'], 'The credits response must be JSON alone: '.substr($result['stdout'], 0, 120));
-            $this->assertSame('ok', $credits['state']);
-            $this->assertSame('900k', $credits['value']);
-            $this->assertSame(1234567, $credits['credits_30d']);
+            $this->pmssAssertArraySubsetSame(['state' => 'ok', 'value' => '900k', 'credits_30d' => 1234567], $credits);
             $this->assertStringNotContainsString('token', strtolower($result['stdout']), 'The credits JSON speaks credits, never tokens');
             $this->assertStringNotContainsString($key, $result['stdout']);
 

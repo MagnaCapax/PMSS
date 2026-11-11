@@ -82,16 +82,14 @@ class PanelSessionCustomerLoginTest extends TestCase
         foreach ([['password' => $password], ['csrf' => $csrf, 'password' => 'wrong']] as $request) {
             $failed = \pmssPanelSessionLoginAttempt($request, $paths, 'fixtur01', 1700000001);
             $this->assertFalse($failed['ok']);
-            $this->assertSame(isset($request['csrf']) ? 401 : 403, $failed['status']);
-            $this->assertSame([], $failed['headers']);
+            $this->pmssAssertArraySubsetSame(['status' => isset($request['csrf']) ? 401 : 403, 'headers' => []], $failed);
         }
         $this->assertSame(2, \pmssPanelSessionRead($paths)['failed']);
         $oldId = str_repeat('a', 64);
         $this->assertTrue(\pmssPanelSessionWrite($paths, array_replace(\pmssPanelSessionRead($paths), ['id' => $oldId])));
         $result = \pmssPanelSessionLoginAttempt(['csrf' => $csrf, 'password' => $password], $paths, 'fixtur01', 1700000002);
         $this->assertTrue($result['ok']);
-        $this->assertSame(302, $result['status']);
-        $this->assertSame($oldId, $result['oldSessionId']);
+        $this->pmssAssertArraySubsetSame(['status' => 302, 'oldSessionId' => $oldId], $result);
         $this->assertTrue($result['sessionId'] !== $oldId);
         $this->assertSame($result['sessionId'], \pmssPanelSessionRead($paths)['id']);
         $this->assertSame(0, \pmssPanelSessionRead($paths)['failed']);
@@ -109,8 +107,7 @@ class PanelSessionCustomerLoginTest extends TestCase
         $result = \pmssPanelSessionLoginAttempt(['password' => 'secret'], $paths, 'fixtur01', 1700000000);
 
         $this->assertFalse((bool) $result['ok']);
-        $this->assertSame(403, $result['status']);
-        $this->assertSame([], $result['headers']);
+        $this->pmssAssertArraySubsetSame(['status' => 403, 'headers' => []], $result);
         $this->assertSame(1, \pmssPanelSessionRead($paths)['failed']);
     }
 
@@ -126,8 +123,7 @@ class PanelSessionCustomerLoginTest extends TestCase
         ], $paths, 'fixtur01', 1700000001);
 
         $this->assertFalse((bool) $result['ok']);
-        $this->assertSame(401, $result['status']);
-        $this->assertSame([], $result['headers']);
+        $this->pmssAssertArraySubsetSame(['status' => 401, 'headers' => []], $result);
         $this->assertSame(1, \pmssPanelSessionRead($paths)['failed']);
     }
 
@@ -153,12 +149,10 @@ class PanelSessionCustomerLoginTest extends TestCase
         $session = \pmssPanelSessionRead($paths);
 
         $this->assertTrue((bool) $result['ok']);
-        $this->assertSame(302, $result['status']);
-        $this->assertSame($oldSessionId, $result['oldSessionId']);
+        $this->pmssAssertArraySubsetSame(['status' => 302, 'oldSessionId' => $oldSessionId], $result);
         $this->assertMatches('/^[0-9a-f]{64}$/D', $result['sessionId']);
         $this->assertTrue($result['sessionId'] !== $oldSessionId, 'login must regenerate the session id');
-        $this->assertSame($result['sessionId'], $session['id']);
-        $this->assertSame(0, $session['failed']);
+        $this->pmssAssertArraySubsetSame(['id' => $result['sessionId'], 'failed' => 0], $session);
         $this->assertSame('/user-fixtur01/stats.php', $result['headers']['Location']);
         $this->assertSame(0600, fileperms($paths['session']) & 0777);
     }

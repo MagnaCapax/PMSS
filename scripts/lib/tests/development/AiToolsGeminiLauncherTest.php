@@ -30,9 +30,9 @@ class AiToolsGeminiLauncherTest extends AiToolsLauncherTestCase
         $decision = \pmssAiGeminiDecision(['-p', 'hello'], ['HOME' => '/tmp/test-home'], $state);
         $this->assertSame([\PMSS_AI_GEMINI_BINARY, '-p', 'hello'], $decision['argv']);
         $this->assertStringNotContainsString('private-test-key', implode(' ', $decision['argv']));
-        $this->assertSame('private-test-key', $decision['env']['GEMINI_API_KEY']);
-        $this->assertSame('https://virsilipas.mcx.fi', $decision['env']['GOOGLE_GEMINI_BASE_URL']);
-        $this->assertSame(\PMSS_AI_GEMINI_DEFAULTS, $decision['env']['GEMINI_CLI_SYSTEM_DEFAULTS_PATH']);
+        $this->pmssAssertArraySubsetSame(['GEMINI_API_KEY' => 'private-test-key',
+            'GOOGLE_GEMINI_BASE_URL' => 'https://virsilipas.mcx.fi',
+            'GEMINI_CLI_SYSTEM_DEFAULTS_PATH' => \PMSS_AI_GEMINI_DEFAULTS], $decision['env']);
         $this->assertTrue($decision['notice']);
         $state['endpoint'] = 'https://virsilipas.mcx.fi/v1/v1///';
         $this->assertSame('https://virsilipas.mcx.fi/v1',

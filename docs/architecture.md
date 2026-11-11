@@ -273,6 +273,9 @@ Keep the canonical installer/update details under `docs/install.md` and
   remain explicit.
   Panel, worker-pool, terminal-resource, storage and runtime fixtures also batch
   sibling fields this way; nested records remain separate assertion targets.
+  App profiles, launcher environments, panel sessions, fatal reports, scanner
+  diagnostics and command results share these batches too, retaining strict
+  nested values and keeping exact-shape and ordering checks explicit.
 - CLI probes: `/scripts/util/systemTest.php`, `/scripts/util/componentStatus.php`, `/scripts/util/agentDiagnostics.php`
 
 Test fixtures call constructors and shared helpers directly when a private

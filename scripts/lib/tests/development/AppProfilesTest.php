@@ -36,13 +36,14 @@ final class AppProfilesTest extends TestCase
     public function testExistingDefinitionsRemainUnchangedAndHermesIsOptIn(): void
     {
         $profiles = \pmssUserAppProfiles();
-        $this->assertSame(['rtorrent' => true, 'pikkumies' => true, 'docker' => true], $profiles['default']);
-        $this->assertSame(['rtorrent' => false, 'pikkumies' => true, 'docker' => true, 'openclaw' => true], $profiles['openclaw']);
-        $this->assertSame(['rtorrent' => false, 'pikkumies' => true, 'docker' => false, 'rclone' => true, 'copyparty' => true], $profiles['storagebox']);
-        $this->assertSame(['rtorrent' => true, 'pikkumies' => true, 'docker' => true, 'openclaw' => true, 'hermes' => true], $profiles['aiappbox']);
+        $this->pmssAssertArraySubsetSame([
+            'default' => ['rtorrent' => true, 'pikkumies' => true, 'docker' => true],
+            'openclaw' => ['rtorrent' => false, 'pikkumies' => true, 'docker' => true, 'openclaw' => true],
+            'storagebox' => ['rtorrent' => false, 'pikkumies' => true, 'docker' => false, 'rclone' => true, 'copyparty' => true],
+            'aiappbox' => ['rtorrent' => true, 'pikkumies' => true, 'docker' => true, 'openclaw' => true, 'hermes' => true],
+        ], $profiles);
         $registry = \pmssUserAppSwitchRegistry();
-        $this->assertSame('late', $registry['hermes']['phase']);
-        $this->assertSame('pmssAddUserHermesSwitch', $registry['hermes']['apply']);
+        $this->pmssAssertArraySubsetSame(['phase' => 'late', 'apply' => 'pmssAddUserHermesSwitch'], $registry['hermes']);
         $this->assertSame('off; preinstall skipped', \pmssAddUserHermesSwitch(false, [], '/unused')['message']);
     }
 
@@ -50,8 +51,7 @@ final class AppProfilesTest extends TestCase
     {
         $result = $this->applyProfile('aiappbox');
         $this->assertSame('Start rTorrent', $result['starts'][0][0]);
-        $this->assertSame([], $result['earlyQueues']);
-        $this->assertSame([], $result['markers']);
+        $this->pmssAssertArraySubsetSame(['earlyQueues' => [], 'markers' => []], $result);
         $this->assertFalse(isset($result['config']['dockerEnabled']));
         $this->assertSame(['Queue Pikkumies preinstall', 'Queue OpenClaw preinstall', 'Queue Hermes preinstall'], array_column($result['queues'], 0));
         $this->assertStringContainsAllStrings(['systemd-run', '--slice=user-4321.slice', 'install-hermes', 'install </dev/null'], $result['queues'][2][1]);

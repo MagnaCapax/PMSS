@@ -31,9 +31,8 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
             ),
         ));
 
-        $this->assertSame('invalid_character', $result['summary_json']['reason']);
-        $this->assertSame('slash not allowed', $result['summary_json']['detail']);
-        $this->assertSame('invalid_username', $result['summary_json']['message']);
+        $this->pmssAssertArraySubsetSame(['reason' => 'invalid_character', 'detail' => 'slash not allowed',
+            'message' => 'invalid_username'], $result['summary_json']);
     }
 
     public function testFatalExitWritesOptionalStderrLineForAutomation(): void
