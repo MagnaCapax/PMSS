@@ -302,6 +302,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - Failed command-pipe setup attempts pipe closure, optional child termination,
   and process reaping in that order, even if an earlier cleanup stage throws.
+  This cleanup also runs when stdin closure or nonblocking setup throws before
+  setup can report its result; ownership transfers only after all pipes are ready.
   A lone throwable propagates unchanged; a later cleanup throwable takes
   precedence under PHP's normal `finally` rules. Ordinary pipe failures retain
   their result fields and caller-selected exit code; successful capture is

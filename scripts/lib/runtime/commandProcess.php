@@ -72,28 +72,36 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
         return pmssCommandProcessFailure($launchRc, $launchError);
     }
     $pipeFailed = false;
-    foreach ($inheritTty ? [] : [0, 1, 2] as $index) {
-        if (!isset($pipes[$index]) || !is_resource($pipes[$index])) { $pipeFailed = true; break; }
-    }
-    if (!$inheritTty && !$pipeFailed) {
-        fclose($pipes[0]);
-        foreach ([1, 2] as $index) {
-            if (!@stream_set_blocking($pipes[$index], false)) { $pipeFailed = true; break; }
+    $pipeSetupComplete = false;
+    try {
+        foreach ($inheritTty ? [] : [0, 1, 2] as $index) {
+            if (!isset($pipes[$index]) || !is_resource($pipes[$index])) { $pipeFailed = true; break; }
+        }
+        if (!$inheritTty && !$pipeFailed) {
+            fclose($pipes[0]);
+            foreach ([1, 2] as $index) {
+                if (!@stream_set_blocking($pipes[$index], false)) { $pipeFailed = true; break; }
+            }
+        }
+        $pipeSetupComplete = !$pipeFailed;
+    } finally {
+        // Setup owns the child until every pipe is ready, including when setup throws.
+        if (!$pipeSetupComplete) {
+            try {
+                pmssProcessPipesClose($pipes);
+            } finally {
+                try {
+                    if (function_exists('proc_terminate')) {
+                        @proc_terminate($process);
+                    }
+                } finally {
+                    // Pipe-close or termination faults must not skip reaping the child.
+                    @proc_close($process);
+                }
+            }
         }
     }
     if ($pipeFailed) {
-        try {
-            pmssProcessPipesClose($pipes);
-        } finally {
-            try {
-                if (function_exists('proc_terminate')) {
-                    @proc_terminate($process);
-                }
-            } finally {
-                // Pipe-close or termination faults must not skip reaping the child.
-                @proc_close($process);
-            }
-        }
         return pmssCommandProcessFailure($launchRc, 'proc_open pipes unavailable', true);
     }
 

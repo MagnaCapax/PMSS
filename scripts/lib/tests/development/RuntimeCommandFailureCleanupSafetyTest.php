@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Failed launches use memory streams; no command or signal reaches the host. */
+/** Pipe setup faults use memory streams; no command or signal reaches the host. */
 class RuntimeCommandFailureCleanupSafetyTest extends TestCase
 {
     public function testFailedPipeSetupAttemptsEveryCleanupStage(): void
@@ -63,9 +63,15 @@ foreach (json_decode(getenv('PMSS_TEST_COMMAND_FAILURE_CLEANUP'), true) as [$cas
     } catch (\Throwable $error) { $caught = $error; }
     $live = is_resource($GLOBALS['process']);
     foreach ($GLOBALS['handles'] as $handle) $live = $live || is_resource($handle);
-    // Reap faults supersede termination faults, which supersede the first pipe fault.
+    // Cleanup faults supersede setup faults; within pipe cleanup, the first fault wins.
     $expected = null;
+    if ($case === 'setup') {
+        foreach (['close-0', 'blocking-1', 'blocking-2'] as $phase) {
+            if (isset($GLOBALS['faults'][$phase])) { $expected = $GLOBALS['faults'][$phase]; break; }
+        }
+    }
     foreach (['close-0', 'close-1', 'close-2'] as $phase) {
+        if ($case === 'setup' && $phase === 'close-0') continue;
         if (isset($GLOBALS['faults'][$phase])) { $expected = $GLOBALS['faults'][$phase]; break; }
     }
     $expected = $GLOBALS['faults']['reap'] ?? $GLOBALS['faults']['terminate'] ?? $expected;
@@ -89,14 +95,25 @@ PHP;
             }
             // Nonblocking setup fails after stdin has already closed normally.
             $cases[] = ['blocking-2', ['close-1'], $type, false];
+            // A thrown setup operation must reach the same cleanup as a false result.
+            foreach (['close-0', 'blocking-1', 'blocking-2'] as $phase) {
+                $cases[] = ['setup', [$phase], $type, false];
+                foreach (['close-1', 'close-2', 'terminate', 'reap'] as $cleanupPhase) {
+                    $cases[] = ['setup', [$phase, $cleanupPhase], $type, false];
+                }
+                $cases[] = ['setup', [$phase, 'close-1', 'close-2', 'terminate', 'reap'], $type, false];
+            }
         }
         $rows = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_COMMAND_FAILURE_CLEANUP' => json_encode($cases)]);
         $this->assertSame(count($cases), count($rows));
         foreach ($cases as $index => [$case, $phases, $type, $returnFalse]) {
             $events = ['open'];
-            if (strpos($case, 'blocking-') === 0) {
-                $events = array_merge($events, ['close-0', 'blocking-1']);
-                if ($case === 'blocking-2') $events[] = 'blocking-2';
+            if ($case === 'setup' || strpos($case, 'blocking-') === 0) {
+                $events[] = 'close-0';
+                if (!in_array('close-0', $phases, true)) {
+                    $events[] = 'blocking-1';
+                    if ($case !== 'blocking-1' && !in_array('blocking-1', $phases, true)) $events[] = 'blocking-2';
+                }
             }
             foreach (range(0, 2) as $pipe) {
                 if ($case !== 'missing-'.$pipe && $case !== 'invalid-'.$pipe
