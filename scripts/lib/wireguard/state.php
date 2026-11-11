@@ -1,10 +1,12 @@
 <?php
 /**
- * WireGuard configuration state parsing.
+ * WireGuard configuration acquisition and configured-value discovery.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+
+require_once __DIR__.'/peerConfig.php';
 
 /** Return the directory used for WireGuard configuration state. */
 function wgConfigDir(): string
@@ -43,36 +45,24 @@ function pmssWireguardConfigLines(string $configPath): array
     return ['status' => 'ok', 'lines' => $lines];
 }
 
-/** Parse PMSS-managed peer blocks from wg0.conf lines. */
-function wgConfigPeerBlocksFromLines(array $lines): array
+/** Read, validate, deduplicate and sort configured values with each caller's exact line policy. */
+function pmssWireguardConfigValuesRead(string $configPath, string $field, string $pattern, callable $validate, int $sort): array
 {
-    $peers = [];
-    $current = ['user' => '', 'key' => '', 'ip' => ''];
-
-    // PMSS's # user markers are data, so retain comment-prefixed lines here.
-    foreach (pmssConfigLines(array_merge($lines, ['[Peer]']), []) as $trimmed) {
-        if (stripos($trimmed, '[Peer]') === 0) {
-            if ($current['user'] !== '' || $current['key'] !== '' || $current['ip'] !== '') {
-                $peers[] = $current;
-            }
-            $current = ['user' => '', 'key' => '', 'ip' => ''];
-            continue;
-        }
-        if (preg_match('/^#\s*user\s*=\s*(.*?)\s*$/', $trimmed, $matches) === 1) {
-            $current['user'] = trim($matches[1]);
-            continue;
-        }
-        if (preg_match('/^PublicKey\s*=\s*(.*?)\s*$/i', $trimmed, $matches) === 1) {
-            $current['key'] = trim($matches[1]);
-            continue;
-        }
-        if (preg_match('/^AllowedIPs\s*=\s*(.*?)\s*$/i', $trimmed, $matches) === 1) {
-            $cidr = trim(explode(',', trim($matches[1]), 2)[0]);
-            $current['ip'] = trim(explode('/', $cidr, 2)[0]);
-        }
+    $config = pmssWireguardConfigLines($configPath);
+    if ($config['status'] !== 'ok') {
+        return ['status' => $config['status'], $field => []];
     }
 
-    return $peers;
+    $values = [];
+    foreach ($config['lines'] as $line) {
+        if (preg_match($pattern, trim($line), $matches) === 1 && $validate($matches[1])) {
+            $values[$matches[1]] = true;
+        }
+    }
+    $values = array_keys($values);
+    sort($values, $sort);
+
+    return ['status' => 'ok', $field => $values];
 }
 
 /**
@@ -82,23 +72,6 @@ function wgConfigPeerBlocksFromLines(array $lines): array
  */
 function pmssWireguardPeerUsersFromConfig(string $configPath): array
 {
-    $config = pmssWireguardConfigLines($configPath);
-    if ($config['status'] !== 'ok') {
-        return ['status' => $config['status'], 'users' => []];
-    }
-
-    $peerUsers = [];
-    foreach ($config['lines'] as $line) {
-        if (preg_match('/^#\s*user\s*=\s*([A-Za-z0-9._-]+)\s*$/', trim($line), $matches) !== 1) {
-            continue;
-        }
-        $user = $matches[1];
-        if (pmssValidateUsername($user)) {
-            $peerUsers[$user] = true;
-        }
-    }
-    $peerUsers = array_keys($peerUsers);
-    sort($peerUsers, SORT_NATURAL | SORT_FLAG_CASE);
-
-    return ['status' => 'ok', 'users' => $peerUsers];
+    return pmssWireguardConfigValuesRead($configPath, 'users', '/^#\s*user\s*=\s*([A-Za-z0-9._-]+)\s*$/',
+        'pmssValidateUsername', SORT_NATURAL | SORT_FLAG_CASE);
 }

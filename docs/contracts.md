@@ -1201,6 +1201,16 @@ Per-user guide address reconciliation derives the embedded private key's public
 key and updates only the matching assigned peer; unmatched guides remain unchanged.
 Service hostnames in guides require a root-owned billing ID entry.
 
+Peer-state internals retain the existing `state.php` and `peers.php` includes
+(ADR 0268). `peerConfig.php` owns block parsing and peer text rendering;
+`peerAssignment.php` owns pin reservation and address allocation. Configured
+owner/key readers share acquisition, validation, deduplication and sorting,
+with each reader retaining its original regex, validator and sort flags.
+The permissive block parser remains separate from these validated readers.
+Characterization fixtures lock field precedence, missing/non-regular files,
+result key order and exact peer text; existing assignment cases retain the
+pin, collision, account-limit and failed-read contracts.
+
 ---
 
 ## Application Installers (Contracts)

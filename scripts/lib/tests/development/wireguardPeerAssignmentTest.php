@@ -4,6 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/wireguard.php';
 
+/** Pin/limit/recovery contracts for scripts/lib/wireguard/peerAssignment.php. */
 class WireguardPeerAssignmentTest extends TestCase
 {
     private function key(int $index): string
@@ -58,7 +59,7 @@ class WireguardPeerAssignmentTest extends TestCase
         $keys[] = $this->key(3);
         $used = [];
         $old = [];
-        foreach (['alice', 'bob', 'carol'] as $index => $user) {
+        foreach (['fixtur01', 'fixtur02', 'fixtur03'] as $index => $user) {
             $ip = \wgDeriveClientIp($keys[$index], $used);
             $used[$ip] = true;
             $old[] = ['user' => $user, 'key' => $keys[$index], 'ip' => $ip];
@@ -67,8 +68,8 @@ class WireguardPeerAssignmentTest extends TestCase
         $this->assertTrue($old[0]['ip'] !== $old[1]['ip']);
         $rendered = \wireguardBuildConfig('server-key', 51820, $oldState);
         $fixture = $this->fixture([
-            'alice' => $keys[0]."\n", 'bob' => $keys[1]."\n", 'carol' => $keys[2]."\n",
-        ], 'alice,bob,carol', $rendered);
+            'fixtur01' => $keys[0]."\n", 'fixtur02' => $keys[1]."\n", 'fixtur03' => $keys[2]."\n",
+        ], 'fixtur01,fixtur02,fixtur03', $rendered);
         $assigned = $this->runFixture($fixture);
         $this->assertSame($old, $assigned);
         $this->assertSame($rendered, \wireguardBuildConfig('server-key', 51820, ['entriesFound' => true, 'assigned' => $assigned]));
@@ -83,7 +84,7 @@ class WireguardPeerAssignmentTest extends TestCase
             if (\wgDeriveClientIp($this->key($i), []) === $ip) { $collision = $this->key($i); break; }
         }
         $this->assertTrue($collision !== '');
-        $fixture = $this->fixture(['alice' => $collision."\n", 'bob' => $key."\n"], 'alice,bob', $this->peer('bob', $key, $ip));
+        $fixture = $this->fixture(['fixtur01' => $collision."\n", 'fixtur02' => $key."\n"], 'fixtur01,fixtur02', $this->peer('fixtur02', $key, $ip));
         $assigned = $this->runFixture($fixture);
         $this->assertSame($ip, $assigned[1]['ip']);
         $this->assertTrue($assigned[0]['ip'] !== $ip);
@@ -92,38 +93,38 @@ class WireguardPeerAssignmentTest extends TestCase
     public function testAccountLimitAndExistingPins(): void
     {
         $keys = array_map([$this, 'key'], range(100, 399));
-        $fixture = $this->fixture(['alice' => implode("\n", $keys), 'bob' => $this->key(400)], 'alice,bob');
+        $fixture = $this->fixture(['fixtur01' => implode("\n", $keys), 'fixtur02' => $this->key(400)], 'fixtur01,fixtur02');
         $this->assertSame(9, count($this->runFixture($fixture)));
 
         $pins = '';
-        foreach (array_slice($keys, 0, 10) as $i => $key) { $pins .= $this->peer('alice', $key, '10.90.90.'.($i + 2)); }
+        foreach (array_slice($keys, 0, 10) as $i => $key) { $pins .= $this->peer('fixtur01', $key, '10.90.90.'.($i + 2)); }
         file_put_contents($fixture[1].'/wg0.conf', $pins);
         $assigned = $this->runFixture($fixture);
         $this->assertSame(11, count($assigned));
-        $this->assertSame('bob', $assigned[10]['user']);
+        $this->assertSame('fixtur02', $assigned[10]['user']);
     }
 
     public function testDuplicateKeysAndOwnerPins(): void
     {
         $key = $this->key(500);
-        $fixture = $this->fixture(['alice' => $key."\n".$key."\n", 'bob' => $key."\n"], 'alice,bob');
+        $fixture = $this->fixture(['fixtur01' => $key."\n".$key."\n", 'fixtur02' => $key."\n"], 'fixtur01,fixtur02');
         $this->assertSame(1, count($this->runFixture($fixture)));
-        file_put_contents($fixture[1].'/wg0.conf', $this->peer('bob', $key, '10.90.90.9'));
+        file_put_contents($fixture[1].'/wg0.conf', $this->peer('fixtur02', $key, '10.90.90.9'));
         $assigned = $this->runFixture($fixture);
-        $this->assertSame([['user' => 'bob', 'key' => $key, 'ip' => '10.90.90.9']], $assigned);
+        $this->assertSame([['user' => 'fixtur02', 'key' => $key, 'ip' => '10.90.90.9']], $assigned);
     }
 
     public function testFailedReadAndEmptyRosterCarryPins(): void
     {
         $key = $this->key(600);
-        $pin = $this->peer('alice', $key, '10.90.90.30');
-        $fixture = $this->fixture(['alice' => $key."\n"], 'alice', $pin);
-        unlink($fixture[0].'/alice/.wireguard-public-key');
-        symlink($fixture[1].'/wg0.conf', $fixture[0].'/alice/.wireguard-public-key');
-        $expected = [['user' => 'alice', 'key' => $key, 'ip' => '10.90.90.30']];
+        $pin = $this->peer('fixtur01', $key, '10.90.90.30');
+        $fixture = $this->fixture(['fixtur01' => $key."\n"], 'fixtur01', $pin);
+        unlink($fixture[0].'/fixtur01/.wireguard-public-key');
+        symlink($fixture[1].'/wg0.conf', $fixture[0].'/fixtur01/.wireguard-public-key');
+        $expected = [['user' => 'fixtur01', 'key' => $key, 'ip' => '10.90.90.30']];
         $this->assertSame($expected, $this->runFixture($fixture));
-        unlink($fixture[0].'/alice/.wireguard-public-key');
-        file_put_contents($fixture[0].'/alice/.wireguard-public-key', str_repeat('x', 65537));
+        unlink($fixture[0].'/fixtur01/.wireguard-public-key');
+        file_put_contents($fixture[0].'/fixtur01/.wireguard-public-key', str_repeat('x', 65537));
         $this->assertSame($expected, $this->runFixture($fixture));
         $fixture[2] = ',';
         $this->assertSame($expected, $this->runFixture($fixture));
@@ -134,9 +135,9 @@ class WireguardPeerAssignmentTest extends TestCase
         $shared = $this->key(610);
         $original = $this->key(611);
         $fixture = $this->fixture(
-            ['alice' => $original."\n", 'bob' => $shared."\n"],
-            'alice,bob',
-            $this->peer('alice', $shared, '10.90.90.40').$this->peer('alice', $original, '10.90.90.41')
+            ['fixtur01' => $original."\n", 'fixtur02' => $shared."\n"],
+            'fixtur01,fixtur02',
+            $this->peer('fixtur01', $shared, '10.90.90.40').$this->peer('fixtur01', $original, '10.90.90.41')
         );
         $assigned = $this->runFixture($fixture);
         $this->assertSame('10.90.90.41', $assigned[0]['ip']);
@@ -148,12 +149,12 @@ class WireguardPeerAssignmentTest extends TestCase
         $key = $this->key(700);
         $other = $this->key(701);
         $config = $this->peer('bad.name', $key, '10.90.90.2')
-            .$this->peer('alice', $key, '10.90.90.1')
-            .$this->peer('alice', 'invalid', '10.90.90.3')
-            .$this->peer('alice', $key, '10.90.90.4')
-            .$this->peer('alice', $key, '10.90.90.5')
-            .$this->peer('bob', $other, '10.90.90.4');
-        $fixture = $this->fixture(['alice' => $key, 'bob' => $other], 'alice,bob', $config);
+            .$this->peer('fixtur01', $key, '10.90.90.1')
+            .$this->peer('fixtur01', 'invalid', '10.90.90.3')
+            .$this->peer('fixtur01', $key, '10.90.90.4')
+            .$this->peer('fixtur01', $key, '10.90.90.5')
+            .$this->peer('fixtur02', $other, '10.90.90.4');
+        $fixture = $this->fixture(['fixtur01' => $key, 'fixtur02' => $other], 'fixtur01,fixtur02', $config);
         $assigned = $this->runFixture($fixture);
         $this->assertSame('10.90.90.4', $assigned[0]['ip']);
         $this->assertTrue($assigned[1]['ip'] !== '10.90.90.4');
