@@ -23,7 +23,7 @@ unset($pmssStorageRaidDisplay);
 require_once __DIR__.'/raidParse.php';
 
 /**
- * Read mdadm array status from `/proc/mdstat`.
+ * Read array status from mdstat and probe write-intent bitmaps without changing arrays.
  *
  * @return array<int, array<string, mixed>>
  */
@@ -34,7 +34,15 @@ function pmssStorageHealthSnapshotRaid(string $timestamp, string $mdstatPath = '
         return [];
     }
     $mdstat = @file_get_contents($mdstatPath);
-    return $mdstat === false ? [] : pmssStorageHealthRaidEntriesParse($mdstat, $timestamp);
+    $entries = $mdstat === false ? [] : pmssStorageHealthRaidEntriesParse($mdstat, $timestamp);
+    foreach ($entries as &$entry) {
+        $probe = pmssStorageHealthProbeCommand('raid', $entry['array'], 'mdadm --detail '.escapeshellarg('/dev/'.$entry['array']));
+        // Shared capture owns the process-group deadline, kill-after and timeout event.
+        $result = pmssCommandCapture('LC_ALL=C '.$probe['command'], 30);
+        $entry = pmssStorageHealthRaidBitmapApply($entry,
+            $result['rc'] === 0 ? pmssStorageHealthRaidBitmapParse($result['stdout']) : null);
+    }
+    return $entries;
 }
 
 /** Resolve the md array that backs /home, if /home is mounted directly on md. */
@@ -100,6 +108,11 @@ function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
 {
     foreach ($raidEntries as $entry) {
         $flags = (array) ($entry['flags'] ?? []);
+        // Bitmap warnings describe recovery risk, not current performance or redundancy.
+        if (($entry['severity'] ?? 'ok') === 'warn' && $flags !== []
+            && array_diff($flags, ['no_write_intent_bitmap', 'write_intent_bitmap_unknown']) === []) {
+            continue;
+        }
         $isRebuild = in_array('rebuild_in_progress', $flags, true);
         if (!$isRebuild && !in_array('degraded', $flags, true) && (string) ($entry['severity'] ?? 'ok') === 'ok') {
             continue;

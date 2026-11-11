@@ -52,10 +52,12 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         foreach (['', "\0", $path."\0suffix", "\0".$path, $this->tmpDir.'/missing'] as $invalid) {
             $this->assertSame([], \pmssStorageHealthSnapshotRaid('fixture', $invalid));
         }
-        $this->assertSame(
-            \pmssStorageHealthRaidEntriesParse("md1 : active raid1 sda1[0]\n", 'fixture'),
-            \pmssStorageHealthSnapshotRaid('fixture', $path)
-        );
+        $stub = $this->pmssMakeExecutableStub('mdadm', "#!/bin/sh\nprintf 'Raid Level : raid1\nIntent Bitmap : Internal\nState : clean\n'\n", 'pmss-raid-path-bin-');
+        $this->pmssWithEnv(['PATH' => $stub], function () use ($path): void {
+            $expected = \pmssStorageHealthRaidEntriesParse("md1 : active raid1 sda1[0]\n", 'fixture');
+            $expected[0]['write_intent_bitmap'] = true;
+            $this->assertSame($expected, \pmssStorageHealthSnapshotRaid('fixture', $path));
+        });
         $this->assertSame([], \pmssStorageHealthSnapshotRaid('fixture', $this->pmssWriteFile($path, '')));
     }
 

@@ -73,6 +73,9 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         foreach ($raid as $entry) {
             $sev = (string) ($entry['severity'] ?? 'warn');
             printf("%-4s %-4s %-6s %-6s %-10s %s\n", pmssStorageHealthColor($sev, PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$sev]['mark'] ?? '?'), strtoupper($sev), (string) ($entry['array'] ?? ''), (string) ($entry['level'] ?? ''), (string) ($entry['state'] ?? ''), (string) ($entry['detail'] ?? ''));
+            if (!empty($entry['message'])) {
+                echo '     '.$entry['message'].PHP_EOL;
+            }
         }
         echo PHP_EOL;
     }

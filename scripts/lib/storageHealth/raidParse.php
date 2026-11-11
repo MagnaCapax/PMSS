@@ -3,6 +3,21 @@
 
 require_once __DIR__.'/common.php';
 
+/** Interpret successful mdadm detail output; malformed/partial responses remain unknown. */
+function pmssStorageHealthRaidBitmapParse(string $detail): ?bool
+{
+    if (strpos($detail, "\0") !== false
+        || preg_match('/^[ \t]*Raid Level[ \t]*:[ \t]*raid\d+[ \t]*\r?$/m', $detail) !== 1
+        || preg_match('/^[ \t]*State[ \t]*:[ \t]*\S[^\r\n]*\r?$/m', $detail) !== 1) {
+        return null;
+    }
+    // mdadm omits the field when absent; internal and external bitmaps both emit it.
+    if (preg_match('/^[ \t]*Intent Bitmap[ \t]*:[ \t]*([^\r\n]*)/m', $detail, $matches) === 1) {
+        return trim($matches[1]) === '' ? null : true;
+    }
+    return false;
+}
+
 /** Return unknown when mdstat has no member summary; counts and missing members both matter. */
 function pmssStorageHealthRaidDetailDegradedState(string $detail): ?bool
 {

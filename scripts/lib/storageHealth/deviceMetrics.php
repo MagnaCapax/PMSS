@@ -1,5 +1,5 @@
 <?php
-/** Pure device metrics and finding policies shared by SMART and NVMe. @license GPL-3.0-only */
+/** Pure storage metrics and finding policies shared by SMART, NVMe and RAID. @license GPL-3.0-only */
 
 require_once dirname(__DIR__).'/runtime/environment.php';
 
@@ -37,6 +37,21 @@ function pmssStorageHealthFlagsSeverity(array $flags): string
         return 'fail';
     }
     return array_diff($flags, ['standby', 'reallocated_increase', 'link_errors_increase', 'err_log_increase']) === [] ? 'ok' : 'warn';
+}
+
+/** Add the nullable bitmap observation and derive RAID status without deduplicating activity flags. */
+function pmssStorageHealthRaidBitmapApply(array $entry, ?bool $bitmap): array
+{
+    $entry['write_intent_bitmap'] = $bitmap;
+    if ($bitmap !== true) {
+        $entry['flags'][] = $bitmap === false ? 'no_write_intent_bitmap' : 'write_intent_bitmap_unknown';
+        $entry['message'] = $bitmap === false
+            ? 'No write-intent bitmap: an unclean stop will force a full resync.'
+            : 'Write-intent bitmap state unknown: mdadm detail unavailable or incomplete.';
+    }
+    $entry['severity'] = pmssStorageHealthFlagsSeverity($entry['flags']);
+    $entry['ok'] = $entry['severity'] === 'ok';
+    return $entry;
 }
 
 /** Return findings only for integer counters that grew since the last snapshot. */

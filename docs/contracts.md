@@ -891,6 +891,15 @@ iptables helpers:
 
 ## Resource Statistics
 
+- `pmssStorageHealthSnapshotRaid()` discovers arrays through mdstat, then runs a
+  read-only, C-locale `mdadm --detail` probe per array with the shared 30-second
+  process-group deadline and per-array probe lock. `write_intent_bitmap` is
+  `true` (present), `false` (absent), or `null` (probe failed or output incomplete).
+  Absence adds `no_write_intent_bitmap`; unknown adds `write_intent_bitmap_unknown`.
+  Both warn with an explanatory `message` in JSONL and the operator table;
+  existing degradation still fails. Bitmap warnings alone do not claim current
+  performance loss or produce a customer degradation notice (ADR 0265).
+
 - Live-statistics text counters in `scripts/lib/liveStats.php` must fit PHP integers
   before conversion. Oversized CPU ticks or their sum, memory KiB-to-byte
   conversions, and network byte counters return the existing `null` node result;
