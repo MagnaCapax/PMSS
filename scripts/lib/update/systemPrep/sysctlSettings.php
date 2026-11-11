@@ -1,15 +1,15 @@
 <?php
-/** Build and render managed sysctl settings from a profile. @license GPL-3.0-only */
+/** Build managed sysctl policy from a host profile. @license GPL-3.0-only */
 
 require_once dirname(__DIR__, 2).'/portManager.php';
+require_once __DIR__.'/sysctlText.php';
 
 /** Build memory sysctl settings for the detected host profile. */
 function pmssSysctlMemorySettingsBuild(array $profile): array
 {
     $hasSwap = !empty($profile['has_swap']);
-    $isVm = !empty($profile['is_vm']);
     // No-swap and VM policies take precedence over fast storage.
-    $fastSwap = $hasSwap && !$isVm && !empty($profile['swap_is_fast']);
+    $fastSwap = $hasSwap && empty($profile['is_vm']) && !empty($profile['swap_is_fast']);
     $ramGb = max(1, (int) ($profile['ram_gb'] ?? 1));
 
     return [
@@ -115,86 +115,4 @@ function pmssSysctlSettingsBuild(array $profile): array
     ];
     if (($conntrackSettings = pmssSysctlConntrackSettingsBuild($profile)) !== []) $settings['conntrack'] = $conntrackSettings;
     return $settings;
-}
-
-/** Parse one sysctl assignment while preserving each caller's comment policy. */
-function pmssSysctlAssignmentLineParse(string $line, bool $stripInlineComment = false): ?array
-{
-    $trimmed = trim($stripInlineComment ? (string) preg_replace('/\s+#.*$/', '', $line) : $line);
-    if ($trimmed === '' || $trimmed[0] === '#' || preg_match('/^([A-Za-z0-9_.]+)\s*=\s*(.*)$/', $trimmed, $matches) !== 1) {
-        return null;
-    }
-
-    return [$matches[1], trim($matches[2])];
-}
-
-/** Parse operator-owned sysctl overrides from a config file. */
-function pmssSysctlOverridesParse(string $path): array
-{
-    $keys = [];
-    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line, true)) !== null) $keys[$assignment[0]] = true;
-    return array_keys($keys);
-}
-
-/** Filter grouped sysctl settings while respecting explicit operator overrides. */
-function pmssSysctlSettingsFilterOverrides(array $groupedSettings, array $overrideKeys): array
-{
-    $filtered = [];
-    $overrides = array_flip($overrideKeys);
-    foreach ($groupedSettings as $group => $settings) {
-        if (!is_array($settings)) continue;
-        foreach ($settings as $key => $value) if (!isset($overrides[$key])) $filtered[$group][$key] = (string) $value;
-    }
-    return $filtered;
-}
-
-/** Parse a sysctl config file into key/value pairs for change reporting. */
-function pmssSysctlFileParse(string $path): array
-{
-    $settings = [];
-    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line)) !== null && $assignment[1] !== '') $settings[$assignment[0]] = $assignment[1];
-    return $settings;
-}
-
-/** Render grouped sysctl settings as an ordered config file body. */
-function pmssSysctlConfigRender(array $groupedSettings): string
-{
-    $labels = [
-        'vm' => 'Memory',
-        'net' => 'Network',
-        'conntrack' => 'Conntrack',
-        'security' => 'Security Hardening',
-    ];
-
-    $lines = ['# Pulsed Media Config', '# Hardware-aware PMSS baseline'];
-    foreach ($groupedSettings as $group => $settings) {
-        if (empty($settings)) {
-            continue;
-        }
-
-        $lines[] = '';
-        $lines[] = '# '.($labels[$group] ?? ucfirst($group));
-        foreach ($settings as $key => $value) {
-            $lines[] = $key.' = '.$value;
-        }
-    }
-
-    return implode(PHP_EOL, $lines).PHP_EOL;
-}
-
-/** Describe value changes between the existing file and the next applied profile. */
-function pmssSysctlChangesDescribe(array $existingSettings, array $groupedSettings): array
-{
-    $changes = [];
-    foreach ($groupedSettings as $settings) {
-        if (!is_array($settings)) continue;
-        foreach ($settings as $key => $value) {
-            $key = (string) $key;
-            $value = (string) $value;
-            $previousValue = array_key_exists($key, $existingSettings) ? (string) $existingSettings[$key] : null;
-            if ($previousValue !== $value) $changes[] = $key.': '.($previousValue ?? '<unset>').' -> '.$value;
-        }
-    }
-
-    return $changes;
 }

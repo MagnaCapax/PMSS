@@ -165,6 +165,16 @@ scripts/lib/update/networking.php      # network template seeding & rollout
 scripts/lib/update/runtime/*           # shared runStep/logging/profile helpers
 ```
 
+The sysctl pipeline retains its existing includes and public helpers (ADR 0264).
+`sysctlProfile.php` owns hardware observations, `sysctlSettings.php` owns policy,
+and `sysctlText.php` owns assignment parsing, overrides, rendering and change
+reports. `sysctlTuning.php` retains ordered managed publication and reload gates;
+`sysctlSummary.php` publishes the hardware summary. Reports and summaries share
+ordered string settings: reports keep duplicate occurrences, while summaries
+keep the final value and sort keys. NIC detection retains the first valid default
+route even when that route's speed is unreadable. Policy values remain governed
+by the existing port-reservation, IPv4-only and memory-floor ADRs.
+
 The lighttpd/nginx lifecycle step stays inline in `scripts/util/update-step2.php`
 because phase 2 is its only caller.
 

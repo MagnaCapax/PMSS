@@ -6,11 +6,9 @@ require_once dirname(__DIR__, 2).'/network/interface.php';
 /** Read a boolean-like environment override when present. */
 function pmssSystemPrepReadBoolEnv(string $key): ?bool
 {
-    $override = getenv($key);
-    if ($override === false) return null;
-    $normalized = pmssEnvValueNormalized($override);
-    if (in_array($normalized, ['1', 'true', 'yes'], true)) return true;
-    return in_array($normalized, ['0', 'false', 'no'], true) ? false : null;
+    // Unset, empty and unrecognized overrides all defer to hardware detection.
+    return ['1' => true, 'true' => true, 'yes' => true, '0' => false, 'false' => false, 'no' => false]
+        [pmssEnvValueNormalized(getenv($key))] ?? null;
 }
 
 /** Detect whether any swap device is configured. */
@@ -78,24 +76,17 @@ function pmssSysctlNicSpeedMbps(): int
     }
 
     $routePath = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_NET_ROUTE_PATH', '/proc/net/route');
-    $iface = '';
     foreach (pmssConfigRows(array_slice(pmssReadRegularFileNonEmptyLines($routePath), 1), 2, []) as $columns) {
-        if ($columns[1] === '00000000') {
-            $iface = pmssNetworkInterfaceNameNormalize((string) $columns[0], 15);
-            if ($iface === '') {
-                continue;
-            }
-            break;
-        }
+        if ($columns[1] !== '00000000') continue;
+        $iface = pmssNetworkInterfaceNameNormalize((string) $columns[0], 15);
+        if ($iface === '') continue;
+        // Read only the first valid default route; an unreadable speed keeps its fallback.
+        $speedPath = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_NET_PATH', '/sys/class/net').'/'.$iface.'/speed';
+        // A malformed sysfs sample must not saturate into a fictitious fast link.
+        return pmssReadRegularFileInt($speedPath, 1000);
     }
 
-    if ($iface === '') {
-        return 1000;
-    }
-
-    $speedPath = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_NET_PATH', '/sys/class/net').'/'.$iface.'/speed';
-    // A malformed sysfs sample must not saturate into a fictitious fast link.
-    return pmssReadRegularFileInt($speedPath, 1000);
+    return 1000;
 }
 
 /** Detect whether the current host is a virtual machine. */
