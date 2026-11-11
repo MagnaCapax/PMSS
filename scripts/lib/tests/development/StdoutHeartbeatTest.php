@@ -16,11 +16,11 @@ final class StdoutHeartbeatTest extends TestCase
     public function testLifecycleScriptsStartHeartbeatBeforeHomeGuard(): void
     {
         foreach (['terminateUser.php', 'suspend.php', 'unsuspend.php', 'addUser.php'] as $script) {
-            $this->pmssAssertRepoFileContract('scripts/'.$script, ['ordered' => [[
+            $this->pmssAssertRepoFileContainsOrderedStrings('scripts/'.$script, [
                 "require_once __DIR__.'/lib/runtime/stdoutHeartbeat.php';",
                 'pmssStdoutHeartbeatStartForStdout();',
                 "pmssRequireHomeMounted('".$script."')",
-            ]]]);
+            ]);
         }
     }
 

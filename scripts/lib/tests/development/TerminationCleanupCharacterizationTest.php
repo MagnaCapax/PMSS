@@ -54,11 +54,11 @@ PHP;
         $this->assertSame($expected, $this->pmssRunInlinePhpJson($script));
 
         // Keep the cleanup outside the initial account-only phase, including resumes.
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/terminateUser.php', [
             'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
             'pmssTerminateUserClearLinger($username, $dryRun);',
             'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
-        ]]]);
+        ]);
     }
 
     public function testPortValidationRetainsExistingValuesAndWarningPayloads(): void

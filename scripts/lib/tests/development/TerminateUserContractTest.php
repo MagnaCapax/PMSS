@@ -22,7 +22,7 @@ final class TerminateUserContractTest extends TestCase
     }
     public function testTerminateUserConfirmationLoopHandlesEof(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)']]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/terminateUser.php', ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)']);
     }
 
     public function testTerminateUserReleasesEveryToggleAppPortAndCrashState(): void
@@ -32,9 +32,8 @@ final class TerminateUserContractTest extends TestCase
         $services = array();
         foreach ($catalog as $app => $row) $services = array_merge($services, array($app), $row['extraPortServices']);
         $this->assertSame(array('slskd', 'slskd-peer', 'copyparty', 'qui', 'scryer'), $services);
-        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', 'array_merge(array($toggleApp), $row[\'extraPortServices\'])');
-        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', "escapeshellarg(\$service)");
-        $this->pmssAssertRepoFileContainsString('scripts/terminateUser.php', '/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/terminateUser.php', ['array_merge(array($toggleApp), $row[\'extraPortServices\'])',
+            "escapeshellarg(\$service)", '/var/lib/pmss/toggle-apps/{$username}-{$toggleApp}.json']);
     }
 
     public function testTerminateUserInvokesSystemdRevertOnSlice(): void
@@ -503,11 +502,11 @@ PHP;
     {
         // The exact-home invariant lives in terminateUser.php itself; the reclaim-side
         // duplicate went with the async rename-aside helpers (Refs #729).
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/terminateUser.php', [
             '$realHome !== $expectedHome',
             'Prefix checks are too loose',
             'Refusing to operate on unexpected home path',
-        ]]);
+        ]);
     }
 
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
@@ -536,10 +535,8 @@ PHP;
 
     public function testTerminateUserFinalCleanupDoesNotDeleteActiveHomeName(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
-                'required' => ["'remove_nginx_user'"],
-                'forbidden' => ['escapeshellarg("/home/{$username}")'],
-            ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/terminateUser.php',
+            ["'remove_nginx_user'"], ['escapeshellarg("/home/{$username}")']);
     }
 
     public function testTerminateUserRemovesNginxSubdomainRouteFiles(): void

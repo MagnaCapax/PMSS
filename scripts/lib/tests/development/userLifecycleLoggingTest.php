@@ -71,20 +71,20 @@ PHP;
 
     public function testUserLifecycleSourceContractsUseSharedHelpers(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/user/lifecycleLog.php', ['required' => [
-                "pmssLogScalarText(\$payload['status'] ?? 'INFO')",
-                "pmssLogScalarText(\$payload['action'] ?? 'unknown')",
-                "pmssLogScalarText(\$payload['phase'] ?? 'unknown')",
-                "pmssLogScalarText(\$payload['username'] ?? '')",
-                "pmssLogScalarText(\$payload['message'])",
-                "pmssLogScalarText(\$payload['step'])",
-                'function pmssUserLifecycleContextLog(',
-                'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
-                'function pmssUserLifecycleContextLogStatusMessage(',
-                '\'status\' => $status',
-                '\'message\' => $message',
-                'pmssUserLifecycleContextLog(',
-            ]]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/lifecycleLog.php', [
+            "pmssLogScalarText(\$payload['status'] ?? 'INFO')",
+            "pmssLogScalarText(\$payload['action'] ?? 'unknown')",
+            "pmssLogScalarText(\$payload['phase'] ?? 'unknown')",
+            "pmssLogScalarText(\$payload['username'] ?? '')",
+            "pmssLogScalarText(\$payload['message'])",
+            "pmssLogScalarText(\$payload['step'])",
+            'function pmssUserLifecycleContextLog(',
+            'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
+            'function pmssUserLifecycleContextLogStatusMessage(',
+            '\'status\' => $status',
+            '\'message\' => $message',
+            'pmssUserLifecycleContextLog(',
+        ]);
     }
 
     public function testRunStepsPreservesOrderAndDryRunResults(): void

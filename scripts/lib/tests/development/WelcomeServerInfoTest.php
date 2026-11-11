@@ -97,9 +97,9 @@ final class WelcomeServerInfoTest extends TestCase
 
     public function testWelcomeRendersServerCardAfterMemoryCard(): void
     {
-        $this->assertOrderedStrings(array(
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/welcome.php', array(
             '.pmssWelcomeHomeMemoryMetricHtmlBuild($homeMemoryState)',
             '.pmssWelcomeHomeServerMetricHtmlBuild();',
-        ), $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
+        ));
     }
 }
