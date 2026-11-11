@@ -2038,6 +2038,10 @@ This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
 Reflected characterization fixtures share `pmssTestingFunctionExport()` in
 `scripts/lib/testing/filesystem.php`; selection, substitutions and strict mode stay with callers.
 
+- Exception type and message-fragment checks use `TestCase::assertThrows()` or
+  `assertThrowsRuntime()`, including account CLI, moved-state, torrent config and
+  installer refusals. Keep exact-message, throwable-identity and mixed
+  success/failure observations explicit; the shared helpers do not express them.
 - Mount, quota, port, logging and installer fixtures reuse `pmssWriteFile()` and
   `pmssWriteFiles()` for checked publication and parent creation. Preserve explicit
   directory modes; keep deliberately empty directories and injected runtime writes

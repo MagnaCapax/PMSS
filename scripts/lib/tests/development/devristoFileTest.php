@@ -11,14 +11,10 @@ class DevristoFileTest extends TestCase
 {
     public function testConstructorThrowsOnInvalidData(): void
     {
-        $threw = false;
-        try {
+        $this->assertThrows(\InvalidArgumentException::class, static function (): void {
             $data = ['name' => 'a']; // missing length and/or path
             new TorrentFile($data);
-        } catch (\InvalidArgumentException $e) {
-            $threw = true;
-        }
-        $this->assertTrue($threw, 'Constructor should reject invalid data');
+        });
     }
 
     public function testGettersWithPathArray(): void

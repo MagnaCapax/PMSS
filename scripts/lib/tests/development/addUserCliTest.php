@@ -15,10 +15,9 @@ class addUserCliTest extends TestCase
             $this->assertSame($profile, $this->parseAddUserCli(array_merge($args, array('--app-profile='.$profile)))['user']['appProfile']);
         }
         foreach (array('', 'OpenClaw', 'other', 'openclaw;id', '../openclaw', str_repeat('a', 41), "default\n", "default\0") as $profile) {
-            $threw = false;
-            try { $this->parseAddUserCli(array_merge($args, array('--app-profile='.$profile))); }
-            catch (\InvalidArgumentException $e) { $threw = true; }
-            $this->assertTrue($threw, 'Invalid app profile accepted');
+            $this->assertThrows(\InvalidArgumentException::class, function () use ($args, $profile): void {
+                $this->parseAddUserCli(array_merge($args, array('--app-profile='.$profile)));
+            });
         }
         $names = implode(', ', array_keys(\pmssUserAppProfiles()));
         $this->assertStringContainsAllStrings(['--app-profile=PROFILE', $names], \pmssAddUserCliUsage());

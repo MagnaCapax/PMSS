@@ -81,10 +81,9 @@ It\'s \$host \\ safe 2026-11-30
 NGINX;
         $this->assertSame($expected, \pmssNginxMovedPage("It's \$host \\ safe ##movedUntil", '2026-11-30'));
         foreach (['2026-02-30', '2026-1-1', '2026-11-30;return 200 x'] as $date) {
-            $rejected = false;
-            try { \pmssNginxMovedPage('date ##movedUntil', $date); }
-            catch (\RuntimeException $error) { $rejected = true; }
-            $this->assertTrue($rejected);
+            $this->assertThrowsRuntime(static function () use ($date): void {
+                \pmssNginxMovedPage('date ##movedUntil', $date);
+            });
         }
     }
 }

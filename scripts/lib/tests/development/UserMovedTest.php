@@ -31,10 +31,9 @@ class UserMovedTest extends TestCase
             ['mvdtst', '--until=0000-01-01'], ['mvdtst', '--until=2026-00-01'], ['mvdtst', '--until=2026-12-32'],
             ['mvdtst', "--until=2026-01-01\n"], ['mvdtst', '--until=2026-01-01;id'], ['mvdtst', '--until=$(id)']];
         foreach ($cases as $args) {
-            $rejected = false;
-            try { \pmssUserMovedParseArguments(array_merge(['userMoved.php'], $args)); }
-            catch (\InvalidArgumentException $error) { $rejected = true; }
-            $this->assertTrue($rejected, json_encode($args));
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($args): void {
+                \pmssUserMovedParseArguments(array_merge(['userMoved.php'], $args));
+            });
             // Invoke the real CLI too: errors must have a failing exit status.
             $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->pmssRepoPath('scripts/userMoved.php'));
             foreach ($args as $arg) $command .= ' '.escapeshellarg($arg);

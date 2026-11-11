@@ -238,13 +238,9 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $cfg = $this->rtorrentConfigFixture();
 
         foreach (['BadName', '../root', 'user/name', 'dummy;rm'] as $username) {
-            try {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($cfg, $username): void {
                 $cfg->writeConfig($username, "x = y\n");
-            } catch (\InvalidArgumentException $exception) {
-                $this->assertStringContainsString('valid PMSS username', $exception->getMessage());
-                continue;
-            }
-            $this->fail('Expected invalid username to be rejected: '.$username);
+            }, 'valid PMSS username');
         }
     }
 

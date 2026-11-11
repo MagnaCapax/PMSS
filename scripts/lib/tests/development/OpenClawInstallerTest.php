@@ -95,12 +95,9 @@ final class OpenClawInstallerTest extends TestCase
     public function testUpdateRefusesMissingEntryBeforeQuotaOrGatewayWork(): void
     {
         $paths = \ocPaths($this->pmssMakeTempDir('pmss-oc-missing-'));
-        try {
+        $this->assertThrowsRuntime(static function () use ($paths): void {
             \ocUpdate($paths);
-            $this->assertTrue(false, 'Missing installation accepted');
-        } catch (\RuntimeException $error) {
-            $this->assertStringContainsString('not installed', $error->getMessage());
-        }
+        }, 'not installed');
         $this->assertFalse(file_exists($paths['state']));
     }
 
@@ -348,10 +345,9 @@ LIGHTTPD;
             str_replace('127.0.0.1', 'evil.example', $json), str_replace('23000', '23001', $json),
             json_encode(array('browserUrl' => 'http://127.0.0.1:23000'.$base.'/#token=long-lived')),
             json_encode(array('browserUrl' => 'http://127.0.0.1:23000'.$base.'/#bootstrapToken[]=x'))) as $invalid) {
-            $threw = false;
-            try { \ocDashboardUrlRewrite($invalid, 'https://server.example', $base, 23000); }
-            catch (\RuntimeException $e) { $threw = true; }
-            $this->assertTrue($threw, 'Malformed handoff accepted');
+            $this->assertThrowsRuntime(static function () use ($invalid, $base): void {
+                \ocDashboardUrlRewrite($invalid, 'https://server.example', $base, 23000);
+            });
         }
     }
 
@@ -361,12 +357,9 @@ LIGHTTPD;
         mkdir($root.'/fixtur01');
         $paths = array('home' => $root.'/fixtur01');
         $calls = 0;
-        try {
+        $this->assertThrowsRuntime(static function () use ($paths, &$calls): void {
             \ocProxyApply($paths, 23000, static function () use (&$calls): bool { return ++$calls > 1; });
-            $this->assertTrue(false, 'Expected rollback error');
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('panel recovered', $e->getMessage());
-        }
+        }, 'panel recovered');
         $this->assertSame(2, $calls);
         $file = $paths['home'].'/.lighttpd/custom.d/openclaw.conf';
         $this->assertFalse(file_exists($file));
@@ -375,10 +368,9 @@ LIGHTTPD;
         \ocProxyApply($paths, null, static function (): bool { return true; });
         $this->assertFalse(file_exists($file));
         symlink($root.'/outside', $file);
-        $threw = false;
-        try { \ocProxyApply($paths, 23000, static function (): bool { return true; }); }
-        catch (\RuntimeException $e) { $threw = true; }
-        $this->assertTrue($threw);
+        $this->assertThrowsRuntime(static function () use ($paths): void {
+            \ocProxyApply($paths, 23000, static function (): bool { return true; });
+        });
         $this->assertFalse(file_exists($root.'/outside'));
     }
 
