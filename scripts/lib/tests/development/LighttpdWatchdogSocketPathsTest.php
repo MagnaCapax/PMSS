@@ -51,7 +51,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testBuildsOnlyStartupSocketPathsWhenConfigHasDemandSpawnedWorkers(): void
     {
-        $configPath = $this->writeConfig("\"max-procs\" => 6\n\"min-procs\" => 1");
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "\"max-procs\" => 6\n\"min-procs\" => 1\n");
 
         $this->assertEquals(
             [$this->tempDir.'/.lighttpd/php.socket-0'],
@@ -61,7 +61,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testFallsBackToLegacySocketProbeWhenMaxProcsMissing(): void
     {
-        $configPath = $this->writeConfig('server.port = 12345');
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "server.port = 12345\n");
 
         $this->assertEquals(
             [$this->tempDir.'/.lighttpd/php.socket-0'],
@@ -71,7 +71,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testFallsBackToLegacySocketProbeWhenMaxProcsInvalid(): void
     {
-        $configPath = $this->writeConfig('"max-procs" => 0');
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "\"max-procs\" => 0\n");
 
         $this->assertEquals(
             [$this->tempDir.'/.lighttpd/php.socket-0'],
@@ -81,7 +81,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testBuildsSingleSocketPathWhenOnlyOneWorkerExpected(): void
     {
-        $configPath = $this->writeConfig("\"max-procs\" => 1\n\"min-procs\" => 1");
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "\"max-procs\" => 1\n\"min-procs\" => 1\n");
 
         $this->assertEquals(
             [$this->tempDir.'/.lighttpd/php.socket-0'],
@@ -91,7 +91,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testBuildsSingleSocketPathWhenMinProcsMissing(): void
     {
-        $configPath = $this->writeConfig('"max-procs" => 1');
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "\"max-procs\" => 1\n");
 
         $this->assertEquals(
             [$this->tempDir.'/.lighttpd/php.socket-0'],
@@ -101,7 +101,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testBuildsEveryStartupSocketPathWhenMinProcsMatchesMultipleWorkers(): void
     {
-        $configPath = $this->writeConfig("\"max-procs\" => 6\n\"min-procs\" => 3");
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "\"max-procs\" => 6\n\"min-procs\" => 3\n");
 
         $this->assertEquals(
             [
@@ -115,7 +115,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testFallsBackToMaxProcsWhenMinProcsMissing(): void
     {
-        $configPath = $this->writeConfig('"max-procs" => 3');
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "\"max-procs\" => 3\n");
 
         $this->assertEquals(
             [
@@ -129,7 +129,7 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     public function testClampsInvalidMinProcsToConfiguredMaxProcs(): void
     {
-        $configPath = $this->writeConfig("\"max-procs\" => 3\n\"min-procs\" => 6");
+        $configPath = $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', "\"max-procs\" => 3\n\"min-procs\" => 6\n");
 
         $this->assertEquals(
             [
@@ -149,10 +149,5 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
             [$this->tempDir.'/.lighttpd/php.socket-0'],
             \pmssLighttpdWatchdogSocketPaths($this->tempDir, $configPath)
         );
-    }
-
-    private function writeConfig(string $body): string
-    {
-        return $this->pmssWriteFile($this->tempDir.'/lighttpd.conf', $body."\n");
     }
 }

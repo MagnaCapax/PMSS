@@ -5,15 +5,10 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class UserPasswordsCustomerHelperTest extends TestCase
 {
-    private function helperPath(): string
-    {
-        return $this->pmssRepoPath('etc/skel/www/userPasswords.php');
-    }
-
     private function assertLocalclientPassword(string $expected, string $path): void
     {
         $script = 'echo json_encode(array("password" => pmssDelugeAuthReadLocalclientPassword('.var_export($path, true).')));';
-        $this->assertSame($expected, $this->pmssRunInlinePhpRequireJson($this->helperPath(), $script)['password']);
+        $this->assertSame($expected, $this->pmssRunRepoInlinePhpRequireJson('etc/skel/www/userPasswords.php', $script)['password']);
     }
 
     public function testReadLocalclientPasswordReturnsEmptyWhenMissing(): void
@@ -72,8 +67,8 @@ final class UserPasswordsCustomerHelperTest extends TestCase
             .json_encode(array('pwd_salt' => $salt, 'pwd_sha1' => sha1($salt.'old-secret'), 'sessions' => (object) array()), JSON_UNESCAPED_SLASHES)
         );
 
-        $result = $this->pmssRunInlinePhpRequireJson(
-            $this->helperPath(),
+        $result = $this->pmssRunRepoInlinePhpRequireJson(
+            'etc/skel/www/userPasswords.php',
             '$rotated = pmssDelugeServicePasswordRotate("fixtur01");'
             .'$parsed = pmssUserPasswordsWebConfRead('.var_export($webConfPath, true).');'
             .'echo json_encode(array("rotated" => $rotated, "parsed" => $parsed));',

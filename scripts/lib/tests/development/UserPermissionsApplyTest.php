@@ -22,11 +22,6 @@ class UserPermissionsApplyTest extends TestCase
         parent::tearDown();
     }
 
-    private function home(): string
-    {
-        return $this->pmssEnsureDir($this->tempDir.'/home');
-    }
-
     private function file(string $path, int $mode, string $content = 'kept'): string
     {
         $this->pmssEnsureDir(dirname($path));
@@ -49,7 +44,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testStripOnlyKeepsStricterModesAndClearsOtherBits(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $config = $this->pmssEnsureDir($home.'/.config');
         $this->assertTrue(chmod($config, 0755));
         $private = $this->pmssEnsureDir($config.'/private');
@@ -82,7 +77,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testPluginLaunchersRecoverAfterWebExecStrip(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $thisUser = 'fixtur01';
         $prefix = "/home/{$thisUser}";
         $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
@@ -138,7 +133,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testAccountOwnedTreeIsNormalisedWithoutFollowingLinks(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $outside = $this->file($this->tempDir.'/outside/state', 0600);
         $config = $this->pmssEnsureDir($home.'/.config');
         $this->assertTrue(chmod($config, 0700));
@@ -164,7 +159,7 @@ class UserPermissionsApplyTest extends TestCase
         if (!is_array($other) || $other['uid'] === posix_geteuid()) {
             throw new SkipTest('no second account to compare with');
         }
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $file = $this->file($home.'/.viminfo', 0600);
 
         \pmssUserPermissionsModeApply('nobody', $home, $other['uid'], $file, 0640);
@@ -177,7 +172,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testFinalLinkAndLinkedDirectoryLeaveOutsideFilesUnchanged(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $outside = $this->file($this->tempDir.'/outside/rutorrent/conf/config.php', 0600);
         $this->pmssCreateSymlinkOrSkip($outside, $home.'/.viminfo');
         $this->pmssCreateSymlinkOrSkip($this->tempDir.'/outside', $home.'/www');
@@ -194,7 +189,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testOpenedFileModeAppliesOnlyToSingleLinkFilesInsideHome(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $uid = posix_geteuid();
         $owner = $this->pmssCurrentOwner();
         $marker = $this->file($home.'/.quota', 0600, "100\n");
@@ -216,7 +211,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testOpenedHandleOutsideHomeIsRefusedWhateverTheNameSays(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $uid = posix_geteuid();
         $outside = $this->file($this->tempDir.'/outside/conf/config.php', 0600);
         $this->pmssCreateSymlinkOrSkip($this->tempDir.'/outside/conf', $home.'/conf');
@@ -245,7 +240,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testAnchoredFindReachesOnlyTheTargetThroughRealDirectories(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $target = $this->file($home.'/www/rutorrent/conf/config.php', 0644);
         $sibling = $this->file($home.'/www/rutorrent/conf/other.php', 0644);
         $outside = $this->file($this->tempDir.'/outside/rutorrent/conf/config.php', 0644);
@@ -282,7 +277,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testAnchoredFindRejectsPathsItCannotPlace(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         foreach ([$this->tempDir.'/elsewhere', $home.'/../x', $home.'/a/./b', $home.'//a', $home.'x/a', "{$home}/a\0b"] as $path) {
             $this->assertSame(null, \pmssUserPermissionsAnchoredFind($home, $path, false, '-true', '-true'), $path);
         }
@@ -291,7 +286,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testOwnerApplyRunsChownInsideTheHeldDirectory(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $file = $this->file($home.'/.lighttpd/.htpasswd', 0640);
         $spec = posix_geteuid().':'.posix_getegid();
 
@@ -306,7 +301,7 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testOpenedGroupSetNeverAdoptsAFileOwnedBySomeoneElse(): void
     {
-        $home = $this->home();
+        $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $uid = posix_geteuid();
         $owner = $this->pmssCurrentOwner();
         $group = posix_getgrgid(posix_getegid());

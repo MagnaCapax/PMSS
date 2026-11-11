@@ -5,14 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class NginxDefaultTlsTemplateTest extends TestCase
 {
-    private function template(): string
-    {
-        return $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default-ssl');
-    }
-
     public function testDefaultSiteInheritsProtocolsAndKeepsOnlyExistingAeadCiphers(): void
     {
-        $template = $this->template();
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default-ssl');
         foreach (['SSLv3', 'TLSv1.1', 'DES-CBC3', 'ssl_protocols'] as $removed) {
             $this->assertFalse(strpos($template, $removed) !== false);
         }
@@ -53,7 +48,7 @@ class NginxDefaultTlsTemplateTest extends TestCase
         $site = str_replace(
             ['/etc/nginx/ssl/nginx.crt', '/etc/nginx/ssl/nginx.key'],
             [$cert, $key],
-            $this->template()
+            $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default-ssl')
         );
         // Unprivileged syntax check: no system log, temp or low-port access from a CI runner.
         $temps = '';
