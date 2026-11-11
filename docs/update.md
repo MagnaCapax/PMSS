@@ -429,7 +429,10 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).
    An empty managed-user list still refreshes the global nginx default site
-   and runs the config test. The final refresh uses `--reload` after a passing
+   and runs the config test. This also replaces a stale self-signed default-site
+   configuration when all four required Let's Encrypt files exist and are
+   readable, without waiting for the first account (Refs #942).
+   The final refresh uses `--reload` after a passing
    test, starting nginx if it is stopped; an explicit `--restart` remains
    available for callers that need a full restart. The certificate setup step
    also reloads nginx after rebuilding and validating its configuration.
