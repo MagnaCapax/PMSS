@@ -181,4 +181,67 @@ class UpdateServicesBootstrapTest extends TestCase
         }));
         $this->assertFalse($called);
     }
+
+    /** Exercise scripts/lib/quota/mount.php's caller with in-memory fstab and command capture. */
+    public function testQuotaBootstrapRemountsFreshFstabOptionsOnlyWhenQuotaIsOff(): void
+    {
+        $journaled = 'usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1';
+        $stubs = <<<'PHP'
+namespace PMSS\QuotaBootstrapFixture;
+function is_dir($path) { return true; }
+function pmssEnsureQuotaOptions($mount, $options, $logger) {
+    $GLOBALS['trace'][] = ['quota-options', $mount];
+    \pmssFstabMountOptionsEnsure($GLOBALS['fstab'], $mount,
+        ['usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1']);
+}
+function pmssEnsureJournalCommitOption($mount, $seconds, $logger) {}
+function pmssEnsureMountNofailOption($mount, $logger) {}
+function pmssFstabLinesRead($path, $logger, $context) {
+    $GLOBALS['trace'][] = ['fstab', $path];
+    return $GLOBALS['fstab'];
+}
+function pmssCommandCapture($command) {
+    $GLOBALS['trace'][] = ['probe', $command];
+    return ['rc' => $GLOBALS['rc'], 'stdout' => '', 'stderr' => ''];
+}
+function pmssQuotaCommandRun($command) {
+    return \pmssQuotaCommandRun($command, __NAMESPACE__.'\\pmssCommandCapture');
+}
+function runStep($description, $command) { $GLOBALS['trace'][] = ['remount', $command]; }
+function pmssWarnPendingJournalCommit($mount, $options, $logger) {
+    $GLOBALS['trace'][] = ['pending', $mount];
+}
+function pmssWarnUnexpectedQuotaFiles($mount, $logger) { $GLOBALS['trace'][] = ['files', $mount]; }
+PHP;
+        $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/quota/mount.php'), true).';'
+            .'eval('.var_export($stubs, true).');';
+        foreach (['pmssConfigureQuotaMount', 'pmssJournaledQuotaRemountBlocked'] as $function) {
+            $script .= \pmssTestingFunctionExport($function, 'PMSS\QuotaBootstrapFixture');
+        }
+
+        foreach ([
+            ['/home', 'defaults', 0, true],
+            ['/home', $journaled, 0, true],
+            ['/home', $journaled, 1, false],
+            ['/home', $journaled, 2, false],
+            ['/srv/fixture-data', 'defaults', 0, true],
+        ] as [$mount, $options, $rc, $remount]) {
+            // The real parser sees the options just added above, as it does on a fresh install.
+            $fixture = '$GLOBALS["fstab"] = '.var_export(["fixture {$mount} ext4 {$options} 0 0"], true).';'
+                .'$GLOBALS["rc"] = '.$rc.'; $GLOBALS["trace"] = [];'
+                .'\PMSS\QuotaBootstrapFixture\pmssConfigureQuotaMount(static function ($message) {});'
+                .'echo json_encode($GLOBALS["trace"]);';
+            $run = $this->pmssExecInlinePhpWithTempStderr($script.$fixture, [
+                'PMSS_SKIP_QUOTA' => '0', 'PMSS_QUOTA_MOUNT' => $mount,
+            ]);
+            $this->assertSame(0, $run['result']['rc'], (string) @file_get_contents($run['stderrPath']));
+            $this->assertSame([
+                ['quota-options', $mount],
+                ['fstab', '/etc/fstab'],
+                ['probe', 'quotaon -p '.escapeshellarg($mount)],
+                $remount ? ['remount', 'mount -o remount '.escapeshellarg($mount)] : ['pending', $mount],
+                ['files', $mount],
+            ], $this->pmssDecodeJsonArray($run['result']['output']), $mount.' rc='.$rc.' options='.$options);
+        }
+    }
 }
