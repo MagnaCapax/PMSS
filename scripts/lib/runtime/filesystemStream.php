@@ -3,11 +3,13 @@
 
 /**
  * Open with a caller-selected creation mask, restoring process state before returning or throwing.
- * Path checks, open mode, stream ownership and cleanup remain with the caller.
+ * Reject malformed path/mode bytes; path policy, mode choice and stream ownership stay with the caller.
  * @return resource|false
  */
 function pmssFileOpenWithUmask(string $path, string $mode, int $mask)
 {
+    // Keep malformed opens on the false-result path before changing process state.
+    if ($path === '' || $mode === '' || strpos($path, "\0") !== false || strpos($mode, "\0") !== false) return false;
     $previous = umask($mask);
     try {
         return @fopen($path, $mode);

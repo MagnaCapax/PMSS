@@ -188,6 +188,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   stdout, or terminates execution itself.
 
 - `pmssFileWriteComplete()` returns `false` for NUL-containing paths before invoking a writer; valid paths retain complete-byte write semantics.
+- `pmssFileOpenWithUmask()` returns `false` for empty or NUL-containing paths
+  or modes before changing umask or invoking the opener. Valid arguments pass
+  through unchanged; the caller's umask is restored on success, failed opens,
+  exceptions and errors. Successful streams remain caller-owned.
 - `pmssReadRegularFileContentsVerified()` returns `null` for a `PHP_INT_MAX` byte limit, whose one-byte overread would overflow the stream length; valid bounded reads retain their content and metadata contract.
 - `pmssProcMeminfoFieldsRead()` omits counters above `PHP_INT_MAX` before casting;
   an invalid duplicate leaves any prior valid field intact. Representable values,
