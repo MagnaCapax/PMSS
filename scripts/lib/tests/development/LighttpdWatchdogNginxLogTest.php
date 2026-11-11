@@ -99,13 +99,12 @@ PHP;
 
     public function testNginxTemplateEmitsTheParserSuffix(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-conf');
-        $this->assertStringContainsString('log_format pmss_combined', $template);
-        $this->assertStringContainsString('pmss_status="$status"', $template);
-        $this->assertStringContainsString('pmss_upstream_addr="$upstream_addr"', $template);
-        $this->assertStringContainsString('pmss_upstream_status="$upstream_status"', $template);
-        $this->assertStringContainsString('pmss_upstream_header_time="$upstream_header_time"', $template);
-        $this->assertStringContainsString('access_log /var/log/nginx/access.log pmss_combined;', $template);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.nginx-conf', [
+            'log_format pmss_combined', 'pmss_status="$status"',
+            'pmss_upstream_addr="$upstream_addr"', 'pmss_upstream_status="$upstream_status"',
+            'pmss_upstream_header_time="$upstream_header_time"',
+            'access_log /var/log/nginx/access.log pmss_combined;',
+        ]);
     }
 
     public function testParserTreatsApplication502WithHeaderAsHealthyHop(): void

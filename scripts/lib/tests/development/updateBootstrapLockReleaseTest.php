@@ -93,8 +93,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
             $this->pmssTestModeEnv());
 
         $this->assertEquals(0, $result['rc'], 'runtime shell invocation should complete');
-        $this->assertStringContainsString('exec 3>&- 4>&- 9>&- 1048576>&-; ', $result['output']);
-        $this->assertStringContainsString('printf ok', $result['output']);
+        $this->assertStringContainsAllStrings(['exec 3>&- 4>&- 9>&- 1048576>&-; ', 'printf ok'], $result['output']);
     }
 
     public function testRuntimeLockFdListRejectsUnsafeFdRootFailSoft(): void

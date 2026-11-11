@@ -421,9 +421,8 @@ PHP;
         });
 
         $this->assertEquals("fixtur01\n", (string) file_get_contents($marker));
-        $this->assertStringContainsString('Start Demo for user: fixtur01', $output);
-        $this->assertStringNotContainsString('Start Demo for user: fixtur02', $output);
-        $this->assertStringNotContainsString('Start Demo for user: fixtur03', $output);
+        $this->assertStringContainsAndOmitsStrings(['Start Demo for user: fixtur01'],
+            ['Start Demo for user: fixtur02', 'Start Demo for user: fixtur03'], $output);
     }
 
     public function testRunServiceStopsWhenListUsersCommandFails(): void

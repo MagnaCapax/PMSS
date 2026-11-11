@@ -337,9 +337,8 @@ SH
 
     public function testStaticFallback502PageQualifiesTicketGuidance(): void
     {
-        $contents = $this->pmssReadRepoFile('var/www/error-502.html');
-        $this->assertStringContainsString('If this continues for more than a few minutes, open a support ticket.', $contents);
-        $this->assertStringContainsString('stop the torrent client before deleting files', $contents);
+        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-502.html',
+            ['If this continues for more than a few minutes, open a support ticket.', 'stop the torrent client before deleting files']);
     }
 
     public function testWriteErrorPageCreatesExpectedPerUserPath(): void

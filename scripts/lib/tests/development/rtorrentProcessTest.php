@@ -644,9 +644,8 @@ PHP;
     public function testResetSessionDirectoryUsesLinkAwareMetadataCalls(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/rtorrent/recovery.php');
-        $this->assertStringContainsString('@lchown($sessionDir, $user)', $source);
-        $this->assertStringContainsString('@lchgrp($sessionDir, (int) $pw[\'gid\'])', $source);
-        $this->assertStringContainsString('return is_dir($sessionDir) && !is_link($sessionDir);', $source);
+        $this->assertStringContainsAllStrings(['@lchown($sessionDir, $user)', '@lchgrp($sessionDir, (int) $pw[\'gid\'])',
+            'return is_dir($sessionDir) && !is_link($sessionDir);'], $source);
         $this->assertFalse(strpos($source, '@chown($sessionDir, $user)') !== false);
     }
 }
