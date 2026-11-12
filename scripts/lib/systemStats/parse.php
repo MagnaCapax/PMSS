@@ -109,6 +109,8 @@ function pmssSystemStatsDiskBusyPercent(array $before, array $after, float $samp
 /** Read one PSI field with the shared percentage/integer boundary rules. */
 function pmssSystemStatsPsiMetricFromRaw(string $raw, string $row, string $name): ?float
 {
+    // A valid-looking field cannot make a NUL-corrupted kernel record trustworthy.
+    if (strpos($raw, "\0") !== false) return null;
     // Require a complete field name on the requested row, never the following row.
     if (!preg_match('/^'.preg_quote($row, '/').'[ \t][^\r\n]*?(?<=[ \t])'.preg_quote($name, '/').'=([0-9]+(?:\.[0-9]+)?)(?=\s|$)/m', $raw, $match)) return null;
     $number = (float) $match[1];

@@ -71,3 +71,11 @@ valid metrics, first-match precedence, formatting and output order are unchanged
 `HostStatsCharacterizationTest` covers both consumers with malformed row and
 field boundaries, tabs, CRLF, repeated rows and repeated fields. These fixtures
 run only on testing machines.
+
+The shared PSI field validator rejects NUL bytes anywhere in the raw kernel
+record before matching fields. A valid-looking field cannot hide corruption in
+another field or row. System-stats rendering keeps its `na` fallback; numeric
+consumers keep `null`. Valid values, whitespace, first-match precedence, missing
+field policies and formatting remain unchanged. `SystemStatsPsiInputSafetyTest`
+covers raw corruption and both read consumers with synthetic data; execution
+stays on testing machines.
