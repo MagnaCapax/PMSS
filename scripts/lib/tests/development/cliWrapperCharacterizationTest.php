@@ -103,38 +103,26 @@ PHP;
 
     public function testThinWrappersDelegateDirectlyToUtilScripts(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/systemTest.php' => [
-                'required' => ["require_once __DIR__.'/lib/runtime.php';", "pmssRequireCliEntrypointScript(__DIR__, 'util/systemTest.php');"],
-                'forbidden' => ['$argv'],
-            ],
-            'scripts/userDocker.php' => [
-                'required' => ["require_once __DIR__.'/lib/runtime.php';", "pmssRequireCliEntrypointScript(__DIR__, 'util/userDocker.php');"],
-                'forbidden' => ['$argv'],
-            ],
-            'scripts/userResourcesList.php' => [
-                'required' => ["require_once __DIR__.'/lib/runtime.php';", "pmssRequireCliEntrypointScript(__DIR__, 'util/userResourcesList.php');"],
-                'forbidden' => ['$argv'],
-            ],
-        ]);
+        foreach (['systemTest', 'userDocker', 'userResourcesList'] as $script) {
+            $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/'.$script.'.php',
+                ["require_once __DIR__.'/lib/runtime.php';", "pmssRequireCliEntrypointScript(__DIR__, 'util/".$script.".php');"], ['$argv']);
+        }
     }
 
     public function testUserDockerKeepsSharedStopAndSocketGuards(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/docker/stop.php' => ['required' => ['userDockerStopScan($user, $uid)']],
-            'scripts/lib/user/docker/start.php' => ['required' => [
-                '$socketPresent = file_exists($dockerSock);',
-                'Docker socket present for {$user}, but process check failed; skipping start',
-                'Docker start requested for {$user} via dockerd-rootless.sh',
-            ]],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/docker/stop.php', ['userDockerStopScan($user, $uid)']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/docker/start.php', [
+            '$socketPresent = file_exists($dockerSock);',
+            'Docker socket present for {$user}, but process check failed; skipping start',
+            'Docker start requested for {$user} via dockerd-rootless.sh',
         ]);
     }
 
     public function testCliEntrypointsUseSharedRuntimeHelpers(): void
     {
-        $this->pmssAssertRepoFileContractCases(array_merge(array_fill_keys(
-            [
+        foreach ([
+            'pmssRunCliEntrypointWithArgv' => [
                 'scripts/showResources.php',
                 'scripts/showTraffic.php',
                 'scripts/cron/scheduledConfigBackup.php',
@@ -143,24 +131,20 @@ PHP;
                 'scripts/util/userConfigCgroup.php',
                 'scripts/util/userConfigLighttpd.php',
             ],
-            ['required' => ['pmssRunCliEntrypointWithArgv(__FILE__,'], 'forbidden' => ["PHP_SAPI === 'cli'"]]
-        ), array_fill_keys(
-            ['scripts/cron/checkDirectories.php', 'scripts/cron/rtorrentPortReservationsReconcile.php'],
-            ['required' => ['pmssRunCliEntrypoint(__FILE__,'], 'forbidden' => ["PHP_SAPI === 'cli'"]]
-        )));
+            'pmssRunCliEntrypoint' => ['scripts/cron/checkDirectories.php', 'scripts/cron/rtorrentPortReservationsReconcile.php'],
+        ] as $entrypoint => $scripts) {
+            foreach ($scripts as $script) {
+                $this->pmssAssertRepoFileContainsAndOmitsStrings($script, [$entrypoint.'(__FILE__,'], ["PHP_SAPI === 'cli'"]);
+            }
+        }
     }
 
     public function testLegacyCheckInstancesWrapperDelegatesInProcess(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/checkInstances.php' => [
-                'required' => [
-                    "\$target = __DIR__.'/checkRtorrent.php';",
-                    'missing; cannot run rTorrent watchdog',
-                    'require $target;',
-                ],
-                'forbidden' => ['pmss-check'.'Instances.lock', 'passthru($cmd', 'array_shift($args)', 'escapeshellarg($target)'],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkInstances.php', [
+            "\$target = __DIR__.'/checkRtorrent.php';",
+            'missing; cannot run rTorrent watchdog',
+            'require $target;',
+        ], ['pmss-check'.'Instances.lock', 'passthru($cmd', 'array_shift($args)', 'escapeshellarg($target)']);
     }
 }

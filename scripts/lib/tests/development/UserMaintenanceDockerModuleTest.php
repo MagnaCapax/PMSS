@@ -69,15 +69,11 @@ class UserMaintenanceDockerModuleTest extends TestCase
             return 'function '.$function.'(';
         }, ['pmssEnsureLingerAndDocker', 'pmssEnsureRootlessDockerInstalled', 'pmssEnsureDockerDependencies']);
 
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/userMaintenance.php' => [
-                'required' => ["'users/docker.php'"],
-                'forbidden' => $dockerFunctions,
-            ],
-            'scripts/lib/update/users/docker.php' => ['required' => [$dockerFunctions[0], "'dockerInstall.php'", "'dockerDependencies.php'"]],
-            'scripts/lib/update/users/dockerInstall.php' => ['required' => [$dockerFunctions[1]]],
-            'scripts/lib/update/users/dockerDependencies.php' => ['required' => [$dockerFunctions[2]]],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', ["'users/docker.php'"], $dockerFunctions);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php',
+            [$dockerFunctions[0], "'dockerInstall.php'", "'dockerDependencies.php'"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerInstall.php', [$dockerFunctions[1]]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerDependencies.php', [$dockerFunctions[2]]);
     }
 
     public function testDockerUnitKeptFunctionalAndPriorMaskReverted(): void
@@ -87,15 +83,9 @@ class UserMaintenanceDockerModuleTest extends TestCase
         // treats broken `systemctl --user` as a fault to FIX). It MUST stay functional — it is
         // NOT masked. A unit a prior release masked (symlink -> /dev/null) is un-masked so the
         // real customer-usable unit is restored.
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/users/dockerInstall.php' => [
-                'required' => ["=== '/dev/null'", 'unit present and valid'],
-                'forbidden' => ['pmssNeutralizeUserDockerServiceUnit', 'neutralised (masked)'],
-            ],
-            'scripts/lib/user/rootlessDockerConfig.php' => [
-                'required' => ['pmssUserRootlessDockerConfigConverge'],
-                'forbidden' => ['pmssNeutralizeUserDockerServiceUnit'],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/dockerInstall.php',
+            ["=== '/dev/null'", 'unit present and valid'], ['pmssNeutralizeUserDockerServiceUnit', 'neutralised (masked)']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/rootlessDockerConfig.php',
+            ['pmssUserRootlessDockerConfigConverge'], ['pmssNeutralizeUserDockerServiceUnit']);
     }
 }

@@ -9,21 +9,16 @@ class FuseOverlayfsSupportTest extends TestCase
     public function testFuseOverlayfsContractsStayCentralized(): void
     {
         $this->assertSame('apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold fuse-overlayfs', \pmssDistUpgradeAptCommand('', 'install', 'fuse-overlayfs'));
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/distUpgrade/docker.php' => ['required' => [
-                'pmssEnsureFuseOverlayfsAfterDistUpgrade',
-                'apt-cache show fuse-overlayfs',
-                "pmssDistUpgradeAptCommand(\$env, 'install', 'fuse-overlayfs')",
-                'fuse-overlayfs',
-            ]],
-            'scripts/lib/update/userMaintenance.php' => ['required' => ["'users/docker.php'"]],
-            'scripts/lib/update/users/dockerDependencies.php' => [
-                'required' => ['fuse-overlayfs', 'disable_containerd_snapshotter'],
-                'forbidden' => [
-                    'if ($distroVersion >= 12)' => 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available',
-                ],
-            ],
-            'scripts/lib/user/rootlessDockerPolicy.php' => ['required' => ['containerd-snapshotter']],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/distUpgrade/docker.php', [
+            'pmssEnsureFuseOverlayfsAfterDistUpgrade',
+            'apt-cache show fuse-overlayfs',
+            "pmssDistUpgradeAptCommand(\$env, 'install', 'fuse-overlayfs')",
+            'fuse-overlayfs',
         ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', ["'users/docker.php'"]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/dockerDependencies.php',
+            ['fuse-overlayfs', 'disable_containerd_snapshotter'],
+            ['if ($distroVersion >= 12)' => 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/rootlessDockerPolicy.php', ['containerd-snapshotter']);
     }
 }

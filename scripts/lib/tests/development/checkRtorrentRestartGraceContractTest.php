@@ -42,48 +42,45 @@ class checkRtorrentRestartGraceContractTest extends TestCase
 
     public function testRestartGraceKeepsSharedHelperLaunchAndMarkers(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/checkRtorrent.php' => [
-                'required' => [
-                    'pmssCheckRtorrentHandleMissingProcess(',
-                    'pmssCheckRtorrentHandleAliveProcess(',
-                    'PMSS_RTORRENT_MISSING_GRACE',
-                    'PMSS_RTORRENT_START_FAILURE_SESSION_RESET',
-                    'PMSS_RTORRENT_START_FAILURE_ESCALATE',
-                    'PMSS_RTORRENT_UNRESPONSIVE_GRACE',
-                    'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
-                ],
-                'forbidden' => ["@passthru('/scripts/startRtorrent "],
-            ],
-            'scripts/lib/rtorrent/process.php' => ['required' => [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkRtorrent.php', [
+            'pmssCheckRtorrentHandleMissingProcess(',
+            'pmssCheckRtorrentHandleAliveProcess(',
+            'PMSS_RTORRENT_MISSING_GRACE',
+            'PMSS_RTORRENT_START_FAILURE_SESSION_RESET',
+            'PMSS_RTORRENT_START_FAILURE_ESCALATE',
+            'PMSS_RTORRENT_UNRESPONSIVE_GRACE',
+            'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
+        ], ["@passthru('/scripts/startRtorrent "]);
+        foreach ([
+            'scripts/lib/rtorrent/process.php' => [
                 "require_once __DIR__.'/watchdogState.php';",
                 "require_once __DIR__.'/processLifecycle.php';",
-            ]],
-            'scripts/lib/rtorrent/processLifecycle.php' => ['required' => [
+            ],
+            'scripts/lib/rtorrent/processLifecycle.php' => [
                 'function rtorrentProcessStart(',
                 'rtorrentProcessWriteStateFile(rtorrentProcessRestartMarkerPath($user), $now);',
-            ]],
-            'scripts/lib/rtorrent/watchdog.php' => ['required' => [
+            ],
+            'scripts/lib/rtorrent/watchdog.php' => [
                 "require_once __DIR__.'/watchdogProcessFlow.php';",
-            ]],
-            'scripts/lib/rtorrent/watchdogProcessFlow.php' => ['required' => [
+            ],
+            'scripts/lib/rtorrent/watchdogProcessFlow.php' => [
                 "require_once __DIR__.'/watchdogEscalation.php';",
                 "require_once __DIR__.'/watchdogMissing.php';",
                 "require_once __DIR__.'/watchdogScgi.php';",
-            ]],
-            'scripts/lib/rtorrent/watchdogState.php' => ['required' => [
+            ],
+            'scripts/lib/rtorrent/watchdogState.php' => [
                 "require_once __DIR__.'/watchdogEscalation.php';",
                 "require_once __DIR__.'/watchdogScgi.php';",
-            ]],
-            'scripts/lib/rtorrent/watchdogMissing.php' => ['required' => [
+            ],
+            'scripts/lib/rtorrent/watchdogMissing.php' => [
                 'function pmssCheckRtorrentHandleMissingProcess(',
                 "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
                 'persistent start failure recovery: reset session directory',
-            ]],
-            'scripts/lib/rtorrent/watchdogEscalation.php' => ['required' => [
+            ],
+            'scripts/lib/rtorrent/watchdogEscalation.php' => [
                 'persistent start failure escalated; leaving retry disabled for external monitoring',
-            ]],
-            'scripts/lib/rtorrent/watchdogScgi.php' => ['required' => [
+            ],
+            'scripts/lib/rtorrent/watchdogScgi.php' => [
                 'function pmssCheckRtorrentHandleAliveProcess(',
                 'rtorrentProcessUnresponsiveGraceState($restartMarker, $unresponsiveGrace)',
                 "time() - \$graceState['restartAge']",
@@ -93,7 +90,9 @@ class checkRtorrentRestartGraceContractTest extends TestCase
                 '$restartAge < 7200',
                 '$restartAge < 14400',
                 'max($baseGrace, $restartAge < 7200 ? 600 : 1200)',
-            ]],
-        ]);
+            ],
+        ] as $path => $required) {
+            $this->pmssAssertRepoFileContainsAllStrings($path, $required);
+        }
     }
 }

@@ -26,20 +26,15 @@ class SharedShellHelperUsageTest extends TestCase
 
     public function testUserPermissionsUsesSharedShellLibrary(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/userPermissions.php' => [
-                'required' => ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsCommands.php'", 'pmssUserPermissionsRun('],
-                'forbidden' => ['function run(string $cmd): int' => 'Expected userPermissions.php to stop defining a local run() helper'],
-            ],
-            // permissionsApply.php reaches pmssRun() and does not load shell.php itself,
-            // so every entry point that applies permissions loads it.
-            'scripts/util/setupUserHomePermissions.php' => [
-                'required' => ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsApply.php'"],
-            ],
-            'scripts/recreateUser.php' => [
-                'required' => ["require_once __DIR__.'/lib/shell.php';", 'pmssRunOrExit('],
-                'forbidden' => ['function run(string $cmd): void' => 'Expected recreateUser.php to stop defining a local run() helper'],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userPermissions.php',
+            ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsCommands.php'", 'pmssUserPermissionsRun('],
+            ['function run(string $cmd): int' => 'Expected userPermissions.php to stop defining a local run() helper']);
+        // permissionsApply.php reaches pmssRun() and does not load shell.php itself,
+        // so every entry point that applies permissions loads it.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupUserHomePermissions.php',
+            ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsApply.php'"]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/recreateUser.php',
+            ["require_once __DIR__.'/lib/shell.php';", 'pmssRunOrExit('],
+            ['function run(string $cmd): void' => 'Expected recreateUser.php to stop defining a local run() helper']);
     }
 }
