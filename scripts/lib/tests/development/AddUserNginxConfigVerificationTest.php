@@ -10,10 +10,8 @@ class AddUserNginxConfigVerificationTest extends TestCase
 {
     public function testCanonicalNginxConfigPathStaysInProvisioningGuards(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/add/userConfigApply.php' => ['required' => ["'/etc/nginx/users/'.\$user['name']"]],
-            'scripts/lib/user/add/artifactVerification.php' => ['required' => ["'/etc/nginx/users/'.\$userName"]],
-        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/add/userConfigApply.php', ["'/etc/nginx/users/'.\$user['name']"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/add/artifactVerification.php', ["'/etc/nginx/users/'.\$userName"]);
     }
 
     public function testProvisioningFailsLoudlyWhenConfigIsMissing(): void

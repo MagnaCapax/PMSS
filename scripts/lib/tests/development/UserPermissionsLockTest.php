@@ -24,14 +24,11 @@ class UserPermissionsLockTest extends TestCase
 
     public function testLockIsBlockingCloseOnExecAndNeverReleasedEarly(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/userPermissions.php', [
-            'required' => [
-                "'pmss-userPermissions-'.\$thisUser.'.lock'), false, 'ce');",
-            ],
-            'forbidden' => [
-                'pmssLockHandleRelease($permissionsLock' => 'The lock must be held until the final immutable set has run',
-                'fclose($permissionsLock' => 'The lock must be held until the final immutable set has run',
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userPermissions.php', [
+            "'pmss-userPermissions-'.\$thisUser.'.lock'), false, 'ce');",
+        ], [
+            'pmssLockHandleRelease($permissionsLock' => 'The lock must be held until the final immutable set has run',
+            'fclose($permissionsLock' => 'The lock must be held until the final immutable set has run',
         ]);
         $this->pmssAssertRepoFileSubstringCount('scripts/util/userPermissions.php', 'pmssLockFileAcquire(', 1);
     }

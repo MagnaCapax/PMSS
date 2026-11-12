@@ -7,33 +7,20 @@ class checkRtorrentContractTest extends TestCase
 {
     public function testSharedListUsersParserAndLaunchContractsRemain(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/checkRtorrent.php' => [
-                'required' => [
-                    "pmssListManagedUsersResult('/scripts/listUsers.php')",
-                    "require_once __DIR__.'/../lib/rtorrent/watchdog.php';",
-                    'pmssCheckRtorrentHandleMissingProcess(',
-                ],
-                'forbidden' => ["@exec('/scripts/listUsers.php'", '/^[a-z][a-z0-9]{0,7}$/'],
-            ],
-            'scripts/lib/rtorrent/watchdog.php' => [
-                'required' => ['function pmssCheckRtorrentCleanupStaleSocket('],
-            ],
-            'scripts/lib/rtorrent/watchdogMissing.php' => [
-                'required' => ["rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])"],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkRtorrent.php', [
+            "pmssListManagedUsersResult('/scripts/listUsers.php')",
+            "require_once __DIR__.'/../lib/rtorrent/watchdog.php';",
+            'pmssCheckRtorrentHandleMissingProcess(',
+        ], ["@exec('/scripts/listUsers.php'", '/^[a-z][a-z0-9]{0,7}$/']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', ['function pmssCheckRtorrentCleanupStaleSocket(']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdogMissing.php', ["rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])"]);
     }
 
     public function testMissingConfigBranchRecoversInsteadOfSilentlySkipping(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/rtorrent/watchdog.php' => [
-                'required' => ['function pmssCheckRtorrentRecoverMissingConfig('],
-            ],
-            'scripts/cron/checkRtorrent.php' => [
-                'matches' => ['/if \(!is_file\(\$home\.\'\/\\.rtorrent\\.rc\'\)\) \{\s*if \(!pmssCheckRtorrentRecoverMissingConfig\(\$user, \$home, \$debug\)\) \{\s*continue;\s*\}\s*\}/s'],
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', ['function pmssCheckRtorrentRecoverMissingConfig(']);
+        $this->pmssAssertRepoFileContract('scripts/cron/checkRtorrent.php', [
+            'matches' => ['/if \(!is_file\(\$home\.\'\/\\.rtorrent\\.rc\'\)\) \{\s*if \(!pmssCheckRtorrentRecoverMissingConfig\(\$user, \$home, \$debug\)\) \{\s*continue;\s*\}\s*\}/s'],
         ]);
     }
 
@@ -52,77 +39,69 @@ class checkRtorrentContractTest extends TestCase
 
     public function testStaleSocketRecoveryUsesSharedCleanupContracts(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/rtorrent/watchdog.php' => [
-                'required' => [
-                    'function pmssCheckRtorrentCleanupStaleSocket(',
-                ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', [
+            'function pmssCheckRtorrentCleanupStaleSocket(',
+        ]);
+        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdogMissing.php', [
+            'matches' => [
+                '/pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?if \(!\$executorPresent\).*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
             ],
-            'scripts/lib/rtorrent/watchdogMissing.php' => [
-                'matches' => [
-                    '/pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?if \(!\$executorPresent\).*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
-                ],
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkRtorrent.php', [
+            'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
+            "if (!pmssDirEnsureExists(\$stateDir, 0755))",
+            "ERROR: failed to create runtime state directory: ",
+            'pmssCheckRtorrentHandleMissingProcess(',
+            'pmssCheckRtorrentHandleAliveProcess(',
+        ]);
+        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdogScgi.php', [
+            'required' => [
+                'SCGI unresponsive but rtorrent still alive (pids=',
+                'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
+                'rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles)',
+                "'action' => 'restart'",
+                'rtorrentProcessStatesForPids($rtorrentPids)',
+                'rtorrentScgiSocketQueueSnapshot($socketPath)',
+                "\$decision['action'] === 'extend_grace' || \$decision['action'] === 'observe_wedge'",
+                'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
             ],
-            'scripts/cron/checkRtorrent.php' => [
-                'required' => [
-                    'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
-                    "if (!pmssDirEnsureExists(\$stateDir, 0755))",
-                    "ERROR: failed to create runtime state directory: ",
-                    'pmssCheckRtorrentHandleMissingProcess(',
-                    'pmssCheckRtorrentHandleAliveProcess(',
-                ],
-            ],
-            'scripts/lib/rtorrent/watchdogScgi.php' => [
-                'required' => [
-                    'SCGI unresponsive but rtorrent still alive (pids=',
-                    'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
-                    'rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles)',
-                    "'action' => 'restart'",
-                    'rtorrentProcessStatesForPids($rtorrentPids)',
-                    'rtorrentScgiSocketQueueSnapshot($socketPath)',
-                    "\$decision['action'] === 'extend_grace' || \$decision['action'] === 'observe_wedge'",
-                    'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
-                ],
-                'matches' => [
-                    '/rtorrentScgiCall\(\$socketPath, \'system\.api_version\', \[\], 5\) !== false.*?pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);/s',
-                    '/if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
-                    '/rtorrentProcessWriteStateFile\(\$state\[\'unresponsive\'\], \(string\) time\(\)\);\s*if \(\$decision\[\'action\'\] === \'extend_grace\'\) rtorrentProcessClearStaleState\(\$state\[\'acceptQueueWedge\'\]\);\s*pmssCheckRtorrentLogBoth\(\$user, \$decision\[\'message\'\], \$debug\);/s',
-                ],
+            'matches' => [
+                '/rtorrentScgiCall\(\$socketPath, \'system\.api_version\', \[\], 5\) !== false.*?pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);/s',
+                '/if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
+                '/rtorrentProcessWriteStateFile\(\$state\[\'unresponsive\'\], \(string\) time\(\)\);\s*if \(\$decision\[\'action\'\] === \'extend_grace\'\) rtorrentProcessClearStaleState\(\$state\[\'acceptQueueWedge\'\]\);\s*pmssCheckRtorrentLogBoth\(\$user, \$decision\[\'message\'\], \$debug\);/s',
             ],
         ]);
     }
 
     public function testScgiThrottleCallRequiresConfiguredThrottleAndKeepsHealthyLogOutsideGuard(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/rtorrent/watchdog.php' => [
-                'required' => [
-                    '$userContent = pmssReadRegularFileContentsVerified($userScript, null, 1048576, $userMeta);',
-                    'executor refresh skipped (checksum unavailable)',
-                    'pmssReplaceAccountFile($user, $home, $userScript, $skelContent, (int) $userMeta[\'mode\'] & 0777, true)',
-                    'executor refresh failed (copy error)',
-                ],
-                'forbidden' => [
-                    '@md5_file($userScript)',
-                    '@fileperms($userScript)',
-                    'pmssWriteUserFile($userScript',
-                    'copy($skelScript, $userScript);',
-                    '@chown($userScript, $user);',
-                    '$throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;',
-                ],
-                'ordered' => [[
-                    'needles' => [
-                        '$throttle = pmssReadTorrentThrottle($user);',
-                        'if ($throttle === null) return;',
-                        '$throttleValue = $throttle > 0 ? $throttle : 0;',
-                        "rtorrentScgiCall(\$socketPath, 'throttle.global_up.max_rate.set_kb', ['', \$throttleValue], 5)",
-                    ],
-                    'missingPrefix' => 'checkRtorrent throttle guard missing: ',
-                ]],
+        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdog.php', [
+            'required' => [
+                '$userContent = pmssReadRegularFileContentsVerified($userScript, null, 1048576, $userMeta);',
+                'executor refresh skipped (checksum unavailable)',
+                'pmssReplaceAccountFile($user, $home, $userScript, $skelContent, (int) $userMeta[\'mode\'] & 0777, true)',
+                'executor refresh failed (copy error)',
             ],
-            'scripts/lib/rtorrent/watchdogScgi.php' => [
-                'matches' => ['/pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s'],
+            'forbidden' => [
+                '@md5_file($userScript)',
+                '@fileperms($userScript)',
+                'pmssWriteUserFile($userScript',
+                'copy($skelScript, $userScript);',
+                '@chown($userScript, $user);',
+                '$throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;',
             ],
+            'ordered' => [[
+                'needles' => [
+                    '$throttle = pmssReadTorrentThrottle($user);',
+                    'if ($throttle === null) return;',
+                    '$throttleValue = $throttle > 0 ? $throttle : 0;',
+                    "rtorrentScgiCall(\$socketPath, 'throttle.global_up.max_rate.set_kb', ['', \$throttleValue], 5)",
+                ],
+                'missingPrefix' => 'checkRtorrent throttle guard missing: ',
+            ]],
+        ]);
+        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdogScgi.php', [
+            'matches' => ['/pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s'],
         ]);
     }
 
