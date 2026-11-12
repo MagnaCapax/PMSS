@@ -42,22 +42,16 @@ class ShowTrafficFormatTest extends TestCase
     public function testCliHelpAndSourceContracts(): void
     {
         $this->pmssAssertRepoPhpScriptOutputContains('scripts/showTraffic.php', ['--help'], ['--json', '--show-missing', '--extended', '--sort', '--color', '--no-color'], [], '');
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/showTraffic.php' => [
-                'required' => ["require_once __DIR__.'/lib/traffic/report.php';", "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');"],
-                'forbidden' => ["exec(escapeshellarg(__DIR__.'/listUsers.php')"],
-            ],
-            'scripts/lib/traffic/report.php' => [
-                'required' => ["require_once __DIR__.'/reportModel.php';", "require_once __DIR__.'/reportDisplay.php';"],
-            ],
-            'scripts/lib/traffic/reportModel.php' => [
-                'required' => ['pmssListManagedUsersResult($listUsersScript)', 'pmssShowTrafficRawCounters($data)'],
-            ],
-            'scripts/lib/traffic/reportDisplay.php' => [
-                'required' => ["pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"],
-                'forbidden' => ['pmssReadSerializedArrayFile(', 'pmssTrafficLimitReadGiBFile('],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/showTraffic.php',
+            ["require_once __DIR__.'/lib/traffic/report.php';", "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');"],
+            ["exec(escapeshellarg(__DIR__.'/listUsers.php')"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/traffic/report.php',
+            ["require_once __DIR__.'/reportModel.php';", "require_once __DIR__.'/reportDisplay.php';"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/traffic/reportModel.php',
+            ['pmssListManagedUsersResult($listUsersScript)', 'pmssShowTrafficRawCounters($data)']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/reportDisplay.php',
+            ["pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"],
+            ['pmssReadSerializedArrayFile(', 'pmssTrafficLimitReadGiBFile(']);
     }
 
     public function testRawCountersNormalizeRequiredTrafficStats(): void

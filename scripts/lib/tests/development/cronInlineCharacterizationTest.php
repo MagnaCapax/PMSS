@@ -60,24 +60,30 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testServiceWatchdogsUseSharedHelpersAndKeepCommands(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/checkQbittorrentInstances.php' => ['required' => ['$pmssCheckQbittorrentLock = pmssCronLockAcquire(\'checkQbittorrentInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', 'pmssQbittorrentWatchdogRunning(', 'torrentClientsResolve.php qbittorrent --launch --held', "'qbittorrent-nox stopped: suspended or moved'", "'qbittorrent-nox start requested'", 'pmssBuildUserServiceShellCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'qBittorrent watchdog must quote su shell boundaries through the shared helper']],
-            'scripts/cron/checkRcloneInstances.php' => ['required' => ['$pmssCheckRcloneLock = pmssCronLockAcquire(\'checkRcloneInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped: suspended or moved'", "'rclone start requested'", 'pmssBuildUserServiceShellCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'rclone watchdog must quote su shell boundaries through the shared helper']],
-            'scripts/cron/checkDelugeInstances.php' => ['required' => ['$pmssCheckDelugeLock = pmssCronLockAcquire(\'checkDelugeInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped: suspended or moved'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'", 'pmssBuildUserServiceShellCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'deluge watchdog must quote su shell boundaries through the shared helper']],
-            'scripts/lib/runtime/commandShell.php' => ['required' => ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']],
-            'scripts/lib/user/serviceLaunch.php' => ['required' => ['function pmssBuildUserServiceShellCommand(', "'--scope'", "'--slice='.\$slice", "pmssBuildCommand('systemd-run'", "pmssBuildCommand('systemctl', ['start', \$slice])"]],
-            'scripts/lib/user/watchdog.php' => ['required' => [
-                "pmssRequireRelativeFiles(__DIR__, ['log.php', 'selection.php', 'serviceLaunch.php']);",
-                "pmssRequireRelativeFiles(__DIR__, ['watchdogProcess.php', 'watchdogPolicy.php']);",
-                'function pmssUserWatchdogServiceSpec(',
-                'function pmssUserWatchdogEnsureServices(',
-                'function pmssUserWatchdogRunService(',
-            ]],
-            'scripts/lib/user/watchdogProcess.php' => ['required' => [
-                'function pmssUserWatchdogLockAcquire(',
-                'function pmssUserWatchdogRestartProcessesIf(',
-                'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
-            ]],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkQbittorrentInstances.php',
+            ['$pmssCheckQbittorrentLock = pmssCronLockAcquire(\'checkQbittorrentInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', 'pmssQbittorrentWatchdogRunning(', 'torrentClientsResolve.php qbittorrent --launch --held', "'qbittorrent-nox stopped: suspended or moved'", "'qbittorrent-nox start requested'", 'pmssBuildUserServiceShellCommand($thisUser,'],
+            ['su '.'{$thisUser}' => 'qBittorrent watchdog must quote su shell boundaries through the shared helper']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkRcloneInstances.php',
+            ['$pmssCheckRcloneLock = pmssCronLockAcquire(\'checkRcloneInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped: suspended or moved'", "'rclone start requested'", 'pmssBuildUserServiceShellCommand($thisUser,'],
+            ['su '.'{$thisUser}' => 'rclone watchdog must quote su shell boundaries through the shared helper']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/checkDelugeInstances.php',
+            ['$pmssCheckDelugeLock = pmssCronLockAcquire(\'checkDelugeInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped: suspended or moved'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'", 'pmssBuildUserServiceShellCommand($thisUser,'],
+            ['su '.'{$thisUser}' => 'deluge watchdog must quote su shell boundaries through the shared helper']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/runtime/commandShell.php',
+            ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/serviceLaunch.php',
+            ['function pmssBuildUserServiceShellCommand(', "'--scope'", "'--slice='.\$slice", "pmssBuildCommand('systemd-run'", "pmssBuildCommand('systemctl', ['start', \$slice])"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdog.php', [
+            "pmssRequireRelativeFiles(__DIR__, ['log.php', 'selection.php', 'serviceLaunch.php']);",
+            "pmssRequireRelativeFiles(__DIR__, ['watchdogProcess.php', 'watchdogPolicy.php']);",
+            'function pmssUserWatchdogServiceSpec(',
+            'function pmssUserWatchdogEnsureServices(',
+            'function pmssUserWatchdogRunService(',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdogProcess.php', [
+            'function pmssUserWatchdogLockAcquire(',
+            'function pmssUserWatchdogRestartProcessesIf(',
+            'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
         ]);
     }
 

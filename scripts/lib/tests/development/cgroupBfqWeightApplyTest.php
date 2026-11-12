@@ -148,14 +148,12 @@ class CgroupBfqWeightApplyTest extends TestCase
 
     public function testSharedDirectWriteSourceChecksExactByteCount(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directFiles.php', [
-                'required' => [
-                    'function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum, int $maximum): bool',
-                    'return $minimum <= $maximum && $value >= $minimum && $value <= $maximum',
-                    '&& pmssCgroupDirectWritableFileTarget($path)',
-                    '&& pmssFileWriteComplete($path, (string) $value);',
-                ],
-            ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/cgroup/directFiles.php', [
+            'function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum, int $maximum): bool',
+            'return $minimum <= $maximum && $value >= $minimum && $value <= $maximum',
+            '&& pmssCgroupDirectWritableFileTarget($path)',
+            '&& pmssFileWriteComplete($path, (string) $value);',
+        ]);
     }
 
     public function testSharedPasswdUidParserAcceptsOnlyPositiveIntegerUid(): void
@@ -254,12 +252,10 @@ class CgroupBfqWeightApplyTest extends TestCase
                 ],
             ]);
         // The bonus comes from the per-user store record (ADR 0213), shared with the CPU-priority cron.
-        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/policy.php', [
-            'required' => [
-                'function pmssUserBonusPercentFromConfig(array $config): int',
-                '$value <= PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT',
-                'return pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json));',
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/cgroup/policy.php', [
+            'function pmssUserBonusPercentFromConfig(array $config): int',
+            '$value <= PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT',
+            'return pmssBfqApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json));',
         ]);
     }
 }

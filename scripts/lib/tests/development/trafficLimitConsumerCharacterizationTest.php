@@ -7,23 +7,20 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 {
     public function testTrafficStateReadersAvoidInlineParsing(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficLimitRootStateRead('], 'forbidden' => ['/.bonusTraffic']],
-            'scripts/lib/stats/collect.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']],
-            'scripts/lib/pmssStats.php' => [
-                'required' => ["require_once __DIR__.'/user/trafficLimit.php';"],
-                'forbidden' => ['function '.'pmssStats'.'ReadIntegerFile('],
-            ],
-            'etc/skel/www/stats.php' => [
-                'required' => ['pmssStatsRenderTrafficUsageBlock(', 'pmssStatsSerializedStateRead('],
-                'forbidden' => ["file_get_contents('../.trafficLimit')", "file_get_contents('../.bonusTraffic')", '@unserialize(@file_get_contents('],
-            ],
-            'etc/skel/www/statsTraffic.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssStatsSerializedStateRead(']],
-            'etc/skel/www/welcome.php' => [
-                'required' => ['pmssTrafficLimitStateRead(', 'pmssCustomerSerializedArrayFileRead('],
-                'forbidden' => ["file_get_contents('../.trafficLimit')", "pmssWelcomeInteger"."FileRead('../.bonusTraffic'", '@unserialize(trim(@file_get_contents('],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLimits.php',
+            ['pmssTrafficLimitRootStateRead('], ['/.bonusTraffic']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/stats/collect.php',
+            ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/pmssStats.php',
+            ["require_once __DIR__.'/user/trafficLimit.php';"], ['function '.'pmssStats'.'ReadIntegerFile(']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/stats.php',
+            ['pmssStatsRenderTrafficUsageBlock(', 'pmssStatsSerializedStateRead('],
+            ["file_get_contents('../.trafficLimit')", "file_get_contents('../.bonusTraffic')", '@unserialize(@file_get_contents(']);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsTraffic.php',
+            ['pmssTrafficLimitStateRead(', 'pmssStatsSerializedStateRead(']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php',
+            ['pmssTrafficLimitStateRead(', 'pmssCustomerSerializedArrayFileRead('],
+            ["file_get_contents('../.trafficLimit')", "pmssWelcomeInteger"."FileRead('../.bonusTraffic'", '@unserialize(trim(@file_get_contents(']);
     }
 
     public function testTrafficLimitCronUsesSharedSafeHelpers(): void
@@ -76,11 +73,9 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $slidingKey = 'sliding'.'ThrottleStart';
         $legacyFileKey = 'throttle'.'_mbit';
 
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/trafficLimits.php' => ['forbidden' => [$slidingKey, $legacyFileKey]],
-            'scripts/lib/network/fireqos.php' => ['forbidden' => [$legacyFileKey]],
-            'scripts/lib/update/networking.php' => ['forbidden' => [$slidingKey]],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLimits.php', [], [$slidingKey, $legacyFileKey]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/network/fireqos.php', [], [$legacyFileKey]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/networking.php', [], [$slidingKey]);
     }
 
     public function testUserResourcesTrafficStateReadingDelegatesToSharedHelpers(): void
@@ -99,16 +94,13 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $showTrafficReader = 'pmssShowTrafficRead'.'StatsPayload';
         $trafficLimitsReader = 'pmssRead'.'TrafficData';
 
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/traffic/reportModel.php' => [
-                'required' => ['pmssTrafficStatsPath($thisUser, $statsDir)', 'pmssReadSerializedArrayFile($statsPath)', 'pmssTrafficReadRootOwnedStatsPayload(pmssTrafficIngressStatsPath($thisUser), $baseUser)'],
-                'forbidden' => ['function '.$showTrafficReader, 'unserialize('],
-            ],
-            'scripts/lib/resources/show.php' => ['required' => ['pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")'], 'forbidden' => ['unserialize(']],
-            'scripts/cron/trafficLimits.php' => [
-                'required' => ['$trafficDataFile = pmssTrafficStatsPath($thisUser);', 'pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser)'],
-                'forbidden' => ['function '.$trafficLimitsReader, '@unserialize', '"/home/{$thisUser}/.trafficData"'],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/reportModel.php',
+            ['pmssTrafficStatsPath($thisUser, $statsDir)', 'pmssReadSerializedArrayFile($statsPath)', 'pmssTrafficReadRootOwnedStatsPayload(pmssTrafficIngressStatsPath($thisUser), $baseUser)'],
+            ['function '.$showTrafficReader, 'unserialize(']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/resources/show.php',
+            ['pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")'], ['unserialize(']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLimits.php',
+            ['$trafficDataFile = pmssTrafficStatsPath($thisUser);', 'pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser)'],
+            ['function '.$trafficLimitsReader, '@unserialize', '"/home/{$thisUser}/.trafficData"']);
     }
 }

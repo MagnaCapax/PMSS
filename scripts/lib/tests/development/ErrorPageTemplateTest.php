@@ -95,36 +95,33 @@ class ErrorPageTemplateTest extends TestCase
 
     public function testErrorPageSourceContractsStayReadable(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'var/www/error-401.html' => ['required' => [
-                '401 - Authentication Required',
-                'Enter your PMSS username',
-                'refresh this page to try again',
-                'Use Generate new password on your seedbox service page',
-                '<a href="/">Return to the main page.</a>',
-            ]],
-            'var/www/error-403.html' => ['required' => [
-                '403 - Forbidden',
-                'The sage guards this path.',
-                'It is at /user-YOURUSERNAME/ on this server.',
-                '<a href="/">Return to the main page.</a>',
-            ]],
-            'var/www/error-404.html' => ['required' => ['It is at /user-YOURUSERNAME/ on this server.']],
-            'var/www/error-502.html' => ['required' => ['Your disk quota is full', 'stop the torrent client before deleting files', 'account is suspended', 'server-wide storage pressure', 'Use Restart account on your seedbox service page']],
-            'etc/seedbox/config/template.lighttpd' => ['required' => ['server.errorfile-prefix    = "/home/##username/www/error-"']],
-            'etc/skel/www/error-503.html' => ['required' => [
-                '503 - Service Unavailable',
-                'class="error-message"',
-                'The sage is waiting for this application to answer.',
-                'pmss503check=',
-                'window.fetch(retryUrl(), {',
-                'window.location.reload();',
-                '<a href="/">Return to the main page.</a>',
-            ]],
-            'var/www/error-suspended.html' => [
-                'required' => ['Account Suspended', '/suspended_images/suspended-', "e.onerror=function(){e.style.display='none';}", 'To restore access, check your invoices', 'https://pulsedmedia.com/contact/', 'class="cta"', '.cta:visited', 'color:#fff;'],
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-401.html', [
+            '401 - Authentication Required',
+            'Enter your PMSS username',
+            'refresh this page to try again',
+            'Use Generate new password on your seedbox service page',
+            '<a href="/">Return to the main page.</a>',
         ]);
+        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-403.html', [
+            '403 - Forbidden',
+            'The sage guards this path.',
+            'It is at /user-YOURUSERNAME/ on this server.',
+            '<a href="/">Return to the main page.</a>',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-404.html', ['It is at /user-YOURUSERNAME/ on this server.']);
+        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-502.html', ['Your disk quota is full', 'stop the torrent client before deleting files', 'account is suspended', 'server-wide storage pressure', 'Use Restart account on your seedbox service page']);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.lighttpd', ['server.errorfile-prefix    = "/home/##username/www/error-"']);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/error-503.html', [
+            '503 - Service Unavailable',
+            'class="error-message"',
+            'The sage is waiting for this application to answer.',
+            'pmss503check=',
+            'window.fetch(retryUrl(), {',
+            'window.location.reload();',
+            '<a href="/">Return to the main page.</a>',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-suspended.html',
+            ['Account Suspended', '/suspended_images/suspended-', "e.onerror=function(){e.style.display='none';}", 'To restore access, check your invoices', 'https://pulsedmedia.com/contact/', 'class="cta"', '.cta:visited', 'color:#fff;']);
         $this->assertImageFilesExist('suspended_images/suspended-', 5);
     }
 
