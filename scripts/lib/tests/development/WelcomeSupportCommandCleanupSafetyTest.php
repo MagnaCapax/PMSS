@@ -109,7 +109,7 @@ PHP;
         }
         $rows = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_WELCOME_COMMAND_CLEANUP' => json_encode($cases)]);
         $this->assertSame(count($cases), count($rows));
-        $launch = ["timeout 20 '/fixture/pikkumies' 'ask' 'two words'",
+        $launch = ["timeout --kill-after=5s 20 '/fixture/pikkumies' 'ask' 'two words'",
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']]];
         foreach ($cases as $index => [$case, $keys, $type, $events, $result]) {
             $reads = [];

@@ -2129,7 +2129,7 @@ function pmssWelcomeHomeSupportPikkumiesBinary($home, $lib)
 /** Runs the Pikkumies command as the account with $stdin; returns array(exit code, first output line). */
 function pmssWelcomeHomeSupportPikkumiesRun($binary, array $args, $stdin, $seconds)
 {
-    $command = 'timeout '.(int) $seconds.' '.escapeshellarg($binary).' '.implode(' ', array_map('escapeshellarg', $args));
+    $command = 'timeout --kill-after=5s '.(int) $seconds.' '.escapeshellarg($binary).' '.implode(' ', array_map('escapeshellarg', $args));
     $process = @proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes);
     if (!is_resource($process)) return array(-1, '');
     try {

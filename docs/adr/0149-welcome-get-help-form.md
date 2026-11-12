@@ -97,7 +97,7 @@ promtp should always say no ticket needed if all is fine ... always stadnard, an
 The Welcome Pikkumies command capture attempts stdin, stdout and stderr closure,
 then child reaping, even when writing, reading or an earlier close throws.
 Lone exceptions and errors propagate unchanged; combined faults retain PHP's
-normal `finally` precedence. Command bytes, timeout, capture bounds, output
+normal `finally` precedence. Timeout uses a five-second SIGKILL backstop (ADR 0035); capture bounds, output
 selection and exit status retain their contracts. `WelcomeSupportCommandCleanupSafetyTest`
 injects faults using memory streams and process stubs; execution belongs on the
 testing machine, with no support request or real child process.
