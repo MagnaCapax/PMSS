@@ -108,7 +108,15 @@ function pmssConfigureTorrentClientLockOpen($dir, $client, $label)
     error_clear_last();
     $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
     if (!is_resource($lock)) return array(null, $failed());
-    if (@flock($lock, LOCK_EX | LOCK_NB)) return array($lock, null);
-    fclose($lock);
+    $retained = false;
+    try {
+        if (@flock($lock, LOCK_EX | LOCK_NB)) {
+            $retained = true;
+            return array($lock, null);
+        }
+    } finally {
+        // Only a successful return transfers ownership; a thrown flock still owns a stream.
+        if (!$retained) fclose($lock);
+    }
     return array(null, array('ok' => false, 'status' => 409, 'message' => 'A '.$label.' switch is already running.'));
 }

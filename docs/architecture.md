@@ -107,6 +107,12 @@ Keep the canonical installer/update details under `docs/install.md` and
   and checks original throwables and cleanup order on the testing machine.
 - **etc/skel/www/scriptsIncFiles.php** preflights complete local helper groups before loading them in order.
   Statistics, storage notices and memory status share this loader; incomplete deliveries retain their unavailable fallbacks.
+- **etc/skel/www/configureTorrentClientsVersion.php** owns switch-lock acquisition
+  until a successful return transfers the stream to its caller. A thrown `flock()`
+  closes the stream; busy locks still close before the unchanged refusal is built.
+  `TorrentClientsSwitchLockTest` covers retained ownership, acquisition and close
+  faults, throwable precedence and refusal payloads with memory streams. Execution
+  verification stays on testing machines.
 - **scripts/lib/agentDiagnostics.php** – Stable diagnostic CLI and text renderer.
   `agentDiagnostics/catalog.php` defines ordered probes, `command.php` owns checked
   PHP-script execution, and `collect.php` acquires and projects recursive results.
