@@ -1016,6 +1016,17 @@ iptables helpers:
     to `1..10080`, resolves `tail` through runtime command helpers, and returns
     `''` on invalid paths, missing commands, non-zero tail exit, or timeout.
 
+- Statistics dispatch in `scripts/lib/stats/userStatsProcessor.php` retains two
+  interfaces: the concrete traffic/resource processors aggregate inline, while
+  `spawnWorkers()` remains directly callable for detached dispatch. Inline runs
+  prepare, acquire the run-lock hook, discover and validate accounts, then process
+  them with shared window boundaries. A named-account invocation validates and
+  processes directly without the run-lock hook. Detached calls preserve escaped
+  command bytes, startup-failure diagnostics and NUL refusal behavior. These paths
+  are characterized by `statsDispatchCharacterizationTest.php` and
+  `resourceStatsCliCharacterizationTest.php`; concrete inline use alone does not
+  establish that the detached interface is unused.
+
 - Resource aggregation uses the persisted payload throughout: `ResourceStatsAccumulator::results()`
   and `resourceStatistics::collectWindowResultsFromData()` return metric-keyed
   `raw` windows, current values, and `daily` rows. `resources/payload.php` projects
