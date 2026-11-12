@@ -60,17 +60,15 @@ class CgroupBonusCpuWeightApplyTest extends TestCase
 
     public function testCronSourceContracts(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/cron/cgroupBonusCpuWeightApply.php', [
-            'required' => [
-                "require_once __DIR__.'/../lib/cgroup/bonusCpuWeight.php';",
-                'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
-                'pmssCpuApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json))',
-                "pmssBuildCommand('systemctl', ['set-property', \$slice, 'CPUWeight='.\$want])",
-                'if ($state[\'weight\'] === $want) {',
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/cgroupBonusCpuWeightApply.php', [
+            "require_once __DIR__.'/../lib/cgroup/bonusCpuWeight.php';",
+            'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
+            'pmssCpuApplyBonusWeight($base, pmssUserBonusPercentFromConfig($json))',
+            "pmssBuildCommand('systemctl', ['set-property', \$slice, 'CPUWeight='.\$want])",
+            'if ($state[\'weight\'] === $want) {',
+        ],
             // Priority only: no process signals, no unit restarts, no userConfig re-run, no direct writes.
-            'forbidden' => ['kill ', 'posix_kill', "'restart'", "'try-restart'", 'userConfig.php', 'file_put_contents'],
-        ]);
+            ['kill ', 'posix_kill', "'restart'", "'try-restart'", 'userConfig.php', 'file_put_contents']);
         $cron = (string) file_get_contents(__DIR__.'/../../../../etc/seedbox/config/root.cron');
         $this->assertStringContainsString('/scripts/cron/cgroupBonusCpuWeightApply.php >> /var/log/pmss/cgroupBonusCpuWeightApply.log 2>&1', $cron);
     }

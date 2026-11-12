@@ -96,30 +96,22 @@ PHP;
 
     public function testUtilityWrapperKeepsUsageTextButDelegatesExecution(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/userTrafficLimit.php' => [
-                'required' => [
-                    "require_once __DIR__.'/../lib/runtime.php';",
-                    "require_once __DIR__.'/../lib/user/trafficLimit.php';",
-                    "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');",
-                ],
-                'forbidden' => [
-                    'pmssParseCliTokens($argv',
-                    'pmssIntegerSettingFileWrite($target, $trafficLimit)',
-                    '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
-                ],
-            ],
-            'scripts/util/userBonusTraffic.php' => [
-                'required' => [
-                    "require_once __DIR__.'/../lib/user/trafficLimit.php';",
-                    "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserBonusTrafficCli');",
-                ],
-                'forbidden' => [
-                    "require_once '/scripts/lib/user/bonusTraffic.php';",
-                    'pmssParseCliTokens($argv',
-                    '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
-                ],
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userTrafficLimit.php', [
+            "require_once __DIR__.'/../lib/runtime.php';",
+            "require_once __DIR__.'/../lib/user/trafficLimit.php';",
+            "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');",
+        ], [
+            'pmssParseCliTokens($argv',
+            'pmssIntegerSettingFileWrite($target, $trafficLimit)',
+            '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userBonusTraffic.php', [
+            "require_once __DIR__.'/../lib/user/trafficLimit.php';",
+            "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserBonusTrafficCli');",
+        ], [
+            "require_once '/scripts/lib/user/bonusTraffic.php';",
+            'pmssParseCliTokens($argv',
+            '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
         ]);
     }
 
@@ -135,23 +127,18 @@ PHP;
                 $this->assertSame($this->pmssRepoPath('scripts/lib/user/'.$file), (new \ReflectionFunction($function))->getFileName());
             }
         }
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/trafficLimit.php' => ['forbidden' => [
-                'function '.'pmssBonusTraffic'.'ReadGiB(',
-                'function '.'pmssBonusTraffic'.'WriteGiB(',
-                'function '.'pmssBonusTraffic'.'Remove(',
-            ]],
-            'scripts/lib/user/bonusTraffic.php' => [
-                'required' => [
-                    'Backward-compatible bonus traffic entrypoint.',
-                    "require_once __DIR__.'/trafficLimit.php';",
-                ],
-                'forbidden' => [
-                    'function pmssUserBonusTrafficCli(array $argv): int',
-                    'pmssParseCliTokens($argv)',
-                    'pmssIntegerSettingFileWrite($bonusFile',
-                ],
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/trafficLimit.php', [], [
+            'function '.'pmssBonusTraffic'.'ReadGiB(',
+            'function '.'pmssBonusTraffic'.'WriteGiB(',
+            'function '.'pmssBonusTraffic'.'Remove(',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/bonusTraffic.php', [
+            'Backward-compatible bonus traffic entrypoint.',
+            "require_once __DIR__.'/trafficLimit.php';",
+        ], [
+            'function pmssUserBonusTrafficCli(array $argv): int',
+            'pmssParseCliTokens($argv)',
+            'pmssIntegerSettingFileWrite($bonusFile',
         ]);
     }
 

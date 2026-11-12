@@ -28,15 +28,11 @@ final class CustomerTrafficRatioTest extends TestCase
 
     public function testWelcomeAndStatsUseSharedTrafficRatioState(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'etc/skel/www/welcome.php' => [
-                'required' => ['pmssTrafficRatioStateBuild($usedMiB, $inbound)', '$traffic[\'ratio\'][\'color\']'],
-                'forbidden' => ['$ratio >= 2.0', '$ratio >= 1.0', '$ratio'.'Color'],
-            ],
-            'etc/skel/www/statsTraffic.php' => [
-                'required' => ['pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth)', '$trafficRatioState[\'class\']'],
-                'forbidden' => ['$trafficRatio'.'GoodMin', '$trafficRatio'.'WarnMin', '$trafficRatio >='],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php',
+            ['pmssTrafficRatioStateBuild($usedMiB, $inbound)', '$traffic[\'ratio\'][\'color\']'],
+            ['$ratio >= 2.0', '$ratio >= 1.0', '$ratio'.'Color']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/statsTraffic.php',
+            ['pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth)', '$trafficRatioState[\'class\']'],
+            ['$trafficRatio'.'GoodMin', '$trafficRatio'.'WarnMin', '$trafficRatio >=']);
     }
 }
