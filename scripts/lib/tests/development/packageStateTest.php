@@ -70,10 +70,8 @@ class PackageStateTest extends TestCase
 
     public function testUserMaintenanceUsesRestartWhenDockerPackagesChanged(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/users/docker.php' => ['required' => ["getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1' ? 'restart' : 'start'"]],
-            'scripts/lib/update/userMaintenance.php' => ['required' => ["getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1'"]],
-        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php', ["getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1' ? 'restart' : 'start'"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', ["getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1'"]);
     }
 
     public function testUpdateStep2DoesNotCarryPackageQueueSkipPath(): void

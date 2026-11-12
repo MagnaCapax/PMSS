@@ -28,30 +28,22 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
      */
     public function testUserMaintenanceSkipReasonsUseSoftFailMarkerPolicy(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/userMaintenance.php' => [
-                'required' => [
-                    '$skipReasons = [];',
-                    "\$skipReasons[] = '(empty): empty username entry';",
-                    "\$skipReasons[] = \$userTrim.': invalid username';",
-                    "\$skipReasons[] = \$userTrim.': '.\$reason;",
-                    "'skip_reasons' => \$skipReasons,",
-                ],
-            ],
-            'scripts/util/update-step2.php' => [
-                'required' => [
-                    '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
-                    'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
-                ],
-            ],
-            'scripts/lib/update/runtime/userMaintenanceState.php' => [
-                'required' => [
-                    'processed_users_mismatch',
-                    'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL',
-                    "' skipped=['.implode('; ', array_slice(\$skipReasons, 0, 10)).']'",
-                    'pmssUpdateRecordIncompleteUserMaintenance(',
-                ],
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', [
+            '$skipReasons = [];',
+            "\$skipReasons[] = '(empty): empty username entry';",
+            "\$skipReasons[] = \$userTrim.': invalid username';",
+            "\$skipReasons[] = \$userTrim.': '.\$reason;",
+            "'skip_reasons' => \$skipReasons,",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
+            '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
+            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/runtime/userMaintenanceState.php', [
+            'processed_users_mismatch',
+            'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL',
+            "' skipped=['.implode('; ', array_slice(\$skipReasons, 0, 10)).']'",
+            'pmssUpdateRecordIncompleteUserMaintenance(',
         ]);
     }
 

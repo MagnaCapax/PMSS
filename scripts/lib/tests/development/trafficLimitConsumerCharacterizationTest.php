@@ -28,32 +28,30 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testTrafficLimitCronUsesSharedSafeHelpers(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/trafficLimitThrottle.php' => ['required' => [
-                'pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)',
-                'traffic throttle file write failed',
-                'pmssTrafficLimitThrottleFileRemove($throttleFile, $error)',
-                "function pmssTrafficLimitThrottleFilePath(string \$user, string \$homeRoot = '/home'): ?string",
-                'pmssTrafficLimitCliUsernameNormalize($user)',
-                '@realpath($home) !== $home',
-                'pmssUserFilePathIsSafe($path)',
-                "require_once __DIR__.'/trafficLimitMarkers.php';",
-                "require_once __DIR__.'/trafficLimitReconcile.php';",
-            ]],
-            'scripts/lib/user/trafficLimitMarkers.php' => ['required' => [
-                'function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool',
-                'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
-            ]],
-            'scripts/lib/user/trafficLimitReconcile.php' => ['required' => [
-                'if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {',
-            ]],
-            'scripts/cron/trafficLimits.php' => ['required' => [
-                'if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(\'/scripts/listUsers.php\'))) === null) {',
-                'exit(1);',
-                'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile, $throttlePlan[\'effectiveCapMbit\'])) {',
-                'pmssTrafficLimitThrottleLiftAfterCooldown($thisUser, $userTrafficLimitEnabledFile, ',
-                'pmssTrafficLimitThrottleApply($thisUser, $throttlePlan[\'effectiveCapMbit\']);',
-            ]],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimitThrottle.php', [
+            'pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)',
+            'traffic throttle file write failed',
+            'pmssTrafficLimitThrottleFileRemove($throttleFile, $error)',
+            "function pmssTrafficLimitThrottleFilePath(string \$user, string \$homeRoot = '/home'): ?string",
+            'pmssTrafficLimitCliUsernameNormalize($user)',
+            '@realpath($home) !== $home',
+            'pmssUserFilePathIsSafe($path)',
+            "require_once __DIR__.'/trafficLimitMarkers.php';",
+            "require_once __DIR__.'/trafficLimitReconcile.php';",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimitMarkers.php', [
+            'function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool',
+            'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimitReconcile.php', [
+            'if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
+            'if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(\'/scripts/listUsers.php\'))) === null) {',
+            'exit(1);',
+            'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile, $throttlePlan[\'effectiveCapMbit\'])) {',
+            'pmssTrafficLimitThrottleLiftAfterCooldown($thisUser, $userTrafficLimitEnabledFile, ',
+            'pmssTrafficLimitThrottleApply($thisUser, $throttlePlan[\'effectiveCapMbit\']);',
         ]);
     }
 

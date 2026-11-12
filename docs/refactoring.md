@@ -598,8 +598,9 @@ fragment bytes and ordering diagnostics remain at their callers.
 First-occurrence ordering checks use `assertOrderedStrings()` or
 `pmssAssertRepoFileContainsOrderedStrings()` instead of local position variables.
 Keep offset searches and last-occurrence checks explicit; they have different semantics.
-Single-kind source assertions call the corresponding direct repository helper;
-reserve contract tables for combined checks or multiple ordering groups. Preserve
+Single-kind source assertions call the corresponding direct repository helper,
+including checks of several files that all require fragments only. Reserve
+contract tables for combined checks or multiple ordering groups. Preserve
 fragment order and diagnostic prefixes when removing single-entry table wrappers.
 Generated panel, route, quota, launch, preflight and PHP-ini text checks use
 `assertStringContainsAllStrings()` and `assertStringContainsAndOmitsStrings()`

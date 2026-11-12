@@ -8,10 +8,8 @@ class UpdateStep2ErrorHandlingPolicyWiringTest extends TestCase
 {
     public function testStepPolicyWiringContractsStayStable(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/runtime/stepPolicy.php' => ['required' => ['PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', 'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING', 'pmssUpdateStep2ClassificationIsKnown', 'unknown_classification', 'pmssUpdateStep2HandleClassifiedFailure']],
-            'scripts/util/update-step2.php' => ['required' => ["'update/runtime/stepPolicy.php'", "['Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED]", "['Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL]", "pmssRunProfiledCallable('Configuring web stack', 'pmssConfigureWebStack', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);"]],
-        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/runtime/stepPolicy.php', ['PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', 'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING', 'pmssUpdateStep2ClassificationIsKnown', 'unknown_classification', 'pmssUpdateStep2HandleClassifiedFailure']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', ["'update/runtime/stepPolicy.php'", "['Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED]", "['Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL]", "pmssRunProfiledCallable('Configuring web stack', 'pmssConfigureWebStack', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);"]);
         $this->pmssAssertRepoFileSubstringCountAtLeast(
             'scripts/util/update-step2.php',
             'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED',

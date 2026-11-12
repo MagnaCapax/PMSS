@@ -106,16 +106,14 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function testDistUpgradeLockedCommandMessagesStayStable(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/distUpgrade/apt.php' => ['required' => [
-                '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase',
-                '[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action',
-                '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery',
-                '[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install',
-            ]],
-            'scripts/lib/update/distUpgrade/boot.php' => ['required' => [
-                '[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall',
-            ]],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/distUpgrade/apt.php', [
+            '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase',
+            '[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action',
+            '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery',
+            '[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/distUpgrade/boot.php', [
+            '[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall',
         ]);
     }
 

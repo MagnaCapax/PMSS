@@ -139,10 +139,8 @@ PHP;
 
     public function testCronAndLogrotateAreWired(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'etc/seedbox/config/root.cron' => ['required' => ['*/10 * * * *   root /scripts/cron/arpKeepalive.php >> /var/log/pmss/arpKeepalive.log 2>&1']],
-            'etc/seedbox/config/template.logrotate.pmss' => ['required' => ['/var/log/pmss/arpKeepalive.log {', 'maxsize 16M']],
-            'scripts/cron/arpKeepalive.php' => ['required' => ["require_once __DIR__.'/../lib/arpKeepalive.php';", 'escapeshellarg($ip)']],
-        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/root.cron', ['*/10 * * * *   root /scripts/cron/arpKeepalive.php >> /var/log/pmss/arpKeepalive.log 2>&1']);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.logrotate.pmss', ['/var/log/pmss/arpKeepalive.log {', 'maxsize 16M']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/arpKeepalive.php', ["require_once __DIR__.'/../lib/arpKeepalive.php';", 'escapeshellarg($ip)']);
     }
 }
