@@ -34,7 +34,8 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
             return null;
         }
         $data = @file_get_contents($path, false, null, 0, $maxBytes);
-        if ($data === false) {
+        // Corrupt kernel bytes must not reach logs or disappear during trimming.
+        if ($data === false || strpos($data, "\0") !== false) {
             return null;
         }
         $data = trim((string) $data);
