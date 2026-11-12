@@ -10,7 +10,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['managedPath.php', '../user/selection.php']);
+pmssRequireRelativeFiles(__DIR__, ['managedPath.php', '../user/selection.php', '../storageHealth/common.php']);
 
 /** Return the durable success marker path for the post-install benchmark. */
 function pmssStorageBenchmarkPostInstallMarkerPath(): string
@@ -19,13 +19,27 @@ function pmssStorageBenchmarkPostInstallMarkerPath(): string
 }
 
 /**
+ * Deadline for the post-install benchmark step (ADR 0273).
+ *
+ * The file-backed jobs take about five minutes. Each inventory device adds a 1 GiB dd,
+ * an ioping and two 30 s fio reads, measured at about 80 s on 26 TB HDDs, so the global
+ * 1200 s deadline stops hosts with more than about 11 devices part-way. Allow 600 s plus
+ * 120 s per device, never below the deadline that applies to every other command.
+ */
+function pmssStorageBenchmarkPostInstallTimeoutSeconds(int $deviceCount): int
+{
+    return max(pmssCommandTimeoutSeconds(''), 600 + 120 * max(0, $deviceCount));
+}
+
+/**
  * Run the post-install storage benchmark when the host is still tenant-empty.
  *
  * @param callable|null $logger
  * @param callable|null $runner
  * @param callable|null $userLister
+ * @param callable|null $deviceCounter returns the inventory device count
  */
-function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable $runner = null, ?callable $userLister = null): int
+function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable $runner = null, ?callable $userLister = null, ?callable $deviceCounter = null): int
 {
     $log = $logger ?: 'logmsg';
     $rawUsers = $userLister === null ? pmssManagedHomeUsersList(true) : $userLister();
@@ -50,9 +64,16 @@ function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable 
     }
 
     $run = $runner ?: 'runStep';
-    $rc = (int) $run('Running post-install idle storage benchmark', pmssBuildCommand('php', [
-        '/scripts/util/storageBenchmark.php', '--require-idle', '--devices', '--label=post-install',
-    ]));
+    $devices = $deviceCounter === null ? count(pmssStorageHealthDiskInventoryRead()) : (int) $deviceCounter();
+    $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
+    putenv('PMSS_COMMAND_TIMEOUT='.(string) pmssStorageBenchmarkPostInstallTimeoutSeconds($devices));
+    try {
+        $rc = (int) $run('Running post-install idle storage benchmark', pmssBuildCommand('php', [
+            '/scripts/util/storageBenchmark.php', '--require-idle', '--devices', '--label=post-install',
+        ]));
+    } finally {
+        putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
+    }
     // Mirror captured stdout into the update log so WARN lines persist.
     $stdout = (string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '');
     $lines = preg_split('/\R/', trim($stdout));

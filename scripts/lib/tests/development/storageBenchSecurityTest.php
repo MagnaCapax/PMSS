@@ -56,20 +56,37 @@ foreach ([[NAN, null], [INF, null], [-INF, null], ['1e309', null], ['-1e309', nu
 }
 echo json_encode($results);
 PHP;
+        // A probe that returned no value is not evidence of idle (ADR 0273).
         $idle = ['run_id' => 'fixture', 'test' => 'preflight-idle', 'ok' => true, 'ioping_avg_ms' => null];
-        $expected = array_fill(0, 6, [true, $idle]);
-        $expected[] = [true, $idle + ['iostat_util_pct' => 85]];
-        $expected[] = [false, array_replace($idle, ['ok' => false])
-            + ['iostat_util_pct' => 85.5, 'warn_util' => 'iostat util high']];
+        $unmeasured = array_replace($idle, ['ok' => false]) + ['warn' => 'ioping returned no value'];
+        $expected = array_fill(0, 6, [false, $unmeasured]);
+        $expected[] = [false, $unmeasured + ['iostat_util_pct' => 85]];
+        $expected[] = [false, $unmeasured + ['iostat_util_pct' => 85.5, 'warn_util' => 'iostat util high']];
         $expected[] = [true, array_replace($idle, ['ioping_avg_ms' => 100, 'iostat_util_pct' => 0])];
         // Missing utilization must not erase a busy latency result.
         $expected[] = [false, array_replace($idle, ['ok' => false, 'ioping_avg_ms' => 101])
             + ['warn' => 'ioping above threshold']];
         // Corrupt utilization follows missing-data policy without erasing busy latency.
-        $expected = array_merge($expected, array_fill(0, 5, [true, $idle]));
+        $expected = array_merge($expected, array_fill(0, 5, [false, $unmeasured]));
         $expected[] = [false, array_replace($idle, ['ok' => false, 'ioping_avg_ms' => 101])
             + ['warn' => 'ioping above threshold']];
-        $this->assertSame($expected, $this->pmssRunInlinePhpJson($script));
+        $sysBlock = $this->pmssMakeTempDir('pmss-bench-sysblock-', 0700);
+        $this->assertSame($expected, $this->pmssRunInlinePhpJson($script, ['PMSS_STORAGE_BENCHMARK_SYS_BLOCK_ROOT' => $sysBlock]));
+    }
+
+    public function testMdSyncActivityMarksTheHostBusy(): void
+    {
+        require_once dirname(__DIR__, 2).'/storageBenchmark.php';
+        $root = $this->pmssMakeTempDir('pmss-bench-md-', 0700);
+        $this->assertSame(null, \storageBenchmarkMdSyncBusy($root));
+        foreach (['md2' => "idle\n", 'md100' => "frozen\n", 'md101' => "recover\n"] as $array => $action) {
+            mkdir($root.'/'.$array.'/md', 0700, true);
+            file_put_contents($root.'/'.$array.'/md/sync_action', $action);
+        }
+        $this->assertSame('md101 recover', \storageBenchmarkMdSyncBusy($root));
+        file_put_contents($root.'/md101/md/sync_action', "idle\n");
+        $this->assertSame(null, \storageBenchmarkMdSyncBusy($root));
+        $this->assertSame(null, \storageBenchmarkMdSyncBusy($root.'/missing'));
     }
 
     public function testBenchmarkFileReservationAndCleanupPreserveForeignEntries(): void

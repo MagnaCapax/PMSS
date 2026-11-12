@@ -62,7 +62,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 return 0;
             };
 
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users']);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users'], static function (): int { return 0; });
             $this->assertSame(0, $rc);
         });
 
@@ -84,11 +84,45 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 return 2;
             };
 
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users']);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users'], static function (): int { return 0; });
             $this->assertSame(2, $rc);
         });
 
         $this->assertFalse(file_exists($marker));
         $this->assertStringContainsString('leaving marker unset', implode("\n", $logs));
+    }
+
+    public function testDeadlineScalesWithDeviceCountAndNeverDropsBelowTheGlobalOne(): void
+    {
+        $this->pmssWithEnv(['PMSS_COMMAND_TIMEOUT' => null], function (): void {
+            $this->assertSame(1200, \pmssStorageBenchmarkPostInstallTimeoutSeconds(0));
+            $this->assertSame(1200, \pmssStorageBenchmarkPostInstallTimeoutSeconds(-3));
+            $this->assertSame(1200, \pmssStorageBenchmarkPostInstallTimeoutSeconds(5));
+            $this->assertSame(2280, \pmssStorageBenchmarkPostInstallTimeoutSeconds(14));
+        });
+        $this->pmssWithEnv(['PMSS_COMMAND_TIMEOUT' => '5000'], function (): void {
+            $this->assertSame(5000, \pmssStorageBenchmarkPostInstallTimeoutSeconds(14));
+        });
+    }
+
+    public function testBenchmarkStepRunsUnderTheScaledDeadlineAndRestoresTheGlobalOne(): void
+    {
+        $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
+        $seen = [];
+        $logs = [];
+
+        $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker, 'PMSS_COMMAND_TIMEOUT' => '1300'], function () use (&$seen, &$logs): void {
+            $runner = static function () use (&$seen): int {
+                $seen[] = getenv('PMSS_COMMAND_TIMEOUT');
+                $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
+                return 124;
+            };
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users'], static function (): int { return 14; });
+            $this->assertSame(124, $rc);
+            $this->assertSame('1300', getenv('PMSS_COMMAND_TIMEOUT'));
+        });
+
+        $this->assertSame(['2280'], $seen);
+        $this->assertFalse(file_exists($marker));
     }
 }

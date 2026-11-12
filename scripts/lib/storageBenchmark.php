@@ -25,13 +25,25 @@ function storageBenchmarkIostatUtilPctRead(string $path): ?float
     // Retain legacy scalar normalization, then check numeric-string overflow too.
     return pmssFiniteFloat(trim((string) $util));
 }
-/** Persist the shared idle evidence before either benchmark mode decides whether to abort. */
+/** Name the first md array that is resyncing, recovering, checking, repairing or reshaping. */
+function storageBenchmarkMdSyncBusy(string $sysBlockRoot): ?string
+{
+    foreach (glob(rtrim($sysBlockRoot, '/').'/md*/md/sync_action') ?: [] as $file) {
+        $action = is_readable($file) ? trim((string) file_get_contents($file)) : '';
+        if (in_array($action, ['resync', 'recover', 'check', 'repair', 'reshape'], true)) return basename(dirname($file, 2)).' '.$action;
+    }
+    return null;
+}
+/** Persist the shared idle evidence before either benchmark mode decides whether to abort (ADR 0273: no evidence is not idle). */
 function storageBenchmarkIdlePreflight(string $jsonLog, array $base, string $targetDir, int $latencyLimit, int $utilLimit): bool
 {
     $pre = $base + ['test' => 'preflight-idle', 'ok' => true];
     $pre['ioping_avg_ms'] = pmssIopingAverageMs($targetDir);
-    if (($pre['ioping_avg_ms'] ?? 0) > $latencyLimit) { $pre['ok'] = false; $pre['warn'] = 'ioping above threshold'; }
+    if ($pre['ioping_avg_ms'] === null) { $pre['ok'] = false; $pre['warn'] = 'ioping returned no value'; }
+    elseif ($pre['ioping_avg_ms'] > $latencyLimit) { $pre['ok'] = false; $pre['warn'] = 'ioping above threshold'; }
     $util = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat'); if ($util !== null) { $pre['iostat_util_pct'] = $util; if ($util > $utilLimit) { $pre['ok'] = false; $pre['warn_util'] = 'iostat util high'; } }
+    $mdBusy = storageBenchmarkMdSyncBusy(pmssEnvTrimmed('PMSS_STORAGE_BENCHMARK_SYS_BLOCK_ROOT', '/sys/block'));
+    if ($mdBusy !== null) { $pre['ok'] = false; $pre['md_sync'] = $mdBusy; }
     storageBenchmarkAppendJsonLine($jsonLog, $pre);
     return $pre['ok'];
 }
