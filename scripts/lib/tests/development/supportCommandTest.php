@@ -21,7 +21,6 @@ class SupportCommandTest extends TestCase
         $this->user = 'user'.bin2hex(random_bytes(2));
 
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
-        $this->pmssEnsureDir($this->configDir);
         $this->pmssEnsureDir($this->skelDir.'/bin');
         $this->pmssWriteFile($this->configDir.'/support.php', "<?php\nreturn ".var_export([
             'targetEmail' => 'support@example.com',

@@ -26,7 +26,7 @@ class UserCgroupSliceDropinsTest extends TestCase
     public function testBatchPreservesBytesBackupsAndLegacyOrderBeforeCanonicalProperties(): void
     {
         $root = $this->pmssMakeTempDir('pmss-slice-demote-');
-        $base = $this->pmssEnsureDir($root.'/system');
+        $base = $root.'/system';
         $contents = ['90-pmss-user.conf' => "[Slice]\nCPUWeight=500\nMemoryHigh=4000M\nCPUAccounting=yes\n",
             '99-pmss.conf' => "[Slice]\nIOWeight=500\nTasksAccounting=yes\n"];
         foreach ([1234, 2345] as $uid) {

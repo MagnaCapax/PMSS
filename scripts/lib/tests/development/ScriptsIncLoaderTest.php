@@ -12,7 +12,6 @@ final class ScriptsIncLoaderTest extends TestCase
     private function makeHome(array $parts): string
     {
         $home = $this->pmssMakeTempDir('pmss-scriptsinc-loader-');
-        $this->pmssEnsureDir($home.'/www');
         foreach (array('.scriptsInc.php', 'www/scriptsInc.php') as $file) {
             $this->pmssWriteFile($home.'/'.$file, $this->pmssReadRepoFile('etc/skel/'.$file));
         }

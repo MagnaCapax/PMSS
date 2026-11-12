@@ -335,17 +335,12 @@ class IndexSkeletonFrameDataTest extends TestCase
     public function testRemoteDisabledRenderAddsTorrentFramesFromProxyFragments(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-proxy-root-', 'fixtur01');
-        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
         touch($home.'/.qbittorrentEnable');
         touch($home.'/.delugeEnable');
-        $this->pmssWriteFile(
-            $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
-            '$HTTP["url"] =~ "^/user-fixtur01/qbittorrent/" {'."\n}\n"
-        );
-        $this->pmssWriteFile(
-            $home.'/.lighttpd/custom.d/pmss-deluge.conf',
-            '$HTTP["url"] =~ "^/user-fixtur01/deluge/" {'."\n}\n"
-        );
+        $this->pmssWriteFiles($home, [
+            '.lighttpd/custom.d/pmss-qbittorrent.conf' => '$HTTP["url"] =~ "^/user-fixtur01/qbittorrent/" {'."\n}\n",
+            '.lighttpd/custom.d/pmss-deluge.conf' => '$HTTP["url"] =~ "^/user-fixtur01/deluge/" {'."\n}\n",
+        ]);
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
@@ -359,15 +354,10 @@ class IndexSkeletonFrameDataTest extends TestCase
     public function testRemoteDisabledRenderSkipsToggleAppProxyFragmentsWithoutEnableFlags(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-disabled-proxy-root-', 'fixtur01');
-        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
-        $this->pmssWriteFile(
-            $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
-            '$HTTP["url"] =~ "^/user-fixtur01/qbittorrent/" {'."\n}\n"
-        );
-        $this->pmssWriteFile(
-            $home.'/.lighttpd/custom.d/pmss-rclone.conf',
-            '$HTTP["url"] =~ "^/user-fixtur01/rclone/" {'."\n}\n"
-        );
+        $this->pmssWriteFiles($home, [
+            '.lighttpd/custom.d/pmss-qbittorrent.conf' => '$HTTP["url"] =~ "^/user-fixtur01/qbittorrent/" {'."\n}\n",
+            '.lighttpd/custom.d/pmss-rclone.conf' => '$HTTP["url"] =~ "^/user-fixtur01/rclone/" {'."\n}\n",
+        ]);
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
@@ -378,7 +368,6 @@ class IndexSkeletonFrameDataTest extends TestCase
     public function testRemoteDisabledRenderAddsRcloneFrameFromProxyFragment(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-rclone-root-', 'fixtur01');
-        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
         touch($home.'/.rcloneEnable');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-rclone.conf',
@@ -433,7 +422,6 @@ class IndexSkeletonFrameDataTest extends TestCase
     public function testRemoteDisabledRenderAddsMediaStackFramesFromProxyFragment(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-media-root-', 'fixtur01');
-        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/media-stack.conf',
             implode("\n", array(

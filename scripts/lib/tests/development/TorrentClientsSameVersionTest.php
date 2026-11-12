@@ -64,7 +64,7 @@ final class TorrentClientsSameVersionTest extends TestCase
         foreach (array('qbittorrent', 'deluge', 'transmission', 'rtorrent') as $client) {
             $events = array();
             list($home, $request, $ops) = $this->fixture($client, '4.1.3', '4.1.3', $events);
-            $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
+            $dir = $home.'/.config/pmss/torrentClients';
             foreach (array('lastRun', 'lastgood', 'notice') as $suffix)
                 $this->pmssWriteFile($dir.'/'.$client.'.'.$suffix, "kept\n");
             $this->assertTrue($this->apply($home, $request, $ops)['ok']);
@@ -107,13 +107,12 @@ final class TorrentClientsSameVersionTest extends TestCase
         foreach (array('qbittorrent', 'deluge', 'transmission', 'rtorrent') as $client) {
             $events = array();
             list($home, $request, $ops) = $this->fixture($client, '4.1.3', 'not running', $events);
-            $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
-            $this->pmssWriteFile($dir.'/'.$client.'.lastRun', "5.0.0\n");
+            $path = $this->pmssWriteFile($home.'/.config/pmss/torrentClients/'.$client.'.lastRun', "5.0.0\n");
             $result = $this->apply($home, $request, $ops);
             $this->assertSame(409, $result['status']);
             $this->assertStringContainsString('switch refused', $result['message']);
             $this->assertSame(array(), $events);
-            $this->assertSame("5.0.0\n", file_get_contents($dir.'/'.$client.'.lastRun'));
+            $this->assertSame("5.0.0\n", file_get_contents($path));
         }
     }
 
