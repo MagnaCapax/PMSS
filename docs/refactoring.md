@@ -629,6 +629,8 @@ Fragment-only source assertions call the corresponding direct repository helper,
 including combined required/forbidden checks across several files. Reserve
 contract tables for regex checks or checks combining fragments with ordering.
 Preserve fragment order, one read per file and diagnostic prefixes when removing wrappers.
+Installer contracts follow the same rule: fragment-only cases call direct helpers,
+while checksum regex cases retain individual rich contracts in their original order.
 Account configuration, managed writes, proc isolation and lifecycle/maintenance
 guards use direct fragment assertions too; maintenance phase ordering retains
 its single rich contract without an outer file map.
