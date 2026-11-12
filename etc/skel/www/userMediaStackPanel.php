@@ -220,12 +220,16 @@ function pmssMediaStackPanelLogTailRead(string $home, int $maxBytes = 6000, stri
         return '';
     }
 
-    if ($size > $maxBytes) {
-        @fseek($handle, -$maxBytes, SEEK_END);
-    }
+    try {
+        if ($size > $maxBytes) {
+            @fseek($handle, -$maxBytes, SEEK_END);
+        }
 
-    $tail = stream_get_contents($handle);
-    @fclose($handle);
+        $tail = stream_get_contents($handle);
+    } finally {
+        // Seek/read faults must release the panel's stream before unwinding.
+        @fclose($handle);
+    }
     return is_string($tail) ? ltrim($tail) : '';
 }
 

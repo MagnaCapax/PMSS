@@ -169,9 +169,13 @@ function pmssAppsLogTailRead(string $home, string $app): string
     $size = @filesize($path);
     $handle = @fopen($path, 'rb');
     if (!is_resource($handle)) return '';
-    if (is_int($size) && $size > 16384) @fseek($handle, -16384, SEEK_END);
-    $raw = stream_get_contents($handle, 16384);
-    @fclose($handle);
+    try {
+        if (is_int($size) && $size > 16384) @fseek($handle, -16384, SEEK_END);
+        $raw = stream_get_contents($handle, 16384);
+    } finally {
+        // Keep cleanup ahead of rendering, including exceptional I/O paths.
+        @fclose($handle);
+    }
     if (!is_string($raw)) return '';
     $lines = array_slice(explode("\n", trim($raw)), -20);
     return implode("\n", array_map(static function ($line) {

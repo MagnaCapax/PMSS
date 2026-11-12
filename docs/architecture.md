@@ -100,6 +100,11 @@ Keep the canonical installer/update details under `docs/install.md` and
   and tile projection. **userMediaStackPanel.php** projects installed-state
   observations after its existing reads. Both keep their delivery boundaries,
   output contracts and action policies (ADR 0203).
+- **etc/skel/www/appsRuntime.php** and **userMediaStackPanel.php** close their
+  log-tail streams in `finally`, including when seek or read throws. Existing
+  paths, limits, fallback results, whitespace and HTML escaping stay intact.
+  `CustomerPanelLogTailCleanupSafetyTest` injects I/O faults with memory streams
+  and checks original throwables and cleanup order on the testing machine.
 - **etc/skel/www/scriptsIncFiles.php** preflights complete local helper groups before loading them in order.
   Statistics, storage notices and memory status share this loader; incomplete deliveries retain their unavailable fallbacks.
 - **scripts/lib/agentDiagnostics.php** – Stable diagnostic CLI and text renderer.
