@@ -50,10 +50,10 @@ Usage
 ## Examples
 
 ```bash
-/scripts/util/userConfig.php alice 1024 200
-/scripts/util/userConfig.php alice --io-weight=300
-/scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true
-/scripts/util/userConfig.php alice --welcome-message='<p>Planned maintenance tonight.</p>'
+/scripts/util/userConfig.php fixtur01 1024 200
+/scripts/util/userConfig.php fixtur01 --io-weight=300
+/scripts/util/userConfig.php fixtur01 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true
+/scripts/util/userConfig.php fixtur01 --welcome-message='<p>Planned maintenance tonight.</p>'
 ```
 
 ## Notes

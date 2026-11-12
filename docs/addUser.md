@@ -58,10 +58,10 @@ Usage
 ## Examples
 
 ```bash
-/scripts/addUser.php alice rand 1024 200
-/scripts/addUser.php alice rand 1024 250 --bonus-quota-gib=50
-/scripts/addUser.php alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --io-weight=320
-/scripts/addUser.php --user=alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --io-latency-ms=50 --io-cost-qos='enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00' --upload-throttle-kib=2048 --docker-enabled=true
+/scripts/addUser.php fixtur01 rand 1024 200
+/scripts/addUser.php fixtur01 rand 1024 250 --bonus-quota-gib=50
+/scripts/addUser.php fixtur01 --password=rand --ram-mib=1024 --disk-quota-gib=200 --io-weight=320
+/scripts/addUser.php --user=fixtur01 --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --io-latency-ms=50 --io-cost-qos='enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00' --upload-throttle-kib=2048 --docker-enabled=true
 ```
 
 On success the script creates the Unix user and home directory, assigns an HTTP service port, applies `userConfig.php`, converges the per-user environment, starts the user services, and emits both text and JSON summary markers for automation.

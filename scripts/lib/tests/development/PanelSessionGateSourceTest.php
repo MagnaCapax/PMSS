@@ -32,11 +32,11 @@ class PanelSessionGateSourceTest extends TestCase
 
     public function testLuaGateAllowsOnlyLoginAndLogoutPublicHandlersInsideUserZone(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/lighttpd/panelSessionGate.lua', ['required' => [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/lighttpd/panelSessionGate.lua', [
             'local LOGIN_SCRIPT = "panelSessionLogin.php"',
             'local LOGOUT_SCRIPT = "panelSessionLogout.php"',
             'relative == "/" .. LOGIN_SCRIPT or relative == "/" .. LOGOUT_SCRIPT',
             'set_remote_user(user, "login")',
-        ], 'forbidden' => ['/webdav-' => 'WebDAV must stay outside the Lua gate']]);
+        ], ['/webdav-' => 'WebDAV must stay outside the Lua gate']);
     }
 }

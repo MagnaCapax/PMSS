@@ -32,29 +32,27 @@ final class UserCliHelpContractsTest extends TestCase
 
     public function testOperatorDocsStayAlignedWithStructuredHelp(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'docs/addUser.md' => ['required' => [
-                'addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB',
-                '--bonus-quota-gib=BONUS_QUOTA_GiB',
-                '--cpu-weight=WEIGHT',
-                '--io-latency-ms=MS',
-                '--io-cost-qos=SETTING',
-                '--io-cost-model=SETTING',
-                '250 MiB',
-                '--docker-enabled=true|false',
-                '/scripts/addUser.php alice rand 1024 200',
-            ]],
-            'docs/userConfig.md' => ['required' => [
-                './userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB',
-                '--welcome-message=HTML',
-                '--iops-limit=OPS',
-                '--io-latency-ms=MS',
-                '--io-cost-qos=SETTING',
-                '--io-cost-model=SETTING',
-                '1-10000',
-                '250 MiB',
-                '/scripts/util/userConfig.php alice 1024 200',
-            ]],
+        $this->pmssAssertRepoFileContainsAllStrings('docs/addUser.md', [
+            'addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB',
+            '--bonus-quota-gib=BONUS_QUOTA_GiB',
+            '--cpu-weight=WEIGHT',
+            '--io-latency-ms=MS',
+            '--io-cost-qos=SETTING',
+            '--io-cost-model=SETTING',
+            '250 MiB',
+            '--docker-enabled=true|false',
+            '/scripts/addUser.php fixtur01 rand 1024 200',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('docs/userConfig.md', [
+            './userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB',
+            '--welcome-message=HTML',
+            '--iops-limit=OPS',
+            '--io-latency-ms=MS',
+            '--io-cost-qos=SETTING',
+            '--io-cost-model=SETTING',
+            '1-10000',
+            '250 MiB',
+            '/scripts/util/userConfig.php fixtur01 1024 200',
         ]);
     }
 }

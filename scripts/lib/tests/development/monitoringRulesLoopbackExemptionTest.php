@@ -37,20 +37,20 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
             ."/sbin/iptables -A OUTPUT ! -d 10.0.0.0/8 -m owner --uid-owner 1001 -j MARK --set-mark 1001\n"
             ."/sbin/iptables -A OUTPUT -m owner --uid-owner 1001 -j ACCEPT\n"
             ."/sbin/iptables -A OUTPUT -d 10.0.0.0/8 -j ACCEPT\n";
-        $this->assertSame($expected, \networkMonitoringRulesRender(['alice' => 1001], ['10.0.0.0/8']));
+        $this->assertSame($expected, \networkMonitoringRulesRender(['fixtur01' => 1001], ['10.0.0.0/8']));
         $this->assertSame("/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n", \networkMonitoringRulesRender([], []));
     }
 
     public function testOwnerGuardPrecedesLoopbackAndKeepsAccountingBytes(): void
     {
-        $users = ['alice' => 1001, 'bob' => '2002'];
+        $users = ['fixtur01' => 1001, 'fixtur02' => '2002'];
         $prefix = '';
         foreach ([1001 => [22001, 32001], 2002 => [22002]] as $uid => $ports) {
             foreach ($ports as $port) {
                 $prefix .= "/sbin/iptables -A OUTPUT -o lo -p tcp --syn --dport {$port} -m owner ! --uid-owner {$uid} -m owner ! --uid-owner 0 -j REJECT --reject-with tcp-reset\n";
             }
         }
-        $rules = \networkMonitoringRulesRender($users, ['10.0.0.0/8'], ['alice' => [22001, 32001], 'bob' => [22002]]);
+        $rules = \networkMonitoringRulesRender($users, ['10.0.0.0/8'], ['fixtur01' => [22001, 32001], 'fixtur02' => [22002]]);
         $this->assertSame($prefix.\networkMonitoringRulesRender($users, ['10.0.0.0/8']), $rules);
         // Parsing for either apply path must retain both negated owners verbatim.
         $this->assertSame(explode("\n", rtrim(str_replace('/sbin/iptables ', '', $rules))), \networkParseMonitoringCommands($rules));
@@ -58,9 +58,9 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
 
     public function testOwnerGuardRejectsMalformedInputsAndDeduplicatesPorts(): void
     {
-        $users = ['alice' => 1001, 'bob' => '2002;id', 'carol' => 1.5, 'dave' => -1, 'eve' => '4294967295'];
-        $ports = ['alice' => [true, 1023, 1024, '1024', 65535, 65536, '22000;id', "22000\0", [], 3.5],
-            'bob' => [23000], 'carol' => [24000], 'dave' => [25000], 'eve' => [26000]];
+        $users = ['fixtur01' => 1001, 'fixtur02' => '2002;id', 'fixtur03' => 1.5, 'fixtur04' => -1, 'fixtur05' => '4294967295'];
+        $ports = ['fixtur01' => [true, 1023, 1024, '1024', 65535, 65536, '22000;id', "22000\0", [], 3.5],
+            'fixtur02' => [23000], 'fixtur03' => [24000], 'fixtur04' => [25000], 'fixtur05' => [26000]];
         $rules = \networkMonitoringRulesRender($users, [], $ports);
         $guard = strstr($rules, '/sbin/iptables -A OUTPUT -d 127.0.0.0/8', true);
         $this->assertSame(2, substr_count($guard, '-j REJECT'));
@@ -81,7 +81,7 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
 
     public function testOwnerGuardEmptyMapKeepsLegacyRules(): void
     {
-        $users = ['alice' => 1001, 'bob' => 1002];
+        $users = ['fixtur01' => 1001, 'fixtur02' => 1002];
         foreach ([[], ['10.0.0.0/8', '192.168.0.0/16']] as $localnets) {
             $this->assertSame(\networkMonitoringRulesRender($users, $localnets), \networkMonitoringRulesRender($users, $localnets, []));
         }
@@ -89,13 +89,10 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
 
     public function testMonitoringCallerAlwaysReadsRegistryWithoutHostMarker(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/makeMonitoringRules.php' => [
-                'required' => ['$webUiPorts = networkQbittorrentWebUiPortsRead($userUids);',
-                    'networkMonitoringRulesRender($userUids, $localnets, $webUiPorts)'],
-                'forbidden' => ['PMSS_NETWORK_LOOPBACK_OWNER_GUARD_MARKER', 'loopbackOwnerGuardEnabled'],
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/makeMonitoringRules.php', [
+            '$webUiPorts = networkQbittorrentWebUiPortsRead($userUids);',
+            'networkMonitoringRulesRender($userUids, $localnets, $webUiPorts)',
+        ], ['PMSS_NETWORK_LOOPBACK_OWNER_GUARD_MARKER', 'loopbackOwnerGuardEnabled']);
     }
 
     public function testOwnerGuardCountersAreExcludedFromTrafficAccounting(): void

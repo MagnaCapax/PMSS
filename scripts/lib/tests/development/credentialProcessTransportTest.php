@@ -34,7 +34,7 @@ class CredentialProcessTransportTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/recreateUser.php');
         $this->assertTrue(strpos($source, 'pmssCredentialProcessRun($pwCommand, $passwordInput)') !== false);
         $this->assertFalse(strpos($source, 'escapeshellarg($password)') !== false);
-        $this->assertStdinTransport(['--password-stdin', 'alice']);
+        $this->assertStdinTransport(['--password-stdin', 'fixtur01']);
     }
 
     public function testAddUserHandoffUsesStdin(): void
@@ -43,7 +43,7 @@ class CredentialProcessTransportTest extends TestCase
         $this->assertTrue(strpos($source, '$user[\'password\']') !== false);
         $this->assertTrue(strpos($source, '$safeChangePw,') !== false);
         $this->assertFalse(strpos($source, 'escapeshellarg($user[\'password\'])') !== false);
-        $this->assertStdinTransport(['--password-stdin', 'bob']);
+        $this->assertStdinTransport(['--password-stdin', 'fixtur02']);
     }
 
     public function testQbittorrentHandoffUsesStdin(): void
@@ -59,7 +59,7 @@ class CredentialProcessTransportTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/lib/user/passwordFile.php');
         $this->assertTrue(strpos($source, 'htpasswd -i -B') !== false);
         $this->assertFalse(strpos($source, 'escapeshellarg($password)') !== false);
-        $this->assertStdinTransport(['-i', '-B', '/tmp/fixture', 'alice']);
+        $this->assertStdinTransport(['-i', '-B', '/tmp/fixture', 'fixtur01']);
     }
 
     public function testChangePwStdinAndPositionalValuesMatch(): void
@@ -101,7 +101,7 @@ class CredentialProcessTransportTest extends TestCase
         $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script);
 
         $output = [];
-        foreach ([['alice', 'rand', '512', '100'], ['--user=alice', '--password=rand', '--ram-mib=512', '--disk-quota-gib=100']] as $arguments) {
+        foreach ([['fixtur01', 'rand', '512', '100'], ['--user=fixtur01', '--password=rand', '--ram-mib=512', '--disk-quota-gib=100']] as $arguments) {
             $user = \pmssAddUserParseCli(array_merge(['addUser.php'], $arguments))['user'];
             $this->assertSame('', $user['password']);
             $this->assertSame(0, \pmssCredentialProcessRun($command, $user['password'], $output));
@@ -148,13 +148,13 @@ class CredentialProcessTransportTest extends TestCase
     public function testChangePwSurvivesAStdoutNobodyReads(): void
     {
         // The success path needs root and a real account, so hold changePw to the two lines that matter.
-        $this->pmssAssertRepoFileContract('scripts/changePw.php', ['ordered' => [[
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/changePw.php', [
             'ignore_user_abort(true);',
             'echo "\t *******  {$username}     new password:',
             'pmssQbittorrentPasswordSyncWarning(',
             'exit(0);',
             'function generatePassword(): string',
-        ]]]);
+        ]);
         // Why both are needed: with the reader gone, PHP CLI exits 255 after a failed write even when
         // ignore_user_abort lets the script run on, unless the script exits with its own code.
         foreach (['' => 255, ' exit(0);' => 0] as $tail => $expected) {
@@ -234,7 +234,7 @@ class CredentialProcessTransportTest extends TestCase
             .'function pmssUserBaseContext($action, $phase, $user, $extra) { return $extra; } '
             .'function pmssUserWriteLogs($event) { $GLOBALS["events"][] = $event; } '
             .'function pmssUserLifecycleContextLog($action, $phase, $user, $extra) { pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $user, $extra)); } '
-            .'$user = ["name" => "alice"]; $events = []; $provisionStats = ["steps" => 0, "err" => 0, "ok" => 0]; '
+            .'$user = ["name" => "fixtur01"]; $events = []; $provisionStats = ["steps" => 0, "err" => 0, "ok" => 0]; '
             .'$rc = runProvisionStep("Set initial password", '.var_export($command, true).', null, '.var_export($stdin, true).'); '
             .'file_put_contents('.var_export($dir.'/result.json', true).', json_encode(["rc" => $rc, "stats" => $provisionStats, "events" => $events]));');
         $run = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' '.escapeshellarg($dir.'/harness.php'), [
@@ -254,7 +254,7 @@ class CredentialProcessTransportTest extends TestCase
         $this->pmssWriteExecutableFile($dir.'/bin/chpasswd', "#!/bin/sh\ncat >/dev/null\nprintf 'shadow failure\n' >&2\nexit 4\n", 0755, 0700);
         $output = [];
         $this->pmssWithEnv(['PATH' => $dir.'/bin:'.getenv('PATH')], function () use (&$output): void {
-            [$status, $hash] = \pmssChangePwShadowUpdate('alice', 'provided-value', true, $output);
+            [$status, $hash] = \pmssChangePwShadowUpdate('fixtur01', 'provided-value', true, $output);
             $this->assertSame(4, $status);
             $this->assertSame('', $hash);
         });
