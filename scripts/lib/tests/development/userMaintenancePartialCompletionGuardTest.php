@@ -37,56 +37,50 @@ PHP,
 
     public function testUserMaintenanceSourceContractsStayWired(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/userMaintenance.php' => ['required' => [
-                "require_once __DIR__.'/users/docker.php';",
-                'Processed %d of %d users',
-                "'empty username entry' : 'invalid username'",
-                "Account '%s' skipped during environment refresh: %s",
-                "'event'     => 'user_maintenance_summary'",
-                "'processed' => ", "'skipped' => ",
-                'pmssUserMaintenanceAccountRefresh(',
-            ]],
-            'scripts/lib/update/users/maintenanceAccount.php' => [
-                'required' => [
-                    '$environmentReason = null;',
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', [
+            "require_once __DIR__.'/users/docker.php';",
+            'Processed %d of %d users',
+            "'empty username entry' : 'invalid username'",
+            "Account '%s' skipped during environment refresh: %s",
+            "'event'     => 'user_maintenance_summary'",
+            "'processed' => ", "'skipped' => ",
+            'pmssUserMaintenanceAccountRefresh(',
+        ]);
+        $this->pmssAssertRepoFileContract('scripts/lib/update/users/maintenanceAccount.php', [
+            'required' => [
+                '$environmentReason = null;',
+                "if (!pmssUpdateUserEnvironment(\$userTrim, \$rutorrentIndexSha, \$environmentReason)) {",
+                "\$environmentMessage = 'user environment convergence failed';",
+                "\$environmentMessage .= ': '.\$environmentReason;",
+                "throw new RuntimeException(\$environmentMessage);",
+            ],
+            'ordered' => [[
+                'needles' => [
                     "if (!pmssUpdateUserEnvironment(\$userTrim, \$rutorrentIndexSha, \$environmentReason)) {",
-                    "\$environmentMessage = 'user environment convergence failed';",
-                    "\$environmentMessage .= ': '.\$environmentReason;",
-                    "throw new RuntimeException(\$environmentMessage);",
+                    'pmssUserRefreshMarkDone($userTrim, $refreshSignature);',
                 ],
-                'ordered' => [[
-                    'needles' => [
-                        "if (!pmssUpdateUserEnvironment(\$userTrim, \$rutorrentIndexSha, \$environmentReason)) {",
-                        'pmssUserRefreshMarkDone($userTrim, $refreshSignature);',
-                    ],
-                    'missingPrefix' => 'Missing convergence/marker phase: ',
-                    'orderPrefix' => 'Convergence marker order changed at: ',
-                ]],
-            ],
-            'scripts/lib/update/users/docker.php' => [
-                'required' => [
-                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureLingerAndDocker')",
-                ],
-            ],
-            'scripts/lib/update/users/dockerCommands.php' => ['required' => [
-                "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssRunAndLog')",
+                'missingPrefix' => 'Missing convergence/marker phase: ',
+                'orderPrefix' => 'Convergence marker order changed at: ',
             ]],
-            'scripts/lib/update/users/dockerInstall.php' => ['required' => [
-                "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureRootlessDockerInstalled')",
-            ]],
-            'scripts/lib/update/users/dockerDependencies.php' => ['required' => [
-                "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureDockerDependencies')",
-            ]],
-            'scripts/util/update-step2.php' => [
-                'required' => [
-                    '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
-                    'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
-                ],
-            ],
-            'scripts/lib/update/users/permissions.php' => [
-                'required' => ['PMSS_USER_PERMISSIONS_TIMEOUT', 'PMSS_COMMAND_TIMEOUT', "'-c3'", 'RuntimeException'],
-            ],
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php', [
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureLingerAndDocker')",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerCommands.php', [
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssRunAndLog')",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerInstall.php', [
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureRootlessDockerInstalled')",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerDependencies.php', [
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureDockerDependencies')",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
+            '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
+            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/permissions.php', [
+            'PMSS_USER_PERMISSIONS_TIMEOUT', 'PMSS_COMMAND_TIMEOUT', "'-c3'", 'RuntimeException',
         ]);
     }
 }

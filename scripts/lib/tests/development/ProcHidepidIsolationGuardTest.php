@@ -19,33 +19,23 @@ class ProcHidepidIsolationGuardTest extends TestCase
     public function testProcMountEnforcesHidepid2WithoutGidBypass(): void
     {
         // bootDefaults.php is the sole enforcer of the /proc hidepid=2 mount.
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/systemPrep/bootDefaults.php' => [
-                'required' => [
-                    "['hidepid=' => 'hidepid=2']",
-                    'defaults,hidepid=2',
-                    'remount,hidepid=2',
-                ],
-                'forbidden' => [
-                    'gid=' => 'bootDefaults.php must NOT add a gid= option to the /proc mount: gid=<group> exempts that group from hidepid and exposes every tenant\'s /proc (the 2026-06-30 hole). See ADR-0027.',
-                ],
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/bootDefaults.php', [
+            "['hidepid=' => 'hidepid=2']",
+            'defaults,hidepid=2',
+            'remount,hidepid=2',
+        ], [
+            'gid=' => 'bootDefaults.php must NOT add a gid= option to the /proc mount: gid=<group> exempts that group from hidepid and exposes every tenant\'s /proc (the 2026-06-30 hole). See ADR-0027.',
         ]);
     }
 
     public function testHostEnvironmentAdvisoryDoesNotSuggestRemovingHidepid(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/systemPrep/hostEnvironment.php' => [
-                'required' => [
-                    'Do NOT remount /proc without hidepid',
-                    'expected and non-fatal',
-                    'See ADR-0027',
-                ],
-                'forbidden' => [
-                    'Consider remounting' => 'hostEnvironment.php must not advise remounting /proc without hidepid on v2 (the pre-ADR-0027 hole-suggesting wording).',
-                ],
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/hostEnvironment.php', [
+            'Do NOT remount /proc without hidepid',
+            'expected and non-fatal',
+            'See ADR-0027',
+        ], [
+            'Consider remounting' => 'hostEnvironment.php must not advise remounting /proc without hidepid on v2 (the pre-ADR-0027 hole-suggesting wording).',
         ]);
     }
 

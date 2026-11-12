@@ -629,6 +629,9 @@ Fragment-only source assertions call the corresponding direct repository helper,
 including combined required/forbidden checks across several files. Reserve
 contract tables for regex checks or checks combining fragments with ordering.
 Preserve fragment order, one read per file and diagnostic prefixes when removing wrappers.
+Account configuration, managed writes, proc isolation and lifecycle/maintenance
+guards use direct fragment assertions too; maintenance phase ordering retains
+its single rich contract without an outer file map.
 Generated panel, route, quota, launch, preflight and PHP-ini text checks use
 `assertStringContainsAllStrings()` and `assertStringContainsAndOmitsStrings()`
 for repeated fragments, retaining caller-owned bytes and assertion order.

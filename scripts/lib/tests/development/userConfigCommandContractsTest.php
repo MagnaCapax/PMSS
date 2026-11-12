@@ -7,40 +7,35 @@ class userConfigCommandContractsTest extends TestCase
 {
     public function testUserConfigSourceContractsRemainStable(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/userConfig.php' => [
-                'required' => [
-                    "require_once __DIR__.'/../lib/user/userConfigRuntime.php';",
-                    'pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange)',
-                    'pmssUserConfigWelcomeOnlyPersist($store, $user[\'name\'], $expectedHome, $welcomeMessage, $existing)',
-                    'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled)',
-                    "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
-                    "pmssWriteUserFile(\$qbittorrentConfigFile, \$qbittorrentConfig, \$user['name'], 0600)",
-                    "elseif (!pmssQbittorrentThrottleSeedRecord(\$user['name'], \$expectedHome, \$throttle ?? 0))",
-                    "if (pmssUserConfigDiskQuotaShouldApply(\$configMode)) {\n    userApplyDiskQuota(\$user);\n}",
-                    'pmssUserConfigApplyCgroupAndDocker($user, $store)',
-                    '$rtorrentConfig->createConfig(pmssRtorrentPortReservationReusable($payload) + [',
-                ],
-                'forbidden' => [
-                    'file_put_contents($qbittorrentConfigFile' => 'Account config writes must use the managed writer',
-                    '(int) $pid'.'Chunk',
-                    "strpos(\$arg, '--upload-throttle-kib=')" => 'userConfig.php should not keep a manual scan: --upload-throttle-kib',
-                    'pmssUserConfigCli'.'PersistedResourcePresence' => 'userConfig.php should not keep duplicated resource presence logic',
-                    "'--cpu-weight=' . \$user['CPUWeight']" => 'userConfig.php should not keep duplicated CPU weight CLI rendering',
-                ],
-            ],
-            'scripts/lib/user/userConfigRuntime.php' => ['required' => [
-                'function pmssUserConfigPayloadBuild(',
-                'function pmssUserConfigApplyCgroupAndDocker(',
-                "runStep('Configuring cgroups', pmssBuildCommand('php', \$args));",
-                "'Rootless Docker disabled by config for '.\$user['name']",
-                "pmssBuildUserShellCommand(\$user['name'], \$dockerSetupCmd)",
-                '/usr/bin/dockerd-rootless-setuptool.sh install',
-            ], 'forbidden' => [
-                'machinectl shell' => 'rootless-Docker setup must be manager-independent (ADR-0027): no `machinectl shell user@` (needs a working per-user systemd manager, which fails under cgroup v2 + hidepid=2, systemd issue 12955)',
-            ]],
-            'scripts/lib/user/userConfigCgroup.php' => ['required' => ["'/scripts/util/userConfigCgroup.php'"]],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userConfig.php', [
+            "require_once __DIR__.'/../lib/user/userConfigRuntime.php';",
+            'pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange)',
+            'pmssUserConfigWelcomeOnlyPersist($store, $user[\'name\'], $expectedHome, $welcomeMessage, $existing)',
+            'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled)',
+            "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
+            "pmssWriteUserFile(\$qbittorrentConfigFile, \$qbittorrentConfig, \$user['name'], 0600)",
+            "elseif (!pmssQbittorrentThrottleSeedRecord(\$user['name'], \$expectedHome, \$throttle ?? 0))",
+            "if (pmssUserConfigDiskQuotaShouldApply(\$configMode)) {\n    userApplyDiskQuota(\$user);\n}",
+            'pmssUserConfigApplyCgroupAndDocker($user, $store)',
+            '$rtorrentConfig->createConfig(pmssRtorrentPortReservationReusable($payload) + [',
+        ], [
+            'file_put_contents($qbittorrentConfigFile' => 'Account config writes must use the managed writer',
+            '(int) $pid'.'Chunk',
+            "strpos(\$arg, '--upload-throttle-kib=')" => 'userConfig.php should not keep a manual scan: --upload-throttle-kib',
+            'pmssUserConfigCli'.'PersistedResourcePresence' => 'userConfig.php should not keep duplicated resource presence logic',
+            "'--cpu-weight=' . \$user['CPUWeight']" => 'userConfig.php should not keep duplicated CPU weight CLI rendering',
         ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/userConfigRuntime.php', [
+            'function pmssUserConfigPayloadBuild(',
+            'function pmssUserConfigApplyCgroupAndDocker(',
+            "runStep('Configuring cgroups', pmssBuildCommand('php', \$args));",
+            "'Rootless Docker disabled by config for '.\$user['name']",
+            "pmssBuildUserShellCommand(\$user['name'], \$dockerSetupCmd)",
+            '/usr/bin/dockerd-rootless-setuptool.sh install',
+        ], [
+            'machinectl shell' => 'rootless-Docker setup must be manager-independent (ADR-0027): no `machinectl shell user@` (needs a working per-user systemd manager, which fails under cgroup v2 + hidepid=2, systemd issue 12955)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/userConfigCgroup.php', ["'/scripts/util/userConfigCgroup.php'"]);
     }
 
     public function testUsageTextSeparatesNamedOptionsFromPositionals(): void

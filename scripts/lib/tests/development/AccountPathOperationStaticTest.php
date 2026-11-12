@@ -79,31 +79,29 @@ final class AccountPathOperationStaticTest extends TestCase
     public function testConfigAndSkeletonWritesKeepSharedWriterRouting(): void
     {
         $forbidden = ['tempnam(', 'rename(', 'copy('];
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/deluge.php' => ['required' => [
-                "pmssDelugeConfigFileWrite(\$configFile, \$updated, 'upload throttle')",
-            ], 'forbidden' => $forbidden],
-            'scripts/lib/user/delugeProvisioning.php' => ['required' => [
-                'pmssWriteUserFile($path, $content, $owner, $mode)',
-                'pmssReplaceUserFilePreservingMetadata($path, $content, 0644)',
-            ], 'forbidden' => $forbidden],
-            'scripts/lib/lighttpd/userFileReplace.php' => ['required' => [
-                'function pmssReplaceUserFilePreservingMetadata(',
-                "pmssRootStageFileWrite(\$path, \$content, \$group['name'], \$mode)",
-                'pmssReplaceAccountFile($user, $home, $path, $content, $mode, true)',
-            ]],
-            'scripts/lib/update.php' => ['required' => [
-                'pmssReadRegularFileContents((string) $sourceFile)',
-                'pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true)',
-            ], 'forbidden' => $forbidden],
-            'scripts/lib/user/rootlessDockerConfig.php' => ['required' => [
-                'pmssAccountHomeIdentity($configFile)',
-                '$identity[2] === $uid',
-                'pmssReplaceAccountFile($identity[1], $identity[0], $configFile, $json, 0600, true)',
-                'pmssReplaceUserFile($configFile, $json, static function (string $openedPath): bool',
-                '@chmod($openedPath, 0600)',
-            ], 'forbidden' => $forbidden],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/deluge.php', [
+            "pmssDelugeConfigFileWrite(\$configFile, \$updated, 'upload throttle')",
+        ], $forbidden);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/delugeProvisioning.php', [
+            'pmssWriteUserFile($path, $content, $owner, $mode)',
+            'pmssReplaceUserFilePreservingMetadata($path, $content, 0644)',
+        ], $forbidden);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/userFileReplace.php', [
+            'function pmssReplaceUserFilePreservingMetadata(',
+            "pmssRootStageFileWrite(\$path, \$content, \$group['name'], \$mode)",
+            'pmssReplaceAccountFile($user, $home, $path, $content, $mode, true)',
         ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update.php', [
+            'pmssReadRegularFileContents((string) $sourceFile)',
+            'pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true)',
+        ], $forbidden);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/rootlessDockerConfig.php', [
+            'pmssAccountHomeIdentity($configFile)',
+            '$identity[2] === $uid',
+            'pmssReplaceAccountFile($identity[1], $identity[0], $configFile, $json, 0600, true)',
+            'pmssReplaceUserFile($configFile, $json, static function (string $openedPath): bool',
+            '@chmod($openedPath, 0600)',
+        ], $forbidden);
     }
 
     public function testTransferSessionRewriteUsesVerifiedOpenInode(): void

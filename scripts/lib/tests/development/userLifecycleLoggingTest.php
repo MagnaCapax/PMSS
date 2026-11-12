@@ -250,22 +250,20 @@ PHP;
 
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => false), $active);
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => true), $suspended);
-        $this->pmssAssertRepoFileContractCases(array(
-            'scripts/suspend.php' => array('required' => array(
-                "pmssUserLifecycleRequireWebRootState('suspend'",
-                "'archive_web_root'",
-                'suspension aborted',
-                'exit(1);',
-            )),
-            'scripts/unsuspend.php' => array('required' => array(
-                "pmssUserLifecycleRequireWebRootState('unsuspend'",
-                'pmssUserLifecycleWebRootContainsUserContent($disabledRoot)',
-                'pmssUserLifecycleClearEmptySuspendedMarker($homeDir, $disabledRoot)',
-                "'validate_restored_web_root'",
-                "is_file(\$activeRoot.'/index.php')",
-                "pmssUserLifecycleWebStackStartAndVerify('unsuspend'",
-                'if ($webStackRc !== 0)',
-            )),
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/suspend.php', array(
+            "pmssUserLifecycleRequireWebRootState('suspend'",
+            "'archive_web_root'",
+            'suspension aborted',
+            'exit(1);',
+        ));
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/unsuspend.php', array(
+            "pmssUserLifecycleRequireWebRootState('unsuspend'",
+            'pmssUserLifecycleWebRootContainsUserContent($disabledRoot)',
+            'pmssUserLifecycleClearEmptySuspendedMarker($homeDir, $disabledRoot)',
+            "'validate_restored_web_root'",
+            "is_file(\$activeRoot.'/index.php')",
+            "pmssUserLifecycleWebStackStartAndVerify('unsuspend'",
+            'if ($webStackRc !== 0)',
         ));
     }
 
