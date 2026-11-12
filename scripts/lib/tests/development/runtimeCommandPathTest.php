@@ -202,15 +202,31 @@ PHP;
         });
     }
 
+    /** ADR 0274: the periodic host probes reuse ioping.tmp (-k); one-off callers do not. */
+    public function testIopingKeepReusesWorkingFileOnlyWhenAsked(): void
+    {
+        $argsLog = $this->pmssMakeTempFile('pmss-ioping-keep-');
+        $binDir = $this->pmssMakeExecutableStub('ioping', "#!/bin/sh\nprintf '%s\\n' \"\$*\" >> ".escapeshellarg($argsLog)."\nprintf '%s\\n' '4 KiB <<< /tmp: request=1 time=2.0 ms'\n", 'pmss-ioping-keep-');
+
+        $this->pmssWithPathPrefix($binDir, function () use ($argsLog): void {
+            $this->assertEquals(2.0, pmssIopingMedianMs('/tmp', true));
+            $this->assertEquals(2.0, pmssIopingMedianMs('/tmp'));
+            $this->assertSame("-c 60 -i 0.1 -w 12 -k -D /tmp\n-c 60 -i 0.1 -w 12 -D /tmp\n", (string) file_get_contents($argsLog));
+        });
+        // The host stats probe (iopingHome/iopingRoot, iopingHomeMs) is the caller that keeps the file.
+        $source = (string) file_get_contents(dirname(__DIR__, 3).'/lib/systemStats/observe.php');
+        $this->assertTrue(strpos($source, 'pmssIopingMedianMs($path, true)') !== false, 'host stats probe must pass keep');
+    }
+
     /** ADR 0274: a probe killed at the hard timeout keeps its completed samples plus one censored sample. */
     public function testIopingTimedOutProbeReadsSlowNotMissing(): void
     {
         $cases = [
             // [stub stdout lines, exit code, expected median, expected average]
             'partial samples, TERM' => [['time=2.0 ms', 'time=4.0 ms', 'time=6.0 ms'], 124, 5.0, null],
-            'nothing answered, TERM' => [[], 124, 15000.0, null],
-            'nothing answered, KILL' => [[], 137, 15000.0, null],
-            'one slow sample, KILL' => [['time=900.0 ms'], 137, 7950.0, null],
+            'nothing answered, TERM' => [[], 124, 60000.0, null],
+            'nothing answered, KILL' => [[], 137, 60000.0, null],
+            'one slow sample, KILL' => [['time=900.0 ms'], 137, 30450.0, null],
             'flock skip is no measurement' => [['time=1.0 ms'], 75, null, null],
             'other failure is no measurement' => [['time=1.0 ms'], 1, null, null],
         ];

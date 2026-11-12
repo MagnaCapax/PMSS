@@ -350,17 +350,18 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - aptCmd(string $args): string
   - Returns apt-get command prefix with non-interactive dpkg options.
 - pmssIopingAverageMs(?string $target): ?float
-  - Runs the canonical `ioping -c 60 -i 0.1 -w 12 -D <target>` probe (15 s hard
+  - Runs the canonical `ioping -c 60 -i 0.1 -w 12 -D <target>` probe (60 s hard
     timeout) and parses the summary average in milliseconds. Missing binaries,
     empty targets, malformed output and a probe killed at the timeout return
     `null`.
-- pmssIopingMedianMs(?string $target): ?float
+- pmssIopingMedianMs(?string $target, bool $keep = false): ?float
   - Uses the same direct-I/O probe, parses per-request latency samples, and
     returns their median in milliseconds. Falls back to the summary average
     when older/stubbed output lacks individual sample lines. A slow disk stops
-    at the 12 s work time with fewer samples; a probe killed at the 15 s
-    timeout keeps its completed samples plus one censored 15000 ms sample, so
-    it reads slow instead of null (ADR 0274).
+    at the 12 s work time with fewer samples; a probe killed at the 60 s
+    timeout keeps its completed samples plus one censored 60000 ms sample, so
+    it reads slow instead of null. `$keep` adds `-k` (reuse `ioping.tmp` in a
+    directory target); the host statistics probe passes it (ADR 0274).
 - pmssSystemStatsHostPressureSnapshotWrite(string $path, array $stats, ?int $timestamp=null): bool
   - Atomically writes a mode-0644 customer-readable JSON snapshot containing
     only timestamp, five-minute full I/O PSI, and `/home` ioping latency.

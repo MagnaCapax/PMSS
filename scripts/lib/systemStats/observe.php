@@ -26,7 +26,7 @@ function pmssSystemStatsTopMemoryProcesses(?callable $runner = null): string
 function pmssSystemStatsPsiRead(string $path): string { return is_readable($path) ? pmssSystemStatsPsiFromRaw(pmssReadRegularFileContents($path)) : 'na'; }
 
 /** Format optional representative ioping latency for the stats log. */
-function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingMedianMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
+function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingMedianMs($path, true) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
 
 /**
  * Read the jbd2 journal counters of the filesystem mounted at /home as the `jbd2_home` field.

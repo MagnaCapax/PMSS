@@ -3,19 +3,25 @@
 
 const PMSS_IOPING_PROBE_COUNT = 60;
 const PMSS_IOPING_PROBE_INTERVAL = '0.1';
-const PMSS_IOPING_PROBE_TIMEOUT = 15;
+// Hard timeout: long enough that a stalled request is measured, not cut off (ADR 0274).
+const PMSS_IOPING_PROBE_TIMEOUT = 60;
 // ioping stops sending after this many seconds and prints what completed (ADR 0274), so a slow disk yields
 // fewer samples instead of a killed probe; the timeout above stays as the hard backstop.
 const PMSS_IOPING_PROBE_WORK_TIME = '12';
 
-/** Run the canonical direct-I/O 4 KiB latency probe and return raw output. */
-function pmssIopingProbeOutput(?string $target): ?string
+/**
+ * Run the canonical direct-I/O 4 KiB latency probe and return raw output. $keep reuses ioping.tmp in a
+ * directory target (-k) so a periodic probe does not create, write and sync a new file every run (ADR 0274).
+ */
+function pmssIopingProbeOutput(?string $target, bool $keep = false): ?string
 {
     // Keep malformed paths on the null-result path before shell quoting can throw.
     if ($target !== null && pmssFilesystemPathHasNulByte($target)) return null;
     $bin = pmssCommandPath('ioping');
     if ($bin === '' || $target === null || trim($target) === '') return null;
-    $command = pmssCommandArgvShellQuote([$bin, '-c', (string) PMSS_IOPING_PROBE_COUNT, '-i', PMSS_IOPING_PROBE_INTERVAL, '-w', PMSS_IOPING_PROBE_WORK_TIME, '-D', $target]);
+    $argv = [$bin, '-c', (string) PMSS_IOPING_PROBE_COUNT, '-i', PMSS_IOPING_PROBE_INTERVAL, '-w', PMSS_IOPING_PROBE_WORK_TIME];
+    if ($keep) $argv[] = '-k';
+    $command = pmssCommandArgvShellQuote(array_merge($argv, ['-D', $target]));
     // Single-instance guard (#751): bind the lock to the ioping process itself, so a
     // direct-I/O probe orphaned in D-state past the timeout wrapper blocks only its
     // OWN next tick instead of piling up N-deep and DoSing the host it measures.
@@ -87,9 +93,9 @@ function pmssIopingAverageMs(?string $target): ?float
     return $out === null ? null : pmssIopingAverageMsFromOutput($out);
 }
 
-function pmssIopingMedianMs(?string $target): ?float
+function pmssIopingMedianMs(?string $target, bool $keep = false): ?float
 {
-    $out = pmssIopingProbeOutput($target);
+    $out = pmssIopingProbeOutput($target, $keep);
     if ($out === null) return null;
     return pmssIopingMedianMsFromSamples(pmssIopingSamplesMsFromOutput($out)) ?? pmssIopingAverageMsFromOutput($out);
 }
