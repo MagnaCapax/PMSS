@@ -30,20 +30,16 @@ class UpdateStep2WebRefreshGuardTest extends TestCase
 
     public function testWebStackRegeneratesAllNginxConfigsFromStagedTemplate(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
-            'required' => [
-                "runStep('Regenerating nginx configs from staged templates', '/scripts/util/createNginxConfig.php')",
-                "throw new RuntimeException('nginx_config_regeneration_failed');",
-            ],
-            'ordered' => [[
-                'needles' => [
-                    "function pmssConfigureWebStack(): void",
-                    'Regenerating nginx configs from staged templates',
-                    'Updating all user environments',
-                    'Post-update nginx configuration refresh',
-                ],
-            ]],
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
+            "runStep('Regenerating nginx configs from staged templates', '/scripts/util/createNginxConfig.php')",
+            "throw new RuntimeException('nginx_config_regeneration_failed');",
         ]);
+        $this->assertOrderedStrings([
+            "function pmssConfigureWebStack(): void",
+            'Regenerating nginx configs from staged templates',
+            'Updating all user environments',
+            'Post-update nginx configuration refresh',
+        ], $source);
     }
 
     public function testAccountRecoveryRunsAfterUserLoopBeforeRemainingPhase2Work(): void
