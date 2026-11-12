@@ -50,7 +50,10 @@ function pmssIopingProbeOutput(?string $target, bool $keep = false): ?string
     }
     // Any other failure (no ioping, flock skip 75, bad target) is not a measurement.
     if ($rc !== 0) return null;
-    $out = trim($result['stdout'] !== '' ? $result['stdout'] : $result['stderr']);
+    $out = $result['stdout'] !== '' ? $result['stdout'] : $result['stderr'];
+    // Reject corrupt capture bytes before trim() can hide edge terminators.
+    if (strpos($out, "\0") !== false) return null;
+    $out = trim($out);
     return $out === '' ? null : $out;
 }
 
@@ -58,6 +61,8 @@ function pmssIopingValueToMs(float $value, string $unit): float { return strtolo
 /** Reject malformed or overflowing averages before publishing a latency sample. */
 function pmssIopingAverageMsFromOutput(string $output): ?float
 {
+    // A valid-looking summary must not hide corruption elsewhere in the output.
+    if (strpos($output, "\0") !== false) return null;
     if (!preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(us|ms|s)\s*\//i', $output, $m)) return null;
     return pmssFiniteFloat(pmssIopingValueToMs((float) $m[1], $m[2]));
 }
@@ -65,6 +70,8 @@ function pmssIopingAverageMsFromOutput(string $output): ?float
 /** Parse per-request ioping samples, ignoring summary lines. */
 function pmssIopingSamplesMsFromOutput(string $output): array
 {
+    // Do not publish partial trusted samples from a corrupt capture.
+    if (strpos($output, "\0") !== false) return [];
     preg_match_all('/\btime\s*=\s*([0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(us|ms|s)\b/i', $output, $matches, PREG_SET_ORDER);
     $values = [];
     foreach ($matches as $match) {

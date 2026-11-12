@@ -93,6 +93,21 @@ Local verification is limited to changed-file PHP syntax and moved/deleted
 symbol searches. Execution tests, including dry-run rehearsals, are left to
 the lane's testing machine and CI; no live commands or probes are exercised here.
 
+## Ioping output safety follow-up (2026-11-12)
+
+The capture boundary rejects NUL bytes in the selected successful output stream
+before trimming, and both latency parsers reject NUL-containing output before
+matching fields. Otherwise, trim could hide edge NULs or a valid-looking field
+could conceal corruption elsewhere in the capture. Refusals use the existing
+`null` average/probe result and empty sample list. Valid units, whitespace,
+ordering, stdout/stderr selection and command bytes remain unchanged.
+
+ADR 0274's killed-probe policy remains authoritative: malformed stdout contributes
+no completed samples, but the censored timeout sample is still returned.
+`IopingOutputSafetyTest` covers raw parsing, both successful capture streams and
+killed captures with injected command results. Execution stays on the testing
+machine; local verification is limited to changed-file PHP syntax.
+
 ## References
 
 - [Architecture overview](../architecture.md)

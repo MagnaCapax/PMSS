@@ -41,6 +41,25 @@ class IopingOutputSafetyTest extends TestCase
         $this->assertSame([], \pmssIopingSamplesMsFromOutput('time=1..2 ms'));
     }
 
+    public function testNulCorruptionRejectsTheWholeOutputBeforeParsing(): void
+    {
+        $raw = "time=1 ms\ntime=3 ms\n".$this->summary('4.5 ms');
+        foreach ([
+            'leading' => "\0".$raw,
+            'trailing' => $raw."\0",
+            'between samples' => str_replace("\ntime=3", "\n\0time=3", $raw),
+            'inside sample' => str_replace('time=1', "time=1\0", $raw),
+            'inside average' => str_replace('4.5', "4.\0".'5', $raw),
+            'after average' => str_replace('4.5 ms', "4.5 ms\0", $raw),
+            'unparsed summary field' => $raw."\0 ms",
+            'unrelated line' => $raw."\nother\0data\n",
+            'only NUL' => "\0",
+        ] as $label => $invalid) {
+            $this->assertSame(null, \pmssIopingAverageMsFromOutput($invalid), $label);
+            $this->assertSame([], \pmssIopingSamplesMsFromOutput($invalid), $label);
+        }
+    }
+
     public function testMedianRetainsOrdinaryResultsAndInputOrder(): void
     {
         foreach ([[[], null], [[4.0], 4.0], [[3.0, 1.0], 2.0], [[3.0, 1.0, 2.0], 2.0],
@@ -103,8 +122,20 @@ PHP;
             $expected[] = ["time=1.000000 ms\ntime=3.000000 ms\ncensored time=60000 ms", null, 3.0];
             $cases[] = ['rc' => $rc, 'stdout' => '', 'stderr' => $output];
             $expected[] = ['censored time=60000 ms', null, 60000.0];
+            // Corrupt samples are discarded, but a killed probe still records its timeout.
+            $cases[] = ['rc' => $rc, 'stdout' => $output."\0", 'stderr' => ''];
+            $expected[] = ['censored time=60000 ms', null, 60000.0];
+        }
+        foreach (["\0".$output, $output."\0", " \0\n".$output,
+            str_replace('time=1', "time=1\0", $output), $output."\nother\0data"] as $invalid) {
+            foreach ([['stdout' => $invalid, 'stderr' => $output],
+                ['stdout' => '', 'stderr' => $invalid]] as $capture) {
+                $cases[] = ['rc' => 0] + $capture;
+                $expected[] = [null, null, null];
+            }
         }
         foreach ([['stdout' => " \n".$output."\n", 'stderr' => 'ignored'],
+            ['stdout' => $output, 'stderr' => "ignored\0data"],
             ['stdout' => '', 'stderr' => " \n".$output."\n"]] as $capture) {
             $cases[] = ['rc' => 0] + $capture;
             $expected[] = [$output, 4.5, 2.0];
