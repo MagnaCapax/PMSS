@@ -91,8 +91,12 @@ function pmssCustomerNativePidsRead(array $binaries, string $procRoot = '/proc',
   $allowed[$resolved] = true;
   $handle = @fopen($resolved, 'rb');
   if (!is_resource($handle)) continue;
-  $first = fgets($handle, 160);
-  fclose($handle);
+  try {
+   $first = fgets($handle, 160);
+  } finally {
+   // Header inspection owns the stream even when a read throws.
+   fclose($handle);
+  }
   if (is_string($first) && preg_match('/^#!\s*(\/\S+)/', $first, $match) === 1) {
    $interpreterPath = $match[1];
    if ($interpreterPath === '/usr/bin/env' && preg_match('/^#!\s*\/usr\/bin\/env\s+python3(?:\s|$)/', trim($first)) === 1) $interpreterPath = '/usr/bin/python3';
@@ -196,17 +200,18 @@ function pmssCustomerTorrentClientToggleStart(string $client, callable $systemSt
  if (is_link($dir)) return $protected
   ? pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the operation directory is a link.') : false;
  $lock = null;
- if (is_dir($dir)) {
-  $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
-  if (!is_resource($lock)) return $protected
-   ? pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the operation lock could not be opened.') : false;
-  if (!@flock($lock, LOCK_EX | LOCK_NB)) {
-   fclose($lock);
-   if ($protected) pmssQbittorrentFrontendNotice($home, 'qBittorrent is busy with another operation; try again shortly.');
-   return false;
-  }
- }
  try {
+  // Acquisition belongs to the same cleanup lifetime as the selected launch.
+  if (is_dir($dir)) {
+   $lock = @fopen($dir.'/'.$client.'.lock', 'ce');
+   if (!is_resource($lock)) return $protected
+    ? pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the operation lock could not be opened.') : false;
+   if (!@flock($lock, LOCK_EX | LOCK_NB)) {
+    fclose($lock);
+    if ($protected) pmssQbittorrentFrontendNotice($home, 'qBittorrent is busy with another operation; try again shortly.');
+    return false;
+   }
+  }
   if ($protected && !pmssQbittorrentFrontendRefusalClear($home))
    return pmssQbittorrentFrontendStartRefused($home, 'qBittorrent start refused: the refusal marker could not be cleared.');
   // Recheck under the lock so a completed Configure switch determines this launch.
@@ -232,7 +237,10 @@ function pmssCustomerTorrentClientToggleStart(string $client, callable $systemSt
    return pmssQbittorrentFrontendStart($home, $systemStart, $ops);
  } else { $systemStart(); return true; }
  } finally {
-  if (is_resource($lock)) { flock($lock, LOCK_UN); fclose($lock); }
+  if (is_resource($lock)) {
+   try { flock($lock, LOCK_UN); }
+   finally { fclose($lock); }
+  }
  }
 }
 }

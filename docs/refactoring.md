@@ -172,6 +172,15 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Customer app process helpers close executable-header streams in `finally` before
+process scanning or propagation of read faults. Toggle-start lock acquisition
+shares the launch cleanup lifetime, and unlocking cannot prevent stream closure.
+Normal header bounds, selected/system commands, contention results and close order
+retain their contracts; later cleanup faults retain PHP's throwable precedence.
+`CustomerAppProcessCleanupSafetyTest` injects exceptions and errors using memory
+streams and synthetic observations. Execution stays on testing machines; no app
+is launched or signalled.
+
 Command-pipe cleanup retries a close once only while the stream remains live.
 A false result or throwable before closure cannot strand a transiently failing
 pipe; persistent faults remain bounded so later descriptors are still attempted.
