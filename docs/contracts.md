@@ -657,8 +657,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     line and does not abort the transfer.
 
 - pmssUpdateAllUsers(string $rutorrentIndexSha): array
-  - Enumerates users from `users::listHomeUsers()`, runs per-user maintenance, and returns summary keys: `total`, `processed`, `skipped`.
+  - Enumerates users from `users::listHomeUsers()`, runs per-user maintenance, and returns summary keys in order: `total`, `processed`, `skipped`, `skip_reasons`.
   - Emits end-of-loop summary log line `Processed N of M users` and JSON event `user_maintenance_summary`.
+  - The original include loads resume storage, legacy CPU-quota repair and account
+    convergence from `users/refreshState.php`, `legacyCpuQuota.php` and
+    `maintenanceAccount.php` (ADR 0275). The single queue owns catching and summary
+    accounting; the account helper returns the existing lighttpd-incomplete flag.
   - Calls `pmssUpdateUserEnvironment()` first, then applies linger/rootless-Docker wiring and optional post-refresh checks for each valid user.
   - Before marking a user refreshed, repairs stale per-user systemd drop-ins with bare sub-MiB `MemoryMax=<N>` values and matching suffixed `MemoryLimit=<N>M` siblings by appending the PMSS MiB suffix and reloading systemd.
   - Catches per-user throwables (including permission-step timeouts), logs warning, skips that user, and continues remaining users.

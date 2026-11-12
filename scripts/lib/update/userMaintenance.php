@@ -14,90 +14,7 @@ pmssRequireRelativeFiles(__DIR__, [
 require_once __DIR__.'/users/docker.php';
 // Source-contract marker for the delegated Docker module: 'users/docker.php'.
 
-/**
- * Signature a user is refreshed against for same-version resume skips.
- */
-function pmssUserRefreshSignature(string $rutorrentIndexSha, string $projectionPath = '/var/lib/pmss/public/torrentClients.json'): string
-{
-    $version = trim((string) @file_get_contents('/etc/seedbox/config/version'));
-    // A same-version run that installs or removes torrent client builds must still publish each account's links.
-    $projection = is_file($projectionPath) && !is_link($projectionPath) && (int) @filesize($projectionPath) <= 65536
-        ? sha1((string) @file_get_contents($projectionPath)) : '';
-    return sha1($version.'|'.$rutorrentIndexSha.'|'.$projection);
-}
-
-/** Marker path for a username when the boundary inputs are safe. */
-function pmssUserRefreshMarkerPath(string $user): string
-{
-    $dir = pmssResolvePathFromEnv('PMSS_USER_REFRESH_STATE_DIR', '/var/lib/pmss/user-refresh');
-    if (!pmssValidateUsername($user) || !pmssPathTargetIsSafe($dir, true, false, false)) {
-        return '';
-    }
-
-    // Check the marker leaf too: a symlink must neither authorize a resume
-    // skip nor redirect the completion write outside the state directory.
-    $path = $dir.'/'.$user;
-    return pmssPathTargetIsSafe($path, false, false, false) ? $path : '';
-}
-
-/** True when the user was already fully refreshed against this signature. */
-function pmssUserRefreshAlreadyDone(string $user, string $signature): bool
-{
-    $path = pmssUserRefreshMarkerPath($user);
-    return $path !== '' && is_file($path) && trim((string) @file_get_contents($path)) === $signature;
-}
-
-/** Record that the user is fully refreshed against this signature. */
-function pmssUserRefreshMarkDone(string $user, string $signature, ?callable $writer = null): void
-{
-    $path = pmssUserRefreshMarkerPath($user);
-    if ($path === '') {
-        logMessage('[WARN] Refusing to write unsafe user refresh marker for '.pmssLogSafeLabel($user));
-        return;
-    }
-
-    $dir = dirname($path);
-    if (!pmssDirEnsureExists($dir, 0755)) {
-        logMessage('[WARN] Unable to create user refresh state directory: '.$dir);
-        return;
-    }
-    $payload = $signature."\n";
-    if (!pmssFileWriteComplete($path, $payload, 0, $writer)) {
-        logMessage('[WARN] Unable to write user refresh marker: '.$path);
-    }
-}
-
-function pmssUserMaintenanceLegacyCpuQuotaNeedsFix(string $sliceDir): bool
-{
-    foreach (is_dir($sliceDir) ? (glob($sliceDir.'/*.conf') ?: []) : [] as $file) {
-        $content = @file_get_contents($file);
-        if ($content !== false && preg_match('/^CPUQuota\s*=\s*85%$/m', $content)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-function pmssUserMaintenanceRepairLegacyCpuQuota(string $user): void
-{
-    $uinfo = pmssUserAccountLookup($user);
-    if ($uinfo === null) {
-        return;
-    }
-
-    $uid = (int) $uinfo['uid'];
-    if (!pmssUserMaintenanceLegacyCpuQuotaNeedsFix('/etc/systemd/system/user-'.$uid.'.slice.d')) {
-        return;
-    }
-
-    $threads = pmssTotalCpuThreads();
-    $newQuota = ($threads > 0) ? ($threads * 85) : 600;
-    runStep(
-        "Fixing legacy 85% CPUQuota for {$user}",
-        'systemctl set-property '.escapeshellarg('user-'.$uid.'.slice').' CPUQuota='.$newQuota.'%'
-    );
-}
+pmssRequireRelativeFiles(__DIR__.'/users', ['refreshState.php', 'legacyCpuQuota.php', 'maintenanceAccount.php']);
 
 /**
  * Refresh ruTorrent and skeleton data for every provisioned user.
@@ -110,44 +27,33 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
     }
     $users = users::listHomeUsers();
     sort($users, SORT_NATURAL | SORT_FLAG_CASE);
-    $totalUsers = count($users);
-    $processedUsers = 0;
-    $skippedUsers = 0;
-    $incompleteUsers = 0;
+    $summary = ['total' => count($users), 'processed' => 0, 'skipped' => 0, 'skip_reasons' => []];
+    $incomplete = false;
     $refreshSignature = pmssUserRefreshSignature($rutorrentIndexSha);
     $dockerPackagesChanged = getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1';
-    $skipReasons = [];
     $userConfigStore = new UserConfigStore();
-    logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
+    logMessage(sprintf('Per-user maintenance: %d user(s) to process', $summary['total']));
     $isTty = pmssStreamIsTty(STDOUT);
-    $phases = ['Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)'];
-    $postChecks = [];
-    if (is_file('/scripts/util/checkUserHtpasswd.php')) {
-        $phases[] = 'Legacy htpasswd sync';
-        $postChecks['Synchronizing per-user htpasswd'] = '/scripts/util/checkUserHtpasswd.php';
-    }
-    if (is_file('/scripts/cron/checkLighttpdInstances.php')) {
-        $phases[] = 'Lighttpd instance check';
-        $postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';
-    }
+    // Each optional check owns its display phase, command label and accepted exit codes.
+    $postChecks = array_filter([
+        '/scripts/util/checkUserHtpasswd.php' => ['Legacy htpasswd sync', 'Synchronizing per-user htpasswd', []],
+        '/scripts/cron/checkLighttpdInstances.php' => ['Lighttpd instance check', 'Checking lighttpd instance', [PMSS_CRON_LOCK_BUSY_EXIT]],
+    ], static function (string $path): bool { return is_file($path); }, ARRAY_FILTER_USE_KEY);
+    $phases = array_merge(['Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)'], array_column($postChecks, 0));
 
     foreach ($users as $user) {
-        if (($userTrim = trim($user)) === '') {
-            $skippedUsers++;
-            $skipReasons[] = '(empty): empty username entry';
-            logMessage("[WARN] Account '(empty)' skipped during environment refresh: empty username entry");
-            continue;
-        }
-        if (!pmssValidateUsername($userTrim)) {
-            $skippedUsers++;
-            $skipReasons[] = $userTrim.': invalid username';
-            logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: invalid username", $userTrim));
+        if (($userTrim = trim($user)) === '' || !pmssValidateUsername($userTrim)) {
+            $summary['skipped']++;
+            $reason = $userTrim === '' ? 'empty username entry' : 'invalid username';
+            $label = $userTrim === '' ? '(empty)' : $userTrim;
+            $summary['skip_reasons'][] = $label.': '.$reason;
+            logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: %s", $label, $reason));
             continue;
         }
 
         $resumeAlreadyDone = pmssUserRefreshAlreadyDone($userTrim, $refreshSignature);
         if (!$dockerPackagesChanged && $resumeAlreadyDone && pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)) {
-            $processedUsers++;
+            $summary['processed']++;
             logMessage(sprintf('User %s already refreshed this version; skipping (resume)', $userTrim));
             continue;
         }
@@ -166,48 +72,17 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
         pmssUserLighttpdRefreshFailed($userTrim, false);
 
         try {
-            if ($resumeAlreadyDone || !pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)) {
-                throw new RuntimeException('cgroup slice memory policy refresh failed');
-            }
-
-            pmssUserMaintenanceRepairLegacyCpuQuota($userTrim);
-            $environmentReason = null;
-            if (!pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha, $environmentReason)) {
-                $environmentMessage = 'user environment convergence failed';
-                if (is_string($environmentReason) && trim($environmentReason) !== '') {
-                    $environmentMessage .= ': '.$environmentReason;
-                }
-                throw new RuntimeException($environmentMessage);
-            }
-            pmssEnsureLingerAndDocker($userTrim);
-
-            foreach ($postChecks as $label => $helperPath) {
-                $skipExitCodes = $label === 'Checking lighttpd instance' ? [PMSS_CRON_LOCK_BUSY_EXIT] : [];
-                $rc = runUserStep($userTrim, $label, pmssBuildCommand($helperPath, [$userTrim]), $skipExitCodes);
-                if ($rc !== 0 && !in_array($rc, $skipExitCodes, true)) {
-                    pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', $label, $rc));
-                }
-            }
-
-            $userDuration = microtime(true) - $userStart;
-            pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
-            $lighttpdFailed = pmssUserLighttpdRefreshFailed($userTrim);
-            if ($lighttpdFailed) {
-                $incompleteUsers++;
-                pmssUserLog($userTrim, '[WARN] Skipping user refresh marker: lighttpd refresh incomplete; will retry next update');
-                pmssCommandProfileRecord('updateUser '.$userTrim, '', 'ERR', 1, $userDuration, false);
-            } else {
-                pmssCommandProfileRecord('updateUser '.$userTrim, '', 'OK', 0, $userDuration, false);
-                pmssUserRefreshMarkDone($userTrim, $refreshSignature);
-            }
+            $incomplete = pmssUserMaintenanceAccountRefresh(
+                $userTrim, $rutorrentIndexSha, $refreshSignature, $resumeAlreadyDone, $userConfigStore, $postChecks, $userStart
+            ) || $incomplete;
             // Processed includes completed passes with a deferred marker;
             // skipped remains reserved for accounts whose maintenance aborted.
-            $processedUsers++;
+            $summary['processed']++;
         } catch (\Throwable $throwable) {
-            $skippedUsers++;
+            $summary['skipped']++;
             $userDuration = microtime(true) - $userStart;
             $reason = get_class($throwable).($throwable->getMessage() === '' ? '' : ': '.$throwable->getMessage());
-            $skipReasons[] = $userTrim.': '.$reason;
+            $summary['skip_reasons'][] = $userTrim.': '.$reason;
 
             logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: %s", $userTrim, $reason));
             pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
@@ -215,21 +90,12 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
         }
     }
 
-    $summaryStatus = $processedUsers < $totalUsers || $incompleteUsers > 0 ? 'warn' : 'ok';
-    logMessage(sprintf('%sProcessed %d of %d users', $summaryStatus === 'warn' ? '[WARN] ' : '', $processedUsers, $totalUsers));
+    $summaryStatus = $summary['processed'] < $summary['total'] || $incomplete ? 'warn' : 'ok';
+    logMessage(sprintf('%sProcessed %d of %d users', $summaryStatus === 'warn' ? '[WARN] ' : '', $summary['processed'], $summary['total']));
     pmssLogJson([
         'event'     => 'user_maintenance_summary',
         'status'    => $summaryStatus,
-        'total'     => $totalUsers,
-        'processed' => $processedUsers,
-        'skipped'   => $skippedUsers,
-        'skip_reasons' => $skipReasons,
-    ]);
+    ] + $summary);
 
-    return [
-        'total' => $totalUsers,
-        'processed' => $processedUsers,
-        'skipped' => $skippedUsers,
-        'skip_reasons' => $skipReasons,
-    ];
+    return $summary;
 }

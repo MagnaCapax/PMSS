@@ -38,21 +38,22 @@ PHP,
     public function testUserMaintenanceSourceContractsStayWired(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/update/userMaintenance.php' => [
+            'scripts/lib/update/userMaintenance.php' => ['required' => [
+                "require_once __DIR__.'/users/docker.php';",
+                'Processed %d of %d users',
+                "'empty username entry' : 'invalid username'",
+                "Account '%s' skipped during environment refresh: %s",
+                "'event'     => 'user_maintenance_summary'",
+                "'processed' => ", "'skipped' => ",
+                'pmssUserMaintenanceAccountRefresh(',
+            ]],
+            'scripts/lib/update/users/maintenanceAccount.php' => [
                 'required' => [
-                    "require_once __DIR__.'/users/docker.php';",
-                    'Processed %d of %d users',
-                    "Account '(empty)' skipped during environment refresh: empty username entry",
-                    "Account '%s' skipped during environment refresh: invalid username",
-                    "Account '%s' skipped during environment refresh: %s",
                     '$environmentReason = null;',
                     "if (!pmssUpdateUserEnvironment(\$userTrim, \$rutorrentIndexSha, \$environmentReason)) {",
                     "\$environmentMessage = 'user environment convergence failed';",
                     "\$environmentMessage .= ': '.\$environmentReason;",
                     "throw new RuntimeException(\$environmentMessage);",
-                    "'event'     => 'user_maintenance_summary'",
-                    "'processed' => ",
-                    "'skipped'   => ",
                 ],
                 'ordered' => [[
                     'needles' => [

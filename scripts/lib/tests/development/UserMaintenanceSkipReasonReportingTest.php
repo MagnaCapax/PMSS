@@ -29,11 +29,12 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
     public function testUserMaintenanceSkipReasonsUseSoftFailMarkerPolicy(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', [
-            '$skipReasons = [];',
-            "\$skipReasons[] = '(empty): empty username entry';",
-            "\$skipReasons[] = \$userTrim.': invalid username';",
-            "\$skipReasons[] = \$userTrim.': '.\$reason;",
-            "'skip_reasons' => \$skipReasons,",
+            "'skip_reasons' => []",
+            "\$reason = \$userTrim === '' ? 'empty username entry' : 'invalid username';",
+            "\$summary['skip_reasons'][] = \$label.': '.\$reason;",
+            "\$summary['skip_reasons'][] = \$userTrim.': '.\$reason;",
+            '] + $summary);',
+            'return $summary;',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
             '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',

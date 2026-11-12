@@ -9,7 +9,7 @@ class LighttpdRefreshMarkerTest extends TestCase
     public function testFailedLighttpdStepRemainsUnmarkedAndRetriesWhileCompletedUsersResume(): void
     {
         $root = $this->pmssMakeTempDir('pmss-lighttpd-markers-');
-        foreach (['alice', 'bob'] as $user) {
+        foreach (['fixtur01', 'fixtur02'] as $user) {
             foreach (['.tmp', '.irssi', 'www/recycle'] as $directory) {
                 mkdir($root.'/'.$user.'/'.$directory, 0755, true);
             }
@@ -18,7 +18,7 @@ class LighttpdRefreshMarkerTest extends TestCase
 namespace LighttpdMarkerFixture;
 class RuntimeException extends \RuntimeException {}
 class UserConfigStore {}
-class users { public static function listHomeUsers() { return ['alice', 'bob']; } }
+class users { public static function listHomeUsers() { return ['fixtur01', 'fixtur02']; } }
 function logMessage($message) {}
 function pmssUserLog($user, $message) { $GLOBALS['logs'][$user][] = $message; }
 function pmssLogJson($data) { $GLOBALS['summaryStatus'] = $data['status']; }
@@ -50,11 +50,14 @@ PHP;
         $script .= '\putenv("PMSS_TEST_MODE=1"); \putenv("PMSS_DRY_RUN=0"); \putenv("PMSS_DOCKER_PACKAGES_CHANGED=0");';
         $script .= '\putenv("PMSS_LOG_DIR=".$GLOBALS["root"]); \putenv("PMSS_USER_REFRESH_STATE_DIR=".$GLOBALS["root"]."/state");';
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/userMaintenance.php', 'LighttpdMarkerFixture');
+        foreach (['refreshState.php', 'legacyCpuQuota.php', 'maintenanceAccount.php'] as $module) {
+            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/users/'.$module, 'LighttpdMarkerFixture');
+        }
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/users/http.php', 'LighttpdMarkerFixture');
         $script .= <<<'PHP'
 $runs = [];
-foreach ([1, 1, 0] as $aliceRc) {
-    $GLOBALS['results'] = ['alice' => $aliceRc, 'bob' => 0];
+foreach ([1, 1, 0] as $fixtur01Rc) {
+    $GLOBALS['results'] = ['fixtur01' => $fixtur01Rc, 'fixtur02' => 0];
     $GLOBALS['attempted'] = $GLOBALS['PMSS_PROFILE'] = $GLOBALS['continued'] = $GLOBALS['logs'] = [];
     \ob_start();
     $summary = pmssUpdateAllUsers('index-sha');
@@ -64,9 +67,9 @@ foreach ([1, 1, 0] as $aliceRc) {
     }));
     $runs[] = ['summary' => $summary, 'attempted' => $GLOBALS['attempted'], 'steps' => $steps,
         'continued' => $GLOBALS['continued'], 'logs' => $GLOBALS['logs'], 'status' => $GLOBALS['summaryStatus'],
-        'marked' => [pmssUserRefreshAlreadyDone('alice', pmssUserRefreshSignature('index-sha')),
-            pmssUserRefreshAlreadyDone('bob', pmssUserRefreshSignature('index-sha'))],
-        'aliceMarkerExists' => \file_exists($GLOBALS['root'].'/state/alice')];
+        'marked' => [pmssUserRefreshAlreadyDone('fixtur01', pmssUserRefreshSignature('index-sha')),
+            pmssUserRefreshAlreadyDone('fixtur02', pmssUserRefreshSignature('index-sha'))],
+        'fixtur01MarkerExists' => \file_exists($GLOBALS['root'].'/state/fixtur01')];
 }
 echo json_encode($runs);
 PHP;
@@ -75,19 +78,19 @@ PHP;
             $this->pmssAssertArraySubsetSame(['total' => 2, 'processed' => 2, 'skipped' => 0, 'skip_reasons' => []], $runs[$index]['summary']);
             $this->assertSame('warn', $runs[$index]['status']);
             $this->assertSame([false, true], $runs[$index]['marked']);
-            $this->assertFalse($runs[$index]['aliceMarkerExists']);
-            $this->assertStringContainsString('lighttpd configuration refresh failed (rc=1)', implode("\n", $runs[$index]['logs']['alice']));
-            $this->assertStringContainsString('[WARN] Skipping user refresh marker: lighttpd refresh incomplete', implode("\n", $runs[$index]['logs']['alice']));
+            $this->assertFalse($runs[$index]['fixtur01MarkerExists']);
+            $this->assertStringContainsString('lighttpd configuration refresh failed (rc=1)', implode("\n", $runs[$index]['logs']['fixtur01']));
+            $this->assertStringContainsString('[WARN] Skipping user refresh marker: lighttpd refresh incomplete', implode("\n", $runs[$index]['logs']['fixtur01']));
             $this->assertSame('ERR', $runs[$index]['steps'][0]['status']);
             $this->assertSame(1, $runs[$index]['steps'][0]['rc']);
         }
         foreach ($runs as $run) {
-            $this->assertSame(['later environment handlers', 'linger/docker', 'Synchronizing per-user htpasswd', 'Checking lighttpd instance'], $run['continued']['alice']);
+            $this->assertSame(['later environment handlers', 'linger/docker', 'Synchronizing per-user htpasswd', 'Checking lighttpd instance'], $run['continued']['fixtur01']);
         }
-        $this->assertSame($runs[0]['continued']['alice'], $runs[0]['continued']['bob']);
-        $this->assertSame(['alice', 'bob'], $runs[0]['attempted']);
-        $this->assertSame(['alice'], $runs[1]['attempted'], 'completed account keeps its resume skip');
-        $this->assertSame(['alice'], $runs[2]['attempted'], 'failed account retries and can converge');
+        $this->assertSame($runs[0]['continued']['fixtur01'], $runs[0]['continued']['fixtur02']);
+        $this->assertSame(['fixtur01', 'fixtur02'], $runs[0]['attempted']);
+        $this->assertSame(['fixtur01'], $runs[1]['attempted'], 'completed account keeps its resume skip');
+        $this->assertSame(['fixtur01'], $runs[2]['attempted'], 'failed account retries and can converge');
         $this->assertSame([true, true], $runs[2]['marked']);
         $this->pmssAssertArraySubsetSame(['total' => 2, 'processed' => 2, 'skipped' => 0], $runs[2]['summary']);
         $this->assertSame('OK', $runs[2]['steps'][0]['status']);

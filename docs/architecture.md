@@ -180,6 +180,11 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/systemPrep/dbusPolicyHardening.php** – One ordered artifact registry renders and converges the systemd1/login1 D-Bus policies and `/run/systemd/{users,sessions}` tmpfiles protections; the update flow has one installer and no per-channel implementations.
 - **scripts/lib/update/services/** – Runtime templates (rc.local, systemd, sshd), legacy service disablement, mediainfo installer, security tweaks.
 - **scripts/lib/update/users/** – User maintenance (context, HTTP, home maintenance, ruTorrent refresh).
+  `userMaintenance.php` retains the single queue and final summary;
+  `users/refreshState.php` owns resume markers, `legacyCpuQuota.php` owns the
+  legacy repair and `maintenanceAccount.php` owns account convergence. Optional
+  checks share ordered phase/exit-policy metadata, and summary accounting feeds
+  both the return value and JSON event directly (ADR 0275).
   `filesystem.php` retains ordered skeleton delivery. Its path maintenance,
   guarded text patches and legacy panel-index repair live in `filesystemPaths.php`,
   `filesystemPatch.php` and `panelCompatibility.php`. `panelFiles.php` supplies

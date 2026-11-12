@@ -375,11 +375,10 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 'required' => [
                     'Synchronizing per-user htpasswd',
                     'Checking lighttpd instance',
-                    "pmssCommandProfileRecord('updateUser '.\$userTrim, '', 'OK', 0, \$userDuration, false);",
                     "pmssCommandProfileRecord('updateUser '.\$userTrim, '', 'ERR', 1, \$userDuration, false, '',",
                     'Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)',
                     "'users/docker.php'",
-                    "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';",
+                    "'/scripts/cron/checkLighttpdInstances.php' => ['Lighttpd instance check', 'Checking lighttpd instance', [PMSS_CRON_LOCK_BUSY_EXIT]]",
                     "pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);",
                     'pmssLogJson([',
                 ],
@@ -396,11 +395,16 @@ class UpdateCompressionCharacterizationTest extends TestCase
                     "if (!function_exists('pmssEnsureRootlessDockerInstalled'))",
                     "if (!function_exists('pmssEnsureDockerDependencies'))",
                 ], 'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once')),
+            ],
+            'scripts/lib/update/users/maintenanceAccount.php' => [
+                'required' => [
+                    "pmssCommandProfileRecord('updateUser '.\$userTrim, '', \$lighttpdFailed ? 'ERR' : 'OK', \$lighttpdFailed ? 1 : 0, \$userDuration, false);",
+                ],
                 'ordered' => [[
                     'needles' => [
                         'if (!pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha, $environmentReason)) {',
                         'pmssEnsureLingerAndDocker($userTrim);',
-                        'foreach ($postChecks as $label => $helperPath)',
+                        'foreach ($postChecks as $helperPath => [, $label, $skipExitCodes])',
                     ],
                     'missingPrefix' => 'Missing user-maintenance phase: ',
                     'orderPrefix' => 'User-maintenance phase order changed at: ',

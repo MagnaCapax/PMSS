@@ -1,5 +1,14 @@
 # Refactoring Guidelines
 
+User maintenance retains one queue and its original include/public helpers
+(ADR 0275). Resume storage, legacy CPU-quota repair and account convergence have
+separate modules. Optional checks pair presentation and exit policy in one
+ordered table; the queue accumulates its returned summary directly. Invalid
+entry reporting and completed-pass profiling each share one path. Characterization
+traces retain resume short circuits, command order, busy-exit handling, partial
+lighttpd results, exception boundaries, JSON field order and TTY output.
+Execution verification stays on testing machines; devbox checks changed syntax.
+
 Base system preparation retains its original include and public helpers while
 separating temporary-mount policy, boot installation, locale/timezone convergence
 and root-shell defaults (ADR 0267). Boot preflight, reads and publication share
