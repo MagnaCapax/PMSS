@@ -72,6 +72,25 @@ Note: Jellyfin requires FFmpeg 4.4+ for startup. The script uses distro ffmpeg w
 
 App URLs may be overridden via CLI flags (below). The script verifies each URL in dry‑run/verify‑only mode. These modes resolve runtime metadata but do not download or hash the runtime archive.
 
+## Download Integrity
+
+Downloaded archives are checked against `~/.install-checksums.sha256`. When an
+API URL has a generic basename such as `latest` or `updatefile`, the installer
+uses the final response's `Content-Disposition` filename, or the last redirect's
+filename, from the actual download. If no safe archive filename is available,
+it falls back to the original URL basename. Explicit archive identifiers and
+URLs that already name an archive keep their existing lookup behavior.
+
+A known SHA256 mismatch always aborts before extraction. By default, missing
+pins remain allowed for new upstream releases; every skipped verification is
+listed once at exit, including after a later installation failure. Passing
+`--strict-checksums` rejects an archive without a pin unless mandatory upstream
+SHA512 verification covers it (currently the ASP.NET runtime). Strict mode is
+off by default and does not turn dry-run endpoint checks into archive downloads.
+It can stop after earlier applications have been installed; it is not a rollback
+mode. This policy covers the installer's archive downloads, not Git or pip.
+See [ADR 0277](adr/0277-media-stack-archive-checksum-policy.md).
+
 ## Installing the Installer
 
 - Run locally (uses the installed copy):
@@ -89,6 +108,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
   - `--self-update`        Fetch and re‑exec the latest installer from GitHub first (default off)
   - `--skip-update`        No‑op kept for compatibility (self‑update is already off by default)
   - `--dry-run`            Verify URLs and show actions; do not change the system
+  - `--strict-checksums`   Require SHA256 pins or mandatory upstream SHA512 for downloaded archives (default off)
   - `--verify-only`        Only verify URLs (alias to `--dry-run`) and exit early
   - `--force`              Continue below the 1000 MiB account-memory guard
   - `--start-stopped`      Start installed apps whose tmux sessions are absent, then exit

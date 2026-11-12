@@ -85,6 +85,8 @@ set -Eeuo pipefail # Exit on error, undefined vars, pipe failures
 
 # Defaults
 DRY_RUN=0
+STRICT_CHECKSUMS=0
+CHECKSUMS_SKIPPED=()
 VERIFY_ONLY=0
 FORCE_INSTALL=0
 UNINSTALL=0
@@ -147,6 +149,7 @@ Overrides:
   --jellyfin-ffmpeg=PATH      Set Jellyfin EncoderAppPath in encoding.xml to PATH
 
 Modes:
+  --strict-checksums          Require a checksum for every downloaded archive
   --dry-run                   Verify endpoints and show actions; do not modify system
   --verify-only               Only verify URLs (alias: implies --dry-run) and exit
   --force                     Continue below the ${MEDIA_STACK_MIN_MEMORY_MIB} MiB memory guard
@@ -168,6 +171,7 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--dry-run) DRY_RUN=1 ;;
+	--strict-checksums) STRICT_CHECKSUMS=1 ;;
 	--force) FORCE_INSTALL=1 ;;
 	--start-stopped) START_STOPPED=1 ;;
 	--start-app=*)
@@ -477,22 +481,34 @@ fetch_checksums_file() {
 	fi
 }
 
-# Verify SHA256 checksum of a downloaded file against the checksums file.
-# - artifact_id not found in checksums file: warn, return 0 (allow new versions)
+# Report unpinned downloads last, including when a later installation step fails.
+checksum_summary() {
+	[[ ${#CHECKSUMS_SKIPPED[@]} -gt 0 ]] || return 0
+	log_warn "Downloads without checksum verification (${#CHECKSUMS_SKIPPED[@]}):"
+	printf '  %s\n' "${CHECKSUMS_SKIPPED[@]}" >&2
+}
+trap checksum_summary EXIT
+
+# Verify SHA256 against the pin file; mandatory upstream SHA512 can cover a missing pin.
+# - artifact_id not found: collect for summary, or reject in strict mode
 # - artifact_id found but hash mismatches: error, return 1 (corruption/compromise)
 verify_checksum() {
-	local file="$1" artifact_id="$2"
+	local file="$1" artifact_id="$2" sha512="${3:-}" expected_hash=""
 	if [[ ! -f "$file" ]]; then
-		return 0 # File not present (e.g., dry-run mode) — skip
+		[[ ${DRY_RUN:-0} -eq 1 ]] && return 0
+		log_err "Downloaded archive is missing: ${artifact_id}"
+		return 1
 	fi
-	if [[ ! -f "$CHECKSUMS_FILE" ]]; then
-		log_warn "No checksums file — skipping verification for $(basename "$file")"
-		return 0
+	if [[ -f "$CHECKSUMS_FILE" ]]; then
+		expected_hash=$(grep -F "  ${artifact_id}" "$CHECKSUMS_FILE" 2>/dev/null | grep -v '^#' | awk '{print $1}' | head -1) || true
 	fi
-	local expected_hash
-	expected_hash=$(grep -F "  ${artifact_id}" "$CHECKSUMS_FILE" 2>/dev/null | grep -v '^#' | awk '{print $1}' | head -1)
 	if [[ -z "$expected_hash" ]]; then
-		log_warn "No checksum on file for '${artifact_id}' — skipping verification"
+		[[ -n "$sha512" ]] && return 0 # Checked by fetch_verified_archive before extraction.
+		if [[ ${STRICT_CHECKSUMS:-0} -eq 1 ]]; then
+			log_err "No checksum available for '${artifact_id}' (strict mode)"
+			return 1
+		fi
+		CHECKSUMS_SKIPPED+=("$artifact_id")
 		return 0
 	fi
 	local actual_hash
@@ -555,9 +571,10 @@ fetch_text() {
 }
 
 fetch() {
-	# fetch <url> <outfile or ->
+	# An optional third argument captures response headers from the same transfer.
 	local url="$1"
 	local out="$2"
+	local headers="${3:-}"
 	log_info "Fetching: $url"
 	if [[ $DRY_RUN -eq 1 ]]; then
 		if check_url "$url"; then
@@ -568,6 +585,14 @@ fetch() {
 			return 1
 		fi
 	fi
+	if [[ -n "$headers" ]]; then
+		if command -v wget >/dev/null 2>&1; then
+			wget -q --server-response "$url" -O "$out" 2>"$headers"
+		else
+			curl -fsSL -D "$headers" "$url" -o "$out"
+		fi
+		return $?
+	fi
 	if command -v wget >/dev/null 2>&1; then
 		if [[ "$out" == "-" ]]; then wget -qO - "$url"; else wget -q "$url" -O "$out"; fi
 	else
@@ -577,14 +602,38 @@ fetch() {
 
 fetch_verified_archive() {
 	local url="$1" archive="$2" label="$3" checksum_id="${4:-}"
-	local sha512="${5:-}"
+	local sha512="${5:-}" headers="" resolved_id=""
 	[[ -n "$checksum_id" ]] || checksum_id=$(basename "${url%%\?*}")
+	# Generic API paths need the served filename, never the local archive name.
+	if [[ $DRY_RUN -eq 0 && ! "$checksum_id" =~ \.(tar\.gz|tgz|tar\.xz|zip)$ ]]; then
+		headers=$(mktemp) || exit 1
+	fi
 
-	if ! fetch "$url" "$archive"; then
+	if ! fetch "$url" "$archive" "$headers"; then
+		[[ -z "$headers" ]] || rm -f -- "$headers"
 		log_err "Failed to download ${label}"
 		exit 1
 	fi
-	if ! verify_checksum "$archive" "$checksum_id"; then
+	if [[ -n "$headers" ]]; then
+		resolved_id=$(awk '
+			{ sub(/\r$/, "") }
+			$1 ~ /^HTTP\// { filename = "" }
+			tolower($1) == "location:" {
+				location = $2; sub(/\?.*$/, "", location); sub(/^.*\//, "", location)
+			}
+			tolower($1) == "content-disposition:" {
+				line = $0
+				if (match(tolower(line), /filename="?[^";[:space:]]+/)) {
+					filename = substr(line, RSTART, RLENGTH); sub(/^[^=]*="?/, "", filename)
+				}
+			}
+			END { print filename != "" ? filename : location }
+		' "$headers")
+		rm -f -- "$headers"
+		# Header values are untrusted identifiers, never paths or shell input.
+		[[ "$resolved_id" =~ ^[a-zA-Z0-9._+-]+\.(tar\.gz|tgz|tar\.xz|zip)$ ]] && checksum_id="$resolved_id"
+	fi
+	if ! verify_checksum "$archive" "$checksum_id" "$sha512"; then
 		log_err "${label} download failed integrity check — aborting"
 		exit 1
 	fi
