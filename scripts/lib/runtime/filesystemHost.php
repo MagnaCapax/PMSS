@@ -17,7 +17,13 @@ function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
 
 function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fields = pmssProcMeminfoFieldsRead($path); return (int) round(($fields['MemTotal'] ?? 0) / 1024); }
 
-function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return !pmssFilesystemPathHasNulByte($path) && is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
+/** Keep corrupt hostname bytes on the existing read-failure fallback path. */
+function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string
+{
+    if (pmssFilesystemPathHasNulByte($path) || !is_string($hostname = @file_get_contents($path))) return $default;
+    // Check raw bytes before trim() can conceal edge NULs in a host identity.
+    return strpos($hostname, "\0") === false ? trim($hostname) : $default;
+}
 
 function pmssHostnameIsValid(string $hostname, bool $allowIpv4 = true): bool
 {

@@ -58,6 +58,20 @@ failure results; whitespace, leading zeroes, and zero remain accepted. Raw
 binary and generic trimmed-text reads keep their existing contracts.
 `RuntimeTest` covers these cases; execution stays on testing machines.
 
+## Hostname input safety follow-up (2026-11-12)
+
+`pmssHostnameRead()` rejects NUL bytes in the raw file contents before trimming,
+using the existing caller-supplied read-failure default without modifying it.
+Otherwise, edge NULs could disappear during trimming, or embedded NULs could
+reach consumers as part of a host identity. The existing path guard, read call,
+whitespace normalization and empty-file result remain unchanged. DNS validation
+stays with callers; this adds no hostname syntax policy.
+
+`RuntimeHostnameInputSafetyTest` covers corruption positions, ordinary text,
+empty/whitespace files, missing paths, NUL paths and unchanged defaults using
+private fixture files. Execution stays on testing machines; local verification
+is limited to changed-file PHP syntax.
+
 ## References
 - [Architecture overview](../architecture.md)
 - [Runtime contracts](../contracts.md#runtime-execution--profiling)
