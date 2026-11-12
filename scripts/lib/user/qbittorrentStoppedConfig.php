@@ -94,7 +94,11 @@ function pmssQbittorrentConfigLocked(string $home, callable $work, array $ops = 
             : 'qBittorrent is busy with another operation; try again shortly.');
         return false;
     } finally {
-        @flock($lock, LOCK_UN);
-        fclose($lock);
+        try {
+            @flock($lock, LOCK_UN);
+        } finally {
+            // An unlock fault must not retain the account's operation lock.
+            fclose($lock);
+        }
     }
 }

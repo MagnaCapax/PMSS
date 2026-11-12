@@ -117,7 +117,11 @@ function pmssQbittorrentFrontendConfigLocked(string $home, callable $work): bool
         }
         return $work();
     } finally {
-        @flock($lock, LOCK_UN);
-        fclose($lock);
+        try {
+            @flock($lock, LOCK_UN);
+        } finally {
+            // An unlock fault must not retain the account's operation lock.
+            fclose($lock);
+        }
     }
 }

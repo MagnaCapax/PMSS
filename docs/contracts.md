@@ -689,6 +689,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Starts missing service specs after applying the exported lock-fd close prefix;
     the watchdog parent retains its lock while long-lived daemons cannot inherit it.
 - qBittorrent toggle and watchdog diagnostics
+  - Operator and customer stopped-config locks attempt stream closure even if
+    unlocking throws. Resolver launches own their acquired lock through setup,
+    resolution, notices and start callbacks; callers supplying a held lock keep
+    ownership. Busy-result differences, retries, messages and successful launch
+    behavior are preserved. Lone throwables propagate unchanged; later cleanup
+    throwables retain PHP's normal `finally` precedence.
+    `QbittorrentConfigLockCleanupSafetyTest` covers these paths with memory
+    streams and intercepted operations; execution stays on testing machines.
   - Native stops in password sync, port repair, upload-throttle reconciliation
     and the panel use executable identity rather than process-name kills.
     Operator stops admit managed install/store/account paths and exclude unreadable
