@@ -198,6 +198,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   leading zeroes, unitless counters, and valid duplicate ordering are unchanged.
   `pmssProcMeminfoTotalMiBRead()` retains its zero fallback when `MemTotal` is
   missing or overflowed. `RuntimeTest` covers these file-boundary cases.
+  NUL-containing rows are skipped before numeric matching, preserving valid
+  siblings and prior valid duplicates. `RuntimeMeminfoInputSafetyTest` covers
+  corruption positions, total-memory fallbacks and ordinary field ordering.
 
 - `scripts/util/lighttpdSymlinkRepair.php USERNAME` is an explicit root-only
   recovery command for `.lighttpd/upload`, `access.log`, and `error.log` links.
