@@ -14,6 +14,8 @@ function pmssSystemStatsHostPressureMetricParse($value, string $suffix = ''): ?f
 {
     if (!is_scalar($value)) return null;
 
+    // Reject corrupt metrics before trim() can hide leading or trailing NULs.
+    if (strpos((string) $value, "\0") !== false) return null;
     $value = trim((string) $value);
     if ($suffix !== '') {
         if (strlen($value) <= strlen($suffix) || substr($value, -strlen($suffix)) !== $suffix) return null;

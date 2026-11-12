@@ -79,3 +79,11 @@ consumers keep `null`. Valid values, whitespace, first-match precedence, missing
 field policies and formatting remain unchanged. `SystemStatsPsiInputSafetyTest`
 covers raw corruption and both read consumers with synthetic data; execution
 stays on testing machines.
+
+The host-pressure projection also rejects NUL bytes in each raw metric before
+trimming whitespace or stripping its unit. Corrupt values retain the existing
+nullable unavailable result without dropping a valid sibling metric. Ordinary
+scalar conversions, finite non-negative values, suffix matching, payload order
+and snapshot publication are unchanged. `SystemStatsCollectTest` covers raw
+corruption, independent metric projection and accepted scalar boundaries;
+execution stays on testing machines.

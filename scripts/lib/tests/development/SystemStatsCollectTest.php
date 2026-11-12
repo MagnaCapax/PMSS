@@ -386,6 +386,45 @@ PHP;
         }
     }
 
+    public function testHostPressureMetricsRejectNulsBeforeNormalization(): void
+    {
+        foreach ([["\0", ''], ['', "\0"], [" \0", "\t"], ["\t", "\0\r\n"], ['', " \0 \n"]] as [$prefix, $suffix]) {
+            $psi = $prefix.'6.5'.$suffix;
+            $latency = $prefix.'123.4ms'.$suffix;
+            $this->assertSame(null, \pmssSystemStatsHostPressureMetricParse($psi));
+            $this->assertSame(null, \pmssSystemStatsHostPressureMetricParse($latency, 'ms'));
+
+            // Only the corrupt metric is unavailable; its valid sibling still projects.
+            $this->assertSame([
+                'timestamp' => 1, 'psi_io_full_avg300' => null, 'ioping_home_ms' => 123.4,
+            ], \pmssSystemStatsHostPressurePayloadBuild(['psiIo' => '1/2/3/4/5/'.$psi.'/7/8', 'iopingHome' => '123.4ms'], 1));
+            $this->assertSame([
+                'timestamp' => 1, 'psi_io_full_avg300' => 6.5, 'ioping_home_ms' => null,
+            ], \pmssSystemStatsHostPressurePayloadBuild(['psiIo' => '1/2/3/4/5/6.5/7/8', 'iopingHome' => $latency], 1));
+        }
+        $this->assertSame(null, \pmssSystemStatsHostPressureMetricParse("6.\0".'5'));
+        $this->assertSame(null, \pmssSystemStatsHostPressureMetricParse("123.4\0ms", 'ms'));
+        $this->assertSame(null, \pmssSystemStatsHostPressureMetricParse("123.4m\0s", 'ms'));
+    }
+
+    public function testHostPressureMetricsPreserveScalarAndWhitespaceConversions(): void
+    {
+        foreach ([
+            [0, '', 0.0], [1.25, '', 1.25], [true, '', 1.0],
+            [" \t6.5 \r\n", '', 6.5], [" \t123.4ms \r\n", 'ms', 123.4],
+            ['0ms', 'ms', 0.0], ['1e2', '', 100.0], ['+1', '', 1.0],
+        ] as [$value, $suffix, $expected]) {
+            $this->assertSame($expected, \pmssSystemStatsHostPressureMetricParse($value, $suffix));
+        }
+        // Existing type, range, finiteness and suffix refusals remain in place.
+        foreach ([null, [], new \stdClass(), false, '', '-1', 'INF', '1e999'] as $value) {
+            $this->assertSame(null, \pmssSystemStatsHostPressureMetricParse($value));
+        }
+        foreach (['ms', '123.4', '123.4MS', '-1ms', 'INFms'] as $value) {
+            $this->assertSame(null, \pmssSystemStatsHostPressureMetricParse($value, 'ms'));
+        }
+    }
+
     public function testHostPressureSnapshotUsesSafeWorldReadableFile(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-host-pressure-');

@@ -369,6 +369,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Atomically writes a mode-0644 customer-readable JSON snapshot containing
     only timestamp, five-minute full I/O PSI, and `/home` ioping latency.
   - Rejects unsafe/symlinked targets through the shared managed-file writer.
+  - Metric parsing rejects raw NUL bytes before trimming or removing units,
+    using `null` for the affected metric while preserving its valid sibling.
+    Valid scalar conversions, whitespace, suffixes and JSON fields are unchanged.
 
 - pmssRecordProfile(array $entry): void → lazily initializes `$GLOBALS['PMSS_PROFILE']`, appends the entry, and emits JSON `step` event.
 - Profiling keeps the existing `runtime/profile.php` and `runtime/commands.php`
