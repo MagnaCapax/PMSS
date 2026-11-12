@@ -175,7 +175,7 @@ PHP;
             foreach (['/tmp', '/', 'relative', '/tmp/space name', "/tmp/quote'path", "/tmp/line\npath"] as $target) {
                 foreach (['pmssIopingProbeOutput' => $output, 'pmssIopingAverageMs' => 2.0, 'pmssIopingMedianMs' => 2.0] as $probe => $expected) {
                     $this->assertSame($expected, $probe($target));
-                    $this->assertSame(implode("\0", ['-c', '60', '-i', '0.1', '-D', $target, '']), file_get_contents($argsLog));
+                    $this->assertSame(implode("\0", ['-c', '60', '-i', '0.1', '-w', '12', '-D', $target, '']), file_get_contents($argsLog));
                 }
             }
         });
@@ -198,7 +198,44 @@ PHP;
 
         $this->pmssWithPathPrefix($binDir, function () use ($argsLog): void {
             $this->assertEquals(2.0, pmssIopingAverageMs('/tmp'));
-            $this->assertSame("-c 60 -i 0.1 -D /tmp\n", (string) file_get_contents($argsLog));
+            $this->assertSame("-c 60 -i 0.1 -w 12 -D /tmp\n", (string) file_get_contents($argsLog));
+        });
+    }
+
+    /** ADR 0274: a probe killed at the hard timeout keeps its completed samples plus one censored sample. */
+    public function testIopingTimedOutProbeReadsSlowNotMissing(): void
+    {
+        $cases = [
+            // [stub stdout lines, exit code, expected median, expected average]
+            'partial samples, TERM' => [['time=2.0 ms', 'time=4.0 ms', 'time=6.0 ms'], 124, 5.0, null],
+            'nothing answered, TERM' => [[], 124, 15000.0, null],
+            'nothing answered, KILL' => [[], 137, 15000.0, null],
+            'one slow sample, KILL' => [['time=900.0 ms'], 137, 7950.0, null],
+            'flock skip is no measurement' => [['time=1.0 ms'], 75, null, null],
+            'other failure is no measurement' => [['time=1.0 ms'], 1, null, null],
+        ];
+        foreach ($cases as $label => $case) {
+            $body = '';
+            foreach ($case[0] as $line) $body .= 'printf \'%s\\n\' '.escapeshellarg('4 KiB <<< /tmp: request=1 '.$line)."\n";
+            $binDir = $this->pmssMakeExecutableStub('ioping', "#!/bin/sh\n".$body.'exit '.$case[1]."\n", 'pmss-ioping-timeout-');
+            $this->pmssWithPathPrefix($binDir, function () use ($case, $label): void {
+                $this->assertSame($case[2], pmssIopingMedianMs('/tmp'), $label.' median');
+                $this->assertSame($case[3], pmssIopingAverageMs('/tmp'), $label.' average');
+            });
+        }
+    }
+
+    /** ADR 0274: a normal stop at the work time (exit 0, fewer samples than the count) is used as measured. */
+    public function testIopingWorkTimeStopUsesCompletedSamples(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub(
+            'ioping',
+            "#!/bin/sh\nprintf '%s\\n' '4 KiB <<< /tmp: request=1 time=150.0 ms' '4 KiB <<< /tmp: request=2 time=170.0 ms' '4 KiB <<< /tmp: request=3 time=500.0 ms'\nprintf '%s\\n' 'min/avg/max/mdev = 150.0 ms / 273.3 ms / 500.0 ms / 160.0 ms'\n",
+            'pmss-ioping-worktime-'
+        );
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            $this->assertEquals(170.0, pmssIopingMedianMs('/tmp'));
+            $this->assertEquals(273.3, pmssIopingAverageMs('/tmp'));
         });
     }
 

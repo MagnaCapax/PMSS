@@ -90,11 +90,19 @@ echo json_encode([$results, $GLOBALS['calls']], JSON_PRESERVE_ZERO_FRACTION);
 PHP;
         $output = "time=1 ms\ntime=3 ms\n".$this->summary('4.5 ms');
         $cases = $expected = [];
-        foreach ([1, 2, 75, 124, 137, -1, null] as $rc) {
+        foreach ([1, 2, 75, -1, null] as $rc) {
             foreach ([['stdout' => $output, 'stderr' => ''], ['stdout' => '', 'stderr' => $output]] as $capture) {
                 $cases[] = $rc === null ? $capture : ['rc' => $rc] + $capture;
                 $expected[] = [null, null, null];
             }
+        }
+        // ADR 0274: a probe killed at the timeout keeps its stdout samples plus one censored 15000 ms sample and
+        // never its summary, so the median reads slow and the average stays null.
+        foreach ([124, 137] as $rc) {
+            $cases[] = ['rc' => $rc, 'stdout' => $output, 'stderr' => ''];
+            $expected[] = ["time=1.000000 ms\ntime=3.000000 ms\ncensored time=15000 ms", null, 3.0];
+            $cases[] = ['rc' => $rc, 'stdout' => '', 'stderr' => $output];
+            $expected[] = ['censored time=15000 ms', null, 15000.0];
         }
         foreach ([['stdout' => " \n".$output."\n", 'stderr' => 'ignored'],
             ['stdout' => '', 'stderr' => " \n".$output."\n"]] as $capture) {
@@ -106,7 +114,7 @@ PHP;
             $expected[] = [null, null, null];
         }
         foreach ([false, true] as $flock) {
-            $command = \pmssCommandArgvShellQuote([PHP_BINARY, '-c', '60', '-i', '0.1', '-D', "/fixture/space 'path"]);
+            $command = \pmssCommandArgvShellQuote([PHP_BINARY, '-c', '60', '-i', '0.1', '-w', '12', '-D', "/fixture/space 'path"]);
             if ($flock) $command = escapeshellarg(PHP_BINARY).' -xn -E 75 '.escapeshellarg('/fixture/ioping.lock').' '.$command;
             $this->assertSame([$expected, array_fill(0, count($cases) * 3, [$command, 15])],
                 $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IOPING_CAPTURE' => json_encode([$flock, $cases])]));
