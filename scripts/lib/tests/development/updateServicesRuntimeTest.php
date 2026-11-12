@@ -321,7 +321,6 @@ class UpdateServicesRuntimeTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-ssh-dropin-same-');
         $dropinDir = $root.'/ssh.service.d';
         $dropinFile = $dropinDir.'/10-pmss-starvation-resistance.conf';
-        $this->pmssEnsureDir($dropinDir);
         $this->pmssWriteFile($dropinFile, $this->pmssReadRepoFile('etc/seedbox/config/template.ssh.service.pmss-starvation.conf'));
         $this->pmssResetRuntimeProfile();
 

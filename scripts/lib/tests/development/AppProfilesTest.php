@@ -74,7 +74,6 @@ final class AppProfilesTest extends TestCase
     public function testHermesGateBoundariesAndExistingInstall(): void
     {
         $home = $this->tempDir.'/fixtur01';
-        $this->pmssEnsureDir($home.'/bin');
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $user = ['memory' => 1000];
         $ops = ['host' => 'node.example.com'] + $this->pmssMakeCallbacks([

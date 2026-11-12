@@ -15,7 +15,6 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $dir = $this->pmssMakeTempDir('pmss-welcome-safety-');
         $www = $dir.'/www';
-        $this->pmssEnsureDir($www);
         $this->pmssWriteFile($www.'/scriptsInc.php', $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
         foreach (array('Format', 'Files', 'Frontend', 'Bonus', 'Cgroup', 'Backup',
             'RestoreTar', 'Restore', 'AppProcess', 'AppsHtml', 'AppsStatus', 'ActionJs') as $part) {

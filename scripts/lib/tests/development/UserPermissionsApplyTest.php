@@ -24,7 +24,6 @@ class UserPermissionsApplyTest extends TestCase
 
     private function file(string $path, int $mode, string $content = 'kept'): string
     {
-        $this->pmssEnsureDir(dirname($path));
         $this->pmssWriteFile($path, $content);
         $this->assertTrue(chmod($path, $mode));
         return $path;

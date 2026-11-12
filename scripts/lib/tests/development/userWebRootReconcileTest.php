@@ -118,7 +118,6 @@ class UserWebRootReconcileTest extends TestCase
     }
     public function testPartialMergeAddsMissingEntriesWithoutOverwritingCustomerFiles(): void
     {
-        $this->pmssEnsureDir($this->home.'/www');
         $this->pmssWriteFile($this->home.'/www/index.php', 'customer-panel');
         $this->pmssWriteFile($this->home.'/www/customer.txt', 'customer-data');
         $this->pmssWriteFile($this->home.'/www/managed-dir', 'customer-path');

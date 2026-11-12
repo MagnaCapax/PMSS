@@ -315,7 +315,6 @@ PHP;
         $this->pmssEnsureDir($disabledRoot);
         $this->assertTrue(\pmssUserLifecycleWebRootContainsUserContent($activeRoot));
         $this->assertTrue(\pmssUserLifecycleClearEmptySuspendedMarker($home, $disabledRoot));
-        $this->pmssEnsureDir($disabledRoot);
         $this->pmssWriteFile($disabledRoot.'/rutorrent/.keep', '');
         $this->assertTrue(\pmssUserLifecycleWebRootContainsUserContent($disabledRoot));
         $this->assertFalse(\pmssUserLifecycleClearEmptySuspendedMarker($home, $disabledRoot));

@@ -131,7 +131,6 @@ class LighttpdSocketCleanupTest extends TestCase
         if (getenv('PMSS_TEST_TEMP_ROOT') === dirname($root)) chmod(dirname($root), 0755);
         $user = 'nobody';
         $home = $root.'/'.$user;
-        $this->pmssEnsureDir($home.'/.lighttpd');
         $this->pmssEnsureDir($home.'/.lighttpd/upload');
         $this->pmssWriteFile($home.'/.lighttpd.conf', 'server.port = 12345'."\n");
         $socket = $home.'/.lighttpd/php.socket-0';

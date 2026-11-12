@@ -325,11 +325,9 @@ final class CustomerStatsLayoutTest extends TestCase
         $controllerlessDir = $root.'/controllerless';
         $cpuOnlyDir = $root.'/cpu-only';
         $v2Dir = $root.'/v2';
-        foreach (array($emptyDir, $v1Dir, $controllerlessDir, $cpuOnlyDir, $v2Dir) as $dir) {
-            mkdir($dir);
-        }
+        mkdir($emptyDir);
         foreach (array($v1Dir, $controllerlessDir, $cpuOnlyDir, $v2Dir) as $dir) {
-            $this->pmssWriteFile($dir.'/memory.stat', "anon 42\n");
+            $this->pmssWriteFile($dir.'/memory.stat', "anon 42\n", 0777);
         }
         $this->pmssWriteFile($controllerlessDir.'/cgroup.controllers', "\n");
         $this->pmssWriteFile($cpuOnlyDir.'/cgroup.controllers', "cpu io\n");
