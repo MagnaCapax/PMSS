@@ -109,18 +109,16 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     public function testPickerAndRestartReuseDeliveredCustomerFiles(): void
     {
         $root = dirname(__DIR__, 4);
-        $this->pmssAssertRepoFileContractCases([
-            'etc/skel/www/configure.php' => ['required' => ['pmssConfigureTorrentClientCardsBuild($home)']],
-            'etc/skel/www/configureTorrentClientsCard.php' => ['required' => ["'rtorrent' => 'rTorrent'", 'pmssConfigureTorrentClientVersionsOffered($client, $path)']],
-            'scripts/lib/update/users/filesystem.php' => ['required' => [
-                "'www/configureTorrentClientsOther.php'", "'www/configureTorrentClientsSwitch.php'",
-                "'www/configureTorrentClientsVersion.php'", "'www/configureTorrentClientsCard.php'",
-                "'www/torrentClientsResolve.php'", "'.rtorrentRestart.php'",
-            ]],
-            'etc/skel/.rtorrentRestart.php' => ['required' => ["'rtorrent([ -]main)?'", 'screen -fa -d -m ./.rtorrentExecute.php',
-                // A stale executor exits with a fresh run stamp; the consumer must look at the executor lock as well.
-                "flock(\$executorLock, LOCK_EX | LOCK_NB)", '$lastRun == 0 or $executorIdle or']],
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/configure.php', ['pmssConfigureTorrentClientCardsBuild($home)']);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/configureTorrentClientsCard.php', ["'rtorrent' => 'rTorrent'", 'pmssConfigureTorrentClientVersionsOffered($client, $path)']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/filesystem.php', [
+            "'www/configureTorrentClientsOther.php'", "'www/configureTorrentClientsSwitch.php'",
+            "'www/configureTorrentClientsVersion.php'", "'www/configureTorrentClientsCard.php'",
+            "'www/torrentClientsResolve.php'", "'.rtorrentRestart.php'",
         ]);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentRestart.php', ["'rtorrent([ -]main)?'", 'screen -fa -d -m ./.rtorrentExecute.php',
+            // A stale executor exits with a fresh run stamp; the consumer must look at the executor lock as well.
+            "flock(\$executorLock, LOCK_EX | LOCK_NB)", '$lastRun == 0 or $executorIdle or']);
         // Stop in Apps must hold: the executor leaves instead of relaunching while the stop marker exists.
         $executor = file_get_contents($root.'/etc/skel/.rtorrentExecute.php');
         $stopCheck = strpos($executor, "if (file_exists('.rtorrentDisable'))");

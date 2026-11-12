@@ -68,36 +68,31 @@ final class CustomerStatsLayoutTest extends TestCase
             'Missing stats layout marker: ',
             'Resource summary order changed at: '
         );
-        $this->pmssAssertRepoFileContractCases(array(
-            'etc/skel/www/statsResourceRender.php' => array('required' => array(
-                'class="stats-block resource-summary-block"',
-                'class="resource-summary-strip"',
-                'class="resource-summary-label">CPU</span>',
-                'class="resource-summary-label">Memory</span>',
-                'class="resource-summary-label">Processes</span>',
-            )),
-            'etc/skel/www/stats.php' => array(
-                'required' => array(
-                    'class="stats-block stats-bonus-block"',
-                    'pmssCustomerBonusDisplayTextBuild($pmssBonusDisplayState)',
-                    'pmssCustomerBonusDisplayNoteBuild($pmssBonusDisplayState)',
-                    'class="stats-block stats-block-base-resources"',
-                    'class="stats-base-resources-pre"',
-                    '.stats-block-base-resources .stats-base-resources-pre',
-                    'max-height: none;',
-                    'overflow-y: visible;',
-                ),
-                'forbidden' => array(
-                    '<h6>CPU usage</h6>',
-                    '<h6>Memory usage</h6>',
-                    '<h6>Process count</h6>',
-                ),
-            ),
-            'etc/skel/www/scriptsIncBonus.php' => array('required' => array(
-                'function pmssCustomerBonusDisplayStateRead(',
-                'function pmssCustomerBonusDisplayTextBuild(',
-                'function pmssCustomerBonusDisplayNoteBuild(',
-            )),
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsResourceRender.php', array(
+            'class="stats-block resource-summary-block"',
+            'class="resource-summary-strip"',
+            'class="resource-summary-label">CPU</span>',
+            'class="resource-summary-label">Memory</span>',
+            'class="resource-summary-label">Processes</span>',
+        ));
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/stats.php', array(
+            'class="stats-block stats-bonus-block"',
+            'pmssCustomerBonusDisplayTextBuild($pmssBonusDisplayState)',
+            'pmssCustomerBonusDisplayNoteBuild($pmssBonusDisplayState)',
+            'class="stats-block stats-block-base-resources"',
+            'class="stats-base-resources-pre"',
+            '.stats-block-base-resources .stats-base-resources-pre',
+            'max-height: none;',
+            'overflow-y: visible;',
+        ), array(
+            '<h6>CPU usage</h6>',
+            '<h6>Memory usage</h6>',
+            '<h6>Process count</h6>',
+        ));
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/scriptsIncBonus.php', array(
+            'function pmssCustomerBonusDisplayStateRead(',
+            'function pmssCustomerBonusDisplayTextBuild(',
+            'function pmssCustomerBonusDisplayNoteBuild(',
         ));
     }
 
@@ -127,28 +122,23 @@ final class CustomerStatsLayoutTest extends TestCase
 
     public function testStatsPageLoadsBundledHelperLibrary(): void
     {
-        $this->pmssAssertRepoFileContractCases(array(
-            'etc/skel/www/stats.php' => array(
-                'required' => array(
-                    '$pmssStatsRequiredHelpers',
-                    'Stats unavailable: missing local panel helper',
-                    "require_once __DIR__.'/scriptsInc.php';",
-                    "pmssWelcomeRequireLocalHelper('statsHelpers.php');",
-                    'The Info page is being updated on this server. Reload it in a few minutes.',
-                    'pmssStatsRenderResourceBlocks($resourceState);',
-                ),
-                'forbidden' => array('function pmssStatsSerializedStateRead(', 'PMSS_STATS'.'_HELPERS_ONLY'),
-            ),
-            'etc/skel/www/statsStatus.php' => array('required' => array(
-                'function pmssStatsNetworkInterfaceStatus(',
-                'function pmssStatsDockerInactiveNote(',
-            )),
-            'etc/skel/www/statsCharts.php' => array('required' => array(
-                'function pmssStatsRenderLineChart(',
-            )),
-            'etc/skel/www/statsResourceRender.php' => array('required' => array(
-                'function pmssStatsRenderResourceBlocks(',
-            )),
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/stats.php', array(
+            '$pmssStatsRequiredHelpers',
+            'Stats unavailable: missing local panel helper',
+            "require_once __DIR__.'/scriptsInc.php';",
+            "pmssWelcomeRequireLocalHelper('statsHelpers.php');",
+            'The Info page is being updated on this server. Reload it in a few minutes.',
+            'pmssStatsRenderResourceBlocks($resourceState);',
+        ), array('function pmssStatsSerializedStateRead(', 'PMSS_STATS'.'_HELPERS_ONLY'));
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsStatus.php', array(
+            'function pmssStatsNetworkInterfaceStatus(',
+            'function pmssStatsDockerInactiveNote(',
+        ));
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsCharts.php', array(
+            'function pmssStatsRenderLineChart(',
+        ));
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsResourceRender.php', array(
+            'function pmssStatsRenderResourceBlocks(',
         ));
     }
 

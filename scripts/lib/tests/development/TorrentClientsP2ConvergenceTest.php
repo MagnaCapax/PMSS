@@ -139,10 +139,8 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->assertSame('custom', readlink($home.'/bin/qbittorrent/default'));
         $this->assertSame('fresh skeleton', file_get_contents($backup.'/.pmss-recreate-bin-skel/support'));
         $this->assertTrue(in_array($backup.'/.pmss-recreate-bin-skel', $left, true));
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/recreateUser.php' => ['required' => ['pmssUpdateUserEnvironment($userName']],
-            'scripts/lib/update/users.php' => ['required' => ['pmssTorrentClientsPostSetupConverge($user']],
-        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/recreateUser.php', ['pmssUpdateUserEnvironment($userName']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users.php', ['pmssTorrentClientsPostSetupConverge($user']);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertSame([], $events->logs);
     }
