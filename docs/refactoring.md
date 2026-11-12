@@ -1,5 +1,14 @@
 # Refactoring Guidelines
 
+Account-local Docker first-run capture owns its pipes and child through thrown
+write, read, close and reap failures. Cleanup attempts both pipe closes, then
+termination and reaping of a still-owned child; an already-reaped child is left
+alone. Lone throwables propagate unchanged, with normal `finally` precedence
+for combined faults. Command bytes, stdin, suppressed stderr, successful output
+and ordinary null results retain their contracts (ADR 0143).
+`DockerLsioSeedCaptureSafetyTest` covers these paths with memory streams and fake
+process operations; execution stays on testing machines.
+
 User maintenance retains one queue and its original include/public helpers
 (ADR 0275). Resume storage, legacy CPU-quota repair and account convergence have
 separate modules. Optional checks pair presentation and exit policy in one

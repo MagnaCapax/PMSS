@@ -10,12 +10,34 @@ function pmssDockerLsioSeedCapture(array $command, string $input = ''): ?string
     if (!is_resource($process)) {
         return null;
     }
-    $written = $input === '' || fwrite($pipes[0], $input) === strlen($input);
-    fclose($pipes[0]);
-    $output = stream_get_contents($pipes[1]);
-    fclose($pipes[1]);
-    $rc = proc_close($process);
-    return $written && $rc === 0 && is_string($output) ? $output : null;
+    try {
+        $written = $input === '' || fwrite($pipes[0], $input) === strlen($input);
+        fclose($pipes[0]);
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $rc = proc_close($process);
+        return $written && $rc === 0 && is_string($output) ? $output : null;
+    } catch (\Throwable $error) {
+        // Failed I/O still owns both pipes and this invocation's child.
+        try {
+            try {
+                if (is_resource($pipes[0])) fclose($pipes[0]);
+            } finally {
+                if (is_resource($pipes[1])) fclose($pipes[1]);
+            }
+        } finally {
+            // A close or termination fault must not skip the remaining cleanup.
+            // A child already reaped before a throwable no longer belongs to us.
+            if (is_resource($process)) {
+                try {
+                    if (function_exists('proc_terminate')) @proc_terminate($process);
+                } finally {
+                    @proc_close($process);
+                }
+            }
+        }
+        throw $error;
+    }
 }
 
 /** Curl config quoting keeps generated secrets off both host and container argv. */
