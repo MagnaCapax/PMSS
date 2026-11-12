@@ -24,7 +24,7 @@ class cgroupPolicyRefreshTest extends TestCase
 
     public function testBuildCommandCarriesIoCostAndLatencyFlags(): void
     {
-        $command = \pmssUserConfigCliBuildStoredCgroupApplyCommand('alice', [
+        $command = \pmssUserConfigCliBuildStoredCgroupApplyCommand('fixtur01', [
             'ramMiB' => 1024,
             'CPUWeight' => 200,
             'ioLatencyMs' => 50,
@@ -34,7 +34,7 @@ class cgroupPolicyRefreshTest extends TestCase
 
         $this->assertTrue(is_string($command));
         $this->assertStringContainsAllStrings([
-            "'/scripts/util/userConfigCgroup.php' 'alice' '--apply' '--memory-high=1024'",
+            "'/scripts/util/userConfigCgroup.php' 'fixtur01' '--apply' '--memory-high=1024'",
             "'--cpu-weight=200'",
             "'--io-latency-ms=50'",
             "'--io-cost-qos=enable=1 ctrl=user'",
@@ -44,7 +44,7 @@ class cgroupPolicyRefreshTest extends TestCase
 
     public function testBuildCommandReturnsNullWithoutMemoryBaseline(): void
     {
-        $this->assertSame(null, \pmssUserConfigCliBuildStoredCgroupApplyCommand('alice', ['ioLatencyMs' => 50]));
+        $this->assertSame(null, \pmssUserConfigCliBuildStoredCgroupApplyCommand('fixtur01', ['ioLatencyMs' => 50]));
     }
 
     public function testRefreshRestoresBfqOnceAfterAllPolicyAttempts(): void
@@ -52,12 +52,12 @@ class cgroupPolicyRefreshTest extends TestCase
         $payload = ['ramMiB' => 1024, 'ioLatencyMs' => 50];
         $writer = '/scripts/cron/cgroupBfqWeightApply.php';
         foreach ([
-            [['alice' => $payload, 'bob' => $payload], []],
-            [['alice' => $payload, 'bob' => $payload], ['alice' => 3]],
-            [['alice' => ['ioLatencyMs' => 50], 'bob' => $payload], []],
-            [['alice' => ['ramMiB' => 1024]], []],
+            [['fixtur01' => $payload, 'fixtur02' => $payload], []],
+            [['fixtur01' => $payload, 'fixtur02' => $payload], ['fixtur01' => 3]],
+            [['fixtur01' => ['ioLatencyMs' => 50], 'fixtur02' => $payload], []],
+            [['fixtur01' => ['ramMiB' => 1024]], []],
             [[], []],
-            [['alice' => $payload], [$writer => 2]],
+            [['fixtur01' => $payload], [$writer => 2]],
         ] as $case) {
             list($payloads, $failures) = $case;
             // Keep account discovery, cache publication, and commands inside the fixture.
@@ -98,18 +98,14 @@ PHP;
 
     public function testUpdaterRestoresBfqAfterUserBatchBeforeSummaryHandling(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
-            'ordered' => [[
-                'needles' => [
-                    '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
-                    "runStep('Restoring direct BFQ weights after user maintenance', '/scripts/cron/cgroupBfqWeightApply.php');",
-                    'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
-                    "runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');",
-                    "pmssRunProfiledCallable('Ensuring weekly TRIM timer', 'pmssEnsureFstrimTimer');",
-                    "runStep('Restoring direct BFQ weights before root cron restore', '/scripts/cron/cgroupBfqWeightApply.php');",
-                    "runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');",
-                ],
-            ]],
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/update-step2.php', [
+            '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
+            "runStep('Restoring direct BFQ weights after user maintenance', '/scripts/cron/cgroupBfqWeightApply.php');",
+            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
+            "runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');",
+            "pmssRunProfiledCallable('Ensuring weekly TRIM timer', 'pmssEnsureFstrimTimer');",
+            "runStep('Restoring direct BFQ weights before root cron restore', '/scripts/cron/cgroupBfqWeightApply.php');",
+            "runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');",
         ]);
     }
 

@@ -301,7 +301,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   Fragment-only repository checks call the direct batch helpers, including
   `pmssAssertRepoFileContainsAndOmitsStrings()` for forbidden diagnostic maps.
   Repository-only checks use the `pmssAssertRepoFile*` helpers for file reads and
-  assertion batches; keep returned source only for scoped parsing or count checks.
+  assertion batches; reuse returned source for later parsing, counts or ordering.
+  Ordering-only checks call `pmssAssertRepoFileContainsOrderedStrings()` directly.
   Adjacent required/forbidden checks share one read; reuse that source for later
   regexes or checks with distinct diagnostic prefixes, preserving assertion order.
 - Generated CLI, service-command and torrent-client fixtures use the same batch

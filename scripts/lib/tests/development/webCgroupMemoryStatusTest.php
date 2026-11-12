@@ -208,9 +208,7 @@ class WebCgroupMemoryStatusTest extends TestCase
             'limit_source' => 'memory.high',
         ], $status);
         $this->assertStringContainsString('2.0 GiB / 3.0 GiB', $status['usage_text']);
-        $this->pmssAssertRepoFileContract('etc/skel/www/webCgroupMemoryRead.php', array(
-            'forbidden' => array('systemctl show user-'),
-        ));
+        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/webCgroupMemoryRead.php', 'systemctl show user-');
     }
 
     public function testReadSurfacesV1OomKillFromMemoryOomControlWithUpgradeCta(): void

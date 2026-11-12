@@ -511,25 +511,23 @@ PHP;
 
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/userConfig.php' => ['required' => [
-                "'rtorrentPort' => (int) (\$configuration['config']['scgiPort'] ?? 0)",
-                'failed to persist rTorrent ports',
-            ]],
-            'scripts/terminateUser.php' => ['required' => [
-                'pmssTerminateUserReleaseRtorrentPortReservations($username',
-            ]],
-            'scripts/lib/user/termination/ports.php' => ['required' => [
-                'function pmssTerminateUserReleaseRtorrentPortReservations',
-                'function pmssTerminateUserRtorrentPortRecord',
-                'pmssTerminateUserRtorrentPorts',
-                '$configLines = @file($portFile',
-                'pmssNetworkPortParseDigits',
-                'cleanup_ports_config_read',
-                'cleanup_ports_config_invalid',
-                'rtorrentDhtPort',
-                'rtorrentListenPort',
-            ]],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', [
+            "'rtorrentPort' => (int) (\$configuration['config']['scgiPort'] ?? 0)",
+            'failed to persist rTorrent ports',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/terminateUser.php', [
+            'pmssTerminateUserReleaseRtorrentPortReservations($username',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/termination/ports.php', [
+            'function pmssTerminateUserReleaseRtorrentPortReservations',
+            'function pmssTerminateUserRtorrentPortRecord',
+            'pmssTerminateUserRtorrentPorts',
+            '$configLines = @file($portFile',
+            'pmssNetworkPortParseDigits',
+            'cleanup_ports_config_read',
+            'cleanup_ports_config_invalid',
+            'rtorrentDhtPort',
+            'rtorrentListenPort',
         ]);
     }
 
@@ -541,19 +539,17 @@ PHP;
 
     public function testTerminateUserRemovesNginxSubdomainRouteFiles(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/termination/filesystem.php' => ['required' => [
-                'function pmssTerminateUserRemoveNginxRouteFiles',
-                'function pmssTerminateUserNginxRouteFileSpecs',
-                'remove_nginx_route_file',
-                'remove_nginx_route_file_hash',
-                '"/etc/nginx/conf.d/pmss-user-{$username}.conf"',
-                '"/etc/nginx/conf.d/pmss-user-{$username}-hash.conf"',
-            ]],
-            'scripts/terminateUser.php' => ['ordered' => [[
-                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
-                'pmssUserLifecycleRefreshNginxConfig(',
-            ]]],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/termination/filesystem.php', [
+            'function pmssTerminateUserRemoveNginxRouteFiles',
+            'function pmssTerminateUserNginxRouteFileSpecs',
+            'remove_nginx_route_file',
+            'remove_nginx_route_file_hash',
+            '"/etc/nginx/conf.d/pmss-user-{$username}.conf"',
+            '"/etc/nginx/conf.d/pmss-user-{$username}-hash.conf"',
+        ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/terminateUser.php', [
+            'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+            'pmssUserLifecycleRefreshNginxConfig(',
         ]);
     }
 
@@ -570,33 +566,28 @@ PHP;
 
     public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/termination/filesystem.php' => [
-                'required' => [
-                    'function pmssTerminateUserUnlinkPath',
-                    'function pmssTerminateUserRemoveEmptyDir',
-                    "'SKIP'",
-                    'Dry run; file not removed',
-                    'Dry run; directory not removed',
-                ],
-                'forbidden' => [
-                    '@unlink("/etc/nginx/users/{$username}")',
-                    'unlink($filePath)',
-                    'rmdir($portsBase)',
-                ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/termination/filesystem.php', [
+            'function pmssTerminateUserUnlinkPath',
+            'function pmssTerminateUserRemoveEmptyDir',
+            "'SKIP'",
+            'Dry run; file not removed',
+            'Dry run; directory not removed',
+        ], [
+            '@unlink("/etc/nginx/users/{$username}")',
+            'unlink($filePath)',
+            'rmdir($portsBase)',
+        ]);
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
+            'required' => [
+                "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
+                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+                '} elseif ($dryRun) {',
+                "'status'  => 'SKIP'",
             ],
-            'scripts/terminateUser.php' => [
-                'required' => [
-                    "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
-                    'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
-                    '} elseif ($dryRun) {',
-                    "'status'  => 'SKIP'",
-                ],
-                'ordered' => [[
-                    '} elseif ($dryRun) {',
-                    '$db->removeUser($username);',
-                ]],
-            ],
+            'ordered' => [[
+                '} elseif ($dryRun) {',
+                '$db->removeUser($username);',
+            ]],
         ]);
     }
 

@@ -329,21 +329,18 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testUserPermissionsRoutesEveryRepairThroughTheCheckedObject(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/userPermissions.php', [
-            'required' => [
-                "require_once __DIR__.'/../lib/user/permissionsApply.php';",
-                'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));',
-                '["/home/{$thisUser}/.config", 0770, true, true],',
-                "pmssUserPermissionsOwnerApply(\$homeDir, \$path, \$owner, \$predicate, \$predicate !== '');",
-                'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$homeDir], sprintf(',
-                'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf(',
-            ],
-            'forbidden' => [
-                'function chmodPath(' => 'Mode changes go through pmssUserPermissionsModeApply',
-                'function chownPath(' => 'Owner changes go through pmssUserPermissionsOwnerApply',
-                '-exec chown' => 'chown runs through -execdir',
-                'pmssUserPermissionsRun(sprintf(' => 'Mode walks run as the account',
-            ],
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userPermissions.php', [
+            "require_once __DIR__.'/../lib/user/permissionsApply.php';",
+            'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));',
+            '["/home/{$thisUser}/.config", 0770, true, true],',
+            "pmssUserPermissionsOwnerApply(\$homeDir, \$path, \$owner, \$predicate, \$predicate !== '');",
+            'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$homeDir], sprintf(',
+            'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf(',
+        ], [
+            'function chmodPath(' => 'Mode changes go through pmssUserPermissionsModeApply',
+            'function chownPath(' => 'Owner changes go through pmssUserPermissionsOwnerApply',
+            '-exec chown' => 'chown runs through -execdir',
+            'pmssUserPermissionsRun(sprintf(' => 'Mode walks run as the account',
         ]);
         $this->assertOrderedStrings([
             'return @lstat($path) !== false && ($rootArtifactRepairable[$path] ?? true);',
@@ -354,7 +351,7 @@ class UserPermissionsApplyTest extends TestCase
             "'find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +'",
             'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));',
             'pmssTrafficSetImmutable($trafficFile, true);',
-        ], $this->pmssReadRepoFile('scripts/util/userPermissions.php'));
+        ], $source);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/permissionsApply.php', [
             "pmssUserFileOpenVerified(\$path, 'rbn')",
             '@readlink($procPath)',

@@ -126,18 +126,14 @@ final class PikkumiesPreinstallHookTest extends TestCase
             'pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null)',
             'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
         ], $terminate);
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/recreateUser.php' => ['ordered' => [[
-                "pmssRunOrExit('cp -Rp /etc/skel ' . escapeshellarg(\$homeDir));",
-                'pmssPikkumiesPreinstallStateClear($userName)',
-            ]]],
-            'scripts/terminateUser.php' => ['ordered' => [[
-                'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
-                'pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null)',
-            ]], 'required' => [
-                'pmssTerminateUserClearPreinstallState',
-            ]],
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/recreateUser.php', [
+            "pmssRunOrExit('cp -Rp /etc/skel ' . escapeshellarg(\$homeDir));",
+            'pmssPikkumiesPreinstallStateClear($userName)',
         ]);
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
+            'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
+            'pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null)',
+        ]], 'required' => ['pmssTerminateUserClearPreinstallState']]);
     }
 
     public function testWithoutHostMarkerStartsNewAndFinishesStoppedInstalls(): void
