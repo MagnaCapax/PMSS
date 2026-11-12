@@ -39,16 +39,14 @@ class checkRtorrentContractTest extends TestCase
 
     public function testRecoveryUsesCanonicalConfigInputsAndLogsOutcome(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdog.php', [
-            'required' => [
-                'new UserConfigStore()',
-                "applyFallbacks(\$user, is_array(\$payload = \$userConfigStore->get(\$user)) ? \$payload : [])",
-                "'/etc/seedbox/config/user.rtorrent.defaults.dht'",
-                "'/etc/seedbox/config/user.rtorrent.defaults.pex'",
-                'pmssReadTorrentThrottle($user)',
-                "new rtorrentConfig(\$resources)",
-                "pmssCheckRtorrentLogBoth(\$user, 'missing .rtorrent.rc recovered', \$debug);",
-            ],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', [
+            'new UserConfigStore()',
+            "applyFallbacks(\$user, is_array(\$payload = \$userConfigStore->get(\$user)) ? \$payload : [])",
+            "'/etc/seedbox/config/user.rtorrent.defaults.dht'",
+            "'/etc/seedbox/config/user.rtorrent.defaults.pex'",
+            'pmssReadTorrentThrottle($user)',
+            "new rtorrentConfig(\$resources)",
+            "pmssCheckRtorrentLogBoth(\$user, 'missing .rtorrent.rc recovered', \$debug);",
         ]);
     }
 

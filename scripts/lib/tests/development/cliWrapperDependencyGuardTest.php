@@ -7,8 +7,8 @@ class CliWrapperDependencyGuardTest extends TestCase
 {
     public function testCliWrappersGuardMissingTargetsBeforeRequire(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/setupSkelPermissions.php' => ['required' => ["if (!is_file(\$setupPermissions))", 'setupPermissions.php missing; aborting wrapper.', 'require $setupPermissions;']],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupSkelPermissions.php', [
+            "if (!is_file(\$setupPermissions))", 'setupPermissions.php missing; aborting wrapper.', 'require $setupPermissions;',
         ]);
     }
 }

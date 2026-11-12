@@ -7,8 +7,8 @@ class SharedShellHelperUsageTest extends TestCase
 {
     public function testShellLibraryDefinesSharedRunner(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/shell.php' => ['required' => ['function pmssRun(string $cmd, bool $logFailure = true): int', 'function pmssRunOrExit(string $cmd, bool $logFailure = true): void']],
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/shell.php', [
+            'function pmssRun(string $cmd, bool $logFailure = true): int', 'function pmssRunOrExit(string $cmd, bool $logFailure = true): void',
         ]);
     }
 

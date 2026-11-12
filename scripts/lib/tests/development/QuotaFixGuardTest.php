@@ -153,52 +153,34 @@ class QuotaFixGuardTest extends TestCase
 
     public function testUpdateDecidesRecalculationBeforeRemountAndQuotaFixStampsOnlyAfterVerify(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
-            'ordered' => [[
-                'needles' => [
-                    "\$pmssQuotaRecalculationNeeded = pmssQuotaHomeRecalculationNeeded(null, 'logmsg');",
-                    "['Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']],",
-                    "if (\$pmssQuotaRecalculationNeeded) {",
-                    "runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');",
-                ],
-                'missingPrefix' => 'update-step2 missing quota recalculation gate: ',
-                'orderPrefix' => 'update-step2 quota recalculation gate order changed near: ',
-            ]],
-        ]);
-        $this->pmssAssertRepoFileContract('scripts/util/quotaFix.php', [
-            'ordered' => [[
-                'needles' => [
-                    "\$quotaFixStamp = pmssQuotaRecalculationStampPath();",
-                    "!@unlink(\$quotaFixStamp)",
-                    "'quotaoff -av'",
-                    "'quotaon -av'",
-                    "\$quotaCounts = pmssQuotaHomeEnforcementWarn();",
-                    "@file_put_contents(\$quotaFixStamp",
-                ],
-                'missingPrefix' => 'quotaFix missing completion stamp guard: ',
-                'orderPrefix' => 'quotaFix completion stamp order changed near: ',
-            ]],
-        ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/update-step2.php', [
+            "\$pmssQuotaRecalculationNeeded = pmssQuotaHomeRecalculationNeeded(null, 'logmsg');",
+            "['Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']],",
+            "if (\$pmssQuotaRecalculationNeeded) {",
+            "runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');",
+        ], 'update-step2 missing quota recalculation gate: ', 'update-step2 quota recalculation gate order changed near: ');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/quotaFix.php', [
+            "\$quotaFixStamp = pmssQuotaRecalculationStampPath();",
+            "!@unlink(\$quotaFixStamp)",
+            "'quotaoff -av'",
+            "'quotaon -av'",
+            "\$quotaCounts = pmssQuotaHomeEnforcementWarn();",
+            "@file_put_contents(\$quotaFixStamp",
+        ], 'quotaFix missing completion stamp guard: ', 'quotaFix completion stamp order changed near: ');
     }
 
     public function testQuotaFixSkipsQuotacheckWhenQuotaoffFails(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/util/quotaFix.php', [
-            'ordered' => [[
-                'needles' => [
-                    '$quotaOffResult = pmssQuotaFixRunCommand',
-                    "\$quotaCheckCommands = pmssQuotaFixCheckCommands(\$quotaOffResult['ok']);",
-                    "if (\$quotaCheckCommands !== []) {",
-                    "pmssRemoveStaleQuotaCheckFiles('/home');",
-                    "foreach (\$quotaCheckCommands as \$quotaCheckCommand) {",
-                    "pmssQuotaFixRunCommand(\n            '[quotaFix] Recalculating quota usage from disk",
-                    '[quotaFix] WARNING: skipping quotacheck because quotaoff failed',
-                    "pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, \$exitCode);",
-                ],
-                'missingPrefix' => 'quotaFix missing safety guard: ',
-                'orderPrefix' => 'quotaFix safety guard order changed near: ',
-            ]],
-        ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/quotaFix.php', [
+            '$quotaOffResult = pmssQuotaFixRunCommand',
+            "\$quotaCheckCommands = pmssQuotaFixCheckCommands(\$quotaOffResult['ok']);",
+            "if (\$quotaCheckCommands !== []) {",
+            "pmssRemoveStaleQuotaCheckFiles('/home');",
+            "foreach (\$quotaCheckCommands as \$quotaCheckCommand) {",
+            "pmssQuotaFixRunCommand(\n            '[quotaFix] Recalculating quota usage from disk",
+            '[quotaFix] WARNING: skipping quotacheck because quotaoff failed',
+            "pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, \$exitCode);",
+        ], 'quotaFix missing safety guard: ', 'quotaFix safety guard order changed near: ');
     }
 
     /** Run pmssQuotaFixCheckCommands against a fixture fstab, quota files and a stubbed quotaon -p. */
