@@ -91,3 +91,13 @@ promtp should always say no ticket needed if all is fine ... always stadnard, an
 - The form and the log take only the Result sentence of Pikkumies' answer; the rest of it is in the Pikkumies tab.
 - Item 4's credit floor is 60,000, not 40,000: the credit service reserves for the call's prompt, which grows with
   Pikkumies' session, and a QA check was refused with 44,602 left (2026-10-23).
+
+## Implementation safety: command capture cleanup
+
+The Welcome Pikkumies command capture attempts stdin, stdout and stderr closure,
+then child reaping, even when writing, reading or an earlier close throws.
+Lone exceptions and errors propagate unchanged; combined faults retain PHP's
+normal `finally` precedence. Command bytes, timeout, capture bounds, output
+selection and exit status retain their contracts. `WelcomeSupportCommandCleanupSafetyTest`
+injects faults using memory streams and process stubs; execution belongs on the
+testing machine, with no support request or real child process.

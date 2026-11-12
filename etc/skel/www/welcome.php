@@ -2132,13 +2132,27 @@ function pmssWelcomeHomeSupportPikkumiesRun($binary, array $args, $stdin, $secon
     $command = 'timeout '.(int) $seconds.' '.escapeshellarg($binary).' '.implode(' ', array_map('escapeshellarg', $args));
     $process = @proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes);
     if (!is_resource($process)) return array(-1, '');
-    fwrite($pipes[0], (string) $stdin);
-    fclose($pipes[0]);
-    $out = (string) stream_get_contents($pipes[1], 65536);
-    $err = (string) stream_get_contents($pipes[2], 4096);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    $code = proc_close($process);
+    try {
+        try {
+            try {
+                fwrite($pipes[0], (string) $stdin);
+            } finally {
+                fclose($pipes[0]);
+            }
+            $out = (string) stream_get_contents($pipes[1], 65536);
+            $err = (string) stream_get_contents($pipes[2], 4096);
+        } finally {
+            // Each pipe gets its close attempt even when I/O or an earlier close throws.
+            try {
+                fclose($pipes[1]);
+            } finally {
+                fclose($pipes[2]);
+            }
+        }
+    } finally {
+        // Reap the timeout-wrapped child before propagating an I/O failure.
+        $code = proc_close($process);
+    }
     return array($code, trim($out !== '' ? $out : $err));
 }
 
