@@ -263,8 +263,13 @@ accounts' unused shares to readers while retaining today's share cap as a minimu
 `headroom * PMSS_DYNAMIC_IOPS_EXCLUDE_RATIO > 1` to avoid cap oscillation. Unknown
 rates or readers wanting more have unbounded demand, but no account's demand exceeds
 its tier ceiling or explicit cap, so pool it cannot use goes to others. Each projection uses its own
-charged pool; explicit caps, rounding and tier ceilings still apply. The shipped
-mode remains `off` per [ADR 0243](adr/0243-read-caps-off-by-default-after-the-linux-6-1-journal-stall.md).
+charged pool; explicit caps, rounding and tier ceilings still apply.
+
+The shipped mode is `auto` ([ADR 0271](adr/0271-read-caps-follow-the-kernel.md)). It
+acts as `enforce` only on Linux 6.12 or later with the cgroup-v1 memory and blkio
+controllers present: that kernel dispatches metadata ahead of the cap, and its v1 memory
+controller keeps per-account memory limits. Elsewhere it acts as `off`, so Linux 6.1
+hosts keep caps off ([ADR 0243](adr/0243-read-caps-off-by-default-after-the-linux-6-1-journal-stall.md)).
 
 Preview with `/scripts/cron/cgroupIopsLimitApply.php --dry-run`; `--census`
 also uses the selected enforce map without writing. `PMSS_DRY_RUN=1` suppresses

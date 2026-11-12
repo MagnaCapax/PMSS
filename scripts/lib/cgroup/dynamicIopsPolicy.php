@@ -8,6 +8,21 @@
 require_once __DIR__.'/policy.php';
 require_once __DIR__.'/dynamicIopsContention.php';
 
+/**
+ * Linux 6.12+ dispatches REQ_META/REQ_SWAP bios ahead of blk-throttle (commit 29390bb5661d); 6.1 queues
+ * them behind the cgroup's own data reads and stalls the ext4 journal (ADR 0243). Caps also need the
+ * cgroup-v1 memory and blkio controllers, which stock Debian 6.12+ builds lack (no CONFIG_MEMCG_V1).
+ */
+function pmssDynamicIopsKernelReady($release = null, $cgroupRoot = null): bool
+{
+    $release = $release === null ? (string) php_uname('r') : (string) $release;
+    $cgroupRoot = $cgroupRoot === null ? '/sys/fs/cgroup' : rtrim((string) $cgroupRoot, '/');
+    if (!preg_match('/^([0-9]+)\.([0-9]+)/', $release, $m)) return false;
+    if ((int) $m[1] < 6 || ((int) $m[1] === 6 && (int) $m[2] < 12)) return false;
+    return is_file($cgroupRoot.'/memory/memory.limit_in_bytes')
+        && is_file($cgroupRoot.'/blkio/blkio.throttle.read_iops_device');
+}
+
 /** Enforce by default; reject malformed knobs rather than silently changing the allocation. */
 function pmssDynamicIopsSettings(array $policy): ?array
 {
@@ -21,6 +36,8 @@ function pmssDynamicIopsSettings(array $policy): ?array
         'ssdLatencyLowX' => 5.0, 'ssdLatencyHighX' => 10.0];
     // Shadow mode was removed; a host still set to it enforces.
     if ($settings['mode'] === 'shadow') $settings['mode'] = 'enforce';
+    // 'auto' enforces only on a kernel that keeps metadata reads out of the cap queue (ADR 0271).
+    if ($settings['mode'] === 'auto') $settings['mode'] = pmssDynamicIopsKernelReady() ? 'enforce' : 'off';
     if (!in_array($settings['mode'], ['off', 'enforce'], true)) return null;
     foreach (['idlePressure', 'busyPressure', 'idleMultiplier', 'busyMultiplier', 'floor', 'floorCharge',
         'curbStartIowait', 'curbFullIowait', 'curbMaxCut', 'quotaExponent', 'probeStartLo', 'probeGain',
