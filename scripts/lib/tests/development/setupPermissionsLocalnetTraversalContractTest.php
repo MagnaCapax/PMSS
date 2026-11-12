@@ -7,7 +7,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 {
     public function testSeedboxParentTraversalStepRemainsInPermissionTargets(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupPermissions.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/systemPermissionsTrees.php', [
             "'/etc/seedbox' => [",
             "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']",
         ]);
@@ -16,7 +16,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
     public function testSeedboxParentTraversalRunsBeforeConfigTreeNormalization(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/util/setupPermissions.php',
+            'scripts/lib/update/systemPermissionsTrees.php',
             [
                 "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']",
                 'pmssConfigPermissionsSweep($configDir);',
@@ -28,7 +28,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testToggleAppCatalogPathLosesGroupWriteOnly(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/setupPermissions.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/update/systemPermissionsTrees.php');
         $this->assertTrue(preg_match('#"(find /etc/skel/www [^"]+)"#', $source, $match) === 1, 'catalog permission step missing');
         $dir = $this->pmssMakeTempDir('pmss-skel-www-');
         $catalog = $this->pmssWriteFile($dir.'/toggleAppCatalog.php', "<?php return [];\n");
@@ -52,11 +52,13 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testPermissionTargetsFilterBeforeChmod(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/setupPermissions.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPermissionsTrees.php', [
             'find /etc/skel -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +',
             'find /etc/seedbox -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +',
             'find /etc/skel -type f -perm /007 -exec chmod o-rwx -- {} +',
             'find /etc/seedbox -type f -perm /007 -exec chmod o-rwx -- {} +',
+        ], ['chmod -R o-w']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPermissionsSecrets.php', [
             "find /etc/openvpn -maxdepth 1 -type f -name '*.conf'",
             '-not -user root -o -not -group root',
             '-exec chown root:root {} +',
@@ -65,14 +67,12 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testPermissionHardeningSkipsSymlinkTargetsBeforeActing(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupPermissions.php', [
-            'function pmssPermissionTargetDirectoryExists(string $path): bool',
-            'function pmssPermissionTargetFileExists(string $path): bool',
-            'return !pmssSkipSymlink($path) && is_dir($path);',
-            'return !pmssSkipSymlink($path) && is_file($path);',
-            "if (pmssPermissionTargetDirectoryExists('/etc/wireguard')) {",
-            "if (pmssPermissionTargetFileExists('/etc/openvpn/ta.key')) {",
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/systemPermissionsTargets.php', [
+            'function pmssPermissionTargetExists(string $path, bool $directory = true): bool',
+            'return !pmssSkipSymlink($path) && ($directory ? is_dir($path) : is_file($path));',
+            'if (!pmssPermissionTargetExists($path, $directory)) {',
         ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/systemPermissionsSecrets.php', "if (pmssPermissionTargetExists('/etc/wireguard')) {");
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/configPermissions.php', 'if ($node->isLink()) {');
     }
 
