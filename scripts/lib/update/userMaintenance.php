@@ -25,7 +25,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
         $staleLingerCount = pmssUserMaintenancePruneStaleLinger();
         logMessage(sprintf('Removed %d stale systemd linger flag(s)', $staleLingerCount));
     }
-    $users = users::listHomeUsers();
+    $users = users::listHomeUsers(true);
     sort($users, SORT_NATURAL | SORT_FLAG_CASE);
     $summary = ['total' => count($users), 'processed' => 0, 'skipped' => 0, 'skip_reasons' => []];
     $incomplete = false;

@@ -59,6 +59,16 @@ class UserConfigStore
         return is_array($payload) ? pmssUserConfigPayloadNormalise($payload) : (pmssUserConfigLegacyUsersRead($this->legacyAggregatePath)[$username] ?? null);
     }
 
+    /** Provisioning evidence survives malformed records so maintenance can report damage. */
+    public function hasRecord(string $username): bool
+    {
+        if (($username = $this->validatedUsername($username)) === null) return false;
+        if (pmssPathExistsOrLink($this->userConfigPath($username))) return true;
+        $legacy = pmssJsonFileReadAssoc($this->legacyAggregatePath);
+        if (!is_array($legacy)) return false;
+        return array_key_exists($username, is_array($legacy['users'] ?? null) ? $legacy['users'] : $legacy);
+    }
+
     public function set(string $username, array $payload): bool
     {
         return $this->update($username, static function (?array $current) use ($payload): array {

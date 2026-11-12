@@ -97,9 +97,13 @@ class userFilesystem
 
     /**
      * Combined list of users discovered from filesystem and passwd data.
+     * Maintenance may require provisioning evidence without changing legacy listings.
      */
-    public static function listHomeUsers(): array
+    public static function listHomeUsers(bool $provisionedOnly = false): array
     {
+        if ($provisionedOnly) require_once __DIR__.'/userConfigStore.php';
+        $store = $provisionedOnly ? new UserConfigStore() : null;
+        $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
         $combined = array_fill_keys(self::listHomeDirectories(), true);
         foreach (self::listPasswdUsers() as $user) {
             $combined[$user] = true;
@@ -108,6 +112,9 @@ class userFilesystem
         $valid = [];
         foreach (array_keys($combined) as $name) {
             if (pmssUserAccountLookup($name) !== null) {
+                // Old accounts may predate the store; broken rc links still need repair.
+                if ($store !== null && !$store->hasRecord($name)
+                    && !pmssPathExistsOrLink(self::homePath($name, $homeRoot).'/.rtorrent.rc')) continue;
                 $valid[] = $name;
             }
         }

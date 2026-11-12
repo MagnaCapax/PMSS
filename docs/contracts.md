@@ -657,7 +657,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     line and does not abort the transfer.
 
 - pmssUpdateAllUsers(string $rutorrentIndexSha): array
-  - Enumerates users from `users::listHomeUsers()`, runs per-user maintenance, and returns summary keys in order: `total`, `processed`, `skipped`, `skip_reasons`.
+  - Enumerates provisioned users from `users::listHomeUsers(true)`, runs per-user maintenance, and returns summary keys in order: `total`, `processed`, `skipped`, `skip_reasons`.
+  - Provisioning evidence is a canonical config path (even malformed), an entry in
+    either legacy aggregate shape, or a legacy `.rtorrent.rc` path. Dangling links
+    count as evidence. Ordinary login accounts without any evidence are excluded
+    before counting; damaged PMSS accounts still reach existing repair/validation.
+    The default `listHomeUsers()` discovery contract remains unchanged.
   - Emits end-of-loop summary log line `Processed N of M users` and JSON event `user_maintenance_summary`.
   - The original include loads resume storage, legacy CPU-quota repair and account
     convergence from `users/refreshState.php`, `legacyCpuQuota.php` and

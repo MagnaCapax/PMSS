@@ -155,11 +155,11 @@ class users extends UserRepository
     }
 
     /**
-     * Combined list of filesystem and passwd-based user accounts.
+     * Combined list of filesystem and passwd-based accounts, optionally provisioned only.
      */
-    public static function listHomeUsers(): array
+    public static function listHomeUsers(bool $provisionedOnly = false): array
     {
-        return userFilesystem::listHomeUsers();
+        return userFilesystem::listHomeUsers($provisionedOnly);
     }
 
 }
