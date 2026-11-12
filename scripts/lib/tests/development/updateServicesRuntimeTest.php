@@ -293,12 +293,11 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testCronPamSystemdSessionUsesAtomicMetadataPreservingWrite(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/lib/update/services/systemd.php', [
-            'required' => ['pmssReplaceUserFilePreservingMetadata($pamCronPath, $new)'],
-            'forbidden' => [
-                '@file_put_contents($pamCron'.'Path' => 'cron PAM updates must not truncate the live file in place',
-                '@chmod($pamCron'.'Path' => 'cron PAM metadata must be applied before atomic replacement',
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/services/systemd.php', [
+            'pmssReplaceUserFilePreservingMetadata($pamCronPath, $new)',
+        ], [
+            '@file_put_contents($pamCron'.'Path' => 'cron PAM updates must not truncate the live file in place',
+            '@chmod($pamCron'.'Path' => 'cron PAM metadata must be applied before atomic replacement',
         ]);
     }
 

@@ -51,48 +51,44 @@ class checkRtorrentRestartGraceContractTest extends TestCase
             'PMSS_RTORRENT_UNRESPONSIVE_GRACE',
             'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
         ], ["@passthru('/scripts/startRtorrent "]);
-        foreach ([
-            'scripts/lib/rtorrent/process.php' => [
-                "require_once __DIR__.'/watchdogState.php';",
-                "require_once __DIR__.'/processLifecycle.php';",
-            ],
-            'scripts/lib/rtorrent/processLifecycle.php' => [
-                'function rtorrentProcessStart(',
-                'rtorrentProcessWriteStateFile(rtorrentProcessRestartMarkerPath($user), $now);',
-            ],
-            'scripts/lib/rtorrent/watchdog.php' => [
-                "require_once __DIR__.'/watchdogProcessFlow.php';",
-            ],
-            'scripts/lib/rtorrent/watchdogProcessFlow.php' => [
-                "require_once __DIR__.'/watchdogEscalation.php';",
-                "require_once __DIR__.'/watchdogMissing.php';",
-                "require_once __DIR__.'/watchdogScgi.php';",
-            ],
-            'scripts/lib/rtorrent/watchdogState.php' => [
-                "require_once __DIR__.'/watchdogEscalation.php';",
-                "require_once __DIR__.'/watchdogScgi.php';",
-            ],
-            'scripts/lib/rtorrent/watchdogMissing.php' => [
-                'function pmssCheckRtorrentHandleMissingProcess(',
-                "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
-                'persistent start failure recovery: reset session directory',
-            ],
-            'scripts/lib/rtorrent/watchdogEscalation.php' => [
-                'persistent start failure escalated; leaving retry disabled for external monitoring',
-            ],
-            'scripts/lib/rtorrent/watchdogScgi.php' => [
-                'function pmssCheckRtorrentHandleAliveProcess(',
-                'rtorrentProcessUnresponsiveGraceState($restartMarker, $unresponsiveGrace)',
-                "time() - \$graceState['restartAge']",
-                '$effectiveGrace = $graceState[\'grace\'];',
-                'rtorrentProcessScgiUnresponsiveDecision(',
-                'function rtorrentProcessUnresponsiveGraceState(',
-                '$restartAge < 7200',
-                '$restartAge < 14400',
-                'max($baseGrace, $restartAge < 7200 ? 600 : 1200)',
-            ],
-        ] as $path => $required) {
-            $this->pmssAssertRepoFileContainsAllStrings($path, $required);
-        }
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/process.php', [
+            "require_once __DIR__.'/watchdogState.php';",
+            "require_once __DIR__.'/processLifecycle.php';",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/processLifecycle.php', [
+            'function rtorrentProcessStart(',
+            'rtorrentProcessWriteStateFile(rtorrentProcessRestartMarkerPath($user), $now);',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', [
+            "require_once __DIR__.'/watchdogProcessFlow.php';",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdogProcessFlow.php', [
+            "require_once __DIR__.'/watchdogEscalation.php';",
+            "require_once __DIR__.'/watchdogMissing.php';",
+            "require_once __DIR__.'/watchdogScgi.php';",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdogState.php', [
+            "require_once __DIR__.'/watchdogEscalation.php';",
+            "require_once __DIR__.'/watchdogScgi.php';",
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdogMissing.php', [
+            'function pmssCheckRtorrentHandleMissingProcess(',
+            "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
+            'persistent start failure recovery: reset session directory',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdogEscalation.php', [
+            'persistent start failure escalated; leaving retry disabled for external monitoring',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdogScgi.php', [
+            'function pmssCheckRtorrentHandleAliveProcess(',
+            'rtorrentProcessUnresponsiveGraceState($restartMarker, $unresponsiveGrace)',
+            "time() - \$graceState['restartAge']",
+            '$effectiveGrace = $graceState[\'grace\'];',
+            'rtorrentProcessScgiUnresponsiveDecision(',
+            'function rtorrentProcessUnresponsiveGraceState(',
+            '$restartAge < 7200',
+            '$restartAge < 14400',
+            'max($baseGrace, $restartAge < 7200 ? 600 : 1200)',
+        ]);
     }
 }
