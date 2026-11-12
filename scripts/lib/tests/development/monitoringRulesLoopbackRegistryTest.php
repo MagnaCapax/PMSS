@@ -19,7 +19,12 @@ class MonitoringRulesLoopbackRegistryTest extends TestCase
     {
         $this->pmssWriteFiles($this->tempDir, ['qbittorrent-fixtur01' => "22001\n", 'media-stack-qbittorrent-fixtur01' => "32001\n"]);
         $messages = [];
-        $this->assertSame(['fixtur01' => [22001, 32001]], \networkQbittorrentWebUiPortsRead(['fixtur01' => 1001], $this->tempDir, $this->pmssMakeArrayLogger($messages)));
+        $ports = \networkQbittorrentWebUiPortsRead(['fixtur01' => 1001], $this->tempDir, $this->pmssMakeArrayLogger($messages));
+        $this->assertSame(['fixtur01' => [22001, 32001]], $ports);
+        // No host marker is created: registered ports must still produce owner rules.
+        $rules = \networkMonitoringRulesRender(['fixtur01' => 1001], [], $ports);
+        $this->assertStringContainsAllStrings(['--dport 22001 ', '--dport 32001 ',
+            '--uid-owner 1001 -m owner ! --uid-owner 0 -j REJECT'], $rules);
         $this->assertSame([], $messages);
     }
 

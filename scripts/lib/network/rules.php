@@ -33,23 +33,21 @@ function networkMonitoringOwnerUid($value): ?int
     return $uid !== null && $uid <= 4294967294 ? $uid : null;
 }
 
-/** Render egress accounting, optionally restricting registered loopback WebUI ports. */
-function networkMonitoringRulesRender(array $userUids, array $localnets, array $webUiPorts = [], bool $loopbackOwnerGuardEnabled = false): string
+/** Render egress accounting and owner rules for registered loopback WebUI ports. */
+function networkMonitoringRulesRender(array $userUids, array $localnets, array $webUiPorts = []): string
 {
     $lastLocalNet = $localnets ? end($localnets) : '';
     $ownerRules = '';
-    if ($loopbackOwnerGuardEnabled) {
-        foreach ($userUids as $user => $value) {
-            $uid = networkMonitoringOwnerUid($value);
-            if ($uid === null || !is_array($webUiPorts[$user] ?? null)) continue;
-            $seenPorts = [];
-            foreach ($webUiPorts[$user] as $value) {
-                $port = pmssNetworkPortParseDigits($value, 1024);
-                if ($port === null || isset($seenPorts[$port])) continue;
-                $seenPorts[$port] = true;
-                // Loopback service ports accept connections only from the owning account and root.
-                $ownerRules .= "/sbin/iptables -A OUTPUT -o lo -p tcp --syn --dport {$port} -m owner ! --uid-owner {$uid} -m owner ! --uid-owner 0 -j REJECT --reject-with tcp-reset\n";
-            }
+    foreach ($userUids as $user => $value) {
+        $uid = networkMonitoringOwnerUid($value);
+        if ($uid === null || !is_array($webUiPorts[$user] ?? null)) continue;
+        $seenPorts = [];
+        foreach ($webUiPorts[$user] as $value) {
+            $port = pmssNetworkPortParseDigits($value, 1024);
+            if ($port === null || isset($seenPorts[$port])) continue;
+            $seenPorts[$port] = true;
+            // Loopback service ports accept connections only from the owning account and root.
+            $ownerRules .= "/sbin/iptables -A OUTPUT -o lo -p tcp --syn --dport {$port} -m owner ! --uid-owner {$uid} -m owner ! --uid-owner 0 -j REJECT --reject-with tcp-reset\n";
         }
     }
     $rules = "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";

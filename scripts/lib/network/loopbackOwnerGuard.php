@@ -1,10 +1,8 @@
 <?php
-/** Root-registry inputs for the opt-in loopback service owner guard. @license GPL-3.0-only */
+/** Root-registry inputs for the loopback service owner guard. @license GPL-3.0-only */
 
 require_once __DIR__.'/../portManager.php';
 require_once __DIR__.'/rules.php';
-
-const PMSS_NETWORK_LOOPBACK_OWNER_GUARD_MARKER = '/etc/seedbox/config/qbittorrentLoopbackOwnerGuard.enabled';
 
 /**
  * Read native and Docker WebUI reservations only; never allocate or read home display files.

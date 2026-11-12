@@ -456,6 +456,10 @@ if ($letsEncryptEmail === null) {
 // Drop obsolete global autodl configuration
 if (file_exists('/etc/autodl.cfg')) { unlink('/etc/autodl.cfg'); }
 
+// Owner rules follow the installed release; remove only the obsolete file or link (ADR 0272).
+runStep('Removing obsolete qBittorrent loopback owner marker',
+    'path=/etc/seedbox/config/qbittorrentLoopbackOwnerGuard.enabled; if [ -L "$path" ] || [ -f "$path" ]; then rm -f -- "$path"; fi');
+
 // Legacy daemons that should never run globally.
 foreach (['btsync', 'rslsync', 'pyload', 'sabnzbdplus'] as $legacySvc) {
     if (file_exists('/etc/init.d/'.$legacySvc)) {

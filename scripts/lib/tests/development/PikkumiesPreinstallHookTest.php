@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Existing-home Pikkumies preinstall (ADR 0090): host marker gate, RAM floor, installer present, once per account. */
+/** Existing-home Pikkumies preinstall (ADR 0090): space/RAM floors, installer present, once per account. */
 final class PikkumiesPreinstallHookTest extends TestCase
 {
     public function testLifecycleMarkerClearAcceptsOnlyFilesAndLinks(): void
@@ -90,13 +90,12 @@ final class PikkumiesPreinstallHookTest extends TestCase
     {
         require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
         $root = $this->pmssMakeTempDir('pmss-pk-hook-path-');
-        $this->pmssWriteFile($root.'/marker', '');
         $this->pmssWriteFile($root.'/target/state/fixt01', 'keep');
         symlink($root.'/target', $root.'/parent-link');
         $calls = [];
         $ops = self::pmssMakeCallbacks(['users' => ['fixt01'], 'run' => null], $calls);
         foreach (['state', 'new-state'] as $leaf) {
-            \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/parent-link/'.$leaf, $ops);
+            \pmssPikkumiesPreinstallExistingRun($root.'/parent-link/'.$leaf, $ops);
         }
         $this->assertSame([], $calls);
         $this->assertSame('keep', file_get_contents($root.'/target/state/fixt01'));
@@ -141,11 +140,11 @@ final class PikkumiesPreinstallHookTest extends TestCase
         ]);
     }
 
-    public function testAbsentMarkerOnlyFinishesAnInstallThatStoppedAfterItsClone(): void
+    public function testWithoutHostMarkerStartsNewAndFinishesStoppedInstalls(): void
     {
         $this->assertTrue(include_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php');
         $root = $this->pmssMakeTempDir('pmss-pk-unmarked-');
-        // fxfresh: no clone (a rollout install); fxfin: a finished install; fxstop: a clone whose install
+        // fxfresh: no clone; fxfin: a finished install; fxstop: a clone whose install
         // stopped; fxmark: the same, marked as installed by the earlier hook; fxdone: re-run once already
         $users = ['fxfresh', 'fxfin', 'fxstop', 'fxmark', 'fxdone'];
         foreach ($users as $user) {
@@ -162,23 +161,23 @@ final class PikkumiesPreinstallHookTest extends TestCase
             'users' => static function () use (&$users): array { return $users; },
             'run' => $this->pmssMakeArrayLogger($runs),
             'homeBase' => $root.'/home',
-        ] + self::pmssMakeCallbacks(['ramMiB' => 4096]);
+        ] + self::pmssMakeCallbacks(['ramMiB' => 4096, 'freeSpace' => 106 * 1073741824]);
         $this->pmssWithPathPrefix($root.'/stub', function () use ($root, &$users, $ops, &$marked): void {
-            \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', $ops);
+            \pmssPikkumiesPreinstallExistingRun($root.'/state', $ops);
             $marked = array_map('basename', glob($root.'/state/*'));
-            $users = ['fxfresh', 'fxfin'];
-            \pmssPikkumiesPreinstallExistingRun($root.'/absent-marker', $root.'/state', $ops);
+            $users = ['fxfin'];
+            \pmssPikkumiesPreinstallExistingRun($root.'/state', $ops);
         });
 
         sort($marked);
         $this->assertSame(['fxdone', 'fxfin', 'fxmark'], $marked, 'a finished install is marked; a stopped one stays unmarked until it succeeds');
-        $this->assertSame(1, count($runs), 'without the host marker no new clone starts and a finished install never reruns: '.implode(' | ', $runs));
-        $this->assertSame(2, substr_count($runs[0], 'install-pikkumies.sh'), 'both stopped installs run again, the marked one too: '.$runs[0]);
+        $this->assertSame(1, count($runs), 'without a host marker new and stopped installs start; a finished install never reruns: '.implode(' | ', $runs));
+        $this->assertSame(3, substr_count($runs[0], 'install-pikkumies.sh'), 'the new install and both stopped installs run: '.$runs[0]);
         $this->assertSame(2, substr_count($runs[0], 'grep -qF'), 'each skipped as the user when its crontab has the update line: '.$runs[0]);
         foreach (['fxstop', 'fxmark'] as $user) {
             $this->assertTrue(strpos($runs[0], ") && printf finished > '\\''".$root."/state/".$user."'\\''") !== false, "$user is recorded as finished only after it succeeds: ".$runs[0]);
         }
-        $this->assertSame(0, substr_count($runs[0], ' && touch -- '), 'a clone is never marked with an empty file: '.$runs[0]);
+        $this->assertSame(1, substr_count($runs[0], ' && touch -- '), 'only the new clone gets an empty completion file: '.$runs[0]);
         $this->assertFalse(file_exists($root.'/home/fxfresh/.mcxPikkumies'));
     }
 
@@ -186,18 +185,17 @@ final class PikkumiesPreinstallHookTest extends TestCase
     {
         require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
         $root = $this->pmssMakeTempDir('pmss-pk-links-');
-        $this->pmssWriteFile($root.'/marker', '');
         $this->pmssEnsureDir($root.'/target');
         symlink($root.'/target', $root.'/state-link');
         $calls = [];
         $ops = self::pmssMakeCallbacks(['users' => ['fixt01'], 'run' => null], $calls);
-        \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state-link', $ops);
+        \pmssPikkumiesPreinstallExistingRun($root.'/state-link', $ops);
         $this->assertSame([], $calls);
         $this->assertSame([], glob($root.'/target/*'));
 
         $this->pmssEnsureDir($root.'/state');
         symlink($root.'/absent', $root.'/state/fixt01');
-        \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
+        \pmssPikkumiesPreinstallExistingRun($root.'/state', $ops);
         $this->assertSame(['users'], $calls);
         $this->assertFalse(file_exists($root.'/absent'));
     }
@@ -206,7 +204,6 @@ final class PikkumiesPreinstallHookTest extends TestCase
     {
         require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
         $root = $this->pmssMakeTempDir('pmss-pk-run-');
-        $this->pmssWriteFile($root.'/marker', '');
         // big: eligible; small: below the floor; noinst: no installer; has: already has Pikkumies; done: tried before
         $ram = ['big' => 4096, 'small' => 256, 'noinst' => 4096, 'has' => 4096, 'done' => 4096];
         foreach (array_keys($ram) as $user) {
@@ -222,14 +219,14 @@ final class PikkumiesPreinstallHookTest extends TestCase
             'ramMiB' => static function (string $user) use ($ram): int { return $ram[$user]; },
             'run' => $this->pmssMakeArrayLogger($runs),
             'homeBase' => $root.'/home',
-        ] + self::pmssMakeCallbacks(['users' => array_merge(array_keys($ram), ['../etc'])]);
+        ] + self::pmssMakeCallbacks(['users' => array_merge(array_keys($ram), ['../etc']), 'freeSpace' => 102 * 1073741824]);
         $this->pmssWithPathPrefix($root.'/stub', function () use ($root, $ops, &$marked): void {
-            \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
+            \pmssPikkumiesPreinstallExistingRun($root.'/state', $ops);
             $marked = array_map('basename', glob($root.'/state/*'));
             // the install did not run (stubbed), so the next update starts it again
-            \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
+            \pmssPikkumiesPreinstallExistingRun($root.'/state', $ops);
             touch($root.'/state/big'); // what the chain does when the install exits 0
-            \pmssPikkumiesPreinstallExistingRun($root.'/marker', $root.'/state', $ops);
+            \pmssPikkumiesPreinstallExistingRun($root.'/state', $ops);
         });
 
         sort($marked);
@@ -241,7 +238,52 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->assertSame(1, substr_count($runs[0], 'install-pikkumies.sh'), 'only one account is eligible: '.$runs[0]);
         $this->assertTrue(strpos($runs[0], ") && touch -- '\\''".$root."/state/big'\\''") !== false, 'the state file must follow a successful install only: '.$runs[0]);
     }
-public function testMarkerPathIsMadeInARootOnlyDirectoryAndRefusesLinksAndRepeats(): void
+    public function testSpaceFloorSkipsWholeRunAndMeasuresHomeOnce(): void
+    {
+        require_once dirname(__DIR__, 2).'/update/apps/pikkumiesPreinstall.php';
+        $root = $this->pmssMakeTempDir('pmss-pk-space-');
+        foreach (['fixt01', 'fixt02'] as $user) {
+            $this->pmssWriteFile($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/bin/sh\n");
+        }
+        $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
+        $floor = 104 * 1073741824;
+        $oldLog = ini_get('error_log');
+        ini_set('error_log', $root.'/hook.log');
+        try {
+            // Two eligible accounts need 104 GiB; invalid readings also leave the run for later.
+            foreach ([0, $floor - 1, false, null, -1, INF, NAN, $floor, $floor + 1] as $free) {
+                $runs = $reads = [];
+                $this->pmssWriteFile($root.'/hook.log', '');
+                $ops = [
+                    'homeBase' => $root.'/home',
+                    'run' => $this->pmssMakeArrayLogger($runs),
+                    'freeSpace' => static function (string $path) use ($free, &$reads) {
+                        $reads[] = $path;
+                        return $free;
+                    },
+                ] + self::pmssMakeCallbacks(['users' => ['fixt01', 'fixt02'], 'ramMiB' => 4096]);
+                $this->pmssWithPathPrefix($root.'/stub', function () use ($root, $ops): void {
+                    \pmssPikkumiesPreinstallExistingRun($root.'/state', $ops);
+                });
+                $this->assertSame([$root.'/home'], $reads, 'one reading on the home filesystem per run');
+                $allowed = is_numeric($free) && is_finite((float) $free) && $free >= $floor;
+                $this->assertSame($allowed ? 1 : 0, count($runs));
+                $log = file_get_contents($root.'/hook.log');
+                if (!$allowed) {
+                    $this->assertSame(1, substr_count($log, '[SKIP] pikkumies preinstall:'));
+                    $this->assertStringContainsAllStrings(['/home free space ', 'floor 104.00 GiB', 'no installs started'], $log);
+                    $this->assertStringContainsString($free === $floor - 1 ? '104.00 GiB' : ($free === 0 ? '0.00 GiB' : 'unavailable'), $log);
+                } else {
+                    $this->assertSame(2, substr_count($runs[0], 'install-pikkumies.sh'));
+                }
+                $this->assertSame([], glob($root.'/state/*'), 'no completion files before installs succeed');
+            }
+        } finally {
+            ini_set('error_log', $oldLog);
+        }
+    }
+
+    public function testMarkerPathIsMadeInARootOnlyDirectoryAndRefusesLinksAndRepeats(): void
     {
         require_once dirname(__DIR__, 2).'/user/pikkumiesPreinstallState.php';
         $root = $this->pmssMakeTempDir('pmss-pk-path-');

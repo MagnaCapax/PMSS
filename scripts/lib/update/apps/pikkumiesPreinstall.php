@@ -1,20 +1,17 @@
 <?php
 /**
  * Preinstall Pikkumies in existing homes (ADR 0090). New accounts get it at creation; this reaches the
- * accounts made before that. A new clone needs the host marker, so the rollout goes host by host; an install
- * that stopped after its clone is finished on every host. An account is marked once its install succeeds: the
- * state file stops a retry after the user removed Pikkumies.
+ * accounts made before that on every update. An install that stopped after its clone is finished too.
+ * An account is marked once its install succeeds: the state file stops a retry after the user removed Pikkumies.
  * The installs run one after another in the background, each as its user in the user's slice, and
  * build no agent runtime (that follows at each account's own daily update time).
  */
 
-/** Never let the optional preinstall abort update-step2's uncaught include. */
+/** Never let the preinstall abort update-step2's uncaught include. */
 function pmssPikkumiesPreinstallExistingRun(
-    string $marker = '/etc/seedbox/config/pikkumiesPreinstall.enabled',
     string $stateDir = '/var/lib/pmss/pikkumies-preinstall',
     array $ops = []
 ): void {
-    $hostMarked = is_file($marker);
     try {
         require_once dirname(__DIR__, 2).'/user/selection.php';
         require_once dirname(__DIR__, 2).'/user/add/postProvision.php';
@@ -25,6 +22,7 @@ function pmssPikkumiesPreinstallExistingRun(
             return (int) ($payload['ramMiB'] ?? 0);
         };
         $run = $ops['run'] ?? static function (string $command): void { exec($command); };
+        $freeSpace = $ops['freeSpace'] ?? static function (string $path) { return @disk_free_space($path); };
         $homeBase = $ops['homeBase'] ?? '/home';
         // Reject redirected ancestors before mkdir or any marker work, not just a linked leaf.
         if (is_link($stateDir) || !pmssPathTargetIsSafe($stateDir, true)
@@ -56,8 +54,8 @@ function pmssPikkumiesPreinstallExistingRun(
                 if (is_link($statePath) || (file_exists($statePath) && (!is_file($statePath) || filesize($statePath) > 0))) continue;
                 $after = ' && printf finished > '.escapeshellarg($statePath);
             } else {
-                // Without a clone: rollout hosts only, once.
-                if (!$hostMarked || $marker === null) continue;
+                // Without a clone: once per account, through the normal update pace.
+                if ($marker === null) continue;
                 $after = ' && touch -- '.escapeshellarg($marker);
             }
             // Below the RAM floor or no installer yet: not marked, so a later update can try again.
@@ -67,6 +65,14 @@ function pmssPikkumiesPreinstallExistingRun(
             $launches[] = '( '.$launch.' )'.$after;
         }
         if ($launches === []) return;
+        // Measure once, after eligibility checks, before starting any account's install.
+        $floor = (100 + 2 * count($launches)) * 1073741824;
+        $free = pmssFiniteNonNegativeFloat($freeSpace($homeBase));
+        if ($free === null || $free < $floor) {
+            error_log(sprintf('[SKIP] pikkumies preinstall: /home free space %s; floor %.2f GiB; no installs started',
+                $free === null ? 'unavailable' : sprintf('%.2f GiB', $free / 1073741824), $floor / 1073741824));
+            return;
+        }
         $run('nohup sh -c '.escapeshellarg(implode('; ', $launches)).' >/dev/null 2>&1 &');
         error_log('[INFO] pikkumies preinstall: started for '.count($launches).' account(s)');
     } catch (Throwable $error) {

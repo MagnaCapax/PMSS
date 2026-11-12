@@ -21,6 +21,5 @@ if (!networkIptablesOwnerMatchAvailable()) exit(0);
 
 // Multiple networks may be defined, one per line, to mark "local" traffic.
 $localnets = networkLoadLocalnets();
-$loopbackOwnerGuardEnabled = is_file(PMSS_NETWORK_LOOPBACK_OWNER_GUARD_MARKER);
-$webUiPorts = $loopbackOwnerGuardEnabled ? networkQbittorrentWebUiPortsRead($userUids) : [];
-echo networkMonitoringRulesRender($userUids, $localnets, $webUiPorts, $loopbackOwnerGuardEnabled);
+$webUiPorts = networkQbittorrentWebUiPortsRead($userUids);
+echo networkMonitoringRulesRender($userUids, $localnets, $webUiPorts);

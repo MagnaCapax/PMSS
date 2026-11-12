@@ -120,19 +120,17 @@ The "75 MB download and 257 MB on disk" in Consequences was the standalone
 Python of Pikkumies ADR-0014, which ADR-0033 superseded; the runtime now takes
 about 2 GB, as measured above.
 
-## Amendment 2026-10-17: existing accounts, host by host
+## Amendment 2026-10-17: existing accounts through updates
 
 The operator's "infact pikkumies should be preinstalled ..... in most cases
 that is, if enough ram" answered a report that said installing on every
 account had not been asked for, so it covers accounts that already exist, not
 only new ones. `scripts/lib/update/apps/pikkumiesPreinstall.php` runs in
-update-step2 and does nothing unless `/etc/seedbox/config/pikkumiesPreinstall.enabled`
-exists on the host. Updates reach every server on the same night, while a
-change of this size goes out a few servers at a time with a check in between,
-so the marker is how the rollout is staged: it is placed on a batch of hosts,
-the result is checked, then the next batch.
+update-step2 on every update. Updates are rolling and paced; that normal update
+pace controls the rollout. The host-marker staging originally described here
+is superseded by the 2026-11-12 amendment and ADR 0272.
 
-On a host with the marker, each managed account gets the same command as a new
+Each managed account gets the same command as a new
 account (`pmssPikkumiesPreinstallLaunch`: RAM floor, skeleton installer
 present, as the user in the user's slice, `PIKKUMIES_SKIP_HERMES=1`), unless it
 already has `~/.mcxPikkumies`. The installs run one after another in a single
@@ -144,7 +142,7 @@ the floor, without the installer, or whose install failed (a download error,
 say) gets no state file and is tried again at a later update.
 
 Recreating an account clears its root-owned preinstall marker after the new
-skeleton is in place, allowing the next staged update to install Pikkumies in
+skeleton is in place, allowing the next update to install Pikkumies in
 the rebuilt home. Termination clears the marker after account removal so a
 later account with the same name starts without inherited preinstall state.
 Both paths leave the marker alone on a failed rebuild or dry-run termination.
@@ -176,8 +174,8 @@ keeps it deleted. The file the wrapper above creates (our endpoint, empty
 
 A new account's preinstall (`pmssAddUserPikkumiesPreinstallCommand`) wrote no
 state file, so the rule above ("a user who removed Pikkumies does not get it
-back") did not cover accounts created with Pikkumies preinstalled: on a host
-outside the rollout batches, or before the next update marked them, a removed
+back") did not cover accounts created with Pikkumies preinstalled: before
+the next update marked them, a removed
 Pikkumies looked like an account that never had it. The new-account command now
 ends with the same chain as the update hook, `( install ) && touch -- <state
 file>`, so the state file is written only when the install exits 0 and a failed
@@ -191,7 +189,7 @@ never the target of the root-owned touch.
 Accounts created between the new-account preinstall (2026-10-17) and this
 change, which have since removed `~/.mcxPikkumies`, cannot be told apart from
 accounts that never had it; they stay unmarked. An account that still has
-`~/.mcxPikkumies` is marked by the update hook on a rollout host, as before.
+`~/.mcxPikkumies` is marked by the update hook, as before.
 
 ## Amendment 2026-10-20: the preinstall RAM floor is 400 MiB
 
@@ -233,6 +231,27 @@ finished before its key arrived), so root reads nothing the account controls
 (ADR 0121). When that command exits 0 it writes "finished" into the state file,
 and a clone whose state file says so is not run again, so a user who turned
 auto-update off is not updated every night; the empty state file an earlier hook
-or a new account wrote does not count. An account without a clone still needs the host marker, so
-the rollout stays host by host, and a user who removed Pikkumies (no clone)
-does not get it back.
+or a new account wrote does not count. An account without a clone is installed
+through the normal update run, subject to the checks above and the space floor
+below. A user who removed Pikkumies keeps the per-account state file and does
+not get it back.
+
+## Amendment 2026-11-12: existing-home preinstall follows the update pace
+
+The hook runs on every update without
+`/etc/seedbox/config/pikkumiesPreinstall.enabled`. ADR 0272 supersedes the
+host-marker staging part of the existing-accounts amendment. The separate
+`pikkumiesEternals.enabled` setting is unchanged.
+
+Before launching any installs, the hook checks free space once on the filesystem
+holding `/home`. The floor is **2 GiB per account eligible for an install in this
+run, plus 100 GiB**. Exactly the floor is sufficient. Less free space, or an
+unavailable reading, skips every install in this run and emits one line naming
+the free space and the floor. A later update can try again. The reader is
+injectable through the hook's operation map for testing-machine fixtures.
+
+The existing RAM floor, installer-presence checks, completed-clone handling,
+partial-install recovery and per-account state-file handling stay in place.
+Completed installs are left alone; a state file still prevents reinstalling
+an account whose owner removed Pikkumies. Installs remain sequential in one
+background chain, as the account owner in its slice.
