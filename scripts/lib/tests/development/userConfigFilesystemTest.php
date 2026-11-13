@@ -123,8 +123,9 @@ class UserConfigFilesystemTest extends TestCase
 
     public function testUserConfigUsesSharedRuntimeFilesystemHelpers(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "pmssReadOptionalSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources', 'rTorrent resource configuration')");
-        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "pmssReadRequiredRegularFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template')");
-        $this->pmssAssertRepoFileNotContainsString('scripts/util/userConfig.php', "unserialize((string) file_get_contents(\$resourceFile))");
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userConfig.php', [
+            "pmssReadOptionalSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources', 'rTorrent resource configuration')",
+            "pmssReadRequiredRegularFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template')",
+        ], ["unserialize((string) file_get_contents(\$resourceFile))"]);
     }
 }

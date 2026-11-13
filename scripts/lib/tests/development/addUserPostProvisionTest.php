@@ -34,7 +34,7 @@ final class AddUserPostProvisionTest extends TestCase
     public function testOpenClawSkeletonInstallerIsLoadedOnlyWhenTheProfileIsUsed(): void
     {
         // A node without the skeleton installer must still create ordinary accounts.
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/user/add/openclaw.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/user/add/openclaw.php');
         // The only require sits inside the loader, after the missing-file guard.
         $this->assertOrderedStrings(['function pmssAddUserOpenClawInstallerLoad',
             'if (!is_file($installer) || is_link($installer)) return false;', 'require_once $installer;'], $source);
@@ -45,21 +45,17 @@ final class AddUserPostProvisionTest extends TestCase
 
     public function testTrafficSeedingDelegatesToSharedStorageHelper(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/lib/user/add/postProvision.php',
-            [
-                "pmssTrafficSeedInitialState(\$user['name'], dirname(\$homePath), null, 'logProvisionMessage')",
-                "logProvisionMessage('Seeded traffic files with zero values')",
-            ]
-        );
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/user/add/postProvision.php', ['pmssTrafficWriteFile(', 'pmssEnsureSafeDir($runtimeStatsDir, 0755)']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/add/postProvision.php', [
+            "pmssTrafficSeedInitialState(\$user['name'], dirname(\$homePath), null, 'logProvisionMessage')",
+            "logProvisionMessage('Seeded traffic files with zero values')",
+        ], ['pmssTrafficWriteFile(', 'pmssEnsureSafeDir($runtimeStatsDir, 0755)']);
     }
 
     public function testQuotaMetadataStepsSelectRegularFileEntry(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/postProvision.php',
-            "runProvisionStep('Seed quota file', 'php /scripts/cron/updateQuotas.php')");
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/user/add/postProvision.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/add/postProvision.php', [
+            "runProvisionStep('Seed quota file', 'php /scripts/cron/updateQuotas.php')",
+        ], [
             'find %s -maxdepth 0 -type f -links 1 -exec chmod 640 {} +',
             'find %s -maxdepth 0 -type f -links 1 -exec chown -h %s {} +',
         ]);

@@ -69,7 +69,7 @@ class CgroupBonusCpuWeightApplyTest extends TestCase
         ],
             // Priority only: no process signals, no unit restarts, no userConfig re-run, no direct writes.
             ['kill ', 'posix_kill', "'restart'", "'try-restart'", 'userConfig.php', 'file_put_contents']);
-        $cron = (string) file_get_contents(__DIR__.'/../../../../etc/seedbox/config/root.cron');
-        $this->assertStringContainsString('/scripts/cron/cgroupBonusCpuWeightApply.php >> /var/log/pmss/cgroupBonusCpuWeightApply.log 2>&1', $cron);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron',
+            '/scripts/cron/cgroupBonusCpuWeightApply.php >> /var/log/pmss/cgroupBonusCpuWeightApply.log 2>&1');
     }
 }

@@ -46,13 +46,12 @@ class ArrInstallerNoExecPolicyTest extends TestCase
      */
     public function testInstallerSourceContainsNoBinaryTrustOrProbePrimitives(): void
     {
-        $source = (string) @file_get_contents(dirname(__DIR__, 2).'/update/apps/arr.php');
-        foreach (glob(dirname(__DIR__, 2).'/update/apps/arr/*.php') ?: [] as $module) {
-            $source .= (string) file_get_contents($module);
+        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/arr.php');
+        foreach (glob($this->pmssRepoPath('scripts/lib/update/apps/arr/*.php')) ?: [] as $module) {
+            $source .= $this->pmssReadRepoFile('scripts/lib/update/apps/arr/'.basename($module));
         }
 
-        $this->assertStringContainsString('pmssArrInstalledVersionRead', $source, 'sanity: installer source loaded');
-        $this->assertStringContainsAndOmitsStrings([], [
+        $this->assertStringContainsAndOmitsStrings(['pmssArrInstalledVersionRead' => 'sanity: installer source loaded'], [
             'is_executable' => 'arr.php must not reach for is_executable -- installed binaries are never run',
             'pmssAppVersionProbe' => 'arr.php must not reach for pmssAppVersionProbe -- installed binaries are never run',
             'proc_open' => 'arr.php must not reach for proc_open -- installed binaries are never run',
@@ -106,7 +105,7 @@ class ArrInstallerNoExecPolicyTest extends TestCase
         foreach (['lidarr.php', 'prowlarr.php', 'radarr.php', 'readarr.php', 'sonarr.php'] as $wrapper) {
             $this->assertFalse(is_file($appRoot.'/'.$wrapper), $wrapper.' should not remain as a parallel app wrapper');
         }
-        $this->assertStringContainsString('pmssArrUpdateSupportedApps();', (string) @file_get_contents($appRoot.'/servarr.php'));
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/servarr.php', 'pmssArrUpdateSupportedApps();');
     }
 
     public function testReleaseAssetSelectionPrefersTargetArchitectureOverGenericBuild(): void
