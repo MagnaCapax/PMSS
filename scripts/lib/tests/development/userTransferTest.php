@@ -46,12 +46,12 @@ class UserTransferTest extends TestCase
     public function testParseCliHandlesSupportedForms(): void
     {
         foreach ([
-            [['userTransfer.php', 'deefbox', 'lt5-1-56-138anger-core'], ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'lt5-1-56-138anger-core.pulsedmedia.com', 'suffixAppended' => true]],
-            [['userTransfer.php', 'deefbox', 'remote01', 'example.com'], ['localUser' => 'deefbox', 'remoteUser' => 'remote01', 'hostname' => 'example.com', 'suffixAppended' => false, 'mainPasses' => 31, 'finalPasses' => 3, 'sleepMin' => 60, 'sleepMax' => 360, 'verifyThreshold' => 90, 'dryRun' => false, 'printPassword' => false]],
-            [['userTransfer.php', 'DeefBox', 'example.com'], ['localUser' => 'deefbox', 'remoteUser' => 'deefbox']],
-            [['userTransfer.php', '--', 'deefbox', 'example.com'], ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com']],
-            [['userTransfer.php', '--no-sleep', 'deefbox', 'example.com'], ['sleepMin' => 0, 'sleepMax' => 0]],
-            [['userTransfer.php', '--verify-threshold=95', 'deefbox', 'example.com'], ['verifyThreshold' => 95]],
+            [['userTransfer.php', 'demouser', 'demohost'], ['localUser' => 'demouser', 'remoteUser' => 'demouser', 'hostname' => 'demohost.pulsedmedia.com', 'suffixAppended' => true]],
+            [['userTransfer.php', 'demouser', 'remote01', 'example.com'], ['localUser' => 'demouser', 'remoteUser' => 'remote01', 'hostname' => 'example.com', 'suffixAppended' => false, 'mainPasses' => 31, 'finalPasses' => 3, 'sleepMin' => 60, 'sleepMax' => 360, 'verifyThreshold' => 90, 'dryRun' => false, 'printPassword' => false]],
+            [['userTransfer.php', 'DemoUser', 'example.com'], ['localUser' => 'demouser', 'remoteUser' => 'demouser']],
+            [['userTransfer.php', '--', 'demouser', 'example.com'], ['localUser' => 'demouser', 'remoteUser' => 'demouser', 'hostname' => 'example.com']],
+            [['userTransfer.php', '--no-sleep', 'demouser', 'example.com'], ['sleepMin' => 0, 'sleepMax' => 0]],
+            [['userTransfer.php', '--verify-threshold=95', 'demouser', 'example.com'], ['verifyThreshold' => 95]],
         ] as [$argv, $expected]) {
             $cfg = \pmssUserTransferParseCli($argv);
             foreach ($expected as $key => $value) {
@@ -65,12 +65,12 @@ class UserTransferTest extends TestCase
         foreach ([
             [['userTransfer.php', 'deef_box', 'example.com'], 'Invalid username'],
             [['userTransfer.php', 'toolongname', 'example.com'], 'Invalid username'],
-            [['userTransfer.php', 'deefbox', 'bad host'], 'Invalid hostname'],
-            [['userTransfer.php', 'deefbox', 'example.com', '--main-passes'], 'requires a value'],
-            [['userTransfer.php', '--sleep-min=abc', 'deefbox', 'example.com'], 'expected integer'],
-            [['userTransfer.php', '--verify-threshold=101', 'deefbox', 'example.com'], 'verify-threshold'],
-            [['userTransfer.php', '--sleep-min=10', '--sleep-max=5', 'deefbox', 'example.com'], 'sleep-max must be'],
-            [['userTransfer.php', '--main-passes=501', 'deefbox', 'example.com'], 'main-passes'],
+            [['userTransfer.php', 'demouser', 'bad host'], 'Invalid hostname'],
+            [['userTransfer.php', 'demouser', 'example.com', '--main-passes'], 'requires a value'],
+            [['userTransfer.php', '--sleep-min=abc', 'demouser', 'example.com'], 'expected integer'],
+            [['userTransfer.php', '--verify-threshold=101', 'demouser', 'example.com'], 'verify-threshold'],
+            [['userTransfer.php', '--sleep-min=10', '--sleep-max=5', 'demouser', 'example.com'], 'sleep-max must be'],
+            [['userTransfer.php', '--main-passes=501', 'demouser', 'example.com'], 'main-passes'],
         ] as [$argv, $messageFragment]) {
             $this->assertThrowsRuntime(static function () use ($argv): void {
                 \pmssUserTransferParseCli($argv);
@@ -121,7 +121,7 @@ class UserTransferTest extends TestCase
             '2',
             '--dry-run',
             '--print-password',
-            'deefbox',
+            'demouser',
             'example.com',
         ]);
 
@@ -129,7 +129,7 @@ class UserTransferTest extends TestCase
         $this->assertEquals(2, $cfg['finalPasses']);
         $this->assertTrue($cfg['dryRun']);
         $this->assertTrue($cfg['printPassword']);
-        $this->assertSame('33448dbf45fb18a2927929b8432652ed3eaaef39908fd9e27f8535de57377990', hash('sha256', json_encode($cfg)));
+        $this->assertSame('003df31ba1808993e7640cb1e2722e68ea97b7ce77c2a700e0f174bf75570484', hash('sha256', json_encode($cfg)));
     }
 
     public function testGeneratedProbeScriptsContainExpectedFragments(): void
@@ -137,9 +137,9 @@ class UserTransferTest extends TestCase
         $cfg = $this->baseConfig();
 
         foreach ([
-            [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -aHAX --numeric-ids', ':/home/deefbox/', '/home/deefbox/', '.rtorrent.rc', '.qbittorrentPort', '.config/pmss-user.json', '.trafficDataIngress', '.trafficDataIngressLocal', '.resourceData', '*.pmss-tmp-*', '/.billingId', '/.billingServiceId', '/.billingClientId'], ['rsync -av' => 'expected no verbose per-file rsync logging', '--exclude={' => 'expected no brace-expanded excludes']],
-            [\pmssUserTransferBuildRsyncFinal($cfg), ["rsync -aHAX --numeric-ids", "'-R'", ':/home/deefbox/./session', ':/home/deefbox/./www/public'], ['rsync -av' => 'expected no verbose per-file rsync logging', '{session' => 'expected no brace-expanded sources']],
-            [\pmssUserTransferBuildAuthProbe($cfg), ['ssh -F /dev/null -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], []],
+            [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -aHAX --numeric-ids', ':/home/demouser/', '/home/demouser/', '.rtorrent.rc', '.qbittorrentPort', '.config/pmss-user.json', '.trafficDataIngress', '.trafficDataIngressLocal', '.resourceData', '*.pmss-tmp-*', '/.billingId', '/.billingServiceId', '/.billingClientId'], ['rsync -av' => 'expected no verbose per-file rsync logging', '--exclude={' => 'expected no brace-expanded excludes']],
+            [\pmssUserTransferBuildRsyncFinal($cfg), ["rsync -aHAX --numeric-ids", "'-R'", ':/home/demouser/./session', ':/home/demouser/./www/public'], ['rsync -av' => 'expected no verbose per-file rsync logging', '{session' => 'expected no brace-expanded sources']],
+            [\pmssUserTransferBuildAuthProbe($cfg), ['ssh -F /dev/null -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'demouser'", "'example.com'", "'/bin/true'"], []],
             [\pmssUserTransferBuildRemoteSizeProbe($this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90])), ['-o NumberOfPasswordPrompts=1', "'example.com'", '/home/remote01/', 'du -sbx -- "$home"', 'find "$home" -xdev -type f -printf .', 'printf "bytes=%s files=%s\\n"'], ['%p' => 'expected no path-printing stat probe output']],
         ] as [$script, $required, $forbidden]) {
             $this->assertStringContainsAndOmitsStrings($required, $forbidden, $script);
@@ -151,7 +151,7 @@ class UserTransferTest extends TestCase
         foreach ([false, true] as $namespaceRsync) {
             $script = \pmssUserTransferBuildRsyncFinal($this->baseConfig(['namespaceRsync' => $namespaceRsync]));
             $this->assertStringContainsString('/session/rtorrent.lock', $script);
-            $this->assertStringContainsString(':/home/deefbox/./session', $script);
+            $this->assertStringContainsString(':/home/demouser/./session', $script);
         }
     }
 
@@ -163,7 +163,7 @@ class UserTransferTest extends TestCase
             foreach (\pmssUserTransferScratchPayloads($cfg) as $key => $script) {
                 $this->assertStringNotContainsString('/etc/seedbox/config/users', $script, $key);
             }
-            $this->assertStringContainsString("-l 'deefbox'", \pmssUserTransferBuildAuthProbe($cfg));
+            $this->assertStringContainsString("-l 'demouser'", \pmssUserTransferBuildAuthProbe($cfg));
         }
     }
 
@@ -180,12 +180,12 @@ class UserTransferTest extends TestCase
 
     public function testBwlimitCapsEveryRsyncPassOnlyWhenRequested(): void
     {
-        $this->assertSame(15360, \pmssUserTransferParseCli(['userTransfer.php', '--bwlimit=15360', 'deefbox', 'example.com'])['bwlimit']);
-        $this->assertSame(2048, \pmssUserTransferParseCli(['userTransfer.php', '--bwlimit', '2048', 'deefbox', 'example.com'])['bwlimit']);
-        $this->assertFalse(array_key_exists('bwlimit', \pmssUserTransferParseCli(['userTransfer.php', 'deefbox', 'example.com'])));
+        $this->assertSame(15360, \pmssUserTransferParseCli(['userTransfer.php', '--bwlimit=15360', 'demouser', 'example.com'])['bwlimit']);
+        $this->assertSame(2048, \pmssUserTransferParseCli(['userTransfer.php', '--bwlimit', '2048', 'demouser', 'example.com'])['bwlimit']);
+        $this->assertFalse(array_key_exists('bwlimit', \pmssUserTransferParseCli(['userTransfer.php', 'demouser', 'example.com'])));
         foreach (['--bwlimit=0', '--bwlimit=10000001', '--bwlimit=1.5m', '--bwlimit=-5', '--bwlimit=15m'] as $option) {
             $this->assertThrowsRuntime(static function () use ($option): void {
-                \pmssUserTransferParseCli(['userTransfer.php', $option, 'deefbox', 'example.com']);
+                \pmssUserTransferParseCli(['userTransfer.php', $option, 'demouser', 'example.com']);
             }, 'bwlimit');
         }
         foreach ([false, true] as $namespaceRsync) {
@@ -427,9 +427,9 @@ class UserTransferTest extends TestCase
     public function testParseDuBytesHandlesReadableAndUnreadableOutput(): void
     {
         foreach ([
-            "12345\t/home/deefbox/\n" => 12345,
+            "12345\t/home/demouser/\n" => 12345,
             "bytes=12345 files=67\n" => 12345,
-            "du: cannot access '/home/deefbox': Permission denied\n" => null,
+            "du: cannot access '/home/demouser': Permission denied\n" => null,
         ] as $output => $expected) {
             $this->assertSame($expected, \pmssUserTransferParseDuBytes($output), $output);
         }
@@ -440,7 +440,7 @@ class UserTransferTest extends TestCase
         foreach ([
             "bytes=12345 files=67\n" => ['bytes' => 12345, 'files' => 67],
             "bytes=0 files=0\n" => ['bytes' => 0, 'files' => 0],
-            "12345\t/home/deefbox/\n" => null,
+            "12345\t/home/demouser/\n" => null,
             "bytes=12345\n" => null,
             "bytes=abc files=67\n" => null,
         ] as $output => $expected) {
@@ -492,7 +492,7 @@ class UserTransferTest extends TestCase
         $expectedAuth = <<<'SNAP'
 #!/bin/bash
 set -e
-ssh -F /dev/null -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1 -l 'deefbox' 'example.com' '/bin/true'
+ssh -F /dev/null -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1 -l 'demouser' 'example.com' '/bin/true'
 SNAP;
 
         $this->assertStringContainsAllStrings(['--numeric-ids', '--usermap=', '--groupmap=', 'unshare -U', 'env -u PMSS_USER_TRANSFER_PASSWORD', '/.billingId'], \pmssUserTransferBuildRsyncMain($cfg));
@@ -513,7 +513,7 @@ SNAP;
         $final = \pmssUserTransferBuildRsyncFinal($cfg);
         $sourceHold = \pmssUserTransferBuildEternalSourceCommand($cfg, 1800000000);
         $sourceRelease = \pmssUserTransferBuildEternalSourceCommand($cfg, null);
-        $targetHold = \pmssUserTransferTargetEternalCommand('deefbox', 1800000000);
+        $targetHold = \pmssUserTransferTargetEternalCommand('demouser', 1800000000);
 
         $this->assertStringContainsString('/.mcxPikkumies/pikkumies/local', $main);
         $this->assertStringContainsString('/.hermes', $main);
@@ -612,10 +612,10 @@ SNAP;
         $this->assertStringContainsAllStrings([
             "ssh -F /dev/null -o Compression=no",
             "-o NumberOfPasswordPrompts=1",
-            "-l 'deefbox'",
+            "-l 'demouser'",
             "'example.com'",
-            '/home/deefbox/.config/qBittorrent/qBittorrent.conf',
-            '/home/deefbox/.config/qBittorrent/categories.json',
+            '/home/demouser/.config/qBittorrent/qBittorrent.conf',
+            '/home/demouser/.config/qBittorrent/categories.json',
             "> '/root/scratch/qBittorrent.conf'",
             "> '/root/scratch/categories.json'",
         ], $script);
@@ -677,7 +677,7 @@ SNAP;
     public function testSharedRsyncCommandBuilderMatchesSnapshot(): void
     {
         $cfg = $this->baseConfig();
-        $script = \pmssUserTransferBuildRsyncCommand($cfg, ['/home/deefbox/', '/home/deefbox/.local'], ['www', 'session']);
+        $script = \pmssUserTransferBuildRsyncCommand($cfg, ['/home/demouser/', '/home/demouser/.local'], ['www', 'session']);
         $this->assertStringContainsAllStrings(['rsync -aHAX --numeric-ids', 'www', 'session', 'unshare -U', 'wait "$child"'], $script);
     }
 
@@ -699,15 +699,15 @@ SNAP;
             $this->assertStringNotContainsString('--groupmap=', $script);
             $this->assertStringNotContainsString('unshare -U bash', $script);
         }
-        $this->assertStringContainsAllStrings(['.config/qBittorrent/qBittorrent.conf', '.resourceData', '*.pmss-tmp-*', ':/home/deefbox/'], $main);
-        $this->assertStringContainsAllStrings(["'-R'", ':/home/deefbox/./session', ':/home/deefbox/./www/public'], $final);
+        $this->assertStringContainsAllStrings(['.config/qBittorrent/qBittorrent.conf', '.resourceData', '*.pmss-tmp-*', ':/home/demouser/'], $main);
+        $this->assertStringContainsAllStrings(["'-R'", ':/home/demouser/./session', ':/home/demouser/./www/public'], $final);
     }
 
     public function testNamespaceProbeFailureKeepsExistingRsyncMapping(): void
     {
         $probe = \pmssUserTransferBuildNamespaceProbe($this->baseConfig());
         $this->assertStringContainsAllStrings([
-            'ssh -F /dev/null', "-l 'deefbox'", "'example.com'",
+            'ssh -F /dev/null', "-l 'demouser'", "'example.com'",
             "'unshare --map-auto --map-root-user true'", '>/dev/null 2>&1',
         ], $probe);
         foreach ([[1, 0], [0, 1], [127, 0], [0, 255], [1, 1]] as [$localRc, $remoteRc]) {
@@ -1329,8 +1329,8 @@ SNAP;
 
     private function baseConfig(array $overrides = []): array
     {
-        return array_replace(['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com',
-            'receiver' => ['uid' => 1200, 'gid' => 1200, 'home' => '/home/deefbox', 'uidMap' => "0 1200 1\n100000 200000 65536\n",
+        return array_replace(['localUser' => 'demouser', 'remoteUser' => 'demouser', 'hostname' => 'example.com',
+            'receiver' => ['uid' => 1200, 'gid' => 1200, 'home' => '/home/demouser', 'uidMap' => "0 1200 1\n100000 200000 65536\n",
                 'gidMap' => "0 1200 1\n100000 200000 65536\n", 'sourceUid' => 1300, 'sourceGid' => 1300]], $overrides);
     }
 
