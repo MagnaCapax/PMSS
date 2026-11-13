@@ -704,6 +704,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, array $runningStates=[]): array
   - Starts missing service specs after applying the exported lock-fd close prefix;
     the watchdog parent retains its lock while long-lived daemons cannot inherit it.
+  - Redirects service-start stdin, stdout and stderr to `/dev/null` before the
+    command runs, including compound commands. Daemons cannot retain the capture
+    pipes and delay parent exit or lock release (#905). Start notices, user logs,
+    command deadlines and timeout backoff remain active; launch output is discarded.
 - qBittorrent toggle and watchdog diagnostics
   - Operator and customer stopped-config locks attempt stream closure even if
     unlocking throws. Resolver launches own their acquired lock through setup,

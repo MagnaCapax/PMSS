@@ -400,7 +400,7 @@ function pmssCustomerNativeStop(array $binaries): void {
     $GLOBALS['running'] = false;
 }
 function pmssUserWatchdogCommandRun($command, $seconds, $user, $service): array {
-    if ($command === 'start-app') { $GLOBALS['starts']++; $GLOBALS['running'] = true; }
+    if ($command === 'exec </dev/null >/dev/null 2>&1; start-app') { $GLOBALS['starts']++; $GLOBALS['running'] = true; }
     return ['rc' => 0];
 }
 function pmssUserLog($user, $message): void {}

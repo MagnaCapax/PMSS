@@ -326,6 +326,58 @@ PHP;
         }
     }
 
+    /** A background daemon must outlive the watchdog without retaining its pipes or lock. */
+    public function testServiceDaemonStdioAllowsWatchdogExitAndLockRelease(): void
+    {
+        $root = $this->pmssMakeTempDir('watchdog-daemon-', 0700);
+        $daemon = '$root = '.var_export($root, true).';'.<<<'PHP'
+file_put_contents($root.'/ready', json_encode([
+    readlink('/proc/self/fd/0'), readlink('/proc/self/fd/1'), readlink('/proc/self/fd/2'),
+]));
+$deadline = microtime(true) + 20;
+while (!file_exists($root.'/stop') && microtime(true) < $deadline) usleep(10000);
+touch($root.'/done');
+PHP;
+        // Exercise a compound command: the redirect must cover both early output and the daemon.
+        $command = 'printf launch-output; printf launch-error >&2; '.$this->pmssBuildInlinePhpCommand($daemon).' &';
+        $script = 'namespace WatchdogDaemonFixture; function pmssUserLog($user, $message): void {}';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'WatchdogDaemonFixture');
+        $script .= '$root = '.var_export($root, true).'; $command = '.var_export($command, true).';';
+        $script .= <<<'PHP'
+$lock = pmssUserWatchdogLockAcquire($root.'/watchdog.lock');
+ob_start();
+$states = pmssUserWatchdogEnsureServices('fixtur01', [
+    pmssUserWatchdogServiceSpec('demo', $command, 'start requested'),
+], ['demo' => false]);
+$output = ob_get_clean();
+echo json_encode([is_resource($lock), $states, $output, pmssUserWatchdogBackoffActive('fixtur01', 'demo')]);
+// Deliberately retain the lock until this PHP process exits.
+PHP;
+        $handle = false;
+        try {
+            $result = $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_MODE' => '1', 'PMSS_RUNTIME_DIR' => $root,
+                'PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS' => '2',
+                'PMSS_TIMEOUT_FIRE_LOG' => $root.'/timeout.jsonl',
+                'PMSS_JSON_LOG' => $root.'/events.jsonl',
+            ]);
+            $this->assertSame([true, ['demo' => false], "Start demo for user: fixtur01\n", false], $result);
+            $deadline = microtime(true) + 2;
+            while (!is_file($root.'/ready') && microtime(true) < $deadline) usleep(10000);
+            $this->assertTrue(is_file($root.'/ready'));
+            $this->assertSame(['/dev/null', '/dev/null', '/dev/null'], json_decode(file_get_contents($root.'/ready'), true));
+            $this->assertFalse(is_file($root.'/done'));
+            $handle = pmssLockFileAcquire($root.'/watchdog.lock', true);
+            $this->assertTrue(is_resource($handle));
+        } finally {
+            pmssLockHandleRelease($handle);
+            // Stop only this fixture through its own marker, with a hard lifetime as a backstop.
+            touch($root.'/stop');
+            $deadline = microtime(true) + 2;
+            while (!is_file($root.'/done') && microtime(true) < $deadline) usleep(10000);
+        }
+    }
+
     public function testWatchdogLockFailurePreservesExportedDescriptorList(): void
     {
         $this->pmssWithEnv([PMSS_UPDATE_LOCK_FDS_ENV => '7,9'], function (): void {

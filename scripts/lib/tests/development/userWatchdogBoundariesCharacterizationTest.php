@@ -83,7 +83,7 @@ echo json_encode($results);
 PHP;
         $gate = ['gate', '/fixture-home/fixture', false];
         $start = ['backoff', ['build', 'fixture'], $gate, 'backoff', 'record',
-            ['start', 90, 'fixture', 'demo'], ['log', 'fixture', 'requested']];
+            ['exec </dev/null >/dev/null 2>&1; start', 90, 'fixture', 'demo'], ['log', 'fixture', 'requested']];
         $this->assertSame([
             [['demo' => false], "Start Demo for user: fixture\n", $start],
             [['demo' => true], '', ['backoff', ['build', 'fixture'], ['gate', '/fixture-home/fixture', true]]],

@@ -60,7 +60,8 @@ function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, a
             && !pmssUserWatchdogBackoffActive($username, $processName)
             && pmssUserWatchdogGatedStartRecord($username, $serviceSpec)) {
             echo 'Start '.(string) ($serviceSpec['serviceLabel'] ?? $processName).' for user: '.$username."\n";
-            pmssUserWatchdogCommandRun((string) $command, 90, $username, $processName);
+            // Daemons must not retain the capture pipes after their launch shell exits.
+            pmssUserWatchdogCommandRun('exec </dev/null >/dev/null 2>&1; '.(string) $command, 90, $username, $processName);
             pmssUserLog($username, (string) ($serviceSpec['userLogMessage'] ?? ($processName.' start requested')));
         }
         $runningStates[$processName] = $running;
