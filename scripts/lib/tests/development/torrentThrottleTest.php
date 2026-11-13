@@ -122,8 +122,7 @@ class TorrentThrottleTest extends TestCase
         $this->assertStringContainsString('setquota', implode("\n", $commands));
         $this->assertStringNotContainsString(' > ', implode("\n", $commands));
         $this->assertStringNotContainsString('chmod o+r', implode("\n", $commands));
-        $source = $this->pmssReadRepoFile('scripts/lib/user/traffic.php');
-        $this->assertStringContainsString('pmssQuotaSnapshotWrite($quotaPath', $source);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/traffic.php', 'pmssQuotaSnapshotWrite($quotaPath');
         foreach ($commands as $command) {
             $this->assertStringNotContainsString(';', $command, 'Quota refresh commands must not be shell-chained');
         }

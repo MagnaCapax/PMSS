@@ -37,12 +37,10 @@ class RutorrentConfigOwnershipTest extends TestCase
 
     public function testUpdateRutorrentConfigUsesManagedWriterForBothFiles(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/rutorrent/config.php');
-
-        $this->assertStringContainsString('pmssWriteUserFile($configPath, $rutorrentConfig, $username, 0750)', $source);
-        $this->assertStringContainsString('pmssWriteUserFile($accessPath, $accessIni, $username, 0750)', $source);
-        $this->assertFalse(strpos($source, 'file_put_contents($configPath') !== false);
-        $this->assertFalse(strpos($source, 'file_put_contents($accessPath') !== false);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/rutorrent/config.php', [
+            'pmssWriteUserFile($configPath, $rutorrentConfig, $username, 0750)',
+            'pmssWriteUserFile($accessPath, $accessIni, $username, 0750)',
+        ], ['file_put_contents($configPath', 'file_put_contents($accessPath']);
     }
 
     public function testUpdateRutorrentConfigLeavesLinkedConfigDestinationUntouched(): void

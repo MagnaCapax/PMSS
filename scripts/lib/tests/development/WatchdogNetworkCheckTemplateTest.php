@@ -7,67 +7,58 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
 {
     public function testWatchdogLoadThresholdsAreExplicit(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.conf');
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.watchdog.conf', [
             'max-load-1 = 300',
             'max-load-5 = 225',
             'max-load-15 = 150',
-        ], $template);
+        ]);
     }
 
     public function testNetworkCheckRequiresAllTargetsToFail(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.watchdog.network-check.sh', [
             'DEFAULT_GATEWAYS=$(ip -4 route show default',
             'EXTERNAL_TARGETS="1.1.1.1 8.8.8.8"',
             'TARGETS="$DEFAULT_GATEWAYS $EXTERNAL_TARGETS"',
             'for ip in $TARGETS; do',
             'if ping -c "$PING_COUNT" -W "$PING_TIMEOUT" "$ip" >/dev/null 2>&1; then',
             'exit 0',
-        ], $template);
+        ]);
     }
 
     public function testNetworkCheckPreservesFailureEvidence(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-
         // The check can end in a reboot and /run is tmpfs, so the evidence has to reach
         // syslog to survive the decision it makes. (Refs #916, Refs #669)
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.watchdog.network-check.sh', [
             'logger -t "$LOG_TAG"',
             'failure window opened',
             'SUSTAINED FAILURE',
             'recovered on ${ip}',
             'ping-binary-missing',
-        ], $template);
+        ]);
     }
 
     public function testNetworkCheckRateLimitsItsOwnLogging(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-
         // The daemon runs this every 10s against an 1800s window: without a rate limit
         // a single window would write 180 lines into syslog.
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.watchdog.network-check.sh', [
             'LOG_INTERVAL=60',
             'log_due() {',
             'if log_due "$now"; then',
-        ], $template);
+        ]);
     }
 
     public function testNetworkCheckGatesSustainedEvidenceUntilRecovery(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-
-        $this->assertStringContainsAllStrings([
+        $template = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/template.watchdog.network-check.sh', [
             'SUSTAINED_FILE="/run/pmss-watchdog-net-sustained"',
             'if [ ! -f "$SUSTAINED_FILE" ]; then',
             'echo "$now" >"$SUSTAINED_FILE" 2>/dev/null || true',
             'elif log_due "$now"; then',
             'rm -f "$FAIL_FILE" "$LOG_STATE" "$SUSTAINED_FILE" 2>/dev/null || true',
-        ], $template);
+        ]);
         $this->assertOrderedStrings(['if [ ! -f "$SUSTAINED_FILE" ]; then', 'log_line "SUSTAINED FAILURE',
             'elif log_due "$now"; then', 'exit 1'], $template, '',
             'The full sustained block must be gated while every sustained check still exits 1: ');
@@ -75,18 +66,15 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
 
     public function testNetworkCheckWritesRotatedEvidenceBeforeSyslog(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-
-        $this->assertStringContainsString('EVIDENCE_LOG="/var/log/pmss/check', $template);
+        $template = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/template.watchdog.network-check.sh',
+            ['EVIDENCE_LOG="/var/log/pmss/check']);
         $this->assertOrderedStrings(['>>"$EVIDENCE_LOG" 2>/dev/null || true', 'logger -t "$LOG_TAG"'], $template, '',
             'The rotated file must be the first evidence sink: ');
     }
 
     public function testNetworkCheckCapturesLocalDiscriminators(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.watchdog.network-check.sh', [
             '/proc/pressure/io',
             '/proc/pressure/cpu',
             '$1 == "some" {sub(/^avg10=/, "", $2)',
@@ -98,7 +86,7 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
             'read -r PROBE_END _ </proc/uptime',
             'probe=${probe_seconds}s',
             'command -v ping >/dev/null 2>&1 || return 0',
-        ], $template);
+        ]);
     }
 
     public function testNetworkCheckKeepsDateOffTheHealthyPath(): void
@@ -114,8 +102,7 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
 
     public function testNetworkCheckBudgetsEachEvidenceCollector(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.watchdog.network-check.sh', [
             'EVIDENCE_BUDGET=20',
             "host_snapshot() {\n\tif ! within_budget; then",
             "for ip in \$TARGETS; do\n\t\tif ! within_budget; then",
@@ -123,7 +110,7 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
             'budget-exhausted',
             "if within_budget; then\n\t\t\t\troute=",
             'rm -f "$SUSTAINED_FILE" 2>/dev/null || true',
-        ], $template);
+        ]);
     }
 
     public function testNetworkCheckFailureWindowAndRecoveryInShell(): void

@@ -11,9 +11,8 @@ class UserUpdatePluginsTest extends TestCase
 {
     public function testDeprecatedPluginRemovalUsesAccountCommand(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
-        $this->assertStringContainsString("pmssRutorrentAccountStep(\$user, \$home, 'Removing deprecated cpuload plugin'", $source);
-        $this->assertFalse(strpos($source, "sprintf('rm -rf %s'") !== false);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/rutorrent.php',
+            ["pmssRutorrentAccountStep(\$user, \$home, 'Removing deprecated cpuload plugin'"], ["sprintf('rm -rf %s'"]);
     }
 
     public function testEnsurePluginsReportsMissingSource(): void
