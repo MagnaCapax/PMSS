@@ -13,7 +13,7 @@ class StorageBenchmarkFileSafetyTest extends TestCase
         $path = $dir.'/reserved.dat';
         $identity = \storageBenchmarkFileReserve($path);
         $this->assertTrue(is_array($identity));
-        file_put_contents($path, 'preserved');
+        $this->pmssWriteFile($path, 'preserved');
         $missing = $dir.'/missing.dat';
 
         // Edge NULs must not select the existing entry or create the missing one.

@@ -42,7 +42,7 @@ class SystemStatsPsiInputSafetyTest extends TestCase
             "\0\nsome avg10=0\nfull avg300=9\n",
         ] as $raw) {
             // Only the fixture file is read; no kernel probe or command runs here.
-            file_put_contents($path, $raw);
+            $this->pmssWriteFile($path, $raw);
             $this->assertSame('na', \pmssSystemStatsPsiRead($path));
             $this->assertSame(null, \pmssDiskIostatReadPsiFullAvg300($path));
         }
@@ -61,7 +61,7 @@ class SystemStatsPsiInputSafetyTest extends TestCase
             ['', 'na', null],
         ] as [$raw, $formatted, $numeric]) {
             // The formatter and scalar reader deliberately have distinct missing-field policies.
-            file_put_contents($path, $raw);
+            $this->pmssWriteFile($path, $raw);
             $this->assertSame($formatted, \pmssSystemStatsPsiRead($path));
             $this->assertSame($numeric, \pmssDiskIostatReadPsiFullAvg300($path));
         }

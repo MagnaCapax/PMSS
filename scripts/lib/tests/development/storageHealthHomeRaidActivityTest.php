@@ -82,9 +82,8 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testResolvesHomeArrayFromNamedMdDevice(): void
     {
-        @mkdir($this->tmpDir.'/dev/md', 0700, true);
         $this->pmssWriteRelativeFile($this->tmpDir, 'dev/md7', '', 0700);
-        symlink('../md7', $this->tmpDir.'/dev/md/home');
+        $this->pmssWriteSymlinks($this->tmpDir, ['dev/md/home' => '../md7'], 0700);
 
         $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', $this->tmpDir.'/dev/md/home /home ext4 rw 0 0'."\n", 0700);
 

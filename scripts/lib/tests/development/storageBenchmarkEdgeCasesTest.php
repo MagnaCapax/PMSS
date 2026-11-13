@@ -56,9 +56,8 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $log = $this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl');
         $rid = 'nl-'.bin2hex(random_bytes(2));
         $ts = date('c');
-        file_put_contents($log, '{"run_id":"'.$rid.'","run_ts":"'.$ts.'","test":"preflight-idle","ok":true'."\n", FILE_APPEND);
-        file_put_contents($log, "}\n", FILE_APPEND);
-        $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkFileEntry($rid, $ts)]);
+        $this->pmssAppendFixtureLines($log, ['{"run_id":"'.$rid.'","run_ts":"'.$ts.'","test":"preflight-idle","ok":true', '}',
+            $this->pmssStorageBenchmarkFileEntry($rid, $ts)]);
         $this->assertStringContainsString('randread-small', $this->pmssRunStorageBenchmarkShowLast($log));
     }
 

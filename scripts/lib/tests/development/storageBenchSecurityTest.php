@@ -392,26 +392,19 @@ PHP;
         $this->assertShowPathContains($log, $expected, $case);
     }
 
-    private function writeBenchmarkSecurityLog(string $content, int $flags = 0): string
-    {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-        file_put_contents($log, $content, $flags);
-        return $log;
-    }
-
     public function testPathTraversalInJsonPathIsRead(): void
     {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); @touch($log);
+        $log = $this->pmssWriteFile($this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'), '');
         $up = dirname($log).'/../'.basename(dirname($log)).'/'.basename($log);
         $this->assertShowPathContains($up, 'No runs found.');
     }
 
     public function testSymlinkJsonLogIsHandled(): void
     {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $dir = dirname($log); @mkdir($dir, 0700, true);
-        $real = $dir.'/real.jsonl'; @file_put_contents($real, json_encode($this->pmssStorageBenchmarkPreflightEntry('r', date('c')))."\n");
-        $link = $dir.'/link.jsonl'; @symlink($real, $link);
-        $this->assertShowPathContains($link, 'Storage benchmark (last run)');
+        $dir = $this->pmssMakeTempDir('pmss-bench-sec-', 0700);
+        $real = $this->pmssWriteFile($dir.'/real.jsonl', json_encode($this->pmssStorageBenchmarkPreflightEntry('r', date('c')))."\n");
+        $this->pmssWriteSymlinks($dir, ['link.jsonl' => $real]);
+        $this->assertShowPathContains($dir.'/link.jsonl', 'Storage benchmark (last run)');
     }
 
     public function testDirectoryAsLogPathPrintsNoLog(): void
@@ -421,7 +414,7 @@ PHP;
 
     public function testUnreadableLogDoesNotCrash(): void
     {
-        $log = $this->writeBenchmarkSecurityLog(''); @chmod($log, 0000);
+        $log = $this->pmssWriteFile($this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'), ''); @chmod($log, 0000);
         $this->assertShowPathContains($log, 'No runs found.');
         @chmod($log, 0600);
     }
@@ -429,13 +422,13 @@ PHP;
     public function testHugeLineDoesNotCrash(): void
     {
         $big = str_repeat('A', 50000);
-        $log = $this->writeBenchmarkSecurityLog('{"run_id":"r","run_ts":"'.date('c').'","test":"preflight-idle","label":"'.$big.'","ok":true}'."\n");
+        $log = $this->pmssWriteStorageBenchmarkLog(['{"run_id":"r","run_ts":"'.date('c').'","test":"preflight-idle","label":"'.$big.'","ok":true}'], 'pmss-bench-sec-');
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testNullBytesInLogAreIgnored(): void
     {
-        $this->assertShowPathContains($this->writeBenchmarkSecurityLog("\0\0\0\n", FILE_APPEND), 'No runs found.');
+        $this->assertShowPathContains($this->pmssWriteStorageBenchmarkLog(["\0\0\0"], 'pmss-bench-sec-'), 'No runs found.');
     }
 
     public function testUntrustedMetricAndDeviceFieldsAreTolerated(): void
@@ -455,7 +448,7 @@ PHP;
     public function testMalformedUtf8InLabel(): void
     {
         $label = "bad\x80utf8"; // invalid byte sequence
-        $log = $this->writeBenchmarkSecurityLog('{"run_id":"x","run_ts":"'.date('c').'","label":"'.$label.'","test":"preflight-idle","ok":true}'."\n");
+        $log = $this->pmssWriteStorageBenchmarkLog(['{"run_id":"x","run_ts":"'.date('c').'","label":"'.$label.'","test":"preflight-idle","ok":true}'], 'pmss-bench-sec-');
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
@@ -468,14 +461,13 @@ PHP;
 
     public function testRunIdAsArrayDoesNotCrash(): void
     {
-        $this->assertShowPathContains($this->writeBenchmarkSecurityLog('{"run_id":["a"],"run_ts":"'.date('c').'","test":"preflight-idle","ok":true}'."\n"), 'No runs found.');
+        $this->assertShowPathContains($this->pmssWriteStorageBenchmarkLog(['{"run_id":["a"],"run_ts":"'.date('c').'","test":"preflight-idle","ok":true}'], 'pmss-bench-sec-'), 'No runs found.');
     }
 
     public function testLeadingBOMInFileIsTolerated(): void
     {
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-        file_put_contents($log, "\xEF\xBB\xBF", FILE_APPEND);
-        file_put_contents($log, json_encode($this->pmssStorageBenchmarkPreflightEntry('bom', date('c')))."\n", FILE_APPEND);
+        $this->pmssAppendFixtureLines($log, ["\xEF\xBB\xBF".json_encode($this->pmssStorageBenchmarkPreflightEntry('bom', date('c')))]);
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
@@ -488,16 +480,14 @@ PHP;
     public function testSymlinkToDirectoryIsRejected(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-bench-linkdir-', 0700);
-        $link = $dir.'/l.jsonl';
-        @symlink($dir, $link);
-        $this->assertShowPathContains($link, 'No log at');
+        $this->pmssWriteSymlinks($dir, ['l.jsonl' => $dir], 0700);
+        $this->assertShowPathContains($dir.'/l.jsonl', 'No log at');
     }
 
     public function testMalformedThenValidLineWorks(): void
     {
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-        file_put_contents($log, "{bad}\n", FILE_APPEND);
-        $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('ok', date('c'))]);
+        $this->pmssAppendFixtureLines($log, ['{bad}', $this->pmssStorageBenchmarkPreflightEntry('ok', date('c'))]);
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
@@ -646,8 +636,7 @@ PHP;
     {
         require_once $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
         $stubDir = $this->pmssMakeTempDir('pmss-bench-blockdev-', 0700);
-        $invocations = $this->pmssMakeTempPath('pmss-bench-blockdev-', '.log');
-        @file_put_contents($invocations, '');
+        $invocations = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-bench-blockdev-', '.log'), '');
         $this->pmssWriteExecutableFiles($stubDir, [
             'blockdev' => "#!/bin/sh\nprintf '%s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nprintf '%s\\n' '1048576'\n",
         ]);
@@ -721,8 +710,7 @@ SH
         $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
         $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-fallocate-', 'benchmark-storage.jsonl');
         $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
-        $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
-        @file_put_contents($invocations, '');
+        $invocations = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-bench-invocations-', '.log'), '');
 
         $this->pmssWriteExecutableFiles($stubDir, [
             'stat' => "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n",
@@ -757,7 +745,7 @@ SH,
     public function testBenchmarkPathGuardsFailBeforeBenchmarkWork(): void
     {
         $targetBase = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
-        @mkdir($targetBase.'/safe', 0700, true);
+        $this->pmssEnsureDir($targetBase.'/safe', 0700);
         $target = $targetBase.'/safe/../safe';
         $parent = $this->pmssMakeTempFile('pmss-bench-parent-');
         $dir = $this->pmssMakeTempDir('pmss-bench-logdir-', 0700);
@@ -805,8 +793,7 @@ SH,
         $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
         $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-device-', 'benchmark-storage.jsonl');
         $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
-        $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
-        @file_put_contents($invocations, '');
+        $invocations = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-bench-invocations-', '.log'), '');
 
         $this->pmssWriteExecutableFiles($stubDir, [
             'lsblk' => "#!/bin/sh\nprintf '%s\\n' 'null disk 0 NullDevice NULLSER 1B'\n",
@@ -854,8 +841,7 @@ SH
         $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
         $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-df-', 'benchmark-storage.jsonl');
         $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
-        $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
-        @file_put_contents($invocations, '');
+        $invocations = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-bench-invocations-', '.log'), '');
 
         $this->pmssWriteExecutableFiles($stubDir, [
             'stat' => "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n",

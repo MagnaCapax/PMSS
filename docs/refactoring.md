@@ -683,6 +683,9 @@ Tracker backups, refresh/preinstall markers, host-stat logs, WireGuard sentinels
 legacy-installer spools, journald templates, Deluge patches and panel frames share this path.
 Session-history modes, kernel blacklists, benchmark samples and backup archives
 also delegate populated parent setup to the checked writers, retaining creation modes.
+PSI samples, benchmark reservations and invocation logs use the same writers;
+malformed JSONL/BOM bytes retain explicit append fixtures, and named RAID links
+delegate parent creation to the shared symlink writer.
 Keep deliberate file-type changes, permission transitions and injected writers explicit.
 
 Executable test fixtures use `pmssWriteExecutableFile()` for the shared write
