@@ -11,9 +11,8 @@ class AgenticRefactorScopeClaimTest extends TestCase
         $workDir = $this->pmssMakeTempDir('pmss-refactor-claims-');
         $claimsDir = $workDir.'/claims';
         $candidates = $workDir.'/candidate-files.txt';
-        @mkdir($claimsDir, 0755, true);
-        @mkdir($claimsDir.'/scripts_lib_runtime.php', 0755, true);
-        file_put_contents($candidates, "scripts/lib/runtime.php\nscripts/update.php\n\nscripts/lib/log.php\n");
+        $this->pmssEnsureDir($claimsDir.'/scripts_lib_runtime.php');
+        $this->pmssWriteFile($candidates, "scripts/lib/runtime.php\nscripts/update.php\n\nscripts/lib/log.php\n");
 
         $output = $this->pmssRunShellHarness(
             "#!/usr/bin/env bash\n"
@@ -35,9 +34,9 @@ class AgenticRefactorScopeClaimTest extends TestCase
     {
         $root = $this->pmssRepoPath('');
         $claimsDir = $this->pmssMakeTempDir('pmss-refactor-release-');
-        @mkdir($claimsDir.'/held_by_other', 0755, true);
-        @mkdir($claimsDir.'/owned_one', 0755, true);
-        @mkdir($claimsDir.'/owned_two', 0755, true);
+        $this->pmssEnsureDir($claimsDir.'/held_by_other');
+        $this->pmssEnsureDir($claimsDir.'/owned_one');
+        $this->pmssEnsureDir($claimsDir.'/owned_two');
 
         $output = $this->pmssRunShellHarness(
             "#!/usr/bin/env bash\n"
@@ -57,9 +56,9 @@ class AgenticRefactorScopeClaimTest extends TestCase
         $root = $this->pmssRepoPath('');
         $claimsDir = $this->pmssMakeTempDir('pmss-refactor-stale-');
         $candidates = $this->pmssMakeTempPath('pmss-refactor-candidates-');
-        @mkdir($claimsDir.'/stale_claim', 0755, true);
-        @mkdir($claimsDir.'/fresh_claim', 0755, true);
-        file_put_contents($candidates, "scripts/update.php\n");
+        $this->pmssEnsureDir($claimsDir.'/stale_claim');
+        $this->pmssEnsureDir($claimsDir.'/fresh_claim');
+        $this->pmssWriteFile($candidates, "scripts/update.php\n");
         touch($claimsDir.'/stale_claim', time() - 3600);
 
         $output = $this->pmssRunShellHarness(

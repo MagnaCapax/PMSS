@@ -113,8 +113,7 @@ class cgroupSliceTest extends TestCase
         ]);
         $template = $fixture['cfgDir'].'/template.cgroup.user-slice.v1.conf';
         mkdir($template);
-        $target = $fixture['dropDir'].'/15-pmss.conf';
-        file_put_contents($target, "[Slice]\nTasksMax=4096\n");
+        $target = $this->pmssWriteFile($fixture['dropDir'].'/15-pmss.conf', "[Slice]\nTasksMax=4096\n");
         $messages = [];
 
         $this->pmssWithEnv($fixture['env'], function () use (&$messages): void {

@@ -8,9 +8,8 @@ class FstabHelperCharacterizationTest extends TestCase
 {
     public function testFstabLinesReadRejectsSymlinkedInput(): void
     {
-        $target = $this->pmssMakeTempFile('pmss-fstab-target-');
+        $target = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-fstab-target-'), "tmpfs /tmp tmpfs defaults 0 0\n");
         $link = $this->pmssMakeTempPath('pmss-fstab-link-');
-        file_put_contents($target, "tmpfs /tmp tmpfs defaults 0 0\n");
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
         $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($link): void {

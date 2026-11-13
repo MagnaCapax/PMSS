@@ -69,7 +69,7 @@ class QuotaSnapshotTest extends TestCase
             ["UUID=a /home ext4 usrjquota=aquota.user 0 0\n", true],
             ["UUID=a /home ext4 grpjquota=aquota.group 0 0\n", true],
         ] as [$contents, $expected]) {
-            file_put_contents($fstab, $contents);
+            $this->pmssWriteFile($fstab, $contents);
             $this->assertSame($expected, \pmssQuotaSnapshotMountDeclaresJournaledQuota('/home', $fstab));
         }
         $this->assertFalse(\pmssQuotaSnapshotMountDeclaresJournaledQuota('/home', $fstab.'.missing'));
@@ -96,7 +96,7 @@ class QuotaSnapshotTest extends TestCase
             ['usrjquota=aquota.user', 0, [], false],
             ['usrjquota=aquota.user', 0, ['1001 -- 1 2 3 4 5 6'], false],
         ] as [$options, $rc, $output, $alert]) {
-            file_put_contents($fstab, 'UUID=fixture /home ext4 '.$options." 0 0\n");
+            $this->pmssWriteFile($fstab, 'UUID=fixture /home ext4 '.$options." 0 0\n");
             // Run the real cron callback with in-memory logging and a simulated repquota.
             $source = $this->pmssReadRepoFile('scripts/cron/quotaSnapshot.php');
             $source = substr($source, strpos($source, '<?php') + 5);

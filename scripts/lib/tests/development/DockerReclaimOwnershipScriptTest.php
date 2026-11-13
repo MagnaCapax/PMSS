@@ -25,8 +25,7 @@ class DockerReclaimOwnershipScriptTest extends TestCase
         $this->bashBin = trim($this->pmssRunShellCommand('command -v bash', [], '2>/dev/null'));
         $this->scriptPath = __DIR__.'/../../../../etc/skel/bin/docker-reclaim-ownership';
 
-        @mkdir($this->homeDir, 0700, true);
-        @mkdir($this->fakeBinDir, 0700, true);
+        $this->pmssEnsureDir($this->homeDir, 0700);
 
         // Records every invocation; chown itself is the real daemon's job
         // inside the container, so the stub only needs to prove the wiring.
@@ -80,8 +79,7 @@ BASH;
 
     public function testMissingDockerBinaryFails(): void
     {
-        $emptyPath = $this->tempDir.'/empty-bin';
-        @mkdir($emptyPath, 0700, true);
+        $emptyPath = $this->pmssEnsureDir($this->tempDir.'/empty-bin', 0700);
         $target = $this->pmssEnsureDir($this->homeDir.'/docker/jellyfin');
 
         $result = $this->runHelper([$target], ['PATH' => $emptyPath]);

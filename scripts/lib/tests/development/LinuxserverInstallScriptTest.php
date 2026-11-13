@@ -31,8 +31,7 @@ class LinuxserverInstallScriptTest extends TestCase
         $this->legacyInstallerPath = __DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh';
         $this->helperPath = __DIR__.'/../../../../etc/skel/bin/dockerInstallLsio.php';
 
-        @mkdir($this->homeDir, 0700, true);
-        @mkdir($this->fakeBinDir, 0700, true);
+        $this->pmssEnsureDir($this->homeDir, 0700);
 
         $dockerStub = <<<'BASH'
 #!/usr/bin/env bash
@@ -491,8 +490,7 @@ BASH;
 
     public function testRunWithoutDockerDoesNotCreateDirectories(): void
     {
-        $emptyPath = $this->tempDir.'/empty-bin';
-        @mkdir($emptyPath, 0700, true);
+        $emptyPath = $this->pmssEnsureDir($this->tempDir.'/empty-bin', 0700);
 
         $result = $this->runHelper(['jellyfin'], ['PATH' => $emptyPath]);
 
