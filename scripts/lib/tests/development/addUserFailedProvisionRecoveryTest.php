@@ -228,9 +228,7 @@ PHP;
             return $description === 'second' ? 9 : 0;
         }));
         $this->assertSame($steps, $calls);
-        $this->assertTrue(pmssAddUserCleanupStepsRun($steps, static function (): int {
-            return 0;
-        }));
+        $this->assertTrue(pmssAddUserCleanupStepsRun($steps, self::pmssMakeCallbacks(['run' => 0])['run']));
     }
 
     public function testFailureRollbackRunsOnlyForEarlyFailAfterUserCreation(): void

@@ -2133,6 +2133,8 @@ Reflected characterization fixtures share `pmssTestingFunctionExport()` in
   explicit. Merge overrides on the left so their callbacks retain precedence.
 - Quota command, sysfs, ARP, device-probe and package-runner fixtures use that
   factory for immutable observations, including single injected operations.
+  Locale writes, PID readiness, plugin/rollback commands, account lookups and
+  post-install device counts also use it, retaining stateful callbacks explicitly.
   String log captures use `pmssMakeArrayLogger()`; callbacks that inspect
   arguments, count invocations, change state or throw remain explicit.
 - Prefer high-level helpers (`runStep`, `pmssRefreshRepositories`, `pmssApplyDpkgSelections`, `pmssUpdateUserEnvironment`) to keep logs/profile consistent.

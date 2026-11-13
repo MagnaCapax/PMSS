@@ -74,48 +74,44 @@ class AddUserProvisioningGuardTest extends TestCase
     public function testCronSpoolPreflightRemovesOnlyUnclaimedRegularFile(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-adduser-cron-');
-        $path = $dir.'/alice';
-        $orphan = static function (int $uid) {
-            return false;
-        };
+        $path = $dir.'/fixtur01';
+        $orphan = self::pmssMakeCallbacks(['account' => false])['account'];
         $claimed = static function (int $uid): array {
             return array('uid' => $uid, 'name' => 'other');
         };
 
-        $this->assertSame('absent', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->assertSame('absent', \pmssAddUserCronSpoolPreflight('fixtur01', $dir, $orphan));
         $this->pmssWriteFile($path, 'old cron');
-        $this->assertSame('claimed', \pmssAddUserCronSpoolPreflight('alice', $dir, $claimed));
+        $this->assertSame('claimed', \pmssAddUserCronSpoolPreflight('fixtur01', $dir, $claimed));
         $this->assertSame('old cron', file_get_contents($path));
-        $this->assertSame('removed', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->assertSame('removed', \pmssAddUserCronSpoolPreflight('fixtur01', $dir, $orphan));
         $this->assertFalse(file_exists($path));
     }
 
     public function testCronSpoolPreflightRefusesUnsafeEntries(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-adduser-cron-');
-        $path = $dir.'/alice';
-        $orphan = static function (int $uid) {
-            return false;
-        };
+        $path = $dir.'/fixtur01';
+        $orphan = self::pmssMakeCallbacks(['account' => false])['account'];
 
-        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('../alice', $dir, $orphan));
+        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('../fixtur01', $dir, $orphan));
         $this->assertTrue(mkdir($path));
-        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('fixtur01', $dir, $orphan));
         $this->assertTrue(rmdir($path));
         $target = $this->pmssWriteFile($dir.'/target', 'keep');
         $this->assertTrue(symlink($target, $path));
-        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('fixtur01', $dir, $orphan));
         $this->assertSame('keep', file_get_contents($target));
     }
 
     public function testScreenSocketPreparePreservesAbsentAndCurrentOwnerTrees(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
-        $path = $dir.'/S-alice';
-        $this->assertSame('absent', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir));
+        $path = $dir.'/S-fixtur01';
+        $this->assertSame('absent', \pmssAddUserScreenSocketPrepare('fixtur01', 1234, $dir));
         $this->screenDirectoryCreate($path);
         $this->pmssWriteFile($path.'/session', 'keep');
-        $this->assertSame('ready', \pmssAddUserScreenSocketPrepare('alice', fileowner($path), $dir));
+        $this->assertSame('ready', \pmssAddUserScreenSocketPrepare('fixtur01', fileowner($path), $dir));
         $this->assertSame('keep', file_get_contents($path.'/session'));
         $this->assertSame([], glob($dir.'/.pmss-remove-*'));
     }
@@ -123,23 +119,23 @@ class AddUserProvisioningGuardTest extends TestCase
     public function testScreenSocketPrepareRemovesStaleTreeWithoutFollowingInnerLinks(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
-        $path = $dir.'/S-alice';
+        $path = $dir.'/S-fixtur01';
         $target = $this->pmssWriteFile($dir.'/outside', 'keep');
         $this->screenDirectoryCreate($path);
         $this->assertTrue(symlink($target, $path.'/socket'));
-        $this->assertSame('removed', \pmssAddUserScreenSocketPrepare('alice', fileowner($path) + 1, $dir));
+        $this->assertSame('removed', \pmssAddUserScreenSocketPrepare('fixtur01', fileowner($path) + 1, $dir));
         $this->assertFalse(file_exists($path));
         $this->assertSame('keep', file_get_contents($target));
         $this->assertSame([], glob($dir.'/.pmss-remove-*'));
         // Screen can create a fresh directory on its next account-owned launch.
         $this->screenDirectoryCreate($path);
-        $this->assertSame('ready', \pmssAddUserScreenSocketPrepare('alice', fileowner($path), $dir));
+        $this->assertSame('ready', \pmssAddUserScreenSocketPrepare('fixtur01', fileowner($path), $dir));
     }
 
     public function testScreenSocketRemovalFailureLeavesWholeTreeInPrivateStage(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
-        $path = $dir.'/S-alice';
+        $path = $dir.'/S-fixtur01';
         $this->screenDirectoryCreate($path);
         $this->pmssWriteFile($path.'/session', 'stale');
         $uid = fileowner($path);
@@ -147,7 +143,7 @@ class AddUserProvisioningGuardTest extends TestCase
         $args = $dir.'/rm-args';
         $bin = $this->pmssMakeExecutableStub('rm', "#!/bin/sh\nprintf '%s\\n' \"\$@\" >\"\$PMSS_TEST_SCREEN_RM_ARGS\"\nexit 1\n", 'pmss-screen-rm-');
         $this->pmssWithPathPrefixedEnv($bin, ['PMSS_TEST_SCREEN_RM_ARGS' => $args], function () use ($dir, $uid): void {
-            $this->assertSame('remove_failed', \pmssAddUserScreenSocketPrepare('alice', $uid + 1, $dir));
+            $this->assertSame('remove_failed', \pmssAddUserScreenSocketPrepare('fixtur01', $uid + 1, $dir));
         });
         $stages = glob($dir.'/.pmss-remove-*');
         $this->assertSame(1, count($stages));
@@ -162,15 +158,15 @@ class AddUserProvisioningGuardTest extends TestCase
     public function testScreenSocketPrepareRejectsInvalidScopeAndUnusualEntries(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
-        foreach (['', '../alice', "alice\0suffix", 'root'] as $name) {
+        foreach (['', '../fixtur01', "fixtur01\0suffix", 'root'] as $name) {
             $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare($name, 1234, $dir));
         }
         foreach ([0, -1] as $uid) {
-            $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', $uid, $dir));
+            $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('fixtur01', $uid, $dir));
         }
-        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir."\0suffix"));
-        $path = $this->pmssWriteFile($dir.'/S-alice', 'keep');
-        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', fileowner($path) + 1, $dir));
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('fixtur01', 1234, $dir."\0suffix"));
+        $path = $this->pmssWriteFile($dir.'/S-fixtur01', 'keep');
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('fixtur01', fileowner($path) + 1, $dir));
         $this->assertSame('keep', file_get_contents($path));
     }
 
@@ -179,21 +175,21 @@ class AddUserProvisioningGuardTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
         $this->assertTrue(mkdir($dir.'/target'));
         $this->pmssWriteFile($dir.'/target/keep', 'keep');
-        $this->assertTrue(symlink($dir.'/target', $dir.'/S-alice'));
-        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir));
+        $this->assertTrue(symlink($dir.'/target', $dir.'/S-fixtur01'));
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('fixtur01', 1234, $dir));
         $this->assertTrue(symlink($dir, $dir.'/redirect'));
-        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('alice', 1234, $dir.'/redirect'));
-        $this->assertTrue(is_link($dir.'/S-alice'));
+        $this->assertSame('unsafe', \pmssAddUserScreenSocketPrepare('fixtur01', 1234, $dir.'/redirect'));
+        $this->assertTrue(is_link($dir.'/S-fixtur01'));
         $this->assertSame('keep', file_get_contents($dir.'/target/keep'));
     }
 
     public function testScreenSocketPrepareReportsFailedOrIncompleteRemoval(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-adduser-screen-');
-        $path = $dir.'/S-alice';
+        $path = $dir.'/S-fixtur01';
         $this->screenDirectoryCreate($path);
         foreach ([false, true] as $result) {
-            $this->assertSame('remove_failed', \pmssAddUserScreenSocketPrepare('alice', fileowner($path) + 1, $dir,
+            $this->assertSame('remove_failed', \pmssAddUserScreenSocketPrepare('fixtur01', fileowner($path) + 1, $dir,
                 function (string $target) use ($path, $result): bool {
                     $this->assertSame($path, $target);
                     return $result;

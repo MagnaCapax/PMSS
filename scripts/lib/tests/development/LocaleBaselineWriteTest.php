@@ -19,9 +19,7 @@ class LocaleBaselineWriteTest extends TestCase
     {
         $content = "en_US.UTF-8 UTF-8\n";
         foreach ([false, 0, strlen($content) - 1] as $result) {
-            $this->assertFalse(\pmssLocaleGenWriteComplete('/unused/locale.gen', $content, static function () use ($result) {
-                return $result;
-            }));
+            $this->assertFalse(\pmssLocaleGenWriteComplete('/unused/locale.gen', $content, self::pmssMakeCallbacks(['write' => $result])['write']));
         }
     }
 }

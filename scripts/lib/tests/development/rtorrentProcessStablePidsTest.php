@@ -25,9 +25,7 @@ class rtorrentProcessStablePidsTest extends TestCase
      */
     public function testWaitForStablePidsReturnsFalseWhenProcessNeverAppears(): void
     {
-        $result = rtorrentProcessWaitForStablePids(function (): array {
-            return [];
-        }, 0.02, 0.01, 5000);
+        $result = rtorrentProcessWaitForStablePids(self::pmssMakeCallbacks(['pids' => []])['pids'], 0.02, 0.01, 5000);
 
         $this->assertTrue(!$result);
     }

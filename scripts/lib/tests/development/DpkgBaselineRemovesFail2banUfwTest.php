@@ -29,7 +29,8 @@ class DpkgBaselineRemovesFail2banUfwTest extends TestCase
 
     public function testSanitiserKeepsPurgeLinesWhenPackageUnavailable(): void
     {
-        $plan = \pmssDpkgSelectionsSanitise(["fail2ban\tpurge", "ufw\t\t\tpurge"], 12, static function (): bool { return false; }, static function (): bool { return false; });
+        $probes = self::pmssMakeCallbacks(['packageAvailable' => false, 'intelDisplayPresent' => false]);
+        $plan = \pmssDpkgSelectionsSanitise(["fail2ban\tpurge", "ufw\t\t\tpurge"], 12, $probes['packageAvailable'], $probes['intelDisplayPresent']);
         $this->assertEquals(["fail2ban\tpurge", "ufw\tpurge"], $plan['sanitised']);
     }
 }

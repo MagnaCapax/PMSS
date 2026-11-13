@@ -65,9 +65,7 @@ class CheckRutorrentPluginsTest extends TestCase
         $this->pmssWriteFile($accessPath, "allow=0\n");
         chmod($accessPath, 0640);
 
-        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths, function (): int {
-            return 0;
-        });
+        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths, self::pmssMakeCallbacks(['run' => 0])['run']);
 
         $this->assertTrue($ok === true);
         $this->assertEquals("allow=1\n", (string) file_get_contents($accessPath));
@@ -91,9 +89,7 @@ class CheckRutorrentPluginsTest extends TestCase
         $this->pmssEnsureDir($paths['homeRoot'].'/fixtur01/www/rutorrent/plugins', 0755);
         $this->pmssEnsureDir($paths['skelRoot'].'/www/rutorrent/plugins/hddquota', 0755);
 
-        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths, function (): int {
-            return 0;
-        });
+        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths, self::pmssMakeCallbacks(['run' => 0])['run']);
 
         $this->assertTrue($ok === false);
     }
@@ -110,9 +106,7 @@ class CheckRutorrentPluginsTest extends TestCase
         $accessPath = $paths['homeRoot'].'/fixtur01/www/rutorrent/conf/access.ini';
         $this->pmssCreateSymlinkOrSkip($outsidePath, $accessPath);
 
-        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths, function (): int {
-            return 0;
-        });
+        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths, self::pmssMakeCallbacks(['run' => 0])['run']);
 
         $this->assertTrue($ok === false);
         $this->assertEquals("allow=0\n", (string) file_get_contents($outsidePath));

@@ -62,7 +62,8 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 return 0;
             };
 
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users'], static function (): int { return 0; });
+            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 0]);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices']);
             $this->assertSame(0, $rc);
         });
 
@@ -84,7 +85,8 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 return 2;
             };
 
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users'], static function (): int { return 0; });
+            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 0]);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices']);
             $this->assertSame(2, $rc);
         });
 
@@ -117,7 +119,8 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
                 return 124;
             };
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, self::pmssMakeCallbacks(['users' => []])['users'], static function (): int { return 14; });
+            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 14]);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices']);
             $this->assertSame(124, $rc);
             $this->assertSame('1300', getenv('PMSS_COMMAND_TIMEOUT'));
         });
