@@ -16,6 +16,8 @@ require_once __DIR__.'/deviceParse.php';
  */
 function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timestamp): ?array
 {
+    // Malformed inventory values must not warn or invoke object conversion hooks.
+    if (!is_scalar($disk['path'] ?? null)) return null;
     $dev = (string) $disk['path'];
     // Corrupt paths use the unavailable result before shell quoting can throw.
     if (pmssFilesystemPathHasNulByte($dev)) {

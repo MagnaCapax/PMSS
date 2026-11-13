@@ -63,6 +63,13 @@ arguments and successful snapshot payloads remain unchanged.
 and preserves whitespace and shell metacharacters in valid arguments through
 an isolated probe stub. These tests run only on the testing machine.
 
+NVMe also treats absent, null and non-scalar inventory paths as unavailable
+before string conversion or command lookup. Arrays, resources and objects
+cannot warn, throw through conversion hooks or supply a probe target. Scalar
+casts, valid path bytes, NUL rejection and successful payloads retain their
+contracts. The same path-safety test covers malformed values with warnings
+promoted to exceptions and command lookup intercepted, without probing devices.
+
 ## References
 
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)
