@@ -1228,6 +1228,41 @@ SH
         $this->assertStringContainsString('Leaving existing Jellyfin config untouched because this run will skip Jellyfin.', $this->script);
     }
 
+    public function testJellyfinPromptDeclinePreservesStateAndContinues(): void
+    {
+        $start = strpos($this->script, '# Safety check for existing Jellyfin config/data');
+        $this->assertTrue($start !== false);
+        $end = strpos($this->script, "\n\tif [[ \$DRY_RUN -eq 0 ]]; then", $start);
+        $this->assertTrue($end !== false);
+        $preflight = substr($this->script, $start, $end - $start);
+
+        // Only a single y/Y authorizes a reset; declining must allow runtime repair.
+        foreach (array(
+            ['y', 1, 0, 1, 1], ['Y', 1, 0, 1, 1],
+            ['n', 1, 0, 0, 0], ['N', 1, 0, 0, 0], ['', 1, 0, 0, 0],
+            ['yes', 1, 0, 0, 0], ['yY', 1, 0, 0, 0],
+            ['N', 0, 0, 0, 0], ['N', 1, 1, 1, 0],
+        ) as $case) {
+            $home = $this->pmssMakeTempDir('pmss-jellyfin-prompt-');
+            $state = $this->pmssWriteRelativeFile($home, '.config/jellyfin/state.fixture', 'preserved');
+            $harness = implode("\n", array(
+                '#!/usr/bin/env bash', 'set -euo pipefail',
+                'HOME='.escapeshellarg($home),
+                'JELLYFIN_CONFIG_RESET=0; JELLYFIN_INSTALL_ENABLED='.$case[1].'; DRY_RUN='.$case[2],
+                'log_warn() { printf "%s\\n" "$*"; }',
+                'preflight() {', $preflight, '}',
+                'preflight <<< '.escapeshellarg($case[0]),
+                'printf "\\ncontinued:%s:%s\\n" "$JELLYFIN_INSTALL_ENABLED" "$JELLYFIN_CONFIG_RESET"', '',
+            ));
+            $output = $this->pmssRunShellHarness($harness);
+            $this->assertStringContainsString('continued:'.$case[3].':'.$case[4], $output);
+            $this->assertSame('preserved', file_get_contents($state));
+            if ($case[1] === 1 && $case[3] === 0) {
+                $this->assertStringContainsString('Leaving existing Jellyfin config untouched; skipping Jellyfin for this run.', $output);
+            }
+        }
+    }
+
     public function testJellyfinConfigResetWaitsForDownloadedBuild(): void
     {
         $preflight = strpos($this->script, '# Safety check for existing Jellyfin config/data');

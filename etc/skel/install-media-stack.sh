@@ -1531,8 +1531,13 @@ if [[ -z "$SECURE_APP" ]]; then
 		else
 			printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
 			read -r confirm
-			[[ $confirm == [yY] ]] || exit 1
-			JELLYFIN_CONFIG_RESET=1
+			if [[ $confirm == [yY] ]]; then
+				JELLYFIN_CONFIG_RESET=1
+			else
+				# Keep shared runtime repair reachable without resetting Jellyfin state.
+				JELLYFIN_INSTALL_ENABLED=0
+				log_warn "Leaving existing Jellyfin config untouched; skipping Jellyfin for this run."
+			fi
 		fi
 	elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ]; then
 		[[ $DRY_RUN -eq 1 ]] || JELLYFIN_CONFIG_RESET=1
