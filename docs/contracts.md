@@ -861,6 +861,14 @@ Sub-handlers:
     `AuthorizedKeysFile` if the template leaves it commented; sets perms and
     ownership; reexecs/reloads systemd as needed and restarts sshd; runs
     rc.local.
+  - SSH OOM isolation (#901, ADR 0023): the drop-in omits `OOMScoreAdjust` so
+    OpenSSH can protect the listener at `-1000` and restore new sessions to `0`.
+    Changed drop-in content triggers a restart only after successful SSH syntax
+    validation. Every update also repairs inherited `-1000` on the updater and
+    processes in user slices or with real UID >= 1000; root system services retain
+    their scores. Other scores stay intact; dry runs skip the repair.
+    Host acceptance requires checking the listener and a new SSH workload's
+    `/proc/<pid>/oom_score_adj`, then verifying OOM recovery inside the account cap.
 
 - pmssApplyJournaldLimits(?callable $logger=null): void
   - Renders `/etc/systemd/journald.conf.d/pmss-limits.conf` from template;

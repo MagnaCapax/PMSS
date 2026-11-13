@@ -108,6 +108,14 @@ class UpdateServicesRuntimeTest extends TestCase
             '104' => ['-1000', '0::/system.slice/example.service', "Uid:\t0\t0\t0\t0\n", '-1000'],
             '105' => ['0', '0::/user.slice/user-1000.slice/session-1.scope', "Uid:\t1000\n", '0'],
             '106' => ['-500', '0::/user.slice/user-1000.slice/session-1.scope', "Uid:\t1000\n", '-500'],
+            // Production uses cgroup v1: repair old SSH workloads even outside user slices (#901).
+            '108' => ['-1000', "5:memory:/system.slice/ssh.service\n1:name=systemd:/user.slice/user-1000.slice/session-2.scope\n", "Uid:\t0\t0\t0\t0\n", '0'],
+            '109' => ['-1000', "5:memory:/system.slice/ssh.service\n1:name=systemd:/system.slice/ssh.service\n", "Uid:\t1000\t1000\t1000\t1000\n", '0'],
+            // Listener and system-service immunity must survive the tenant repair.
+            '110' => ['-1000', "5:memory:/system.slice/ssh.service\n1:name=systemd:/system.slice/ssh.service\n", "Uid:\t0\t0\t0\t0\n", '-1000'],
+            '111' => ['-1000', '1:name=systemd:/system.slice/example.service', "Uid:\t999\t999\t999\t999\n", '-1000'],
+            '112' => ['0', '5:memory:/user.slice/user-1000.slice/session-2.scope', "Uid:\t1000\n", '0'],
+            '113' => ['-500', '5:memory:/user.slice/user-1000.slice/session-2.scope', "Uid:\t1000\n", '-500'],
         ];
         $this->pmssWriteFile($proc.'/self/oom_score_adj', '-1000');
         foreach ($fixtures as $pid => list($score, $cgroup, $status)) {
@@ -116,7 +124,7 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->pmssWriteFile($proc.'/107/status', "Uid:\t1000\n");
         $this->pmssWriteFiles($proc.'/not-a-pid', ['oom_score_adj' => '-1000', 'cgroup' => '0::/user.slice/user-1000.slice']);
 
-        $this->assertSame(3, \pmssResetInheritedOomImmunity($proc));
+        $this->assertSame(5, \pmssResetInheritedOomImmunity($proc));
         $this->assertSame('0', $this->pmssReadFileOrEmpty($proc.'/self/oom_score_adj'));
         foreach ($fixtures as $pid => $fixture) {
             $this->assertSame($fixture[3], $this->pmssReadFileOrEmpty($proc.'/'.$pid.'/oom_score_adj'));
