@@ -8,12 +8,10 @@ final class PikkumiesContractTest extends TestCase
     /** Check the shared fixture against only the v1 section, not older contracts. */
     public function testFixtureValuesAppearInContractSection(): void
     {
-        $root = dirname(__DIR__, 4);
         $fixture = $this->pmssReadJsonArrayFile(__DIR__.'/../fixtures/pikkumies-contract-v1.1.json');
         $this->assertSame(JSON_ERROR_NONE, json_last_error());
 
-        $docs = file_get_contents($root.'/docs/contracts.md');
-        $this->assertSame(true, is_string($docs));
+        $docs = $this->pmssReadRepoFile('docs/contracts.md');
         $start = '## Pikkumies Eternals and web UIs (contract v1.1)';
         $end = '## Notes for Agentic Coding';
         $this->assertSame(1, substr_count($docs, $start));

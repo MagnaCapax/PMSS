@@ -630,6 +630,9 @@ contracts also use those shared readers and assertions. Required, forbidden and
 ordered checks reuse one acquired source when combined; scoped parsing and
 generated-file observations retain their own reads. Individual test methods,
 fragment bytes and ordering diagnostics remain at their callers.
+Ioping, dist-upgrade, watchdog locks, Pikkumies documentation and customer helper
+inventory checks use the same readers, preserving file-type guards, section
+boundaries, substring counts and diagnostic messages.
 First-occurrence ordering checks use `assertOrderedStrings()` or
 `pmssAssertRepoFileContainsOrderedStrings()` instead of local position variables.
 Keep offset searches and last-occurrence checks explicit; they have different semantics.

@@ -89,9 +89,9 @@ class ScriptsIncSplitTest extends TestCase
     public function testPartsArePresentAndContainOnlyGuardedFunctions(): void
     {
         foreach (self::PARTS as $part) {
-            $path = $this->pmssRepoPath('etc/skel/www/scriptsInc'.$part.'.php');
-            $this->assertTrue(is_file($path), $part.' part is missing.');
-            $source = (string) file_get_contents($path);
+            $path = 'etc/skel/www/scriptsInc'.$part.'.php';
+            $this->assertTrue(is_file($this->pmssRepoPath($path)), $part.' part is missing.');
+            $source = $this->pmssReadRepoFile($path);
             $this->assertTrue(strlen($source) > 100, $part.' part is too small.');
             $this->assertTrue(strpos($source, '<?php') === 0, $part.' does not start with PHP.');
             $this->assertTrue(preg_match('/\A<\?php\n\/\*\* [^\r\n]*Loaded by scriptsInc\.php; never require a part directly\. \*\/\n/', $source) === 1,

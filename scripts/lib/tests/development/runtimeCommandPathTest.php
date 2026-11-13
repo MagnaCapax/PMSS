@@ -214,8 +214,8 @@ PHP;
             $this->assertSame("-c 60 -i 0.1 -w 12 -k -D /tmp\n-c 60 -i 0.1 -w 12 -D /tmp\n", (string) file_get_contents($argsLog));
         });
         // The host stats probe (iopingHome/iopingRoot, iopingHomeMs) is the caller that keeps the file.
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/lib/systemStats/observe.php');
-        $this->assertTrue(strpos($source, 'pmssIopingMedianMs($path, true)') !== false, 'host stats probe must pass keep');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/systemStats/observe.php',
+            'pmssIopingMedianMs($path, true)', 'host stats probe must pass keep');
     }
 
     /** ADR 0274: a probe killed at the hard timeout keeps its completed samples plus one censored sample. */

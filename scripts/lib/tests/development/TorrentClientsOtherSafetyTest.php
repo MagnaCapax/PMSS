@@ -91,12 +91,10 @@ final class TorrentClientsOtherSafetyTest extends TestCase
 
     public function testWatchdogLaunchesRespectClientSwitchLocks(): void
     {
-        $root = dirname(__DIR__, 3).'/cron/';
-        $deluge = file_get_contents($root.'checkDelugeInstances.php');
-        $transmission = file_get_contents($root.'transmissionInstancesCheck.php');
+        $deluge = $this->pmssReadRepoFile('scripts/cron/checkDelugeInstances.php');
+        $transmission = $this->pmssReadRepoFile('scripts/cron/transmissionInstancesCheck.php');
         $this->assertSame(2, substr_count($deluge, 'flock -n 9 || exit 0'));
         $this->assertStringContainsString('torrentClients/deluge.lock', $deluge);
-        $this->assertStringContainsString('torrentClients/transmission.lock', $transmission);
-        $this->assertStringContainsString('flock -n 9 || exit 0', $transmission);
+        $this->assertStringContainsAllStrings(['torrentClients/transmission.lock', 'flock -n 9 || exit 0'], $transmission);
     }
 }
