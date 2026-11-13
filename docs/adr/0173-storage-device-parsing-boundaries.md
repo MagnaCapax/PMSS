@@ -56,6 +56,13 @@ temperature units at the integer boundary without running storage probes.
 SMART passes its ordered patterns directly to the shared parser; NVMe consumes
 captured stdout directly, retaining failed/empty-probe handling.
 
+NVMe rejects NUL-containing device paths before command lookup or shell quoting,
+returning the existing unavailable (`null`) result. Valid path bytes, command
+arguments and successful snapshot payloads remain unchanged.
+`StorageHealthNvmePathSafetyTest` covers leading, embedded and trailing NULs
+and preserves whitespace and shell metacharacters in valid arguments through
+an isolated probe stub. These tests run only on the testing machine.
+
 ## References
 
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)

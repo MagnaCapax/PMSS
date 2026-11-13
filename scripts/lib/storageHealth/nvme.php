@@ -17,6 +17,10 @@ require_once __DIR__.'/deviceParse.php';
 function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timestamp): ?array
 {
     $dev = (string) $disk['path'];
+    // Corrupt paths use the unavailable result before shell quoting can throw.
+    if (pmssFilesystemPathHasNulByte($dev)) {
+        return null;
+    }
     if (strpos($dev, 'nvme') === false || pmssCommandPath('nvme') === '') {
         return null;
     }
