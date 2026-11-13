@@ -34,7 +34,7 @@ class MediaStackPanelTest extends TestCase
 
     public function testEndpointRequiresCustomerTreeHelper(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/mediaStack.php', [
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/mediaStack.php', [
             "require_once __DIR__.'/userMediaStackPanel.php';",
             'list($home, $username, $hostname) = pmssCustomerAccountContext();',
         ], ['/scripts/lib/user/mediaStackPanel.php']);
@@ -43,18 +43,18 @@ class MediaStackPanelTest extends TestCase
             "basename(rtrim(\$home, '/'))",
             "php_uname('n')",
         ]);
-        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/userMediaStackPanel.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/userMediaStackPanel.php', [], [
             'function pmssMediaStackPanelCurrent'.'UserRead',
             'function pmssMediaStackPanelCurrent'.'HostnameRead',
             'function pmssMediaStackPanelShellExec'.'Available',
             'function pmssMediaStackPanel'.'Installed',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/mediaStack.php', [
+        $this->assertStringContainsAllStrings([
             "is_string(\$_POST['action']) && strpos(\$_POST['action'], 'confirm-secure-') === 0",
             'pmssMediaStackPanelSecureHandle($home, $username, $hostname);',
             "elseif (\$action === 'start-stopped')",
             'pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);',
-        ]);
+        ], $source);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', [
             "pmssCustomerAppsSectionHtmlBuild(\$appsStatus, 'welcome.php?status=1')",
             'pmssActionScriptJs()',

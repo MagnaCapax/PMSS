@@ -7,11 +7,11 @@ class UserMaintenanceCrontabPreserveTest extends TestCase
 {
     public function testUserMaintenanceDoesNotOverwriteUserCrontab(): void
     {
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/userMaintenance.php', [
+        $this->assertStringContainsAndOmitsStrings([], [
             'user.crontab.default',
             "pmssBuildCommand('crontab'",
             'Restoring default crontab',
             '$shouldRestoreCrontab',
-        ], 'userMaintenance.php must not carry user crontab overwrite logic: ');
+        ], $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php'), 'userMaintenance.php must not carry user crontab overwrite logic: ');
     }
 }

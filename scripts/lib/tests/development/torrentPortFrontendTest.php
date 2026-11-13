@@ -46,7 +46,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testApplySkeletonFilesStopsPropagatingLegacyPythonHelpers(): void
     {
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/users/filesystem.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/filesystem.php', [], [
             "        '.delugePort.py',",
             "        '.qbittorrentPort.py',",
             "if (is_readable('/scripts/lib/user/torrentPort.php')) {",

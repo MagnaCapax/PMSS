@@ -19,13 +19,11 @@ class ListUsersConsumersGuardTest extends TestCase
 
         foreach ($this->pmssListUsersConsumerMap() as $needle => $files) {
             foreach ($files as $file) {
-                $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
+                $source = $this->pmssReadRepoFile($file);
+                $this->assertStringContainsAllStrings([$needle], $source, $file.' must use shared listUsers parsing');
                 if ($needle !== 'pmssListManagedUsersResult(') {
-                    $this->pmssAssertRepoFileNotContainsStrings(
-                        $file,
-                        $legacyInlineParsers,
-                        $file.' should keep pmssListManagedUsers() output as-is '
-                    );
+                    $this->assertStringContainsAndOmitsStrings([], $legacyInlineParsers, $source,
+                        $file.' should keep pmssListManagedUsers() output as-is ');
                 }
             }
         }
@@ -46,15 +44,11 @@ class ListUsersConsumersGuardTest extends TestCase
         ];
 
         foreach ($targets as $file) {
-            $this->pmssAssertRepoFileNotContainsStrings(
-                $file,
-                [
-                    "shell_exec('/scripts/listUsers.php')",
-                    "@exec('/scripts/listUsers.php",
-                    "`/scripts/listUsers.php`",
-                ],
-                $file.' must use shared listUsers helpers instead of inline shelling'
-            );
+            $this->assertStringContainsAndOmitsStrings([], [
+                "shell_exec('/scripts/listUsers.php')",
+                "@exec('/scripts/listUsers.php",
+                "`/scripts/listUsers.php`",
+            ], $this->pmssReadRepoFile($file), $file.' must use shared listUsers helpers instead of inline shelling');
         }
     }
 }
