@@ -81,3 +81,12 @@ decoding and preserves execution/read exceptions.
   Legacy scalar casts, optional-null defaults, command bytes and textual
   conversion exceptions retain their existing contracts. Isolated command-input
   tests cover every guarded option and scalar/default compatibility.
+- Those integer-cast options also reject native non-finite numbers and numeric
+  strings whose floating conversion overflows, before a cast can turn them into
+  command arguments. The shared finite-number parser supplies this guard;
+  rejection uses the same `fio failed` result before allocation or execution.
+  Numeric checks trim surrounding whitespace consistently on PHP 7.3 and later;
+  the existing NUL guard still checks the original bytes.
+  Finite scalar casts, scientific notation and optional-null defaults retain
+  their existing commands and results. `StorageBenchmarkCommandInputTest`
+  covers every affected option with isolated operations on the testing machine.

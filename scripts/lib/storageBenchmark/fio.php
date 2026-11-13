@@ -11,10 +11,12 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
         }
     }
     // Casts can turn containers into 1 or truncate NUL-bearing strings into valid options.
-    // Keep scalar conversions and optional-null defaults, but reject corrupt representations.
+    // Keep finite scalar conversions and optional-null defaults, but reject corrupt representations.
     foreach (['runtime', 'iodepth', 'numjobs', 'direct', 'rwmixread'] as $key) {
+        $number = is_string($job[$key] ?? null) ? trim($job[$key]) : ($job[$key] ?? null);
         if (isset($job[$key]) && (!is_scalar($job[$key])
-            || (is_string($job[$key]) && pmssFilesystemPathHasNulByte($job[$key])))) {
+            || (is_string($job[$key]) && pmssFilesystemPathHasNulByte($job[$key]))
+            || (is_numeric($number) && pmssFiniteFloat($number) === null))) {
             return ['ok' => false, 'error' => 'fio failed'];
         }
     }

@@ -108,6 +108,32 @@ PHP;
             $this->pmssRunInlinePhpJson($script));
     }
 
+    public function testFioRejectsNonFiniteIntegerOptionsBeforeSideEffects(): void
+    {
+        $script = <<<'PHP'
+namespace BenchmarkNonFiniteIntegerFixture;
+function pmssCreatePrivateTempFile($prefix) { throw new \RuntimeException('unexpected allocation'); }
+function runCommand($command, $verbose) { throw new \RuntimeException('unexpected execution'); }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php',
+            'BenchmarkNonFiniteIntegerFixture', ['storageBenchmark/fio.php']);
+        $script .= <<<'PHP'
+$job = ['name' => 'fixture', 'rw' => 'read', 'iodepth' => 1, 'numjobs' => 1, 'direct' => 1];
+$cases = [];
+// Refuse both native non-finite numbers and numeric strings that overflow a float.
+foreach (['runtime', 'iodepth', 'numjobs', 'direct', 'rwmixread'] as $key) {
+    foreach ([NAN, INF, -INF, '1e309', '-1e309', '1E9999', '-1E9999',
+        str_repeat('9', 400), '-'.str_repeat('9', 400),
+        ' 1e309', '1e309 ', "\t-1e309\r\n", ' '.str_repeat('9', 400).' '] as $raw) {
+        $cases[] = fioRun('/unused/data', 4096, 1, array_replace($job, [$key => $raw]));
+    }
+}
+echo json_encode($cases);
+PHP;
+        $this->assertSame(array_fill(0, 65, ['ok' => false, 'error' => 'fio failed']),
+            $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testValidFioArgumentsKeepCommandBytesMetricsAndCleanup(): void
     {
         $script = <<<'PHP'
@@ -128,7 +154,8 @@ $ordinary = [$result, $GLOBALS['events']];
 // Integer casts retain legacy scalar conversions and optional-null fallback semantics.
 $coercions = [];
 foreach ([['runtime' => '7', 'iodepth' => ' 02 ', 'numjobs' => 3.9, 'direct' => true, 'rwmixread' => '095'],
-    ['runtime' => null, 'iodepth' => 2.9, 'numjobs' => '03', 'direct' => '01', 'rwmixread' => 95.9]] as $values) {
+    ['runtime' => null, 'iodepth' => 2.9, 'numjobs' => '03', 'direct' => '01', 'rwmixread' => 95.9],
+    ['runtime' => '7e0', 'iodepth' => '2e0', 'numjobs' => '3e0', 'direct' => '1e0', 'rwmixread' => '9.5e1']] as $values) {
     $GLOBALS['events'] = [];
     $coerced = fioRun("relative file's data", 4096, 7, array_replace($job, $values));
     $coercions[] = [$coerced, $GLOBALS['events']] === $ordinary;
@@ -144,7 +171,7 @@ PHP;
                 'read_iops' => 2, 'write_iops' => 0, 'read_p95_ms' => 0, 'write_p95_ms' => 0,
                 'raw' => ['jobs' => [['read' => ['bw_bytes' => 1048576, 'iops' => 2]]]]]],
             ['fio-', [$command, true], ['read', '/unused/fio.json'], ['unlink', '/unused/fio.json']],
-        ], [true, true]], $this->pmssRunInlinePhpJson($script));
+        ], [true, true, true]], $this->pmssRunInlinePhpJson($script));
     }
 
     public function testDdRejectsMalformedPathsAndPreservesValidCommands(): void
