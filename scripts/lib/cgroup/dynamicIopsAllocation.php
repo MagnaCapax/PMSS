@@ -2,6 +2,7 @@
 /** Pure quota variants projected from one account cohort. Loaded by dynamicIopsPolicy.php. @license GPL-3.0-only */
 require_once __DIR__.'/directApply.php';
 require_once __DIR__.'/dynamicIopsWorkConserving.php';
+require_once __DIR__.'/dynamicIopsPool.php';
 
 /** Keep identical floor, two-significant-figure rounding and ceiling for both projections. */
 function pmssDynamicIopsProposal(array $row, float $chargedPool, float $water = 0.0): int
@@ -17,40 +18,9 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
 {
     $settings = pmssDynamicIopsSettings($policy);
     if ($settings === null) return null;
-    $blend = pmssFiniteNonNegativeFloat($pressure['blend'] ?? null);
-    if ($blend !== null && $blend > 100) $blend = null;
-    $fraction = $blend === null ? 1.0 : max(0.0, min(1.0,
-        ($blend - $settings['idlePressure']) / ($settings['busyPressure'] - $settings['idlePressure'])));
-    $multiplier = $settings['idleMultiplier'] + $fraction * ($settings['busyMultiplier'] - $settings['idleMultiplier']);
-    // Only solid state uses a latency band (ADR 0237); HDDs use paired work blocks (ADR 0238).
-    $latency = pmssFiniteNonNegativeFloat($pressure['latency_ms'] ?? null);
-    $media = $pressure['media'] ?? null;
-    $reference = pmssFiniteNonNegativeFloat($pressure['latency_reference_ms'] ?? null);
-    $band = in_array($media, ['ssd', 'nvme'], true) && $reference !== null && $reference > 0
-        ? [$settings['ssdLatencyLowX'] * $reference, $settings['ssdLatencyHighX'] * $reference] : null;
-    $steer = $latency !== null && $band !== null ? 'latency' : 'pressure';
-    if ($steer === 'latency') {
-        $previous = pmssFiniteNonNegativeFloat($pressure['previous_multiplier'] ?? null) ?? $multiplier;
-        $next = $latency < $band[0] ? $previous * $settings['latencyStep']
-            : ($latency > $band[1] ? $previous / $settings['latencyStep'] : $previous);
-        $multiplier = max($settings['busyMultiplier'], min($settings['idleMultiplier'], $next));
-    }
-    if ($media === 'hdd') {
-        $steer = 'probe';
-        $multiplier = $pressure['probe_multiplier'] ?? $settings['probeStartLo'];
-    }
-    $passive = pmssFiniteNonNegativeFloat($passive);
-    $benchmark = pmssFiniteNonNegativeFloat($benchmark);
-    // A cached fio figure can exceed real disk IOPS a thousandfold; a cap needs the measured ceiling.
-    $host = $passive ?? 0.0;
-    $pool = $host * $multiplier;
-    if (!is_finite($pool) || $pool >= PHP_INT_MAX) return null;
-    $iowait = pmssFiniteNonNegativeFloat($pressure['iowait_blend'] ?? null);
-    if ($iowait !== null && $iowait > 100) $iowait = null;
-    $curb = $iowait === null ? 1.0 : 1 - $settings['curbMaxCut'] * max(0.0, min(1.0,
-        ($iowait - $settings['curbStartIowait']) / ($settings['curbFullIowait'] - $settings['curbStartIowait'])));
-    $uncurbed = $pool;
-    $pool *= $curb;
+    $result = pmssDynamicIopsPool($settings, $pressure, $passive, $benchmark);
+    if ($result === null) return null;
+    $pool = $result['pool'];
     $weightSum = pmssCgroupPolicyUserIoWeightSum(array_column($users, 'source'), $policy);
     $cohort = [];
     foreach ($users as $user => $entry) {
@@ -65,7 +35,7 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
             'ceiling' => pmssCgroupPolicyReadIopsTierCeiling($source, $policy),
             'explicit' => isset($source['IOReadIOPS']) && is_scalar($source['IOReadIOPS']),
             'legacy' => pmssCgroupPolicyDerivedReadIopsCap($source, $policy,
-                $legacyPassive ?? $passive, $weightSum, count($users), $storageClass, $legacyAllowed)];
+                $legacyPassive ?? $result['passive_read_iops'], $weightSum, count($users), $storageClass, $legacyAllowed)];
     }
     // Valid cohort quotas are positive; only missing values drop out of the median.
     $sorted = array_filter(array_column($cohort, 'quota'));
@@ -73,59 +43,57 @@ function pmssDynamicIopsAllocate(array $users, array $policy, array $pressure, ?
     $count = count($sorted);
     // Incomplete cohort data must not redistribute other accounts' shares. The probe's multiplier does
     // not come from the blend, so a late iostat sample cannot stop it (ADR 0238).
-    $fallback = $host <= 0 ? 'missing-ceiling' : ($blend === null && $steer !== 'probe' ? 'missing-pressure' :
-        ($count !== count($users) ? 'missing-quota-or-weight' : null));
+    $fallback = $result['fallback'] ?? ($count !== count($users) ? 'missing-quota-or-weight' : null);
+    $result['fallback'] = $fallback;
     $low = $count === 0 ? 1.0 : $sorted[intdiv($count - 1, 2)];
     $median = $count === 0 ? 1.0 : $low + ($sorted[intdiv($count, 2)] - $low) / 2;
-    $result = ['pressure' => $pressure, 'passive_read_iops' => $passive, 'benchmark_read_iops' => $benchmark,
-        'host_read_iops' => $host, 'multiplier' => $multiplier, 'steer' => $steer, 'pool' => $pool, 'fallback' => $fallback, 'variants' => []];
     foreach (['1.0' => 1.0, '0.5' => 0.5] as $label => $alpha) {
-        $rows = $cohort; $lift = 0.0; $wouldLift = 0.0;
+        $rows = $cohort;
         foreach ($rows as $user => $row) {
             $rows[$user]['share'] = (pmssFiniteNonNegativeFloat($row['weight']) ?? 0) * pow(($row['quota'] ?? $median) / $median, $alpha);
         }
         $sum = array_sum(array_column($rows, 'share'));
         if (!is_finite($sum)) return null;
-        $weights = [];
-        foreach ($rows as $user => &$row) {
+        $lifts = ['proposed' => 0.0, 'would_be' => 0.0];
+        foreach ($rows as &$row) {
             $row['share'] = $sum > 0 ? $row['share'] / $sum : 0.0;
-            $weights[$user] = $row['share'];
             $shortfall = max(0.0, $row['floor'] - $pool * $row['share']);
-            if (!$row['explicit']) $lift += $shortfall;
+            if (!$row['explicit']) $lifts['proposed'] += $shortfall;
             // Counterfactual floor charging includes every account, including explicit caps.
-            $wouldLift += $shortfall;
+            $lifts['would_be'] += $shortfall;
         }
         unset($row);
-        $chargedPool = max(0.0, $pool - $settings['floorCharge'] * $lift);
-        $wouldPool = max(0.0, $pool - $settings['floorCharge'] * $wouldLift);
-        $water = []; $wouldWater = [];
+        // Both projections keep their own charge, but use the same ordered calculation path.
+        $pools = array_map(static function (float $lift) use ($pool, $settings): float { return max(0.0, $pool - $settings['floorCharge'] * $lift); }, $lifts);
+        $water = array_fill_keys(array_keys($pools), []);
         if ($fallback === null && $settings['mode'] === 'enforce' && $rates !== null) {
-            $bounds = [];
-            foreach ($rows as $user => $row) {
-                $explicit = $row['explicit'] ? pmssIopsParseSpec($users[$user]['source']['IOReadIOPS']) : null;
-                $bounds[$user] = min($row['ceiling'] ?? INF, $explicit ?? INF);
-            }
-            $demand = pmssDynamicIopsDemand($rows, $rates, $wantsMore, $settings['workConservingHeadroom'], $bounds);
-            $water = pmssDynamicIopsWaterFill($weights, $demand, $chargedPool);
-            $wouldWater = pmssDynamicIopsWaterFill($weights, $demand, $wouldPool);
+            $demand = [];
             foreach ($rows as $user => &$row) {
                 $row['rate'] = pmssFiniteNonNegativeFloat($rates[$user] ?? null);
+                $explicit = $row['explicit'] ? pmssIopsParseSpec($users[$user]['source']['IOReadIOPS']) : null;
+                // Unknown or held demand is unbounded; quiet readers keep headroom, within their usable cap.
+                $demand[$user] = min((float) min($row['ceiling'] ?? INF, $explicit ?? INF),
+                    $row['rate'] === null || ($wantsMore[$user] ?? false) === true ? INF : max((float) $row['floor'], $row['rate'] * $settings['workConservingHeadroom']));
                 // JSON cannot encode INF; null denotes unbounded demand in the private cycle log.
                 $row['demand'] = is_finite($demand[$user]) ? $demand[$user] : null;
-                $row['water'] = ['proposed' => $water[$user], 'would_be' => $wouldWater[$user]];
             }
+            unset($row);
+            $weights = array_map(static function (array $row): float { return $row['share']; }, $rows);
+            $water = array_map(static function (float $charged) use ($weights, $demand): array { return pmssDynamicIopsWaterFill($weights, $demand, $charged); }, $pools);
+            foreach ($rows as $user => &$row) $row['water'] = array_map(static function (array $allocation) use ($user): float { return $allocation[$user]; }, $water);
             unset($row);
         }
         foreach ($rows as $user => &$row) {
-            $row['proposed'] = $fallback !== null || $row['explicit'] ? $row['legacy'] :
-                pmssDynamicIopsProposal($row, $chargedPool, $water[$user] ?? 0.0);
-            $row['would_be'] = $fallback !== null ? null : pmssDynamicIopsProposal($row, $wouldPool, $wouldWater[$user] ?? 0.0);
+            foreach ($pools as $projection => $charged) {
+                $row[$projection] = $projection === 'proposed' && ($fallback !== null || $row['explicit']) ? $row['legacy'] :
+                    ($fallback !== null ? null : pmssDynamicIopsProposal($row, $charged, $water[$projection][$user] ?? 0.0));
+            }
         }
         unset($row);
-        $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lift, 'charged_pool' => $chargedPool,
-            'users' => $rows, 'would_be_floor_lift' => $wouldLift, 'would_be_charged_pool' => $wouldPool];
+        $result['variants'][$label] = ['alpha' => $alpha, 'floor_lift' => $lifts['proposed'], 'charged_pool' => $pools['proposed'],
+            'users' => $rows, 'would_be_floor_lift' => $lifts['would_be'], 'would_be_charged_pool' => $pools['would_be']];
     }
-    return $result + ['iowait_blend' => $iowait, 'curb_factor' => $curb, 'pool_uncurbed' => $uncurbed];
+    return $result;
 }
 
 /** Return one complete enforced read-cap map, never legacy caps on failed evidence. */

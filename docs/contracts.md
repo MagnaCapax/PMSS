@@ -1571,6 +1571,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
     injection for tests and billing's existing schema remain unchanged.
 
 - scripts/lib/cgroup/dynamicIopsPolicy.php / dynamicIopsAllocation.php / dynamicIopsShadow.php
+  - Host-pool steering lives in `dynamicIopsPool.php`; account allocation fills
+    the existing ordered record. Proposed/counterfactual charging, water filling
+    and proposal generation share projection-keyed flows (ADR 0280). Bounded
+    demand is constructed with its row annotations, without an intermediate
+    bounds map. Full-payload characterization retains numeric types, key order,
+    explicit/tier limits, fallbacks and mixed numeric/string account keys.
   - `pmssDynamicIopsSettings()` accepts `enforce` (shipped default) and `off`;
     the removed `shadow` maps to `enforce`. Floor defaults to 15. Invalid knobs
     return null. Curb defaults are 50/80%

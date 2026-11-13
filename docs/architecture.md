@@ -244,6 +244,11 @@ Keep the canonical installer/update details under `docs/install.md` and
   one duplicate gate (ADR 0247).
 - **scripts/lib/blockDeviceLeaves.php** – One bounded sysfs topology walk supplies backing leaf disks to BFQ policy and `/home` iostat selection, and visits backing nodes for cgroup storage-class detection. Callers retain their own response to incomplete topology.
 - **scripts/lib/cgroup/readIopsPolicy.php** – Derived read-IOPS policy loads the runtime value helpers directly; passive ceiling computation remains in `cgroup/ioCeiling.php`.
+- **scripts/lib/cgroup/dynamicIopsAllocation.php** retains cohort and quota
+  allocation behind the existing policy include. `dynamicIopsPool.php` owns pure
+  host-pool steering and curbing; ordered projection maps share charging, water
+  filling and proposal generation. Bounded demand and its row annotations are
+  built together, preserving payload order and enforcement policy (ADR 0280).
 - **scripts/lib/cgroup/plan.php** – Finalizes the CLI's single plan after input
   and profile expansion: retain live properties, display, guard, build and apply
   ordered steps. Manager keeps orchestration and public sizing helpers (ADR 0175).
