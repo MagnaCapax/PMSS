@@ -105,6 +105,7 @@ exim4-base	install
 exim4-config	install
 exim4-daemon-light	install
 expect	install
+fail2ban	purge
 fakeroot	install
 fdisk	install
 ffmpeg	install
@@ -1440,6 +1441,7 @@ tree	install
 tzdata	install
 ucf	install
 udev	install
+ufw	purge
 uidmap	install
 unar	install
 unionfs-fuse	install

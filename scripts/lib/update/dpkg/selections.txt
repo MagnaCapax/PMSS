@@ -88,6 +88,7 @@ exim4-base					install
 exim4-config					install
 exim4-daemon-light				install
 expect						install
+fail2ban				purge
 fakeroot					install
 fdisk						install
 file						install
@@ -232,6 +233,7 @@ librtmp1:amd64			install
 libsasl2-2:amd64			install
 libsasl2-modules:amd64			install
 libsasl2-modules-db:amd64			install
+ufw						purge
 wireguard					install
 wireguard-dkms				install
 wireguard-tools				install

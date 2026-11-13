@@ -4,7 +4,8 @@ Date: 2026-03-07
 Category: security
 
 ## Status
-Accepted (do not enable fail2ban fleet-wide by default at this time)
+Superseded by ADR 0278 (2026-11-13): PMSS baselines now purge fail2ban and ufw.
+Originally: Accepted (do not enable fail2ban fleet-wide by default at this time)
 
 ## Context
 

@@ -90,7 +90,7 @@ Security Doctrine Scenarios (Issue #212)
 45. Known CSRF vulnerability; code exposes web UI on `0.0.0.0` without protection.
 46. Known path traversal; code writes sensitive files under web root.
 47. Known weak default credentials; code fails to rotate defaults.
-48. Known brute-force weakness; code enables login without rate limiting or fail2ban.
+48. Known brute-force weakness; code enables login with a weak, short or default password (strong credentials are the defence; PMSS does not ship fail2ban or ufw, ADR 0278).
 49. Known insecure protocol; code enables it without explicit opt-in.
 50. Known plaintext auth file; code does not generate service-specific credential.
 51. Service binds on public interface; code does not document or restrict.

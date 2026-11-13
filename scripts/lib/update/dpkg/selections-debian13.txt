@@ -83,7 +83,7 @@ exfatprogs					install
 expect						install
 extlinux					install
 f2fs-tools					install
-fail2ban					install
+fail2ban				purge
 fd-find						install
 fdisk						install
 file						install
@@ -793,6 +793,7 @@ tree						install
 tzdata						install
 ucf						install
 udev						install
+ufw						purge
 unzip						install
 usb.ids						install
 util-linux					install
