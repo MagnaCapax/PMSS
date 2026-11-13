@@ -63,6 +63,13 @@ function pmssScheduledConfigBackupCustomerResult(array $process): array
     }
 
     $payload = $jsonLine !== '' ? pmssJsonDecodeAssoc($jsonLine) : null;
+    // Customer JSON containers cannot supply scalar results or authorize retention.
+    foreach (['ok', 'message', 'bytes', 'path', 'keptCount', 'deletedCount'] as $field) {
+        if (isset($payload[$field]) && !is_scalar($payload[$field])) {
+            $payload = null;
+            break;
+        }
+    }
     if (!is_array($payload)) {
         $stderr = pmssScheduledConfigBackupMessageSafe((string) ($process['stderr'] ?? ''));
         return ['ok' => false, 'message' => 'scheduled backup helper returned invalid output'.($stderr !== '' ? ': '.$stderr : ''), 'bytes' => 0, 'path' => ''];

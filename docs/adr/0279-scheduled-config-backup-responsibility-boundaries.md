@@ -60,6 +60,16 @@ listeners. PHP's CVE-2026-6103 documents TAR parser disagreement and injected
 entries, reinforcing the existing archive boundary. This change neither parses
 nor extracts archives and preserves the customer-owned archive implementation.
 
+The customer result decoder rejects nested arrays/objects in consumed scalar
+fields before conversion, using the existing invalid-output failure record.
+Missing/null fields, scalar coercions, ignored extension fields, last-line
+selection, exit-status precedence and bounded stderr diagnostics stay unchanged.
+Malformed creation results cannot authorize retention; malformed retention results
+cannot report success. `ScheduledConfigBackupResultSafetyTest` covers these
+boundaries with JSON strings and injected captures, without customer execution.
+No malformed stdout value is added to diagnostics; archive verification, private
+modes, credential separation and exposure paths remain unchanged.
+
 ## References
 
 - [Customer archive transaction and security analysis](0200-customer-backup-archive-transaction.md)
