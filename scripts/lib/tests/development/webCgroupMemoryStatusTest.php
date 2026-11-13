@@ -234,8 +234,7 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->pmssWriteFiles($dir, ['memory.usage_in_bytes' => "104857600\n", 'memory.limit_in_bytes' => "327155712\n",
             'memory.oom_control' => "oom_kill_disable 0\nunder_oom 0\noom_kill 0\n"]);
         $childDir = $dir.'/user@1234.service';
-        @mkdir($childDir, 0777, true);
-        $this->pmssWriteFile($childDir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 3\n");
+        $this->pmssWriteFile($childDir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 3\n", 0777);
         $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 2, 'last_increase' => null, 'sampled_at' => 100]));
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);

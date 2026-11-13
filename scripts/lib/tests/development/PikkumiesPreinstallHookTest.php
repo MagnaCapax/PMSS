@@ -148,8 +148,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
             if ($user !== 'fxfresh') $this->pmssEnsureDir($root.'/home/'.$user.'/.mcxPikkumies/pikkumies/local');
         }
         $this->pmssWriteFile($root.'/home/fxfin/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
-        $this->pmssEnsureDir($root.'/state');
-        touch($root.'/state/fxmark');
+        $this->pmssWriteFile($root.'/state/fxmark', '');
         $this->pmssWriteFile($root.'/state/fxdone', 'finished');
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
         $runs = [];
@@ -207,8 +206,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
             if ($user !== 'noinst') $this->pmssWriteFile($root.'/home/'.$user.'/bin/install-pikkumies.sh', "#!/usr/bin/env bash\n");
         }
         $this->pmssWriteFile($root.'/home/has/.mcxPikkumies/pikkumies/local/hermes-managed/config.yaml', "model: x\n");
-        $this->pmssEnsureDir($root.'/state');
-        touch($root.'/state/done');
+        $this->pmssWriteFile($root.'/state/done', '');
         $this->pmssWriteExecutableFile($root.'/stub/id', "#!/bin/sh\necho 4321\n");
         $runs = [];
         $ops = [

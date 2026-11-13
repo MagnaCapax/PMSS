@@ -297,7 +297,7 @@ echo json_encode([$result, file_get_contents($path)]);
 PHP;
         $path = $this->pmssMakeTempDir('pmss-stats-short-write-').'/stats.log';
         foreach ([false, 0, 1, 5, 6, null] as $limit) {
-            file_put_contents($path, "prior\n");
+            $this->pmssWriteFile($path, "prior\n");
             $record = $limit === false ? '' : substr("ready\n", 0, $limit === null ? 6 : $limit);
             $this->assertSame([$limit === null || $limit === 6, "prior\n".$record],
                 $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_STATS_APPEND' => json_encode([$path, $limit])]));
@@ -308,7 +308,6 @@ PHP;
     {
         $root = $this->pmssMakeTempDir('pmss-stats-path-');
         $target = $root.'/target';
-        $this->pmssEnsureDir($target, 0755);
         $victim = $this->pmssWriteFile($target.'/stats.log', "prior\n");
         $this->assertTrue(symlink($target, $root.'/redirect'));
         $this->assertTrue(symlink($victim, $root.'/leaf'));
@@ -351,7 +350,6 @@ echo json_encode([pmssSystemStatsAppendLogLine($path, 'blocked'), file_get_conte
 PHP;
         $root = $this->pmssMakeTempDir('pmss-stats-parent-swap-');
         $this->pmssEnsureDir($root.'/parent', 0755);
-        $this->pmssEnsureDir($root.'/redirect', 0755);
         $this->pmssWriteFile($root.'/redirect/stats.log', "prior\n");
         $this->assertSame([false, "prior\n"], $this->pmssRunInlinePhpJson($script, [
             'PMSS_TEST_STATS_PARENT_SWAP' => json_encode([$root.'/parent/stats.log', $root.'/redirect']),

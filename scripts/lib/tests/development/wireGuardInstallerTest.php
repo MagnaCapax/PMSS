@@ -300,7 +300,7 @@ class WireGuardInstallerTest extends TestCase
         $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
         $this->pmssEnsureDir($homeBase.'/fixtur01');
         $outside = $this->pmssMakeTempDir('pmss-wireguard-outside-', 0700).'/root-only.txt';
-        file_put_contents($outside, "outside-marker-line\n");
+        $this->pmssWriteFile($outside, "outside-marker-line\n");
         symlink($outside, $homeBase.'/fixtur01/.wireguard-public-key');
 
         $this->pmssWithEnv([

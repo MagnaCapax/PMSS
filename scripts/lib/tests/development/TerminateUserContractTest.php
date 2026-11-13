@@ -77,7 +77,6 @@ final class TerminateUserContractTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-terminate-shell-');
         $bin = $root.'/bin';
-        mkdir($bin);
         $this->pmssWriteExecutableFile($bin.'/runuser', <<<'SH'
 #!/bin/sh
 [ "$1" = --pty ] && shift
@@ -87,7 +86,8 @@ shift 3
 shift 2
 [ -t 0 ] && exit 99
 exec sh -c "$1"
-SH
+SH,
+            0777
         );
         $target = $root.'/socket';
         $command = \pmssTerminateUserAccountSocketRemoveCommand('user1234', $target);
@@ -97,8 +97,7 @@ SH
         $this->assertSame(0, $this->pmssExecShellCommand($stubbed, [], '')['rc']);
         $this->assertFalse(file_exists($target));
         $this->assertSame(0, $this->pmssExecShellCommand($stubbed, [], '')['rc'], 'absent path is an idempotent no-op');
-        mkdir($target);
-        $this->pmssWriteFile($target.'/child', 'keep');
+        $this->pmssWriteFile($target.'/child', 'keep', 0777);
         // A failing rm must surface through runuser and the outer timeout.
         $this->pmssWriteExecutableFile($bin.'/rm', "#!/bin/sh\nexit 1\n");
         $this->assertSame(1, $this->pmssExecShellCommand($stubbed, [], '')['rc'], 'inner command failure must not be masked');
@@ -124,7 +123,6 @@ SH
     {
         $root = $this->pmssMakeTempDir('pmss-runuser-capability-');
         $bin = $root.'/bin';
-        mkdir($bin);
         $this->pmssWriteExecutableFile($bin.'/runuser', <<<'SH'
 #!/bin/sh
 if [ "$1" = --help ]; then
@@ -138,7 +136,8 @@ shift 3
 shift 2
 [ -t 0 ] && exit 99
 exec sh -c "$1"
-SH
+SH,
+            0777
         );
         $builder = $root.'/build.php';
         $this->pmssWriteFile($builder, '<?php require '.var_export($this->pmssRepoPath('scripts/lib/runtime/environment.php'), true)
@@ -295,7 +294,6 @@ SH
         $start = strpos($source, '$resume = false;');
         $block = substr($source, $start, strpos($source, '$knownUsers =', $start) - $start);
         $root = $this->pmssMakeTempDir('pmss-resume-seal-');
-        $this->pmssEnsureDir($root.'/bin');
         $this->pmssWriteExecutableFile($root.'/bin/chown', "#!/bin/sh\n[ \"\$*\" = 'root:root -- .' ] || exit 97\nexit \"\${SEAL_RC:-0}\"\n");
         $paths = ['/home/user1234', '/home/backup-user1234', '/home/backup-user1234.superseded'];
         foreach ($paths as $index => $path) {
