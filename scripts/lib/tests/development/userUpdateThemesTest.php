@@ -12,7 +12,6 @@ class UserUpdateThemesTest extends TestCase
         $home = $this->pmssEnsureDir($homeRoot.'/'.$user);
         $skel = $this->pmssMakeTempDir('pmss-user-theme-skel-');
         @mkdir($home.'/www/rutorrent/plugins/theme/themes', 0755, true);
-        @mkdir($skel.'/www/rutorrent/plugins/theme/themes', 0755, true);
         $source = $skel.'/www/rutorrent/plugins/theme/themes/Agent34';
         $this->pmssWriteFile($source.'/style.css', 'theme');
 

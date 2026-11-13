@@ -95,7 +95,6 @@ class NginxDefaultServerTest extends TestCase
         symlink($root.'/keep.conf', $root.'/linked.conf');
         symlink($root.'/missing', $root.'/dangling.conf');
         symlink($root, $root.'/redirected');
-        mkdir($root.'/locked');
         $this->pmssWriteFile($root.'/locked/default.conf', 'retry later');
         chmod($root.'/locked', 0500);
         try {

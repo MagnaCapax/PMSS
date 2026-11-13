@@ -147,8 +147,7 @@ PHP;
         $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
         $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
         @mkdir($homeRoot.'/fixtur01', 0755, true);
-        @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
-        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "750GiB\n");
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "750GiB\n", 0700);
         $logs = array();
 
         $this->assertTrue(\pmssTrafficLimitHomeArtifactReconcile(
@@ -167,10 +166,8 @@ PHP;
     {
         $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
         $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
-        @mkdir($homeRoot.'/fixtur01', 0755, true);
-        @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
         $this->pmssWriteFile($homeRoot.'/fixtur01/.trafficLimit', "25\n");
-        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "750\n");
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "750\n", 0700);
 
         $this->assertTrue(\pmssTrafficLimitHomeArtifactReconcile('fixtur01', $homeRoot, $runtimeRoot));
         $this->assertSame('25', trim((string) @file_get_contents($homeRoot.'/fixtur01/.trafficLimit')));
@@ -181,8 +178,7 @@ PHP;
         $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
         $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
         @mkdir($homeRoot.'/fixtur01', 0755, true);
-        @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
-        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "-1\n");
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/fixtur01', "-1\n", 0700);
         $logs = array();
 
         $this->assertFalse(\pmssTrafficLimitHomeArtifactReconcile(

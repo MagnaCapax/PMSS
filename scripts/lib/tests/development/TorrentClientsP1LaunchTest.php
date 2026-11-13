@@ -43,8 +43,7 @@ final class TorrentClientsP1LaunchTest extends TestCase
     public function testSelectedLauncherExitsQuietlyOnBusySwitchLock(): void
     {
         $home = $this->pmssMakeTempDir('pmss-p1-launch-');
-        $bin = $this->pmssEnsureDir($home.'/bin/qbittorrent/custom');
-        $this->pmssWriteFile($bin.'/qbittorrent-nox', 'fixture');
+        $this->pmssWriteFile($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'fixture');
         $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/qbittorrent/default');
         $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
         $handle = fopen($dir.'/qbittorrent.lock', 'c');
