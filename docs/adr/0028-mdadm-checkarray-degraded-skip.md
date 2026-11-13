@@ -41,6 +41,15 @@ The planner resolves each array's state in one helper: valid numeric sysfs data
 takes precedence, then mdstat supplies the fallback, otherwise state is unknown.
 Missing or malformed sysfs data must not mask usable mdstat evidence.
 
+Mdstat member counts must fit PHP integers before comparison. Unrepresentable
+counts retain the existing unknown state instead of saturating to a false
+healthy comparison; an explicit missing-member bitmap still proves degradation.
+Valid sysfs state retains precedence. Representable counts, leading zeroes,
+selection order, fallback-all policy and command bytes remain unchanged.
+`MdadmCheckarrayTest` covers integer boundaries, source precedence and refusal
+to launch checkarray for an unknown array. Execution stays on testing machines;
+devbox verification is changed-file syntax only.
+
 ## Consequences
 - Positive: degraded arrays no longer receive a scheduled data-check that cannot
   restore redundancy and may worsen storage pressure.

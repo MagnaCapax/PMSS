@@ -21,8 +21,13 @@ function pmssStorageHealthRaidBitmapParse(string $detail): ?bool
 /** Return unknown when mdstat has no member summary; counts and missing members both matter. */
 function pmssStorageHealthRaidDetailDegradedState(string $detail): ?bool
 {
-    return preg_match('/\[(\d+)\/(\d+)\]\s*\[([U_]+)\]/', $detail, $matches) === 1
-        ? strpos($matches[3], '_') !== false || (int) $matches[1] !== (int) $matches[2] : null;
+    if (preg_match('/\[(\d+)\/(\d+)\]\s*\[([U_]+)\]/', $detail, $matches) !== 1) return null;
+    // Missing members remain decisive even when the numeric summary is corrupt.
+    if (strpos($matches[3], '_') !== false) return true;
+    $expected = pmssUnsignedDecimalIntParse($matches[1]);
+    $active = pmssUnsignedDecimalIntParse($matches[2]);
+    // Saturated casts can make distinct oversized counts falsely appear healthy.
+    return $expected === null || $active === null ? null : $expected !== $active;
 }
 
 /**

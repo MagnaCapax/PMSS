@@ -141,6 +141,62 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertSame(null, \pmssMdadmCheckarrayEntryDegradedState([], $this->fixtureRoot));
     }
 
+    /** Numeric boundaries for scripts/lib/storageHealth/raidParse.php. */
+    public function testMdstatMemberCountsRejectOverflowWithoutHidingMissingMembers(): void
+    {
+        $limit = (string) PHP_INT_MAX;
+        foreach ([
+            [$limit.'0', $limit.'1'], [$limit.'0', $limit.'0'],
+            [$limit.'0', '2'], ['2', $limit.'0'],
+            ['000'.$limit.'0', '000'.$limit.'1'], [str_repeat('9', 256), '1'],
+        ] as [$expected, $active]) {
+            $this->assertSame(null, \pmssStorageHealthRaidDetailDegradedState('['.$expected.'/'.$active.'] [UU]'));
+            // The member bitmap remains independent evidence of degradation.
+            $this->assertSame(true, \pmssStorageHealthRaidDetailDegradedState('['.$expected.'/'.$active.'] [U_]'));
+        }
+        foreach ([
+            ['[0/0] [UU]', false], ['[2/2] [UU]', false], ['[2/1] [UU]', true],
+            ['[0002/02] [UU]', false], ['[2/2] [U_]', true],
+            ['['.$limit.'/'.$limit.'] [UU]', false],
+            ['['.$limit.'/'.(PHP_INT_MAX - 1).'] [UU]', true],
+            ['[2/x] [UU]', null], ['', null],
+        ] as [$detail, $expected]) {
+            $this->assertSame($expected, \pmssStorageHealthRaidDetailDegradedState($detail));
+        }
+    }
+
+    public function testOverflowedMdstatCountsStayUnknownWithoutChangingSysfsPrecedence(): void
+    {
+        $overflow = (string) PHP_INT_MAX.'0';
+        $detail = '['.$overflow.'/'.$overflow.'] [UU]';
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat',
+            'md0 : active raid1 '.$detail."\nmd1 : active raid1 [2/2] [UU]\n".
+            'md2 : active raid1 ['.$overflow."/1] [U_]\n", 0700);
+        // Missing and malformed sysfs values must not turn corrupt mdstat into healthy state.
+        foreach ([null, 'invalid', '0', '1'] as $sysfs) {
+            if ($sysfs !== null) $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md0/md/degraded', $sysfs."\n", 0700);
+            $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
+            $this->assertFalse($plan['fallback_all']);
+            $this->assertSame('', $plan['reason']);
+            $this->assertSame($sysfs === '0' ? ['md0', 'md1'] : ['md1'], $plan['healthy']);
+            $this->assertSame($sysfs === '1' ? ['md0', 'md2'] : ['md2'], $plan['degraded']);
+            $this->assertSame($sysfs === null || $sysfs === 'invalid' ? ['md0'] : [], $plan['unknown']);
+        }
+    }
+
+    public function testMainSkipsOverflowedMdstatCountsWithoutLaunchingCheckarray(): void
+    {
+        $limit = (string) PHP_INT_MAX;
+        $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat',
+            'md0 : active raid1 ['.$limit.'0/'.$limit."1] [UU]\n", 0700);
+        $result = $this->runCommand($mdstat, $this->writeCheckarrayStub());
+
+        $this->assertSame(0, $result['rc']);
+        $this->assertStringContainsString('skipping md0 (state unknown)', $result['output']);
+        $this->assertSame('', $this->pmssReadFileOrEmpty($this->fixtureRoot.'/checkarray.log'));
+        $this->assertFalse(file_exists($this->fixtureRoot.'/state/mdadm-checkarray-last'));
+    }
+
     public function testPlanFallsBackWhenMdstatLooksUnsupported(): void
     {
         $mdstat = $this->pmssWriteRelativeFile($this->fixtureRoot, 'mdstat', "md0 : unexpected format without raid level\n", 0700);
