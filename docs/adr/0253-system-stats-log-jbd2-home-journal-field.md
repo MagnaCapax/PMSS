@@ -90,6 +90,14 @@ every logged value is an unsigned integer or `na`, so no text can enter the line
   collected stats array). External consumers ignore labels they do not know.
 - Follow-up: the sysadmin-side collectors difference `transactions` and `requested`.
 
+The observer rejects NUL bytes in all three filesystem path arguments before
+reading mountinfo, resolving the sysfs link or enumerating journals. Malformed
+paths retain `na` without relying on warning suppression to handle exceptions.
+Valid paths, probe order and journal formatting remain unchanged.
+`SystemStatsJbd2Test` covers leading, embedded and trailing NULs in each argument
+and the successful fixture result; execution stays on testing machines.
+
 ## References
+
 - ADR 0044, ADR 0070, ADR 0226, ADR 0243
 - `fs/jbd2/journal.c` `jbd2_seq_info_show`, `fs/jbd2/commit.c` statistics accumulation (Linux v6.1)

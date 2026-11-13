@@ -38,6 +38,10 @@ function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) 
  */
 function pmssSystemStatsJbd2HomeRead(string $mountinfo = '/proc/self/mountinfo', string $sysDevBlock = '/sys/dev/block', string $jbd2Root = '/proc/fs/jbd2'): string
 {
+    // Suppression cannot turn malformed-path exceptions into the unavailable result.
+    foreach ([$mountinfo, $sysDevBlock, $jbd2Root] as $path) {
+        if (pmssFilesystemPathHasNulByte($path)) return 'na';
+    }
     $majorMinor = pmssSystemStatsJbd2HomeDeviceFromMountinfo(pmssReadRegularFileContents($mountinfo));
     $link = $majorMinor === null ? false : @readlink($sysDevBlock.'/'.$majorMinor);
     $entries = is_string($link) ? @scandir($jbd2Root) : false;
