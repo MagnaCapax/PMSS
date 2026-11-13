@@ -10,10 +10,17 @@ function storageBenchmarkHomeDeviceResolve(
     ?callable $canonicalPath = null,
     ?callable $sizeRead = null
 ): array {
+    $entry = ['device' => $mountDevice, 'rota' => null, 'size' => null, 'mode' => 'home-device'];
+    // Refuse corrupt paths before shell quoting or sysfs reads can throw.
+    // An explicit mount device leaves targetDir unused, as before.
+    if (pmssFilesystemPathHasNulByte($sysfsRoot)
+        || ($mountDevice === null && pmssFilesystemPathHasNulByte($targetDir))) {
+        return $entry + ['ok' => false, 'error' => 'unsafe or unavailable mount device'];
+    }
     $path = $mountDevice ?? storageBenchmarkCommandFieldRead(
         'df -P '.escapeshellarg($targetDir).' | awk '.escapeshellarg('NR==2 {print $1}')
     );
-    $entry = ['device' => $path, 'rota' => null, 'size' => null, 'mode' => 'home-device'];
+    $entry['device'] = $path;
     if ($path === null || !storageBenchmarkDevicePathIsSafe($path)) {
         return $entry + ['ok' => false, 'error' => 'unsafe or unavailable mount device'];
     }

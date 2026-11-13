@@ -90,3 +90,10 @@ decoding and preserves execution/read exceptions.
   Finite scalar casts, scientific notation and optional-null defaults retain
   their existing commands and results. `StorageBenchmarkCommandInputTest`
   covers every affected option with isolated operations on the testing machine.
+- Mounted-device inspection rejects NUL-containing sysfs roots and, when mount
+  discovery is needed, NUL-containing target directories before any probe runs.
+  Refusals use the existing unavailable-device result. Explicit mount devices
+  still leave the target directory unused; valid command bytes, root normalization,
+  observation order and result field order stay unchanged.
+  `StorageBenchmarkHomeDeviceInputSafetyTest` covers these paths with isolated
+  command, filesystem and device observations on the testing machine.
