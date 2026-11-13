@@ -189,43 +189,6 @@ class BootTuningEnsureTest extends TestCase
         ], 'virtio-blk read_ahead_kb must match template.rc.local (4096); a divergent value '
             .'makes the effective setting depend on which writer ran last');
     }
-    public function testVirtioBfqTimeoutSyncIsOptInValidatedAndWrittenAfterScheduler(): void
-    {
-        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-bfq-slice-', 0700);
-        [$script] = $this->runBootTuning($dir);
-        $body = (string)file_get_contents($script);
-
-        // The knob is written once, inside the vd*/xvd* loop, after the scheduler write:
-        // switching the scheduler resets its tunables, so the reverse order would be inert.
-        $this->assertSame(1, substr_count($body, 'iosched/timeout_sync'), 'timeout_sync must be written in exactly one place');
-        $loopStart = strpos($body, 'for disk in /sys/block/vd* /sys/block/xvd*; do');
-        $this->assertTrue($loopStart !== false, 'virtio loop missing');
-        $loopEnd = strpos($body, "\ndone", (int)$loopStart);
-        $sched = strpos($body, 'write_sys "$disk/queue/scheduler" bfq', (int)$loopStart);
-        $knob = strpos($body, 'iosched/timeout_sync', (int)$loopStart);
-        $this->assertTrue($sched !== false && $knob !== false && $sched < $knob && $knob < $loopEnd,
-            'timeout_sync must sit inside the virtio loop, after the scheduler write');
-        $this->pmssAssertStringNotContainsString('iosched/slice_idle', $body,
-            'slice_idle must stay at the kernel default: idling keeps per-user blkio.bfq.weight isolation (ADR 0045)');
-        $this->pmssAssertFileContainsAllStrings($script, [
-            '"virtio_bfq_timeout_sync_ms": $(json_int_or_null "$bfq_timeout_sync_ms")',
-        ], 'hardware.json must report the optional slice length (null = kernel default)');
-
-        // Run the validator itself: only a plain integer from 10 to 125 passes.
-        $this->assertSame(1, preg_match('/^read_bfq_timeout_sync_ms\(\) \{\n.*?\n\}\n/ms', $body, $m), 'validator function missing');
-        $valueFile = $dir.'/bfq-timeout-sync-ms';
-        $cases = ['60' => '60', " 60 \n" => '60', "10\n" => '10', '125' => '125', '9' => '', '126' => '',
-            '060' => '', 'abc' => '', '' => '', '99999' => '', '-20' => '', "40\n200\n" => '40'];
-        foreach ($cases as $content => $expected) {
-            file_put_contents($valueFile, (string)$content);
-            $out = shell_exec('sh -c '.escapeshellarg($m[0].'read_bfq_timeout_sync_ms "$1"').' sh '.escapeshellarg($valueFile).' 2>&1');
-            $this->assertSame($expected, (string)$out, 'value file '.json_encode((string)$content));
-        }
-        unlink($valueFile);
-        $out = shell_exec('sh -c '.escapeshellarg($m[0].'read_bfq_timeout_sync_ms "$1"').' sh '.escapeshellarg($valueFile).' 2>&1');
-        $this->assertSame('', (string)$out, 'absent value file must write nothing');
-    }
-
     public function testWritesBootTuningService(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-service-', 0700);

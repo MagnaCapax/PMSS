@@ -104,11 +104,6 @@ as deferred — not adopted as a side effect of consolidating the writers.
   `sync_speed_min` 25000 and `sync_speed_max` 750000; the bcache `cache_mode` loop
   remains ungated and rc.local-only.
 - **Step 3: blocked on fleet minimum PMSS version**, as designed.
-- **Optional vd* knob (2026-11-13).** This unit also owns `iosched/timeout_sync` on `vd*`/`xvd*`,
-  written only when `/etc/seedbox/config/bfq-timeout-sync-ms` holds an integer from 10 to 125, after
-  the scheduler write. It is an opt-in canary for measuring the BFQ slice length on busy guests, not
-  a fleet default; rc.local never writes it. `hardware.json` reports it as `virtio_bfq_timeout_sync_ms`
-  (null = kernel default).
 
 ## Consequences
 - Until the consolidation completes, every shared knob must be changed in BOTH files in

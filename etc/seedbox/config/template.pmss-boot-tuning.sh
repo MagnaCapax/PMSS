@@ -18,21 +18,6 @@ json_int_or_null() {
 	esac
 }
 
-# Optional BFQ slice length for virtio guest disks, read from a one-line value file in
-# milliseconds. Prints the value only when it is a plain integer from 10 to 125; anything else
-# (absent file, blank, leading zero, out of range) prints nothing and the kernel default stays.
-read_bfq_timeout_sync_ms() {
-	[ -r "$1" ] || return 0
-	v=$(head -n 1 "$1" 2>/dev/null | tr -d ' \t\r')
-	case "$v" in
-	'' | 0* | *[!0-9]* | ????*) return 0 ;;
-	esac
-	if [ "$v" -ge 10 ] && [ "$v" -le 125 ]; then
-		printf '%s' "$v"
-	fi
-	return 0
-}
-
 write_hardware_summary() {
 	timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo '')
 	ram_gb=''
@@ -90,7 +75,6 @@ write_hardware_summary() {
     "nvme_read_ahead_kb": 128,
     "bcache_scheduler": "bfq",
     "bcache_read_ahead_kb": 4096,
-    "virtio_bfq_timeout_sync_ms": $(json_int_or_null "$bfq_timeout_sync_ms"),
     "ext4_group_prealloc": ${ext4_prealloc_audit:-[]}
   }
 }
@@ -177,18 +161,9 @@ done
 # both write this knob, so a mismatch makes the value depend on which ran last. The
 # original 2048 here matched the value observed in the FIELD, which was a stale
 # 2022-vintage rc.local pushed by an external actor - not the specification.
-# Opt-in canary instrument: /etc/seedbox/config/bfq-timeout-sync-ms shortens the BFQ slice so
-# the wait of low-weight queues behind higher-weight slices on a busy guest can be measured
-# against the kernel default. Written after the scheduler, because switching the scheduler
-# resets its tunables. slice_idle stays untouched: per-queue idling is what keeps the per-user
-# blkio.bfq.weight isolation (ADR 0045). No value file = nothing written.
-bfq_timeout_sync_ms=$(read_bfq_timeout_sync_ms /etc/seedbox/config/bfq-timeout-sync-ms)
 for disk in /sys/block/vd* /sys/block/xvd*; do
 	[ -d "$disk/queue" ] || continue
 	write_sys "$disk/queue/scheduler" bfq
-	if [ -n "$bfq_timeout_sync_ms" ]; then
-		write_sys "$disk/queue/iosched/timeout_sync" "$bfq_timeout_sync_ms"
-	fi
 	write_sys "$disk/queue/read_ahead_kb" 4096
 done
 
