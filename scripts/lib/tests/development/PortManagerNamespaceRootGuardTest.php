@@ -37,8 +37,7 @@ final class PortManagerNamespaceRootGuardTest extends TestCase
     public function testUsedPortsKeepsLegacyReservationsWhenManagedRootInvalid(): void
     {
         $legacyRoot = $this->pmssMakeTempDir('pmss-legacy-ports-');
-        $this->pmssEnsureDir($legacyRoot.'/scgi');
-        file_put_contents($legacyRoot.'/scgi/26000', '');
+        $this->pmssWriteFile($legacyRoot.'/scgi/26000', '');
 
         $used = \pmssPortManagerUsedPorts('', $legacyRoot);
 
@@ -50,7 +49,7 @@ final class PortManagerNamespaceRootGuardTest extends TestCase
     {
         $managedRoot = $this->pmssMakeTempDir('pmss-managed-ports-');
         $linkRoot = $this->pmssMakeTempDir('pmss-managed-ports-link-').'/ports';
-        file_put_contents($managedRoot.'/lighttpd-alice', "24000\n");
+        $this->pmssWriteFile($managedRoot.'/lighttpd-fixtur01', "24000\n");
         symlink($managedRoot, $linkRoot);
 
         $this->assertSame([], \pmssPortManagerUsedPorts($linkRoot, ''));

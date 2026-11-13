@@ -201,8 +201,7 @@ class UserTransferTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-transfer-mount-summary-');
         $home = $root.'/home';
-        mkdir($home);
-        file_put_contents($home.'/payload', 'owned');
+        $this->pmssWriteFile($home.'/payload', 'owned', 0777);
         $mountinfo = $root.'/mountinfo';
         $base = "1 0 8:1 / / rw - ext4 /dev/example rw\n"
             ."2 1 8:2 / $home rw - ext4 /dev/home rw\n";
@@ -214,7 +213,7 @@ class UserTransferTest extends TestCase
             if ($contents === null) {
                 unlink($mountinfo);
             } else {
-                file_put_contents($mountinfo, $contents);
+                $this->pmssWriteFile($mountinfo, $contents);
             }
             $shell = str_replace('/proc/self/mountinfo', escapeshellarg($mountinfo), \pmssUserTransferBuildHomeStatsShell($home));
             $result = \pmssCommandCapture(\pmssBuildCommand('bash', ['-ec', $shell]));
@@ -295,7 +294,7 @@ class UserTransferTest extends TestCase
         $this->pmssEnsureDir($source.'/data/remote view');
         $this->pmssEnsureDir($source.'/.local/mounted');
         $this->pmssEnsureDir($source.'/bind');
-        file_put_contents($source.'/data/payload', 'owned');
+        $this->pmssWriteFile($source.'/data/payload', 'owned');
         $shell = 'set -eu; mount --make-rprivate /; '
             .'mount -t tmpfs tmpfs '.escapeshellarg($source.'/data/remote view').'; '
             .'mount -t tmpfs tmpfs '.escapeshellarg($source.'/.local/mounted').'; '
@@ -347,18 +346,13 @@ class UserTransferTest extends TestCase
 
     public function testPayloadAccessCheckPassesFromAnUnreadableWorkingDirectory(): void
     {
-        $root = sys_get_temp_dir().'/pmss-ut-cwd-'.bin2hex(random_bytes(4));
-        mkdir($root.'/data', 0700, true);
+        $root = $this->pmssMakeTempDir('pmss-ut-cwd-', 0700);
+        $this->pmssWriteFile($root.'/data/file', 'x', 0700);
         mkdir($root.'/cwd', 0700);
-        file_put_contents($root.'/data/file', 'x');
         $shell = \pmssUserTransferBuildPayloadAccessCheckShell($root.'/data');
         // The caller's working directory becomes unreadable, as root's home is for the account under su.
         exec('cd '.escapeshellarg($root.'/cwd').' && chmod 000 . && sh -c '.escapeshellarg($shell).'; echo $?', $out);
         chmod($root.'/cwd', 0700);
-        unlink($root.'/data/file');
-        rmdir($root.'/data');
-        rmdir($root.'/cwd');
-        rmdir($root);
         $this->assertSame('0', (string) end($out));
     }
 
@@ -384,8 +378,7 @@ class UserTransferTest extends TestCase
     public function testRtorrentRestartVerifiesOnlyAfterSuccessfulCommand(): void
     {
         $home = (string) getenv('PMSS_TEST_TEMP_ROOT').'/transfer-restart';
-        mkdir($home, 0700);
-        file_put_contents($home.'/.rtorrentRestart.php', '<?php');
+        $this->pmssWriteFile($home.'/.rtorrentRestart.php', '<?php', 0700);
         $commands = [];
         $runner = $this->pmssMakeStepRunner($commands, 7);
 
@@ -669,7 +662,7 @@ SNAP;
     public function testQbittorrentCategoriesJsonReadRejectsInvalidJson(): void
     {
         $path = $this->pmssMakeTempPath('pmss-userTransfer-qbit-invalid-');
-        file_put_contents($path, '{not json');
+        $this->pmssWriteFile($path, '{not json');
 
         $this->assertSame(null, \pmssUserTransferQbittorrentCategoriesJsonRead($path));
     }
@@ -775,20 +768,20 @@ SNAP;
         chgrp($outside, $account['gid']);
         chown($target, $account['uid']);
         chgrp($target, $account['gid']);
-        file_put_contents($target.'/.billingId', "98765\n");
+        $this->pmssWriteFile($target.'/.billingId', "98765\n");
         chmod($target.'/.billingId', 0640);
         foreach (['.billingId', '.billingServiceId', '.billingClientId'] as $marker) {
-            file_put_contents($source.'/'.$marker, "1\n");
+            $this->pmssWriteFile($source.'/'.$marker, "1\n");
         }
-        file_put_contents($source.'/data/payload', 'payload');
+        $this->pmssWriteFile($source.'/data/payload', 'payload');
         chown($source.'/data/payload', $account['uid']);
         chgrp($source.'/data/payload', $account['gid']);
         link($source.'/data/payload', $source.'/data/hardlink');
-        file_put_contents($source.'/data/subordinate', 'subordinate');
+        $this->pmssWriteFile($source.'/data/subordinate', 'subordinate');
         chown($source.'/data/subordinate', 100000);
         chgrp($source.'/data/subordinate', 100000);
         chmod($source.'/data/subordinate', 0644);
-        file_put_contents($source.'/data/setuid', 'not executable code');
+        $this->pmssWriteFile($source.'/data/setuid', 'not executable code');
         chown($source.'/data/setuid', $account['uid']);
         chgrp($source.'/data/setuid', $account['gid']);
         chmod($source.'/data/setuid', 04755);
@@ -803,7 +796,7 @@ SNAP;
         chmod($source.'/escape', 0755);
         chown($source.'/escape', $account['uid']);
         chgrp($source.'/escape', $account['gid']);
-        file_put_contents($source.'/escape/blocked', 'must stay inside target');
+        $this->pmssWriteFile($source.'/escape/blocked', 'must stay inside target');
         chown($source.'/escape/blocked', $account['uid']);
         chgrp($source.'/escape/blocked', $account['gid']);
         $cfg = ['receiver' => ['uid' => $account['uid'], 'gid' => $account['gid'], 'home' => $target,
@@ -902,7 +895,7 @@ SNAP;
         $sessionFile = $sessionDir.'/test.torrent.rtorrent';
         $oldPath = '/home/olduser/data/movie';
         $payload = 'd9:directory'.strlen($oldPath).':'.$oldPath.'e';
-        file_put_contents($sessionFile, $payload);
+        $this->pmssWriteFile($sessionFile, $payload);
 
         \pmssUserTransferRewriteRtorrentSessionPaths([
             'localUser' => 'newuser',
@@ -925,7 +918,7 @@ SNAP;
         $this->assertTrue(is_array($localAccount));
         $old = '/home/olduser/data/a';
         $payload = 'd9:directory'.strlen($old).':'.$old.'4:note4:keep' . 'e';
-        file_put_contents($path, $payload);
+        $this->pmssWriteFile($path, $payload);
         $before = lstat($path);
         $this->assertFalse($before['uid'] === $localAccount['uid'], 'fixture must exercise foreign imported ownership');
         \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => $localUser, 'remoteUser' => 'olduser'], $home);
@@ -940,11 +933,10 @@ SNAP;
     {
         $base = $this->pmssMakeTempDir('pmss-session-linked-');
         $home = $base.'/home';
-        $this->pmssEnsureDir($home.'/session');
         $outside = $base.'/outside.rtorrent';
         $payload = 'd9:directory20:/home/olduser/data/ae';
-        file_put_contents($outside, $payload);
-        file_put_contents($home.'/session/legitimate.rtorrent', $payload);
+        $this->pmssWriteFile($outside, $payload);
+        $this->pmssWriteFile($home.'/session/legitimate.rtorrent', $payload);
         symlink($outside, $home.'/session/linked.rtorrent');
         \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => 'newuser', 'remoteUser' => 'olduser'], $home);
         $this->assertSame($payload, file_get_contents($outside));
@@ -963,11 +955,10 @@ SNAP;
         $home = $base.'/home/newuser';
         $sessionDir = $home.'/session';
         $logDir = $base.'/logs';
-        $this->pmssEnsureDir($sessionDir);
         $this->pmssEnsureDir($logDir);
 
         $path = '/home/another/data/movie';
-        file_put_contents($sessionDir.'/test.torrent.rtorrent', 'd9:directory'.strlen($path).':'.$path.'e');
+        $this->pmssWriteFile($sessionDir.'/test.torrent.rtorrent', 'd9:directory'.strlen($path).':'.$path.'e');
 
         list(, $output) = $this->pmssCaptureStdout(function () use ($home): void {
             \pmssUserTransferRewriteRtorrentSessionPaths([
@@ -1014,9 +1005,9 @@ SNAP;
             $home = $this->pmssMakeTempDir('pmss-transfer-qbittorrent-');
             $marker = $home.'/.qbittorrentEnable';
             if ($case === 'directory') mkdir($marker);
-            if ($case === 'symlink' || $case === 'dry-run') file_put_contents($home.'/enabled', '');
+            if ($case === 'symlink' || $case === 'dry-run') $this->pmssWriteFile($home.'/enabled', '');
             if ($case === 'symlink' || $case === 'dangling') symlink($home.'/enabled', $marker);
-            if ($case === 'dry-run') file_put_contents($marker, '');
+            if ($case === 'dry-run') $this->pmssWriteFile($marker, '');
             $ops = [
                 'account' => static function (): array { return ['uid' => 1000]; },
                 'pids' => static function (): array { throw new \RuntimeException('Unexpected process probe'); },
@@ -1032,7 +1023,7 @@ SNAP;
     public function testRequestQbittorrentRestartSignalsOnlyNativeAccountProcesses(): void
     {
         $home = $this->pmssMakeTempDir('pmss-transfer-qbittorrent-native-');
-        file_put_contents($home.'/.qbittorrentEnable', '');
+        $this->pmssWriteFile($home.'/.qbittorrentEnable', '');
         $signals = [];
         $ops = [
             'account' => static function (string $user): array {
@@ -1082,8 +1073,7 @@ SNAP;
         $user = $account['name'];
         $home = $this->pmssMakeTempDir('pmss-share-rename-');
         $parent = $home.'/www/rutorrent/share/users';
-        $this->pmssEnsureDir($parent.'/remote');
-        file_put_contents($parent.'/remote/payload', "customer bytes\0remain");
+        $this->pmssWriteFile($parent.'/remote/payload', "customer bytes\0remain");
         $inode = lstat($parent.'/remote')['ino'];
         \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
         $this->assertFalse(file_exists($parent.'/remote'));
@@ -1100,15 +1090,13 @@ SNAP;
         $parent = $home.'/www/rutorrent/share/users';
         $outside = $base.'/outside';
         $this->pmssEnsureDir($parent);
-        $this->pmssEnsureDir($outside);
-        file_put_contents($outside.'/payload', 'outside bytes');
+        $this->pmssWriteFile($outside.'/payload', 'outside bytes');
         symlink($outside, $parent.'/remote');
         \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
         $this->assertSame('outside bytes', file_get_contents($outside.'/payload'));
         $this->assertTrue(is_link($parent.'/remote'));
         unlink($parent.'/remote');
-        $this->pmssEnsureDir($parent.'/remote');
-        file_put_contents($parent.'/remote/payload', 'tenant bytes');
+        $this->pmssWriteFile($parent.'/remote/payload', 'tenant bytes');
         symlink($outside, $parent.'/'.$user);
         \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
         $this->assertSame('tenant bytes', file_get_contents($parent.'/remote/payload'));
@@ -1178,14 +1166,14 @@ SNAP;
         $this->assertSame(0, filesize($marker), 'marker must be empty');
         $this->assertSame(posix_geteuid(), fileowner($marker));
 
-        file_put_contents($marker, 'existing');
+        $this->pmssWriteFile($marker, 'existing');
         $this->assertTrue($create(), 'an existing marker still requests a restart');
         $this->assertSame('existing', file_get_contents($marker), 'existing marker bytes must remain intact');
         unlink($marker);
 
         // A symlink to an existing file: refused, and the target is never touched.
         $target = $base.'/root-owned-target';
-        file_put_contents($target, 'secret');
+        $this->pmssWriteFile($target, 'secret');
         $targetMtime = filemtime($target);
         symlink($target, $marker);
         $this->assertFalse($create(), 'a planted symlink must be refused');
@@ -1203,9 +1191,7 @@ SNAP;
     public function testUserTransferRtorrentRestartVerificationHelpers(): void
     {
         $home = $this->pmssMakeTempDir('pmss-userTransfer-rtorrent-verify-');
-        $this->pmssEnsureDir($home.'/session');
-        file_put_contents($home.'/session/a.torrent', 'a');
-        file_put_contents($home.'/session/b.torrent', 'b');
+        $this->pmssWriteFiles($home.'/session', ['a.torrent' => 'a', 'b.torrent' => 'b']);
 
         $this->assertSame(2, \pmssUserTransferRtorrentSessionTorrentCount($home));
 
@@ -1237,8 +1223,7 @@ SNAP;
         $home = $base.'/home/testuser';
         $outside = $base.'/outside';
         $this->pmssEnsureDir($home);
-        $this->pmssEnsureDir($outside);
-        file_put_contents($outside.'/secret', 'x');
+        $this->pmssWriteFile($outside.'/secret', 'x');
 
         if (!function_exists('symlink') || @symlink($outside, $home.'/escape') === false) {
             throw new SkipTest('symlink not supported in this environment');
@@ -1281,7 +1266,7 @@ SNAP;
         $base = $this->pmssMakeTempDir('pmss-userTransfer-symlink-');
         $realTarget = $base.'/real';
         $target = $base.'/link';
-        file_put_contents($realTarget, 'original');
+        $this->pmssWriteFile($realTarget, 'original');
         symlink($realTarget, $target);
 
         $this->assertThrowsRuntime(static function () use ($target): void {
@@ -1297,10 +1282,9 @@ SNAP;
         $scratch = $base.'/scratch';
         $outside = $base.'/outside';
         $logDir = $base.'/logs';
-        $this->pmssEnsureDir($scratch);
         $this->pmssEnsureDir($logDir);
-        file_put_contents($scratch.'/transfer.expect', 'scratch');
-        file_put_contents($outside, 'keep');
+        $this->pmssWriteFile($scratch.'/transfer.expect', 'scratch');
+        $this->pmssWriteFile($outside, 'keep');
 
         $this->pmssWithEnv(['PMSS_LOG_DIR' => $logDir], function () use ($scratch, $outside): void {
             \pmssUserTransferScratchCleanup($scratch, [

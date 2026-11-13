@@ -12,12 +12,10 @@ final class ScriptsIncLoaderTest extends TestCase
     private function makeHome(array $parts): string
     {
         $home = $this->pmssMakeTempDir('pmss-scriptsinc-loader-');
-        foreach (array('.scriptsInc.php', 'www/scriptsInc.php') as $file) {
+        $files = array('.scriptsInc.php', 'www/scriptsInc.php');
+        foreach ($parts as $part) $files[] = 'www/scriptsInc'.$part.'.php';
+        foreach ($files as $file) {
             $this->pmssWriteFile($home.'/'.$file, $this->pmssReadRepoFile('etc/skel/'.$file));
-        }
-        foreach ($parts as $part) {
-            $file = 'scriptsInc'.$part.'.php';
-            $this->pmssWriteFile($home.'/www/'.$file, $this->pmssReadRepoFile('etc/skel/www/'.$file));
         }
         return $home;
     }

@@ -104,8 +104,7 @@ PHP;
     public function testWebRootSentinelsRequireNonEmptyRegularFiles(): void
     {
         $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
-        $this->pmssWriteFile($homeDir.'/www/index.php', 'panel');
-        $this->pmssWriteFile($homeDir.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssWriteFiles($homeDir.'/www', ['index.php' => 'panel', 'rutorrent/index.html' => 'rutorrent']);
 
         $this->assertTrue(\pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir));
         $this->pmssWriteFile($homeDir.'/www/rutorrent/index.html', '');
@@ -121,8 +120,7 @@ PHP;
         $this->pmssWriteFile($homeDir.'/www/index.php', 'existing panel');
 
         $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-skeleton-');
-        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'skeleton panel');
-        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'skeleton rutorrent');
+        $this->pmssWriteFiles($skeletonRoot.'/www', ['index.php' => 'skeleton panel', 'rutorrent/index.html' => 'skeleton rutorrent']);
         $this->pmssTrackEnvOverrides([
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-lock-'),
@@ -149,8 +147,7 @@ PHP;
         $this->pmssRemoveTree($homeDir.'/www');
 
         $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-full-skeleton-');
-        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
-        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssWriteFiles($skeletonRoot.'/www', ['index.php' => 'panel', 'rutorrent/index.html' => 'rutorrent']);
         $this->pmssTrackEnvOverrides([
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-full-lock-'),
@@ -183,8 +180,7 @@ PHP;
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssEnsureDir($homeDir);
         $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-idempotent-skeleton-');
-        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
-        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssWriteFiles($skeletonRoot.'/www', ['index.php' => 'panel', 'rutorrent/index.html' => 'rutorrent']);
         $this->pmssTrackEnvOverrides([
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-idempotent-lock-'),
@@ -217,8 +213,7 @@ PHP;
         $this->pmssWriteFile($outsideDir.'/sentinel.txt', 'outside');
         $this->pmssCreateSymlinkedDirectoryOrSkip($outsideDir, $homeDir.'/www');
         $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-symlink-skeleton-');
-        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
-        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssWriteFiles($skeletonRoot.'/www', ['index.php' => 'panel', 'rutorrent/index.html' => 'rutorrent']);
         $this->pmssTrackEnvOverrides([
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-symlink-lock-'),
@@ -241,8 +236,7 @@ PHP;
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssWriteFile($homeDir.'/www', 'not-a-directory');
         $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-path-type-skeleton-');
-        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
-        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssWriteFiles($skeletonRoot.'/www', ['index.php' => 'panel', 'rutorrent/index.html' => 'rutorrent']);
         $this->pmssTrackEnvOverrides([
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-path-type-lock-'),
@@ -260,8 +254,7 @@ PHP;
     public function testHealthySentinelsDoNotInvokeReconciler(): void
     {
         $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
-        $this->pmssWriteFile($homeDir.'/www/index.php', 'panel');
-        $this->pmssWriteFile($homeDir.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssWriteFiles($homeDir.'/www', ['index.php' => 'panel', 'rutorrent/index.html' => 'rutorrent']);
         $messages = [];
 
         $this->assertTrue(\pmssCheckGuiWebRootReconcileIfSentinelMissing(

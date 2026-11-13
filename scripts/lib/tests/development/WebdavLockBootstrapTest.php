@@ -39,10 +39,9 @@ class WebdavLockBootstrapTest extends TestCase
     public function testFixesLockFilePermissions(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-webdav-lock-perms-', 0700);
-        $userHome = dirname($this->pmssEnsureDir($dir.'/home/demouser/.lighttpd', 0700));
+        $userHome = $dir.'/home/demouser';
 
-        $lockFile = $userHome.'/.lighttpd/webdav.lock.db';
-        file_put_contents($lockFile, '');
+        $lockFile = $this->pmssWriteFile($userHome.'/.lighttpd/webdav.lock.db', '', 0700);
         chmod($lockFile, 0644);
 
         \pmssEnsureWebdavLockDatabase('demouser', $userHome);
