@@ -278,6 +278,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   bounded probes; `deviceParse.php` interprets text without I/O. `deviceMetrics.php`
   shares ordered matching, threshold selection, counter growth and entry status.
   SMART retains last-line precedence; NVMe retains first-match precedence (ADR 0173).
+  SMART rejects NUL-containing stdout or stderr before parsing, using its existing
+  unavailable-output result. Valid text retains SMART exit-code bitmask handling,
+  timeout findings and standby status. `StorageHealthSmartOutputSafetyTest` covers
+  these boundaries with injected probes on the testing machine.
 - **scripts/lib/storageBenchmark.php** – Stable CLI and guarded probe facade.
   `storageBenchmark/cli.php` owns option policy, `file.php` owns reservation and
   inode-checked cleanup, `device.php` owns member-device reads, and `fio.php`

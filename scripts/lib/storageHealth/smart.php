@@ -25,7 +25,8 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
     $probe = pmssStorageHealthProbeCommand('smart', (string) ($disk['kname'] ?? ''), 'smartctl -n standby -H -A -i '.escapeshellarg($dev));
     $res = pmssCommandCapture($probe['command'], 25);
     $out = $res['stdout']."\n".$res['stderr'];
-    if (trim($out) === '') {
+    // Corrupt probe text cannot prove health, even when it contains a valid line.
+    if (trim($out) === '' || pmssFilesystemPathHasNulByte($out)) {
         $locked = $probe['lock_exit_code'] !== 0 && (int) $res['rc'] === $probe['lock_exit_code'];
         return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1),
             [$locked ? 'smartctl_probe_locked' : 'smartctl_empty'], $locked ? 'smartctl probe already running' : 'smartctl produced no output');
