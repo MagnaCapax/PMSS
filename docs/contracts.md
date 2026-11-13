@@ -188,6 +188,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   stdout, or terminates execution itself.
 
 - `pmssFileWriteComplete()` returns `false` for NUL-containing paths before invoking a writer; valid paths retain complete-byte write semantics.
+- `pmssInodeSafeRewriteRegularFile()` returns `false` for NUL-containing roots
+  or destination paths before filesystem access or the rewrite callback. Valid
+  paths retain their containment, inode, metadata and in-place write semantics.
+  `InodeSafeRewriteInputSafetyTest` covers refusals and accepted rewrites;
+  execution stays on testing machines.
 - `pmssFileOpenWithUmask()` returns `false` for empty or NUL-containing paths
   or modes before changing umask or invoking the opener. Valid arguments pass
   through unchanged; the caller's umask is restored on success, failed opens,

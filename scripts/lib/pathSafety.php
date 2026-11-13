@@ -234,6 +234,8 @@ function pmssPathWithinResolvedRoot(string $path, string $root): bool
 /** Rewrite one existing regular inode without following a substituted path. */
 function pmssInodeSafeRewriteRegularFile(string $root, string $path, callable $rewrite): bool
 {
+    // Reject corrupt inputs before clearstatcache() can throw instead of refusing the rewrite.
+    if (pmssFilesystemPathHasNulByte($root) || pmssFilesystemPathHasNulByte($path)) return false;
     clearstatcache(true, $path);
     if (!pmssPathTargetIsSafe($root, true) || !is_dir($root)
         || !pmssPathTargetIsSafe($path, false, true)
