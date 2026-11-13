@@ -139,8 +139,9 @@ class WireGuardInstallerTest extends TestCase
                 'PublicKey = '.$aliceKey,
                 'PublicKey = '.$bobKey,
             ]);
+            // Owner comments use the synthetic fixture names introduced in 5b4a8166.
             $this->assertSame(
-                'b946445515861e459499723c0c9456e0b85c37e19f5af3728a32d6bf4637addf',
+                '7b0aaa718b6156c99b479799bb8910f9cf1c4f985dd0c9ac01d6f87ccbe3d5bd',
                 hash('sha256', $contents),
                 'WireGuard config bytes changed'
             );
