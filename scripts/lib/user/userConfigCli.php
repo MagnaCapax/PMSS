@@ -66,6 +66,7 @@ function pmssUserConfigCliUsage(): string
         ], pmssUserConfigCliResourceHelpLines('userConfigPositionals', 'parameter', $resourceDescriptionSuffixes)),
         'Named Options' => array_merge(pmssUserConfigCliResourceHelpLines('userConfigNamedOptions', 'usage', $resourceDescriptionSuffixes), [
             pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
+            pmssCliHelpLine('--bonus-quota-gib=BONUS_QUOTA_GiB', 'Additional disk quota already included in the total; positive values update the display, 0 leaves it unchanged.'),
             pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
             pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),
             pmssCliHelpLine('-h, --help', 'Show this help and exit.'),

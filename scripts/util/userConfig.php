@@ -18,6 +18,7 @@ foreach (['traffic', 'iopsLimit', 'deluge', 'qbittorrent', 'qbittorrentWebUiAuth
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/user/userConfigCli.php';
 require_once __DIR__.'/../lib/user/userConfigRuntime.php';
+require_once __DIR__.'/../lib/user/bonusQuota.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/rutorrent/config.php';
@@ -33,7 +34,7 @@ require_once __DIR__.'/../lib/torrentClients/identity.php';
  */
 $usage = pmssUserConfigCliUsage();
 $resourceOptions = pmssUserConfigCliResourceOptionNames();
-$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], $resourceOptions));
+$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled', 'bonus-quota-gib'], $resourceOptions));
 $helpRequested = pmssCliOption($parsed, 'help', 'h', false) !== false;
 $args = array_merge([''], $parsed['arguments']);
 if ($helpRequested) {
@@ -48,9 +49,15 @@ try {
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage()."\n");
 }
+try {
+    $bonusQuotaGiB = pmssAddUserBonusQuotaGiBParse(pmssCliOption($parsed, 'bonus-quota-gib'));
+} catch (InvalidArgumentException $exception) {
+    pmssCliExitWithStderr($exception->getMessage()."\n", 1);
+}
 $explicitResourceOverrides = pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'explicit');
 $namedConfigChange = $uploadThrottleKib !== null
     || $dockerEnabled !== null
+    || $bonusQuotaGiB !== null
     || count($explicitResourceOverrides) > 0;
 $configMode = pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange);
 if ($configMode === '') {
@@ -66,6 +73,9 @@ $user = [
 ];
 $user = array_merge($user, pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'resolved'));
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
+if ($bonusQuotaGiB !== null) {
+    $user['bonusQuotaGiB'] = $bonusQuotaGiB;
+}
 
 $passwdEntry = pmssPasswdEntryLookup($user['name']);
 if ($passwdEntry === null) {
@@ -130,6 +140,10 @@ if ($uploadThrottleKib !== null) {
     }
 }
 
+// Match creation's display-only writer after the authoritative store succeeds.
+if (!pmssAddUserBonusQuotaPersist($user, $expectedHome)) {
+    fwrite(STDERR, "Warning: failed to persist bonus quota display copy for {$user['name']}\n");
+}
 // Write optional traffic caps before touching heavyweight services so limits
 // persist even if later steps bail out.
 userApplyTrafficLimit($user);

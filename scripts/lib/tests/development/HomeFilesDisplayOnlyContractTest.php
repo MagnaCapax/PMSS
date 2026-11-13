@@ -29,7 +29,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         'scripts/lib/resources/processor.php' => ['.resourceData'],
         'scripts/lib/traffic/storage.php' => ['.trafficLimit', '.trafficData', '.trafficDataLocal', '.trafficDataIngress'],
         'scripts/lib/user/add/artifactVerification.php' => ['.quota'],
-        'scripts/lib/user/add/postProvision.php' => ['.bonusQuota'],
+        'scripts/lib/user/bonusQuota.php' => ['.bonusQuota'],
         'scripts/lib/user/homeMarkerRegistry.php' => ['.bonus', '.bonusTraffic', '.bonusQuota', '.billingId', '.billingServiceId', '.billingClientId', '.trafficLimit'],
         'scripts/lib/user/iopsLimit.php' => ['.iopsLimit'],
         'scripts/lib/user/rootArtifactPermissions.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail', '.quota'],

@@ -14,31 +14,7 @@ require_once __DIR__.'/../../userLifecycle.php';
 require_once __DIR__.'/../serviceLaunch.php';
 require_once __DIR__.'/../userConfigStore.php';
 require_once __DIR__.'/../appSwitch.php';
-
-/** Persist creation-time additional quota for immediate panel visibility. */
-function pmssAddUserBonusQuotaPersist(array $user, string $homePath): bool
-{
-    if (!array_key_exists('bonusQuotaGiB', $user)) {
-        return true;
-    }
-    if (!is_int($user['bonusQuotaGiB']) || $user['bonusQuotaGiB'] < 0) {
-        return false;
-    }
-    if ($user['bonusQuotaGiB'] === 0) {
-        return true;
-    }
-    if (!isset($user['name']) || !is_string($user['name']) || !pmssValidateUsername($user['name'])) {
-        return false;
-    }
-
-    return pmssReplaceAccountFileWithLegacyFallback(
-        $user['name'],
-        rtrim($homePath, '/'),
-        rtrim($homePath, '/').'/.bonusQuota',
-        (string) $user['bonusQuotaGiB'],
-        0640
-    );
-}
+require_once __DIR__.'/../bonusQuota.php';
 
 /**
  * Run post-provision steps that should not block account creation.

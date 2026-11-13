@@ -12,6 +12,7 @@
 
 require_once __DIR__.'/../../cli/optionParser.php';
 require_once __DIR__.'/../userConfigCli.php';
+require_once __DIR__.'/../bonusQuota.php';
 require_once __DIR__.'/../appProfilePolicy.php';
 
 /**
@@ -59,23 +60,6 @@ function pmssAddUserCliUsage(): string
             '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.',
         ],
     ], $useColor);
-}
-
-/** Parse the optional creation-time additional disk quota. */
-function pmssAddUserBonusQuotaGiBParse($raw): ?int
-{
-    if ($raw === null) {
-        return null;
-    }
-    if (!is_string($raw) || preg_match('/^(0|[1-9][0-9]*)$/D', $raw) !== 1) {
-        throw new InvalidArgumentException('Invalid --bonus-quota-gib value');
-    }
-
-    $value = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-    if ($value === false) {
-        throw new InvalidArgumentException('Invalid --bonus-quota-gib value');
-    }
-    return (int) $value;
 }
 
 /**

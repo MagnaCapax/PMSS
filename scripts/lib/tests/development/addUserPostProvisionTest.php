@@ -81,6 +81,16 @@ final class AddUserPostProvisionTest extends TestCase
         $this->assertSame('25', trim((string) file_get_contents($home.'/.bonusQuota')));
         $this->assertSame(0640, fileperms($home.'/.bonusQuota') & 0777);
 
+        // Reconfigures must replace the old figure for both addon increases and decreases.
+        foreach ([100, 10] as $quota) {
+            $this->assertTrue(\pmssAddUserBonusQuotaPersist(['name' => 'fixtur01', 'bonusQuotaGiB' => $quota], $home));
+            $this->assertSame((string) $quota, file_get_contents($home.'/.bonusQuota'));
+        }
+        foreach ([['name' => 'fixtur01'], ['name' => 'fixtur01', 'bonusQuotaGiB' => 0]] as $unchanged) {
+            $this->assertTrue(\pmssAddUserBonusQuotaPersist($unchanged, $home));
+            $this->assertSame('10', file_get_contents($home.'/.bonusQuota'));
+        }
+
         unlink($home.'/.bonusQuota');
         $outside = $this->tempDir.'/outside';
         $this->pmssWriteFile($outside, 'unchanged');
