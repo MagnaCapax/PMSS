@@ -262,39 +262,29 @@ class UpdateServicesRuntimeTest extends TestCase
     {
         $this->assertSame("session    optional   pam_systemd.so\n", \pmssCronPamSystemdLine());
 
-        $f = tempnam(sys_get_temp_dir(), 'pmss-cron-pam-');
-        try {
-            $original = "@include common-auth\nsession    required     pam_loginuid.so\n";
-            file_put_contents($f, $original);
-            chmod($f, 0640);
-            $owner = fileowner($f);
+        $original = "@include common-auth\nsession    required     pam_loginuid.so\n";
+        $f = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-cron-pam-'), $original);
+        chmod($f, 0640);
+        $owner = fileowner($f);
 
-            // Appends pam_systemd to an existing regular cron PAM file.
-            $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
-            $this->assertSame($original.\pmssCronPamSystemdLine(), file_get_contents($f));
-            $this->assertSame(0640, fileperms($f) & 0777);
-            $this->assertSame($owner, fileowner($f));
+        // Appends pam_systemd to an existing regular cron PAM file.
+        $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
+        $this->assertSame($original.\pmssCronPamSystemdLine(), file_get_contents($f));
+        $this->assertSame(0640, fileperms($f) & 0777);
+        $this->assertSame($owner, fileowner($f));
 
-            // Idempotent: a second call does not duplicate the line.
-            $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
-            $this->assertSame(1, substr_count(file_get_contents($f), 'pam_systemd.so'));
-        } finally {
-            @unlink($f);
-        }
+        // Idempotent: a second call does not duplicate the line.
+        $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
+        $this->assertSame(1, substr_count(file_get_contents($f), 'pam_systemd.so'));
 
         // A commented pam_systemd line does NOT count as present (real line is appended).
-        $g = tempnam(sys_get_temp_dir(), 'pmss-cron-pam2-');
-        try {
-            file_put_contents($g, "# session optional pam_systemd.so (disabled)\n@include common-auth\n");
-            $this->assertTrue(\pmssEnsureCronPamSystemdSession($g));
-            $this->assertSame(2, substr_count(file_get_contents($g), 'pam_systemd.so'));
-        } finally {
-            @unlink($g);
-        }
+        $g = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-cron-pam2-'),
+            "# session optional pam_systemd.so (disabled)\n@include common-auth\n");
+        $this->assertTrue(\pmssEnsureCronPamSystemdSession($g));
+        $this->assertSame(2, substr_count(file_get_contents($g), 'pam_systemd.so'));
 
         // Absent cron PAM file -> no-op success, file is NOT created.
-        $absent = sys_get_temp_dir().'/pmss-cron-pam-absent-'.getmypid();
-        @unlink($absent);
+        $absent = $this->pmssMakeTempPath('pmss-cron-pam-absent-');
         $this->assertTrue(\pmssEnsureCronPamSystemdSession($absent));
         $this->assertFalse(file_exists($absent));
     }

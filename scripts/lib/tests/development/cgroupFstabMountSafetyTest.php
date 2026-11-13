@@ -8,8 +8,7 @@ class CgroupFstabMountSafetyTest extends TestCase
 {
     public function testCgroupV1FstabMountAddsManagedEntryWithBackup(): void
     {
-        $fstab = $this->pmssMakeTempFile('pmss-cgroup-fstab-');
-        $this->pmssWriteFile($fstab, "UUID=abc / ext4 defaults 0 0\n");
+        $fstab = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-cgroup-fstab-'), "UUID=abc / ext4 defaults 0 0\n");
 
         $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab): void {
             $this->assertSame(true, \pmssCgroupV1FstabMountEnsure($fstab, $logger));
@@ -26,8 +25,7 @@ class CgroupFstabMountSafetyTest extends TestCase
     public function testCgroupV1FstabMountSkipsExistingEntry(): void
     {
         $original = "cgroup /sys/fs/cgroup cgroup defaults 0 0\n";
-        $fstab = $this->pmssMakeTempFile('pmss-cgroup-fstab-existing-');
-        $this->pmssWriteFile($fstab, $original);
+        $fstab = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-cgroup-fstab-existing-'), $original);
 
         $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab): void {
             $this->assertSame(false, \pmssCgroupV1FstabMountEnsure($fstab, $logger));

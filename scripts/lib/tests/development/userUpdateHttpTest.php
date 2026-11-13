@@ -162,7 +162,6 @@ JSON
         $ctx = $this->pmssUserUpdateContext($home);
 
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
-        $this->pmssWriteFile($jsonLog, '');
 
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 
@@ -187,7 +186,6 @@ JSON
         $home = $this->pmssMakeTempDir('pmss-http-irssi-conflict-');
         $this->pmssWriteFile($home.'/.irssi', 'customer content');
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
-        $this->pmssWriteFile($jsonLog, '');
 
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         try {
@@ -210,7 +208,6 @@ JSON
         $ctx = $this->pmssUserUpdateContext($home);
 
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
-        $this->pmssWriteFile($jsonLog, '');
 
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 

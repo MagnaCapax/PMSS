@@ -30,7 +30,6 @@ class ArrUpdateTest extends TestCase
             $this->assertEquals("1.2.3\n", (string) @file_get_contents($installPath.'/version.txt'));
             $this->assertEquals([], glob($workPattern) ?: [], 'expected workspace cleanup after install');
         } finally {
-            $this->cleanup($baseDir);
             $this->cleanupGlob($workPattern);
         }
     }
@@ -58,7 +57,6 @@ class ArrUpdateTest extends TestCase
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
             $this->assertEquals([], glob($workPattern) ?: [], 'expected workspace cleanup after extract failure');
         } finally {
-            $this->cleanup($baseDir);
             $this->cleanupGlob($workPattern);
         }
     }
@@ -82,7 +80,7 @@ class ArrUpdateTest extends TestCase
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
             $this->assertEquals([], glob($workPattern) ?: [], 'expected workspace cleanup after download failure');
         } finally {
-            $this->cleanup($baseDir); $this->cleanupGlob($workPattern);
+            $this->cleanupGlob($workPattern);
         }
     }
 
@@ -99,17 +97,13 @@ class ArrUpdateTest extends TestCase
         ]);
         $shimDir = $this->writeCurlShim($baseDir, 'amd64');
 
-        try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)-.*\.tar\.gz/');
-            });
+        $this->pmssWithPathPrefixedEnv($shimDir, [
+            'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+        ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)-.*\.tar\.gz/');
+        });
 
-            $this->assertEquals('x64', (string) @file_get_contents($installPath.'/marker.txt'));
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $this->assertEquals('x64', (string) @file_get_contents($installPath.'/marker.txt'));
     }
 
     public function testUpdateFallsBackToGenericAssetWhenArchSpecificBuildDoesNotMatch(): void
@@ -124,47 +118,35 @@ class ArrUpdateTest extends TestCase
         ]);
         $shimDir = $this->writeCurlShim($baseDir, 'amd64');
 
-        try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)(?:-.*)?\.tar\.gz/');
-            });
+        $this->pmssWithPathPrefixedEnv($shimDir, [
+            'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+        ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)(?:-.*)?\.tar\.gz/');
+        });
 
-            $this->assertEquals('generic', (string) @file_get_contents($installPath.'/marker.txt'));
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $this->assertEquals('generic', (string) @file_get_contents($installPath.'/marker.txt'));
     }
 
     public function testUpdateRejectsUnsafeExtractDirectoryBeforeFetchingMetadata(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-unsafe-extract-');
 
-        try {
-            list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
-                $this->runArrUpdate('PmssArrUnsafeExtract', $baseDir.'/install', $baseDir.'/missing-releases.json', '../PackageDir');
-            });
+        list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
+            $this->runArrUpdate('PmssArrUnsafeExtract', $baseDir.'/install', $baseDir.'/missing-releases.json', '../PackageDir');
+        });
 
-            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: extract_dir'], ['Unable to fetch release metadata'], $output);
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: extract_dir'], ['Unable to fetch release metadata'], $output);
     }
 
     public function testUpdateRejectsUnsafeInstallPathBeforeFetchingMetadata(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-unsafe-install-');
 
-        try {
-            list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
-                $this->runArrUpdate('PmssArrUnsafeInstall', $baseDir.'/../install', $baseDir.'/missing-releases.json', 'PackageDir');
-            });
+        list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
+            $this->runArrUpdate('PmssArrUnsafeInstall', $baseDir.'/../install', $baseDir.'/missing-releases.json', 'PackageDir');
+        });
 
-            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
     }
 
     public function testUpdateRejectsTopLevelInstallPathBeforeFetchingMetadata(): void
@@ -179,19 +161,14 @@ class ArrUpdateTest extends TestCase
     public function testUpdateRejectsSymlinkedInstallPathBeforeFetchingMetadata(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-symlink-install-');
-        $link = sys_get_temp_dir().'/pmss-arr-update-link-'.bin2hex(random_bytes(3));
+        $link = $this->pmssMakeTempPath('pmss-arr-update-link-');
 
-        try {
-            $this->pmssCreateSymlinkOrSkip($baseDir, $link);
-            list(, $output) = $this->pmssCaptureStdout(function () use ($link): void {
-                $this->runArrUpdate('PmssArrUnsafeSymlink', $link.'/install', $link.'/missing-releases.json', 'PackageDir');
-            });
+        $this->pmssCreateSymlinkOrSkip($baseDir, $link);
+        list(, $output) = $this->pmssCaptureStdout(function () use ($link): void {
+            $this->runArrUpdate('PmssArrUnsafeSymlink', $link.'/install', $link.'/missing-releases.json', 'PackageDir');
+        });
 
-            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
-        } finally {
-            @unlink($link);
-            $this->cleanup($baseDir);
-        }
+        $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
     }
 
     public function testUpdateRejectsFileInstallPathBeforeFetchingMetadata(): void
@@ -199,16 +176,12 @@ class ArrUpdateTest extends TestCase
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-file-install-');
         $installPath = $baseDir.'/install';
 
-        try {
-            $this->pmssWriteFile($installPath, 'not a directory');
-            list(, $output) = $this->pmssCaptureStdout(function () use ($installPath, $baseDir): void {
-                $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
-            });
+        $this->pmssWriteFile($installPath, 'not a directory');
+        list(, $output) = $this->pmssCaptureStdout(function () use ($installPath, $baseDir): void {
+            $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
+        });
 
-            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
     }
 
     public function testUpdateDoesNotReportInstalledWhenInstallParentIsMissing(): void
@@ -221,16 +194,12 @@ class ArrUpdateTest extends TestCase
         $metadataPath = $this->writeMetadata($baseDir, [[basename($archivePath), $archivePath]]);
         $shimDir = $this->writeCurlShim($baseDir);
 
-        try {
-            list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-            }, $this->pmssPathPrefixedEnvironment($shimDir));
+        list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
+        }, $this->pmssPathPrefixedEnvironment($shimDir));
 
-            $this->assertFalse(is_dir($installPath), 'install path should stay absent when its parent directory is missing');
-            $this->assertStringContainsAndOmitsStrings(['Install parent directory missing; refusing to replace application'], ['Installed version 1.2.3'], $output);
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $this->assertFalse(is_dir($installPath), 'install path should stay absent when its parent directory is missing');
+        $this->assertStringContainsAndOmitsStrings(['Install parent directory missing; refusing to replace application'], ['Installed version 1.2.3'], $output);
     }
 
     public function testUpdateSkipsMatchingInstallFromVersionFileWithoutRunningTheBinary(): void
@@ -248,19 +217,15 @@ class ArrUpdateTest extends TestCase
         // Canary: a runnable binary that records any invocation. It must stay silent.
         $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
-        try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-            });
+        $this->pmssWithPathPrefixedEnv($shimDir, [
+            'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+        ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
+        });
 
-            $expectedMarker = @fileowner($installPath) === 0 ? 'existing' : 'replacement';
-            $this->assertEquals($expectedMarker, (string) @file_get_contents($installPath.'/marker.txt'));
-            $this->assertTrue(!is_file($probeLog), 'the installed binary must never be executed to determine its version');
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $expectedMarker = @fileowner($installPath) === 0 ? 'existing' : 'replacement';
+        $this->assertEquals($expectedMarker, (string) @file_get_contents($installPath.'/marker.txt'));
+        $this->assertTrue(!is_file($probeLog), 'the installed binary must never be executed to determine its version');
     }
 
     public function testUpdateReinstallsMatchingVersionWhenInstallIsNotRootOwned(): void
@@ -279,17 +244,13 @@ class ArrUpdateTest extends TestCase
         }
         $this->assertTrue(\pmssRootOwnedTreeNeedsRefresh($installPath));
 
-        try {
-            list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, 'PackageDir');
-            }, $this->pmssPathPrefixedEnvironment($shimDir));
+        list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath): void {
+            $this->runArrUpdate($app, $installPath, $metadataPath, 'PackageDir');
+        }, $this->pmssPathPrefixedEnvironment($shimDir));
 
-            $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
-            $this->assertStringContainsString('install has non-root-owned entries; reinstalling', $output);
-            $this->assertStringNotContainsString('Already at 1.2.3', $output);
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
+        $this->assertStringContainsString('install has non-root-owned entries; reinstalling', $output);
+        $this->assertStringNotContainsString('Already at 1.2.3', $output);
     }
 
     public function testUpdateReinstallsWhenVersionMetadataIsAbsentWithoutRunningTheBinary(): void
@@ -306,21 +267,17 @@ class ArrUpdateTest extends TestCase
         $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
         $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
-        try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-            });
+        $this->pmssWithPathPrefixedEnv($shimDir, [
+            'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+        ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
+        });
 
-            // Unknown version reinstalls once, then persists version.txt so the next
-            // run is a cheap metadata read instead of another download.
-            $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
-            $this->assertEquals("1.2.3\n", (string) @file_get_contents($installPath.'/version.txt'));
-            $this->assertTrue(!is_file($probeLog), 'the installed binary must never be executed to determine its version');
-        } finally {
-            $this->cleanup($baseDir);
-        }
+        // Unknown version reinstalls once, then persists version.txt so the next
+        // run is a cheap metadata read instead of another download.
+        $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
+        $this->assertEquals("1.2.3\n", (string) @file_get_contents($installPath.'/version.txt'));
+        $this->assertTrue(!is_file($probeLog), 'the installed binary must never be executed to determine its version');
     }
 
     private function createArchive(string $baseDir, string $extractDir, array $files, string $archiveName = 'bundle-1.2.3.tar.gz'): string

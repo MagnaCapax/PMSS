@@ -31,8 +31,7 @@ final class StorageHealthRaidBitmapTest extends TestCase
     public function testSnapshotProbesEachArrayAndReportsMissingBitmap(): void
     {
         $arguments = $this->pmssMakeTempFile('pmss-raid-bitmap-argv-');
-        $mdstat = $this->pmssMakeTempFile('pmss-raid-bitmap-mdstat-');
-        $this->pmssWriteFile($mdstat, "md1 : active raid5 sda1[0] sdb1[1] [2/2] [UU]\n".
+        $mdstat = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-raid-bitmap-mdstat-'), "md1 : active raid5 sda1[0] sdb1[1] [2/2] [UU]\n".
             "md2 : active raid1 sdc1[0] sdd1[1] [2/2] [UU]\n");
         $stub = $this->pmssMakeExecutableStub('mdadm', "#!/bin/sh\nprintf '%s\\n' \"\$LC_ALL \$*\" >> ".escapeshellarg($arguments)."\n".
             "printf 'Raid Level : raid5\\nState : clean\\n'\n".
@@ -52,8 +51,7 @@ final class StorageHealthRaidBitmapTest extends TestCase
 
     public function testFailedProbesDiscardEvenHealthyLookingPartialOutput(): void
     {
-        $mdstat = $this->pmssMakeTempFile('pmss-raid-bitmap-failed-');
-        $this->pmssWriteFile($mdstat, "md1 : active raid5 sda1[0] [2/2] [UU]\n");
+        $mdstat = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-raid-bitmap-failed-'), "md1 : active raid5 sda1[0] [2/2] [UU]\n");
         // Include timeout, forced termination, lock contention and missing-command results.
         foreach ([1, 2, 75, 124, 126, 127, 137, 255] as $rc) {
             $stub = $this->pmssMakeExecutableStub('mdadm', "#!/bin/sh\nprintf 'Raid Level : raid5\\nState : clean\\nIntent Bitmap : Internal\\n'\nexit ".$rc."\n", 'pmss-raid-failed-bin-');
@@ -67,8 +65,7 @@ final class StorageHealthRaidBitmapTest extends TestCase
 
     public function testMissingToolEmptyAndMalformedSuccessfulProbesRemainUnknown(): void
     {
-        $mdstat = $this->pmssMakeTempFile('pmss-raid-bitmap-unknown-');
-        $this->pmssWriteFile($mdstat, "md1 : active raid1 sda1[0] [2/2] [UU]\n");
+        $mdstat = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-raid-bitmap-unknown-'), "md1 : active raid1 sda1[0] [2/2] [UU]\n");
         $paths = [$this->pmssMakeTempDir('pmss-raid-no-mdadm-')];
         foreach (['', 'unrecognized output', 'Intent Bitmap : Internal'] as $output) {
             $paths[] = $this->pmssMakeExecutableStub('mdadm', "#!/bin/sh\nprintf '%s\\n' ".escapeshellarg($output)."\n", 'pmss-raid-unknown-bin-');

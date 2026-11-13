@@ -675,6 +675,10 @@ avoid local forwarding helpers that add unused parameters or another publication
 Resource-state, port-namespace and user-file fixtures call `pmssMakeTempDir()` and
 `pmssEnsureDir()` directly instead of private directory-forwarding methods. Keep
 prefixes, modes, per-call allocation and missing-home scenarios at their callers.
+Temporary PAM files, repository refusals and ARR installer fixtures likewise
+delegate cleanup to tracked paths. Compose allocation with checked publication;
+a freshly allocated empty log needs no second write. Keep metadata checks,
+cache resets and cleanup of updater-created workspaces explicit.
 
 Traffic, resource-limit, filesystem-reader and watchdog setup writes use these
 checked writers too. `pmssWriteSerializedFixture()` retains object and scalar

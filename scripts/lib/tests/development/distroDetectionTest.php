@@ -190,22 +190,17 @@ class DistroDetectionTest extends TestCase
     public function testSafeWriteSourcesLogsParentDirectoryFailure(): void
     {
         $tmpDir = $this->pmssMakeTempDir('pmss-apt-parent-');
-        $blocker = $tmpDir.'/blocked';
-        file_put_contents($blocker, 'not-a-directory');
+        $blocker = $this->pmssWriteFile($tmpDir.'/blocked', 'not-a-directory');
 
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
 
-        try {
-            $this->pmssWithAptSourcesPath($blocker.'/sources.list', function () use ($logger): void {
-                $this->assertTrue(!\pmssSafeWriteSources("deb https://mirror.invalid bookworm main\n", 'Bookworm', $logger));
-            });
-            $this->pmssAssertMessagesContain($logs, '[ERROR] Unable to create parent directory for Bookworm sources.list: '.$blocker);
-            $this->assertTrue(!file_exists($blocker.'/sources.list'));
-            $this->assertTrue(!file_exists($blocker.'/sources.list.pmss-backup'));
-        } finally {
-            @unlink($blocker);
-        }
+        $this->pmssWithAptSourcesPath($blocker.'/sources.list', function () use ($logger): void {
+            $this->assertTrue(!\pmssSafeWriteSources("deb https://mirror.invalid bookworm main\n", 'Bookworm', $logger));
+        });
+        $this->pmssAssertMessagesContain($logs, '[ERROR] Unable to create parent directory for Bookworm sources.list: '.$blocker);
+        $this->assertTrue(!file_exists($blocker.'/sources.list'));
+        $this->assertTrue(!file_exists($blocker.'/sources.list.pmss-backup'));
     }
 
     /**
@@ -223,22 +218,18 @@ class DistroDetectionTest extends TestCase
     {
         $configDir = $this->pmssMakeTempDir('pmss-config-');
 
-        try {
-            $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($configDir): void {
-                $logs = [];
-                $logger = $this->pmssMakeArrayLogger($logs);
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($configDir): void {
+            $logs = [];
+            $logger = $this->pmssMakeArrayLogger($logs);
 
-                $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
-                $this->pmssAssertMessagesContain($logs, 'Repository template missing: ');
+            $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
+            $this->pmssAssertMessagesContain($logs, 'Repository template missing: ');
 
-                $logs = [];
-                file_put_contents($configDir.'/template.sources.bookworm', " \n\t ");
-                $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
-                $this->pmssAssertMessagesContain($logs, 'Repository template empty: ');
-            });
-        } finally {
-            @unlink($configDir.'/template.sources.bookworm');
-        }
+            $logs = [];
+            $this->pmssWriteFile($configDir.'/template.sources.bookworm', " \n\t ");
+            $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
+            $this->pmssAssertMessagesContain($logs, 'Repository template empty: ');
+        });
     }
 
     /** Invalid suite names must not reach the filesystem or appear in log lines. */
