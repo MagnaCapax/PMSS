@@ -70,6 +70,15 @@ casts, valid path bytes, NUL rejection and successful payloads retain their
 contracts. The same path-safety test covers malformed values with warnings
 promoted to exceptions and command lookup intercepted, without probing devices.
 
+The same NVMe boundary rejects non-scalar non-null optional inventory metadata
+(`kname`, `model`, `serial`, `rota`, and `size`) before command lookup. These values
+are cast for the probe lock or final entry; rejecting containers, resources and
+objects prevents warnings and conversion hooks before or after a probe. Missing
+and null metadata retain their defaults; scalar conversions, probe arguments,
+capture timeout and successful payloads remain unchanged. The inventory cases in
+`StorageHealthNvmePathSafetyTest` cover both refusal and compatibility through
+isolated command shims on the testing machine.
+
 ## References
 
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)

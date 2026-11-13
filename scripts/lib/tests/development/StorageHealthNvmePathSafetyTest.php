@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/storageHealth.php';
 
-/** Device-path boundary coverage for scripts/lib/storageHealth/nvme.php. */
+/** Inventory boundary coverage for scripts/lib/storageHealth/nvme.php. */
 class StorageHealthNvmePathSafetyTest extends TestCase
 {
     public function testMalformedPathValuesReturnUnavailableBeforeCommandLookup(): void
@@ -36,8 +36,13 @@ set_error_handler(static function ($severity, $message, $file, $line): void {
 });
 try {
     foreach ([null, [], ['/dev/nvme0n1'], new \stdClass(), $stringable, $exception,
-        $error, $incomplete, $stream, $closedStream] as $path) {
-        $results[] = pmssStorageHealthSnapshotNvme(['path' => $path], [], 'fixture');
+        $error, $incomplete, $stream, $closedStream] as $value) {
+        foreach (['path', 'kname', 'model', 'serial', 'rota', 'size'] as $field) {
+            // Optional nulls remain valid; only the required path refuses null.
+            if ($field !== 'path' && $value === null) continue;
+            $results[] = pmssStorageHealthSnapshotNvme(
+                array_replace(['path' => '/dev/nvme0n1'], [$field => $value]), [], 'fixture');
+        }
     }
     $results[] = pmssStorageHealthSnapshotNvme([], [], 'fixture');
 } finally {
@@ -46,7 +51,44 @@ try {
 }
 echo json_encode($results);
 PHP;
-        $this->assertSame(array_fill(0, 11, null), $this->pmssRunInlinePhpJson($script));
+        $this->assertSame(array_fill(0, 56, null), $this->pmssRunInlinePhpJson($script));
+    }
+
+    public function testScalarAndNullMetadataKeepProbeArgumentsAndPayload(): void
+    {
+        // Isolate the boundary without launching nvme or accessing a device.
+        $script = <<<'PHP'
+namespace NvmeMetadataValueFixture;
+function pmssCommandPath($command) { return '/fixture/nvme'; }
+function pmssStorageHealthProbeCommand($kind, $kname, $command) {
+    $GLOBALS['probe'] = [$kind, $kname, $command];
+    return ['command' => $command];
+}
+function pmssCommandCapture($command, $timeout) {
+    $GLOBALS['capture'] = [$command, $timeout];
+    return ['rc' => 0, 'stdout' => "temperature : 42 C\nmedia_errors : 0\n"];
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageHealth/nvme.php',
+            'NvmeMetadataValueFixture');
+        $script .= <<<'PHP'
+$rows = [[]];
+foreach ([null, false, true, 0, 1, 1.5, NAN, INF, -INF, '', 'fixture'] as $value) {
+    $rows[] = array_fill_keys(['kname', 'model', 'serial', 'rota', 'size'], $value);
+}
+$results = [];
+foreach ($rows as $metadata) {
+    $disk = ['path' => '/dev/nvme0n1'] + $metadata;
+    $entry = pmssStorageHealthSnapshotNvme($disk, [], 'fixture');
+    $command = "nvme smart-log '/dev/nvme0n1' 2>/dev/null";
+    $results[] = [$entry === pmssStorageHealthParseNvmeOutput(
+        "temperature : 42 C\nmedia_errors : 0\n", $disk, null, 'fixture'),
+        $GLOBALS['probe'] === ['nvme', (string) ($metadata['kname'] ?? ''), $command],
+        $GLOBALS['capture'] === [$command, 20]];
+}
+echo json_encode($results);
+PHP;
+        $this->assertSame(array_fill(0, 12, [true, true, true]), $this->pmssRunInlinePhpJson($script));
     }
 
     public function testScalarNonNvmePathsKeepUnavailableResult(): void

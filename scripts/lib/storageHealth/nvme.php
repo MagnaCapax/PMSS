@@ -18,6 +18,10 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
 {
     // Malformed inventory values must not warn or invoke object conversion hooks.
     if (!is_scalar($disk['path'] ?? null)) return null;
+    // Optional metadata is cast for the probe lock and final entry; null keeps its defaults.
+    foreach (['kname', 'model', 'serial', 'rota', 'size'] as $field) {
+        if (isset($disk[$field]) && !is_scalar($disk[$field])) return null;
+    }
     $dev = (string) $disk['path'];
     // Corrupt paths use the unavailable result before shell quoting can throw.
     if (pmssFilesystemPathHasNulByte($dev)) {
