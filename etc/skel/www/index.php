@@ -440,6 +440,23 @@ function pmssGuiFramesLocalOnlyEnabled($markerPath = '../.guiFramesLocalOnly')
     return is_file($markerPath) && !is_link($markerPath);
 }
 
+/** Probe actual writes: permission bits alone cannot detect hard quota exhaustion. */
+function pmssGuiFramesDirectoryWritable($directory)
+{
+    // Exclusive creation never overwrites an existing customer file or follows a link.
+    $path = rtrim($directory, '/').'/.pmss-gui-write-'.uniqid('', true);
+    $probe = @fopen($path, 'x');
+    if ($probe === false) {
+        return false;
+    }
+    try {
+        return @fwrite($probe, '1') === 1 && @fflush($probe);
+    } finally {
+        @fclose($probe);
+        @unlink($path);
+    }
+}
+
 /** Apply the customer frame-source preference through one guarded marker. */
 function pmssGuiFramesLocalOnlyPreferenceApply($mode, $markerPath = '../.guiFramesLocalOnly')
 {
@@ -542,7 +559,8 @@ if (isset($_POST['usageAlertsMode'])) {
 // FAILOVER, not a replacement: the remote guiFrames path is the primary on-load
 // GUI auto-update mechanism. Reverted #601 per operator directive 2026-06-03 —
 // removing the primary instead of keeping local as failover was the defect.
-if (!getenv('PMSS_DISABLE_REMOTE_FRAMES') && !pmssGuiFramesLocalOnlyEnabled()) {
+if (!getenv('PMSS_DISABLE_REMOTE_FRAMES') && !pmssGuiFramesLocalOnlyEnabled()
+        && pmssGuiFramesDirectoryWritable(dirname(__DIR__)) && pmssGuiFramesDirectoryWritable(__DIR__)) {
     $framesUrl = 'https://pulsedmedia.com/remote/guiFrames.php?v=2';
     $remoteFrames = function_exists('pmssWelcomeHttpContextCreate')
         ? @file_get_contents($framesUrl, false, pmssWelcomeHttpContextCreate())
@@ -552,10 +570,23 @@ if (!getenv('PMSS_DISABLE_REMOTE_FRAMES') && !pmssGuiFramesLocalOnlyEnabled()) {
         if ($decoded !== false) {
             $framesCode = @unserialize($decoded);
             if (is_string($framesCode) && $framesCode !== '') {
-                $frames = eval($framesCode);
-                if (!is_array($frames)) {
+                // Discard partial output before rendering a clean local failover.
+                $framesBufferLevel = ob_get_level();
+                $framesOutput = '';
+                ob_start();
+                try {
+                    $frames = eval($framesCode);
+                } catch (\Throwable $error) {
+                    $useLocalFrames = true;
+                } finally {
+                    while (ob_get_level() > $framesBufferLevel) {
+                        $framesOutput = ob_get_clean().$framesOutput;
+                    }
+                }
+                if ($useLocalFrames || $framesOutput !== '' || !is_array($frames)) {
                     $frames = array();
                     $useLocalFrames = true;
+                    $pmssHealReload = false;
                 }
             } else {
                 $useLocalFrames = true;
