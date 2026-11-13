@@ -404,8 +404,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   Pure parsing and finding helpers load independently of the runtime facade.
   NVMe snapshots parse stdout only after a zero command exit status. Failed,
   locked, and timed-out probes return the existing `null` unavailable result,
-  including when they captured partial metrics; empty successful output also
-  retains that result. `StorageHealthSnapshotNvmeTest` covers these boundaries
+  including when they captured partial metrics; empty or NUL-containing successful
+  output also retains that result before parsing. NUL-free unknown text, whitespace
+  and first-match metric precedence remain unchanged.
+  `StorageHealthSnapshotNvmeTest` covers these boundaries
   and the successful payloads.
 
 - `pmssMediaStackWatchdogStatusWrite()` encodes before allocating a temporary

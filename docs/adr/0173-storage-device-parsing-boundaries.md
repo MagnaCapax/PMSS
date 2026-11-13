@@ -79,6 +79,14 @@ capture timeout and successful payloads remain unchanged. The inventory cases in
 `StorageHealthNvmePathSafetyTest` cover both refusal and compatibility through
 isolated command shims on the testing machine.
 
+NVMe also rejects NUL-containing probe stdout before metric parsing, using the
+same `null` unavailable result as failed or empty probes. Corrupt text cannot
+yield a plausible partial snapshot. NUL-free output, including unknown text,
+whitespace, repeated metrics and CRLF lines, retains its existing payload and
+first-match behavior. `StorageHealthSnapshotNvmeTest` intercepts capture and
+parsing to cover refusal ordering, command bytes, timeout and valid payloads
+without accessing devices; execution stays on the testing machine.
+
 ## References
 
 - [Storage findings](0058-storage-health-status-derived-from-findings.md)

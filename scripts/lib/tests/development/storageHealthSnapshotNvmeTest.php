@@ -114,6 +114,60 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
         });
     }
 
+    public function testNulProbeOutputIsDiscardedBeforeParsing(): void
+    {
+        // Intercept capture and parsing: no nvme command or device is accessed.
+        $script = <<<'PHP'
+namespace NvmeProbeOutputFixture;
+function pmssCommandPath($command) { return '/fixture/nvme'; }
+function pmssStorageHealthProbeCommand($kind, $kname, $command) { return ['command' => $command]; }
+function pmssCommandCapture($command, $timeout) {
+    $GLOBALS['capture'][] = [$command, $timeout];
+    return ['rc' => 0, 'stdout' => $GLOBALS['output']];
+}
+function pmssStorageHealthParseNvmeOutput($out, $disk, $previous, $timestamp) {
+    ++$GLOBALS['parseCalls'];
+    return \pmssStorageHealthParseNvmeOutput($out, $disk, $previous, $timestamp);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageHealth/nvme.php',
+            'NvmeProbeOutputFixture');
+        $script .= <<<'PHP'
+$disk = ['path' => '/dev/nvme0n1', 'kname' => 'nvme0n1'];
+$previous = ['media_errors' => 2];
+$healthy = "critical_warning : 0\ntemperature : 42 C\nmedia_errors : 5\n";
+$cases = [
+    'leading' => ["\0".$healthy, true],
+    'trailing' => [$healthy."\0", true],
+    'between rows' => ["critical_warning : 0\0\ntemperature : 42 C", true],
+    'inside counter' => ["media_errors : 5\0ignored", true],
+    'inside label' => ["media_err\0ors : 5", true],
+    'inside temperature' => ["temperature : 42\0 C", true],
+    'only nul' => ["\0", true],
+    'empty' => ['', true],
+    'healthy' => [$healthy, false],
+    'crlf' => [str_replace("\n", "\r\n", $healthy), false],
+    'unknown' => ['unrecognized output', false],
+    'whitespace' => [" \t\n", false],
+    'duplicate' => [$healthy."temperature : 99 C\n", false],
+];
+$results = [];
+foreach ($cases as $label => [$output, $unavailable]) {
+    $GLOBALS['output'] = $output;
+    $GLOBALS['parseCalls'] = 0;
+    $GLOBALS['capture'] = [];
+    $entry = pmssStorageHealthSnapshotNvme($disk, ['nvme::/dev/nvme0n1' => ['metrics' => $previous]], 'fixture');
+    $expected = $unavailable ? null : \pmssStorageHealthParseNvmeOutput($output, $disk, $previous, 'fixture');
+    $results[$label] = [$entry === $expected, $GLOBALS['parseCalls'] === ($unavailable ? 0 : 1),
+        $GLOBALS['capture'] === [["nvme smart-log '/dev/nvme0n1' 2>/dev/null", 20]]];
+}
+echo json_encode($results);
+PHP;
+        foreach ($this->pmssRunInlinePhpJson($script) as $label => $observations) {
+            $this->assertSame([true, true, true], $observations, $label);
+        }
+    }
+
     public function testSnapshotNvmeParsesMetricsAndFlags(): void
     {
         $device = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
