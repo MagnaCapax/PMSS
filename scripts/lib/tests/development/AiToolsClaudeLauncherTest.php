@@ -43,6 +43,11 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
             $this->assertSame('default', $decision['env'][$name]);
         }
         $this->assertTrue($decision['notice']);
+        $this->assertSame('0', $decision['env']['CLAUDE_CODE_AUTO_MODE_SERVER']);
+        $own = \pmssAiClaudeDecision([], $env + ['CLAUDE_CODE_AUTO_MODE_SERVER' => '1'], $state);
+        $this->assertSame('1', $own['env']['CLAUDE_CODE_AUTO_MODE_SERVER']);
+        $passthrough = \pmssAiClaudeDecision([], $env + ['ANTHROPIC_API_KEY' => 'own-key'], $state);
+        $this->assertFalse(array_key_exists('CLAUDE_CODE_AUTO_MODE_SERVER', $passthrough['env']));
         $state['endpoint'] = 'https://virsilipas.mcx.fi/v1/v1///';
         $this->assertSame('https://virsilipas.mcx.fi/v1',
             \pmssAiClaudeDecision([], ['HOME' => '/tmp/pmss-test-home'], $state)['env']['ANTHROPIC_BASE_URL']);

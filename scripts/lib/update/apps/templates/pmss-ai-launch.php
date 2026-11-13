@@ -224,6 +224,10 @@ function pmssAiClaudeDecision(array $args, array $env, array $state): array
             $env[$name] = 'default';
         }
     }
+    // Auto mode's server-side checks exist only on Anthropic's own API, never behind the credits proxy.
+    if (!array_key_exists('CLAUDE_CODE_AUTO_MODE_SERVER', $env)) {
+        $env['CLAUDE_CODE_AUTO_MODE_SERVER'] = '0';
+    }
     return ['argv' => $pass['argv'], 'env' => $env, 'notice' => true];
 }
 
