@@ -78,10 +78,9 @@ final class ChromiumRuntimeInstallTest extends TestCase
         $commands = array_merge($this->runStep(12)['run'], $this->runStep(13)['run'], $this->runStep(13, ['slirp4netns'])['run']);
         $this->assertSame(3, count($commands));
         foreach ($commands as $command) {
-            $this->assertStringContainsString('apt-get ', $command);
-            $this->assertStringContainsString('install -y --no-install-recommends ', $command, 'recommends would pull chromium-sandbox on older Debian builds');
-            $this->assertStringNotContainsString('chromium-sandbox', $command);
-            $this->assertStringNotContainsString('allow-change-held-packages', $command);
+            $this->assertStringContainsAndOmitsStrings(['apt-get ',
+                'install -y --no-install-recommends ' => 'recommends would pull chromium-sandbox on older Debian builds',
+            ], ['chromium-sandbox', 'allow-change-held-packages'], $command);
         }
         $this->pmssAssertRepoFileNotContainsString('scripts/lib/update/apps/chromium.php', 'allow-change-held-packages');
     }

@@ -169,11 +169,8 @@ PHP
 
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
             $counters = \pmssResourceLogReadCounters(1000, $root);
-            $this->assertSame('bfq', $counters['io_source'] ?? null);
-            $this->assertSame(9000, $counters['io_read'] ?? null);
-            $this->assertSame(8000, $counters['io_write'] ?? null);
-            $this->assertSame(90, $counters['io_read_ops'] ?? null);
-            $this->assertSame(80, $counters['io_write_ops'] ?? null);
+            $this->pmssAssertArraySubsetSame(['io_source' => 'bfq', 'io_read' => 9000,
+                'io_write' => 8000, 'io_read_ops' => 90, 'io_write_ops' => 80], $counters);
         });
     }
 
@@ -471,9 +468,8 @@ PHP
 
         $this->assertSame(['/sbin/iptables -nvx -L OUTPUT', '/sbin/iptables -Z OUTPUT'], $commands);
         $this->assertTrue(is_string($usage));
-        $this->assertStringContainsString('Chain OUTPUT (policy ACCEPT 1 packets, 123 bytes)', $usage);
-        $this->assertStringContainsString('owner UID match 1000', $usage);
-        $this->assertStringNotContainsString(' MARK ', $usage);
+        $this->assertStringContainsAndOmitsStrings(['Chain OUTPUT (policy ACCEPT 1 packets, 123 bytes)',
+            'owner UID match 1000'], [' MARK '], $usage);
     }
 
     public function testTrafficOutputUsageCollectorDoesNotResetAfterListFailure(): void

@@ -76,9 +76,8 @@ final class StorageHealthRaidBitmapTest extends TestCase
         foreach ($paths as $path) {
             $this->pmssWithEnv(['PATH' => $path], function () use ($mdstat): void {
                 $entry = \pmssStorageHealthSnapshotRaid('fixture', $mdstat)[0];
-                $this->assertSame(null, $entry['write_intent_bitmap']);
-                $this->assertSame(['write_intent_bitmap_unknown'], $entry['flags']);
-                $this->assertSame('warn', $entry['severity']);
+                $this->pmssAssertArraySubsetSame(['write_intent_bitmap' => null,
+                    'flags' => ['write_intent_bitmap_unknown'], 'severity' => 'warn'], $entry);
                 $this->assertStringContainsString('state unknown', $entry['message']);
             });
         }
@@ -93,8 +92,7 @@ final class StorageHealthRaidBitmapTest extends TestCase
                 if ($bitmap !== true) $expected[] = $bitmap === false ? 'no_write_intent_bitmap' : 'write_intent_bitmap_unknown';
                 $this->assertSame($expected, $entry['flags']);
                 $severity = in_array('degraded', $flags, true) ? 'fail' : ($expected === [] ? 'ok' : 'warn');
-                $this->assertSame($severity, $entry['severity']);
-                $this->assertSame($severity === 'ok', $entry['ok']);
+                $this->pmssAssertArraySubsetSame(['severity' => $severity, 'ok' => $severity === 'ok'], $entry);
             }
         }
     }

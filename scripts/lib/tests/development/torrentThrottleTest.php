@@ -119,9 +119,7 @@ class TorrentThrottleTest extends TestCase
         userApplyDiskQuota(['name' => $this->user, 'quota' => 10]);
 
         $commands = $this->pmssProfileCommands();
-        $this->assertStringContainsString('setquota', implode("\n", $commands));
-        $this->assertStringNotContainsString(' > ', implode("\n", $commands));
-        $this->assertStringNotContainsString('chmod o+r', implode("\n", $commands));
+        $this->assertStringContainsAndOmitsStrings(['setquota'], [' > ', 'chmod o+r'], implode("\n", $commands));
         $this->pmssAssertRepoFileContainsString('scripts/lib/user/traffic.php', 'pmssQuotaSnapshotWrite($quotaPath');
         foreach ($commands as $command) {
             $this->assertStringNotContainsString(';', $command, 'Quota refresh commands must not be shell-chained');
@@ -138,11 +136,7 @@ class TorrentThrottleTest extends TestCase
 
         userApplyDiskQuota(['name' => $this->user, 'quota' => 10]);
 
-        $commands = $this->pmssProfileCommands();
-        $joined = implode("\n", $commands);
-        $this->assertStringContainsString('setquota', $joined);
-        $this->assertStringNotContainsString("quota '-u'", $joined);
-        $this->assertStringNotContainsString('chmod', $joined);
+        $this->assertStringContainsAndOmitsStrings(['setquota'], ["quota '-u'", 'chmod'], implode("\n", $this->pmssProfileCommands()));
         $this->assertStringContainsString(
             'Refreshing quota status file: unsafe or missing user home',
             (string) ($GLOBALS['PMSS_PROFILE'][1]['description'] ?? '')

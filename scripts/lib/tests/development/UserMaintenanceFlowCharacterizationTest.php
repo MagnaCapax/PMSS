@@ -121,9 +121,7 @@ class UserMaintenanceFlowCharacterizationTest extends TestCase
             $this->assertTrue(in_array(['marker', 'fixtur02'], $result['events'], true));
         }
         $result = $this->trace(['fault' => 'reset']);
-        $this->assertSame(['Error', 'fixture fault'], $result['thrown']);
-        $this->assertSame(null, $result['summary']);
-        $this->assertSame(null, $result['json']);
+        $this->pmssAssertArraySubsetSame(['thrown' => ['Error', 'fixture fault'], 'summary' => null, 'json' => null], $result);
     }
 
     public function testEnvironmentFailureReasonsRetainOriginalBytesAndStopBeforeDocker(): void
