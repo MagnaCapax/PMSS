@@ -95,3 +95,11 @@ without conversion warnings or object conversion hooks. Valid scalar conversion,
 missing-value fallbacks, sibling metric projection and payload order remain intact.
 `SystemStatsHostPressureInputSafetyTest` covers these cases without host probes;
 execution stays on testing machines, with changed-file syntax checked locally.
+
+The top-memory parser also checks each probe row's scalar type before string
+conversion. Arrays, objects and resources are skipped without warnings or
+conversion hooks; malformed rows cannot discard valid siblings. Empty results
+retain `na`, while scalar conversion, command-name and counter validation,
+row ordering, unit formatting and failed-capture handling remain unchanged.
+`SystemStatsTopMemoryInputSafetyTest` covers the parser and injected observation
+runner without host probes; execution stays on testing machines.

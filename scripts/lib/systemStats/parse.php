@@ -20,6 +20,8 @@ function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
 {
     $items = [];
     foreach ($rows as $row) {
+        // Malformed containers must not warn or invoke object conversion hooks.
+        if (!is_scalar($row)) continue;
         // Reject raw NULs before column trimming can hide malformed probe output.
         $row = (string) $row;
         if (strpos($row, "\0") !== false || ($parts = pmssConfigLineColumns($row, 2, [])) === []) continue;
