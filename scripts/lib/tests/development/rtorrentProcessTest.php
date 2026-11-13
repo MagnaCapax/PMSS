@@ -474,11 +474,10 @@ PHP;
         $home = $root.'/homes/'.$user;
         $runtime = $root.'/runtime';
         $this->pmssEnsureDir($home.'/session', 0755);
-        $this->pmssEnsureDir($runtime, 0700);
         $this->pmssWriteFiles($home, ['.rtorrent.rc' => 'fixture', '.rtorrentExecute.php' => '.rtorrentExecute.lock flock(']);
         $counter = $runtime.'/startRtorrent-customrc-fail-'.$user.'.count';
         $launchMarker = $root.'/login-launch';
-        $this->pmssWriteFile($counter, 'kept');
+        $this->pmssWriteFile($counter, 'kept', 0700);
         $this->pmssWriteExecutableFiles($root, [
             'pgrep' => "#!/bin/sh\nexit 1\n",
             'ps' => "#!/bin/sh\nexit 0\n",
@@ -530,7 +529,7 @@ PHP;
     {
         $user = $this->sessionResetTestUser();
         $home = $this->tempDir.'/'.$user;
-        $sessionDir = $this->pmssEnsureDir($home.'/session');
+        $sessionDir = $home.'/session';
         $this->pmssWriteFile($sessionDir.'/resume.dat', 'state');
         [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home, $user): bool {
             return rtorrentProcessResetSessionDirectory($home, $user, $logger);
@@ -588,7 +587,7 @@ PHP;
     {
         $user = $this->sessionResetTestUser();
         $home = $this->tempDir.'/'.$user;
-        $targetHome = dirname($this->pmssEnsureDir($this->tempDir.'/target-home/session'));
+        $targetHome = $this->tempDir.'/target-home';
         $this->pmssWriteFile($targetHome.'/session/resume.dat', 'state');
         $this->pmssCreateSymlinkOrSkip($targetHome, $home);
 

@@ -118,7 +118,6 @@ PHP;
         if (!\pmssValidateUsername($user)) throw new SkipTest('Host account name is outside PMSS account format');
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-reconcile-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
-        $this->pmssEnsureDir($homeDir.'/www');
         $this->pmssWriteFile($homeDir.'/www/index.php', 'existing panel');
 
         $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-skeleton-');
@@ -146,7 +145,6 @@ PHP;
         if (!\pmssValidateUsername($user)) throw new SkipTest('Host account name is outside PMSS account format');
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-full-recovery-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
-        $this->pmssEnsureDir($homeDir);
         $this->pmssEnsureDir($homeDir.'/www');
         $this->pmssRemoveTree($homeDir.'/www');
 
@@ -242,7 +240,6 @@ PHP;
         $user = 'dummy';
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-path-type-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
-        $this->pmssEnsureDir($homeDir);
         $this->pmssWriteFile($homeDir.'/www', 'not-a-directory');
         $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-path-type-skeleton-');
         $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');

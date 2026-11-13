@@ -260,10 +260,11 @@ final class CustomerStatsLayoutTest extends TestCase
     public function testStatsStatusHelpersCharacterizeLocalResourceContracts(): void
     {
         $cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');
-        $this->pmssWriteFile($cgroupDir.'/memory.current', (string) (256 * 1024 * 1024)."\n");
-        $this->pmssWriteFile($cgroupDir.'/memory.high', (string) (512 * 1024 * 1024)."\n");
-        $this->pmssWriteFile($cgroupDir.'/memory.max', (string) (1024 * 1024 * 1024)."\n");
-        $this->pmssWriteFile($cgroupDir.'/pids.current', "7\n");
+        $this->pmssWriteFiles($cgroupDir, [
+            'memory.current' => (string) (256 * 1024 * 1024)."\n",
+            'memory.high' => (string) (512 * 1024 * 1024)."\n",
+            'memory.max' => (string) (1024 * 1024 * 1024)."\n", 'pids.current' => "7\n",
+        ]);
         $commands = array();
         $runner = function (string $command, string $label) use (&$commands): array {
             $commands[] = $command;

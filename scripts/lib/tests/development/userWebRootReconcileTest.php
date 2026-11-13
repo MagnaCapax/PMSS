@@ -60,7 +60,6 @@ class UserWebRootReconcileTest extends TestCase
     }
     public function testFullRestorePreservesCustomerStateAfterWebRootDeletion(): void
     {
-        $this->pmssEnsureDir($this->home.'/www');
         $this->pmssWriteFile($this->home.'/data/keep.bin', 'data-state');
         $this->pmssWriteFile($this->home.'/watch/keep.torrent', 'watch-state');
         $this->pmssWriteFile($this->home.'/session/keep.state', 'session-state');

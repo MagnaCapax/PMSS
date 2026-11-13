@@ -110,7 +110,6 @@ class installMediaStackScriptTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-update-policy-home-');
         $existingConfig = $home.'/existing';
-        $this->pmssEnsureDir($existingConfig);
         $this->pmssWriteFile(
             $existingConfig.'/config.xml',
             "<Config>\n  <UpdateMechanism>External</UpdateMechanism>\n  <UpdateAutomatically>True</UpdateAutomatically>\n</Config>\n"
@@ -793,7 +792,6 @@ BASH
         $bin = $this->pmssMakeTempDir('pmss-media-auth-seed-bin-');
         $trace = $home.'/curl-trace';
         $apiKey = '0123456789abcdef0123456789abcdef';
-        $this->pmssEnsureDir($home.'/.config/radarr');
         $this->pmssEnsureDir($home.'/tmp');
         $this->pmssWriteFile($home.'/.config/radarr/config.xml', "<Config></Config>\n");
 
@@ -1029,7 +1027,6 @@ BASH
     {
         foreach (['0', '1', '2', 'unknown'] as $count) {
             $home = $this->pmssMakeTempDir('pmss-autobrr-count-');
-            $this->pmssEnsureDir($home.'/.bin/autobrr');
             $this->pmssWriteFile($home.'/config/autobrr.db', 'preserve-me');
             $this->pmssWriteExecutableFile($home.'/.bin/autobrr/autobrrctl', "#!/usr/bin/env bash\ncat >/dev/null\n");
             $script = "#!/usr/bin/env bash\nset -euo pipefail\n"
