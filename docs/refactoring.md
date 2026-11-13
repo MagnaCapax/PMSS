@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Scheduled configuration backups retain their cron entrypoint and original include
+while separating customer command/protocol handling from account policy and queue
+reporting (ADR 0279). Three single-caller helpers disappear into command construction
+and capture. Characterization locks the customer program and command bytes, PHP
+fallback order, capture arguments, last-line decoding, archive refusals, retention
+ordering, outcome fields, diagnostics and queue exception handling. These fixtures
+run on testing machines; devbox verification remains changed-file syntax only.
+
 Account-local Docker first-run capture owns its pipes and child through thrown
 write, read, close and reap failures. Cleanup attempts both pipe closes, then
 termination and reaping of a still-owned child; an already-reaped child is left
