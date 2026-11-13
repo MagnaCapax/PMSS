@@ -9,13 +9,11 @@ class DynamicIopsKernelReadyTest extends TestCase
 {
     private function cgroupRoot(bool $memory, bool $blkio): string
     {
-        $root = sys_get_temp_dir().'/pmss-kready-'.bin2hex(random_bytes(4));
+        $root = $this->pmssMakeTempDir('pmss-kready-', 0700);
         $files = [];
         if ($memory) $files['memory/memory.limit_in_bytes'] = "9223372036854771712\n";
         if ($blkio) $files['blkio/blkio.throttle.read_iops_device'] = '';
-        if ($files === []) mkdir($root, 0700, true);
-        else $this->pmssWriteFiles($root, $files, 0700);
-        return $root;
+        return $this->pmssWriteFiles($root, $files, 0700);
     }
 
     public function testReleaseAndControllers(): void

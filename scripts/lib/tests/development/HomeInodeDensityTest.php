@@ -122,8 +122,9 @@ class HomeInodeDensityTest extends TestCase
 
     public function testSkipsWhenHomePathIsMissing(): void
     {
-        $messages = $this->pmssArrayLoggerMessages(static function (callable $logger): void {
-            \pmssHomeInodeDensityCheck($logger, '/tmp/pmss-missing-home-path', 262144);
+        $home = $this->pmssMakeTempPath('pmss-missing-home-path-');
+        $messages = $this->pmssArrayLoggerMessages(static function (callable $logger) use ($home): void {
+            \pmssHomeInodeDensityCheck($logger, $home, 262144);
         });
 
         $this->pmssAssertMessagesContain($messages, 'path missing');
@@ -138,7 +139,7 @@ class HomeInodeDensityTest extends TestCase
         $this->assertFalse($result, 'Fatal disk-space failures should abort the caller');
         $this->assertStringContainsAllStrings(['Insufficient free space on', 'Preflight checks failed (fatal)'], implode("\n", $messages));
 
-        $missingBase = sys_get_temp_dir().'/pmss-preflight-missing-'.uniqid('', true);
+        $missingBase = $this->pmssMakeTempPath('pmss-preflight-missing-');
         [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($missingBase): bool {
             return \pmssUpdateStep2PreflightChecks($logger, [], [$missingBase.'/dpkg.lock'], [$missingBase.'/apt-cache'], '', 1.0);
         });

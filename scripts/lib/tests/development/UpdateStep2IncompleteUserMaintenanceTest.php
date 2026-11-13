@@ -49,7 +49,7 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
                 foreach ([null, false, 'invalid', 0] as $invalid) pmssUpdateStep2HandleUserMaintenanceSummary($invalid);
                 $this->assertTrue(is_file($marker));
                 foreach ([[], ['processed' => 2, 'total' => 2], ['processed' => 3, 'total' => 2]] as $complete) {
-                    file_put_contents($marker, '{}');
+                    $this->pmssWriteFile($marker, '{}');
                     pmssUpdateStep2HandleUserMaintenanceSummary($complete);
                     $this->assertFalse(is_file($marker));
                 }
@@ -76,9 +76,8 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
 
     public function testIncompleteTailMarkerWrittenThenCleared(): void
     {
-        $tmp = sys_get_temp_dir().'/pmss-test-incomplete-'.bin2hex(random_bytes(4)).'.json';
-        putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH='.$tmp);
-        try {
+        $tmp = $this->pmssMakeTempPath('pmss-test-incomplete-', '.json');
+        $this->pmssWithEnv(['PMSS_INCOMPLETE_USER_MAINTENANCE_PATH' => $tmp], function () use ($tmp): void {
             pmssUpdateRecordIncompleteUserMaintenance(21, 22, ['u: RuntimeException: userPermissions timeout after 900s']);
             $this->assertTrue(is_file($tmp), 'incomplete-tail marker must be written on mismatch');
             $decoded = $this->pmssReadJsonArrayFile($tmp);
@@ -88,49 +87,35 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
                 'marker must record skip reasons for operator visibility');
             pmssUpdateClearIncompleteUserMaintenance();
             $this->assertTrue(!is_file($tmp), 'marker must be cleared once all users process');
-        } finally {
-            putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH');
-            if (is_file($tmp)) { @unlink($tmp); }
-        }
+        });
     }
 
     public function testIncompleteTailMarkerRejectsRelativeOverridePath(): void
     {
         $relative = 'pmss-test-incomplete-relative.json';
-        putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH='.$relative);
         try {
-            pmssUpdateRecordIncompleteUserMaintenance(1, 2, ['fixtur01: skipped']);
-            $this->assertFalse(is_file($relative), 'relative marker path must not be written');
-            $this->assertFalse(pmssUpdateIncompleteUserMaintenancePathIsSafe($relative));
+            $this->pmssWithEnv(['PMSS_INCOMPLETE_USER_MAINTENANCE_PATH' => $relative], function () use ($relative): void {
+                pmssUpdateRecordIncompleteUserMaintenance(1, 2, ['fixtur01: skipped']);
+                $this->assertFalse(is_file($relative), 'relative marker path must not be written');
+                $this->assertFalse(pmssUpdateIncompleteUserMaintenancePathIsSafe($relative));
+            });
         } finally {
-            putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH');
             if (is_file($relative)) { @unlink($relative); }
         }
     }
 
     public function testIncompleteTailMarkerRejectsSymlinkedParentOnClear(): void
     {
-        $root = sys_get_temp_dir().'/pmss-test-incomplete-root-'.bin2hex(random_bytes(4));
-        $targetDir = $root.'/target';
-        $linkDir = $root.'/link';
-        @mkdir($targetDir, 0755, true);
-        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
+        $root = $this->pmssMakeTempDir('pmss-test-incomplete-root-');
+        [$targetDir, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($root.'/target', $root.'/link');
 
         $marker = $linkDir.'/marker.json';
-        $realMarker = $targetDir.'/marker.json';
-        file_put_contents($realMarker, "{}\n");
-        putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH='.$marker);
-        try {
+        $realMarker = $this->pmssWriteFile($targetDir.'/marker.json', "{}\n");
+        $this->pmssWithEnv(['PMSS_INCOMPLETE_USER_MAINTENANCE_PATH' => $marker], function () use ($realMarker, $marker): void {
             pmssUpdateClearIncompleteUserMaintenance();
             $this->assertTrue(is_file($realMarker), 'marker behind symlinked parent must not be removed');
             $this->assertFalse(pmssUpdateIncompleteUserMaintenancePathIsSafe($marker));
-        } finally {
-            putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH');
-            if (is_file($realMarker)) { @unlink($realMarker); }
-            if (is_link($linkDir)) { @unlink($linkDir); }
-            if (is_dir($targetDir)) { @rmdir($targetDir); }
-            if (is_dir($root)) { @rmdir($root); }
-        }
+        });
     }
 
     public function testFullCompletionClearsStaleMarker(): void

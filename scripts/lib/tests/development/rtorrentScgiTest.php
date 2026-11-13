@@ -178,7 +178,7 @@ class RtorrentScgiTest extends TestCase
 
     public function testCallAndSendRejectInvalidBoundaries(): void
     {
-        $missingSocket = '/tmp/pmss-test-nonexistent-' . getmypid() . '.socket';
+        $missingSocket = $this->pmssMakeTempPath('pmss-test-nonexistent-', '.socket');
         foreach ([
             'call should reject missing socket' => function () use ($missingSocket) { return rtorrentScgiCall($missingSocket, 'system.api_version', [], 1); },
             'call should reject empty path' => function () { return rtorrentScgiCall('', 'system.api_version', [], 1); },
@@ -192,15 +192,9 @@ class RtorrentScgiTest extends TestCase
 
     public function testScgiSendReturnsFalseForRegularFilePath(): void
     {
-        $path = sys_get_temp_dir() . '/pmss-rtorrent-scgi-file-' . getmypid();
-        file_put_contents($path, "not-a-socket\n");
-
-        try {
-            $result = rtorrentScgiSend($path, 'test', 1);
-            $this->assertTrue($result === false, 'Send should return false for regular file paths');
-        } finally {
-            @unlink($path);
-        }
+        $path = $this->pmssWriteTempFile('rtorrent-scgi-file', "not-a-socket\n");
+        $result = rtorrentScgiSend($path, 'test', 1);
+        $this->assertTrue($result === false, 'Send should return false for regular file paths');
     }
 
     public function testCompleteRequestFormatting(): void

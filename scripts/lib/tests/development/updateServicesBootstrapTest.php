@@ -132,7 +132,7 @@ class UpdateServicesBootstrapTest extends TestCase
 
     public function testQuotaSkipFalseyValueFallsThroughPastSkipGuard(): void
     {
-        $mount = sys_get_temp_dir().'/pmss-bootstrap-quota-'.bin2hex(random_bytes(4));
+        $mount = $this->pmssMakeTempPath('pmss-bootstrap-quota-');
         $this->assertBootstrapSkipBehavior(
             'PMSS_SKIP_QUOTA',
             'no',
@@ -147,7 +147,7 @@ class UpdateServicesBootstrapTest extends TestCase
 
     public function testQuotaSkipUppercaseFalseyValueFallsThroughPastSkipGuard(): void
     {
-        $mount = sys_get_temp_dir().'/pmss-bootstrap-quota-'.bin2hex(random_bytes(4));
+        $mount = $this->pmssMakeTempPath('pmss-bootstrap-quota-');
         $this->assertBootstrapSkipBehavior(
             'PMSS_SKIP_QUOTA',
             'FALSE',
