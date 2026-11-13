@@ -166,9 +166,8 @@ class RtorrentProcessTest extends TestCase
 
     public function testStaleStateRefusesSymlinkParentWithoutWriting(): void
     {
-        $targetDir = $this->pmssEnsureDir($this->tempDir.'/target');
-        $linkDir = $this->tempDir.'/link';
-        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
+        [$targetDir, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip(
+            $this->tempDir.'/target', $this->tempDir.'/link');
 
         $result = rtorrentProcessCheckStaleState($linkDir.'/state.ts', 60);
 
@@ -209,10 +208,8 @@ PHP;
 
     public function testClearStaleStateRefusesSymlinkLeaf(): void
     {
-        $target = $this->tempDir.'/target-state.ts';
-        $link = $this->tempDir.'/linked-state.ts';
-        $this->pmssWriteFile($target, '123');
-        $this->pmssCreateSymlinkOrSkip($target, $link);
+        [$target, $link] = $this->pmssCreateSymlinkedFileOrSkip(
+            $this->tempDir.'/target-state.ts', $this->tempDir.'/linked-state.ts', '123');
 
         rtorrentProcessClearStaleState($link);
 

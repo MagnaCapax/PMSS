@@ -102,11 +102,10 @@ class WebCgroupMemoryStatusTest extends TestCase
     public function testSharedCustomerFileReadersKeepSymlinkAndMapContracts(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
-        $integerPath = $dir.'/memory.current';
-        $integerLink = $dir.'/memory.link';
-        $this->pmssWriteFiles($dir, ['memory.current' => "42\n", 'memory.zero' => "0\n"]);
-        $this->pmssCreateSymlinkOrSkip($integerPath, $integerLink);
-        $this->pmssWriteFiles($dir, ['memory.events' => "high 7\nfull avg10=0.25 avg60=0.00\nbadline\n",
+        [$integerPath, $integerLink] = $this->pmssCreateSymlinkedFileOrSkip(
+            $dir.'/memory.current', $dir.'/memory.link', "42\n");
+        $this->pmssWriteFiles($dir, ['memory.zero' => "0\n",
+            'memory.events' => "high 7\nfull avg10=0.25 avg60=0.00\nbadline\n",
             'resource.data' => serialize(['memory' => ['current' => 42]])]);
 
         $this->assertSame(42, \pmssCustomerUnsignedIntegerFileRead($integerPath));

@@ -438,10 +438,7 @@ PHP;
         clearstatcache(true, $path);
         $this->assertSame(0644, fileperms($path) & 0777);
 
-        $target = $dir.'/target';
-        $link = $dir.'/link';
-        $this->pmssWriteFile($target, "unchanged\n");
-        $this->pmssCreateSymlinkOrSkip($target, $link);
+        [$target, $link] = $this->pmssCreateSymlinkedFileOrSkip($dir.'/target', $dir.'/link', "unchanged\n");
         $this->assertFalse(\pmssSystemStatsHostPressureSnapshotWrite($link, $stats, 101, posix_geteuid(), posix_getegid()));
         $this->assertSame("unchanged\n", file_get_contents($target));
     }

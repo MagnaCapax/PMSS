@@ -122,9 +122,8 @@ class UserWebRootReconcileTest extends TestCase
         $this->pmssWriteFile($this->home.'/www/managed-dir', 'customer-path');
         $this->pmssWriteFile($this->skeleton.'/managed-dir/child.php', 'managed-child');
         $outside = $this->pmssMakeTempDir('pmss-web-reconcile-outside-');
-        $outsideContent = $outside.'/secret.txt';
-        $this->pmssWriteFile($outsideContent, 'must-not-change');
-        $this->pmssCreateSymlinkOrSkip($outsideContent, $this->skeleton.'/unsafe.php');
+        [$outsideContent] = $this->pmssCreateSymlinkedFileOrSkip(
+            $outside.'/secret.txt', $this->skeleton.'/unsafe.php', 'must-not-change');
         $messages = [];
         $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
         $this->assertEquals('customer-panel', file_get_contents($this->home.'/www/index.php'));
