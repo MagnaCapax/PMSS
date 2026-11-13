@@ -72,6 +72,11 @@ Note: Jellyfin requires FFmpeg 4.4+ for startup. The script uses distro ffmpeg w
 
 App URLs may be overridden via CLI flags (below). The script verifies each URL in dry‑run/verify‑only mode. These modes resolve runtime metadata but do not download or hash the runtime archive.
 
+Metadata lookup failures name the app and report the curl exit code and HTTP
+status, or the wget exit code, alongside the client's stderr diagnostics. Failed
+transfers never supply partial metadata to parsers. A SABnzbd release response
+without a `-src` asset reports the missing asset separately from a transport error.
+
 ## Download Integrity
 
 Downloaded archives are checked against `~/.install-checksums.sha256`. When an

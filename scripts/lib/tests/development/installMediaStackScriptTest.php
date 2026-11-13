@@ -1791,11 +1791,11 @@ BASH
         $this->assertStringContainsAllStrings([
             'fetch_text() {',
             'curl -fsSL --max-time 20 "$url"',
-            'wget -q -O - --timeout=20 --tries=1 "$url"',
-            'SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest")',
+            'wget -nv -O - --timeout=20 --tries=1 "$url"',
+            'SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest" "SABnzbd")',
             'https://api.github.com/repos/autobrr/autobrr/releases/latest',
             'autobrr_resolve_download_url',
-            'JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE")',
+            'JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE" "Jellyfin")',
             'Could not resolve SABnzbd release metadata from GitHub',
         ], $this->script);
     }

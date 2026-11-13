@@ -559,15 +559,27 @@ check_url() {
 }
 
 fetch_text() {
-	local url="$1"
+	local url="$1" label="${2:-$1}" response="" transport="" status="" rc=0
 
+	# Keep client diagnostics on stderr and the HTTP trailer out of metadata stdout.
 	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL --max-time 20 "$url" 2>/dev/null
+		transport="curl"
+		response=$(curl -fsSL --max-time 20 "$url" -w $'\n%{http_code}') || rc=$?
+		status=", HTTP ${response##*$'\n'}"
+		response="${response%$'\n'*}"
 	elif command -v wget >/dev/null 2>&1; then
-		wget -q -O - --timeout=20 --tries=1 "$url" 2>/dev/null
+		transport="wget"
+		response=$(wget -nv -O - --timeout=20 --tries=1 "$url") || rc=$?
 	else
+		log_err "${label} metadata lookup failed (neither curl nor wget is available)"
 		return 1
 	fi
+	# A failed transfer can contain a partial body; never pass it to a parser.
+	if ((rc != 0)); then
+		log_err "${label} metadata lookup failed (${transport} exit ${rc}${status})"
+		return "$rc"
+	fi
+	printf '%s' "$response"
 }
 
 fetch() {
@@ -650,7 +662,7 @@ aspnetcore_resolve_download_url() {
 	local artifact
 	# Parse structured metadata with the PHP already used for app configuration.
 	# shellcheck disable=SC2016
-	if ! artifact=$(fetch_text "https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json" | php -r '
+	if ! artifact=$(fetch_text "https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json" "ASP.NET runtime" | php -r '
 		$data = json_decode(stream_get_contents(STDIN), true);
 		$arch = $argv[1];
 		$version = $data["latest-release"] ?? null;
@@ -691,7 +703,7 @@ autobrr_resolve_download_url() {
 		return 0
 	fi
 
-	if ! release_json=$(fetch_text "https://api.github.com/repos/autobrr/autobrr/releases/latest"); then
+	if ! release_json=$(fetch_text "https://api.github.com/repos/autobrr/autobrr/releases/latest" "Autobrr"); then
 		log_err "Could not resolve Autobrr release metadata from GitHub"
 		return 1
 	fi
@@ -1565,13 +1577,14 @@ if [[ -z "$SECURE_APP" ]]; then
 		SABNZBD_URL="$OVR_SAB_URL"
 		SABNZBD_VERSION="override"
 	else
-		if ! SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest"); then
-			SABNZBD_RELEASE_JSON=""
+		if ! SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest" "SABnzbd"); then
+			log_err "Could not resolve SABnzbd release metadata from GitHub"
+			exit 1
 		fi
 		SABNZBD_VERSION=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'tag_name' | cut -d '"' -f 4 || true)
 		SABNZBD_URL=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
 		if [[ -z "$SABNZBD_URL" ]]; then
-			log_err "Could not resolve SABnzbd release metadata from GitHub"
+			log_err "Could not resolve SABnzbd -src asset from the latest GitHub release"
 			exit 1
 		fi
 	fi
@@ -1590,7 +1603,7 @@ if [[ -z "$SECURE_APP" ]]; then
 		JELLYFIN_URL="$OVR_JELLYFIN_URL"
 		JF_FILENAME="override"
 	else
-		if ! JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE"); then
+		if ! JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE" "Jellyfin"); then
 			JF_REPO_INDEX=""
 		fi
 		JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+(\\.[0-9]+){1,2}-${JF_ARCH}\\.tar\\.gz" | head -n 1 || true)
