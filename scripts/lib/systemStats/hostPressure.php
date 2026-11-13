@@ -27,7 +27,9 @@ function pmssSystemStatsHostPressureMetricParse($value, string $suffix = ''): ?f
 /** Build the narrow metric payload exposed to customer-side PHP. */
 function pmssSystemStatsHostPressurePayloadBuild(array $stats, ?int $timestamp = null): array
 {
-    $psiFields = explode('/', (string) ($stats['psiIo'] ?? ''));
+    $psi = $stats['psiIo'] ?? null;
+    // Match the metric parser's type guard before string conversion can warn or throw.
+    $psiFields = is_scalar($psi) ? explode('/', (string) $psi) : [];
     return [
         'timestamp' => $timestamp ?? time(),
         // systemStats PSI order keeps full_avg300 at index 5.

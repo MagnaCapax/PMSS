@@ -87,3 +87,11 @@ scalar conversions, finite non-negative values, suffix matching, payload order
 and snapshot publication are unchanged. `SystemStatsCollectTest` covers raw
 corruption, independent metric projection and accepted scalar boundaries;
 execution stays on testing machines.
+
+The host-pressure payload checks the PSI container's scalar type before splitting
+its slash-delimited fields, matching the existing metric parser's input policy.
+Arrays, objects and resources produce the existing nullable unavailable metric
+without conversion warnings or object conversion hooks. Valid scalar conversion,
+missing-value fallbacks, sibling metric projection and payload order remain intact.
+`SystemStatsHostPressureInputSafetyTest` covers these cases without host probes;
+execution stays on testing machines, with changed-file syntax checked locally.

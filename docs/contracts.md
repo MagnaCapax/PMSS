@@ -943,6 +943,12 @@ iptables helpers:
 
 ## Resource Statistics
 
+- The host-pressure payload in `systemStats/hostPressure.php` rejects non-scalar
+  PSI containers before string conversion. Arrays, objects and resources yield
+  the existing `null` metric without warnings or object conversion hooks;
+  valid scalars, independent latency projection and payload order are unchanged.
+  `SystemStatsHostPressureInputSafetyTest` covers this boundary without probes.
+
 - `pmssStorageHealthSnapshotRaid()` discovers arrays through mdstat, then runs a
   read-only, C-locale `mdadm --detail` probe per array with the shared 30-second
   process-group deadline and per-array probe lock. `write_intent_bitmap` is
