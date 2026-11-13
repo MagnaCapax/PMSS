@@ -5,6 +5,48 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class StorageBenchmarkCommandInputTest extends TestCase
 {
+    public function testMdSyncRejectsNulRootsBeforeFilesystemDiscovery(): void
+    {
+        // No filesystem operation may receive a NUL-containing probe root.
+        $script = <<<'PHP'
+namespace BenchmarkMdSyncInputFixture;
+function glob($pattern) { throw new \RuntimeException('unexpected discovery'); }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php',
+            'BenchmarkMdSyncInputFixture');
+        $script .= <<<'PHP'
+$cases = [];
+foreach (["\0", "\0/fixture/sys/block", "/fixture/sys/block\0", "/fixture/sys/\0block",
+    "/fixture/sys/block\0suffix", "/fixture/sys/block/\0/"] as $root) {
+    $cases[] = storageBenchmarkMdSyncBusy($root);
+}
+echo json_encode($cases);
+PHP;
+        $this->assertSame(array_fill(0, 6, null), $this->pmssRunInlinePhpJson($script));
+    }
+
+    public function testMdSyncScanFailureKeepsPathNormalizationAndNullResult(): void
+    {
+        $script = <<<'PHP'
+namespace BenchmarkMdSyncScanFixture;
+function glob($pattern) { $GLOBALS['patterns'][] = $pattern; return false; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php',
+            'BenchmarkMdSyncScanFixture');
+        $script .= <<<'PHP'
+$cases = [];
+$GLOBALS['patterns'] = [];
+foreach (['/fixture/sys/block', '/fixture/sys/block/', '/fixture/sys/block///', 'relative/block', '', '/'] as $root) {
+    $cases[] = storageBenchmarkMdSyncBusy($root);
+}
+echo json_encode([$cases, $GLOBALS['patterns']]);
+PHP;
+        $pattern = '/fixture/sys/block/md*/md/sync_action';
+        $this->assertSame([array_fill(0, 6, null), [$pattern, $pattern, $pattern,
+            'relative/block/md*/md/sync_action', '/md*/md/sync_action', '/md*/md/sync_action']],
+            $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testFioRejectsMalformedArgumentsBeforeAllocatingOrExecuting(): void
     {
         // Stub every side effect: these cases must never launch fio or create a file.

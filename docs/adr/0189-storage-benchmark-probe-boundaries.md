@@ -50,6 +50,11 @@ decoding and preserves execution/read exceptions.
   errors, missing job zero and ordered metric/raw payloads.
 - Static checks run on the development control host. The lane runs the development
   suite on a testing machine before publishing; no benchmark or test runs locally.
+- The RAID activity probe rejects NUL-containing sysfs roots before discovery,
+  returning its existing unavailable-observation result (`null`). Valid root
+  normalization, activity matching and first-busy-array selection stay unchanged.
+  `StorageBenchmarkCommandInputTest` checks refusal before `glob()` and retains
+  ordinary scan-failure behavior through isolated discovery shims.
 - File-backed runs own the reserved inode through `finally`, including shutdown
   registration, preallocation and job iteration. Exceptions and errors trigger the
   existing inode-checked cleanup before reaching the caller; normal summaries and

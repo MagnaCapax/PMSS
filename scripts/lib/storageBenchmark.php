@@ -28,6 +28,8 @@ function storageBenchmarkIostatUtilPctRead(string $path): ?float
 /** Name the first md array that is resyncing, recovering, checking, repairing or reshaping. */
 function storageBenchmarkMdSyncBusy(string $sysBlockRoot): ?string
 {
+    // Corrupt paths must retain the scan-failure result before glob() sees them.
+    if (pmssFilesystemPathHasNulByte($sysBlockRoot)) return null;
     foreach (glob(rtrim($sysBlockRoot, '/').'/md*/md/sync_action') ?: [] as $file) {
         $action = is_readable($file) ? trim((string) file_get_contents($file)) : '';
         if (in_array($action, ['resync', 'recover', 'check', 'repair', 'reshape'], true)) return basename(dirname($file, 2)).' '.$action;
