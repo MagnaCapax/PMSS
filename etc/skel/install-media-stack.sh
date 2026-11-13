@@ -1123,7 +1123,8 @@ EOF
 		done
 		echo ""
 		lighttpd_media_stack_proxy_block_write "autobrr" "$AUTOBRR_PORT"
-		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		# Match watchdog install markers so a skipped reinstall keeps Jellyfin reachable.
+		if media_stack_app_installed jellyfin || [[ -d "$HOME/.config/jellyfin" ]]; then
 			echo ""
 			lighttpd_media_stack_proxy_block_write "jellyfin" "$JELLYFIN_PORT"
 		fi

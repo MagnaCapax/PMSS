@@ -1422,6 +1422,7 @@ LIGHTTPD;
         $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'media_stack_app_installed',
             'lighttpd_media_stack_proxy_block_write',
             'lighttpd_media_stack_config_write',
         ));
@@ -1433,15 +1434,32 @@ LIGHTTPD;
             'SABNZBD_PORT=18080 RADARR_PORT=17878 PROWLARR_PORT=19696 SONARR_PORT=18989 AUTOBRR_PORT=17474 JELLYFIN_PORT=18096',
             'JELLYFIN_INSTALL_ENABLED=1',
             $functions,
+            'mkdir -p "$HOME/.bin/jellyfin" "$HOME/.config/jellyfin"',
+            'touch "$HOME/.bin/jellyfin/jellyfin.dll"',
             'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack.conf"',
+            'cp "$HOME/.lighttpd/custom.d/media-stack.conf" "$HOME/.lighttpd/custom.d/media-stack-installed.conf"',
             'JELLYFIN_INSTALL_ENABLED=0',
+            // Regenerate the existing fragment, then exercise each watchdog marker alone.
+            'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack.conf"',
+            'rmdir "$HOME/.config/jellyfin"',
+            'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack-binary-only.conf"',
+            'rm "$HOME/.bin/jellyfin/jellyfin.dll"',
+            'mkdir -p "$HOME/.config/jellyfin"',
+            'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack-config-only.conf"',
+            'rmdir "$HOME/.config/jellyfin"',
             'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack-no-jellyfin.conf"',
+            'JELLYFIN_INSTALL_ENABLED=1',
+            'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack-not-installed.conf"',
             '',
         ));
 
         $this->pmssRunShellHarness($script);
         $withJellyfin = (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack.conf');
         $withoutJellyfin = (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack-no-jellyfin.conf');
+        foreach (array('installed', 'binary-only', 'config-only') as $case) {
+            $this->assertSame($withJellyfin, (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack-'.$case.'.conf'));
+        }
+        $this->assertSame($withoutJellyfin, (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack-not-installed.conf'));
 
         $this->assertOrderedStrings(array(
             'Location rewriting belongs here via map-urlpath. Set-Cookie',
