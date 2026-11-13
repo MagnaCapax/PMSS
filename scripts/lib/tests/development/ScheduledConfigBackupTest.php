@@ -32,8 +32,7 @@ class ScheduledConfigBackupTest extends TestCase
 
     private function writeBackupArchive(string $name, int $mtime): string
     {
-        $dir = $this->pmssEnsureDir($this->home.'/.pmss-backups', 0700);
-        $path = $this->pmssWriteFile($dir.'/'.$name, 'archive');
+        $path = $this->pmssWriteFile($this->home.'/.pmss-backups/'.$name, 'archive', 0700);
         touch($path, $mtime);
         return $path;
     }
@@ -44,10 +43,10 @@ class ScheduledConfigBackupTest extends TestCase
             throw new SkipTest('/bin/tar is required for scheduled backup archive tests');
         }
 
-        $this->pmssWriteRelativeFile($this->home, '.rtorrent.rc', 'config');
-        $this->pmssWriteRelativeFile($this->home, 'session/state.torrent', 'torrent');
-        $this->pmssWriteRelativeFile($this->home, '.config/deluge/auth', 'service-secret');
-        $this->pmssWriteRelativeFile($this->home, 'data/media.bin', 'media');
+        $this->pmssWriteFiles($this->home, [
+            '.rtorrent.rc' => 'config', 'session/state.torrent' => 'torrent',
+            '.config/deluge/auth' => 'service-secret', 'data/media.bin' => 'media',
+        ]);
 
         $result = \pmssCustomerBackupFileCreate($this->home);
 

@@ -9,11 +9,7 @@ class SessionHistoryPermissionsTest extends TestCase
     /** Create a target under the fixture root with exact starting permissions. */
     private function makeTarget(string $root, string $path, int $mode): string
     {
-        $target = $root.$path;
-        if (!is_dir(dirname($target))) {
-            mkdir(dirname($target), 0755, true);
-        }
-        file_put_contents($target, 'fixture');
+        $target = $this->pmssWriteFile($root.$path, 'fixture');
         chmod($target, $mode);
         return $target;
     }

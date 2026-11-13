@@ -60,14 +60,12 @@ class UserWebRootReconcileTest extends TestCase
     }
     public function testFullRestorePreservesCustomerStateAfterWebRootDeletion(): void
     {
-        $this->pmssWriteFile($this->home.'/data/keep.bin', 'data-state');
-        $this->pmssWriteFile($this->home.'/watch/keep.torrent', 'watch-state');
-        $this->pmssWriteFile($this->home.'/session/keep.state', 'session-state');
-        $this->pmssWriteFile($this->home.'/.rtorrent.rc.custom', 'rtorrent-state');
-        $this->pmssWriteFile($this->home.'/.lighttpd/custom', 'lighttpd-state');
-        $this->pmssWriteFile($this->home.'/.lighttpd/custom.d/override.conf', 'override-state');
-        $this->pmssWriteFile($this->home.'/www/public/index.html', 'public-state');
-        $this->pmssWriteFile($this->home.'/www/rutorrent/share/users/profile.ini', 'user-override');
+        $this->pmssWriteFiles($this->home, [
+            'data/keep.bin' => 'data-state', 'watch/keep.torrent' => 'watch-state',
+            'session/keep.state' => 'session-state', '.rtorrent.rc.custom' => 'rtorrent-state',
+            '.lighttpd/custom' => 'lighttpd-state', '.lighttpd/custom.d/override.conf' => 'override-state',
+            'www/public/index.html' => 'public-state', 'www/rutorrent/share/users/profile.ini' => 'user-override',
+        ]);
 
         $migrationMessages = [];
         pmssUserMigrateWebRootState($this->context(), $this->logger($migrationMessages));

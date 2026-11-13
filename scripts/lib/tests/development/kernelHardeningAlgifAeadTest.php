@@ -22,8 +22,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
     public function testKeepsUnloadAttemptWhenBlacklistIsAlreadyCurrent(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-algif-skip-');
-        @mkdir($dir.'/modprobe.d', 0755, true);
-        file_put_contents($dir.'/modprobe.d/pmss-algif-blacklist.conf', \pmssAlgifAeadBlacklistBody());
+        $this->pmssWriteFile($dir.'/modprobe.d/pmss-algif-blacklist.conf', \pmssAlgifAeadBlacklistBody());
         $logs = [];
         $calls = [];
 
@@ -65,9 +64,8 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
     public function testDispatcherSkipsCurrentBlacklistsForEveryRegistryEntry(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-kernel-hardening-skip-');
-        @mkdir($dir.'/modprobe.d', 0755, true);
         foreach ($this->dispatcherCases($dir) as $case) {
-            file_put_contents($case['path'], $case['body']);
+            $this->pmssWriteFile($case['path'], $case['body']);
         }
 
         $logs = [];

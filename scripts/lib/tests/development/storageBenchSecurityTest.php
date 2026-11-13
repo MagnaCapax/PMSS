@@ -20,11 +20,11 @@ class StorageBenchSecurityTest extends TestCase
             [-1, -1.0], ['-1.5', -1.5], [101, 101.0],
         ] as $index => [$value, $expected]) {
             // Serialize directly: JSON cannot carry native NaN or infinity fixtures.
-            file_put_contents($path, serialize(['diskUtil' => $value]));
+            $this->pmssWriteSerializedFixture($path, ['diskUtil' => $value]);
             $this->assertSame($expected, \storageBenchmarkIostatUtilPctRead($path), 'sample '.$index);
         }
         foreach (['', 'invalid', serialize([]), serialize(null)] as $payload) {
-            file_put_contents($path, $payload);
+            $this->pmssWriteFile($path, $payload);
             $this->assertSame(null, \storageBenchmarkIostatUtilPctRead($path));
         }
         $this->assertSame(null, \storageBenchmarkIostatUtilPctRead($path.'-missing'));
@@ -79,12 +79,12 @@ PHP;
         require_once dirname(__DIR__, 2).'/storageBenchmark.php';
         $root = $this->pmssMakeTempDir('pmss-bench-md-', 0700);
         $this->assertSame(null, \storageBenchmarkMdSyncBusy($root));
-        foreach (['md2' => "idle\n", 'md100' => "frozen\n", 'md101' => "recover\n"] as $array => $action) {
-            mkdir($root.'/'.$array.'/md', 0700, true);
-            file_put_contents($root.'/'.$array.'/md/sync_action', $action);
-        }
+        $this->pmssWriteFiles($root, [
+            'md2/md/sync_action' => "idle\n", 'md100/md/sync_action' => "frozen\n",
+            'md101/md/sync_action' => "recover\n",
+        ], 0700);
         $this->assertSame('md101 recover', \storageBenchmarkMdSyncBusy($root));
-        file_put_contents($root.'/md101/md/sync_action', "idle\n");
+        $this->pmssWriteFile($root.'/md101/md/sync_action', "idle\n", 0700);
         $this->assertSame(null, \storageBenchmarkMdSyncBusy($root));
         $this->assertSame(null, \storageBenchmarkMdSyncBusy($root.'/missing'));
     }
@@ -98,19 +98,19 @@ PHP;
         $this->assertTrue(is_file($path));
 
         // Exclusive creation must leave an existing file and its contents alone.
-        file_put_contents($path, 'original');
+        $this->pmssWriteFile($path, 'original');
         $this->assertSame(null, \storageBenchmarkFileReserve($path));
         $this->assertSame('original', file_get_contents($path));
 
         $oldHandle = fopen($path, 'r');
         unlink($path);
-        file_put_contents($path, 'replacement');
+        $this->pmssWriteFile($path, 'replacement');
         $this->assertFalse(\storageBenchmarkFileCleanup($path, $identity));
         $this->assertSame('replacement', file_get_contents($path));
 
         unlink($path);
         $target = $dir.'/target';
-        file_put_contents($target, 'target');
+        $this->pmssWriteFile($target, 'target');
         symlink($target, $path);
         $this->assertSame(null, \storageBenchmarkFileReserve($path));
         $this->assertFalse(\storageBenchmarkFileCleanup($path, $identity));

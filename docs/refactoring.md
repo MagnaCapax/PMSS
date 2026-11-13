@@ -681,6 +681,8 @@ checked writers too. `pmssWriteSerializedFixture()` retains object and scalar
 rejection payloads; simulated runtime writes remain explicit operation callbacks.
 Tracker backups, refresh/preinstall markers, host-stat logs, WireGuard sentinels,
 legacy-installer spools, journald templates, Deluge patches and panel frames share this path.
+Session-history modes, kernel blacklists, benchmark samples and backup archives
+also delegate populated parent setup to the checked writers, retaining creation modes.
 Keep deliberate file-type changes, permission transitions and injected writers explicit.
 
 Executable test fixtures use `pmssWriteExecutableFile()` for the shared write
