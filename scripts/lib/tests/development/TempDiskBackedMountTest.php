@@ -9,19 +9,17 @@ class TempDiskBackedMountTest extends TestCase
 {
     private function configureTempDiskBacked(?int $distroVersion = null, ?string $pathPrefix = null): array
     {
-        $messages = [];
-        $callback = function () use (&$messages, $distroVersion): void {
-            $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($distroVersion): void {
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($distroVersion, $pathPrefix): void {
+            $callback = static function () use ($logger, $distroVersion): void {
                 \pmssConfigureTempDiskBackedMount($logger, $distroVersion);
-            });
-        };
+            };
 
-        if ($pathPrefix === null) {
-            $callback();
-        } else {
-            $this->pmssWithPathPrefix($pathPrefix, $callback);
-        }
-        return $messages;
+            if ($pathPrefix === null) {
+                $callback();
+            } else {
+                $this->pmssWithPathPrefix($pathPrefix, $callback);
+            }
+        });
     }
 
     public function testSkipsBeforeDebian13(): void

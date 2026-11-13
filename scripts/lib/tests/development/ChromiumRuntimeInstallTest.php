@@ -28,7 +28,7 @@ final class ChromiumRuntimeInstallTest extends TestCase
                 $calls['run'][] = $command;
                 return $extra['rc'] ?? 0;
             },
-            'log' => static function (string $line) use (&$calls): void { $calls['log'][] = $line; },
+            'log' => $this->pmssMakeArrayLogger($calls['log']),
         ];
         \pmssChromiumRuntimeEnsure($ops);
         return $calls;

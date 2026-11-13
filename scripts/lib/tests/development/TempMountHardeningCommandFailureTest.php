@@ -18,18 +18,15 @@ class TempMountHardeningCommandFailureTest extends TestCase
 
     private function runWithFailingMount(array $env, callable $callback): array
     {
-        $messages = [];
         $this->pmssResetRuntimeProfile();
         // Fail through a PATH stub before any real system mount can run.
-        $this->pmssWithPathPrefixedEnv(
-            $this->pmssMakeExecutableStub('mount', "#!/bin/sh\nexit 17\n", 'pmss-mount-hardening-fail-bin-'),
-            $env + ['PMSS_DRY_RUN' => null],
-            function () use (&$messages, $callback): void {
-                $messages = $this->pmssArrayLoggerMessages($callback);
-            }
-        );
-
-        return $messages;
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($env, $callback): void {
+            $this->pmssWithPathPrefixedEnv(
+                $this->pmssMakeExecutableStub('mount', "#!/bin/sh\nexit 17\n", 'pmss-mount-hardening-fail-bin-'),
+                $env + ['PMSS_DRY_RUN' => null],
+                static function () use ($logger, $callback): void { $callback($logger); }
+            );
+        });
     }
 
     public function testNoexecRemountFailureIsLogged(): void

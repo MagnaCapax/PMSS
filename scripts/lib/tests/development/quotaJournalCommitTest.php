@@ -59,10 +59,10 @@ class QuotaJournalCommitTest extends TestCase
 
     private function journalMessages(string $mount, string $configured, string $mounts): array
     {
-        $messages = [];
-        $this->pmssWithEnv(['PMSS_PROC_MOUNTS_PATH' => $mounts], function () use ($mount, $configured, &$messages): void {
-            \pmssWarnPendingJournalCommit($mount, $configured, $this->pmssMakeArrayLogger($messages));
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($mount, $configured, $mounts): void {
+            $this->pmssWithEnv(['PMSS_PROC_MOUNTS_PATH' => $mounts], static function () use ($mount, $configured, $logger): void {
+                \pmssWarnPendingJournalCommit($mount, $configured, $logger);
+            });
         });
-        return $messages;
     }
 }

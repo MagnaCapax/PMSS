@@ -216,7 +216,7 @@ PHP;
         $summary = \pmssScheduledConfigBackupRun($store, [
             'homeRoot' => $this->homeRoot,
             'runner' => static function (): void { throw new \Error('private fixture detail'); },
-            'logger' => static function ($message) use (&$logs): void { $logs[] = $message; },
+            'logger' => $this->pmssMakeArrayLogger($logs),
             'userLogger' => static function (...$args) use (&$userLogs): void { $userLogs[] = $args; },
         ]);
         $this->assertSame(['timestamp', 'event', 'processed', 'succeeded', 'failed', 'skipped', 'level'], array_keys($summary));
