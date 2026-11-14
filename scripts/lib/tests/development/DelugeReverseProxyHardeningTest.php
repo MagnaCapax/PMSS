@@ -117,7 +117,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     {
         // Regression guard: base-host requests (FQDN) must land on the main vhost
         // where /etc/nginx/users/* is included (legacy Deluge redirects live there).
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/setup.php', ["'server_name localhost;'", "'server_name localhost '.\$subdomainBase.';'"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/setupDefaultSite.php', ["'server_name localhost;'", "'server_name localhost '.\$subdomainBase.';'"]);
     }
 
     public function testCreateNginxConfigStillSupportsLegacyDelugeWebPortPlaceholder(): void

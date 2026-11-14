@@ -73,7 +73,9 @@ function pmssCreateNginxConfigTestAndMaybeRestart($restart, $reload = false) {
     return $GLOBALS['configTestRc'];
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/nginxConfig/setup.php', 'NginxEmptyUsersTlsFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/nginxConfig/setup.php', 'NginxEmptyUsersTlsFixture', [
+            'setupFilesystem.php', 'setupTls.php', 'setupDefaultSite.php', 'setupAccountUi.php',
+        ]);
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/nginxConfig/main.php', 'NginxEmptyUsersTlsFixture');
         $script .= '\ob_start(); $results = []; for ($i = 0; $i < '.$runs.'; ++$i) {'
             .' $results[] = pmssCreateNginxConfigMain(["createNginxConfig.php", "--reload"]); } \ob_end_clean();'

@@ -206,8 +206,9 @@ final class PikkumiesUiRoutesTest extends TestCase
             "fetch('/__pmss-session'", "method:'POST'", "credentials:'same-origin'", "r.status===204?'/':'/login'"], $html);
         $this->assertFalse(strpos($html, '?token') !== false, 'the token never travels in a query string');
         $this->assertStringContainsString("'hermes-login.html'", $this->pmssReadRepoFile('scripts/lib/nginxConfig/pikkumiesUi.php'));
-        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
-        $this->assertSame(2, substr_count($setup, 'pmssPikkumiesUiPagesInstall()'), 'only legacy ports A and B install shared pages');
+        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setupAccountUi.php');
+        $this->assertSame(1, substr_count($setup, 'pmssPikkumiesUiPagesInstall()'), 'legacy ports A and B share one page-install attempt');
+        $this->assertStringContainsAllStrings(["[844, '/opt/pikkumies-agentboard/agentboard'", '[845, null,'], $setup);
     }
 
     public function testPortBSendsLoggedOutPagesToTheLoginFormAndKeepsHermesCookiesOnRoot(): void
@@ -258,7 +259,7 @@ final class PikkumiesUiRoutesTest extends TestCase
     {
         $bar = $this->pmssReadRepoFile('etc/seedbox/config/pikkumies-bar.html');
         $offline = $this->pmssReadRepoFile('etc/seedbox/config/pikkumies-not-running.html');
-        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
+        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setupAccountUi.php');
         $this->assertTrue(strlen($bar) < 10240);
         $this->assertStringContainsAllStrings([
             'lang="en"', 'maxlength="4000"', 'aria-label="Ask Pikkumies"',

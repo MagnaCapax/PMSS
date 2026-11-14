@@ -1,108 +1,28 @@
 <?php
-/**
- * Nginx config setup helpers for createNginxConfig.php.
- *
- * Responsible for preparing /etc/nginx paths, copying templates, and computing
- * SSL/subdomain context required for per-user vhost generation.
- *
- * @license GPL-3.0-only
- */
+/** Nginx global setup and per-user render context. @license GPL-3.0-only */
 
 require_once __DIR__.'/templates.php';
 require_once __DIR__.'/pikkumiesUi.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../configBackups.php';
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/setupFilesystem.php';
+require_once __DIR__.'/setupTls.php';
+require_once __DIR__.'/setupDefaultSite.php';
+require_once __DIR__.'/setupAccountUi.php';
 
-/** Report failed global config writes without changing the setup flow. */
-function pmssCreateNginxConfigSetupWarn(string $operation, string $path): void
-{
-    $message = '[WARN] Failed to '.$operation.' nginx config: '.$path;
-    fwrite(STDERR, $message.PHP_EOL);
-}
-
-/** Copy a global template and report failed attempts. */
-function pmssCreateNginxConfigSetupCopy(string $source, string $target): bool
-{
-    if (@copy($source, $target)) return true;
-    pmssCreateNginxConfigSetupWarn('copy template to', $target);
-    return false;
-}
-
-/** Check the complete byte count so a short global config write is visible. */
-function pmssCreateNginxConfigSetupWrite(string $path, string $content): bool
-{
-    if (pmssFileWriteComplete($path, $content)) return true;
-    pmssCreateNginxConfigSetupWarn('write', $path);
-    return false;
-}
-
-/** Report directory preparation failures while retaining fail-soft setup. */
-function pmssCreateNginxConfigSetupDirectory(string $path): bool
-{
-    if (pmssDirEnsureExists($path, 0755)) return true;
-    pmssCreateNginxConfigSetupWarn('prepare directory for', $path);
-    return false;
-}
-
-/** Keep the existing stale-default guards and report a failed removal. */
-function pmssCreateNginxConfigSetupRemoveDefault(string $path): void
-{
-    if (is_file($path) && !is_link($path) && pmssPathTargetIsSafe($path, false, true)) {
-        if (!@unlink($path)) pmssCreateNginxConfigSetupWarn('remove obsolete account UI default', $path);
-    }
-}
-
-/** Keep the host name inside one OpenSSL subject argument. */
-function pmssNginxConfigSelfSignedCertCommand(string $hostname): ?string
-{
-    if (!pmssHostnameIsValid($hostname)) return null;
-
-    return 'openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '
-        .escapeshellarg('/C=FI/ST=none/L=none/O=PulsedMedia/CN='.$hostname)
-        .' -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt';
-}
-
-/**
- * Ensure the default nginx site defines default_server on its listen directives.
- *
- * Older hosts may still carry stale site templates without default_server, which
- * causes nginx to treat the first loaded vhost as the implicit default (conf.d
- * loads before sites-enabled by default).
- * Regex failures retain the last intact config/line rather than emptying it.
- */
-function pmssNginxConfigEnsureSiteDefaultDefinesDefaultServer(string $config): string
-{
-    $config = preg_replace_callback('/^(\\s*listen\\s+(80|443)\\b)([^;]*)(;.*)$/m', static function (array $match) {
-        if ($match[2] === '443' && preg_match('/\\bssl\\b/', $match[3]) !== 1) {
-            return $match[0];
-        }
-        if (preg_match('/\\bdefault_server\\b/', $match[3]) !== 0) {
-            return $match[0];
-        }
-        return $match[1].rtrim($match[3]).' default_server'.$match[4];
-    }, $config) ?? $config;
-
-    return $config;
-}
-
-/**
- * Prepare nginx config directories and compute render context.
- *
- * @return array<string,mixed>
- */
+/** Prepare global configs in their existing order and return the stable render context. */
 function pmssCreateNginxConfigSetup(): array
 {
-    $userTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user");
-    $suspendedTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user-suspended");
-    $movedTemplate = @file_get_contents('/etc/seedbox/config/template.nginx-user-moved');
-    $movedNoticeTemplate = @file_get_contents('/etc/seedbox/config/template.moved.notice.html');
-
-    // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
+    $ctx = [
+        'userTemplate' => @file_get_contents('/etc/seedbox/config/template.nginx-user'),
+        'suspendedTemplate' => @file_get_contents('/etc/seedbox/config/template.nginx-user-suspended'),
+        'movedTemplate' => @file_get_contents('/etc/seedbox/config/template.nginx-user-moved'),
+        'movedNoticeTemplate' => @file_get_contents('/etc/seedbox/config/template.moved.notice.html'),
+    ];
     foreach (['/etc/nginx', '/etc/nginx/sites-available', '/etc/nginx/sites-enabled'] as $path) {
         pmssCreateNginxConfigSetupDirectory($path);
     }
-
     foreach ([
         '/etc/seedbox/config/template.nginx-conf' => '/etc/nginx/nginx.conf',
         '/etc/seedbox/config/template.nginx-proxy_params' => '/etc/nginx/proxy_params',
@@ -113,125 +33,35 @@ function pmssCreateNginxConfigSetup(): array
     }
 
     $serverHostname = pmssHostnameRead();
-    // /etc/hostname should be a single token; trim defensively to avoid whitespace surprises.
+    // Keep the first hostname token and its original case for certificate paths.
     $serverHostname = (string) (pmssConfigLineColumns($serverHostname, 0, [])[0] ?? $serverHostname);
     $subdomainBase = strtolower($serverHostname);
     $subdomainEnabled = pmssNginxUserHostIsValidFqdn($subdomainBase);
     $subdomainConfigDir = '/etc/nginx/conf.d';
-    $nginxConfigSiteDefault = @file_get_contents('/etc/seedbox/config/template.nginx-site-default');
-    $nginxConfigSiteDefaultSsl = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl');
-    $nginxConfigSiteDefaultSslLetsEncrypt = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl-lets-encrypt');
-    $certificatePath = "/etc/letsencrypt/live/{$serverHostname}";
-    $certificateFiles = [
-        "{$certificatePath}/fullchain.pem",
-        "{$certificatePath}/privkey.pem",
-        '/etc/letsencrypt/options-ssl-nginx.conf',
-        '/etc/letsencrypt/ssl-dhparams.pem',
-    ];
-    $hasLetsEncryptCert = true;
-    foreach ($certificateFiles as $path) {
-        if (!file_exists($path) || !is_readable($path)) {
-            $hasLetsEncryptCert = false;
-            break;
-        }
-    }
-    if ($hasLetsEncryptCert) {
-        // Insert server hostname on Let's Encrypt template AND put it on the default SSL config
-        $nginxConfigSiteDefaultSsl = str_replace('||SERVER_HOSTNAME||', $serverHostname, $nginxConfigSiteDefaultSslLetsEncrypt);
-    }
+    $defaultSite = @file_get_contents('/etc/seedbox/config/template.nginx-site-default');
+    $ssl = pmssNginxConfigSetupSsl($serverHostname);
+    $nginxSslBlock = trim((string) $ssl);
+    if ($nginxSslBlock !== '') $nginxSslBlock .= "\n";
+    pmssNginxConfigSetupDefaultSite($defaultSite, $ssl, $subdomainEnabled, $subdomainBase);
 
-    $nginxSslBlock = '';
-    if ($nginxConfigSiteDefaultSsl !== false) {
-        $sslCandidate = trim((string)$nginxConfigSiteDefaultSsl);
-        if ($sslCandidate !== '') {
-            $nginxSslBlock = rtrim($sslCandidate)."\n";
-        }
-    }
-
-    if ($nginxConfigSiteDefault !== false) {
-        $nginxConfigSiteDefault = pmssNginxConfigEnsureSiteDefaultDefinesDefaultServer((string)$nginxConfigSiteDefault);
-
-        // Ensure requests to the base hostname (FQDN) land on the main vhost where
-        // user location blocks (including legacy Deluge redirects) are included.
-        // This prevents unexpected fallback to user subdomain vhosts on some hosts.
-        if ($subdomainEnabled) {
-            $nginxConfigSiteDefault = str_replace(
-                'server_name localhost;',
-                'server_name localhost '.$subdomainBase.';',
-                $nginxConfigSiteDefault
-            );
-        }
-
-        $nginxConfigSiteDefault = str_replace('||SSL_SETTINGS_CONFIGURED_HERE||', (string)$nginxConfigSiteDefaultSsl, $nginxConfigSiteDefault);
-        pmssBackupCriticalConfig('nginx', '/etc/nginx/sites-available/default');
-        pmssCreateNginxConfigSetupWrite('/etc/nginx/sites-available/default', $nginxConfigSiteDefault);
-        $enabledDefault = '/etc/nginx/sites-enabled/default';
-        if (!file_exists($enabledDefault)) {
-            if (@symlink('/etc/nginx/sites-available/default', $enabledDefault) === false) {
-                pmssCreateNginxConfigSetupWrite($enabledDefault, $nginxConfigSiteDefault);
-            }
-        } elseif (!is_link($enabledDefault)) {
-            // Keep the enabled copy in sync on hosts where default is not a symlink.
-            pmssBackupCriticalConfig('nginx', $enabledDefault);
-            pmssCreateNginxConfigSetupWrite($enabledDefault, $nginxConfigSiteDefault);
-        }
-    }
-    // Create SSL config if required!
     pmssCreateNginxConfigSetupDirectory('/etc/nginx/ssl');
-
-    if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
-        // Generate a self-signed cert if Let's Encrypt not present yet (ignore errors on systems without openssl)
+    if (!file_exists('/etc/nginx/ssl/nginx.crt')) {
         $command = pmssNginxConfigSelfSignedCertCommand($serverHostname);
         if ($command !== null) @passthru($command);
     }
-
-    // Apply the mode on every run; an existing directory would otherwise keep its old mode.
+    // Existing directories must receive their mode on every run too.
     if (!pmssEnsureSafeDir('/etc/nginx/users', 0751)) {
         fwrite(STDERR, "Could not apply mode 0751 to /etc/nginx/users\n");
     }
-
     if ($subdomainEnabled) {
         pmssCreateNginxConfigSetupDirectory($subdomainConfigDir);
     } elseif ($subdomainBase !== '') {
         fwrite(STDERR, "Skipping nginx subdomain vhosts (invalid hostname: {$subdomainBase})\n");
     }
-
-    // The explicit default consumes unknown Host/SNI values on the UI port.
-    $uiDefault = $subdomainConfigDir.'/pmss-pikkumies-default.conf';
-    $uiEnabled = $subdomainEnabled && $nginxSslBlock !== ''
-        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
-        && is_file('/opt/pikkumies-agentboard/agentboard')
-        && pmssPikkumiesUiPortAvailable(844);
-    if ($uiEnabled) {
-        if (!pmssPikkumiesUiPagesInstall()) {
-            pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
-        }
-        if (!pmssWriteManagedFile($uiDefault, pmssPikkumiesUiDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644)) {
-            pmssCreateNginxConfigSetupWarn('write account UI default', $uiDefault);
-        }
-    } else {
-        pmssCreateNginxConfigSetupRemoveDefault($uiDefault);
-    }
-    $hermesDefault = $subdomainConfigDir.'/pmss-hermes-default.conf';
-    $pikkumiesHermesDefault = $subdomainConfigDir.'/pmss-pikkumies-hermes-default.conf';
-    if ($subdomainEnabled && $nginxSslBlock !== ''
-        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled') && pmssPikkumiesUiPortAvailable(845)) {
-        if (!$uiEnabled && !pmssPikkumiesUiPagesInstall())
-            pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
-        if (!pmssWriteManagedFile($pikkumiesHermesDefault, pmssPikkumiesHermesDefaultNginxBlock($nginxSslBlock), 'root', 'root', 0644))
-            pmssCreateNginxConfigSetupWarn('write Pikkumies Hermes UI default', $pikkumiesHermesDefault);
-    } else {
-        pmssCreateNginxConfigSetupRemoveDefault($pikkumiesHermesDefault);
-    }
-    // ADR 0150: retire port C even on marker hosts; Hermes uses the existing panel listener.
-    pmssCreateNginxConfigSetupRemoveDefault($hermesDefault);
+    pmssNginxConfigSetupAccountUi($subdomainEnabled, $nginxSslBlock, $subdomainConfigDir);
 
     $templates = pmssNginxUserSubdomainTemplates();
-    return [
-        'userTemplate' => $userTemplate,
-        'suspendedTemplate' => $suspendedTemplate,
-        'movedTemplate' => $movedTemplate,
-        'movedNoticeTemplate' => $movedNoticeTemplate,
+    return $ctx + [
         'subdomainEnabled' => $subdomainEnabled,
         'subdomainBase' => $subdomainBase,
         'subdomainConfigDir' => $subdomainConfigDir,

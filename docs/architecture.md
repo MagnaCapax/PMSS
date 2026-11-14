@@ -253,6 +253,11 @@ Keep the canonical installer/update details under `docs/install.md` and
   and profile expansion: retain live properties, display, guard, build and apply
   ordered steps. Manager keeps orchestration and public sizing helpers (ADR 0175).
 - **scripts/lib/nginxConfig/** – Generates the public user subdomain route and reconciles obsolete private hash routes. The template catalog contains only active and suspended public variants.
+  Global `setup.php` retains ordered orchestration and the render context;
+  `setupFilesystem.php`, `setupTls.php`, `setupDefaultSite.php` and
+  `setupAccountUi.php` own filesystem diagnostics, existing-certificate selection,
+  default-site publication and account-UI defaults. Both legacy UI defaults share
+  one ordered convergence loop and one shared-page attempt (ADR 0284).
   Native Hermes uses the existing panel path via `template.nginx-user` and
   the account lighttpd relay, with no port-846 server (ADR 0125 amendment, ADR 0150).
   The account UI facade retains publication and preflight; simplified, Hermes

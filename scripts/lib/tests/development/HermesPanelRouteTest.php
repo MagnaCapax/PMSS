@@ -89,7 +89,7 @@ final class HermesPanelRouteTest extends TestCase
         $this->assertSame(1, preg_match('~location /deluge-##username/ \{[^}]*proxy_hide_header WWW-Authenticate;~', $template));
         $public = \pmssNginxUserSubdomainTemplates()['public'];
         $this->assertSame(2, substr_count($public, 'proxy_hide_header WWW-Authenticate;'));
-        foreach (['scripts/lib/nginxConfig/setup.php', 'scripts/lib/nginxConfig/userConfigsGenerate.php'] as $path) {
+        foreach (['scripts/lib/nginxConfig/setup.php', 'scripts/lib/nginxConfig/setupAccountUi.php', 'scripts/lib/nginxConfig/userConfigsGenerate.php'] as $path) {
             $source = $this->pmssReadRepoFile($path);
             $this->assertStringNotContainsString('pmssHermesUiNginxBlock(', $source);
             $this->assertStringNotContainsString('pmssHermesUiDefaultNginxBlock(', $source);

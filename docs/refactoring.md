@@ -1,5 +1,15 @@
 # Refactoring Guidelines
 
+Global nginx setup retains its facade and public helpers while separating
+filesystem operations, existing-certificate selection, default-site publication
+and account-UI convergence (ADR 0284). The two legacy account-UI branches become
+one ordered loop, retaining each entry's binary/port gate and one shared-page
+attempt, including failed attempts. Certificate selection returns its fallback
+directly; template reads populate the returned context without separate aliases.
+Characterization locks context key order, template and command bytes, backup/link
+ordering, diagnostics, trust refusals and throwable boundaries. Execution remains
+on testing machines; devbox verification checks changed-file syntax only.
+
 Account permission repair keeps validation, lock ownership and final exit
 reporting in its CLI (ADR 0281). Home preparation, ordered policy, pruned owner
 traversal and convergence have separate modules. Checked-file mode and group

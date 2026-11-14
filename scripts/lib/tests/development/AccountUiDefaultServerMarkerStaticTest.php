@@ -13,21 +13,17 @@ final class AccountUiDefaultServerMarkerStaticTest extends TestCase
 
     public function testEveryAccountUiDefaultServerNeedsTheHostMarker(): void
     {
-        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/nginxConfig/setup.php',
-            ['pmssCreateNginxConfigSetupRemoveDefault($hermesDefault)'], ['pmssHermesUiDefaultNginxBlock(']);
-        foreach (['pmssPikkumiesUiDefaultNginxBlock', 'pmssPikkumiesHermesDefaultNginxBlock'] as $builder) {
-            $at = strpos($source, $builder.'(');
-            $this->assertTrue($at !== false, 'default server builder not found: '.$builder);
-            $ifAt = strrpos(substr($source, 0, (int) $at), "\n    if (");
-            $this->assertTrue($ifAt !== false, 'no guarding if before '.$builder);
-            $condition = substr($source, (int) $ifAt, (int) strpos($source, ') {', (int) $ifAt) - (int) $ifAt);
-            if (preg_match('/^\s*if \(\$([A-Za-z_]+)$/', $condition, $m) === 1) {
-                // `if ($flag) {`: judge the assignment of $flag that precedes it
-                $assignAt = strrpos(substr($source, 0, (int) $ifAt), '$'.$m[1].' = ');
-                $this->assertTrue($assignAt !== false, 'no assignment of $'.$m[1].' before '.$builder);
-                $condition = substr($source, (int) $assignAt, (int) strpos($source, ';', (int) $assignAt) - (int) $assignAt);
-            }
-            $this->assertStringContainsString(self::MARKER, $condition, $builder.' is written without the host marker check');
-        }
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/nginxConfig/setupAccountUi.php', [
+            "'pmss-pikkumies-default.conf' => [844, '/opt/pikkumies-agentboard/agentboard', 'pmssPikkumiesUiDefaultNginxBlock'",
+            "'pmss-pikkumies-hermes-default.conf' => [845, null, 'pmssPikkumiesHermesDefaultNginxBlock'",
+            "pmssCreateNginxConfigSetupRemoveDefault(\$subdomainConfigDir.'/pmss-hermes-default.conf')",
+        ], ['pmssHermesUiDefaultNginxBlock']);
+        // Both table entries must pass the same marker, binary and port guard before publication.
+        $guard = strpos($source, "if (\$subdomainEnabled && \$nginxSslBlock !== ''");
+        $this->assertTrue($guard !== false, 'no guarding if before default publication');
+        $condition = substr($source, $guard, strpos($source, ') {', $guard) - $guard);
+        $this->assertStringContainsAllStrings([self::MARKER,
+            '($binary === null || is_file($binary))', 'pmssPikkumiesUiPortAvailable($port)'], $condition);
+        $this->assertOrderedStrings(['foreach ([', $condition, 'pmssWriteManagedFile($path,'], $source);
     }
 }
