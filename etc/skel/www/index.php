@@ -452,8 +452,12 @@ function pmssGuiFramesDirectoryWritable($directory)
     try {
         return @fwrite($probe, '1') === 1 && @fflush($probe);
     } finally {
-        @fclose($probe);
-        @unlink($path);
+        try {
+            @fclose($probe);
+        } finally {
+            // A close failure must not leave the quota probe in the customer tree.
+            @unlink($path);
+        }
     }
 }
 
