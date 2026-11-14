@@ -11,6 +11,13 @@ docker run IMG    # run container
 
 Rootless Docker is started automatically when needed (by update-time hooks and cron watchdogs). If `docker ps` reports a socket error, wait a minute for the watchdog to kick in or contact support rather than trying to run `dockerd-rootless.sh` manually.
 
+The installed `~/.config/systemd/user/docker.service` is retained for the documented
+customer start path ([ADR 0066](./adr/0066-rootless-docker-unit-masked-not-deleted.md)).
+The watchdog starts Docker independently of that unit: use `docker` directly for
+normal operations, and do **not** use `systemctl --user start docker.service` or
+`systemctl --user restart docker.service` while the watchdog's daemon is running,
+since a second daemon can collide with it.
+
 To ensure Docker commands talk to the correct daemon, the `DOCKER_HOST` environment variable is set in your `~/.bashrc`:
 
 ```
@@ -114,7 +121,7 @@ The default skeleton under `/etc/skel` provides a `~/bin/docker-install-wireguar
 For operators, per-user Docker can be controlled via:
 
 ```
-/scripts/userDocker.php USER {start|stop|restart|status}
+/scripts/util/userDocker.php USER {start|stop|restart|status}
 ```
 
 This helper **defaults to starting `dockerd-rootless.sh` directly** (non-systemd rootless mode) once it has confirmed no rootless Docker process is running. Systemd user units are treated as advisory for start, while `stop` and `restart` pass the user's runtime directory to the user bus, fall back to a user-scoped process stop on failure, and verify that Docker is no longer running before reporting success. When `dockerEnabled=false`, the stop path also disables the user unit. Actions are logged to `/var/log/pmss/users/<username>.log` (and mirrored into `/var/log/pmss/users.log`/`.jsonl` when available).
@@ -137,21 +144,24 @@ If `docker ps` fails with a socket error like:
 failed to connect to the docker API at unix:///run/user/UID/docker.sock
 ```
 
-check whether the daemon is running:
+check your account's daemon processes without relying on the systemd user manager:
 
 ```
-systemctl --user status docker.service
-journalctl --user -u docker.service --no-pager -n 50
-
-If `systemctl --user` hangs or you are not in a real user session, use:
-
-```
-/scripts/userDocker.php USER status
-ps -u USER -o pid,cmd | grep dockerd
-```
+ps -u "$(id -u)" -o pid,cmd | grep '[d]ockerd'
 ```
 
-If `systemctl --user` complains about missing `$DBUS_SESSION_BUS_ADDRESS` or `$XDG_RUNTIME_DIR`, you are not in a real user session. Log in directly as the user (for example `ssh user@host`) and re-run the commands, or contact support so the host-level rootless Docker configuration can be checked.
+Operators can check the process, unit-file and socket observations with:
+
+```
+/scripts/util/userDocker.php USER status
+```
+
+`systemctl --user status docker.service` and `journalctl --user -u docker.service`
+describe the unit-managed daemon only. An inactive unit or `No journal files were
+found` does not mean the watchdog's daemon is down: it runs outside the unit and
+its stdout/stderr are discarded by the launcher. Ask support to inspect watchdog
+activity in `/var/log/pmss/rootlessDocker.log` and per-account lifecycle actions in
+`/var/log/pmss/users/<username>.log`.
 
 If the daemon's processes are alive but `docker ps` still cannot connect to the
 socket (a "wedged" daemon), do **not** `systemctl --user restart docker` — that
