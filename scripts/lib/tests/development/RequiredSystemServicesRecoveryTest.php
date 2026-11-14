@@ -47,8 +47,7 @@ class RequiredSystemServicesRecoveryTest extends TestCase
     {
         foreach (['initializing', 'starting', 'stopping', 'offline', 'maintenance', 'unknown', ''] as $manager) {
             $row = $this->observe(['manager' => [$manager]]);
-            $this->assertSame([], $row['steps']);
-            $this->assertTrue($row['released']);
+            $this->pmssAssertArraySubsetSame(['steps' => [], 'released' => true], $row);
         }
         $this->assertSame([], $this->observe(['runtime' => false])['steps']);
         $this->assertSame(4, count($this->observe(['manager' => ['degraded']])['steps']));
@@ -72,9 +71,7 @@ class RequiredSystemServicesRecoveryTest extends TestCase
         $this->assertSame('fixture-prior', $row['fds']);
         foreach (['export', 'step'] as $fault) {
             $row = $this->observe(['fault' => $fault]);
-            $this->assertSame('fixture fault', $row['error']);
-            $this->assertTrue($row['released']);
-            $this->assertSame('fixture-prior', $row['fds']);
+            $this->pmssAssertArraySubsetSame(['error' => 'fixture fault', 'released' => true, 'fds' => 'fixture-prior'], $row);
         }
     }
 

@@ -41,8 +41,8 @@ class IndexRemoteFramesFailoverTest extends TestCase
             .'array("url" => "remote-welcome.php", "title" => "Remote", "linkText" => "Welcome"));');
         $this->pmssAssertArraySubsetSame(['status' => 200, 'fetches' => 1, 'errors' => '',
             'leftovers' => [], 'bufferDelta' => 0], $result);
-        $this->assertStringContainsAllStrings(['<!-- REMOTE HEAD -->', 'remote-welcome.php', '</html>'], $result['html']);
-        $this->assertStringNotContainsString('id="pmss-tab-filemanager"', $result['html']);
+        $this->assertStringContainsAndOmitsStrings(['<!-- REMOTE HEAD -->', 'remote-welcome.php', '</html>'],
+            ['id="pmss-tab-filemanager"'], $result['html']);
     }
 
     public function testExplicitLocalModeDoesNotProbeOrFetch(): void
@@ -57,10 +57,8 @@ class IndexRemoteFramesFailoverTest extends TestCase
     private function assertLocalPanel(array $result): void
     {
         $this->pmssAssertArraySubsetSame(['status' => 200, 'leftovers' => [], 'bufferDelta' => 0], $result);
-        $this->assertStringContainsAllStrings(['<!DOCTYPE HTML', 'id="pmss-tab-welcome"',
-            'id="pmss-tab-filemanager"', 'filemanager.php', '</html>'], $result['html']);
-        $this->assertStringNotContainsString('BROKEN PAYLOAD', $result['html']);
-        $this->assertStringNotContainsString('REMOTE RAN', $result['html']);
+        $this->assertStringContainsAndOmitsStrings(['<!DOCTYPE HTML', 'id="pmss-tab-welcome"',
+            'id="pmss-tab-filemanager"', 'filemanager.php', '</html>'], ['BROKEN PAYLOAD', 'REMOTE RAN'], $result['html']);
     }
 
     private function render(string $failure, string $payload): array

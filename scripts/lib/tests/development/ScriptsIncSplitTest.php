@@ -156,9 +156,6 @@ class ScriptsIncSplitTest extends TestCase
         $this->assertOrderedStrings(array_map(static function ($part): string {
             return "'".$part."'";
         }, self::PARTS), $loader);
-        foreach (self::PARTS as $part) {
-            $this->assertStringContainsString("'".$part."'", $loader);
-        }
         $this->assertSame(array_map(static function ($part): string { return 'scriptsInc'.$part.'.php'; }, self::PARTS),
             \pmssUserPanelHelperFiles());
     }

@@ -20,8 +20,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
 
-        $this->pmssAssertArraySubsetSame(['healthy' => ['md0'], 'degraded' => ['md1'], 'unknown' => []], $plan);
-        $this->assertFalse($plan['fallback_all']);
+        $this->pmssAssertArraySubsetSame(['healthy' => ['md0'], 'degraded' => ['md1'], 'unknown' => [], 'fallback_all' => false], $plan);
     }
 
     public function testArrayNamesRequireAWholeMdDeviceName(): void
@@ -118,8 +117,7 @@ class MdadmCheckarrayTest extends TestCase
     {
         $plan = \pmssMdadmCheckarrayPlan($this->fixtureRoot.'/missing-mdstat', $this->fixtureRoot.'/sys/block');
 
-        $this->assertTrue($plan['fallback_all']);
-        $this->assertSame('mdstat_unreadable', $plan['reason']);
+        $this->pmssAssertArraySubsetSame(['fallback_all' => true, 'reason' => 'mdstat_unreadable'], $plan);
     }
 
     public function testDegradedStatePreservesSourcePrecedenceAndUnknowns(): void
@@ -176,8 +174,7 @@ class MdadmCheckarrayTest extends TestCase
         foreach ([null, 'invalid', '0', '1'] as $sysfs) {
             if ($sysfs !== null) $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md0/md/degraded', $sysfs."\n", 0700);
             $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
-            $this->assertFalse($plan['fallback_all']);
-            $this->pmssAssertArraySubsetSame(['reason' => '',
+            $this->pmssAssertArraySubsetSame(['fallback_all' => false, 'reason' => '',
                 'healthy' => $sysfs === '0' ? ['md0', 'md1'] : ['md1'],
                 'degraded' => $sysfs === '1' ? ['md0', 'md2'] : ['md2'],
                 'unknown' => $sysfs === null || $sysfs === 'invalid' ? ['md0'] : []], $plan);
@@ -203,8 +200,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
 
-        $this->assertTrue($plan['fallback_all']);
-        $this->assertSame('mdstat_parse_empty', $plan['reason']);
+        $this->pmssAssertArraySubsetSame(['fallback_all' => true, 'reason' => 'mdstat_parse_empty'], $plan);
     }
 
     public function testUnknownArrayStateIsSkippedByMain(): void

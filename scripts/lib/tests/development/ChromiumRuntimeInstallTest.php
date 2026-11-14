@@ -69,8 +69,8 @@ final class ChromiumRuntimeInstallTest extends TestCase
         }
         $partial = $this->runStep(13, ['chromium']);
         $this->assertSame(1, count($partial['run']));
-        $this->assertStringContainsString("--no-install-recommends 'slirp4netns'", $partial['run'][0]);
-        $this->assertStringNotContainsString("'chromium'", $partial['run'][0], 'only the missing part is installed');
+        $this->assertStringContainsAndOmitsStrings(["--no-install-recommends 'slirp4netns'"],
+            ["'chromium'" => 'only the missing part is installed'], $partial['run'][0]);
     }
 
     public function testNoCommandEverNamesTheSetuidSandboxOrOverridesHolds(): void
