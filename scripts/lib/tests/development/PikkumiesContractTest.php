@@ -22,9 +22,7 @@ final class PikkumiesContractTest extends TestCase
         $section = substr($docs, $sectionStart, $sectionEnd - $sectionStart);
 
         $values = new \RecursiveIteratorIterator(new \RecursiveArrayIterator($fixture));
-        foreach ($values as $value) {
-            $this->assertStringContainsString((string) $value, $section, 'Missing fixture value: '.(string) $value);
-        }
+        $this->assertStringContainsAllStrings(iterator_to_array($values, false), $section, 'Missing fixture value: ');
         $this->assertStringContainsString(implode(' ', $fixture['eternals']['argv']), $section);
         foreach ($fixture['ask']['exitCodes'] as $code => $meaning) {
             $this->assertStringContainsString('`'.$code.'` = '.$meaning, $section);

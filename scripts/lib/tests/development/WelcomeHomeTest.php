@@ -142,12 +142,10 @@ final class WelcomeHomeTest extends TestCase
 
         $this->assertStringContainsAllStrings(['class="h-chip h-chip-bonus"', 'Loyalty bonus <b>+25%</b>', 'Bonus is applied on this server.'], $html['percent']);
         $this->assertStringContainsAllStrings(['Bonus disk <b>+50 GiB</b>', 'Additional disk space is included in your quota on this server.'], $html['gib']);
-        $this->assertStringContainsString('Bonus disk <b>+1,925 GiB</b>', $html['gibLarge']);
-        $this->pmssAssertStringNotContainsString('Bonus disk space:', $html['gibLarge']);
+        $this->assertStringContainsAndOmitsStrings(['Bonus disk <b>+1,925 GiB</b>'], ['Bonus disk space:'], $html['gibLarge']);
         $this->assertStringContainsAllStrings(['Loyalty bonus <b>0%</b>', 'No bonus is applied on this server.'], $html['zero']);
         foreach (['absent', 'invalid'] as $name) {
-            $this->assertStringContainsString('how it works', $html[$name], $name);
-            $this->pmssAssertStringNotContainsString('0%', $html[$name], $name);
+            $this->assertStringContainsAndOmitsStrings(['how it works' => $name], ['0%' => $name], $html[$name]);
         }
         foreach ($states as $name => $unused) {
             $this->pmssAssertStringNotContainsString('>Upgrade</a>', $html[$name], $name);
@@ -780,8 +778,7 @@ final class WelcomeHomeTest extends TestCase
         $this->assertStringContainsAllStrings(['<dt>Permanent address</dt><dd>'.$name.'</dd>', 'data-copy="'.$name.'"',
             'index.php/Permalinks_on_PMSS', '<dt>Host</dt><dd>host.example.test</dd>'], $html['with']);
         foreach (['none', 'omitted'] as $case) {
-            $this->pmssAssertStringNotContainsString('Permanent address', $html[$case], $case);
-            $this->pmssAssertStringNotContainsString('mcx.fi', $html[$case], $case);
+            $this->assertStringContainsAndOmitsStrings([], ['Permanent address' => $case, 'mcx.fi' => $case], $html[$case]);
             $this->assertStringContainsString('<dt>Username</dt><dd>fixtur01</dd>', $html[$case], $case);
         }
     }

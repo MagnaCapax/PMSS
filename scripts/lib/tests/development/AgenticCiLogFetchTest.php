@@ -180,8 +180,7 @@ BASH
         $calls = file($trace, FILE_IGNORE_NEW_LINES);
         $this->assertSame(2, count($calls));
         foreach ($calls as $call) {
-            $this->assertStringContainsString('--limit 50', $call);
-            $this->assertStringContainsString('headBranch,event', $call);
+            $this->assertStringContainsAllStrings(['--limit 50', 'headBranch,event'], $call);
         }
     }
 

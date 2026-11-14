@@ -69,10 +69,9 @@ final class TorrentClientsCardsAvailabilityRenderTest extends TestCase
                 $cards = $page();
                 $this->assertSame(array('torrent-client-versions'), array_keys($cards));
                 $html = $cards['torrent-client-versions'];
-                foreach (array('qBittorrent', 'Deluge', 'Transmission', 'rTorrent') as $label)
-                    $this->assertStringContainsString('<p>'.$label.': system</p>', $html);
-                foreach (array('<select', 'Switch version', 'not installed') as $text)
-                    $this->assertStringNotContainsString($text, $html);
+                $this->assertStringContainsAndOmitsStrings(array('<p>qBittorrent: system</p>', '<p>Deluge: system</p>',
+                    '<p>Transmission: system</p>', '<p>rTorrent: system</p>'),
+                    array('<select', 'Switch version', 'not installed'), $html);
             });
     }
 

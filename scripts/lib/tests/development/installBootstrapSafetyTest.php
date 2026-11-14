@@ -16,9 +16,8 @@ class installBootstrapSafetyTest extends TestCase
     public function testSnapshotCleanupAvoidsWildcardDelete(): void
     {
         $broadDeletePattern = 'rm -rf PMSS'.'*';
-        $this->assertStringContainsString('cleanup_snapshot_workspace()', $this->script);
-        $this->assertStringContainsString('/tmp/PMSS.tar.gz', $this->script);
-        $this->assertStringNotContainsString($broadDeletePattern, $this->script);
+        $this->assertStringContainsAndOmitsStrings(['cleanup_snapshot_workspace()', '/tmp/PMSS.tar.gz'],
+            [$broadDeletePattern], $this->script);
     }
 
     public function testSnapshotTreeValidatedBeforeStaging(): void
