@@ -20,9 +20,8 @@ class UserRutorrentCompatPatchTest extends TestCase
             $path = $this->pmssWriteRelativeFile($home, $case['path'], $case['legacy']);
 
             \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-            $content = (string) file_get_contents($path);
-
-            $this->assertStringContainsAndOmitsStrings([$case['expected']], [$case['unexpected']], $content);
+            $content = $this->pmssAssertFileContainsAllStrings($path, [$case['expected']]);
+            $this->pmssAssertStringNotContainsString($case['unexpected'], $content);
         }
     }
 
@@ -32,9 +31,7 @@ class UserRutorrentCompatPatchTest extends TestCase
         $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "prefix\n\t\t\$tm = getdate();\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n");
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-        $content = (string) file_get_contents($path);
-
-        $this->assertStringContainsString("\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;", $content);
+        $content = $this->pmssAssertFileContainsAllStrings($path, ["\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;"]);
         $this->assertEquals(1, substr_count($content, '$interval = (int)$interval;'));
         $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', $content);
     }
@@ -106,32 +103,26 @@ class UserRutorrentCompatPatchTest extends TestCase
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
 
-        $this->assertStringContainsString("\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;", (string) file_get_contents($settingsPath));
-        $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', (string) file_get_contents($settingsPath));
-        $this->assertStringContainsString('text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8', (string) file_get_contents($snoopyPath));
-        $this->pmssAssertStringNotContainsString('image/x-xbitmap', (string) file_get_contents($snoopyPath));
-        $this->assertStringContainsString('@ob_flush();', (string) file_get_contents($rssPath));
-        $this->assertStringContainsString('return (int) $field;', (string) file_get_contents($hddquotaPath));
-        $throttleContent = (string) file_get_contents($throttlePath);
-        $this->assertStringContainsAndOmitsStrings(['new rXMLRPCCommand( "set_upload_rate", 0 )',
-            'new rXMLRPCCommand( "set_download_rate", 0 )'], ['MAX_SPEED'], $throttleContent);
+        $this->pmssAssertFileContainsAllStrings($settingsPath, ["\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;",
+            '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),']);
+        $snoopyContent = $this->pmssAssertFileContainsAllStrings($snoopyPath, ['text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8']);
+        $this->pmssAssertStringNotContainsString('image/x-xbitmap', $snoopyContent);
+        $this->pmssAssertFileContainsAllStrings($rssPath, ['@ob_flush();']);
+        $this->pmssAssertFileContainsAllStrings($hddquotaPath, ['return (int) $field;']);
+        $throttleContent = $this->pmssAssertFileContainsAllStrings($throttlePath, ['new rXMLRPCCommand( "set_upload_rate", 0 )',
+            'new rXMLRPCCommand( "set_download_rate", 0 )']);
+        $this->pmssAssertStringNotContainsString('MAX_SPEED', $throttleContent);
     }
 
     public function testSkeletonHddquotaActionReturnsInt(): void
     {
-        $path = $this->pmssRepoPath('etc/skel/www/rutorrent/plugins/hddquota/action.php');
-        $content = (string) file_get_contents($path);
-
-        $this->assertStringContainsString('return (int) $field;', $content);
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/rutorrent/plugins/hddquota/action.php', 'return (int) $field;');
     }
 
     public function testSkeletonSnoopyAcceptDefaultIsModern(): void
     {
-        $path = $this->pmssRepoPath('etc/skel/www/rutorrent/php/Snoopy.class.inc');
-        $content = (string) file_get_contents($path);
-
-        $this->assertStringContainsAndOmitsStrings(['var $accept			=	"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";'],
-            ['image/x-xbitmap'], $content);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/rutorrent/php/Snoopy.class.inc',
+            ['var $accept			=	"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";'], ['image/x-xbitmap']);
     }
 
     public function testCompatibilityRebuildsSkeletonFilesAndIsIdempotent(): void

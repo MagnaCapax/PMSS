@@ -14,8 +14,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
         ], 'pmss-systemd-user-at-install-');
 
         $this->assertTrue(is_file($target), 'Expected user@.service drop-in to be created');
-        $body = (string)file_get_contents($target);
-        $this->assertStringContainsString('LimitNOFILE=8192:16384', $body);
+        $this->pmssAssertFileContainsAllStrings($target, ['LimitNOFILE=8192:16384']);
         $this->assertSame(0644, fileperms($target) & 0777);
         $this->assertTrue(!file_exists($target.'.tmp'), 'Temporary drop-in file should not remain after install');
     }
@@ -28,8 +27,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
         ], 'pmss-systemd-user-at-clamp-');
 
         $this->assertTrue(is_file($target), 'Expected user@.service drop-in to be created');
-        $body = (string)file_get_contents($target);
-        $this->assertStringContainsString('LimitNOFILE=4096:4096', $body);
+        $this->pmssAssertFileContainsAllStrings($target, ['LimitNOFILE=4096:4096']);
     }
 
     public function testSkipsWhenPolicyDoesNotProvideNoFileValues(): void
@@ -65,8 +63,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
         $target = $dir.'/30-pmss-log-namespace.conf';
         $this->assertTrue(is_file($target), 'Expected user@.service log namespace drop-in to be created');
-        $body = (string)file_get_contents($target);
-        $this->assertStringContainsString('LogNamespace=user-%i', $body);
+        $this->pmssAssertFileContainsAllStrings($target, ['LogNamespace=user-%i']);
         $this->assertSame(0644, fileperms($target) & 0777);
         $this->assertTrue(!file_exists($target.'.tmp'), 'Temporary log namespace drop-in should not remain after install');
     }

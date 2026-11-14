@@ -113,8 +113,10 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         $this->assertSame(0755, fileperms($stub) & 0777);
         $this->assertSame(0644, fileperms($launcher) & 0777);
         $this->assertSame($uid, fileowner($stub));
-        $this->assertStringContainsString('exec /usr/bin/php /opt/pmss/ai-tools/pmss-ai-launch.php claude "$@"', file_get_contents($stub));
-        $this->assertStringContainsString('exec /opt/pmss/ai-tools/npm/claude/bin/claude "$@"', file_get_contents($stub));
+        $this->pmssAssertFileContainsAllStrings($stub, [
+            'exec /usr/bin/php /opt/pmss/ai-tools/pmss-ai-launch.php claude "$@"',
+            'exec /opt/pmss/ai-tools/npm/claude/bin/claude "$@"',
+        ]);
         $this->assertFalse(\pmssAiToolsClaudeInstallNeeded($launcher, $stub, $source, $uid, $gid));
         chmod($stub, 0700);
         $this->assertTrue(\pmssAiToolsClaudeInstallNeeded($launcher, $stub, $source, $uid, $gid));

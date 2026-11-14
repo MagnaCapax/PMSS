@@ -68,14 +68,14 @@ class BootTuningEnsureTest extends TestCase
         // divergent value makes the effective setting depend on boot order. rc.local
         // writes 4096 (operator ruling 2026-09-18: "4096 is more authoritative"), so the
         // md branch and the hardware.json md_read_ahead_kb it advertises must both be 4096.
-        $this->pmssAssertFileContainsAllStrings($script, [
+        $body = $this->pmssAssertFileContainsAllStrings($script, [
             '"md_read_ahead_kb": 4096',
         ], 'hardware.json must advertise the md read_ahead_kb this script actually writes; '
             .'a stale declaration makes the audit surface lie about the host');
 
         $this->pmssAssertStringNotContainsString(
             'read_ahead_kb" 2048',
-            (string)file_get_contents($script),
+            $body,
             'no writer may diverge from template.rc.local 4096 on a knob rc.local also writes'
         );
     }
@@ -141,14 +141,13 @@ class BootTuningEnsureTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-bcache-', 0700);
         [$script] = $this->runBootTuning($dir);
-        $body = (string)file_get_contents($script);
 
         // ADR 0064 step 1. template.rc.local's blanket per-disk loop
         // (ls /sys/block|grep -v nvme|grep -v md|grep -v loop) INCLUDES bcache*, so until this
         // branch existed rc.local was the only queue-knob writer for those devices. Step 2 gates
         // that loop off on updated hosts; without this branch the gating would silently drop
         // bcache tuning fleet-wide. Assert the branch is here so the ordering cannot be inverted.
-        $this->pmssAssertFileContainsAllStrings($script, [
+        $body = $this->pmssAssertFileContainsAllStrings($script, [
             '/sys/block/bcache*',
             '"bcache_read_ahead_kb": 4096',
             '"bcache_scheduler": "bfq"',

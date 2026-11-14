@@ -23,8 +23,7 @@ class SystemdSliceLegacyShadowUpdateTest extends TestCase
             'totalMemMiB' => 1024,
         ]));
 
-        $this->assertTrue(file_exists($legacyShadow), 'Legacy shadow file missing after run');
-        $data = (string) file_get_contents($legacyShadow);
-        $this->assertStringContainsString('TasksMax=2048', $data, 'Legacy TasksMax not rewritten to expected floor clamp');
+        $this->pmssAssertFileContainsAllStrings($legacyShadow, ['TasksMax=2048' => 'Legacy TasksMax not rewritten to expected floor clamp'],
+            'Legacy shadow file missing after run');
     }
 }
