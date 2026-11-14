@@ -99,7 +99,10 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `storageHealthSnapshot.php` – Append SMART/NVMe/mdadm health snapshots to
   `/var/log/pmss/storage-health.jsonl` without waking standby disks. The root
   cron template runs it twice daily (06:00 and 18:00), and the PMSS logrotate
-  policy retains the JSONL plus the cron wrapper log.
+  policy retains the JSONL plus the cron wrapper log. The wrapper registers the
+  collector under its own CLI entrypoint identity; requiring the guarded util
+  alone does not run collection. `StorageHealthCronTest` exercises the started
+  wrapper with stubbed probes on the testing machine.
 - `processSnapshot.php` – Append process tree snapshots for postmortem analysis (root-only log at `/var/log/pmss/process-snapshot.log`).
 - `systemStatsLog.php` – Record host PSI, ioping, load, memory, and disk-busy
   metrics every five minutes. It also atomically refreshes the narrow mode-0644
