@@ -52,8 +52,7 @@ final class HermesPanelRouteTest extends TestCase
         $this->assertStringContainsString('"/user-##username/" =>', $template);
         foreach ([['../qafix01', 24000], ['qafix01', 443], ['qafix01', 65536]] as $case)
             $this->assertSame('', \pmssLighttpdHermesUiBlock($case[0], $case[1]));
-        $render = $this->pmssReadRepoFile('scripts/lib/lighttpd/configRender.php');
-        $this->assertStringNotContainsString('pmss-install.status', $render, 'the route must exist before install');
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/lighttpd/configRender.php', 'pmss-install.status', 'the route must exist before install');
     }
 
     public function testNginxCorrectsLighttpdResponseMappingWithoutRewritingUpstreamCode(): void
@@ -90,21 +89,16 @@ final class HermesPanelRouteTest extends TestCase
         $public = \pmssNginxUserSubdomainTemplates()['public'];
         $this->assertSame(2, substr_count($public, 'proxy_hide_header WWW-Authenticate;'));
         foreach (['scripts/lib/nginxConfig/setup.php', 'scripts/lib/nginxConfig/setupAccountUi.php', 'scripts/lib/nginxConfig/userConfigsGenerate.php'] as $path) {
-            $source = $this->pmssReadRepoFile($path);
-            $this->assertStringNotContainsString('pmssHermesUiNginxBlock(', $source);
-            $this->assertStringNotContainsString('pmssHermesUiDefaultNginxBlock(', $source);
+            $this->pmssAssertRepoFileContainsAndOmitsStrings($path, [], ['pmssHermesUiNginxBlock(', 'pmssHermesUiDefaultNginxBlock(']);
         }
     }
 
     public function testHandoffUsesOriginBasedUrlsAndOnlyASingleUseFragment(): void
     {
-        $page = $this->pmssReadRepoFile('etc/skel/www/hermesLogin.php');
-        $this->assertStringContainsAllStrings(['new URL(base, location.origin)', "new URL(base + 'login', location.origin)",
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/hermesLogin.php', ['new URL(base, location.origin)', "new URL(base + 'login', location.origin)",
             "new URL(base + '__pmss-session', location.origin)", "history.replaceState(null, '', location.pathname)",
-            '/^#token=([0-9a-f]{64})$/', "credentials:'same-origin'", 'Referrer-Policy: no-referrer'], $page);
-        $this->assertStringNotContainsString('location.href)', $page);
-        $this->assertStringNotContainsString('?token=', $page);
-        $this->assertStringContainsString("'www/hermesLogin.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
+            '/^#token=([0-9a-f]{64})$/', "credentials:'same-origin'", 'Referrer-Policy: no-referrer'], ['location.href)', '?token=']);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/hermesLogin.php'");
     }
 
     public function testSessionCookieMustMatchTheNativePanelPrefixAndSecurityAttributes(): void

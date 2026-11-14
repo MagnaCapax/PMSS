@@ -222,18 +222,19 @@ class CgroupReadIopsDerivationTest extends TestCase
 
     public function testDirectEnforcerDerivesReadOnlyWithoutUserConfigPersistence(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/cgroupIopsLimitApply.php', [
+        $source = $this->pmssReadRepoFile('scripts/cron/cgroupIopsLimitApply.php');
+        $this->assertOrderedStrings([
             '$readIops  = pmssIopsParseSpec($json[\'IOReadIOPS\']  ?? null);',
             'if (!$dynamicEnforce && $readIops === null) {',
             '$readIops = pmssCgroupPolicyDerivedReadIopsCap(',
             '$limits = [$readIops, $writeIops];',
             "['read', \$limits[0], pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.throttle.read_iops_device')]",
-        ]);
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/cron/cgroupIopsLimitApply.php', [
+        ], $source);
+        $this->assertStringContainsAndOmitsStrings([], [
             'UserConfigStore',
             'pmssAtomicWriteFile',
             'pmssUserConfigJsonWrite',
             '$writeIops = pmssCgroupPolicyDerivedReadIopsCap(',
-        ]);
+        ], $source);
     }
 }

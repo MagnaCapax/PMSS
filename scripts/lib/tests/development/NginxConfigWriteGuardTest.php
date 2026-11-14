@@ -283,7 +283,7 @@ PHP;
     public function testSetupDoesNotDeleteRoutesBeforeGeneration(): void
     {
         foreach (['setup.php', 'setupFilesystem.php', 'setupTls.php', 'setupDefaultSite.php', 'setupAccountUi.php'] as $file) {
-            $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/nginxConfig/'.$file, [
+            $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/nginxConfig/'.$file, [], [
                 "glob('/etc/nginx/users/*')",
                 "glob(\$subdomainConfigDir.'/pmss-user-*.conf')",
                 "@unlink(\$subdomainConfigDir.'/pmss-user-'.\$requestedUser.'.conf')",
@@ -337,7 +337,7 @@ PHP;
             "require_once __DIR__.'/../lighttpd/userFileWrite.php';",
             'function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $label): bool',
         ]);
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [], [
             'file_put_contents($subdomainConfigDir',
             'file_put_contents("/etc/nginx/users/',
             '@unlink("/etc/nginx/users/',

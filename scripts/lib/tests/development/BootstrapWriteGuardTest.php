@@ -59,7 +59,7 @@ class BootstrapWriteGuardTest extends TestCase
             'pmssSshdAuthorizedKeysDirectiveNormalize(',
         ]);
         foreach (['bootstrap.php', 'hostname.php', 'sshdConfig.php', 'sshd.php'] as $module) {
-            $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/services/'.$module, ["file_put_contents('/etc/hostname'", 'file_put_contents($sshdConfig, $updated)']);
+            $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/services/'.$module, [], ["file_put_contents('/etc/hostname'", 'file_put_contents($sshdConfig, $updated)']);
         }
     }
 }
