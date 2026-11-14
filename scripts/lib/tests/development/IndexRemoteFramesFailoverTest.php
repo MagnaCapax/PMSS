@@ -11,8 +11,7 @@ class IndexRemoteFramesFailoverTest extends TestCase
         foreach (['open-home', 'open-www', 'write-false', 'write-zero', 'flush-false'] as $failure) {
             $result = $this->render($failure, 'echo "REMOTE RAN"; return array();');
             $this->assertLocalPanel($result);
-            $this->assertSame(0, $result['fetches'], $failure);
-            $this->assertSame('', $result['errors'], $failure);
+            $this->pmssAssertArraySubsetSame(['fetches' => 0, 'errors' => ''], $result, $failure.': ');
             $this->assertSame($failure === 'open-www' ? 2 : 1, count($result['probes']), $failure);
         }
     }

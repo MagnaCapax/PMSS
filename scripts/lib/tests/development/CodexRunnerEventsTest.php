@@ -57,8 +57,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $this->assertSame(127, $result['rc'], $result['output']);
         $events = $this->events();
         $this->assertSame(['runner_start', 'assistant_invoke_start', 'assistant_invoke_end', 'runner_end'], array_column($events, 'event'));
-        $this->assertSame(127, $events[3]['rc']);
-        $this->assertSame('error', $events[3]['level']);
+        $this->pmssAssertArraySubsetSame(['rc' => 127, 'level' => 'error'], $events[3]);
     }
 
     public function testAssistantFailureIsNotReportedAsSuccess(): void

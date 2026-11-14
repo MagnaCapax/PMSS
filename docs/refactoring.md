@@ -678,6 +678,8 @@ scenario loops remain explicit.
 Package recovery, cleanup, diagnostics, quota, firmware, timer, nginx and
 torrent-client result fixtures use that same helper for adjacent field checks.
 Null expectations still require a present key; nested arrays keep strict equality.
+Positional command observations use the same subset helper without unpacking
+fields solely for assertions; command-fragment checks stay at the caller.
 
 Process and monitoring fixtures use `TestCase::pmssWriteFiles()` for ordered
 file trees and `pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared

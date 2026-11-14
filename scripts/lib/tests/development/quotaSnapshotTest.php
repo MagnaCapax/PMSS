@@ -133,8 +133,8 @@ PHP;
             $capture = $this->pmssExecInlinePhpWithTempStderr($script, ['PMSS_QUOTA_SNAPSHOT_MOUNT' => '/home']);
             $this->assertSame(0, $capture['result']['rc']);
             $result = $this->pmssDecodeJsonArray($capture['result']['output']);
-            $this->assertSame($alert ? 1 : 0, $result['rc']);
-            $this->assertSame(['/fixture/repquota -u -n '.escapeshellarg('/home').' 2>&1'], $result['commands']);
+            $this->pmssAssertArraySubsetSame(['rc' => $alert ? 1 : 0,
+                'commands' => ['/fixture/repquota -u -n '.escapeshellarg('/home').' 2>&1']], $result);
             $this->assertSame($alert ? '###PMSS_QUOTA_ALERT repquota_failed mount=home rc='.$rc.PHP_EOL : '',
                 (string) file_get_contents($capture['stderrPath']));
             // Failed reports retain timestamped evidence even when no alert is warranted.

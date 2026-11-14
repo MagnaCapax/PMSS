@@ -146,11 +146,10 @@ class RemoteBinaryHelperTest extends TestCase
         $this->assertSame('', $output);
         $data = pmssJsonLineFileLast($timeoutLog);
         $this->assertTrue(is_array($data), 'expected app probe timeout-fire JSON payload');
-        $this->assertSame('timeout_fired', $data['event'] ?? '');
-        $this->assertSame(1, $data['intended_seconds'] ?? 0);
-        $this->assertSame(124, $data['exit_status'] ?? 0);
-        $this->assertSame('SIGTERM', $data['signal'] ?? '');
-        $this->assertSame('app-version-probe-test', $data['correlation_id'] ?? '');
+        $this->pmssAssertArraySubsetSame([
+            'event' => 'timeout_fired', 'intended_seconds' => 1, 'exit_status' => 124,
+            'signal' => 'SIGTERM', 'correlation_id' => 'app-version-probe-test',
+        ], $data);
     }
 
     private function withFakeDownloadBody(string $body, callable $callback, array $extraEnv = array()): void

@@ -75,8 +75,7 @@ PHP;
     {
         $result = $this->observe(['safe' => false]);
         $this->assertFalse($result[0]);
-        $this->assertSame([], $result[2]);
-        $this->assertSame([], $result[4]);
+        $this->pmssAssertArraySubsetSame([2 => [], 4 => []], $result);
     }
 
     public function testAccountProbeChecksStartupAndWritesAsTheAccountWithDeadline(): void
@@ -84,19 +83,16 @@ PHP;
         $result = $this->observe([]);
         $this->assertTrue($result[0]);
         $this->assertSame(['/home/fixtur01', '/home/fixtur01/session'], $result[2]);
-        [$user, $home, $paths, $command, $input, $timeout] = $result[4][0];
-        $this->assertSame('fixtur01', $user);
-        $this->assertSame('/home/fixtur01', $home);
-        $this->assertSame($result[2], $paths);
-        $this->assertSame(null, $input);
-        $this->assertSame(10, $timeout);
+        $this->pmssAssertArraySubsetSame([
+            0 => 'fixtur01', 1 => '/home/fixtur01', 2 => $result[2], 4 => null, 5 => 10,
+        ], $result[4][0]);
         $this->assertStringContainsAllStrings([
             "test -r '/home/fixtur01/.rtorrent.rc'", 'test -x /usr/local/bin/rtorrent',
             'command -v screen', 'test -r /etc/seedbox/config/localnet',
             'test -s /etc/seedbox/config/localnet', "test -x '/home/fixtur01/.rtorrentExecute.php'",
             "test -r '/home/fixtur01/.scriptsInc.php'", 'command -v php',
             'mktemp --', 'printf x > "$probe"', 'trap', 'rm -f -- "$probe"',
-        ], $command);
+        ], $result[4][0][3]);
     }
 
     public function testMissingOptionalFilesAndSessionRetainLegacyStartPrerequisites(): void
@@ -131,8 +127,7 @@ PHP;
     {
         foreach ([['count' => 2], ['resetMarker' => true]] as $case) {
             $result = $this->observe($case, true);
-            $this->assertSame(['start'], $result[1]);
-            $this->assertSame([], $result[4]);
+            $this->pmssAssertArraySubsetSame([1 => ['start'], 4 => []], $result);
         }
         $result = $this->observe([], true);
         $this->assertSame(['reset', 'write:reset', 'start'], $result[1]);
