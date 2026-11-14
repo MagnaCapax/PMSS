@@ -8,8 +8,7 @@ class StatsAppToggleFrontendTest extends TestCase
     public function testStatsPagePointsToConfigureAfterDelivery(): void
     {
         $html = $this->pmssRenderCustomerPanelPage('stats.php');
-        $this->assertStringContainsString('Manage in Configure', $html);
-        $this->assertStringNotContainsString('data-action="disable"', $html);
+        $this->assertStringContainsAndOmitsStrings(['Manage in Configure'], ['data-action="disable"'], $html);
     }
 
     public function testStatsPageShowsInlineEnableTogglesForCustomerManagedApps(): void
@@ -19,8 +18,8 @@ class StatsAppToggleFrontendTest extends TestCase
         foreach (pmssCustomerManagedAppDefinitions() as $app => $definition) {
             // Legacy Stats offers installed binaries; installable rows live in Configure.
             if (!empty($definition['installable'])) continue;
-            $this->assertStringContainsString('data-app="'.$app.'"', $html);
-            $this->assertStringContainsString('data-endpoint="'.$definition['endpoint'].'"', $html);
+            $this->assertStringContainsAllStrings(['data-app="'.$app.'"',
+                'data-endpoint="'.$definition['endpoint'].'"'], $html);
         }
         $this->assertStringNotContainsString('data-app="openclaw"', $html);
 

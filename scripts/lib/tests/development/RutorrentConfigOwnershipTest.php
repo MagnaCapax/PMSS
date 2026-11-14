@@ -30,8 +30,8 @@ class RutorrentConfigOwnershipTest extends TestCase
         }
 
         $config = (string) file_get_contents($confDir.'/config.php');
-        $this->assertStringContainsString('$scgi_host = "unix://'.$home.'/.rtorrent.socket";', $config);
-        $this->assertStringContainsString("\$tempDirectory = '{$home}/.tmp/';", $config);
+        $this->assertStringContainsAllStrings(['$scgi_host = "unix://'.$home.'/.rtorrent.socket";',
+            "\$tempDirectory = '{$home}/.tmp/';"], $config);
         $this->assertEquals("allow = test\n", (string) file_get_contents($confDir.'/access.ini'));
     }
 

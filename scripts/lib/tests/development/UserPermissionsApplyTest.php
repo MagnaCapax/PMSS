@@ -292,8 +292,8 @@ PHP;
         [$single, $recursive, $strip] = $this->pmssRunInlinePhpJson($script);
         $this->assertStringContainsString(' -maxdepth 0 -uid 1001 ', $single);
         foreach ([$recursive, $strip] as $command) {
-            $this->assertStringContainsString(' -xdev -ignore_readdir_race -type d -not -uid 1001 -prune -o -uid 1001 ', $command);
-            $this->assertStringContainsString('-not -type l \( ! -type f -o -links 1 \)', $command);
+            $this->assertStringContainsAllStrings([' -xdev -ignore_readdir_race -type d -not -uid 1001 -prune -o -uid 1001 ',
+                '-not -type l \( ! -type f -o -links 1 \)'], $command);
         }
         $this->assertStringContainsString('-not -perm 0770 -exec chmod 0770 {} +', $recursive);
         $this->assertStringContainsString('-perm /6007 -exec chmod u-s,g-s,o-rwx {} +', $strip);

@@ -31,10 +31,9 @@ final class UserEntryMetadataCommandTest extends TestCase
     public function testCommandsQuotePathsAndBoundSingleEntryChanges(): void
     {
         $path = "/tmp/account path'quoted";
-        $modeCommand = \pmssUserEntryChmodCommand($path, 0750);
 
-        $this->assertStringContainsString(escapeshellarg($path).' -maxdepth 0 -not -type l', $modeCommand);
-        $this->assertStringContainsString('-links 1 \\) -exec chmod 0750', $modeCommand);
+        $this->assertStringContainsAllStrings([escapeshellarg($path).' -maxdepth 0 -not -type l',
+            '-links 1 \\) -exec chmod 0750'], \pmssUserEntryChmodCommand($path, 0750));
         $this->assertThrows(\InvalidArgumentException::class, static function () use ($path): void {
             \pmssUserEntryChmodCommand($path, -1);
         });

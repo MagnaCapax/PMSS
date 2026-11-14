@@ -10,12 +10,12 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
     public function testMonitoringRulesExemptLoopbackBeforePerUserRules(): void
     {
         $loopbackRule = '$rules = "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\\n";';
-        $userLoop = 'foreach ($userUids as $thisUid) {';
 
-        $this->pmssAssertRepoFileSubstringCount('scripts/lib/network/rules.php', $loopbackRule, 1, 'Loopback exemption should be declared exactly once');
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/lib/network/rules.php',
-            [$loopbackRule, $userLoop],
+        $source = $this->pmssReadRepoFile('scripts/lib/network/rules.php');
+        $this->assertEquals(1, substr_count($source, $loopbackRule), 'Loopback exemption should be declared exactly once');
+        $this->assertOrderedStrings(
+            [$loopbackRule, 'foreach ($userUids as $thisUid) {'],
+            $source,
             'Expected monitoring rule fragment: ',
             'Loopback exemption must run before per-user accounting rules: '
         );
@@ -64,8 +64,7 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
         $rules = \networkMonitoringRulesRender($users, [], $ports);
         $guard = strstr($rules, '/sbin/iptables -A OUTPUT -d 127.0.0.0/8', true);
         $this->assertSame(2, substr_count($guard, '-j REJECT'));
-        $this->assertStringContainsString('--dport 1024 ', $guard);
-        $this->assertStringContainsString('--dport 65535 ', $guard);
+        $this->assertStringContainsAllStrings(['--dport 1024 ', '--dport 65535 '], $guard);
         $this->assertSame(2, substr_count($guard, '--uid-owner 1001 -m owner ! --uid-owner 0'));
     }
 
