@@ -66,4 +66,25 @@ class PikkumiesInstallerSelfUpdateTest extends TestCase
             $this->pmssExecArgvCommand(['rm', '-rf', '--', $root], [], '');
         }
     }
+
+    /**
+     * On an existing checkout the installer runs `pikkumies update` then `pikkumies install`. A person runs it, so the
+     * update step carries PIKKUMIES_ATTENDED=1 and Pikkumies builds its runtime as `install` would, instead of refusing
+     * with the daily cron's reserve and then reporting "building" (Pikkumies ADR-0013 addendum 2026-11-14).
+     */
+    public function testUpdateStepRunsAttended(): void
+    {
+        $root = $this->pmssMakeTempDir('pikkumies-installer-', 0700);
+        $home = $root.'/home';
+        $launcher = $home.'/.mcxPikkumies/pikkumies/bin/pikkumies';
+        $this->pmssEnsureDir($home.'/.mcxPikkumies/.git', 0700);
+        $this->pmssEnsureDir(dirname($launcher), 0700);
+        $this->pmssWriteExecutableFile($launcher, "#!/bin/sh\necho \"\$1 \${PIKKUMIES_ATTENDED:-unset}\" >> \"\$HOME/ran\"\n", 0700);
+        $result = $this->pmssExecArgvCommand(['env', '-i', 'HOME='.$home, 'PATH=/usr/bin:/bin',
+            'bash', $this->pmssRepoPath('etc/skel/bin/install-pikkumies.sh'), '--no-self-update']);
+        $ran = trim((string) @file_get_contents($home.'/ran'));
+        $this->pmssExecArgvCommand(['rm', '-rf', '--', $root], [], '');
+        $this->assertTrue($result['rc'] === 0, 'installer exited '.$result['rc'].': '.implode(' ', $result['lines']));
+        $this->assertTrue($ran === "update 1\ninstall unset", 'the update step must run attended, then install: '.json_encode($ran));
+    }
 }

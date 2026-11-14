@@ -255,3 +255,17 @@ partial-install recovery and per-account state-file handling stay in place.
 Completed installs are left alone; a state file still prevents reinstalling
 an account whose owner removed Pikkumies. Installs remain sequential in one
 background chain, as the account owner in its slice.
+
+## Amendment 2026-11-14: the update step runs attended
+
+On an existing checkout the installer runs `pikkumies update`, then
+`pikkumies install`. Pikkumies' `update` builds a missing runtime in its
+unattended mode, meant for the daily cron (a 10% file and disk reserve, idle
+priority). A person running the installer therefore saw "not installed ... run
+`pikkumies` to build anyway" from the update step and "building" from
+`install`, and on a plan with room the update step started the build at idle
+priority. The update step now sets `PIKKUMIES_ATTENDED=1`, so Pikkumies builds
+the way `install` does (Pikkumies ADR-0013 addendum 2026-11-14). Older
+Pikkumies versions ignore the variable. The automated preinstall keeps
+`PIKKUMIES_SKIP_HERMES=1`, which Pikkumies checks first, so it still builds
+nothing.

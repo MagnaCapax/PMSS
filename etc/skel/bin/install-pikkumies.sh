@@ -18,7 +18,8 @@ fi
 set -euo pipefail
 dir="$HOME/.mcxPikkumies"
 if [ -d "$dir/.git" ]; then
-    "$dir/pikkumies/bin/pikkumies" update
+    # A person runs this installer: Pikkumies builds its runtime now, as `install` would (Pikkumies ADR-0013 addendum 2026-11-14).
+    PIKKUMIES_ATTENDED=1 "$dir/pikkumies/bin/pikkumies" update
 else
     # A folder left without its git checkout would make the clone fail: keep it under a new name, then clone fresh.
     if [ -e "$dir" ] || [ -L "$dir" ]; then mv "$dir" "$dir.kept-$(date -u +%Y%m%dT%H%M%SZ)"; fi

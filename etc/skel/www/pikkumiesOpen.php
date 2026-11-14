@@ -122,7 +122,8 @@ function pmssPikkumiesOpenBackground($binary, $verb, $lock, $log)
 {
     if (!is_dir(dirname($lock))) @mkdir(dirname($lock), 0700, true);
     // setsid: a process left in php-cgi's group dies when php-cgi recycles (live QA 2026-10-21).
-    exec('umask 077 && /usr/bin/setsid flock -n -o '.escapeshellarg($lock).' nohup '.escapeshellarg($binary).' '.$verb
+    // PIKKUMIES_ATTENDED=1: a person clicked, so post-update builds as `pikkumies install` would (Pikkumies ADR-0013 addendum 2026-11-14).
+    exec('umask 077 && PIKKUMIES_ATTENDED=1 /usr/bin/setsid flock -n -o '.escapeshellarg($lock).' nohup '.escapeshellarg($binary).' '.$verb
         .' </dev/null >>'.escapeshellarg($log).' 2>&1 &');
 }
 

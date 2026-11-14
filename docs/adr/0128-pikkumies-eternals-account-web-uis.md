@@ -153,3 +153,15 @@ and Hermes state; the archived home retains their previous data.
 
 ADRs 0021, 0023, 0031, 0039, 0090, 0101, 0118, 0121 and 0122;
 `docs/contracts.md`, `docs/portManager.md`.
+
+## Amendment 2026-11-14: the setup button builds attended
+
+The setup page's button runs `post-update` in the background. Without a
+marker Pikkumies treats that as the daily cron and keeps a 10% file and disk
+reserve at idle priority, so a fresh account below about 156 GiB got the
+setup page again after each click, while `pikkumies` in a terminal built from
+about 140 GiB. Background runs started from the launcher now set
+`PIKKUMIES_ATTENDED=1`, so a click builds the way `pikkumies install` does
+(Pikkumies ADR-0013 addendum 2026-11-14). The other background verb,
+`ui web-build`, does not read the variable. Older Pikkumies versions ignore
+it.
