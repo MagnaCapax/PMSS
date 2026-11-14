@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Account permission repair keeps validation, lock ownership and final exit
+reporting in its CLI (ADR 0281). Home preparation, ordered policy, pruned owner
+traversal and convergence have separate modules. Checked-file mode and group
+repairs share one stream lifetime; the only recursive owner predicate uses the
+validated account directly. Characterization locks policy lists, command bytes,
+phase order, trust refusals, ordinary failures and throwable boundaries.
+Execution remains on testing machines; devbox checks changed-file syntax only.
+
 Scheduled configuration backups retain their cron entrypoint and original include
 while separating customer command/protocol handling from account policy and queue
 reporting (ADR 0279). Three single-caller helpers disappear into command construction

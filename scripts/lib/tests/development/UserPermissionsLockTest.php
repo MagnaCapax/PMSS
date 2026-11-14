@@ -15,11 +15,16 @@ class UserPermissionsLockTest extends TestCase
             'if (!is_array($userIds)) die("No such user\n");',
             "\$permissionsLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-userPermissions-'.\$thisUser.'.lock'), false, 'ce');",
             'if ($permissionsLock === false) {',
-            'pmssUserPermissionsOwnerApply($homeDir, $homeDir,',
-            'pmssTrafficSetImmutable($trafficFile, false);',
-            'pmssTrafficSetImmutable($trafficFile, true);',
+            'pmssUserPermissionsConverge($thisUser, $homeDir, $userIds);',
             'exit(pmssUserPermissionsResult());',
         ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/user/permissions.php', [
+            'pmssUserPermissionsHomePrepare($thisUser, $homeDir, $userIds);',
+            'pmssTrafficSetImmutable($trafficFile, false);',
+            'pmssTrafficSetImmutable($trafficFile, true);',
+        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/permissionsHome.php',
+            'pmssUserPermissionsOwnerApply($homeDir, $homeDir,');
     }
 
     public function testLockIsBlockingCloseOnExecAndNeverReleasedEarly(): void

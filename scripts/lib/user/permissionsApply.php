@@ -83,24 +83,7 @@ function pmssUserPermissionsModeApply(string $user, string $home, int $uid, stri
  */
 function pmssUserPermissionsOpenedModeSet(string $user, string $home, string $path, int $mode, int $ownerUid): bool
 {
-    $handle = pmssUserFileOpenVerified($path, 'rbn');
-    try {
-        // Metadata inspection can throw too; the acquired stream already needs cleanup.
-        $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
-        if ($opened === null) {
-            pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; mode left as-is', basename($path), $ownerUid));
-            return false;
-        }
-        if (@chmod($opened, $mode)) {
-            return true;
-        }
-        pmssUserPermissionsFailed(sprintf('chmod %04o on opened %s', $mode, $path));
-        return false;
-    } finally {
-        if ($handle !== null) {
-            @fclose($handle);
-        }
-    }
+    return pmssUserPermissionsOpenedSet($user, $home, $path, $mode, $ownerUid, 'mode');
 }
 
 /**
@@ -110,18 +93,26 @@ function pmssUserPermissionsOpenedModeSet(string $user, string $home, string $pa
  */
 function pmssUserPermissionsOpenedGroupSet(string $user, string $home, string $path, string $group, int $ownerUid): bool
 {
+    return pmssUserPermissionsOpenedSet($user, $home, $path, $group, $ownerUid, 'group');
+}
+
+/** Share the verified-handle lifetime; the typed mode/group entrypoints select the operation. */
+function pmssUserPermissionsOpenedSet(string $user, string $home, string $path, $value, int $ownerUid, string $kind): bool
+{
     $handle = pmssUserFileOpenVerified($path, 'rbn');
     try {
         // Keep every post-open check inside the stream's cleanup lifetime.
         $opened = $handle === null ? null : pmssUserPermissionsHandleInHome($handle, $home, $ownerUid);
         if ($opened === null) {
-            pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; group left as-is', basename($path), $ownerUid));
+            pmssUserLog($user, sprintf('userPermissions: %s is not a single-link file owned by uid %d inside the home; %s left as-is', basename($path), $ownerUid, $kind));
             return false;
         }
-        if (@chgrp($opened, $group)) {
+        if ($kind === 'mode' ? @chmod($opened, $value) : @chgrp($opened, $value)) {
             return true;
         }
-        pmssUserPermissionsFailed(sprintf('chgrp %s on opened %s', $group, $path));
+        pmssUserPermissionsFailed($kind === 'mode'
+            ? sprintf('chmod %04o on opened %s', $value, $path)
+            : sprintf('chgrp %s on opened %s', $value, $path));
         return false;
     } finally {
         if ($handle !== null) {

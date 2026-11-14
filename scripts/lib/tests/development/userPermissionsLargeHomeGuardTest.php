@@ -14,16 +14,19 @@ PHP;
 escapeshellarg("/home/{$thisUser}/.local").' -prune -o';
 PHP;
         $uidFilter = <<<'PHP'
--not '.pmssOwnerIdSetFindPredicate('-uid', (int) $userIds['uid'], $uidRanges)
+pmssOwnerIdSetFindPredicate('-uid', (int) $userIds['uid'], $uidRanges)
 PHP;
         $gidFilter = <<<'PHP'
--not '.pmssOwnerIdSetFindPredicate('-gid', (int) $userIds['gid'], $gidRanges)
+pmssOwnerIdSetFindPredicate('-gid', (int) $userIds['gid'], $gidRanges)
 PHP;
         $ownerSpec = <<<'PHP'
 escapeshellarg($userIds['uid'].':'.$userIds['gid'])
 PHP;
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userPermissions.php', [
+        $source = $this->pmssReadRepoFile('scripts/lib/user/permissionsPolicy.php')
+            .$this->pmssReadRepoFile('scripts/lib/user/permissionsOwnership.php')
+            .$this->pmssReadRepoFile('scripts/lib/user/permissions.php');
+        $this->assertStringContainsAndOmitsStrings([
             '["/home/{$thisUser}/data", 0750],',
             '"/home/{$thisUser}/.resourceData",',
             '"/home/{$thisUser}/.throttle",',
@@ -35,13 +38,13 @@ PHP;
             $uidFilter,
             $gidFilter,
             $ownerSpec,
-            "require_once __DIR__.'/../lib/user/subordinateIds.php';",
-            "\$findParts[] = '-execdir chown -h';",
+            "require_once __DIR__.'/subordinateIds.php';",
+            '-execdir chown -h %s {} +',
             'find %s \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
             'escapeshellarg("/home/{$thisUser}/.config"),',
             '["/home/{$thisUser}/.config", 0770, true, true],',
             'find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +',
-            'function pmssFindOwnerMismatchPredicate(string $owner): string',
+            '$predicate = !empty($item[2]) ? sprintf(',
             '\( -not -user %s -o -not -group %s \)',
             "pmssUserPermissionsOwnerApply(\$homeDir, \$path, \$owner, \$predicate, \$predicate !== '');",
         ], [
@@ -49,7 +52,7 @@ PHP;
             '["/home/{$thisUser}/.config", 0770, true],' => '~/.config is strip-only so owner-only modes survive (#1217)',
             "pmssRun(sprintf('chown %s%s %s'" => 'Direct ownership command must stay out of the account tree',
             "pmssRun(sprintf('chmod %s%o %s'" => 'Direct mode command must stay out of the account tree',
-        ]);
+        ], $source);
     }
 
     public function testLegacyPermissionStepsSelectOnlyDirectRegularEntries(): void

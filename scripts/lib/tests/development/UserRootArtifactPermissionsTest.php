@@ -99,11 +99,12 @@ class UserRootArtifactPermissionsTest extends TestCase
     /** userPermissions.php takes its gate from the function above and applies it to both repair phases. */
     public function testUserPermissionsAppliesTheGateToBothRepairPhases(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/user/permissionsPolicy.php')
+            .$this->pmssReadRepoFile('scripts/lib/user/permissions.php');
         $this->assertStringContainsString('["/home/{$thisUser}/.billingId", 0640]', $source);
         $this->assertStringContainsString('["/home/{$thisUser}/.notifyEmail", "root:{$thisUser}"]', $source);
         $this->assertStringContainsAllStrings([
-            '$rootArtifactWriters = pmssUserRootArtifactWriters($thisUser, $trafficPaths);',
+            'foreach (pmssUserRootArtifactWriters($thisUser, $trafficPaths) as $artifactPath => $artifactWriter) {',
             "pmssUserPermissionsOpenedGroupSet(\$thisUser, \$homeDir, \$path, substr(\$owner, strpos(\$owner, ':') + 1), 0);",
             "&& (\$rootArtifactRepairable[\$path] ?? true);",
         ], $source);

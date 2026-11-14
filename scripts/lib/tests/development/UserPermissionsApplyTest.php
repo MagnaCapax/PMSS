@@ -79,14 +79,10 @@ class UserPermissionsApplyTest extends TestCase
         $home = $this->pmssEnsureDir($this->tempDir.'/home');
         $thisUser = 'fixtur01';
         $prefix = "/home/{$thisUser}";
-        $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
-        $start = strpos($source, '$chmodItems = [');
-        $this->assertTrue($start !== false);
-        $end = strpos($source, "\n];", $start);
-        $this->assertTrue($end !== false);
-        // Load only the trusted declarative mode list, never the root-run utility.
-        $chmodItems = [];
-        eval(substr($source, $start, $end + 3 - $start));
+        // Load only the trusted policy, never the root-run utility.
+        require_once $this->pmssRepoPath('scripts/lib/user/permissionsPolicy.php');
+        [$chmodItems] = \pmssUserPermissionsPolicy($thisUser,
+            array_fill_keys(['normal', 'local', 'ingress', 'ingressLocal'], '/fixture/unused'));
 
         $helpers = [];
         foreach (['create', 'erasedata', 'unpack'] as $plugin) {
@@ -328,10 +324,11 @@ class UserPermissionsApplyTest extends TestCase
 
     public function testUserPermissionsRoutesEveryRepairThroughTheCheckedObject(): void
     {
-        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userPermissions.php', [
-            "require_once __DIR__.'/../lib/user/permissionsApply.php';",
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/permissionsPolicy.php',
+            '["/home/{$thisUser}/.config", 0770, true, true],');
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/permissions.php', [
+            "require_once __DIR__.'/permissionsApply.php';",
             'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));',
-            '["/home/{$thisUser}/.config", 0770, true, true],',
             "pmssUserPermissionsOwnerApply(\$homeDir, \$path, \$owner, \$predicate, \$predicate !== '');",
             'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$homeDir], sprintf(',
             'pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf(',
@@ -344,7 +341,7 @@ class UserPermissionsApplyTest extends TestCase
         $this->assertOrderedStrings([
             'return @lstat($path) !== false && ($rootArtifactRepairable[$path] ?? true);',
             'pmssTrafficSetImmutable($trafficFile, false);',
-            "\$findParts[] = '-execdir chown -h';",
+            'pmssUserPermissionsOwnerWalk($thisUser, $userIds, $trafficPaths);',
             'pmssUserPermissionsOwnerApply($homeDir, $path, $owner',
             "'find %s \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +'",
             "'find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +'",

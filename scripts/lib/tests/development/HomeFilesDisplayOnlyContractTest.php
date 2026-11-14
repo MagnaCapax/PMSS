@@ -38,7 +38,8 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         'scripts/lib/user/trafficLimitCommands.php' => ['.bonusTraffic', '.trafficLimit'],
         'scripts/lib/user/trafficLimitThrottle.php' => ['.throttle'],
         'scripts/lib/user/userConfigStore.php' => ['pmss-user.json'],
-        'scripts/util/userPermissions.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail', '.trafficData', '.throttle', '.quota', '.resourceData', '.trafficDataIngress'],
+        'scripts/lib/user/permissionsPolicy.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail', '.trafficData', '.quota', '.trafficDataIngress'],
+        'scripts/lib/user/permissionsOwnership.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail', '.throttle', '.quota', '.resourceData'],
         // Moving or rebuilding the home itself.
         'scripts/lib/user/recreateRestore.php' => ['.billingId', '.billingServiceId', '.billingClientId', '.notifyEmail'],
         'scripts/lib/userTransfer/rsyncScripts.php' => ['.bonusTraffic', '.bonusQuota', '.billingId', '.billingServiceId', '.billingClientId', '.trafficLimit', '.trafficData', '.qbittorrentPort', '.quota', 'pmss-user.json', '.resourceData', '.trafficDataIngress', '.trafficDataLocal'],
@@ -98,7 +99,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
             if ($extra !== []) $unexpected[] = $path.': '.implode(', ', $extra);
         }
         $this->assertSame([], $unexpected, 'Root code names a home file outside the ADR 0213 allowlist');
-        $this->assertTrue(isset($found['scripts/util/userPermissions.php']), 'scanner found nothing; check the scan');
+        $this->assertTrue(isset($found['scripts/lib/user/permissionsPolicy.php']), 'scanner found nothing; check the scan');
     }
 
     public function testStoreValuesSurviveWholeRecordWritesAndReadBackValidated(): void

@@ -27,8 +27,9 @@ class SharedShellHelperUsageTest extends TestCase
     public function testUserPermissionsUsesSharedShellLibrary(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userPermissions.php',
-            ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsCommands.php'", 'pmssUserPermissionsRun('],
+            ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsCommands.php'"],
             ['function run(string $cmd): int' => 'Expected userPermissions.php to stop defining a local run() helper']);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/permissionsOwnership.php', 'pmssUserPermissionsRun(');
         // permissionsApply.php reaches pmssRun() and does not load shell.php itself,
         // so every entry point that applies permissions loads it.
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupUserHomePermissions.php',
