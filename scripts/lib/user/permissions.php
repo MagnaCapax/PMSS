@@ -60,9 +60,10 @@ function pmssUserPermissionsConverge(string $thisUser, string $homeDir, array $u
 
     // Modes are set after ownership so account-owned entries already belong to the
     // account that changes them; directories it does not own are left out. Directories
-    // first; the explicit items below override.
+    // first; the explicit items below override. Stay on the home filesystem, still
+    // including ordinary ~/data directories, and tolerate concurrent cache removal.
     pmssUserPermissionsAccountRun($thisUser, $homeDir, [$homeDir], sprintf(
-        'find %s \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
+        'find %s -xdev -ignore_readdir_race \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
         escapeshellarg('/home/'.$thisUser),
         escapeshellarg("/home/{$thisUser}/.local"),
         escapeshellarg("/home/{$thisUser}/.config"),
@@ -74,7 +75,7 @@ function pmssUserPermissionsConverge(string $thisUser, string $homeDir, array $u
     // to 0750 by the walk above). Bounded to ~/www so large payload trees under ~/data are
     // untouched; the explicit chmodItems below re-apply any file that legitimately keeps exec.
     $wwwDir = "/home/{$thisUser}/www";
-    pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf('find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +', escapeshellarg($wwwDir), $accountUid, $accountUid));
+    pmssUserPermissionsAccountRun($thisUser, $homeDir, [$wwwDir], sprintf('find %s -xdev -ignore_readdir_race -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +', escapeshellarg($wwwDir), $accountUid, $accountUid));
 
     foreach ($chmodItems as $item) {
         $path = $item[0];

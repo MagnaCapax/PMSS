@@ -71,7 +71,7 @@ function pmssUserPermissionsModeApply(string $user, string $home, int $uid, stri
             continue;
         }
         $command = $recursive
-            ? sprintf('find %s -type d -not -uid %d -prune -o -uid %d -not -type l \( ! -type f -o -links 1 \) %s -exec chmod %s {} +', escapeshellarg($target), $uid, $uid, $select, $set)
+            ? sprintf('find %s -xdev -ignore_readdir_race -type d -not -uid %d -prune -o -uid %d -not -type l \( ! -type f -o -links 1 \) %s -exec chmod %s {} +', escapeshellarg($target), $uid, $uid, $select, $set)
             : sprintf('find %s -maxdepth 0 -uid %d -not -type l \( ! -type f -o -links 1 \) -exec chmod %s {} +', escapeshellarg($target), $uid, $octal);
         pmssUserPermissionsAccountRun($user, $home, [$target], $command);
     }
@@ -173,7 +173,7 @@ function pmssUserPermissionsAnchoredFind(string $home, string $target, bool $rec
         $parents[] = $pattern($dir);
     }
 
-    $command = sprintf('find %s -mindepth 1 \( %s \( %s %s -o -true \) \)', escapeshellarg($home), $match, $tests, $action);
+    $command = sprintf('find %s -xdev -ignore_readdir_race -mindepth 1 \( %s \( %s %s -o -true \) \)', escapeshellarg($home), $match, $tests, $action);
     if ($parents !== []) {
         $command .= ' -o \( '.implode(' -o ', $parents).' \)';
     }

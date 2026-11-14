@@ -77,9 +77,9 @@ PHP;
             ['owner', '/fixture/plain', 'root:root', '', false],
             ['owner', '/fixture/lighttpd', 'fixtur01:fixtur01', "\( -not -user 'fixtur01' -o -not -group 'fixtur01' \)", true],
             ['account', ['/home/fixtur01'],
-                "find '/home/fixtur01' \( -path '/home/fixtur01/.local' -o -path '/home/fixtur01/.config' -o -type d -not -uid 1001 \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +"],
+                "find '/home/fixtur01' -xdev -ignore_readdir_race \( -path '/home/fixtur01/.local' -o -path '/home/fixtur01/.config' -o -type d -not -uid 1001 \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +"],
             ['account', ['/home/fixtur01/www'],
-                "find '/home/fixtur01/www' -type d -not -uid 1001 -prune -o -type f -links 1 -uid 1001 -perm /0111 -exec chmod a-x {} +"],
+                "find '/home/fixtur01/www' -xdev -ignore_readdir_race -type d -not -uid 1001 -prune -o -type f -links 1 -uid 1001 -perm /0111 -exec chmod a-x {} +"],
             ['mode', '/fixture/trusted', 0640, false, false],
             ['mode', '/fixture/config', 0770, true, true],
             ['exists', '/home/fixtur01/.ssh'],
@@ -94,6 +94,25 @@ PHP;
                 $this->assertSame(array_slice($complete, 0, $position), $calls);
             }
             $this->assertSame(count($complete) * 2, count($faults));
+            if (!$ssh) {
+                // Run the actual rendered directory walk only in a disposable home.
+                $home = $this->pmssMakeTempDir('pmss-permission-data-');
+                foreach (['data/nested/child', '.local/nested', '.config/nested'] as $relative) {
+                    $this->pmssEnsureDir($home.'/'.$relative);
+                }
+                $this->pmssWriteFile($home.'/data/nested/file', 'payload');
+                foreach (['data', 'data/nested', 'data/nested/child', '.local/nested', '.config/nested', 'data/nested/file'] as $relative) {
+                    $this->assertTrue(chmod($home.'/'.$relative, 0777));
+                }
+                $command = str_replace(['/home/fixtur01', '-uid 1001'], [$home, '-uid '.posix_geteuid()], $trace[9][2]);
+                $result = $this->pmssExecShellCommand($command);
+                $this->assertSame(0, $result['rc'], $result['output']);
+                foreach (['data' => 0750, 'data/nested' => 0750, 'data/nested/child' => 0750,
+                    '.local/nested' => 0777, '.config/nested' => 0777, 'data/nested/file' => 0777] as $relative => $mode) {
+                    clearstatcache(true, $home.'/'.$relative);
+                    $this->assertSame($mode, fileperms($home.'/'.$relative) & 07777, $relative);
+                }
+            }
         }
     }
 
@@ -120,7 +139,7 @@ foreach ([['uid' => [], 'gid' => []], ['uid' => [[100000, 65536]], 'gid' => [[20
 }
 echo json_encode($results);
 PHP;
-        $command = "find '/home/fixtur01' -mindepth 1 -path '/home/fixtur01/.local' -prune -o"
+        $command = "find '/home/fixtur01' -xdev -ignore_readdir_race -mindepth 1 -path '/home/fixtur01/.local' -prune -o"
             ." -path '/home/fixtur01/data' -prune -o";
         foreach (['/home/fixtur01/.quota', '/home/fixtur01/.resourceData', '/home/fixtur01/.throttle',
             '/home/fixtur01/.billingServiceId', '/home/fixtur01/.billingId', '/home/fixtur01/.billingClientId',

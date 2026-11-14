@@ -29,7 +29,8 @@ function pmssUserPermissionsOwnerWalk(string $thisUser, array $userIds, array $t
         "/home/{$thisUser}/.profile",
         "/home/{$thisUser}/.lighttpd.conf",
     ];
-    $findParts = [sprintf('find %s -mindepth 1', escapeshellarg("/home/{$thisUser}"))];
+    // Bound descent to the home filesystem; tolerate entries removed during enumeration.
+    $findParts = [sprintf('find %s -xdev -ignore_readdir_race -mindepth 1', escapeshellarg("/home/{$thisUser}"))];
     // Prune ~/.local subtree to avoid noisy chown failures on application-managed trees (e.g. Docker).
     $findParts[] = '-path '.escapeshellarg("/home/{$thisUser}/.local").' -prune -o';
     // Bulk data files are user payload and typically already owned correctly; avoid

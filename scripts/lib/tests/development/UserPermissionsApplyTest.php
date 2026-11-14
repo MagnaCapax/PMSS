@@ -258,6 +258,7 @@ class UserPermissionsApplyTest extends TestCase
         ] as [$path, $recursive]) {
             $command = \pmssUserPermissionsAnchoredFind($home, $path, $recursive, $tests, $action);
             $this->assertTrue(is_string($command), $path);
+            $this->assertStringContainsString(' -xdev -ignore_readdir_race -mindepth 1 ', $command);
             $this->assertSame(0, \pmssRun($command), $command);
         }
 
@@ -268,6 +269,34 @@ class UserPermissionsApplyTest extends TestCase
             $this->assertSame($mtime, $this->mtime($path), $path);
         }
         $this->assertTrue(is_link($home.'/alt') && is_link($home.'/.lighttpd'));
+    }
+
+    /** Recursive configured modes keep traversal and identity guards in both mode policies. */
+    public function testRecursiveModeCommandsStayOnTheirStartingFilesystem(): void
+    {
+        $script = <<<'PHP'
+namespace PermissionModeWalkFixture;
+function lstat($path) { return false; }
+function pmssPathShellTargetPaths($path) { return [$path]; }
+function pmssAccountPathRun($user, $home, $paths, $command, $input, $timeout, &$timedOut, &$failure) {
+    $GLOBALS['commands'][] = $command; return true;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/permissionsApply.php', 'PermissionModeWalkFixture');
+        $script .= <<<'PHP'
+foreach ([[false, false], [true, false], [true, true]] as [$recursive, $strip]) {
+    pmssUserPermissionsModeApply('fixtur01', '/home/fixtur01', 1001, '/home/fixtur01/.config', 0770, $recursive, $strip);
+}
+echo json_encode($GLOBALS['commands']);
+PHP;
+        [$single, $recursive, $strip] = $this->pmssRunInlinePhpJson($script);
+        $this->assertStringContainsString(' -maxdepth 0 -uid 1001 ', $single);
+        foreach ([$recursive, $strip] as $command) {
+            $this->assertStringContainsString(' -xdev -ignore_readdir_race -type d -not -uid 1001 -prune -o -uid 1001 ', $command);
+            $this->assertStringContainsString('-not -type l \( ! -type f -o -links 1 \)', $command);
+        }
+        $this->assertStringContainsString('-not -perm 0770 -exec chmod 0770 {} +', $recursive);
+        $this->assertStringContainsString('-perm /6007 -exec chmod u-s,g-s,o-rwx {} +', $strip);
     }
 
     public function testAnchoredFindRejectsPathsItCannotPlace(): void
@@ -343,8 +372,8 @@ class UserPermissionsApplyTest extends TestCase
             'pmssTrafficSetImmutable($trafficFile, false);',
             'pmssUserPermissionsOwnerWalk($thisUser, $userIds, $trafficPaths);',
             'pmssUserPermissionsOwnerApply($homeDir, $path, $owner',
-            "'find %s \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +'",
-            "'find %s -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +'",
+            "'find %s -xdev -ignore_readdir_race \( -path %s -o -path %s -o -type d -not -uid %d \) -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +'",
+            "'find %s -xdev -ignore_readdir_race -type d -not -uid %d -prune -o -type f -links 1 -uid %d -perm /0111 -exec chmod a-x {} +'",
             'pmssUserPermissionsModeApply($thisUser, $homeDir, $accountUid, $path, $perm, $recursive, !empty($item[3]));',
             'pmssTrafficSetImmutable($trafficFile, true);',
         ], $source);
