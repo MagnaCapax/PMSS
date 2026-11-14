@@ -16,9 +16,9 @@ class ArchitectureSmokeTest extends TestCase
     public function testRepositoryFileDiscoveryPreservesScanBoundaries(): void
     {
         $root = $this->pmssMakeTempDir('pmss-repo-scan-');
-        foreach (['tree/a.php', 'tree/nested/b.PHP', 'tree/.hidden.sh', "tree/edge.php\n", 'outside/hidden.php'] as $path) {
-            $this->pmssWriteFile($root.'/'.$path, 'fixture');
-        }
+        $this->pmssWriteFiles($root, array_fill_keys([
+            'tree/a.php', 'tree/nested/b.PHP', 'tree/.hidden.sh', "tree/edge.php\n", 'outside/hidden.php',
+        ], 'fixture'));
         $this->pmssEnsureDir($root.'/tree/empty.php');
         $this->pmssCreateSymlinkOrSkip($root.'/outside', $root.'/tree/linked-directory');
         $this->pmssCreateSymlinkOrSkip($root.'/tree/a.php', $root.'/tree/linked.php');

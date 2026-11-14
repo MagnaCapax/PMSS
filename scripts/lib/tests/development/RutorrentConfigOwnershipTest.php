@@ -15,8 +15,7 @@ class RutorrentConfigOwnershipTest extends TestCase
         $confDir = $home.'/www/rutorrent/conf';
 
         $this->pmssEnsureDir($confDir);
-        $this->pmssWriteFile($configRoot.'/template.rutorrent.config', $this->configTemplate());
-        $this->pmssWriteFile($configRoot.'/template.rutorrent.access', "allow = test\n");
+        $this->pmssWriteFiles($configRoot, ['template.rutorrent.config' => $this->configTemplate(), 'template.rutorrent.access' => "allow = test\n"]);
 
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configRoot, 'PMSS_HOME_DIR' => $homeRoot], function () use ($user): void {
             \updateRutorrentConfig($user, 1);
@@ -50,8 +49,7 @@ class RutorrentConfigOwnershipTest extends TestCase
         $homeRoot = $this->pmssMakeTempDir('pmss-rutorrent-home-');
         $confDir = $this->pmssUserHomePath($homeRoot, $user).'/www/rutorrent/conf';
         $this->pmssEnsureDir($confDir);
-        $this->pmssWriteFile($configRoot.'/template.rutorrent.config', $this->configTemplate());
-        $this->pmssWriteFile($configRoot.'/template.rutorrent.access', "allow = test\n");
+        $this->pmssWriteFiles($configRoot, ['template.rutorrent.config' => $this->configTemplate(), 'template.rutorrent.access' => "allow = test\n"]);
         $outside = $this->pmssWriteFile($configRoot.'/outside', 'keep');
         $this->assertTrue(symlink($outside, $confDir.'/config.php'));
 

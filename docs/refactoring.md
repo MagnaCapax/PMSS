@@ -702,6 +702,8 @@ the same checked writers for parent creation and payload writes. Keep simulated
 installer return values and staged missing-file cases explicit; these exercise
 runtime failure boundaries rather than fixture setup. Empty directories and
 permission transitions remain separate from file publication.
+Repository discovery, bootstrap staging and ruTorrent fixtures batch related writes
+through the same helper, preserving publication order and exact payload bytes.
 Let checked writers create populated parent directories; retain explicit setup
 for empty directories and pass the original creation mode to the writer.
 Nginx, systemd, refresh-marker and resource-metric fixtures follow this rule;

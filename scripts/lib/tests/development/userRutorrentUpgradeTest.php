@@ -23,16 +23,14 @@ class UserRutorrentUpgradeTest extends TestCase
             'PMSS_SKEL_DIR' => $this->skeleton,
             'PMSS_CONFIG_DIR' => $this->config,
         ]);
-        $this->pmssWriteFile($this->config.'/template.rutorrent.config', '$scgi_host = "";');
-        $this->pmssWriteFile($this->config.'/template.rutorrent.access', 'access');
+        $this->pmssWriteFiles($this->config, ['template.rutorrent.config' => '$scgi_host = "";', 'template.rutorrent.access' => 'access']);
     }
 
     public function testUpgradeKeepsDurableShareLinkAndRssState(): void
     {
         $this->seedUpgradeTrees();
         $share = $this->home.'/www/rutorrent/share';
-        $this->pmssWriteFile($share.'/settings/rss.dat', 'rss-feeds');
-        $this->pmssWriteFile($share.'/users/'.$this->user.'/settings/rss/rssfilters.dat', 'rss-filters');
+        $this->pmssWriteFiles($share, ['settings/rss.dat' => 'rss-feeds', 'users/'.$this->user.'/settings/rss/rssfilters.dat' => 'rss-filters']);
         pmssUserMigrateWebRootState($this->context());
 
         pmssUserUpgradeRutorrent($this->context());
@@ -49,8 +47,7 @@ class UserRutorrentUpgradeTest extends TestCase
     {
         $this->seedUpgradeTrees();
         $share = $this->home.'/www/rutorrent/share';
-        $this->pmssWriteFile($share.'/settings/rss.dat', 'rss-feeds');
-        $this->pmssWriteFile($share.'/.hidden-state', 'hidden');
+        $this->pmssWriteFiles($share, ['settings/rss.dat' => 'rss-feeds', '.hidden-state' => 'hidden']);
 
         pmssUserUpgradeRutorrent($this->context());
 
@@ -127,10 +124,8 @@ class UserRutorrentUpgradeTest extends TestCase
     /** Seed old and skeleton ruTorrent trees; optionally make new share invalid. */
     private function seedUpgradeTrees(bool $skeletonShareAsFile = false): void
     {
-        $this->pmssWriteFile($this->home.'/www/rutorrent/index.html', 'old-rutorrent');
-        $this->pmssWriteFile($this->home.'/www/rutorrent/conf/config.php', 'old-config');
-        $this->pmssWriteFile($this->skeleton.'/www/rutorrent/index.html', 'new-rutorrent');
-        $this->pmssWriteFile($this->skeleton.'/www/rutorrent/conf/config.php', 'new-config');
+        $this->pmssWriteFiles($this->home.'/www/rutorrent', ['index.html' => 'old-rutorrent', 'conf/config.php' => 'old-config']);
+        $this->pmssWriteFiles($this->skeleton.'/www/rutorrent', ['index.html' => 'new-rutorrent', 'conf/config.php' => 'new-config']);
         $share = $this->skeleton.'/www/rutorrent/share';
         if ($skeletonShareAsFile) {
             $this->pmssWriteFile($share, 'invalid-share');

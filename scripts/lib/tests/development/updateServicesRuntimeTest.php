@@ -136,9 +136,8 @@ class UpdateServicesRuntimeTest extends TestCase
     public function testResetInheritedOomImmunityDryRunLeavesProcFixtureUntouched(): void
     {
         $proc = $this->pmssMakeTempDir('pmss-oom-dry-proc-');
-        $this->pmssWriteFile($proc.'/self/oom_score_adj', '-1000');
-        $this->pmssWriteFile($proc.'/101/oom_score_adj', '-1000');
-        $this->pmssWriteFile($proc.'/101/cgroup', '0::/user.slice/user-1000.slice/session-1.scope');
+        $this->pmssWriteFiles($proc, ['self/oom_score_adj' => '-1000', '101/oom_score_adj' => '-1000',
+            '101/cgroup' => '0::/user.slice/user-1000.slice/session-1.scope']);
 
         $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($proc): void {
             $this->assertSame(0, \pmssResetInheritedOomImmunity($proc));

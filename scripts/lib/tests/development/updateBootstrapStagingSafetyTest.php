@@ -52,8 +52,7 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
     public function testSnapshotPathGuardAcceptsOnlyRealPathsInsideSnapshot(): void
     {
         $root = $this->pmssMakeTempDir('pmss-update-snapshot-');
-        $this->pmssWriteFile($root.'/scripts/update.php', '<?php echo "ok";');
-        $this->pmssWriteFile($root.'/scripts/util/update-step2.php', '<?php echo "ok";');
+        $this->pmssWriteFiles($root.'/scripts', array_fill_keys(['update.php', 'util/update-step2.php'], '<?php echo "ok";'));
 
         $error = null;
         $this->assertTrue(pmssIsSafeSnapshotPath($root, $root.'/scripts', 'directory', $error), (string) $error);
@@ -170,10 +169,7 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $staging = $root.'/staging';
         $backup = $root.'/backup';
 
-        $this->pmssEnsureDir($target);
-        $this->pmssEnsureDir($staging);
-        $this->pmssWriteFile($target.'/old.txt', 'old');
-        $this->pmssWriteFile($staging.'/new.txt', 'new');
+        $this->pmssWriteFiles($root, ['target/old.txt' => 'old', 'staging/new.txt' => 'new']);
 
         pmssAtomicSwapDirectory($target, $staging, $backup, 'test tree');
 
