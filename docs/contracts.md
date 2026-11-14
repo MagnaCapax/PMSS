@@ -1471,6 +1471,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
     root-copy failure still permits display publication. Event fields, account-log
     messages, fallback bytes and exception propagation retain their previous behavior.
     See ADR 0254 and `QuotaSnapshotRefreshCharacterizationTest`.
+  - Shared quota capture rejects NUL-containing stdout before per-line trimming.
+    Corrupt responses return no lines and rc 2 unless an existing failure code is
+    greater than 1; expired calls retain their timeout code and flag. Valid text,
+    including rc-1 over-quota output, keeps its existing formatting and status.
+    `QuotaReportOutputSafetyTest` covers these boundaries with injected captures
+    and clocks; execution stays on the testing machine.
   - Usage includes the primary UID and all subordinate UID allocations parsed by
     `pmssSubordinateIdRanges()`, for both cron and provisioning snapshots. Bounded
     numeric user `repquota` reports are cached per filesystem during the sweep;

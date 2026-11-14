@@ -27,6 +27,10 @@ function pmssQuotaReportCapture(string $command, int $timeoutSec = PMSS_QUOTA_RE
     // unrelated early 137, such as an OOM kill, from reading as a hang.
     $timedOut = ($rc === 124 || $rc === 137) && microtime(true) - $startedAt >= $timeoutSec;
     $stdout = $timedOut ? '' : rtrim($result['stdout'], "\n");
+    // Per-line trimming can hide NULs; never publish fragments of a corrupt text report.
+    if (strpos($stdout, "\0") !== false) {
+        return ['rc' => $rc > 1 ? $rc : 2, 'lines' => [], 'timed_out' => false];
+    }
     $lines = $stdout === '' ? [] : array_map('rtrim', explode("\n", $stdout));
     return ['rc' => $rc, 'lines' => $lines, 'timed_out' => $timedOut];
 }
