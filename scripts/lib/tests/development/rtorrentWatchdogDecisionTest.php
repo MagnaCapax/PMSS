@@ -221,8 +221,7 @@ PHP;
         $payload = json_decode((string) file_get_contents($state['escalation']), true);
         $this->assertSame(1, $attempts, 'failed one-shot still attempts only once');
         $this->assertTrue(is_array($payload), 'failed one-shot should leave a JSON escalation marker');
-        $this->assertSame('fixtur01', $payload['user']);
-        $this->assertSame(7, $payload['count']);
+        $this->pmssAssertArraySubsetSame(['user' => 'fixtur01', 'count' => 7], $payload);
         $this->assertTrue((int) $payload['timestamp'] >= $before, 'failed one-shot should re-arm the interval from now');
     }
 

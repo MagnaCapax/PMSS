@@ -39,11 +39,8 @@ class IndexRemoteFramesFailoverTest extends TestCase
     {
         $result = $this->render('', '$htmlHead = "<!-- REMOTE HEAD -->"; return array("welcome" => '
             .'array("url" => "remote-welcome.php", "title" => "Remote", "linkText" => "Welcome"));');
-        $this->assertSame(200, $result['status']);
-        $this->assertSame(1, $result['fetches']);
-        $this->assertSame('', $result['errors']);
-        $this->assertSame([], $result['leftovers']);
-        $this->assertSame(0, $result['bufferDelta']);
+        $this->pmssAssertArraySubsetSame(['status' => 200, 'fetches' => 1, 'errors' => '',
+            'leftovers' => [], 'bufferDelta' => 0], $result);
         $this->assertStringContainsAllStrings(['<!-- REMOTE HEAD -->', 'remote-welcome.php', '</html>'], $result['html']);
         $this->assertStringNotContainsString('id="pmss-tab-filemanager"', $result['html']);
     }
@@ -53,16 +50,13 @@ class IndexRemoteFramesFailoverTest extends TestCase
         foreach (['disabled', 'local-only'] as $mode) {
             $result = $this->render($mode, 'echo "REMOTE RAN"; return array();');
             $this->assertLocalPanel($result);
-            $this->assertSame(0, $result['fetches']);
-            $this->assertSame([], $result['probes']);
+            $this->pmssAssertArraySubsetSame(['fetches' => 0, 'probes' => []], $result);
         }
     }
 
     private function assertLocalPanel(array $result): void
     {
-        $this->assertSame(200, $result['status']);
-        $this->assertSame([], $result['leftovers']);
-        $this->assertSame(0, $result['bufferDelta']);
+        $this->pmssAssertArraySubsetSame(['status' => 200, 'leftovers' => [], 'bufferDelta' => 0], $result);
         $this->assertStringContainsAllStrings(['<!DOCTYPE HTML', 'id="pmss-tab-welcome"',
             'id="pmss-tab-filemanager"', 'filemanager.php', '</html>'], $result['html']);
         $this->assertStringNotContainsString('BROKEN PAYLOAD', $result['html']);

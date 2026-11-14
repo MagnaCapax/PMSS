@@ -22,8 +22,7 @@ final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
     {
         $this->pmssWithEnv(['PATH' => ''], function (): void {
             $probe = \pmssStorageHealthProbeCommand('smart', 'sda', 'smartctl -H /dev/sda');
-            $this->assertSame('smartctl -H /dev/sda', $probe['command']);
-            $this->assertSame(0, $probe['lock_exit_code']);
+            $this->pmssAssertArraySubsetSame(['command' => 'smartctl -H /dev/sda', 'lock_exit_code' => 0], $probe);
         });
     }
 

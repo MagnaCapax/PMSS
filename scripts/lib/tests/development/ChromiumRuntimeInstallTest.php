@@ -96,8 +96,8 @@ final class ChromiumRuntimeInstallTest extends TestCase
         $this->assertSame(1, count($halfDone['run']), 'an interrupted install is finished, not skipped');
 
         $unready = $this->runStep(13, [], [], ['packagesReady' => false]);
-        $this->assertSame([[], []], [$unready['status'], $unready['run']]);
-        $this->assertSame(['[SKIP] chromium runtime: package phase not complete'], $unready['log']);
+        $this->pmssAssertArraySubsetSame(['status' => [], 'run' => [],
+            'log' => ['[SKIP] chromium runtime: package phase not complete']], $unready);
     }
 
     public function testFailuresStaySoft(): void
@@ -107,8 +107,7 @@ final class ChromiumRuntimeInstallTest extends TestCase
         $this->assertStringContainsString('[WARN] chromium runtime install failed (rc=100)', $failed['log'][0]);
 
         $thrown = $this->runStep(12, [], [], ['status' => static function (): string { throw new \RuntimeException('dpkg unavailable'); }]);
-        $this->assertSame([], $thrown['run']);
-        $this->assertSame(['[WARN] chromium runtime skipped: dpkg unavailable'], $thrown['log']);
+        $this->pmssAssertArraySubsetSame(['run' => [], 'log' => ['[WARN] chromium runtime skipped: dpkg unavailable']], $thrown);
     }
 
     public function testSelectionBaselinesDoNotCarryChromium(): void

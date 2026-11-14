@@ -26,8 +26,8 @@ class UserMaintenanceFlowCharacterizationTest extends TestCase
     {
         $result = $this->trace(['users' => ['fixtur10', 'fixtur02']]);
         $summary = ['total' => 2, 'processed' => 2, 'skipped' => 0, 'skip_reasons' => []];
-        $this->assertSame($summary, $result['summary']);
-        $this->assertSame(['event' => 'user_maintenance_summary', 'status' => 'ok'] + $summary, $result['json']);
+        $this->pmssAssertArraySubsetSame(['summary' => $summary,
+            'json' => ['event' => 'user_maintenance_summary', 'status' => 'ok'] + $summary], $result);
         $this->assertSame(['fixtur02', 'fixtur10'], array_column($this->events($result, 'resume'), 1));
         $accountEvents = array_values(array_filter($result['events'], static function ($row): bool {
             return isset($row[1]) && $row[1] === 'fixtur02';
