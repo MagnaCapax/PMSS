@@ -793,6 +793,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssUserReconcileWebRoot(array $ctx, ?callable $logger=null): bool
   - Converges one user's managed web root under a per-user lock, preserving
     customer-owned paths and refusing unsafe symlinks or conflicting path types.
+  - Reads skeleton files in the caller and streams complete bytes to temporary
+    files created and published as the account, keeping `/etc/skel` root-only.
+  - When files were restored, runs `userPermissions.php` after config regeneration
+    to preserve ownership classes (ADR 0046), including root-owned ruTorrent
+    `conf/config.php`. A nonzero repair result returns false with summary reason
+    `permissions-failed`; a merge that restores no files does not run the repair.
   - A failed directory scan stops validation, ownership traversal, or skeleton
     copying; an unreadable existing root cannot be classified as empty.
   - Emits one structured summary log line per locked run with `reason`, `mode`,

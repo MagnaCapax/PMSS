@@ -49,7 +49,7 @@ function pmssUserWebRootMigrationRootParentsSafe(string $home, array $paths): bo
 }
 
 /** Run as the account, or as an already unprivileged owner of a fixture home. */
-function pmssUserWebRootMigrationRun(string $user, string $home, array $paths, string $command): bool
+function pmssUserWebRootMigrationRun(string $user, string $home, array $paths, string $command, ?string $input = null): bool
 {
     $uid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
     $account = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
@@ -58,9 +58,11 @@ function pmssUserWebRootMigrationRun(string $user, string $home, array $paths, s
         && !pmssUserWebRootMigrationRootParentsSafe($home, $paths)) {
         return false;
     }
-    if (pmssAccountPathRun($user, $home, $paths, $command)) {
+    if (pmssAccountPathRun($user, $home, $paths, $command, $input)) {
         return true;
     }
+    // Streamed copies need the checked account runner; the legacy fallback has no stdin pipe.
+    if ($input !== null) return false;
     if ($uid < 1 || @fileowner($home) !== $uid || !pmssPathTargetIsSafe($home, true)) {
         return false;
     }

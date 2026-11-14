@@ -8,6 +8,13 @@ class CheckGuiCronTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-check-gui-']; }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Keep the external permission repair out of these watchdog path fixtures.
+        $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1']);
+    }
+
     public function testRootCronSchedulesCheckGui(): void
     {
         $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', '/scripts/cron/checkGui.php', 'root.cron should schedule checkGui.php');
@@ -16,7 +23,7 @@ class CheckGuiCronTest extends TestCase
     public function testStandaloneWatchdogLoadsRequiredSymbols(): void
     {
         $script = <<<'PHP'
-$requiredSymbols = ['Logger' => 'class', 'pmssSkeletonBase' => 'function'];
+$requiredSymbols = ['Logger' => 'class', 'pmssSkeletonBase' => 'function', 'runUserStep' => 'function'];
 foreach ($requiredSymbols as $symbol => $type) {
     $loaded = $type === 'class' ? class_exists($symbol, false) : function_exists($symbol);
     if (!$loaded) {

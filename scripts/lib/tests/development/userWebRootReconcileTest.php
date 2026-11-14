@@ -31,6 +31,8 @@ class UserWebRootReconcileTest extends TestCase
             'template.rutorrent.config' => '$scgi_host = "";', 'template.rutorrent.access' => 'access',
         ]);
         $this->pmssTrackEnvOverrides([
+            // Plan the external repair; its execution has separate ownership fixtures.
+            'PMSS_DRY_RUN' => '1',
             'PMSS_SKEL_DIR' => dirname($this->skeleton),
             'PMSS_CONFIG_DIR' => $this->config,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-web-reconcile-lock-'),

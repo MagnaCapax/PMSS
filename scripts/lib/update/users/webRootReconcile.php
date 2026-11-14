@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__.'/webRoot.php';
+require_once dirname(__DIR__).'/runtime/commands.php';
 require_once dirname(__DIR__, 2).'/runtime/locks.php';
 require_once dirname(__DIR__, 2).'/rutorrent/config.php';
 require_once __DIR__.'/webRootReconcileCopy.php';
@@ -25,15 +26,18 @@ function pmssUserWebRootReconcileInstallFile(
 ): bool
 {
     if ($user === null) return false;
+    // The account cannot read the root-only skeleton; send trusted bytes over stdin.
+    $content = pmssReadRegularFileContents($source);
+    if ($content === null) return false;
     $template = dirname($target).'/.pmss-web-root-XXXXXXXX';
     $targetArg = escapeshellarg($target);
     $command = 'tmp=$(mktemp -- '.escapeshellarg($template).') || exit 1; '
         .'trap \'rm -f -- "$tmp"\' EXIT; '
-        .'cp -- '.escapeshellarg($source).' "$tmp"'
+        .'cat > "$tmp" && test "$(wc -c < "$tmp")" -eq '.strlen($content)
         .' && chmod '.sprintf('%04o', $mode).' -- "$tmp"'
         .' && test ! -L '.$targetArg
         .' && '.($noReplace ? 'ln -- "$tmp" '.$targetArg : 'mv -T -- "$tmp" '.$targetArg);
-    $installed = pmssUserWebRootMigrationRun($user, $home, [$target], $command);
+    $installed = pmssUserWebRootMigrationRun($user, $home, [$target], $command, $content);
     if ($installed && $stats !== null) {
         $stats['files_restored'] = (int) ($stats['files_restored'] ?? 0) + 1;
     }
@@ -182,6 +186,17 @@ function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
                 updateRutorrentConfig($user, 1);
             } else {
                 pmssUserWebRootMigrationLog($user, $logger, 'ruTorrent templates unavailable; config regeneration skipped');
+            }
+        }
+        // Match the update path after all writers, including config regeneration.
+        // The canonical repair preserves authoritative classes with inode-safe operations.
+        if ($stats['files_restored'] > 0) {
+            $rc = runUserStep($user, 'Refreshing restored web-root permissions',
+                pmssBuildCommand('/scripts/util/userPermissions.php', [$user]));
+            if ($rc !== 0) {
+                $reason = 'permissions-failed';
+                pmssUserWebRootMigrationLog($user, $logger, 'Restored web-root permission repair failed rc='.$rc);
+                return false;
             }
         }
         return true;

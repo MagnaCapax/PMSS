@@ -145,7 +145,8 @@ final class AccountPathOperationStaticTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/webRoot.php', [
             'pmssPathTargetIsSafe($source, true, true)',
             'pmssPathTargetIsSafe($target, true, true)',
-            'pmssAccountPathRun($user, $home, $paths, $command)',
+            'pmssAccountPathRun($user, $home, $paths, $command, $input)',
+            'if ($input !== null) return false;',
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)',
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)',
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source)',
@@ -155,6 +156,8 @@ final class AccountPathOperationStaticTest extends TestCase
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/webRootReconcile.php', [
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www)',
             'pmssUserWebRootMigrationRun($user, $home, [$target]',
+            'pmssReadRegularFileContents($source)',
+            'strlen($content)',
         ], ['@rename($stage, $www)']);
     }
 
