@@ -545,6 +545,7 @@ pmssRunProfiledCallable('Installing logrotate policies', 'pmssLogrotatePoliciesI
 pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetworkTemplate', ['logmsg']);
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
 pmssRunProfiledCallable('Hardening access to session and network binaries', 'pmssSessionHistoryPermissionsHarden', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+pmssRunProfiledCallable('Hardening access to the atop archive directory', 'pmssProcessArchiveDirHarden', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 // Opt-in only (marker /etc/seedbox/config/socket-table-privacy.enabled). With no marker this
 // restores stock /proc/net modes and is a no-op — inert until the operator enables it per host.
 pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);

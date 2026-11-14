@@ -37,3 +37,29 @@ function pmssSessionHistoryPermissionsHarden(string $root = ''): bool
 
     return true;
 }
+
+/**
+ * Keep the atop archive directory on the same policy as the records above:
+ * no other-access. Re-run on every update, since a package reinstall restores
+ * the stock mode. The root argument keeps development tests away from host paths.
+ */
+function pmssProcessArchiveDirHarden(string $root = ''): bool
+{
+    if (getenv('PMSS_DRY_RUN') === '1') {
+        return true;
+    }
+
+    $target = rtrim($root, '/').'/var/log/atop';
+    clearstatcache(true, $target);
+    $stats = @lstat($target);
+    if ($stats === false) {
+        return true;
+    }
+    // A real directory only: a symlink here would redirect the chmod elsewhere.
+    $mode = $stats['mode'];
+    if (($mode & 0170000) !== 0040000 || (($mode & 0007) !== 0 && !@chmod($target, ($mode & 07777) & ~0007))) {
+        throw new RuntimeException('Cannot harden permissions: /var/log/atop');
+    }
+
+    return true;
+}
