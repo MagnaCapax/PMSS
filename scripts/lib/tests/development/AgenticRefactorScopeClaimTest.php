@@ -105,9 +105,8 @@ class AgenticRefactorScopeClaimTest extends TestCase
     {
         $launcher = $this->pmssReadRepoFile('development/agentic-refactor.sh')
             .$this->pmssReadRepoFile('development/lib/refactor-context.sh');
-        $library = $this->pmssReadRepoFile('development/lib/codex-common.sh');
 
         $this->assertStringContainsAndOmitsStrings(['codex_scope_claim_filter_candidates'], ['candidate-files.filtered.txt', 'pmss_refactor'.'_key='], $launcher);
-        $this->assertStringContainsString('codex_scope_claim_filter_candidates()', $library);
+        $this->pmssAssertRepoFileContainsString('development/lib/codex-common.sh', 'codex_scope_claim_filter_candidates()');
     }
 }

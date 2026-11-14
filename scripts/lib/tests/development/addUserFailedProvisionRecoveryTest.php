@@ -255,20 +255,18 @@ PHP;
 
     public function testAddUserWrapperUsesPreflightHelper(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/lib/user/add/preflight.php';", 'pmssAddUserEnsurePreflightState($userDb, $user, $homePath);'], $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/addUser.php', ["require_once __DIR__.'/lib/user/add/preflight.php';", 'pmssAddUserEnsurePreflightState($userDb, $user, $homePath);']);
     }
 
     public function testAddUserWrapperInitializesFailureRollback(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/lib/user/add/failureRollback.php';", "pmssAddUserFailureRollbackInit(\$userDb, \$user['name'], \$homePath);"], $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/addUser.php', ["require_once __DIR__.'/lib/user/add/failureRollback.php';", "pmssAddUserFailureRollbackInit(\$userDb, \$user['name'], \$homePath);"]);
     }
 
     public function testProvisioningPhasesMarkRollbackBoundaries(): void
     {
-        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkSystemUserCreated();', $this->pmssReadRepoFile('scripts/lib/user/add/systemUserCreate.php'));
-        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkUserConfigApplied();', $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php'));
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/systemUserCreate.php', 'pmssAddUserFailureRollbackMarkSystemUserCreated();');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/userConfigApply.php', 'pmssAddUserFailureRollbackMarkUserConfigApplied();');
     }
 
     public function testSystemUserCreateConvergesCredentialDirectoryBeforePasswordSync(): void

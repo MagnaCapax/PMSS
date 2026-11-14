@@ -136,8 +136,7 @@ final class FleetCompareTest extends TestCase
 
     public function testFleetFeedPathIsPinnedAndRefreshedWithTheNewsRequest(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $this->assertStringContainsString("'/data/v1/fleet-performance.json',\n    );", $source);
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', ["'/data/v1/fleet-performance.json',\n    );"]);
         $emit = substr($source, strpos($source, 'function pmssWelcomeHomeNewsEmit'), 700);
         $this->assertStringContainsString("fleet-performance.json', 900, true)", $emit);
     }

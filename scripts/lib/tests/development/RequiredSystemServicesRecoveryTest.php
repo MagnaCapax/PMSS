@@ -8,8 +8,7 @@ class RequiredSystemServicesRecoveryTest extends TestCase
 {
     public function testGuardCallsRecoveryAfterDisablement(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/cron/systemdServicesGuard.php');
-        $this->assertStringContainsString('/services/systemd/recovery.php', $source);
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/systemdServicesGuard.php', ['/services/systemd/recovery.php']);
         $this->assertTrue(strpos($source, 'pmssStopDisableMaskSystemdUnit(')
             < strpos($source, 'pmssRecoverRequiredSystemdServices();'));
     }
