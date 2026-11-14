@@ -976,6 +976,11 @@ iptables helpers:
   Both warn with an explanatory `message` in JSONL and the operator table;
   existing degradation still fails. Bitmap warnings alone do not claim current
   performance loss or produce a customer degradation notice (ADR 0265).
+  NUL-containing raw mdstat observations return the existing empty snapshot before
+  parsing or probing. `pmssStorageHealthHomeArrayResolve()` rejects NUL bytes in
+  any raw mount-table row before normalization or selecting `/home`, returning
+  its existing `null` unavailable result. Valid whitespace, CRLF, array payloads,
+  probe commands and bitmap findings retain their contracts.
 
 - Live-statistics text counters in `scripts/lib/liveStats.php` must fit PHP integers
   before conversion. Oversized CPU ticks or their sum, memory KiB-to-byte

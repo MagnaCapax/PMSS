@@ -47,6 +47,14 @@ unchanged. Hermetic fixtures cover present/absent/unknown observations, probe
 arguments, failure exit codes and notice classification; execution stays on
 the testing machine. The existing shared command tests cover timeout containment.
 
+Raw mdstat observations containing NUL bytes use the existing empty snapshot
+before any array parsing or mdadm probe. Mount-table observations containing NUL
+bytes in any row use the existing unavailable home-array result before trimming
+or selection. Valid whitespace, CRLF, array payload order, probe commands and
+bitmap findings stay unchanged. `StorageHealthHomeRaidActivityTest` covers these
+acquisition boundaries, including absence of probes for corrupt text; execution
+stays on the testing machine.
+
 ## References
 
 - [mdadm detail output](https://github.com/md-raid-utilities/mdadm/blob/main/Detail.c)

@@ -34,7 +34,11 @@ function pmssStorageHealthSnapshotRaid(string $timestamp, string $mdstatPath = '
         return [];
     }
     $mdstat = @file_get_contents($mdstatPath);
-    $entries = $mdstat === false ? [] : pmssStorageHealthRaidEntriesParse($mdstat, $timestamp);
+    // Corrupt proc text must not become plausible arrays after line trimming.
+    if ($mdstat === false || pmssFilesystemPathHasNulByte($mdstat)) {
+        return [];
+    }
+    $entries = pmssStorageHealthRaidEntriesParse($mdstat, $timestamp);
     foreach ($entries as &$entry) {
         $probe = pmssStorageHealthProbeCommand('raid', $entry['array'], 'mdadm --detail '.escapeshellarg('/dev/'.$entry['array']));
         // Shared capture owns the process-group deadline, kill-after and timeout event.
@@ -54,6 +58,12 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
     }
     if (!is_array($mounts = @file($mountsPath, FILE_IGNORE_NEW_LINES))) {
         return null;
+    }
+    // Check the whole observation before normalization or selecting an early /home row.
+    foreach ($mounts as $line) {
+        if (pmssFilesystemPathHasNulByte($line)) {
+            return null;
+        }
     }
     foreach (pmssConfigRows($mounts, 2, []) as $fields) {
         if (str_replace('\\040', ' ', (string) $fields[1]) !== '/home') {

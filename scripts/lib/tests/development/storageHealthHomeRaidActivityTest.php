@@ -71,6 +71,51 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertSame(null, \pmssStorageHealthHomeArrayResolve($this->pmssWriteFile($path, '')));
     }
 
+    /** Raw input boundaries in scripts/lib/storageHealth/raid.php must precede probing. */
+    public function testRaidSnapshotRejectsCorruptTextBeforeProbes(): void
+    {
+        $row = "md1 : active raid1 sda1[0] [2/2] [UU]\n";
+        $path = $this->pmssWriteRelativeFile($this->tmpDir, 'mdstat', '', 0700);
+        $calls = $this->pmssMakeTempFile('pmss-raid-text-probes-');
+        $stub = $this->pmssMakeExecutableStub('mdadm', "#!/bin/sh\nprintf '%s\\n' \"\$*\" >> ".escapeshellarg($calls)."\n".
+            "printf 'Raid Level : raid1\\nIntent Bitmap : Internal\\nState : clean\\n'\n", 'pmss-raid-text-bin-');
+        $this->pmssWithEnv(['PATH' => $stub], function () use ($row, $path, $calls): void {
+            foreach (["\0".$row, $row."\0", str_replace('sda1', "sd\0a1", $row),
+                str_replace('[UU]', "[U\0U]", $row), $row."\0md2 : active raid1 sdb1[0]\n",
+                $row." recovery = 7.5%\0\n"] as $raw) {
+                $this->pmssWriteFile($path, $raw);
+                $this->assertSame([], \pmssStorageHealthSnapshotRaid('fixture', $path));
+            }
+            // Refusals must not launch mdadm, even when a valid sibling array was present.
+            $this->assertSame('', file_get_contents($calls));
+            foreach ([$row, " \t".$row, str_replace("\n", "\r\n", $row)] as $raw) {
+                $this->pmssWriteFile($path, $raw);
+                $expected = \pmssStorageHealthRaidEntriesParse($raw, 'fixture');
+                $expected[0]['write_intent_bitmap'] = true;
+                $this->assertSame($expected, \pmssStorageHealthSnapshotRaid('fixture', $path));
+            }
+            $this->assertSame(str_repeat("--detail /dev/md1\n", 3), file_get_contents($calls));
+        });
+    }
+
+    public function testHomeArrayRejectsCorruptTextBeforeNormalization(): void
+    {
+        $row = "/dev/md1 /home ext4 rw 0 0\n";
+        $path = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', '', 0700);
+        foreach (["\0".$row, $row."\0", str_replace('md1', "m\0d1", $row),
+            str_replace('/home', "/home\0", $row), $row."\0/dev/md2 /other ext4 rw 0 0\n",
+            "/dev/md2 /other ext4 rw\0 0 0\n".$row] as $raw) {
+            $this->pmssWriteFile($path, $raw);
+            $this->assertSame(null, \pmssStorageHealthHomeArrayResolve($path));
+            $this->assertSame(null, \pmssStorageHealthHomeRaidActivity($path, []));
+        }
+        // Whitespace, CRLF and unrelated valid rows keep direct-md resolution intact.
+        foreach ([$row, " \t".$row, str_replace("\n", "\r\n", $row),
+            "/dev/vda1 / ext4 rw 0 0\n".$row, $row."/dev/md2 /other ext4 rw 0 0\n"] as $raw) {
+            $this->assertSame('md1', \pmssStorageHealthHomeArrayResolve($this->pmssWriteFile($path, $raw)));
+        }
+    }
+
     public function testHomeArrayRejectsNulInsideMountSource(): void
     {
         foreach (["/dev/\0md1", "/dev/md1\0suffix", "/dev/md\0/../md1"] as $source) {
