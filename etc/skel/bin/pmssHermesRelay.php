@@ -14,8 +14,15 @@ function pmssHermesRelayConnect(int $port, ?callable $owner = null)
     if (!pmssHermesRelayListenerOwned($port, $owner)) return false;
     $backend = @stream_socket_client('tcp://127.0.0.1:'.$port, $error, $message, 2);
     if ($backend === false) return false;
-    if (!pmssHermesRelayListenerOwned($port, $owner)) { fclose($backend); return false; }
-    return $backend;
+    $retained = false;
+    try {
+        if (!pmssHermesRelayListenerOwned($port, $owner)) return false;
+        $retained = true;
+        return $backend;
+    } finally {
+        // Transfer only a rechecked connection; failed ownership probes release it here.
+        if (!$retained) fclose($backend);
+    }
 }
 
 /** The published socket must answer through the same login gate as TCP. */
@@ -23,10 +30,14 @@ function pmssHermesRelayReady(string $socket): bool
 {
     $peer = @stream_socket_client('unix://'.$socket, $error, $message, 2);
     if ($peer === false) return false;
-    stream_set_timeout($peer, 2);
-    fwrite($peer, "GET /api/auth/me HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
-    $status = fgets($peer);
-    fclose($peer);
+    try {
+        stream_set_timeout($peer, 2);
+        fwrite($peer, "GET /api/auth/me HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        $status = fgets($peer);
+    } finally {
+        // The readiness probe owns its peer through timeout, write and read faults.
+        fclose($peer);
+    }
     return is_string($status) && preg_match('/^HTTP\/1\.[01] 401(?: |$)/', trim($status)) === 1;
 }
 
@@ -70,9 +81,13 @@ function pmssHermesRelayTokenClaim(string $directory, string $token): bool
     if ($age < 0 || $age >= 60) return false;
     $handle = @fopen($path, 'rb');
     if (!is_resource($handle)) return false;
-    $opened = fstat($handle);
-    $content = (string) fread($handle, 66);
-    fclose($handle);
+    try {
+        $opened = fstat($handle);
+        $content = (string) fread($handle, 66);
+    } finally {
+        // Inspection faults must close the file before propagating, without claiming it.
+        fclose($handle);
+    }
     if (!is_array($opened) || $opened['ino'] !== $file['ino'] || $opened['dev'] !== $file['dev']
         || !hash_equals($token."\n", $content)) return false;
     return @unlink($path); // the unlink is the claim: of two racing requests only one can succeed
@@ -121,22 +136,26 @@ function pmssHermesRelayLogin(string $token, string $credentials, string $user, 
     $password = pmssHermesRelayPassword($credentials);
     $backend = $password === null ? false : pmssHermesRelayConnect($port, $owner);
     if ($backend === false) return $deny;
-    $prefix = basename(dirname($credentials)) === '.hermes' ? '/user-'.$user.'/hermes' : '';
-    $body = (string) json_encode(array('provider' => 'basic', 'username' => $user, 'password' => $password, 'next' => $prefix.'/'));
-    // Native Hermes scopes __Secure- cookies to the panel mount; the Pikkumies relay retains its root cookie.
-    $request = "POST /auth/password-login HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Forwarded-Proto: https\r\n"
-        .($prefix === '' ? '' : 'X-Forwarded-Prefix: '.$prefix."\r\n")
-        ."Content-Type: application/json\r\nContent-Length: ".strlen($body)."\r\nConnection: close\r\n\r\n".$body;
-    stream_set_timeout($backend, 5);
-    $deadline = time() + 5;
-    $raw = '';
-    $sent = @fwrite($backend, $request) === strlen($request);
-    while ($sent && !feof($backend) && strlen($raw) < 65536 && time() <= $deadline) {
-        $chunk = @fread($backend, 8192);
-        if ($chunk === false || ($chunk === '' && stream_get_meta_data($backend)['timed_out'])) break;
-        $raw .= $chunk;
+    try {
+        $prefix = basename(dirname($credentials)) === '.hermes' ? '/user-'.$user.'/hermes' : '';
+        $body = (string) json_encode(array('provider' => 'basic', 'username' => $user, 'password' => $password, 'next' => $prefix.'/'));
+        // Native Hermes scopes __Secure- cookies to the panel mount; the Pikkumies relay retains its root cookie.
+        $request = "POST /auth/password-login HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Forwarded-Proto: https\r\n"
+            .($prefix === '' ? '' : 'X-Forwarded-Prefix: '.$prefix."\r\n")
+            ."Content-Type: application/json\r\nContent-Length: ".strlen($body)."\r\nConnection: close\r\n\r\n".$body;
+        stream_set_timeout($backend, 5);
+        $deadline = time() + 5;
+        $raw = '';
+        $sent = @fwrite($backend, $request) === strlen($request);
+        while ($sent && !feof($backend) && strlen($raw) < 65536 && time() <= $deadline) {
+            $chunk = @fread($backend, 8192);
+            if ($chunk === false || ($chunk === '' && stream_get_meta_data($backend)['timed_out'])) break;
+            $raw .= $chunk;
+        }
+    } finally {
+        // Own the login connection from request assembly through the bounded response read.
+        fclose($backend);
     }
-    fclose($backend);
     $cookies = pmssHermesRelayLoginCookies($raw, $prefix);
     if ($cookies === null) return $deny;
     $response = "HTTP/1.1 204 No Content\r\n";

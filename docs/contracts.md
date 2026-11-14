@@ -1997,6 +1997,13 @@ customer UID, audit result shape, live-client refusal and disk precheck remain.
 
 ## Pikkumies Eternals and web UIs (contract v1.1)
 
+Synchronous helpers in `etc/skel/bin/pmssHermesRelay.php` close their acquired
+streams when listener rechecks, readiness I/O, token inspection or login request
+assembly/response I/O throws. A successful connection transfers to its caller;
+token unlinking follows successful inspection and closure. Lone throwables
+propagate unchanged, and combined close faults retain PHP's `finally` precedence.
+Request bytes, results, credential handling and existing access guards are preserved.
+
 This is the shared contract for PMSS, mcxPikkumies, and
 mcxPikkumiesAgentboard. ADR 0128 records Eternals and account web UIs;
 ADR 0125 covers vanilla Hermes. Paths beginning with `~` are relative

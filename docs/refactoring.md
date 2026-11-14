@@ -1,5 +1,14 @@
 # Refactoring Guidelines
 
+Synchronous Hermes relay probes and sign-in exchanges own acquired streams through
+`finally`. Failed or throwing listener rechecks close the untransferred backend;
+readiness I/O, token inspection and login request/response faults close their own
+streams before propagating. Successful connections still transfer to the caller.
+Token claims, request bytes, cookies and ordinary results retain their contracts;
+combined cleanup faults follow PHP's normal throwable precedence.
+`HermesRelayCleanupSafetyTest` injects exceptions and errors with memory streams
+and synthetic metadata. Execution stays on testing machines.
+
 Global nginx setup retains its facade and public helpers while separating
 filesystem operations, existing-certificate selection, default-site publication
 and account-UI convergence (ADR 0284). The two legacy account-UI branches become
