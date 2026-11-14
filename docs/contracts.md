@@ -1471,6 +1471,13 @@ Automation often invokes these utilities; below are expected inputs and effects.
     root-copy failure still permits display publication. Event fields, account-log
     messages, fallback bytes and exception propagation retain their previous behavior.
     See ADR 0254 and `QuotaSnapshotRefreshCharacterizationTest`.
+  - Usage includes the primary UID and all subordinate UID allocations parsed by
+    `pmssSubordinateIdRanges()`, for both cron and provisioning snapshots. Bounded
+    numeric user `repquota` reports are cached per filesystem during the sweep;
+    overlapping allocations count each UID once. Group records describe the same
+    inodes and are never added again. Primary limits, grace and kernel markers stay
+    unchanged. Failed aggregation follows the existing failed-probe policy;
+    timeouts stop the sweep before publication. See ADR 0285.
 
 - scripts/cron/checkGui.php
   - Behavior: Runs outside the panel request path and checks non-empty

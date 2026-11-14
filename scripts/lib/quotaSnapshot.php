@@ -36,3 +36,4 @@ function pmssQuotaRootCopyWrite(string $user, string $content): bool
 // Preserve the existing snapshot include for display, watchdog and cron consumers.
 require_once __DIR__.'/quota/snapshotText.php';
 require_once __DIR__.'/quota/snapshotReport.php';
+require_once __DIR__.'/quota/snapshotUsage.php';

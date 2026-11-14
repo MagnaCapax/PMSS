@@ -35,6 +35,7 @@ function pmssQuotaSnapshotRefreshUser(string $thisUser, callable $log): bool
     $hasExistingSnapshot = strpos($existingQuotaContent, 'Disk quotas') !== false;
     $quotaCmd = 'quota -u '.escapeshellarg($thisUser).' -v -s 2>&1';
     $quotaRun = pmssQuotaReportCapture($quotaCmd);
+    $quotaRun = pmssQuotaSnapshotAggregateReport($thisUser, $quotaRun);
     if ($quotaRun['timed_out']) {
         // A hung quota usually means /home is unhealthy; do not attempt fallback writes.
         $log("quota command for {$thisUser} exceeded its ".PMSS_QUOTA_REPORT_TIMEOUT_SECONDS.'s deadline and was killed');

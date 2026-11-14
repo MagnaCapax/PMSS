@@ -69,9 +69,10 @@ function userApplyDiskQuota(array $user): void
         return;
     }
 
-    $lines = [];
-    @exec(pmssBuildCommand('quota', ['-u', $user['name'], '-s']).' 2>&1', $lines, $rc);
-    if ($rc > 1 || $lines === [] || !pmssQuotaSnapshotWrite($quotaPath, implode("\n", $lines)."\n")) {
+    $report = pmssQuotaSnapshotAggregateReport($user['name'],
+        pmssQuotaReportCapture(pmssBuildCommand('quota', ['-u', $user['name'], '-s']).' 2>&1'));
+    if ($report['timed_out'] || $report['rc'] > 1 || $report['lines'] === []
+        || !pmssQuotaSnapshotWrite($quotaPath, implode("\n", $report['lines'])."\n")) {
         pmssLogStatus('error', "Refreshing quota status file failed for {$user['name']}: {$quotaPath}");
     }
 }
