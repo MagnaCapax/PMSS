@@ -317,6 +317,31 @@ class UserTransferTest extends TestCase
         $this->assertStringContainsString('nested_mounts=2 mount_type_tmpfs=2', $result['stdout']);
     }
 
+    public function testTransferRsyncFlagsKeepSparseFilesSparse(): void
+    {
+        // ADR 0283: the flags the main pass really emits must copy a hole as a hole, so a home that fits its
+        // quota on the source also fits it on the target.
+        $probe = \pmssCommandCapture('command -v rsync >/dev/null && command -v truncate >/dev/null');
+        if ($probe['rc'] !== 0) {
+            throw new SkipTest('requires rsync and truncate');
+        }
+        $script = \pmssUserTransferBuildRsyncMain($this->baseConfig());
+        $this->assertSame(1, preg_match('/rsync -aHAX[^\'"]*?--sparse/', $script, $m), 'main pass lacks --sparse');
+        $flags = preg_replace('/ --(numeric-ids|stats)\b/', '', $m[0]);
+        $root = $this->pmssMakeTempDir('pmss-transfer-sparse-');
+        $this->pmssEnsureDir($root.'/source');
+        $file = $root.'/source/partial.bin';
+        $made = \pmssCommandCapture('truncate -s 64M '.escapeshellarg($file).' && printf data >> '.escapeshellarg($file));
+        $this->assertSame(0, $made['rc'], $made['stderr']);
+        $copy = \pmssCommandCapture($flags.' '.escapeshellarg($root.'/source/').' '.escapeshellarg($root.'/target/'));
+        $this->assertSame(0, $copy['rc'], $copy['stderr']);
+        clearstatcache();
+        $this->assertSame(filesize($file), filesize($root.'/target/partial.bin'));
+        $this->assertSame(file_get_contents($file, false, null, 64 * 1048576), file_get_contents($root.'/target/partial.bin', false, null, 64 * 1048576));
+        $blocks = (int) trim((string) \pmssCommandCapture('stat -c %b '.escapeshellarg($root.'/target/partial.bin'))['stdout']);
+        $this->assertTrue($blocks * 512 < 1048576, 'copied hole was written as data: '.($blocks * 512).' bytes allocated');
+    }
+
     public function testCrossUsernamePayloadOwnershipCheckUsesTargetIds(): void
     {
         $command = \pmssUserTransferBuildPayloadOwnershipCheckCommand('/home/newuser/data', 1201, 1202);

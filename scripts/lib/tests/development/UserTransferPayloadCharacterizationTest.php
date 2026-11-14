@@ -87,7 +87,7 @@ class UserTransferPayloadCharacterizationTest extends TestCase
                 " '--ignore-missing-args' '--bwlimit=0' '--ignore-existing' '--compare-dest=/home/fixtur01/'", '/home/fixtur01/old-copy/'],
         ] as [$overrides, $options, $mapping, $expectedOptions, $destination]) {
             $cfg = $overrides + self::CONFIG + ['receiver' => ['sourceUid' => 2200, 'sourceGid' => 2300]];
-            $expected = self::HEADER.'rsync -aHAX --numeric-ids --stats --one-file-system'.$mapping
+            $expected = self::HEADER.'rsync -aHAX --numeric-ids --stats --one-file-system --sparse'.$mapping
                 ." --filter='-x user.rsync.*' --filter='-x! user.*'".$expectedOptions.' -e '.escapeshellarg($ssh)
                 ." --exclude='www' --exclude='session' 'fixtur02@transfer.example:/home/fixtur02/' ".escapeshellarg($destination)."\n";
             $this->assertSame($expected, \PMSS\Tests\TransferPayloadFixture\pmssUserTransferBuildRsyncCommand(

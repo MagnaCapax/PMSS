@@ -31,7 +31,8 @@ function pmssUserTransferBuildRsyncCommand(
     }
 
     // One boundary flag retains empty mount directories for customer remounts.
-    $rsync = 'rsync -aHAX --numeric-ids --stats --one-file-system'
+    // --sparse: holes stay holes, so a home that fits its quota on the source also fits it on the target (ADR 0283).
+    $rsync = 'rsync -aHAX --numeric-ids --stats --one-file-system --sparse'
         .(!empty($cfg['namespaceRsync']) ? ' --rsync-path='.escapeshellarg('unshare --map-auto --map-root-user rsync')
             : ' --usermap='.escapeshellarg($cfg['receiver']['sourceUid'].':0')
                 .' --groupmap='.escapeshellarg($cfg['receiver']['sourceGid'].':0'))
