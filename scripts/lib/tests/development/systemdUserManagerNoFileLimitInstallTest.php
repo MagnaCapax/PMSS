@@ -44,8 +44,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
         $cfgDir = $this->pmssMakeTempDir('pmss-systemd-user-at-cfg-');
         $sliceDir = $this->pmssMakeTempDir('pmss-systemd-user-at-slice-');
         $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-log-namespace-');
-        file_put_contents(
-            $cfgDir.'/template.cgroup.user-slice.v2.conf',
+        $this->pmssWriteFile($cfgDir.'/template.cgroup.user-slice.v2.conf',
             "[Slice]\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n"
         );
 

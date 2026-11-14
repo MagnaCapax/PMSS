@@ -85,11 +85,9 @@ class UserMetricsCollectTest extends TestCase
             ['file_get_contents(', 'fopen(', 'readfile(', 'pmssReadSerializedArrayFile(']);
         $root = $this->pmssMakeTempDir('pmss-oom-project-', 0700);
         $homeRoot = $root.'/home';
-        $stateRoot = $root.'/state';
-        @mkdir($homeRoot.'/www-data', 0700, true);
-        @mkdir($stateRoot, 0700);
+        $stateRoot = $this->pmssEnsureDir($root.'/state', 0700);
         $homePath = $homeRoot.'/www-data/.oomKillStatus';
-        $this->pmssWriteFile($homePath, serialize(['count' => 1, 'last_increase' => 1, 'sampled_at' => 1]));
+        $this->pmssWriteFile($homePath, serialize(['count' => 1, 'last_increase' => 1, 'sampled_at' => 1]), 0700);
 
         $this->assertTrue(\pmssOomStatusProject('www-data', 4, 100, $homeRoot, $stateRoot));
         $this->assertSame(null, unserialize((string) file_get_contents($homePath))['last_increase']);
@@ -159,7 +157,7 @@ class UserMetricsCollectTest extends TestCase
 
     public function testOmitsAbsentSourcesAndReturnsEmptyWhenNothingReadable(): void
     {
-        $this->assertEquals([], \pmssUserMetricsCollect(1000, $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [])));
+        $this->assertEquals([], \pmssUserMetricsCollect(1000, $this->pmssMakeTempDir('pmss-metrics-', 0700)));
 
         // Invalid counters stay absent; a valid zero must survive omission filtering.
         $slice = 'user.slice/user-1000.slice/';

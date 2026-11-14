@@ -10,10 +10,7 @@ class SystemdSliceLegacyShadowUpdateTest extends TestCase
     {
         $base = $this->pmssMakeTempDir('pmss-cg-shadow-');
         $drop = $base.'/user-.slice.d';
-        @mkdir($drop, 0755, true);
-
-        $legacyShadow = $drop.'/99-pmss.conf';
-        file_put_contents($legacyShadow, "[Slice]\nTasksMax=1000\n");
+        $legacyShadow = $this->pmssWriteFile($drop.'/99-pmss.conf', "[Slice]\nTasksMax=1000\n");
 
         $this->pmssSystemdSliceEnsure($this->pmssSystemdSliceFixturePrepare([
             'cfgPrefix' => 'pmss-cg-cfg-shadow-',

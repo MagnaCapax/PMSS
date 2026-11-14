@@ -693,6 +693,8 @@ runtime failure boundaries rather than fixture setup. Empty directories and
 permission transitions remain separate from file publication.
 Let checked writers create populated parent directories; retain explicit setup
 for empty directories and pass the original creation mode to the writer.
+Nginx, systemd, refresh-marker and resource-metric fixtures follow this rule;
+empty fixture trees call the temporary-directory allocator directly.
 Resource-counter trees and virtualenv executables call the checked writers directly;
 avoid local forwarding helpers that add unused parameters or another publication name.
 Resource-state, port-namespace and user-file fixtures call `pmssMakeTempDir()` and

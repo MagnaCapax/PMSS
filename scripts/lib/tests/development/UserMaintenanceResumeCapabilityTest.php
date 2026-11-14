@@ -82,10 +82,9 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
     public function testMarkerRejectsSymlinkLeavesWithoutChangingTheirTargets(): void
     {
         $root = $this->pmssMakeTempDir('pmss-urefresh-links-', 0700);
-        $stateDir = $root.'/state';
-        mkdir($stateDir, 0700);
+        $stateDir = $this->pmssEnsureDir($root.'/state', 0700);
         $this->pmssWriteFile($root.'/target', "old-signature\n");
-        mkdir($root.'/directory', 0700);
+        $this->pmssEnsureDir($root.'/directory', 0700);
 
         foreach (['target', 'missing', 'directory'] as $target) {
             $marker = $stateDir.'/fixtur01';
@@ -103,8 +102,7 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
     public function testMarkerRejectsDirectoryLeafWithoutRemovingContents(): void
     {
         $stateDir = $this->pmssMakeTempDir('pmss-urefresh-directory-', 0700);
-        mkdir($stateDir.'/fixtur01', 0700);
-        $this->pmssWriteFile($stateDir.'/fixtur01/sentinel', 'keep');
+        $this->pmssWriteFile($stateDir.'/fixtur01/sentinel', 'keep', 0700);
 
         $this->assertUnsafeMarkerRejected($stateDir);
         $this->assertSame('keep', file_get_contents($stateDir.'/fixtur01/sentinel'));

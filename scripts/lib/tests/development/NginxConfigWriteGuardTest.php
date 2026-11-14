@@ -15,7 +15,7 @@ class NginxConfigWriteGuardTest extends TestCase
     public function testWriteFileStoresContentWithManagedPermissions(): void
     {
         $path = $this->tempDir.'/conf.d/pmss-user-fixtur01.conf';
-        @mkdir(dirname($path), 0755, true);
+        $this->pmssEnsureDir(dirname($path));
 
         $this->assertTrue(\pmssCreateNginxConfigWriteFile($path, "server {}\n", 'fixtur01', 'public subdomain config'));
         $this->assertEquals("server {}\n", (string) file_get_contents($path));
@@ -58,7 +58,7 @@ class NginxConfigWriteGuardTest extends TestCase
     public function testRemoveFileTreatsMissingFileAsConverged(): void
     {
         $path = $this->tempDir.'/users/missing';
-        @mkdir(dirname($path), 0755, true);
+        $this->pmssEnsureDir(dirname($path));
 
         $this->assertTrue(\pmssCreateNginxConfigRemoveFile($path, 'fixtur01', 'stale user config'));
         $this->assertFalse(file_exists($path));
@@ -75,8 +75,7 @@ class NginxConfigWriteGuardTest extends TestCase
 
     public function testRemoveFileRejectsDirectoryTarget(): void
     {
-        $path = $this->tempDir.'/users/fixtur01';
-        @mkdir($path, 0755, true);
+        $path = $this->pmssEnsureDir($this->tempDir.'/users/fixtur01');
 
         $this->assertFalse(\pmssCreateNginxConfigRemoveFile($path, 'fixtur01', 'stale user config'));
         $this->assertTrue(is_dir($path), 'directory target must remain untouched');
@@ -176,7 +175,7 @@ PHP;
         $this->pmssWriteFiles($homeBase.'/fixtur01', ['.rtorrent.rc' => "schedule = test\n", '.lighttpd.conf' => "server.port = 12345\n"]);
         $this->pmssWriteFile($runtimePortDir.'/lighttpd-fixtur01', "12345\n");
         $priorRoute = $this->pmssWriteFile($this->tempDir.'/prior-route', "old route\n");
-        @mkdir($nginxUsersDir, 0755, true);
+        $this->pmssEnsureDir($nginxUsersDir);
         $this->pmssCreateSymlinkOrSkip($priorRoute, $nginxUsersDir.'/fixtur01');
         $ctx = ['nginxUsersDir' => $nginxUsersDir, 'homeBase' => $homeBase, 'runtimePortDir' => $runtimePortDir,
             'userTemplate' => 'proxy ##username ##serverPort', 'subdomainEnabled' => false];
@@ -194,8 +193,7 @@ PHP;
         $ports = $this->tempDir.'/ports';
         $this->pmssWriteFiles($home, ['.rtorrent.rc' => "schedule = test\n", '.lighttpd.conf' => "server.port = 12345\n"]);
         $this->pmssWriteFile($ports.'/lighttpd-fixtur01', "12345\n");
-        @mkdir($users, 0755, true);
-        @mkdir($conf, 0755, true);
+        $this->pmssEnsureDir($users);
         $ctx = [
             'homeBase' => $this->tempDir.'/home', 'runtimePortDir' => $ports,
             'nginxUsersDir' => $users, 'subdomainConfigDir' => $conf,
@@ -219,7 +217,7 @@ PHP;
         $this->assertFalse(file_exists($users.'/fixtur01'));
         $this->assertSame('public fixtur01.example.test 12345', file_get_contents($public));
 
-        @mkdir($home.'/www-disabled', 0755);
+        $this->pmssEnsureDir($home.'/www-disabled');
         $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('fixtur01', $ctx, false));
         $this->assertSame('suspended fixtur01', file_get_contents($users.'/fixtur01'));
         $this->assertSame('suspended public fixtur01.example.test', file_get_contents($public));
@@ -236,7 +234,7 @@ PHP;
         $home = $this->tempDir.'/home/fixtur01';
         $this->pmssWriteFiles($home, ['.rtorrent.rc' => "schedule = test\n", '.lighttpd.conf' => "server.port = 12345\n"]);
         $this->pmssWriteFile($this->tempDir.'/ports/lighttpd-fixtur01', "12345\n");
-        @mkdir($this->tempDir.'/users', 0755, true);
+        $this->pmssEnsureDir($this->tempDir.'/users');
         $ctx = [
             'homeBase' => $this->tempDir.'/home', 'runtimePortDir' => $this->tempDir.'/ports',
             'nginxUsersDir' => $this->tempDir.'/users', 'subdomainEnabled' => false,
@@ -251,7 +249,7 @@ PHP;
         $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('fixtur01', $ctx, false));
         $this->assertSame('1|1|12345', file_get_contents($this->tempDir.'/users/fixtur01'));
 
-        @mkdir($home.'/www-disabled', 0755);
+        $this->pmssEnsureDir($home.'/www-disabled');
         $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('fixtur01', $ctx, false));
         $this->assertSame('fixtur01|##serverPort|##unknown', file_get_contents($this->tempDir.'/users/fixtur01'));
     }
@@ -260,7 +258,7 @@ PHP;
     {
         $ctx = ['nginxUsersDir' => $this->tempDir.'/users', 'homeBase' => $this->tempDir.'/home',
             'runtimePortDir' => $this->tempDir.'/ports', 'subdomainEnabled' => false];
-        @mkdir($ctx['homeBase'].'/fixtur01', 0755, true);
+        $this->pmssEnsureDir($ctx['homeBase'].'/fixtur01');
         $route = $this->pmssWriteFile($ctx['nginxUsersDir'].'/fixtur01', "old route\n");
 
         $this->assertSame(PMSS_NGINX_USER_CONFIG_SKIPPED, \pmssCreateNginxConfigGenerateUser('fixtur01', $ctx, true));
@@ -300,15 +298,13 @@ PHP;
 
     public function testExtractedGenerationHelpersKeepSubdomainAndLegacyDelugeContracts(): void
     {
-        $configDir = $this->tempDir.'/conf.d';
-        @mkdir($configDir, 0755, true);
+        $configDir = $this->pmssEnsureDir($this->tempDir.'/conf.d');
         $ctx = ['subdomainConfigDir' => $configDir, 'nginxSslBlock' => 'ssl-on', 'publicSubdomainTemplate' => 'public ##host## ##user## ##port## ##ssl_block##'];
         $this->assertTrue(\pmssCreateNginxConfigWriteSubdomainConfigs($ctx, 'fixtur01', 'example.test', false, 12345));
         $this->assertEquals('public fixtur01.example.test fixtur01 12345 ssl-on', (string) file_get_contents($configDir.'/pmss-user-fixtur01.conf'));
         $this->assertFalse(file_exists($configDir.'/pmss-user-fixtur01-hash.conf'));
 
-        $homeDir = $this->tempDir.'/home/fixtur01';
-        @mkdir($homeDir, 0755, true);
+        $homeDir = $this->pmssEnsureDir($this->tempDir.'/home/fixtur01');
         $target = $this->pmssWriteFile($this->tempDir.'/outside-port', "62000\n");
         $this->pmssCreateSymlinkOrSkip($target, $homeDir.'/.delugeWebPort');
         $this->pmssWriteFile($homeDir.'/.delugePort', "65535\n");
