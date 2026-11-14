@@ -72,8 +72,7 @@ class UserSkeletonDeliveryCharacterizationTest extends TestCase
             $script = '$GLOBALS["content"] = '.var_export($content, true).';'
                 .'pmssUserPatchWritableStrings("/fixture/home/fixtur01/file", '.var_export($replacements, true).');';
             $result = $this->trace('pmssUserPatchWritableStrings', $script);
-            $this->assertSame($expected, $result['content']);
-            $this->assertSame($expected !== $content ? [['write']] : [], $result['events']);
+            $this->pmssAssertArraySubsetSame(['content' => $expected, 'events' => $expected !== $content ? [['write']] : []], $result);
         }
     }
 

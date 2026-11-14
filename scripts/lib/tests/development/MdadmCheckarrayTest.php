@@ -177,10 +177,10 @@ class MdadmCheckarrayTest extends TestCase
             if ($sysfs !== null) $this->pmssWriteRelativeFile($this->fixtureRoot, 'sys/block/md0/md/degraded', $sysfs."\n", 0700);
             $plan = \pmssMdadmCheckarrayPlan($mdstat, $this->fixtureRoot.'/sys/block');
             $this->assertFalse($plan['fallback_all']);
-            $this->assertSame('', $plan['reason']);
-            $this->assertSame($sysfs === '0' ? ['md0', 'md1'] : ['md1'], $plan['healthy']);
-            $this->assertSame($sysfs === '1' ? ['md0', 'md2'] : ['md2'], $plan['degraded']);
-            $this->assertSame($sysfs === null || $sysfs === 'invalid' ? ['md0'] : [], $plan['unknown']);
+            $this->pmssAssertArraySubsetSame(['reason' => '',
+                'healthy' => $sysfs === '0' ? ['md0', 'md1'] : ['md1'],
+                'degraded' => $sysfs === '1' ? ['md0', 'md2'] : ['md2'],
+                'unknown' => $sysfs === null || $sysfs === 'invalid' ? ['md0'] : []], $plan);
         }
     }
 

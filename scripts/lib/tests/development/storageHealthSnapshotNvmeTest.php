@@ -21,9 +21,8 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
                     'num_err_log_entries : '.$raw, 'percentage_used : '.$raw,
                     'temperature : '.$raw.' '.$unit,
                 ]), [], null, 'fixture');
-                foreach (['critical_warnings', 'media_errors', 'num_err_log_entries', 'percentage_used'] as $metric) {
-                    $this->assertSame($expected, $entry['metrics'][$metric], $metric.': '.$raw);
-                }
+                $this->pmssAssertArraySubsetSame(array_fill_keys(
+                    ['critical_warnings', 'media_errors', 'num_err_log_entries', 'percentage_used'], $expected), $entry['metrics'], $raw.': ');
                 $temperature = $expected === null ? null : $expected - ($unit === 'K' ? 273 : 0);
                 $this->assertSame($temperature, $entry['metrics']['temperature'], $raw.' '.$unit);
             }

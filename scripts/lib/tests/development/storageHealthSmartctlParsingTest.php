@@ -20,17 +20,15 @@ class StorageHealthSmartctlParsingTest extends TestCase
                 'UDMA_CRC_Error_Count '.$raw, 'Temperature_Celsius '.$raw,
                 'Power_On_Hours '.$raw,
             ]), [], null, 'fixture');
-            foreach (['reallocated', 'pending', 'udma_crc', 'link_errors', 'temp_c', 'power_on_hours'] as $metric) {
-                $this->assertSame($expected, $entry['metrics'][$metric], $metric.': '.$raw);
-            }
+            $this->pmssAssertArraySubsetSame(array_fill_keys(
+                ['reallocated', 'pending', 'udma_crc', 'link_errors', 'temp_c', 'power_on_hours'], $expected), $entry['metrics'], $raw.': ');
             $scsi = \pmssStorageHealthParseSmartctlOutput(implode("\n", [
                 'SMART Health Status: OK', 'Current Drive Temperature: '.$raw.' C',
                 'Elements in grown defect list: '.$raw, 'Non-medium error count: '.$raw,
                 'Accumulated power on time '.$raw.':00:00',
             ]), [], null, 'fixture');
-            foreach (['reallocated', 'link_errors', 'temp_c', 'power_on_hours'] as $metric) {
-                $this->assertSame($expected, $scsi['metrics'][$metric], $metric.': '.$raw);
-            }
+            $this->pmssAssertArraySubsetSame(array_fill_keys(
+                ['reallocated', 'link_errors', 'temp_c', 'power_on_hours'], $expected), $scsi['metrics'], $raw.': ');
         }
         // SMART keeps the last matching line, including an unavailable final sample.
         $entry = \pmssStorageHealthParseSmartctlOutput(

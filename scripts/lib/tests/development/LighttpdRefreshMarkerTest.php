@@ -76,13 +76,11 @@ PHP;
         $runs = $this->pmssRunInlinePhpJson($script);
         foreach ([0, 1] as $index) {
             $this->pmssAssertArraySubsetSame(['total' => 2, 'processed' => 2, 'skipped' => 0, 'skip_reasons' => []], $runs[$index]['summary']);
-            $this->assertSame('warn', $runs[$index]['status']);
-            $this->assertSame([false, true], $runs[$index]['marked']);
+            $this->pmssAssertArraySubsetSame(['status' => 'warn', 'marked' => [false, true]], $runs[$index]);
             $this->assertFalse($runs[$index]['fixtur01MarkerExists']);
             $this->assertStringContainsString('lighttpd configuration refresh failed (rc=1)', implode("\n", $runs[$index]['logs']['fixtur01']));
             $this->assertStringContainsString('[WARN] Skipping user refresh marker: lighttpd refresh incomplete', implode("\n", $runs[$index]['logs']['fixtur01']));
-            $this->assertSame('ERR', $runs[$index]['steps'][0]['status']);
-            $this->assertSame(1, $runs[$index]['steps'][0]['rc']);
+            $this->pmssAssertArraySubsetSame(['status' => 'ERR', 'rc' => 1], $runs[$index]['steps'][0]);
         }
         foreach ($runs as $run) {
             $this->assertSame(['later environment handlers', 'linger/docker', 'Synchronizing per-user htpasswd', 'Checking lighttpd instance'], $run['continued']['fixtur01']);

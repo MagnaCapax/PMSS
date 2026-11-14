@@ -12,8 +12,7 @@ class SystemPermissionsFlowCharacterizationTest extends TestCase
     public function testAllPresentTargetsRetainExactCommandsModesAndOrder(): void
     {
         $result = $this->trace([]);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame($this->expectedEvents(), $result['events']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'events' => $this->expectedEvents()], $result);
     }
 
     public function testEveryCommandFailureAccumulatesWithoutStoppingLaterWork(): void
@@ -30,21 +29,19 @@ class SystemPermissionsFlowCharacterizationTest extends TestCase
     public function testBestEffortChmodAndUnlinkFailuresDoNotChangeExitStatus(): void
     {
         $result = $this->trace(['direct_result' => false]);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame($this->expectedEvents(), $result['events']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'events' => $this->expectedEvents()], $result);
     }
 
     public function testMissingTargetsRetainOnlyMissingTreeDiagnostics(): void
     {
         $result = $this->trace(['missing_all' => true]);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame([
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'events' => [
             ['root'],
             ['log', 'Skipping /etc/skel permission adjustments; directory missing'],
             ['log', 'Skipping /etc/seedbox permission adjustments; directory missing'],
             ['log', 'Skipping ownership enforcement; missing /etc/skel'],
             ['log', 'Skipping ownership enforcement; missing /etc/seedbox'],
-        ], $result['events']);
+        ]], $result);
     }
 
     public function testSymlinkedWireguardParentSuppressesAllChildWork(): void
@@ -54,8 +51,7 @@ class SystemPermissionsFlowCharacterizationTest extends TestCase
         }));
         $expected[] = ['log', 'Skipping /etc/wireguard: symlink detected'];
         $result = $this->trace(['links' => ['/etc/wireguard']]);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame($expected, $result['events']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'events' => $expected], $result);
     }
 
     public function testFileTargetsRejectDirectoriesAndSymlinksBeforeOwnership(): void
@@ -72,8 +68,7 @@ class SystemPermissionsFlowCharacterizationTest extends TestCase
                 $expected[] = $row;
             }
             $result = $this->trace([$kind => [$path]]);
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame($expected, $result['events']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'events' => $expected], $result);
         }
     }
 
@@ -90,11 +85,10 @@ class SystemPermissionsFlowCharacterizationTest extends TestCase
     public function testRootRefusalAndThrownCommandStopAtTheirOriginalBoundaries(): void
     {
         $result = $this->trace(['root_fault' => true]);
-        $this->assertSame(99, $result['rc']);
-        $this->assertSame([['root'], ['throw', 'Error', 'root refused']], $result['events']);
+        $this->pmssAssertArraySubsetSame(['rc' => 99, 'events' => [['root'], ['throw', 'Error', 'root refused']]], $result);
         $result = $this->trace(['throw_step' => 2]);
-        $this->assertSame(99, $result['rc']);
-        $this->assertSame(array_merge(array_slice($this->expectedEvents(), 0, 4), [['throw', 'Error', 'command fault']]), $result['events']);
+        $this->pmssAssertArraySubsetSame(['rc' => 99,
+            'events' => array_merge(array_slice($this->expectedEvents(), 0, 4), [['throw', 'Error', 'command fault']])], $result);
     }
 
     /** Literal original CLI contract, independent of the runtime policy tables. */
