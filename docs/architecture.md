@@ -287,6 +287,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   bounded probes; `deviceParse.php` interprets text without I/O. `deviceMetrics.php`
   shares ordered matching, threshold selection, counter growth and entry status.
   SMART retains last-line precedence; NVMe retains first-match precedence (ADR 0173).
+  Acquisition policies also differ: SMART parses combined stdout/stderr and
+  annotates parsed timeout findings; NVMe returns null for failed, empty or
+  NUL-containing stdout. RAID retains its array entries when bitmap inspection
+  is unavailable. Keep those contracts explicit when considering shared probes.
   SMART rejects NUL-containing stdout or stderr before parsing, using its existing
   unavailable-output result. Valid text retains SMART exit-code bitmask handling,
   timeout findings and standby status. `StorageHealthSmartOutputSafetyTest` covers
