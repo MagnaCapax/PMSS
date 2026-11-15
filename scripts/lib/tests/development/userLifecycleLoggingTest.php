@@ -130,8 +130,7 @@ PHP;
 
         $this->assertSame(0, $result);
         $this->assertSame(array('refresh_nginx_config', 'restart_nginx_systemctl'), array_column($calls, 'step'));
-        $this->assertSame('php /scripts/util/createNginxConfig.php --user \'fixtur01\'', $calls[0]['command']);
-        $this->assertSame('fixtur01', $calls[0]['username']);
+        $this->pmssAssertArraySubsetSame(array('command' => 'php /scripts/util/createNginxConfig.php --user \'fixtur01\'', 'username' => 'fixtur01'), $calls[0]);
         $this->assertTrue($calls[0]['dryRun']);
     }
 

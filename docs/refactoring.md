@@ -714,6 +714,8 @@ torrent-client result fixtures use that same helper for adjacent field checks.
 Null expectations still require a present key; nested arrays keep strict equality.
 Positional command observations use the same subset helper without unpacking
 fields solely for assertions; command-fragment checks stay at the caller.
+Resource-list columns, maintenance event slots, frame definitions and Docker PID
+maps use the same strict batches, preserving expected order and extra fields.
 
 Process and monitoring fixtures use `TestCase::pmssWriteFiles()` for ordered
 file trees and `pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared

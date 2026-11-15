@@ -33,7 +33,7 @@ foreach ($cases as $name => [$rc, $lines]) {
     $GLOBALS['psLines'] = $lines;
     $GLOBALS['commands'] = $GLOBALS['logs'] = [];
     try {
-        $results[$name] = ['ok', userDockerStopScan('alice', 1001)];
+        $results[$name] = ['ok', userDockerStopScan('fixtur01', 1001)];
     } catch (\RuntimeException $e) {
         $results[$name] = ['fail', $e->getMessage()];
     }
@@ -45,7 +45,6 @@ PHP;
         $this->assertSame('fail', $results['ps-error'][0], 'ps error with output');
         $this->assertSame('fail', $results['other-failure'][0], 'non-1 exit');
         $this->assertSame('ok', $results['running'][0], 'running daemon');
-        $this->assertSame([4242], $results['running'][1]['dockerd'], 'dockerd pid');
-        $this->assertSame([4243], $results['running'][1]['rootlesskit'], 'rootlesskit pid');
+        $this->pmssAssertArraySubsetSame(['dockerd' => [4242], 'rootlesskit' => [4243]], $results['running'][1], 'running pid ');
     }
 }

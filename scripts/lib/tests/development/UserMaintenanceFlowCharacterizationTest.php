@@ -38,8 +38,7 @@ class UserMaintenanceFlowCharacterizationTest extends TestCase
             ['post', 'fixtur02', 'Synchronizing per-user htpasswd', "/scripts/util/checkUserHtpasswd.php 'fixtur02'", []],
             ['post', 'fixtur02', 'Checking lighttpd instance', "/scripts/cron/checkLighttpdInstances.php 'fixtur02'", [75]],
         ], array_slice($this->events($result, 'post'), 0, 2));
-        $this->assertSame(['user_log', 'fixtur02', 'update-step2: user maintenance finished (1.00s)'], $accountEvents[8]);
-        $this->assertSame(['profile', 'fixtur02', ['updateUser fixtur02', '', 'OK', 0, 1, false]], $accountEvents[10]);
+        $this->pmssAssertArraySubsetSame([8 => ['user_log', 'fixtur02', 'update-step2: user maintenance finished (1.00s)'], 10 => ['profile', 'fixtur02', ['updateUser fixtur02', '', 'OK', 0, 1, false]]], $accountEvents);
         $this->assertSame('', $result['output']);
     }
 

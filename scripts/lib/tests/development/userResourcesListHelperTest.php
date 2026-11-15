@@ -53,7 +53,7 @@ class UserResourcesListHelperTest extends TestCase
     public function testRowBuildFullModeUsesStableTextContracts(): void
     {
         $row = \pmssUserResourcesListRowBuild([
-            'user' => 'alice',
+            'user' => 'fixtur01',
             'uid' => 1001,
             'memory_high' => 1073741824,
             'memory_max' => 2147483648,
@@ -74,9 +74,7 @@ class UserResourcesListHelperTest extends TestCase
             'suspended' => true,
         ], 'full');
 
-        foreach (['alice', '1001', '1G', '2G', '200', '150%', '300', '1M', '2M', '1000', '2000', '50G', '75G', '25000', '31250', 'inf', '12.5G', 'inf', 'yes'] as $index => $expected) {
-            $this->assertSame($expected, $row[$index], 'column '.$index);
-        }
+        $this->pmssAssertArraySubsetSame(['fixtur01', '1001', '1G', '2G', '200', '150%', '300', '1M', '2M', '1000', '2000', '50G', '75G', '25000', '31250', 'inf', '12.5G', 'inf', 'yes'], $row, 'column ');
     }
 
     public function testRowBuildBriefModeSnapshot(): void

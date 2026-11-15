@@ -512,8 +512,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         $ordered = \pmssLocalFramePriorityOrder($frames, array('wiki' => 99, 'welcome' => -99), false);
 
         $this->assertSame(array('welcome', 'wiki', 'rutorrent'), array_keys($ordered));
-        $this->assertSame($frames['wiki'], $ordered['wiki'], 'Reordering must carry each frame definition unchanged');
-        $this->assertSame($frames['welcome'], $ordered['welcome']);
+        $this->pmssAssertArraySubsetSame(array('wiki' => $frames['wiki'], 'welcome' => $frames['welcome']), $ordered, 'Reordering must carry each frame definition unchanged: ');
     }
 
     public function testPriorityOrderPutsPikkumiesRightAfterWelcomeByDefault(): void
