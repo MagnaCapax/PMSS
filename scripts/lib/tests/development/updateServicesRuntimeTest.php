@@ -232,11 +232,10 @@ class UpdateServicesRuntimeTest extends TestCase
     /** #1180/#1185: cron restores its own file before reading /etc/cron.d, except while update.php holds it off. */
     public function testCronDropinRestoresRootCronBeforeStartUnlessUpdateHoldsIt(): void
     {
-        $content = \pmssCronRestartDropinContent(4);
         $this->assertStringContainsAllStrings([
             "ExecStartPre=-/bin/sh -c 'test -e /run/pmss-root-cron-disabled || test -e /etc/cron.d/pmss",
             "install -m 0644 /etc/seedbox/config/root.cron /etc/cron.d/pmss'\n",
-        ], $content);
+        ], \pmssCronRestartDropinContent(4));
         // update.php is self-contained, so its literal marker path must stay in step with the library.
         $this->pmssAssertRepoFileContainsAllStrings('scripts/update.php', ["'".\pmssRootCronDisabledMarker()."'"]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.rc.local', ["[ ! -e ".\pmssRootCronDisabledMarker()." ]"]);
@@ -248,13 +247,13 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->assertStringContainsAllStrings(["CPUAccounting=yes\n", "CPUQuota=300%\n"], \pmssCronRestartDropinContent(4));
 
         // 8 threads -> 700%, still reserving exactly one thread.
-        $this->assertTrue(strpos(\pmssCronRestartDropinContent(8), "CPUQuota=700%\n") !== false);
+        $this->assertStringContainsString("CPUQuota=700%\n", \pmssCronRestartDropinContent(8));
 
         // 2 threads -> 100% (1 reserved, 1 for cron).
-        $this->assertTrue(strpos(\pmssCronRestartDropinContent(2), "CPUQuota=100%\n") !== false);
+        $this->assertStringContainsString("CPUQuota=100%\n", \pmssCronRestartDropinContent(2));
 
         // 1 thread -> nothing to reserve; no CPUQuota cap (never throttle a single-core host).
-        $this->assertTrue(strpos(\pmssCronRestartDropinContent(1), 'CPUQuota=') === false);
+        $this->assertStringNotContainsString('CPUQuota=', \pmssCronRestartDropinContent(1));
     }
 
     public function testCronPamSystemdSessionContainsUserCronInUserSlice(): void

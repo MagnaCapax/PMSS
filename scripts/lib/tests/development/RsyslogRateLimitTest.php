@@ -58,7 +58,7 @@ class RsyslogRateLimitTest extends TestCase
         ], 'validated rsyslog config missing: ');
         $this->assertEquals(0640, fileperms($target) & 0777, 'rsyslog config mode changed');
         $this->assertEquals(1, count($commands));
-        $this->assertTrue(strpos($commands[0][1], 'rsyslogd -N1 -f ') !== false, 'candidate was not validated');
+        $this->assertStringContainsString('rsyslogd -N1 -f ', $commands[0][1], 'candidate was not validated');
         $this->assertEquals([], glob($root.'/.pmss-rsyslog-*') ?: [], 'candidate was not removed');
         $this->pmssAssertMessagesContain($messages, 'Applied rsyslog kernel input rate limit', 'expected apply log');
         $this->assertEquals(1, count(glob($target.'.pmss-backup-*') ?: []), 'expected one backup');

@@ -8,7 +8,7 @@ class SystemdSlicePlaceholdersCoverageTest extends TestCase
 {
     public function testAllPlaceholdersReplaced(): void
     {
-        $out = $this->pmssSystemdSliceRender([
+        $this->assertStringNotContainsString('%%', $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate([
                 'CPUWeight=%%USER_CGROUP_CPU_WEIGHT%%',
                 'IOWeight=%%USER_CGROUP_IO_WEIGHT%%',
@@ -18,7 +18,6 @@ class SystemdSlicePlaceholdersCoverageTest extends TestCase
                 'CPUQuota=%%USER_CGROUP_CPU_QUOTA%%',
             ]),
             'totalMemMiB' => 4096,
-        ]);
-        $this->assertTrue(strpos($out, '%%') === false, 'placeholders remained');
+        ]), 'placeholders remained');
     }
 }

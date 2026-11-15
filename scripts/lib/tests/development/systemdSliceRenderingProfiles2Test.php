@@ -8,29 +8,28 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
 {
     public function testCpuQuotaRenderedFromPolicyDefault(): void
     {
-        $out = $this->pmssSystemdSliceRender([
+        $this->assertStringContainsString('CPUQuota=85%', $this->pmssSystemdSliceRender([
             'v2Template' => "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n",
             'policy' => ['cpuQuotaPercent' => 85],
             'totalMemMiB' => 4096,
-        ]);
-        $this->assertTrue(strpos($out, 'CPUQuota=85%') !== false, 'CPUQuota percent not expanded');
+        ]), 'CPUQuota percent not expanded');
     }
 
     public function testCpuQuotaInfinityPreserved(): void
     {
-        $out = $this->pmssSystemdSliceRender([
+        $this->assertStringContainsString('CPUQuota=infinity', $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfginf-',
             'dropPrefix' => 'pmss-cg-dropinf-',
             'v2Template' => "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n",
             'policy' => ['cpuQuotaPercent' => 'infinity'],
             'totalMemMiB' => 2048,
-        ]);
-        $this->assertTrue(strpos($out, 'CPUQuota=infinity') !== false, 'CPUQuota infinity not rendered');
+        ]), 'CPUQuota infinity not rendered');
     }
 
     public function testMountPolicyAppendsIoLinesWhenResolvable(): void
     {
-        $out = $this->pmssSystemdSliceRender([
+        // Device string varies; assert IO lines present.
+        $this->assertStringContainsAllStrings(['IOReadBandwidthMax=', 'IOWriteBandwidthMax='], $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfg2-',
             'dropPrefix' => 'pmss-cg-drop2-',
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
@@ -39,8 +38,6 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
                 'mounts' => ['/'=> ['readBw' => '1M', 'writeBw' => '2M']],
             ],
             'totalMemMiB' => 2048,
-        ]);
-        // Device string varies; assert IO lines present.
-        $this->assertStringContainsAllStrings(['IOReadBandwidthMax=', 'IOWriteBandwidthMax='], $out);
+        ]));
     }
 }

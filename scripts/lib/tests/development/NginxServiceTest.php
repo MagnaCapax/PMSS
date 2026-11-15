@@ -22,7 +22,7 @@ class NginxServiceTest extends TestCase
         foreach (['start', 'restart', 'reload'] as $action) {
             $operation = $action === 'reload' ? 'reload-or-restart' : $action;
             $this->assertManagedCommand($action, ['PMSS_TEST_NGINX_ACTION_RC' => '7'], 7, [$operation.' nginx']);
-            $this->assertTrue(strpos(\pmssNginxServiceCommand($action, true), '/etc/init.d') === false);
+            $this->assertStringNotContainsString('/etc/init.d', \pmssNginxServiceCommand($action, true));
         }
     }
 

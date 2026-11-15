@@ -16,7 +16,7 @@ class StorageHealthExecCaptureTest extends TestCase
 
         $this->assertEquals(124, $result['rc']);
         $this->assertStringContainsString("before\n", $result['stdout']);
-        $this->assertTrue(strpos($result['stdout'], "after\n") === false, 'Timed out command should not report output produced after termination');
+        $this->assertStringNotContainsString("after\n", $result['stdout'], 'Timed out command should not report output produced after termination');
     }
 
     public function testExecCaptureReturnsShellFailureCodeForMissingCommand(): void

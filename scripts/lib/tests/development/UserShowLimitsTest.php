@@ -68,14 +68,12 @@ final class UserShowLimitsTest extends TestCase
     {
         $o = $this->fixture();
         $data = \pmssUserShowLimitsCollect($o);
-        $this->assertSame(1610612736.0, $this->metric($data, 'memory', 'memory')['value']);
-        $this->assertSame(4294967296.0, $this->metric($data, 'memory', 'memory')['limit']);
+        $this->pmssAssertArraySubsetSame(['value' => 1610612736.0, 'limit' => 4294967296.0], $this->metric($data, 'memory', 'memory'));
         $this->assertSame(25.0, $this->metric($data, 'memory', 'memory pressure')['value']);
         $this->assertSame(null, $this->metric($data, 'processes', 'processes')['limit']);
         $this->assertSame(null, $this->metric($data, 'cpu', 'CPU quota enforced')['value']);
         $this->assertSame(21474836480.0, $this->metric($data, 'traffic', 'upload past 30 days')['limit']);
-        $this->assertSame(20971520.0, $this->metric($data, 'disk I/O', 'IOReadBW configured')['value']);
-        $this->assertSame('bytes_per_second', $this->metric($data, 'disk I/O', 'IOReadBW configured')['unit']);
+        $this->pmssAssertArraySubsetSame(['value' => 20971520.0, 'unit' => 'bytes_per_second'], $this->metric($data, 'disk I/O', 'IOReadBW configured'));
         $this->assertSame('bytes_per_second', $this->metric($data, 'disk I/O', 'read bps enforced')['unit']);
         $this->assertSame('iops', $this->metric($data, 'disk I/O', 'IOReadIOPS configured')['unit']);
         $this->assertSame('iops', $this->metric($data, 'disk I/O', 'read IOPS enforced')['unit']);
@@ -103,7 +101,7 @@ final class UserShowLimitsTest extends TestCase
         $data = $this->pmssDecodeJsonArray($json);
         $this->assertSame('11.10', $this->metric($data, 'account', 'Debian version')['value']);
         $this->assertSame('12.15', $this->metric($data, 'account', 'PMSS version')['value']);
-        $this->assertTrue(strpos($json, '\\u001b') === false);
+        $this->assertStringNotContainsString('\\u001b', $json);
         list(, $jsonl) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits', '--jsonl'), $o); });
         foreach (explode("\n", trim($jsonl)) as $line) {
             $metric = $this->pmssDecodeJsonArray($line);
@@ -132,7 +130,7 @@ final class UserShowLimitsTest extends TestCase
         touch($o['home'].'/.quota', $o['now'] - 5);
         clearstatcache(true, $o['home'].'/.quota');
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits'), $o); }, array('NO_COLOR' => '1'));
-        $this->assertTrue(strpos($human, '5s [quota-snapshot]') !== false);
+        $this->assertStringContainsString('5s [quota-snapshot]', $human);
     }
 
     public function testCpuUnlimitedAndUnreadableRemainDistinct(): void
@@ -141,13 +139,13 @@ final class UserShowLimitsTest extends TestCase
         $cpu = $o['cgroups']['cpu'];
         $this->pmssWriteFile($cpu.'/cpu.max', "max 100000\n");
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits'), $o); }, array('NO_COLOR' => '1'));
-        $this->assertTrue(strpos($human, 'CPU quota enforced') !== false);
-        $this->assertTrue((bool) preg_match('/CPU quota enforced\s+unlimited \[cgroup\]/', $human));
+        $this->assertStringContainsString('CPU quota enforced', $human);
+        $this->assertMatches('/CPU quota enforced\s+unlimited \[cgroup\]/', $human);
         $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'cpu', 'CPU quota enforced')['value']);
         unlink($cpu.'/cpu.max');
         unlink($cpu.'/cpu.cfs_quota_us');
         list(, $human) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits'), $o); }, array('NO_COLOR' => '1'));
-        $this->assertTrue((bool) preg_match('/CPU quota enforced\s+n\/a \[cgroup\]/', $human));
+        $this->assertMatches('/CPU quota enforced\s+n\/a \[cgroup\]/', $human);
     }
 
     public function testDeletedButOpenFilesAreCounted(): void
