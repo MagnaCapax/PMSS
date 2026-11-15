@@ -19,7 +19,7 @@ final class AccountPathOperationStaticTest extends TestCase
         'scripts/lib/update/users/rutorrent.php:77' => ['d062608dbb673d40273b90bb95bc14763cd256b9', 'account step wrapper for retracker removal'],
         'scripts/lib/update/users/rutorrent.php:81' => ['3dd0ae350c20d790277f9d0eabc1cc60d563392f', 'account step wrapper for torrents directory'],
         'scripts/lib/update/users/rutorrent.php:86' => ['34745298797ba4c2173feeda1eb0bf7a2ba81e66', 'account step wrapper for RSS directory'],
-        'scripts/lib/update/users/rutorrent.php:182' => ['57a8c8d8fd485bc0e56b412d2401ba63a84d6f48', 'account step wrapper for tree move'],
+        'scripts/lib/update/users/rutorrent.php:186' => ['57a8c8d8fd485bc0e56b412d2401ba63a84d6f48', 'account step wrapper for tree move'],
     ];
 
     public function testAccountPathOperationsUseManagedBoundaries(): void

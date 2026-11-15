@@ -116,8 +116,12 @@ PHP;
         ['php/Snoopy.class.inc', $snoopyAcceptLegacy, $snoopyAcceptPatched],
         ['plugins/rss/action.php', 'ob_flush();', '@ob_flush();'],
         ['plugins/hddquota/action.php', 'return $field;', 'return (int) $field;'],
-        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_upload_rate", 0 )'],
-        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 0 )'],
+        // Named channels need a nonzero global rate; 327625 KiB/s stays below libtorrent's unchoke limit.
+        // Bypass stale MAX_SPEED constants and heal copies zeroed by the earlier compatibility patch.
+        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_upload_rate", 327625*1024 )'],
+        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
+        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", 0 )', 'new rXMLRPCCommand( "set_upload_rate", 327625*1024 )'],
+        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", 0 )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
     ], pmssUserRutorrentRpcCompatibilityPatches()) as [$path, $legacy, $patched]) {
         pmssUserPatchWritableStrings($ctx['home'].'/www/rutorrent/'.$path, [['legacy' => $legacy, 'patched' => $patched]]);
     }

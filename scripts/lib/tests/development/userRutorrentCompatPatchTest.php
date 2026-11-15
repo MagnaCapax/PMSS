@@ -109,9 +109,37 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->pmssAssertStringNotContainsString('image/x-xbitmap', $snoopyContent);
         $this->pmssAssertFileContainsAllStrings($rssPath, ['@ob_flush();']);
         $this->pmssAssertFileContainsAllStrings($hddquotaPath, ['return (int) $field;']);
-        $throttleContent = $this->pmssAssertFileContainsAllStrings($throttlePath, ['new rXMLRPCCommand( "set_upload_rate", 0 )',
-            'new rXMLRPCCommand( "set_download_rate", 0 )']);
+        $throttleContent = $this->pmssAssertFileContainsAllStrings($throttlePath, ['new rXMLRPCCommand( "set_upload_rate", 327625*1024 )',
+            'new rXMLRPCCommand( "set_download_rate", 327625*1024 )']);
         $this->pmssAssertStringNotContainsString('MAX_SPEED', $throttleContent);
+    }
+
+    public function testThrottlePinIgnoresStaleConstantsAndHealsZeroedCopiesIdempotently(): void
+    {
+        $relative = 'www/rutorrent/plugins/throttle/throttle.php';
+        $skeleton = $this->pmssReadRepoFile('etc/skel/'.$relative);
+        foreach ([3072, 327625] as $constant) {
+            foreach (['MAX_SPEED', '0'] as $rate) {
+                $source = str_replace('327625*1024', $constant.'*1024', $skeleton);
+                $expected = $source;
+                foreach (['upload', 'download'] as $direction) {
+                    $anchor = 'new rXMLRPCCommand( "set_'.$direction.'_rate", MAX_SPEED )';
+                    $source = str_replace($anchor, 'new rXMLRPCCommand( "set_'.$direction.'_rate", '.$rate.' )', $source);
+                    $expected = str_replace($anchor, 'new rXMLRPCCommand( "set_'.$direction.'_rate", 327625*1024 )', $expected);
+                }
+                $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-pin-', 'fixtur01', dirname($relative));
+                $target = $this->pmssWriteRelativeFile($home, $relative, $source);
+                \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+                // Full-file equality preserves zero-rate guards, named channels and unrelated bytes.
+                $this->assertSame($expected, file_get_contents($target));
+                clearstatcache(true, $target);
+                $inode = stat($target)['ino'];
+                \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+                clearstatcache(true, $target);
+                $this->assertSame($expected, file_get_contents($target));
+                $this->assertSame($inode, stat($target)['ino']);
+            }
+        }
     }
 
     public function testSkeletonHddquotaActionReturnsInt(): void
@@ -238,7 +266,7 @@ PHP;
     public function testRutorrentBackupOperationKeepsItsOriginalLine(): void
     {
         $lines = explode("\n", $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php'));
-        $this->assertStringContainsString("'Backing up existing ruTorrent'", $lines[181]);
+        $this->assertStringContainsString("'Backing up existing ruTorrent'", $lines[185]);
     }
 
     public function testObtainUsesVersionedDhtAndPortAliases(): void
@@ -419,15 +447,24 @@ PHP;
                 'expected' => 'return (int) $field;',
                 'unexpected' => 'return $field;',
             ],
-            [
-                'dir' => 'www/rutorrent/plugins/throttle',
-                'path' => 'www/rutorrent/plugins/throttle/throttle.php',
-                'legacy' => "prefix\nnew rXMLRPCCommand( \"set_upload_rate\", MAX_SPEED )\nnew rXMLRPCCommand( \"set_download_rate\", MAX_SPEED )\nsuffix\n",
-                'patched' => "prefix\nnew rXMLRPCCommand( \"set_upload_rate\", 0 )\nnew rXMLRPCCommand( \"set_download_rate\", 0 )\nsuffix\n",
-                'expected' => "new rXMLRPCCommand( \"set_upload_rate\", 0 )\nnew rXMLRPCCommand( \"set_download_rate\", 0 )",
-                'unexpected' => "new rXMLRPCCommand( \"set_upload_rate\", MAX_SPEED )\nnew rXMLRPCCommand( \"set_download_rate\", MAX_SPEED )",
-            ],
         ];
+        // Include either direction healed independently after a partially completed update.
+        foreach (['MAX_SPEED', '0'] as $upload) {
+            foreach (['MAX_SPEED', '0'] as $download) {
+                $legacy = 'new rXMLRPCCommand( "set_upload_rate", '.$upload." )\n"
+                    .'new rXMLRPCCommand( "set_download_rate", '.$download.' )';
+                $patched = "new rXMLRPCCommand( \"set_upload_rate\", 327625*1024 )\n"
+                    .'new rXMLRPCCommand( "set_download_rate", 327625*1024 )';
+                $cases[] = [
+                    'dir' => 'www/rutorrent/plugins/throttle',
+                    'path' => 'www/rutorrent/plugins/throttle/throttle.php',
+                    'legacy' => "prefix\n".$legacy."\nsuffix\n",
+                    'patched' => "prefix\n".$patched."\nsuffix\n",
+                    'expected' => $patched,
+                    'unexpected' => $legacy,
+                ];
+            }
+        }
         // One fixture per new delivery entry extends every existing safety scenario.
         foreach (\pmssUserRutorrentRpcCompatibilityPatches() as [$path, $legacy, $patched]) {
             $cases[] = [
