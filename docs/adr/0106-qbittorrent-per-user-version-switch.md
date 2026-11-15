@@ -77,3 +77,13 @@ applies the rule above from the selected build's `compatFamily`
 (`pmssQbittorrentFrontendDiskIoType` in `etc/skel/www/qbittorrentBuild.php`, a
 twin of `pmssQbittorrentCompatFamily` plus `pmssQbittorrentDiskIoType`). It never writes while the account's
 qBittorrent runs.
+
+## Safety clarification: switch lock lifetime
+
+The customer qBittorrent switch owns its lock through a `finally` scope across
+preflight, backup, selection, start and rollback. Cleanup attempts stream closure
+even when unlocking throws. Ordinary results, refusal policy and rollback order
+remain unchanged; lone throwables propagate unchanged, with PHP's usual cleanup
+precedence for combined faults. `QbittorrentSwitchLockCleanupSafetyTest` injects
+exceptions and errors using memory streams and intercepted operations; run it
+only on a testing machine.
