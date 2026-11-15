@@ -33,3 +33,12 @@ Existing migration/recovery tests remain intact. Added characterization tests lo
 snapshot ordering/schema, partial failure, link policies, and missing/file inputs.
 All suites run on testing machines. Rollback restores the prior module layout;
 no state migration is needed.
+
+The legacy unprivileged command fallback in `webRoot.php` retains ownership of
+its child through thrown reaping faults. It attempts termination and another
+reap only while the child remains acquired; termination faults cannot skip that
+reap. Lone throwables propagate unchanged, with PHP's normal precedence for
+combined cleanup faults. Command bytes, descriptors, account/path guards and
+ordinary boolean results remain unchanged. `WebRootMigrationCommandCleanupSafetyTest`
+injects exceptions and errors with memory streams and fake process operations;
+execution stays on testing machines.

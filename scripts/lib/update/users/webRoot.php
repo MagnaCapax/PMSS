@@ -75,7 +75,20 @@ function pmssUserWebRootMigrationRun(string $user, string $home, array $paths, s
     $process = @proc_open('sh -c '.escapeshellarg($command), [
         0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'],
     ], $pipes);
-    return is_resource($process) && @proc_close($process) === 0;
+    try {
+        return is_resource($process) && @proc_close($process) === 0;
+    } catch (\Throwable $error) {
+        // The legacy fallback owns its child too when the first reap throws.
+        if (is_resource($process)) {
+            try {
+                if (function_exists('proc_terminate')) @proc_terminate($process);
+            } finally {
+                // A termination fault must not skip the remaining reap attempt.
+                @proc_close($process);
+            }
+        }
+        throw $error;
+    }
 }
 
 /** Move a directory within one home with the account's authority. */
