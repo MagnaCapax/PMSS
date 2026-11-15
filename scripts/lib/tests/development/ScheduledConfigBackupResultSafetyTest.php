@@ -84,8 +84,8 @@ class ScheduledConfigBackupResultSafetyTest extends TestCase
                     },
                     'userLogger' => static function (...$args) use (&$logs): void { $logs[] = $args; },
                 ]);
-                $this->assertSame('failed', $result['status']);
-                $this->assertSame('scheduled backup helper returned invalid output', $result['message']);
+                $this->pmssAssertArraySubsetSame(['status' => 'failed',
+                    'message' => 'scheduled backup helper returned invalid output'], $result);
                 $this->assertSame($stage === 'create' ? ['create'] : ['create', 'prune'], $calls);
                 $this->assertSame([['fixtur01', 'scheduled config backup: failed reason='.$result['message']
                     .($stage === 'prune' ? ' bytes=7' : '')]], $logs);

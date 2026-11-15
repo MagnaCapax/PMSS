@@ -67,9 +67,9 @@ class LiveStatsTest extends TestCase
     {
         $meminfo = "MemTotal:       1000 kB\nMemAvailable:    400 kB\n";
         $c = \pmssLiveStatsNodeCountersParse($this->stat(100), $meminfo, $this->netDev(7000, 3000), 'eth0');
-        $this->assertSame(1100, $c['total']);
-        $this->assertSame(200, $c['busy']); // total - idle - iowait
+        // Busy excludes idle and iowait from the total counter.
         $this->pmssAssertArraySubsetSame([
+            'total' => 1100, 'busy' => 200,
             'mem_total' => 1024000, 'mem_used' => 614400, 'rx' => 7000, 'tx' => 3000, 'steal' => 0,
         ], $c);
         $this->assertSame(null, \pmssLiveStatsNodeCountersParse($this->stat(100), $meminfo, $this->netDev(1, 1), 'nope0'));

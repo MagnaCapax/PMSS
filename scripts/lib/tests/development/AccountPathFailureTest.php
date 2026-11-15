@@ -13,8 +13,8 @@ class AccountPathFailureTest extends TestCase
         $result = $this->runAccount('printf "quota\\nfull\\t\\033[31m\\000" >&2; exit 23');
         $this->assertFalse($result['ok']);
         $this->assertFalse($result['timedOut']);
-        $this->assertSame('stage=child rc=23 stderr=quota full [31m', $result['failure']);
-        $this->assertSame([true, 0, 0600, '/'], $result['descriptor']);
+        $this->pmssAssertArraySubsetSame(['failure' => 'stage=child rc=23 stderr=quota full [31m',
+            'descriptor' => [true, 0, 0600, '/']], $result);
         $this->assertFalse($result['captureOpen']);
         $this->assertTrue($result['rootBranch']);
         $this->assertSame("-u fixtur01 --\n", $result['runuser']);
@@ -50,8 +50,8 @@ class AccountPathFailureTest extends TestCase
             $result = $this->runAccount('exit 99', null, 0, $fault);
             $this->assertFalse($result['ok']);
             $this->assertFalse($result['timedOut']);
-            $this->assertSame('stage='.($fault === 'unlink' ? 'stderr' : $fault).' rc=not-started', $result['failure']);
-            $this->assertSame('', $result['runuser']);
+            $this->pmssAssertArraySubsetSame(['failure' => 'stage='.($fault === 'unlink' ? 'stderr' : $fault)
+                .' rc=not-started', 'runuser' => ''], $result);
             $this->assertFalse($result['captureOpen']);
         }
     }
@@ -71,8 +71,7 @@ class AccountPathFailureTest extends TestCase
         $result = $this->runAccount('printf blocked >&2; exec sleep 30', null, 1);
         $this->assertFalse($result['ok']);
         $this->assertTrue($result['timedOut']);
-        $this->assertStringContainsString('stage=timeout rc=', $result['failure']);
-        $this->assertStringContainsString(' stderr=blocked', $result['failure']);
+        $this->assertStringContainsAllStrings(['stage=timeout rc=', ' stderr=blocked'], $result['failure']);
         $this->assertFalse($result['captureOpen']);
     }
 

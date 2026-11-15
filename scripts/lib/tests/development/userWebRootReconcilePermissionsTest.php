@@ -24,11 +24,10 @@ class UserWebRootReconcilePermissionsTest extends TestCase
             }
             $this->assertSame([0, 0, 0754], $result['metadata']['rutorrent/conf/config.php']);
             $this->assertSame(1, count($result['steps']));
-            $this->assertSame($result['expectedCommand'], $result['steps'][0]['command']);
-            $this->assertSame($mode === 'partial' ? 'skeleton-config' : 'generated-config', $result['steps'][0]['config']);
-            $this->assertSame('customer-data', $result['customer']);
-            $this->assertSame(hash('sha256', "panel\0\xff\n"), $result['panelHash']);
-            $this->assertSame(0, $result['emptySize']);
+            $this->pmssAssertArraySubsetSame(['command' => $result['expectedCommand'],
+                'config' => $mode === 'partial' ? 'skeleton-config' : 'generated-config'], $result['steps'][0]);
+            $this->pmssAssertArraySubsetSame(['customer' => 'customer-data',
+                'panelHash' => hash('sha256', "panel\0\xff\n"), 'emptySize' => 0], $result);
         }
     }
 
@@ -36,8 +35,7 @@ class UserWebRootReconcilePermissionsTest extends TestCase
     {
         foreach (['healthy', 'locked'] as $mode) {
             $result = $this->reconcileFixture($mode);
-            $this->assertSame($mode === 'healthy', $result['ok']);
-            $this->assertSame([], $result['steps']);
+            $this->pmssAssertArraySubsetSame(['ok' => $mode === 'healthy', 'steps' => []], $result);
         }
     }
 
@@ -48,8 +46,8 @@ class UserWebRootReconcilePermissionsTest extends TestCase
             $this->assertFalse($result['ok']);
             $this->assertTrue($result['lockReleased']);
             $this->assertSame(1, count($result['steps']));
-            $this->assertStringContainsString('permission repair failed rc='.$rc, implode('|', $result['messages']));
-            $this->assertStringContainsString('reason=permissions-failed', implode('|', $result['messages']));
+            $this->assertStringContainsAllStrings(['permission repair failed rc='.$rc,
+                'reason=permissions-failed'], implode('|', $result['messages']));
         }
     }
 
@@ -65,8 +63,7 @@ class UserWebRootReconcilePermissionsTest extends TestCase
     {
         $result = $this->reconcileFixture('unsafe');
         $this->assertFalse($result['ok']);
-        $this->assertSame([], $result['steps']);
-        $this->assertSame('customer-data', $result['customer']);
+        $this->pmssAssertArraySubsetSame(['steps' => [], 'customer' => 'customer-data'], $result);
         $this->assertTrue($result['lockReleased']);
     }
 

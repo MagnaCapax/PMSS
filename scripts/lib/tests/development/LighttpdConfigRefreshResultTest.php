@@ -13,8 +13,7 @@ class LighttpdConfigRefreshResultTest extends TestCase
                 $result = $this->refreshFixture($kind, $arguments);
                 $this->assertSame($arguments === [] ? 0 : 1, $result['rc'], $kind);
                 $this->assertSame(['fixtur01', 'fixtur02'], $result['attempted'], 'later accounts must still run');
-                $this->assertStringContainsString('Password protected area (fixtur01)', $result['config']);
-                $this->assertStringContainsString('/user-fixtur01/', $result['config']);
+                $this->assertStringContainsAllStrings(['Password protected area (fixtur01)', '/user-fixtur01/'], $result['config']);
                 $this->assertSame([['root', 0644]], $result['writes']);
                 $this->assertSame([], $result['auxiliary'], 'no runtime writes after refused preparation');
                 $this->assertFalse($result['linkChanged']);
@@ -58,8 +57,8 @@ class LighttpdConfigRefreshResultTest extends TestCase
     {
         foreach ([['fixtur01'], ['--strict', 'fixtur01'], ['fixtur01', '--strict']] as $arguments) {
             $result = $this->refreshFixture('public-link', $arguments);
-            $this->assertSame(in_array('--strict', $arguments, true) ? 1 : 0, $result['rc']);
-            $this->assertSame(['fixtur01'], $result['attempted']);
+            $this->pmssAssertArraySubsetSame(['rc' => in_array('--strict', $arguments, true) ? 1 : 0,
+                'attempted' => ['fixtur01']], $result);
             $this->assertStringContainsString('Password protected area (fixtur01)', $result['config']);
         }
     }
