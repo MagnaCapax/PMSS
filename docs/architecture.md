@@ -132,6 +132,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   processes as the account, and starts rTorrent, marked media-stack apps, then
   lighttpd. Its root-side media-stack bridge loads the root-owned skeleton
   command helper; customer PHP loads the per-user copy (ADR 0086).
+  Lock acquisition closes the first stream if resolving or acquiring the second
+  lock throws. Successful calls still transfer both streams to the caller;
+  ordinary refusals keep their reasons and lock order. Memory-only fault cases
+  in `RestartUserLockCleanupSafetyTest` run on the testing machine.
 - **scripts/lib/lighttpd/accountPath.php** – `pmssAccountPathRun()` checks paths
   against an existing account home and launches account-owned file work as that
   account. `pmssReplaceAccountFile()` in the adjacent managed writer streams

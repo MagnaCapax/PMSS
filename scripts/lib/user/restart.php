@@ -26,7 +26,13 @@ function pmssRestartUserLocksAcquire(string $user, ?string &$reason): ?array
         $reason = $busy ? 'restart already running' : 'restart lock unavailable';
         return null;
     }
-    $recreate = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-userRecreate-'.$user.'.lock'), true, 'c', false, true, $busy);
+    try {
+        $recreate = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-userRecreate-'.$user.'.lock'), true, 'c', false, true, $busy);
+    } catch (\Throwable $error) {
+        // Until both locks transfer to the caller, this function owns restart.
+        fclose($restart);
+        throw $error;
+    }
     if ($recreate === false) {
         fclose($restart);
         $reason = $busy ? 'rebuild in progress' : 'rebuild lock unavailable';
