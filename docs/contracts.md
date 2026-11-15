@@ -841,6 +841,15 @@ Sub-handlers:
 
 ## Web Stack & System Prep
 
+- Required-service recovery in `scripts/lib/update/services/systemd/recovery.php`
+  attempts update-lock release even when descriptor-environment inspection or
+  restoration throws. Restoration still precedes release while the lock is held;
+  absent and empty prior values remain distinct. Lone throwables propagate
+  unchanged, and combined faults follow PHP's `finally` precedence. Service
+  selection, start commands, early returns and skip diagnostics retain ADR 0257's
+  behavior. `RequiredServicesLockCleanupSafetyTest` covers these lifetimes with
+  memory streams and inert service/environment operations on the testing machine.
+
 - `scripts/lib/update/systemPrep.php` remains the definition-only system preparation
   include. Temporary-mount policy, boot-tuning installation, locale/timezone
   convergence and root-shell defaults live in `systemPrep/tempMount.php`,

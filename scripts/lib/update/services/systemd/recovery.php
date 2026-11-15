@@ -30,27 +30,31 @@ function pmssRecoverRequiredSystemdServices(string $lockFile = '/var/lib/pmss/up
         return;
     }
 
-    $previousFds = getenv(PMSS_UPDATE_LOCK_FDS_ENV);
     try {
-        // Started daemons must not inherit the updater lock from shell children.
-        pmssLockHandleExportChildCloseFds($lock);
-        foreach (['nginx', 'ssh', 'cron', 'proftpd'] as $unit) {
-            $manager = trim((string) @shell_exec('systemctl is-system-running 2>/dev/null'));
-            if (!in_array($manager, ['running', 'degraded'], true)) {
-                return;
-            }
-            if (!in_array(pmssSystemdUnitState('is-enabled', $unit), ['enabled', 'enabled-runtime'], true)
-                || !in_array(pmssSystemdUnitState('is-active', $unit), ['inactive', 'failed'], true)) {
-                continue;
-            }
+        $previousFds = getenv(PMSS_UPDATE_LOCK_FDS_ENV);
+        try {
+            // Started daemons must not inherit the updater lock from shell children.
+            pmssLockHandleExportChildCloseFds($lock);
+            foreach (['nginx', 'ssh', 'cron', 'proftpd'] as $unit) {
+                $manager = trim((string) @shell_exec('systemctl is-system-running 2>/dev/null'));
+                if (!in_array($manager, ['running', 'degraded'], true)) {
+                    return;
+                }
+                if (!in_array(pmssSystemdUnitState('is-enabled', $unit), ['enabled', 'enabled-runtime'], true)
+                    || !in_array(pmssSystemdUnitState('is-active', $unit), ['inactive', 'failed'], true)) {
+                    continue;
+                }
 
-            // Keep nginx's existing config test and managed-master verification.
-            $command = $unit === 'nginx' ? 'nginx -t && '.pmssNginxServiceCommand('start', true)
-                : 'systemctl start '.escapeshellarg($unit).' && systemctl is-active --quiet '.escapeshellarg($unit);
-            runStep('Recovering required system service '.$unit, $command);
+                // Keep nginx's existing config test and managed-master verification.
+                $command = $unit === 'nginx' ? 'nginx -t && '.pmssNginxServiceCommand('start', true)
+                    : 'systemctl start '.escapeshellarg($unit).' && systemctl is-active --quiet '.escapeshellarg($unit);
+                runStep('Recovering required system service '.$unit, $command);
+            }
+        } finally {
+            putenv($previousFds === false ? PMSS_UPDATE_LOCK_FDS_ENV : PMSS_UPDATE_LOCK_FDS_ENV.'='.$previousFds);
         }
     } finally {
-        putenv($previousFds === false ? PMSS_UPDATE_LOCK_FDS_ENV : PMSS_UPDATE_LOCK_FDS_ENV.'='.$previousFds);
+        // Environment inspection or restoration faults must not retain the updater lock.
         pmssLockHandleRelease($lock);
     }
 }
