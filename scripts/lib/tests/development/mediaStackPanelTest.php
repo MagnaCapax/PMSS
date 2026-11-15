@@ -110,8 +110,8 @@ class MediaStackPanelTest extends TestCase
                 }
                 $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
                 $this->assertSame(['tail', 'urls', 'security', 'canStart', 'canRestart', 'poll', 'state', 'message', 'details'], array_keys($status));
-                $this->assertSame([$state, $message, $details, $canRestart, false, false],
-                    [$status['state'], $status['message'], $status['details'], $status['canRestart'], $status['canStart'], $status['poll']]);
+                $this->pmssAssertArraySubsetSame(['state' => $state, 'message' => $message, 'details' => $details,
+                    'canRestart' => $canRestart, 'canStart' => false, 'poll' => false], $status);
             }
         }
     }
@@ -364,8 +364,7 @@ class MediaStackPanelTest extends TestCase
 
         $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
 
-        $this->assertSame('degraded', $status['state']);
-        $this->assertTrue($status['canRestart']);
+        $this->pmssAssertArraySubsetSame(['state' => 'degraded', 'canRestart' => true], $status);
         $this->assertStringContainsString('Radarr: failed repeatedly (3 consecutive failed checks).', implode(' ', $status['details']));
     }
 
@@ -432,8 +431,7 @@ class MediaStackPanelTest extends TestCase
         ]);
 
         $status = \pmssMediaStackPanelStatusRead($home, 'fixtur01', 'seedbox.example');
-        $this->assertSame('failed', $status['state']);
-        $this->assertFalse($status['canStart']);
+        $this->pmssAssertArraySubsetSame(['state' => 'failed', 'canStart' => false], $status);
     }
 
     public function testHtmlIncludesMediaStackCredentialsNotice(): void

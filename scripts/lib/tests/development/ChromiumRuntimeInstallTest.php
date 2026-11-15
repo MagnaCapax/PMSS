@@ -65,7 +65,7 @@ final class ChromiumRuntimeInstallTest extends TestCase
     {
         foreach ([12 => ['chromium'], 13 => ['chromium', 'slirp4netns']] as $major => $installed) {
             $calls = $this->runStep($major, $installed, ['/' => 0.1]);
-            $this->assertSame([[], [], []], [$calls['free'], $calls['run'], $calls['log']], "Debian {$major}: converged host stays quiet");
+            $this->pmssAssertArraySubsetSame(['free' => [], 'run' => [], 'log' => []], $calls, "Debian {$major}: converged host stays quiet ");
         }
         $partial = $this->runStep(13, ['chromium']);
         $this->assertSame(1, count($partial['run']));
@@ -89,7 +89,7 @@ final class ChromiumRuntimeInstallTest extends TestCase
     {
         foreach (['deinstall ok config-files', 'purge ok not-installed', 'hold ok not-installed'] as $state) {
             $calls = $this->runStep(12, ['chromium' => $state]);
-            $this->assertSame([[], []], [$calls['free'], $calls['run']], "'{$state}' is an opt-out");
+            $this->pmssAssertArraySubsetSame(['free' => [], 'run' => []], $calls, "'{$state}' is an opt-out ");
             $this->assertStringContainsString('[SKIP] chromium runtime: chromium is selected', $calls['log'][0]);
         }
         $halfDone = $this->runStep(12, ['chromium' => 'install ok half-configured']);

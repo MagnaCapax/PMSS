@@ -204,16 +204,15 @@ final class WelcomeHomeTest extends TestCase
         $this->assertFalse(in_array('lighttpd', array_column($result['plain'], 'id'), true), 'lighttpd is not an app tile');
 
         $plain = array_column($result['plain'], null, 'id');
-        $this->pmssAssertArraySubsetSame(['name' => 'ruTorrent', 'desc' => 'Your main torrent client'], $plain['rtorrent']);
-        $this->assertSame(['open', true], [$plain['rtorrent']['action'], $plain['rtorrent']['restart']]);
-        $this->assertSame(['start', false], [$plain['qBittorrent']['action'], $plain['qBittorrent']['open']], 'A stopped app starts with one click');
+        $this->pmssAssertArraySubsetSame(['name' => 'ruTorrent', 'desc' => 'Your main torrent client',
+            'action' => 'open', 'restart' => true], $plain['rtorrent']);
+        $this->pmssAssertArraySubsetSame(['action' => 'start', 'open' => false], $plain['qBittorrent'], 'A stopped app starts with one click ');
         $this->assertSame('start', $plain['Deluge']['action'], 'An app switched off starts with one click');
         $this->assertSame('setup', $plain['radarr']['action'], 'A media app never installed is set up in Configure');
         $this->assertSame('absent', $plain['radarr']['state']);
         $this->assertSame([false], array_values(array_unique(array_column($result['plain'], 'hero'))));
 
-        $this->assertSame('openclaw', $result['agent'][0]['id']);
-        $this->assertSame(true, $result['agent'][0]['hero']);
+        $this->pmssAssertArraySubsetSame(['id' => 'openclaw', 'hero' => true], $result['agent'][0]);
         $this->assertSame(1, count(array_filter(array_column($result['agent'], 'hero'))));
         $agentMore = array_column(array_filter($result['agent'], function ($t) { return $t['more']; }), 'id');
         $this->assertTrue(in_array('Deluge', $agentMore, true),'An OpenClaw-first account is not nudged back to a torrent client in the first rows');

@@ -82,9 +82,8 @@ PHP;
                 continue;
             }
             $decoded = \pmssDelugeConfigDecode($updated);
-            $this->assertSame($expected, $decoded['config']['max_upload_speed']);
-            $this->assertSame(77, $decoded['config']['max_upload_speed_per_torrent']);
-            $this->assertSame('/srv/fixture-data', $decoded['config']['download_location']);
+            $this->pmssAssertArraySubsetSame(['max_upload_speed' => $expected,
+                'max_upload_speed_per_torrent' => 77, 'download_location' => '/srv/fixture-data'], $decoded['config']);
             $this->assertSame(['file' => 1, 'format' => 1], $decoded['meta']);
         }
     }
@@ -102,13 +101,12 @@ PHP;
             ['raw' => $this->config(-1.0), 'cap' => 250, 'applied' => 0],
             ['raw' => $this->config(250.0), 'cap' => 250, 'applied' => 250],
         ]);
-        $this->assertSame([true, true, true], array_slice($write, 0, 3));
+        $this->pmssAssertArraySubsetSame([true, true, true], $write);
         $this->assertSame([['directory', '/fixture/runtime/delugeUploadThrottle', 0700],
             ['record', ['/fixture/runtime/delugeUploadThrottle/fixtur01' => 0600], 250],
             ['write', 'upload throttle']], $write[3]);
         $this->assertSame(250, \pmssDelugeConfigDecode($write[4])['config']['max_upload_speed']);
-        $this->assertSame(250, $write[5]);
-        $this->assertFalse($write[6]);
+        $this->pmssAssertArraySubsetSame([5 => 250, 6 => false], $write);
         $this->assertSame([false, true, false, [], $this->config(250.0), 250, false], $saved);
     }
 
@@ -117,7 +115,7 @@ PHP;
         foreach ([[250.0, null, false], [250.0, 250, true], [100, 250, false]] as [$value, $applied, $changed]) {
             $original = $this->config($value);
             [$result] = $this->observe([['raw' => $original, 'applied' => $applied ?? 0]]);
-            $this->assertSame([$changed, true, $changed], array_slice($result, 0, 3));
+            $this->pmssAssertArraySubsetSame([$changed, true, $changed], $result);
             $this->assertSame($changed ? [['write', 'upload throttle'], ['remove']]
                 : ($applied === null ? [] : [['remove']]), $result[3]);
             $this->assertSame(0, $result[5]);
@@ -142,9 +140,7 @@ PHP;
             ['user' => '../fixtur01']] as $failure) {
             $case = $failure + ['raw' => $this->config(-1.0), 'cap' => 250, 'applied' => 0];
             [$result] = $this->observe([$case]);
-            $this->assertTrue($result[1]);
-            $this->assertFalse($result[2]);
-            $this->assertSame($case['raw'], $result[4]);
+            $this->pmssAssertArraySubsetSame([1 => true, 2 => false, 4 => $case['raw']], $result);
         }
     }
 

@@ -136,8 +136,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
                 'url' => ['https://pulsedmedia.com/remote/pkg/rtorrent-'.$version.'-static-amd64-r1'],
                 'sha256' => $sha256, 'isDefault' => $version === '0.16.25',
             ], $entry);
-            $this->assertFalse($entry['disabled']);
-            $this->assertSame([], $entry['cve']);
+            $this->pmssAssertArraySubsetSame(['disabled' => false, 'cve' => []], $entry);
         }
         $root = $this->pmssMakeTempDir('pmss-rtorrent-016-');
         $store = $root.'/clients';
@@ -163,7 +162,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         foreach (['0.16.25', '0.16.26', '0.9.8-r16', '0.9.8-stickz7.2'] as $version) {
             symlink($store.'/rtorrent/'.$version, $home.'/bin/rtorrent/default');
             $result = $this->pmssExecShellCommand(\pmssRtorrentExecutorCommand($home, $projection, $store), [], '');
-            $this->assertSame([0, ['-O|'.$caDefault.'|'.(strpos($version, '0.16.') === 0 ? '-D|' : '')]], [$result['rc'], $result['lines']]);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'lines' => ['-O|'.$caDefault.'|'.(strpos($version, '0.16.') === 0 ? '-D|' : '')]], $result);
             $this->assertSame("try_import = .rtorrent.rc.custom\n", file_get_contents($home.'/.rtorrent.rc'));
             $this->assertSame("network.http.cacert.set = /custom/ca.pem\n", file_get_contents($home.'/.rtorrent.rc.custom'));
             unlink($home.'/bin/rtorrent/default');
@@ -186,15 +185,14 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     public function testStickzForkEntryIsPinnedOptInZeroNineEightFamily(): void
     {
         $entry = $this->entries()[4];
-        $this->pmssAssertArraySubsetSame(['version' => '0.9.8-stickz7.2', 'kind' => 'static'], $entry);
-        // Same rc and process-name family as 0.9.8, so it launches without -D.
         $this->pmssAssertArraySubsetSame([
+            'version' => '0.9.8-stickz7.2', 'kind' => 'static',
+            // Same rc and process-name family as 0.9.8, so it launches without -D.
             'compatFamily' => '0.9.8',
             'url' => ['https://pulsedmedia.com/remote/pkg/rtorrent-stickz-7.2-static-amd64-r1'],
             'sha256' => '726f9ce28d2675425d45a624b95957b22f2777d4ccacf3634e5f9f7da3cf003c',
+            'isDefault' => false, 'disabled' => false,
         ], $entry);
-        $this->assertFalse($entry['isDefault']);
-        $this->assertFalse($entry['disabled']);
     }
     public function testProjectionDoesNotOfferDisabledInstalledBuilds(): void
     {
