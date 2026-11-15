@@ -106,8 +106,7 @@ class UserConfigStoreCharacterizationTest extends TestCase
         };
         $row = $store->applyFallbacks(' FIXTUR01 ', ['ramMiB' => 0]);
         $this->assertSame(['fixtur01'], $store->calls);
-        $this->assertSame(244, $row['ramMiB']);
-        $this->assertSame(false, $row['dockerEnabled']);
+        $this->pmssAssertArraySubsetSame(['ramMiB' => 244, 'dockerEnabled' => false], $row);
         $store->applyFallbacks('../fixtur01', []);
         $store->applyFallbacks('fixtur01', ['ramMiB' => 512]);
         $this->assertSame(['fixtur01'], $store->calls);

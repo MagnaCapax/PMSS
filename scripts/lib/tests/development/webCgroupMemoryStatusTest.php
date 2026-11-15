@@ -373,9 +373,9 @@ class WebCgroupMemoryStatusTest extends TestCase
     {
         $paths = \pmssCustomerCgroupCounterPaths(1234, '', 'memory.stat', 'memory', 'memory.stat');
 
-        $this->assertSame('/sys/fs/cgroup/user.slice/user-1234.slice/memory.stat', $paths[0]);
-        $this->assertSame('/sys/fs/cgroup/unified/user.slice/user-1234.slice/memory.stat', $paths[1]);
-        $this->assertSame('/sys/fs/cgroup/memory/user.slice/user-1234.slice/memory.stat', $paths[2]);
+        $this->pmssAssertArraySubsetSame([0 => '/sys/fs/cgroup/user.slice/user-1234.slice/memory.stat',
+            1 => '/sys/fs/cgroup/unified/user.slice/user-1234.slice/memory.stat',
+            2 => '/sys/fs/cgroup/memory/user.slice/user-1234.slice/memory.stat'], $paths);
     }
 
     public function testMemoryStatCandidatePathsKeepUidFallbackAfterExplicitSlice(): void

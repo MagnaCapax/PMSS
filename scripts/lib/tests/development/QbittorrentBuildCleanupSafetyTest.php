@@ -134,11 +134,11 @@ PHP;
                 [$result, $sameFailure, $events, $signals, $cleaned], $probe.':'.$case);
             $this->assertSame($knownPid ? false : null, $blocking, $probe.':'.$case);
             $this->assertSame([$case === 'pipe-close', $case === 'reap'], [$pipeLive, $processLive], $probe.':'.$case);
-            $this->assertSame('exec setsid '.escapeshellarg('/fixture/qbittorrent-nox').' --version', $launch[0]);
-            $this->assertSame([0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $launch[1]);
-            $this->assertSame($profile, $launch[2]);
-            $this->assertSame([$profile, $profile.'/.config', $profile.'/.local/share', $profile.'/.cache'],
-                [$launch[3]['HOME'], $launch[3]['XDG_CONFIG_HOME'], $launch[3]['XDG_DATA_HOME'], $launch[3]['XDG_CACHE_HOME']]);
+            $this->pmssAssertArraySubsetSame([0 => 'exec setsid '.escapeshellarg('/fixture/qbittorrent-nox').' --version',
+                1 => [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']],
+                2 => $profile], $launch);
+            $this->pmssAssertArraySubsetSame(['HOME' => $profile, 'XDG_CONFIG_HOME' => $profile.'/.config',
+                'XDG_DATA_HOME' => $profile.'/.local/share', 'XDG_CACHE_HOME' => $profile.'/.cache'], $launch[3]);
         }
     }
 }

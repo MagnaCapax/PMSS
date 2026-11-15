@@ -24,7 +24,7 @@ class userConfigCliCharacterizationTest extends TestCase
 
         $parsed = \pmssUserConfigCliResources(
             ['options' => []],
-            array_merge(['userConfig.php', 'alice', '512', '100'], $positionals),
+            array_merge(['userConfig.php', 'fixtur01', '512', '100'], $positionals),
             'userConfigIndex',
             'resolved'
         );
@@ -38,7 +38,7 @@ class userConfigCliCharacterizationTest extends TestCase
     public function testResolvedResourcesPreferNamedOptionsOverPositionals(): void
     {
         [$parsed, $args] = $this->parsedInvocation(
-            ['alice', '512', '100', '', '200', '', '/dev/sda:5M'],
+            ['fixtur01', '512', '100', '', '200', '', '/dev/sda:5M'],
             [
                 'cpu-weight' => '400',
                 'io-read-bw' => '/dev/nvme0n1:8M',
@@ -47,14 +47,13 @@ class userConfigCliCharacterizationTest extends TestCase
 
         $resolved = \pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'resolved');
 
-        $this->assertSame(400, $resolved['CPUWeight']);
-        $this->assertSame('/dev/nvme0n1:8M', $resolved['IOReadBW']);
+        $this->pmssAssertArraySubsetSame(['CPUWeight' => 400, 'IOReadBW' => '/dev/nvme0n1:8M'], $resolved);
     }
 
     public function testExplicitResourcesOnlyReturnProvidedValues(): void
     {
         [$parsed, $args] = $this->parsedInvocation(
-            ['alice'],
+            ['fixtur01'],
             [
                 'io-weight' => '300',
                 'cpu-weight' => '',
@@ -80,8 +79,7 @@ class userConfigCliCharacterizationTest extends TestCase
         $parsed = ['options' => ['traffic-cap-mbit' => '0', 'cpu-weight' => '', 'io-weight' => '300']];
 
         $raw = \pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'raw');
-        $this->assertSame('500', $raw['trafficLimit']);
-        $this->assertSame('0', $raw['trafficCapMbit']);
+        $this->pmssAssertArraySubsetSame(['trafficLimit' => '500', 'trafficCapMbit' => '0'], $raw);
         $this->assertFalse(isset($raw['CPUWeight']));
         $this->assertSame('300', $raw['IOWeight']);
 
@@ -91,8 +89,7 @@ class userConfigCliCharacterizationTest extends TestCase
         ], $explicit);
 
         $resolved = \pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'resolved');
-        $this->assertSame(0, $resolved['CPUWeight']);
-        $this->assertSame(0, $resolved['ioLatencyMs']);
+        $this->pmssAssertArraySubsetSame(['CPUWeight' => 0, 'ioLatencyMs' => 0], $resolved);
     }
 
     public function testBuildUserConfigPositionalsKeepsExplicitZeroValues(): void
@@ -107,7 +104,7 @@ class userConfigCliCharacterizationTest extends TestCase
     public function testExplicitResourcesDrivePersistedResourceUpdates(): void
     {
         [$parsed, $args] = $this->parsedInvocation([
-            'alice',
+            'fixtur01',
             '512',
             '100',
             '900',
@@ -178,7 +175,7 @@ class userConfigCliCharacterizationTest extends TestCase
 
     public function testCgroupApplyArgsUseOneCanonicalShape(): void
     {
-        $args = \pmssUserConfigCliBuildCgroupApplyArgs('alice', 1024, [
+        $args = \pmssUserConfigCliBuildCgroupApplyArgs('fixtur01', 1024, [
             'CPUWeight' => 200,
             'IOWeight' => 300,
             'IOReadIOPS' => '/dev/md0:250',
@@ -188,7 +185,7 @@ class userConfigCliCharacterizationTest extends TestCase
 
         $this->assertSame([
             '/scripts/util/userConfigCgroup.php',
-            'alice',
+            'fixtur01',
             '--apply',
             '--memory-high=1024',
             '--cpu-weight=200',
@@ -201,14 +198,14 @@ class userConfigCliCharacterizationTest extends TestCase
 
     public function testCgroupApplyArgsClearExplicitZeroIopsCaps(): void
     {
-        $args = \pmssUserConfigCliBuildCgroupApplyArgs('alice', 1024, [
+        $args = \pmssUserConfigCliBuildCgroupApplyArgs('fixtur01', 1024, [
             'IOReadIOPS' => '0',
             'IOWriteIOPS' => 0,
         ]);
 
         $this->assertSame([
             '/scripts/util/userConfigCgroup.php',
-            'alice',
+            'fixtur01',
             '--apply',
             '--memory-high=1024',
             '--io-read-iops=/home:max',
@@ -218,9 +215,9 @@ class userConfigCliCharacterizationTest extends TestCase
 
     public function testStoredCgroupApplyArgsRequireMemoryBaseline(): void
     {
-        $this->assertSame(null, \pmssUserConfigCliBuildStoredCgroupApplyArgs('alice', ['IOWeight' => 300]));
+        $this->assertSame(null, \pmssUserConfigCliBuildStoredCgroupApplyArgs('fixtur01', ['IOWeight' => 300]));
 
-        $args = \pmssUserConfigCliBuildStoredCgroupApplyArgs('alice', [
+        $args = \pmssUserConfigCliBuildStoredCgroupApplyArgs('fixtur01', [
             'ramMiB' => 512,
             'IOWeight' => 300,
             'cpuQuotaPercent' => 'infinity',
@@ -228,7 +225,7 @@ class userConfigCliCharacterizationTest extends TestCase
 
         $this->assertSame([
             '/scripts/util/userConfigCgroup.php',
-            'alice',
+            'fixtur01',
             '--apply',
             '--memory-high=512',
             '--io-weight=300',

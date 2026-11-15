@@ -31,8 +31,8 @@ class TrackerCleanerLibraryTest extends TestCase
             ['https://also-good.test/announce'],
         ], $rules);
         $this->assertTrue($result['changed']);
-        $this->assertSame([['https://good.test/announce'], ['https://also-good.test/announce']], $result['announce_list']);
-        $this->assertSame(['udp://tracker.openbittorrent.com:80/announce'], $result['removed_trackers']);
+        $this->pmssAssertArraySubsetSame(['announce_list' => [['https://good.test/announce'], ['https://also-good.test/announce']],
+            'removed_trackers' => ['udp://tracker.openbittorrent.com:80/announce']], $result);
         $this->assertTrue(pmssTrackerCleanerShouldScrubTracker('https://tracker.coppersurfer.tk/announce', $rules));
         $this->assertFalse(pmssTrackerCleanerShouldScrubTracker('https://good.test/announce', $rules));
     }
