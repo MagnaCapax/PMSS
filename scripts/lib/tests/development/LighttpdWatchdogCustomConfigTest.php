@@ -120,6 +120,41 @@ PHP;
         $this->assertSame([['ensure', 'recover'], ['ensure', 'recover', 'ensure']], $this->pmssRunInlinePhpJson($script));
     }
 
+    public function testMissingStandardIncludesArePreparedOnTheFirstFailedStart(): void
+    {
+        foreach (['missing-custom', 'missing-directory', 'empty-directory', 'missing-tree'] as $scenario) {
+            $result = $this->scenario($scenario);
+            $this->pmssAssertArraySubsetSame([
+                'results' => [true, false, false], 'counts' => [null, null, null],
+                'custom' => $scenario === 'missing-directory' ? 'customer settings' : '',
+                'directoriesReady' => true, 'backup' => null, 'moveCommands' => [],
+                'config' => 'managed config', 'sibling' => $scenario === 'missing-custom' ? 'sibling' : null,
+            ], $result, $scenario);
+            $this->assertSame(1, count($result['repairCommands']), $scenario);
+            $this->assertStringContainsString("'--strict' 'fixtur01'", $result['repairCommands'][0]);
+            $this->assertSame(['lighttpd missing include preparation completed'], $result['logs']);
+        }
+    }
+
+    public function testMissingIncludeRepairRespectsParseAndLaunchGuards(): void
+    {
+        foreach (['missing-valid', 'missing-timeout', 'missing-running', 'missing-backoff',
+            'missing-repair-failure', 'missing-repair-timeout', 'missing-repair-noop', 'missing-link'] as $scenario) {
+            $result = $this->scenario($scenario);
+            $this->assertSame([false, false, false], $result['results'], $scenario);
+            $this->assertSame([], $result['moveCommands'], $scenario);
+            $this->assertSame('untouched', $result['outside'], $scenario);
+            $this->assertSame('managed config', $result['config'], $scenario);
+            if (in_array($scenario, ['missing-valid', 'missing-timeout', 'missing-running', 'missing-backoff'], true)) {
+                $this->assertSame([], $result['repairCommands'], $scenario);
+            } else {
+                $this->assertSame(3, count($result['repairCommands']), $scenario);
+                $this->assertSame(array_fill(0, 3, 'lighttpd missing include preparation failed'), $result['logs'], $scenario);
+            }
+            if ($scenario === 'missing-link') $this->assertTrue($result['customLink']);
+        }
+    }
+
     private function parseError(string $path): string
     {
         return 'source: '.$path.' line: 19 pos: 19 parser failed somehow near here: =';
@@ -138,9 +173,30 @@ function fileowner($path) { return $path === $GLOBALS['home'] ? $GLOBALS['accoun
 function pmssCommandPath($binary) { return '/usr/sbin/lighttpd'; }
 function pmssBuildUserServiceShellCommand($user, $command) { return 'account-uid '.$command; }
 function pmssUserWatchdogCommandRun($command, $seconds, $user, $service) {
+    if (strpos($command, '/scripts/util/userConfigLighttpd.php') !== false) {
+        if ($seconds !== 60 || $user !== 'fixtur01' || $service !== 'lighttpd') throw new \RuntimeException('Unexpected repair scope');
+        $GLOBALS['repairCommands'][] = $command;
+        $scenario = $GLOBALS['scenario'];
+        $timeout = $scenario === 'missing-repair-timeout';
+        $ready = false;
+        if (!in_array($scenario, ['missing-repair-failure', 'missing-repair-timeout', 'missing-repair-noop'], true)) {
+            $ready = pmssPrepareLighttpdUserDirectories($user, $GLOBALS['home'], false, $reason);
+        }
+        if ($ready) $GLOBALS['probe']['rc'] = 0;
+        return ['rc' => $ready || $scenario === 'missing-repair-noop' ? 0 : 1, 'timed_out' => $timeout];
+    }
     $GLOBALS['probeCommands'][] = $command;
     return $GLOBALS['probe'];
 }
+// Account-file operations are confined to the fixture tree; preparation itself is real.
+function pmssEnsureUserHomeDir($user, $home, $relative, $mode) {
+    $path = $home.'/'.$relative;
+    return \pmssPathTargetIsSafe($path, true, true) && (is_dir($path) || mkdir($path, $mode, true));
+}
+function pmssReplaceAccountFile($user, $home, $path, $content, $mode) {
+    return file_put_contents($path, $content) === strlen($content) && chmod($path, $mode);
+}
+function pmssAccountFileApplyMetadata(...$args) { return true; }
 function pmssAtomicJsonFileWrite($path, $data, $mode) {
     return !$GLOBALS['writeFailure'] && \pmssAtomicJsonFileWrite($path, $data, $mode);
 }
@@ -156,10 +212,12 @@ function pmssAccountPathRun($user, $home, $paths, $command, $input, $seconds, &$
 }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/watchdogCustomConfig.php', 'CustomConfigFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userDirectoriesPrepare.php', 'CustomConfigFixture');
         $script .= <<<'PHP'
 [$root, $scenario] = json_decode(getenv('PMSS_TEST_CUSTOM_RECOVERY'), true);
 $home = $root.'/homes/fixtur01';
 mkdir($home.'/.lighttpd/custom.d', 0700, true);
+mkdir($home.'/www', 0700);
 mkdir($root.'/runtime', 0700);
 putenv('PMSS_RUNTIME_DIR='.$root.'/runtime');
 putenv('PMSS_HOME_DIR='.$root.'/homes');
@@ -170,12 +228,28 @@ file_put_contents($source, 'broken');
 chmod($source, 0640);
 file_put_contents($sibling, 'sibling');
 file_put_contents($outside, 'untouched');
+file_put_contents($home.'/.lighttpd/custom', 'customer settings');
+file_put_contents($home.'/.lighttpd.conf', 'managed config');
 $state = $root.'/runtime/checkLighttpdInstances-config-fixtur01.json';
 $accountUid = posix_geteuid();
 $process = $backoff = $writeFailure = false;
-$logs = $probeCommands = $moveCommands = $results = $counts = [];
+$logs = $probeCommands = $repairCommands = $moveCommands = $results = $counts = [];
 $error = static function ($path) { return 'source: '.$path.' line: 19 pos: 19 parser failed somehow near here: ='; };
 $probe = ['rc' => 1, 'timed_out' => false, 'stdout' => '', 'stderr' => $error($source)];
+if (strpos($scenario, 'missing-') === 0 || $scenario === 'empty-directory') {
+    // An intact managed config still includes the vanished runtime paths.
+    if ($scenario !== 'missing-directory') unlink($home.'/.lighttpd/custom');
+    if (in_array($scenario, ['missing-directory', 'empty-directory', 'missing-tree'], true)) {
+        unlink($source); unlink($sibling); rmdir(dirname($source));
+    }
+    if ($scenario === 'missing-tree') rmdir($home.'/.lighttpd');
+    if ($scenario === 'missing-link') symlink($root.'/absent', $home.'/.lighttpd/custom');
+    $probe['stderr'] = 'opening configfile '.$home.'/.lighttpd/custom failed: No such file or directory';
+    if ($scenario === 'missing-valid') $probe['rc'] = 0;
+    if ($scenario === 'missing-timeout') $probe['timed_out'] = true;
+    if ($scenario === 'missing-running') $process = true;
+    if ($scenario === 'missing-backoff') $backoff = true;
+}
 for ($cycle = 0; $cycle < 3; $cycle++) {
     $running = false;
     if ($cycle === 2) {
@@ -210,8 +284,13 @@ $data = ['results' => $results, 'counts' => $counts, 'sourceExists' => file_exis
     'source' => file_exists($source) ? file_get_contents($source) : null,
     'backup' => $backup === null ? null : file_get_contents($backup),
     'backupMetadata' => $backup === null ? null : [fileperms($backup) & 0777, \fileowner($backup)],
-    'sibling' => file_get_contents($sibling), 'outside' => file_get_contents($outside),
-    'logs' => $logs, 'probeCommands' => $probeCommands, 'moveCommands' => $moveCommands, 'uid' => posix_geteuid()];
+    'sibling' => is_file($sibling) ? file_get_contents($sibling) : null, 'outside' => file_get_contents($outside),
+    'custom' => is_file($home.'/.lighttpd/custom') ? file_get_contents($home.'/.lighttpd/custom') : null,
+    'customLink' => is_link($home.'/.lighttpd/custom'),
+    'config' => file_get_contents($home.'/.lighttpd.conf'),
+    'directoriesReady' => is_dir($home.'/.lighttpd/custom.d') && is_dir($home.'/.lighttpd/upload'),
+    'logs' => $logs, 'probeCommands' => $probeCommands, 'repairCommands' => $repairCommands,
+    'moveCommands' => $moveCommands, 'uid' => posix_geteuid()];
 if ($scenario === 'recover' && $backup !== null) { rename($backup, $source); $data['restored'] = file_get_contents($source); }
 echo json_encode($data);
 PHP;

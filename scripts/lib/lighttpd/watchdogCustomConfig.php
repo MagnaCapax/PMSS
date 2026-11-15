@@ -1,5 +1,5 @@
 <?php
-/** Reversible recovery of one repeatedly unparsable customer fragment. @license GPL-3.0-only */
+/** Missing include repair and reversible customer fragment recovery. @license GPL-3.0-only */
 
 require_once __DIR__.'/userFileWrite.php';
 require_once __DIR__.'/../user/watchdog.php';
@@ -23,7 +23,8 @@ function pmssLighttpdWatchdogCustomConfigFailure(string $home, array $result): ?
 
 /**
  * After an unsuccessful start, require three matching syntax failures before
- * setting aside one file. True requests one ordinary start retry by the caller.
+ * setting aside one file; missing standard includes use the existing generator.
+ * True requests one ordinary start retry by the caller.
  * Live processes, environmental failures and changed contents reset the count.
  */
 function pmssLighttpdWatchdogCustomConfigRecover(string $username, string $home, string $configPath, bool $running): bool
@@ -51,6 +52,20 @@ function pmssLighttpdWatchdogCustomConfigRecover(string $username, string $home,
     // generic launch error may authorize moving customer configuration.
     $command = 'cd '.escapeshellarg($home).' && '.pmssBuildCommand($lighttpd, ['-t', '-f', $configPath]);
     $result = pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($username, $command), 30, $username, 'lighttpd');
+    // Missing prerequisites need creation, not fragment quarantine. Use fixed
+    // paths rather than trusting diagnostic text to select a root command.
+    if ($result['rc'] !== 0 && !$result['timed_out']
+        && (!file_exists($home.'/.lighttpd/custom') || !is_dir($home.'/.lighttpd/custom.d'))) {
+        @unlink($statePath);
+        $repair = pmssUserWatchdogCommandRun(
+            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', ['--strict', $username]), 60, $username, 'lighttpd'
+        );
+        clearstatcache();
+        $repaired = $repair['rc'] === 0 && !$repair['timed_out']
+            && is_file($home.'/.lighttpd/custom') && is_dir($home.'/.lighttpd/custom.d');
+        pmssUserLog($username, 'lighttpd missing include preparation '.($repaired ? 'completed' : 'failed'));
+        return $repaired;
+    }
     $source = pmssLighttpdWatchdogCustomConfigFailure($home, $result);
     $content = $source !== null && pmssPathTargetIsSafe($source, false, true)
         ? pmssReadRegularFileContentsVerified($source, $account['uid'], 1048576, $metadata) : null;

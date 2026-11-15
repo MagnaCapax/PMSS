@@ -62,3 +62,24 @@ file are never moved. No validator is relaxed.
 - Refs #1109; related #858 and #919.
 - [ADR 0032](0032-system-managed-per-user-lighttpd-config-belongs-in-template.md).
 - [Watchdog contract](../contracts.md#utilities-script-contracts).
+
+## Missing standard includes (2026-11-15, Refs #1276)
+
+The same post-start recovery step also handles an emptied or removed
+`~/.lighttpd` tree while the managed config remains present. After a failed,
+non-timeout account-UID syntax check, absence of the standard `custom` file or
+`custom.d` directory requests the existing `userConfigLighttpd.php --strict`
+generator with a 60-second watchdog deadline. Fixed prerequisite paths select
+this repair; parser text never selects commands or arbitrary repair targets.
+The existing preparation helpers retain their account-identity writes, path
+guards and preservation of existing customer configuration. No file is set aside
+on this path, and any fragment-failure sequence is reset.
+
+Only a successful, non-timeout generator result with both include paths present
+requests the existing single ordinary start retry. Live processes, backoff,
+successful parses and parse timeouts do not trigger preparation. Failed or
+refused preparation is logged and remains eligible for a later watchdog pass.
+The starter still validates the entire config; its guards and the three-failure
+threshold for fragment quarantine remain unchanged. Hermetic watchdog fixtures
+cover missing prerequisites and guarded failures; execution and live recovery
+verification stay on testing machines and the affected host, respectively.
