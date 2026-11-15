@@ -40,9 +40,8 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
             'function pmssTrafficLimitMarkerTouch(string $user, string $path, ?int $capMbit = null): bool',
             'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimitReconcile.php', [
-            'if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {',
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/trafficLimitReconcile.php',
+            'if (!pmssTrafficLimitMarkerRemove($user, $enabledMarkerPath)) {');
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
             'if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(\'/scripts/listUsers.php\'))) === null) {',
             'exit(1);',
@@ -74,8 +73,8 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $legacyFileKey = 'throttle'.'_mbit';
 
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLimits.php', [], [$slidingKey, $legacyFileKey]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/network/fireqos.php', [], [$legacyFileKey]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/networking.php', [], [$slidingKey]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/network/fireqos.php', $legacyFileKey);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/update/networking.php', $slidingKey);
     }
 
     public function testUserResourcesTrafficStateReadingDelegatesToSharedHelpers(): void

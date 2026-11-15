@@ -63,18 +63,14 @@ PHP,
                 'orderPrefix' => 'Convergence marker order changed at: ',
             ]],
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php', [
-            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureLingerAndDocker')",
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerCommands.php', [
-            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssRunAndLog')",
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerInstall.php', [
-            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureRootlessDockerInstalled')",
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerDependencies.php', [
-            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureDockerDependencies')",
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/docker.php',
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureLingerAndDocker')");
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/dockerCommands.php',
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssRunAndLog')");
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/dockerInstall.php',
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureRootlessDockerInstalled')");
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/dockerDependencies.php',
+            "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureDockerDependencies')");
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
             '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
             'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',

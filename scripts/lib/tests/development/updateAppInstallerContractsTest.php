@@ -220,9 +220,8 @@ class UpdateAppInstallerContractsTest extends TestCase
     {
         foreach (['aiTools/node.php' => 'aiToolsInstall.php', 'aiTools/codexInstall.php' => 'aiToolsInstall.php',
             'deluge.php' => 'deluge.php', 'rtorrent.php' => 'rtorrent.php'] as $installer => $loader) {
-            $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/'.$loader, [
-                "require_once __DIR__.'/remoteBinary.php';",
-            ]);
+            $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/'.$loader,
+                "require_once __DIR__.'/remoteBinary.php';");
             $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.$installer, [], [
                 "pmssBuildCommand('wget'" => $installer.' should delegate pinned downloads to remoteBinary.php',
                 "@hash_file('sha256'" => $installer.' should delegate checksum verification to remoteBinary.php',

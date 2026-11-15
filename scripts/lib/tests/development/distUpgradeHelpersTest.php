@@ -112,9 +112,8 @@ class DistUpgradeHelpersTest extends TestCase
             '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery',
             '[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/distUpgrade/boot.php', [
-            '[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall',
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/distUpgrade/boot.php',
+            '[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
     }
 
     public function testBootReadinessParsers(): void

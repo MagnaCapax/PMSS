@@ -232,9 +232,8 @@ PHP;
 
     public function testCronEntryPointUsesNonBlockingSingleInstanceLock(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/diskIostat.php', [
-            "\$pmssDiskIostatLock = pmssCronLockAcquire('diskIostat', 'pmssCronLockSkipLog')",
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/cron/diskIostat.php',
+            "\$pmssDiskIostatLock = pmssCronLockAcquire('diskIostat', 'pmssCronLockSkipLog')");
     }
 
     public function testFailedCapturesCannotPublishParseablePartialSamples(): void
