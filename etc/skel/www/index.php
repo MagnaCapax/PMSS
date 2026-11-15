@@ -522,8 +522,12 @@ function pmssUsageAlertsPreferenceApply($mode, $markerPath = '../.usageAlertsEna
     if (!is_resource($marker)) {
         return false;
     }
-    $written = fwrite($marker, "enabled\n") !== false;
-    fclose($marker);
+    try {
+        $written = fwrite($marker, "enabled\n") !== false;
+    } finally {
+        // The preference writer owns this stream even when the write throws.
+        fclose($marker);
+    }
     if (!$written || !@chmod($markerPath, 0600)) {
         @unlink($markerPath);
         return false;

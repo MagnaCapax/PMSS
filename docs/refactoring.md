@@ -225,6 +225,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+The panel usage-alert preference writer closes a newly created marker stream in
+`finally`, including when writing throws. Marker bytes, ordinary write/close
+results, permission repair and removal ordering retain their contracts. A lone
+exception or error propagates unchanged; combined write/close faults follow PHP's
+normal `finally` precedence. `IndexUsageAlertsCleanupSafetyTest` injects these
+faults using memory streams without rendering the panel or sending mail. Execution
+stays on testing machines; devbox verification checks changed-file syntax only.
+
 Web-root reconciliation attempts lock release even when its final summary logger
 throws. The summary still runs while the lock is held; ordinary return values,
 summary bytes and recovery ordering stay unchanged. Lone exceptions and errors
