@@ -216,6 +216,13 @@ Keep the canonical installer/update details under `docs/install.md` and
   `delugeHostlist.php` retains localclient selection and metadata-preserving writes.
   Writer ownership policies and credential generation remain unchanged (ADR 0199).
 - **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
+- **scripts/lib/update/apps/delugePatches.php** retains the compatibility entrypoints
+  and ordered candidate catalog. Four line transforms share guarded acquisition,
+  unchanged-input detection and publication in `deluge/patchFile.php`;
+  `delugeWebBasePatch.php` retains the venv preflight. Legacy Python 2 discovery
+  and cleanup live in `deluge/legacyArtifacts.php`, loaded by the original installer.
+  Patch bytes, diagnostics, candidate order and cleanup outcomes retain their
+  characterization contracts (ADR 0289).
 - **scripts/lib/update/apps/arr.php** – Shared ARR installer facade and app dispatch.
   `arr/config.php` retains input guards, `arr/release.php` owns metadata-only
   version reading and asset selection, and `arr/activation.php` runs explicit
