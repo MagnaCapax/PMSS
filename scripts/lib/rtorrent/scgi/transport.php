@@ -12,7 +12,8 @@ require_once __DIR__.'/xmlrpc.php';
  */
 function rtorrentScgiSend(string $socketPath, string $request, int $timeout = 5)
 {
-    if ($socketPath === '' || $request === '' || $timeout < 1) {
+    // Path terminators must not reach filesystem/socket APIs; request NULs are SCGI framing.
+    if ($socketPath === '' || strpos($socketPath, "\0") !== false || $request === '' || $timeout < 1) {
         return false;
     }
     if (!file_exists($socketPath) || @filetype($socketPath) !== 'socket') {

@@ -13,12 +13,16 @@ require_once dirname(__DIR__, 2).'/runtime.php';
  */
 function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPath): ?array
 {
-    if ($socketPath === '') {
+    if ($socketPath === '' || pmssFilesystemPathHasNulByte($socketPath)) {
         return null;
     }
 
-    foreach (pmssConfigRows($lines, 5, []) as $columns) {
-        if ($columns[1] !== 'LISTEN' || !in_array($socketPath, $columns, true)) {
+    foreach ($lines as $line) {
+        $line = (string) $line;
+        // Reject corrupt observations before trim can erase leading/trailing NULs.
+        if (pmssFilesystemPathHasNulByte($line)) continue;
+        $columns = pmssConfigLineColumns($line, 5, []);
+        if ($columns === [] || $columns[1] !== 'LISTEN' || !in_array($socketPath, $columns, true)) {
             continue;
         }
 
@@ -44,7 +48,8 @@ function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPa
  */
 function rtorrentScgiSocketQueueSnapshot(string $socketPath): ?array
 {
-    if ($socketPath === '') {
+    // Malformed selectors cannot identify a Unix socket; skip the host probe too.
+    if ($socketPath === '' || pmssFilesystemPathHasNulByte($socketPath)) {
         return null;
     }
 

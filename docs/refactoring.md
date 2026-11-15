@@ -225,6 +225,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+rTorrent SCGI transport and queue probes reject NUL-containing socket paths before
+filesystem, connection or command probes, retaining their false/null fallbacks.
+Queue observations reject NUL-containing raw rows before whitespace normalization;
+corrupt rows do not hide later valid observations. Valid path bytes, queue parsing,
+binary SCGI request framing and socket cleanup retain their existing contracts.
+`RtorrentScgiTransportSafetyTest` and `RtorrentScgiTest` cover these boundaries with
+synthetic observations; execution stays on testing machines.
+
 Deluge, Transmission and rTorrent version switches own their account lock through
 acquisition, callbacks, refusals and rollback in one `finally` lifetime. Unlock
 faults still permit stream closure; lone throwables propagate unchanged and

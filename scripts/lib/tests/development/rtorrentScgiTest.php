@@ -165,6 +165,29 @@ class RtorrentScgiTest extends TestCase
         ], '/tmp/example.socket'));
     }
 
+    public function testSocketQueueRejectsNulRowsBeforeNormalization(): void
+    {
+        $path = '/fixture/scgi.socket';
+        $valid = 'u_str LISTEN 1 2 '.$path.' 12345 * 0';
+        foreach ([
+            'leading' => "\0".$valid,
+            'trailing' => $valid."\0",
+            'padded' => " \t\0".$valid."\0\r\n",
+            'state' => str_replace('LISTEN', "LISTEN\0", $valid),
+            'counter' => str_replace('1 2', "1\0 2", $valid),
+            'path' => str_replace($path, $path."\0", $valid),
+            'only-nul' => "\0",
+        ] as $label => $line) {
+            $this->assertSame(null, rtorrentScgiSocketQueueSnapshotFromLines([$line], $path), $label);
+            // Corruption in one row must not hide a later healthy observation.
+            $this->assertSame(['recvQ' => 1, 'sendQ' => 2],
+                rtorrentScgiSocketQueueSnapshotFromLines([$line, $valid], $path), $label);
+        }
+        $this->assertSame(['recvQ' => 1, 'sendQ' => 2],
+            rtorrentScgiSocketQueueSnapshotFromLines([" \t".$valid."\r\n"], $path));
+        $this->assertSame(null, rtorrentScgiSocketQueueSnapshotFromLines([$valid], $path."\0"));
+    }
+
     public function testSocketQueueSaturatedRequiresRecvQAtBacklog(): void
     {
         foreach ([

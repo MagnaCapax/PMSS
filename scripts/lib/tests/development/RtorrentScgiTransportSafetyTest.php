@@ -6,6 +6,54 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Socket fault injection uses memory streams and never opens a real connection. */
 class RtorrentScgiTransportSafetyTest extends TestCase
 {
+    public function testMalformedPathsStopBeforeFilesystemSocketAndQueueProbes(): void
+    {
+        $runtime = var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true);
+        $script = <<<'PHP'
+namespace ScgiPathInputFixture;
+// Record every system boundary; these fixtures never inspect or connect to a host socket.
+function file_exists($path) { $GLOBALS['events'][] = ['exists', $path]; return true; }
+function filetype($path) { $GLOBALS['events'][] = ['type', $path]; return 'socket'; }
+function fsockopen($endpoint, $port, &$errno, &$errstr, $timeout) {
+    $GLOBALS['events'][] = ['open', $endpoint, $port, $timeout];
+    return false;
+}
+function exec($command, &$output, &$rc) {
+    $GLOBALS['events'][] = ['exec', $command];
+    $output = ['u_str LISTEN 1 2 '.$GLOBALS['path'].' 12345 * 0'];
+    $rc = 0;
+}
+PHP;
+        $script .= "require {$runtime};";
+        foreach (['transport.php', 'queue.php'] as $module) {
+            $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/scgi/'.$module, 'ScgiPathInputFixture');
+        }
+        $paths = ['', "\0", "\0/fixture/scgi.socket", "/fixture/scgi\0.socket", "/fixture/scgi.socket\0",
+            '/fixture/scgi.socket', 'relative.socket', '/fixture/slot name.socket', "/fixture/scgi.socket\n"];
+        $script .= <<<'PHP'
+$results = [];
+foreach (json_decode(getenv('PMSS_TEST_SCGI_PATHS'), true) as $path) {
+    $GLOBALS['path'] = $path;
+    $GLOBALS['events'] = [];
+    $sent = rtorrentScgiSend($path, "request\0bytes", 7);
+    $snapshot = rtorrentScgiSocketQueueSnapshot($path);
+    $results[] = [$sent, $snapshot, $GLOBALS['events']];
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_SCGI_PATHS' => json_encode($paths)]);
+        $this->assertSame(count($paths), count($results));
+        foreach ($paths as $index => $path) {
+            $invalid = $path === '' || strpos($path, "\0") !== false;
+            // Whitespace is preserved in transport arguments; queue columns retain their old splitting.
+            $snapshot = $invalid || strpos($path, ' ') !== false || strpos($path, "\n") !== false
+                ? null : ['recvQ' => 1, 'sendQ' => 2];
+            $events = $invalid ? [] : [['exists', $path], ['type', $path],
+                ['open', 'unix://'.$path, 0, 7], ['exec', 'ss -xln 2>/dev/null']];
+            $this->assertSame([false, $snapshot, $events], $results[$index], var_export($path, true));
+        }
+    }
+
     public function testSocketLifetimePreservesReturnsArgumentsAndThrownObjects(): void
     {
         $script = <<<'PHP'
