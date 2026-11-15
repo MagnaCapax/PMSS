@@ -63,6 +63,28 @@ Existing consumers retain their signatures, return values, and diagnostic text.
 Two internal helper concepts and a duplicated failure branch disappear; the
 module registry is the only additional dispatch concept. Runtime source shrinks.
 
+## Account command cleanup follow-up (2026-11-15)
+
+`pmssAccountPathRun()` owns its stdin pipe and child through thrown writes,
+pipe setup/close, status polling and reaping. Failure cleanup attempts stdin
+closure, then termination and reaping of a still-owned child, before the
+existing bounded stderr inspection. Bounded launches retain the shared
+process-group terminator; unbounded launches signal only their acquired child.
+Already-reaped children are left alone. Lone throwables propagate unchanged;
+combined cleanup faults retain normal PHP `finally` precedence.
+
+Commands, account identity checks, stdin bytes, private capture permissions,
+300-byte sanitized diagnostics, ordinary results and timeout policy stay intact.
+No primary/service credential storage, separation, public endpoint or listener
+changes. Exposure of stdin or stderr remains within the existing account/config
+boundary. PHP's [proc_open command-injection history](https://www.php.net/ChangeLog-8.php#PHP_8_2_18)
+(CVE-2024-1874) reinforces retaining command construction and validation unchanged.
+The [process API](https://www.php.net/manual/en/function.proc-terminate.php)
+signals the acquired process; reaping still uses `proc_close()`.
+`AccountPathCommandCleanupSafetyTest` injects exceptions, errors and combined
+cleanup faults using memory streams and fake process operations. Execution stays
+on testing machines; devbox verification checks changed-file PHP syntax only.
+
 ## References
 
 - [ADR 0121](0121-root-operations-and-account-controlled-objects.md)

@@ -76,6 +76,8 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
     $failure = 'stage=stderr rc=not-started';
     $stderr = @tmpfile();
     if (!is_resource($stderr)) return false;
+    $process = null;
+    $pipes = [];
     try {
         // Keep only the private open descriptor, even if a child outlives its parent.
         if (!@unlink(stream_get_meta_data($stderr)['uri'])) return false;
@@ -123,6 +125,22 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
         $ok = !$timedOut && $written === $length && $status === 0;
         $failure = $ok ? '' : 'stage='.($timedOut ? 'timeout' : ($written === $length ? 'child' : 'stdin')).' rc='.$status;
         return $ok;
+    } catch (\Throwable $error) {
+        try {
+            if (is_resource($pipes[0] ?? null)) @fclose($pipes[0]);
+        } finally {
+            // Own only this launch's unreaped child; timeout diagnostics can throw after reaping.
+            if (is_resource($process)) {
+                try {
+                    if ($timeoutSec > 0) pmssCommandTimeoutTerminate($process);
+                    elseif (function_exists('proc_terminate')) @proc_terminate($process);
+                } finally {
+                    // A pipe-close or termination fault must not skip reaping.
+                    @proc_close($process);
+                }
+            }
+        }
+        throw $error;
     } finally {
         // Read only the first 300 bytes; never retain or log the full account tree errors.
         try {
