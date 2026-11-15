@@ -193,8 +193,7 @@ class NetworkFireqosTest extends TestCase
         }
 
         $this->assertTrue($created === false);
-        $this->assertStringContainsString('class root', $config);
-        $this->assertStringNotContainsString($username, $config);
+        $this->assertStringContainsAndOmitsStrings(['class root'], [$username], $config);
     }
 
     public function testRepositoryTemplateRoutesEveryUidIntoGroupBeforeLeaves(): void
@@ -237,8 +236,7 @@ class NetworkFireqosTest extends TestCase
             $caps = \networkFireqosUserCaps(['throttle' => ['max' => 100]], ['root']);
             $config = \networkBuildFireqosConfig(['throttle' => ['max' => 100]], ['root'], []);
             $this->assertEquals(100, $caps['root']['cap']);
-            $this->assertStringContainsString('class root ceil 100Mbit', $config);
-            $this->assertStringNotContainsString('99999Mbit', $config);
+            $this->assertStringContainsAndOmitsStrings(['class root ceil 100Mbit'], ['99999Mbit'], $config);
         });
     }
 

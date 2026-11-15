@@ -90,8 +90,7 @@ PHP;
                 ['PMSS_INTENT_CHECK_CMD' => $this->launcherEnv['PMSS_TEST_ISSUES']]] as $env) {
                 $run = $this->select([], $env);
                 $this->assertSame(0, $run['rc'], $run['output']);
-                $this->assertStringContainsString('intent check disabled', $run['output']);
-                $this->assertStringContainsString('No approved issues after gate', $run['output']);
+                $this->assertStringContainsAllStrings(['intent check disabled', 'No approved issues after gate'], $run['output']);
             }
         } finally {
             if ($inherited !== false) {
@@ -158,8 +157,7 @@ PHP;
         $this->fixture([1001], [], [1001 => $clear], '2026-10-03T13:00:00Z');
         $run = $this->launch('agentic-issues.sh', ['--exec', '/bin/true']);
         $this->assertSame(0, $run['rc'], $run['output']);
-        $this->assertStringContainsString('changed after intent check', $run['output']);
-        $this->assertStringContainsString('No issues left after freshness check', $run['output']);
+        $this->assertStringContainsAllStrings(['changed after intent check', 'No issues left after freshness check'], $run['output']);
         $this->assertFalse(strpos($run['output'], '[agentic-issues] done') !== false);
 
         $this->fixture([1001], [], [1001 => $clear]);
@@ -182,7 +180,7 @@ PHP;
         $this->assertStringContainsString('#1001 intent-check not clear (exit=2): ERROR budget cap reached for the check', $run['output']);
         $this->assertFalse(strpos($run['output'], 'ERROR second line') !== false, $run['output']);
         $this->assertFalse(strpos($run['output'], 'noise before') !== false, $run['output']);
-        $this->assertStringContainsString('#1002 intent-check not clear (exit=2): ERROR '.str_repeat('x', 194)."\n", $run['output']);
-        $this->assertStringContainsString("#1003 intent-check not clear (exit=1)\n", $run['output']);
+        $this->assertStringContainsAllStrings(['#1002 intent-check not clear (exit=2): ERROR '.str_repeat('x', 194)."\n",
+            "#1003 intent-check not clear (exit=1)\n"], $run['output']);
     }
 }

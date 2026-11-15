@@ -17,8 +17,7 @@ class PinnedArtifactFailureSummaryTest extends TestCase
             'temp' => 'download temp file unavailable',
         ] as $mode => $reason) {
             $output = $this->fixture([[$mode, 'demo artifact']]);
-            $this->assertStringContainsString('result=null', $output);
-            $this->assertStringNotContainsString('callback', $output);
+            $this->assertStringContainsAndOmitsStrings(['result=null'], ['callback'], $output);
             $this->assertSame("later steps finished\n".$this->summary('demo artifact ('.$reason.')'),
                 substr($output, strpos($output, 'later steps finished')));
         }

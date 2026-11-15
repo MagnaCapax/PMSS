@@ -12,8 +12,7 @@ class UserCgroupCliProfilesCombinationsTest extends TestCase
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--device=/home', '--io-profile=nvme'], [
             'PMSS_HOME_DEVICE' => '/dev/pmssNVME',
         ]);
-        $this->assertStringContainsString('IOWeight=200', $out);
-        $this->assertStringNotContainsString('IOReadBandwidthMax=', $out);
+        $this->assertStringContainsAndOmitsStrings(['IOWeight=200'], ['IOReadBandwidthMax='], $out);
     }
 
     public function testBulkProfileRaisesWeights(): void

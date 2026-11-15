@@ -54,8 +54,7 @@ class PolicyOverridePrecedenceTest extends TestCase
                 ['PMSS_HOME_DEVICE' => '/dev/testhome']
             );
 
-            $this->assertStringContainsString($expected, $out, $label);
-            $this->assertStringNotContainsString('IOReadBandwidthMax=/dev/testhome 25M', $out, $label);
+            $this->assertStringContainsAndOmitsStrings([$expected => $label], ['IOReadBandwidthMax=/dev/testhome 25M' => $label], $out);
         }
     }
 }
