@@ -10,6 +10,7 @@ require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/delugeTemplates.php';
 require_once __DIR__.'/delugeProvisioning.php';
 require_once __DIR__.'/delugePasswords.php';
+require_once __DIR__.'/delugeUploadThrottle.php';
 pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFileWrite.php', 'traffic.php', 'delugeManagedConfig.php', 'passwords.php', '../portManager.php']);
 
 function userConfigureDeluge(array $user, array $configuration): void
@@ -90,7 +91,9 @@ function userConfigureDeluge(array $user, array $configuration): void
         }
     }
 
-    pmssDelugeConfigFileWrite("$configDir/core.conf", $coreConfig, 'core', $username);
+    if ($throttle === null || pmssDelugeUploadThrottleRecordWrite($username, $throttle)) {
+        pmssDelugeConfigFileWrite("$configDir/core.conf", $coreConfig, 'core', $username);
+    }
     pmssDelugeConfigFileWrite("$configDir/hostlist.conf", str_replace(
         ['##DAEMONPORT', '##LOCALCLIENT_PASSWORD##'], [$delugePort, $localclientPassword], $hostlistTemplate
     ), 'hostlist', $username, 0600);
@@ -125,22 +128,31 @@ function userConfigureDeluge(array $user, array $configuration): void
 }
 
 /**
- * Update Deluge core.conf with the current upload throttle, returning true on change.
+ * Update stopped Deluge core.conf, returning true only for a published change.
  */
 function pmssDelugeApplyUploadThrottle(string $username, ?int $throttle = null): bool
 {
+    if (!pmssValidateUsername($username) || pmssUserWatchdogProcessRunning($username, 'deluged')) {
+        return false;
+    }
     $configFile = pmssDelugeConfigPath($username);
     $config = pmssReadRegularFileContents($configFile);
-    if ($config === null) {
+    $record = pmssDelugeUploadThrottleRecordPath($username);
+    $applied = pmssIntegerSettingFileReadOrNull($record, 'pmssUnsignedDecimalIntParse');
+    if ($config === null || $applied === null) {
         return false;
     }
 
     $throttle = $throttle ?? pmssReadTorrentThrottle($username);
-    $value = ($throttle !== null && $throttle > 0) ? (string) $throttle : '-1.0';
-    $updated = preg_replace('/"max_upload_speed"\\s*:\\s*-?[0-9.]+/', '"max_upload_speed": '.$value, $config, 1, $count);
-
-    return $count > 0
-        && $updated !== null
-        && $updated !== $config
-        && pmssDelugeConfigFileWrite($configFile, $updated, 'upload throttle');
+    $updated = pmssDelugeUploadThrottleConfig($config, $throttle, $applied);
+    if ($updated !== null) {
+        if (($throttle ?? 0) > 0 && !pmssDelugeUploadThrottleRecordWrite($username, $throttle)) return false;
+        if (!pmssDelugeConfigFileWrite($configFile, $updated, 'upload throttle')) return false;
+    }
+    // Forget ownership even if a customer replaced our cap with a different limit.
+    if (($throttle ?? 0) <= 0 && $applied > 0 && pmssDelugeConfigDecode($config) !== null
+        && !pmssIntegerSettingFileRemove($record)) {
+        pmssLogStatus('WARN', 'Failed to clear Deluge applied upload throttle record', 1);
+    }
+    return $updated !== null;
 }

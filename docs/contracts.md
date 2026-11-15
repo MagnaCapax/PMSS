@@ -794,6 +794,15 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     `userConfig.php` leaves a live client's settings untouched so the watchdog
     can still detect drift from the stored `uploadThrottleKib` value (root user
     store; `.torrentThrottle` in the home is its display copy).
+- Deluge upload-throttle reconciliation (`scripts/lib/user/deluge.php`, `delugeUploadThrottle.php`)
+  - `pmssDelugeUploadThrottleNeedsUpdate()` compares without writing. The watchdog
+    stops on drift, rechecks daemon exit and applies managed settings and the cap
+    only while stopped; slow shutdown defers both writes and starts.
+  - Positive `uploadThrottleKib` values retain exact-value enforcement, with
+    numeric integer/float equality. Without a cap, customer limits are preserved.
+    Only a value matching `/etc/seedbox/runtime/delugeUploadThrottle/<account>`
+    is reset to unlimited; the root-owned record is then removed. Provisioning
+    records template caps too. Existing unrecorded caps are not guessed (ADR 0288).
 - pmssCredentialProcessRun(string $command, ?string $credential, ?array &$output=null, bool $stderrOnly=false, ?float $timeout=null, array $ops=[]): int
   - Passes credentials only on stdin. Capture merges stdout/stderr by default;
     stderr-only capture leaves stdout inherited so generated credentials never

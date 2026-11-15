@@ -29,13 +29,18 @@ pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 
         return ['deluged' => true, 'deluge-web' => true];
     }
     $running = pmssUserWatchdogProcessRunning($thisUser, 'deluged');
-    pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $running, 'pmssDelugeApplyManagedConfig');
-    $delugedRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['deluged', 'deluge-web'], static function () use ($thisUser): bool { return function_exists('pmssDelugeApplyUploadThrottle') && pmssDelugeApplyUploadThrottle($thisUser); }, 'deluge restarted to apply upload throttle', 9, static function () use ($thisUser): void {
+    $delugedRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['deluged', 'deluge-web'], static function () use ($thisUser): bool { return function_exists('pmssDelugeUploadThrottleNeedsUpdate') && pmssDelugeUploadThrottleNeedsUpdate($thisUser); }, 'deluge restarted to apply upload throttle', 9, static function () use ($thisUser): void {
         $daemon = pmssTorrentClientNativeStopPids($thisUser, 'deluge', ['storeOnly' => true]);
         $web = pmssTorrentClientNativeStopPids($thisUser, 'deluge', ['storeOnly' => true, 'processName' => 'deluge-web']);
         if ($daemon === [] && $web === []) { pmssUserWatchdogTerminateProcesses($thisUser, ['deluged', 'deluge-web'], 9); return; }
         pmssTorrentClientNativeStop($thisUser, 'deluge', 15, ['storeOnly' => true]);
         pmssTorrentClientNativeStop($thisUser, 'deluge', 15, ['storeOnly' => true, 'processName' => 'deluge-web']);
     });
+    // SIGTERM may still be saving core.conf; defer writes and starts until exit.
+    if ($running && !$delugedRunning && pmssUserWatchdogProcessRunning($thisUser, 'deluged')) {
+        return ['deluged' => true, 'deluge-web' => true];
+    }
+    pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $delugedRunning, 'pmssDelugeApplyManagedConfig');
+    pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $delugedRunning, 'pmssDelugeApplyUploadThrottle');
     return ['deluged' => $delugedRunning];
 }, __DIR__.'/../lib/user/deluge.php');
