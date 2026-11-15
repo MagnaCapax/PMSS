@@ -661,6 +661,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     `userPermissions.php` normalization step fixes final ownership.
   - Cross-username transfers hard-fail after normalization unless the `data`
     payload is target-owned and readable/traversable by the local account.
+  - Post-transfer rTorrent restart requests honour a regular or linked
+    `~/.rtorrentDisable` marker before creating `www/.rtorrentRestart` or
+    executing the restart consumer, including dry runs. An existing restart
+    request is left untouched. Missing markers and directory entries retain
+    the normal restart flow, matching the watchdog's opt-out predicate (Refs #869).
   - After permissions and client selections converge, enabled native qBittorrent
     receives SIGTERM so its watchdog reloads the copied sessions on the next pass.
     Missing, linked or non-file `.qbittorrentEnable` markers skip the request;
