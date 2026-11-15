@@ -11,6 +11,7 @@
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/runtime.php';
 pmssRequireRelativeFiles('/scripts/lib', ['user/log.php', 'user/userConfigStore.php', 'user/watchdog.php']);
+pmssRequireRelativeFiles('/scripts/lib/user/docker', ['command.php', 'watchdog.php']);
 
 // Serialize runs with the canonical in-script lock (ADR-0049), replacing the
 // former root.cron `flock -xn`. Overlapping runs would race per-user rootless
@@ -50,8 +51,9 @@ foreach ($users as $user) {
         continue;
     }
 
-    // Delegate start logic to userDocker helper so systemd and non-systemd
-    // rootless modes are handled consistently and logged per user.
-    $cmd = sprintf('php /scripts/util/userDocker.php %s start', escapeshellarg($user));
+    // Reuse checked shutdown for idle daemons that survived a package upgrade.
+    $action = userDockerWatchdogAction($user, $logDockerMessage);
+    if ($action === null) continue;
+    $cmd = sprintf('php /scripts/util/userDocker.php %s %s', escapeshellarg($user), escapeshellarg($action));
     runCommand($cmd, false, $logDockerMessage);
 }

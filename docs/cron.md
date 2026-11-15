@@ -19,7 +19,12 @@ The following entries must remain in the root crontab; they keep key services
 healthy between full update runs:
 
 - **Rootless Docker watchdog** – Restarts per-user Docker daemons when they
-  exit unexpectedly. Logs to `/var/log/pmss/rootlessDocker.log`.
+  exit unexpectedly. It also compares a responsive daemon's version with the
+  installed `dockerd` and requests a checked restart on mismatch only when a
+  successful `docker ps --quiet` reports no running containers. Each account-side
+  probe has a five-second deadline; busy daemons and failed probes defer drift
+  recovery and log the decision. A timed-out probe uses the shared 15-minute
+  account/service backoff (ADR 0286). Logs to `/var/log/pmss/rootlessDocker.log`.
   `*/5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1`
 - **WireGuard health check** – Ensures the WireGuard kernel module is loaded
   and `wg-quick@wg0` stays active. Logs to `/var/log/pmss/checkWireguard.log`
