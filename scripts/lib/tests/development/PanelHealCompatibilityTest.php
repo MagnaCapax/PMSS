@@ -28,7 +28,7 @@ final class PanelHealCompatibilityTest extends TestCase
                             $before = substr($source, 0, $offset);
                             $guard = '~if\s*\(is_file\(__DIR__\s*\.\s*[\'\"]/'
                                 .preg_quote($match[1], '~').'[\'\"]\)\)\s*(?:\{\s*)?$~';
-                            $this->assertSame(1, preg_match($guard, $before), $name.' requires nightly '.$match[1].' without a guard');
+                            $this->assertMatches($guard, $before, $name.' requires nightly '.$match[1].' without a guard');
                         }
                     } else {
                         // Dynamic loaders have explicit path guards; keep this inventory closed.

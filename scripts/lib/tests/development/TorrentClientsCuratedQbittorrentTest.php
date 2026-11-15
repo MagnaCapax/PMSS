@@ -47,11 +47,11 @@ final class TorrentClientsCuratedQbittorrentTest extends TestCase
         $this->assertSame($expected, array_column($entries, 'version'));
         foreach ($entries as $entry) {
             [$version, $family] = explode('-lt', $entry['version']);
-            $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $entry['sha256']));
+            $this->assertMatches('/\A[a-f0-9]{64}\z/', $entry['sha256']);
             $this->assertSame(1, count($entry['url']));
             $prefix = 'https://github.com/userdocs/qbittorrent-nox-static/releases/download/release-';
             $pattern = '~\A'.preg_quote($prefix.$version.'_v'.$family.'.', '~').'[0-9]+/x86_64-qbittorrent-nox\z~';
-            $this->assertSame(1, preg_match($pattern, $entry['url'][0]));
+            $this->assertMatches($pattern, $entry['url'][0]);
             $this->assertFalse($entry['disabled']);
             $this->assertFalse($entry['isDefault']);
             $this->assertSame($family === '1.2' ? 'lt1.2' : $version, $entry['compatFamily']);

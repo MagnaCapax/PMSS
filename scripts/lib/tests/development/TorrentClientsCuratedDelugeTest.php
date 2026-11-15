@@ -42,7 +42,7 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
             $this->assertTrue(in_array('setuptools-80.10.2-py3-none-any.whl', $files, true));
             $this->assertTrue(in_array('pyOpenSSL-24.2.1-py3-none-any.whl', $files, true));
             foreach ($entry['wheels'] as $wheel) {
-                $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $wheel['sha256']));
+                $this->assertMatches('/\A[a-f0-9]{64}\z/', $wheel['sha256']);
             }
             $this->assertSame('bookworm-cp311', $entry['compatWindow']);
             $this->assertFalse($entry['isDefault']);

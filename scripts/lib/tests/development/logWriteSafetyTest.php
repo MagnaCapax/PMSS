@@ -106,7 +106,7 @@ PHP;
             $this->assertSame(2, count($requests));
             $this->assertSame($path, $requests[0][0]);
             $this->assertSame([$path.'.fallback', $fallback, FILE_APPEND | LOCK_EX], $requests[1]);
-            $this->assertTrue((bool) preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] ready\n$/D', $fallback));
+            $this->assertMatches('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] ready\n$/D', $fallback);
         }
     }
 

@@ -697,6 +697,9 @@ boundaries, substring counts and diagnostic messages.
 First-occurrence ordering checks use `assertOrderedStrings()` or
 `pmssAssertRepoFileContainsOrderedStrings()` instead of local position variables.
 Keep offset searches and last-occurrence checks explicit; they have different semantics.
+Positive regex-only observations use `assertMatches()` directly, preserving pattern
+bytes and custom diagnostics. Capture extraction, exact match counts and compound
+predicates keep their explicit `preg_match()` or `preg_match_all()` observations.
 Fragment-only source assertions call the corresponding direct repository helper,
 including combined required/forbidden checks across several files. Reserve
 contract tables for regex checks or checks combining fragments with ordering.

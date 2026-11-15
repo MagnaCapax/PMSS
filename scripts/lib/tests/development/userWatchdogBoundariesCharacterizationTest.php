@@ -44,7 +44,7 @@ class UserWatchdogBoundariesCharacterizationTest extends TestCase
     public function testSharedServicePatternKeepsExactBoundsAndCharacterRules(): void
     {
         foreach (['a', 'demo', 'a0-b', str_repeat('a', 32)] as $name) {
-            $this->assertSame(1, preg_match(PMSS_USER_WATCHDOG_SERVICE_PATTERN, $name));
+            $this->assertMatches(PMSS_USER_WATCHDOG_SERVICE_PATTERN, $name);
         }
         foreach (['', '0demo', 'Demo', 'demo_app', '../demo', "demo\n", "demo\0", str_repeat('a', 33)] as $name) {
             $this->assertSame(0, preg_match(PMSS_USER_WATCHDOG_SERVICE_PATTERN, $name));

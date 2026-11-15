@@ -8,9 +8,7 @@ class AiDockerInstallerSafetyTest extends TestCase
 {
     public function testAiToolsArchiveExtractionAndNodeRefreshOrder(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/aiToolsInstall.php', [
-            "require_once __DIR__.'/../rootOwnedTree.php';",
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/aiToolsInstall.php', "require_once __DIR__.'/../rootOwnedTree.php';");
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/aiTools/node.php', [
             'if (!$dryRun && is_dir($installRoot))',
             "preg_match('/\\A\\.pmss-remove-[0-9a-f]{16}\\z/', \$entry)",
@@ -21,16 +19,14 @@ class AiDockerInstallerSafetyTest extends TestCase
             'is_executable($nodeBinary)',
             "runStep('Extracting pinned Node.js runtime for AI CLI tools', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions'",
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/aiTools/codexInstall.php', [
-            "runStep('Extracting Codex CLI archive', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions'",
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/aiTools/codexInstall.php',
+            "runStep('Extracting Codex CLI archive', 'umask 022 && '.pmssBuildCommand('tar', ['--no-same-owner', '--no-same-permissions'");
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/aiTools/node.php', [
             "preg_match('/\\Anode-v[0-9]+(?:\\.[0-9]+)*-linux-x64\\z/', \$entry)",
             'pmssRootOwnedTreeRemove($oldDir)',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/arr/activation.php', [
-            'umask 022 && tar --no-same-owner --no-same-permissions -xzf %s -C %s',
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/arr/activation.php',
+            'umask 022 && tar --no-same-owner --no-same-permissions -xzf %s -C %s');
     }
 
     public function testAiToolsNodeTreeOwnershipAndLinkSafeRemoval(): void
@@ -106,7 +102,7 @@ class AiDockerInstallerSafetyTest extends TestCase
         $this->assertStringContainsAndOmitsStrings([], ["'/usr/local/bin/']", '@tempnam(', 'download/v1.3.2/', '--version'],
             $source, 'docker.php must not contain ');
         foreach (['x86_64', 'aarch64', 'armv7l', 'ppc64le', 'riscv64', 's390x'] as $arch) {
-            $this->assertSame(1, preg_match("/'".$arch."' => '[a-f0-9]{64}',/", $source), $arch);
+            $this->assertMatches("/'".$arch."' => '[a-f0-9]{64}',/", $source, $arch);
         }
     }
 }

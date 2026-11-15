@@ -32,7 +32,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             'url' => ['https://github.com/jesec/rtorrent/releases/download/v0.9.8-r16/rtorrent-linux-amd64'],
             'sha256' => '974c367b92eca69b85de8afde4937559b8396dc996694da2e7cb4fdc38dc8b40',
         ], $entry);
-        $this->assertSame(1, preg_match('/\A[a-f0-9]{64}\z/', $entry['sha256']));
+        $this->assertMatches('/\A[a-f0-9]{64}\z/', $entry['sha256']);
         $this->assertFalse($entry['isDefault']);
         // Offered again with the bundled ruTorrent compatibility patches (ADR 0146).
         $this->assertFalse($entry['disabled']);
@@ -109,7 +109,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
     public function testPickerAndRestartReuseDeliveredCustomerFiles(): void
     {
         $root = dirname(__DIR__, 4);
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/configure.php', ['pmssConfigureTorrentClientCardsBuild($home)']);
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/configure.php', 'pmssConfigureTorrentClientCardsBuild($home)');
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/configureTorrentClientsCard.php', ["'rtorrent' => 'rTorrent'", 'pmssConfigureTorrentClientVersionsOffered($client, $path)']);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/filesystem.php', [
             "'www/configureTorrentClientsOther.php'", "'www/configureTorrentClientsSwitch.php'",
@@ -179,8 +179,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertStringContainsString('branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
             .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))', $rc);
         $this->assertSame(0, preg_match('/^encoding\.add/m', $rc));
-        $this->assertSame(1, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent-main'));
-        $this->assertSame(1, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent main'));
+        $this->assertMatches('/^rtorrent([ -]main)?$/', 'rtorrent-main');
+        $this->assertMatches('/^rtorrent([ -]main)?$/', 'rtorrent main');
         $this->assertSame(0, preg_match('/^rtorrent([ -]main)?$/', 'rtorrent-disk'));
     }
     public function testStickzForkEntryIsPinnedOptInZeroNineEightFamily(): void
