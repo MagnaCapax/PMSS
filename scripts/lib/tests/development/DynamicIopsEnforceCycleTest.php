@@ -32,10 +32,10 @@ class DynamicIopsEnforceCycleTest extends TestCase
             $row = $this->enforceCycle($options);
             $readPath = '/sys/fs/cgroup/blkio/user.slice/user-1001.slice/blkio.throttle.read_iops_device';
             $this->assertSame('8:0 123', $row['kernel'][$readPath]);
-            foreach ($row['writes'] as $write) $this->assertTrue(strpos($write[0], 'write_iops_device') !== false);
+            foreach ($row['writes'] as $write) $this->assertStringContainsString('write_iops_device', $write[0]);
             $cycle = $row['logs']['PMSS_DYNAMIC_IOPS_LOG'][0];
             $this->pmssAssertArraySubsetSame(['read_action' => 'keep-kernel', 'read_caps' => null], $cycle);
-            $this->assertTrue(strpos(implode("\n", $row['messages']), 'read_action=keep-kernel fallback=') !== false);
+            $this->assertStringContainsString('read_action=keep-kernel fallback=', implode("\n", $row['messages']));
         }
     }
 
@@ -45,8 +45,8 @@ class DynamicIopsEnforceCycleTest extends TestCase
             ['logFailure' => true], ['throw' => true]] as $options) {
             $row = $this->enforceCycle($options);
             $this->assertSame([], $row['writes']);
-            $this->assertTrue(strpos(implode("\n", $row['messages']), 'keeping kernel read caps') !== false);
-            $this->assertTrue(strpos(end($row['messages']), 'errors=1') !== false);
+            $this->assertStringContainsString('keeping kernel read caps', implode("\n", $row['messages']));
+            $this->assertStringContainsString('errors=1', end($row['messages']));
         }
     }
 
@@ -55,7 +55,7 @@ class DynamicIopsEnforceCycleTest extends TestCase
         foreach ([[[], ['--dry-run']], [['envDryRun' => '1'], []]] as [$options, $args]) {
             $row = $this->enforceCycle($options, $args);
             $this->pmssAssertArraySubsetSame(['writes' => [], 'logs' => []], $row);
-            $this->assertTrue(strpos($row['output'], '8:0 1900') !== false);
+            $this->assertStringContainsString('8:0 1900', $row['output']);
         }
     }
 

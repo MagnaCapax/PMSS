@@ -47,9 +47,8 @@ class ReadLimitStatusTest extends TestCase
     {
         $this->assertSame('', \pmssReadLimitHtmlBuild(null));
         $quiet = \pmssReadLimitHtmlBuild(['limit' => 1240, 'held' => false]);
-        $this->assertTrue(strpos($quiet, 'up to 1,240 per second') !== false);
-        $this->assertFalse(strpos($quiet, 'wait their turn') !== false);
-        $this->assertTrue(strpos(\pmssReadLimitHtmlBuild(['limit' => 20, 'held' => true]), 'wait their turn') !== false);
+        $this->assertStringContainsAndOmitsStrings(['up to 1,240 per second'], ['wait their turn'], $quiet);
+        $this->assertStringContainsString('wait their turn', \pmssReadLimitHtmlBuild(['limit' => 20, 'held' => true]));
     }
 
     public function testSlicePrivacyRefusesSystemIdsAndNeverTouchesNonRootDirectories(): void

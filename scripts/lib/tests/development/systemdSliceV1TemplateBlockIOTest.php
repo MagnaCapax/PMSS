@@ -15,6 +15,6 @@ class SystemdSliceV1TemplateBlockIOTest extends TestCase
             'v1Template' => $this->pmssSystemdSliceTasksTemplate(['BlockIOAccounting=yes']),
             'totalMemMiB' => 4096,
         ]);
-        $this->assertTrue(strpos($out, 'BlockIOAccounting=yes') !== false, 'v1 template lost BlockIOAccounting');
+        $this->assertStringContainsString('BlockIOAccounting=yes', $out, 'v1 template lost BlockIOAccounting');
     }
 }

@@ -45,11 +45,11 @@ class LiveStatsTest extends TestCase
     {
         foreach ([0, -1] as $capacity) {
             $html = \pmssStatsLiveCell(500.0, 50.0, ' Mbit/s', $capacity);
-            $this->assertFalse(strpos($html, 'class="live-bar"') !== false);
+            $this->assertStringNotContainsString('class="live-bar"', $html);
             $this->assertStringContainsAllStrings(['node 500 Mbit/s', 'you 50 Mbit/s'], $html);
         }
         // Old rings have no capacity fields, so the optional argument must also hide the bar.
-        $this->assertFalse(strpos(\pmssStatsLiveCell(5.0, 0.5, ' Mbit/s'), 'class="live-bar"') !== false);
+        $this->assertStringNotContainsString('class="live-bar"', \pmssStatsLiveCell(5.0, 0.5, ' Mbit/s'));
     }
 
     public function testNetworkTrendUsesCapacityAndHidesLinesWhenUnknown(): void
@@ -59,7 +59,7 @@ class LiveStatsTest extends TestCase
         $this->assertStringContainsAllStrings(['class="live-node" points="0,36.2 300,20"', 'class="live-you" points="0,37.8 300,36.2"'], $svg);
         $this->assertStringContainsString('points="0,2 300,2"', \pmssStatsLiveSvg([[10000, 1000], [15000, 1500]], 10000));
         foreach ([0, -1] as $capacity) {
-            $this->assertFalse(strpos(\pmssStatsLiveSvg($points, $capacity), '<polyline') !== false);
+            $this->assertStringNotContainsString('<polyline', \pmssStatsLiveSvg($points, $capacity));
         }
     }
 

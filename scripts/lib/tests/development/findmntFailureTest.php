@@ -19,7 +19,7 @@ class FindmntFailureTest extends TestCase
             'totalMemMiB' => 2048,
         ]));
 
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=') === false, 'unexpected IOReadBandwidthMax append');
-        $this->assertTrue(strpos($out, 'IOWriteBandwidthMax=') === false, 'unexpected IOWriteBandwidthMax append');
+        $this->assertStringNotContainsString('IOReadBandwidthMax=', $out, 'unexpected IOReadBandwidthMax append');
+        $this->assertStringNotContainsString('IOWriteBandwidthMax=', $out, 'unexpected IOWriteBandwidthMax append');
     }
 }

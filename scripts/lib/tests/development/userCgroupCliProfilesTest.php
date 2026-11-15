@@ -10,13 +10,13 @@ class UserCgroupCliProfilesTest extends TestCase
     public function testCpuProfileLowSetsWeight50(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--dry-run', '--cpu-profile=low']);
-        $this->assertTrue(strpos((string)$out, 'CPUWeight=50') !== false);
+        $this->assertStringContainsString('CPUWeight=50', (string)$out);
     }
 
     public function testTasksProfileHighSets8192(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--dry-run', '--tasks-profile=high']);
-        $this->assertTrue(strpos((string)$out, 'TasksMax=8192') !== false);
+        $this->assertStringContainsString('TasksMax=8192', (string)$out);
     }
 
     public function testMemProfileHeavyDerivesMax(): void
@@ -31,7 +31,7 @@ class UserCgroupCliProfilesTest extends TestCase
             ['root', '--dry-run', '--device=/home', '--io-profile=hdd'],
             ['PMSS_HOME_DEVICE' => '/dev/testhome']
         );
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=/dev/testhome 5M') !== false, 'device resolution failed');
+        $this->assertStringContainsString('IOReadBandwidthMax=/dev/testhome 5M', $out, 'device resolution failed');
     }
 
     public function testAdditiveSingleChangeOnlyCpuWeight(): void
@@ -43,6 +43,6 @@ class UserCgroupCliProfilesTest extends TestCase
     public function testWipeDryRunDoesNotApply(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--dry-run', '--wipe']);
-        $this->assertTrue(strpos($out, 'dry-run') !== false);
+        $this->assertStringContainsString('dry-run', $out);
     }
 }

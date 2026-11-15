@@ -24,7 +24,7 @@ class cgroupSliceTest extends TestCase
             'MemoryHigh=',
             'MemoryMax=',
         ], 'slice drop-in not created');
-        $this->assertTrue(strpos($content, '%%') === false, 'placeholders remained in output');
+        $this->assertStringNotContainsString('%%', $content, 'placeholders remained in output');
     }
 
     public function testMemoryConstraintsApplied(): void
@@ -86,7 +86,7 @@ class cgroupSliceTest extends TestCase
         $this->pmssSystemdSliceEnsure($fixture);
         $this->assertTrue(file_exists($fixture['dropDir'].'/15-pmss.conf'));
         // Ensure we didn't accidentally write to /usr/lib; cannot check fs safely here, but path check suffices.
-        $this->assertTrue(strpos($fixture['dropDir'], '/etc/systemd') === false, 'test harness used temp path, not /etc');
+        $this->assertStringNotContainsString('/etc/systemd', $fixture['dropDir'], 'test harness used temp path, not /etc');
     }
 
     public function testInvalidTemplateLogsWarningAndSkips(): void

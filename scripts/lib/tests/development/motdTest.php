@@ -30,8 +30,8 @@ class MotdTest extends TestCase
 
         $this->assertTrue(file_exists($output), 'MOTD output file missing');
         $content = (string)file_get_contents($output);
-        $this->assertTrue(strpos($content, '%HOSTNAME%') === false, 'HOSTNAME placeholder should be replaced');
-        $this->assertTrue(strpos($content, '%PMSS_VERSION%') === false, 'PMSS_VERSION placeholder should be replaced');
+        $this->assertStringNotContainsString('%HOSTNAME%', $content, 'HOSTNAME placeholder should be replaced');
+        $this->assertStringNotContainsString('%PMSS_VERSION%', $content, 'PMSS_VERSION placeholder should be replaced');
     }
 
     public function testGenerateMotdHonorsColorOptOutEnv(): void
@@ -54,7 +54,7 @@ class MotdTest extends TestCase
 
         $this->assertTrue(file_exists($output), 'MOTD output file missing');
         $content = (string) file_get_contents($output);
-        $this->assertTrue(strpos($content, "\e[") === false, 'MOTD color opt-out should suppress ANSI escapes');
+        $this->assertStringNotContainsString("\e[", $content, 'MOTD color opt-out should suppress ANSI escapes');
     }
 
     public function testRenderMotdTemplateDefaultsMissingModelValues(): void
@@ -95,7 +95,7 @@ class MotdTest extends TestCase
         $this->assertTrue($lastIdx >= 0, 'MOTD refresh is not referenced in update-step2.php');
         $this->assertTrue($updatedIdx >= 0, 'update-step2.php should record /var/run/pmss/updated');
         $this->assertTrue($cronIdx >= 0, 'update-step2.php should restore root cron via setupRootCron.php');
-        $this->assertTrue(strpos($source, "pmssWriteManagedPathFile('/var/run/pmss/updated'") !== false, 'update-step2.php should use shared managed-path writes for /var/run/pmss/updated');
+        $this->assertStringContainsString("pmssWriteManagedPathFile('/var/run/pmss/updated'", $source, 'update-step2.php should use shared managed-path writes for /var/run/pmss/updated');
         $this->assertTrue($updatedIdx < $lastIdx, '/var/run/pmss/updated should be written before MOTD refresh');
         $this->assertTrue($cronIdx < $lastIdx, 'Root cron should be restored before MOTD refresh');
         $total = count($lines);
