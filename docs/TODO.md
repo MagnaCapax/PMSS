@@ -17,6 +17,11 @@ Active work items are tracked in GitHub issues to avoid duplication between this
 ## Code Quality Audits
 
 - [ ] Audit string matching patterns across codebase for truncation bugs and typos. Found `.rtorrentexecut` typo (missing 'e') in process.php; similar issues may exist in other `strpos()`, `preg_match()`, or filename pattern checks. Check process name matching, config file patterns, and path validations.
+- [ ] Before extracting new required helpers from `etc/skel/www/welcome.php` or
+  `userMediaStackPanel.php`, establish delivery closure against the external
+  retrieval allowlist and coordinate dependency ordering under
+  [ADR 0022](adr/0022-guiv-delivered-customer-files-must-be-self-contained.md).
+  The local skeleton manifest alone cannot verify that external prerequisite.
 
 ## Recently Completed
 
