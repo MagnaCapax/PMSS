@@ -114,8 +114,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             $this->pmssDecodeJsonArray($output)
         );
 
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $this->assertStringContainsAllStrings(["'https://pulsedmedia.com/remote/welcomeHeadingText.php'", "'https://pulsedmedia.com/clients/announcementsrss.php'", '@file_get_contents($url, false, pmssWelcomeHttpContextCreate(), 0, 1048576)'], $source);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', ["'https://pulsedmedia.com/remote/welcomeHeadingText.php'", "'https://pulsedmedia.com/clients/announcementsrss.php'", '@file_get_contents($url, false, pmssWelcomeHttpContextCreate(), 0, 1048576)']);
     }
 
     public function testWelcomeLocalHelperRejectsTraversalPaths(): void

@@ -19,8 +19,8 @@ class ListUsersConsumersGuardTest extends TestCase
 
         foreach ($this->pmssListUsersConsumerMap() as $needle => $files) {
             foreach ($files as $file) {
-                $source = $this->pmssReadRepoFile($file);
-                $this->assertStringContainsAllStrings([$needle], $source, $file.' must use shared listUsers parsing');
+                $source = $this->pmssAssertRepoFileContainsAndOmitsStrings($file,
+                    [$needle => $file.' must use shared listUsers parsing'.$needle]);
                 if ($needle !== 'pmssListManagedUsersResult(') {
                     $this->assertStringContainsAndOmitsStrings([], $legacyInlineParsers, $source,
                         $file.' should keep pmssListManagedUsers() output as-is ');

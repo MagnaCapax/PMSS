@@ -49,9 +49,8 @@ final class UserEntryMetadataCommandTest extends TestCase
         $this->assertSame(0, substr_count($rutorrent, 'pmssUserEntryChownCommand('));
         $this->assertStringContainsString('pmssRutorrentAccountStep(', $rutorrent);
         $this->assertSame(2, substr_count($rutorrent, 'pmssUserEntryChmodCommand('));
-        $this->assertStringContainsString('pmssBuildUserShellCommand($user, $copyCommand)', $http);
-        $this->assertFalse(strpos($http, 'pmssUserEntryChownCommand($irssiDir') !== false);
-        $this->assertFalse(strpos($rutorrent, 'chown -R') !== false);
-        $this->assertFalse(strpos($rutorrent, 'chmod -R') !== false);
+        $this->assertStringContainsAndOmitsStrings(['pmssBuildUserShellCommand($user, $copyCommand)'],
+            ['pmssUserEntryChownCommand($irssiDir'], $http);
+        $this->assertStringContainsAndOmitsStrings([], ['chown -R', 'chmod -R'], $rutorrent);
     }
 }

@@ -8,10 +8,9 @@ final class DelugeConfigWriteSafetyTest extends TestCase
 {
     public function testMissingDirectoriesAreCreatedAsAccountUser(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/user/deluge.php');
-        $this->assertStringContainsAllStrings(["'Deluge config'     => \$configDir",
-            "pmssBuildUserShellCommand(\$username, 'mkdir -p -- '.escapeshellarg(\$dir))"], $source);
-        $this->assertFalse(strpos($source, "sprintf('chown %1\$s -R %2\$s', escapeshellarg(\$username.':'.\$username), escapeshellarg(\$dir))") !== false);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/deluge.php', ["'Deluge config'     => \$configDir",
+            "pmssBuildUserShellCommand(\$username, 'mkdir -p -- '.escapeshellarg(\$dir))"],
+            ["sprintf('chown %1\$s -R %2\$s', escapeshellarg(\$username.':'.\$username), escapeshellarg(\$dir))"]);
     }
 
     public function testRootOwnershipWalkAndTemplateCopyAreAbsent(): void

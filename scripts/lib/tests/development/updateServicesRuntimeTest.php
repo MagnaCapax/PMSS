@@ -300,16 +300,14 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testSshdStarvationDropinTemplateDocumentsDefenseInDepth(): void
     {
-        $content = $this->pmssReadRepoFile('etc/seedbox/config/template.ssh.service.pmss-starvation.conf');
-
-        $this->assertStringContainsAllStrings([
+        $content = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/template.ssh.service.pmss-starvation.conf', [
             "[Service]\n",
             'per-user slice containment prevents pid exhaustion',
             "CPUWeight=10000\n",
             "IOWeight=10000\n",
             "MemoryMin=64M\n",
-        ], $content);
-        $this->assertTrue(strpos($content, 'OpenSSH oom_adjust_setup protects the listener') !== false);
+            'OpenSSH oom_adjust_setup protects the listener',
+        ]);
         $this->assertSame(0, preg_match('/^OOMScoreAdjust\s*=/m', $content));
     }
 
