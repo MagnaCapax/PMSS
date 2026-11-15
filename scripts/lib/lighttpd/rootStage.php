@@ -143,8 +143,12 @@ function pmssRootStageFileWrite(string $path, string $content, string $group, in
         $failure = '';
         return true;
     } finally {
-        @unlink($stageFile);
-        @rmdir($stage);
+        try {
+            @unlink($stageFile);
+        } finally {
+            // File-removal faults must not skip the empty-directory cleanup attempt.
+            @rmdir($stage);
+        }
     }
 }
 

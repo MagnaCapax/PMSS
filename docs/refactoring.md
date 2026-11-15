@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Private managed-file staging attempts directory cleanup even when staging-file
+removal throws. The existing file-before-directory order and empty-directory
+removal remain; lone throwables propagate unchanged and combined cleanup faults
+follow PHP's `finally` precedence (ADR 0164).
+`RootStageDirectoryCleanupSafetyTest` covers ordinary results, false returns,
+exceptions and errors with intercepted I/O. Execution stays on testing machines;
+devbox checks changed-file PHP syntax only.
+
 Synchronous Hermes relay probes and sign-in exchanges own acquired streams through
 `finally`. Failed or throwing listener rechecks close the untransferred backend;
 readiness I/O, token inspection and login request/response faults close their own

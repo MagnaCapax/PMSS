@@ -85,6 +85,28 @@ signals the acquired process; reaping still uses `proc_close()`.
 cleanup faults using memory streams and fake process operations. Execution stays
 on testing machines; devbox verification checks changed-file PHP syntax only.
 
+## Private root-stage cleanup follow-up (2026-11-15)
+
+`pmssRootStageFileWrite()` attempts empty stage-directory removal in a nested
+`finally`, even if staging-file removal throws. Removal stays limited to the
+existing private stage file and its directory; a nonempty directory is never
+recursively removed. Lone throwables propagate unchanged, while a directory
+cleanup throwable retains PHP's normal `finally` precedence. Publication,
+immutable handling, return values and failure text keep their existing rules.
+`RootStageDirectoryCleanupSafetyTest` injects exceptions, errors and false
+returns using memory streams and intercepted filesystem/publication operations.
+The testing machine runs it; devbox verification checks changed-file syntax.
+
+The review retained the existing path/owner/inode checks, root-private stage
+mode, credential separation and payload-free diagnostics. No credential
+storage, file permissions, listeners or web routes change. Exposing staged
+content would expose the managed payload, so the stage remains root-private.
+PHP's historical pathname-NUL bypass (CVE-2015-2348, recorded in the
+[PHP changelog](https://www.php.net/ChangeLog-5.php#5.4.39)) reinforces keeping
+path validation unchanged. The [error-control documentation](https://www.php.net/manual/en/language.operators.errorcontrol.php)
+confirms custom handlers still run for suppressed diagnostics; cleanup must
+therefore tolerate throwables despite `@`.
+
 ## References
 
 - [ADR 0121](0121-root-operations-and-account-controlled-objects.md)
