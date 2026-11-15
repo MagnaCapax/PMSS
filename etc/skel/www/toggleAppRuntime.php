@@ -165,6 +165,16 @@ function pmssToggleAppBootstrap(string $app, string $user, string $home, int $po
         // A seed-only store keeps its first password, so a new one would never sign in (#1242).
         $store = isset($row['credentialStore']) ? $home.'/'.$row['credentialStore'] : '';
         if ($password === '' || $store === '' || is_link($store) || !is_file($store)) $password = bin2hex(random_bytes(24));
+        if ($row['credentialMode'] === 'qui') {
+            // Keep one repair password across deadline fires, without publishing an unconfirmed login.
+            $pending = $login.'.pending';
+            if (file_exists($pending) || is_link($pending)) {
+                if (is_link($pending) || !is_file($pending) || (@fileperms($pending) & 0777) !== 0600) return false;
+                $savedPending = @file_get_contents($pending, false, null, 0, 50);
+                if (!is_string($savedPending) || preg_match('/^[a-f0-9]{48}\n$/D', $savedPending) !== 1) return false;
+                $password = substr($savedPending, 0, 48);
+            } elseif (!pmssToggleAppPrivateWrite($pending, $password."\n")) return false;
+        }
         foreach (pmssToggleAppConfigs($app, $user, $home, $port, $password, $peerPort) as $relative => $contents) {
             if (!pmssToggleAppPrivateWrite($home.'/'.$relative, $contents)) return false;
         }
@@ -195,7 +205,10 @@ function pmssToggleAppBootstrap(string $app, string $user, string $home, int $po
     if (!pmssToggleAppPrivateWriteIfChanged($proxyPath, $proxy)) return false;
     // Reset crash history only after successful regeneration; unchanged passes never request a restart.
     if ($restartOnChange && $regenerated && !pmssToggleAppRestartSignal($app, $home)) return false;
-    return pmssToggleAppPrivateWriteIfChanged($secured, "secured\n");
+    if (!pmssToggleAppPrivateWriteIfChanged($secured, "secured\n")) return false;
+    // Retain retry state through login/route/marker publication; leftover cleanup is safe to retry.
+    if ($row['credentialMode'] === 'qui') @unlink($login.'.pending');
+    return true;
 }
 
 /** Publish only the fixed four-state vocabulary for the owner-facing panel. */

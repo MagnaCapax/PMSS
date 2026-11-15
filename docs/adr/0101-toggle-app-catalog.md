@@ -205,3 +205,36 @@ password the owner chose and requires the change screen again. Keeping the
 password does not widen exposure, because a rotated value never reached the
 store and the old one kept working. Accounts whose Login already diverged
 from the store are not repaired by this change. Rollback removes the key.
+
+## Resume an interrupted qui repair (2026-11-15, Refs #1271)
+
+The 15-second bootstrap deadline can interrupt qui account creation or password
+change after config regeneration. Generating another password on every retry
+discards progress and can leave the database ahead of the displayed Login.
+
+Before config/CLI writes, account-UID PHP atomically saves the generated service
+password in `~/.pmss/apps/qui.login.pending` at mode 0600. Retries require a
+regular, non-symlink, mode-0600 file containing exactly 48 lowercase hex digits
+and a newline. Invalid pending state refuses repair without replacing it. The
+CLI always receives the saved value on stdin. The previous Login stays intact
+until account setup succeeds; config, database, route and secured-marker gates
+retain their checks. Pending state is removed only after marker publication;
+interrupted cleanup is retried on the next successful pass. Completed repairs
+still rotate once, while an unchanged pass never invokes the account CLI.
+
+Reusing the displayed Login was rejected because it cannot represent an
+unfinished rotation without publishing an unconfirmed credential. Extending
+the deadline was rejected in favor of retaining ADR 0035's bound and group
+signals. Rollback preserves private pending state but loses retry convergence.
+
+Security review rechecked the upstream [CORS advisory, CVE-2026-30924](https://github.com/autobrr/qui/security/advisories/GHSA-h8vw-ph9r-xpch),
+fixed in 1.15.0; the installer still pins 1.32.0. Web/API access, stored downstream
+credentials and external-program execution remain the exposure paths. A leaked
+pending password grants qui access and potentially actions as the account; it
+is independent of both the primary PMSS password and the session encryption key.
+The new file stays outside the web root, uses the existing private writer and
+never enters logs, responses or argv. Loopback binding and panel routes stay
+unchanged. `ToggleAppQuiRecoveryTest` covers fresh setup and repair with two
+group-killed passes (before and after a simulated database commit), successful
+recovery, idempotence and unsafe pending files. Execution belongs on the testing
+machine; devbox verification is changed-file syntax only.
