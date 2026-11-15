@@ -22,6 +22,13 @@ Active work items are tracked in GitHub issues to avoid duplication between this
   retrieval allowlist and coordinate dependency ordering under
   [ADR 0022](adr/0022-guiv-delivered-customer-files-must-be-self-contained.md).
   The local skeleton manifest alone cannot verify that external prerequisite.
+- [ ] Before sharing child-process cleanup across `etc/skel/bin/dockerLsioSeedHttp.php`,
+  `etc/skel/bin/pmssAccountAgent.php` and `etc/skel/www/toggleAppRuntime.php`,
+  verify a common helper's delivery to both account trees. Preserve each caller's
+  pipe count, still-owned-child check, termination/reaping order and throwable
+  precedence. `etc/skel/bin/pmssHermesRuntime.php` reaps without the same
+  termination step and must retain that distinction. See
+  [ADR 0022](adr/0022-guiv-delivered-customer-files-must-be-self-contained.md).
 
 ## Recently Completed
 
