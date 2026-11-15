@@ -225,6 +225,15 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Deluge, Transmission and rTorrent version switches own their account lock through
+acquisition, callbacks, refusals and rollback in one `finally` lifetime. Unlock
+faults still permit stream closure; lone throwables propagate unchanged and
+combined faults retain PHP's normal `finally` precedence. Existing validation,
+operation order, notices and ordinary results retain their contracts (ADR 0119).
+`TorrentClientsOtherSwitchLockCleanupSafetyTest` uses memory streams to inject
+exceptions and errors, including legacy acquisition. Execution stays on testing
+machines; devbox verification checks changed-file syntax only.
+
 qui account CLI capture attempts every remaining pipe close, then termination
 and reaping of its still-owned child when I/O throws. An already-reaped child
 is left alone; later cleanup still runs after earlier cleanup faults. Lone
