@@ -227,7 +227,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 "@hash_file('sha256'" => $installer.' should delegate checksum verification to remoteBinary.php',
             ]);
 
-            $this->assertTrue(preg_match('/pmss(?:RunPinnedRemoteArchiveStep|PinnedRemote(?:TempFile|ArtifactTempFile)Use)\(/', $contents) === 1, $installer.' should call a remoteBinary.php pinned download helper');
+            $this->assertMatches('/pmss(?:RunPinnedRemoteArchiveStep|PinnedRemote(?:TempFile|ArtifactTempFile)Use)\(/', $contents, $installer.' should call a remoteBinary.php pinned download helper');
         }
     }
 

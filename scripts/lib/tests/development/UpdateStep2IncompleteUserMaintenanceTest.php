@@ -63,8 +63,7 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
     {
         $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/userMaintenanceState.php');
         // The processed_users_mismatch call must classify SOFT_FAIL.
-        $this->assertTrue(
-            preg_match('/pmssUpdateStep2HandleClassifiedFailure\(\s*\'Updating all user environments\',\s*PMSS_UPDATE_STEP_CLASS_SOFT_FAIL/s', $data) === 1,
+        $this->assertMatches('/pmssUpdateStep2HandleClassifiedFailure\(\s*\'Updating all user environments\',\s*PMSS_UPDATE_STEP_CLASS_SOFT_FAIL/s', $data,
             'processed_users_mismatch must be SOFT_FAIL (GH#592), not MUST_SUCCEED'
         );
         // Guard against naive re-promotion: the mismatch block must NOT use MUST_SUCCEED.

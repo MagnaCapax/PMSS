@@ -93,7 +93,7 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         if (\PMSS_PIKKUMIES_AGENTBOARD_VERSION === '') {
             $this->assertSame('', \PMSS_PIKKUMIES_AGENTBOARD_SHA256);
         } else {
-            $this->assertTrue(preg_match('/^[a-f0-9]{64}$/iD', \PMSS_PIKKUMIES_AGENTBOARD_SHA256) === 1);
+            $this->assertMatches('/^[a-f0-9]{64}$/iD', \PMSS_PIKKUMIES_AGENTBOARD_SHA256);
         }
     }
 

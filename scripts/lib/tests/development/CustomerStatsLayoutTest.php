@@ -254,7 +254,7 @@ final class CustomerStatsLayoutTest extends TestCase
         [, $output] = $this->pmssCaptureStdout(function (): void {
             \pmssStatsRenderResourceBlocks(['data' => [], 'time' => 0, 'error' => null]);
         });
-        $this->assertTrue(preg_match('/<pre[^>]*>\s*Resource usage at [^\n]*\nI\/O Read [^\n]*\nI\/O Write [^\n]*\nPast 30 days total I\/O operations:/', $output) === 1);
+        $this->assertMatches('/<pre[^>]*>\s*Resource usage at [^\n]*\nI\/O Read [^\n]*\nI\/O Write [^\n]*\nPast 30 days total I\/O operations:/', $output);
     }
 
     public function testStatsStatusHelpersCharacterizeLocalResourceContracts(): void

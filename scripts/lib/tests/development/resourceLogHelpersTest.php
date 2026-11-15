@@ -376,7 +376,7 @@ PHP
         $root = $this->pmssMakeTempDir('pmss-resource-', 0700);
         $path = $root.'/resource.log';
         $this->assertTrue(\pmssAppendRootTimestampedLogEntry($path, ": 123\n"));
-        $this->assertTrue((bool) preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}: 123\n$/', (string) file_get_contents($path)));
+        $this->assertMatches('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}: 123\n$/', (string) file_get_contents($path));
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/resourceLog.php', ["pmssAppendRootTimestampedLogEntry(\$logDir.'/'.\$user"], ["pmssAppendUserFile(\$logDir.'/'.\$user", "@file_put_contents(\$logDir.'/'.\$user"]);
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLog.php', ['pmssAppendRootTimestampedLogEntry('], ["file_put_contents(\$logdir . \$thisUser"]);
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficIngressLog.php', ['pmssAppendRootTimestampedLogEntry('], ["@file_put_contents(\$logDir.'/'.\$user"]);
