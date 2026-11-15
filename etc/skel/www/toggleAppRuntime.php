@@ -100,12 +100,37 @@ function pmssToggleAppQuiAccountCommand(string $binary, string $configDir, strin
         .' --username '.escapeshellarg($user);
     $process = @proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes);
     if (!is_resource($process)) return array(false, '');
-    fwrite($pipes[0], $password."\n");
-    fclose($pipes[0]);
-    $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    return array(proc_close($process) === 0, $output);
+    try {
+        fwrite($pipes[0], $password."\n");
+        fclose($pipes[0]);
+        $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        return array(proc_close($process) === 0, $output);
+    } catch (\Throwable $error) {
+        try {
+            try {
+                if (is_resource($pipes[0])) fclose($pipes[0]);
+            } finally {
+                try {
+                    if (is_resource($pipes[1])) fclose($pipes[1]);
+                } finally {
+                    if (is_resource($pipes[2])) fclose($pipes[2]);
+                }
+            }
+        } finally {
+            // Only this invocation's unreaped child belongs to failure cleanup.
+            // Pipe or termination faults must not skip the remaining cleanup.
+            if (is_resource($process)) {
+                try {
+                    if (function_exists('proc_terminate')) @proc_terminate($process);
+                } finally {
+                    @proc_close($process);
+                }
+            }
+        }
+        throw $error;
+    }
 }
 
 /** qui reports an existing account with exit 0 too; rotate before publishing the login. */

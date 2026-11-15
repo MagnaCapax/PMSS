@@ -225,6 +225,15 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+qui account CLI capture attempts every remaining pipe close, then termination
+and reaping of its still-owned child when I/O throws. An already-reaped child
+is left alone; later cleanup still runs after earlier cleanup faults. Lone
+throwables propagate unchanged, with normal `finally` precedence for combined
+faults. Command bytes, credential stdin, stdout/stderr concatenation and ordinary
+results retain their contracts (ADR 0101). `ToggleAppQuiCommandCleanupSafetyTest`
+injects exceptions and errors with memory streams and fake process operations.
+Execution stays on testing machines; devbox checks changed-file syntax only.
+
 The panel usage-alert preference writer closes a newly created marker stream in
 `finally`, including when writing throws. Marker bytes, ordinary write/close
 results, permission repair and removal ordering retain their contracts. A lone
