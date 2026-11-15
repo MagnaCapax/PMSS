@@ -33,7 +33,7 @@ class BootDefaultsEnsureTest extends TestCase
             \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
             $updatedFstab = (string)file_get_contents($fstab);
             if (isset($case['expectFstab'])) { $this->assertStringContainsString($case['expectFstab'], $updatedFstab, 'case '.$case['label'].' fstab'); }
-            if (isset($case['rejectFstab'])) { $this->assertTrue(strpos($updatedFstab, $case['rejectFstab']) === false, 'case '.$case['label'].' fstab reject'); }
+            if (isset($case['rejectFstab'])) { $this->assertStringNotContainsString($case['rejectFstab'], $updatedFstab, 'case '.$case['label'].' fstab reject'); }
             $updatedGrub = (string)file_get_contents($grub);
             if (!empty($case['grubUnchanged'])) { $this->assertEquals($originalGrub, $updatedGrub, 'case '.$case['label'].' grub unchanged'); }
             elseif (isset($case['expectGrub'])) { $this->assertStringContainsString($case['expectGrub'], $updatedGrub, 'case '.$case['label'].' grub'); }

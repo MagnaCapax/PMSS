@@ -154,10 +154,8 @@ class TrafficLimitSafetyHelperTest extends TestCase
             $this->assertFalse(file_exists($home.'/.throttle'), $state);
             if ($state === 'neither') {
                 $this->assertSame('', $output, 'no state needs no log');
-            } elseif ($state === 'throttle') {
-                $this->assertTrue(strpos($output, 'orphaned traffic throttle file removed') !== false, $state);
             } else {
-                $this->assertTrue(strpos($output, 'traffic throttle removed') !== false, $state);
+                $this->assertStringContainsString($state === 'throttle' ? 'orphaned traffic throttle file removed' : 'traffic throttle removed', $output, $state);
             }
         }
     }
@@ -333,11 +331,8 @@ class TrafficLimitSafetyHelperTest extends TestCase
             $this->assertTrue($result, $state);
             $this->assertFalse(file_exists($enabledMarker), $state);
             $this->assertFalse(file_exists($home.'/.throttle'), $state);
-            if ($state === 'expired') {
-                $this->assertTrue(strpos($output, 'traffic throttle removed after cooldown (no usage data)') !== false, $state);
-            } else {
-                $this->assertTrue(strpos($output, 'orphaned traffic throttle file removed') !== false, $state);
-            }
+            $this->assertStringContainsString($state === 'expired'
+                ? 'traffic throttle removed after cooldown (no usage data)' : 'orphaned traffic throttle file removed', $output, $state);
         }
     }
 

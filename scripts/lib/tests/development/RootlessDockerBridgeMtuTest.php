@@ -122,7 +122,7 @@ SH;
             $run = array_values(preg_grep('/^run /', $lines));
             $this->assertSame($runs, $run !== [], $network);
             if ($runs) {
-                $this->assertTrue(strpos($run[0], ' --network wireguard ') !== false, $run[0]);
+                $this->assertStringContainsString(' --network wireguard ', $run[0], $run[0]);
             }
         }
     }

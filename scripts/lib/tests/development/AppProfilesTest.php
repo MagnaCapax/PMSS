@@ -192,8 +192,7 @@ final class AppProfilesTest extends TestCase
         foreach (['scripts/addUser.php', 'scripts/lib/user/add/cli.php', 'scripts/lib/user/add/postProvision.php'] as $file) {
             $source = file_get_contents($this->pmssRepoPath($file));
             foreach (array_unique(array_merge(array_keys(\pmssUserAppProfiles()), array_keys(\pmssUserAppSwitchRegistry()))) as $name) {
-                $this->assertFalse(strpos($source, "'".$name."'") !== false, $file.' hardcodes '.$name);
-                $this->assertFalse(strpos($source, '"'.$name.'"') !== false, $file.' hardcodes '.$name);
+                $this->assertStringContainsAndOmitsStrings([], ["'".$name."'" => $file.' hardcodes '.$name, '"'.$name.'"' => $file.' hardcodes '.$name], $source);
             }
         }
         $this->assertFalse(file_exists($this->pmssRepoPath('scripts/lib/user/add/appProfile.php')));

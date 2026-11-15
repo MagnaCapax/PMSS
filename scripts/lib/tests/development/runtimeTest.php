@@ -582,8 +582,7 @@ PHP;
         $captured = [];
         $rc = \runCommand('echo HELLO_RUNTIME', false, $this->pmssMakeArrayLogger($captured));
         $this->assertEquals(0, $rc);
-        $out = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
-        $this->assertTrue(strpos($out, 'HELLO_RUNTIME') !== false);
+        $this->assertStringContainsString('HELLO_RUNTIME', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '');
     }
 
     public function testRunCommandRunsCompoundCommandsWithPathSet(): void
@@ -887,8 +886,7 @@ PHP;
             function (string $m): void {}
         );
         $this->assertEquals(0, $rc);
-        $out = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
-        $this->assertTrue(strpos($out, 'apt-get') !== false);
+        $this->assertStringContainsString('apt-get', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '');
     }
 
     public function testCommandBashInvocationPreservesAptEnvExecContract(): void

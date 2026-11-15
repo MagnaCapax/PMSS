@@ -101,8 +101,7 @@ PHP;
         $this->assertTrue($result[0]);
         $this->assertSame(['/home/fixtur01'], $result[2]);
         $this->assertSame($result[2], $result[4][0][2]);
-        $this->assertFalse(strpos($result[4][0][3], '/etc/seedbox/config/localnet') !== false);
-        $this->assertFalse(strpos($result[4][0][3], '.rtorrentExecute.php') !== false);
+        $this->assertStringContainsAndOmitsStrings([], ['/etc/seedbox/config/localnet', '.rtorrentExecute.php'], $result[4][0][3]);
     }
 
     public function testFailedOrTimedOutAccountProbeDefersReset(): void

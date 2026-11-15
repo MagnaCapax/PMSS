@@ -115,8 +115,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     public function testAptCmdPrefixesArguments(): void
     {
         $cmd = \aptCmd('install -y');
-        $this->assertTrue(strpos($cmd, 'apt-get') !== false);
-        $this->assertStringContainsAllStrings(['DEBIAN_FRONTEND=noninteractive', 'APT_LISTCHANGES_FRONTEND=none', 'UCF_FORCE_CONFOLD=1', 'NEEDRESTART_MODE=a'], $cmd);
+        $this->assertStringContainsAllStrings(['apt-get', 'DEBIAN_FRONTEND=noninteractive', 'APT_LISTCHANGES_FRONTEND=none', 'UCF_FORCE_CONFOLD=1', 'NEEDRESTART_MODE=a'], $cmd);
         $this->assertEquals('install -y', substr($cmd, -strlen('install -y')));
     }
 

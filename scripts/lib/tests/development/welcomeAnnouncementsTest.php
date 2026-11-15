@@ -71,8 +71,7 @@ class WelcomeAnnouncementsTest extends TestCase
         $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
         $this->assertEquals(4, substr_count($html, '<li'));
-        $this->assertStringContainsString('One', $html);
-        $this->assertTrue(strpos($html, 'Five') === false, 'Fifth item must be omitted');
+        $this->assertStringContainsAndOmitsStrings(['One'], ['Five' => 'Fifth item must be omitted'], $html);
     }
 
     public function testItemsMissingRequiredFieldsAreSkipped(): void
@@ -85,8 +84,7 @@ class WelcomeAnnouncementsTest extends TestCase
         $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
         $this->assertEquals(1, substr_count($html, '<li'));
-        $this->assertStringContainsString('Ready', $html);
-        $this->assertTrue(strpos($html, 'Missing Link') === false, 'Incomplete items must be skipped');
+        $this->assertStringContainsAndOmitsStrings(['Ready'], ['Missing Link' => 'Incomplete items must be skipped'], $html);
     }
 
     public function testTitlesAreEscapedBeforeRendering(): void
@@ -97,8 +95,7 @@ class WelcomeAnnouncementsTest extends TestCase
 
         $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
-        $this->assertStringContainsString('&lt;b&gt;bold&lt;/b&gt;', $html);
-        $this->assertTrue(strpos($html, '<b>bold</b>') === false, 'Rendered title must stay escaped');
+        $this->assertStringContainsAndOmitsStrings(['&lt;b&gt;bold&lt;/b&gt;'], ['<b>bold</b>' => 'Rendered title must stay escaped'], $html);
     }
 
     public function testFeedItemsReadReturnsStructuredRows(): void
