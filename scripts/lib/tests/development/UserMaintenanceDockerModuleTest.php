@@ -72,8 +72,8 @@ class UserMaintenanceDockerModuleTest extends TestCase
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', ["'users/docker.php'"], $dockerFunctions);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php',
             [$dockerFunctions[0], "'dockerInstall.php'", "'dockerDependencies.php'"]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerInstall.php', [$dockerFunctions[1]]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/dockerDependencies.php', [$dockerFunctions[2]]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/dockerInstall.php', $dockerFunctions[1]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/dockerDependencies.php', $dockerFunctions[2]);
     }
 
     public function testDockerUnitKeptFunctionalAndPriorMaskReverted(): void

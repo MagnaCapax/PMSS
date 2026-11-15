@@ -12,16 +12,15 @@ class checkRtorrentContractTest extends TestCase
             "require_once __DIR__.'/../lib/rtorrent/watchdog.php';",
             'pmssCheckRtorrentHandleMissingProcess(',
         ], ["@exec('/scripts/listUsers.php'", '/^[a-z][a-z0-9]{0,7}$/']);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', ['function pmssCheckRtorrentCleanupStaleSocket(']);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdogMissing.php', ["rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])"]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/rtorrent/watchdog.php', 'function pmssCheckRtorrentCleanupStaleSocket(');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/rtorrent/watchdogMissing.php', "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])");
     }
 
     public function testMissingConfigBranchRecoversInsteadOfSilentlySkipping(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', ['function pmssCheckRtorrentRecoverMissingConfig(']);
-        $this->pmssAssertRepoFileContract('scripts/cron/checkRtorrent.php', [
-            'matches' => ['/if \(!is_file\(\$home\.\'\/\\.rtorrent\\.rc\'\)\) \{\s*if \(!pmssCheckRtorrentRecoverMissingConfig\(\$user, \$home, \$debug\)\) \{\s*continue;\s*\}\s*\}/s'],
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/rtorrent/watchdog.php', 'function pmssCheckRtorrentRecoverMissingConfig(');
+        $this->pmssAssertRepoFileMatches('scripts/cron/checkRtorrent.php',
+            '/if \(!is_file\(\$home\.\'\/\\.rtorrent\\.rc\'\)\) \{\s*if \(!pmssCheckRtorrentRecoverMissingConfig\(\$user, \$home, \$debug\)\) \{\s*continue;\s*\}\s*\}/s');
     }
 
     public function testRecoveryUsesCanonicalConfigInputsAndLogsOutcome(): void
@@ -39,14 +38,9 @@ class checkRtorrentContractTest extends TestCase
 
     public function testStaleSocketRecoveryUsesSharedCleanupContracts(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/watchdog.php', [
-            'function pmssCheckRtorrentCleanupStaleSocket(',
-        ]);
-        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdogMissing.php', [
-            'matches' => [
-                '/pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?if \(!\$executorPresent\).*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
-            ],
-        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/rtorrent/watchdog.php', 'function pmssCheckRtorrentCleanupStaleSocket(');
+        $this->pmssAssertRepoFileMatches('scripts/lib/rtorrent/watchdogMissing.php',
+            '/pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?if \(!\$executorPresent\).*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s');
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkRtorrent.php', [
             'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
             "if (!pmssDirEnsureExists(\$stateDir, 0755))",
@@ -100,9 +94,8 @@ class checkRtorrentContractTest extends TestCase
                 'missingPrefix' => 'checkRtorrent throttle guard missing: ',
             ]],
         ]);
-        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdogScgi.php', [
-            'matches' => ['/pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s'],
-        ]);
+        $this->pmssAssertRepoFileMatches('scripts/lib/rtorrent/watchdogScgi.php',
+            '/pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s');
     }
 
     public function testRtorrentDisableMarkerSkipsUserAndStaysStopped(): void

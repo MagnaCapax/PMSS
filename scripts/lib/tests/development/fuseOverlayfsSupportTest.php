@@ -15,10 +15,10 @@ class FuseOverlayfsSupportTest extends TestCase
             "pmssDistUpgradeAptCommand(\$env, 'install', 'fuse-overlayfs')",
             'fuse-overlayfs',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', ["'users/docker.php'"]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "'users/docker.php'");
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/dockerDependencies.php',
             ['fuse-overlayfs', 'disable_containerd_snapshotter'],
             ['if ($distroVersion >= 12)' => 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available']);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/rootlessDockerPolicy.php', ['containerd-snapshotter']);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/rootlessDockerPolicy.php', 'containerd-snapshotter');
     }
 }
