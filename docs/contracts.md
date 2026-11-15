@@ -182,6 +182,17 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   post-install benchmark logging and the local transfer statistics probe;
   shared quoting, sanitization and aggregate-probe helpers remain authoritative.
 
+- Account command capture has three distinct contracts: `pmssAgentRun()` returns
+  `[exitCode, mergedOutput]` and accepts an environment; `pmssDockerLsioSeedCapture()`
+  requires a complete stdin write and returns stdout only on exit zero, discarding
+  stderr; `pmssToggleAppQuiAccountCommand()` returns `[success, stdoutThenStderr]`
+  after feeding its service credential on stdin. Exceptional cleanup attempts
+  remaining pipe closes, then termination and reaping of the still-owned child,
+  preserving PHP's throwable precedence. The first two helpers live in the
+  account `bin/` tree; the panel helper lives in `www/`. Shared cleanup must retain
+  those contracts and establish guiv delivery closure before adding a required
+  dependency across these files (ADR 0022); updater inventory alone is insufficient.
+
 - `pmssCliReturnWithStderr(string $message, int $exitCode = 1): int` writes the
   message verbatim to stderr and returns the supplied code. CLI failure paths
   return its result or pass it to `exit()`; it never adds a newline, writes to
