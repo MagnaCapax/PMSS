@@ -18,9 +18,8 @@ final class QbittorrentWatchdogPortsTest extends TestCase
     public function testPortManagerRequestPreservesReservationsForRejectedPreferences(): void
     {
         $directory = $this->pmssMakeTempDir('pmss-qbt-reservations-');
-        $this->pmssWriteFile($directory.'/qbittorrent-fixtur01', '24000');
-        $this->pmssWriteFile($directory.'/lighttpd-fixtur02', '25000');
-        $this->pmssWriteFile($directory.'/legacy/scgi/26000', '');
+        $this->pmssWriteFiles($directory, ['qbittorrent-fixtur01' => '24000',
+            'lighttpd-fixtur02' => '25000', 'legacy/scgi/26000' => '']);
         $script = 'namespace QbittorrentPortRequestFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/portManager.php'), true).';';
         // No actual socket bind: exercise the allocator's request policy with a deterministic probe.
         $script .= 'function pmssPortManagerPortIsAvailable(int $port): bool { return $port !== 27000; }';

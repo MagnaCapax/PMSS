@@ -71,31 +71,24 @@ class UserWebRootReconcileTest extends TestCase
 
         $migrationMessages = [];
         pmssUserMigrateWebRootState($this->context(), $this->logger($migrationMessages));
-        $before = [
-            'data' => file_get_contents($this->home.'/data/keep.bin'),
-            'watch' => file_get_contents($this->home.'/watch/keep.torrent'),
-            'session' => file_get_contents($this->home.'/session/keep.state'),
-            'public' => file_get_contents($this->home.'/www/public/index.html'),
-            'share' => file_get_contents($this->home.'/www/rutorrent/share/users/profile.ini'),
-            'rtorrent' => file_get_contents($this->home.'/.rtorrent.rc.custom'),
-            'lighttpd' => file_get_contents($this->home.'/.lighttpd/custom'),
-            'lighttpd_override' => file_get_contents($this->home.'/.lighttpd/custom.d/override.conf'),
+        // Observe the same ordered paths before deletion and after recovery.
+        $paths = [
+            'data' => $this->home.'/data/keep.bin',
+            'watch' => $this->home.'/watch/keep.torrent',
+            'session' => $this->home.'/session/keep.state',
+            'public' => $this->home.'/www/public/index.html',
+            'share' => $this->home.'/www/rutorrent/share/users/profile.ini',
+            'rtorrent' => $this->home.'/.rtorrent.rc.custom',
+            'lighttpd' => $this->home.'/.lighttpd/custom',
+            'lighttpd_override' => $this->home.'/.lighttpd/custom.d/override.conf',
         ];
+        $before = array_map('file_get_contents', $paths);
 
         $this->pmssRemoveTree($this->home.'/www');
         $messages = [];
         $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
 
-        $after = [
-            'data' => file_get_contents($this->home.'/data/keep.bin'),
-            'watch' => file_get_contents($this->home.'/watch/keep.torrent'),
-            'session' => file_get_contents($this->home.'/session/keep.state'),
-            'public' => file_get_contents($this->home.'/www/public/index.html'),
-            'share' => file_get_contents($this->home.'/www/rutorrent/share/users/profile.ini'),
-            'rtorrent' => file_get_contents($this->home.'/.rtorrent.rc.custom'),
-            'lighttpd' => file_get_contents($this->home.'/.lighttpd/custom'),
-            'lighttpd_override' => file_get_contents($this->home.'/.lighttpd/custom.d/override.conf'),
-        ];
+        $after = array_map('file_get_contents', $paths);
         $this->assertSame($before, $after);
         $this->assertTrue(is_link($this->home.'/www/public'));
         $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
@@ -117,9 +110,8 @@ class UserWebRootReconcileTest extends TestCase
     }
     public function testPartialMergeAddsMissingEntriesWithoutOverwritingCustomerFiles(): void
     {
-        $this->pmssWriteFile($this->home.'/www/index.php', 'customer-panel');
-        $this->pmssWriteFile($this->home.'/www/customer.txt', 'customer-data');
-        $this->pmssWriteFile($this->home.'/www/managed-dir', 'customer-path');
+        $this->pmssWriteFiles($this->home.'/www', ['index.php' => 'customer-panel',
+            'customer.txt' => 'customer-data', 'managed-dir' => 'customer-path']);
         $this->pmssWriteFile($this->skeleton.'/managed-dir/child.php', 'managed-child');
         $outside = $this->pmssMakeTempDir('pmss-web-reconcile-outside-');
         [$outsideContent] = $this->pmssCreateSymlinkedFileOrSkip(
@@ -141,11 +133,9 @@ class UserWebRootReconcileTest extends TestCase
     }
     public function testPartialMergeUsesOneTraversalForExistingAndNewDirectories(): void
     {
-        $this->pmssWriteFile($this->skeleton.'/existing/new/managed.php', 'managed-existing');
-        $this->pmssWriteFile($this->skeleton.'/fresh/nested/managed.php', 'managed-fresh');
-        $this->pmssWriteFile($this->skeleton.'/fresh/nested/second.php', 'second');
-        $this->pmssWriteFile($this->home.'/www/existing/customer.php', 'customer');
-        $this->pmssWriteFile($this->home.'/www/index.php', 'customer-panel');
+        $this->pmssWriteFiles($this->skeleton, ['existing/new/managed.php' => 'managed-existing',
+            'fresh/nested/managed.php' => 'managed-fresh', 'fresh/nested/second.php' => 'second']);
+        $this->pmssWriteFiles($this->home.'/www', ['existing/customer.php' => 'customer', 'index.php' => 'customer-panel']);
 
         $messages = [];
         $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));

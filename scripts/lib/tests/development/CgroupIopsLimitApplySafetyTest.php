@@ -93,11 +93,10 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
     public function testPlannedUsersPreserveCycleAccountingAndResolverFailures(): void
     {
         $usersDir = $this->pmssMakeTempDir('pmss-cgroup-users-', 0700);
-        $this->pmssWriteFile($usersDir.'/fixtur01.json', '{"enabled":true}', 0700);
-        $this->pmssWriteFile($usersDir.'/fixtur02.json', '{"enabled":true}', 0700);
-        $this->pmssWriteFile($usersDir.'/skipme.json', '{"enabled":false}', 0700);
-        $this->pmssWriteFile($usersDir.'/badjson.json', '{', 0700);
-        $this->pmssWriteFile($usersDir.'/bad name.json', '{"enabled":true}', 0700);
+        $this->pmssWriteFiles($usersDir, [
+            'fixtur01.json' => '{"enabled":true}', 'fixtur02.json' => '{"enabled":true}',
+            'skipme.json' => '{"enabled":false}', 'badjson.json' => '{', 'bad name.json' => '{"enabled":true}',
+        ], 0700);
 
         $total = 0;
         $errors = 0;

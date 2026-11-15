@@ -102,8 +102,7 @@ final class SysctlPipelineCharacterizationTest extends TestCase
         $route = $root.'/route';
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_NIC_SPEED_MBPS' => null,
             'PMSS_SYSCTL_PROC_NET_ROUTE_PATH' => $route, 'PMSS_SYSCTL_SYS_CLASS_NET_PATH' => $root]);
-        $this->pmssWriteFile($root.'/fixtur1/speed', "25000\n");
-        $this->pmssWriteFile($root.'/fixtur2/speed', "10000\n");
+        $this->pmssWriteFiles($root, ['fixtur1/speed' => "25000\n", 'fixtur2/speed' => "10000\n"]);
         foreach ([
             ["Iface Destination\ninvalid/name 00000000\nfixtur1 00000000\nfixtur2 00000000\n", 25000],
             ["Iface Destination\nmissing0 00000000\nfixtur1 00000000\n", 1000],

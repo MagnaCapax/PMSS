@@ -113,9 +113,8 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
     public function testCollectsOnlySafeLegacyPython2Artifacts(): void
     {
         $root = $this->tempDir.'/usr/local/lib/python2.7/dist-packages';
-        $this->pmssWriteFile($root.'/deluge-2.0.3-py2.7.egg', 'legacy');
-        $this->pmssWriteFile($root.'/deluge-2.0.5-py2.7.egg-info', 'legacy');
-        $this->pmssWriteFile($root.'/not-deluge-2.0.5-py2.7.egg', 'other');
+        $this->pmssWriteFiles($root, ['deluge-2.0.3-py2.7.egg' => 'legacy',
+            'deluge-2.0.5-py2.7.egg-info' => 'legacy', 'not-deluge-2.0.5-py2.7.egg' => 'other']);
 
         $paths = \pmssDelugeLegacyPython2ArtifactPaths($root);
 
