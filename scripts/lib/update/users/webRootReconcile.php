@@ -86,7 +86,7 @@ function pmssUserWebRootReconcileFull(
     return true;
 }
 
-/** Emit one structured run summary after the reconciler releases its lock. */
+/** Emit one structured run summary before the reconciler releases its lock. */
 function pmssUserWebRootReconcileLogSummary(
     string $user,
     ?callable $logger,
@@ -201,7 +201,11 @@ function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
         }
         return true;
     } finally {
-        pmssUserWebRootReconcileLogSummary($user, $logger, $reason, $mode, $stats, $startedAt);
-        pmssLockHandleRelease($lock);
+        try {
+            pmssUserWebRootReconcileLogSummary($user, $logger, $reason, $mode, $stats, $startedAt);
+        } finally {
+            // A summary logger fault must not strand the per-account lock.
+            pmssLockHandleRelease($lock);
+        }
     }
 }

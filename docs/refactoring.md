@@ -225,6 +225,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Web-root reconciliation attempts lock release even when its final summary logger
+throws. The summary still runs while the lock is held; ordinary return values,
+summary bytes and recovery ordering stay unchanged. Lone exceptions and errors
+propagate unchanged, and combined faults retain PHP's normal `finally` precedence.
+`WebRootReconcileLockCleanupSafetyTest` checks success, refusals, contention,
+acquisition faults and body/summary/release faults using memory-only boundaries.
+Execution stays on testing machines; devbox verification checks changed PHP syntax.
+
 Customer app process helpers close executable-header streams in `finally` before
 process scanning or propagation of read faults. Toggle-start lock acquisition
 shares the launch cleanup lifetime, and unlocking cannot prevent stream closure.
