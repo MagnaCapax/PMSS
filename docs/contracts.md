@@ -164,6 +164,15 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   Managed metadata logs append the reason. Serialized-target failure callbacks
   retain the path as their first argument and receive an optional second reason
   for root-stage failures; traffic/resource logs append it when present.
+  `pmssRootStagePublishRun()` also owns its child through thrown reaping faults:
+  it attempts termination and reaping only while that child remains acquired,
+  then runs the existing bounded stderr inspection and closure. A termination
+  fault cannot skip reaping or stderr cleanup; already-reaped children remain
+  untouched. Lone throwables propagate unchanged, and combined cleanup faults
+  retain PHP's normal `finally` precedence. Commands, ordinary boolean results,
+  failure text, private capture permissions and content redaction stay unchanged.
+  `RootStagePublishCleanupSafetyTest` covers these lifetimes with memory streams
+  and fake process operations; execution stays on testing machines.
 
 - `pmssAccountPathRun()` preserves its boolean result and optional timeout flag.
   Its optional eighth argument receives failure text with a stage, child exit

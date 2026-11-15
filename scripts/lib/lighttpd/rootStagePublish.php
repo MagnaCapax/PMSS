@@ -9,6 +9,7 @@ function pmssRootStagePublishRun(string $command, ?string &$failure = null): boo
     $failure = 'stage=publish-stderr rc=not-started';
     $stderr = @tmpfile();
     if (!is_resource($stderr)) return false;
+    $process = null;
     try {
         // As in accountPath.php, only the private descriptor survives launch.
         if (!@unlink(stream_get_meta_data($stderr)['uri'])) return false;
@@ -20,6 +21,17 @@ function pmssRootStagePublishRun(string $command, ?string &$failure = null): boo
         $status = @proc_close($process);
         $failure = $status === 0 ? '' : 'stage=publish rc='.$status;
         return $status === 0;
+    } catch (\Throwable $error) {
+        // A failed reap can leave this invocation's child owned and running.
+        if (is_resource($process)) {
+            try {
+                if (function_exists('proc_terminate')) @proc_terminate($process);
+            } finally {
+                // Termination faults must not skip the remaining reap attempt.
+                @proc_close($process);
+            }
+        }
+        throw $error;
     } finally {
         // Account-influenced paths may appear here: bound and sanitize before logging.
         try {
