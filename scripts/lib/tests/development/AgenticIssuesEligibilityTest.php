@@ -158,7 +158,7 @@ PHP;
         $run = $this->launch('agentic-issues.sh', ['--exec', '/bin/true']);
         $this->assertSame(0, $run['rc'], $run['output']);
         $this->assertStringContainsAllStrings(['changed after intent check', 'No issues left after freshness check'], $run['output']);
-        $this->assertFalse(strpos($run['output'], '[agentic-issues] done') !== false);
+        $this->assertStringNotContainsString('[agentic-issues] done', $run['output']);
 
         $this->fixture([1001], [], [1001 => $clear]);
         $run = $this->launch('agentic-issues.sh', ['--exec', '/bin/true']);
@@ -178,8 +178,7 @@ PHP;
         $run = $this->select();
         $this->assertSame(0, $run['rc'], $run['output']);
         $this->assertStringContainsString('#1001 intent-check not clear (exit=2): ERROR budget cap reached for the check', $run['output']);
-        $this->assertFalse(strpos($run['output'], 'ERROR second line') !== false, $run['output']);
-        $this->assertFalse(strpos($run['output'], 'noise before') !== false, $run['output']);
+        $this->assertStringContainsAndOmitsStrings([], ['ERROR second line' => $run['output'], 'noise before' => $run['output']], $run['output']);
         $this->assertStringContainsAllStrings(['#1002 intent-check not clear (exit=2): ERROR '.str_repeat('x', 194)."\n",
             "#1003 intent-check not clear (exit=1)\n"], $run['output']);
     }

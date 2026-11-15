@@ -69,7 +69,7 @@ class UserMovedTest extends TestCase
         // setMovedUntil must use set(), since persist() also writes a home cache.
         $source = file_get_contents($this->pmssRepoPath('scripts/lib/user/userConfigStore.php'));
         $method = substr($source, strpos($source, 'public function setMovedUntil'), strpos($source, 'public function persist') - strpos($source, 'public function setMovedUntil'));
-        $this->assertFalse(strpos($method, '->persist(') !== false);
+        $this->assertStringNotContainsString('->persist(', $method);
     }
 
     public function testSharedPredicateUsesStoreAndLeavesWebRootPredicateUnchanged(): void

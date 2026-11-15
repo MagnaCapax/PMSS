@@ -83,7 +83,7 @@ PHP;
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame(['root'], $events);
         $this->assertSame(null, $started);
-        $this->assertTrue(strpos($result['output'], 'links=upload,access.log,error.log') !== false);
+        $this->assertStringContainsString('links=upload,access.log,error.log', $result['output']);
     }
 
     public function testQuotaRefusalStopsBeforeRepairAndStartup(): void
@@ -92,7 +92,7 @@ PHP;
         $this->assertSame(1, $result['rc']);
         $this->assertSame(['root', 'quota'], $events);
         $this->assertSame(null, $started);
-        $this->assertTrue(strpos($result['output'], 'Live quota does not authorize') !== false);
+        $this->assertStringContainsString('Live quota does not authorize', $result['output']);
     }
 
     public function testFailedRepairStopsRemainingRepairsAndStartup(): void

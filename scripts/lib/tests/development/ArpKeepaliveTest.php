@@ -37,7 +37,7 @@ class ArpKeepaliveTest extends TestCase
     {
         foreach (['not-an-ip', '10.0.0.9; rm -rf /', "10.0.0.9\n10.0.0.8", '::1', '999.1.1.1', ''] as $bad) {
             $out = $this->runKeepalive($this->marker($bad), "10.0.0.9 dev eth0\n", self::ARP_HEADER, $sent);
-            $this->assertTrue(strpos($out, 'skip: marker does not hold a single IPv4 address') !== false, 'rejects '.json_encode($bad));
+            $this->assertStringContainsString('skip: marker does not hold a single IPv4 address', $out, 'rejects '.json_encode($bad));
             $this->assertFalse($sent);
         }
     }
@@ -45,7 +45,7 @@ class ArpKeepaliveTest extends TestCase
     public function testOffLinkTargetIsSkipped(): void
     {
         $out = $this->runKeepalive($this->marker("10.0.0.9\n"), "10.0.0.9 via 10.0.0.1 dev eth0 src 10.0.0.2\n", self::ARP_HEADER, $sent);
-        $this->assertTrue(strpos($out, 'is not on-link') !== false);
+        $this->assertStringContainsString('is not on-link', $out);
         $this->assertFalse($sent);
     }
 
@@ -53,7 +53,7 @@ class ArpKeepaliveTest extends TestCase
     {
         foreach (["\0".'10.0.0.9', "10.0.0.9\0", " \0 10.0.0.9 \n", "10.0.0.9\0\n", "10.0.\0.9"] as $raw) {
             $out = $this->runKeepalive($this->marker($raw), "10.0.0.9 dev eth0\n", self::ARP_HEADER, $sent);
-            $this->assertTrue(strpos($out, 'skip: marker does not hold a single IPv4 address') !== false);
+            $this->assertStringContainsString('skip: marker does not hold a single IPv4 address', $out);
             $this->assertFalse($sent);
         }
     }
@@ -119,7 +119,7 @@ PHP;
     {
         $arp = self::ARP_HEADER."10.0.0.9         0x1         0x2         52:54:00:aa:bb:cc     *        eth0\n";
         $out = $this->runKeepalive($this->marker('10.0.0.9'), "10.0.0.9 dev eth0 src 10.0.0.2\n", $arp, $sent);
-        $this->assertTrue(strpos($out, 'WARN: target 10.0.0.9 answers') !== false);
+        $this->assertStringContainsString('WARN: target 10.0.0.9 answers', $out);
         $this->assertFalse($sent);
     }
 
@@ -128,7 +128,7 @@ PHP;
         $arp = self::ARP_HEADER."\n \t\n10.0.0.9\t0x1 0x0\n 10.0.0.9\t0x1\t0x0 00:00:00:00:00:00 * eth0 \r\n";
         $out = $this->runKeepalive($this->marker(" 10.0.0.9 \n"), "10.0.0.9 dev eth0 src 10.0.0.2\n", $arp, $sent);
         $this->assertTrue($sent);
-        $this->assertTrue(strpos($out, 'arp-keepalive sent target=10.0.0.9 neighbour=incomplete') !== false);
+        $this->assertStringContainsString('arp-keepalive sent target=10.0.0.9 neighbour=incomplete', $out);
     }
 
     public function testNeighbourStateMatchesExactAddressOnly(): void

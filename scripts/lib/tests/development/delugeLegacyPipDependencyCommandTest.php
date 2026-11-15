@@ -12,7 +12,7 @@ class DelugeLegacyPipDependencyCommandTest extends DelugeAppTestCase
     {
         $command = \pmssBuildCommand('pip', array_merge(['install'], \pmssDelugeLegacyPipDependencyPackages()));
 
-        $this->assertTrue(strpos($command, "'pyasn1==0.4.6'") !== false);
+        $this->assertStringContainsString("'pyasn1==0.4.6'", $command);
     }
 
     /**
@@ -22,7 +22,7 @@ class DelugeLegacyPipDependencyCommandTest extends DelugeAppTestCase
     {
         $command = \pmssBuildCommand('pip', array_merge(['install'], \pmssDelugeLegacyPipDependencyPackages()));
 
-        $this->assertTrue(strpos($command, "'--upgrade'") === false);
+        $this->assertStringNotContainsString("'--upgrade'", $command);
     }
 
     /**

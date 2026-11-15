@@ -16,7 +16,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
             ],
             'totalMemMiB' => 2048,
         ]);
-        $this->assertTrue(strpos($out, 'IODeviceWeight=') !== false, 'IODeviceWeight not appended');
+        $this->assertStringContainsString('IODeviceWeight=', $out, 'IODeviceWeight not appended');
     }
 
     public function testIODeviceWeightSkippedOnV1(): void
@@ -30,7 +30,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
             ],
             'totalMemMiB' => 2048,
         ]);
-        $this->assertTrue(strpos($out, 'IODeviceWeight=') === false, 'IODeviceWeight should be skipped on v1');
+        $this->assertStringNotContainsString('IODeviceWeight=', $out, 'IODeviceWeight should be skipped on v1');
     }
 
     public function testIOPSLimitsAppendedWhenConfigured(): void

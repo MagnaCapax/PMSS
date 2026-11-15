@@ -48,7 +48,7 @@ PHP;
             'rc' => 0, 'setupCalls' => 1, 'configTestCalls' => [[false, false]],
         ], $result);
         $this->assertMatches('/location \/\s*\{/', $result['site']);
-        $this->assertTrue(strpos($result['site'], 'try_files $uri $uri/ =404;') !== false);
+        $this->assertStringContainsString('try_files $uri $uri/ =404;', $result['site']);
     }
 
     public function testEmptyListingWithRestartUsesExistingRestartPath(): void

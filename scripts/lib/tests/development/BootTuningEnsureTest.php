@@ -106,9 +106,9 @@ class BootTuningEnsureTest extends TestCase
 
         $bootTuning = (string)file_get_contents($this->pmssRepoPath('etc/seedbox/config/template.pmss-boot-tuning.sh'));
         foreach (['sync_speed_min' => '25000', 'sync_speed_max' => '750000'] as $knob => $value) {
-            $this->assertTrue(strpos($rcLocal, 'echo '.$value.' | tee /sys/block/${MD}/md/'.$knob) !== false,
+            $this->assertStringContainsString('echo '.$value.' | tee /sys/block/${MD}/md/'.$knob, $rcLocal,
                 'rc.local md '.$knob.' must be '.$value);
-            $this->assertTrue(strpos($bootTuning, 'write_sys "$md/md/'.$knob.'" '.$value) !== false,
+            $this->assertStringContainsString('write_sys "$md/md/'.$knob.'" '.$value, $bootTuning,
                 'boot-tuning md '.$knob.' must match rc.local at '.$value);
         }
     }
