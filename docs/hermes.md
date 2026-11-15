@@ -59,6 +59,14 @@ The account can use `~/bin/install-hermes status`, `start`, `stop`,
 account-owned Hermes state. No Hermes cron job is installed. Installation
 status is shown in Configure; the card polls every five seconds while open.
 
+Dashboard PID capture attempts to close every acquired pipe and reap its launch
+child after I/O faults. Cleanup still reaches reaping when a pipe close throws;
+an already-reaped child is left alone. Lone exceptions and errors propagate
+unchanged, while combined faults retain PHP's normal cleanup precedence.
+Command bytes, PID validation, marker writes and readiness checks retain their
+contracts. `HermesStartCleanupSafetyTest` covers these paths with memory streams
+and fake process operations; execution stays on testing machines.
+
 During managed account transfer, the opt-in `.hermes` tree is excluded from
 the hot main pass. The tracked dashboard stops before the final pass copies
 it. An untracked customer-started process can still write during that copy.

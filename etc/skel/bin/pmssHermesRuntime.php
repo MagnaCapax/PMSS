@@ -130,7 +130,30 @@ function pmssHermesStart(array $paths): void
     $command = pmssHermesStartCommand($paths, $url, $port, $log);
     $process = proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, array());
     if (!is_resource($process)) throw new RuntimeException('Dashboard could not launch');
-    fclose($pipes[0]); $pid = trim((string) stream_get_contents($pipes[1])); fclose($pipes[1]); fclose($pipes[2]); proc_close($process);
+    try {
+        fclose($pipes[0]);
+        $pid = trim((string) stream_get_contents($pipes[1]));
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($process);
+    } catch (\Throwable $error) {
+        // PID capture owns the launcher's pipes and child until reaping completes.
+        try {
+            try {
+                if (is_resource($pipes[0])) fclose($pipes[0]);
+            } finally {
+                try {
+                    if (is_resource($pipes[1])) fclose($pipes[1]);
+                } finally {
+                    if (is_resource($pipes[2])) fclose($pipes[2]);
+                }
+            }
+        } finally {
+            // A pipe-close fault must not skip reaping; an already-reaped child is left alone.
+            if (is_resource($process)) proc_close($process);
+        }
+        throw $error;
+    }
     if (!preg_match('/^[1-9][0-9]*$/D', $pid)) throw new RuntimeException('Dashboard did not return a PID');
     file_put_contents($paths['pid'], $pid."\n");
     file_put_contents($paths['port'], $port."\n");
