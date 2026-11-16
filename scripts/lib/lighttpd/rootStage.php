@@ -133,11 +133,15 @@ function pmssRootStageFileWrite(string $path, string $content, string $group, in
         $oldCleared = $immutable && is_array($old);
         $failure = 'stage=immutable-clear rc=not-started';
         if ($oldCleared && !pmssRootStageImmutableSet($path, $old, false)) return false;
-        $command = pmssRootStagePublishCommand($parent, $home, $stageFile, basename($path), (int) $published['dev']);
-        if (!pmssRootStagePublishRun($command, $failure)) {
-            if ($oldCleared) pmssRootStageImmutableSet($path, $old, true);
-            return false;
+        $publishSucceeded = false;
+        try {
+            $command = pmssRootStagePublishCommand($parent, $home, $stageFile, basename($path), (int) $published['dev']);
+            $publishSucceeded = pmssRootStagePublishRun($command, $failure);
+        } finally {
+            // Restore only the old pinned inode, including when publication throws.
+            if (!$publishSucceeded && $oldCleared) pmssRootStageImmutableSet($path, $old, true);
         }
+        if (!$publishSucceeded) return false;
         $failure = 'stage=immutable-set rc=not-started';
         if ($immutable && !pmssRootStageImmutableSet($path, $published, true)) return false;
         $failure = '';

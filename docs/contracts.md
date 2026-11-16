@@ -307,6 +307,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   directory mtime. Content or metadata differences retain atomic replacement;
   path, identity and link checks still apply (Refs #1088).
 
+  Root-stage writes attempt to restore a successfully cleared old immutable inode when
+  publication fails or throws, including during command construction. Restoration
+  retains the old device/inode guard; successful publication protects the new
+  inode instead. Stage cleanup follows restoration even when restoration throws.
+  Ordinary results and failure text stay unchanged; lone throwables propagate,
+  with PHP's normal `finally` precedence for combined cleanup faults (ADR 0164).
+
 - Lock lifecycle helpers close streams when handle validation, lock acquisition,
   or explicit unlocking throws. The original throwable propagates; successful
   acquisition still transfers ownership to the caller, including the legacy

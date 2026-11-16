@@ -107,6 +107,29 @@ path validation unchanged. The [error-control documentation](https://www.php.net
 confirms custom handlers still run for suppressed diagnostics; cleanup must
 therefore tolerate throwables despite `@`.
 
+## Immutable restoration follow-up (2026-11-16)
+
+After successfully clearing an existing managed inode's immutable flag,
+`pmssRootStageFileWrite()` attempts restoration in `finally` when command
+construction or publication throws, as it already does for a false publication
+result. Restoration still uses the old device/inode snapshot; it cannot authorize
+toggling a substituted inode. Successful publication retains the new-inode
+immutable step. Ordinary results, failure text and false restoration results
+remain unchanged. Stage-file and empty-directory cleanup still follow restoration,
+including when restoration throws; combined faults retain PHP's `finally` precedence.
+
+`RootStageImmutableCleanupSafetyTest` covers exceptions, errors, false returns,
+mutable/missing old entries, inode arguments and cleanup order using intercepted
+operations and memory streams. Execution belongs on testing machines; devbox
+verification checks changed-file PHP syntax only. No dry-run or live immutable
+operation is executed on the devbox.
+
+The security review retains the path/inode guards and root-private staging above,
+including the defenses relevant to PHP's historical pathname-NUL issue
+(CVE-2015-2348). Exposure of a managed payload remains bounded by its existing
+owner/mode and private stage. Primary/service credential separation, redaction,
+file permissions, web endpoints and listeners are unchanged.
+
 ## References
 
 - [ADR 0121](0121-root-operations-and-account-controlled-objects.md)

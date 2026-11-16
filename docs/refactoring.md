@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Root-stage publication attempts to restore a cleared old immutable inode through thrown
+command/publication failures before staging cleanup. Restoration retains the
+old inode guard; successful publication still protects the new inode. Ordinary
+results and failure text are preserved, with PHP's `finally` precedence for
+combined faults (ADR 0164). `RootStageImmutableCleanupSafetyTest` intercepts all
+filesystem/process mutations and uses memory streams; execution stays on testing
+machines, with changed-file PHP syntax checks on the devbox.
+
 Atomic managed-file replacement attempts unpublished staging-file removal even
 when stream closure throws. Successful publication clears the staging name before
 cleanup; close-before-unlink order and ordinary results remain unchanged. Lone
