@@ -16,6 +16,12 @@ Active work items are tracked in GitHub issues to avoid duplication between this
 
 ## Code Quality Audits
 
+- [ ] Establish the compatibility scope of `PmssUserStatsProcessor::spawnWorkers()`
+  before removing detached processing. `ResourceStatsProcessor` and
+  `TrafficStatsProcessor` select inline processing, while their shared base still
+  defaults to detached workers and exposes worker spawning publicly. Characterize
+  both modes before deciding whether that branch can be retired; two inline
+  subclasses alone do not establish that the inherited contract is unused.
 - [ ] Audit string matching patterns across codebase for truncation bugs and typos. Found `.rtorrentexecut` typo (missing 'e') in process.php; similar issues may exist in other `strpos()`, `preg_match()`, or filename pattern checks. Check process name matching, config file patterns, and path validations.
 - [ ] Before extracting new required helpers from `etc/skel/www/welcome.php` or
   `userMediaStackPanel.php`, establish delivery closure against the external
