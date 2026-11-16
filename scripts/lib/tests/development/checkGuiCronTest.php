@@ -46,22 +46,23 @@ PHP;
 
     public function testCheckGuiRepairsCoreUserspacePaths(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/checkGui.php',
-            [
+        foreach ([
+            'scripts/cron/checkGui.php' => [
                 'pmssCheckGuiEnsureUserDirectory($wwwDir',
-                'pmssCheckGuiEnsureUserDirectory($dataDir',
-                'pmssCheckGuiRestoreUserIndex',
+                "pmssCheckGuiEnsureUserDirectory(\$homeDir.'/data'",
                 'pmssCheckGuiRestoreUserFile',
-                'pmssCheckGuiWebRootSentinelsHealthy',
                 'pmssCheckGuiWebRootReconcileIfSentinelMissing',
-                'pmssUserReconcileWebRoot',
                 "'scriptsInc.php'",
                 'pmssUserPanelHelperFiles()',
                 'pmssCheckGuiManagedUserNameNormalize($thisUser)',
             ],
-            'checkGui should keep core userspace repair wiring: '
-        );
+            'scripts/lib/gui/watchdogPaths.php' => [
+                'pmssCheckGuiWebRootSentinelsHealthy', 'pmssUserReconcileWebRoot',
+            ],
+            'scripts/lib/gui/watchdogRepair.php' => ['pmssCheckGuiRestoreUserIndex'],
+        ] as $path => $fragments) {
+            $this->pmssAssertRepoFileContainsAllStrings($path, $fragments, 'checkGui should keep core userspace repair wiring: ');
+        }
     }
 
     public function testManagedUserNameNormalizeRejectsUnsafeEntries(): void

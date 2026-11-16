@@ -1,5 +1,15 @@
 # Refactoring Guidelines
 
+GUI watchdog traversal retains its cron entrypoint, include surface and logger
+identity (ADR 0291). Account/path/ownership checks and sentinel reconciliation
+live in `gui/watchdogPaths.php`; directory/file recovery lives in
+`gui/watchdogRepair.php`. Three temporary aliases disappear; ownership failures
+share one diagnostic path after the symlink refusal. Characterization locks
+metadata probe order, warning bytes, queue skips, repair ordering, ignored failures,
+the final directory check and exception propagation. Existing fixtures retain
+source validation, full-read, atomic-publication and sentinel guards. Execution
+stays on testing machines; devbox verification checks changed PHP syntax only.
+
 Operator and customer qBittorrent version probes protect environment setup with
 the existing profile cleanup lifetime immediately after directory creation.
 Environment setup exceptions and errors attempt profile removal before propagating;

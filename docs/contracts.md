@@ -1556,6 +1556,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
     timeouts stop the sweep before publication. See ADR 0285.
 
 - scripts/cron/checkGui.php
+  - Boundaries: The cron keeps account traversal and its original logger identity;
+    `gui/watchdogPaths.php` owns normalization, path/ownership checks and sentinel
+    recovery, while `gui/watchdogRepair.php` owns directory/file repair (ADR 0291).
+    All public helpers remain available through the cron include. An unsuccessful
+    reconciler or `data/` repair does not skip managed-file recovery; an unsuccessful
+    `www/` repair does. A thrown repair stops traversal and propagates unchanged.
   - Behavior: Runs outside the panel request path and checks non-empty
     `www/index.php` and `www/rutorrent/index.html` sentinels. When either
     sentinel fails, it invokes the shared per-user web-root reconciler before

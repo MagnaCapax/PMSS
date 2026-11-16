@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/cron/checkGui.php** retains GUI-watchdog traversal, logging and the
+  CLI guard. `gui/watchdogPaths.php` owns account normalization, path/ownership
+  checks and sentinel-gated reconciliation; `gui/watchdogRepair.php` owns
+  directory and managed-file recovery. The original include and all public
+  helpers remain available (ADR 0291).
 - **scripts/cron/checkWireguard.php** retains the cron entrypoint and loads
   `wireguard/watchdog.php` for configuration preflight and service dispatch.
   `watchdogPeers.php` owns module/peer observations and reconciliation;

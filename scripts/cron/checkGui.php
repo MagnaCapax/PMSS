@@ -1,241 +1,36 @@
 #!/usr/bin/env php
 <?php
-/**
- * Cron watchdog ensuring each user retains a web GUI entry point.
- *
- * Preconditions:
- *   - User homes live under `/home/<user>` with `www/` mirroring the skeleton.
- *   - Healthy managed panel files match their skeleton sources; missing or
- *     divergent files are restored.
- *
- * Future enhancements may add HTTP responsiveness probes; keep the watchdog
- * lightweight and idempotent so it can run every few minutes without churn.
- *
- * @license GPL-3.0-only
- * @author PMSS Team
- */
+/** GUI watchdog account traversal and CLI entrypoint. @license GPL-3.0-only */
 
 require_once __DIR__.'/../lib/runtime.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', [
     'logger.php', 'lighttpd/userFileWrite.php', 'user/selection.php',
+    'gui/watchdogPaths.php', 'gui/watchdogRepair.php',
     'update/users/filesystem.php', 'update/users/context.php', 'update/users/webRootReconcile.php',
 ]);
-
-/**
- * Normalize and revalidate a managed-user iterator value before composing paths.
- */
-function pmssCheckGuiManagedUserNameNormalize($rawUser): ?string
-{
-    if (!is_scalar($rawUser)) {
-        return null;
-    }
-
-    $username = trim((string) $rawUser);
-    if (!pmssValidateUsername($username)) {
-        return null;
-    }
-
-    return pmssNormalizeUsername($username);
-}
-
-/**
- * Confirm a GUI repair target stays inside the expected home directory.
- */
-function pmssCheckGuiUserPathIsSafe(string $path, string $homeDir, bool $directoryTarget): bool
-{
-    $homeDir = rtrim($homeDir, '/');
-    if ($homeDir === '' || !pmssPathTargetIsSafe($homeDir, true)) {
-        return false;
-    }
-
-    clearstatcache(true, $path);
-    return pmssPathTargetIsSafe($path, $directoryTarget, true)
-        && pmssPathWithinRootIsSafe(dirname($path), $homeDir, true)
-        && !is_link($path)
-        && (!file_exists($path) || ($directoryTarget ? is_dir($path) : is_file($path)));
-}
-
-/**
- * Confirm a repaired path already belongs to the account that wrote it.
- */
-function pmssCheckGuiApplyOwnership(string $path, string $user, callable $log): bool
-{
-    clearstatcache(true, $path);
-    if (is_link($path)) {
-        $log("Skipping {$user}: refusing to apply ownership to symlinked {$path}");
-        return false;
-    }
-    if (!is_file($path) && !is_dir($path)) {
-        $log("Skipping {$user}: unable to apply ownership to {$path}");
-        return false;
-    }
-
-    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
-    $stat = @lstat($path);
-    if (!is_array($account) || !is_array($stat)
-        || (int) $stat['uid'] !== (int) $account['uid']) {
-        $log("Skipping {$user}: unable to apply ownership to {$path}");
-        return false;
-    }
-
-    return true;
-}
-
-/** Check the small sentinel set before running the complete web-root reconciler. */
-function pmssCheckGuiWebRootSentinelsHealthy(string $wwwDir, string $homeDir): bool
-{
-    foreach ([$wwwDir.'/index.php', $wwwDir.'/rutorrent/index.html'] as $sentinel) {
-        if (!pmssCheckGuiUserPathIsSafe($sentinel, $homeDir, false)
-            || is_link($sentinel)
-            || !is_file($sentinel)
-            || (int) @filesize($sentinel) <= 0) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/** Reconcile only when a critical web-root sentinel is missing or unusable. */
-function pmssCheckGuiWebRootReconcileIfSentinelMissing(string $user, string $homeDir, callable $log): bool
-{
-    if (pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir)) {
-        return true;
-    }
-
-    $context = pmssBuildUserWebRootContext($user);
-    if ($context === null || rtrim((string) $context['home'], '/') !== rtrim($homeDir, '/')) {
-        $log("Skipping {$user}: unable to build a safe web-root reconciliation context");
-        return false;
-    }
-
-    return pmssUserReconcileWebRoot($context, $log);
-}
-
-/**
- * Ensure a required user directory exists with expected ownership.
- *
- * Returns false only when a conflicting non-directory path blocks recovery.
- */
-function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string $label, callable $log, string $homeDir = ''): bool
-{
-    $homeDir = $homeDir === '' ? dirname($directory) : rtrim($homeDir, '/');
-    if (!pmssCheckGuiUserPathIsSafe($directory, $homeDir, true)) {
-        $log("Skipping {$user}: unsafe {$label} directory target {$directory}");
-        return false;
-    }
-
-    if (is_dir($directory)) {
-        return true;
-    }
-
-    if (file_exists($directory)) {
-        $log("Skipping {$user}: expected {$label} directory but found non-directory at {$directory}");
-        return false;
-    }
-
-    $log("Restoring {$label} directory for user {$user}");
-    if (!pmssAccountDirectoryEnsure($user, $homeDir, $directory, 0755, 0755)) {
-        $log("Skipping {$user}: unable to create {$label} directory at {$directory}");
-        return false;
-    }
-    if (!pmssCheckGuiApplyOwnership($directory, $user, $log)) {
-        return false;
-    }
-
-    return is_dir($directory);
-}
-
-/**
- * Restore a managed user panel file when it is missing or differs from the skeleton.
- */
-function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, string $user, string $label, callable $log, string $homeDir = ''): bool
-{
-    $homeDir = $homeDir === '' ? dirname(dirname($targetFile)) : rtrim($homeDir, '/');
-    if (!pmssCheckGuiUserPathIsSafe($targetFile, $homeDir, false)) {
-        $log("Skipping {$user}: unsafe {$label} target {$targetFile}");
-        return false;
-    }
-
-    $targetSize = @filesize($targetFile);
-    $sourceSize = @filesize($sourceFile);
-    if (is_file($targetFile) && is_int($targetSize) && $targetSize > 0) {
-        // Preserve an existing panel file when the skeleton is temporarily unavailable.
-        if (!is_int($sourceSize) || $sourceSize <= 0) {
-            return true;
-        }
-        if (pmssPathTargetIsSafe($sourceFile, false, true) && pmssRegularFilePathIsReadable($sourceFile)) {
-            $targetHash = @sha1_file($targetFile);
-            if ($targetHash !== false && $targetHash === @sha1_file($sourceFile)) {
-                return true;
-            }
-        }
-    }
-
-    if (file_exists($targetFile) && !is_file($targetFile)) {
-        $log("Skipping {$user}: expected {$label} file but found non-file at {$targetFile}");
-        return false;
-    }
-
-    if (
-        !pmssPathTargetIsSafe($sourceFile, false, true)
-        || !pmssRegularFilePathIsReadable($sourceFile)
-        || !is_int($sourceSize)
-        || $sourceSize <= 0
-    ) {
-        $log("Cannot restore {$label} for {$user}: missing skeleton source {$sourceFile}");
-        return false;
-    }
-
-    $content = pmssReadRegularFileContents($sourceFile);
-    if ($content === null || strlen($content) !== $sourceSize) {
-        $log("Skipping {$user}: unable to read complete {$label} source {$sourceFile}");
-        return false;
-    }
-
-    $log("Restoring {$label} for user {$user}");
-    $existing = @lstat($targetFile);
-    $mode = is_array($existing) ? ((int) $existing['mode'] & 0777) : 0644;
-    if (!pmssReplaceAccountFile($user, $homeDir, $targetFile, $content, $mode, true)) {
-        $log("Skipping {$user}: unable to atomically replace {$label} at {$targetFile}");
-        return false;
-    }
-
-    return pmssCheckGuiApplyOwnership($targetFile, $user, $log);
-}
-
-/** Preserve the existing public helper contract for index.php callers. */
-function pmssCheckGuiRestoreUserIndex(string $targetFile, string $sourceFile, string $user, callable $log, string $homeDir = ''): bool
-{
-    return pmssCheckGuiRestoreUserFile($targetFile, $sourceFile, $user, 'index.php', $log, $homeDir);
-}
 
 /**
  * Run the GUI watchdog for every managed home user.
  */
 function pmssCheckGuiMain(array $argv): int
 {
-    $logger = new Logger(__FILE__);
-    $log = [$logger, 'msg'];
-    $skeletonWwwDir = '/etc/skel/www';
-    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
+    $log = [new Logger(__FILE__), 'msg'];
+    $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
 
     foreach (pmssManagedHomeUsersList() as $thisUser) {
         $thisUser = pmssCheckGuiManagedUserNameNormalize($thisUser);
         if ($thisUser === null) {
-            $logger->msg('Skipping invalid managed-user entry while checking GUI files');
+            $log('Skipping invalid managed-user entry while checking GUI files');
             continue;
         }
 
         // User suspended check after the iterator value has been revalidated.
-        if (file_exists(rtrim($homeRoot, '/')."/{$thisUser}/www-disabled")) continue;
-
-        $homeDir = rtrim($homeRoot, '/')."/{$thisUser}";
+        $homeDir = $homeRoot."/{$thisUser}";
+        if (file_exists($homeDir.'/www-disabled')) continue;
         $wwwDir = $homeDir.'/www';
-        $dataDir = $homeDir.'/data';
 
         if (!is_dir($homeDir) || is_link($homeDir)) {
-            $logger->msg("Skipping {$thisUser}: home directory missing or unsafe at {$homeDir}");
+            $log("Skipping {$thisUser}: home directory missing or unsafe at {$homeDir}");
             continue;
         }
 
@@ -247,13 +42,13 @@ function pmssCheckGuiMain(array $argv): int
         if (!pmssCheckGuiEnsureUserDirectory($wwwDir, $thisUser, 'www', $log, $homeDir)) {
             continue;
         }
-        pmssCheckGuiEnsureUserDirectory($dataDir, $thisUser, 'data', $log, $homeDir);
+        pmssCheckGuiEnsureUserDirectory($homeDir.'/data', $thisUser, 'data', $log, $homeDir);
 
         // Restore the catalog before the split helpers that require it.
         foreach (array_merge(['toggleAppCatalog.php', 'index.php', 'scriptsInc.php'], pmssUserPanelHelperFiles()) as $guiFile) {
             pmssCheckGuiRestoreUserFile(
                 $wwwDir.'/'.$guiFile,
-                $skeletonWwwDir.'/'.$guiFile,
+                '/etc/skel/www/'.$guiFile,
                 $thisUser,
                 $guiFile,
                 $log,
