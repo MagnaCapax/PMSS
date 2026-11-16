@@ -208,6 +208,13 @@ Keep the canonical installer/update details under `docs/install.md` and
   `webRootPaths.php` owns destination conflicts, and `webRootReconcileCopy.php`
   owns skeleton traversal. The locked reconciler retains full/partial recovery
   orchestration (ADR 0172).
+- **scripts/lib/user/qbittorrentBuildProbe.php** and its customer-tree copy reject
+  failed stdout reads through the existing `null` result before further polling,
+  then run the existing child, pipe and private-profile cleanup. Empty nonblocking
+  reads remain valid; successful output, deadlines and limits retain their contracts.
+  `QbittorrentBuildReadSafetyTest` covers first and partial read failures, an exited
+  child, empty reads and successful captures using memory streams and fake processes.
+  Execution stays on testing machines; devbox checks changed-file PHP syntax only.
 - **scripts/lib/user/qbittorrentWebUiAuth.php** – Opt-in qBittorrent WebUI config reconciliation. It checks the same path predicate as the writer, updates every managed key copy, and stops a matching native daemon at most once per account per day until a stopped pass applies the file. The customer panel's password-required helper lives under `etc/skel/www/`.
 - **scripts/lib/user/deluge.php** and **delugeManagedConfig.php** retain provisioning
   and maintenance entry points. Template rendering and file/port publication live

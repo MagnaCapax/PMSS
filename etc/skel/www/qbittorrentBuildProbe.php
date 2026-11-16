@@ -27,6 +27,8 @@ function pmssQbittorrentFrontendBuildProbe(string $binary, array $ops = []): ?st
         $output = '';
         do {
             $chunk = @stream_get_contents($pipes[1], 4097 - strlen($output));
+            // A failed read cannot certify even an already captured version string.
+            if ($chunk === false) return null;
             if (is_string($chunk)) $output .= $chunk;
             $status = proc_get_status($process);
             if ($status === false) return null;
