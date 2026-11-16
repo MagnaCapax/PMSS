@@ -16,7 +16,7 @@ codex_runner_finish() {
 }
 
 codex_runner_begin() {
-	[[ -n "$outdir" ]] || outdir="$(codex_make_temp_workspace pmss-codex-run)"
+	[[ -n "$outdir" ]] || outdir="$(codex_make_temp_workspace pmss-run-codex)"
 	run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}"
 	run_start_ms="$(codex_now_ms)"
 	event_log="${event_log:-${PMSS_CODEX_RUN_EVENT_LOG:-$ROOT/log/codex-run/$(date -u +%Y-%m-%d)/$run_id.jsonl}}"

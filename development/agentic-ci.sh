@@ -47,7 +47,7 @@ Examples:
 EOF
 }
 
-OUTDIR="$(codex_make_temp_workspace pmss-codex-ci)"
+OUTDIR="$(codex_make_temp_workspace pmss-ci-codex)"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 RUNLOG="$OUTDIR/job-run.log"
@@ -558,6 +558,13 @@ if [[ $any_logs -eq 0 ]]; then
 fi
 
 codex_context_args=(--context "$SUMMARY")
+# Whole job logs can be too large to hand over; the failing steps alone are small.
+FAILED_STEPS="$OUTDIR/failed-steps.log"
+php "$HERE/lib/ci-failed-steps.php" "$FAILED_STEPS" "$OUTDIR/job-build.log" "$OUTDIR/job-smoke.log" "$JOBLOG" || true
+if [[ -s "$FAILED_STEPS" ]]; then
+	echo "[codex-ci] failed-steps excerpt: $(wc -c <"$FAILED_STEPS") bytes" >&1
+	codex_context_args+=(--context "$FAILED_STEPS")
+fi
 for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
 	[[ -s "$jl" ]] || continue
 	codex_context_args+=(--context "$jl")
