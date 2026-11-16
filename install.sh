@@ -475,8 +475,10 @@ ensure_packages() {
 export DEBIAN_FRONTEND=noninteractive
 
 preflight_checks() {
-	local required_bytes=$((2 * 1024 * 1024 * 1024)) # 2 GiB
-	local free_bytes
+	# Compare in KiB: df -Pk prints integers. Multiplying in awk made old mawk print
+	# 9.7e+10 on large disks, the -lt test errored and the guard failed open.
+	local required_kib=$((2 * 1024 * 1024)) # 2 GiB
+	local free_kib
 
 	if [ "$existing_install" != true ]; then
 		case "${PMSS_SKIP_HOME_MOUNT_CHECK:-}" in
@@ -490,8 +492,8 @@ preflight_checks() {
 		esac
 	fi
 
-	free_bytes=$(df -Pk / | awk 'NR==2 {print $4 * 1024}')
-	if [ -n "$free_bytes" ] && [ "$free_bytes" -lt "$required_bytes" ]; then
+	free_kib=$(df -Pk / | awk 'NR==2 {print $4}')
+	if [ -n "$free_kib" ] && [ "$free_kib" -lt "$required_kib" ]; then
 		log_error "Insufficient disk space on / (need >= 2 GiB free)"
 		exit 1
 	fi

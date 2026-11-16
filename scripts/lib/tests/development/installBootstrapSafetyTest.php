@@ -304,6 +304,21 @@ BASH;
         $this->assertSame(0, $second['rc']);
         $this->assertStringNotContainsString('INFO', $second['output'], 'A second run changes nothing');
     }
+    public function testFreeSpaceGuardComparesIntegerKibOnLargeAndSmallDisks(): void
+    {
+        $this->assertStringContainsAndOmitsStrings(["awk 'NR==2 {print \$4}'", '-lt "$required_kib"'],
+            ['$4 * 1024', 'free_bytes'], $this->script);
+        $this->assertSame(1, preg_match('/^\tfree_kib=.*?\n\tfi\n/ms', $this->script, $m), 'Guard block found');
+        $root = $this->pmssMakeTempDir('pmss-install-freespace-');
+        $script = $this->pmssWriteFile($root.'/run.sh', "log_error() { echo \"ERROR \$*\"; }\n"
+            ."df() { printf 'Filesystem 1024-blocks Used Available Capacity Mounted\\n/dev/x 1 1 %s 1%% /\\n' \"\$FAKE_KIB\"; }\n"
+            ."required_kib=\$((2 * 1024 * 1024))\n".$m[0]."echo PASSED\n");
+        foreach (['95131836' => 0, '1048576' => 1] as $kib => $rc) {
+            $r = $this->pmssExecShellCommand('FAKE_KIB='.$kib.' bash '.escapeshellarg($script));
+            $this->assertSame($rc, $r['rc'], $kib.' KiB: '.$r['output']);
+            $this->assertStringNotContainsString('integer expression', $r['output']);
+        }
+    }
     public function testSharedConvergenceRemainsInUpdateStep2(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
