@@ -7,6 +7,9 @@
  */
 
 require_once __DIR__.'/pythonVenv.php';
+require_once __DIR__.'/python/pip.php';
+
+pmssPythonPipRepair();
 
 $venvDir   = '/opt/flexget';
 pmssPythonVenvInstallCli($venvDir, 'FlexGet', [

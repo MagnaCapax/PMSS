@@ -351,6 +351,15 @@ table only tracks external/non-Debian sources.
 
 Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely on the system interpreter; track them for future virtualenv migrations so pip activity stays isolated per app.
 
+The Python installer also repairs `/usr/local/bin/pip` and `pip3` launchers whose
+absolute Python shebang points to a missing interpreter (#815). Only regular,
+non-symlink launchers qualify, and the corresponding `/usr/bin` command must pass
+`--version` before the local launcher moves to `<launcher>.pmss-disabled`, allowing
+PATH lookup to reach the distro command. Existing backups are never overwritten;
+working local interpreters and unrecognized launchers stay untouched. Both the
+version probe and backup use `runStep()` and honor `PMSS_DRY_RUN`. Reopen an
+existing shell or clear its command hash after an update repairs its launcher.
+
 Torrent-client venv, Transmission web, and Agentboard archive inspection rejects
 empty or NUL-containing filenames before shell quoting or tar execution, using
 the existing false/empty-list failure results. Valid filename bytes, listing
