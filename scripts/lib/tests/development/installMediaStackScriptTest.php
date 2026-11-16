@@ -2190,4 +2190,41 @@ BASH
             'No PMSS-reserved port is available for sonarr'], $output);
     }
 
+    public function testPortReservationFailureReachesStderrAndStopsInstaller(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-port-failure-');
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'log_warn', 'log_err', 'media_stack_port_is_valid',
+            'media_stack_reserved_port_read', 'pick_existing_or_reserved_port',
+        ));
+
+        // Keep the assignment unguarded: an || fallback would hide set -e behavior.
+        foreach (array('', 'abc', '0', '65536', '-1') as $existing) {
+            $harness = $home.'/run.sh';
+            $this->pmssWriteExecutableFile($harness, implode("\n", array(
+                '#!/usr/bin/env bash',
+                'set -Eeuo pipefail',
+                'HOME='.escapeshellarg($home),
+                'C_WARN=""; C_ERR=""; C_RESET=""',
+                $functions,
+                'port=$(pick_existing_or_reserved_port '.escapeshellarg($existing).' sonarr)',
+                'printf "continued:%s\\n" "$port"',
+                '',
+            )));
+
+            // Observe streams separately; merged output cannot prove stderr delivery.
+            $capture = $this->pmssExecShellCommandWithTempStderr(escapeshellarg($harness));
+            $stderr = (string) file_get_contents($capture['stderrPath']);
+            $this->assertSame(1, $capture['result']['rc']);
+            $this->assertSame('', $capture['result']['output']);
+            $this->assertStringContainsString(
+                '[ERR ] No PMSS-reserved port is available for sonarr; run a full PMSS update first',
+                $stderr
+            );
+            if ($existing !== '') {
+                $this->assertStringContainsString("[WARN] Ignoring invalid existing port '".$existing."'", $stderr);
+            }
+        }
+    }
+
 }
