@@ -213,38 +213,51 @@ function pmssUserMigrateWebRootBasenameCollapsePath(
     }
 
     $temporary = dirname($target).'/.'.basename($target).'.pmss-misfile-copy-'.getmypid().'-'.bin2hex(random_bytes(6));
-    if (!pmssUserWebRootMigrationCopyTree($user, $home, $misfile, $temporary)) {
-        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-        pmssUserWebRootMigrationLog($user, $logger, 'Unable to copy misfiled '.$misfileRelative.' to durable storage');
-        return;
-    }
+    $cleanupNeeded = true;
+    try {
+        if (!pmssUserWebRootMigrationCopyTree($user, $home, $misfile, $temporary)) {
+            $cleanupNeeded = false;
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
+            pmssUserWebRootMigrationLog($user, $logger, 'Unable to copy misfiled '.$misfileRelative.' to durable storage');
+            return;
+        }
 
-    $after = pmssUserWebRootMigrationSnapshot($temporary);
-    if ($after === null || $before !== $after) {
-        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-        pmssUserWebRootMigrationLog($user, $logger, 'Verification failed; removed incomplete copy for '.$misfileRelative);
-        return;
-    }
-    if (($conflict = pmssUserWebRootMigrationDestinationConflict($target, $targetRelative, $sourceRelative, false)) !== null) {
-        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-        pmssUserWebRootMigrationLog($user, $logger, $conflict);
-        return;
-    }
-    if (file_exists($target)
-        && (!pmssUserWebRootMigrationDirectoryIsEmpty($target)
-            || !pmssUserWebRootMigrationRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target)))) {
-        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-        pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
-        return;
-    }
+        $after = pmssUserWebRootMigrationSnapshot($temporary);
+        if ($after === null || $before !== $after) {
+            $cleanupNeeded = false;
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
+            pmssUserWebRootMigrationLog($user, $logger, 'Verification failed; removed incomplete copy for '.$misfileRelative);
+            return;
+        }
+        if (($conflict = pmssUserWebRootMigrationDestinationConflict($target, $targetRelative, $sourceRelative, false)) !== null) {
+            $cleanupNeeded = false;
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
+            pmssUserWebRootMigrationLog($user, $logger, $conflict);
+            return;
+        }
+        if (file_exists($target)
+            && (!pmssUserWebRootMigrationDirectoryIsEmpty($target)
+                || !pmssUserWebRootMigrationRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target)))) {
+            $cleanupNeeded = false;
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
+            pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
+            return;
+        }
 
-    if (!pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)) {
-        pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
-        pmssUserWebRootMigrationLog($user, $logger, 'Unable to copy misfiled '.$misfileRelative.' to durable storage');
-        return;
-    }
+        if (!pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)) {
+            $cleanupNeeded = false;
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
+            pmssUserWebRootMigrationLog($user, $logger, 'Unable to copy misfiled '.$misfileRelative.' to durable storage');
+            return;
+        }
+        // Publication transfers the copy; later logger faults must leave it alone.
+        $cleanupNeeded = false;
 
-    pmssUserWebRootMigrationLog($user, $logger, 'Copied misfiled '.$misfileRelative.' to durable storage for '.$sourceRelative);
+        pmssUserWebRootMigrationLog($user, $logger, 'Copied misfiled '.$misfileRelative.' to durable storage for '.$sourceRelative);
+    } finally {
+        // Retain cleanup-before-log order and never retry a cleanup that itself threw.
+        if ($cleanupNeeded) pmssUserWebRootMigrationRemoveCopy($user, $home, $temporary);
+    }
 }
 
 /** Migrate one customer-owned path, refusing conflicts and unsafe trees. */

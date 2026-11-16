@@ -42,3 +42,13 @@ combined cleanup faults. Command bytes, descriptors, account/path guards and
 ordinary boolean results remain unchanged. `WebRootMigrationCommandCleanupSafetyTest`
 injects exceptions and errors with memory streams and fake process operations;
 execution stays on testing machines.
+
+Misfiled-tree migration also owns its unpublished staging copy through copying,
+snapshot verification, destination inspection and publication. Thrown failures
+attempt the existing account-authority cleanup before propagating. Ordinary
+refusals retain cleanup-before-log ordering; a cleanup fault is never retried,
+and a successfully published copy survives subsequent logger faults. Lone
+throwables propagate unchanged; combined faults retain PHP's `finally`
+precedence. `WebRootMigrationCopyCleanupSafetyTest` intercepts filesystem and
+account operations without copying or deleting real paths. Execution stays on
+testing machines; devbox verification checks changed-file PHP syntax only.
